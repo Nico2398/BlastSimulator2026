@@ -173,54 +173,54 @@ npx tsx scripts/screenshot.ts --name "my-feature"
 
 ### Phase 2 — World and Terrain
 
-- [ ] **2.1: Rock catalog**
+- [x] **2.1: Rock catalog**
   **⚠ CREATIVE CHECKPOINT — Before finalizing, propose the full list of rock names (id + EN name + FR name + short description) to the human for approval. Include the numerical properties (fracture threshold, density, porosity) with a comment explaining the real-world basis.**
   Implement `src/core/world/RockCatalog.ts`. Define 8-12 fictional rock types with humorous names. Each rock type has: id, i18n name key, fracture threshold, porosity (0-1), density (kg/m³), hardness tier (1-5), ore probability distribution (map of ore_id → probability), texture color (placeholder). Provide both starter rocks (low threshold) and endgame rocks (high threshold). Research real-world rock properties (granite: ~2700 kg/m³, limestone: ~2500 kg/m³, etc.) and scale to game units. Add all names in en.json and fr.json.
   **Acceptance criteria:**
-  - [ ] **Human approved** rock names and descriptions
-  - [ ] Unit test: `getRock('cruite')` returns valid rock data with all required fields
-  - [ ] Unit test: all rock IDs are unique
-  - [ ] Unit test: ore probability distributions sum to ≤ 1.0 for each rock
-  - [ ] i18n: all rock names exist in both en.json and fr.json
-  - [ ] At least 8 rocks defined, spanning hardness tiers 1-5
-  - [ ] All numerical values documented with real-world basis in code comments
-  - [ ] `npm run validate` passes
+  - [x] **Human approved** rock names and descriptions
+  - [x] Unit test: `getRock('cruite')` returns valid rock data with all required fields
+  - [x] Unit test: all rock IDs are unique
+  - [x] Unit test: ore probability distributions sum to ≤ 1.0 for each rock
+  - [x] i18n: all rock names exist in both en.json and fr.json
+  - [x] At least 8 rocks defined, spanning hardness tiers 1-5
+  - [x] All numerical values documented with real-world basis in code comments
+  - [x] `npm run validate` passes
 
-- [ ] **2.2: Ore catalog**
+- [x] **2.2: Ore catalog**
   **⚠ CREATIVE CHECKPOINT — Propose ore names and values to the human before finalizing.**
   Implement `src/core/world/OreCatalog.ts`. Define 6-10 fictional ore types with humorous names. Each ore has: id, i18n name key, base value per kg, rarity tier, color (for UI display). Include "Treranium" (très rare, very rare, highest value) and common bulk ores. Add all names in en.json and fr.json.
   **Acceptance criteria:**
-  - [ ] **Human approved** ore names
-  - [ ] Unit test: `getOre('treranium')` returns valid ore data
-  - [ ] Unit test: all ore IDs are unique
-  - [ ] Unit test: ores span a wide value range (cheap to very expensive)
-  - [ ] i18n: all ore names in both locales
-  - [ ] `npm run validate` passes
+  - [x] **Human approved** ore names
+  - [x] Unit test: `getOre('treranium')` returns valid ore data
+  - [x] Unit test: all ore IDs are unique
+  - [x] Unit test: ores span a wide value range (cheap to very expensive)
+  - [x] i18n: all ore names in both locales
+  - [x] `npm run validate` passes
 
-- [ ] **2.3: Explosive catalog**
+- [x] **2.3: Explosive catalog**
   **⚠ CREATIVE CHECKPOINT — Propose explosive names and descriptions to the human before finalizing. Include energy values with real-world basis (ANFO: ~3.4 MJ/kg, dynamite: ~7.5 MJ/kg, emulsion: ~3.8 MJ/kg) and explain the game-scaled values.**
   Implement `src/core/world/ExplosiveCatalog.ts`. Define 6-10 fictional explosives with humorous names. Each explosive has: id, i18n name key, energy per kg, cost per kg, water sensitivity (boolean), min/max charge per hole, rock tier requirement (minimum hardness it can fracture), blast radius modifier, projection risk modifier, vibration modifier. Range from cheap/weak starters to expensive/powerful endgame ("Dynatomics"). Add all names in en.json and fr.json.
   **Acceptance criteria:**
-  - [ ] **Human approved** explosive names and descriptions
-  - [ ] Unit test: `getExplosive('pop_rock')` returns valid explosive data
-  - [ ] Unit test: all explosive IDs are unique
-  - [ ] Unit test: explosives sorted by tier have increasing energy per kg
-  - [ ] Unit test: endgame explosive ("dynatomics") can fracture hardness tier 5 rocks
-  - [ ] i18n: all explosive names in both locales
-  - [ ] All energy values documented with real-world basis in code comments
-  - [ ] `npm run validate` passes
+  - [x] **Human approved** explosive names and descriptions
+  - [x] Unit test: `getExplosive('pop_rock')` returns valid explosive data
+  - [x] Unit test: all explosive IDs are unique
+  - [x] Unit test: explosives sorted by tier have increasing energy per kg
+  - [x] Unit test: endgame explosive ("dynatomics") can fracture hardness tier 5 rocks
+  - [x] i18n: all explosive names in both locales
+  - [x] All energy values documented with real-world basis in code comments
+  - [x] `npm run validate` passes
 
-- [ ] **2.4: VoxelGrid**
+- [x] **2.4: VoxelGrid**
   Implement `src/core/world/VoxelGrid.ts`. A 3D grid where each cell holds: rock type ID (or empty), density (0-1, where 0 = empty/air), ore densities (map of ore_id → 0.0-1.0), fracture threshold modifier (for cracked rock). Methods: `getVoxel(x,y,z)`, `setVoxel(x,y,z,data)`, `clearVoxel(x,y,z)`, `getRegion(min,max)`, `isInBounds(x,y,z)`. Grid dimensions configurable.
   **Acceptance criteria:**
-  - [ ] Unit test: set and get a voxel at specific coordinates
-  - [ ] Unit test: `clearVoxel` sets density to 0
-  - [ ] Unit test: `getRegion` returns all voxels in a bounding box
-  - [ ] Unit test: `isInBounds` correctly rejects out-of-range coordinates
-  - [ ] Unit test: grid correctly stores ore density per voxel
-  - [ ] `npm run validate` passes
+  - [x] Unit test: set and get a voxel at specific coordinates
+  - [x] Unit test: `clearVoxel` sets density to 0
+  - [x] Unit test: `getRegion` returns all voxels in a bounding box
+  - [x] Unit test: `isInBounds` correctly rejects out-of-range coordinates
+  - [x] Unit test: grid correctly stores ore density per voxel
+  - [x] `npm run validate` passes
 
-- [ ] **2.5: Procedural terrain generation**
+- [x] **2.5: Procedural terrain generation**
   Implement `src/core/world/TerrainGen.ts`. Given a seed, grid dimensions, and mine type preset, generate:
   - Surface height using layered simplex noise
   - Rock type distribution using noise-based biomes (transitions between rock types)
@@ -228,30 +228,30 @@ npx tsx scripts/screenshot.ts --name "my-feature"
   - A central rocky extraction zone and a neutral dirt/sand border zone
   Use the seeded PRNG from task 1.1.
   **Acceptance criteria:**
-  - [ ] Unit test: same seed produces identical terrain
-  - [ ] Unit test: different seeds produce different terrain
-  - [ ] Unit test: surface voxels above ground are empty (density=0)
-  - [ ] Unit test: ore density is zero in the neutral border zone
-  - [ ] Unit test: ore density distribution roughly matches rock type probabilities over a large sample
-  - [ ] Integration test: `new_game` console command creates a game with a generated terrain
-  - [ ] `npm run validate` passes
+  - [x] Unit test: same seed produces identical terrain
+  - [x] Unit test: different seeds produce different terrain
+  - [x] Unit test: surface voxels above ground are empty (density=0)
+  - [x] Unit test: ore density is zero in the neutral border zone
+  - [x] Unit test: ore density distribution roughly matches rock type probabilities over a large sample
+  - [x] Integration test: `new_game` console command creates a game with a generated terrain
+  - [x] `npm run validate` passes
 
-- [ ] **2.6: Mine type presets**
+- [x] **2.6: Mine type presets**
   Implement `src/core/world/MineType.ts`. Define 3-4 mine type presets (e.g., "desert", "mountain", "tropical", "arctic"). Each preset specifies: dominant rock types, ore richness, terrain shape parameters (flatness, elevation range), nearby settlement probability, climate bias. These feed into TerrainGen.
   **Acceptance criteria:**
-  - [ ] Unit test: each mine type produces terrain with its expected dominant rock
-  - [ ] Unit test: "desert" preset produces flatter terrain than "mountain"
-  - [ ] i18n: mine type names and descriptions in both locales
-  - [ ] Console command: `new_game mine_type:desert seed:42` uses the preset
-  - [ ] `npm run validate` passes
+  - [x] Unit test: each mine type produces terrain with its expected dominant rock
+  - [x] Unit test: "desert" preset produces flatter terrain than "mountain"
+  - [x] i18n: mine type names and descriptions in both locales
+  - [x] Console command: `new_game mine_type:desert seed:42` uses the preset
+  - [x] `npm run validate` passes
 
-- [ ] **2.7: Console commands — world inspection**
+- [x] **2.7: Console commands — world inspection**
   Implement console commands: `inspect x,y,z` (show voxel data at coordinates), `terrain_info` (show grid dimensions, mine type, surface stats), `survey x,y` (reveal rock type and ore densities at a surface position — only if survey mechanic allows it; for now, allow free surveying). Wire commands in ConsoleRunner.
   **Acceptance criteria:**
-  - [ ] Integration test: `inspect 10,5,3` on a generated terrain returns rock type and density
-  - [ ] Integration test: `survey 25,30` returns human-readable rock and ore information
-  - [ ] Unknown coordinates return an informative error message
-  - [ ] `npm run validate` passes
+  - [x] Integration test: `inspect 10,5,3` on a generated terrain returns rock type and density
+  - [x] Integration test: `survey 25,30` returns human-readable rock and ore information
+  - [x] Unknown coordinates return an informative error message
+  - [x] `npm run validate` passes
 
 ---
 
@@ -1133,7 +1133,7 @@ npx tsx scripts/screenshot.ts --name "my-feature"
 |-------|-------|-----------|
 | Phase 0 — Scaffolding | 4 | 4 |
 | Phase 1 — Core Data Structures | 4 | 4 |
-| Phase 2 — World and Terrain | 7 | 0 |
+| Phase 2 — World and Terrain | 7 | 7 |
 | Phase 3 — Mining Mechanics | 14 | 0 |
 | Phase 4 — Economy | 4 | 0 |
 | Phase 5 — Entities and Management | 6 | 0 |
@@ -1144,4 +1144,4 @@ npx tsx scripts/screenshot.ts --name "my-feature"
 | Phase 10 — User Interface | 10 | 0 |
 | Phase 11 — Audio | 3 | 0 |
 | Phase 12 — Polish and Deployment | 8 | 0 |
-| **Total** | **95** | **8** |
+| **Total** | **95** | **15** |
