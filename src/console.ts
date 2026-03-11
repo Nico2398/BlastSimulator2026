@@ -29,6 +29,13 @@ import {
   contractCommand,
   fragmentsCommand,
 } from './console/commands/economy.js';
+import {
+  buildCommand,
+  vehicleCommand,
+  employeeCommand,
+  scoresCommand,
+  zoneCommand,
+} from './console/commands/entities.js';
 
 console.log(bold('BlastSimulator2026 Console Mode'));
 console.log(info('Type "help" for available commands.\n'));
@@ -72,7 +79,7 @@ runner.register('preview', 'Preview blast (energy|fragments|projections|vibratio
 runner.register('buy_software', 'Buy software upgrade', (args, named) =>
   buySoftwareCommand(ctx, args, named),
 );
-runner.register('build', 'Build structures (ramp origin:X,Z direction:south length:10)', (args, named) =>
+runner.register('build_ramp', 'Build ramp (origin:X,Z direction:south length:10)', (args, named) =>
   buildRampCommand(ctx, args, named),
 );
 runner.register('weather', 'Show/advance weather (advance)', (args, named) =>
@@ -94,6 +101,23 @@ runner.register('contract', 'Contracts (list|accept|status|deliver|negotiate)', 
 );
 runner.register('fragments', 'Fragment logistics (status)', (args, named) =>
   fragmentsCommand(ctx, args, named),
+);
+
+// --- Entity commands (Phase 5) ---
+runner.register('build', 'Place/manage buildings (list|destroy|move|<type> at:x,z)', (args, named) =>
+  buildCommand(ctx, args, named),
+);
+runner.register('vehicle', 'Manage vehicles (list|buy|assign|move)', (args, named) =>
+  vehicleCommand(ctx, args, named),
+);
+runner.register('employee', 'Manage employees (list|hire|raise|fire)', (args, named) =>
+  employeeCommand(ctx, args, named),
+);
+runner.register('scores', 'Show all four scores', (args, named) =>
+  scoresCommand(ctx, args, named),
+);
+runner.register('zone', 'Safety zones (clear|status)', (args, named) =>
+  zoneCommand(ctx, args, named),
 );
 
 const rl = readline.createInterface({
