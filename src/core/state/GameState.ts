@@ -3,6 +3,12 @@
 
 import type { DrillHole } from '../mining/DrillPlan.js';
 import type { HoleCharge } from '../mining/ChargePlan.js';
+import type { FinanceState } from '../economy/Finance.js';
+import { createFinanceState } from '../economy/Finance.js';
+import type { ContractState } from '../economy/Contract.js';
+import { createContractState } from '../economy/Contract.js';
+import type { LogisticsState } from '../economy/Logistics.js';
+import { createLogisticsState } from '../economy/Logistics.js';
 
 /** Save format version — increment when GameState shape changes. */
 export const SAVE_VERSION = 1;
@@ -53,6 +59,13 @@ export interface GameState {
 
   /** Named saved blast plans. */
   savedPlans: Record<string, SavedBlastPlan>;
+
+  /** Finance system state. */
+  finances: FinanceState;
+  /** Contract system state. */
+  contracts: ContractState;
+  /** Fragment logistics state. */
+  logistics: LogisticsState;
 }
 
 export interface WorldState {
@@ -88,5 +101,8 @@ export function createGame(config: GameConfig): GameState {
     chargesByHole: {},
     sequenceDelays: {},
     savedPlans: {},
+    finances: createFinanceState(config.startingCash ?? DEFAULT_STARTING_CASH),
+    contracts: createContractState(),
+    logistics: createLogisticsState(),
   };
 }

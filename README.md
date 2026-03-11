@@ -432,18 +432,18 @@ npx tsx scripts/screenshot.ts --name "my-feature"
 
 ### Phase 4 — Economy (Console Mode)
 
-- [ ] **4.1: Finance system**
+- [x] **4.1: Finance system**
   Implement `src/core/economy/Finance.ts`. Track: cash balance, income history, expense history. Functions: `addIncome(state, amount, category, description)`, `addExpense(state, amount, category, description)`, `getBalance(state)`, `getFinancialReport(state, periodTicks)`. Categories: sales, contracts, salaries, equipment, fines, maintenance, fuel.
   **Acceptance criteria:**
-  - [ ] Unit test: initial balance is set from game config
-  - [ ] Unit test: addIncome increases balance
-  - [ ] Unit test: addExpense decreases balance
-  - [ ] Unit test: financial report correctly sums by category
-  - [ ] Unit test: balance going below 0 triggers bankruptcy flag
-  - [ ] Console command: `finances` shows balance and recent transactions
-  - [ ] `npm run validate` passes
+  - [x] Unit test: initial balance is set from game config
+  - [x] Unit test: addIncome increases balance
+  - [x] Unit test: addExpense decreases balance
+  - [x] Unit test: financial report correctly sums by category
+  - [x] Unit test: balance going below 0 triggers bankruptcy flag
+  - [x] Console command: `finances` shows balance and recent transactions
+  - [x] `npm run validate` passes
 
-- [ ] **4.2: Contract system**
+- [x] **4.2: Contract system**
   Implement `src/core/economy/Contract.ts`. Define contract types:
   - Ore sale: sell rubble rich in specific ore for profit
   - Rubble disposal: pay to dispose of plain rubble (or get a buyer at low price)
@@ -451,38 +451,38 @@ npx tsx scripts/screenshot.ts --name "my-feature"
   Each contract has: material requirements, quantity, unit price, deadline (in ticks), penalty for breach, bonus for early completion.
   Implement `src/core/economy/Market.ts` to generate available contracts (seeded random, influenced by game progress and scores).
   **Acceptance criteria:**
-  - [ ] Unit test: generated contracts have valid fields within expected ranges
-  - [ ] Unit test: contract list refreshes periodically (new contracts appear)
-  - [ ] Unit test: accepting a contract adds it to active contracts
-  - [ ] Unit test: delivering materials against a contract updates progress
-  - [ ] Unit test: completing a contract credits payment
-  - [ ] Unit test: missing a deadline triggers penalty deduction
-  - [ ] Console commands: `contract list`, `contract accept 3`, `contract status`, `contract deliver 1 amount:50`
-  - [ ] `npm run validate` passes
+  - [x] Unit test: generated contracts have valid fields within expected ranges
+  - [x] Unit test: contract list refreshes periodically (new contracts appear)
+  - [x] Unit test: accepting a contract adds it to active contracts
+  - [x] Unit test: delivering materials against a contract updates progress
+  - [x] Unit test: completing a contract credits payment
+  - [x] Unit test: missing a deadline triggers penalty deduction
+  - [x] Console commands: `contract list`, `contract accept 3`, `contract status`, `contract deliver 1 amount:50`
+  - [x] `npm run validate` passes
 
-- [ ] **4.3: Contract negotiation**
+- [x] **4.3: Contract negotiation**
   Implement negotiation in `Contract.ts`. When the player negotiates a contract, the outcome is probabilistic:
   - Success (probability influenced by scores and random): improved terms (better price, longer deadline, lower penalty)
   - Failure: terms stay the same or worsen (lower price, shorter deadline, higher penalty)
   - Negotiation skill could be a future upgrade
   **Acceptance criteria:**
-  - [ ] Unit test: negotiation with fixed seed produces deterministic outcome
-  - [ ] Unit test: successful negotiation improves at least one contract term
-  - [ ] Unit test: failed negotiation can worsen terms
-  - [ ] Unit test: probability of success is influenced by relevant scores
-  - [ ] Console command: `contract negotiate 3`
-  - [ ] `npm run validate` passes
+  - [x] Unit test: negotiation with fixed seed produces deterministic outcome
+  - [x] Unit test: successful negotiation improves at least one contract term
+  - [x] Unit test: failed negotiation can worsen terms
+  - [x] Unit test: probability of success is influenced by relevant scores
+  - [x] Console command: `contract negotiate 3`
+  - [x] `npm run validate` passes
 
-- [ ] **4.4: Fragment storage and logistics**
+- [x] **4.4: Fragment storage and logistics**
   Implement fragment storage in GameState. Fragments from blasts are initially on the ground. They must be picked up by vehicles and either sold (if matching a contract), stored (in a storage depot), or disposed of. Track: fragments on ground, fragments in storage, fragments in transit.
   **Acceptance criteria:**
-  - [ ] Unit test: after blast, fragments are in "on_ground" state
-  - [ ] Unit test: `pickupFragment(vehicle, fragment)` moves fragment to "in_transit"
-  - [ ] Unit test: delivering fragment to depot moves it to "stored"
-  - [ ] Unit test: selling fragment against contract credits income and reduces quantity
-  - [ ] Unit test: no available storage → cannot pick up more fragments (must sell or dispose)
-  - [ ] Console command: `fragments status` shows count by state
-  - [ ] `npm run validate` passes
+  - [x] Unit test: after blast, fragments are in "on_ground" state
+  - [x] Unit test: `pickupFragment(vehicle, fragment)` moves fragment to "in_transit"
+  - [x] Unit test: delivering fragment to depot moves it to "stored"
+  - [x] Unit test: selling fragment against contract credits income and reduces quantity
+  - [x] Unit test: no available storage → cannot pick up more fragments (must sell or dispose)
+  - [x] Console command: `fragments status` shows count by state
+  - [x] `npm run validate` passes
 
 ---
 
@@ -1135,7 +1135,7 @@ npx tsx scripts/screenshot.ts --name "my-feature"
 | Phase 1 — Core Data Structures | 4 | 4 |
 | Phase 2 — World and Terrain | 7 | 7 |
 | Phase 3 — Mining Mechanics | 14 | 14 |
-| Phase 4 — Economy | 4 | 0 |
+| Phase 4 — Economy | 4 | 4 |
 | Phase 5 — Entities and Management | 6 | 0 |
 | Phase 6 — Event System | 10 | 0 |
 | Phase 7 — Campaign, World Map, Win/Lose | 8 | 0 |
