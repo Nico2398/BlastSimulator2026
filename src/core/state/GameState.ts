@@ -1,12 +1,16 @@
 // BlastSimulator2026 — Central game state
 // Pure data. No side effects. All game data lives here.
 
+import type { DrillHole } from '../mining/DrillPlan.js';
+import type { HoleCharge } from '../mining/ChargePlan.js';
+
 /** Save format version — increment when GameState shape changes. */
 export const SAVE_VERSION = 1;
 
 export interface GameConfig {
   seed: number;
   mineType?: string;
+  startingCash?: number;
 }
 
 /**
@@ -31,6 +35,24 @@ export interface GameState {
 
   /** World terrain — not serialized directly (too large), reconstructed from seed. */
   world: WorldState | null;
+
+  /** Set of surveyed column keys "x,z". */
+  surveyedPositions: Set<string>;
+
+  /** Player cash balance. */
+  cash: number;
+
+  /** Current drill plan holes. */
+  drillHoles: DrillHole[];
+
+  /** Current charge plan per hole (keyed by hole ID). */
+  chargesByHole: Record<string, HoleCharge>;
+
+  /** Detonation sequence: hole ID → delay in ms. */
+  sequenceDelays: Record<string, number>;
+
+  /** Named saved blast plans. */
+  savedPlans: Record<string, SavedBlastPlan>;
 }
 
 export interface WorldState {
@@ -40,6 +62,14 @@ export interface WorldState {
   /** The VoxelGrid is NOT stored in JSON — it's regenerated from seed on load. */
   gridReady: boolean;
 }
+
+export interface SavedBlastPlan {
+  drillHoles: DrillHole[];
+  chargesByHole: Record<string, HoleCharge>;
+  sequenceDelays: Record<string, number>;
+}
+
+const DEFAULT_STARTING_CASH = 50000;
 
 /** Create a fresh GameState from config. */
 export function createGame(config: GameConfig): GameState {
@@ -52,5 +82,11 @@ export function createGame(config: GameConfig): GameState {
     isPaused: false,
     mineType: config.mineType ?? 'desert',
     world: null,
+    surveyedPositions: new Set(),
+    cash: config.startingCash ?? DEFAULT_STARTING_CASH,
+    drillHoles: [],
+    chargesByHole: {},
+    sequenceDelays: {},
+    savedPlans: {},
   };
 }

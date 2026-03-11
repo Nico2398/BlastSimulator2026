@@ -6,7 +6,6 @@
   "blast.no_casualties": "No casualties.",
   "blast.projections": "{count} projections detected (max distance: {maxDist}m)",
   "test.greeting": "Hello, {name}!",
-
   "rock.cruite.name": "Cruite",
   "rock.cruite.desc": "Soft, chalky, crumbles if you look at it wrong.",
   "rock.sandite.name": "Sandite",
@@ -27,7 +26,6 @@
   "rock.absurdite.desc": "Absurdly hard. Nature's joke on miners.",
   "rock.titanite.name": "Titanite",
   "rock.titanite.desc": "Titan-class hardness. Only Dynatomics will crack it.",
-
   "ore.dirtite.name": "Dirtite",
   "ore.dirtite.desc": "Barely qualifies as ore. Bulk filler.",
   "ore.rustite.name": "Rustite",
@@ -44,7 +42,6 @@
   "ore.absurdium.desc": "Absurdly valuable. Found in the hardest rocks.",
   "ore.treranium.name": "Treranium",
   "ore.treranium.desc": "Très rare. The endgame prize.",
-
   "explosive.pop_rock.name": "Pop-Rock",
   "explosive.pop_rock.desc": "Party popper energy. Good for chalk.",
   "explosive.boomite.name": "Boomite",
@@ -61,11 +58,22 @@
   "explosive.obliviax.desc": "Near-oblivion in a stick.",
   "explosive.dynatomics.name": "Dynatomics",
   "explosive.dynatomics.desc": "The endgame monster. Handle with fear.",
-
   "mine.desert.name": "Desert Quarry",
   "mine.desert.desc": "Flat, dry, soft rocks. Easy money to get started.",
   "mine.mountain.name": "Mountain Ridge",
   "mine.mountain.desc": "Steep terrain, harder rocks, better ore.",
   "mine.tropical.name": "Tropical Depths",
-  "mine.tropical.desc": "Dense jungle canopy above endgame rocks and rare ore."
+  "mine.tropical.desc": "Dense jungle canopy above endgame rocks and rare ore.",
+  "blast.rating.perfect": "Perfect",
+  "blast.rating.good": "Good",
+  "blast.rating.mediocre": "Mediocre",
+  "blast.rating.bad": "Bad",
+  "blast.rating.catastrophic": "Catastrophic",
+  "weather.sunny": "Sunny",
+  "weather.cloudy": "Cloudy",
+  "weather.light_rain": "Light Rain",
+  "weather.heavy_rain": "Heavy Rain",
+  "weather.storm": "Storm",
+  "weather.heat_wave": "Heat Wave",
+  "weather.cold_snap": "Cold Snap"
 }

@@ -6,10 +6,13 @@ import { SAVE_VERSION } from './GameState.js';
 
 /**
  * Serialize a GameState to a JSON string.
- * All state must be JSON-serializable (no functions, no circular refs).
+ * Handles Set→Array conversion for surveyedPositions.
  */
 export function serialize(state: GameState): string {
-  return JSON.stringify(state);
+  return JSON.stringify(state, (_key, value) => {
+    if (value instanceof Set) return { __type: 'Set', values: [...value] };
+    return value as unknown;
+  });
 }
 
 /**
@@ -38,6 +41,19 @@ export function deserialize(json: string): GameState {
   }
 
   // Future: add migration logic for older versions here.
+
+  // Restore Set<string> for surveyedPositions
+  const raw = obj['surveyedPositions'] as unknown;
+  if (raw && typeof raw === 'object' && '__type' in (raw as Record<string, unknown>)) {
+    const setData = raw as { __type: string; values: string[] };
+    if (setData.__type === 'Set') {
+      (obj as Record<string, unknown>)['surveyedPositions'] = new Set(setData.values);
+    }
+  } else if (Array.isArray(raw)) {
+    (obj as Record<string, unknown>)['surveyedPositions'] = new Set(raw as string[]);
+  } else {
+    (obj as Record<string, unknown>)['surveyedPositions'] = new Set<string>();
+  }
 
   return obj as unknown as GameState;
 }

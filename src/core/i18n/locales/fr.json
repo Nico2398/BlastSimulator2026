@@ -6,7 +6,6 @@
   "blast.no_casualties": "Aucune victime.",
   "blast.projections": "{count} projections détectées (distance max : {maxDist}m)",
   "test.greeting": "Bonjour, {name} !",
-
   "rock.cruite.name": "Cruite",
   "rock.cruite.desc": "Tendre, crayeuse, s'effrite si on la regarde de travers.",
   "rock.sandite.name": "Sablite",
@@ -27,7 +26,6 @@
   "rock.absurdite.desc": "Absurdement dure. La blague de la nature aux mineurs.",
   "rock.titanite.name": "Titanite",
   "rock.titanite.desc": "Dureté classe titan. Seul le Dynatomics en viendra à bout.",
-
   "ore.dirtite.name": "Bouite",
   "ore.dirtite.desc": "À peine un minerai. Remplissage en vrac.",
   "ore.rustite.name": "Rouillite",
@@ -44,7 +42,6 @@
   "ore.absurdium.desc": "Absurdement précieux. Dans les roches les plus dures.",
   "ore.treranium.name": "Treranium",
   "ore.treranium.desc": "Très rare. Le graal de fin de jeu.",
-
   "explosive.pop_rock.name": "Pop-Rock",
   "explosive.pop_rock.desc": "Énergie de pétard. Bon pour la craie.",
   "explosive.boomite.name": "Boumite",
@@ -61,11 +58,22 @@
   "explosive.obliviax.desc": "Quasi-néant en bâtonnet.",
   "explosive.dynatomics.name": "Dynatomics",
   "explosive.dynatomics.desc": "Le monstre ultime. À manipuler avec terreur.",
-
   "mine.desert.name": "Carrière Désertique",
   "mine.desert.desc": "Plat, sec, roches tendres. Argent facile pour démarrer.",
   "mine.mountain.name": "Crête Montagneuse",
   "mine.mountain.desc": "Terrain escarpé, roches plus dures, meilleur minerai.",
   "mine.tropical.name": "Profondeurs Tropicales",
-  "mine.tropical.desc": "Canopée dense au-dessus de roches et minerais de fin de jeu."
+  "mine.tropical.desc": "Canopée dense au-dessus de roches et minerais de fin de jeu.",
+  "blast.rating.perfect": "Parfait",
+  "blast.rating.good": "Bon",
+  "blast.rating.mediocre": "Médiocre",
+  "blast.rating.bad": "Mauvais",
+  "blast.rating.catastrophic": "Catastrophique",
+  "weather.sunny": "Ensoleillé",
+  "weather.cloudy": "Nuageux",
+  "weather.light_rain": "Pluie légère",
+  "weather.heavy_rain": "Forte pluie",
+  "weather.storm": "Tempête",
+  "weather.heat_wave": "Canicule",
+  "weather.cold_snap": "Coup de froid"
 }

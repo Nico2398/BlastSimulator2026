@@ -5,18 +5,31 @@ import * as readline from 'readline';
 import { ConsoleRunner } from './console/ConsoleRunner.js';
 import { bold, error, info } from './console/ConsoleFormatter.js';
 import {
-  type GameContext,
   newGameCommand,
   inspectCommand,
   terrainInfoCommand,
   surveyCommand,
 } from './console/commands/world.js';
+import {
+  type MiningContext,
+  drillPlanCommand,
+  chargeCommand,
+  sequenceCommand,
+  blastCommand,
+  blastPlanCommand,
+  previewCommand,
+  buySoftwareCommand,
+  buildRampCommand,
+  weatherCommand,
+  tubingCommand,
+} from './console/commands/mining.js';
+import { createTubingState } from './core/mining/Tubing.js';
 
 console.log(bold('BlastSimulator2026 Console Mode'));
 console.log(info('Type "help" for available commands.\n'));
 
 const runner = new ConsoleRunner();
-const ctx: GameContext = { state: null, grid: null };
+const ctx: MiningContext = { state: null, grid: null, softwareTier: 0, tubingState: createTubingState() };
 
 // --- World commands (Phase 2) ---
 runner.register('new_game', 'Create a new game (mine_type:desert seed:42)', (args, named) =>
@@ -30,6 +43,41 @@ runner.register('terrain_info', 'Show terrain grid info', (args, named) =>
 );
 runner.register('survey', 'Survey terrain at x,z', (args, named) =>
   surveyCommand(ctx, args, named),
+);
+
+// --- Mining commands (Phase 3) ---
+runner.register('drill_plan', 'Manage drill plan (grid|add|show)', (args, named) =>
+  drillPlanCommand(ctx, args, named),
+);
+runner.register('charge', 'Set charges (hole:* explosive:X amount:Ykg stemming:Zm)', (args, named) =>
+  chargeCommand(ctx, args, named),
+);
+runner.register('sequence', 'Detonation sequence (auto|set|show)', (args, named) =>
+  sequenceCommand(ctx, args, named),
+);
+runner.register('blast', 'Execute the current blast plan', (args, named) =>
+  blastCommand(ctx, args, named),
+);
+runner.register('blast_plan', 'Save/load/validate blast plans', (args, named) =>
+  blastPlanCommand(ctx, args, named),
+);
+runner.register('preview', 'Preview blast (energy|fragments|projections|vibrations)', (args, named) =>
+  previewCommand(ctx, args, named),
+);
+runner.register('buy_software', 'Buy software upgrade', (args, named) =>
+  buySoftwareCommand(ctx, args, named),
+);
+runner.register('build', 'Build structures (ramp origin:X,Z direction:south length:10)', (args, named) =>
+  buildRampCommand(ctx, args, named),
+);
+runner.register('weather', 'Show/advance weather (advance)', (args, named) =>
+  weatherCommand(ctx, args, named),
+);
+runner.register('buy', 'Buy items (tubing amount:10)', (_args, named) =>
+  tubingCommand(ctx, ['buy'], named),
+);
+runner.register('install_tubing', 'Install tubing on a hole (hole:3)', (_args, named) =>
+  tubingCommand(ctx, ['install'], named),
 );
 
 const rl = readline.createInterface({
