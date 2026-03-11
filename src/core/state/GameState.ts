@@ -6,6 +6,7 @@ export const SAVE_VERSION = 1;
 
 export interface GameConfig {
   seed: number;
+  mineType?: string;
 }
 
 /**
@@ -25,15 +26,19 @@ export interface GameState {
   /** Whether the game loop is paused. */
   isPaused: boolean;
 
-  // Subsystem state slots — populated as phases are implemented
-  // world: WorldState;
-  // economy: EconomyState;
-  // employees: EmployeeState[];
-  // vehicles: VehicleState[];
-  // buildings: BuildingState[];
-  // events: EventState;
-  // campaign: CampaignState;
-  // scores: ScoreState;
+  /** Mine type preset ID used for this game. */
+  mineType: string;
+
+  /** World terrain — not serialized directly (too large), reconstructed from seed. */
+  world: WorldState | null;
+}
+
+export interface WorldState {
+  sizeX: number;
+  sizeY: number;
+  sizeZ: number;
+  /** The VoxelGrid is NOT stored in JSON — it's regenerated from seed on load. */
+  gridReady: boolean;
 }
 
 /** Create a fresh GameState from config. */
@@ -45,5 +50,7 @@ export function createGame(config: GameConfig): GameState {
     tickCount: 0,
     timeScale: 1,
     isPaused: false,
+    mineType: config.mineType ?? 'desert',
+    world: null,
   };
 }
