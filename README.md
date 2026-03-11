@@ -257,62 +257,62 @@ npx tsx scripts/screenshot.ts --name "my-feature"
 
 ### Phase 3 — Mining Mechanics (Console Mode)
 
-- [ ] **3.1: Survey system**
+- [x] **3.1: Survey system**
   Implement `src/core/mining/Survey.ts`. Surveying reveals voxel data at a position. Before surveying, the player does not know what's underground (fog of war on the voxel grid). Track which positions have been surveyed in GameState. Surveying costs money and requires an available surveyor employee (stub employee system for now — always allow). Add `survey x,y` console command that surveys a column of voxels at (x,y) down to a configurable depth.
   **Acceptance criteria:**
-  - [ ] Unit test: unsurveyed position returns "unknown"
-  - [ ] Unit test: after `performSurvey(state, x, y)`, the position data is revealed
-  - [ ] Unit test: surveying deducts cost from finances
-  - [ ] Unit test: re-surveying an already surveyed position is a no-op (no extra cost)
-  - [ ] Integration test: `survey 25,30` followed by `inspect 25,30,0` shows data
-  - [ ] `npm run validate` passes
+  - [x] Unit test: unsurveyed position returns "unknown"
+  - [x] Unit test: after `performSurvey(state, x, y)`, the position data is revealed
+  - [x] Unit test: surveying deducts cost from finances
+  - [x] Unit test: re-surveying an already surveyed position is a no-op (no extra cost)
+  - [x] Integration test: `survey 25,30` followed by `inspect 25,30,0` shows data
+  - [x] `npm run validate` passes
 
-- [ ] **3.2: Drill plan**
+- [x] **3.2: Drill plan**
   Implement `src/core/mining/DrillPlan.ts`. A drill plan defines a set of holes. Each hole has: position (x,y), depth, diameter. Support grid pattern generation: `createGridPlan(origin, rows, cols, spacing, depth, diameter)`. Also support manual hole placement: `addHole(plan, position, depth, diameter)`. Store the active drill plan in GameState.
   **Acceptance criteria:**
-  - [ ] Unit test: `createGridPlan({x:0,y:0}, 3, 4, 3, 8, 0.15)` creates 12 holes in correct positions
-  - [ ] Unit test: `addHole` appends a hole and assigns it a unique ID
-  - [ ] Unit test: grid spacing is correctly applied (distance between adjacent holes)
-  - [ ] Console command: `drill_plan grid origin:20,25 rows:3 cols:4 spacing:3 depth:8`
-  - [ ] Console command: `drill_plan add x:10 y:15 depth:6`
-  - [ ] Console command: `drill_plan show` lists all holes with positions and depths
-  - [ ] `npm run validate` passes
+  - [x] Unit test: `createGridPlan({x:0,y:0}, 3, 4, 3, 8, 0.15)` creates 12 holes in correct positions
+  - [x] Unit test: `addHole` appends a hole and assigns it a unique ID
+  - [x] Unit test: grid spacing is correctly applied (distance between adjacent holes)
+  - [x] Console command: `drill_plan grid origin:20,25 rows:3 cols:4 spacing:3 depth:8`
+  - [x] Console command: `drill_plan add x:10 y:15 depth:6`
+  - [x] Console command: `drill_plan show` lists all holes with positions and depths
+  - [x] `npm run validate` passes
 
-- [ ] **3.3: Charge plan**
+- [x] **3.3: Charge plan**
   Implement `src/core/mining/ChargePlan.ts`. For each hole in the drill plan, define: explosive type (from catalog), amount (kg), stemming height (meters). Support batch charging (`charge hole:* explosive:X amount:Y stemming:Z`) and per-hole charging. Validate: explosive must exist in catalog, amount within explosive's min/max range, stemming height ≤ hole depth.
   **Acceptance criteria:**
-  - [ ] Unit test: charging a hole stores explosive type and amount
-  - [ ] Unit test: batch charge `hole:*` charges all holes identically
-  - [ ] Unit test: invalid explosive ID returns an error
-  - [ ] Unit test: amount outside min/max range returns an error
-  - [ ] Unit test: stemming exceeding hole depth returns an error
-  - [ ] Console commands: `charge hole:1 explosive:pop_rock amount:3kg stemming:1.5m`, `charge hole:* ...`
-  - [ ] Console command: `charge show` lists charge plan per hole
-  - [ ] `npm run validate` passes
+  - [x] Unit test: charging a hole stores explosive type and amount
+  - [x] Unit test: batch charge `hole:*` charges all holes identically
+  - [x] Unit test: invalid explosive ID returns an error
+  - [x] Unit test: amount outside min/max range returns an error
+  - [x] Unit test: stemming exceeding hole depth returns an error
+  - [x] Console commands: `charge hole:1 explosive:pop_rock amount:3kg stemming:1.5m`, `charge hole:* ...`
+  - [x] Console command: `charge show` lists charge plan per hole
+  - [x] `npm run validate` passes
 
-- [ ] **3.4: Detonation sequence**
+- [x] **3.4: Detonation sequence**
   Implement `src/core/mining/Sequence.ts`. A sequence assigns a delay (ms) to each hole. Support manual assignment and auto-generation. Auto sequence: V-pattern from the free face, with configurable inter-delay. Store sequence in GameState alongside the blast plan.
   **Acceptance criteria:**
-  - [ ] Unit test: `setDelay(hole:1, 0)`, `setDelay(hole:2, 25)` stores delays correctly
-  - [ ] Unit test: auto V-pattern generates increasing delays from the free face
-  - [ ] Unit test: auto sequence with `delay_step:25ms` for a 3x4 grid has correct timing spread
-  - [ ] Console commands: `sequence set hole:1 delay:0ms hole:2 delay:25ms`
-  - [ ] Console command: `sequence auto delay_step:25ms`
-  - [ ] Console command: `sequence show` displays timing for all holes
-  - [ ] `npm run validate` passes
+  - [x] Unit test: `setDelay(hole:1, 0)`, `setDelay(hole:2, 25)` stores delays correctly
+  - [x] Unit test: auto V-pattern generates increasing delays from the free face
+  - [x] Unit test: auto sequence with `delay_step:25ms` for a 3x4 grid has correct timing spread
+  - [x] Console commands: `sequence set hole:1 delay:0ms hole:2 delay:25ms`
+  - [x] Console command: `sequence auto delay_step:25ms`
+  - [x] Console command: `sequence show` displays timing for all holes
+  - [x] `npm run validate` passes
 
-- [ ] **3.5: Blast plan composition**
+- [x] **3.5: Blast plan composition**
   Implement `src/core/mining/BlastPlan.ts`. A blast plan combines: drill plan, charge plan, and sequence. It is the complete definition needed to execute a blast. Validate completeness: all holes must have charges and delays. Store as a named plan in GameState (player can have multiple saved plans).
   **Acceptance criteria:**
-  - [ ] Unit test: creating a blast plan from drill + charge + sequence succeeds when all holes are defined
-  - [ ] Unit test: validation fails if any hole is missing a charge
-  - [ ] Unit test: validation fails if any hole is missing a sequence delay
-  - [ ] Console command: `blast_plan save name:plan1` saves the current plan
-  - [ ] Console command: `blast_plan load name:plan1` loads a saved plan
-  - [ ] Console command: `blast_plan validate` checks completeness and reports issues
-  - [ ] `npm run validate` passes
+  - [x] Unit test: creating a blast plan from drill + charge + sequence succeeds when all holes are defined
+  - [x] Unit test: validation fails if any hole is missing a charge
+  - [x] Unit test: validation fails if any hole is missing a sequence delay
+  - [x] Console command: `blast_plan save name:plan1` saves the current plan
+  - [x] Console command: `blast_plan load name:plan1` loads a saved plan
+  - [x] Console command: `blast_plan validate` checks completeness and reports issues
+  - [x] `npm run validate` passes
 
-- [ ] **3.6: Blast energy calculation (core algorithm)**
+- [x] **3.6: Blast energy calculation (core algorithm)**
   Implement `src/core/mining/BlastCalc.ts` following the algorithm in `.agent/BLAST_SYSTEM.md`. Implement:
   - `calculateHoleEnergy(charge, explosive)` → effective energy
   - `calculateEnergyField(point, holes)` → total energy at a point
@@ -320,15 +320,15 @@ npx tsx scripts/screenshot.ts --name "my-feature"
   - `waterEffect(hole, explosive, weather)` → energy multiplier
   All pure functions, fully testable.
   **Acceptance criteria:**
-  - [ ] Unit test: energy decreases with distance from hole (inverse square)
-  - [ ] Unit test: multiple holes sum their energy at any point
-  - [ ] Unit test: stemming factor is 1.0 when stemming is adequate, <1.0 when insufficient
-  - [ ] Unit test: water-sensitive explosive in flooded hole without tubing → energy drops to ~10%
-  - [ ] Unit test: water-sensitive explosive with tubing → full energy
-  - [ ] Unit test: non-water-sensitive explosive in flooded hole → full energy
-  - [ ] `npm run validate` passes
+  - [x] Unit test: energy decreases with distance from hole (inverse square)
+  - [x] Unit test: multiple holes sum their energy at any point
+  - [x] Unit test: stemming factor is 1.0 when stemming is adequate, <1.0 when insufficient
+  - [x] Unit test: water-sensitive explosive in flooded hole without tubing → energy drops to ~10%
+  - [x] Unit test: water-sensitive explosive with tubing → full energy
+  - [x] Unit test: non-water-sensitive explosive in flooded hole → full energy
+  - [x] `npm run validate` passes
 
-- [ ] **3.7: Fragmentation calculation**
+- [x] **3.7: Fragmentation calculation**
   Implement fragmentation logic in `BlastCalc.ts` following `.agent/BLAST_SYSTEM.md`:
   - `calculateFragmentation(energy, rockThreshold)` → fractured/cracked/unaffected + fragment size
   - `calculateFragmentCount(voxelVolume, fragmentSize)` → number of fragments
@@ -336,35 +336,35 @@ npx tsx scripts/screenshot.ts --name "my-feature"
   - `calculateInitialVelocity(fragmentPos, holes, fragmentMass)` → Vec3
   All pure functions.
   **Acceptance criteria:**
-  - [ ] Unit test: energy below threshold → not fractured
-  - [ ] Unit test: energy between 0.5x and 1x threshold → cracked (threshold reduced)
-  - [ ] Unit test: energy between 1x and 2x threshold → good fragmentation (medium fragments)
-  - [ ] Unit test: energy between 2x and 4x threshold → fine fragmentation (small fragments)
-  - [ ] Unit test: energy above 4x threshold → dust + projection flag
-  - [ ] Unit test: fragment count * fragment volume ≈ voxel volume (conservation of mass)
-  - [ ] Unit test: initial velocity points away from nearest hole
-  - [ ] Unit test: projection classification threshold works correctly
-  - [ ] `npm run validate` passes
+  - [x] Unit test: energy below threshold → not fractured
+  - [x] Unit test: energy between 0.5x and 1x threshold → cracked (threshold reduced)
+  - [x] Unit test: energy between 1x and 2x threshold → good fragmentation (medium fragments)
+  - [x] Unit test: energy between 2x and 4x threshold → fine fragmentation (small fragments)
+  - [x] Unit test: energy above 4x threshold → dust + projection flag
+  - [x] Unit test: fragment count * fragment volume ≈ voxel volume (conservation of mass)
+  - [x] Unit test: initial velocity points away from nearest hole
+  - [x] Unit test: projection classification threshold works correctly
+  - [x] `npm run validate` passes
 
-- [ ] **3.8: Free face calculation**
+- [x] **3.8: Free face calculation**
   Implement `calculateFreeFace(holePosition, terrainState, sequence, currentTime)` in `BlastCalc.ts`. A hole has a free face factor based on how many of its neighboring voxels are empty (air or previously blasted). The sequence matters: holes that detonate after neighbors have already fired benefit from the newly created void.
   **Acceptance criteria:**
-  - [ ] Unit test: hole at terrain edge (open on one side) has free face > 0
-  - [ ] Unit test: hole completely surrounded by rock has free face ≈ 0
-  - [ ] Unit test: after simulating earlier holes in sequence, free face increases for later holes
-  - [ ] Unit test: free face factor affects fragmentation quality and vibration multiplier
-  - [ ] `npm run validate` passes
+  - [x] Unit test: hole at terrain edge (open on one side) has free face > 0
+  - [x] Unit test: hole completely surrounded by rock has free face ≈ 0
+  - [x] Unit test: after simulating earlier holes in sequence, free face increases for later holes
+  - [x] Unit test: free face factor affects fragmentation quality and vibration multiplier
+  - [x] `npm run validate` passes
 
-- [ ] **3.9: Vibration calculation**
+- [x] **3.9: Vibration calculation**
   Implement `calculateVibrations(blastPlan, terrainState, villagePositions)` in `BlastCalc.ts`. Use the formula from `.agent/BLAST_SYSTEM.md`: charge per delay, distance decay, ground factor. Calculate vibration levels at each village.
   **Acceptance criteria:**
-  - [ ] Unit test: single-delay blast (all holes at once) produces maximum vibration
-  - [ ] Unit test: well-spread sequence produces lower vibration
-  - [ ] Unit test: vibration decreases with distance from blast to village
-  - [ ] Unit test: higher charge per delay → higher vibration
-  - [ ] `npm run validate` passes
+  - [x] Unit test: single-delay blast (all holes at once) produces maximum vibration
+  - [x] Unit test: well-spread sequence produces lower vibration
+  - [x] Unit test: vibration decreases with distance from blast to village
+  - [x] Unit test: higher charge per delay → higher vibration
+  - [x] `npm run validate` passes
 
-- [ ] **3.10: Blast execution and result**
+- [x] **3.10: Blast execution and result**
   Implement `executeBlast(state)` that orchestrates the full blast pipeline:
   1. Validate blast plan
   2. Time-step simulation: detonate holes per sequence timing
@@ -377,56 +377,56 @@ npx tsx scripts/screenshot.ts --name "my-feature"
   9. Update scores (safety, nuisance)
   10. Store fragments in GameState
   **Acceptance criteria:**
-  - [ ] Integration test: full blast scenario with well-designed plan → fragments, no projections, "good" rating
-  - [ ] Integration test: overcharged blast → projections, "catastrophic" rating
-  - [ ] Integration test: undercharged blast on hard rock → unfractured, "bad" rating
-  - [ ] Integration test: terrain voxels are cleared after blast
-  - [ ] Integration test: fragment ore densities match parent voxels
-  - [ ] Console command: `blast` executes the current plan and prints the blast report
-  - [ ] `npm run validate` passes
+  - [x] Integration test: full blast scenario with well-designed plan → fragments, no projections, "good" rating
+  - [x] Integration test: overcharged blast → projections, "catastrophic" rating
+  - [x] Integration test: undercharged blast on hard rock → unfractured, "bad" rating
+  - [x] Integration test: terrain voxels are cleared after blast
+  - [x] Integration test: fragment ore densities match parent voxels
+  - [x] Console command: `blast` executes the current plan and prints the blast report
+  - [x] `npm run validate` passes
 
-- [ ] **3.11: Blast preview (software tiers)**
+- [x] **3.11: Blast preview (software tiers)**
   Implement `src/core/mining/Software.ts`. Track which software tier the player owns. Implement preview functions that calculate but don't execute: `previewEnergy(plan, terrain)`, `previewFragments(plan, terrain)`, `previewProjections(plan, terrain)`, `previewVibrations(plan, terrain, villages)`. Each function only returns data if the player owns the corresponding software tier.
   **Acceptance criteria:**
-  - [ ] Unit test: `previewEnergy` with tier 0 returns null (no software)
-  - [ ] Unit test: `previewEnergy` with tier ≥ 1 returns energy field data
-  - [ ] Unit test: `previewFragments` requires tier ≥ 2
-  - [ ] Unit test: `previewProjections` requires tier ≥ 3
-  - [ ] Unit test: `previewVibrations` requires tier ≥ 4
-  - [ ] Console command: `preview energy`, `preview fragments`, etc.
-  - [ ] Console command: `buy_software tier:2` purchases an upgrade
-  - [ ] `npm run validate` passes
+  - [x] Unit test: `previewEnergy` with tier 0 returns null (no software)
+  - [x] Unit test: `previewEnergy` with tier ≥ 1 returns energy field data
+  - [x] Unit test: `previewFragments` requires tier ≥ 2
+  - [x] Unit test: `previewProjections` requires tier ≥ 3
+  - [x] Unit test: `previewVibrations` requires tier ≥ 4
+  - [x] Console command: `preview energy`, `preview fragments`, etc.
+  - [x] Console command: `buy_software tier:2` purchases an upgrade
+  - [x] `npm run validate` passes
 
-- [ ] **3.12: Ramp building**
+- [x] **3.12: Ramp building**
   Implement `src/core/mining/Ramp.ts`. Ramps provide vehicle access to lower levels of the pit. A ramp is defined by start position, direction, and length. Building a ramp modifies the voxel grid (carves a slope). Ramps cost money and take time (ticks).
   **Acceptance criteria:**
-  - [ ] Unit test: `buildRamp` modifies voxel grid to create a sloped passage
-  - [ ] Unit test: ramp connects surface level to a lower elevation
-  - [ ] Unit test: ramp building deducts cost from finances
-  - [ ] Console command: `build ramp origin:8,12 direction:south length:10`
-  - [ ] `npm run validate` passes
+  - [x] Unit test: `buildRamp` modifies voxel grid to create a sloped passage
+  - [x] Unit test: ramp connects surface level to a lower elevation
+  - [x] Unit test: ramp building deducts cost from finances
+  - [x] Console command: `build ramp origin:8,12 direction:south length:10`
+  - [x] `npm run validate` passes
 
-- [ ] **3.13: Weather system**
+- [x] **3.13: Weather system**
   Implement `src/core/weather/WeatherCycle.ts`. A state machine cycling through weather states: sunny, cloudy, light rain, heavy rain, storm, heat wave, cold snap. Transitions are probabilistic (seeded). Duration of each state varies. Implement `src/core/weather/WeatherEffects.ts`: rain fills drill holes (based on rock porosity), affecting explosive reliability. Track hole flooding state.
   **Acceptance criteria:**
-  - [ ] Unit test: weather cycle produces deterministic sequence from a given seed
-  - [ ] Unit test: weather transitions follow valid state transitions
-  - [ ] Unit test: heavy rain on porous rock floods unfilled holes
-  - [ ] Unit test: tubing prevents hole flooding
-  - [ ] Unit test: flooded hole + water-sensitive explosive → charge fails
-  - [ ] Console command: `weather` shows current weather
-  - [ ] Console command: `weather advance` moves to next weather state (for testing)
-  - [ ] `npm run validate` passes
+  - [x] Unit test: weather cycle produces deterministic sequence from a given seed
+  - [x] Unit test: weather transitions follow valid state transitions
+  - [x] Unit test: heavy rain on porous rock floods unfilled holes
+  - [x] Unit test: tubing prevents hole flooding
+  - [x] Unit test: flooded hole + water-sensitive explosive → charge fails
+  - [x] Console command: `weather` shows current weather
+  - [x] Console command: `weather advance` moves to next weather state (for testing)
+  - [x] `npm run validate` passes
 
-- [ ] **3.14: Tubing / casing system**
+- [x] **3.14: Tubing / casing system**
   Implement tubing as purchasable equipment. Player can buy tubing units and install them in specific drill holes. Tubing waterproofs the hole. Track tubing inventory and installation in GameState.
   **Acceptance criteria:**
-  - [ ] Unit test: buying tubing deducts money and adds to inventory
-  - [ ] Unit test: installing tubing on a hole marks it as waterproofed
-  - [ ] Unit test: installed tubing prevents water effect on explosives
-  - [ ] Unit test: cannot install tubing if none in inventory
-  - [ ] Console commands: `buy tubing amount:10`, `install_tubing hole:3`
-  - [ ] `npm run validate` passes
+  - [x] Unit test: buying tubing deducts money and adds to inventory
+  - [x] Unit test: installing tubing on a hole marks it as waterproofed
+  - [x] Unit test: installed tubing prevents water effect on explosives
+  - [x] Unit test: cannot install tubing if none in inventory
+  - [x] Console commands: `buy tubing amount:10`, `install_tubing hole:3`
+  - [x] `npm run validate` passes
 
 ---
 
@@ -1134,7 +1134,7 @@ npx tsx scripts/screenshot.ts --name "my-feature"
 | Phase 0 — Scaffolding | 4 | 4 |
 | Phase 1 — Core Data Structures | 4 | 4 |
 | Phase 2 — World and Terrain | 7 | 7 |
-| Phase 3 — Mining Mechanics | 14 | 0 |
+| Phase 3 — Mining Mechanics | 14 | 14 |
 | Phase 4 — Economy | 4 | 0 |
 | Phase 5 — Entities and Management | 6 | 0 |
 | Phase 6 — Event System | 10 | 0 |
@@ -1144,4 +1144,4 @@ npx tsx scripts/screenshot.ts --name "my-feature"
 | Phase 10 — User Interface | 10 | 0 |
 | Phase 11 — Audio | 3 | 0 |
 | Phase 12 — Polish and Deployment | 8 | 0 |
-| **Total** | **95** | **15** |
+| **Total** | **95** | **29** |
