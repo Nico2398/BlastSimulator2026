@@ -126,48 +126,48 @@ npx tsx scripts/screenshot.ts --name "my-feature"
 
 ### Phase 1 — Core Data Structures
 
-- [ ] **1.1: Vec3 and math utilities**
+- [x] **1.1: Vec3 and math utilities**
   Create `src/core/math/Vec3.ts` with a simple 3D vector type and operations: add, subtract, scale, normalize, distance, dot, cross, length, lerp, clamp. Pure functions, no mutation. Also create `src/core/math/Random.ts` with a seeded PRNG (e.g., mulberry32) so all randomness is reproducible from a seed.
   **Acceptance criteria:**
-  - [ ] Unit test: Vec3 distance, normalize, lerp produce correct results
-  - [ ] Unit test: seeded Random produces the same sequence given the same seed
-  - [ ] Unit test: two different seeds produce different sequences
-  - [ ] `npm run validate` passes
+  - [x] Unit test: Vec3 distance, normalize, lerp produce correct results
+  - [x] Unit test: seeded Random produces the same sequence given the same seed
+  - [x] Unit test: two different seeds produce different sequences
+  - [x] `npm run validate` passes
 
-- [ ] **1.2: GameState and GameLoop**
+- [x] **1.2: GameState and GameLoop**
   Define `src/core/state/GameState.ts`: the central state interface containing all game data (initially mostly empty sub-objects). Implement `createGame(config)` factory function. Implement `src/core/state/GameLoop.ts`: a tick-based loop that takes a `GameState` and `dt` and calls update functions for each subsystem (stubs for now). Add `timeScale` to GameState (1x, 2x, 4x, 8x) and `isPaused` flag.
   **Acceptance criteria:**
-  - [ ] Unit test: `createGame({ seed: 42 })` returns a valid GameState object
-  - [ ] Unit test: `tick(state, 100)` advances `state.time` by `100 * state.timeScale`
-  - [ ] Unit test: `tick(state, 100)` with `isPaused = true` does not advance time
-  - [ ] Unit test: changing `timeScale` to 4 makes time advance 4x faster
-  - [ ] `npm run validate` passes
+  - [x] Unit test: `createGame({ seed: 42 })` returns a valid GameState object
+  - [x] Unit test: `tick(state, 100)` advances `state.time` by `100 * state.timeScale`
+  - [x] Unit test: `tick(state, 100)` with `isPaused = true` does not advance time
+  - [x] Unit test: changing `timeScale` to 4 makes time advance 4x faster
+  - [x] `npm run validate` passes
 
-- [ ] **1.3: Save/Load system**
+- [x] **1.3: Save/Load system**
   Implement `src/core/state/SaveLoad.ts`: `serialize(state) → string` (JSON) and `deserialize(json) → GameState`. Ensure all state is serializable (no functions, no circular references). Add version field for future migration. Define `src/core/state/SaveBackend.ts`: the persistence interface with methods `save(slotId, data)`, `load(slotId)`, `list()`, `delete(slotId)`. This interface lives in `src/core/` because it is a pure type definition with no side effects. Then implement three concrete backends in `src/persistence/` (OUTSIDE of `src/core/`, since they use platform APIs):
   - `src/persistence/FilePersistence.ts`: reads/writes JSON files to a configurable directory (for desktop/local use, uses Node.js `fs`)
   - `src/persistence/IndexedDBPersistence.ts`: uses IndexedDB for web persistence (survives page reloads, no size limit issues)
   - `src/persistence/DownloadPersistence.ts`: fallback for web — exports save as a downloadable `.json` file, imports via file picker (uses DOM APIs)
   The game auto-detects the environment and picks the best backend. Save slots store: serialized GameState, slot name, timestamp, campaign progress snapshot (current level, levels unlocked).
   **Acceptance criteria:**
-  - [ ] Unit test: `deserialize(serialize(state))` produces an equivalent state
-  - [ ] Unit test: serialized output is valid JSON
-  - [ ] Unit test: deserialization of unknown version throws a clear error
-  - [ ] Unit test: `FilePersistence` can save and load a state from disk (Node.js test)
-  - [ ] Unit test: `SaveBackend` interface is correctly implemented by all three backends
-  - [ ] Unit test: save slot metadata (name, timestamp, campaign progress) is stored alongside state
-  - [ ] Unit test: `list()` returns all saved slots with metadata
-  - [ ] `src/core/state/SaveBackend.ts` contains ONLY the interface — no platform imports
-  - [ ] `src/persistence/` implementations do NOT import from `renderer/`, `physics/`, `ui/`, `audio/`
-  - [ ] `npm run validate` passes
+  - [x] Unit test: `deserialize(serialize(state))` produces an equivalent state
+  - [x] Unit test: serialized output is valid JSON
+  - [x] Unit test: deserialization of unknown version throws a clear error
+  - [x] Unit test: `FilePersistence` can save and load a state from disk (Node.js test)
+  - [x] Unit test: `SaveBackend` interface is correctly implemented by all three backends
+  - [x] Unit test: save slot metadata (name, timestamp, campaign progress) is stored alongside state
+  - [x] Unit test: `list()` returns all saved slots with metadata
+  - [x] `src/core/state/SaveBackend.ts` contains ONLY the interface — no platform imports
+  - [x] `src/persistence/` implementations do NOT import from `renderer/`, `physics/`, `ui/`, `audio/`
+  - [x] `npm run validate` passes
 
-- [ ] **1.4: Event emitter**
+- [x] **1.4: Event emitter**
   Implement `src/core/state/EventEmitter.ts`: a typed event emitter for core→renderer communication. Methods: `on(event, handler)`, `off(event, handler)`, `emit(event, data)`. Define an `EventMap` type listing all game events (initially a small set: `terrain:updated`, `blast:started`, `blast:ended`, `fragment:created`, `time:tick`).
   **Acceptance criteria:**
-  - [ ] Unit test: subscribing to an event and emitting it calls the handler with correct data
-  - [ ] Unit test: `off()` removes the handler; subsequent emits don't call it
-  - [ ] Unit test: multiple handlers on the same event all fire
-  - [ ] `npm run validate` passes
+  - [x] Unit test: subscribing to an event and emitting it calls the handler with correct data
+  - [x] Unit test: `off()` removes the handler; subsequent emits don't call it
+  - [x] Unit test: multiple handlers on the same event all fire
+  - [x] `npm run validate` passes
 
 ---
 
@@ -1132,7 +1132,7 @@ npx tsx scripts/screenshot.ts --name "my-feature"
 | Phase | Tasks | Completed |
 |-------|-------|-----------|
 | Phase 0 — Scaffolding | 4 | 4 |
-| Phase 1 — Core Data Structures | 4 | 0 |
+| Phase 1 — Core Data Structures | 4 | 4 |
 | Phase 2 — World and Terrain | 7 | 0 |
 | Phase 3 — Mining Mechanics | 14 | 0 |
 | Phase 4 — Economy | 4 | 0 |
@@ -1144,4 +1144,4 @@ npx tsx scripts/screenshot.ts --name "my-feature"
 | Phase 10 — User Interface | 10 | 0 |
 | Phase 11 — Audio | 3 | 0 |
 | Phase 12 — Polish and Deployment | 8 | 0 |
-| **Total** | **95** | **4** |
+| **Total** | **95** | **8** |
