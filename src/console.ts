@@ -24,6 +24,11 @@ import {
   tubingCommand,
 } from './console/commands/mining.js';
 import { createTubingState } from './core/mining/Tubing.js';
+import {
+  financesCommand,
+  contractCommand,
+  fragmentsCommand,
+} from './console/commands/economy.js';
 
 console.log(bold('BlastSimulator2026 Console Mode'));
 console.log(info('Type "help" for available commands.\n'));
@@ -78,6 +83,17 @@ runner.register('buy', 'Buy items (tubing amount:10)', (_args, named) =>
 );
 runner.register('install_tubing', 'Install tubing on a hole (hole:3)', (_args, named) =>
   tubingCommand(ctx, ['install'], named),
+);
+
+// --- Economy commands (Phase 4) ---
+runner.register('finances', 'Show balance and transactions', (args, named) =>
+  financesCommand(ctx, args, named),
+);
+runner.register('contract', 'Contracts (list|accept|status|deliver|negotiate)', (args, named) =>
+  contractCommand(ctx, args, named),
+);
+runner.register('fragments', 'Fragment logistics (status)', (args, named) =>
+  fragmentsCommand(ctx, args, named),
 );
 
 const rl = readline.createInterface({

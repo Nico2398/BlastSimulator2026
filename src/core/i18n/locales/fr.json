@@ -75,5 +75,20 @@
   "weather.heavy_rain": "Forte pluie",
   "weather.storm": "Tempête",
   "weather.heat_wave": "Canicule",
-  "weather.cold_snap": "Coup de froid"
+  "weather.cold_snap": "Coup de froid",
+  "economy.balance": "Solde : ${amount}",
+  "economy.bankrupt": "EN FAILLITE",
+  "economy.income": "Revenus",
+  "economy.expenses": "Dépenses",
+  "economy.contract.ore_sale": "Vente de minerai",
+  "economy.contract.rubble_disposal": "Évacuation de gravats",
+  "economy.contract.supply": "Contrat d'approvisionnement",
+  "economy.contract.accepted": "Contrat accepté",
+  "economy.contract.completed": "Contrat terminé !",
+  "economy.contract.expired": "Contrat expiré — pénalité appliquée",
+  "economy.negotiation.success": "Négociation réussie !",
+  "economy.negotiation.failure": "Négociation échouée.",
+  "economy.fragments.on_ground": "Au sol",
+  "economy.fragments.in_transit": "En transit",
+  "economy.fragments.stored": "Stockés"
 }
