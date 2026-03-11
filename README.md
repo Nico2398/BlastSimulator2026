@@ -488,75 +488,75 @@ npx tsx scripts/screenshot.ts --name "my-feature"
 
 ### Phase 5 — Entities and Management (Console Mode)
 
-- [ ] **5.1: Building system**
+- [x] **5.1: Building system**
   Implement `src/core/entities/Building.ts`. Building types: worker quarters, storage depot, vehicle depot, office, break room, canteen, medical bay, explosives magazine. Each building has: type, position (grid coordinates), size, construction cost, operating cost per tick, capacity (e.g., storage tons, employee slots), effect on scores. Buildings can be placed, relocated (at cost), and destroyed. Buildings hit by projections are destroyed.
   **Acceptance criteria:**
-  - [ ] Unit test: placing a building deducts cost and adds it to GameState
-  - [ ] Unit test: building operating costs are deducted each tick
-  - [ ] Unit test: storage depot increases storage capacity
-  - [ ] Unit test: worker quarters increase well-being score
-  - [ ] Unit test: destroying a building removes it and its effects
-  - [ ] Unit test: cannot place building on occupied space or outside bounds
-  - [ ] Console commands: `build quarters at:5,10`, `build list`, `build destroy 3`, `build move 3 to:8,12`
-  - [ ] i18n: all building names and descriptions in both locales
-  - [ ] `npm run validate` passes
+  - [x] Unit test: placing a building deducts cost and adds it to GameState
+  - [x] Unit test: building operating costs are deducted each tick
+  - [x] Unit test: storage depot increases storage capacity
+  - [x] Unit test: worker quarters increase well-being score
+  - [x] Unit test: destroying a building removes it and its effects
+  - [x] Unit test: cannot place building on occupied space or outside bounds
+  - [x] Console commands: `build quarters at:5,10`, `build list`, `build destroy 3`, `build move 3 to:8,12`
+  - [x] i18n: all building names and descriptions in both locales
+  - [x] `npm run validate` passes
 
-- [ ] **5.2: Vehicle system**
+- [x] **5.2: Vehicle system**
   Implement `src/core/entities/Vehicle.ts`. Vehicle types: truck, excavator, drill rig, bulldozer. Each vehicle has: type, purchase cost, maintenance cost per tick, fuel cost per tick, capacity (tons for trucks, dig rate for excavators), speed, current position, current task (idle/moving/working), health. Vehicles can be purchased, assigned to tasks, moved, and are destroyable by projections. Excavators are the key bottleneck — limited count, essential for loading rubble.
   **Acceptance criteria:**
-  - [ ] Unit test: purchasing a vehicle deducts cost and adds it to fleet
-  - [ ] Unit test: vehicle maintenance/fuel costs accumulate per tick
-  - [ ] Unit test: assigning a truck to transport rubble changes its state
-  - [ ] Unit test: excavator loading rate matches its capacity stat
-  - [ ] Unit test: destroyed vehicle is removed from fleet
-  - [ ] Console commands: `vehicle buy truck`, `vehicle list`, `vehicle assign 1 task:transport from:pit to:depot`, `vehicle move 1 to:20,15`
-  - [ ] i18n: vehicle type names in both locales
-  - [ ] `npm run validate` passes
+  - [x] Unit test: purchasing a vehicle deducts cost and adds it to fleet
+  - [x] Unit test: vehicle maintenance/fuel costs accumulate per tick
+  - [x] Unit test: assigning a truck to transport rubble changes its state
+  - [x] Unit test: excavator loading rate matches its capacity stat
+  - [x] Unit test: destroyed vehicle is removed from fleet
+  - [x] Console commands: `vehicle buy truck`, `vehicle list`, `vehicle assign 1 task:transport from:pit to:depot`, `vehicle move 1 to:20,15`
+  - [x] i18n: vehicle type names in both locales
+  - [x] `npm run validate` passes
 
-- [ ] **5.3: Employee system**
+- [x] **5.3: Employee system**
   Implement `src/core/entities/Employee.ts`. Employees have: name (generated), role (driller, blaster, driver, surveyor, manager), salary, morale (0-100), union status (boolean), injury status, alive status. Roles determine what tasks the employee can perform. Hiring costs money; salaries are ongoing expenses. Employees can receive raises (affects morale and well-being score). Unionized employees cannot be fired (unless... mafia path). Employee names generated from i18n name lists.
   **Acceptance criteria:**
-  - [ ] Unit test: hiring adds employee and deducts hiring cost
-  - [ ] Unit test: salaries are paid each pay cycle (configurable tick interval)
-  - [ ] Unit test: giving a raise increases salary and morale
-  - [ ] Unit test: low morale reduces employee effectiveness
-  - [ ] Unit test: injured employee cannot work until healed
-  - [ ] Unit test: unionized employee cannot be fired (returns error)
-  - [ ] Console commands: `employee hire role:driller`, `employee list`, `employee raise 3 amount:500`, `employee fire 5`
-  - [ ] `npm run validate` passes
+  - [x] Unit test: hiring adds employee and deducts hiring cost
+  - [x] Unit test: salaries are paid each pay cycle (configurable tick interval)
+  - [x] Unit test: giving a raise increases salary and morale
+  - [x] Unit test: low morale reduces employee effectiveness
+  - [x] Unit test: injured employee cannot work until healed
+  - [x] Unit test: unionized employee cannot be fired (returns error)
+  - [x] Console commands: `employee hire role:driller`, `employee list`, `employee raise 3 amount:500`, `employee fire 5`
+  - [x] `npm run validate` passes
 
-- [ ] **5.4: Score system**
+- [x] **5.4: Score system**
   Implement `src/core/scores/ScoreManager.ts` and individual score modules: `WellBeing.ts`, `Safety.ts`, `Ecology.ts`, `Nuisance.ts`. Each score is 0-100, updated each tick based on current state. Score formulas account for: buildings, employee treatment, accident history, equipment investment, blast vibrations, dust, waste, etc. Scores influence event probabilities and contract terms.
   **Acceptance criteria:**
-  - [ ] Unit test: initial scores are at a neutral starting point (e.g., 50)
-  - [ ] Unit test: building worker quarters increases well-being
-  - [ ] Unit test: an accident decreases safety score
-  - [ ] Unit test: blast vibrations decrease nuisance score
-  - [ ] Unit test: investing in safety equipment increases safety score
-  - [ ] Unit test: scores are clamped to 0-100
-  - [ ] Console command: `scores` shows all four scores
-  - [ ] `npm run validate` passes
+  - [x] Unit test: initial scores are at a neutral starting point (e.g., 50)
+  - [x] Unit test: building worker quarters increases well-being
+  - [x] Unit test: an accident decreases safety score
+  - [x] Unit test: blast vibrations decrease nuisance score
+  - [x] Unit test: investing in safety equipment increases safety score
+  - [x] Unit test: scores are clamped to 0-100
+  - [x] Console command: `scores` shows all four scores
+  - [x] `npm run validate` passes
 
-- [ ] **5.5: Damage and casualty system**
+- [x] **5.5: Damage and casualty system**
   Implement damage processing: when a fragment (projection) hits a building, vehicle, or employee position, calculate damage based on fragment mass and velocity. Buildings have HP; vehicles have HP; employees can be injured or killed. Deaths trigger lawsuit events. Track accident history in GameState.
   **Acceptance criteria:**
-  - [ ] Unit test: fast heavy fragment hitting a building reduces its HP
-  - [ ] Unit test: building at 0 HP is destroyed
-  - [ ] Unit test: fragment hitting employee position injures/kills based on energy
-  - [ ] Unit test: death is recorded in accident history
-  - [ ] Unit test: death triggers a "lawsuit pending" flag
-  - [ ] Integration test: overcharged blast near buildings → building damage
-  - [ ] `npm run validate` passes
+  - [x] Unit test: fast heavy fragment hitting a building reduces its HP
+  - [x] Unit test: building at 0 HP is destroyed
+  - [x] Unit test: fragment hitting employee position injures/kills based on energy
+  - [x] Unit test: death is recorded in accident history
+  - [x] Unit test: death triggers a "lawsuit pending" flag
+  - [x] Integration test: overcharged blast near buildings → building damage
+  - [x] `npm run validate` passes
 
-- [ ] **5.6: Zone clearing and evacuation**
+- [x] **5.6: Zone clearing and evacuation**
   Implement zone management: player can define a safety zone before a blast and order evacuation. All employees and vehicles within the zone are moved out. Failure to evacuate before blasting risks casualties. Implement `clearZone(state, bounds)` and `isZoneClear(state, bounds)`.
   **Acceptance criteria:**
-  - [ ] Unit test: `clearZone` moves all entities out of the defined area
-  - [ ] Unit test: `isZoneClear` returns true when no entities remain
-  - [ ] Unit test: blasting without clearing zone + projections → casualties
-  - [ ] Unit test: blasting after clearing zone → no casualties even with projections in the zone
-  - [ ] Console commands: `zone clear x1:10 y1:10 x2:30 y2:30`, `zone status`
-  - [ ] `npm run validate` passes
+  - [x] Unit test: `clearZone` moves all entities out of the defined area
+  - [x] Unit test: `isZoneClear` returns true when no entities remain
+  - [x] Unit test: blasting without clearing zone + projections → casualties
+  - [x] Unit test: blasting after clearing zone → no casualties even with projections in the zone
+  - [x] Console commands: `zone clear x1:10 y1:10 x2:30 y2:30`, `zone status`
+  - [x] `npm run validate` passes
 
 ---
 
@@ -1136,7 +1136,7 @@ npx tsx scripts/screenshot.ts --name "my-feature"
 | Phase 2 — World and Terrain | 7 | 7 |
 | Phase 3 — Mining Mechanics | 14 | 14 |
 | Phase 4 — Economy | 4 | 4 |
-| Phase 5 — Entities and Management | 6 | 0 |
+| Phase 5 — Entities and Management | 6 | 6 |
 | Phase 6 — Event System | 10 | 0 |
 | Phase 7 — Campaign, World Map, Win/Lose | 8 | 0 |
 | Phase 8 — Physics Integration | 5 | 0 |
