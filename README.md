@@ -86,41 +86,41 @@ npx tsx scripts/screenshot.ts --name "my-feature"
 
 ### Phase 0 — Project Scaffolding
 
-- [ ] **0.1: Initialize project**
+- [x] **0.1: Initialize project**
   Create `package.json` with all dependencies (typescript, vite, three, cannon-es, simplex-noise, vitest, puppeteer, tsx). Add the following npm scripts to `package.json`: `"dev": "vite"`, `"build": "vite build"`, `"console": "tsx src/console.ts"`, `"validate": "bash scripts/validate.sh"`, `"test": "vitest run"`. Create `tsconfig.json` with strict mode. Create `vite.config.ts`. Create `index.html` with a `<canvas id="game-canvas">`. Create a minimal `src/main.ts` that renders a colored cube with Three.js to confirm the pipeline works. Create a minimal `src/console.ts` entry point that prints "BlastSimulator2026 Console Mode" and exits.
   **Acceptance criteria:**
-  - [ ] `npm install` completes without errors
-  - [ ] `npx tsc --noEmit` passes
-  - [ ] `npm run build` produces a `dist/` folder
-  - [ ] `npm run console` prints "BlastSimulator2026 Console Mode"
-  - [ ] `npm run validate` runs `scripts/validate.sh` (will partially fail until task 0.2 — that's expected)
-  - [ ] Opening `index.html` via dev server shows a spinning or static colored cube
+  - [x] `npm install` completes without errors
+  - [x] `npx tsc --noEmit` passes
+  - [x] `npm run build` produces a `dist/` folder
+  - [x] `npm run console` prints "BlastSimulator2026 Console Mode"
+  - [x] `npm run validate` runs `scripts/validate.sh` (will partially fail until task 0.2 — that's expected)
+  - [x] Opening `index.html` via dev server shows a spinning or static colored cube
 
-- [ ] **0.2: Set up testing infrastructure**
+- [x] **0.2: Set up testing infrastructure**
   Configure Vitest in `vite.config.ts` or `vitest.config.ts`. Create `tests/unit/` and `tests/integration/` directories. Write a trivial passing test (`tests/unit/smoke.test.ts`) that asserts `1 + 1 === 2`. Make `scripts/validate.sh` executable and functional.
   **Acceptance criteria:**
-  - [ ] `npx vitest run` finds and passes the smoke test
-  - [ ] `bash scripts/validate.sh` runs all four steps and reports success
+  - [x] `npx vitest run` finds and passes the smoke test
+  - [x] `bash scripts/validate.sh` runs all four steps and reports success
 
-- [ ] **0.3: Set up i18n system**
+- [x] **0.3: Set up i18n system**
   Implement `src/core/i18n/I18n.ts`: a translation module with `t(key, params?)` function, `setLocale(locale)`, and `getLocale()`. Support string interpolation with `{variable}` syntax. Create `src/core/i18n/locales/en.json` and `src/core/i18n/locales/fr.json` with a few sample keys (e.g., `"game.title": "BlastSimulator2026"`, `"game.subtitle": "Dig. Blast. Profit."` / `"game.subtitle": "Creuse. Explose. Profite."`). Create `src/core/i18n/keys.ts` with typed key constants.
   **Acceptance criteria:**
-  - [ ] Unit test: `t('game.title')` returns "BlastSimulator2026" in both locales (brand name, untranslated)
-  - [ ] Unit test: `t('game.subtitle')` returns "Dig. Blast. Profit." when locale is 'en'
-  - [ ] Unit test: `t('game.subtitle')` returns "Creuse. Explose. Profite." when locale is 'fr'
-  - [ ] Unit test: `t('blast.fragments', { count: 42 })` returns "42 fragments detected" in en
-  - [ ] Unit test: switching locale with `setLocale` changes all subsequent `t()` calls
-  - [ ] `npm run validate` passes
+  - [x] Unit test: `t('game.title')` returns "BlastSimulator2026" in both locales (brand name, untranslated)
+  - [x] Unit test: `t('game.subtitle')` returns "Dig. Blast. Profit." when locale is 'en'
+  - [x] Unit test: `t('game.subtitle')` returns "Creuse. Explose. Profite." when locale is 'fr'
+  - [x] Unit test: `t('blast.fragments', { count: 42 })` returns "42 fragments detected" in en
+  - [x] Unit test: switching locale with `setLocale` changes all subsequent `t()` calls
+  - [x] `npm run validate` passes
 
-- [ ] **0.4: Set up console mode framework**
+- [x] **0.4: Set up console mode framework**
   Implement `src/console/ConsoleRunner.ts`: a command parser that reads lines from stdin, splits them into command name + arguments, dispatches to registered command handlers, and prints results. Implement `src/console/ConsoleFormatter.ts` for pretty-printing. Register a `help` command that lists all available commands. Wire it in `src/console.ts` so `npx tsx src/console.ts` starts an interactive REPL.
   **Acceptance criteria:**
-  - [ ] Unit test: `parseCommand('survey 25,30')` returns `{ command: 'survey', args: ['25,30'] }`
-  - [ ] Unit test: `parseCommand('charge hole:1 explosive:tnt amount:5kg')` parses named args correctly
-  - [ ] Running `npx tsx src/console.ts` starts an interactive prompt
-  - [ ] Typing `help` lists registered commands
-  - [ ] Typing an unknown command prints an error message
-  - [ ] `npm run validate` passes
+  - [x] Unit test: `parseCommand('survey 25,30')` returns `{ command: 'survey', args: ['25,30'] }`
+  - [x] Unit test: `parseCommand('charge hole:1 explosive:tnt amount:5kg')` parses named args correctly
+  - [x] Running `npx tsx src/console.ts` starts an interactive prompt
+  - [x] Typing `help` lists registered commands
+  - [x] Typing an unknown command prints an error message
+  - [x] `npm run validate` passes
 
 ---
 
@@ -1131,7 +1131,7 @@ npx tsx scripts/screenshot.ts --name "my-feature"
 
 | Phase | Tasks | Completed |
 |-------|-------|-----------|
-| Phase 0 — Scaffolding | 4 | 0 |
+| Phase 0 — Scaffolding | 4 | 4 |
 | Phase 1 — Core Data Structures | 4 | 0 |
 | Phase 2 — World and Terrain | 7 | 0 |
 | Phase 3 — Mining Mechanics | 14 | 0 |
@@ -1144,4 +1144,4 @@ npx tsx scripts/screenshot.ts --name "my-feature"
 | Phase 10 — User Interface | 10 | 0 |
 | Phase 11 — Audio | 3 | 0 |
 | Phase 12 — Polish and Deployment | 8 | 0 |
-| **Total** | **95** | **0** |
+| **Total** | **95** | **4** |
