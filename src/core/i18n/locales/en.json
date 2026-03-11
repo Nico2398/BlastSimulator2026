@@ -1,0 +1,9 @@
+{
+  "game.title": "BlastSimulator2026",
+  "game.subtitle": "Dig. Blast. Profit.",
+  "game.version": "v0.1.0",
+  "blast.fragments": "{count} fragments detected",
+  "blast.no_casualties": "No casualties.",
+  "blast.projections": "{count} projections detected (max distance: {maxDist}m)",
+  "test.greeting": "Hello, {name}!"
+}
