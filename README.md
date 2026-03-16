@@ -766,49 +766,49 @@ npx tsx scripts/screenshot.ts --name "my-feature"
 
 ### Phase 8 — Physics Integration
 
-- [ ] **8.1: Physics world setup**
+- [x] **8.1: Physics world setup**
   Implement `src/physics/PhysicsWorld.ts`. Wrapper around Cannon-es world. Methods: `init()`, `step(dt)`, `addBody(shape, mass, position)`, `removeBody(id)`, `clear()`. Physics runs only during blast events.
   **Acceptance criteria:**
-  - [ ] Unit test: creating a physics world and stepping it doesn't crash
-  - [ ] Unit test: adding a body and stepping → body falls due to gravity
-  - [ ] Unit test: `clear()` removes all bodies
-  - [ ] `npm run validate` passes
+  - [x] Unit test: creating a physics world and stepping it doesn't crash
+  - [x] Unit test: adding a body and stepping → body falls due to gravity
+  - [x] Unit test: `clear()` removes all bodies
+  - [x] `npm run validate` passes
 
-- [ ] **8.2: Terrain collision body**
+- [x] **8.2: Terrain collision body**
   Implement `src/physics/TerrainBody.ts`. Creates a static collision shape from the voxel grid surface. Must be updated after each blast (terrain has changed).
   **Acceptance criteria:**
-  - [ ] Unit test: a dynamic body dropped onto terrain collider comes to rest above surface
-  - [ ] Unit test: after terrain modification, collider updates accordingly
-  - [ ] `npm run validate` passes
+  - [x] Unit test: a dynamic body dropped onto terrain collider comes to rest above surface
+  - [x] Unit test: after terrain modification, collider updates accordingly
+  - [x] `npm run validate` passes
 
-- [ ] **8.3: Fragment physics bodies**
+- [x] **8.3: Fragment physics bodies**
   Implement `src/physics/FragmentBody.ts`. For each fragment from a blast, create a Cannon-es rigid body with appropriate mass, shape (box approximation), and initial velocity. Let them simulate until they settle (velocity below threshold).
   **Acceptance criteria:**
-  - [ ] Unit test: fragment with upward velocity follows ballistic arc
-  - [ ] Unit test: fragment settles on terrain after some time
-  - [ ] Unit test: fragment final position is stored back in GameState
-  - [ ] `npm run validate` passes
+  - [x] Unit test: fragment with upward velocity follows ballistic arc
+  - [x] Unit test: fragment settles on terrain after some time
+  - [x] Unit test: fragment final position is stored back in GameState
+  - [x] `npm run validate` passes
 
-- [ ] **8.4: Collision damage handler**
+- [x] **8.4: Collision damage handler**
   Implement `src/physics/CollisionHandler.ts`. When a fragment collides with a building, vehicle, or employee position, calculate damage based on impact energy (mass * velocity²). Apply damage to the hit entity.
   **Acceptance criteria:**
-  - [ ] Unit test: high-energy collision destroys building
-  - [ ] Unit test: low-energy collision damages but doesn't destroy
-  - [ ] Unit test: fragment hitting employee position triggers casualty
-  - [ ] Unit test: collision events are recorded in GameState
-  - [ ] `npm run validate` passes
+  - [x] Unit test: high-energy collision destroys building
+  - [x] Unit test: low-energy collision damages but doesn't destroy
+  - [x] Unit test: fragment hitting employee position triggers casualty
+  - [x] Unit test: collision events are recorded in GameState
+  - [x] `npm run validate` passes
 
-- [ ] **8.5: Full blast physics integration test**
+- [x] **8.5: Full blast physics integration test**
   Create a comprehensive integration test that:
   1. Sets up a game with terrain, buildings, and employees
   2. Designs a deliberately overcharged blast plan
   3. Executes the blast through the full pipeline (core calc → physics sim → damage)
   4. Verifies: fragments exist, projections flew, building damaged, casualty recorded
   **Acceptance criteria:**
-  - [ ] Integration test passes with deterministic seed
-  - [ ] Blast report matches expected outcome
-  - [ ] State is consistent after blast (no dangling references)
-  - [ ] `npm run validate` passes
+  - [x] Integration test passes with deterministic seed
+  - [x] Blast report matches expected outcome
+  - [x] State is consistent after blast (no dangling references)
+  - [x] `npm run validate` passes
 
 ---
 
@@ -1139,7 +1139,7 @@ npx tsx scripts/screenshot.ts --name "my-feature"
 | Phase 5 — Entities and Management | 6 | 6 |
 | Phase 6 — Event System | 10 | 10 |
 | Phase 7 — Campaign, World Map, Win/Lose | 8 | 8 |
-| Phase 8 — Physics Integration | 5 | 0 |
+| Phase 8 — Physics Integration | 5 | 5 |
 | Phase 9 — 3D Rendering | 12 | 0 |
 | Phase 10 — User Interface | 10 | 0 |
 | Phase 11 — Audio | 3 | 0 |
