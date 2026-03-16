@@ -8,6 +8,16 @@ export interface GameEventMap {
   'blast:ended': undefined;
   'fragment:created': { count: number };
   'time:tick': { dt: number };
+
+  // Phase 7 — Campaign events
+  'level:complete': { levelId: string; totalProfit: number; blastsPerformed: number; casualties: number; finalWellBeing: number; finalEcology: number; finalSafety: number };
+  'bankruptcy:warning': { cash: number; ticksRemaining: number };
+  'bankruptcy:triggered': { cash: number };
+  'arrest:triggered': { exposure: number };
+  'ecology:warning': { ticksRemaining: number };
+  'ecology:shutdown': Record<string, never>;
+  'revolt:warning': { ticksRemaining: number };
+  'revolt:triggered': Record<string, never>;
 }
 
 type EventHandler<T> = (data: T) => void;

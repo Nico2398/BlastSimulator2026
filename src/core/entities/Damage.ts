@@ -38,10 +38,12 @@ export interface DamageState {
   accidents: AccidentRecord[];
   lawsuitPending: boolean;
   deathCount: number;
+  /** Total number of blasts detonated in this session. */
+  blastCount: number;
 }
 
 export function createDamageState(): DamageState {
-  return { accidents: [], lawsuitPending: false, deathCount: 0 };
+  return { accidents: [], lawsuitPending: false, deathCount: 0, blastCount: 0 };
 }
 
 // ── Processing ──

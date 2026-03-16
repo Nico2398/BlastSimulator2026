@@ -27,9 +27,21 @@ import type { CorruptionState } from '../economy/Corruption.js';
 import { createCorruptionState } from '../economy/Corruption.js';
 import type { MafiaState } from '../events/MafiaActions.js';
 import { createMafiaState } from '../events/MafiaActions.js';
+import type { CampaignState } from '../campaign/Campaign.js';
+import { createCampaignState } from '../campaign/Campaign.js';
+import type { BankruptcyState } from '../campaign/Bankruptcy.js';
+import { createBankruptcyState } from '../campaign/Bankruptcy.js';
+import type { ArrestState } from '../campaign/CriminalArrest.js';
+import { createArrestState } from '../campaign/CriminalArrest.js';
+import type { EcologicalState } from '../campaign/EcologicalDisaster.js';
+import { createEcologicalState } from '../campaign/EcologicalDisaster.js';
+import type { RevoltState } from '../campaign/WorkerRevolt.js';
+import { createRevoltState } from '../campaign/WorkerRevolt.js';
+import type { LevelStats } from '../campaign/SuccessTracker.js';
+import { createLevelStats } from '../campaign/SuccessTracker.js';
 
 /** Save format version — increment when GameState shape changes. */
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 export interface GameConfig {
   seed: number;
@@ -103,6 +115,25 @@ export interface GameState {
   corruption: CorruptionState;
   /** Mafia state (exposure, smuggling, frames). */
   mafia: MafiaState;
+
+  // ── Phase 7: Campaign & Win/Lose ──
+
+  /** Campaign progression (unlocked levels, profit history). Persists across level restarts. */
+  campaign: CampaignState;
+  /** Bankruptcy tracker (resets each level). */
+  bankruptcy: BankruptcyState;
+  /** Criminal arrest tracker (resets each level). */
+  arrest: ArrestState;
+  /** Ecological shutdown tracker (resets each level). */
+  ecological: EcologicalState;
+  /** Worker revolt tracker (resets each level). */
+  revolt: RevoltState;
+  /** Per-level success statistics. */
+  levelStats: LevelStats;
+  /** Whether the current level has ended (any game-over or completion). */
+  levelEnded: boolean;
+  /** Reason the level ended, or null if still active. */
+  levelEndReason: 'completed' | 'bankruptcy' | 'arrest' | 'ecological_shutdown' | 'worker_revolt' | null;
 }
 
 export interface WorldState {
@@ -150,5 +181,13 @@ export function createGame(config: GameConfig): GameState {
     events: createEventSystemState(),
     corruption: createCorruptionState(),
     mafia: createMafiaState(),
+    campaign: createCampaignState(),
+    bankruptcy: createBankruptcyState(),
+    arrest: createArrestState(),
+    ecological: createEcologicalState(),
+    revolt: createRevoltState(),
+    levelStats: createLevelStats(),
+    levelEnded: false,
+    levelEndReason: null,
   };
 }
