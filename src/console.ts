@@ -36,6 +36,17 @@ import {
   scoresCommand,
   zoneCommand,
 } from './console/commands/entities.js';
+import {
+  tickCommand,
+  eventCommand,
+  corruptCommand,
+  mafiaCommand,
+  timeCommand,
+} from './console/commands/events.js';
+import { setupEvents } from './core/events/index.js';
+
+// Register all 258 events into the global pool
+setupEvents();
 
 console.log(bold('BlastSimulator2026 Console Mode'));
 console.log(info('Type "help" for available commands.\n'));
@@ -118,6 +129,23 @@ runner.register('scores', 'Show all four scores', (args, named) =>
 );
 runner.register('zone', 'Safety zones (clear|status)', (args, named) =>
   zoneCommand(ctx, args, named),
+);
+
+// --- Event commands (Phase 6) ---
+runner.register('tick', 'Advance time by N ticks (default 1)', (args, named) =>
+  tickCommand(ctx, args, named),
+);
+runner.register('event', 'Event system (status|choose|timers)', (args, named) =>
+  eventCommand(ctx, args, named),
+);
+runner.register('corrupt', 'Corruption (target:judge cost:50000)', (args, named) =>
+  corruptCommand(ctx, args, named),
+);
+runner.register('mafia', 'Mafia ops (status|accident|frame|smuggle)', (args, named) =>
+  mafiaCommand(ctx, args, named),
+);
+runner.register('time', 'Time control (status|pause|resume|speed 4)', (args, named) =>
+  timeCommand(ctx, args, named),
 );
 
 const rl = readline.createInterface({

@@ -5,7 +5,7 @@
 // ── Categories ──
 
 export type IncomeCategory = 'sales' | 'contracts' | 'bonus';
-export type ExpenseCategory = 'salaries' | 'equipment' | 'fines' | 'maintenance' | 'fuel' | 'materials' | 'construction';
+export type ExpenseCategory = 'salaries' | 'equipment' | 'fines' | 'maintenance' | 'fuel' | 'materials' | 'construction' | 'corruption' | 'mafia';
 
 // ── Transaction records ──
 
