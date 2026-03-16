@@ -1405,5 +1405,19 @@
   "weather.heavy_rain": "Heavy Rain",
   "weather.light_rain": "Light Rain",
   "weather.storm": "Storm",
-  "weather.sunny": "Sunny"
+  "weather.sunny": "Sunny",
+  "level.dusty_hollow.name": "Dusty Hollow",
+  "level.dusty_hollow.desc": "A sun-baked desert quarry where ambitions are as dry as the landscape. Perfect for beginners who'd rather not immediately go bankrupt.",
+  "level.grumpstone_ridge.name": "Grumpstone Ridge",
+  "level.grumpstone_ridge.desc": "A mountain site where the rocks are as surly as the union representatives. Neighbours will complain. That's their problem.",
+  "level.treranium_depths.name": "Treranium Depths",
+  "level.treranium_depths.desc": "A lush tropical hellhole packed with treranium, mafia enforcers, and three villages that collectively hate you. The rocks here didn't read the rulebook — some crumble like wet biscuits, others laugh at your best explosives.",
+  "campaign.level_complete": "Level complete!",
+  "campaign.bankruptcy_warning": "Warning: funds critically low!",
+  "campaign.bankrupt": "Bankrupt! The mine has been seized.",
+  "campaign.arrested": "Arrested! Too much exposure. The level is over.",
+  "campaign.ecology_warning": "Warning: government shutdown imminent!",
+  "campaign.ecology_shutdown": "Mine shutdown! Ecological violations triggered government closure.",
+  "campaign.revolt_warning": "Warning: workers on the verge of revolt!",
+  "campaign.revolt_triggered": "Worker revolt! Permanent strike. The level is over."
 }

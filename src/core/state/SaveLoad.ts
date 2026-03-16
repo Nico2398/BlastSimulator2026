@@ -55,5 +55,21 @@ export function deserialize(json: string): GameState {
     (obj as Record<string, unknown>)['surveyedPositions'] = new Set<string>();
   }
 
+  // Restore Set<string> for levelStats.uniqueOresExtracted
+  const levelStatsRaw = obj['levelStats'] as Record<string, unknown> | undefined;
+  if (levelStatsRaw) {
+    const ores = levelStatsRaw['uniqueOresExtracted'];
+    if (ores && typeof ores === 'object' && '__type' in (ores as Record<string, unknown>)) {
+      const setData = ores as { __type: string; values: string[] };
+      if (setData.__type === 'Set') {
+        levelStatsRaw['uniqueOresExtracted'] = new Set(setData.values);
+      }
+    } else if (Array.isArray(ores)) {
+      levelStatsRaw['uniqueOresExtracted'] = new Set(ores as string[]);
+    } else {
+      levelStatsRaw['uniqueOresExtracted'] = new Set<string>();
+    }
+  }
+
   return obj as unknown as GameState;
 }

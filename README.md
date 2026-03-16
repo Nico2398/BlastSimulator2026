@@ -684,7 +684,7 @@ npx tsx scripts/screenshot.ts --name "my-feature"
 
 ### Phase 7 — Campaign, World Map, and Win/Lose Conditions
 
-- [ ] **7.1: Level definition system**
+- [x] **7.1: Level definition system**
   **⚠ CREATIVE CHECKPOINT — Propose the 3 level names, descriptions (EN+FR), and difficulty parameters to the human for approval before finalizing.**
   Implement `src/core/campaign/Level.ts`. A level represents a single mine site with specific parameters. Each level defines: id, i18n name and description, mine type preset, terrain seed, grid dimensions, starting cash, available rock types, available explosives (some locked until later levels), unlock threshold (cumulative profit needed to complete the level), difficulty modifiers (event frequency multiplier, contract price multiplier, score decay rate). Define **3 levels** with progressive difficulty:
   - **Level 1 — "Dusty Hollow"**: Small desert quarry, soft rocks, basic explosives, generous contracts, low event frequency, forgiving scores. Tutorial-friendly. Unlock threshold: low profit target.
@@ -692,75 +692,75 @@ npx tsx scripts/screenshot.ts --name "my-feature"
   - **Level 3 — "Treranium Depths"**: Large tropical site, hard rocks including endgame, all explosives, demanding contracts, frequent events, multiple villages, mafia presence, weather complications. Unlock threshold: high profit.
   Add all level names and descriptions in en.json and fr.json.
   **Acceptance criteria:**
-  - [ ] **Human approved** level names, descriptions, and difficulty curve
-  - [ ] Unit test: `getLevel('dusty_hollow')` returns valid level data with all required fields
-  - [ ] Unit test: all 3 levels defined with increasing difficulty modifiers
-  - [ ] Unit test: level 1 has lower unlock threshold than level 2, which has lower than level 3
-  - [ ] Unit test: level 3 includes all explosive types, level 1 only includes starter explosives
-  - [ ] i18n: all level names and descriptions in both locales
-  - [ ] `npm run validate` passes
+  - [x] **Human approved** level names, descriptions, and difficulty curve
+  - [x] Unit test: `getLevel('dusty_hollow')` returns valid level data with all required fields
+  - [x] Unit test: all 3 levels defined with increasing difficulty modifiers
+  - [x] Unit test: level 1 has lower unlock threshold than level 2, which has lower than level 3
+  - [x] Unit test: level 3 includes all explosive types, level 1 only includes starter explosives
+  - [x] i18n: all level names and descriptions in both locales
+  - [x] `npm run validate` passes
 
-- [ ] **7.2: Campaign state and progression**
+- [x] **7.2: Campaign state and progression**
   Implement `src/core/campaign/Campaign.ts`. Campaign state tracks: which levels are unlocked, which are completed, cumulative profit per level, current active level. At game start, only level 1 is unlocked. Completing a level (reaching its profit threshold) unlocks the next level. The player can replay any unlocked level. Campaign state is saved alongside game state (included in save slots).
   **Acceptance criteria:**
-  - [ ] Unit test: new campaign has only level 1 unlocked
-  - [ ] Unit test: reaching profit threshold on level 1 unlocks level 2
-  - [ ] Unit test: reaching profit threshold on level 2 unlocks level 3
-  - [ ] Unit test: completing all 3 levels is tracked as campaign complete
-  - [ ] Unit test: player can start a new game on any unlocked level
-  - [ ] Unit test: campaign state serializes/deserializes correctly with SaveLoad
-  - [ ] Console command: `campaign status` shows unlocked levels and progress per level
-  - [ ] `npm run validate` passes
+  - [x] Unit test: new campaign has only level 1 unlocked
+  - [x] Unit test: reaching profit threshold on level 1 unlocks level 2
+  - [x] Unit test: reaching profit threshold on level 2 unlocks level 3
+  - [x] Unit test: completing all 3 levels is tracked as campaign complete
+  - [x] Unit test: player can start a new game on any unlocked level
+  - [x] Unit test: campaign state serializes/deserializes correctly with SaveLoad
+  - [x] Console command: `campaign status` shows unlocked levels and progress per level
+  - [x] `npm run validate` passes
 
-- [ ] **7.3: Level completion and transition**
+- [x] **7.3: Level completion and transition**
   When a level's profit threshold is reached, trigger a `level:complete` event. The player receives a completion summary (total profit, blasts performed, casualties, scores). They can then choose to continue playing the current level or return to the world map to start the next one. Starting a new level creates a fresh GameState with the level's parameters but retains the campaign progression data.
   **Acceptance criteria:**
-  - [ ] Unit test: profit reaching threshold triggers level complete flag
-  - [ ] Unit test: level completion summary contains correct stats
-  - [ ] Unit test: starting a new level resets GameState but preserves campaign state
-  - [ ] Unit test: continuing after completion allows further play on same level
-  - [ ] Console command: `campaign complete` (debug) force-completes current level
-  - [ ] Console command: `campaign start level:grumpstone_ridge` starts a specific unlocked level
-  - [ ] `npm run validate` passes
+  - [x] Unit test: profit reaching threshold triggers level complete flag
+  - [x] Unit test: level completion summary contains correct stats
+  - [x] Unit test: starting a new level resets GameState but preserves campaign state
+  - [x] Unit test: continuing after completion allows further play on same level
+  - [x] Console command: `campaign complete` (debug) force-completes current level
+  - [x] Console command: `campaign start level:grumpstone_ridge` starts a specific unlocked level
+  - [x] `npm run validate` passes
 
-- [ ] **7.4: Bankruptcy**
+- [x] **7.4: Bankruptcy**
   If cash balance drops below a configurable threshold for a sustained period (e.g., 100 ticks), trigger game over for the current level. The player is returned to the world map and can retry the level. Provide warnings at low balance.
   **Acceptance criteria:**
-  - [ ] Unit test: sustained negative balance triggers bankruptcy
-  - [ ] Unit test: temporary negative balance followed by income does not trigger
-  - [ ] Unit test: warning event fires when balance is low
-  - [ ] Unit test: bankruptcy does not reset campaign progression (only current level fails)
-  - [ ] `npm run validate` passes
+  - [x] Unit test: sustained negative balance triggers bankruptcy
+  - [x] Unit test: temporary negative balance followed by income does not trigger
+  - [x] Unit test: warning event fires when balance is low
+  - [x] Unit test: bankruptcy does not reset campaign progression (only current level fails)
+  - [x] `npm run validate` passes
 
-- [ ] **7.5: Criminal arrest**
+- [x] **7.5: Criminal arrest**
   If corruption/mafia exposure reaches critical level, trigger arrest and game over for the current level. Player returns to world map.
   **Acceptance criteria:**
-  - [ ] Unit test: exposure level above threshold triggers arrest
-  - [ ] Unit test: arrest ends the current level (not the campaign)
-  - [ ] `npm run validate` passes
+  - [x] Unit test: exposure level above threshold triggers arrest
+  - [x] Unit test: arrest ends the current level (not the campaign)
+  - [x] `npm run validate` passes
 
-- [ ] **7.6: Ecological disaster**
+- [x] **7.6: Ecological disaster**
   If ecology score stays at 0 for a sustained period, government shuts down the mine. Game over for the current level.
   **Acceptance criteria:**
-  - [ ] Unit test: sustained 0 ecology → shutdown game over
-  - [ ] Unit test: recovering ecology in time prevents shutdown
-  - [ ] `npm run validate` passes
+  - [x] Unit test: sustained 0 ecology → shutdown game over
+  - [x] Unit test: recovering ecology in time prevents shutdown
+  - [x] `npm run validate` passes
 
-- [ ] **7.7: Worker revolt**
+- [x] **7.7: Worker revolt**
   If well-being score stays at 0 for a sustained period, permanent strike — game over for the current level.
   **Acceptance criteria:**
-  - [ ] Unit test: sustained 0 well-being → revolt game over
-  - [ ] `npm run validate` passes
+  - [x] Unit test: sustained 0 well-being → revolt game over
+  - [x] `npm run validate` passes
 
-- [ ] **7.8: Success tracking per level**
+- [x] **7.8: Success tracking per level**
   Track per-level statistics: total wealth accumulated, mine depth reached, unique ore types extracted, total rock volume blasted, blasts performed, casualties, best scores achieved. These display on the world map for completed levels and contribute to a star/medal rating system (e.g., 1-3 stars based on efficiency, safety, profit margin).
   **Acceptance criteria:**
-  - [ ] Unit test: wealth tracker accumulates over time within a level
-  - [ ] Unit test: depth tracker updates after blasts
-  - [ ] Unit test: ore extraction tracker counts unique types
-  - [ ] Unit test: star rating calculated correctly from stats (e.g., 3 stars = high profit, zero casualties, good ecology)
-  - [ ] Console command: `stats` shows all success metrics for current level
-  - [ ] `npm run validate` passes
+  - [x] Unit test: wealth tracker accumulates over time within a level
+  - [x] Unit test: depth tracker updates after blasts
+  - [x] Unit test: ore extraction tracker counts unique types
+  - [x] Unit test: star rating calculated correctly from stats (e.g., 3 stars = high profit, zero casualties, good ecology)
+  - [x] Console command: `stats` shows all success metrics for current level
+  - [x] `npm run validate` passes
 
 ---
 
@@ -1138,10 +1138,10 @@ npx tsx scripts/screenshot.ts --name "my-feature"
 | Phase 4 — Economy | 4 | 4 |
 | Phase 5 — Entities and Management | 6 | 6 |
 | Phase 6 — Event System | 10 | 10 |
-| Phase 7 — Campaign, World Map, Win/Lose | 8 | 0 |
+| Phase 7 — Campaign, World Map, Win/Lose | 8 | 8 |
 | Phase 8 — Physics Integration | 5 | 0 |
 | Phase 9 — 3D Rendering | 12 | 0 |
 | Phase 10 — User Interface | 10 | 0 |
 | Phase 11 — Audio | 3 | 0 |
 | Phase 12 — Polish and Deployment | 8 | 0 |
-| **Total** | **95** | **39** |
+| **Total** | **95** | **47** |

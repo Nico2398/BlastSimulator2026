@@ -1405,5 +1405,19 @@
   "weather.heavy_rain": "Forte pluie",
   "weather.light_rain": "Pluie légère",
   "weather.storm": "Tempête",
-  "weather.sunny": "Ensoleillé"
+  "weather.sunny": "Ensoleillé",
+  "level.dusty_hollow.name": "La Combe Poussiéreuse",
+  "level.dusty_hollow.desc": "Une carrière désertique où les ambitions sont aussi sèches que le paysage. Idéal pour les débutants qui préfèrent ne pas faire faillite immédiatement.",
+  "level.grumpstone_ridge.name": "Le Crête Grognonne",
+  "level.grumpstone_ridge.desc": "Un site de montagne où les rochers sont aussi grognons que les représentants syndicaux. Les voisins se plaindront. C'est leur problème.",
+  "level.treranium_depths.name": "Les Profondeurs du Treranium",
+  "level.treranium_depths.desc": "Un enfer tropical luxuriant rempli de treranium, de mafiosi et de trois villages qui vous détestent collectivement. Les rochers ici n'ont pas lu le règlement — certains s'effritent comme des biscuits mouillés, d'autres se moquent de vos meilleurs explosifs.",
+  "campaign.level_complete": "Niveau terminé !",
+  "campaign.bankruptcy_warning": "Avertissement : fonds critiquement bas !",
+  "campaign.bankrupt": "Faillite ! La mine a été saisie.",
+  "campaign.arrested": "Arrestation ! Trop d'exposition. Le niveau est terminé.",
+  "campaign.ecology_warning": "Avertissement : fermeture gouvernementale imminente !",
+  "campaign.ecology_shutdown": "Fermeture de la mine ! Les violations écologiques ont déclenché une fermeture gouvernementale.",
+  "campaign.revolt_warning": "Avertissement : les travailleurs sont au bord de la révolte !",
+  "campaign.revolt_triggered": "Révolte ouvrière ! Grève permanente. Le niveau est terminé."
 }

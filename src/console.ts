@@ -43,6 +43,12 @@ import {
   mafiaCommand,
   timeCommand,
 } from './console/commands/events.js';
+import {
+  campaignStatusCommand,
+  campaignCompleteCommand,
+  campaignStartCommand,
+  statsCommand,
+} from './console/commands/campaign.js';
 import { setupEvents } from './core/events/index.js';
 
 // Register all 258 events into the global pool
@@ -146,6 +152,19 @@ runner.register('mafia', 'Mafia ops (status|accident|frame|smuggle)', (args, nam
 );
 runner.register('time', 'Time control (status|pause|resume|speed 4)', (args, named) =>
   timeCommand(ctx, args, named),
+);
+
+// --- Campaign commands (Phase 7) ---
+runner.register('campaign', 'Campaign (status|start level:<id>|complete)', (args, named) => {
+  const sub = args[0] ?? named['sub'] ?? 'status';
+  const rest = args.slice(1);
+  if (sub === 'status') return campaignStatusCommand(ctx, rest, named);
+  if (sub === 'start') return campaignStartCommand(ctx, rest, named);
+  if (sub === 'complete') return campaignCompleteCommand(ctx, rest, named);
+  return { success: false, output: `Unknown sub-command: "${sub}". Use: status | start | complete` };
+});
+runner.register('stats', 'Show per-level success stats and star rating', (args, named) =>
+  statsCommand(ctx, args, named),
 );
 
 const rl = readline.createInterface({
