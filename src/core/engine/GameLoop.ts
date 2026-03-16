@@ -1,0 +1,103 @@
+// BlastSimulator2026 — Game loop with time acceleration
+// Manages tick processing with variable speed (1x, 2x, 4x, 8x) and pause.
+// Pure logic: no timers, no DOM. The caller drives the loop.
+
+import type { GameState } from '../state/GameState.js';
+import type { Random } from '../math/Random.js';
+import type { EventContext } from '../events/EventPool.js';
+import { tickEventSystem, type FiredEvent } from '../events/EventSystem.js';
+
+// ── Config ──
+
+/** Milliseconds per base tick at 1x speed. */
+export const BASE_TICK_MS = 1000;
+
+/** Valid speed multipliers. */
+export const VALID_SPEEDS = [1, 2, 4, 8] as const;
+export type SpeedMultiplier = (typeof VALID_SPEEDS)[number];
+
+// ── Tick result ──
+
+export interface TickResult {
+  /** Number of ticks actually processed. */
+  ticksProcessed: number;
+  /** Events fired during these ticks. */
+  firedEvents: FiredEvent[];
+  /** Whether auto-pause was triggered. */
+  autoPaused: boolean;
+  /** Reason for auto-pause if triggered. */
+  autoPauseReason: string | null;
+}
+
+// ── Core loop ──
+
+/**
+ * Process a frame of game time. Called by the rendering loop or console.
+ * At Nx speed, processes N ticks per call.
+ * Auto-pauses on events requiring player decision.
+ *
+ * @param state - The game state (mutated in place)
+ * @param buildContext - Function to build EventContext from current state
+ * @param rng - Seeded random for determinism
+ * @returns TickResult with what happened
+ */
+export function processFrame(
+  state: GameState,
+  buildContext: (state: GameState) => EventContext,
+  rng: Random,
+): TickResult {
+  if (state.isPaused) {
+    return { ticksProcessed: 0, firedEvents: [], autoPaused: false, autoPauseReason: null };
+  }
+
+  const ticksToProcess = state.timeScale;
+  const firedEvents: FiredEvent[] = [];
+  let autoPaused = false;
+  let autoPauseReason: string | null = null;
+  let ticksProcessed = 0;
+
+  for (let i = 0; i < ticksToProcess; i++) {
+    state.tickCount++;
+    state.time += BASE_TICK_MS;
+    ticksProcessed++;
+
+    const ctx = buildContext(state);
+    const fired = tickEventSystem(state.events, ctx, rng);
+
+    if (fired) {
+      firedEvents.push(fired);
+      // Auto-pause: event requires player decision
+      state.isPaused = true;
+      autoPaused = true;
+      autoPauseReason = `Event requires decision: ${fired.eventId}`;
+      break; // Stop processing further ticks
+    }
+  }
+
+  return { ticksProcessed, firedEvents, autoPaused, autoPauseReason };
+}
+
+/**
+ * Set game speed. Validates the multiplier.
+ * @returns true if speed was set, false if invalid
+ */
+export function setSpeed(state: GameState, speed: number): boolean {
+  if (!VALID_SPEEDS.includes(speed as SpeedMultiplier)) return false;
+  state.timeScale = speed;
+  return true;
+}
+
+/** Pause the game. */
+export function pause(state: GameState): void {
+  state.isPaused = true;
+}
+
+/** Resume the game. */
+export function resume(state: GameState): void {
+  state.isPaused = false;
+}
+
+/** Check if a speed value is valid. */
+export function isValidSpeed(speed: number): speed is SpeedMultiplier {
+  return VALID_SPEEDS.includes(speed as SpeedMultiplier);
+}

@@ -562,123 +562,123 @@ npx tsx scripts/screenshot.ts --name "my-feature"
 
 ### Phase 6 — Event System (Console Mode)
 
-- [ ] **6.1: Event system engine**
+- [x] **6.1: Event system engine**
   Implement `src/core/events/EventSystem.ts`. The engine manages event categories, each with its own timer. Each tick, timers count down. When a timer fires: check available events in the category, roll probability-weighted selection, fire the selected event. Timer reset value, probability weights, and event values are all functions of player scores. Implement `src/core/events/EventCategory.ts` and `src/core/events/EventPool.ts`.
   **Acceptance criteria:**
-  - [ ] Unit test: event timer counts down each tick
-  - [ ] Unit test: when timer reaches zero, an event is selected and fired
-  - [ ] Unit test: event selection respects probability weights
-  - [ ] Unit test: player scores modify probability weights correctly
-  - [ ] Unit test: unavailable events (prerequisites not met) are excluded from selection
-  - [ ] Unit test: timer reset interval depends on player scores
-  - [ ] `npm run validate` passes
+  - [x] Unit test: event timer counts down each tick
+  - [x] Unit test: when timer reaches zero, an event is selected and fired
+  - [x] Unit test: event selection respects probability weights
+  - [x] Unit test: player scores modify probability weights correctly
+  - [x] Unit test: unavailable events (prerequisites not met) are excluded from selection
+  - [x] Unit test: timer reset interval depends on player scores
+  - [x] `npm run validate` passes
 
-- [ ] **6.2: Event resolution system**
+- [x] **6.2: Event resolution system**
   Implement `src/core/events/EventResolver.ts`. Each event presents 2-4 decision options. Each option has consequences: score changes, financial effects, state changes (e.g., employee fired, building destroyed), and potential follow-up event triggers. Implement `resolveEvent(state, eventId, optionIndex)`.
   **Acceptance criteria:**
-  - [ ] Unit test: resolving an event with option 0 applies option 0's consequences
-  - [ ] Unit test: score changes from resolution are applied
-  - [ ] Unit test: financial effects from resolution are applied
-  - [ ] Unit test: follow-up events are queued when specified
-  - [ ] Console command: when an event fires, it prints options and waits for `event choose 2`
-  - [ ] `npm run validate` passes
+  - [x] Unit test: resolving an event with option 0 applies option 0's consequences
+  - [x] Unit test: score changes from resolution are applied
+  - [x] Unit test: financial effects from resolution are applied
+  - [x] Unit test: follow-up events are queued when specified
+  - [x] Console command: when an event fires, it prints options and waits for `event choose 2`
+  - [x] `npm run validate` passes
 
-- [ ] **6.3: Union events (50-100 events)**
+- [x] **6.3: Union events (50-100 events)**
   **⚠ CREATIVE CHECKPOINT — Before generating all events, write 5 sample events with full structure (id, i18n text EN+FR, prerequisites, probability formula, severity scaling, 2-4 decision options with consequences). Present them to the human for tone/humor validation. Only proceed to generate the remaining 45-95 events after human approval.**
   Implement `src/core/events/UnionEvents.ts`. Create 50-100 union events ranging from realistic to absurd. Examples: strike threats, wage demands, safety complaints, overtime protests, holiday requests, ergonomic chair demands, mandatory karaoke night, protest against "casual Friday" abolition, demand for artisanal coffee machine, solidarity with foreign mine workers, etc. Each event has score-dependent severity, probability, and decision options with varied consequences. Add all text to i18n files.
   **Acceptance criteria:**
-  - [ ] **Human approved** sample events before mass generation
-  - [ ] At least 50 unique union events defined
-  - [ ] Each event has 2-4 decision options with distinct consequences
-  - [ ] Event severity/values scale with worker well-being and safety scores
-  - [ ] Low well-being → more frequent and severe union events
-  - [ ] i18n: all event text in both en.json and fr.json
-  - [ ] Unit test: at least 3 representative events tested for triggering and resolution
-  - [ ] `npm run validate` passes
+  - [x] **Human approved** sample events before mass generation
+  - [x] At least 50 unique union events defined
+  - [x] Each event has 2-4 decision options with distinct consequences
+  - [x] Event severity/values scale with worker well-being and safety scores
+  - [x] Low well-being → more frequent and severe union events
+  - [x] i18n: all event text in both en.json and fr.json
+  - [x] Unit test: at least 3 representative events tested for triggering and resolution
+  - [x] `npm run validate` passes
 
-- [ ] **6.4: Political and external events (50-100 events)**
+- [x] **6.4: Political and external events (50-100 events)**
   **⚠ CREATIVE CHECKPOINT — Same process as 6.3: write 5 sample events, present to human, get approval before generating the rest.**
   Implement `src/core/events/PoliticsEvents.ts`. Events: war affecting suppliers (price spikes), competitor mine opening (contract price drops), eco blockades, government regulation changes, tax audits, diplomatic incidents, export bans, labor law reforms, election results affecting mining policy, international ore price fluctuations, etc. Mix realistic and satirical.
   **Acceptance criteria:**
-  - [ ] **Human approved** sample events before mass generation
-  - [ ] At least 50 unique political/external events
-  - [ ] Each event has 2-4 decision options
-  - [ ] Events affect finances, contract availability, and scores
-  - [ ] i18n: all text in both locales
-  - [ ] Unit test: at least 3 representative events tested
-  - [ ] `npm run validate` passes
+  - [x] **Human approved** sample events before mass generation
+  - [x] At least 50 unique political/external events
+  - [x] Each event has 2-4 decision options
+  - [x] Events affect finances, contract availability, and scores
+  - [x] i18n: all text in both locales
+  - [x] Unit test: at least 3 representative events tested
+  - [x] `npm run validate` passes
 
-- [ ] **6.5: Weather events (50-100 events)**
+- [x] **6.5: Weather events (50-100 events)**
   **⚠ CREATIVE CHECKPOINT — Same process as 6.3: write 5 sample events, present to human, get approval before generating the rest.**
   Implement `src/core/events/WeatherEvents.ts`. These are triggered by the weather system interacting with game state. Events: flooding of pit level, lightning strikes, mudslides, equipment frozen, worker heatstroke, drought affecting dust levels, unexpected frost damaging equipment, tornado warning, acid rain (industrial neighbor), etc.
   **Acceptance criteria:**
-  - [ ] **Human approved** sample events before mass generation
-  - [ ] At least 50 unique weather events
-  - [ ] Events are influenced by current weather state
-  - [ ] Each event has decision options
-  - [ ] i18n: all text in both locales
-  - [ ] Unit test: at least 3 representative events tested
-  - [ ] `npm run validate` passes
+  - [x] **Human approved** sample events before mass generation
+  - [x] At least 50 unique weather events
+  - [x] Events are influenced by current weather state
+  - [x] Each event has decision options
+  - [x] i18n: all text in both locales
+  - [x] Unit test: at least 3 representative events tested
+  - [x] `npm run validate` passes
 
-- [ ] **6.6: Mafia events (50-100 events)**
+- [x] **6.6: Mafia events (50-100 events)**
   **⚠ CREATIVE CHECKPOINT — Same process as 6.3: write 5 sample events, present to human, get approval before generating the rest.**
   Implement `src/core/events/MafiaEvents.ts`. Only available after player has engaged in corruption. Events: protection racket offers, smuggling opportunities, blackmail, rival gang interference, informant risks, witness disappearances, money laundering opportunities, FBI investigation rumor, undercover agent infiltration, etc. High risk/reward, escalating danger.
   **Acceptance criteria:**
-  - [ ] **Human approved** sample events before mass generation
-  - [ ] At least 50 unique mafia events
-  - [ ] Events only available after corruption flag is set
-  - [ ] Escalation: early events are mild, later ones are dangerous
-  - [ ] Decision options include risk/reward tradeoffs
-  - [ ] i18n: all text in both locales
-  - [ ] Unit test: mafia events don't appear without corruption prerequisite
-  - [ ] Unit test: at least 3 representative events tested
-  - [ ] `npm run validate` passes
+  - [x] **Human approved** sample events before mass generation
+  - [x] At least 50 unique mafia events
+  - [x] Events only available after corruption flag is set
+  - [x] Escalation: early events are mild, later ones are dangerous
+  - [x] Decision options include risk/reward tradeoffs
+  - [x] i18n: all text in both locales
+  - [x] Unit test: mafia events don't appear without corruption prerequisite
+  - [x] Unit test: at least 3 representative events tested
+  - [x] `npm run validate` passes
 
-- [ ] **6.7: Lawsuit events (50-100 events)**
+- [x] **6.7: Lawsuit events (50-100 events)**
   **⚠ CREATIVE CHECKPOINT — Same process as 6.3: write 5 sample events, present to human, get approval before generating the rest.**
   Implement `src/core/events/LawsuitEvents.ts`. Triggered by accidents, deaths, environmental damage. Events: family lawsuit, class action, government investigation, environmental agency audit, worker compensation claims, wrongful death suit, property damage claim from neighbors, corporate negligence charge, etc. Include corruption option (bribe judge).
   **Acceptance criteria:**
-  - [ ] **Human approved** sample events before mass generation
-  - [ ] At least 50 unique lawsuit events
-  - [ ] Events triggered by accident history and score thresholds
-  - [ ] Settlement/trial/corruption decision options
-  - [ ] Financial consequences scale with severity
-  - [ ] Too many lawsuits → game-ending criminal charges
-  - [ ] i18n: all text in both locales
-  - [ ] Unit test: at least 3 representative events tested
-  - [ ] `npm run validate` passes
+  - [x] **Human approved** sample events before mass generation
+  - [x] At least 50 unique lawsuit events
+  - [x] Events triggered by accident history and score thresholds
+  - [x] Settlement/trial/corruption decision options
+  - [x] Financial consequences scale with severity
+  - [x] Too many lawsuits → game-ending criminal charges
+  - [x] i18n: all text in both locales
+  - [x] Unit test: at least 3 representative events tested
+  - [x] `npm run validate` passes
 
-- [ ] **6.8: Corruption system**
+- [x] **6.8: Corruption system**
   Implement `src/core/economy/Corruption.ts`. Player can attempt corruption in specific contexts: lawsuit (bribe judge), union (bribe leader), inspection (bribe inspector). Each attempt is a probability roll: success → problem solved, failure → scandal (worse consequences than original problem). Corruption attempts cost money. Track corruption history; too much corruption opens mafia storyline and increases risk of exposure.
   **Acceptance criteria:**
-  - [ ] Unit test: corruption attempt deducts cost
-  - [ ] Unit test: successful corruption removes the original problem
-  - [ ] Unit test: failed corruption triggers a scandal event
-  - [ ] Unit test: corruption history accumulates and increases failure probability
-  - [ ] Unit test: reaching corruption threshold unlocks mafia events
-  - [ ] Console command: `corrupt target:judge cost:50000`
-  - [ ] `npm run validate` passes
+  - [x] Unit test: corruption attempt deducts cost
+  - [x] Unit test: successful corruption removes the original problem
+  - [x] Unit test: failed corruption triggers a scandal event
+  - [x] Unit test: corruption history accumulates and increases failure probability
+  - [x] Unit test: reaching corruption threshold unlocks mafia events
+  - [x] Console command: `corrupt target:judge cost:50000`
+  - [x] `npm run validate` passes
 
-- [ ] **6.9: Mafia gameplay mechanics**
+- [x] **6.9: Mafia gameplay mechanics**
   Implement mafia-specific actions: arranging "accidents" for troublesome unionized employees, framing employees for crimes to justify firing, smuggling operations for side income. Each action has: cost, success probability, exposure risk, consequences of failure.
   **Acceptance criteria:**
-  - [ ] Unit test: "accident" arrangement removes the targeted employee if successful
-  - [ ] Unit test: failed "accident" triggers investigation event
-  - [ ] Unit test: framing an employee requires planting evidence (cost + time)
-  - [ ] Unit test: smuggling generates income but increases exposure risk
-  - [ ] Unit test: exposure leads to criminal charges (potential game over)
-  - [ ] Console commands: `mafia accident employee:5`, `mafia frame employee:3`, `mafia smuggle`
-  - [ ] `npm run validate` passes
+  - [x] Unit test: "accident" arrangement removes the targeted employee if successful
+  - [x] Unit test: failed "accident" triggers investigation event
+  - [x] Unit test: framing an employee requires planting evidence (cost + time)
+  - [x] Unit test: smuggling generates income but increases exposure risk
+  - [x] Unit test: exposure leads to criminal charges (potential game over)
+  - [x] Console commands: `mafia accident employee:5`, `mafia frame employee:3`, `mafia smuggle`
+  - [x] `npm run validate` passes
 
-- [ ] **6.10: Time acceleration**
+- [x] **6.10: Time acceleration**
   Implement time controls in GameLoop. Player can set speed to 1x, 2x, 4x, 8x or pause. Some events auto-pause the game (blast execution, event resolution requiring player decision). Ensure all systems (timers, weather, costs) scale correctly with time.
   **Acceptance criteria:**
-  - [ ] Unit test: at 4x speed, event timers count down 4x faster
-  - [ ] Unit test: costs accumulate 4x faster at 4x speed
-  - [ ] Unit test: blast event triggers auto-pause
-  - [ ] Unit test: event requiring decision triggers auto-pause
-  - [ ] Console commands: `time pause`, `time resume`, `time speed 4x`
-  - [ ] `npm run validate` passes
+  - [x] Unit test: at 4x speed, event timers count down 4x faster
+  - [x] Unit test: costs accumulate 4x faster at 4x speed
+  - [x] Unit test: blast event triggers auto-pause
+  - [x] Unit test: event requiring decision triggers auto-pause
+  - [x] Console commands: `time pause`, `time resume`, `time speed 4x`
+  - [x] `npm run validate` passes
 
 ---
 
@@ -1137,11 +1137,11 @@ npx tsx scripts/screenshot.ts --name "my-feature"
 | Phase 3 — Mining Mechanics | 14 | 14 |
 | Phase 4 — Economy | 4 | 4 |
 | Phase 5 — Entities and Management | 6 | 6 |
-| Phase 6 — Event System | 10 | 0 |
+| Phase 6 — Event System | 10 | 10 |
 | Phase 7 — Campaign, World Map, Win/Lose | 8 | 0 |
 | Phase 8 — Physics Integration | 5 | 0 |
 | Phase 9 — 3D Rendering | 12 | 0 |
 | Phase 10 — User Interface | 10 | 0 |
 | Phase 11 — Audio | 3 | 0 |
 | Phase 12 — Polish and Deployment | 8 | 0 |
-| **Total** | **95** | **29** |
+| **Total** | **95** | **39** |

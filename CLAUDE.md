@@ -40,7 +40,7 @@ For all game constants (rock fracture thresholds, explosive energy per kg, contr
 - Write tests BEFORE or ALONGSIDE implementation
 - All `src/core/` code must be **pure TypeScript** — no DOM, no WebGL, no `window`, no side effects
 - All user-facing strings go through the i18n system (`t('key')`) — always add both `en.json` and `fr.json`
-- No file should exceed 300 lines — split into sub-modules
+- No **code** file should exceed 300 lines — split into sub-modules. Data/content files (event definitions, i18n JSON) are exempt from this limit.
 - Use the seeded PRNG (`src/core/math/Random.ts`) for all randomness so tests are deterministic
 
 ## After Every Task

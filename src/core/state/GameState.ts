@@ -21,6 +21,12 @@ import type { DamageState } from '../entities/Damage.js';
 import { createDamageState } from '../entities/Damage.js';
 import type { ZoneState } from '../entities/Zone.js';
 import { createZoneState } from '../entities/Zone.js';
+import type { EventSystemState } from '../events/EventSystem.js';
+import { createEventSystemState } from '../events/EventSystem.js';
+import type { CorruptionState } from '../economy/Corruption.js';
+import { createCorruptionState } from '../economy/Corruption.js';
+import type { MafiaState } from '../events/MafiaActions.js';
+import { createMafiaState } from '../events/MafiaActions.js';
 
 /** Save format version — increment when GameState shape changes. */
 export const SAVE_VERSION = 1;
@@ -91,6 +97,12 @@ export interface GameState {
   damage: DamageState;
   /** Safety zone state. */
   zone: ZoneState;
+  /** Event system state (timers, pending events, follow-up queue). */
+  events: EventSystemState;
+  /** Corruption state (bribery history, mafia unlock). */
+  corruption: CorruptionState;
+  /** Mafia state (exposure, smuggling, frames). */
+  mafia: MafiaState;
 }
 
 export interface WorldState {
@@ -135,5 +147,8 @@ export function createGame(config: GameConfig): GameState {
     scores: createScoreState(),
     damage: createDamageState(),
     zone: createZoneState(),
+    events: createEventSystemState(),
+    corruption: createCorruptionState(),
+    mafia: createMafiaState(),
   };
 }
