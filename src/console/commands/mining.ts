@@ -22,6 +22,7 @@ import {
 } from '../../core/weather/WeatherCycle.js';
 import { Random } from '../../core/math/Random.js';
 import { buyTubing, installTubing, createTubingState } from '../../core/mining/Tubing.js';
+import type { FragmentData } from '../../core/mining/BlastExecution.js';
 
 // ── Extended context for mining ──
 
@@ -30,6 +31,10 @@ export interface MiningContext extends GameContext {
   rng?: Random;
   softwareTier: number;
   tubingState: ReturnType<typeof createTubingState>;
+  /** Positions of fragments from the last blast — used by renderer for localized re-mesh. */
+  lastBlastFragments?: { x: number; y: number; z: number }[];
+  /** Full fragment data from last blast — used by renderer to spawn fragment meshes. */
+  lastBlastFragmentData?: FragmentData[];
 }
 
 function requireGame(ctx: MiningContext): string | null {
@@ -195,6 +200,10 @@ export function blastCommand(
 
   const result = executeBlast(plan, ctx.grid!, []);
   if (!result) return { success: false, output: 'Blast execution failed.' };
+
+  // Store fragment data for renderer (localized remesh + mesh spawning)
+  ctx.lastBlastFragments = result.fragments.map(f => f.position);
+  ctx.lastBlastFragmentData = result.fragments;
 
   return {
     success: true,

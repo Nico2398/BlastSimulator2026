@@ -5,17 +5,12 @@ import type { Random } from '../math/Random.js';
 import type { ScoreState } from '../scores/ScoreManager.js';
 import type { EventDef, EventCategory, EventContext } from './EventPool.js';
 import { getEventsByCategory } from './EventPool.js';
+import { EVENT_BASE_TIMERS } from '../config/balance.js';
 
-// ── Config ──
+// ── Config (imported from centralized balance) ──
 
 /** Base timer reset values per category (in ticks). */
-const BASE_TIMER: Record<EventCategory, number> = {
-  union: 25,
-  politics: 40,
-  weather: 30,
-  mafia: 50,
-  lawsuit: 35,
-};
+const BASE_TIMER: Record<EventCategory, number> = { ...EVENT_BASE_TIMERS };
 
 // ── Timer state ──
 

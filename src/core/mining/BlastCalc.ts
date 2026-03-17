@@ -7,16 +7,15 @@ import { vec3, sub, normalize, scale, length as vecLength } from '../math/Vec3.j
 import type { DrillHole } from './DrillPlan.js';
 import type { HoleCharge } from './ChargePlan.js';
 import { getExplosive } from '../world/ExplosiveCatalog.js';
+import { BLAST_ENERGY_EPSILON, MAX_FRAGMENTS_PER_VOXEL, PROJECTION_SPEED_THRESHOLD } from '../config/balance.js';
 
 // ────────────────────────────────────────────────────────
 // § 2: Energy Calculation
 // ────────────────────────────────────────────────────────
 
-// Minimum effective distance² for energy field.
-// Set to 4.0 (equivalent to 2m min radius) because charge is distributed
-// along borehole depth (~8m), not a point source. Real blasting literature
-// models the "near field" as uniform within ~2x borehole radius.
-const EPSILON = 4.0;
+// Minimum effective distance² for energy field (imported from balance config).
+// Real blasting: near field is uniform within ~2x borehole radius (~2m).
+const EPSILON = BLAST_ENERGY_EPSILON;
 
 /** Raw energy of a charged hole (before stemming/water effects). */
 export function calculateHoleEnergy(charge: HoleCharge): number {
@@ -145,7 +144,7 @@ export function calculateFragmentation(
  * Capped at MAX_FRAGMENTS_PER_VOXEL to prevent memory issues.
  * Over-blasted dust is represented as a few "dust pile" fragments, not individual particles.
  */
-const MAX_FRAGMENTS_PER_VOXEL = 20;
+// MAX_FRAGMENTS_PER_VOXEL imported from balance config above
 
 export function calculateFragmentCount(
   voxelVolume: number,
@@ -160,7 +159,7 @@ export function calculateFragmentCount(
 // § 5.1: Initial Velocity
 // ────────────────────────────────────────────────────────
 
-const PROJECTION_SPEED_THRESHOLD = 15; // m/s
+// PROJECTION_SPEED_THRESHOLD imported from balance config above
 
 /**
  * Calculate initial velocity of a fragment.

@@ -9,11 +9,13 @@ import { tickEventSystem, type FiredEvent } from '../events/EventSystem.js';
 
 // ── Config ──
 
+import { BASE_TICK_MS as _BASE_TICK_MS, VALID_SPEEDS as _VALID_SPEEDS } from '../config/balance.js';
+
 /** Milliseconds per base tick at 1x speed. */
-export const BASE_TICK_MS = 1000;
+export const BASE_TICK_MS = _BASE_TICK_MS;
 
 /** Valid speed multipliers. */
-export const VALID_SPEEDS = [1, 2, 4, 8] as const;
+export const VALID_SPEEDS = _VALID_SPEEDS;
 export type SpeedMultiplier = (typeof VALID_SPEEDS)[number];
 
 // ── Tick result ──

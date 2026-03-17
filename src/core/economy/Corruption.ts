@@ -3,15 +3,16 @@
 // More corruption → higher failure risk → mafia events unlock.
 
 import type { Random } from '../math/Random.js';
+import { BRIBERY_BASE_SUCCESS, BRIBERY_HISTORY_PENALTY, MAFIA_UNLOCK_THRESHOLD } from '../config/balance.js';
 
-// ── Config ──
+// ── Config (imported from centralized balance) ──
 
 /** Base success rate for corruption attempts. */
-const BASE_SUCCESS_RATE = 0.7;
+const BASE_SUCCESS_RATE = BRIBERY_BASE_SUCCESS;
 /** Each prior corruption attempt reduces success rate by this much. */
-const HISTORY_PENALTY = 0.03;
+const HISTORY_PENALTY = BRIBERY_HISTORY_PENALTY;
 /** Corruption level that unlocks mafia events. */
-export const MAFIA_THRESHOLD = 3;
+export const MAFIA_THRESHOLD = MAFIA_UNLOCK_THRESHOLD;
 
 // ── Corruption targets ──
 

@@ -17,7 +17,7 @@ const WEATHER_ICONS: Partial<Record<WeatherState, string>> = {
   cold_snap: '❄️',
 };
 
-const SPEED_LABELS: Record<number, string> = { 1: '1×', 2: '2×', 4: '4×', 8: '8×' };
+// Speed labels use i18n key hud.speed_x with interpolation
 const SPEED_CYCLE = [1, 2, 4, 8];
 
 export class HUD {
@@ -55,7 +55,7 @@ export class HUD {
 
     this.speedBtn = document.createElement('button');
     this.speedBtn.className = 'bs-speed-btn';
-    this.speedBtn.textContent = '1×';
+    this.speedBtn.textContent = t('hud.speed_x', { speed: '1' });
     this.speedBtn.title = t('hud.speed');
     this.speedBtn.addEventListener('click', () => this.cycleSpeed());
 
@@ -114,7 +114,7 @@ export class HUD {
 
     // Speed
     this.currentSpeed = state.timeScale;
-    this.speedBtn.textContent = SPEED_LABELS[state.timeScale] ?? `${state.timeScale}×`;
+    this.speedBtn.textContent = t('hud.speed_x', { speed: String(state.timeScale) });
 
     // Weather icon
     if (weather) {

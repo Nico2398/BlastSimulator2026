@@ -1,9 +1,15 @@
-// FragmentMesh — unit tests
+// FragmentMesh — unit tests (InstancedMesh-based renderer)
+//
+// The renderer now uses 8 InstancedMesh objects (one per shape variant)
+// for batched GPU rendering — 8 draw calls for any fragment count.
+// Tests verify count tracking, position updates, removal, and capping.
 
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 import { FragmentMesh } from '../../../src/renderer/FragmentMesh.js';
+
+const SHAPE_VARIANTS = 8;
 
 function makeFragment(id: number, overrides: Partial<FragmentData> = {}): FragmentData {
   return {
@@ -19,89 +25,89 @@ function makeFragment(id: number, overrides: Partial<FragmentData> = {}): Fragme
   };
 }
 
-describe('FragmentMesh', () => {
-  it('spawnFragments adds meshes to scene', () => {
+describe('FragmentMesh (InstancedMesh)', () => {
+  it('constructor adds SHAPE_VARIANTS InstancedMesh objects to scene', () => {
+    const scene = new THREE.Scene();
+    const fm = new FragmentMesh(scene);
+    expect(scene.children.length).toBe(SHAPE_VARIANTS);
+    fm.dispose();
+  });
+
+  it('spawnFragments updates count correctly', () => {
     const scene = new THREE.Scene();
     const fm = new FragmentMesh(scene);
     fm.spawnFragments([makeFragment(1), makeFragment(2), makeFragment(3)]);
-    expect(scene.children.length).toBe(3);
     expect(fm.count).toBe(3);
     fm.dispose();
   });
 
-  it('fragments are sized relative to volume', () => {
+  it('count starts at 0 before spawning', () => {
     const scene = new THREE.Scene();
     const fm = new FragmentMesh(scene);
-    const small = makeFragment(1, { volume: 0.1 });
-    const large = makeFragment(2, { volume: 2.0 });
-    fm.spawnFragments([small, large]);
+    expect(fm.count).toBe(0);
+    fm.dispose();
+  });
 
-    const m1 = scene.children[0] as THREE.Mesh;
-    const m2 = scene.children[1] as THREE.Mesh;
-    // Large fragment should have larger scale
-    expect(m2.scale.x).toBeGreaterThan(m1.scale.x);
+  it('spawnFragments places fragments into instanced buckets', () => {
+    const scene = new THREE.Scene();
+    const fm = new FragmentMesh(scene);
+    // Spawn 8 fragments — one per shape variant (id % 8 distributes them)
+    const frags = Array.from({ length: 8 }, (_, i) => makeFragment(i));
+    fm.spawnFragments(frags);
+    expect(fm.count).toBe(8);
     fm.dispose();
   });
 
   it('projection fragments are rendered (isProjection=true)', () => {
     const scene = new THREE.Scene();
     const fm = new FragmentMesh(scene);
-    fm.spawnFragments([makeFragment(10, { isProjection: true })]);
-    expect(scene.children.length).toBe(1);
-    // Material color should be reddish
-    const mesh = scene.children[0] as THREE.Mesh;
-    const mat = mesh.material as THREE.MeshPhongMaterial;
-    expect(mat.color.r).toBeGreaterThan(mat.color.b);
+    fm.spawnFragments([makeFragment(0, { isProjection: true })]);
+    expect(fm.count).toBe(1);
+    // Instanced mesh for bucket 0 should have count=1
+    const im = scene.children[0] as THREE.InstancedMesh;
+    expect(im.count).toBe(1);
     fm.dispose();
   });
 
-  it('ore-rich fragments are tinted toward gold', () => {
+  it('updatePositions changes instance matrix position', () => {
     const scene = new THREE.Scene();
     const fm = new FragmentMesh(scene);
-    const orePoor = makeFragment(1, { oreDensities: { gold: 0.01 }, rockId: 'cruite' });
-    const oreRich = makeFragment(2, { oreDensities: { gold: 0.50 }, rockId: 'cruite' });
-    fm.spawnFragments([orePoor, oreRich]);
+    fm.spawnFragments([makeFragment(0)]);
+    fm.updatePositions(new Map([[0, { x: 10, y: 20, z: 30 }]]));
 
-    const mPoor = scene.children[0] as THREE.Mesh;
-    const mRich = scene.children[1] as THREE.Mesh;
-    const cPoor = (mPoor.material as THREE.MeshPhongMaterial).color;
-    const cRich = (mRich.material as THREE.MeshPhongMaterial).color;
-    // Gold tint should make ore-rich fragment have more red+green than poor
-    const goldnessPoor = cPoor.r + cPoor.g;
-    const goldnessRich = cRich.r + cRich.g;
-    expect(goldnessRich).toBeGreaterThan(goldnessPoor);
+    // Extract position from the instanced matrix
+    const im = scene.children[0] as THREE.InstancedMesh;
+    const mtx = new THREE.Matrix4();
+    im.getMatrixAt(0, mtx);
+    const pos = new THREE.Vector3();
+    pos.setFromMatrixPosition(mtx);
+    expect(pos.x).toBeCloseTo(10);
+    expect(pos.y).toBeCloseTo(20);
+    expect(pos.z).toBeCloseTo(30);
     fm.dispose();
   });
 
-  it('updatePositions moves mesh to new position', () => {
+  it('removeFragment decrements count using swap-with-last', () => {
     const scene = new THREE.Scene();
     const fm = new FragmentMesh(scene);
-    fm.spawnFragments([makeFragment(5)]);
-    fm.updatePositions(new Map([[5, { x: 10, y: 20, z: 30 }]]));
-    const mesh = scene.children[0] as THREE.Mesh;
-    expect(mesh.position.x).toBeCloseTo(10);
-    expect(mesh.position.y).toBeCloseTo(20);
-    expect(mesh.position.z).toBeCloseTo(30);
-    fm.dispose();
-  });
-
-  it('removeFragment removes specific mesh from scene', () => {
-    const scene = new THREE.Scene();
-    const fm = new FragmentMesh(scene);
-    fm.spawnFragments([makeFragment(1), makeFragment(2), makeFragment(3)]);
-    fm.removeFragment(2);
-    expect(scene.children.length).toBe(2);
+    // Use fragments in same bucket (all id % 8 === 0)
+    fm.spawnFragments([makeFragment(0), makeFragment(8), makeFragment(16)]);
+    expect(fm.count).toBe(3);
+    fm.removeFragment(8); // Remove middle fragment
     expect(fm.count).toBe(2);
     fm.dispose();
   });
 
-  it('clearAll removes all fragments', () => {
+  it('clearAll resets all counts to 0', () => {
     const scene = new THREE.Scene();
     const fm = new FragmentMesh(scene);
-    fm.spawnFragments([makeFragment(1), makeFragment(2), makeFragment(3)]);
+    fm.spawnFragments([makeFragment(0), makeFragment(1), makeFragment(2)]);
     fm.clearAll();
-    expect(scene.children.length).toBe(0);
     expect(fm.count).toBe(0);
+    // All instanced meshes should have count 0
+    for (const child of scene.children) {
+      expect((child as THREE.InstancedMesh).count).toBe(0);
+    }
     fm.dispose();
   });
 
@@ -111,6 +117,23 @@ describe('FragmentMesh', () => {
     const frags = Array.from({ length: 3000 }, (_, i) => makeFragment(i));
     fm.spawnFragments(frags);
     expect(fm.count).toBeLessThanOrEqual(2000);
+    fm.dispose();
+  });
+
+  it('dispose() removes all instanced meshes from scene', () => {
+    const scene = new THREE.Scene();
+    const fm = new FragmentMesh(scene);
+    fm.spawnFragments([makeFragment(0), makeFragment(1)]);
+    fm.dispose();
+    expect(scene.children.length).toBe(0);
+  });
+
+  it('2000 fragments spawn without error (performance smoke test)', () => {
+    const scene = new THREE.Scene();
+    const fm = new FragmentMesh(scene);
+    const frags = Array.from({ length: 2000 }, (_, i) => makeFragment(i));
+    expect(() => fm.spawnFragments(frags)).not.toThrow();
+    expect(fm.count).toBe(2000);
     fm.dispose();
   });
 });

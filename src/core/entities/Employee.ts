@@ -2,33 +2,22 @@
 // Workers with roles, morale, union status, and injury tracking.
 
 import { Random } from '../math/Random.js';
+import { HIRING_COSTS as _HIRING_COSTS, BASE_SALARIES as _BASE_SALARIES, PAY_CYCLE_TICKS as _PAY_CYCLE_TICKS } from '../config/balance.js';
 
 // ── Roles ──
 
 export type EmployeeRole = 'driller' | 'blaster' | 'driver' | 'surveyor' | 'manager';
 
-// ── Config ──
+// ── Config (imported from centralized balance) ──
 
 /** Hiring cost by role ($). */
-const HIRING_COSTS: Record<EmployeeRole, number> = {
-  driller: 1000,
-  blaster: 1500,
-  driver: 800,
-  surveyor: 1200,
-  manager: 2000,
-};
+const HIRING_COSTS: Record<EmployeeRole, number> = { ..._HIRING_COSTS };
 
 /** Base salary per pay cycle by role ($). */
-const BASE_SALARIES: Record<EmployeeRole, number> = {
-  driller: 500,
-  blaster: 700,
-  driver: 400,
-  surveyor: 600,
-  manager: 1000,
-};
+const BASE_SALARIES: Record<EmployeeRole, number> = { ..._BASE_SALARIES };
 
 /** Ticks between pay cycles. */
-export const PAY_CYCLE_TICKS = 10;
+export const PAY_CYCLE_TICKS = _PAY_CYCLE_TICKS;
 
 // ── Name generation ──
 

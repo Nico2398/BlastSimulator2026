@@ -1,11 +1,17 @@
 // BlastSimulator2026 — Browser entry point
-// Initializes the 3D scene, UI, audio, and exposes the console bridge.
+// Initializes the 3D scene, UI, audio, save system, and exposes the console bridge.
 
 import { SceneManager } from './renderer/SceneManager.js';
 import { GameRenderer } from './renderer/GameRenderer.js';
 import { UIManager } from './ui/UIManager.js';
+import { SaveLoadUI } from './ui/SaveLoadUI.js';
+import { TutorialOverlay } from './ui/TutorialOverlay.js';
+import { KeyboardShortcuts } from './ui/KeyboardShortcuts.js';
+import { MainMenu } from './ui/MainMenu.js';
 import { AudioManager } from './audio/AudioManager.js';
 import { AudioHooks } from './audio/AudioHooks.js';
+import { IndexedDBPersistence } from './persistence/IndexedDBPersistence.js';
+import { DownloadPersistence } from './persistence/DownloadPersistence.js';
 import { createRunner } from './console/createRunner.js';
 
 // --- 3D Scene ---
@@ -18,6 +24,35 @@ const gameRenderer = new GameRenderer(scene);
 // --- UI ---
 const uiContainer = document.getElementById('bs-ui-root') ?? document.body;
 const uiManager = new UIManager(uiContainer);
+
+// --- Persistence ---
+let saveBackend;
+try {
+  saveBackend = new IndexedDBPersistence();
+} catch {
+  saveBackend = new DownloadPersistence();
+}
+
+// --- Save/Load UI ---
+const saveLoadUI = new SaveLoadUI(uiContainer);
+saveLoadUI.setBackend(saveBackend);
+saveLoadUI.setGetState(() => ctx.state);
+
+// --- Main Menu ---
+const mainMenu = new MainMenu(uiContainer);
+mainMenu.setOnNewCampaign(() => {
+  mainMenu.hide();
+  if (!TutorialOverlay.isCompleted()) tutorial.start();
+});
+mainMenu.setOnStartLevel((levelId) => {
+  window.__gameConsole(`new_game level:${levelId}`);
+});
+mainMenu.setOnLoad(() => { saveLoadUI.show(); });
+mainMenu.setOnSettings(() => { uiManager.showPanel('settings'); });
+mainMenu.show();
+
+// --- Tutorial ---
+const tutorial = new TutorialOverlay(uiContainer);
 
 // --- Audio ---
 const audioMgr = new AudioManager();
@@ -70,10 +105,27 @@ uiManager.setGameConsole(window.__gameConsole);
 uiManager.setSpeedChangeHandler((speed) => {
   window.__gameConsole(`speed ${speed}`);
 });
+saveLoadUI.setOnLoad((state) => {
+  // Restore loaded state into the runner context
+  ctx.state = state;
+  gameRenderer.syncFromContext(ctx);
+});
+
+// --- Keyboard Shortcuts ---
+new KeyboardShortcuts({
+  togglePause: () => window.__gameConsole('pause'),
+  setSpeed: (n) => window.__gameConsole(`speed ${n}`),
+  togglePanel: (name) => uiManager.togglePanel(name as any),
+  quickSave: () => { if (ctx.state) void saveLoadUI['autoSave'](ctx.state); },
+  openSettings: () => uiManager.togglePanel('settings'),
+});
 
 // --- Render loop ---
 scene.start((dt) => {
   gameRenderer.update(dt);
   // Update UI from current state on each frame
-  if (ctx.state) uiManager.update(ctx.state, ctx.weatherCycle?.current);
+  if (ctx.state) {
+    uiManager.update(ctx.state, ctx.weatherCycle?.current);
+    saveLoadUI.onTick(ctx.state);
+  }
 });
