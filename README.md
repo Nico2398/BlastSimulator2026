@@ -923,16 +923,16 @@ npx tsx scripts/screenshot.ts --name "my-feature"
 
 ### Phase 10 — User Interface
 
-- [ ] **10.1: HUD**
+- [x] **10.1: HUD**
   Implement `src/ui/HUD.ts`. HTML overlay showing: cash balance, current time/date, time speed, all four scores as bars, active event notification, current weather icon. Positioned at screen edges, non-intrusive.
   **Acceptance criteria:**
-  - [ ] HUD displays current balance updated in real-time
-  - [ ] Score bars reflect current score values
-  - [ ] Time speed indicator shows current setting and is clickable to change
-  - [ ] Weather icon matches current weather
-  - [ ] `npm run validate` passes
+  - [x] HUD displays current balance updated in real-time
+  - [x] Score bars reflect current score values
+  - [x] Time speed indicator shows current setting and is clickable to change
+  - [x] Weather icon matches current weather
+  - [x] `npm run validate` passes
 
-- [ ] **10.2: Blast plan editor UI**
+- [x] **10.2: Blast plan editor UI**
   Implement `src/ui/BlastPlanUI.ts`. Interactive interface for designing blast plans:
   - Click terrain to place drill holes, or use grid tool
   - Select holes to set charges (dropdown for explosive type, slider for amount)
@@ -940,85 +940,85 @@ npx tsx scripts/screenshot.ts --name "my-feature"
   - Preview button (triggers software overlays if owned)
   - Execute button (with confirmation dialog)
   **Acceptance criteria:**
-  - [ ] Can place holes by clicking on terrain
-  - [ ] Can set charge type and amount per hole via UI controls
-  - [ ] Sequence editor allows setting delays
-  - [ ] Preview button activates overlay if software is owned
-  - [ ] Execute button triggers blast with confirmation
-  - [ ] All UI text uses i18n
-  - [ ] `npm run validate` passes
+  - [x] Can place holes by clicking on terrain
+  - [x] Can set charge type and amount per hole via UI controls
+  - [x] Sequence editor allows setting delays
+  - [x] Preview button activates overlay if software is owned
+  - [x] Execute button triggers blast with confirmation
+  - [x] All UI text uses i18n
+  - [x] `npm run validate` passes
 
-- [ ] **10.3: Contract UI**
+- [x] **10.3: Contract UI**
   Implement `src/ui/ContractUI.ts`. Show available contracts in a list. Each contract shows: material, quantity, price, deadline, penalty. Buttons: accept, negotiate, decline. Active contracts panel shows progress toward delivery.
   **Acceptance criteria:**
-  - [ ] Available contracts render with all details
-  - [ ] Accept/negotiate/decline buttons work correctly
-  - [ ] Negotiation result is shown with updated terms
-  - [ ] Active contracts show progress bars
-  - [ ] All text uses i18n
-  - [ ] `npm run validate` passes
+  - [x] Available contracts render with all details
+  - [x] Accept/negotiate/decline buttons work correctly
+  - [x] Negotiation result is shown with updated terms
+  - [x] Active contracts show progress bars
+  - [x] All text uses i18n
+  - [x] `npm run validate` passes
 
-- [ ] **10.4: Build menu**
+- [x] **10.4: Build menu**
   Implement `src/ui/BuildMenu.ts`. Grid of available building types with icons, names, costs. Click to enter placement mode (ghost building follows cursor on terrain). Click to place, right-click to cancel. Tooltip shows building effects.
   **Acceptance criteria:**
-  - [ ] Building menu shows all building types with costs
-  - [ ] Placement mode shows ghost building at cursor position
-  - [ ] Valid placement locations highlighted in green, invalid in red
-  - [ ] Placing a building updates GameState and renders the building
-  - [ ] `npm run validate` passes
+  - [x] Building menu shows all building types with costs
+  - [x] Placement mode shows ghost building at cursor position
+  - [x] Valid placement locations highlighted in green, invalid in red
+  - [x] Placing a building updates GameState and renders the building
+  - [x] `npm run validate` passes
 
-- [ ] **10.5: Vehicle management panel**
+- [x] **10.5: Vehicle management panel**
   Implement `src/ui/VehiclePanel.ts`. List of owned vehicles with type, status, current task, health. Buttons: buy new, assign task, move, scrap. Task assignment shows available tasks (transport, dig, drill, build).
   **Acceptance criteria:**
-  - [ ] Vehicle list shows all fleet vehicles
-  - [ ] Can buy new vehicles
-  - [ ] Can assign vehicles to tasks
-  - [ ] Vehicle status updates in real-time
-  - [ ] `npm run validate` passes
+  - [x] Vehicle list shows all fleet vehicles
+  - [x] Can buy new vehicles
+  - [x] Can assign vehicles to tasks
+  - [x] Vehicle status updates in real-time
+  - [x] `npm run validate` passes
 
-- [ ] **10.6: Employee management panel**
+- [x] **10.6: Employee management panel**
   Implement `src/ui/EmployeePanel.ts`. List of employees with name, role, salary, morale, union status, health. Buttons: hire, fire, raise. Sorting and filtering by role.
   **Acceptance criteria:**
-  - [ ] Employee list shows all employees
-  - [ ] Can hire new employees by role
-  - [ ] Fire button works (except for unionized employees — show error)
-  - [ ] Raise button adjusts salary and morale
-  - [ ] `npm run validate` passes
+  - [x] Employee list shows all employees
+  - [x] Can hire new employees by role
+  - [x] Fire button works (except for unionized employees — show error)
+  - [x] Raise button adjusts salary and morale
+  - [x] `npm run validate` passes
 
-- [ ] **10.7: Event dialog**
+- [x] **10.7: Event dialog**
   Implement `src/ui/EventDialog.ts`. When an event fires, show a popup dialog with: event title, narrative text, 2-4 decision buttons. Each button shows a brief description of the option. After choosing, show outcome text. Auto-pauses the game.
   **Acceptance criteria:**
-  - [ ] Event dialog appears when an event fires
-  - [ ] Game pauses while dialog is open
-  - [ ] Decision buttons trigger event resolution
-  - [ ] Outcome text is displayed after resolution
-  - [ ] Dialog can be dismissed to resume game
-  - [ ] All text uses i18n
-  - [ ] `npm run validate` passes
+  - [x] Event dialog appears when an event fires
+  - [x] Game pauses while dialog is open
+  - [x] Decision buttons trigger event resolution
+  - [x] Outcome text is displayed after resolution
+  - [x] Dialog can be dismissed to resume game
+  - [x] All text uses i18n
+  - [x] `npm run validate` passes
 
-- [ ] **10.8: Survey UI**
+- [x] **10.8: Survey UI**
   Implement `src/ui/SurveyUI.ts`. Click terrain to survey. Show results as a popup or panel: rock type, ore densities as colored bars, depth profile.
   **Acceptance criteria:**
-  - [ ] Clicking terrain in survey mode triggers a survey
-  - [ ] Results show rock type and ore densities clearly
-  - [ ] Already-surveyed locations show data without re-surveying
-  - [ ] `npm run validate` passes
+  - [x] Clicking terrain in survey mode triggers a survey
+  - [x] Results show rock type and ore densities clearly
+  - [x] Already-surveyed locations show data without re-surveying
+  - [x] `npm run validate` passes
 
-- [ ] **10.9: Settings menu**
+- [x] **10.9: Settings menu**
   Implement `src/ui/SettingsMenu.ts`. Options: language selector (en/fr), audio volume (master, effects, music), game speed, save game, load game, quit.
   **Acceptance criteria:**
-  - [ ] Language change immediately updates all UI text
-  - [ ] Save/load buttons work correctly
-  - [ ] All text uses i18n
-  - [ ] `npm run validate` passes
+  - [x] Language change immediately updates all UI text
+  - [x] Save/load buttons work correctly
+  - [x] All text uses i18n
+  - [x] `npm run validate` passes
 
-- [ ] **10.10: Mini-map**
+- [x] **10.10: Mini-map**
   Small overview map in corner showing: terrain outline, building positions, vehicle positions, blast zone indicators. Clickable to jump camera to location.
   **Acceptance criteria:**
-  - [ ] Mini-map renders in screen corner
-  - [ ] Shows buildings and vehicles as colored dots
-  - [ ] Clicking mini-map moves main camera
-  - [ ] `npm run validate` passes
+  - [x] Mini-map renders in screen corner
+  - [x] Shows buildings and vehicles as colored dots
+  - [x] Clicking mini-map moves main camera
+  - [x] `npm run validate` passes
 
 ---
 
@@ -1141,7 +1141,7 @@ npx tsx scripts/screenshot.ts --name "my-feature"
 | Phase 7 — Campaign, World Map, Win/Lose | 8 | 8 |
 | Phase 8 — Physics Integration | 5 | 5 |
 | Phase 9 — 3D Rendering | 12 | 12 |
-| Phase 10 — User Interface | 10 | 0 |
+| Phase 10 — User Interface | 10 | 10 |
 | Phase 11 — Audio | 3 | 0 |
 | Phase 12 — Polish and Deployment | 8 | 0 |
-| **Total** | **95** | **47** |
+| **Total** | **95** | **57** |
