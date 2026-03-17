@@ -53,6 +53,26 @@ const noiseA = createNoise3D(() => 0.1337);
 const noiseB = createNoise3D(() => 0.7171);
 const noiseVein = createNoise3D(() => 0.3141);
 
+// ---------- Color sample cache ----------
+// Quantise to 0.5-unit grid to avoid recalculating identical nearby positions.
+// At a typical terrain mesh resolution this yields a >4× cache hit rate.
+const COLOR_SAMPLE_CACHE = new Map<string, THREE.Color>();
+// Clear cache before each chunk rebuild to avoid unbounded growth
+let cacheHits = 0;
+let cacheMisses = 0;
+
+/** Clear the sample cache. Call before rebuilding a chunk to prevent unbounded growth. */
+export function clearColorSampleCache(): void {
+  COLOR_SAMPLE_CACHE.clear();
+  cacheHits = 0;
+  cacheMisses = 0;
+}
+
+/** Return cache hit/miss stats (for performance monitoring). */
+export function getColorCacheStats(): { hits: number; misses: number } {
+  return { hits: cacheHits, misses: cacheMisses };
+}
+
 // ---------- Public API ----------
 
 /**
@@ -67,15 +87,27 @@ export function sampleRockColor(
   rockId: string,
   wx: number, wy: number, wz: number,
 ): THREE.Color {
+  // Quantise to 0.5-unit grid for caching — visually imperceptible at vertex density
+  const qx = Math.round(wx * 2) / 2;
+  const qy = Math.round(wy * 2) / 2;
+  const qz = Math.round(wz * 2) / 2;
+  const cacheKey = `${rockId}:${qx},${qy},${qz}`;
+  const cached = COLOR_SAMPLE_CACHE.get(cacheKey);
+  if (cached) {
+    cacheHits++;
+    return cached;
+  }
+  cacheMisses++;
+
   const cfg = ROCK_NOISE[rockId] ?? DEFAULT_NOISE_CONFIG;
   const baseColor = getRockBaseColor(rockId);
 
   // Primary macro variation
-  const na = noiseA(wx * cfg.freqA, wy * cfg.freqA, wz * cfg.freqA); // [-1, 1]
+  const na = noiseA(qx * cfg.freqA, qy * cfg.freqA, qz * cfg.freqA); // [-1, 1]
   // Secondary detail variation
-  const nb = noiseB(wx * cfg.freqB, wy * cfg.freqB, wz * cfg.freqB);
+  const nb = noiseB(qx * cfg.freqB, qy * cfg.freqB, qz * cfg.freqB);
   // Vein — sharp (abs of noise gives vein-like ridges)
-  const nv = Math.abs(noiseVein(wx * cfg.veinFreq, wy * cfg.veinFreq, wz * cfg.veinFreq));
+  const nv = Math.abs(noiseVein(qx * cfg.veinFreq, qy * cfg.veinFreq, qz * cfg.veinFreq));
   const vein = Math.max(0, 1 - nv * 5); // thin white/dark streaks
 
   // Combined brightness modifier
@@ -89,7 +121,9 @@ export function sampleRockColor(
   const g = Math.max(0, Math.min(1, baseColor.g + brightness * 0.9));
   const b = Math.max(0, Math.min(1, baseColor.b + brightness * 0.85));
 
-  return new THREE.Color(r, g, b);
+  const color = new THREE.Color(r, g, b);
+  COLOR_SAMPLE_CACHE.set(cacheKey, color);
+  return color;
 }
 
 /**

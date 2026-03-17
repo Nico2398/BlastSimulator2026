@@ -6,24 +6,17 @@
 
 import type { GameState } from '../state/GameState.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
+import {
+  BANKRUPTCY_THRESHOLD as _THRESHOLD,
+  BANKRUPTCY_GRACE_TICKS as _GRACE,
+  BANKRUPTCY_WARNING_TICKS as _WARNING,
+} from '../config/balance.js';
 
-// ── Config ──
+// ── Config (imported from centralized balance) ──
 
-/**
- * Cash threshold below which the player is "dangerously low".
- * Real basis: a small quarry needs ~$10k to cover payroll + ops each cycle.
- * Scaled to game: $5,000 minimum operating reserve.
- */
-export const BANKRUPTCY_THRESHOLD = 5000;
-
-/**
- * Ticks below threshold before bankruptcy triggers.
- * At 1 tick/100ms game time, 100 ticks ≈ 10 seconds real-time ≈ several game-weeks.
- */
-export const BANKRUPTCY_GRACE_TICKS = 100;
-
-/** Ticks below threshold before first warning fires. */
-export const BANKRUPTCY_WARNING_TICKS = 30;
+export const BANKRUPTCY_THRESHOLD = _THRESHOLD;
+export const BANKRUPTCY_GRACE_TICKS = _GRACE;
+export const BANKRUPTCY_WARNING_TICKS = _WARNING;
 
 // ── State ──
 

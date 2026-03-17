@@ -174,19 +174,33 @@ export class GameRenderer {
   onBlast(ctx: MiningContext): void {
     if (!this.terrain || !this.lastGrid) return;
 
-    // Rebuild terrain to show crater
-    this.terrain.buildAll();
+    // Localized terrain remesh: only rebuild chunks containing affected voxels.
+    // Fragment positions tell us exactly which voxels were blasted.
+    if (ctx.lastBlastFragments && ctx.lastBlastFragments.length > 0) {
+      this.terrain.update(ctx.lastBlastFragments);
+    } else {
+      // Fallback: full rebuild (e.g. if fragment data unavailable)
+      this.terrain.buildAll();
+    }
+
+    // Spawn fragment meshes for the blasted rock
+    if (this.fragments && ctx.lastBlastFragmentData && ctx.lastBlastFragmentData.length > 0) {
+      this.fragments.clearAll();
+      this.fragments.spawnFragments(ctx.lastBlastFragmentData);
+    }
 
     if (!this.blastEffects || !ctx.state) return;
 
-    // Build hole detonations from the (now-cleared) state context
-    // Use drill holes from before the blast — they're cleared after execution.
-    // Fall back to a generic effect centred on the grid.
-    const gx = (this.lastGrid.sizeX / 2);
-    const gz = (this.lastGrid.sizeZ / 2);
-    const origin = new THREE.Vector3(gx, 0, gz);
+    // Compute blast origin from fragment centroid or grid centre
+    let ox = this.lastGrid.sizeX / 2;
+    let oz = this.lastGrid.sizeZ / 2;
+    if (ctx.lastBlastFragments && ctx.lastBlastFragments.length > 0) {
+      ox = ctx.lastBlastFragments.reduce((s, p) => s + p.x, 0) / ctx.lastBlastFragments.length;
+      oz = ctx.lastBlastFragments.reduce((s, p) => s + p.z, 0) / ctx.lastBlastFragments.length;
+    }
+    const origin = new THREE.Vector3(ox, 0, oz);
     this.blastEffects.trigger({
-      holes: [{ x: gx, y: 0, z: gz, delaySeconds: 0 }],
+      holes: [{ x: ox, y: 0, z: oz, delaySeconds: 0 }],
       energyLevel: 0.6,
       origin,
     });

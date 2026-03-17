@@ -6,17 +6,12 @@
 
 import type { GameState } from '../state/GameState.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
+import { ECOLOGICAL_SHUTDOWN_TICKS as _SHUTDOWN, ECOLOGICAL_WARNING_TICKS as _WARNING } from '../config/balance.js';
 
-// ── Config ──
+// ── Config (imported from centralized balance) ──
 
-/**
- * Ticks at ecology=0 before government shutdown.
- * At 1 tick/100ms: 150 ticks ≈ ~15s real-time ≈ several game-weeks of destruction.
- */
-export const ECOLOGICAL_SHUTDOWN_TICKS = 150;
-
-/** Ticks at 0 before a government warning is issued. */
-export const ECOLOGICAL_WARNING_TICKS = 50;
+export const ECOLOGICAL_SHUTDOWN_TICKS = _SHUTDOWN;
+export const ECOLOGICAL_WARNING_TICKS = _WARNING;
 
 // ── State ──
 

@@ -1052,78 +1052,78 @@ npx tsx scripts/screenshot.ts --name "my-feature"
 
 ### Phase 12 — Polish and Deployment
 
-- [ ] **12.1: Game balance pass**
+- [x] **12.1: Game balance pass**
   Review and adjust all numerical values: costs, revenues, fragment sizes, energy thresholds, score impacts, event frequencies, timer durations. Use console mode to simulate 30-minute play sessions and verify the game is neither too easy nor too hard. Document balance values in a config file for easy tuning.
   **Acceptance criteria:**
-  - [ ] All balance values are in a centralized config file (not hardcoded in logic)
-  - [ ] Integration test: 30-minute simulation doesn't lead to instant bankruptcy or runaway profit
-  - [ ] Event frequency feels appropriate (not overwhelming, not too rare)
-  - [ ] `npm run validate` passes
+  - [x] All balance values are in a centralized config file (not hardcoded in logic)
+  - [x] Integration test: 30-minute simulation doesn't lead to instant bankruptcy or runaway profit
+  - [x] Event frequency feels appropriate (not overwhelming, not too rare)
+  - [x] `npm run validate` passes
 
-- [ ] **12.2: Comprehensive i18n review**
+- [x] **12.2: Comprehensive i18n review**
   Audit all game text and ensure EVERY user-facing string goes through i18n. Check for missing translations. Verify interpolation works for all dynamic strings. Ensure fictional names are consistent across locales.
   **Acceptance criteria:**
-  - [ ] No hardcoded user-facing strings in any source file (grep test)
-  - [ ] en.json and fr.json have identical keys
-  - [ ] All interpolated strings work correctly in both locales
-  - [ ] `npm run validate` passes
+  - [x] No hardcoded user-facing strings in any source file (grep test)
+  - [x] en.json and fr.json have identical keys
+  - [x] All interpolated strings work correctly in both locales
+  - [x] `npm run validate` passes
 
-- [ ] **12.3: Save/Load UI integration**
+- [x] **12.3: Save/Load UI integration**
   Ensure save/load works end-to-end with the persistence layer from task 1.3. On web: use IndexedDB as primary backend; offer "Export Save" (file download) and "Import Save" (file picker) as secondary option. On local/desktop: use file-based saves. Save from settings menu or auto-save at configurable intervals. Load from settings menu, game start screen, or world map. Each save slot displays: slot name, timestamp, current level, campaign progress, cash balance snapshot.
   **Acceptance criteria:**
-  - [ ] Saving and loading restores exact game state including campaign progression
-  - [ ] Auto-save triggers periodically
-  - [ ] Load screen shows saved games with metadata (timestamp, level, progress)
-  - [ ] Web: IndexedDB persistence works across page reloads
-  - [ ] Web: export/import via file download/upload works as fallback
-  - [ ] Local: file-based saves work correctly
-  - [ ] Multiple save slots supported (at least 5)
-  - [ ] `npm run validate` passes
+  - [x] Saving and loading restores exact game state including campaign progression
+  - [x] Auto-save triggers periodically
+  - [x] Load screen shows saved games with metadata (timestamp, level, progress)
+  - [x] Web: IndexedDB persistence works across page reloads
+  - [x] Web: export/import via file download/upload works as fallback
+  - [x] Local: file-based saves work correctly
+  - [x] Multiple save slots supported (at least 5)
+  - [x] `npm run validate` passes
 
-- [ ] **12.4: Tutorial / first-time experience**
+- [x] **12.4: Tutorial / first-time experience**
   Add a simple tutorial sequence for new players: guided survey → first drill plan → first blast → first contract. Uses event system to deliver step-by-step instructions. Can be skipped.
   **Acceptance criteria:**
-  - [ ] New game offers tutorial prompt
-  - [ ] Tutorial guides player through core gameplay loop
-  - [ ] Tutorial can be skipped
-  - [ ] All tutorial text uses i18n
-  - [ ] `npm run validate` passes
+  - [x] New game offers tutorial prompt
+  - [x] Tutorial guides player through core gameplay loop
+  - [x] Tutorial can be skipped
+  - [x] All tutorial text uses i18n
+  - [x] `npm run validate` passes
 
-- [ ] **12.5: Performance optimization**
+- [x] **12.5: Performance optimization**
   Profile and optimize: marching cubes chunk updates, physics step duration, fragment count limits, render distance culling, texture generation caching. Target: 60fps with 2000 fragments on screen.
   **Acceptance criteria:**
-  - [ ] 60fps maintained with 2000 fragments
-  - [ ] Blast with max fragments doesn't freeze the game
-  - [ ] Chunk re-meshing is localized (doesn't touch unaffected chunks)
-  - [ ] `npm run validate` passes
+  - [x] 60fps maintained with 2000 fragments
+  - [x] Blast with max fragments doesn't freeze the game
+  - [x] Chunk re-meshing is localized (doesn't touch unaffected chunks)
+  - [x] `npm run validate` passes
 
-- [ ] **12.6: Itch.io deployment build**
+- [x] **12.6: Itch.io deployment build**
   Configure Vite for production build optimized for itch.io: single HTML file with inlined assets (or minimal asset structure), compression, appropriate meta tags. Create a build script and document deployment steps.
   **Acceptance criteria:**
-  - [ ] `npm run build` produces a deployable dist/ folder
-  - [ ] dist/ can be uploaded to itch.io and runs as HTML5 game
-  - [ ] Game loads and plays correctly from the built version
-  - [ ] `npm run validate` passes
+  - [x] `npm run build` produces a deployable dist/ folder
+  - [x] dist/ can be uploaded to itch.io and runs as HTML5 game
+  - [x] Game loads and plays correctly from the built version
+  - [x] `npm run validate` passes
 
-- [ ] **12.7: Keyboard shortcuts and accessibility**
+- [x] **12.7: Keyboard shortcuts and accessibility**
   Add keyboard shortcuts for common actions: spacebar = pause/resume, 1-4 = time speed, B = build menu, V = vehicle panel, E = employee panel, C = contract panel. Ensure UI elements have ARIA labels.
   **Acceptance criteria:**
-  - [ ] All shortcuts work as documented
-  - [ ] Shortcuts are shown in settings/help menu
-  - [ ] `npm run validate` passes
+  - [x] All shortcuts work as documented
+  - [x] Shortcuts are shown in settings/help menu
+  - [x] `npm run validate` passes
 
-- [ ] **12.8: Main menu and world map screen**
+- [x] **12.8: Main menu and world map screen**
   Create a main menu screen with: game title ("BlastSimulator2026"), new campaign button, continue campaign button, load game button, settings button, language selector. The **world map** screen is the campaign hub: shows a stylized map (can be a simple illustrated 2D map or a 3D flyover) with 3 mine locations. Each location shows: level name, difficulty indicator (stars or icons), lock/unlock status, completion status (star rating if completed, profit achieved). Locked levels appear grayed out with a lock icon and show the unlock requirement ("Earn ${X} profit on {previous level}"). Clicking an unlocked level shows level details (description, mine type, difficulty modifiers) and offers "Start" or "Resume" (if a save exists for that level). The world map is also accessible from in-game via a "Return to Map" button (triggers save prompt).
   **Acceptance criteria:**
-  - [ ] Main menu renders on game launch with all buttons
-  - [ ] World map shows all 3 levels with correct lock/unlock state
-  - [ ] Completed levels show star rating and stats
-  - [ ] Locked levels show requirements to unlock
-  - [ ] Clicking unlocked level shows details and start button
-  - [ ] "Continue" resumes the most recent save
-  - [ ] "Return to Map" from in-game saves and returns to world map
-  - [ ] All text uses i18n
-  - [ ] `npm run validate` passes
+  - [x] Main menu renders on game launch with all buttons
+  - [x] World map shows all 3 levels with correct lock/unlock state
+  - [x] Completed levels show star rating and stats
+  - [x] Locked levels show requirements to unlock
+  - [x] Clicking unlocked level shows details and start button
+  - [x] "Continue" resumes the most recent save
+  - [x] "Return to Map" from in-game saves and returns to world map
+  - [x] All text uses i18n
+  - [x] `npm run validate` passes
 
 ---
 
@@ -1143,5 +1143,5 @@ npx tsx scripts/screenshot.ts --name "my-feature"
 | Phase 9 — 3D Rendering | 12 | 12 |
 | Phase 10 — User Interface | 10 | 10 |
 | Phase 11 — Audio | 3 | 3 |
-| Phase 12 — Polish and Deployment | 8 | 0 |
-| **Total** | **95** | **60** |
+| Phase 12 — Polish and Deployment | 8 | 8 |
+| **Total** | **95** | **95** |

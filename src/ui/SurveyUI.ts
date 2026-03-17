@@ -62,7 +62,7 @@ export class SurveyUI {
 
     const posLine = document.createElement('div');
     posLine.style.cssText = 'color:#a08060;margin-bottom:4px';
-    posLine.textContent = `Survey (${x}, ${z})`;
+    posLine.textContent = t('ui.survey.pos', { x: String(x), z: String(z) });
 
     const content = document.createElement('pre');
     content.style.cssText = 'margin:0;font-family:inherit;font-size:10px;white-space:pre-wrap;color:#c0a070';

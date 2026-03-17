@@ -3,15 +3,38 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="BlastSimulator2026 — dig. blast. profit. A satirical open-pit mine management game." />
+    <meta name="author" content="BlastSimulator2026" />
+    <!-- Open Graph for itch.io embed previews -->
+    <meta property="og:title" content="BlastSimulator2026" />
+    <meta property="og:description" content="Dig. Blast. Profit. A satirical open-pit mine management game." />
+    <meta property="og:type" content="website" />
     <title>BlastSimulator2026</title>
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
-      body { background: #1a1a2e; overflow: hidden; }
+      body { background: #050a0f; overflow: hidden; }
       #game-canvas { display: block; width: 100vw; height: 100vh; }
+      /* Loading state — hidden once JS initialises */
+      #bs-loading {
+        position: fixed; inset: 0;
+        display: flex; align-items: center; justify-content: center;
+        background: #050a0f; color: #f0c060;
+        font-family: monospace; font-size: 18px;
+        z-index: 99999;
+      }
     </style>
   </head>
   <body>
+    <div id="bs-loading">Loading BlastSimulator2026…</div>
     <canvas id="game-canvas"></canvas>
+    <div id="bs-ui-root"></div>
     <script type="module" src="/src/main.ts"></script>
+    <script>
+      // Remove loading screen once the module loads
+      window.addEventListener('load', () => {
+        const el = document.getElementById('bs-loading');
+        if (el) el.style.display = 'none';
+      });
+    </script>
   </body>
 </html>

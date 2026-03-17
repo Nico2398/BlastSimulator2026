@@ -6,14 +6,11 @@
 
 import type { GameState } from '../state/GameState.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
+import { ARREST_EXPOSURE_THRESHOLD as _THRESHOLD } from '../config/balance.js';
 
-// ── Config ──
+// ── Config (imported from centralized balance) ──
 
-/**
- * Exposure threshold that triggers arrest (0-1 scale).
- * Above 0.9 = the whole town knows. Arrest is inevitable.
- */
-export const ARREST_EXPOSURE_THRESHOLD = 0.9;
+export const ARREST_EXPOSURE_THRESHOLD = _THRESHOLD;
 
 // ── State ──
 

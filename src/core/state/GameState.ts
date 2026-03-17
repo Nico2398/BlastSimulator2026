@@ -150,7 +150,8 @@ export interface SavedBlastPlan {
   sequenceDelays: Record<string, number>;
 }
 
-const DEFAULT_STARTING_CASH = 50000;
+import { STARTING_CASH } from '../config/balance.js';
+const DEFAULT_STARTING_CASH = STARTING_CASH;
 
 /** Create a fresh GameState from config. */
 export function createGame(config: GameConfig): GameState {

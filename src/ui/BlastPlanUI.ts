@@ -59,7 +59,7 @@ export class BlastPlanUI {
     seqBtn.className = 'bs-btn';
     seqBtn.style.width = '100%';
     seqBtn.style.marginBottom = '4px';
-    seqBtn.textContent = 'Auto Sequence';
+    seqBtn.textContent = t('ui.blast.auto_seq');
     seqBtn.addEventListener('click', () => { this.gameConsole?.('sequence auto'); });
 
     const previewBtn = document.createElement('button');
@@ -125,7 +125,7 @@ export class BlastPlanUI {
     const editBtn = document.createElement('button');
     editBtn.className = 'bs-btn';
     editBtn.style.cssText = 'padding:1px 6px;font-size:10px';
-    editBtn.textContent = '✏';
+    editBtn.textContent = t('ui.blast.edit_hole');
     editBtn.addEventListener('click', () => this.selectHole(hole.id));
 
     row.append(idEl, info, editBtn);
@@ -160,7 +160,7 @@ export class BlastPlanUI {
     const applyBtn = document.createElement('button');
     applyBtn.className = 'bs-btn bs-btn-primary';
     applyBtn.style.cssText = 'width:100%;margin-top:6px';
-    applyBtn.textContent = 'Apply Charge';
+    applyBtn.textContent = t('ui.blast.apply_charge');
     applyBtn.addEventListener('click', () => {
       if (!this.selectedHoleId) return;
       const exp = explosiveSelect.value;

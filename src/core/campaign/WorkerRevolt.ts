@@ -6,17 +6,12 @@
 
 import type { GameState } from '../state/GameState.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
+import { REVOLT_TICKS as _REVOLT, REVOLT_WARNING_TICKS as _WARNING } from '../config/balance.js';
 
-// ── Config ──
+// ── Config (imported from centralized balance) ──
 
-/**
- * Ticks at well-being=0 before permanent revolt triggers.
- * At 1 tick/100ms: 120 ticks ≈ ~12s real-time ≈ a few game-weeks of misery.
- */
-export const REVOLT_TICKS = 120;
-
-/** Ticks at 0 before a first strike warning. */
-export const REVOLT_WARNING_TICKS = 40;
+export const REVOLT_TICKS = _REVOLT;
+export const REVOLT_WARNING_TICKS = _WARNING;
 
 // ── State ──
 

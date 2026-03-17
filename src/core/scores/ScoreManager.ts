@@ -38,8 +38,10 @@ export interface ScoreInputs {
 
 // ── Update logic ──
 
+import { SCORE_DECAY_RATE } from '../config/balance.js';
+
 /** Decay rate: scores drift towards 50 by this much per tick. */
-const DECAY_RATE = 0.05;
+const DECAY_RATE = SCORE_DECAY_RATE;
 
 /**
  * Update scores based on current inputs. Mutates state.

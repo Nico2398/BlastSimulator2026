@@ -9,7 +9,7 @@
 import * as THREE from 'three';
 import type { VoxelGrid } from '../core/world/VoxelGrid.js';
 import { EDGE_TABLE, TRI_TABLE } from './MarchingCubesTables.js';
-import { sampleRockColor } from './ProceduralTexture.js';
+import { sampleRockColor, clearColorSampleCache } from './ProceduralTexture.js';
 
 // ---------- Constants ----------
 // 16 voxels per chunk side — standard for MC chunk streaming
@@ -134,6 +134,10 @@ export class TerrainMesh {
   }
 
   private buildChunk(cx: number, cy: number, cz: number): void {
+    // Clear color cache before rebuilding — prevents unbounded growth across
+    // all chunks and gives high hit-rate within a single chunk's vertices
+    clearColorSampleCache();
+
     const key = this.chunkKey(cx, cy, cz);
 
     // Remove existing mesh
@@ -171,8 +175,11 @@ export class TerrainMesh {
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
     geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
     geometry.computeVertexNormals();
+    // Required for frustum culling — Three.js skips off-screen chunks automatically
+    geometry.computeBoundingSphere();
 
     const mesh = new THREE.Mesh(geometry, this.material);
+    mesh.frustumCulled = true;
     this.scene.add(mesh);
     this.chunks.set(key, mesh);
   }
