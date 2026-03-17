@@ -132,7 +132,10 @@ export function vehicleCommand(
       if (!getAllVehicleTypes().includes(type)) {
         return { success: false, output: `Usage: vehicle buy (${getAllVehicleTypes().join('|')})` };
       }
-      const { vehicle, cost } = purchaseVehicle(state.vehicles, type);
+      // Spawn near grid centre so vehicles are visible from default camera
+      const spawnX = state.world ? state.world.sizeX / 2 : 32;
+      const spawnZ = state.world ? state.world.sizeZ / 2 : 32;
+      const { vehicle, cost } = purchaseVehicle(state.vehicles, type, spawnX, spawnZ);
       addExpense(state.finances, cost, 'equipment', `Buy ${type}`, state.tickCount);
       return { success: true, output: `Purchased ${type} #${vehicle.id}. Cost: $${cost}` };
     }
@@ -196,7 +199,9 @@ export function employeeCommand(
       if (!validRoles.includes(role)) {
         return { success: false, output: `Usage: employee hire role:(${validRoles.join('|')})` };
       }
-      const { employee, hiringCost } = hireEmployee(state.employees, role, rng);
+      const empX = state.world ? state.world.sizeX / 2 + (state.employees.employees.length % 5) * 2 : 32;
+      const empZ = state.world ? state.world.sizeZ / 2 : 32;
+      const { employee, hiringCost } = hireEmployee(state.employees, role, rng, empX, empZ);
       addExpense(state.finances, hiringCost, 'salaries', `Hire ${role}: ${employee.name}`, state.tickCount);
       return { success: true, output: `Hired ${employee.name} (${role}). Cost: $${hiringCost}` };
     }

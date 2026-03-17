@@ -30,6 +30,8 @@ export class SceneManager {
   readonly camera: THREE.PerspectiveCamera;
   readonly renderer: THREE.WebGLRenderer;
   readonly cameraController: CameraController;
+  readonly sun: THREE.DirectionalLight;
+  readonly ambient: THREE.AmbientLight;
 
   private animFrameId = -1;
   private readonly resizeHandler: () => void;
@@ -54,12 +56,12 @@ export class SceneManager {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
     // --- Lighting ---
-    const ambient = new THREE.AmbientLight(AMBIENT_COLOR, AMBIENT_INTENSITY);
-    this.scene.add(ambient);
+    this.ambient = new THREE.AmbientLight(AMBIENT_COLOR, AMBIENT_INTENSITY);
+    this.scene.add(this.ambient);
 
-    const sun = new THREE.DirectionalLight(SUN_COLOR, SUN_INTENSITY);
-    sun.position.copy(SUN_POSITION);
-    this.scene.add(sun);
+    this.sun = new THREE.DirectionalLight(SUN_COLOR, SUN_INTENSITY);
+    this.sun.position.copy(SUN_POSITION);
+    this.scene.add(this.sun);
 
     // Softer fill from the opposite side (blue-sky bounce)
     const fill = new THREE.DirectionalLight(0xd0e8ff, 0.3);
@@ -74,10 +76,15 @@ export class SceneManager {
     window.addEventListener('resize', this.resizeHandler);
   }
 
-  /** Start the 60fps render loop. */
-  start(): void {
+  /** Start the 60fps render loop. Optional onUpdate callback fires each frame with delta-time. */
+  start(onUpdate?: (dt: number) => void): void {
+    let lastTime = performance.now();
     const loop = () => {
       this.animFrameId = requestAnimationFrame(loop);
+      const now = performance.now();
+      const dt = Math.min((now - lastTime) / 1000, 0.1); // cap at 100ms
+      lastTime = now;
+      if (onUpdate) onUpdate(dt);
       this.renderer.render(this.scene, this.camera);
     };
     loop();

@@ -43,11 +43,11 @@ This runs: TypeScript compilation → Unit tests → Build check → Task consis
 - Or run the integration test suite: `npx vitest run tests/integration/`
 
 ### Step 6: Visual Check (if applicable)
-- If the task involves rendering, take a screenshot:
+- If the task involves rendering, take a screenshot using the one-command helper (see `.agent/VISUAL_TESTING.md`):
 ```bash
-npx tsx scripts/screenshot.ts
+bash scripts/visual-test.sh --name "task-name" --commands "new_game seed:1"
 ```
-- Inspect the screenshot to verify visual correctness
+- Inspect the screenshot to verify visual correctness; fix issues before marking complete
 
 ### Step 7: Mark Complete
 - Update README.md: change `- [ ]` to `- [x]` for the completed task
@@ -172,3 +172,4 @@ Before implementing a feature, read the relevant document:
 | Blast mechanics | `.agent/BLAST_SYSTEM.md` |
 | Writing tests | `.agent/TESTING.md` |
 | Workflow questions | `.agent/WORKFLOW.md` (this file) |
+| Visual/screenshot testing | `.agent/VISUAL_TESTING.md` |
