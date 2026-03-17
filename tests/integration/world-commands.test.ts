@@ -6,12 +6,13 @@ import {
   terrainInfoCommand,
   surveyCommand,
 } from '../../src/console/commands/world.js';
+import { EventEmitter } from '../../src/core/state/EventEmitter.js';
 
 describe('Console — world commands', () => {
   let ctx: GameContext;
 
   beforeEach(() => {
-    ctx = { state: null, grid: null };
+    ctx = { state: null, grid: null, emitter: new EventEmitter() };
   });
 
   describe('new_game', () => {
@@ -62,7 +63,7 @@ describe('Console — world commands', () => {
     });
 
     it('errors with no game loaded', () => {
-      const emptyCtx: GameContext = { state: null, grid: null };
+      const emptyCtx: GameContext = { state: null, grid: null, emitter: new EventEmitter() };
       const result = inspectCommand(emptyCtx, ['10,5,3'], {});
       expect(result.success).toBe(false);
     });
