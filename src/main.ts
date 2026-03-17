@@ -149,6 +149,7 @@ new KeyboardShortcuts({
 // At 1x speed: 1 tick/second. At 4x: 4 ticks/second.
 // Accumulated time prevents tick drift from frame-rate variation.
 let accumulatedGameMs = 0;
+let hadPendingEvent = false;
 
 scene.start((dt) => {
   gameRenderer.update(dt);
@@ -166,6 +167,15 @@ scene.start((dt) => {
         break;
       }
     }
+  }
+
+  // Play chime when a new pending event appears
+  if (ctx.state) {
+    const hasPendingEvent = !!ctx.state.events.pendingEvent;
+    if (hasPendingEvent && !hadPendingEvent) {
+      audioHooks.onEventNotification();
+    }
+    hadPendingEvent = hasPendingEvent;
   }
 
   // Update UI from current state on each frame
