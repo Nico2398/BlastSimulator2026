@@ -92,6 +92,29 @@ export class UIManager {
     this.hud.setSpeedChangeHandler(cb);
   }
 
+  /**
+   * Show a brief toast notification (game-over warnings, contract expiry, etc.).
+   * Auto-dismisses after 6 seconds.
+   */
+  showNotification(message: string): void {
+    const el = document.createElement('div');
+    el.style.cssText = [
+      'position:fixed;bottom:80px;left:50%;transform:translateX(-50%)',
+      'background:#3a1a0a;border:1px solid #c06020;border-radius:6px',
+      'padding:10px 18px;font-size:13px;color:#f0c060',
+      'z-index:10000;pointer-events:none;text-align:center;max-width:360px',
+      'box-shadow:0 2px 12px rgba(0,0,0,0.8)',
+    ].join(';');
+    el.textContent = message;
+    document.body.appendChild(el);
+    // Fade out and remove
+    setTimeout(() => {
+      el.style.transition = 'opacity 0.5s';
+      el.style.opacity = '0';
+      setTimeout(() => el.remove(), 500);
+    }, 5500);
+  }
+
   update(state: GameState, weather?: WeatherState): void {
     this.hud.update(state, weather);
     this.miniMap.update(state);

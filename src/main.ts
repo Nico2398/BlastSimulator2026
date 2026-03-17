@@ -13,6 +13,7 @@ import { AudioHooks } from './audio/AudioHooks.js';
 import { IndexedDBPersistence } from './persistence/IndexedDBPersistence.js';
 import { DownloadPersistence } from './persistence/DownloadPersistence.js';
 import { createRunner } from './console/createRunner.js';
+import { BASE_TICK_MS } from './core/engine/GameLoop.js';
 
 // --- 3D Scene ---
 const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
@@ -65,7 +66,30 @@ document.addEventListener('pointerdown', () => {
 // --- Console Bridge ---
 // window.__gameConsole(cmd) routes commands to the same ConsoleRunner used in CLI mode.
 // Required by scripts/screenshot.ts to drive the game from headless Chrome.
-const { runner, ctx } = createRunner();
+const { runner, ctx, emitter } = createRunner();
+
+// --- Subscribe to game-over emitter events for UI notifications ---
+emitter.on('bankruptcy:triggered', ({ cash }) => {
+  uiManager.showNotification?.(`💸 BANKRUPTCY! Cash: $${Math.floor(cash)}. Level failed.`);
+});
+emitter.on('bankruptcy:warning', ({ ticksRemaining }) => {
+  uiManager.showNotification?.(`⚠️ Low funds! Bankruptcy in ${ticksRemaining} ticks.`);
+});
+emitter.on('ecology:shutdown', () => {
+  uiManager.showNotification?.('🌿 ECOLOGICAL SHUTDOWN! Government closed the mine. Level failed.');
+});
+emitter.on('ecology:warning', ({ ticksRemaining }) => {
+  uiManager.showNotification?.(`⚠️ Ecological violation! Shutdown in ${ticksRemaining} ticks.`);
+});
+emitter.on('arrest:triggered', () => {
+  uiManager.showNotification?.('🚔 CRIMINAL ARREST! Mafia exposure too high. Level failed.');
+});
+emitter.on('revolt:triggered', () => {
+  uiManager.showNotification?.('✊ WORKER REVOLT! Permanent strike declared. Level failed.');
+});
+emitter.on('revolt:warning', ({ ticksRemaining }) => {
+  uiManager.showNotification?.(`⚠️ Workers furious! Revolt in ${ticksRemaining} ticks.`);
+});
 
 declare global {
   interface Window {
@@ -120,9 +144,30 @@ new KeyboardShortcuts({
   openSettings: () => uiManager.togglePanel('settings'),
 });
 
-// --- Render loop ---
+// --- Render loop + game tick timer ---
+// The game ticks at BASE_TICK_MS intervals, adjusted for time scale.
+// At 1x speed: 1 tick/second. At 4x: 4 ticks/second.
+// Accumulated time prevents tick drift from frame-rate variation.
+let accumulatedGameMs = 0;
+
 scene.start((dt) => {
   gameRenderer.update(dt);
+
+  // Advance game time
+  if (ctx.state && !ctx.state.isPaused) {
+    accumulatedGameMs += dt * 1000;
+    // Tick every BASE_TICK_MS ms; timeScale is handled inside tickCommand
+    while (accumulatedGameMs >= BASE_TICK_MS) {
+      accumulatedGameMs -= BASE_TICK_MS;
+      window.__gameConsole(`tick ${ctx.state.timeScale}`);
+      // Stop if game paused mid-loop (e.g. an event fired)
+      if (ctx.state.isPaused) {
+        accumulatedGameMs = 0;
+        break;
+      }
+    }
+  }
+
   // Update UI from current state on each frame
   if (ctx.state) {
     uiManager.update(ctx.state, ctx.weatherCycle?.current);

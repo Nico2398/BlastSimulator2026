@@ -14,7 +14,15 @@ import {
   getSuccessRate,
   type CorruptionTarget,
 } from '../../core/economy/Corruption.js';
-import { addExpense } from '../../core/economy/Finance.js';
+import { addExpense, addIncome } from '../../core/economy/Finance.js';
+import { processPayCycle } from '../../core/entities/Employee.js';
+import { checkDeadlines, generateContracts } from '../../core/economy/Contract.js';
+import { updateBankruptcy } from '../../core/campaign/Bankruptcy.js';
+import { updateEcology } from '../../core/campaign/EcologicalDisaster.js';
+import { updateArrest } from '../../core/campaign/CriminalArrest.js';
+import { updateRevolt } from '../../core/campaign/WorkerRevolt.js';
+import { CONTRACT_REFRESH_INTERVAL } from '../../core/config/balance.js';
+import { BASE_TICK_MS } from '../../core/engine/GameLoop.js';
 import {
   arrangeAccident,
   startFraming,
@@ -60,39 +68,73 @@ export function tickCommand(
   const count = Math.max(1, parseInt(args[0] ?? '1', 10) || 1);
   const lines: string[] = [];
   const rng = new Random(state.seed + state.tickCount);
+  const emitter = ctx.emitter;
 
   for (let i = 0; i < count; i++) {
     state.tickCount++;
+    state.time += BASE_TICK_MS;
+
+    // 1. Event system
     const evCtx = buildEventContext(ctx);
     const fired = tickEventSystem(state.events, evCtx, rng);
 
-    // Process smuggling each tick
+    // 2. Payroll — processPayCycle increments ticksSincePayday internally
+    const paySalary = processPayCycle(state.employees);
+    if (paySalary > 0) {
+      state.cash -= paySalary;
+      addExpense(state.finances, paySalary, 'salaries', 'Payroll', state.tickCount);
+    }
+
+    // 3. Contract deadlines — expire overdue contracts and apply penalties
+    const expired = checkDeadlines(state.contracts, state.tickCount);
+    for (const { penalty } of expired) {
+      state.cash -= penalty;
+      addExpense(state.finances, penalty, 'fines', 'Contract penalty', state.tickCount);
+      lines.push(`[tick ${state.tickCount}] Contract expired! Penalty: $${penalty}`);
+    }
+
+    // 4. Auto-refresh available contracts on schedule
+    if (state.tickCount % CONTRACT_REFRESH_INTERVAL === 0) {
+      generateContracts(state.contracts, rng, state.tickCount);
+    }
+
+    // 5. Smuggling income
     const smugResult = processSmuggling(state.mafia, rng);
     if (smugResult.income > 0) {
       state.cash += smugResult.income;
+      addIncome(state.finances, smugResult.income, 'contracts', 'Smuggling', state.tickCount);
     }
     if (smugResult.exposed) {
       lines.push(`[tick ${state.tickCount}] SMUGGLING EXPOSED! Investigation incoming.`);
     }
 
-    // Check mafia exposure
+    // 6. Mafia exposure check
     if (state.mafia.exposureRisk > 0.3 && isExposed(state.mafia, rng)) {
       lines.push(`[tick ${state.tickCount}] MAFIA EXPOSURE! Criminal charges may follow.`);
     }
 
+    // 7. Campaign game-over condition checks (emit events; UI subscribes)
+    updateBankruptcy(state, state.bankruptcy, emitter);
+    updateEcology(state, state.ecological, emitter);
+    updateArrest(state, state.arrest, emitter);
+    updateRevolt(state, state.revolt, emitter);
+
+    // 8. Pending event — auto-pause and report to player
     if (fired) {
       const def = getEventById(fired.eventId);
       if (def) {
-        const title = t(def.titleKey);
-        const desc = t(def.descKey);
-        lines.push(`[tick ${state.tickCount}] EVENT: ${title}`);
-        lines.push(`  ${desc}`);
+        lines.push(`[tick ${state.tickCount}] EVENT: ${t(def.titleKey)}`);
+        lines.push(`  ${t(def.descKey)}`);
         for (let j = 0; j < def.options.length; j++) {
           lines.push(`  [${j}] ${t(def.options[j]!.labelKey)}`);
         }
         lines.push('  → Use "event choose <index>" to decide.');
       }
+      state.isPaused = true;
+      break;
     }
+
+    if (state.isPaused) break;
   }
 
   if (lines.length === 0) {

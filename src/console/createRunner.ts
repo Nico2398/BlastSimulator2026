@@ -49,10 +49,13 @@ import {
   statsCommand,
 } from './commands/campaign.js';
 import { setupEvents } from '../core/events/index.js';
+import { EventEmitter } from '../core/state/EventEmitter.js';
 
 export interface RunnerWithContext {
   runner: ConsoleRunner;
   ctx: MiningContext;
+  /** Typed emitter — subscribe in main.ts / console.ts for game-over UI or log messages. */
+  emitter: EventEmitter;
 }
 
 /**
@@ -63,8 +66,9 @@ export function createRunner(): RunnerWithContext {
   // Register all 258 events into the global pool (idempotent)
   setupEvents();
 
+  const emitter = new EventEmitter();
   const runner = new ConsoleRunner();
-  const ctx: MiningContext = { state: null, grid: null, softwareTier: 0, tubingState: createTubingState() };
+  const ctx: MiningContext = { state: null, grid: null, softwareTier: 0, tubingState: createTubingState(), emitter };
 
   // --- World commands (Phase 2) ---
   runner.register('new_game', 'Create a new game (mine_type:desert seed:42)', (args, named) =>
@@ -173,5 +177,5 @@ export function createRunner(): RunnerWithContext {
     statsCommand(ctx, args, named),
   );
 
-  return { runner, ctx };
+  return { runner, ctx, emitter };
 }

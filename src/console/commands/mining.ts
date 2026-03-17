@@ -134,7 +134,10 @@ export function chargeCommand(
     return { success: true, output: `Charged ${holeIds.length} holes with ${explosiveId} ${amount}kg` };
   }
 
-  const holeId = holeSpec.startsWith('hole_') ? holeSpec : `hole_${holeSpec}`;
+  // Resolve holeId: accept either the exact ID (H1) or the legacy hole_N format
+  const holeId = ctx.state!.drillHoles.find(h => h.id === holeSpec)
+    ? holeSpec
+    : (holeSpec.startsWith('hole_') ? holeSpec : `hole_${holeSpec}`);
   const hole = ctx.state!.drillHoles.find(h => h.id === holeId);
   if (!hole) return { success: false, output: `Hole "${holeId}" not found` };
 
@@ -166,7 +169,9 @@ export function sequenceCommand(
   if (sub === 'set') {
     const hole = named['hole'] ?? '';
     const delay = parseFloat((named['delay'] ?? '0').replace('ms', ''));
-    const holeId = hole.startsWith('hole_') ? hole : `hole_${hole}`;
+    const holeId = ctx.state!.drillHoles.find(h => h.id === hole)
+      ? hole
+      : (hole.startsWith('hole_') ? hole : `hole_${hole}`);
     setDelay(ctx.state!.sequenceDelays, holeId, delay);
     return { success: true, output: `Set ${holeId} delay: ${delay}ms` };
   }
@@ -388,7 +393,9 @@ export function tubingCommand(
 
   if (sub === 'install') {
     const holeSpec = named['hole'] ?? '';
-    const holeId = holeSpec.startsWith('hole_') ? holeSpec : `hole_${holeSpec}`;
+    const holeId = ctx.state!.drillHoles.find(h => h.id === holeSpec)
+      ? holeSpec
+      : (holeSpec.startsWith('hole_') ? holeSpec : `hole_${holeSpec}`);
     const result = installTubing(ctx.tubingState, holeId);
     return { success: result.success, output: result.message };
   }

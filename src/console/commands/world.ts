@@ -7,11 +7,14 @@ import { generateTerrain } from '../../core/world/TerrainGen.js';
 import { getRock } from '../../core/world/RockCatalog.js';
 import { getOre } from '../../core/world/OreCatalog.js';
 import type { VoxelGrid } from '../../core/world/VoxelGrid.js';
+import { EventEmitter } from '../../core/state/EventEmitter.js';
 
 /** Shared game context for console commands. */
 export interface GameContext {
   state: GameState | null;
   grid: VoxelGrid | null;
+  /** Event emitter for game-over and campaign events. Listeners attached in main.ts/console.ts. */
+  emitter: EventEmitter;
 }
 
 const DEFAULT_GRID_SIZE = 64;
