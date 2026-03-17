@@ -1024,29 +1024,29 @@ npx tsx scripts/screenshot.ts --name "my-feature"
 
 ### Phase 11 — Audio
 
-- [ ] **11.1: Audio manager**
+- [x] **11.1: Audio manager**
   Implement `src/audio/AudioManager.ts`. Central audio system using Web Audio API. Support: play sound effect (one-shot), play looping ambient, adjust volume per category (master, effects, ambient, UI). Mute toggle.
   **Acceptance criteria:**
-  - [ ] Playing a sound effect produces output (or successfully calls Web Audio API)
-  - [ ] Volume adjustment works per category
-  - [ ] Mute toggle silences everything
-  - [ ] `npm run validate` passes
+  - [x] Playing a sound effect produces output (or successfully calls Web Audio API)
+  - [x] Volume adjustment works per category
+  - [x] Mute toggle silences everything
+  - [x] `npm run validate` passes
 
-- [ ] **11.2: Placeholder sounds**
+- [x] **11.2: Placeholder sounds**
   Implement `src/audio/Placeholder.ts`. Generate simple synthesized placeholder sounds using Web Audio API oscillators: beep (UI click), boom (explosion), rumble (earthquake/blast), chime (event notification), ambient hum (general), engine (vehicle), drill whirr, rain patter. Each sound is programmatically generated — no external files needed.
   **Acceptance criteria:**
-  - [ ] Each placeholder sound is distinct and identifiable
-  - [ ] Sounds trigger at correct game events (blast, UI click, event, etc.)
-  - [ ] Sound system is designed so placeholders can be replaced with real audio files later
-  - [ ] `npm run validate` passes
+  - [x] Each placeholder sound is distinct and identifiable
+  - [x] Sounds trigger at correct game events (blast, UI click, event, etc.)
+  - [x] Sound system is designed so placeholders can be replaced with real audio files later
+  - [x] `npm run validate` passes
 
-- [ ] **11.3: Audio event hooks**
+- [x] **11.3: Audio event hooks**
   Wire audio triggers to game events: blast detonation → boom per hole (timed to sequence), fragment impact → thud, UI button click → beep, event notification → chime, vehicle movement → engine loop, weather rain → rain loop, etc.
   **Acceptance criteria:**
-  - [ ] Blast plays a boom sound per detonating hole at the correct timing
-  - [ ] UI interactions play feedback sounds
-  - [ ] Weather sounds match weather state
-  - [ ] `npm run validate` passes
+  - [x] Blast plays a boom sound per detonating hole at the correct timing
+  - [x] UI interactions play feedback sounds
+  - [x] Weather sounds match weather state
+  - [x] `npm run validate` passes
 
 ---
 
@@ -1142,6 +1142,6 @@ npx tsx scripts/screenshot.ts --name "my-feature"
 | Phase 8 — Physics Integration | 5 | 5 |
 | Phase 9 — 3D Rendering | 12 | 12 |
 | Phase 10 — User Interface | 10 | 10 |
-| Phase 11 — Audio | 3 | 0 |
+| Phase 11 — Audio | 3 | 3 |
 | Phase 12 — Polish and Deployment | 8 | 0 |
-| **Total** | **95** | **57** |
+| **Total** | **95** | **60** |
