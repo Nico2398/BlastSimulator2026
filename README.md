@@ -814,110 +814,110 @@ npx tsx scripts/screenshot.ts --name "my-feature"
 
 ### Phase 9 — 3D Rendering
 
-- [ ] **9.1: Scene manager and console bridge**
+- [x] **9.1: Scene manager and console bridge**
   Implement `src/renderer/SceneManager.ts`. Initialize Three.js: scene, perspective camera, directional + ambient lights, renderer targeting the canvas element. Implement a render loop that runs at 60fps independently of game ticks. Cartoon-style lighting (simple, bright, minimal shadows initially). Also in `src/main.ts`, expose `window.__gameConsole(cmd: string)` — a global function that routes commands to the same `ConsoleRunner` used in CLI mode. This bridge is required for the screenshot script (`scripts/screenshot.ts`) to execute game commands in headless Chrome.
   **Acceptance criteria:**
-  - [ ] The game renders an empty scene with a sky-colored background
-  - [ ] Camera is positioned to overlook the terrain area
-  - [ ] `window.__gameConsole('help')` is callable from the browser console and returns command list
-  - [ ] Visual test: screenshot shows empty scene with correct lighting
-  - [ ] `npm run validate` passes
+  - [x] The game renders an empty scene with a sky-colored background
+  - [x] Camera is positioned to overlook the terrain area
+  - [x] `window.__gameConsole('help')` is callable from the browser console and returns command list
+  - [x] Visual test: screenshot shows empty scene with correct lighting
+  - [x] `npm run validate` passes
 
-- [ ] **9.2: Camera controller**
+- [x] **9.2: Camera controller**
   Implement `src/renderer/CameraController.ts`. Orbit, pan, zoom controls. Mouse drag to orbit, right-drag or middle-drag to pan, scroll to zoom. Touch support for mobile.
   **Acceptance criteria:**
-  - [ ] Camera responds to orbit/pan/zoom inputs
-  - [ ] Camera has min/max zoom limits
-  - [ ] Camera cannot go below terrain surface
-  - [ ] `npm run validate` passes
+  - [x] Camera responds to orbit/pan/zoom inputs
+  - [x] Camera has min/max zoom limits
+  - [x] Camera cannot go below terrain surface
+  - [x] `npm run validate` passes
 
-- [ ] **9.3: Terrain mesh (marching cubes)**
+- [x] **9.3: Terrain mesh (marching cubes)**
   Implement `src/renderer/TerrainMesh.ts`. Convert the VoxelGrid to a Three.js mesh using marching cubes algorithm. Support chunk-based rendering (divide grid into chunks; only re-mesh modified chunks). Apply rock-type-based colors to vertices. Terrain updates when voxels change (after blasts).
   **Acceptance criteria:**
-  - [ ] Visual test: generated terrain renders as a smooth, hilly surface
-  - [ ] Visual test: different rock types show different colors
-  - [ ] After clearing voxels (simulating blast), mesh updates to show crater
-  - [ ] Performance: re-meshing a single chunk takes < 50ms
-  - [ ] `npm run validate` passes
+  - [x] Visual test: generated terrain renders as a smooth, hilly surface
+  - [x] Visual test: different rock types show different colors
+  - [x] After clearing voxels (simulating blast), mesh updates to show crater
+  - [x] Performance: re-meshing a single chunk takes < 50ms
+  - [x] `npm run validate` passes
 
-- [ ] **9.4: Procedural rock textures**
+- [x] **9.4: Procedural rock textures**
   Implement `src/renderer/ProceduralTexture.ts`. Generate 3D procedural textures for rock types using noise functions. Textures are coherent in 3D space so that after fragmentation, fragment surfaces show consistent texture (not random). Different rock types have different texture patterns and colors. Textures interpolate at rock type boundaries.
   **Acceptance criteria:**
-  - [ ] Visual test: terrain surface has varied, natural-looking texture per rock type
-  - [ ] Visual test: rock type boundaries show smooth color transitions
-  - [ ] Fragment meshes (when added) inherit texture from their parent voxel location
-  - [ ] `npm run validate` passes
+  - [x] Visual test: terrain surface has varied, natural-looking texture per rock type
+  - [x] Visual test: rock type boundaries show smooth color transitions
+  - [x] Fragment meshes (when added) inherit texture from their parent voxel location
+  - [x] `npm run validate` passes
 
-- [ ] **9.5: Fragment meshes**
+- [x] **9.5: Fragment meshes**
   Implement `src/renderer/FragmentMesh.ts`. Render each fragment as a rough-shaped mesh (irregular box or low-poly shape). Fragments are colored based on rock type and show ore streaks for high-ore-density fragments. Fragment meshes are synchronized with physics positions during blast simulation.
   **Acceptance criteria:**
-  - [ ] Visual test: after blast, terrain crater is filled with visible fragment meshes
-  - [ ] Fragments are sized proportionally to their data
-  - [ ] Ore-rich fragments are visually distinguishable
-  - [ ] During physics sim, fragments move in real-time
-  - [ ] `npm run validate` passes
+  - [x] Visual test: after blast, terrain crater is filled with visible fragment meshes
+  - [x] Fragments are sized proportionally to their data
+  - [x] Ore-rich fragments are visually distinguishable
+  - [x] During physics sim, fragments move in real-time
+  - [x] `npm run validate` passes
 
-- [ ] **9.6: Building meshes (placeholders)**
+- [x] **9.6: Building meshes (placeholders)**
   Implement `src/renderer/BuildingMesh.ts`. Each building type has a simple placeholder mesh: colored boxes, cylinders, etc. Different colors per building type. Buildings appear at their grid position with correct footprint.
   **Acceptance criteria:**
-  - [ ] Visual test: placing a building shows its placeholder mesh at correct position
-  - [ ] Different building types have visually distinct placeholders
-  - [ ] Destroyed buildings are removed from the scene
-  - [ ] `npm run validate` passes
+  - [x] Visual test: placing a building shows its placeholder mesh at correct position
+  - [x] Different building types have visually distinct placeholders
+  - [x] Destroyed buildings are removed from the scene
+  - [x] `npm run validate` passes
 
-- [ ] **9.7: Vehicle meshes (placeholders)**
+- [x] **9.7: Vehicle meshes (placeholders)**
   Implement `src/renderer/VehicleMesh.ts`. Placeholder meshes: truck = yellow box on wheels, excavator = yellow box with arm (cylinder), drill rig = tall cylinder, bulldozer = low box with blade. Vehicles move along paths and animate working actions (simplified).
   **Acceptance criteria:**
-  - [ ] Visual test: vehicles render at their positions with identifiable shapes
-  - [ ] Vehicles move smoothly when assigned tasks
-  - [ ] Different vehicle types are visually distinct
-  - [ ] `npm run validate` passes
+  - [x] Visual test: vehicles render at their positions with identifiable shapes
+  - [x] Vehicles move smoothly when assigned tasks
+  - [x] Different vehicle types are visually distinct
+  - [x] `npm run validate` passes
 
-- [ ] **9.8: Character meshes (placeholders)**
+- [x] **9.8: Character meshes (placeholders)**
   Implement `src/renderer/CharacterMesh.ts`. Minion-style placeholder: capsule body, sphere head, solid color. Employees stand at their work positions. Injured employees could have a different color. Characters evacuate during zone clearing.
   **Acceptance criteria:**
-  - [ ] Visual test: employees render as Minion-like shapes at work positions
-  - [ ] Characters move when zone clearing is activated
-  - [ ] Different roles could have different colors (optional for placeholder phase)
-  - [ ] `npm run validate` passes
+  - [x] Visual test: employees render as Minion-like shapes at work positions
+  - [x] Characters move when zone clearing is activated
+  - [x] Different roles could have different colors (optional for placeholder phase)
+  - [x] `npm run validate` passes
 
-- [ ] **9.9: Skybox and weather visuals**
+- [x] **9.9: Skybox and weather visuals**
   Implement `src/renderer/SkyboxWeather.ts`. Sky color changes based on weather state: sunny = blue, cloudy = gray, rain = dark gray with particle effect (rain drops), storm = very dark with flashes. Simple weather particle systems.
   **Acceptance criteria:**
-  - [ ] Visual test: sky color matches current weather state
-  - [ ] Rain shows falling particle effect
-  - [ ] Weather transition is smooth (gradual color change)
-  - [ ] `npm run validate` passes
+  - [x] Visual test: sky color matches current weather state
+  - [x] Rain shows falling particle effect
+  - [x] Weather transition is smooth (gradual color change)
+  - [x] `npm run validate` passes
 
-- [ ] **9.10: Blast visual effects**
+- [x] **9.10: Blast visual effects**
   Implement blast visuals: explosion flash, dust cloud (particle system), flying fragments, screen shake. Synchronize with the physics simulation timing. Detonation sequence should be visible (holes fire at their designated times with visual flash per hole).
   **Acceptance criteria:**
-  - [ ] Visual test: blast shows sequential flashes per hole
-  - [ ] Dust cloud particle effect appears post-blast
-  - [ ] Fragments fly visually during physics simulation
-  - [ ] Camera shakes proportionally to blast energy
-  - [ ] `npm run validate` passes
+  - [x] Visual test: blast shows sequential flashes per hole
+  - [x] Dust cloud particle effect appears post-blast
+  - [x] Fragments fly visually during physics simulation
+  - [x] Camera shakes proportionally to blast energy
+  - [x] `npm run validate` passes
 
-- [ ] **9.11: Distant scenery**
+- [x] **9.11: Distant scenery**
   Implement decorative distant scenery: low-poly mountains, plains, forests, fields placed far from the interactive zone. These are purely cosmetic, no interaction. Generated based on mine type.
   **Acceptance criteria:**
-  - [ ] Visual test: horizon shows mountains/terrain features
-  - [ ] Scenery varies by mine type preset
-  - [ ] Scenery does not affect performance (very low poly, static)
-  - [ ] `npm run validate` passes
+  - [x] Visual test: horizon shows mountains/terrain features
+  - [x] Scenery varies by mine type preset
+  - [x] Scenery does not affect performance (very low poly, static)
+  - [x] `npm run validate` passes
 
-- [ ] **9.12: Blast plan visualization overlays**
+- [x] **9.12: Blast plan visualization overlays**
   When the player is editing a blast plan, show visual overlays on the terrain:
   - Drill holes as cylinders/lines
   - Charge amounts as color-coded indicators
   - Sequence delays as numbered labels
   - Software tier previews: energy heatmap (tier 1), fragment size overlay (tier 2), projection arcs (tier 3), vibration waves (tier 4)
   **Acceptance criteria:**
-  - [ ] Visual test: drill holes render as markers on terrain
-  - [ ] Visual test: charge plan shows color-coded hole fills
-  - [ ] Visual test: sequence numbers visible on holes
-  - [ ] Visual test: energy heatmap overlay (if software owned) shows on terrain
-  - [ ] `npm run validate` passes
+  - [x] Visual test: drill holes render as markers on terrain
+  - [x] Visual test: charge plan shows color-coded hole fills
+  - [x] Visual test: sequence numbers visible on holes
+  - [x] Visual test: energy heatmap overlay (if software owned) shows on terrain
+  - [x] `npm run validate` passes
 
 ---
 
@@ -1140,7 +1140,7 @@ npx tsx scripts/screenshot.ts --name "my-feature"
 | Phase 6 — Event System | 10 | 10 |
 | Phase 7 — Campaign, World Map, Win/Lose | 8 | 8 |
 | Phase 8 — Physics Integration | 5 | 5 |
-| Phase 9 — 3D Rendering | 12 | 0 |
+| Phase 9 — 3D Rendering | 12 | 12 |
 | Phase 10 — User Interface | 10 | 0 |
 | Phase 11 — Audio | 3 | 0 |
 | Phase 12 — Polish and Deployment | 8 | 0 |
