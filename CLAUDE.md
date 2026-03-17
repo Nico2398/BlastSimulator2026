@@ -33,7 +33,7 @@ For all game constants (rock fracture thresholds, explosive energy per kg, contr
 ## Before Every Task
 1. Read the task list in `README.md` — find the **next unchecked task** (`- [ ]`)
 2. Read its acceptance criteria carefully
-3. Read any `.agent/*.md` files referenced (GAME_DESIGN.md, ARCHITECTURE.md, BLAST_SYSTEM.md, TESTING.md, WORKFLOW.md)
+3. Read any `.agent/*.md` files referenced (GAME_DESIGN.md, ARCHITECTURE.md, BLAST_SYSTEM.md, TESTING.md, WORKFLOW.md, VISUAL_TESTING.md)
 4. Do NOT skip tasks. Do NOT work on multiple tasks at once.
 
 ## During Every Task
@@ -51,7 +51,7 @@ bash scripts/validate.sh
 This runs: TypeScript check → Tests → Build → Task consistency check.
 The task consistency checker (`scripts/check-tasks.sh`) verifies that no tasks were skipped, that expected files exist for completed tasks, and that i18n keys are in sync between en.json and fr.json.
 
-If validation fails, fix the issue before moving on. Then:
+If validation fails, fix the issue before moving on. For rendering tasks, also take a screenshot and confirm visuals (see `.agent/VISUAL_TESTING.md`). Then:
 - Mark the task `[x]` in README.md
 - Update the "Completed" count in the Progress Summary table
 

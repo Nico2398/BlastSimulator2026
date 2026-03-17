@@ -52,8 +52,19 @@ function parseArgs(): ScreenshotOptions {
 async function captureScreenshot(options: ScreenshotOptions): Promise<string> {
     mkdirSync(SCREENSHOTS_DIR, { recursive: true });
 
+    // Use system Chromium if puppeteer's bundled Chrome is not available
+    const CHROMIUM_PATHS = [
+        '/root/.cache/ms-playwright/chromium-1194/chrome-linux/chrome',
+        '/usr/bin/chromium',
+        '/usr/bin/chromium-browser',
+        '/usr/bin/google-chrome',
+    ];
+    const { existsSync } = await import('fs');
+    const executablePath = CHROMIUM_PATHS.find((p) => existsSync(p));
+
     const browser = await puppeteer.launch({
         headless: true,
+        executablePath,
         args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
 

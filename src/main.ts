@@ -2,17 +2,20 @@
 // Initializes the 3D scene and exposes the console bridge for the screenshot script.
 
 import { SceneManager } from './renderer/SceneManager.js';
+import { GameRenderer } from './renderer/GameRenderer.js';
 import { createRunner } from './console/createRunner.js';
 
 // --- 3D Scene ---
 const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
 const scene = new SceneManager(canvas);
-scene.start();
+
+// --- Game Renderer (bridges console commands → Three.js) ---
+const gameRenderer = new GameRenderer(scene);
 
 // --- Console Bridge ---
 // window.__gameConsole(cmd) routes commands to the same ConsoleRunner used in CLI mode.
 // Required by scripts/screenshot.ts to drive the game from headless Chrome.
-const { runner } = createRunner();
+const { runner, ctx } = createRunner();
 
 declare global {
   interface Window {
@@ -22,5 +25,21 @@ declare global {
 
 window.__gameConsole = (cmd: string): string => {
   const result = runner.run(cmd);
+  // Sync the renderer after every command so visual changes appear immediately
+  gameRenderer.syncFromContext(ctx);
+  // Trigger blast effects and terrain rebuild after a blast
+  const cmdName = cmd.trim().split(/\s+/)[0] ?? '';
+  if (cmdName === 'blast' && result.success) {
+    gameRenderer.onBlast(ctx);
+  }
+  // Show blast plan overlay during planning commands
+  if (['drill_plan', 'charge', 'sequence'].includes(cmdName)) {
+    gameRenderer.showBlastPlanOverlay(ctx);
+  }
   return result.output;
 };
+
+// --- Render loop ---
+scene.start((dt) => {
+  gameRenderer.update(dt);
+});
