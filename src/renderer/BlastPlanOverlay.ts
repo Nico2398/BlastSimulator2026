@@ -54,6 +54,8 @@ export interface HoleOverlayData {
   hole: DrillHole;
   charge?: HoleCharge;
   delayMs: number;
+  /** Terrain surface Y at this hole's (x,z) position. Markers are placed relative to this. */
+  surfaceY: number;
   /** Predicted average fragment size for this hole (cm) — for tier-2 overlay. */
   predictedFragSizeCm?: number;
   /** Predicted max projection speed (m/s) — for tier-3. */
@@ -132,13 +134,14 @@ export class BlastPlanOverlay {
   // ---------- Per-hole markers ----------
 
   private addHoleMarker(hd: HoleOverlayData): void {
-    const { hole, charge, delayMs } = hd;
+    const { hole, charge, delayMs, surfaceY } = hd;
+    const base = surfaceY;
 
     // Outer ring (white cylinder outline)
     const ringGeo = new THREE.CylinderGeometry(HOLE_RADIUS, HOLE_RADIUS, HOLE_HEIGHT, HOLE_SEGMENTS, 1, true);
     const ringMat = new THREE.MeshBasicMaterial({ color: HOLE_COLOR, side: THREE.DoubleSide, wireframe: true });
     const ring = new THREE.Mesh(ringGeo, ringMat);
-    ring.position.set(hole.x, HOLE_HEIGHT / 2, hole.z);
+    ring.position.set(hole.x, base + HOLE_HEIGHT / 2, hole.z);
     this.group.add(ring);
 
     // Charge fill (solid inner cylinder)
@@ -148,22 +151,22 @@ export class BlastPlanOverlay {
       const fillGeo = new THREE.CylinderGeometry(HOLE_RADIUS * 0.6, HOLE_RADIUS * 0.6, HOLE_HEIGHT * 0.8, HOLE_SEGMENTS);
       const fillMat = new THREE.MeshBasicMaterial({ color: CHARGE_COLORS[colorIdx], transparent: true, opacity: 0.8 });
       const fill = new THREE.Mesh(fillGeo, fillMat);
-      fill.position.set(hole.x, HOLE_HEIGHT / 2, hole.z);
+      fill.position.set(hole.x, base + HOLE_HEIGHT / 2, hole.z);
       this.group.add(fill);
     }
 
-    // Depth indicator line (going down into terrain)
+    // Depth indicator line (going down from surface)
     const lineMat = new THREE.LineBasicMaterial({ color: 0x888888 });
     const lineGeo = new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(hole.x, 0, hole.z),
-      new THREE.Vector3(hole.x, -hole.depth, hole.z),
+      new THREE.Vector3(hole.x, base, hole.z),
+      new THREE.Vector3(hole.x, base - hole.depth, hole.z),
     ]);
     this.group.add(new THREE.Line(lineGeo, lineMat));
 
     // Delay label (sprite-like flat plane with delay number rendered via canvas)
     if (delayMs >= 0) {
       const label = this.makeDelayLabel(delayMs);
-      label.position.set(hole.x, HOLE_HEIGHT + LABEL_OFFSET, hole.z);
+      label.position.set(hole.x, base + HOLE_HEIGHT + LABEL_OFFSET, hole.z);
       this.group.add(label);
     }
   }
@@ -193,7 +196,7 @@ export class BlastPlanOverlay {
       });
       const circle = new THREE.Mesh(geo, mat);
       circle.rotation.x = -Math.PI / 2;
-      circle.position.set(hd.hole.x, 0.1, hd.hole.z); // just above terrain
+      circle.position.set(hd.hole.x, hd.surfaceY + 0.1, hd.hole.z); // just above terrain surface
       this.group.add(circle);
     }
   }

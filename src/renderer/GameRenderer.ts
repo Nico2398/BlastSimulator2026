@@ -151,20 +151,34 @@ export class GameRenderer {
 
     const cx = drillHoles.reduce((s, h) => s + h.x, 0) / drillHoles.length;
     const cz = drillHoles.reduce((s, h) => s + h.z, 0) / drillHoles.length;
+    const originSurfaceY = this.getTerrainSurfaceY(cx, cz);
 
     this.blastOverlay.show({
       softwareTier: ctx.softwareTier,
-      origin: new THREE.Vector3(cx, 0, cz),
+      origin: new THREE.Vector3(cx, originSurfaceY, cz),
       holes: drillHoles.map(h => {
         const hd: import('./BlastPlanOverlay.js').HoleOverlayData = {
           hole: h,
           delayMs: sequenceDelays[h.id] ?? 0,
+          surfaceY: this.getTerrainSurfaceY(h.x, h.z),
         };
         const charge = chargesByHole[h.id];
         if (charge) hd.charge = charge;
         return hd;
       }),
     });
+  }
+
+  /** Find the highest solid-voxel Y at the given (x, z) column. Returns 0 if no grid. */
+  private getTerrainSurfaceY(x: number, z: number): number {
+    if (!this.lastGrid) return 0;
+    const gx = Math.max(0, Math.min(this.lastGrid.sizeX - 1, Math.floor(x)));
+    const gz = Math.max(0, Math.min(this.lastGrid.sizeZ - 1, Math.floor(z)));
+    for (let y = this.lastGrid.sizeY - 1; y >= 0; y--) {
+      const v = this.lastGrid.getVoxel(gx, y, gz);
+      if (v && v.density >= 0.5) return y + 1;
+    }
+    return 0;
   }
 
   /**

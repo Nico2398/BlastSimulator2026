@@ -33,7 +33,7 @@ const RAIN_PARTICLE_COUNT = 1500;
 const RAIN_AREA = 80;    // width/depth of rain box
 const RAIN_HEIGHT = 50;  // height rain falls from
 const RAIN_SPEED = 20;   // voxels per second downward
-const RAIN_POINT_SIZE = 0.15;
+const RAIN_POINT_SIZE = 0.8;
 
 // ---------- Transition speed ----------
 // Lerp factor per second (0.5 = reaches ~63% in 2 seconds)
@@ -175,9 +175,11 @@ export class SkyboxWeather {
       this.rainPositions[yIdx] = (this.rainPositions[yIdx] ?? 0) - drop;
       // Wrap around when particle hits ground
       if ((this.rainPositions[yIdx] ?? 0) < 0) {
-        this.rainPositions[i * 3]     = cx + (Math.random() - 0.5) * RAIN_AREA;
+        // Positions are local to the rainPoints mesh (which is translated to cx,cz).
+        // Adding cx/cz here would double the offset.
+        this.rainPositions[i * 3]     = (Math.random() - 0.5) * RAIN_AREA;
         this.rainPositions[i * 3 + 1] = RAIN_HEIGHT;
-        this.rainPositions[i * 3 + 2] = cz + (Math.random() - 0.5) * RAIN_AREA;
+        this.rainPositions[i * 3 + 2] = (Math.random() - 0.5) * RAIN_AREA;
       }
     }
 

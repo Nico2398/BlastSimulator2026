@@ -100,8 +100,15 @@ export function executeBlast(
   const errors = validateBlastPlan(plan);
   if (errors.length > 0) return null;
 
-  // 2. Calculate blast zone bounding box
-  const bbox = calculateBlastZone(plan.holes);
+  // 2a. Compute terrain surface Y for each hole so the blast zone and energy
+  //     are anchored at the actual surface, not hardcoded y=0.
+  const holeSurfaceYs: Record<string, number> = {};
+  for (const hole of plan.holes) {
+    holeSurfaceYs[hole.id] = getColumnSurfaceY(grid, hole.x, hole.z);
+  }
+
+  // 2b. Calculate blast zone bounding box anchored at the surface
+  const bbox = calculateBlastZone(plan.holes, holeSurfaceYs);
 
   // 3-4. Process each voxel: energy → fragmentation → fragments
   const fragments: FragmentData[] = [];
@@ -131,7 +138,7 @@ export function executeBlast(
         if (!rock) continue;
 
         const point = vec3(x, y, z);
-        const energy = calculateEnergyField(point, plan.holes, plan.charges, holeDepths);
+        const energy = calculateEnergyField(point, plan.holes, plan.charges, holeDepths, holeSurfaceYs);
         const threshold = rock.fractureThreshold * voxel.fractureModifier;
         const frag = calculateFragmentation(energy, threshold);
 
@@ -140,9 +147,10 @@ export function executeBlast(
           const fragCount = calculateFragmentCount(voxelVolume, frag.fragmentSizeFraction);
           const mass = (rock.density * voxelVolume) / fragCount;
 
-          // Find nearest hole for velocity direction
+          // Find nearest hole for velocity direction (use mid-column as source)
           const nearestHole = findNearestHole(point, plan.holes);
-          const holePos = vec3(nearestHole.x, 0, nearestHole.z);
+          const nearestSurfaceY = holeSurfaceYs[nearestHole.id] ?? 0;
+          const holePos = vec3(nearestHole.x, nearestSurfaceY - nearestHole.depth / 2, nearestHole.z);
 
           for (let i = 0; i < fragCount; i++) {
             const vel = calculateInitialVelocity(point, holePos, energy / fragCount, mass);
@@ -236,13 +244,28 @@ export function executeBlast(
 
 // ── Helpers ──
 
-function calculateBlastZone(holes: readonly DrillHole[]): {
+/** Find the highest solid voxel Y in the column at (x, z). Returns 0 if none found. */
+function getColumnSurfaceY(grid: VoxelGrid, x: number, z: number): number {
+  const gx = Math.max(0, Math.min(grid.sizeX - 1, Math.floor(x)));
+  const gz = Math.max(0, Math.min(grid.sizeZ - 1, Math.floor(z)));
+  for (let y = grid.sizeY - 1; y >= 0; y--) {
+    const v = grid.getVoxel(gx, y, gz);
+    if (v && v.density >= 0.5) return y + 1;
+  }
+  return 0;
+}
+
+function calculateBlastZone(
+  holes: readonly DrillHole[],
+  holeSurfaceYs: Record<string, number>,
+): {
   minX: number; maxX: number;
   minY: number; maxY: number;
   minZ: number; maxZ: number;
 } {
   let minX = Infinity, maxX = -Infinity;
   let minZ = Infinity, maxZ = -Infinity;
+  let maxSurfaceY = 0;
   let maxDepth = 0;
 
   for (const hole of holes) {
@@ -250,14 +273,16 @@ function calculateBlastZone(holes: readonly DrillHole[]): {
     maxX = Math.max(maxX, hole.x);
     minZ = Math.min(minZ, hole.z);
     maxZ = Math.max(maxZ, hole.z);
+    maxSurfaceY = Math.max(maxSurfaceY, holeSurfaceYs[hole.id] ?? 0);
     maxDepth = Math.max(maxDepth, hole.depth);
   }
 
   return {
     minX: Math.floor(minX - BLAST_ZONE_RADIUS),
     maxX: Math.ceil(maxX + BLAST_ZONE_RADIUS),
-    minY: 0,
-    maxY: Math.ceil(maxDepth + BLAST_ZONE_RADIUS),
+    // Y range: from (surface - depth - radius) up to (surface + radius)
+    minY: Math.max(0, Math.floor(maxSurfaceY - maxDepth - BLAST_ZONE_RADIUS)),
+    maxY: Math.ceil(maxSurfaceY + BLAST_ZONE_RADIUS),
     minZ: Math.floor(minZ - BLAST_ZONE_RADIUS),
     maxZ: Math.ceil(maxZ + BLAST_ZONE_RADIUS),
   };
