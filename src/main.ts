@@ -42,11 +42,15 @@ saveLoadUI.setGetState(() => ctx.state);
 // --- Main Menu ---
 const mainMenu = new MainMenu(uiContainer);
 mainMenu.setOnNewCampaign(() => {
-  mainMenu.hide();
+  // Show world map so the player can pick a level.
+  // Tutorial overlay sits on top and doesn't block the map.
+  mainMenu.showWorldMap(null);
   if (!TutorialOverlay.isCompleted()) tutorial.start();
 });
 mainMenu.setOnStartLevel((levelId) => {
-  window.__gameConsole(`new_game level:${levelId}`);
+  // Ensure a base GameState (with campaign) exists before starting a level.
+  if (!ctx.state) window.__gameConsole('new_game');
+  window.__gameConsole(`campaign start level:${levelId}`);
 });
 mainMenu.setOnLoad(() => { saveLoadUI.show(); });
 mainMenu.setOnSettings(() => { uiManager.showPanel('settings'); });

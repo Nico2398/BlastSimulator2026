@@ -80,6 +80,15 @@ async function captureScreenshot(options: ScreenshotOptions): Promise<string> {
         console.log('Game canvas detected. Waiting for initialization...');
         await new Promise((r) => setTimeout(r, INIT_WAIT_MS));
 
+        // Dismiss the main menu overlay so the 3D scene is visible for screenshots.
+        // The menu has z-index:9999 and is always shown at startup; console commands
+        // go through the game logic bridge but don't hide the HTML overlay.
+        await page.evaluate(() => {
+            const menu = document.getElementById('bs-main-menu');
+            if (menu) (menu as HTMLElement).style.display = 'none';
+        });
+        await new Promise((r) => setTimeout(r, 300));
+
         // Execute console commands if any
         for (const command of options.commands) {
             console.log(`Executing command: ${command}`);
