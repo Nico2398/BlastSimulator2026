@@ -93,6 +93,10 @@ export class UIManager {
     this.hud.setSpeedChangeHandler(cb);
   }
 
+  setQuitHandler(cb: () => void): void {
+    this.settingsMenu.setQuitHandler(cb);
+  }
+
   /**
    * Show a brief toast notification (game-over warnings, contract expiry, etc.).
    * Auto-dismisses after 6 seconds.

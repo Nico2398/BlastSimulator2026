@@ -4,6 +4,7 @@
 import { t } from '../core/i18n/I18n.js';
 import type { GameState } from '../core/state/GameState.js';
 import { getAllBuildingTypes, getBuildingDef } from '../core/entities/Building.js';
+import { TileSelectOverlay } from './TileSelectOverlay.js';
 
 export type GameConsoleFn = (cmd: string) => string;
 
@@ -11,7 +12,10 @@ export class BuildMenu {
   private readonly el: HTMLElement;
   private readonly listEl: HTMLElement;
   private readonly statusEl: HTMLElement;
+  private readonly tileSelect: TileSelectOverlay;
   private gameConsole?: GameConsoleFn;
+  private worldSizeX = 40;
+  private worldSizeZ = 40;
 
   constructor(container: HTMLElement) {
     this.el = document.createElement('div');
@@ -37,6 +41,8 @@ export class BuildMenu {
     this.el.append(title, this.listEl, this.statusEl, closeBtn);
     container.appendChild(this.el);
 
+    // TileSelectOverlay appended to document.body so it escapes panel stacking context
+    this.tileSelect = new TileSelectOverlay(document.body);
     this.buildList();
   }
 
@@ -47,6 +53,10 @@ export class BuildMenu {
   get visible(): boolean { return this.el.style.display !== 'none'; }
 
   update(state: GameState): void {
+    if (state.world) {
+      this.worldSizeX = state.world.sizeX;
+      this.worldSizeZ = state.world.sizeZ;
+    }
     const allTypes = getAllBuildingTypes();
     const rows = this.listEl.querySelectorAll('.bs-build-row');
     rows.forEach((row, i) => {
@@ -63,7 +73,7 @@ export class BuildMenu {
     setTimeout(() => { if (this.statusEl.textContent === msg) this.statusEl.textContent = ''; }, 3000);
   }
 
-  dispose(): void { this.el.remove(); }
+  dispose(): void { this.el.remove(); this.tileSelect.dispose(); }
 
   private buildList(): void {
     this.listEl.innerHTML = '';
@@ -95,13 +105,16 @@ export class BuildMenu {
     btn.style.cssText = 'padding:2px 8px;font-size:10px;white-space:nowrap';
     btn.textContent = t('ui.build.place');
     btn.addEventListener('click', () => {
-      const pos = prompt(t('ui.build.place') + ' (x,z):');
-      if (!pos) return;
-      const parts = pos.split(',').map(Number);
-      const x = parts[0] ?? NaN;
-      const z = parts[1] ?? NaN;
-      if (isNaN(x) || isNaN(z)) return;
-      this.gameConsole?.(`build place type:${type} x:${x} z:${z}`);
+      this.tileSelect.open({
+        mode: 'point',
+        worldSizeX: this.worldSizeX,
+        worldSizeZ: this.worldSizeZ,
+        title: t(`building.${type}.name`),
+        onConfirm: (result) => {
+          this.gameConsole?.(`build place type:${type} x:${result.x} z:${result.z}`);
+          this.setStatus(t('ui.build.placed'));
+        },
+      });
     });
 
     row.append(info, btn);

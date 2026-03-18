@@ -133,6 +133,15 @@ uiManager.setGameConsole(window.__gameConsole);
 uiManager.setSpeedChangeHandler((speed) => {
   window.__gameConsole(`speed ${speed}`);
 });
+uiManager.setQuitHandler(() => {
+  mainMenu.show();
+});
+
+// Return-to-map button (fixed top bar, visible during gameplay)
+mainMenu.makeReturnToMapButton(uiContainer, () => {
+  mainMenu.show();
+  mainMenu.showWorldMap(ctx.state?.campaign ?? null);
+});
 saveLoadUI.setOnLoad((state) => {
   // Restore loaded state into the runner context
   ctx.state = state;

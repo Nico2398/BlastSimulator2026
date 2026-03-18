@@ -389,6 +389,89 @@ const CSS = `
 #bs-minimap { bottom: 10px; right: 10px; width: fit-content; }
 #bs-minimap-canvas { display: block; cursor: crosshair; background: #141e10; border-radius: 4px; }
 
+/* ─── Tile Select Overlay ─── */
+.bs-tile-select-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.82);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  z-index: 700;
+  pointer-events: all;
+  backdrop-filter: blur(2px);
+}
+.bs-tile-select-panel {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 18px;
+  background: rgba(10,8,4,0.95);
+  border: 1px solid rgba(200,160,60,0.4);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 12px 60px rgba(0,0,0,0.85);
+  max-width: 95vw;
+  max-height: 95vh;
+}
+.bs-tile-select-canvas {
+  display: block;
+  cursor: crosshair;
+  border-radius: 6px;
+  border: 1px solid rgba(200,160,60,0.25);
+  max-width: 60vw;
+  max-height: 75vh;
+}
+.bs-tile-select-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 200px;
+  max-width: 240px;
+}
+.bs-tile-select-title {
+  font-weight: 700;
+  font-size: 13px;
+  color: #ffc840;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border-bottom: 1px solid rgba(200,160,60,0.25);
+  padding-bottom: 8px;
+}
+.bs-tile-select-hint {
+  font-size: 11px;
+  color: #7a7060;
+  line-height: 1.5;
+}
+.bs-tile-select-info {
+  font-size: 11px;
+  color: #b0a888;
+  background: rgba(255,255,255,0.05);
+  border-radius: 4px;
+  padding: 6px 8px;
+  min-height: 32px;
+  line-height: 1.5;
+}
+.bs-tile-select-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.bs-tile-select-field-label {
+  font-size: 10px;
+  color: #908070;
+  margin-bottom: 2px;
+  display: block;
+}
+.bs-tile-select-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: auto;
+}
+.bs-tile-select-btns .bs-btn { width: 100%; }
+
 /* ─── Notification toast ─── */
 .bs-notification {
   position: fixed;
