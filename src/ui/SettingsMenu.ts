@@ -1,7 +1,7 @@
 // BlastSimulator2026 — Settings Menu (10.9)
 // Language, save/load, audio, and quit controls.
 
-import { t } from '../core/i18n/I18n.js';
+import { t, setLocale } from '../core/i18n/I18n.js';
 import type { GameState } from '../core/state/GameState.js';
 
 export type GameConsoleFn = (cmd: string) => string;
@@ -33,13 +33,19 @@ export class SettingsMenu {
     enBtn.className = 'bs-btn';
     enBtn.style.cssText = 'flex:1;padding:3px';
     enBtn.textContent = t('ui.settings.english');
-    enBtn.addEventListener('click', () => this.onLanguageChange?.('en'));
+    enBtn.addEventListener('click', () => {
+      setLocale('en');
+      this.onLanguageChange?.('en');
+    });
 
     const frBtn = document.createElement('button');
     frBtn.className = 'bs-btn';
     frBtn.style.cssText = 'flex:1;padding:3px';
     frBtn.textContent = t('ui.settings.french');
-    frBtn.addEventListener('click', () => this.onLanguageChange?.('fr'));
+    frBtn.addEventListener('click', () => {
+      setLocale('fr');
+      this.onLanguageChange?.('fr');
+    });
 
     langRow.append(enBtn, frBtn);
 

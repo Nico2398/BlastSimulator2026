@@ -1449,6 +1449,8 @@
   "ui.blast.no_holes": "No holes. Add holes first.",
   "ui.blast.no_charges": "No charges set.",
   "ui.blast.grid_tool": "Grid Tool",
+  "ui.blast.grid_spacing": "Spacing (m)",
+  "ui.blast.grid_depth": "Depth (m)",
   "ui.blast.depth": "Depth (m)",
   "ui.blast.auto_seq": "Auto Sequence",
   "ui.blast.apply_charge": "Apply Charge",
@@ -1477,6 +1479,7 @@
   "ui.build.cancel": "Cancel",
   "ui.build.insufficient_funds": "Insufficient funds",
   "ui.build.close": "Close",
+  "ui.build.placed": "Building placed!",
 
   "ui.vehicles.title": "Vehicles",
   "ui.vehicles.buy": "Buy",

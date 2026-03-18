@@ -5,19 +5,19 @@ import { t } from '../core/i18n/I18n.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { DrillHole } from '../core/mining/DrillPlan.js';
 import type { HoleCharge } from '../core/mining/ChargePlan.js';
+import { TileSelectOverlay } from './TileSelectOverlay.js';
 
 export type GameConsoleFn = (cmd: string) => string;
-
-interface GridToolOptions { rows: number; cols: number; spacing: number; depth: number; x: number; z: number; }
 
 export class BlastPlanUI {
   private readonly el: HTMLElement;
   private readonly holeListEl: HTMLElement;
   private readonly chargeForm: HTMLElement;
+  private readonly tileSelect: TileSelectOverlay;
   private gameConsole?: GameConsoleFn;
-
-  // Grid tool form state
   private selectedHoleId: string | null = null;
+  private worldSizeX = 40;
+  private worldSizeZ = 40;
 
   constructor(container: HTMLElement) {
     this.el = document.createElement('div');
@@ -76,6 +76,8 @@ export class BlastPlanUI {
 
     this.el.append(title, gridBtn, clearBtn, this.holeListEl, this.chargeForm, seqBtn, previewBtn, execBtn);
     container.appendChild(this.el);
+
+    this.tileSelect = new TileSelectOverlay(document.body);
   }
 
   setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
@@ -85,6 +87,10 @@ export class BlastPlanUI {
   get visible(): boolean { return this.el.style.display !== 'none'; }
 
   update(state: GameState): void {
+    if (state.world) {
+      this.worldSizeX = state.world.sizeX;
+      this.worldSizeZ = state.world.sizeZ;
+    }
     const holes = state.drillHoles;
     const charges = state.chargesByHole;
     const delays = state.sequenceDelays;
@@ -103,7 +109,7 @@ export class BlastPlanUI {
     }
   }
 
-  dispose(): void { this.el.remove(); }
+  dispose(): void { this.el.remove(); this.tileSelect.dispose(); }
 
   private makeHoleRow(hole: DrillHole, charge?: HoleCharge, delayMs?: number): HTMLElement {
     const row = document.createElement('div');
@@ -195,12 +201,27 @@ export class BlastPlanUI {
   }
 
   private openGridTool(): void {
-    const opts = prompt('Grid: rows,cols,spacing,depth,startX,startZ (e.g. 3,3,5,6,20,20)');
-    if (!opts) return;
-    const [rows, cols, spacing, depth, x, z] = opts.split(',').map(Number) as [number,number,number,number,number,number];
-    if ([rows, cols, spacing, depth, x, z].some(isNaN)) return;
-    const o: GridToolOptions = { rows, cols, spacing, depth, x, z };
-    this.gameConsole?.(`drill_plan grid rows:${o.rows} cols:${o.cols} spacing:${o.spacing} depth:${o.depth} start:${o.x},${o.z}`);
+    this.tileSelect.open({
+      mode: 'area',
+      worldSizeX: this.worldSizeX,
+      worldSizeZ: this.worldSizeZ,
+      title: t('ui.blast.grid_tool'),
+      extraFields: [
+        { id: 'spacing', label: t('ui.blast.grid_spacing'), defaultValue: 5, min: 1, max: 20, step: 1 },
+        { id: 'depth',   label: t('ui.blast.grid_depth'),   defaultValue: 6, min: 1, max: 40, step: 1 },
+      ],
+      onConfirm: (result) => {
+        const x1 = result.x;
+        const z1 = result.z;
+        const x2 = result.x2 ?? x1;
+        const z2 = result.z2 ?? z1;
+        const spacing = result.fields['spacing'] ?? 5;
+        const depth   = result.fields['depth']   ?? 6;
+        const cols = Math.max(1, Math.round((x2 - x1) / spacing) + 1);
+        const rows = Math.max(1, Math.round((z2 - z1) / spacing) + 1);
+        this.gameConsole?.(`drill_plan grid rows:${rows} cols:${cols} spacing:${spacing} depth:${depth} start:${x1},${z1}`);
+      },
+    });
   }
 
   private confirmBlast(): void {

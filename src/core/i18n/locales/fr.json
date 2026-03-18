@@ -1449,6 +1449,8 @@
   "ui.blast.no_holes": "Pas de trous. Ajoutez d'abord des trous.",
   "ui.blast.no_charges": "Pas de charges définies.",
   "ui.blast.grid_tool": "Grille",
+  "ui.blast.grid_spacing": "Espacement (m)",
+  "ui.blast.grid_depth": "Profondeur (m)",
   "ui.blast.depth": "Profondeur (m)",
   "ui.blast.auto_seq": "Séquence Auto",
   "ui.blast.apply_charge": "Appliquer",
@@ -1477,6 +1479,7 @@
   "ui.build.cancel": "Annuler",
   "ui.build.insufficient_funds": "Fonds insuffisants",
   "ui.build.close": "Fermer",
+  "ui.build.placed": "Bâtiment placé !",
 
   "ui.vehicles.title": "Véhicules",
   "ui.vehicles.buy": "Acheter",

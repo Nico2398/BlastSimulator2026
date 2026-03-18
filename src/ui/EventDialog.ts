@@ -15,6 +15,7 @@ export class EventDialog {
   private readonly optionsEl: HTMLElement;
   private readonly outcomeEl: HTMLElement;
   private gameConsole?: GameConsoleFn;
+  private lastEventId: string | null = null;
 
   constructor(container: HTMLElement) {
     this.overlay = document.createElement('div');
@@ -61,7 +62,7 @@ export class EventDialog {
   setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
 
   show(): void { this.overlay.style.display = ''; }
-  hide(): void { this.overlay.style.display = 'none'; }
+  hide(): void { this.overlay.style.display = 'none'; this.lastEventId = null; }
   get visible(): boolean { return this.overlay.style.display !== 'none'; }
 
   showOutcome(msg: string): void {
@@ -84,23 +85,28 @@ export class EventDialog {
 
     this.titleEl.textContent = t(def.titleKey);
     this.descEl.textContent = t(def.descKey);
-    this.outcomeEl.style.display = 'none';
-    this.outcomeEl.textContent = '';
 
-    this.optionsEl.innerHTML = '';
-    for (let i = 0; i < def.options.length; i++) {
-      const opt = def.options[i]!;
-      const btn = document.createElement('button');
-      btn.className = 'bs-btn bs-event-choice';
-      btn.textContent = t(opt.labelKey);
-      const idx = i;
-      btn.addEventListener('click', () => {
-        this.gameConsole?.(`event choose ${idx}`);
-        // Disable buttons immediately so user can't double-click
-        const btns = this.optionsEl.querySelectorAll('button');
-        btns.forEach(b => { (b as HTMLButtonElement).disabled = true; });
-      });
-      this.optionsEl.appendChild(btn);
+    // Only rebuild buttons when the event changes — prevents destroying buttons mid-click at 60fps
+    if (pending.eventId !== this.lastEventId) {
+      this.lastEventId = pending.eventId;
+      this.outcomeEl.style.display = 'none';
+      this.outcomeEl.textContent = '';
+
+      this.optionsEl.innerHTML = '';
+      for (let i = 0; i < def.options.length; i++) {
+        const opt = def.options[i]!;
+        const btn = document.createElement('button');
+        btn.className = 'bs-btn bs-event-choice';
+        btn.textContent = t(opt.labelKey);
+        const idx = i;
+        btn.addEventListener('click', () => {
+          this.gameConsole?.(`event choose ${idx}`);
+          // Disable buttons immediately so user can't double-click
+          this.optionsEl.querySelectorAll<HTMLButtonElement>('button')
+            .forEach(b => { b.disabled = true; });
+        });
+        this.optionsEl.appendChild(btn);
+      }
     }
   }
 
