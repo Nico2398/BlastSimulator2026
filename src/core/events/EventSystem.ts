@@ -26,6 +26,8 @@ export interface EventSystemState {
   pendingEvent: FiredEvent | null;
   /** Queue of follow-up events to fire. */
   followUpQueue: string[];
+  /** IDs of events that have already fired this level — each fires at most once. */
+  firedEventIds: string[];
 }
 
 export interface FiredEvent {
@@ -43,6 +45,7 @@ export function createEventSystemState(): EventSystemState {
     })),
     pendingEvent: null,
     followUpQueue: [],
+    firedEventIds: [],
   };
 }
 
@@ -63,11 +66,14 @@ export function tickEventSystem(
   // Don't fire new events while one is pending
   if (state.pendingEvent) return null;
 
-  // Check follow-up queue first
-  if (state.followUpQueue.length > 0) {
+  // Check follow-up queue first, skipping already-fired events
+  while (state.followUpQueue.length > 0) {
     const eventId = state.followUpQueue.shift()!;
-    state.pendingEvent = { eventId, firedAtTick: ctx.tickCount };
-    return state.pendingEvent;
+    if (!state.firedEventIds.includes(eventId)) {
+      state.firedEventIds.push(eventId);
+      state.pendingEvent = { eventId, firedAtTick: ctx.tickCount };
+      return state.pendingEvent;
+    }
   }
 
   for (const timer of state.timers) {
@@ -77,9 +83,10 @@ export function tickEventSystem(
       // Reset timer with score-modulated interval
       timer.remaining = getModulatedInterval(timer.category, ctx.scores, timer.baseInterval);
 
-      // Try to fire an event from this category
-      const event = selectEvent(timer.category, ctx, rng);
+      // Try to fire an event from this category (already-fired events excluded)
+      const event = selectEvent(timer.category, ctx, rng, state.firedEventIds);
       if (event) {
+        state.firedEventIds.push(event.id);
         state.pendingEvent = { eventId: event.id, firedAtTick: ctx.tickCount };
         return state.pendingEvent;
       }
@@ -109,9 +116,10 @@ export function selectEvent(
   category: EventCategory,
   ctx: EventContext,
   rng: Random,
+  firedEventIds: string[] = [],
 ): EventDef | null {
   const events = getEventsByCategory(category);
-  const available = events.filter(e => e.canFire(ctx));
+  const available = events.filter(e => !firedEventIds.includes(e.id) && e.canFire(ctx));
 
   if (available.length === 0) return null;
 
