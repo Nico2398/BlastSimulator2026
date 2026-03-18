@@ -1542,6 +1542,7 @@
   "ui.toolbar.survey": "Survey",
   "ui.toolbar.settings": "Settings",
   "ui.toolbar.saves": "Saves",
+  "ui.back": "Back",
 
   "saveload.title": "Save / Load",
   "saveload.save": "Save",

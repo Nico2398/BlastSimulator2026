@@ -1542,6 +1542,7 @@
   "ui.toolbar.survey": "Sondage",
   "ui.toolbar.settings": "Paramètres",
   "ui.toolbar.saves": "Sauvegardes",
+  "ui.back": "Retour",
 
   "saveload.title": "Sauvegarder / Charger",
   "saveload.save": "Sauvegarder",

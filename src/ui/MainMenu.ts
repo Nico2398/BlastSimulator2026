@@ -1,4 +1,4 @@
-// BlastSimulator2026 — Main Menu and World Map Screen (12.8)
+// BlastSimulator2026 — Main Menu and World Map Screen (12.9)
 // Main menu with New/Continue/Load/Settings; world map shows 3 levels
 // with lock/unlock status and completion stars.
 
@@ -26,24 +26,39 @@ export class MainMenu {
     this.overlay = document.createElement('div');
     this.overlay.id = 'bs-main-menu';
     this.overlay.style.cssText = [
-      'position:fixed;inset:0;background:rgba(5,10,15,0.95);z-index:9999',
-      'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px',
+      'position:fixed;inset:0;z-index:9999',
+      'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px',
+      'background:#060402',
     ].join(';');
 
     // ── Title ──
+    const titleWrap = document.createElement('div');
+    titleWrap.style.cssText = 'text-align:center;position:relative';
+
     const title = document.createElement('h1');
-    title.style.cssText = 'color:#f0c060;font-size:36px;margin:0;font-family:monospace;text-shadow:0 0 20px #c07020;text-align:center';
+    title.style.cssText = [
+      'color:#f0b840;font-size:42px;margin:0;font-family:monospace',
+      'text-shadow:0 0 30px rgba(200,100,0,0.6),0 2px 4px rgba(0,0,0,0.8)',
+      'letter-spacing:0.04em',
+    ].join(';');
     title.textContent = t('menu.title');
 
     const subtitle = document.createElement('div');
-    subtitle.style.cssText = 'color:#806040;font-size:12px;margin-bottom:8px';
-    subtitle.textContent = '💣  dig. blast. profit.  💣';
+    subtitle.style.cssText = 'color:#6a5030;font-size:13px;margin-top:6px;letter-spacing:0.12em;text-transform:uppercase';
+    subtitle.textContent = 'dig  ·  blast  ·  profit';
+
+    titleWrap.append(title, subtitle);
 
     // ── Menu box ──
     this.menuBox = document.createElement('div');
-    this.menuBox.style.cssText = 'display:flex;flex-direction:column;gap:8px;min-width:220px';
+    this.menuBox.style.cssText = [
+      'display:flex;flex-direction:column;gap:8px;min-width:240px',
+      'background:rgba(8,6,3,0.85);border:1px solid rgba(200,160,60,0.25)',
+      'border-radius:12px;padding:20px 24px',
+      'box-shadow:0 8px 40px rgba(0,0,0,0.6)',
+    ].join(';');
 
-    const newBtn = this.makeMenuBtn(t('menu.new_campaign'), 'bs-btn-primary', () => this.onNewCampaign?.());
+    const newBtn = this.makeMenuBtn(t('menu.new_campaign'), 'primary', () => this.onNewCampaign?.());
     const continueBtn = this.makeMenuBtn(t('menu.continue'), '', () => this.showWorldMap(null));
     const loadBtn = this.makeMenuBtn(t('menu.load'), '', () => this.onLoad?.());
     const settingsBtn = this.makeMenuBtn(t('menu.settings'), '', () => this.onSettings?.());
@@ -52,9 +67,15 @@ export class MainMenu {
 
     // ── World map box (hidden initially) ──
     this.worldMapBox = document.createElement('div');
-    this.worldMapBox.style.cssText = 'display:none;flex-direction:column;gap:8px;min-width:320px;max-width:500px';
+    this.worldMapBox.style.cssText = [
+      'display:none;flex-direction:column;gap:8px;min-width:340px;max-width:520px',
+      'background:rgba(8,6,3,0.85);border:1px solid rgba(200,160,60,0.25)',
+      'border-radius:12px;padding:20px 24px',
+      'box-shadow:0 8px 40px rgba(0,0,0,0.6)',
+      'max-height:80vh;overflow-y:auto',
+    ].join(';');
 
-    this.overlay.append(title, subtitle, this.menuBox, this.worldMapBox);
+    this.overlay.append(titleWrap, this.menuBox, this.worldMapBox);
     container.appendChild(this.overlay);
   }
 
@@ -75,8 +96,11 @@ export class MainMenu {
     this.worldMapBox.innerHTML = '';
 
     const mapTitle = document.createElement('div');
-    mapTitle.className = 'bs-panel-title';
-    mapTitle.style.cssText = 'font-size:16px;text-align:center';
+    mapTitle.style.cssText = [
+      'font-weight:700;font-size:12px;letter-spacing:0.06em;text-transform:uppercase',
+      'color:#ffc840;margin-bottom:4px;border-bottom:1px solid rgba(200,160,60,0.25)',
+      'padding-bottom:8px',
+    ].join(';');
     mapTitle.textContent = t('menu.world_map');
 
     this.worldMapBox.appendChild(mapTitle);
@@ -90,15 +114,16 @@ export class MainMenu {
 
       const card = document.createElement('div');
       card.style.cssText = [
-        'padding:10px 14px;border-radius:6px;',
-        unlocked ? 'background:#2a1a0a;cursor:pointer' : 'background:#1a1208;cursor:not-allowed;opacity:0.6',
+        'padding:12px 14px;border-radius:8px;',
+        'border:1px solid ',
+        unlocked ? 'rgba(200,160,60,0.2);background:rgba(255,255,255,0.03)' : 'rgba(80,60,30,0.2);background:transparent;opacity:0.55',
       ].join('');
 
       const nameRow = document.createElement('div');
-      nameRow.style.cssText = 'display:flex;align-items:center;justify-content:space-between';
+      nameRow.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:4px';
 
       const name = document.createElement('div');
-      name.style.cssText = 'font-size:13px;color:#d0b060;font-weight:bold';
+      name.style.cssText = 'font-size:14px;color:#d0b060;font-weight:700';
       name.textContent = t(lvl.nameKey);
 
       const stars = document.createElement('div');
@@ -110,30 +135,30 @@ export class MainMenu {
       nameRow.append(name, stars);
 
       const desc = document.createElement('div');
-      desc.style.cssText = 'font-size:10px;color:#806040;margin:3px 0';
+      desc.style.cssText = 'font-size:11px;color:#6a5030;margin:2px 0 4px';
       desc.textContent = t(lvl.descKey);
 
       const difficulty = document.createElement('div');
-      difficulty.style.cssText = 'font-size:10px;color:#a08050';
+      difficulty.style.cssText = 'font-size:11px;color:#8a7040';
       difficulty.textContent = '⛏'.repeat(lvl.difficultyTier);
 
       card.append(nameRow, desc, difficulty);
 
       if (!unlocked) {
         const req = document.createElement('div');
-        req.style.cssText = 'font-size:10px;color:#604030;margin-top:4px';
+        req.style.cssText = 'font-size:10px;color:#503820;margin-top:6px';
         const prevLevel = levels[levels.indexOf(lvl) - 1];
         req.textContent = prevLevel
-          ? t('menu.level_locked', { req: `$${prevLevel ? lvl.unlockThreshold.toLocaleString() : '???'} on ${t(prevLevel.nameKey)}` })
+          ? t('menu.level_locked', { req: `$${lvl.unlockThreshold.toLocaleString()} on ${t(prevLevel.nameKey)}` })
           : '';
         card.appendChild(req);
       } else {
         const btnRow = document.createElement('div');
-        btnRow.style.cssText = 'display:flex;gap:6px;margin-top:6px';
+        btnRow.style.cssText = 'display:flex;gap:6px;margin-top:8px';
 
         const startBtn = document.createElement('button');
         startBtn.className = 'bs-btn bs-btn-primary';
-        startBtn.style.cssText = 'flex:1;font-size:10px;padding:3px';
+        startBtn.style.cssText = 'flex:1;font-size:12px;padding:6px 10px';
         startBtn.textContent = completed ? t('menu.level_resume') : t('menu.level_start');
         startBtn.addEventListener('click', () => {
           this.hide();
@@ -147,7 +172,7 @@ export class MainMenu {
       this.worldMapBox.appendChild(card);
     }
 
-    const backBtn = this.makeMenuBtn('← Back', '', () => {
+    const backBtn = this.makeMenuBtn('← ' + t('ui.back'), '', () => {
       this.worldMapBox.style.display = 'none';
       this.menuBox.style.display = 'flex';
     });
@@ -159,7 +184,7 @@ export class MainMenu {
   makeReturnToMapButton(container: HTMLElement, onReturn: () => void): HTMLElement {
     const btn = document.createElement('button');
     btn.className = 'bs-btn';
-    btn.style.cssText = 'position:fixed;top:8px;right:140px;z-index:300;font-size:10px;padding:3px 8px';
+    btn.style.cssText = 'position:fixed;top:8px;right:140px;z-index:300;font-size:10px;padding:3px 8px;pointer-events:all';
     btn.textContent = t('menu.return_to_map');
     btn.addEventListener('click', onReturn);
     container.appendChild(btn);
@@ -168,10 +193,10 @@ export class MainMenu {
 
   dispose(): void { this.overlay.remove(); }
 
-  private makeMenuBtn(label: string, extraClass: string, onClick: () => void): HTMLButtonElement {
+  private makeMenuBtn(label: string, variant: string, onClick: () => void): HTMLButtonElement {
     const btn = document.createElement('button');
-    btn.className = `bs-btn${extraClass ? ' ' + extraClass : ''}`;
-    btn.style.cssText = 'width:100%;padding:8px;font-size:13px';
+    btn.className = `bs-btn${variant === 'primary' ? ' bs-btn-primary' : ''}`;
+    btn.style.cssText = 'width:100%;padding:10px 16px;font-size:13px;font-weight:600;text-align:left;pointer-events:all';
     btn.textContent = label;
     btn.addEventListener('click', onClick);
     return btn;
