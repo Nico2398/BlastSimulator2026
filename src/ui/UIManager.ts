@@ -61,7 +61,9 @@ export class UIManager {
     this.vehiclePanel = new VehiclePanel(leftCol);
     this.employeePanel = new EmployeePanel(leftCol);
     this.surveyUI = new SurveyUI(leftCol);
-    this.settingsMenu = new SettingsMenu(leftCol);
+    // Settings appended to root container so its z-index:10000 beats the main menu (z-index:9999).
+    // Inside leftCol's fixed stacking context it would be capped at z:100 relative to root.
+    this.settingsMenu = new SettingsMenu(container);
 
     // Event dialog (modal, appended to container)
     this.eventDialog = new EventDialog(container);
@@ -69,10 +71,9 @@ export class UIManager {
     // MiniMap on right
     this.miniMap = new MiniMap(rightCol);
 
-    // Toolbar
+    // Toolbar (right side, vertically centred — layout driven entirely by CSS #bs-toolbar)
     this.toolbar = document.createElement('div');
     this.toolbar.id = 'bs-toolbar';
-    this.toolbar.style.cssText = 'position:fixed;bottom:8px;left:50%;transform:translateX(-50%);z-index:200;display:flex;gap:4px';
     container.appendChild(this.toolbar);
     this.buildToolbar();
   }
@@ -98,13 +99,7 @@ export class UIManager {
    */
   showNotification(message: string): void {
     const el = document.createElement('div');
-    el.style.cssText = [
-      'position:fixed;bottom:80px;left:50%;transform:translateX(-50%)',
-      'background:#3a1a0a;border:1px solid #c06020;border-radius:6px',
-      'padding:10px 18px;font-size:13px;color:#f0c060',
-      'z-index:10000;pointer-events:none;text-align:center;max-width:360px',
-      'box-shadow:0 2px 12px rgba(0,0,0,0.8)',
-    ].join(';');
+    el.className = 'bs-notification';
     el.textContent = message;
     document.body.appendChild(el);
     // Fade out and remove
@@ -147,6 +142,7 @@ export class UIManager {
       case 'survey': this.surveyUI.show(); break;
       case 'settings': this.settingsMenu.show(); break;
     }
+    this.syncToolbarActive();
   }
 
   togglePanel(name: PanelName): void {
@@ -155,6 +151,7 @@ export class UIManager {
     } else {
       this.showPanel(name);
     }
+    this.syncToolbarActive();
   }
 
   dispose(): void {
@@ -171,6 +168,12 @@ export class UIManager {
     this.toolbar.remove();
   }
 
+  private syncToolbarActive(): void {
+    this.toolbar.querySelectorAll<HTMLButtonElement>('.bs-toolbar-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset['panel'] === this.activePanel);
+    });
+  }
+
   private hideAllPanels(): void {
     this.activePanel = null;
     this.blastUI.hide();
@@ -183,23 +186,28 @@ export class UIManager {
   }
 
   private buildToolbar(): void {
-    const buttons: [PanelName, string][] = [
-      ['blast', t('ui.toolbar.blast')],
-      ['contracts', t('ui.toolbar.contracts')],
-      ['build', t('ui.toolbar.build')],
-      ['vehicles', t('ui.toolbar.vehicles')],
-      ['employees', t('ui.toolbar.employees')],
-      ['survey', t('ui.toolbar.survey')],
-      ['settings', t('ui.toolbar.settings')],
+    const buttons: [PanelName, string, string][] = [
+      ['blast',     '💣 ' + t('ui.toolbar.blast'),     'blast'],
+      ['contracts', '📋 ' + t('ui.toolbar.contracts'), 'contracts'],
+      ['build',     '🏗 '  + t('ui.toolbar.build'),     'build'],
+      ['vehicles',  '🚛 ' + t('ui.toolbar.vehicles'),  'vehicles'],
+      ['employees', '👷 ' + t('ui.toolbar.employees'), 'employees'],
+      ['survey',    '🔍 ' + t('ui.toolbar.survey'),    'survey'],
+      ['settings',  '⚙️ '  + t('ui.toolbar.settings'),  'settings'],
     ];
 
     for (const [name, label] of buttons) {
       const btn = document.createElement('button');
-      btn.className = 'bs-btn';
-      btn.style.cssText = 'padding:4px 10px;font-size:11px';
+      btn.className = 'bs-toolbar-btn';
       btn.textContent = label;
       btn.dataset['panel'] = name;
-      btn.addEventListener('click', () => this.togglePanel(name));
+      btn.addEventListener('click', () => {
+        this.togglePanel(name);
+        // Sync active state on all toolbar buttons
+        this.toolbar.querySelectorAll<HTMLButtonElement>('.bs-toolbar-btn').forEach(b => {
+          b.classList.toggle('active', b.dataset['panel'] === name && this.activePanel === name);
+        });
+      });
       this.toolbar.appendChild(btn);
     }
   }

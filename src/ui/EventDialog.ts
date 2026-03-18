@@ -23,32 +23,33 @@ export class EventDialog {
 
     this.box = document.createElement('div');
     this.box.className = 'bs-confirm-box';
-    this.box.style.maxWidth = '320px';
+    this.box.style.cssText = 'max-width:480px;width:92%;text-align:left';
 
     const header = document.createElement('div');
     header.className = 'bs-panel-title';
-    header.style.marginBottom = '6px';
     header.textContent = t('ui.event.title');
 
     this.titleEl = document.createElement('div');
-    this.titleEl.style.cssText = 'font-size:13px;color:#e0c090;font-weight:bold;margin-bottom:6px';
+    this.titleEl.className = 'bs-event-title';
 
     this.descEl = document.createElement('p');
-    this.descEl.style.cssText = 'font-size:11px;color:#c0a070;margin:0 0 10px';
+    this.descEl.className = 'bs-event-text';
+    this.descEl.style.cssText = 'margin:0 0 14px';
 
     const chooseLabel = document.createElement('div');
-    chooseLabel.style.cssText = 'font-size:10px;color:#808060;margin-bottom:4px';
+    chooseLabel.style.cssText = 'font-size:10px;color:#7a7060;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px';
     chooseLabel.textContent = t('ui.event.choose');
 
     this.optionsEl = document.createElement('div');
-    this.optionsEl.style.cssText = 'display:flex;flex-direction:column;gap:4px';
+    this.optionsEl.className = 'bs-event-choices';
 
     this.outcomeEl = document.createElement('div');
-    this.outcomeEl.style.cssText = 'font-size:11px;color:#80c080;margin-top:8px;display:none';
+    this.outcomeEl.className = 'bs-event-outcome';
+    this.outcomeEl.style.display = 'none';
 
     const dismissBtn = document.createElement('button');
     dismissBtn.className = 'bs-btn';
-    dismissBtn.style.cssText = 'width:100%;margin-top:8px';
+    dismissBtn.style.cssText = 'width:100%;margin-top:12px';
     dismissBtn.textContent = t('ui.event.dismiss');
     dismissBtn.addEventListener('click', () => this.hide());
 
@@ -90,13 +91,12 @@ export class EventDialog {
     for (let i = 0; i < def.options.length; i++) {
       const opt = def.options[i]!;
       const btn = document.createElement('button');
-      btn.className = 'bs-btn';
-      btn.style.cssText = 'text-align:left;padding:4px 8px;font-size:11px';
+      btn.className = 'bs-btn bs-event-choice';
       btn.textContent = t(opt.labelKey);
       const idx = i;
       btn.addEventListener('click', () => {
-        this.gameConsole?.(`event choose option:${idx}`);
-        // Disable all buttons after choice
+        this.gameConsole?.(`event choose ${idx}`);
+        // Disable buttons immediately so user can't double-click
         const btns = this.optionsEl.querySelectorAll('button');
         btns.forEach(b => { (b as HTMLButtonElement).disabled = true; });
       });
