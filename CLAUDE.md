@@ -1,86 +1,68 @@
-# BlastSimulator2026
+# BlastSimulator2026 — Claude Cheat Sheet
 
-## Identity
-You are developing **BlastSimulator2026**, a satirical open-pit mine management game. You are working autonomously — the human supervises occasionally but expects you to make progress independently on ALL technical matters.
+**What it is:** A satirical open-pit mine management game (Theme Hospital meets capitalism). Cartoon 3D visuals, blast physics, union strikes, mafia, lawsuits, 3-level campaign.
 
-## Creative Direction — WHEN TO ASK THE HUMAN
-The human is the **creative director** of this game. You must ask for their input ONLY for creative decisions, and handle everything else autonomously. Here is the boundary:
+## Architecture (never violate these boundaries)
 
-**ASK the human (pause and request feedback) for:**
-- Event content: before mass-generating events (tasks 6.3–6.7), propose 3-5 example events with their full structure (text, tone, decision options, consequences) and ask the human to validate the tone, humor level, and structure before generating the remaining 50-100 per category
-- Naming: fictional names for rocks, explosives, ores, levels, characters — propose options, let the human pick
-- Tone calibration: if unsure whether something is too dark, too silly, or off-brand, ask
-- Game feel decisions: if a design choice affects how the game "feels" to play (e.g., how fast time passes, how punishing failures are), flag it
+- `src/core/` → pure TypeScript, zero side effects, no DOM/WebGL/window. Fully testable in Node.js.
+- `src/renderer/` → Three.js visuals. Depends on core. Core never imports renderer.
+- `src/physics/` → Cannon-es. Active only during blasts.
+- `src/persistence/` → Save backends (IndexedDB, File, Download). Imports only from core.
+- `src/ui/` → HTML overlay. Reads GameState.
+- `src/audio/` → Web Audio API.
+- `src/console/` → CLI mode, same core logic as the UI.
+- **State flows one way:** Input → Core → State mutation → Event emitted → Renderer/UI/Audio
 
-**DO NOT ask the human for:**
-- Technical architecture, code structure, algorithms
-- Test design, debugging, build issues
-- Data structure choices (pick the best one, the human trusts your judgment)
-- Numerical balancing (research and use plausible values — see section below)
-- i18n translations (generate both EN and FR yourself)
-- Any implementation detail
+Key patterns: single serializable `GameState`, tick-based loop with `timeScale`/`isPaused`, typed `EventEmitter` for core→renderer communication, seeded PRNG for all randomness.
 
-When you need creative input, clearly state what you need validated and propose concrete options. Do not send vague questions — send examples.
+See `.agent/ARCHITECTURE.md` for full details.
 
-## Numerical Values and Balancing
-For all game constants (rock fracture thresholds, explosive energy per kg, contract prices, salary ranges, score formulas, event timer intervals, etc.):
-1. **Research real-world equivalents** where applicable (real blasting uses ANFO at ~3.4 MJ/kg, dynamite at ~7.5 MJ/kg, real drill holes are 75-150mm diameter, etc.)
-2. **Scale to gameplay** — real values are a starting point, then adjust for fun. A blast shouldn't take 3 real-time hours.
-3. **Store ALL constants in a centralized config** (`src/core/config/` or similar), never hardcode in logic
-4. **Document your reasoning** in code comments: `// Real ANFO: 3.4 MJ/kg, scaled to game units (x100)`
-5. The human will fine-tune values during polishing — your job is to get them in the right ballpark
+## Key Systems — Read Before Touching
 
-## Before Every Task
-1. Read the task list in `README.md` — find the **next unchecked task** (`- [ ]`)
-2. Read its acceptance criteria carefully
-3. Read any `.agent/*.md` files referenced (GAME_DESIGN.md, ARCHITECTURE.md, BLAST_SYSTEM.md, TESTING.md, WORKFLOW.md, VISUAL_TESTING.md)
-4. Do NOT skip tasks. Do NOT work on multiple tasks at once.
+| System | Reference | Location |
+|--------|-----------|----------|
+| Blast pipeline | `.agent/BLAST_SYSTEM.md` | `src/core/mining/BlastCalc.ts` |
+| Event system | `.agent/GAME_DESIGN.md` §9–10 | `src/core/events/` |
+| Campaign/levels | `.agent/GAME_DESIGN.md` §15 | `src/core/campaign/` |
+| Save system | `SaveBackend` interface in core | `src/persistence/` for implementations |
+| Score system | `src/core/scores/` | WellBeing, Safety, Ecology, Nuisance |
 
-## During Every Task
-- Write tests BEFORE or ALONGSIDE implementation
-- All `src/core/` code must be **pure TypeScript** — no DOM, no WebGL, no `window`, no side effects
-- All user-facing strings go through the i18n system (`t('key')`) — always add both `en.json` and `fr.json`
-- No **code** file should exceed 300 lines — split into sub-modules. Data/content files (event definitions, i18n JSON) are exempt from this limit.
-- Use the seeded PRNG (`src/core/math/Random.ts`) for all randomness so tests are deterministic
+## Testing and Validation
 
-## After Every Task
-Run validation — this is mandatory, no exceptions:
 ```bash
-bash scripts/validate.sh
+npm run validate        # TypeScript → tests → build (run after every change)
+npm run test            # Tests only
+npx tsx src/console.ts  # Manual gameplay testing without a browser
+bash scripts/visual-test.sh --name "label" --commands "new_game seed:1"  # Screenshot
 ```
-This runs: TypeScript check → Tests → Build → Task consistency check.
-The task consistency checker (`scripts/check-tasks.sh`) verifies that no tasks were skipped, that expected files exist for completed tasks, and that i18n keys are in sync between en.json and fr.json.
 
-If validation fails, fix the issue before moving on. For rendering tasks, also take a screenshot and confirm visuals (see `.agent/VISUAL_TESTING.md`). Then:
-- Mark the task `[x]` in README.md
-- Update the "Completed" count in the Progress Summary table
+Always run `npm run validate` before considering a fix or feature complete. For rendering changes, also take a screenshot to verify visuals (`.agent/VISUAL_TESTING.md`).
 
-## Architecture Rules (never violate these)
-- `src/core/` → pure logic, testable in Node.js, no imports from `renderer/`, `physics/`, `ui/`, `audio/`, `persistence/`
-- `src/persistence/` → platform-specific save backends (IndexedDB, File, Download), imports only from `core/`
-- `src/renderer/` → Three.js visuals, depends on core, never the reverse
-- `src/physics/` → Cannon-es, only active during blasts
-- `src/console/` → CLI mode, calls same core logic as the UI
-- `src/ui/` → HTML overlay, reads from GameState
-- State flows one way: Input → Core → State mutation → Event emitted → Renderer/UI/Audio
+## File Conventions
 
-## Console↔Browser Bridge
-When working on rendering (Phase 9+), `src/main.ts` must expose a `window.__gameConsole(cmd: string)` function that routes commands to the same ConsoleRunner used in CLI mode. This is required for the screenshot script (`scripts/screenshot.ts`) to work. Add this when implementing task 9.1 (Scene Manager).
+- **300-line limit** per code file — split into sub-modules if needed (data/i18n files exempt)
+- **TypeScript strict** — no `any` except in test fixtures
+- **Seeded PRNG** (`src/core/math/Random.ts`) for all randomness — never `Math.random()`
+- **Centralized config** for all game constants (`src/core/config/`) — never hardcode numbers in logic
+- **Named exports** everywhere except entry points
 
-## Console Mode
-Every gameplay feature must work in console mode (`npx tsx src/console.ts`) before any UI/rendering work. This is how you test without a browser.
+## i18n Rule
 
-## Campaign Structure
-The game has 3 levels of progressive difficulty on a world map. Level completion unlocks the next. Game-over conditions fail the current level only, not the campaign. See `.agent/GAME_DESIGN.md` §15.
+Every user-facing string goes through `t('key')`. Always add both `en.json` and `fr.json` entries simultaneously. Never hardcode player-visible text.
 
-## Save System
-Three persistence backends: FilePersistence (local), IndexedDBPersistence (web), DownloadPersistence (fallback). Auto-detect environment. The `SaveBackend` interface lives in `src/core/state/SaveBackend.ts` (pure type). The implementations live in `src/persistence/` (NOT in core, since they use platform APIs). See task 1.3 in README.
+## Creative Direction
 
-## When Stuck
-- Re-read the task description and `.agent/` docs
-- Check if a prerequisite task was missed
-- Implement the minimum viable version that satisfies acceptance criteria
-- If truly blocked, add `<!-- BLOCKED: reason -->` next to the task and move to the next independent task
+The human is the **creative director**. Ask for input on:
+- New fictional names (rocks, ores, explosives, characters, levels)
+- New event content — propose 3–5 examples first, get tone approval before generating more
+- Game feel decisions (how punishing, how fast, etc.)
 
-## Critical Reminder
-The blast system is the CENTRAL mechanic. See `.agent/BLAST_SYSTEM.md` for the full algorithm. Every formula must be a pure function in `BlastCalc.ts` with unit tests. Do not cut corners on this.
+Handle all technical decisions autonomously (architecture, algorithms, tests, balancing, translations).
+
+## Deployment
+
+```bash
+npm run build    # Produces dist/ — upload to itch.io as HTML5 game
+```
+
+No Electron wrapper yet. See README.md for what would be needed to add one.

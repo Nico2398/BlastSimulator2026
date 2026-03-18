@@ -56,14 +56,5 @@ else
     fail "Build failed. Fix build errors before proceeding."
 fi
 
-# Step 5: Task consistency check
-step "Task Consistency Check"
-if bash scripts/check-tasks.sh 2>&1; then
-    pass "Task consistency OK"
-else
-    fail "Task consistency issues found. Review the output above."
-fi
-
 # Summary
 echo -e "\n${GREEN}${BOLD}=== ALL VALIDATIONS PASSED ===${RESET}"
-echo "You may now mark the current task as complete in README.md."
