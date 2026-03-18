@@ -76,13 +76,17 @@ export function calculateEnergyField(
   holes: readonly DrillHole[],
   charges: Record<string, HoleCharge>,
   holeDepths: Record<string, number>,
+  holeSurfaceYs?: Record<string, number>,
 ): number {
   let total = 0;
   for (const hole of holes) {
     const charge = charges[hole.id];
     if (!charge) continue;
     const energy = effectiveHoleEnergy(charge, holeDepths[hole.id] ?? hole.depth, false, false);
-    const holePos = vec3(hole.x, 0, hole.z);
+    // Hole source modelled as mid-point of the charged column (surface minus half depth)
+    const surfaceY = holeSurfaceYs?.[hole.id] ?? 0;
+    const depth = holeDepths[hole.id] ?? hole.depth;
+    const holePos = vec3(hole.x, surfaceY - depth / 2, hole.z);
     const d2 = distSquared(point, holePos);
     total += energy.downward / (d2 + EPSILON);
   }
