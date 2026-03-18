@@ -124,6 +124,67 @@ describe('Event system engine', () => {
     expect(selected?.id).toBe('open');
   });
 
+  it('same event cannot fire twice in a level', () => {
+    registerEvents([makeEvent('once_only', 'union')]);
+    const state = createEventSystemState();
+    const unionTimer = state.timers.find(t => t.category === 'union')!;
+
+    // Fire the event once
+    unionTimer.remaining = 1;
+    const first = tickEventSystem(state, makeCtx(), new Random(42));
+    expect(first?.eventId).toBe('once_only');
+    clearPendingEvent(state);
+
+    // Attempt to fire again
+    unionTimer.remaining = 1;
+    const second = tickEventSystem(state, makeCtx(), new Random(42));
+    expect(second).toBeNull();
+    expect(state.firedEventIds).toContain('once_only');
+  });
+
+  it('firedEventIds survives JSON round-trip (save/load)', () => {
+    const state = createEventSystemState();
+    state.firedEventIds.push('persist_test');
+
+    const serialized = JSON.stringify(state);
+    const restored = JSON.parse(serialized) as typeof state;
+    expect(restored.firedEventIds).toEqual(['persist_test']);
+  });
+
+  it('follow-up events are also deduplicated', () => {
+    registerEvents([makeEvent('followup_ev', 'union')]);
+    const state = createEventSystemState();
+
+    // Queue the follow-up twice
+    queueFollowUp(state, 'followup_ev');
+    queueFollowUp(state, 'followup_ev');
+
+    const first = tickEventSystem(state, makeCtx(), new Random(42));
+    expect(first?.eventId).toBe('followup_ev');
+    clearPendingEvent(state);
+
+    // Second attempt should be skipped (already fired)
+    const second = tickEventSystem(state, makeCtx(), new Random(42));
+    expect(second).toBeNull();
+  });
+
+  it('firedEventIds resets to empty on createEventSystemState', () => {
+    const state = createEventSystemState();
+    expect(state.firedEventIds).toEqual([]);
+  });
+
+  it('selectEvent excludes already-fired events', () => {
+    registerEvents([
+      makeEvent('fired_ev', 'union'),
+      makeEvent('fresh_ev', 'union'),
+    ]);
+    const ctx = makeCtx();
+    const rng = new Random(42);
+
+    const result = selectEvent('union', ctx, rng, ['fired_ev']);
+    expect(result?.id).toBe('fresh_ev');
+  });
+
   it('timer reset interval depends on player scores', () => {
     registerEvents([makeEvent('test1', 'union')]);
     const state = createEventSystemState();

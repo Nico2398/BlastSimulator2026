@@ -71,5 +71,11 @@ export function deserialize(json: string): GameState {
     }
   }
 
+  // Ensure firedEventIds exists for saves created before it was added
+  const eventsRaw = obj['events'] as Record<string, unknown> | undefined;
+  if (eventsRaw && !Array.isArray(eventsRaw['firedEventIds'])) {
+    eventsRaw['firedEventIds'] = [];
+  }
+
   return obj as unknown as GameState;
 }
