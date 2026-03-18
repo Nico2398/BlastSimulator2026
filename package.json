@@ -16,6 +16,9 @@
     "simplex-noise": "^4.0.3",
     "three": "^0.165.0"
   },
+  "puppeteer": {
+    "skipDownload": true
+  },
   "devDependencies": {
     "@types/three": "^0.165.0",
     "jsdom": "^29.0.0",
