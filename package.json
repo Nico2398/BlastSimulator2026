@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "console": "tsx src/console.ts",
-    "validate": "bash scripts/validate.sh",
+    "validate": "tsc --noEmit && vitest run --reporter=verbose && vite build",
     "test": "vitest run",
     "test:watch": "vitest"
   },

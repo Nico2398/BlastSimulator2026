@@ -1,0 +1,5 @@
+# Ensure consistent line endings across platforms
+* text=auto
+
+# Shell scripts must always use LF — CRLF breaks bash on Windows
+*.sh text eol=lf
