@@ -75,6 +75,7 @@ export function buildCommand(
       }
       const result = moveBuilding(state.buildings, id, toCoords[0]!, toCoords[1]!, GRID_SIZE, GRID_SIZE);
       if (!result.success) return { success: false, output: result.error! };
+      state.cash -= result.cost!;
       addExpense(state.finances, result.cost!, 'construction', `Relocate building #${id}`, state.tickCount);
       return { success: true, output: `Building #${id} moved. Cost: $${result.cost}` };
     }
@@ -98,6 +99,7 @@ export function buildCommand(
       }
       const result = placeBuilding(state.buildings, type, atCoords[0]!, atCoords[1]!, GRID_SIZE, GRID_SIZE);
       if (!result.success) return { success: false, output: result.error! };
+      state.cash -= result.cost!;
       addExpense(state.finances, result.cost!, 'construction', `Build ${type}`, state.tickCount);
       return { success: true, output: `Built ${type} #${result.building!.id} at (${atCoords[0]},${atCoords[1]}). Cost: $${result.cost}` };
     }
@@ -136,6 +138,7 @@ export function vehicleCommand(
       const spawnX = state.world ? state.world.sizeX / 2 : 32;
       const spawnZ = state.world ? state.world.sizeZ / 2 : 32;
       const { vehicle, cost } = purchaseVehicle(state.vehicles, type, spawnX, spawnZ);
+      state.cash -= cost;
       addExpense(state.finances, cost, 'equipment', `Buy ${type}`, state.tickCount);
       return { success: true, output: `Purchased ${type} #${vehicle.id}. Cost: $${cost}` };
     }
@@ -202,6 +205,7 @@ export function employeeCommand(
       const empX = state.world ? state.world.sizeX / 2 + (state.employees.employees.length % 5) * 2 : 32;
       const empZ = state.world ? state.world.sizeZ / 2 : 32;
       const { employee, hiringCost } = hireEmployee(state.employees, role, rng, empX, empZ);
+      state.cash -= hiringCost;
       addExpense(state.finances, hiringCost, 'salaries', `Hire ${role}: ${employee.name}`, state.tickCount);
       return { success: true, output: `Hired ${employee.name} (${role}). Cost: $${hiringCost}` };
     }

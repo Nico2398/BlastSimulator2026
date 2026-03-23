@@ -1,0 +1,72 @@
+{
+  "name": "level1-win-conservative",
+  "description": "Level 1 winning scenario: conservative approach with small blasts and steady income",
+  "steps": [
+    "new_game seed:99",
+    "campaign start level:dusty_hollow",
+    "time resume",
+    "scores",
+
+    "build medical_bay at:5,5",
+    "build office at:8,5",
+
+    "drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:10,10",
+    "charge hole:* explosive:pop_rock amount:3 stemming:2",
+    "sequence auto delay_step:30",
+    "blast",
+    "finances",
+    "scores",
+
+    "tick 20",
+    "event choose 0",
+    "tick 20",
+    "event choose 0",
+    "contract list",
+    "contract accept 1",
+    "contract deliver 1 amount:300",
+
+    "drill_plan grid rows:2 cols:3 spacing:4 depth:6 start:15,15",
+    "charge hole:* explosive:pop_rock amount:3 stemming:2",
+    "sequence auto delay_step:25",
+    "blast",
+    "finances",
+
+    "tick 20",
+    "event choose 0",
+    "tick 20",
+    "event choose 0",
+    "contract list",
+    "contract accept 2",
+    "contract deliver 2 amount:500",
+
+    "drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:20,20",
+    "charge hole:* explosive:boomite amount:5 stemming:2",
+    "sequence auto delay_step:25",
+    "blast",
+    "finances",
+    "scores",
+
+    "tick 20",
+    "event choose 0",
+    "tick 20",
+    "event choose 0",
+    "contract list",
+    "contract accept 3",
+    "contract deliver 3 amount:800",
+
+    "drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:8,8",
+    "charge hole:* explosive:boomite amount:6 stemming:2",
+    "sequence auto delay_step:20",
+    "blast",
+    "finances",
+
+    "tick 20",
+    "event choose 0",
+    "tick 20",
+    "event choose 0",
+    "finances",
+    "scores",
+    "stats",
+    "campaign status"
+  ]
+}

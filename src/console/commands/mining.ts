@@ -10,6 +10,7 @@ import { assembleBlastPlan, validateBlastPlan } from '../../core/mining/BlastPla
 import { executeBlast } from '../../core/mining/BlastExecution.js';
 import { addIncome } from '../../core/economy/Finance.js';
 import { recordVibration } from '../../core/scores/ScoreManager.js';
+import { recordBlastResult, snapshotStats } from '../../core/campaign/SuccessTracker.js';
 import {
   previewEnergy,
   previewFragments,
@@ -227,6 +228,11 @@ export function blastCommand(
   if (result.projectionCount > 0) {
     recordVibration(state.scores, result.projectionCount * 0.5);
   }
+
+  // Track blast in damage state and level stats
+  state.damage.blastCount++;
+  recordBlastResult(state.levelStats, result.fragments);
+  snapshotStats(state.levelStats, state);
 
   // Clear drill plan after blast (holes are consumed)
   state.drillHoles = [];
