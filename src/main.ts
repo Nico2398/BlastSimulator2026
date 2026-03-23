@@ -192,7 +192,7 @@ window.__uiState = () => {
 
 uiManager.setGameConsole(window.__gameConsole);
 uiManager.setSpeedChangeHandler((speed) => {
-  window.__gameConsole(`speed ${speed}`);
+  window.__gameConsole(`time speed ${speed}`);
 });
 uiManager.setQuitHandler(() => {
   mainMenu.show();

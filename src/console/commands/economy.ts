@@ -97,11 +97,22 @@ export function contractCommand(
     }
 
     case 'accept': {
-      const id = parseInt(args[1] ?? '', 10);
+      const id = parseInt(args[1] ?? named['id'] ?? '', 10);
       if (isNaN(id)) return { success: false, output: 'Usage: contract accept <id>' };
       const contract = acceptContract(state.contracts, id, state.tickCount);
       if (!contract) return { success: false, output: `Contract #${id} not found in available list.` };
       return { success: true, output: `Accepted contract #${id}: ${contract.description}` };
+    }
+
+    case 'decline': {
+      const id = parseInt(args[1] ?? named['id'] ?? '', 10);
+      if (isNaN(id)) return { success: false, output: 'Usage: contract decline <id>' };
+      const before = state.contracts.available.length;
+      state.contracts.available = state.contracts.available.filter(c => c.id !== id);
+      if (state.contracts.available.length === before) {
+        return { success: false, output: `Contract #${id} not found.` };
+      }
+      return { success: true, output: `Declined contract #${id}.` };
     }
 
     case 'status': {
@@ -142,7 +153,7 @@ export function contractCommand(
     }
 
     case 'negotiate': {
-      const id = parseInt(args[1] ?? '', 10);
+      const id = parseInt(args[1] ?? named['id'] ?? '', 10);
       if (isNaN(id)) return { success: false, output: 'Usage: contract negotiate <id>' };
       const result = negotiateContract(state.contracts, id, 0, rng);
       if (!result) return { success: false, output: `Contract #${id} not found.` };
@@ -154,7 +165,7 @@ export function contractCommand(
     }
 
     default:
-      return { success: false, output: 'Usage: contract (list|accept|status|deliver|negotiate) [id] [amount:X]' };
+      return { success: false, output: 'Usage: contract (list|accept|decline|status|deliver|negotiate) [id] [amount:X]' };
   }
 }
 
