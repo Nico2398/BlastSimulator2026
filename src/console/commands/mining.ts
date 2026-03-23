@@ -295,7 +295,13 @@ export function blastPlanCommand(
     return { success: false, output: `Validation issues:\n${errors.map(e => `  ${e.holeId}: ${e.issue}`).join('\n')}` };
   }
 
-  return { success: false, output: 'Usage: blast_plan save|load|validate name:plan1' };
+  if (sub === 'list') {
+    const names = Object.keys(ctx.state!.savedPlans);
+    if (names.length === 0) return { success: true, output: 'No saved plans.' };
+    return { success: true, output: `Saved plans:\n${names.map(n => `  ${n}`).join('\n')}` };
+  }
+
+  return { success: false, output: 'Usage: blast_plan save|load|list|validate name:plan1' };
 }
 
 // ── Preview commands ──
@@ -340,12 +346,25 @@ export function previewCommand(
 export function buySoftwareCommand(
   ctx: MiningContext,
   _args: string[],
-  _named: Record<string, string>,
+  named: Record<string, string>,
 ): CommandResult {
   const err = requireGame(ctx);
   if (err) return { success: false, output: err };
 
-  const result = purchaseSoftware(ctx.softwareTier, ctx.state!.cash);
+  const currentTier = ctx.softwareTier;
+
+  if (named['tier'] !== undefined) {
+    const requestedTier = parseInt(named['tier'], 10);
+    if (requestedTier <= currentTier) {
+      return { success: false, output: `Already at tier ${requestedTier} or higher` };
+    }
+    if (requestedTier > currentTier + 1) {
+      return { success: false, output: `Must purchase tier ${currentTier + 1} first` };
+    }
+    // requestedTier === currentTier + 1 — fall through to purchase
+  }
+
+  const result = purchaseSoftware(currentTier, ctx.state!.cash);
   if ('error' in result) return { success: false, output: result.error };
   ctx.state!.cash -= result.cost;
   ctx.softwareTier = result.newTier;
