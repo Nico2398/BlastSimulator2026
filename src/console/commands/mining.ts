@@ -8,6 +8,8 @@ import { createCharge, batchCharge } from '../../core/mining/ChargePlan.js';
 import { setDelay, autoVPattern } from '../../core/mining/Sequence.js';
 import { assembleBlastPlan, validateBlastPlan } from '../../core/mining/BlastPlan.js';
 import { executeBlast } from '../../core/mining/BlastExecution.js';
+import { addIncome } from '../../core/economy/Finance.js';
+import { recordVibration } from '../../core/scores/ScoreManager.js';
 import {
   previewEnergy,
   previewFragments,
@@ -67,6 +69,9 @@ export function drillPlanCommand(
       { x: origin[0] ?? 0, z: origin[1] ?? 0 },
       rows, cols, spacing, depth, diameter,
     );
+    // Clear stale charges/sequences from previous plan
+    ctx.state!.chargesByHole = {};
+    ctx.state!.sequenceDelays = {};
 
     return {
       success: true,
@@ -209,6 +214,24 @@ export function blastCommand(
   // Store fragment data for renderer (localized remesh + mesh spawning)
   ctx.lastBlastFragments = result.fragments.map(f => f.position);
   ctx.lastBlastFragmentData = result.fragments;
+
+  const state = ctx.state!;
+
+  // Credit ore revenue to finances
+  if (result.totalOreValue > 0) {
+    state.cash += result.totalOreValue;
+    addIncome(state.finances, result.totalOreValue, 'sales', 'Blast ore extraction', state.tickCount);
+  }
+
+  // Update scores based on blast outcome
+  if (result.projectionCount > 0) {
+    recordVibration(state.scores, result.projectionCount * 0.5);
+  }
+
+  // Clear drill plan after blast (holes are consumed)
+  state.drillHoles = [];
+  state.chargesByHole = {};
+  state.sequenceDelays = {};
 
   return {
     success: true,

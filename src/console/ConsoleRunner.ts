@@ -61,6 +61,11 @@ export class ConsoleRunner {
     this.descriptions.set(name, description);
   }
 
+  /** Register an alias (hidden from help). */
+  alias(name: string, handler: CommandHandler): void {
+    this.handlers.set(name, handler);
+  }
+
   /** Run a raw command string. Returns a CommandResult. */
   run(input: string): CommandResult {
     const parsed = parseCommand(input);

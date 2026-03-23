@@ -129,6 +129,9 @@ export function createRunner(): RunnerWithContext {
   runner.register('fragments', 'Fragment logistics (status)', (args, named) =>
     fragmentsCommand(ctx, args, named),
   );
+  runner.alias('fragment', (args, named) =>
+    fragmentsCommand(ctx, args, named),
+  );
 
   // --- Entity commands (Phase 5) ---
   runner.register('build', 'Place/manage buildings (list|destroy|move|<type> at:x,z)', (args, named) =>
