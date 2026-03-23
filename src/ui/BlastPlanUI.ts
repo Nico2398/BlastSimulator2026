@@ -1,5 +1,4 @@
 // BlastSimulator2026 — Blast Plan Editor UI (10.2)
-// Panel for placing drill holes, setting charges, sequencing, and executing blasts.
 
 import { t } from '../core/i18n/I18n.js';
 import type { GameState } from '../core/state/GameState.js';
@@ -13,11 +12,13 @@ export class BlastPlanUI {
   private readonly el: HTMLElement;
   private readonly holeListEl: HTMLElement;
   private readonly chargeForm: HTMLElement;
+  private readonly statusEl: HTMLElement;
   private readonly tileSelect: TileSelectOverlay;
   private gameConsole?: GameConsoleFn;
   private selectedHoleId: string | null = null;
   private worldSizeX = 40;
   private worldSizeZ = 40;
+  private statusTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(container: HTMLElement) {
     this.el = document.createElement('div');
@@ -29,52 +30,29 @@ export class BlastPlanUI {
     title.className = 'bs-panel-title';
     title.textContent = t('ui.blast.title');
 
-    // Grid tool
-    const gridBtn = document.createElement('button');
-    gridBtn.className = 'bs-btn';
-    gridBtn.style.marginBottom = '6px';
-    gridBtn.style.width = '100%';
-    gridBtn.textContent = t('ui.blast.grid_tool');
-    gridBtn.addEventListener('click', () => this.openGridTool());
-
-    // Clear button
-    const clearBtn = document.createElement('button');
-    clearBtn.className = 'bs-btn bs-btn-danger';
-    clearBtn.style.marginBottom = '6px';
-    clearBtn.style.width = '100%';
-    clearBtn.textContent = t('ui.blast.clear_holes');
-    clearBtn.addEventListener('click', () => { this.gameConsole?.('drill_plan clear'); });
-
-    // Hole list
+    const gridBtn = this.makeBtn('bs-btn', t('ui.blast.grid_tool'), () => this.openGridTool());
+    const clearBtn = this.makeBtn('bs-btn bs-btn-danger', t('ui.blast.clear_holes'), () => { this.gameConsole?.('drill_plan clear'); });
     this.holeListEl = document.createElement('div');
-
-    // Charge form (shown when hole selected)
     this.chargeForm = document.createElement('div');
     this.chargeForm.style.display = 'none';
     this.chargeForm.style.marginTop = '8px';
     this.buildChargeForm();
 
-    // Sequence + execute buttons
-    const seqBtn = document.createElement('button');
-    seqBtn.className = 'bs-btn';
-    seqBtn.style.width = '100%';
-    seqBtn.style.marginBottom = '4px';
-    seqBtn.textContent = t('ui.blast.auto_seq');
-    seqBtn.addEventListener('click', () => { this.gameConsole?.('sequence auto'); });
+    const chargeAllBtn = this.makeBtn('bs-btn bs-btn-primary', t('ui.blast.charge_all'), () => this.chargeAllHoles());
+    const seqBtn = this.makeBtn('bs-btn', t('ui.blast.auto_seq'), () => {
+      const output = this.gameConsole?.('sequence auto') ?? '';
+      if (output.includes('Auto')) this.showStatus(t('ui.blast.status_sequenced'), 'success');
+      else this.showStatus(output || t('ui.blast.status_no_holes'), 'error');
+    });
+    const previewBtn = this.makeBtn('bs-btn', t('ui.blast.preview'), () => { this.gameConsole?.('preview energy'); });
+    const execBtn = this.makeBtn('bs-btn bs-btn-primary bs-blast-btn', t('ui.blast.execute'), () => this.confirmBlast());
 
-    const previewBtn = document.createElement('button');
-    previewBtn.className = 'bs-btn';
-    previewBtn.style.width = '100%';
-    previewBtn.style.marginBottom = '4px';
-    previewBtn.textContent = t('ui.blast.preview');
-    previewBtn.addEventListener('click', () => { this.gameConsole?.('preview energy'); });
+    this.statusEl = document.createElement('div');
+    this.statusEl.className = 'bs-blast-status';
+    this.statusEl.style.cssText = 'font-size:11px;margin:6px 0;padding:4px 6px;border-radius:4px;display:none;text-align:center';
 
-    const execBtn = document.createElement('button');
-    execBtn.className = 'bs-btn bs-btn-primary bs-blast-btn';
-    execBtn.textContent = t('ui.blast.execute');
-    execBtn.addEventListener('click', () => this.confirmBlast());
-
-    this.el.append(title, gridBtn, clearBtn, this.holeListEl, this.chargeForm, seqBtn, previewBtn, execBtn);
+    this.el.append(title, gridBtn, clearBtn, this.holeListEl, this.chargeForm,
+      chargeAllBtn, seqBtn, previewBtn, execBtn, this.statusEl);
     container.appendChild(this.el);
 
     this.tileSelect = new TileSelectOverlay(document.body);
@@ -111,6 +89,36 @@ export class BlastPlanUI {
 
   dispose(): void { this.el.remove(); this.tileSelect.dispose(); }
 
+  private showStatus(message: string, type: 'success' | 'error'): void {
+    if (this.statusTimer) clearTimeout(this.statusTimer);
+    this.statusEl.textContent = message;
+    this.statusEl.style.display = '';
+    this.statusEl.style.background = type === 'success'
+      ? 'rgba(40, 180, 80, 0.3)' : 'rgba(200, 80, 40, 0.3)';
+    this.statusEl.style.color = type === 'success' ? '#80ff80' : '#ff8060';
+    this.statusTimer = setTimeout(() => {
+      this.statusEl.style.display = 'none';
+    }, 3000);
+  }
+
+  private chargeAllHoles(): void {
+    // Use the current charge form values to charge all holes at once
+    const explosiveEl = this.chargeForm.querySelector('#bs-blast-explosive') as HTMLSelectElement | null;
+    const amountEl = this.chargeForm.querySelector('#bs-blast-amount') as HTMLInputElement | null;
+    const stemmingEl = this.chargeForm.querySelector('#bs-blast-stemming') as HTMLInputElement | null;
+    const exp = explosiveEl?.value ?? 'boomite';
+    const amt = amountEl?.value ?? '5';
+    const stem = stemmingEl?.value ?? '2';
+    const output = this.gameConsole?.(`charge hole:* explosive:${exp} amount:${amt} stemming:${stem}`) ?? '';
+    if (output.includes('Charged')) {
+      this.showStatus(t('ui.blast.status_charged'), 'success');
+    } else if (output) {
+      this.showStatus(output, 'error');
+    } else {
+      this.showStatus(t('ui.blast.status_no_holes'), 'error');
+    }
+  }
+
   private makeHoleRow(hole: DrillHole, charge?: HoleCharge, delayMs?: number): HTMLElement {
     const row = document.createElement('div');
     row.className = 'bs-hole-row';
@@ -123,6 +131,7 @@ export class BlastPlanUI {
     info.className = 'bs-charge-info';
     if (charge) {
       info.textContent = `${charge.explosiveId} ${charge.amountKg}kg +${delayMs ?? 0}ms`;
+      info.style.color = '#80d080';
     } else {
       info.textContent = t('ui.blast.no_charges');
       info.style.color = '#c07050';
@@ -130,7 +139,7 @@ export class BlastPlanUI {
 
     const editBtn = document.createElement('button');
     editBtn.className = 'bs-btn';
-    editBtn.style.cssText = 'padding:1px 6px;font-size:10px';
+    editBtn.style.cssText = 'padding:2px 8px;font-size:11px;min-width:28px';
     editBtn.textContent = t('ui.blast.edit_hole');
     editBtn.addEventListener('click', () => this.selectHole(hole.id));
 
@@ -179,6 +188,7 @@ export class BlastPlanUI {
       if (output.startsWith('Charged')) {
         this.chargeForm.style.display = 'none';
         errorEl.style.display = 'none';
+        this.showStatus(output, 'success');
       } else {
         errorEl.textContent = output || 'Failed to apply charge.';
         errorEl.style.display = '';
@@ -193,6 +203,15 @@ export class BlastPlanUI {
       applyBtn,
       errorEl,
     );
+  }
+
+  private makeBtn(cls: string, text: string, handler: () => void): HTMLButtonElement {
+    const btn = document.createElement('button');
+    btn.className = cls;
+    btn.style.cssText = 'width:100%;margin-bottom:4px';
+    btn.textContent = text;
+    btn.addEventListener('click', handler);
+    return btn;
   }
 
   private makeLabel(text: string): HTMLElement {

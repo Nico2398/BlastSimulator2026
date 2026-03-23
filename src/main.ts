@@ -98,6 +98,8 @@ emitter.on('revolt:warning', ({ ticksRemaining }) => {
 declare global {
   interface Window {
     __gameConsole: (cmd: string) => string;
+    __gameState: () => Record<string, unknown> | null;
+    __uiState: () => Record<string, unknown>;
   }
 }
 
@@ -127,6 +129,65 @@ window.__gameConsole = (cmd: string): string => {
   // Update UI after every command
   if (ctx.state) uiManager.update(ctx.state, ctx.weatherCycle?.current);
   return result.output;
+};
+
+// --- State extraction bridges (used by scenario tests) ---
+window.__gameState = () => {
+  if (!ctx.state) return null;
+  const s = ctx.state;
+  return {
+    seed: s.seed,
+    time: s.time,
+    tickCount: s.tickCount,
+    isPaused: s.isPaused,
+    mineType: s.mineType,
+    drillHoles: s.drillHoles,
+    chargesByHole: s.chargesByHole,
+    sequenceDelays: s.sequenceDelays,
+    finances: { cash: s.finances.cash },
+    holeCount: s.drillHoles.length,
+    chargedCount: Object.keys(s.chargesByHole).length,
+    sequencedCount: Object.keys(s.sequenceDelays).length,
+    buildingCount: s.buildings.buildings.length,
+    vehicleCount: s.vehicles.vehicles.length,
+    employeeCount: s.employees.employees.length,
+    levelEnded: s.levelEnded,
+    levelEndReason: s.levelEndReason,
+  };
+};
+
+window.__uiState = () => {
+  const panels = ['bs-blast-panel', 'bs-contract-panel', 'bs-build-panel',
+    'bs-vehicle-panel', 'bs-employee-panel', 'bs-survey-panel'];
+  const panelStates: Record<string, unknown> = {};
+  for (const id of panels) {
+    const el = document.getElementById(id);
+    if (el) {
+      const computed = getComputedStyle(el);
+      panelStates[id] = {
+        display: computed.display,
+        pointerEvents: computed.pointerEvents,
+        visible: computed.display !== 'none',
+      };
+    }
+  }
+  // Check all buttons in blast panel
+  const blastPanel = document.getElementById('bs-blast-panel');
+  const buttons: Record<string, unknown>[] = [];
+  if (blastPanel) {
+    blastPanel.querySelectorAll('button').forEach(btn => {
+      const computed = getComputedStyle(btn);
+      buttons.push({
+        text: btn.textContent,
+        display: computed.display,
+        pointerEvents: computed.pointerEvents,
+        disabled: btn.disabled,
+        offsetWidth: btn.offsetWidth,
+        offsetHeight: btn.offsetHeight,
+      });
+    });
+  }
+  return { panels: panelStates, blastPanelButtons: buttons };
 };
 
 uiManager.setGameConsole(window.__gameConsole);

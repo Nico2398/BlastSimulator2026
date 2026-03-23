@@ -26,6 +26,7 @@ See `.agent/ARCHITECTURE.md` for full details.
 | Campaign/levels | `.agent/GAME_DESIGN.md` §15 | `src/core/campaign/` |
 | Save system | `SaveBackend` interface in core | `src/persistence/` for implementations |
 | Score system | `src/core/scores/` | WellBeing, Safety, Ecology, Nuisance |
+| Scenario tests | `.agent/VISUAL_TESTING.md` | `scripts/scenario-test.ts`, `scripts/scenario-defs/` |
 
 ## Testing and Validation
 
@@ -35,6 +36,34 @@ npm run test            # Tests only
 npx tsx src/console.ts  # Manual gameplay testing without a browser
 bash scripts/visual-test.sh --name "label" --commands "new_game seed:1"  # Screenshot
 ```
+
+### Scenario Testing (autonomous verification)
+
+Use the scenario test runner for multi-step visual + state verification:
+
+```bash
+# Run a predefined scenario (screenshots + state dumps after EVERY command)
+npx tsx scripts/scenario-test.ts --scenario blast-basic
+
+# Run inline commands
+npx tsx scripts/scenario-test.ts --name my-test \
+  --commands "new_game seed:42; drill_plan grid rows:2 cols:3 spacing:4 depth:6 start:15,15; charge hole:* explosive:boomite amount:5 stemming:2; sequence auto; blast"
+
+# UI button responsiveness diagnostic
+npx tsx scripts/ui-diagnostic.ts
+```
+
+Output per step: `screenshots/scenario-{name}/step-NN-cmd.{png,json}` + `report.json`.
+
+Scenario definitions: `scripts/scenario-defs/*.json`. The browser exposes `window.__gameState()` and `window.__uiState()` for programmatic state extraction.
+
+### Verification workflow
+
+1. `npm run validate` — type check + unit tests + build
+2. Run scenario test — per-step screenshots + state dumps
+3. Read screenshots to visually verify (multimodal)
+4. Read JSON state dumps to verify logical correctness
+5. If issues found: fix → re-run scenario → verify again
 
 Always run `npm run validate` before considering a fix or feature complete. For rendering changes, also take a screenshot to verify visuals (`.agent/VISUAL_TESTING.md`).
 

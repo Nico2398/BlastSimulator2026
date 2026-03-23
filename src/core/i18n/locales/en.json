@@ -1455,6 +1455,10 @@
   "ui.blast.auto_seq": "Auto Sequence",
   "ui.blast.apply_charge": "Apply Charge",
   "ui.blast.edit_hole": "✏",
+  "ui.blast.charge_all": "Charge All Holes",
+  "ui.blast.status_charged": "All holes charged!",
+  "ui.blast.status_sequenced": "Sequence applied!",
+  "ui.blast.status_no_holes": "Create holes first!",
   "hud.speed_x": "{speed}×",
 
   "ui.contracts.title": "Contracts",
