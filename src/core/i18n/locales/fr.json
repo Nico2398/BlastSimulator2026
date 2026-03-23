@@ -1455,6 +1455,10 @@
   "ui.blast.auto_seq": "Séquence Auto",
   "ui.blast.apply_charge": "Appliquer",
   "ui.blast.edit_hole": "✏",
+  "ui.blast.charge_all": "Charger tous les trous",
+  "ui.blast.status_charged": "Tous les trous chargés !",
+  "ui.blast.status_sequenced": "Séquence appliquée !",
+  "ui.blast.status_no_holes": "Créez d'abord des trous !",
   "hud.speed_x": "{speed}×",
 
   "ui.contracts.title": "Contrats",

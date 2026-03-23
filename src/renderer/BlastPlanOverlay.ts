@@ -1,15 +1,5 @@
 // BlastSimulator2026 — Blast Plan Visualization Overlays
-// When the player edits a blast plan, this module renders visual overlays:
-//
-//   1. Drill holes → cylinders/vertical lines at hole positions
-//   2. Charge amounts → color-coded fills inside hole markers
-//   3. Sequence delays → number labels above holes (sprite-based)
-//   4. Energy heatmap → colored terrain-projected circles (tier 1 software)
-//   5. Fragment size overlay → larger dots = coarser fragments (tier 2)
-//   6. Projection arcs → parabolic lines (tier 3)
-//   7. Vibration waves → concentric rings at blast origin (tier 4)
-//
-// All overlays are in a single THREE.Group that can be shown/hidden.
+// Renders drill holes (X-ray view), charge fills, delay labels, and software-tier overlays.
 
 import * as THREE from 'three';
 import type { DrillHole } from '../core/mining/DrillPlan.js';
@@ -18,10 +8,10 @@ import type { HoleCharge } from '../core/mining/ChargePlan.js';
 // ---------- Config ----------
 
 // Hole marker
-const HOLE_RADIUS   = 0.3;    // cylinder radius
-const HOLE_HEIGHT   = 0.6;    // above-surface marker height
+const HOLE_RADIUS   = 0.6;    // cylinder radius (visible at default zoom)
+const HOLE_HEIGHT   = 1.0;    // above-surface marker cap height
 const HOLE_COLOR    = 0xffffff;
-const HOLE_SEGMENTS = 6;      // low-poly cylinder
+const HOLE_SEGMENTS = 8;      // low-poly cylinder
 
 // Charge color scale (empty → max charge)
 const CHARGE_COLORS: readonly number[] = [
@@ -34,7 +24,7 @@ const CHARGE_COLORS: readonly number[] = [
 ];
 
 // Sequence label
-const LABEL_OFFSET = 1.2;     // Y above hole marker
+const LABEL_OFFSET = 1.8;     // Y above hole marker
 
 // Heatmap
 const HEATMAP_MAX_RADIUS = 8; // metres of energy influence
@@ -82,10 +72,6 @@ export class BlastPlanOverlay {
     this.group.visible = false;
   }
 
-  /**
-   * Show overlays for the current blast plan.
-   * Call when the player opens the blast plan editor.
-   */
   show(options: BlastPlanOverlayOptions): void {
     this.clear();
     this.group.visible = true;
@@ -108,12 +94,10 @@ export class BlastPlanOverlay {
     }
   }
 
-  /** Hide all overlays (but keep them in memory for re-show). */
   hide(): void {
     this.group.visible = false;
   }
 
-  /** Clear and remove all overlay geometry. */
   clear(): void {
     for (const child of [...this.group.children]) {
       this.group.remove(child);
@@ -134,46 +118,70 @@ export class BlastPlanOverlay {
   // ---------- Per-hole markers ----------
 
   private addHoleMarker(hd: HoleOverlayData): void {
-    const { hole, charge, delayMs, surfaceY } = hd;
-    const base = surfaceY;
+    const { hole, charge, delayMs, surfaceY: base } = hd;
+    const x = hole.x, z = hole.z, depth = hole.depth;
 
-    // Outer ring (white cylinder outline)
-    const ringGeo = new THREE.CylinderGeometry(HOLE_RADIUS, HOLE_RADIUS, HOLE_HEIGHT, HOLE_SEGMENTS, 1, true);
-    const ringMat = new THREE.MeshBasicMaterial({ color: HOLE_COLOR, side: THREE.DoubleSide, wireframe: true });
-    const ring = new THREE.Mesh(ringGeo, ringMat);
-    ring.position.set(hole.x, base + HOLE_HEIGHT / 2, hole.z);
-    this.group.add(ring);
+    // Surface cap — wireframe ring at terrain surface (X-ray: depthTest off)
+    this.addXrayMesh(
+      new THREE.CylinderGeometry(HOLE_RADIUS, HOLE_RADIUS, HOLE_HEIGHT, HOLE_SEGMENTS, 1, true),
+      { color: HOLE_COLOR, wireframe: true, side: THREE.DoubleSide }, 10, x, base + HOLE_HEIGHT / 2, z,
+    );
+    // Underground shaft — translucent cylinder showing full depth
+    this.addXrayMesh(
+      new THREE.CylinderGeometry(HOLE_RADIUS * 0.5, HOLE_RADIUS * 0.5, depth, HOLE_SEGMENTS),
+      { color: 0xaaaaff, transparent: true, opacity: 0.35, side: THREE.DoubleSide }, 9, x, base - depth / 2, z,
+    );
+    // Shaft wireframe outline
+    this.addXrayMesh(
+      new THREE.CylinderGeometry(HOLE_RADIUS * 0.52, HOLE_RADIUS * 0.52, depth, HOLE_SEGMENTS, 1, true),
+      { color: 0x6666cc, wireframe: true }, 11, x, base - depth / 2, z,
+    );
+    // Bottom disc at hole base
+    const bottom = this.addXrayMesh(
+      new THREE.CircleGeometry(HOLE_RADIUS * 0.5, HOLE_SEGMENTS),
+      { color: 0xff6644, side: THREE.DoubleSide }, 12, x, base - depth, z,
+    );
+    bottom.rotation.x = -Math.PI / 2;
 
-    // Charge fill (solid inner cylinder)
+    // Charge fill inside shaft + surface indicator
     if (charge && charge.amountKg > 0) {
-      const chargeLevel = Math.min(1, charge.amountKg / 200); // normalise to 200 kg max
-      const colorIdx = Math.min(CHARGE_COLORS.length - 1, Math.floor(chargeLevel * (CHARGE_COLORS.length - 1)) + 1);
-      const fillGeo = new THREE.CylinderGeometry(HOLE_RADIUS * 0.6, HOLE_RADIUS * 0.6, HOLE_HEIGHT * 0.8, HOLE_SEGMENTS);
-      const fillMat = new THREE.MeshBasicMaterial({ color: CHARGE_COLORS[colorIdx], transparent: true, opacity: 0.8 });
-      const fill = new THREE.Mesh(fillGeo, fillMat);
-      fill.position.set(hole.x, base + HOLE_HEIGHT / 2, hole.z);
-      this.group.add(fill);
+      const lvl = Math.min(1, charge.amountKg / 200);
+      const ci = Math.min(CHARGE_COLORS.length - 1, Math.floor(lvl * (CHARGE_COLORS.length - 1)) + 1);
+      const fillH = depth * Math.min(0.9, lvl + 0.2);
+      this.addXrayMesh(
+        new THREE.CylinderGeometry(HOLE_RADIUS * 0.4, HOLE_RADIUS * 0.4, fillH, HOLE_SEGMENTS),
+        { color: CHARGE_COLORS[ci], transparent: true, opacity: 0.7 }, 13, x, base - depth + fillH / 2, z,
+      );
+      this.addXrayMesh(
+        new THREE.CylinderGeometry(HOLE_RADIUS * 0.7, HOLE_RADIUS * 0.7, HOLE_HEIGHT * 0.9, HOLE_SEGMENTS),
+        { color: CHARGE_COLORS[ci], transparent: true, opacity: 0.6 }, 14, x, base + HOLE_HEIGHT / 2, z,
+      );
     }
 
-    // Depth indicator line (going down from surface)
-    const lineMat = new THREE.LineBasicMaterial({ color: 0x888888 });
-    const lineGeo = new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(hole.x, base, hole.z),
-      new THREE.Vector3(hole.x, base - hole.depth, hole.z),
-    ]);
-    this.group.add(new THREE.Line(lineGeo, lineMat));
-
-    // Delay label (sprite-like flat plane with delay number rendered via canvas)
+    // Delay label above hole
     if (delayMs >= 0) {
       const label = this.makeDelayLabel(delayMs);
-      label.position.set(hole.x, base + HOLE_HEIGHT + LABEL_OFFSET, hole.z);
+      label.renderOrder = 15;
+      label.position.set(x, base + HOLE_HEIGHT + LABEL_OFFSET, z);
       this.group.add(label);
     }
   }
 
+  /** Helper: create a mesh with depthTest:false (X-ray) and add to group. */
+  private addXrayMesh(
+    geo: THREE.BufferGeometry, matOpts: THREE.MeshBasicMaterialParameters,
+    order: number, x: number, y: number, z: number,
+  ): THREE.Mesh {
+    const mat = new THREE.MeshBasicMaterial({ ...matOpts, depthTest: false });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.renderOrder = order;
+    mesh.position.set(x, y, z);
+    this.group.add(mesh);
+    return mesh;
+  }
+
   // ---------- Software overlays ----------
 
-  /** Tier 1: energy heatmap — colored circles under each hole, radius = influence. */
   private addEnergyHeatmap(options: BlastPlanOverlayOptions): void {
     for (const hd of options.holes) {
       if (!hd.charge) continue;
@@ -201,7 +209,6 @@ export class BlastPlanOverlay {
     }
   }
 
-  /** Tier 2: fragment size overlay — dot color indicates coarse (red) vs fine (green). */
   private addFragSizeOverlay(options: BlastPlanOverlayOptions): void {
     for (const hd of options.holes) {
       if (!hd.predictedFragSizeCm) continue;
@@ -215,12 +222,12 @@ export class BlastPlanOverlay {
       const geo = new THREE.SphereGeometry(0.5, 6, 4);
       const mat = new THREE.MeshBasicMaterial({ color });
       const dot = new THREE.Mesh(geo, mat);
-      dot.position.set(hd.hole.x, HOLE_HEIGHT + 0.6, hd.hole.z);
+      dot.renderOrder = 16;
+      dot.position.set(hd.hole.x, hd.surfaceY + HOLE_HEIGHT + 0.6, hd.hole.z);
       this.group.add(dot);
     }
   }
 
-  /** Tier 3: projection arcs — parabolic lines for high-projection-speed holes. */
   private addProjectionArcs(options: BlastPlanOverlayOptions): void {
     for (const hd of options.holes) {
       if (!hd.projectionSpeed || hd.projectionSpeed < 5) continue;
@@ -229,7 +236,6 @@ export class BlastPlanOverlay {
     }
   }
 
-  /** Tier 4: vibration wave rings around blast origin. */
   private addVibrationWaves(origin: THREE.Vector3): void {
     for (let i = 1; i <= WAVE_RINGS; i++) {
       const r = (i / WAVE_RINGS) * WAVE_MAX_RADIUS;
@@ -256,8 +262,8 @@ export class BlastPlanOverlay {
     const level = Math.min(4, Math.floor(delayMs / 100));
     const colors = [0xffffff, 0x44ffff, 0xffff44, 0xff8844, 0xff4444];
     const color = colors[level]!;
-    const geo = new THREE.BoxGeometry(0.6, 0.3, 0.06);
-    const mat = new THREE.MeshBasicMaterial({ color });
+    const geo = new THREE.BoxGeometry(1.0, 0.5, 0.08);
+    const mat = new THREE.MeshBasicMaterial({ color, depthTest: false });
     return new THREE.Mesh(geo, mat);
   }
 
