@@ -134,7 +134,7 @@ export class EmployeePanel {
       btn.style.cssText = 'padding:2px 8px;font-size:10px';
       btn.textContent = t('ui.employees.hire');
       btn.dataset['role'] = role;
-      btn.addEventListener('click', () => this.gameConsole?.(`employee hire ${role}`));
+      btn.addEventListener('click', () => this.gameConsole?.(`employee hire role:${role}`));
 
       row.append(label, btn);
       this.hireSection.appendChild(row);

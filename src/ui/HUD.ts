@@ -112,9 +112,11 @@ export class HUD {
     const hour = state.tickCount % 24;
     this.timeEl.textContent = t('hud.time', { day, hour: String(hour).padStart(2, '0') });
 
-    // Speed
-    this.currentSpeed = state.timeScale;
-    this.speedBtn.textContent = t('hud.speed_x', { speed: String(state.timeScale) });
+    // Speed — only sync from state if the game overrides it (e.g. on load)
+    if (state.timeScale !== this.currentSpeed) {
+      this.currentSpeed = state.timeScale;
+      this.speedBtn.textContent = t('hud.speed_x', { speed: String(state.timeScale) });
+    }
 
     // Weather icon
     if (weather) {
@@ -149,6 +151,7 @@ export class HUD {
     const idx = SPEED_CYCLE.indexOf(this.currentSpeed);
     const next = SPEED_CYCLE[(idx + 1) % SPEED_CYCLE.length] ?? 1;
     this.currentSpeed = next;
+    this.speedBtn.textContent = t('hud.speed_x', { speed: String(next) });
     this.onSpeedChange?.(next);
   }
 }

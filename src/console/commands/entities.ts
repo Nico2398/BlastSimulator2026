@@ -206,7 +206,7 @@ export function employeeCommand(
       return { success: true, output: `Hired ${employee.name} (${role}). Cost: $${hiringCost}` };
     }
     case 'raise': {
-      const id = parseInt(args[1] ?? '', 10);
+      const id = parseInt(args[1] ?? named['id'] ?? '', 10);
       const amount = parseFloat(named['amount'] ?? '0');
       if (isNaN(id) || amount <= 0) {
         return { success: false, output: 'Usage: employee raise <id> amount:500' };
@@ -217,7 +217,7 @@ export function employeeCommand(
       return { success: true, output: `Raise of $${amount} given to employee #${id}.` };
     }
     case 'fire': {
-      const id = parseInt(args[1] ?? '', 10);
+      const id = parseInt(args[1] ?? named['id'] ?? '', 10);
       if (isNaN(id)) return { success: false, output: 'Usage: employee fire <id>' };
       const result = fireEmployee(state.employees, id);
       if (!result.success) return { success: false, output: result.error! };
