@@ -21,6 +21,9 @@ import { updateBankruptcy } from '../../core/campaign/Bankruptcy.js';
 import { updateEcology } from '../../core/campaign/EcologicalDisaster.js';
 import { updateArrest } from '../../core/campaign/CriminalArrest.js';
 import { updateRevolt } from '../../core/campaign/WorkerRevolt.js';
+import { checkLevelComplete } from '../../core/campaign/LevelTransition.js';
+import { snapshotStats } from '../../core/campaign/SuccessTracker.js';
+import { updateScores, type ScoreInputs } from '../../core/scores/ScoreManager.js';
 import { CONTRACT_REFRESH_INTERVAL } from '../../core/config/balance.js';
 import { BASE_TICK_MS } from '../../core/engine/GameLoop.js';
 import {
@@ -64,6 +67,11 @@ export function tickCommand(
   const err = requireGame(ctx);
   if (err) return err;
   const state = ctx.state!;
+
+  // If there's a pending event, refuse to tick — player must resolve it first
+  if (state.events.pendingEvent) {
+    return { success: false, output: 'Pending event! Resolve it first: "event choose <index>".' };
+  }
 
   const count = Math.max(1, parseInt(args[0] ?? '1', 10) || 1);
   const lines: string[] = [];
@@ -115,13 +123,36 @@ export function tickCommand(
       lines.push(`[tick ${state.tickCount}] MAFIA EXPOSURE! Criminal charges may follow.`);
     }
 
-    // 7. Campaign game-over condition checks (emit events; UI subscribes)
+    // 7. Score updates — decay + building/morale/vibration effects
+    const avgMorale = state.employees.employees.length > 0
+      ? state.employees.employees.reduce((s, e) => s + e.morale, 0) / state.employees.employees.length
+      : 50;
+    const scoreInputs: ScoreInputs = {
+      buildings: state.buildings,
+      avgMorale,
+      recentAccidents: state.damage.accidents.filter(a => a.tick >= state.tickCount - 10).length,
+      hasSafetyEquipment: state.buildings.buildings.some(b => b.type === 'medical_bay'),
+      maxRecentVibration: 0,
+      employeeCount: state.employees.employees.length,
+    };
+    updateScores(state.scores, scoreInputs);
+
+    // 8. Level stats snapshot + campaign profit check
+    snapshotStats(state.levelStats, state);
+    const levelResult = checkLevelComplete(state, state.campaign, emitter);
+    if (levelResult.triggered) {
+      state.levelEnded = true;
+      state.levelEndReason = 'completed';
+      lines.push(`[tick ${state.tickCount}] LEVEL COMPLETE! Profit target reached.`);
+    }
+
+    // 9. Campaign game-over condition checks (emit events; UI subscribes)
     updateBankruptcy(state, state.bankruptcy, emitter);
     updateEcology(state, state.ecological, emitter);
     updateArrest(state, state.arrest, emitter);
     updateRevolt(state, state.revolt, emitter);
 
-    // 8. Pending event — auto-pause and report to player
+    // 10. Pending event — auto-pause and report to player
     if (fired) {
       const def = getEventById(fired.eventId);
       if (def) {
@@ -194,6 +225,8 @@ export function eventCommand(
       if (result.corruptionChange !== 0) {
         state.corruption.level += result.corruptionChange;
       }
+      // Resume the game after resolving the event (tick pauses on event)
+      state.isPaused = false;
       return { success: true, output: lines.join('\n') };
     }
 

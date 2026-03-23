@@ -1,0 +1,52 @@
+{
+  "name": "level1-lose-arrest",
+  "description": "Level 1 losing scenario: heavy corruption and mafia use, triggering criminal arrest",
+  "steps": [
+    "new_game seed:42",
+    "campaign start level:dusty_hollow",
+    "time resume",
+
+    "corrupt target:judge cost:5000",
+    "corrupt target:inspector cost:5000",
+    "corrupt target:union_leader cost:5000",
+    "corrupt target:politician cost:5000",
+    "corrupt target:witness cost:5000",
+
+    "corrupt target:judge cost:10000",
+    "corrupt target:inspector cost:10000",
+    "corrupt target:union_leader cost:10000",
+    "corrupt",
+    "finances",
+
+    "mafia status",
+    "employee hire role:driller",
+    "employee hire role:blaster",
+    "mafia smuggle",
+
+    "tick 10",
+    "event choose 0",
+    "tick 10",
+    "event choose 0",
+    "tick 10",
+    "event choose 0",
+    "mafia status",
+    "finances",
+
+    "corrupt target:judge cost:5000",
+    "corrupt target:politician cost:5000",
+
+    "tick 10",
+    "event choose 0",
+    "tick 10",
+    "event choose 0",
+    "tick 10",
+    "event choose 0",
+    "tick 10",
+    "event choose 0",
+    "mafia status",
+    "finances",
+    "scores",
+    "stats",
+    "campaign status"
+  ]
+}

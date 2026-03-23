@@ -1,0 +1,69 @@
+{
+  "name": "level1-lose-revolt",
+  "description": "Level 1 losing scenario: neglect employee well-being with massive blasting",
+  "steps": [
+    "new_game seed:42",
+    "campaign start level:dusty_hollow",
+    "time resume",
+
+    "employee hire role:driller",
+    "employee hire role:driller",
+    "employee hire role:driller",
+    "employee hire role:blaster",
+    "employee hire role:driver",
+    "employee hire role:surveyor",
+    "employee list",
+    "scores",
+
+    "tick 5",
+    "event choose 0",
+    "tick 5",
+    "event choose 0",
+    "scores",
+
+    "drill_plan grid rows:5 cols:5 spacing:3 depth:12 start:5,5",
+    "charge hole:* explosive:krackle amount:10 stemming:1",
+    "sequence auto delay_step:10",
+    "blast",
+    "scores",
+
+    "tick 5",
+    "event choose 0",
+    "tick 5",
+    "event choose 0",
+    "scores",
+
+    "drill_plan grid rows:5 cols:5 spacing:3 depth:12 start:15,15",
+    "charge hole:* explosive:krackle amount:10 stemming:1",
+    "sequence auto delay_step:10",
+    "blast",
+    "scores",
+
+    "tick 10",
+    "event choose 0",
+    "tick 10",
+    "event choose 0",
+    "tick 10",
+    "event choose 0",
+    "scores",
+
+    "tick 10",
+    "event choose 0",
+    "tick 10",
+    "event choose 0",
+    "tick 10",
+    "event choose 0",
+    "scores",
+
+    "tick 10",
+    "event choose 0",
+    "tick 10",
+    "event choose 0",
+    "tick 10",
+    "event choose 0",
+    "scores",
+    "finances",
+    "stats",
+    "campaign status"
+  ]
+}

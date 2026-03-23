@@ -141,8 +141,10 @@ export function contractCommand(
       if (result.payment === 0 && !result.completed) {
         return { success: false, output: `Contract #${id} not found or already completed.` };
       }
+      state.cash += result.payment;
       addIncome(state.finances, result.payment, 'contracts', `Contract #${id} delivery`, state.tickCount);
       if (result.bonus > 0) {
+        state.cash += result.bonus;
         addIncome(state.finances, result.bonus, 'bonus', `Contract #${id} early bonus`, state.tickCount);
       }
       const msg = result.completed

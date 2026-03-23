@@ -1,0 +1,59 @@
+{
+  "name": "level1-lose-bankruptcy",
+  "description": "Level 1 losing scenario: overspend on buildings and employees with no income",
+  "steps": [
+    "new_game seed:42",
+    "campaign start level:dusty_hollow",
+    "time resume",
+    "finances",
+
+    "build office at:5,5",
+    "build office at:10,5",
+    "build medical_bay at:5,10",
+    "build canteen at:10,10",
+    "build storage_depot at:15,5",
+    "build break_room at:15,10",
+    "finances",
+
+    "vehicle buy excavator",
+    "vehicle buy truck",
+    "vehicle buy drill_rig",
+    "vehicle buy bulldozer",
+    "finances",
+
+    "employee hire role:driller",
+    "employee hire role:driller",
+    "employee hire role:blaster",
+    "employee hire role:driver",
+    "employee hire role:surveyor",
+    "employee hire role:manager",
+    "finances",
+
+    "tick 10",
+    "event choose 0",
+    "tick 10",
+    "event choose 0",
+    "tick 10",
+    "event choose 0",
+    "finances",
+
+    "tick 15",
+    "event choose 0",
+    "tick 15",
+    "event choose 0",
+    "tick 15",
+    "event choose 0",
+    "finances",
+
+    "tick 15",
+    "event choose 0",
+    "tick 15",
+    "event choose 0",
+    "tick 15",
+    "event choose 0",
+    "finances",
+    "scores",
+    "stats",
+    "campaign status"
+  ]
+}

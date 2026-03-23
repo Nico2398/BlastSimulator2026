@@ -1,0 +1,65 @@
+{
+  "name": "level1-win-efficient",
+  "description": "Level 1 winning scenario: efficient blasting + contract fulfillment to reach $80k profit",
+  "steps": [
+    "new_game seed:42",
+    "campaign start level:dusty_hollow",
+    "time resume",
+    "scores",
+    "finances",
+
+    "drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:10,10",
+    "charge hole:* explosive:boomite amount:5 stemming:2",
+    "sequence auto delay_step:25",
+    "blast",
+    "finances",
+    "scores",
+    "stats",
+
+    "tick 5",
+    "event choose 0",
+    "tick 5",
+    "event choose 0",
+    "contract list",
+    "contract accept 1",
+    "contract accept 2",
+    "contract deliver 1 amount:500",
+    "contract deliver 2 amount:500",
+    "finances",
+
+    "drill_plan grid rows:4 cols:4 spacing:4 depth:10 start:15,15",
+    "charge hole:* explosive:krackle amount:8 stemming:2",
+    "sequence auto delay_step:20",
+    "blast",
+    "finances",
+    "scores",
+    "stats",
+
+    "tick 5",
+    "event choose 0",
+    "tick 5",
+    "event choose 0",
+    "contract list",
+    "contract accept 3",
+    "contract deliver 3 amount:1000",
+    "contract status",
+
+    "employee hire role:driller",
+    "employee hire role:blaster",
+    "employee list",
+
+    "drill_plan grid rows:4 cols:4 spacing:5 depth:12 start:5,5",
+    "charge hole:* explosive:krackle amount:10 stemming:3",
+    "sequence auto delay_step:25",
+    "blast",
+
+    "tick 5",
+    "event choose 0",
+    "tick 5",
+    "event choose 0",
+    "finances",
+    "scores",
+    "stats",
+    "campaign status"
+  ]
+}
