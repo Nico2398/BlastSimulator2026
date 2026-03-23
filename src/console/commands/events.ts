@@ -69,10 +69,12 @@ export function tickCommand(
   const lines: string[] = [];
   const rng = new Random(state.seed + state.tickCount);
   const emitter = ctx.emitter;
+  let ticksAdvanced = 0;
 
   for (let i = 0; i < count; i++) {
     state.tickCount++;
     state.time += BASE_TICK_MS;
+    ticksAdvanced++;
 
     // 1. Event system
     const evCtx = buildEventContext(ctx);
@@ -138,7 +140,9 @@ export function tickCommand(
   }
 
   if (lines.length === 0) {
-    lines.push(`Advanced ${count} tick(s). Now at tick ${state.tickCount}. No events fired.`);
+    lines.push(`Advanced ${ticksAdvanced} tick(s). Now at tick ${state.tickCount}. No events fired.`);
+  } else if (ticksAdvanced < count) {
+    lines.push(`(Advanced ${ticksAdvanced} of ${count} requested ticks)`);
   }
 
   return { success: true, output: lines.join('\n') };
