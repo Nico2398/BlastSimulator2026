@@ -58,7 +58,7 @@ export function drillPlanCommand(
   const sub = args[0];
 
   if (sub === 'grid') {
-    const origin = (named['origin'] ?? '0,0').split(',').map(Number);
+    const origin = (named['origin'] ?? named['start'] ?? '0,0').split(',').map(Number);
     const rows = parseInt(named['rows'] ?? '3', 10);
     const cols = parseInt(named['cols'] ?? '3', 10);
     const spacing = parseFloat(named['spacing'] ?? '3');
