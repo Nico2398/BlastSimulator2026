@@ -125,11 +125,11 @@ export class UIManager {
     if (this.vehiclePanel.visible) this.vehiclePanel.update(state);
     if (this.employeePanel.visible) this.employeePanel.update(state);
 
-    // Event dialog — auto-show when pending event exists
+    // Event dialog — auto-show when pending event exists, keep open during outcome
     if (state.events.pendingEvent && !this.eventDialog.visible) {
       this.eventDialog.update(state);
       this.eventDialog.show();
-    } else if (this.eventDialog.visible) {
+    } else if (this.eventDialog.visible && !this.eventDialog.isShowingOutcome) {
       this.eventDialog.update(state);
     }
   }

@@ -160,8 +160,11 @@ export class BlastPlanUI {
       explosiveSelect.appendChild(opt);
     }
 
-    const amountInput = this.makeNumberInput('bs-blast-amount', '5', '1', '100', '1');
+    const amountInput = this.makeNumberInput('bs-blast-amount', '3', '1', '100', '1');
     const stemmingInput = this.makeNumberInput('bs-blast-stemming', '2', '0', '20', '0.5');
+
+    const errorEl = document.createElement('div');
+    errorEl.style.cssText = 'font-size:11px;color:#f08060;margin-top:6px;display:none;white-space:pre-wrap';
 
     const applyBtn = document.createElement('button');
     applyBtn.className = 'bs-btn bs-btn-primary';
@@ -172,8 +175,14 @@ export class BlastPlanUI {
       const exp = explosiveSelect.value;
       const amt = amountInput.value;
       const stem = stemmingInput.value;
-      this.gameConsole?.(`charge hole:${this.selectedHoleId} explosive:${exp} amount:${amt} stemming:${stem}`);
-      this.chargeForm.style.display = 'none';
+      const output = this.gameConsole?.(`charge hole:${this.selectedHoleId} explosive:${exp} amount:${amt} stemming:${stem}`) ?? '';
+      if (output.startsWith('Charged')) {
+        this.chargeForm.style.display = 'none';
+        errorEl.style.display = 'none';
+      } else {
+        errorEl.textContent = output || 'Failed to apply charge.';
+        errorEl.style.display = '';
+      }
     });
 
     this.chargeForm.append(
@@ -182,6 +191,7 @@ export class BlastPlanUI {
       this.makeLabel(t('ui.blast.amount')), amountInput,
       this.makeLabel(t('ui.blast.stemming')), stemmingInput,
       applyBtn,
+      errorEl,
     );
   }
 
