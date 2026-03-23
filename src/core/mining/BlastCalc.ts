@@ -48,28 +48,32 @@ export function waterEffect(
   return 1.0;
 }
 
-/** Effective energy at depth for a hole (after stemming + water). */
+/** Effective energy at depth for a hole (after stemming + water + explosive modifiers). */
 export function effectiveHoleEnergy(
   charge: HoleCharge,
   holeDepth: number,
   isFlooded: boolean,
   hasTubing: boolean,
-): { downward: number; upward: number } {
+): { downward: number; upward: number; vibrationMod: number } {
   const explosive = getExplosive(charge.explosiveId);
-  if (!explosive) return { downward: 0, upward: 0 };
+  if (!explosive) return { downward: 0, upward: 0, vibrationMod: 1 };
 
   const rawE = explosive.energyPerKg * charge.amountKg;
   const sf = stemmingFactor(charge.stemmingM, holeDepth);
   const wf = waterEffect(isFlooded, explosive.waterSensitive, hasTubing);
 
   const downward = rawE * (0.5 + 0.5 * sf) * wf;
-  const upward = rawE * (1 - sf) * 0.7 * wf;
-  return { downward, upward };
+  // projectionRiskMod scales how much energy escapes upward (fly-rock hazard)
+  const upward = rawE * (1 - sf) * 0.7 * wf * explosive.projectionRiskMod;
+  return { downward, upward, vibrationMod: explosive.vibrationMod };
 }
 
 /**
  * Total energy field at a point from all holes.
- * E(P) = Σ [ E_i / (dist² + ε) ]
+ * Downward energy radiates from the mid-column source downward into the rock.
+ * Upward energy (from insufficient stemming) radiates from the collar (hole top)
+ * and adds energy to surface voxels above — creating fly-rock projections.
+ * E(P) = Σ [ E_downward_i / (dist_from_midcolumn² + ε) + E_upward_i / (dist_from_collar² + ε) ]
  */
 export function calculateEnergyField(
   point: Vec3,
@@ -83,12 +87,18 @@ export function calculateEnergyField(
     const charge = charges[hole.id];
     if (!charge) continue;
     const energy = effectiveHoleEnergy(charge, holeDepths[hole.id] ?? hole.depth, false, false);
-    // Hole source modelled as mid-point of the charged column (surface minus half depth)
     const surfaceY = holeSurfaceYs?.[hole.id] ?? 0;
     const depth = holeDepths[hole.id] ?? hole.depth;
-    const holePos = vec3(hole.x, surfaceY - depth / 2, hole.z);
-    const d2 = distSquared(point, holePos);
-    total += energy.downward / (d2 + EPSILON);
+    // Downward energy: radiated from mid-column source
+    const midPos = vec3(hole.x, surfaceY - depth / 2, hole.z);
+    const d2mid = distSquared(point, midPos);
+    total += energy.downward / (d2mid + EPSILON);
+    // Upward energy: radiated from collar (hole top) and affects near-surface voxels
+    if (energy.upward > 0) {
+      const collarPos = vec3(hole.x, surfaceY, hole.z);
+      const d2collar = distSquared(point, collarPos);
+      total += energy.upward / (d2collar + EPSILON);
+    }
   }
   return total;
 }

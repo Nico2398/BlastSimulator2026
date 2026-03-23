@@ -92,8 +92,9 @@ export function previewEnergy(
 
   const holeDepths: Record<string, number> = {};
   for (const hole of plan.holes) holeDepths[hole.id] = hole.depth;
+  const holeSurfaceYs = getHoleSurfaceYs(plan, grid);
 
-  const bbox = getBlastBBox(plan);
+  const bbox = getBlastBBox(plan, grid);
   const energyMap = new Map<string, number>();
   let maxEnergy = 0;
   let minEnergy = Infinity;
@@ -103,7 +104,7 @@ export function previewEnergy(
       for (let x = bbox.minX; x <= bbox.maxX; x++) {
         const voxel = grid.getVoxel(x, y, z);
         if (!voxel || voxel.density <= 0) continue;
-        const energy = calculateEnergyField(vec3(x, y, z), plan.holes, plan.charges, holeDepths);
+        const energy = calculateEnergyField(vec3(x, y, z), plan.holes, plan.charges, holeDepths, holeSurfaceYs);
         if (energy > 0) {
           energyMap.set(`${x},${y},${z}`, energy);
           maxEnergy = Math.max(maxEnergy, energy);
@@ -126,8 +127,9 @@ export function previewFragments(
 
   const holeDepths: Record<string, number> = {};
   for (const hole of plan.holes) holeDepths[hole.id] = hole.depth;
+  const holeSurfaceYs = getHoleSurfaceYs(plan, grid);
 
-  const bbox = getBlastBBox(plan);
+  const bbox = getBlastBBox(plan, grid);
   let fractured = 0, cracked = 0, unaffected = 0;
   let totalFragSize = 0;
 
@@ -139,7 +141,7 @@ export function previewFragments(
         const rock = getRock(voxel.rockId);
         if (!rock) continue;
 
-        const energy = calculateEnergyField(vec3(x, y, z), plan.holes, plan.charges, holeDepths);
+        const energy = calculateEnergyField(vec3(x, y, z), plan.holes, plan.charges, holeDepths, holeSurfaceYs);
         const threshold = rock.fractureThreshold * voxel.fractureModifier;
         const frag = calculateFragmentation(energy, threshold);
 
@@ -173,8 +175,9 @@ export function previewProjections(
 
   const holeDepths: Record<string, number> = {};
   for (const hole of plan.holes) holeDepths[hole.id] = hole.depth;
+  const holeSurfaceYs = getHoleSurfaceYs(plan, grid);
 
-  const bbox = getBlastBBox(plan);
+  const bbox = getBlastBBox(plan, grid);
   const positions: Array<{ x: number; y: number; z: number }> = [];
 
   for (let z = bbox.minZ; z <= bbox.maxZ; z++) {
@@ -185,7 +188,7 @@ export function previewProjections(
         const rock = getRock(voxel.rockId);
         if (!rock) continue;
 
-        const energy = calculateEnergyField(vec3(x, y, z), plan.holes, plan.charges, holeDepths);
+        const energy = calculateEnergyField(vec3(x, y, z), plan.holes, plan.charges, holeDepths, holeSurfaceYs);
         const threshold = rock.fractureThreshold * voxel.fractureModifier;
         const ratio = threshold > 0 ? energy / threshold : 0;
 
@@ -230,11 +233,28 @@ export function previewVibrations(
   };
 }
 
-// ── Helper ──
+// ── Helpers ──
 
-function getBlastBBox(plan: BlastPlan) {
+/** Compute surface Y for each hole by scanning the column from top to bottom. */
+function getHoleSurfaceYs(plan: BlastPlan, grid: VoxelGrid): Record<string, number> {
+  const result: Record<string, number> = {};
+  for (const hole of plan.holes) {
+    const gx = Math.max(0, Math.min(grid.sizeX - 1, Math.floor(hole.x)));
+    const gz = Math.max(0, Math.min(grid.sizeZ - 1, Math.floor(hole.z)));
+    let surfaceY = 0;
+    for (let y = grid.sizeY - 1; y >= 0; y--) {
+      const v = grid.getVoxel(gx, y, gz);
+      if (v && v.density >= 0.5) { surfaceY = y + 1; break; }
+    }
+    result[hole.id] = surfaceY;
+  }
+  return result;
+}
+
+function getBlastBBox(plan: BlastPlan, grid: VoxelGrid) {
   let minX = Infinity, maxX = -Infinity;
   let minZ = Infinity, maxZ = -Infinity;
+  let maxSurfaceY = 0;
   let maxDepth = 0;
   for (const h of plan.holes) {
     minX = Math.min(minX, h.x);
@@ -242,12 +262,19 @@ function getBlastBBox(plan: BlastPlan) {
     minZ = Math.min(minZ, h.z);
     maxZ = Math.max(maxZ, h.z);
     maxDepth = Math.max(maxDepth, h.depth);
+    // Find surface Y for this hole column
+    const gx = Math.max(0, Math.min(grid.sizeX - 1, Math.floor(h.x)));
+    const gz = Math.max(0, Math.min(grid.sizeZ - 1, Math.floor(h.z)));
+    for (let y = grid.sizeY - 1; y >= 0; y--) {
+      const v = grid.getVoxel(gx, y, gz);
+      if (v && v.density >= 0.5) { maxSurfaceY = Math.max(maxSurfaceY, y + 1); break; }
+    }
   }
   return {
     minX: Math.floor(minX - PREVIEW_RADIUS),
     maxX: Math.ceil(maxX + PREVIEW_RADIUS),
-    minY: 0,
-    maxY: Math.ceil(maxDepth + PREVIEW_RADIUS),
+    minY: Math.max(0, Math.floor(maxSurfaceY - maxDepth - PREVIEW_RADIUS)),
+    maxY: Math.ceil(maxSurfaceY + PREVIEW_RADIUS),
     minZ: Math.floor(minZ - PREVIEW_RADIUS),
     maxZ: Math.ceil(maxZ + PREVIEW_RADIUS),
   };

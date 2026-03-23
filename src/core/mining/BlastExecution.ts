@@ -15,6 +15,7 @@ import {
   calculateInitialVelocity,
   calculateVibrations,
   groupChargesByDelay,
+  effectiveHoleEnergy,
 } from './BlastCalc.js';
 import { getRock } from '../world/RockCatalog.js';
 import { getOre } from '../world/OreCatalog.js';
@@ -198,16 +199,28 @@ export function executeBlast(
   }
 
   // 6. Calculate vibrations at villages
+  // Apply per-explosive vibrationMod: average across all charged holes weighted equally.
+  let vibModSum = 0;
+  let vibModCount = 0;
+  for (const hole of plan.holes) {
+    const charge = plan.charges[hole.id];
+    if (!charge) continue;
+    const energy = effectiveHoleEnergy(charge, hole.depth, false, false);
+    vibModSum += energy.vibrationMod;
+    vibModCount++;
+  }
+  const effectiveGroundFactor = groundFactor * (vibModCount > 0 ? vibModSum / vibModCount : 1);
+
   const chargePerDelay = groupChargesByDelay(plan.holes, plan.charges, plan.delays);
+  const blastCenter = calculateBlastCenter(plan.holes);
   const vibrationAtVillages: VillageVibration[] = villages.map(v => {
-    const blastCenter = calculateBlastCenter(plan.holes);
     const dx = v.position.x - blastCenter.x;
     const dz = v.position.z - blastCenter.z;
     const distance = Math.sqrt(dx * dx + dz * dz);
     return {
       villageId: v.id,
       position: v.position,
-      vibration: calculateVibrations(chargePerDelay, Math.max(distance, 1), groundFactor),
+      vibration: calculateVibrations(chargePerDelay, Math.max(distance, 1), effectiveGroundFactor),
     };
   });
 
