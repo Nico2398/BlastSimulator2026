@@ -28,7 +28,7 @@
     "finances",
 
     "drill_plan grid rows:4 cols:4 spacing:4 depth:10 start:15,15",
-    "charge hole:* explosive:krackle amount:8 stemming:2",
+    "charge hole:* explosive:krackle amount:4 stemming:3",
     "sequence auto delay_step:20",
     "blast",
     "finances",
@@ -49,7 +49,7 @@
     "employee list",
 
     "drill_plan grid rows:4 cols:4 spacing:5 depth:12 start:5,5",
-    "charge hole:* explosive:krackle amount:10 stemming:3",
+    "charge hole:* explosive:krackle amount:5 stemming:4",
     "sequence auto delay_step:25",
     "blast",
 
