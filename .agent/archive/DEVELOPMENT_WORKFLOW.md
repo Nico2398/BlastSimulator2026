@@ -1,6 +1,6 @@
 # BlastSimulator2026 — Development Workflow (Archive)
 
-This file preserves the workflow rules used during the autonomous phase-by-phase development (Phases 0–12). It is retained for historical reference. The current workflow for bug fixes and feature requests is described in `CLAUDE.md` and `.agent/WORKFLOW.md`.
+This file preserves the workflow rules used during the autonomous phase-by-phase development (Phases 0–12). It is retained for historical reference. The current workflow for bug fixes and feature requests is described in `.github/copilot-instructions.md` and `.agent/WORKFLOW.md`.
 
 ---
 

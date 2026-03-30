@@ -1,4 +1,4 @@
-# BlastSimulator2026 — Claude Cheat Sheet
+# BlastSimulator2026 — Copilot Instructions
 
 **What it is:** A satirical open-pit mine management game (Theme Hospital meets capitalism). Cartoon 3D visuals, blast physics, union strikes, mafia, lawsuits, 3-level campaign.
 
