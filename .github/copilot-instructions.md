@@ -33,29 +33,60 @@ See `.agent/ARCHITECTURE.md` for full details.
 ```bash
 npm run validate        # TypeScript → tests → build (run after every change)
 npm run test            # Tests only
-npx tsx src/console.ts  # Manual gameplay testing without a browser
-bash scripts/visual-test.sh --name "label" --commands "new_game seed:1"  # Screenshot
+npx tsx src/console.ts  # Interactive gameplay testing (no browser)
 ```
 
 ### Scenario Testing (autonomous verification)
 
-Use the scenario test runner for multi-step visual + state verification:
+Run predefined game scenarios with Puppeteer — captures screenshots + game state after every command. Requires a running dev server. The `PUPPETEER_EXECUTABLE_PATH` may vary by environment; `/usr/bin/chromium` is correct for the agent sandbox.
 
 ```bash
-# Run a predefined scenario (screenshots + state dumps after EVERY command)
-npx tsx scripts/scenario-test.ts --scenario blast-basic
+# 1. Start the dev server (in background)
+npm run dev &
 
-# Run inline commands
-npx tsx scripts/scenario-test.ts --name my-test \
+# 2. Run a predefined scenario (screenshots + state dumps after EVERY command)
+PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium npx tsx scripts/scenario-test.ts --scenario blast-basic
+
+# 3. Run inline commands
+PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium npx tsx scripts/scenario-test.ts --name my-test \
   --commands "new_game seed:42; drill_plan grid rows:2 cols:3 spacing:4 depth:6 start:15,15; charge hole:* explosive:boomite amount:5 stemming:2; sequence auto; blast"
 
 # UI button responsiveness diagnostic
-npx tsx scripts/ui-diagnostic.ts
+PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium npx tsx scripts/ui-diagnostic.ts
 ```
 
 Output per step: `screenshots/scenario-{name}/step-NN-cmd.{png,json}` + `report.json`.
 
-Scenario definitions: `scripts/scenario-defs/*.json`. The browser exposes `window.__gameState()` and `window.__uiState()` for programmatic state extraction.
+Available predefined scenarios in `scripts/scenario-defs/`:
+- `blast-basic` — Full blast pipeline
+- `level1-win-efficient` — Complete level 1 winning run
+- `level1-win-conservative` — Conservative strategy win
+- `level1-lose-bankruptcy` — Game over via bankruptcy
+- `level1-lose-arrest` — Game over via criminal charges
+- `level1-lose-ecology` — Game over via environmental collapse
+- `level1-lose-revolt` — Game over via worker revolt
+
+### Interactive Console
+
+The game has a full CLI mode that runs the same core logic as the browser. Use it to **interactively test game behavior**:
+
+```bash
+npx tsx src/console.ts
+
+# Typical session:
+> new_game seed:42
+> drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:10,10
+> charge hole:* explosive:boomite amount:5 stemming:2
+> sequence auto delay_step:25
+> blast
+> finances
+> scores
+> state summary    # JSON dump of key game metrics
+> state full       # Full JSON dump of the entire GameState
+> exit
+```
+
+The `state` command outputs structured JSON, useful for programmatic verification of game behavior.
 
 ### Verification workflow
 
