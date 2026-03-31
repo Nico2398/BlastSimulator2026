@@ -1,6 +1,6 @@
 # BlastSimulator2026 — Development Phases (Archive)
 
-This file is an **historical record** of the 95 tasks completed during the initial autonomous development phase (all 12 phases). It is preserved for reference but is no longer the active task list. The project has transitioned to an evolution/maintenance workflow — see `CLAUDE.md` for the current workflow.
+This file is an **historical record** of the 95 tasks completed during the initial autonomous development phase (all 12 phases). It is preserved for reference but is no longer the active task list. The project has transitioned to an evolution/maintenance workflow — see `.github/copilot-instructions.md` for the current workflow.
 
 ---
 
