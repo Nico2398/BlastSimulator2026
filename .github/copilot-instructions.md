@@ -33,47 +33,29 @@ See `.agent/ARCHITECTURE.md` for full details.
 ```bash
 npm run validate        # TypeScript → tests → build (run after every change)
 npm run test            # Tests only
-npx tsx src/console.ts  # Manual gameplay testing without a browser
-bash scripts/visual-test.sh --name "label" --commands "new_game seed:1"  # Screenshot
+npx tsx src/console.ts  # Interactive gameplay testing (no browser)
 ```
 
-### Interactive Console (for agents)
+### Scenario Testing (autonomous verification)
 
-The game has a full CLI mode that runs the same core logic as the browser. Use it to **interactively test game behavior** without a browser:
+Run predefined game scenarios with Puppeteer — captures screenshots + game state after every command. Requires a running dev server. The `PUPPETEER_EXECUTABLE_PATH` may vary by environment; `/usr/bin/chromium` is correct for the agent sandbox.
 
 ```bash
-# Start interactive console (use bash mode="async" + write_bash for agent use)
-npx tsx src/console.ts
+# 1. Start the dev server (in background)
+npm run dev &
 
-# Typical session:
-> new_game seed:42
-> drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:10,10
-> charge hole:* explosive:boomite amount:5 stemming:2
-> sequence auto delay_step:25
-> blast
-> finances
-> scores
-> state summary    # JSON dump of key game metrics — use for programmatic verification
-> state full       # Full JSON dump of the entire GameState
-> exit
+# 2. Run a predefined scenario (screenshots + state dumps after EVERY command)
+PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium npx tsx scripts/scenario-test.ts --scenario blast-basic
+
+# 3. Run inline commands
+PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium npx tsx scripts/scenario-test.ts --name my-test \
+  --commands "new_game seed:42; drill_plan grid rows:2 cols:3 spacing:4 depth:6 start:15,15; charge hole:* explosive:boomite amount:5 stemming:2; sequence auto; blast"
+
+# UI button responsiveness diagnostic
+PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium npx tsx scripts/ui-diagnostic.ts
 ```
 
-The `state` command outputs structured JSON, so agents can parse it to verify game behavior programmatically.
-
-### CLI Scenario Runner (no browser required)
-
-Run predefined or ad-hoc game scenarios through the ConsoleRunner in pure Node.js:
-
-```bash
-# Run a predefined scenario
-npm run run-scenario -- --scenario blast-basic
-
-# Run inline commands
-npm run run-scenario -- --commands "new_game seed:42; drill_plan grid rows:2 cols:3 spacing:4 depth:6 start:15,15; charge hole:* explosive:boomite amount:5 stemming:2; sequence auto; blast"
-
-# JSON output for programmatic parsing (includes state snapshot after each step)
-npm run run-scenario -- --scenario blast-basic --json
-```
+Output per step: `screenshots/scenario-{name}/step-NN-cmd.{png,json}` + `report.json`.
 
 Available predefined scenarios in `scripts/scenario-defs/`:
 - `blast-basic` — Full blast pipeline
@@ -84,31 +66,33 @@ Available predefined scenarios in `scripts/scenario-defs/`:
 - `level1-lose-ecology` — Game over via environmental collapse
 - `level1-lose-revolt` — Game over via worker revolt
 
-### Visual Scenario Testing (browser required)
+### Interactive Console
 
-Use the scenario test runner for multi-step visual + state verification:
+The game has a full CLI mode that runs the same core logic as the browser. Use it to **interactively test game behavior**:
 
 ```bash
-# Run a predefined scenario (screenshots + state dumps after EVERY command)
-npx tsx scripts/scenario-test.ts --scenario blast-basic
+npx tsx src/console.ts
 
-# Run inline commands
-npx tsx scripts/scenario-test.ts --name my-test \
-  --commands "new_game seed:42; drill_plan grid rows:2 cols:3 spacing:4 depth:6 start:15,15; charge hole:* explosive:boomite amount:5 stemming:2; sequence auto; blast"
-
-# UI button responsiveness diagnostic
-npx tsx scripts/ui-diagnostic.ts
+# Typical session:
+> new_game seed:42
+> drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:10,10
+> charge hole:* explosive:boomite amount:5 stemming:2
+> sequence auto delay_step:25
+> blast
+> finances
+> scores
+> state summary    # JSON dump of key game metrics
+> state full       # Full JSON dump of the entire GameState
+> exit
 ```
 
-Output per step: `screenshots/scenario-{name}/step-NN-cmd.{png,json}` + `report.json`.
-
-Scenario definitions: `scripts/scenario-defs/*.json`. The browser exposes `window.__gameState()` and `window.__uiState()` for programmatic state extraction.
+The `state` command outputs structured JSON, useful for programmatic verification of game behavior.
 
 ### Verification workflow
 
 1. `npm run validate` — type check + unit tests + build
-2. Run CLI scenario or interactive console — verify game logic
-3. (Optional) Run visual scenario test — per-step screenshots + state dumps
+2. Run scenario test — per-step screenshots + state dumps
+3. Read screenshots to visually verify (multimodal)
 4. Read JSON state dumps to verify logical correctness
 5. If issues found: fix → re-run scenario → verify again
 
