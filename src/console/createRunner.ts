@@ -48,6 +48,7 @@ import {
   campaignStartCommand,
   statsCommand,
 } from './commands/campaign.js';
+import { stateCommand } from './commands/state.js';
 import { setupEvents } from '../core/events/index.js';
 import { EventEmitter } from '../core/state/EventEmitter.js';
 
@@ -178,6 +179,11 @@ export function createRunner(): RunnerWithContext {
   });
   runner.register('stats', 'Show per-level success stats and star rating', (args, named) =>
     statsCommand(ctx, args, named),
+  );
+
+  // --- State inspection (agent-friendly) ---
+  runner.register('state', 'Dump game state as JSON (full|summary)', (args, named) =>
+    stateCommand(ctx, args, named),
   );
 
   return { runner, ctx, emitter };

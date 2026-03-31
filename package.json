@@ -9,7 +9,8 @@
     "console": "tsx src/console.ts",
     "validate": "tsc --noEmit && vitest run --reporter=verbose && vite build",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "run-scenario": "tsx scripts/run-scenario.ts"
   },
   "dependencies": {
     "cannon-es": "^0.20.0",

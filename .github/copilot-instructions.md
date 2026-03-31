@@ -37,7 +37,54 @@ npx tsx src/console.ts  # Manual gameplay testing without a browser
 bash scripts/visual-test.sh --name "label" --commands "new_game seed:1"  # Screenshot
 ```
 
-### Scenario Testing (autonomous verification)
+### Interactive Console (for agents)
+
+The game has a full CLI mode that runs the same core logic as the browser. Use it to **interactively test game behavior** without a browser:
+
+```bash
+# Start interactive console (use bash mode="async" + write_bash for agent use)
+npx tsx src/console.ts
+
+# Typical session:
+> new_game seed:42
+> drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:10,10
+> charge hole:* explosive:boomite amount:5 stemming:2
+> sequence auto delay_step:25
+> blast
+> finances
+> scores
+> state summary    # JSON dump of key game metrics — use for programmatic verification
+> state full       # Full JSON dump of the entire GameState
+> exit
+```
+
+The `state` command outputs structured JSON, so agents can parse it to verify game behavior programmatically.
+
+### CLI Scenario Runner (no browser required)
+
+Run predefined or ad-hoc game scenarios through the ConsoleRunner in pure Node.js:
+
+```bash
+# Run a predefined scenario
+npm run run-scenario -- --scenario blast-basic
+
+# Run inline commands
+npm run run-scenario -- --commands "new_game seed:42; drill_plan grid rows:2 cols:3 spacing:4 depth:6 start:15,15; charge hole:* explosive:boomite amount:5 stemming:2; sequence auto; blast"
+
+# JSON output for programmatic parsing (includes state snapshot after each step)
+npm run run-scenario -- --scenario blast-basic --json
+```
+
+Available predefined scenarios in `scripts/scenario-defs/`:
+- `blast-basic` — Full blast pipeline
+- `level1-win-efficient` — Complete level 1 winning run
+- `level1-win-conservative` — Conservative strategy win
+- `level1-lose-bankruptcy` — Game over via bankruptcy
+- `level1-lose-arrest` — Game over via criminal charges
+- `level1-lose-ecology` — Game over via environmental collapse
+- `level1-lose-revolt` — Game over via worker revolt
+
+### Visual Scenario Testing (browser required)
 
 Use the scenario test runner for multi-step visual + state verification:
 
@@ -60,8 +107,8 @@ Scenario definitions: `scripts/scenario-defs/*.json`. The browser exposes `windo
 ### Verification workflow
 
 1. `npm run validate` — type check + unit tests + build
-2. Run scenario test — per-step screenshots + state dumps
-3. Read screenshots to visually verify (multimodal)
+2. Run CLI scenario or interactive console — verify game logic
+3. (Optional) Run visual scenario test — per-step screenshots + state dumps
 4. Read JSON state dumps to verify logical correctness
 5. If issues found: fix → re-run scenario → verify again
 
