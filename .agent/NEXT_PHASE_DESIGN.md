@@ -124,4 +124,196 @@ export interface BuildingDef {
 
 ---
 
-*Chapters 2–8 to be added in subsequent sessions.*
+## 2. Vehicle Fleet
+
+### 2.1 Design Goals
+
+Vehicles are the player's **operational muscle** — they drill holes, haul rubble, load trucks, and clear terrain. The current system defines 4 vehicle types with flat stats. This chapter adds **tiers & funny names** (matching the buildings pattern), a **driver assignment system**, **fuel management**, **routing**, and **breakdowns** to create a deeper management layer.
+
+### 2.2 Vehicle Types & Tiers
+
+Each vehicle type has 3 tiers with escalating stats and absurd names. All names localized via i18n.
+
+| Type | Tier 1 (Rusty) | Tier 2 (Decent) | Tier 3 (Beast) |
+|------|----------------|-----------------|-----------------|
+| Truck | "Dumpster on Wheels" | "Haul-o-Matic 3000" | "Mega Mover XL" |
+| Excavator | "The Claw" | "Digzilla" | "Earth Eater 9000" |
+| Drill Rig | "Pokey McPoke" | "Bore Master" | "Helldriller" |
+| Bulldozer | "Shove-It" | "Flatten Fred" | "The Obliterator" |
+| Water Truck | "Leaky Larry" | "Spritz Machine" | "Dust Destroyer" |
+| Crane | "Wobbly Arm" | "Lift King" | "Sky Hook Supreme" |
+
+**New types:**
+- **Water Truck** — suppresses dust (reduces nuisance score penalty from blasting and hauling). Required at higher difficulty levels.
+- **Crane** — required for building construction and heavy equipment placement. Without a crane, buildings take 3× longer to construct.
+
+### 2.3 Tier Stat Multipliers
+
+Each tier multiplies the base stats from the existing `VehicleDef`:
+
+| Stat | Tier 1 (×) | Tier 2 (×) | Tier 3 (×) |
+|------|-----------|-----------|-----------|
+| `capacity` | 1.0 | 1.6 | 2.5 |
+| `speed` | 1.0 | 1.3 | 1.8 |
+| `maxHp` | 1.0 | 1.5 | 2.2 |
+| `purchaseCost` | 1.0 | 2.0 | 4.0 |
+| `maintenanceCostPerTick` | 1.0 | 1.4 | 2.0 |
+| `fuelCostPerTick` | 1.0 | 1.2 | 1.5 |
+
+### 2.4 Extended Vehicle Data Schema
+
+Extends `VehicleDef` and `Vehicle` in `src/core/entities/Vehicle.ts`:
+
+```typescript
+export type VehicleTier = 1 | 2 | 3;
+
+export interface VehicleDef {
+  type: VehicleType;
+  tier: VehicleTier;
+  /** i18n key, e.g. 'vehicle.truck.tier1' → "Dumpster on Wheels" */
+  nameKey: string;
+  purchaseCost: number;
+  maintenanceCostPerTick: number;
+  fuelCostPerTick: number;
+  capacity: number;
+  speed: number;
+  maxHp: number;
+  /** Fuel tank size (ticks of operation before refueling). */
+  fuelCapacity: number;
+}
+
+export interface Vehicle {
+  id: number;
+  type: VehicleType;
+  tier: VehicleTier;
+  x: number;
+  z: number;
+  hp: number;
+  task: VehicleTask;
+  targetX: number;
+  targetZ: number;
+  /** Current fuel level (ticks of operation remaining). */
+  fuel: number;
+  /** Assigned driver employee ID, or null if uncrewed. */
+  driverId: number | null;
+  /** Ticks since last maintenance. Breakdown chance increases over time. */
+  ticksSinceMaintenance: number;
+  /** Whether the vehicle is currently broken down. */
+  brokenDown: boolean;
+}
+```
+
+### 2.5 Driver Assignment
+
+- Each vehicle requires a **driver** (employee with role `'driver'`) to operate
+- Uncrewed vehicles remain parked and cannot perform tasks
+- One driver per vehicle; one vehicle per driver
+- If a driver is injured, their vehicle becomes idle until reassigned
+- Drivers gain a hidden **experience** counter: +1 per tick of active driving. At 100/500/1000 xp, they unlock efficiency bonuses (+5%/+10%/+15% to vehicle speed)
+
+```typescript
+/** Driver experience thresholds and bonuses. */
+export const DRIVER_XP_BONUSES = [
+  { threshold: 100, speedMultiplier: 1.05 },
+  { threshold: 500, speedMultiplier: 1.10 },
+  { threshold: 1000, speedMultiplier: 1.15 },
+] as const;
+```
+
+### 2.6 Fuel System
+
+- Every vehicle has a **fuel tank** (`fuelCapacity` in ticks of operation)
+- Each tick a vehicle is not idle, it consumes 1 fuel unit
+- At 0 fuel, the vehicle stops where it is and enters `'idle'` state with a `needsFuel` flag
+- Vehicles auto-refuel when they return to a **Fuel Station** building (instant) or a **Vehicle Depot** (takes 3 ticks)
+- Fuel station tier affects refuel speed: Tier 1 = 3 ticks, Tier 2 = 2 ticks, Tier 3 = instant
+- Fuel tank sizes by type: Truck 50, Excavator 40, Drill Rig 35, Bulldozer 45, Water Truck 30, Crane 25
+
+### 2.7 Breakdown System
+
+Vehicles accumulate **wear** over time. Breakdown probability increases with `ticksSinceMaintenance`:
+
+```
+breakdownChance = min(0.5, ticksSinceMaintenance * 0.0005)
+```
+
+- Checked once per tick when the vehicle is active (not idle)
+- Uses seeded PRNG (`rng.next() < breakdownChance`)
+- Broken-down vehicles cannot operate until repaired
+- Repair requires the vehicle to be at a **Vehicle Depot** and takes `10 / tier` ticks (Tier 3 depot = 3.3 ticks ≈ 4 ticks)
+- Maintenance resets wear: sending a vehicle to a depot for 5 ticks resets `ticksSinceMaintenance` to 0
+- Vehicles depoted at a Tier 2+ Vehicle Depot gain a 50% slower wear accumulation
+
+### 2.8 Routing & Movement
+
+Vehicles move on the **surface grid** (top solid voxel layer). Movement rules:
+
+1. **A\* pathfinding** on the 2D surface grid (details in Chapter 6: NavMesh)
+2. Movement cost per cell = 1.0 for flat, 2.0 for ramp, ∞ for cliff/hole
+3. Speed = `def.speed * driverXpMultiplier` cells per tick
+4. Vehicles cannot overlap on the same cell (queueing at bottlenecks)
+5. **Ramp requirement:** Vehicles cannot traverse vertical drops > 1 cell. Ramps must be built or blasted to create gradual transitions.
+
+### 2.9 Vehicle Tasks — State Machine
+
+```
+                    ┌──────────┐
+          ┌────────►│   idle   │◄────────┐
+          │         └────┬─────┘         │
+          │              │ assign        │ arrive/unload
+          ▼              ▼               │
+    ┌──────────┐   ┌──────────┐   ┌──────────┐
+    │  refuel  │   │  moving  │──►│ working  │
+    └──────────┘   └──────────┘   └──────────┘
+          ▲              │               │
+          │              ▼               ▼
+          │         ┌──────────┐   ┌──────────┐
+          └─────────│breakdown │   │ loading  │
+                    └──────────┘   └──────────┘
+```
+
+Task descriptions:
+| Task | Applicable Vehicles | Behavior |
+|------|-------------------|----------|
+| `idle` | All | Parked, no fuel consumed. Awaiting assignment. |
+| `moving` | All | Pathfinding to target cell. Consumes fuel. |
+| `transport` | Truck | Carrying payload from source to destination. |
+| `loading` | Excavator | Loading rubble into adjacent truck. |
+| `drilling` | Drill Rig | Drilling a hole at target position. |
+| `clearing` | Bulldozer | Removing surface material at target. |
+| `watering` | Water Truck | Spraying water to suppress dust. |
+| `lifting` | Crane | Assisting building construction. |
+| `refuel` | All | Parked at fuel station/depot, refueling. |
+| `breakdown` | All | Broken down, awaiting repair at depot. |
+
+### 2.10 Vehicle Effects on Scores
+
+| Situation | Score Impact |
+|-----------|-------------|
+| Active trucks hauling | Nuisance −0.5/truck/tick (dust, noise) |
+| Water truck active | Nuisance +1.0/tick (dust suppression) |
+| Vehicle breakdown | Safety −2 (one-time event) |
+| Vehicle destroyed by blast | Safety −5, Well-being −3 (one-time) |
+| All vehicles maintained (wear < 50) | Safety +1/tick bonus |
+
+### 2.11 Atomic Task Breakdown
+
+| # | Task | File(s) | Test |
+|---|------|---------|------|
+| 2.11.1 | Add `VehicleTier`, `tier` field, and `fuelCapacity` to `VehicleDef` | `src/core/entities/Vehicle.ts` | `tests/unit/entities/Vehicle.test.ts` |
+| 2.11.2 | Add 2 new vehicle types (`water_truck`, `crane`) to `VehicleType` union | `src/core/entities/Vehicle.ts` | Update existing tests |
+| 2.11.3 | Create 18-entry `VEHICLE_DEFS` catalog (6 types × 3 tiers) with tier multipliers | `src/core/entities/Vehicle.ts` | Test: every type has 3 tiers, stats scale correctly |
+| 2.11.4 | Add i18n keys for all 18 vehicle names (en + fr) | `src/core/i18n/locales/en.json`, `fr.json` | Test: all keys resolve |
+| 2.11.5 | Add `fuel`, `driverId`, `ticksSinceMaintenance`, `brokenDown` to `Vehicle` interface | `src/core/entities/Vehicle.ts` | Test: default values on purchase |
+| 2.11.6 | Implement `assignDriver()` — links employee to vehicle, validates role | `src/core/entities/Vehicle.ts` | Test: only drivers can be assigned |
+| 2.11.7 | Implement fuel consumption in `tickVehicle()` — decrement fuel, stop at 0 | `src/core/engine/GameLoop.ts` | Test: vehicle stops when fuel = 0 |
+| 2.11.8 | Implement breakdown check in `tickVehicle()` — PRNG-based | `src/core/engine/GameLoop.ts` | Test: breakdown probability scales with wear |
+| 2.11.9 | Implement `repairVehicle()` and `maintainVehicle()` depot interactions | `src/core/entities/Vehicle.ts` | Test: repair time scales with depot tier |
+| 2.11.10 | Add `DRIVER_XP_BONUSES` and driver XP accumulation to balance/Employee | `src/core/config/balance.ts`, `src/core/entities/Employee.ts` | Test: XP thresholds and speed bonuses |
+| 2.11.11 | Add `watering` and `lifting` task types to `VehicleTask` | `src/core/entities/Vehicle.ts` | Test: task state machine transitions |
+| 2.11.12 | Wire vehicle purchase/assign into console commands | `src/console/commands/entities.ts` | Integration test |
+| 2.11.13 | Add vehicle tier visuals (mesh scale/color) to renderer | `src/renderer/VehicleMesh.ts` | Visual test |
+
+---
+
+*Chapters 3–8 to be added in subsequent sessions.*
