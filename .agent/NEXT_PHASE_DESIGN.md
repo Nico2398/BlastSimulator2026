@@ -711,4 +711,349 @@ export const BASE_VIBRATION_BUDGET = 50;
 
 ---
 
-*Chapters 6–8 to be added in subsequent sessions.*
+## 6. NavMesh & Pathfinding
+
+### 6.1 Design Goals
+
+Employees and vehicles must navigate the mine surface autonomously, routing around drill holes, buildings, parked vehicles, and the pit edges. As blasts create craters and benches, the navigable surface changes dynamically. Pathfinding must be fast enough for 20+ simultaneous agents at 8× game speed without frame drops.
+
+The implementation uses a **2D navigation grid** derived from the `VoxelGrid` surface, refreshed incrementally after blasts. Full 3D pathfinding is not required — vertical movement is handled via dedicated ramps (see §6.4).
+
+### 6.2 Navigation Grid
+
+The `NavGrid` is a 2D array of `NavCell` entries mirroring the `VoxelGrid`'s X×Z footprint:
+
+```typescript
+export type NavCellType =
+  | 'walkable'       // Open surface, clear of obstacles
+  | 'blocked'        // Building footprint, vehicle parked here, or pit edge
+  | 'drill_hole'     // Active or drilled hole — agents avoid stepping in
+  | 'ramp'           // Slope connecting bench levels, walkable with speed penalty
+  | 'void';          // No solid voxel below — not accessible
+
+export interface NavCell {
+  type: NavCellType;
+  /** Movement cost multiplier (1.0 = normal, >1.0 = slower). */
+  moveCost: number;
+  /** Bench level index (0 = surface, 1 = first bench below, etc.). */
+  benchLevel: number;
+  /** Whether a vehicle occupies this cell this tick. Updated every tick. */
+  vehicleOccupied: boolean;
+}
+```
+
+**Derivation rules (run once on world gen; patched after blasts):**
+1. A cell is `void` if the voxel directly below the surface at that column is air
+2. A cell is `drill_hole` if a `DrillHole` exists at that (x, z) coordinate
+3. A cell is `blocked` if a building footprint covers it, or a parked/stationary vehicle occupies it
+4. A cell is `ramp` if the surface height delta between it and at least one neighbor exceeds 1 voxel unit (placed by the player or auto-detected after terrain subtraction)
+5. All remaining solid-surface cells are `walkable`
+
+Move costs:
+| Cell Type | Cost |
+|-----------|------|
+| `walkable` | 1.0 |
+| `ramp` | 1.8 |
+| `drill_hole` | 5.0 (passable but discouraged) |
+| `blocked` / `void` | ∞ (impassable) |
+
+### 6.3 A\* Pathfinding
+
+Pathfinding uses **A\* with 8-directional movement** (cardinal + diagonal). Diagonal moves cost √2 × `moveCost`.
+
+```typescript
+export interface PathRequest {
+  agentId: number;
+  /** Source cell in NavGrid coordinates. */
+  fromX: number;
+  fromZ: number;
+  /** Destination cell. */
+  toX: number;
+  toZ: number;
+  /** If true, do not cross cells occupied by vehicles. */
+  avoidVehicles: boolean;
+}
+
+export interface PathResult {
+  found: boolean;
+  /** Ordered list of (x, z) waypoints including start and end. */
+  waypoints: Array<{ x: number; z: number }>;
+  /** Total movement cost (sum of moveCosts along path). */
+  totalCost: number;
+}
+```
+
+Heuristic: **octile distance** (standard for 8-directional grids):
+```
+h(a, b) = max(|dx|, |dz|) + (√2 − 1) * min(|dx|, |dz|)
+```
+
+**Pathfinding budget:** A\* is capped at **500 explored nodes per request**. If the budget is exceeded, the agent falls back to a **direct line walk** (ignoring non-`blocked`/`void` obstacles) and emits a `pathfinding_budget_exceeded` dev warning.
+
+### 6.4 Ramps & Multi-Level Navigation
+
+The pit descends in bench levels. Employees and vehicles access lower benches via **ramp structures** (placed by the player as buildings, Chapter 1). Ramps appear in the NavGrid as `ramp` cells bridging two bench levels.
+
+Multi-level path planning:
+1. Check if start and destination are on the same bench level → run standard A\*
+2. If on different levels → find the nearest ramp connecting the required levels → route: `start → ramp entrance → ramp exit → destination` (3 sequential A\* queries)
+3. If no ramp exists connecting the required levels → return `found: false`, emit `no_ramp_available` event
+
+**Ramp definition** (added to Building types from Chapter 1):
+```typescript
+// Added to BuildingType:
+'ramp'  // Connects benchLevel N to benchLevel N+1; footprint 1×4 cells, oriented N/S/E/W
+```
+
+### 6.5 Dynamic NavGrid Updates
+
+The NavGrid must be **incrementally updated** when the world changes — a full rebuild of a 100×100 grid every tick would be too expensive.
+
+Triggered updates:
+| Trigger | Region Updated |
+|---------|---------------|
+| Blast completes | All cells in the blast's AABB + 2-cell margin |
+| Building placed or demolished | Building footprint cells |
+| Vehicle parks or departs | Single cell |
+| Drill hole added | Single cell |
+| Ramp built | 1×4 footprint + adjacent cells |
+
+Each update patches only the affected `NavCell` entries and does **not** invalidate cached paths that do not cross the updated region. Paths that do cross the region are marked stale and re-requested next tick.
+
+### 6.6 Path Following
+
+Agents follow waypoints by moving at most `walkSpeed` cells per tick toward the next waypoint. If the next waypoint becomes `blocked` mid-path (e.g., a vehicle parks there), the agent re-requests a path from current position. After 3 consecutive failed re-requests, the agent enters `stuck` state (idle, morale −2/tick, emits `agent_stuck` event) until the path clears.
+
+### 6.7 Atomic Task Breakdown
+
+| # | Task | File(s) | Test |
+|---|------|---------|------|
+| 6.7.1 | Define `NavCell`, `NavCellType`, `NavGrid` interfaces | `src/core/nav/NavGrid.ts` (new file) | `tests/unit/nav/NavGrid.test.ts` |
+| 6.7.2 | Implement `buildNavGrid()` — derives NavGrid from VoxelGrid + buildings + holes | `src/core/nav/NavGrid.ts` | Test: blocked cells match building footprints |
+| 6.7.3 | Implement `patchNavGrid()` — incremental update for a bounding box | `src/core/nav/NavGrid.ts` | Test: patch only affects specified region |
+| 6.7.4 | Implement A\* `findPath()` with 8-directional movement and octile heuristic | `src/core/nav/Pathfinding.ts` (new file) | Test: correct path length on simple grid; impassable tiles are avoided |
+| 6.7.5 | Implement node budget cap and direct-line fallback | `src/core/nav/Pathfinding.ts` | Test: falls back when grid is very large and budget is hit |
+| 6.7.6 | Implement multi-level routing via ramp lookup | `src/core/nav/Pathfinding.ts` | Test: 3-segment path when ramp present; `found: false` when no ramp |
+| 6.7.7 | Implement `advanceAgent()` — move agent 1 step along waypoints per tick | `src/core/nav/AgentMovement.ts` (new file) | Test: agent reaches destination in expected ticks |
+| 6.7.8 | Implement stale-path detection and re-request on obstacle change | `src/core/nav/AgentMovement.ts` | Test: path re-requested when cell blocked mid-route |
+| 6.7.9 | Implement `stuck` state and `agent_stuck` event | `src/core/nav/AgentMovement.ts` | Test: stuck state after 3 failed re-requests |
+| 6.7.10 | Integrate NavGrid build into `GameState` initialization | `src/core/state/GameState.ts` | Smoke test: GameState serializes NavGrid |
+| 6.7.11 | Wire NavGrid patch calls into blast pipeline and building placement | `src/core/engine/GameLoop.ts` | Test: NavGrid reflects new hole after drill |
+| 6.7.12 | Add i18n keys for pathfinding events (`agent_stuck`, `no_ramp_available`) | `src/core/i18n/locales/en.json`, `fr.json` | Test: all keys resolve |
+
+---
+
+## 7. Employee Needs (Eating, Sleeping, Breaks)
+
+### 7.1 Design Goals
+
+Employees have three biological needs — **hunger**, **fatigue**, and **break pressure** — modelled as gauges that fill over time and must be satisfied by visiting appropriate buildings. Unmet needs drain morale, reduce effectiveness, and eventually cause the employee to collapse (forced rest). Satisfying needs promptly is the player's main micro-management loop during long mining sessions.
+
+This chapter connects directly to the Buildings system (Chapter 1 — canteen, bunkhouse, break room) and the Task Queue system (Chapter 3 — `rest` task type).
+
+### 7.2 Need Gauges
+
+Each employee has three need gauges (0–100; 100 = fully satisfied):
+
+| Gauge | Name | Fills at | Drains at | Collapse Threshold |
+|-------|------|----------|------------|-------------------|
+| `hunger` | Hunger | Eating at Canteen | −1/tick while working | ≤ 10 |
+| `fatigue` | Fatigue | Sleeping at Bunkhouse | −0.5/tick (awake) / −2/tick (active task) | ≤ 5 |
+| `breakNeed` | Break Pressure | Taking break at Break Room | −0.8/tick while working | ≤ 15 |
+
+**Rate modifiers:**
+- Active task (non-`rest`) drains gauges at the "active task" rate
+- Idle state drains at the normal "awake" rate
+- High morale (>70): drain rate ×0.85 (happy workers last longer)
+- Low morale (<30): drain rate ×1.20 (miserable workers tire faster)
+
+### 7.3 Morale Effects of Needs
+
+Needs affect morale at the end of each tick via the `needsMoraleEffect()` function:
+
+```
+moraleEffect = Σ_need [ needPenalty(gaugeValue) ]
+
+needPenalty(g):
+  if g >= 50: 0          // Comfortable — no effect
+  if g >= 30: −0.5/tick  // Uncomfortable — slow drain
+  if g >= 15: −1.5/tick  // Suffering
+  if g <  15: −3.0/tick  // Critical — approaching collapse
+```
+
+Conversely, all needs above 80 simultaneously grants a **"well-rested" bonus**: +1 morale/tick (max bonus capped at 100).
+
+### 7.4 Collapse
+
+When any gauge hits its collapse threshold:
+
+1. The employee's current task is immediately interrupted (pushed back to front of queue)
+2. A `rest` task is prepended with `taskType = 'rest'`, targeting the nearest available building of the correct type
+3. The employee is flagged `collapsing: true` — effectiveness drops to 0 until the `rest` task completes
+4. On completion of the `rest` task, `collapsing` is cleared and the interrupted task resumes
+
+| Collapse Gauge | Rest Building | Rest Duration (ticks) |
+|---------------|--------------|----------------------|
+| `hunger` | Canteen | 2 |
+| `fatigue` | Bunkhouse | 8 |
+| `breakNeed` | Break Room | 3 |
+
+If no suitable building exists within 20 cells, the employee collapses in place: `collapsing: true`, the `rest` task uses the employee's current position, and duration is doubled (miserable ground-rest).
+
+### 7.5 Need Replenishment Rates
+
+Each building tier refills gauges at different speeds:
+
+| Building | Tier 1 | Tier 2 | Tier 3 |
+|---------|--------|--------|--------|
+| Canteen | +12 hunger/tick | +18 hunger/tick | +25 hunger/tick |
+| Bunkhouse | +8 fatigue/tick | +14 fatigue/tick | +20 fatigue/tick |
+| Break Room | +10 breakNeed/tick | +16 breakNeed/tick | +22 breakNeed/tick |
+
+Buildings have finite capacity (from Chapter 1). If a building is full, the employee must wait (`await_vehicle`-style queue at building entrance) or route to the next nearest. Waiting in queue slowly drains gauges at the normal awake rate.
+
+### 7.6 Proactive Need Queuing
+
+Employees don't wait until collapse — the game automatically **inserts need-satisfaction tasks** into the queue when a gauge falls below the warning threshold:
+
+| Gauge | Warning Threshold | Auto-Insert Behaviour |
+|-------|------------------|----------------------|
+| `hunger` | 35 | Insert `rest(canteen)` after current task if not already queued |
+| `fatigue` | 25 | Insert `rest(bunkhouse)` after current task if not already queued |
+| `breakNeed` | 30 | Insert `rest(break_room)` after current task if not already queued |
+
+If the queue is full (capacity exceeded), auto-insert is skipped but a `need_warning` event is emitted so the player can manually intervene. The Manager "Morale Booster" specialization (Chapter 3) slows drain rates by ×0.9 for all nearby employees.
+
+### 7.7 Cost of Needs
+
+Each visit to a building consumes resources:
+
+| Building | Cost per Visit |
+|---------|---------------|
+| Canteen | $10 per employee (food cost) |
+| Bunkhouse | $0 (included in salary — staying costs nothing) |
+| Break Room | $5 per employee (coffee, snacks) |
+
+Canteen food costs scale with tier: Tier 1 × $10, Tier 2 × $8 (bulk purchasing), Tier 3 × $6 (optimized supply chain).
+
+### 7.8 Shift System (Optional Layer)
+
+If the player builds a **Bunkhouse Tier 2+**, an 8-tick shift cycle activates: employees work for 6 ticks, then automatically enter an 8-tick sleep rest at the bunkhouse. Shift boundaries trigger an `employee_shift_change` event. Without a Bunkhouse, employees remain awake indefinitely (fatigue accumulates faster).
+
+### 7.9 Atomic Task Breakdown
+
+| # | Task | File(s) | Test |
+|---|------|---------|------|
+| 7.9.1 | Add `hunger`, `fatigue`, `breakNeed`, `collapsing` fields to `Employee` interface | `src/core/entities/Employee.ts` | Test: new fields initialized on hire |
+| 7.9.2 | Add `NEED_DRAIN_RATES`, `NEED_WARNING_THRESHOLDS`, `NEED_COLLAPSE_THRESHOLDS` to `balance.ts` | `src/core/config/balance.ts` | — |
+| 7.9.3 | Implement `tickNeedGauges()` — drain gauges based on task state + morale modifier | `src/core/entities/Employee.ts` | Test: drain rates match table; active task drains faster |
+| 7.9.4 | Implement `needsMoraleEffect()` — compute tick-level morale delta from all gauges | `src/core/entities/Employee.ts` | Test: zero effect above 50; −3/tick at critical |
+| 7.9.5 | Implement `replenishNeed()` — fill gauge at building tier rate, enforce capacity | `src/core/entities/Employee.ts` | Test: gauge fills at correct rate per tier |
+| 7.9.6 | Implement `checkCollapse()` — interrupt task queue, prepend `rest` task | `src/core/entities/Employee.ts` | Test: interrupted task re-queued; `collapsing` flag set |
+| 7.9.7 | Implement `autoInsertNeedTasks()` — proactive queue insertion at warning thresholds | `src/core/entities/Employee.ts` | Test: `rest` inserted after current task; skipped if queue full |
+| 7.9.8 | Deduct per-visit food/break costs from cash balance | `src/core/engine/GameLoop.ts` | Test: canteen visit deducts $10; tier 3 deducts $6 |
+| 7.9.9 | Implement shift cycle for Bunkhouse Tier 2+ | `src/core/engine/GameLoop.ts` | Test: shift cycle fires at tick 6; sleep rest queued |
+| 7.9.10 | Wire all need events into event system (`need_warning`, `employee_collapsed`, `employee_shift_change`) | `src/core/events/EventSystem.ts` | Test: events fire at correct gauge levels |
+| 7.9.11 | Add i18n keys for all need events and building-full message (en + fr) | `src/core/i18n/locales/en.json`, `fr.json` | Test: all keys resolve |
+| 7.9.12 | Add `needs` console command — print all employees' gauge values | `src/console/commands/entities.ts` | Integration test |
+
+---
+
+## 8. Testing Strategy
+
+### 8.1 Overview
+
+BlastSimulator2026 uses a three-layer test pyramid:
+
+1. **Unit tests** — Pure functions in `src/core/`. Fast, no I/O, seeded PRNG. Run with `npm run test`.
+2. **Integration tests** — Console command sequences that exercise multiple systems together. Run with `npm run test`.
+3. **Scenario tests** — Full browser sessions driven by Puppeteer. Screenshots + JSON state dumps after every command. Run with the scenario-test script.
+
+All three layers must pass before any PR is merged. The `npm run validate` command runs TypeScript type-checking, unit + integration tests, and a production build in sequence.
+
+### 8.2 Unit Test Conventions
+
+Unit tests live in `tests/unit/` mirroring the source tree. Every exported pure function in `src/core/` must have at least one positive test and one edge-case test. Test files use `vitest` (`describe`/`it`/`expect`). Fixtures use `Random` with a fixed seed (conventionally `seed: 42`).
+
+**Naming convention:** `<Module>.test.ts` in the same directory path as the source. E.g. `src/core/nav/Pathfinding.ts` → `tests/unit/nav/Pathfinding.test.ts`.
+
+**Coverage targets (per chapter):**
+
+| Chapter | Minimum Line Coverage |
+|---------|----------------------|
+| 1 — Buildings | 90% |
+| 2 — Vehicles | 85% |
+| 3 — Employee Skills | 90% |
+| 4 — Survey System | 90% |
+| 5 — Blast Enhancements | 95% |
+| 6 — NavMesh | 85% |
+| 7 — Employee Needs | 90% |
+
+### 8.3 Integration Test Conventions
+
+Integration tests live in `tests/integration/`. They use the same `vitest` runner but are allowed to import from `src/console/` (the command layer) and must exercise at least one full round-trip through the game loop. No DOM, no Three.js.
+
+Required integration test suites per chapter:
+
+| Chapter | Test Suite | Key Assertions |
+|---------|-----------|---------------|
+| 1 | `buildings.integration.test.ts` | Place + upgrade building; demolish; placement failure on invalid terrain |
+| 2 | `vehicles.integration.test.ts` | Purchase → assign driver → move → refuel cycle |
+| 3 | `skills.integration.test.ts` | 700 XP triggers Legend; specialization chosen and applied |
+| 4 | `survey.integration.test.ts` | Full survey → blast → ore report comparison |
+| 5 | `blast-enhanced.integration.test.ts` | Deck charge > single-deck; presplit eliminates back-break |
+| 6 | `navmesh.integration.test.ts` | Agent routes around building; multi-level ramp path |
+| 7 | `needs.integration.test.ts` | Collapse triggers rest task; shift cycle fires on schedule |
+
+### 8.4 Scenario Test Definitions
+
+Scenario tests are defined in `scripts/scenario-defs/` as JSON files. Each scenario lists console commands; the test runner captures a screenshot and state JSON after each. New scenarios required for these chapters:
+
+| Scenario File | Purpose | Win Condition |
+|--------------|---------|---------------|
+| `survey-then-blast.json` | Run seismic survey, inspect estimates, blast, check ore report | Lucky Strike event fires if yield > 120% estimate |
+| `skill-progression.json` | Hire driller, run 700 ticks of work, verify Legend level | `employee.skillLevel === 5` in state JSON |
+| `multi-deck-blast.json` | Place 3-deck charge, blast, verify energy field depth profile | No over-blast projection at surface; deep voxels fractured |
+| `presplit-wall.json` | Drill presplit row + production holes, verify zero back-break | `backBreakPenalty === 0` in blast result |
+| `needs-cycle.json` | Hire 3 workers, fast-forward 20 ticks, verify canteen visit auto-queued | `employee.hunger > 30` after visit |
+| `ramp-navigation.json` | Build ramp, assign worker to task on lower bench | Agent reaches destination; no `agent_stuck` event |
+| `vibration-budget.json` | Fire blast exceeding vibration budget 3 times | Third blast halted; $5,000 fine deducted |
+
+### 8.5 Regression Test Policy
+
+Any bug fix must be accompanied by a new unit or integration test that would have caught the bug. The test must fail on the buggy code and pass on the fix. This is enforced via PR review checklist.
+
+### 8.6 Test-Driven Workflow for New Features
+
+For each atomic task in chapters 1–7:
+
+1. Write the test first (red)
+2. Implement the minimum code to pass (green)
+3. Refactor for clarity if needed (refactor)
+4. Run `npm run validate` to confirm no regressions
+5. For visual changes: run the relevant scenario test and inspect screenshots
+
+### 8.7 Performance Benchmarks
+
+The following benchmarks must pass as part of CI (failing marks the build as yellow, not red):
+
+| Benchmark | Target | Measurement |
+|-----------|--------|------------|
+| A\* path on 100×100 grid | < 2ms per request | `performance.now()` in unit test |
+| Full blast pipeline (500 voxels) | < 50ms | Unit test timing |
+| NavGrid full rebuild (100×100) | < 10ms | Unit test timing |
+| Frame tick at 8× speed, 20 agents | < 16ms | Integration test timing |
+| Survey estimation (radius 20) | < 5ms | Unit test timing |
+
+### 8.8 Atomic Task Breakdown
+
+| # | Task | File(s) | Test |
+|---|------|---------|------|
+| 8.8.1 | Add coverage reporter to `vitest.config.ts` (v8 provider, per-file thresholds) | `vitest.config.ts` | CI: coverage gate fails under threshold |
+| 8.8.2 | Create `tests/integration/` directory and add to test runner config | `vitest.config.ts`, `package.json` | Smoke: integration runner picks up test files |
+| 8.8.3 | Add 7 integration test suites (one per chapter) | `tests/integration/` | Each suite passes |
+| 8.8.4 | Add 7 scenario JSON files to `scripts/scenario-defs/` | `scripts/scenario-defs/` | Scenario runner executes all without crash |
+| 8.8.5 | Add performance benchmark suite | `tests/unit/benchmarks/` | Benchmarks log timing; thresholds enforced |
+| 8.8.6 | Add `npm run test:integration` and `npm run test:scenarios` scripts | `package.json` | Each script runs in isolation |
+| 8.8.7 | Update `npm run validate` to include integration tests | `package.json` | `npm run validate` exits 0 on clean repo |
+| 8.8.8 | Document test conventions in `README.md` under a "Testing" section | `README.md` | — |
