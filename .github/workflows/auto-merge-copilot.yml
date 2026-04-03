@@ -40,9 +40,22 @@ jobs:
               owner, repo, pull_number: prNumber
             });
 
-            // Only process Copilot PRs (Copilot creates from copilot/* branches)
+            // Only process Copilot PRs with strong provenance checks
             if (!pr.head.ref.startsWith('copilot/')) {
               console.log('Not a Copilot branch, skipping.');
+              return;
+            }
+
+            // Reject forked PRs — branch must originate from this repo
+            if (pr.head.repo.full_name !== `${owner}/${repo}`) {
+              console.log(`PR originates from fork ${pr.head.repo.full_name}, skipping.`);
+              return;
+            }
+
+            // Verify the PR was authored by the Copilot bot
+            const expectedAuthors = ['copilot[bot]', 'github-copilot[bot]'];
+            if (!expectedAuthors.includes(pr.user.login)) {
+              console.log(`PR author ${pr.user.login} is not Copilot, skipping.`);
               return;
             }
 

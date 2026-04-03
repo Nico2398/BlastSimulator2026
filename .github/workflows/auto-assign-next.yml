@@ -19,20 +19,21 @@ jobs:
             const owner = context.repo.owner;
             const repo = context.repo.repo;
             const prBody = context.payload.pull_request.body || '';
-            const prTitle = context.payload.pull_request.title || '';
 
             // --- 1. Find and close the completed issue ---
             const closesMatch = prBody.match(/[Cc]loses?\s+#(\d+)/);
-            const titleMatch = prTitle.match(/#(\d+)/);
-            const issueNum = closesMatch?.[1] || titleMatch?.[1];
+            const issueNum = closesMatch?.[1];
 
-            if (issueNum) {
-              const n = parseInt(issueNum);
-              console.log(`Closing issue #${n} as done.`);
-              await github.rest.issues.update({ owner, repo, issue_number: n, state: 'closed' });
-              await github.rest.issues.addLabels({ owner, repo, issue_number: n, labels: ['done'] });
-              await github.rest.issues.removeLabel({ owner, repo, issue_number: n, name: 'in-progress' }).catch(() => {});
+            if (!issueNum) {
+              console.log('No explicit close directive found in PR body. Exiting without closing or assigning any issue.');
+              return;
             }
+
+            const n = parseInt(issueNum);
+            console.log(`Closing issue #${n} as done.`);
+            await github.rest.issues.update({ owner, repo, issue_number: n, state: 'closed' });
+            await github.rest.issues.addLabels({ owner, repo, issue_number: n, labels: ['done'] });
+            await github.rest.issues.removeLabel({ owner, repo, issue_number: n, name: 'in-progress' }).catch(() => {});
 
             // --- 2. Find next ready issue (oldest first) ---
             const { data: ready } = await github.rest.issues.listForRepo({

@@ -14,6 +14,7 @@ jobs:
       - name: Comment and notify
         uses: actions/github-script@v7
         with:
+          github-token: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
           script: |
             await github.rest.issues.createComment({
               owner: context.repo.owner,
