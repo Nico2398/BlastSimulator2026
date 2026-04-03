@@ -1,0 +1,82 @@
+name: "Pipeline: assign next issue to Copilot"
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions: {}
+
+jobs:
+  chain-next-task:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Close done issue + assign next to Copilot
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const prBody = context.payload.pull_request.body || '';
+
+            // --- 1. Find and close the completed issue ---
+            const closesMatch = prBody.match(/[Cc]loses?\s+#(\d+)/);
+            const issueNum = closesMatch?.[1];
+
+            if (!issueNum) {
+              console.log('No explicit close directive found in PR body. Exiting without closing or assigning any issue.');
+              return;
+            }
+
+            const n = parseInt(issueNum);
+            console.log(`Closing issue #${n} as done.`);
+            await github.rest.issues.update({ owner, repo, issue_number: n, state: 'closed' });
+            await github.rest.issues.addLabels({ owner, repo, issue_number: n, labels: ['done'] });
+            await github.rest.issues.removeLabel({ owner, repo, issue_number: n, name: 'in-progress' }).catch(() => {});
+
+            // --- 2. Find next ready issue (oldest first) ---
+            const { data: ready } = await github.rest.issues.listForRepo({
+              owner, repo,
+              labels: 'ready',
+              state: 'open',
+              sort: 'created',
+              direction: 'asc',
+              per_page: 10
+            });
+
+            for (const issue of ready) {
+              // Check dependencies
+              const depMatch = issue.body?.match(/[Dd]epends?\s+on:?\s*#(\d+)/);
+              if (depMatch) {
+                const dep = await github.rest.issues.get({
+                  owner, repo, issue_number: parseInt(depMatch[1])
+                });
+                if (dep.data.state !== 'closed') {
+                  console.log(`#${issue.number}: dependency #${depMatch[1]} not closed, skipping.`);
+                  continue;
+                }
+              }
+
+              // Assign to Copilot
+              console.log(`Assigning #${issue.number} to Copilot.`);
+              await github.rest.issues.addAssignees({
+                owner, repo,
+                issue_number: issue.number,
+                assignees: ['copilot']
+              });
+              await github.rest.issues.removeLabel({
+                owner, repo,
+                issue_number: issue.number,
+                name: 'ready'
+              }).catch(() => {});
+              await github.rest.issues.addLabels({
+                owner, repo,
+                issue_number: issue.number,
+                labels: ['in-progress']
+              });
+
+              return; // Only assign one at a time
+            }
+
+            console.log('No more ready issues. Pipeline idle.');

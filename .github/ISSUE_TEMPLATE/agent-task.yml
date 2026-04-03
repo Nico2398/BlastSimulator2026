@@ -1,0 +1,62 @@
+name: "Agent Task"
+description: "Atomic task for autonomous agent processing"
+labels: ["agent-task", "ready"]
+body:
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Why does this task exist? What feature does it belong to?
+    validations:
+      required: true
+
+  - type: textarea
+    id: task
+    attributes:
+      label: Task Description
+      description: >
+        What specifically needs to be done? Reference files, functions,
+        endpoints. Be precise — the agent will follow this literally.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+      description: Checkboxes the agent can verify.
+      value: |
+        - [ ] Criterion 1
+        - [ ] Criterion 2
+        - [ ] All existing tests still pass
+        - [ ] New tests cover the change
+    validations:
+      required: true
+
+  - type: textarea
+    id: testing
+    attributes:
+      label: Testing Procedure
+      description: >
+        Exact commands to validate. The agent will run these.
+      value: |
+        ```bash
+        npm run validate
+        # Expected: all checks pass
+        ```
+    validations:
+      required: true
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies
+      description: Issues that must be merged before this one.
+      placeholder: "Depends on: #XX"
+
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Scope Constraints
+      description: What should NOT be changed.
+      placeholder: "Do not modify CI config, do not add dependencies"

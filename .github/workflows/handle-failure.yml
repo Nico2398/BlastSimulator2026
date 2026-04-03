@@ -1,0 +1,33 @@
+name: "Pipeline: handle agent failure"
+
+on:
+  issues:
+    types: [labeled]
+
+permissions: {}
+
+jobs:
+  notify:
+    if: github.event.label.name == 'blocked'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Comment and notify
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.issue.number,
+              body: [
+                '🚨 **Pipeline paused — agent blocked on this issue.**',
+                '',
+                '@Nico2398 — please review:',
+                '1. The PR and agent session logs',
+                '2. Add clarification to this issue',
+                '3. Remove `blocked`, add `ready`, and re-assign to `copilot` to resume',
+                '',
+                'Or complete the task manually and the pipeline will auto-continue on merge.'
+              ].join('\n')
+            });
