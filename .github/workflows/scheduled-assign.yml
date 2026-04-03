@@ -5,6 +5,8 @@ on:
     - cron: "0 8,14,20 * * *"  # 3x daily at 8am, 2pm, 8pm UTC
   workflow_dispatch:  # manual trigger button
 
+permissions: {}
+
 jobs:
   kickstart:
     runs-on: ubuntu-latest
