@@ -625,8 +625,9 @@ The entire energy is placed in the hole voxel as **overflow energy** at the star
 
 ```
 Per-voxel storage (transient, not persisted to GameState after the blast):
-  effectiveEnergy[v]  — energy permanently absorbed by this voxel
-  overflowEnergy[v]   — energy to be distributed to neighbours
+  effectiveEnergy[v]   — energy permanently absorbed by this voxel (≤ T(v))
+  overflowEnergy[v]    — pending energy to distribute to neighbours this iteration
+  generatedOverflow[v] — cumulative total overflow this voxel produced (used in Step 4)
 ```
 
 **Each iteration:**
@@ -641,6 +642,8 @@ for each voxel v with overflowEnergy[v] > 0:
   effectiveEnergy[v] += absorbed
 
   leftover = incoming - absorbed
+  generatedOverflow[v] += leftover          // accumulate for Step 4
+
   if leftover > 0:
     neighbours = adjacent non-air voxels of v   // up to 6 face-adjacent
     share = leftover / count(neighbours)
@@ -707,7 +710,15 @@ For each fragmented voxel v, randomly sample `fragmentCount(v)` 3D points unifor
 
 #### 5.4.3 3D Voronoi decomposition
 
-Compute a 3D Voronoi diagram over P, clipped to the union of all fragmented voxel boxes. Each Voronoi cell is the base shape of one fragment. The implementation uses Fortune's 3D algorithm or, practically, scipy-style incremental Delaunay with dual conversion (handled in `src/physics/VoronoiFrag.ts`).
+The implementation uses the **simplest correct Voronoi approach** that still produces natural fragment shapes:
+
+1. **Delaunay tetrahedralization** of the global point cloud P using an incremental algorithm (Bowyer–Watson). The result is a set of tetrahedra whose circumsphere contains no other points.
+2. **Dual Voronoi cells**: each Voronoi cell is built from the circumcentres of all Delaunay tetrahedra incident to a given point. Edges connect circumcentres of tetrahedra that share a face.
+3. **Clip** each Voronoi cell to the bounding union of fragmented voxel boxes. Cells whose seed point came from voxel V are clipped to V's unit cube plus a small shared border tolerance to avoid gaps.
+
+This gives one Voronoi cell per sampled point, entirely contained within the fragmented volume. Variable seed density (more seeds in high-score voxels) naturally produces smaller, more numerous fragments in the most energetically stressed zone.
+
+> **Performance note:** The Delaunay tetrahedralization runs once per blast, not per frame. For typical blasts (50–300 fragmented voxels × 1–5 seeds each = 50–1500 points) the algorithm completes in &lt;16 ms on a modern CPU. If point count exceeds `MAX_VORONOI_POINTS` (balance constant, e.g. 2000), seeds are randomly culled from the lowest-score voxels first.
 
 #### 5.4.4 Merging pass
 
@@ -743,8 +754,15 @@ export interface RockFragment {
   volumeM3: number;
   /** kg, computed from volume and rock density. */
   massKg: number;
+  /**
+   * Sum of generatedOverflow from all source voxels, weighted by the fraction
+   * of each voxel's volume this fragment occupies. Used by Step 4 for velocity.
+   */
+  overflowEnergy: number;
   /** Initial linear velocity (m/tick). Set in Step 4. */
   velocity: Vec3;
+  /** Classification set by Step 4 before physics begins. */
+  simulationTier: 'projected' | 'collapse';
   state: 'flying' | 'settling' | 'static';
 }
 ```
@@ -755,82 +773,78 @@ export interface RockFragment {
 
 ### 5.5 Step 4 — Fragment Projection & Physics Settle
 
-#### 5.5.1 Recommended projection algorithm — Energy-Gradient Velocity
+#### 5.5.1 Projection velocity — energy gradient + surface proximity
 
-After evaluating several approaches (proximity to surface, explicit surface voxel flag, pressure wave direction), the **energy-gradient velocity model** gives the best balance between physical plausibility, designer controllability, and avoiding catastrophic fly-rock:
-
-**For each fragment F with centroid C:**
+**Confirmed algorithm.** For each fragment F with centroid C:
 
 ```
-// 1. Excess energy at C (interpolated from surrounding voxels)
-E   = trilinearSample(effectiveEnergy, C)
-T   = trilinearSample(threshold, C)
-excess = max(0, E - T)
-
-// 2. Base speed — sub-linear in excess to prevent satellites
-v_mag = min(
-  PROJECTION_SCALE * sqrt(excess),
-  MAX_PROJECTION_VELOCITY            // e.g. 15 m/tick
-)
-
-// 3. Direction — energy gradient (finite differences on 3×3×3 neighbourhood)
-grad = computeEnergyGradient(effectiveEnergy, C)
-// Gradient points from low to high energy; fragment moves from high to low,
-// so negate:
+// 1. Energy gradient direction — finite differences on 3×3×3 neighbourhood
+//    of the effectiveEnergy field at C.
+//    Fragment moves away from the energy peak (highest pressure), so negate.
+grad     = computeEnergyGradient(effectiveEnergy, C)
 grad_dir = normalize(-grad)
 
-// 4. Free-face bias — pull direction toward nearest exposed face (air voxel)
-faceDir = normalize(C - nearestSolidVoxelCentroid(C))
+// 2. Surface proximity factor — fragments near a free face (air) get full speed;
+//    deeply buried fragments get near-zero speed.
+distToAir              = distanceToNearestAirVoxel(C)      // in meters/cells
+surfaceProximityFactor = exp(-distToAir * SURFACE_PROXIMITY_DECAY)   // e.g. decay = 0.5
 
-// 5. Surface upward bias
-depthRatio = clamp((surfaceY - C.y) / MAX_RELEVANT_DEPTH, 0, 1)
-// depthRatio ≈ 0 near surface, ≈ 1 deep
-upBias = UP * (1 - depthRatio) * SURFACE_UPWARD_BIAS   // e.g. SURFACE_UPWARD_BIAS = 0.4
+// 3. Speed — derived from the overflow energy the fragment "inherited"
+//    (overflowEnergy on RockFragment, set in §5.4.5).
+//    sqrt(2E/m) is the kinetic energy formula inverted; scaled to game units.
+v_mag = sqrt(2.0 * fragment.overflowEnergy / fragment.massKg)
+      * surfaceProximityFactor
 
-// 6. Combine
-raw_dir = lerp(grad_dir, faceDir, FREE_FACE_WEIGHT)    // e.g. FREE_FACE_WEIGHT = 0.4
-raw_dir = normalize(raw_dir + upBias)
+// 4. Clamp to prevent satellites
+v_mag = min(v_mag, MAX_PROJECTION_VELOCITY)   // e.g. 80 m/s
 
-F.velocity = raw_dir * v_mag
+// 5. Final velocity
+F.velocity = grad_dir * v_mag
 ```
 
+**Classification:** if `v_mag > PROJECTION_VELOCITY_THRESHOLD`, the fragment is tagged `simulationTier: 'projected'`; otherwise `'collapse'`. This tier drives the physics strategy below.
+
 **Why this works:**
-- **Inner fragments** (deep, modest excess): energy gradient is gentle, no free face nearby → near-zero velocity → fragments collapse under gravity.
-- **Outer fragments** (near surface, high excess): strong gradient pointing outward + strong free-face pull + upward bias → significant upward/outward projection → fly-rock hazard.
-- **Well-designed blast** (appropriate burden / stemming): excess energy is low across all surface voxels → minimal projection even at surface.
-- **Over-charged blast**: excess spikes at surface → dangerous projection arc.
-- The `sqrt` scaling and `MAX_PROJECTION_VELOCITY` cap prevent even worst-case blasts from putting fragments into orbit.
+- **Deeply buried fragments**: `distToAir` is large → `surfaceProximityFactor ≈ 0` → `v_mag ≈ 0` → fragment collapses under gravity regardless of overflow energy.
+- **Surface fragments, over-charged blast**: `distToAir ≈ 0` → factor = 1.0; high overflow energy → large `v_mag` → dangerous fly-rock.
+- **Well-designed blast** (correct stemming/burden): overflow energy is low everywhere → `v_mag` small even at surface → pile of collapsed fragments, minimal projection.
+- **Poor stemming** (energy leaks upward toward collar): gradient near collar points upward → upward projection, mimicking real fly-rock from collar blow-out.
 
-#### 5.5.2 Physics simulation
+#### 5.5.2 Tiered physics simulation
 
-Once velocities are set, `src/physics/FragmentSim.ts` drives the simulation using **cannon-es**:
+Running full cannon-es rigid-body simulation for every fragment is too expensive (potentially thousands of bodies). The `'projected'` / `'collapse'` classification drives a two-tier strategy:
 
-- Each `RockFragment` is a `CANNON.Body` with mass `fragment.massKg`, shape derived from `collisionVertices` (convex hull).
-- Gravity: standard −9.8 m/s² (converted to ticks).
-- A fragment that hits a solid voxel **sticks**: its body is converted to `static` and its cell occupancy is registered on the surface grid. It does not bounce or roll.
-- Sticking fragment checks: if a human, vehicle, or building occupies the landing cell → damage/destroy (same logic as §5.3.3 but with energy derived from `massKg * |velocity|²`).
+**Tier A — Projected fragments** (`simulationTier: 'projected'`):
+- Each fragment becomes a `CANNON.Body` with `massKg`, shape = convex hull of `collisionVertices`.
+- Full 6-DOF rigid-body dynamics with gravity (−9.8 m/s²).
+- **Hard cap:** only the first `PHYSICS_FRAGMENT_CAP` (e.g. 200) projected fragments get a full `CANNON.Body`. Fragments beyond the cap use simplified **parabolic trajectories** (ballistic arc computed analytically, no collision between them, only ground collision check at landing).
+- **Aggressive sleep:** any Tier A body with `|velocity| < SLEEP_VELOCITY_THRESHOLD` for `SLEEP_TICKS_REQUIRED` consecutive ticks (e.g. 0.5 s worth) is converted to `'static'` immediately.
+
+**Tier B — Collapse fragments** (`simulationTier: 'collapse'`):
+- No cannon-es body created.
+- Fragment drops straight down each tick by gravity until it hits the terrain height or a `'static'` fragment already registered in that column. No inter-fragment lateral collision.
+- Landing is instantaneous: fragment snaps to resting position, registers in the surface grid, and enters `'static'` state.
+- This tier is essentially free in terms of CPU.
+
+**Landing damage (both tiers):**
+- On landing, if a human, vehicle, or building occupies the impact cell → apply kinetic energy damage: `impactEnergy = massKg * v_mag²`. Building survival uses the same formula as §5.3.3 with `impactEnergy` replacing `totalBlastEnergy`.
 
 #### 5.5.3 Fragment sleep & stack behaviour
 
-After the physics settle (all fragments static for N consecutive ticks):
-
-- Fragments enter `state: 'static'` and stop being simulated.
-- A **support graph** is maintained: fragment A supports fragment B if B is resting directly on A's top surface.
-- When fragment A is picked up by a Debris Hauler or broken by a Rock Fragmenter, its supported fragments each independently start a short gravity fall animation (no collision damage — the stack simply collapses to the floor without hurting anything).
+- A **support graph** is maintained: fragment A supports fragment B if B is resting directly on A's top face.
+- When A is collected (Debris Hauler) or broken (Rock Fragmenter), each fragment B that A was supporting independently starts a Tier B gravity-drop (no damage).
+- Sleeping fragments are invisible to cannon-es and cost nothing per tick.
 
 #### 5.5.4 Fragment size and collection rules
 
-```typescript
-/** Fragments too large to be directly hauled are 'oversized'. */
+```
 oversized = fragment.volumeM3 > OVERSIZED_FRAGMENT_THRESHOLD   // e.g. 0.5 m³
 
-if oversized:
-  fragment must be broken by Rock Fragmenter before a Debris Hauler can collect it
-else:
-  Debris Hauler with capacity >= fragment.massKg can collect directly
+oversized  → must be broken by Rock Fragmenter first
+!oversized → Debris Hauler with capacity ≥ fragment.massKg can collect directly
 ```
 
-Ore content of each collected fragment is reported to `GameState.collectedOre` on pickup, feeding the income calculation.
+Ore content of each collected fragment is added to `GameState.collectedOre`, feeding the income calculation.
 
 ---
 
@@ -854,20 +868,32 @@ export const MERGE_PROBABILITY = 0.35;
 /** Inward deflation of collision mesh vertices (m). */
 export const COLLISION_DEFLATE_AMOUNT = 0.05;
 
-/** Scale factor in v_mag = PROJECTION_SCALE * sqrt(excess). */
-export const PROJECTION_SCALE = 1.2;
+/**
+ * Exponential decay rate of surfaceProximityFactor = exp(-distToAir * k).
+ * Higher value → factor drops faster with depth → fewer projections.
+ */
+export const SURFACE_PROXIMITY_DECAY = 0.5;
 
-/** Hard cap on fragment projection velocity (m/tick). */
-export const MAX_PROJECTION_VELOCITY = 15;
+/** Hard cap on fragment projection velocity (m/s). Prevents satellites. */
+export const MAX_PROJECTION_VELOCITY = 80;
 
-/** Weight given to free-face direction vs energy gradient direction. */
-export const FREE_FACE_WEIGHT = 0.4;
+/**
+ * Fragments with v_mag above this threshold are simulated with full cannon-es.
+ * Below it, simplified collapse simulation is used.
+ */
+export const PROJECTION_VELOCITY_THRESHOLD = 2.0;
 
-/** Upward bias strength for fragments near the surface. */
-export const SURFACE_UPWARD_BIAS = 0.4;
+/** Maximum number of full cannon-es rigid bodies per blast. */
+export const PHYSICS_FRAGMENT_CAP = 200;
 
-/** Depth below which surface upward bias fades to zero (cells). */
-export const MAX_RELEVANT_DEPTH = 10;
+/** Fragment body is put to sleep when |v| < this threshold (m/s). */
+export const SLEEP_VELOCITY_THRESHOLD = 0.1;
+
+/** Number of consecutive ticks below SLEEP_VELOCITY_THRESHOLD before sleep. */
+export const SLEEP_TICKS_REQUIRED = 15;
+
+/** Maximum Voronoi seed points before culling low-score voxels. */
+export const MAX_VORONOI_POINTS = 2000;
 
 /** Volume threshold above which a fragment is too large to haul directly (m³). */
 export const OVERSIZED_FRAGMENT_THRESHOLD = 0.5;
@@ -879,26 +905,29 @@ export const OVERSIZED_FRAGMENT_THRESHOLD = 0.5;
 
 | # | Task | File(s) | Test |
 |---|------|---------|------|
-| 5.7.1 | Update `VoxelGrid` cell size documentation and assert 1 m = 1 unit | `src/core/voxels/VoxelGrid.ts` | Test: grid dimensions in meters |
-| 5.7.2 | Add `energyAbsorption` constant to each `RockDef` in `RockCatalog` | `src/core/config/RockCatalog.ts` | Test: all rock defs have positive absorption |
-| 5.7.3 | Implement `computeThreshold(voxel)` — weighted sum of rock coefficients × absorption | `src/core/mining/BlastCalc.ts` | Test: pure rock = rock absorption; 50/50 = average |
+| **5.7.0** | **Prerequisite — multi-rock VoxelGrid:** Change `VoxelCell.rockId: string` to `VoxelCell.composition: VoxelRockComposition`; update `TerrainGen` to populate coefficients via Simplex noise + level bias; update all callers | `src/core/voxels/VoxelGrid.ts`, `src/core/terrain/TerrainGen.ts` | Test: coefficients sum to 1.0 per voxel; pure-rock voxel = single entry coeff 1.0 |
+| 5.7.1 | Assert voxel cell size = 1 m and document it | `src/core/voxels/VoxelGrid.ts` | Test: grid dimensions in meters |
+| 5.7.2 | Add `energyAbsorption` and `density` constants to each `RockDef` in `RockCatalog` | `src/core/config/RockCatalog.ts` | Test: all rock defs have positive absorption and density |
+| 5.7.3 | Implement `computeThreshold(voxel)` — weighted sum of rock coefficients × absorption | `src/core/mining/BlastCalc.ts` | Test: pure rock = rock absorption; 50/50 mix = average |
 | 5.7.4 | Implement `computeInitialEnergy(hole)` — explosiveDef × kg × stemming efficiency | `src/core/mining/BlastCalc.ts` | Test: more charge = more energy; full stemming = 100% efficiency |
-| 5.7.5 | Implement `propagateEnergy(grid, initial)` — iterative overflow loop | `src/core/mining/BlastCalc.ts` | Test: energy stays local for strong rock; spreads for weak rock; guard terminates |
+| 5.7.5 | Implement `propagateEnergy(grid, initial)` — iterative overflow loop tracking `generatedOverflow[v]` | `src/core/mining/BlastCalc.ts` | Test: energy stays local for strong rock; spreads for weak rock; guard terminates; generatedOverflow = 0 for unsaturated voxels |
 | 5.7.6 | Implement `identifyFragmentedVoxels(grid)` — fragmentation criterion + island flood-fill | `src/core/mining/BlastCalc.ts` | Test: isolated island flagged; exact threshold boundary |
-| 5.7.7 | Implement entity damage from blast — employee/vehicle instant kill, building sum+survival roll | `src/core/mining/BlastCalc.ts` | Test: building at 1.5× resistance → death probability ≈ 55% |
-| 5.7.8 | Implement `computeFragmentationScore(voxel)` and Voronoi seed sampling | `src/physics/VoronoiFrag.ts` (new) | Test: fragment count scales with E/T ratio |
-| 5.7.9 | Implement 3D Voronoi decomposition clipped to fragmented voxel union | `src/physics/VoronoiFrag.ts` | Test: all volume covered; no overlaps |
-| 5.7.10 | Implement Voronoi merging pass | `src/physics/VoronoiFrag.ts` | Test: merge probability respected within ±10% over 1000 runs (seeded) |
-| 5.7.11 | Generate `RockFragment` physics objects with deflated collision meshes | `src/physics/FragmentSim.ts` (new) | Test: collision mesh volume < graphic mesh volume |
-| 5.7.12 | Implement energy-gradient velocity assignment (§5.5.1) | `src/physics/FragmentSim.ts` | Test: deep fragment v ≈ 0; surface over-charged fragment v near MAX |
-| 5.7.13 | Implement cannon-es physics loop — gravity, collision, stick-on-land | `src/physics/FragmentSim.ts` | Test: fragment sticks after landing; no bounce |
-| 5.7.14 | Implement fragment sleep and support graph | `src/physics/FragmentSim.ts` | Test: removing bottom fragment triggers stack gravity drop |
-| 5.7.15 | Implement fragment size check and oversized flag | `src/core/mining/BlastCalc.ts` | Test: volume above threshold flagged |
-| 5.7.16 | Wire ore reporting: collect fragment → add to `GameState.collectedOre` | `src/core/GameState.ts` | Test: ore yield matches source voxel composition |
-| 5.7.17 | Trigger NavMesh dirty-region update after fragmentation pass | `src/core/voxels/NavGrid.ts` | Test: fragmented voxels removed from walkable set |
-| 5.7.18 | Add all balance constants to `balance.ts` | `src/core/config/balance.ts` | — |
-| 5.7.19 | Add i18n keys for blast damage events, oversized fragment alert (en + fr) | `src/core/i18n/locales/en.json`, `fr.json` | Test: all keys resolve |
-| 5.7.20 | Add `blast_preview` console command — prints energy map and predicted fragment count | `src/console/commands/mining.ts` | Integration test |
+| 5.7.7 | Implement entity damage from blast — employee/vehicle instant kill, building sum + survival roll | `src/core/mining/BlastCalc.ts` | Test: building at 1.5× resistance → death probability ≈ 55% |
+| 5.7.8 | Implement `computeFragmentationScore(voxel)` and Voronoi seed sampling | `src/physics/VoronoiFrag.ts` (new) | Test: fragment count scales with E/T ratio; min 1 per voxel |
+| 5.7.9 | Implement Bowyer–Watson incremental Delaunay tetrahedralization; compute dual Voronoi cells; clip to fragmented voxel union; respect `MAX_VORONOI_POINTS` cap | `src/physics/VoronoiFrag.ts` | Test: all volume covered; no overlaps; circumsphere property holds |
+| 5.7.10 | Implement Voronoi merging pass (`MERGE_PROBABILITY ≈ 0.35`) | `src/physics/VoronoiFrag.ts` | Test: merge probability respected within ±10% over 1000 runs (seeded) |
+| 5.7.11 | Generate `RockFragment` objects: graphic mesh, deflated collision mesh, `overflowEnergy` from source voxels | `src/physics/FragmentSim.ts` (new) | Test: collision mesh volume < graphic mesh volume; overflowEnergy ≥ 0 |
+| 5.7.12 | Implement Step 4 velocity assignment: energy gradient × surface proximity factor; classify `simulationTier` | `src/physics/FragmentSim.ts` | Test: deep fragment v ≈ 0; surface over-charged fragment v near MAX; poor-stemming blast → upward gradient |
+| 5.7.13 | Implement Tier A (projected) cannon-es loop — full rigid body, `PHYSICS_FRAGMENT_CAP`, parabolic fallback, stick-on-land | `src/physics/FragmentSim.ts` | Test: fragment sticks after landing; cap enforced; parabolic fallback lands at correct position |
+| 5.7.14 | Implement Tier B (collapse) gravity-drop — straight-down, column stack, immediate static | `src/physics/FragmentSim.ts` | Test: collapse fragment rests on terrain; no lateral movement |
+| 5.7.15 | Implement aggressive sleep: stationary for `SLEEP_TICKS_REQUIRED` ticks → `'static'` | `src/physics/FragmentSim.ts` | Test: body sleeps within expected tick window |
+| 5.7.16 | Implement fragment support graph and stack-collapse on pickup | `src/physics/FragmentSim.ts` | Test: removing bottom fragment triggers Tier B drop for supported fragments |
+| 5.7.17 | Implement fragment size check and oversized flag | `src/core/mining/BlastCalc.ts` | Test: volume above threshold flagged correctly |
+| 5.7.18 | Wire ore reporting: collect fragment → add to `GameState.collectedOre` | `src/core/GameState.ts` | Test: ore yield matches source voxel composition |
+| 5.7.19 | Trigger NavMesh dirty-region update after fragmentation pass | `src/core/voxels/NavGrid.ts` | Test: fragmented voxels removed from walkable set |
+| 5.7.20 | Add all balance constants to `balance.ts` | `src/core/config/balance.ts` | — |
+| 5.7.21 | Add i18n keys for blast damage events, oversized fragment alert (en + fr) | `src/core/i18n/locales/en.json`, `fr.json` | Test: all keys resolve |
+| 5.7.22 | Add `blast_preview` console command — prints energy map, predicted fragment count, and projected/collapse split | `src/console/commands/mining.ts` | Integration test |
 
 ---
 
