@@ -5,12 +5,12 @@ This document specifies the next wave of gameplay systems to implement. Each cha
 **Chapters:**
 
 1. [Buildings System](#1-buildings-system)
-2. [Vehicle Fleet (Types, Routing & Drivers)](#2-vehicle-fleet) [to be confirmed]
-3. [Employee Skills & Task Queue](#3-employee-skills--task-queue) [to be confirmed]
-4. [Rock Composition & Survey System](#4-rock-composition--survey-system) [to be confirmed]
+2. [Vehicle Fleet (Types, Routing & Drivers)](#2-vehicle-fleet)
+3. [Employee Skills & Task Queue](#3-employee-skills--task-queue)
+4. [Rock Composition & Survey System](#4-rock-composition--survey-system)
 5. [Blast Algorithm — Full Pipeline](#5-blast-algorithm--full-pipeline)
-6. [NavMesh & Pathfinding](#6-navmesh--pathfinding) [to be confirmed]
-7. [Employee Needs (Eating, Sleeping, Breaks)](#7-employee-needs) [to be confirmed]
+6. [NavMesh & Pathfinding](#6-navmesh--pathfinding)
+7. [Employee Needs (Eating, Sleeping, Breaks)](#7-employee-needs)
 8. [Testing Strategy](#8-testing-strategy)
 
 ---
@@ -455,11 +455,11 @@ The existing `VoxelGrid` already stores `oreDensities` per voxel, and `RockCatal
 
 Three survey tools, each with a different cost/accuracy/coverage tradeoff:
 
-| Method | Tool | i18n Key | Cost ($) | Time (ticks) | Accuracy | Coverage | [to be confirmed]
+| Method | Tool | i18n Key | Cost ($) | Time (ticks) | Accuracy | Coverage |
 |--------|------|---------|---------|-------------|---------|---------|
-| Seismic Survey | Detonates a small charge and records reflections | `survey.seismic` | 3,000 | 8 | ±15% ore density | 20-cell radius, full depth | [to be confirmed]
-| Core Sample | Drills a narrow extraction core | `survey.core_sample` | 800 | 4 | ±5% ore density | Single column, full depth | [to be confirmed]
-| Aerial Spectroscopy | Drone scans surface mineral signature | `survey.aerial` | 1,500 | 3 | ±25% ore density | 30-cell radius, surface only (depth 0–2) | [to be confirmed]
+| Seismic Survey | Detonates a small charge and records reflections | `survey.seismic` | 3,000 | 8 | ±15% ore density | 20-cell radius, full depth |
+| Core Sample | Drills a narrow extraction core | `survey.core_sample` | 800 | 4 | ±5% ore density | Single column, full depth |
+| Aerial Spectroscopy | Drone scans surface mineral signature | `survey.aerial` | 1,500 | 3 | ±25% ore density | 30-cell radius, surface only (depth 0–2) |
 
 Accuracy improves with surveyor skill level:
 ```
@@ -497,49 +497,49 @@ Survey results are stale after 100 ticks (rock may be disturbed by blasts). The 
 
 The survey estimation algorithm runs in `src/core/mining/SurveyCalc.ts`:
 
-1. **Sample true voxel composition** from `VoxelGrid.getVoxel(x, y, z).oreDensities` [to be confirmed]
-2. **Add Gaussian noise** scaled by the method's base error and surveyor skill: [to be confirmed]
+1. **Sample true voxel composition** from `VoxelGrid.getVoxel(x, y, z).oreDensities`
+2. **Add Gaussian noise** scaled by the method's base error and surveyor skill:
    ```
    estimatedDensity = trueDensity + rng.gaussian(0, baseError * (1 - skillBonus))
    estimatedDensity = clamp(estimatedDensity, 0, 1)
    ```
-3. **Round to nearest 0.05** (discrete bands: 0, 5%, 10%... 100%) — players see bands not raw floats [to be confirmed]
-4. For **aerial** surveys: only samples Y = surfaceY and surfaceY−1 (shallow horizon only) [to be confirmed]
-5. For **seismic**: averages estimates over a 3-voxel vertical smear (coarser vertical resolution) [to be confirmed]
+3. **Round to nearest 0.05** (discrete bands: 0, 5%, 10%... 100%) — players see bands not raw floats
+4. For **aerial** surveys: only samples Y = surfaceY and surfaceY−1 (shallow horizon only)
+5. For **seismic**: averages estimates over a 3-voxel vertical smear (coarser vertical resolution)
 
 ### 4.5 Ore Grade Reporting Post-Blast
 
 After a blast, the game computes the **actual ore yield** from destroyed voxels and reports it as a `BlastOreReport`. This report is compared to the pre-blast survey estimate, and the delta drives feedback events:
 
-| Condition | Event | Effect | [to be confirmed]
+| Condition | Event | Effect |
 |-----------|-------|--------|
-| Actual yield > 120% of estimate | "Lucky Strike" | +$2,000 bonus, ecology −1 | [to be confirmed]
-| Actual yield < 60% of estimate | "Barren Blast" | No bonus, surveyor morale −10 | [to be confirmed]
-| Treranium ore found (any amount) | "Legendary Vein" | Contract premium ×3 for 20 ticks | [to be confirmed]
-| Absurdium > 30% of yield | "Absurdium Jackpot" | Mafia event trigger probability +40% | [to be confirmed]
+| Actual yield > 120% of estimate | "Lucky Strike" | +$2,000 bonus, ecology −1 |
+| Actual yield < 60% of estimate | "Barren Blast" | No bonus, surveyor morale −10 |
+| Treranium ore found (any amount) | "Legendary Vein" | Contract premium ×3 for 20 ticks |
+| Absurdium > 30% of yield | "Absurdium Jackpot" | Mafia event trigger probability +40% |
 
 ### 4.6 Survey Visibility Rules
 
-- Un-surveyed voxels appear as the dominant rock type color with no ore overlay [to be confirmed]
-- Surveyed voxels show a color-coded ore density overlay (opacity = confidence) [to be confirmed]
-- Surveys are shared across the team — all players see the same result (no fog per player in this single-player game) [to be confirmed]
-- Seismic surveys disturb nearby buildings: if a building is within 5 cells, it loses 10 HP per survey detonation [to be confirmed]
+- Un-surveyed voxels appear as the dominant rock type color with no ore overlay
+- Surveyed voxels show a color-coded ore density overlay (opacity = confidence)
+- Surveys are shared across the team — all players see the same result (no fog per player in this single-player game)
+- Seismic surveys disturb nearby buildings: if a building is within 5 cells, it loses 10 HP per survey detonation
 
 ### 4.7 Atomic Task Breakdown
 
-| # | Task | File(s) | Test | [to be confirmed]
+| # | Task | File(s) | Test |
 |---|------|---------|------|
-| 4.7.1 | Add `SurveyMethod`, `SurveyResult` interfaces | `src/core/mining/SurveyCalc.ts` (new file) | `tests/unit/mining/SurveyCalc.test.ts` | [to be confirmed]
-| 4.7.2 | Implement `estimateSurveyResult()` — noise + skill scaling | `src/core/mining/SurveyCalc.ts` | Test: estimate within expected error bounds (seeded RNG) | [to be confirmed]
-| 4.7.3 | Implement `isSurveyStale()` — returns true after 100 ticks | `src/core/mining/SurveyCalc.ts` | Test: stale at tick 101, fresh at 99 | [to be confirmed]
-| 4.7.4 | Add `surveyResults: SurveyResult[]` and `nextSurveyId` to `GameState` | `src/core/GameState.ts` | Test: initial state has empty array | [to be confirmed]
-| 4.7.5 | Add survey cost constants to `balance.ts` | `src/core/config/balance.ts` | — | [to be confirmed]
-| 4.7.6 | Implement `runSurvey()` — validates surveyor, deducts cost, enqueues task | `src/core/mining/SurveyCalc.ts` | Test: insufficient funds returns error | [to be confirmed]
-| 4.7.7 | Implement `computeBlastOreReport()` — yields from destroyed voxels | `src/core/mining/SurveyCalc.ts` | Test: ore mass = Σ(density × voxelVolume × rockDensity) | [to be confirmed]
-| 4.7.8 | Wire ore report events to event system | `src/core/events/EventEngine.ts` | Test: lucky strike fires at >120% | [to be confirmed]
-| 4.7.9 | Add i18n keys for survey methods and events (en + fr) | `src/core/i18n/locales/en.json`, `fr.json` | Test: all keys resolve | [to be confirmed]
-| 4.7.10 | Add `survey` console command (`survey seismic x:10 z:10`) | `src/console/commands/mining.ts` | Integration test | [to be confirmed]
-| 4.7.11 | Render survey confidence overlay in `TerrainMesh.ts` | `src/renderer/TerrainMesh.ts` | Visual test | [to be confirmed]
+| 4.7.1 | Add `SurveyMethod`, `SurveyResult` interfaces | `src/core/mining/SurveyCalc.ts` (new file) | `tests/unit/mining/SurveyCalc.test.ts` |
+| 4.7.2 | Implement `estimateSurveyResult()` — noise + skill scaling | `src/core/mining/SurveyCalc.ts` | Test: estimate within expected error bounds (seeded RNG) |
+| 4.7.3 | Implement `isSurveyStale()` — returns true after 100 ticks | `src/core/mining/SurveyCalc.ts` | Test: stale at tick 101, fresh at 99 |
+| 4.7.4 | Add `surveyResults: SurveyResult[]` and `nextSurveyId` to `GameState` | `src/core/GameState.ts` | Test: initial state has empty array |
+| 4.7.5 | Add survey cost constants to `balance.ts` | `src/core/config/balance.ts` | — |
+| 4.7.6 | Implement `runSurvey()` — validates surveyor, deducts cost, enqueues task | `src/core/mining/SurveyCalc.ts` | Test: insufficient funds returns error |
+| 4.7.7 | Implement `computeBlastOreReport()` — yields from destroyed voxels | `src/core/mining/SurveyCalc.ts` | Test: ore mass = Σ(density × voxelVolume × rockDensity) |
+| 4.7.8 | Wire ore report events to event system | `src/core/events/EventEngine.ts` | Test: lucky strike fires at >120% |
+| 4.7.9 | Add i18n keys for survey methods and events (en + fr) | `src/core/i18n/locales/en.json`, `fr.json` | Test: all keys resolve |
+| 4.7.10 | Add `survey` console command (`survey seismic x:10 z:10`) | `src/console/commands/mining.ts` | Integration test |
+| 4.7.11 | Render survey confidence overlay in `TerrainMesh.ts` | `src/renderer/TerrainMesh.ts` | Visual test |
 
 ---
 
@@ -963,19 +963,19 @@ export interface NavCell {
 ```
 
 **Derivation rules (run once on world gen; patched after blasts):**
-1. A cell is `void` if the voxel directly below the surface at that column is air [to be confirmed]
-2. A cell is `drill_hole` if a `DrillHole` exists at that (x, z) coordinate [to be confirmed]
-3. A cell is `blocked` if a building footprint covers it, or a parked/stationary vehicle occupies it [to be confirmed]
-4. A cell is `ramp` if the surface height delta between it and at least one neighbor exceeds 1 voxel unit (placed by the player or auto-detected after terrain subtraction) [to be confirmed]
-5. All remaining solid-surface cells are `walkable` [to be confirmed]
+1. A cell is `void` if the voxel directly below the surface at that column is air
+2. A cell is `drill_hole` if a `DrillHole` exists at that (x, z) coordinate
+3. A cell is `blocked` if a building footprint covers it, or a parked/stationary vehicle occupies it
+4. A cell is `ramp` if the surface height delta between it and at least one neighbor exceeds 1 voxel unit (placed by the player or auto-detected after terrain subtraction)
+5. All remaining solid-surface cells are `walkable`
 
 Move costs:
-| Cell Type | Cost | [to be confirmed]
+| Cell Type | Cost |
 |-----------|------|
-| `walkable` | 1.0 | [to be confirmed]
-| `ramp` | 1.8 | [to be confirmed]
-| `drill_hole` | 5.0 (passable but discouraged) | [to be confirmed]
-| `blocked` / `void` | ∞ (impassable) | [to be confirmed]
+| `walkable` | 1.0 |
+| `ramp` | 1.8 |
+| `drill_hole` | 5.0 (passable but discouraged) |
+| `blocked` / `void` | ∞ (impassable) |
 
 ### 6.3 A\* Pathfinding
 
@@ -1015,9 +1015,9 @@ h(a, b) = max(|dx|, |dz|) + (√2 − 1) * min(|dx|, |dz|)
 The pit descends in bench levels. Employees and vehicles access lower benches via **ramp structures** (placed by the player as buildings, Chapter 1). Ramps appear in the NavGrid as `ramp` cells bridging two bench levels.
 
 Multi-level path planning:
-1. Check if start and destination are on the same bench level → run standard A\* [to be confirmed]
-2. If on different levels → find the nearest ramp connecting the required levels → route: `start → ramp entrance → ramp exit → destination` (3 sequential A\* queries) [to be confirmed]
-3. If no ramp exists connecting the required levels → return `found: false`, emit `no_ramp_available` event [to be confirmed]
+1. Check if start and destination are on the same bench level → run standard A\*
+2. If on different levels → find the nearest ramp connecting the required levels → route: `start → ramp entrance → ramp exit → destination` (3 sequential A\* queries)
+3. If no ramp exists connecting the required levels → return `found: false`, emit `no_ramp_available` event
 
 **Ramp definition** (added to Building types from Chapter 1):
 ```typescript
@@ -1030,13 +1030,13 @@ Multi-level path planning:
 The NavGrid must be **incrementally updated** when the world changes — a full rebuild of a 100×100 grid every tick would be too expensive.
 
 Triggered updates:
-| Trigger | Region Updated | [to be confirmed]
+| Trigger | Region Updated |
 |---------|---------------|
-| Blast completes | All cells in the blast's AABB + 2-cell margin | [to be confirmed]
-| Building placed or demolished | Building footprint cells | [to be confirmed]
-| Vehicle parks or departs | Single cell | [to be confirmed]
-| Drill hole added | Single cell | [to be confirmed]
-| Ramp built | 1×4 footprint + adjacent cells | [to be confirmed]
+| Blast completes | All cells in the blast's AABB + 2-cell margin |
+| Building placed or demolished | Building footprint cells |
+| Vehicle parks or departs | Single cell |
+| Drill hole added | Single cell |
+| Ramp built | 1×4 footprint + adjacent cells |
 
 Each update patches only the affected `NavCell` entries and does **not** invalidate cached paths that do not cross the updated region. Paths that do cross the region are marked stale and re-requested next tick.
 
@@ -1046,20 +1046,20 @@ Agents follow waypoints by moving at most `walkSpeed` cells per tick toward the 
 
 ### 6.7 Atomic Task Breakdown
 
-| # | Task | File(s) | Test | [to be confirmed]
+| # | Task | File(s) | Test |
 |---|------|---------|------|
-| 6.7.1 | Define `NavCell`, `NavCellType`, `NavGrid` interfaces | `src/core/nav/NavGrid.ts` (new file) | `tests/unit/nav/NavGrid.test.ts` | [to be confirmed]
-| 6.7.2 | Implement `buildNavGrid()` — derives NavGrid from VoxelGrid + buildings + holes | `src/core/nav/NavGrid.ts` | Test: blocked cells match building footprints | [to be confirmed]
-| 6.7.3 | Implement `patchNavGrid()` — incremental update for a bounding box | `src/core/nav/NavGrid.ts` | Test: patch only affects specified region | [to be confirmed]
-| 6.7.4 | Implement A\* `findPath()` with 8-directional movement and octile heuristic | `src/core/nav/Pathfinding.ts` (new file) | Test: correct path length on simple grid; impassable tiles are avoided | [to be confirmed]
-| 6.7.5 | Implement node budget cap and direct-line fallback | `src/core/nav/Pathfinding.ts` | Test: falls back when grid is very large and budget is hit | [to be confirmed]
-| 6.7.6 | Implement multi-level routing via ramp lookup | `src/core/nav/Pathfinding.ts` | Test: 3-segment path when ramp present; `found: false` when no ramp | [to be confirmed]
-| 6.7.7 | Implement `advanceAgent()` — move agent 1 step along waypoints per tick | `src/core/nav/AgentMovement.ts` (new file) | Test: agent reaches destination in expected ticks | [to be confirmed]
-| 6.7.8 | Implement stale-path detection and re-request on obstacle change | `src/core/nav/AgentMovement.ts` | Test: path re-requested when cell blocked mid-route | [to be confirmed]
-| 6.7.9 | Implement `stuck` state and `agent_stuck` event | `src/core/nav/AgentMovement.ts` | Test: stuck state after 3 failed re-requests | [to be confirmed]
-| 6.7.10 | Integrate NavGrid build into `GameState` initialization | `src/core/state/GameState.ts` | Smoke test: GameState serializes NavGrid | [to be confirmed]
-| 6.7.11 | Wire NavGrid patch calls into blast pipeline and building placement | `src/core/engine/GameLoop.ts` | Test: NavGrid reflects new hole after drill | [to be confirmed]
-| 6.7.12 | Add i18n keys for pathfinding events (`agent_stuck`, `no_ramp_available`) | `src/core/i18n/locales/en.json`, `fr.json` | Test: all keys resolve | [to be confirmed]
+| 6.7.1 | Define `NavCell`, `NavCellType`, `NavGrid` interfaces | `src/core/nav/NavGrid.ts` (new file) | `tests/unit/nav/NavGrid.test.ts` |
+| 6.7.2 | Implement `buildNavGrid()` — derives NavGrid from VoxelGrid + buildings + holes | `src/core/nav/NavGrid.ts` | Test: blocked cells match building footprints |
+| 6.7.3 | Implement `patchNavGrid()` — incremental update for a bounding box | `src/core/nav/NavGrid.ts` | Test: patch only affects specified region |
+| 6.7.4 | Implement A\* `findPath()` with 8-directional movement and octile heuristic | `src/core/nav/Pathfinding.ts` (new file) | Test: correct path length on simple grid; impassable tiles are avoided |
+| 6.7.5 | Implement node budget cap and direct-line fallback | `src/core/nav/Pathfinding.ts` | Test: falls back when grid is very large and budget is hit |
+| 6.7.6 | Implement multi-level routing via ramp lookup | `src/core/nav/Pathfinding.ts` | Test: 3-segment path when ramp present; `found: false` when no ramp |
+| 6.7.7 | Implement `advanceAgent()` — move agent 1 step along waypoints per tick | `src/core/nav/AgentMovement.ts` (new file) | Test: agent reaches destination in expected ticks |
+| 6.7.8 | Implement stale-path detection and re-request on obstacle change | `src/core/nav/AgentMovement.ts` | Test: path re-requested when cell blocked mid-route |
+| 6.7.9 | Implement `stuck` state and `agent_stuck` event | `src/core/nav/AgentMovement.ts` | Test: stuck state after 3 failed re-requests |
+| 6.7.10 | Integrate NavGrid build into `GameState` initialization | `src/core/state/GameState.ts` | Smoke test: GameState serializes NavGrid |
+| 6.7.11 | Wire NavGrid patch calls into blast pipeline and building placement | `src/core/engine/GameLoop.ts` | Test: NavGrid reflects new hole after drill |
+| 6.7.12 | Add i18n keys for pathfinding events (`agent_stuck`, `no_ramp_available`) | `src/core/i18n/locales/en.json`, `fr.json` | Test: all keys resolve |
 
 ---
 
@@ -1075,17 +1075,17 @@ This chapter connects directly to the Buildings system (Chapter 1 — canteen, b
 
 Each employee has three need gauges (0–100; 100 = fully satisfied):
 
-| Gauge | Name | Fills at | Drains at | Collapse Threshold | [to be confirmed]
+| Gauge | Name | Fills at | Drains at | Collapse Threshold |
 |-------|------|----------|------------|-------------------|
-| `hunger` | Hunger | Eating at Canteen | −1/tick while working | ≤ 10 | [to be confirmed]
-| `fatigue` | Fatigue | Sleeping at Bunkhouse | −0.5/tick (awake) / −2/tick (active task) | ≤ 5 | [to be confirmed]
-| `breakNeed` | Break Pressure | Taking break at Break Room | −0.8/tick while working | ≤ 15 | [to be confirmed]
+| `hunger` | Hunger | Eating at Canteen | −1/tick while working | ≤ 10 |
+| `fatigue` | Fatigue | Sleeping at Bunkhouse | −0.5/tick (awake) / −2/tick (active task) | ≤ 5 |
+| `breakNeed` | Break Pressure | Taking break at Break Room | −0.8/tick while working | ≤ 15 |
 
 **Rate modifiers:**
-- Active task (non-`rest`) drains gauges at the "active task" rate [to be confirmed]
-- Idle state drains at the normal "awake" rate [to be confirmed]
-- High morale (>70): drain rate ×0.85 (happy workers last longer) [to be confirmed]
-- Low morale (<30): drain rate ×1.20 (miserable workers tire faster) [to be confirmed]
+- Active task (non-`rest`) drains gauges at the "active task" rate
+- Idle state drains at the normal "awake" rate
+- High morale (>70): drain rate ×0.85 (happy workers last longer)
+- Low morale (<30): drain rate ×1.20 (miserable workers tire faster)
 
 ### 7.3 Morale Effects of Needs
 
@@ -1107,16 +1107,16 @@ Conversely, all needs above 80 simultaneously grants a **"well-rested" bonus**: 
 
 When any gauge hits its collapse threshold:
 
-1. The employee's current task is immediately interrupted (pushed back to front of queue) [to be confirmed]
-2. A `rest` task is prepended with `taskType = 'rest'`, targeting the nearest available building of the correct type [to be confirmed]
-3. The employee is flagged `collapsing: true` — effectiveness drops to 0 until the `rest` task completes [to be confirmed]
-4. On completion of the `rest` task, `collapsing` is cleared and the interrupted task resumes [to be confirmed]
+1. The employee's current task is immediately interrupted (pushed back to front of queue)
+2. A `rest` task is prepended with `taskType = 'rest'`, targeting the nearest available building of the correct type
+3. The employee is flagged `collapsing: true` — effectiveness drops to 0 until the `rest` task completes
+4. On completion of the `rest` task, `collapsing` is cleared and the interrupted task resumes
 
-| Collapse Gauge | Rest Building | Rest Duration (ticks) | [to be confirmed]
+| Collapse Gauge | Rest Building | Rest Duration (ticks) |
 |---------------|--------------|----------------------|
-| `hunger` | Canteen | 2 | [to be confirmed]
-| `fatigue` | Bunkhouse | 8 | [to be confirmed]
-| `breakNeed` | Break Room | 3 | [to be confirmed]
+| `hunger` | Canteen | 2 |
+| `fatigue` | Bunkhouse | 8 |
+| `breakNeed` | Break Room | 3 |
 
 If no suitable building exists within 20 cells, the employee collapses in place: `collapsing: true`, the `rest` task uses the employee's current position, and duration is doubled (miserable ground-rest).
 
@@ -1124,11 +1124,11 @@ If no suitable building exists within 20 cells, the employee collapses in place:
 
 Each building tier refills gauges at different speeds:
 
-| Building | Tier 1 | Tier 2 | Tier 3 | [to be confirmed]
+| Building | Tier 1 | Tier 2 | Tier 3 |
 |---------|--------|--------|--------|
-| Canteen | +12 hunger/tick | +18 hunger/tick | +25 hunger/tick | [to be confirmed]
-| Bunkhouse | +8 fatigue/tick | +14 fatigue/tick | +20 fatigue/tick | [to be confirmed]
-| Break Room | +10 breakNeed/tick | +16 breakNeed/tick | +22 breakNeed/tick | [to be confirmed]
+| Canteen | +12 hunger/tick | +18 hunger/tick | +25 hunger/tick |
+| Bunkhouse | +8 fatigue/tick | +14 fatigue/tick | +20 fatigue/tick |
+| Break Room | +10 breakNeed/tick | +16 breakNeed/tick | +22 breakNeed/tick |
 
 Buildings have finite capacity (from Chapter 1). If a building is full, the employee must wait (`await_vehicle`-style queue at building entrance) or route to the next nearest. Waiting in queue slowly drains gauges at the normal awake rate.
 
@@ -1136,11 +1136,11 @@ Buildings have finite capacity (from Chapter 1). If a building is full, the empl
 
 Employees don't wait until collapse — the game automatically **inserts need-satisfaction tasks** into the queue when a gauge falls below the warning threshold:
 
-| Gauge | Warning Threshold | Auto-Insert Behaviour | [to be confirmed]
+| Gauge | Warning Threshold | Auto-Insert Behaviour |
 |-------|------------------|----------------------|
-| `hunger` | 35 | Insert `rest(canteen)` after current task if not already queued | [to be confirmed]
-| `fatigue` | 25 | Insert `rest(bunkhouse)` after current task if not already queued | [to be confirmed]
-| `breakNeed` | 30 | Insert `rest(break_room)` after current task if not already queued | [to be confirmed]
+| `hunger` | 35 | Insert `rest(canteen)` after current task if not already queued |
+| `fatigue` | 25 | Insert `rest(bunkhouse)` after current task if not already queued |
+| `breakNeed` | 30 | Insert `rest(break_room)` after current task if not already queued |
 
 If the queue is full (capacity exceeded), auto-insert is skipped but a `need_warning` event is emitted so the player can manually intervene. The Manager "Morale Booster" specialization (Chapter 3) slows drain rates by ×0.9 for all nearby employees.
 
@@ -1148,11 +1148,11 @@ If the queue is full (capacity exceeded), auto-insert is skipped but a `need_war
 
 Each visit to a building consumes resources:
 
-| Building | Cost per Visit | [to be confirmed]
+| Building | Cost per Visit |
 |---------|---------------|
-| Canteen | $10 per employee (food cost) | [to be confirmed]
-| Bunkhouse | $0 (included in salary — staying costs nothing) | [to be confirmed]
-| Break Room | $5 per employee (coffee, snacks) | [to be confirmed]
+| Canteen | $10 per employee (food cost) |
+| Bunkhouse | $0 (included in salary — staying costs nothing) |
+| Break Room | $5 per employee (coffee, snacks) |
 
 Canteen food costs scale with tier: Tier 1 × $10, Tier 2 × $8 (bulk purchasing), Tier 3 × $6 (optimized supply chain).
 
@@ -1162,20 +1162,20 @@ If the player builds a **Bunkhouse Tier 2+**, an 8-tick shift cycle activates: e
 
 ### 7.9 Atomic Task Breakdown
 
-| # | Task | File(s) | Test | [to be confirmed]
+| # | Task | File(s) | Test |
 |---|------|---------|------|
-| 7.9.1 | Add `hunger`, `fatigue`, `breakNeed`, `collapsing` fields to `Employee` interface | `src/core/entities/Employee.ts` | Test: new fields initialized on hire | [to be confirmed]
-| 7.9.2 | Add `NEED_DRAIN_RATES`, `NEED_WARNING_THRESHOLDS`, `NEED_COLLAPSE_THRESHOLDS` to `balance.ts` | `src/core/config/balance.ts` | — | [to be confirmed]
-| 7.9.3 | Implement `tickNeedGauges()` — drain gauges based on task state + morale modifier | `src/core/entities/Employee.ts` | Test: drain rates match table; active task drains faster | [to be confirmed]
-| 7.9.4 | Implement `needsMoraleEffect()` — compute tick-level morale delta from all gauges | `src/core/entities/Employee.ts` | Test: zero effect above 50; −3/tick at critical | [to be confirmed]
-| 7.9.5 | Implement `replenishNeed()` — fill gauge at building tier rate, enforce capacity | `src/core/entities/Employee.ts` | Test: gauge fills at correct rate per tier | [to be confirmed]
-| 7.9.6 | Implement `checkCollapse()` — interrupt task queue, prepend `rest` task | `src/core/entities/Employee.ts` | Test: interrupted task re-queued; `collapsing` flag set | [to be confirmed]
-| 7.9.7 | Implement `autoInsertNeedTasks()` — proactive queue insertion at warning thresholds | `src/core/entities/Employee.ts` | Test: `rest` inserted after current task; skipped if queue full | [to be confirmed]
-| 7.9.8 | Deduct per-visit food/break costs from cash balance | `src/core/engine/GameLoop.ts` | Test: canteen visit deducts $10; tier 3 deducts $6 | [to be confirmed]
-| 7.9.9 | Implement shift cycle for Bunkhouse Tier 2+ | `src/core/engine/GameLoop.ts` | Test: shift cycle fires at tick 6; sleep rest queued | [to be confirmed]
-| 7.9.10 | Wire all need events into event system (`need_warning`, `employee_collapsed`, `employee_shift_change`) | `src/core/events/EventSystem.ts` | Test: events fire at correct gauge levels | [to be confirmed]
-| 7.9.11 | Add i18n keys for all need events and building-full message (en + fr) | `src/core/i18n/locales/en.json`, `fr.json` | Test: all keys resolve | [to be confirmed]
-| 7.9.12 | Add `needs` console command — print all employees' gauge values | `src/console/commands/entities.ts` | Integration test | [to be confirmed]
+| 7.9.1 | Add `hunger`, `fatigue`, `breakNeed`, `collapsing` fields to `Employee` interface | `src/core/entities/Employee.ts` | Test: new fields initialized on hire |
+| 7.9.2 | Add `NEED_DRAIN_RATES`, `NEED_WARNING_THRESHOLDS`, `NEED_COLLAPSE_THRESHOLDS` to `balance.ts` | `src/core/config/balance.ts` | — |
+| 7.9.3 | Implement `tickNeedGauges()` — drain gauges based on task state + morale modifier | `src/core/entities/Employee.ts` | Test: drain rates match table; active task drains faster |
+| 7.9.4 | Implement `needsMoraleEffect()` — compute tick-level morale delta from all gauges | `src/core/entities/Employee.ts` | Test: zero effect above 50; −3/tick at critical |
+| 7.9.5 | Implement `replenishNeed()` — fill gauge at building tier rate, enforce capacity | `src/core/entities/Employee.ts` | Test: gauge fills at correct rate per tier |
+| 7.9.6 | Implement `checkCollapse()` — interrupt task queue, prepend `rest` task | `src/core/entities/Employee.ts` | Test: interrupted task re-queued; `collapsing` flag set |
+| 7.9.7 | Implement `autoInsertNeedTasks()` — proactive queue insertion at warning thresholds | `src/core/entities/Employee.ts` | Test: `rest` inserted after current task; skipped if queue full |
+| 7.9.8 | Deduct per-visit food/break costs from cash balance | `src/core/engine/GameLoop.ts` | Test: canteen visit deducts $10; tier 3 deducts $6 |
+| 7.9.9 | Implement shift cycle for Bunkhouse Tier 2+ | `src/core/engine/GameLoop.ts` | Test: shift cycle fires at tick 6; sleep rest queued |
+| 7.9.10 | Wire all need events into event system (`need_warning`, `employee_collapsed`, `employee_shift_change`) | `src/core/events/EventSystem.ts` | Test: events fire at correct gauge levels |
+| 7.9.11 | Add i18n keys for all need events and building-full message (en + fr) | `src/core/i18n/locales/en.json`, `fr.json` | Test: all keys resolve |
+| 7.9.12 | Add `needs` console command — print all employees' gauge values | `src/console/commands/entities.ts` | Integration test |
 
 ---
 
