@@ -4,7 +4,7 @@ This document specifies the next wave of gameplay systems to implement. Each cha
 
 **Chapters:**
 
-1. [Buildings System (Tiers & Funny Names)](#1-buildings-system) [to be confirmed]
+1. [Buildings System](#1-buildings-system)
 2. [Vehicle Fleet (Types, Routing & Drivers)](#2-vehicle-fleet) [to be confirmed]
 3. [Employee Skills & Task Queue](#3-employee-skills--task-queue) [to be confirmed]
 4. [Rock Composition & Survey System](#4-rock-composition--survey-system) [to be confirmed]
@@ -17,110 +17,127 @@ This document specifies the next wave of gameplay systems to implement. Each cha
 
 ## 1. Buildings System
 
-### 1.1 Design Goals
+### 1.1 Design Philosophy
 
-Buildings are the player's main tool for supporting operations and keeping employees happy. Each building type comes in **3 tiers** (Basic → Improved → Deluxe) with increasingly silly names, higher capacity, better score bonuses, and higher cost. Buildings occupy a **fixed rectangular footprint** on the surface grid and must be placed on **flat terrain** (no voxels removed beneath).
+Buildings are the player's infrastructure layer. They gate actions behind qualified employees and physical capacity. Key principles:
 
-### 1.2 Building Types & Tiers
+- **Every action requires a qualified employee.** If no qualified employee (or required vehicle) is available, the game emits an error message immediately instead of queuing an impossible task.
+- **Training buildings** allow the player to upskill existing employees in exchange for time (employee unavailable, still paid) and a direct training fee. This makes hiring pre-qualified staff generally more cost-efficient.
+- **Research Center** is the prerequisite for unlocking higher tiers of all other buildings. Each tier upgrade is a separate paid research task.
+- **Placement tradeoff:** Buildings placed far from the blast area reduce projection damage risk but increase employee and vehicle travel time, directly reducing productivity (especially critical for warehouses).
 
-All names are fictional and humorous, localized via i18n (`en.json` + `fr.json`).
+### 1.2 Building Types
 
-| Type | Tier 1 (Basic) | Tier 2 (Improved) | Tier 3 (Deluxe) | [to be confirmed]
-|------|----------------|-------------------|-----------------|
-| Worker Quarters | "The Shack" | "Cozy Crate" | "Minion Manor" | [to be confirmed]
-| Storage Depot | "The Pile" | "Stuff Bunker" | "Hoarder's Paradise" | [to be confirmed]
-| Vehicle Depot | "Rusty Garage" | "Grease Palace" | "Mecha Hangar" | [to be confirmed]
-| Office | "Paper Dungeon" | "Bureaucracy Box" | "Corner Office" | [to be confirmed]
-| Break Room | "Sad Bench" | "Vending Lounge" | "Zen Den" | [to be confirmed]
-| Canteen | "Slop Trough" | "Chow Hall" | "Gourmet Grotto" | [to be confirmed]
-| Medical Bay | "Band-Aid Hut" | "Nurse Nook" | "Trauma Tower" | [to be confirmed]
-| Explosives Magazine | "Boom Closet" | "Blast Vault" | "Fort Kaboom" | [to be confirmed]
-| Fuel Station | "Drip Tank" | "Pump Palace" | "Petrol Colosseum" | [to be confirmed]
-| Guard Post | "Lookout Shack" | "Watch Tower" | "Fortress of Compliance" | [to be confirmed]
-| Parking Lot | "Dirt Patch" | "Paved Plaza" | "Multi-Story Mech Park" | [to be confirmed]
+| Building | Purpose |
+|----------|---------|
+| Driving Center | Trains employees to operate a specific vehicle type |
+| Blasting Academy | Trains employees in explosives handling and blast sequencing |
+| Management Office | Trains employees in HR and commercial operations |
+| Geology Lab | Trains employees in survey and rock analysis |
+| Research Center | Unlocks higher tiers of all other buildings (paid research tasks) |
+| Living Quarters | Houses and feeds employees; tier grade directly affects well-being → productivity |
+| Explosive Warehouse | Stores explosives ordered via supply contracts |
+| Freight Warehouse | Stores rock debris containing ore; primary income source via sale contracts |
+| Vehicle Depot | Parks and maintains vehicles; required for vehicle repairs |
 
-#### Tier Progression Rules
-- Tier 1 is available from game start on all levels [to be confirmed]
-- Tier 2 unlocks when the player has built at least 3 buildings of any type [to be confirmed]
-- Tier 3 unlocks when the player reaches Level 2 or has $100,000+ cash [to be confirmed]
-- Upgrading an existing building costs `(next_tier_cost - current_tier_cost) * 0.7` (discount for upgrade vs. new build) [to be confirmed]
-- Upgrades happen in-place — same footprint, no repositioning needed [to be confirmed]
+### 1.3 Tier System
 
-### 1.3 Building Data Schema
+Each building has multiple tiers. Tier 1 is available from the start. Higher tiers are unlocked by completing paid research tasks at the **Research Center**:
 
-Extends the existing `BuildingDef` interface in `src/core/entities/Building.ts`:
+- Each research task occupies the Research Center for a fixed duration and costs money.
+- Higher tiers provide larger capacity, better performance for the building's specific function, and a **larger physical footprint**.
+- When upgrading, the player typically demolishes the old building and constructs the new tier on the same (or adjacent) cleared ground.
+- Both construction and demolition carry a cost.
 
-```typescript
-export type BuildingTier = 1 | 2 | 3;
+### 1.4 Training Buildings
 
-export interface BuildingDef {
-  type: BuildingType;
-  tier: BuildingTier;
-  /** i18n key for the funny tier name, e.g. 'building.worker_quarters.tier1' */
-  nameKey: string;
-  /** Grid footprint width × depth (cells). */
-  sizeX: number;
-  sizeZ: number;
-  /** One-time construction cost ($). */
-  constructionCost: number;
-  /** Operating cost per tick ($). */
-  operatingCostPerTick: number;
-  /** Capacity: storage (kg), employee slots, vehicle slots, etc. */
-  capacity: number;
-  /** HP before destruction by projections. */
-  maxHp: number;
-  /** Score effects per tick while building is active. */
-  scoreEffects: Partial<Record<ScoreId, number>>;
-  /** Minimum flat surface area required (cells). Must equal sizeX * sizeZ. */
-  flatFootprint: number;
-}
-```
+One training building per employee skill category. Rules shared across all training buildings:
 
-### 1.4 Placement Rules
+- The employee travels to the building and remains there for a fixed number of ticks.
+- During training the employee is unavailable for other tasks and continues to receive their salary.
+- The training itself costs a direct fee (materials, equipment wear).
+- **Incentive:** hiring employees who are already qualified for a task is cheaper than training generalists, so the player must weigh hiring cost against training investment.
 
-1. **Flat surface check:** Every cell in the footprint must have a surface voxel at the same Y level (±0.5 cell tolerance). No holes, no slopes. [to be confirmed]
-2. **No overlap:** Buildings cannot overlap each other or the active blast zone. [to be confirmed]
-3. **Safety distance:** Buildings must be at least 5 cells from any drill hole in the current blast plan (configurable in `balance.ts`). [to be confirmed]
-4. **Road access:** At least one edge cell of the building must be adjacent to a navigable path (for employee/vehicle access). [to be confirmed]
-5. **Explosives magazine** must be at least 15 cells from any other building (real regulation: 300m scaled down). [to be confirmed]
+| Building | Skill Granted | Notes |
+|----------|--------------|-------|
+| Driving Center | Vehicle operation — one licence per vehicle type | Each vehicle type (truck, excavator, drill rig, …) requires a separate training course |
+| Blasting Academy | Explosives charging and blast sequencing | Required before an employee can charge holes or set delay sequences |
+| Management Office | HR and commercial operations | Required for contract negotiation, employee hiring and firing |
+| Geology Lab | Survey techniques and rock analysis | Required to perform seismic, core-sample or aerial surveys |
 
-### 1.5 Destructibility
+### 1.5 Living Quarters (Multi-Grade)
 
-- Buildings hit by blast projections lose HP based on fragment kinetic energy [to be confirmed]
-- At 0 HP, the building is destroyed: removed from grid, score penalties applied [to be confirmed]
-- Destroyed buildings trigger events (lawsuits if employees were inside, insurance claims) [to be confirmed]
-- Contents (stored materials, vehicles parked inside) are also destroyed [to be confirmed]
+A single building type with multiple tier grades, each representing a different quality of accommodation and catering. Grade directly affects employee **well-being**, which affects **productivity**.
 
-### 1.6 Building Effects on Gameplay
+| Tier | Description | Well-being Effect |
+|------|------------|------------------|
+| 1 | "Cells" — bare prison-like accommodation | Baseline (penalty if below this) |
+| 2 | "Dormitory" — basic shared rooms with cafeteria | Moderate well-being bonus |
+| 3 | "Unnecessarily Luxurious Hotel" | Large well-being bonus |
 
-| Building | Primary Effect | Secondary Effect | [to be confirmed]
+- Construction cost and maintenance cost increase with tier.
+- The well-being multiplier applies to all employees whose assigned quarters are at that tier.
+- If capacity is exceeded (more employees than beds), all residents suffer a well-being penalty.
+
+### 1.6 Warehouses
+
+**Explosive Warehouse**
+- Stores explosives received from supply contracts.
+- Required to order and receive explosive deliveries; blasting is impossible without it.
+- Capacity (kg of explosives) scales with tier.
+- If destroyed by a blast projection while containing explosives, a **secondary blast event** is triggered.
+
+**Freight Warehouse**
+- Stores rock debris containing ore, hauled from the blast zone by vehicles.
+- Ore is sold via contracts — this is the player's **primary source of income**.
+- Capacity (tonnes of material) scales with tier.
+- The farther the warehouse is from the pit, the longer each haulage trip takes, reducing throughput.
+
+### 1.7 Placement Rules
+
+1. **Fixed footprint:** Each building type and tier has a fixed cell pattern (e.g. 2×2 square, 3×1 strip, L-shape). Higher tiers have larger footprints.
+2. **Flat surface required:** Every cell in the footprint must lie at the same surface height. Placement on slopes or uneven ground is rejected.
+3. **Protected voxels:** Voxels directly beneath a building footprint cannot be dug or blasted. Any attempt to do so is blocked with an error.
+4. **Blast destruction:** If a blast reaches voxels beneath a building (e.g. due to an incorrectly aimed shot), the building is destroyed instantly.
+5. **No overlap:** Buildings cannot overlap each other.
+
+### 1.8 Destruction Effects
+
+- A building destroyed by a blast is removed from the grid immediately.
+- Employees inside at the time of destruction are injured.
+- Stored contents (explosives, ore) are lost; an Explosive Warehouse detonation triggers a secondary blast.
+- Well-being, Safety and Ecology score penalties are applied on destruction.
+
+### 1.9 Building Effects Summary
+
+| Building | Primary Effect | Secondary Effect |
 |----------|---------------|-----------------|
-| Worker Quarters | Houses employees (capacity = beds) | Well-being +2/+4/+6 per tier | [to be confirmed]
-| Storage Depot | Stores rubble/ore (capacity = kg) | Enables material contracts | [to be confirmed]
-| Vehicle Depot | Parks & maintains vehicles (capacity = slots) | Reduces maintenance cost by 10%/20%/30% | [to be confirmed]
-| Office | Required for contract management | Unlocks negotiation at Tier 2+ | [to be confirmed]
-| Break Room | Satisfies employee break needs | Well-being +3/+5/+8 per tier | [to be confirmed]
-| Canteen | Satisfies employee food needs | Well-being +2/+4/+7; efficiency +5%/+10%/+15% | [to be confirmed]
-| Medical Bay | Treats injured employees | Safety +3/+5/+8; recovery speed ×1/×2/×3 | [to be confirmed]
-| Explosives Magazine | Stores explosives safely | Required to purchase explosives | [to be confirmed]
-| Fuel Station | Refuels vehicles automatically | Reduces fuel cost by 5%/10%/15% | [to be confirmed]
-| Guard Post | Deters mafia events | Safety +1/+2/+4; mafia event probability −10%/−20%/−30% | [to be confirmed]
-| Parking Lot | Extra vehicle storage (overflow) | Cheaper than vehicle depot but no maintenance bonus | [to be confirmed]
+| Living Quarters (Tier 1) | Employee housing and feeding | Baseline well-being (penalty if absent) |
+| Living Quarters (Tier 3) | Employee housing and feeding | High well-being → high productivity multiplier |
+| Explosive Warehouse | Enables explosive supply contracts | Secondary blast if destroyed with stock |
+| Freight Warehouse | Enables ore sale contracts | Main income source; throughput limited by distance |
+| Vehicle Depot | Vehicle parking and maintenance | Required for vehicle repairs |
+| Research Center | Unlocks building tier upgrades | Occupied during each research task |
+| Training Buildings | Grants skill qualifications to employees | Reduces unqualified-task errors |
 
-### 1.7 Atomic Task Breakdown
+### 1.10 Atomic Task Breakdown
 
-| # | Task | File(s) | Test | [to be confirmed]
+| # | Task | File(s) | Test |
 |---|------|---------|------|
-| 1.7.1 | Add `BuildingTier` type and `tier` field to `BuildingDef` | `src/core/entities/Building.ts` | `tests/unit/entities/Building.test.ts` | [to be confirmed]
-| 1.7.2 | Add 3 new building types (`fuel_station`, `guard_post`, `parking_lot`) to `BuildingType` union | `src/core/entities/Building.ts` | Update existing tests | [to be confirmed]
-| 1.7.3 | Create full 33-entry `BUILDING_DEFS` catalog (11 types × 3 tiers) | `src/core/entities/Building.ts` | Test: every type has 3 tiers, costs increase per tier | [to be confirmed]
-| 1.7.4 | Add i18n keys for all 33 building names (en + fr) | `src/core/i18n/locales/en.json`, `fr.json` | Test: all keys resolve | [to be confirmed]
-| 1.7.5 | Implement `canPlaceBuilding()` with flat-surface + overlap + safety-distance checks | `src/core/entities/Building.ts` | Test: placement validation with mock terrain | [to be confirmed]
-| 1.7.6 | Implement `upgradeBuilding()` — in-place tier upgrade with cost calculation | `src/core/entities/Building.ts` | Test: cost = `(next - current) * 0.7` | [to be confirmed]
-| 1.7.7 | Add tier unlock conditions to `balance.ts` | `src/core/config/balance.ts` | Test: tier availability based on game state | [to be confirmed]
-| 1.7.8 | Wire building placement into console command `build` | `src/console/commands/entities.ts` | Integration test | [to be confirmed]
-| 1.7.9 | Add `upgrade_building` console command | `src/console/commands/entities.ts` | Integration test | [to be confirmed]
-| 1.7.10 | Update `BuildingMesh.ts` to vary geometry/color by tier | `src/renderer/BuildingMesh.ts` | Visual test | [to be confirmed]
+| 1.10.1 | Define `BuildingType` union with all 9 building types | `src/core/entities/Building.ts` | `tests/unit/entities/Building.test.ts` |
+| 1.10.2 | Define `BuildingTier`, per-type footprint patterns, and `BUILDING_DEFS` catalog | `src/core/entities/Building.ts` | Test: every type has correct footprint per tier; costs increase per tier |
+| 1.10.3 | Implement `canPlaceBuilding()` — flat surface check + overlap check | `src/core/entities/Building.ts` | Test: rejects sloped terrain; rejects overlapping footprints |
+| 1.10.4 | Implement protected-voxel check — block drill/blast under building footprint | `src/core/mining/DrillPlan.ts` | Test: drill command rejected when target cell is under a building |
+| 1.10.5 | Implement building destruction on blast — check footprint overlap with blast AABB | `src/core/mining/BlastCalc.ts` | Test: building destroyed when voxel underneath is within blast zone |
+| 1.10.6 | Implement Explosive Warehouse secondary blast on destruction | `src/core/mining/BlastCalc.ts` | Test: secondary blast event fires when warehouse destroyed with stock |
+| 1.10.7 | Implement Research Center task queue — paid tasks unlock building tiers | `src/core/entities/Building.ts` | Test: tier locked before research completes; unlocked after |
+| 1.10.8 | Implement training task in training buildings — time cost + fee + skill grant | `src/core/entities/Building.ts`, `src/core/entities/Employee.ts` | Test: employee gains skill qualification after required training ticks |
+| 1.10.9 | Implement qualified-employee check — emit error on unqualified task assignment | `src/core/engine/GameLoop.ts` | Test: error event emitted; task not queued when no qualified employee available |
+| 1.10.10 | Implement Living Quarters well-being multiplier per tier | `src/core/entities/Building.ts`, `src/core/scores/` | Test: productivity multiplier matches tier; overcapacity triggers penalty |
+| 1.10.11 | Implement Freight Warehouse ore storage and contract sell interface | `src/core/entities/Building.ts` | Test: ore stored on haul arrival; contract triggers revenue deduction |
+| 1.10.12 | Add i18n keys for all 9 building types, all tier names, training course names (en + fr) | `src/core/i18n/locales/en.json`, `fr.json` | Test: all keys resolve |
+| 1.10.13 | Wire `build`, `demolish`, and `research` console commands | `src/console/commands/entities.ts` | Integration test |
+| 1.10.14 | Update building renderer — footprint pattern shape and tier visuals | `src/renderer/BuildingMesh.ts` | Visual test |
 
 ---
 
