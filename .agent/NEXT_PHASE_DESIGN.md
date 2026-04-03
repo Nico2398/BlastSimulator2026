@@ -8,7 +8,7 @@ This document specifies the next wave of gameplay systems to implement. Each cha
 2. [Vehicle Fleet (Types, Routing & Drivers)](#2-vehicle-fleet) [to be confirmed]
 3. [Employee Skills & Task Queue](#3-employee-skills--task-queue) [to be confirmed]
 4. [Rock Composition & Survey System](#4-rock-composition--survey-system) [to be confirmed]
-5. [Blast Algorithm Enhancements](#5-blast-algorithm-enhancements) [to be confirmed]
+5. [Blast Algorithm — Full Pipeline](#5-blast-algorithm--full-pipeline)
 6. [NavMesh & Pathfinding](#6-navmesh--pathfinding) [to be confirmed]
 7. [Employee Needs (Eating, Sleeping, Breaks)](#7-employee-needs) [to be confirmed]
 8. [Testing Strategy](#8-testing-strategy) [to be confirmed]
@@ -543,192 +543,362 @@ After a blast, the game computes the **actual ore yield** from destroyed voxels 
 
 ---
 
-## 5. Blast Algorithm Enhancements
+## 5. Blast Algorithm — Full Pipeline
 
-### 5.1 Design Goals
+This chapter replaces the previous blast implementation. The new system is a four-step physical simulation:
 
-The current blast pipeline (energy field → fragmentation → vibration) is solid but flat. This chapter adds **angled holes**, **deck charging** (multiple charges per hole), **presplit blasting** (wall control technique), and **buffer row mechanics** for precision bench cuts. It also adds a real-time **vibration budget** that limits how much the player can fire per delay before regulatory penalties trigger.
+1. Energy propagation through the voxel grid
+2. Voxel fragmentation and collision mesh rebuild
+3. Fragment shape generation (Voronoi)
+4. Fragment projection and physics settle
 
-### 5.2 Angled Holes
+All tuning constants are defined in `src/core/config/balance.ts` and exposed in the UI so the designer can balance without code changes.
 
-Currently all holes are vertical. Angled holes allow the player to direct energy at the free face more efficiently, reducing back-break and improving fragmentation near the bench floor.
+---
+
+### 5.1 Rock & Voxel Data Model
+
+#### 5.1.1 Voxel size
+
+The voxel grid uses **1 m × 1 m × 1 m** cells. This is the ground truth unit; all distances, energies, and velocities are in SI-like units relative to this.
+
+#### 5.1.2 Rock composition per voxel
+
+Each voxel stores a mixture of up to 4 rock types. The mixture coefficients are produced by a **3D Simplex noise** field evaluated at the voxel centre, one noise octave per rock type, with a per-type level bias:
 
 ```typescript
-export interface DrillHole {
-  id: string;
-  x: number;
-  z: number;
-  depth: number;
-  /** Inclination angle from vertical, degrees. 0 = vertical, max 30°. */
-  inclinationDeg: number;
-  /** Bearing (compass direction) the hole leans toward, degrees. 0 = north. */
-  bearingDeg: number;
+export interface VoxelRockComposition {
+  /** Up to 4 entries; coefficients sum to 1.0. */
+  rocks: Array<{ rockId: string; coefficient: number }>;
 }
 ```
 
-**Energy field change:** The hole column is no longer vertical. The mid-column source point is calculated along the inclined axis:
-
+Generation algorithm (run once at map creation for each voxel):
 ```
-collarPos = (hole.x, surfaceY, hole.z)
-toeDir = (sin(bearing) * sin(inclination), -cos(inclination), cos(bearing) * sin(inclination))
-midPos = collarPos + toeDir * (depth / 2)
-```
-
-**Fragmentation bonus:** If the hole leans within 15° of perpendicular to the nearest free face:
-```
-freeAlignmentBonus = 1.0 + 0.2 * cos(angleBetweenHoleAxisAndFaceNormal)
-effectiveEnergy *= freeAlignmentBonus
+for each rockType r:
+  raw[r] = simplex3(x * r.noiseFreq, y * r.noiseFreq, z * r.noiseFreq) + r.levelBias
+raw[r] = max(0, raw[r])
+coefficient[r] = raw[r] / sum(raw)   // normalize to sum 1
 ```
 
-**Constraints:**
-- Inclination capped at 30° (beyond that, drill rigs lose stability) [to be confirmed]
-- Angled holes require Drill Rig Tier 2+ (Tier 1 cannot drill angled) [to be confirmed]
-- Angled holes cost +30% drilling time per degree of inclination [to be confirmed]
+#### 5.1.3 Ore veins per voxel
 
-### 5.3 Deck Charging
-
-A single drill hole can hold **up to 3 charge decks** separated by inert stemming plugs. This allows different explosives at different depths without drilling multiple holes.
+Ores are **not** spread homogeneously. Each ore type has a vein seed and a separate Simplex field. Ore is present only where the field exceeds a high threshold, producing elongated vein shapes:
 
 ```typescript
-export interface DeckCharge {
-  /** Explosive type ID. */
-  explosiveId: string;
-  amountKg: number;
-  /** Depth of this deck's midpoint from surface (m). */
-  deckDepthM: number;
-  /** Stemming height above this deck (m). */
-  stemmingAboveM: number;
-}
-
-export interface HoleCharge {
-  holeId: string;
-  /** Single charge (legacy) OR multiple decks. */
-  decks: DeckCharge[];
-  /** Whether tubing is present for water-sensitive explosives. */
-  hasTubing: boolean;
+export interface VoxelOreComposition {
+  ores: Array<{ oreId: string; density: number }>; // density 0–1
 }
 ```
 
-**Energy calculation change:** Each deck contributes its own energy field independently:
+Veins are visible on the surface because they modify the **surface tint** (same noise texture used for rendering, see §5.1.4). Non-surface veins require a core-sample or seismic survey to detect (Chapter 4).
+
+#### 5.1.4 Surface texture coherence
+
+The renderer samples rock + ore composition from the voxel at any grid point to produce texture colours. Because the same noise fields drive both composition and texture, fracturing the terrain always produces a visually coherent surface — new exposed faces show the same pattern as the undisturbed surface.
+
+---
+
+### 5.2 Step 1 — Energy Propagation
+
+#### 5.2.1 Per-voxel energy threshold
+
+Each voxel has an **energy absorption threshold** T, computed from its rock mixture:
+
 ```
-E(P) += Σ_decks [ deckEnergy / (dist(P, deckMidPos)² + ε) ]
+T(v) = Σ_r [ coefficient[r] * rockDef[r].energyAbsorption ]
 ```
 
-**Typical use:** Hard rock at bottom of hole (high-energy deck) + gentle explosive near surface (low-energy deck) for cleaner bench floor and reduced fly-rock.
+`energyAbsorption` is a per-rock constant (defined in `RockCatalog`).
 
-**Cost:** Each additional deck adds $50 + `deck.amountKg * explosivePricePerKg` per hole.
+#### 5.2.2 Initial energy from charges
 
-### 5.4 Presplit Blasting
+Each charged hole cell seeds the propagation with an **initial explosive energy** computed from the explosive type, amount, and depth efficiency (stemming ratio):
 
-Presplit is a wall-control technique: a row of lightly charged, closely spaced holes is fired **before the main blast** to create a clean fracture line along the designed wall. This prevents back-break (unwanted rock fracture behind the bench).
+```
+E_init(v) = explosiveDef.energyPerKg * chargeKg * stemmingEfficiency(stemmingM, depthM)
+```
+
+The entire energy is placed in the hole voxel as **overflow energy** at the start of Step 1. Effective energy starts at 0.
+
+#### 5.2.3 Propagation loop
+
+```
+Per-voxel storage (transient, not persisted to GameState after the blast):
+  effectiveEnergy[v]  — energy permanently absorbed by this voxel
+  overflowEnergy[v]   — energy to be distributed to neighbours
+```
+
+**Each iteration:**
+
+```
+for each voxel v with overflowEnergy[v] > 0:
+  incoming = overflowEnergy[v]
+  overflowEnergy[v] = 0
+
+  absorbable = T(v) - effectiveEnergy[v]   // remaining capacity
+  absorbed   = min(incoming, absorbable)
+  effectiveEnergy[v] += absorbed
+
+  leftover = incoming - absorbed
+  if leftover > 0:
+    neighbours = adjacent non-air voxels of v   // up to 6 face-adjacent
+    share = leftover / count(neighbours)
+    for each n in neighbours:
+      overflowEnergy[n] += share
+
+repeat until no voxel has overflowEnergy > 0,
+  or iteration count > MAX_PROPAGATION_ITERATIONS (guard, e.g. 500)
+```
+
+This naturally models confined blasts (energy stays local when rock is strong) and over-charged blasts (energy radiates outward).
+
+---
+
+### 5.3 Step 2 — Fragmentation & Collision Mesh Rebuild
+
+#### 5.3.1 Fragmentation criterion
+
+A voxel v is **fragmented** (→ air) if:
+
+```
+effectiveEnergy[v] >= FRAGMENTATION_MULTIPLIER * T(v)
+```
+
+`FRAGMENTATION_MULTIPLIER` (balance constant, e.g. 1.0 initially) controls how much energy it takes to actually break rock vs. merely stress it.
+
+#### 5.3.2 Isolated rock islands
+
+After the first fragmentation pass, perform a **flood-fill** from the outer boundary of the grid. Any solid voxel cluster that has no path to the boundary through solid voxels (i.e. fully surrounded by air or buildings) is also marked for fragmentation. This handles hanging rock arches that result from under-charged blasts.
+
+#### 5.3.3 Damage to entities
+
+For each fragmented voxel v, every **entity** (employee, vehicle, building) whose bounding box intersects v is processed:
+
+- **Employees / vehicles standing on v:** instantly destroyed (killed / written off).
+- **Buildings:** buildings are not per-voxel but span a footprint. Sum the `effectiveEnergy` of every voxel beneath the building footprint. If that sum exceeds `buildingDef.structuralResistance`, the building is destroyed. Occupants each independently roll a survival chance:
+  ```
+  deathProbability = clamp((totalEnergy / structuralResistance - 1.0) * 0.5, 0.30, 1.00)
+  ```
+  (min 30% death chance, up to 100% at extreme overkill). Uses seeded PRNG.
+
+#### 5.3.4 NavMesh update
+
+All fragmented voxels plus the new exposed surface cells are submitted as a **dirty region** to the NavMesh (Chapter 6), which recomputes the affected cells incrementally.
+
+---
+
+### 5.4 Step 3 — Fragment Shape Generation
+
+#### 5.4.1 Fragmentation score
+
+Each fragmented voxel receives a **fragmentation score** F:
+
+```
+F(v) = FRAGMENTATION_SCORE_SCALE * (effectiveEnergy[v] / T(v))
+fragmentCount(v) = max(1, round(F(v)))
+```
+
+`FRAGMENTATION_SCORE_SCALE` is a balance constant (e.g. 3.0 initially, meaning a voxel at 3× threshold produces ≈3 fragments).
+
+#### 5.4.2 Voronoi seed sampling
+
+For each fragmented voxel v, randomly sample `fragmentCount(v)` 3D points uniformly inside the voxel's unit cube. All sampled points from all voxels form a global **point cloud P**.
+
+#### 5.4.3 3D Voronoi decomposition
+
+Compute a 3D Voronoi diagram over P, clipped to the union of all fragmented voxel boxes. Each Voronoi cell is the base shape of one fragment. The implementation uses Fortune's 3D algorithm or, practically, scipy-style incremental Delaunay with dual conversion (handled in `src/physics/VoronoiFrag.ts`).
+
+#### 5.4.4 Merging pass
+
+To create non-convex, more realistic fragment shapes, run a random merging pass:
+
+```
+for each Voronoi cell C (in random order):
+  if rng.next() < MERGE_PROBABILITY:
+    neighbours = Voronoi cells sharing a face with C
+    pick random neighbour N
+    merge C and N into a single fragment (union of their convex hulls)
+```
+
+`MERGE_PROBABILITY` ≈ 0.35 (balance constant). Merged cells are not eligible for further merging in the same pass.
+
+#### 5.4.5 Fragment physics objects
+
+Each merged shape becomes a **RockFragment**:
 
 ```typescript
-export type HoleRole = 'production' | 'presplit' | 'buffer';
-
-// Added to DrillHole:
-export interface DrillHole {
-  // ...existing fields...
-  role: HoleRole;
+export interface RockFragment {
+  id: number;
+  /** World-space centroid at spawn. */
+  cx: number; cy: number; cz: number;
+  /** Graphic mesh vertices (world space). */
+  graphicVertices: Float32Array;
+  /** Collision mesh vertices (deflated inward by COLLISION_DEFLATE_AMOUNT). */
+  collisionVertices: Float32Array;
+  /** Rock + ore composition inherited from source voxels (weighted by overlap). */
+  composition: VoxelRockComposition;
+  oreComposition: VoxelOreComposition;
+  /** Volume in m³. */
+  volumeM3: number;
+  /** kg, computed from volume and rock density. */
+  massKg: number;
+  /** Initial linear velocity (m/tick). Set in Step 4. */
+  velocity: Vec3;
+  state: 'flying' | 'settling' | 'static';
 }
 ```
 
-**Presplit rules:**
-- Presplit holes must be spaced ≤ 1.5 m (game cells) apart [to be confirmed]
-- Charge energy must be ≤ 30% of normal production charge [to be confirmed]
-- Presplit holes fire in delay slot 0 (before all production holes) [to be confirmed]
-- If presplit conditions are met, `backBreakPenalty` for the blast is set to 0 (otherwise it is `0.2 * productionEnergy`) [to be confirmed]
+**Collision mesh deflation:** for every vertex in the collision mesh, move it by `−COLLISION_DEFLATE_AMOUNT` (e.g. −0.05 m) along the vertex normal. The graphic mesh is untouched. This prevents physics tunnelling between resting fragments.
 
-**Back-break penalty effect:**
-- Back-break damages the wall behind the blast zone [to be confirmed]
-- Mechanically: voxels behind the presplit line have their `fractureModifier` reduced by `backBreakPenalty * 0.5` [to be confirmed]
-- Score impact: Ecology −0.1 per voxel of back-break (soil destabilization) [to be confirmed]
+---
 
-### 5.5 Buffer Row
+### 5.5 Step 4 — Fragment Projection & Physics Settle
 
-The **buffer row** is the last row of production holes before the new wall. It is charged at 60–80% of the main burden charge to avoid over-blasting toward the newly formed face.
+#### 5.5.1 Recommended projection algorithm — Energy-Gradient Velocity
+
+After evaluating several approaches (proximity to surface, explicit surface voxel flag, pressure wave direction), the **energy-gradient velocity model** gives the best balance between physical plausibility, designer controllability, and avoiding catastrophic fly-rock:
+
+**For each fragment F with centroid C:**
 
 ```
-bufferChargeRatio = clamp(userSetting, 0.6, 0.8)
-bufferHoleEnergy = productionHoleEnergy * bufferChargeRatio
+// 1. Excess energy at C (interpolated from surrounding voxels)
+E   = trilinearSample(effectiveEnergy, C)
+T   = trilinearSample(threshold, C)
+excess = max(0, E - T)
+
+// 2. Base speed — sub-linear in excess to prevent satellites
+v_mag = min(
+  PROJECTION_SCALE * sqrt(excess),
+  MAX_PROJECTION_VELOCITY            // e.g. 15 m/tick
+)
+
+// 3. Direction — energy gradient (finite differences on 3×3×3 neighbourhood)
+grad = computeEnergyGradient(effectiveEnergy, C)
+// Gradient points from low to high energy; fragment moves from high to low,
+// so negate:
+grad_dir = normalize(-grad)
+
+// 4. Free-face bias — pull direction toward nearest exposed face (air voxel)
+faceDir = normalize(C - nearestSolidVoxelCentroid(C))
+
+// 5. Surface upward bias
+depthRatio = clamp((surfaceY - C.y) / MAX_RELEVANT_DEPTH, 0, 1)
+// depthRatio ≈ 0 near surface, ≈ 1 deep
+upBias = UP * (1 - depthRatio) * SURFACE_UPWARD_BIAS   // e.g. SURFACE_UPWARD_BIAS = 0.4
+
+// 6. Combine
+raw_dir = lerp(grad_dir, faceDir, FREE_FACE_WEIGHT)    // e.g. FREE_FACE_WEIGHT = 0.4
+raw_dir = normalize(raw_dir + upBias)
+
+F.velocity = raw_dir * v_mag
 ```
 
-If no buffer row is used (all holes at full charge), back-break increases by 50%. The console `blast_plan` command accepts a `buffer_ratio` argument to set this.
+**Why this works:**
+- **Inner fragments** (deep, modest excess): energy gradient is gentle, no free face nearby → near-zero velocity → fragments collapse under gravity.
+- **Outer fragments** (near surface, high excess): strong gradient pointing outward + strong free-face pull + upward bias → significant upward/outward projection → fly-rock hazard.
+- **Well-designed blast** (appropriate burden / stemming): excess energy is low across all surface voxels → minimal projection even at surface.
+- **Over-charged blast**: excess spikes at surface → dangerous projection arc.
+- The `sqrt` scaling and `MAX_PROJECTION_VELOCITY` cap prevent even worst-case blasts from putting fragments into orbit.
 
-### 5.6 Vibration Budget
+#### 5.5.2 Physics simulation
 
-Real mines operate under vibration limits imposed by regulators. The player faces a **vibration budget per blast**:
+Once velocities are set, `src/physics/FragmentSim.ts` drives the simulation using **cannon-es**:
 
-```
-vibrationBudget = BASE_VIBRATION_BUDGET + manager_bonus
-```
+- Each `RockFragment` is a `CANNON.Body` with mass `fragment.massKg`, shape derived from `collisionVertices` (convex hull).
+- Gravity: standard −9.8 m/s² (converted to ticks).
+- A fragment that hits a solid voxel **sticks**: its body is converted to `static` and its cell occupancy is registered on the surface grid. It does not bounce or roll.
+- Sticking fragment checks: if a human, vehicle, or building occupies the landing cell → damage/destroy (same logic as §5.3.3 but with energy derived from `massKg * |velocity|²`).
 
-- `BASE_VIBRATION_BUDGET` = 50 (arbitrary game units, corresponds to ≈50mm/s PPV) [to be confirmed]
-- Manager with "Taskmaster" specialization: +10 budget [to be confirmed]
-- Proximity to town (set per level): budget reduced by up to −20 [to be confirmed]
+#### 5.5.3 Fragment sleep & stack behaviour
 
-**Per-blast check (runs in `BlastCalc.calculateVibrations()`):**
+After the physics settle (all fragments static for N consecutive ticks):
 
-```
-peakVibration = calculateVibrations(chargePerDelay, distanceToNearestSensitivePoint, groundFactor)
-```
+- Fragments enter `state: 'static'` and stop being simulated.
+- A **support graph** is maintained: fragment A supports fragment B if B is resting directly on A's top surface.
+- When fragment A is picked up by a Debris Hauler or broken by a Rock Fragmenter, its supported fragments each independently start a short gravity fall animation (no collision damage — the stack simply collapses to the floor without hurting anything).
 
-If `peakVibration > vibrationBudget`:
-- Warning displayed (but blast allowed on first offence) [to be confirmed]
-- Second offence: Nuisance score −5 and $1,000 fine [to be confirmed]
-- Third offence: Blast halted by regulator, $5,000 fine and Safety −3 [to be confirmed]
-
-Splitting the blast into more delay slots (smaller charge per delay) is the primary mitigation.
-
-The player can view predicted peak vibration **before** firing via the `blast_preview` console command.
-
-### 5.7 New Balance Constants
+#### 5.5.4 Fragment size and collection rules
 
 ```typescript
-// In src/core/config/balance.ts:
+/** Fragments too large to be directly hauled are 'oversized'. */
+oversized = fragment.volumeM3 > OVERSIZED_FRAGMENT_THRESHOLD   // e.g. 0.5 m³
 
-/** Maximum drill hole inclination (degrees). Beyond this, drill rig is unstable. */
-export const MAX_HOLE_INCLINATION_DEG = 30;
-
-/** Energy bonus multiplier for free-face-aligned angled holes. */
-export const ANGLED_HOLE_ALIGNMENT_BONUS = 0.2;
-
-/** Max charge decks per hole. */
-export const MAX_CHARGE_DECKS = 3;
-
-/** Cost per additional deck charge beyond the first ($). */
-export const DECK_CHARGE_BASE_COST = 50;
-
-/** Max presplit hole spacing (cells). */
-export const PRESPLIT_MAX_SPACING = 1.5;
-
-/** Presplit max charge fraction of production charge. */
-export const PRESPLIT_MAX_CHARGE_RATIO = 0.3;
-
-/** Default buffer row charge ratio. */
-export const BUFFER_CHARGE_DEFAULT_RATIO = 0.7;
-
-/** Base vibration budget per blast (game units). */
-export const BASE_VIBRATION_BUDGET = 50;
+if oversized:
+  fragment must be broken by Rock Fragmenter before a Debris Hauler can collect it
+else:
+  Debris Hauler with capacity >= fragment.massKg can collect directly
 ```
 
-### 5.8 Atomic Task Breakdown
+Ore content of each collected fragment is reported to `GameState.collectedOre` on pickup, feeding the income calculation.
 
-| # | Task | File(s) | Test | [to be confirmed]
+---
+
+### 5.6 New Balance Constants
+
+```typescript
+// src/core/config/balance.ts
+
+/** Maximum propagation iterations (guard against infinite loops). */
+export const MAX_PROPAGATION_ITERATIONS = 500;
+
+/** effectiveEnergy >= N * T triggers fragmentation. */
+export const FRAGMENTATION_MULTIPLIER = 1.0;
+
+/** Converts energy/threshold ratio to fragment count per voxel. */
+export const FRAGMENTATION_SCORE_SCALE = 3.0;
+
+/** Probability that a Voronoi cell merges with a neighbour in the merging pass. */
+export const MERGE_PROBABILITY = 0.35;
+
+/** Inward deflation of collision mesh vertices (m). */
+export const COLLISION_DEFLATE_AMOUNT = 0.05;
+
+/** Scale factor in v_mag = PROJECTION_SCALE * sqrt(excess). */
+export const PROJECTION_SCALE = 1.2;
+
+/** Hard cap on fragment projection velocity (m/tick). */
+export const MAX_PROJECTION_VELOCITY = 15;
+
+/** Weight given to free-face direction vs energy gradient direction. */
+export const FREE_FACE_WEIGHT = 0.4;
+
+/** Upward bias strength for fragments near the surface. */
+export const SURFACE_UPWARD_BIAS = 0.4;
+
+/** Depth below which surface upward bias fades to zero (cells). */
+export const MAX_RELEVANT_DEPTH = 10;
+
+/** Volume threshold above which a fragment is too large to haul directly (m³). */
+export const OVERSIZED_FRAGMENT_THRESHOLD = 0.5;
+```
+
+---
+
+### 5.7 Atomic Task Breakdown
+
+| # | Task | File(s) | Test |
 |---|------|---------|------|
-| 5.8.1 | Add `inclinationDeg`, `bearingDeg`, `role` to `DrillHole` interface | `src/core/mining/DrillPlan.ts` | `tests/unit/mining/DrillPlan.test.ts` | [to be confirmed]
-| 5.8.2 | Update `calculateEnergyField()` to use inclined hole axis for mid-column source | `src/core/mining/BlastCalc.ts` | Test: angled vs vertical hole gives different energy at same point | [to be confirmed]
-| 5.8.3 | Implement free-face alignment bonus in energy calculation | `src/core/mining/BlastCalc.ts` | Test: bonus applies only when within 15° of face normal | [to be confirmed]
-| 5.8.4 | Replace `HoleCharge.amountKg` + `stemmingM` with `decks: DeckCharge[]` | `src/core/mining/ChargePlan.ts` | Test: single-deck backward-compat wrapper | [to be confirmed]
-| 5.8.5 | Update `effectiveHoleEnergy()` to sum across all decks | `src/core/mining/BlastCalc.ts` | Test: multi-deck energy > single deck same total kg | [to be confirmed]
-| 5.8.6 | Implement `validatePresplit()` — checks spacing and charge limits | `src/core/mining/BlastCalc.ts` | Test: reject spacing > 1.5 cells | [to be confirmed]
-| 5.8.7 | Implement `calculateBackBreak()` — penalty from missing presplit / buffer | `src/core/mining/BlastCalc.ts` | Test: zero penalty when presplit conditions met | [to be confirmed]
-| 5.8.8 | Add `BASE_VIBRATION_BUDGET` and blast constants to `balance.ts` | `src/core/config/balance.ts` | — | [to be confirmed]
-| 5.8.9 | Implement `checkVibrationBudget()` — compare to budget, return violation level | `src/core/mining/BlastCalc.ts` | Test: violation levels at correct thresholds | [to be confirmed]
-| 5.8.10 | Wire vibration violation into event system (fines + score penalties) | `src/core/events/EventEngine.ts` | Test: $1,000 fine on second offence | [to be confirmed]
-| 5.8.11 | Add `blast_preview` console command — prints predicted vibration + back-break | `src/console/commands/mining.ts` | Integration test | [to be confirmed]
-| 5.8.12 | Update `drill_plan` console command to accept `inclination`, `bearing`, `role` args | `src/console/commands/mining.ts` | Integration test | [to be confirmed]
-| 5.8.13 | Update `charge` console command to accept `deck` argument (deck index) | `src/console/commands/mining.ts` | Integration test | [to be confirmed]
-| 5.8.14 | Add i18n keys for vibration warnings and presplit feedback (en + fr) | `src/core/i18n/locales/en.json`, `fr.json` | Test: all keys resolve | [to be confirmed]
+| 5.7.1 | Update `VoxelGrid` cell size documentation and assert 1 m = 1 unit | `src/core/voxels/VoxelGrid.ts` | Test: grid dimensions in meters |
+| 5.7.2 | Add `energyAbsorption` constant to each `RockDef` in `RockCatalog` | `src/core/config/RockCatalog.ts` | Test: all rock defs have positive absorption |
+| 5.7.3 | Implement `computeThreshold(voxel)` — weighted sum of rock coefficients × absorption | `src/core/mining/BlastCalc.ts` | Test: pure rock = rock absorption; 50/50 = average |
+| 5.7.4 | Implement `computeInitialEnergy(hole)` — explosiveDef × kg × stemming efficiency | `src/core/mining/BlastCalc.ts` | Test: more charge = more energy; full stemming = 100% efficiency |
+| 5.7.5 | Implement `propagateEnergy(grid, initial)` — iterative overflow loop | `src/core/mining/BlastCalc.ts` | Test: energy stays local for strong rock; spreads for weak rock; guard terminates |
+| 5.7.6 | Implement `identifyFragmentedVoxels(grid)` — fragmentation criterion + island flood-fill | `src/core/mining/BlastCalc.ts` | Test: isolated island flagged; exact threshold boundary |
+| 5.7.7 | Implement entity damage from blast — employee/vehicle instant kill, building sum+survival roll | `src/core/mining/BlastCalc.ts` | Test: building at 1.5× resistance → death probability ≈ 55% |
+| 5.7.8 | Implement `computeFragmentationScore(voxel)` and Voronoi seed sampling | `src/physics/VoronoiFrag.ts` (new) | Test: fragment count scales with E/T ratio |
+| 5.7.9 | Implement 3D Voronoi decomposition clipped to fragmented voxel union | `src/physics/VoronoiFrag.ts` | Test: all volume covered; no overlaps |
+| 5.7.10 | Implement Voronoi merging pass | `src/physics/VoronoiFrag.ts` | Test: merge probability respected within ±10% over 1000 runs (seeded) |
+| 5.7.11 | Generate `RockFragment` physics objects with deflated collision meshes | `src/physics/FragmentSim.ts` (new) | Test: collision mesh volume < graphic mesh volume |
+| 5.7.12 | Implement energy-gradient velocity assignment (§5.5.1) | `src/physics/FragmentSim.ts` | Test: deep fragment v ≈ 0; surface over-charged fragment v near MAX |
+| 5.7.13 | Implement cannon-es physics loop — gravity, collision, stick-on-land | `src/physics/FragmentSim.ts` | Test: fragment sticks after landing; no bounce |
+| 5.7.14 | Implement fragment sleep and support graph | `src/physics/FragmentSim.ts` | Test: removing bottom fragment triggers stack gravity drop |
+| 5.7.15 | Implement fragment size check and oversized flag | `src/core/mining/BlastCalc.ts` | Test: volume above threshold flagged |
+| 5.7.16 | Wire ore reporting: collect fragment → add to `GameState.collectedOre` | `src/core/GameState.ts` | Test: ore yield matches source voxel composition |
+| 5.7.17 | Trigger NavMesh dirty-region update after fragmentation pass | `src/core/voxels/NavGrid.ts` | Test: fragmented voxels removed from walkable set |
+| 5.7.18 | Add all balance constants to `balance.ts` | `src/core/config/balance.ts` | — |
+| 5.7.19 | Add i18n keys for blast damage events, oversized fragment alert (en + fr) | `src/core/i18n/locales/en.json`, `fr.json` | Test: all keys resolve |
+| 5.7.20 | Add `blast_preview` console command — prints energy map and predicted fragment count | `src/console/commands/mining.ts` | Integration test |
 
 ---
 
