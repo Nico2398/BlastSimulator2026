@@ -26,19 +26,21 @@ Buildings are the player's infrastructure layer. They gate actions behind qualif
 - **Research Center** is the prerequisite for unlocking higher tiers of all other buildings. Each tier upgrade is a separate paid research task.
 - **Placement tradeoff:** Buildings placed far from the blast area reduce projection damage risk but increase employee and vehicle travel time, directly reducing productivity (especially critical for warehouses).
 
-### 1.2 Building Types
+### 1.2 Building Types & Tier Names
 
-| Building | Purpose |
-|----------|---------|
-| Driving Center | Trains employees to operate a specific vehicle type |
-| Blasting Academy | Trains employees in explosives handling and blast sequencing |
-| Management Office | Trains employees in HR and commercial operations |
-| Geology Lab | Trains employees in survey and rock analysis |
-| Research Center | Unlocks higher tiers of all other buildings (paid research tasks) |
-| Living Quarters | Houses and feeds employees; tier grade directly affects well-being → productivity |
-| Explosive Warehouse | Stores explosives ordered via supply contracts |
-| Freight Warehouse | Stores rock debris containing ore; primary income source via sale contracts |
-| Vehicle Depot | Parks and maintains vehicles; required for vehicle repairs |
+All tier names are fictional and humorous. Localized via i18n (`en.json` + `fr.json`).
+
+| Building | Tier 1 | Tier 2 | Tier 3 | Purpose |
+|----------|--------|--------|--------|---------|
+| Driving Center | "Learner's Lot" | "Wheel Academy" | "Turbo Campus" | Trains employees to operate a specific vehicle type |
+| Blasting Academy | "Boom Shack" | "Detonation Den" | "The Kaboom Institute" | Trains employees in explosives handling and blast sequencing |
+| Management Office | "The Cupboard" | "Bureaucracy Box" | "Corner Office Supreme" | Trains employees in HR and commercial operations |
+| Geology Lab | "Rock Shed" | "Stone Science HQ" | "Institute of Expensive Rocks" | Trains employees in survey and rock analysis |
+| Research Center | "Think Tank Tent" | "Innovation Bunker" | "The Ivory Crater" | Unlocks higher tiers of all other buildings (paid research tasks) |
+| Living Quarters | "The Cells" | "Staff Dormitory" | "Unnecessarily Luxurious Hotel" | Houses and feeds employees; grade directly affects well-being → productivity |
+| Explosive Warehouse | "Boom Closet" | "Blast Vault" | "Fort Kaboom" | Stores explosives ordered via supply contracts |
+| Freight Warehouse | "The Pile" | "Stuff Bunker" | "Hoarder's Paradise" | Stores rock debris containing ore; primary income source via sale contracts |
+| Vehicle Depot | "Rusty Garage" | "Grease Palace" | "Mecha Hangar" | Parks and maintains vehicles; required for vehicle repairs |
 
 ### 1.3 Tier System
 
@@ -143,299 +145,301 @@ A single building type with multiple tier grades, each representing a different 
 
 ## 2. Vehicle Fleet
 
-### 2.1 Design Goals
+### 2.1 Design Philosophy
 
-Vehicles are the player's **operational muscle** — they drill holes, haul rubble, load trucks, and clear terrain. The current system defines 4 vehicle types with flat stats. This chapter adds **tiers & funny names** (matching the buildings pattern), a **driver assignment system**, **fuel management**, **routing**, and **breakdowns** to create a deeper management layer.
+Vehicles are the player's operational muscle. They execute physical work that employees cannot do on foot. Key constraints:
 
-### 2.2 Vehicle Types & Tiers
+- Every vehicle needs a **qualified driver** — an employee who has passed the appropriate course at the Driving Center for that specific vehicle type. An uncrewed or unqualified vehicle cannot be assigned any task.
+- Vehicles have a **position** on the navmesh and move at a defined **speed** (cells/tick).
+- All vehicles share the **navmesh** with on-foot employees (Chapter 6). The navmesh is dynamically updated after every blast (rock debris, new craters, collapsed terrain, new/destroyed buildings all reshape it).
+- Vehicles cannot occupy the same cell. This creates realistic **traffic congestion** — poorly laid out ramps, clustered warehouses, or neglected debris clearance will cause queuing and lost productivity. The player must think about ramp placement, haulage routes, and debris clearance as active management decisions.
 
-Each vehicle type has 3 tiers with escalating stats and absurd names. All names localized via i18n.
+### 2.2 Vehicle Types & Tier Names
 
-| Type | Tier 1 (Rusty) | Tier 2 (Decent) | Tier 3 (Beast) | [to be confirmed]
-|------|----------------|-----------------|-----------------|
-| Truck | "Dumpster on Wheels" | "Haul-o-Matic 3000" | "Mega Mover XL" | [to be confirmed]
-| Excavator | "The Claw" | "Digzilla" | "Earth Eater 9000" | [to be confirmed]
-| Drill Rig | "Pokey McPoke" | "Bore Master" | "Helldriller" | [to be confirmed]
-| Bulldozer | "Shove-It" | "Flatten Fred" | "The Obliterator" | [to be confirmed]
-| Water Truck | "Leaky Larry" | "Spritz Machine" | "Dust Destroyer" | [to be confirmed]
-| Crane | "Wobbly Arm" | "Lift King" | "Sky Hook Supreme" | [to be confirmed]
+Five vehicle types, each with 3 tiers and humorous names. All localized via i18n (`en.json` + `fr.json`).
 
-**New types:**
-- **Water Truck** — suppresses dust (reduces nuisance score penalty from blasting and hauling). Required at higher difficulty levels. [to be confirmed]
-- **Crane** — required for building construction and heavy equipment placement. Without a crane, buildings take 3× longer to construct. [to be confirmed]
+| Role | Tier 1 | Tier 2 | Tier 3 | Function |
+|------|--------|--------|--------|---------|
+| **Building Destroyer** | "Wrecking Rascal" | "Demolition Darling" | "Obliterator Supreme" | Demolishes buildings quickly; required for tier-upgrade workflow |
+| **Debris Hauler** | "Dumpster on Wheels" | "Haul-o-Matic 3000" | "Mega Mover XL" | Transports fragmented rock from the blast zone to the Freight Warehouse |
+| **Drill Rig** | "Pokey McPoke" | "Bore Master" | "Helldriller" | Drills blast holes to a specified depth and angle |
+| **Rock Digger** | "The Scratch" | "Scoop Sergeant" | "Voxel Vanquisher" | Digs one voxel at a time — slow and expensive compared to blasting, but precise; used for ramp shaping, access route creation, and post-blast polish |
+| **Rock Fragmenter** | "Cracky" | "Smasher 2000" | "The Atomizer" | Breaks oversized debris boulders into transportable fragments |
 
-### 2.3 Tier Stat Multipliers
+### 2.3 Vehicle Stats by Tier
 
-Each tier multiplies the base stats from the existing `VehicleDef`:
+Each tier multiplies the base stats of its type:
 
-| Stat | Tier 1 (×) | Tier 2 (×) | Tier 3 (×) | [to be confirmed]
+| Stat | Tier 1 (×) | Tier 2 (×) | Tier 3 (×) |
 |------|-----------|-----------|-----------|
-| `capacity` | 1.0 | 1.6 | 2.5 | [to be confirmed]
-| `speed` | 1.0 | 1.3 | 1.8 | [to be confirmed]
-| `maxHp` | 1.0 | 1.5 | 2.2 | [to be confirmed]
-| `purchaseCost` | 1.0 | 2.0 | 4.0 | [to be confirmed]
-| `maintenanceCostPerTick` | 1.0 | 1.4 | 2.0 | [to be confirmed]
-| `fuelCostPerTick` | 1.0 | 1.2 | 1.5 | [to be confirmed]
+| `speed` | 1.0 | 1.3 | 1.8 |
+| `capacity` | 1.0 | 1.6 | 2.5 |
+| `workRate` | 1.0 | 1.4 | 2.0 |
+| `maxHp` | 1.0 | 1.5 | 2.2 |
+| `purchaseCost` | 1.0 | 2.0 | 4.0 |
+| `maintenanceCostPerTick` | 1.0 | 1.4 | 2.0 |
 
-### 2.4 Extended Vehicle Data Schema
-
-Extends `VehicleDef` and `Vehicle` in `src/core/entities/Vehicle.ts`:
+### 2.4 Vehicle Data Schema
 
 ```typescript
+export type VehicleRole =
+  | 'building_destroyer'
+  | 'debris_hauler'
+  | 'drill_rig'
+  | 'rock_digger'
+  | 'rock_fragmenter';
+
 export type VehicleTier = 1 | 2 | 3;
 
 export interface VehicleDef {
-  type: VehicleType;
+  role: VehicleRole;
   tier: VehicleTier;
-  /** i18n key, e.g. 'vehicle.truck.tier1' → "Dumpster on Wheels" */
+  /** i18n key for tier name, e.g. 'vehicle.debris_hauler.tier1' → "Dumpster on Wheels" */
   nameKey: string;
   purchaseCost: number;
   maintenanceCostPerTick: number;
-  fuelCostPerTick: number;
-  capacity: number;
-  speed: number;
+  speed: number;         // cells/tick
+  capacity: number;      // kg for hauler, m³ for digger, etc.
+  workRate: number;      // voxels/tick, kg/tick, etc. (role-specific interpretation)
   maxHp: number;
-  /** Fuel tank size (ticks of operation before refueling). */
-  fuelCapacity: number;
 }
 
 export interface Vehicle {
   id: number;
-  type: VehicleType;
+  role: VehicleRole;
   tier: VehicleTier;
+  /** Current position in grid coordinates. */
   x: number;
   z: number;
   hp: number;
-  task: VehicleTask;
-  targetX: number;
-  targetZ: number;
-  /** Current fuel level (ticks of operation remaining). */
-  fuel: number;
-  /** Assigned driver employee ID, or null if uncrewed. */
+  /** Employee ID of assigned driver, or null if uncrewed. */
   driverId: number | null;
-  /** Ticks since last maintenance. Breakdown chance increases over time. */
-  ticksSinceMaintenance: number;
-  /** Whether the vehicle is currently broken down. */
-  brokenDown: boolean;
+  state: VehicleState;
+  /** Current destination (null when idle or working in place). */
+  targetX: number | null;
+  targetZ: number | null;
+  /** Payload currently carried (kg), for debris_hauler. */
+  payloadKg: number;
 }
+
+export type VehicleState =
+  | 'idle'        // parked, no task
+  | 'moving'      // travelling to target cell
+  | 'working'     // actively drilling, digging, hauling, demolishing, or fragmenting
+  | 'waiting'     // blocked by traffic, waiting for cell to free
+  | 'broken';     // requires repair at Vehicle Depot
 ```
 
-### 2.5 Driver Assignment
+### 2.5 Driver Qualification
 
-- Each vehicle requires a **driver** (employee with role `'driver'`) to operate [to be confirmed]
-- Uncrewed vehicles remain parked and cannot perform tasks [to be confirmed]
-- One driver per vehicle; one vehicle per driver [to be confirmed]
-- If a driver is injured, their vehicle becomes idle until reassigned [to be confirmed]
-- Drivers gain a hidden **experience** counter: +1 per tick of active driving. At 100/500/1000 xp, they unlock efficiency bonuses (+5%/+10%/+15% to vehicle speed) [to be confirmed]
+- Each vehicle role requires a distinct driving licence obtained at the **Driving Center**.
+- An employee without the licence for a given role cannot be assigned to that vehicle.
+- One driver per vehicle; one vehicle per driver at a time.
+- If a driver is injured or leaves, the vehicle becomes idle until a qualified replacement is assigned.
 
-```typescript
-/** Driver experience thresholds and bonuses. */
-export const DRIVER_XP_BONUSES = [
-  { threshold: 100, speedMultiplier: 1.05 },
-  { threshold: 500, speedMultiplier: 1.10 },
-  { threshold: 1000, speedMultiplier: 1.15 },
-] as const;
-```
+### 2.6 Traffic & Routing
 
-### 2.6 Fuel System
+Vehicles use the shared navmesh (Chapter 6) with A\* pathfinding. Congestion is intentional and gameplay-relevant:
 
-- Every vehicle has a **fuel tank** (`fuelCapacity` in ticks of operation) [to be confirmed]
-- Each tick a vehicle is not idle, it consumes 1 fuel unit [to be confirmed]
-- At 0 fuel, the vehicle stops where it is and enters `'idle'` state with a `needsFuel` flag [to be confirmed]
-- Vehicles auto-refuel when they return to a **Fuel Station** building (instant) or a **Vehicle Depot** (takes 3 ticks) [to be confirmed]
-- Fuel station tier affects refuel speed: Tier 1 = 3 ticks, Tier 2 = 2 ticks, Tier 3 = instant [to be confirmed]
-- Fuel tank sizes by type: Truck 50, Excavator 40, Drill Rig 35, Bulldozer 45, Water Truck 30, Crane 25 [to be confirmed]
+- Vehicles cannot share a cell. A blocked vehicle enters `'waiting'` state and retries each tick.
+- Long waiting chains (≥ 3 vehicles queued on a single path for ≥ 10 ticks) emit a `TrafficJamEvent` that is surfaced to the player as an alert.
+- **Player solutions:** widen ramps, build parallel haulage routes, relocate the Freight Warehouse closer to the pit, clear debris faster with Rock Fragmenters before hauling.
+- Rock debris deposited after a blast immediately marks those cells as blocked on the navmesh until cleared.
+- A destroyed building collapses into a debris cell that blocks the navmesh until removed by a Rock Digger or Building Destroyer.
 
-### 2.7 Breakdown System
+### 2.7 Vehicle Tasks
 
-Vehicles accumulate **wear** over time. Breakdown probability increases with `ticksSinceMaintenance`:
+| Task | Applicable Roles | Description |
+|------|-----------------|-------------|
+| `move_to` | All | Travel to target cell via navmesh |
+| `haul` | Debris Hauler | Pick up fragmented rock at source, carry to Freight Warehouse |
+| `drill_hole` | Drill Rig | Drill a hole at target x,z to specified depth and angle |
+| `dig_voxel` | Rock Digger | Remove one voxel at target position |
+| `fragment` | Rock Fragmenter | Break an oversized boulder at target cell into smaller fragments |
+| `demolish` | Building Destroyer | Demolish the building occupying target footprint |
+| `wait` | All | Blocked by traffic; retries movement each tick |
 
-```
-breakdownChance = min(0.5, ticksSinceMaintenance * 0.0005)
-```
+### 2.8 Atomic Task Breakdown
 
-- Checked once per tick when the vehicle is active (not idle) [to be confirmed]
-- Uses seeded PRNG (`rng.next() < breakdownChance`) [to be confirmed]
-- Broken-down vehicles cannot operate until repaired [to be confirmed]
-- Repair requires the vehicle to be at a **Vehicle Depot** and takes `10 / tier` ticks (Tier 3 depot = 3.3 ticks ≈ 4 ticks) [to be confirmed]
-- Maintenance resets wear: sending a vehicle to a depot for 5 ticks resets `ticksSinceMaintenance` to 0 [to be confirmed]
-- Vehicles depoted at a Tier 2+ Vehicle Depot gain a 50% slower wear accumulation [to be confirmed]
-
-### 2.8 Routing & Movement
-
-Vehicles move on the **surface grid** (top solid voxel layer). Movement rules:
-
-1. **A\* pathfinding** on the 2D surface grid (details in Chapter 6: NavMesh) [to be confirmed]
-2. Movement cost per cell = 1.0 for flat, 2.0 for ramp, ∞ for cliff/hole [to be confirmed]
-3. Speed = `def.speed * driverXpMultiplier` cells per tick [to be confirmed]
-4. Vehicles cannot overlap on the same cell (queueing at bottlenecks) [to be confirmed]
-5. **Ramp requirement:** Vehicles cannot traverse vertical drops > 1 cell. Ramps must be built or blasted to create gradual transitions. [to be confirmed]
-
-### 2.9 Vehicle Tasks — State Machine
-
-```
-                    ┌──────────┐
-          ┌────────►│   idle   │◄────────┐
-          │         └────┬─────┘         │
-          │              │ assign        │ arrive/unload
-          ▼              ▼               │
-    ┌──────────┐   ┌──────────┐   ┌──────────┐
-    │  refuel  │   │  moving  │──►│ working  │
-    └──────────┘   └──────────┘   └──────────┘
-          ▲              │               │
-          │              ▼               ▼
-          │         ┌──────────┐   ┌──────────┐
-          └─────────│breakdown │   │ loading  │
-                    └──────────┘   └──────────┘
-```
-
-Task descriptions:
-| Task | Applicable Vehicles | Behavior | [to be confirmed]
-|------|-------------------|----------|
-| `idle` | All | Parked, no fuel consumed. Awaiting assignment. | [to be confirmed]
-| `moving` | All | Pathfinding to target cell. Consumes fuel. | [to be confirmed]
-| `transport` | Truck | Carrying payload from source to destination. | [to be confirmed]
-| `loading` | Excavator | Loading rubble into adjacent truck. | [to be confirmed]
-| `drilling` | Drill Rig | Drilling a hole at target position. | [to be confirmed]
-| `clearing` | Bulldozer | Removing surface material at target. | [to be confirmed]
-| `watering` | Water Truck | Spraying water to suppress dust. | [to be confirmed]
-| `lifting` | Crane | Assisting building construction. | [to be confirmed]
-| `refuel` | All | Parked at fuel station/depot, refueling. | [to be confirmed]
-| `breakdown` | All | Broken down, awaiting repair at depot. | [to be confirmed]
-
-### 2.10 Vehicle Effects on Scores
-
-| Situation | Score Impact | [to be confirmed]
-|-----------|-------------|
-| Active trucks hauling | Nuisance −0.5/truck/tick (dust, noise) | [to be confirmed]
-| Water truck active | Nuisance +1.0/tick (dust suppression) | [to be confirmed]
-| Vehicle breakdown | Safety −2 (one-time event) | [to be confirmed]
-| Vehicle destroyed by blast | Safety −5, Well-being −3 (one-time) | [to be confirmed]
-| All vehicles maintained (wear < 50) | Safety +1/tick bonus | [to be confirmed]
-
-### 2.11 Atomic Task Breakdown
-
-| # | Task | File(s) | Test | [to be confirmed]
+| # | Task | File(s) | Test |
 |---|------|---------|------|
-| 2.11.1 | Add `VehicleTier`, `tier` field, and `fuelCapacity` to `VehicleDef` | `src/core/entities/Vehicle.ts` | `tests/unit/entities/Vehicle.test.ts` | [to be confirmed]
-| 2.11.2 | Add 2 new vehicle types (`water_truck`, `crane`) to `VehicleType` union | `src/core/entities/Vehicle.ts` | Update existing tests | [to be confirmed]
-| 2.11.3 | Create 18-entry `VEHICLE_DEFS` catalog (6 types × 3 tiers) with tier multipliers | `src/core/entities/Vehicle.ts` | Test: every type has 3 tiers, stats scale correctly | [to be confirmed]
-| 2.11.4 | Add i18n keys for all 18 vehicle names (en + fr) | `src/core/i18n/locales/en.json`, `fr.json` | Test: all keys resolve | [to be confirmed]
-| 2.11.5 | Add `fuel`, `driverId`, `ticksSinceMaintenance`, `brokenDown` to `Vehicle` interface | `src/core/entities/Vehicle.ts` | Test: default values on purchase | [to be confirmed]
-| 2.11.6 | Implement `assignDriver()` — links employee to vehicle, validates role | `src/core/entities/Vehicle.ts` | Test: only drivers can be assigned | [to be confirmed]
-| 2.11.7 | Implement fuel consumption in `tickVehicle()` — decrement fuel, stop at 0 | `src/core/engine/GameLoop.ts` | Test: vehicle stops when fuel = 0 | [to be confirmed]
-| 2.11.8 | Implement breakdown check in `tickVehicle()` — PRNG-based | `src/core/engine/GameLoop.ts` | Test: breakdown probability scales with wear | [to be confirmed]
-| 2.11.9 | Implement `repairVehicle()` and `maintainVehicle()` depot interactions | `src/core/entities/Vehicle.ts` | Test: repair time scales with depot tier | [to be confirmed]
-| 2.11.10 | Add `DRIVER_XP_BONUSES` and driver XP accumulation to balance/Employee | `src/core/config/balance.ts`, `src/core/entities/Employee.ts` | Test: XP thresholds and speed bonuses | [to be confirmed]
-| 2.11.11 | Add `watering` and `lifting` task types to `VehicleTask` | `src/core/entities/Vehicle.ts` | Test: task state machine transitions | [to be confirmed]
-| 2.11.12 | Wire vehicle purchase/assign into console commands | `src/console/commands/entities.ts` | Integration test | [to be confirmed]
-| 2.11.13 | Add vehicle tier visuals (mesh scale/color) to renderer | `src/renderer/VehicleMesh.ts` | Visual test | [to be confirmed]
+| 2.8.1 | Define `VehicleRole` union and rename existing `VehicleType` → `VehicleRole` | `src/core/entities/Vehicle.ts` | `tests/unit/entities/Vehicle.test.ts` |
+| 2.8.2 | Define `VehicleTier`, `VehicleDef`, and `VehicleState` types | `src/core/entities/Vehicle.ts` | Test: schema completeness |
+| 2.8.3 | Create `VEHICLE_DEFS` catalog (5 roles × 3 tiers, 15 entries) with tier multipliers | `src/core/entities/Vehicle.ts` | Test: every role has 3 tiers; stats scale correctly |
+| 2.8.4 | Add i18n keys for all 15 vehicle tier names (en + fr) | `src/core/i18n/locales/en.json`, `fr.json` | Test: all keys resolve |
+| 2.8.5 | Add `driverId`, `state`, `payloadKg`, `targetX/Z` fields to `Vehicle` interface | `src/core/entities/Vehicle.ts` | Test: defaults on purchase |
+| 2.8.6 | Implement `assignDriver()` — validates employee has licence for this role | `src/core/entities/Vehicle.ts` | Test: unqualified employee rejected |
+| 2.8.7 | Implement `tickVehicle()` — advances movement along navmesh path, handles `waiting` state on cell collision | `src/core/engine/GameLoop.ts` | Test: two vehicles converging on same cell — one enters waiting |
+| 2.8.8 | Implement `TrafficJamEvent` — fires when ≥ 3 vehicles waiting on same path ≥ 10 ticks | `src/core/events/EventEngine.ts` | Test: event fires at correct threshold |
+| 2.8.9 | Implement `demolishBuilding()` task — removes building from grid, updates navmesh | `src/core/entities/Building.ts` | Test: footprint cells freed after demolition |
+| 2.8.10 | Implement `digVoxel()` task for Rock Digger — removes single voxel, updates surface + navmesh | `src/core/mining/DrillPlan.ts` | Test: voxel removed; navmesh updated |
+| 2.8.11 | Implement `fragmentBoulder()` task — converts oversized debris to transportable fragments | `src/core/mining/BlastCalc.ts` | Test: oversized debris flagged; becomes transportable after fragmenting |
+| 2.8.12 | Wire vehicle purchase, assign-driver, and task dispatch into console commands | `src/console/commands/entities.ts` | Integration test |
+| 2.8.13 | Update vehicle renderer — role-specific mesh, tier color/scale variation | `src/renderer/VehicleMesh.ts` | Visual test |
 
 ---
 
 ## 3. Employee Skills & Task Queue
 
-### 3.1 Design Goals
+### 3.1 Design Philosophy
 
-Employees should feel like individuals you develop over time, not interchangeable tokens. This chapter adds a **skill level** per role (1–5 stars), a **specialization** system for late-game differentiation, and a **persistent task queue** so employees carry out multi-step work autonomously without constant micromanagement.
+Employees are not interchangeable tokens. Each one has a set of **skill qualifications**, each with a proficiency level. They autonomously execute queued work, consume resources (food, sleep), and can be a bottleneck or an asset depending on how the player manages their roster, schedules, and training.
 
-### 3.2 Skill Levels
+Key principles:
 
-Each employee has a `skillLevel` (1–5) that directly affects their output quality and speed. Skill increases through **XP** earned by completing tasks.
+- **Every physical action is queued, not instant.** When the player issues a command (drill a hole, charge a hole, place a building, …), it is added to a global pending-action pool. A free employee with the required skill automatically claims and executes it.
+- **Pending actions show a 3D ghost.** Until an action is started, the game renders a semi-transparent blue version of the result object (same 3D model as the finished version, with a fresnel-effect shader). This makes the player's intent visible and distinguishable from completed work.
+- **No qualified employee = immediate error.** If the pending pool contains an action and zero employees with the required skill are free or available (all busy, sleeping, injured…), the game immediately surfaces an error panel rather than silently queuing forever.
+- **Some tasks require a vehicle.** Actions like hauling and drilling cannot be performed on foot — the employee must first board a vehicle of the appropriate type.
 
-| Skill Level | Label | XP to Reach | Effectiveness Bonus | [to be confirmed]
-|------------|-------|-------------|-------------------|
-| 1 | Rookie | 0 | ×1.00 | [to be confirmed]
-| 2 | Decent | 50 | ×1.15 | [to be confirmed]
-| 3 | Skilled | 150 | ×1.30 | [to be confirmed]
-| 4 | Expert | 350 | ×1.50 | [to be confirmed]
-| 5 | Legend | 700 | ×1.75 | [to be confirmed]
+### 3.2 Skill System
 
-XP gain per tick of active work: `1 + floor(skillLevel * 0.5)` (legends level up faster). XP is role-specific — a driller who gets reassigned as a driver starts at skill 1 for driving.
+An employee has **0 to N qualifications** (typically 1, occasionally 2). Each qualification belongs to a **skill category** and has a **proficiency level** (1–5). Salary scales with the total number of qualifications and their combined levels — a multi-skilled employee is more expensive.
 
-Skill multiplier stacks with the existing morale-based `getEffectiveness()` multiplier:
+**Skill categories:**
+| Category | Required for | Training building |
+|----------|-------------|-------------------|
+| `driving.<vehicle_role>` | Operating vehicles of that role | Driving Center |
+| `blasting` | Charging holes, setting sequences, monitoring blasts | Blasting Academy |
+| `management` | Contract negotiation, hiring/firing, policy setting | Management Office |
+| `geology` | Seismic, core-sample, and aerial surveys | Geology Lab |
+
+An employee **tends to be efficient at skills in the same category** (e.g., a blasting specialist is effective at all blasting tasks). They may also hold qualifications outside their core category, but typically at lower proficiency, and only after deliberate training or exceptional hire.
+
+**Proficiency levels and effect:**
+
+| Level | Label | Effect on task duration |
+|-------|-------|------------------------|
+| 1 | Rookie | ×1.00 (baseline) |
+| 2 | Competent | ×0.85 |
+| 3 | Skilled | ×0.70 |
+| 4 | Expert | ×0.55 |
+| 5 | Master | ×0.40 |
+
+Proficiency increases through XP earned by performing the specific task. XP gain per tick of active work:
 ```
-totalEffectiveness = moraleEffectiveness * skillMultiplier
+xpPerTick = 1 + floor(currentLevel * 0.5)
 ```
 
-### 3.3 Specializations
+### 3.3 Task Duration Formula
 
-At skill level 4, an employee may choose one **specialization** (player chooses from 2 options offered). Specializations are permanent and add a targeted bonus on top of the skill multiplier.
+Duration is calculated at dispatch time:
 
-| Role | Specialization A | Specialization B | [to be confirmed]
-|------|-----------------|-----------------|
-| Driller | "Speed Demon" — drill time −25% | "Deep Corer" — max hole depth +50% | [to be confirmed]
-| Blaster | "Precision Popper" — over-blast chance −40% | "Big Banger" — explosive efficiency +20% | [to be confirmed]
-| Driver | "Speed Racer" — vehicle speed +20% | "Heavy Hauler" — truck capacity +30% | [to be confirmed]
-| Surveyor | "Eagle Eye" — survey accuracy +30% | "Speed Scanner" — survey time −40% | [to be confirmed]
-| Manager | "Taskmaster" — task queue length +3 | "Morale Booster" — all nearby employee morale +5/tick | [to be confirmed]
+```
+ticksRequired = baseDuration
+              / (proficiency_multiplier * wellbeing_multiplier * event_multipliers)
+```
 
-### 3.4 Task Queue
+**Wellbeing modifiers** stack multiplicatively:
 
-Each employee has a **task queue** (ordered list of `TaskEntry` items). The game loop processes the front of the queue each tick; on completion the entry is dequeued and the next begins.
+| Condition | Multiplier |
+|-----------|-----------|
+| Well-fed (ate within last N ticks) | ×1.00 (neutral) |
+| Hungry (overdue for a meal) | ×0.80 |
+| Starving (severely overdue) | ×0.60 |
+| Well-rested | ×1.00 |
+| Sleep-deprived | ×0.75 |
+| Exhausted | ×0.50 |
+| Living Quarters Tier 3 bonus | ×1.10 |
+| Living Quarters Tier 1 penalty | ×0.90 |
+
+**Event modifiers** are temporary multipliers injected by the event system (e.g., "Union Happy Hour +20%", "Heatwave −15%"). All active modifiers are listed in the employee detail panel so the player can understand exactly why a task is slow.
+
+### 3.4 Pending-Action Pool & Ghost Preview
+
+The global `pendingActions` array in `GameState` holds all player-issued actions not yet started:
 
 ```typescript
-export type TaskType =
-  | 'move_to'         // Walk to grid position
-  | 'drill_hole'      // Drill at assigned hole position
-  | 'charge_hole'     // Place explosive charge in a drilled hole
-  | 'clear_rubble'    // Clear fragmented material from cell
-  | 'survey_zone'     // Survey a grid region for composition
-  | 'supervise'       // Manager supervises nearby workers (+morale)
-  | 'rest'            // Forced rest (injured / break time)
-  | 'await_vehicle';  // Wait for assigned vehicle to arrive
-
-export interface TaskEntry {
-  type: TaskType;
-  /** Target grid position (for move_to, drill_hole, etc.) */
-  targetX?: number;
-  targetZ?: number;
-  /** Additional payload (e.g., charge spec, survey radius). */
-  payload?: Record<string, unknown>;
-  /** Ticks remaining for current active task (counts down each tick). */
-  ticksRemaining: number;
-  /** Ticks required to complete the task (set on assignment). */
-  ticksRequired: number;
+export interface PendingAction {
+  id: number;
+  type: ActionType;
+  /** Required skill qualification to claim this action. */
+  requiredSkill: SkillQualification;
+  /** Required vehicle role, or null if on-foot task. */
+  requiredVehicleRole: VehicleRole | null;
+  /** Grid position for ghost rendering and employee pathfinding. */
+  targetX: number;
+  targetZ: number;
+  targetY: number;
+  payload: Record<string, unknown>;
 }
+
+export type ActionType =
+  | 'drill_hole'
+  | 'charge_hole'
+  | 'set_sequence'
+  | 'place_building'
+  | 'demolish_building'
+  | 'survey'
+  | 'fragment_debris'
+  | 'haul_debris';
 ```
 
-**Queue rules:**
-- Default queue capacity = 5 entries (Manager "Taskmaster" specialization raises it to 8) [to be confirmed]
-- The player assigns tasks via console `assign` command or UI drag-and-drop (Ch. 6) [to be confirmed]
-- If an employee becomes injured, their queue is paused and a `rest` task is prepended [to be confirmed]
-- If a required building (e.g., canteen) becomes unavailable, queued `rest` tasks at that building are cancelled and requeued at the next available building [to be confirmed]
-- Employees with empty queues enter `idle` state and lose morale at −1/tick (boredom) [to be confirmed]
+**Renderer:** For every entry in `pendingActions`, the renderer creates a ghost mesh (same geometry as the finished object) with a blue fresnel-effect translucent material and slight pulsing animation so the player can distinguish pending from complete.
 
-### 3.5 Task Duration Formulas
+**Claim logic (each tick):**
+1. For each unclaimed `PendingAction`, scan idle employees for a match on `requiredSkill`.
+2. If a match is found and `requiredVehicleRole` is non-null, also check that a vehicle of that role is available and has a qualified driver (or the employee is the driver).
+3. If no match can ever succeed (no employee with the skill exists on the roster at all, regardless of current availability), immediately emit an `UnqualifiedTaskError` event.
+4. If a match exists but all qualified employees are temporarily busy (working, eating, sleeping), do not emit an error — keep waiting.
 
-Base durations (in ticks), modified by skill, morale, and specializations:
+### 3.5 Employee Needs
 
-| Task | Base Duration | Modifier | [to be confirmed]
-|------|--------------|---------|
-| `move_to` | `ceil(distance / walkSpeed)` | walkSpeed = 2 cells/tick | [to be confirmed]
-| `drill_hole` | `ceil(depth / (2 * effectiveness))` | depth in cells | [to be confirmed]
-| `charge_hole` | 3 ticks flat | ×0.8 if blaster skill ≥ 3 | [to be confirmed]
-| `clear_rubble` | `ceil(volume / (5 * effectiveness))` | volume in cells³ | [to be confirmed]
-| `survey_zone` | `ceil(radius² * 0.5 / effectiveness)` | radius in cells | [to be confirmed]
-| `supervise` | Continuous | Runs until cancelled | [to be confirmed]
-| `rest` | Varies (see Ch. 7) | — | [to be confirmed]
+Employees have four tracked need meters (0–100):
 
-### 3.6 Atomic Task Breakdown
+| Need | Depletes when | Restored at | Effect if neglected |
+|------|--------------|-------------|---------------------|
+| **Hunger** | Always, at 1/tick while working, 0.5/tick idle | Eating at Living Quarters (Tier 1+) | Below 30: productivity ×0.80; below 10: ×0.60, employee refuses tasks |
+| **Fatigue** | Working tick, accumulates | Sleeping at Living Quarters (Tier 1+) | Below 40: productivity ×0.75; below 15: ×0.50, employee collapses → forced rest |
+| **Social** | Isolation (working alone) | Being near other employees, break room use | Below 20: morale −2/tick; affects well-being score |
+| **Comfort** | Always slowly | Living Quarters tier bonus | Below 30: morale −1/tick |
 
-| # | Task | File(s) | Test | [to be confirmed]
+### 3.6 Work & Rest Policies
+
+The player configures a **site policy** that governs the automatic rest behaviour for all employees:
+
+| Policy | Description |
+|--------|-------------|
+| `shift_8h` | Standard 8-hour work shift, 8-hour rest. Low fatigue accumulation. |
+| `shift_12h` | Long shift. Faster output but fatigue builds; requires higher-tier Living Quarters to avoid productivity collapse. |
+| `continuous` | No enforced breaks. Maximum output in short term; employees degrade rapidly. Useful for campaign deadline crunch. |
+| `custom` | Player sets individual rest thresholds per employee. |
+
+Meals are scheduled automatically based on the hunger meter threshold set in the policy (default: eat when hunger < 40).
+
+Break times (social need) follow the same configurable threshold system.
+
+### 3.7 Employee Detail Panel (UI)
+
+When the player clicks an employee, the detail panel shows:
+
+- Name, portrait, skill qualifications with proficiency stars
+- Current task and time remaining
+- Task queue (up to 5 pending entries, reorderable by drag)
+- Need meters (Hunger, Fatigue, Social, Comfort) with current values
+- All active modifiers with name, value, and source (event name / building / policy)
+- Salary breakdown per tick
+- XP progress bar per qualification
+
+### 3.8 Atomic Task Breakdown
+
+| # | Task | File(s) | Test |
 |---|------|---------|------|
-| 3.6.1 | Add `skillLevel`, `xp`, `specialization` fields to `Employee` interface | `src/core/entities/Employee.ts` | `tests/unit/entities/Employee.test.ts` | [to be confirmed]
-| 3.6.2 | Add `SKILL_XP_THRESHOLDS` and `SKILL_EFFECTIVENESS_MULTIPLIERS` to `balance.ts` | `src/core/config/balance.ts` | Test: XP → skill level progression | [to be confirmed]
-| 3.6.3 | Implement `gainXp()` — awards XP after task, triggers level-up event | `src/core/entities/Employee.ts` | Test: level up at correct thresholds | [to be confirmed]
-| 3.6.4 | Add `SPECIALIZATIONS` catalog (10 entries) | `src/core/entities/Employee.ts` | Test: each role has exactly 2 options | [to be confirmed]
-| 3.6.5 | Implement `chooseSpecialization()` — only valid at skill 4, one-time | `src/core/entities/Employee.ts` | Test: reject if not skill 4 or already chosen | [to be confirmed]
-| 3.6.6 | Add `TaskEntry` and `TaskType` definitions | `src/core/entities/Employee.ts` | Type-only, no test needed | [to be confirmed]
-| 3.6.7 | Add `taskQueue: TaskEntry[]` to `Employee` interface | `src/core/entities/Employee.ts` | Test: default empty queue | [to be confirmed]
-| 3.6.8 | Implement `enqueueTask()` — validates queue capacity, rejects overflow | `src/core/entities/Employee.ts` | Test: overflow returns error | [to be confirmed]
-| 3.6.9 | Implement `tickEmployee()` — advances task, awards XP on completion, dequeues | `src/core/engine/GameLoop.ts` | Test: multi-step queue completes in correct order | [to be confirmed]
-| 3.6.10 | Implement `computeTaskDuration()` — formulas from §3.5 | `src/core/entities/Employee.ts` | Test: durations scale with skill | [to be confirmed]
-| 3.6.11 | Add i18n keys for all specialization names and descriptions (en + fr) | `src/core/i18n/locales/en.json`, `fr.json` | Test: all keys resolve | [to be confirmed]
-| 3.6.12 | Wire `assign` and `queue` console commands | `src/console/commands/entities.ts` | Integration test | [to be confirmed]
+| 3.8.1 | Define `SkillQualification`, `SkillCategory`, proficiency levels on `Employee` | `src/core/entities/Employee.ts` | `tests/unit/entities/Employee.test.ts` |
+| 3.8.2 | Add `PROFICIENCY_MULTIPLIERS` and XP thresholds to `balance.ts` | `src/core/config/balance.ts` | Test: XP → proficiency level transitions |
+| 3.8.3 | Implement `gainXp()` — per-qualification XP, triggers level-up event | `src/core/entities/Employee.ts` | Test: level up at correct threshold |
+| 3.8.4 | Implement salary calculation — base + sum of qualification level bonuses | `src/core/entities/Employee.ts` | Test: multi-skill employee costs more |
+| 3.8.5 | Define `PendingAction`, `ActionType`, and `pendingActions` in `GameState` | `src/core/GameState.ts` | Test: initial state has empty array |
+| 3.8.6 | Implement claim logic in `tickEmployees()` — match pending actions to idle qualified employees | `src/core/engine/GameLoop.ts` | Test: correct employee claims matching action; unmatched action emits error |
+| 3.8.7 | Implement `UnqualifiedTaskError` event — fires when no roster employee has the required skill | `src/core/events/EventEngine.ts` | Test: event fires for truly unqualified; not fired when temporarily busy |
+| 3.8.8 | Implement ghost-preview list in `GameState` (mirrors `pendingActions` for renderer) | `src/core/GameState.ts` | Test: ghost entry added on action dispatch, removed on claim |
+| 3.8.9 | Add ghost mesh rendering in renderer — blue fresnel translucent, pulsing | `src/renderer/GhostMesh.ts` (new file) | Visual test |
+| 3.8.10 | Implement need meters (Hunger, Fatigue, Social, Comfort) on `Employee` | `src/core/entities/Employee.ts` | Test: meters deplete at correct rates; productivity multipliers apply |
+| 3.8.11 | Implement need restoration — employee auto-routes to Living Quarters when threshold crossed | `src/core/engine/GameLoop.ts` | Test: hungry employee claims meal slot; task queue paused during meal |
+| 3.8.12 | Implement `SitePolicy` and policy tick logic — enforces shift/rest scheduling | `src/core/entities/SitePolicy.ts` (new file) | Test: shift_8h policy triggers rest after correct tick count |
+| 3.8.13 | Implement `computeTaskDuration()` — proficiency × wellbeing × event multipliers | `src/core/entities/Employee.ts` | Test: all modifier combinations produce correct duration |
+| 3.8.14 | Add i18n keys for skill categories, proficiency labels, policy names, need labels (en + fr) | `src/core/i18n/locales/en.json`, `fr.json` | Test: all keys resolve |
+| 3.8.15 | Wire `hire`, `assign_skill`, `set_policy` console commands | `src/console/commands/entities.ts` | Integration test |
 
 ---
 
