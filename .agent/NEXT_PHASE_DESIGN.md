@@ -11,7 +11,7 @@ This document specifies the next wave of gameplay systems to implement. Each cha
 5. [Blast Algorithm — Full Pipeline](#5-blast-algorithm--full-pipeline)
 6. [NavMesh & Pathfinding](#6-navmesh--pathfinding) [to be confirmed]
 7. [Employee Needs (Eating, Sleeping, Breaks)](#7-employee-needs) [to be confirmed]
-8. [Testing Strategy](#8-testing-strategy) [to be confirmed]
+8. [Testing Strategy](#8-testing-strategy)
 
 ---
 
@@ -1183,97 +1183,192 @@ If the player builds a **Bunkhouse Tier 2+**, an 8-tick shift cycle activates: e
 
 ### 8.1 Overview
 
-BlastSimulator2026 uses a three-layer test pyramid:
+BlastSimulator2026 uses a four-layer test pyramid. **No layer is optional. More tests are always better — do not limit the number of test cases.**
 
-1. **Unit tests** — Pure functions in `src/core/`. Fast, no I/O, seeded PRNG. Run with `npm run test`. [to be confirmed]
-2. **Integration tests** — Console command sequences that exercise multiple systems together. Run with `npm run test`. [to be confirmed]
-3. **Scenario tests** — Full browser sessions driven by Puppeteer. Screenshots + JSON state dumps after every command. Run with the scenario-test script. [to be confirmed]
+1. **Unit tests** — Every exported pure function in `src/core/` has exhaustive coverage. Fast, no I/O, seeded PRNG. Run with `npm run test`.
+2. **Small integration tests** — Console command sequences covering partial gameplay loops with a huge variation of scenarios. Multiple test files per system, stressing happy paths, edge cases, failure conditions, and cross-system interactions. Run with `npm run test:integration`.
+3. **Full-level integration tests** — Complete gameplay loop simulations. Console-driven runs from `new_game` to a terminal outcome (win or each of the four loss conditions). Run with `npm run test:integration`.
+4. **Visual scenario tests** — Full browser sessions driven by Puppeteer. Screenshots + JSON state dumps after every command. Mandatory after any rendering change; full-level playthroughs inspected manually by the implementing agent. Run with the scenario-test script.
 
-All three layers must pass before any PR is merged. The `npm run validate` command runs TypeScript type-checking, unit + integration tests, and a production build in sequence.
+All four layers must pass before any PR is merged. The `npm run validate` command runs TypeScript type-checking, unit + integration tests, and a production build in sequence. Visual scenario tests are run manually and screenshots are inspected before marking any visual task complete.
 
 ### 8.2 Unit Test Conventions
 
-Unit tests live in `tests/unit/` mirroring the source tree. Every exported pure function in `src/core/` must have at least one positive test and one edge-case test. Test files use `vitest` (`describe`/`it`/`expect`). Fixtures use `Random` with a fixed seed (conventionally `seed: 42`).
+Unit tests live in `tests/unit/` mirroring the source tree. **Every exported pure function in `src/core/` must have exhaustive tests:** at minimum one positive test (expected happy path), one boundary test (edge values, empty inputs, zero, maximal values), and one failure/rejection test (invalid input, insufficient funds, missing qualification, wrong state). Functions that are trivial field getters may be tested implicitly by higher-level tests, but must still have at least one passing assertion.
+
+Test files use `vitest` (`describe`/`it`/`expect`). Fixtures use `Random` with a fixed seed (conventionally `seed: 42`). Never use `Math.random()` in tests.
 
 **Naming convention:** `<Module>.test.ts` in the same directory path as the source. E.g. `src/core/nav/Pathfinding.ts` → `tests/unit/nav/Pathfinding.test.ts`.
 
 **Coverage targets (per chapter):**
 
-| Chapter | Minimum Line Coverage | [to be confirmed]
+| Chapter | Minimum Line Coverage |
 |---------|----------------------|
-| 1 — Buildings | 90% | [to be confirmed]
-| 2 — Vehicles | 85% | [to be confirmed]
-| 3 — Employee Skills | 90% | [to be confirmed]
-| 4 — Survey System | 90% | [to be confirmed]
-| 5 — Blast Enhancements | 95% | [to be confirmed]
-| 6 — NavMesh | 85% | [to be confirmed]
-| 7 — Employee Needs | 90% | [to be confirmed]
+| 1 — Buildings | 90% |
+| 2 — Vehicles | 90% |
+| 3 — Employee Skills | 90% |
+| 4 — Survey System | 90% |
+| 5 — Blast Enhancements | 95% |
+| 6 — NavMesh | 90% |
+| 7 — Employee Needs | 90% |
 
 ### 8.3 Integration Test Conventions
 
 Integration tests live in `tests/integration/`. They use the same `vitest` runner but are allowed to import from `src/console/` (the command layer) and must exercise at least one full round-trip through the game loop. No DOM, no Three.js.
 
-Required integration test suites per chapter:
+Integration tests are split into two tiers.
 
-| Chapter | Test Suite | Key Assertions | [to be confirmed]
-|---------|-----------|---------------|
-| 1 | `buildings.integration.test.ts` | Place + upgrade building; demolish; placement failure on invalid terrain | [to be confirmed]
-| 2 | `vehicles.integration.test.ts` | Purchase → assign driver → move → refuel cycle | [to be confirmed]
-| 3 | `skills.integration.test.ts` | 700 XP triggers Legend; specialization chosen and applied | [to be confirmed]
-| 4 | `survey.integration.test.ts` | Full survey → blast → ore report comparison | [to be confirmed]
-| 5 | `blast-enhanced.integration.test.ts` | Deck charge > single-deck; presplit eliminates back-break | [to be confirmed]
-| 6 | `navmesh.integration.test.ts` | Agent routes around building; multi-level ramp path | [to be confirmed]
-| 7 | `needs.integration.test.ts` | Collapse triggers rest task; shift cycle fires on schedule | [to be confirmed]
+#### 8.3.1 Small Integration Tests — Partial Gameplay Loops
+
+Each test file exercises one cross-system interaction with a large number of scenario variations. Every file must test **at least 8 distinct scenarios** (different seeds, configurations, edge cases, or failure conditions). More scenarios are always welcome.
+
+| Test Suite | Key Scenarios (minimum set) |
+|-----------|----------------------------|
+| `buildings.integration.test.ts` | (1) Place on valid flat terrain; (2) reject on slope; (3) reject overlapping footprint; (4) demolish frees footprint on navmesh; (5) blast destroys building, applies score penalty; (6) explosive warehouse secondary blast when stock present; (7) living quarters well-being multiplier per tier; (8) research center unlocks tier after correct tick count; (9) overcapacity penalty in living quarters; (10) protected voxels block drill command |
+| `vehicles.integration.test.ts` | (1) Purchase → assign qualified driver → move to target; (2) reject unqualified driver; (3) two vehicles converge on same cell — one waits; (4) TrafficJamEvent fires at queue threshold; (5) vehicle enters `broken` state after damage; (6) repair at depot restores HP; (7) vehicle destroyed by blast projection; (8) driver exits vehicle on arrival at destination, re-enters for next task; (9) uncrewed vehicle cannot be assigned task; (10) vehicle payload tracked correctly during haul |
+| `skills.integration.test.ts` | (1) New hire has 0 qualifications; (2) training building grants skill after required ticks; (3) XP accumulates each active task tick; (4) level-up fires at correct XP threshold; (5) proficiency multiplier reduces task duration; (6) multi-skill employee salary higher than single-skill; (7) unqualified task emits UnqualifiedTaskError; (8) qualified-but-busy employee does not emit error; (9) pending action ghost added to state on dispatch, removed on claim; (10) task duration uses combined proficiency + wellbeing + event modifiers |
+| `survey.integration.test.ts` | (1) Seismic survey produces estimates within ±15% of true value (seeded); (2) core sample within ±5%; (3) aerial survey reveals only surface horizon (Y=0, Y=−1); (4) survey becomes stale at tick 101; (5) Lucky Strike event fires when yield > 120% estimate; (6) Barren Blast event fires when yield < 60%; (7) insufficient funds returns error; (8) surveyor skill level reduces error margin; (9) seismic survey damages nearby building; (10) multiple overlapping surveys accumulate results |
+| `blast-enhanced.integration.test.ts` | (1) Multi-rock voxel threshold is weighted average of coefficients; (2) energy stays local for strong rock; (3) energy spreads for weak rock; (4) island flood-fill marks hanging rock cluster; (5) building destroyed when blast energy exceeds structural resistance; (6) death probability scales with overkill energy; (7) Voronoi fragment count scales with energy/threshold ratio; (8) deep fragment velocity ≈ 0; (9) surface over-charged fragment velocity near MAX; (10) Tier A physics cap enforced; (11) ore yield matches source voxel composition; (12) navmesh dirty-region update fires after fragmentation |
+| `navmesh.integration.test.ts` | (1) A\* finds shortest path on clear grid; (2) path avoids blocked cells; (3) path avoids building footprints; (4) drill hole cell discourages but allows passage; (5) multi-level path routes via ramp; (6) `found: false` when no ramp exists for required levels; (7) path re-requested when cell becomes blocked mid-route; (8) agent enters `stuck` after 3 consecutive failed re-requests; (9) navmesh patches only affected region after blast; (10) navmesh patches after building placement; (11) vehicle-occupied cell flagged per tick |
+| `needs.integration.test.ts` | (1) Hunger drains at correct rate during active task; (2) fatigue drains faster during task than idle; (3) `rest` task auto-inserted at warning threshold; (4) collapse interrupts current task and prepends rest; (5) rest task resolves collapse flag, interrupted task resumes; (6) building at capacity queues waiting employee; (7) well-rested bonus fires when all gauges > 80 simultaneously; (8) shift cycle fires for Bunkhouse Tier 2+; (9) food cost deducted on canteen visit; (10) ground-rest lasts twice as long when no building within 20 cells |
+| `economy.integration.test.ts` | (1) Ore sale contract deducts ore, credits cash; (2) missed deadline triggers penalty fine; (3) successful negotiation improves contract terms; (4) failed negotiation worsens or keeps terms; (5) supply contract delivers explosives on schedule to warehouse; (6) rubble disposal deducts cash for plain rock; (7) bankruptcy tracker fires after sustained negative balance; (8) finance state serializes and restores correctly via save/load |
+| `events.integration.test.ts` | (1) Union event fires at correct timer interval; (2) event probability scales with well-being score; (3) decision choice affects follow-up event probabilities; (4) mafia unlocked after first corruption path choice; (5) lawsuit triggered by employee death event; (6) weather event modifies drill hole flood state; (7) TrafficJamEvent fires at correct vehicle queue threshold; (8) UnqualifiedTaskError emits for genuinely missing skill; (9) event timer resets after firing; (10) event values (fine amounts) scale with score |
+| `campaign.integration.test.ts` | (1) Level completes when profit threshold reached; (2) star rating computed from performance metrics; (3) next level unlocked on completion; (4) campaign progress persists when level is restarted; (5) bankruptcy ends current level and returns to world map; (6) arrest ends current level; (7) ecological shutdown fires after sustained ecology score of 0; (8) worker revolt fires after sustained well-being of 0; (9) player can replay completed level; (10) star rating updates if improved on replay |
+
+#### 8.3.2 Full-Level Integration Tests — Complete Gameplay Loops
+
+These tests drive an entire level via console commands from `new_game` to a terminal outcome, verifying the final `GameState`. They cover every win condition and every loss condition for all levels. These tests are slower (may require hundreds of `tick` advances) and are kept in a separate sub-directory.
+
+| Test File | Level | Outcome | Final Assertion |
+|-----------|-------|---------|-----------------|
+| `level1-win.integration.test.ts` | Level 1 (Dusty Hollow) | Win — reach profit threshold efficiently | `state.levelEndReason === 'completed'`; star rating ≥ 2 |
+| `level1-lose-bankruptcy.integration.test.ts` | Level 1 | Lose — overspend on vehicles, fail to sell ore | `state.levelEndReason === 'bankruptcy'` |
+| `level1-lose-revolt.integration.test.ts` | Level 1 | Lose — ignore employee needs; well-being hits 0 | `state.levelEndReason === 'worker_revolt'` |
+| `level1-lose-ecology.integration.test.ts` | Level 1 | Lose — repeated overblast; ecology score hits 0 | `state.levelEndReason === 'ecological_shutdown'` |
+| `level1-lose-arrest.integration.test.ts` | Level 1 | Lose — pursue corruption path to criminal charges | `state.levelEndReason === 'arrest'` |
+| `level2-win.integration.test.ts` | Level 2 (Grumpstone Ridge) | Win — multi-bench blast cycle with vibration management | `state.levelEndReason === 'completed'`; star rating ≥ 2 |
+| `level2-lose-bankruptcy.integration.test.ts` | Level 2 | Lose — strict deadline contracts missed; cascade fines | `state.levelEndReason === 'bankruptcy'` |
+| `level2-lose-revolt.integration.test.ts` | Level 2 | Lose — continuous shift policy, no Living Quarters upgrade | `state.levelEndReason === 'worker_revolt'` |
+| `level3-win.integration.test.ts` | Level 3 (Treranium Depths) | Win — deep Treranium extraction; all systems active | `state.levelEndReason === 'completed'`; star rating ≥ 1 |
+| `level3-lose-ecology.integration.test.ts` | Level 3 | Lose — tropical storm + repeated overblast | `state.levelEndReason === 'ecological_shutdown'` |
 
 ### 8.4 Scenario Test Definitions
 
-Scenario tests are defined in `scripts/scenario-defs/` as JSON files. Each scenario lists console commands; the test runner captures a screenshot and state JSON after each. New scenarios required for these chapters:
+Scenario tests are defined in `scripts/scenario-defs/` as JSON files. Each scenario lists console commands; the test runner captures a screenshot and state JSON after every command. These produce step-by-step visual evidence that must be inspected by the implementing agent.
 
-| Scenario File | Purpose | Win Condition | [to be confirmed]
-|--------------|---------|---------------|
-| `survey-then-blast.json` | Run seismic survey, inspect estimates, blast, check ore report | Lucky Strike event fires if yield > 120% estimate | [to be confirmed]
-| `skill-progression.json` | Hire driller, run 700 ticks of work, verify Legend level | `employee.skillLevel === 5` in state JSON | [to be confirmed]
-| `multi-deck-blast.json` | Place 3-deck charge, blast, verify energy field depth profile | No over-blast projection at surface; deep voxels fractured | [to be confirmed]
-| `presplit-wall.json` | Drill presplit row + production holes, verify zero back-break | `backBreakPenalty === 0` in blast result | [to be confirmed]
-| `needs-cycle.json` | Hire 3 workers, fast-forward 20 ticks, verify canteen visit auto-queued | `employee.hunger > 30` after visit | [to be confirmed]
-| `ramp-navigation.json` | Build ramp, assign worker to task on lower bench | Agent reaches destination; no `agent_stuck` event | [to be confirmed]
-| `vibration-budget.json` | Fire blast exceeding vibration budget 3 times | Third blast halted; $5,000 fine deducted | [to be confirmed]
+#### 8.4.1 Feature Scenario Tests
 
-### 8.5 Regression Test Policy
+These verify specific features from chapters 1–7 and serve as the primary visual regression check per chapter.
+
+| Scenario File | Chapter | Purpose | Pass Condition |
+|--------------|---------|---------|----------------|
+| `survey-then-blast.json` | 4 | Run seismic survey, inspect estimates, blast, check ore report | Lucky Strike event fires if yield > 120% estimate |
+| `skill-progression.json` | 3 | Hire driller, run 700 ticks of work, verify Legend level | `employee.skillLevel === 5` in state JSON |
+| `multi-deck-blast.json` | 5 | Place 3-deck charge, blast, verify energy field depth profile | No over-blast projection at surface; deep voxels fractured |
+| `presplit-wall.json` | 5 | Drill presplit row + production holes, verify zero back-break | `backBreakPenalty === 0` in blast result |
+| `needs-cycle.json` | 7 | Hire 3 workers, fast-forward 20 ticks, verify canteen visit auto-queued | `employee.hunger > 30` after visit |
+| `ramp-navigation.json` | 6 | Build ramp, assign worker to task on lower bench | Agent reaches destination; no `agent_stuck` event |
+| `vibration-budget.json` | — | Fire blast exceeding vibration budget 3 times | Third blast halted; $5,000 fine deducted |
+| `building-lifecycle.json` | 1 | Place → research upgrade → demolish → rebuild at Tier 2 | Building tier transitions correctly in state JSON |
+| `vehicle-traffic.json` | 2 | Launch 4 haulers on same narrow ramp | TrafficJamEvent fires; throughput reduced vs. wide route |
+| `employee-training.json` | 3 | Hire generalist, train at Blasting Academy, assign blast task | Task accepted after training; task rejected before training |
+| `blast-undercharge.json` | 5 | Blast with 30% of optimal charge | Oversized fragments flagged; zero projections |
+| `blast-overcharge.json` | 5 | Blast with 500% of optimal charge | Projections > 0; catastrophic rating; building receives damage |
+| `collapse-recovery.json` | 7 | Let employee fatigue reach collapse threshold | Task interrupted; rest task executed; original task resumes |
+| `contract-negotiation.json` | — | Negotiate ore sale contract 10 times with different seeds | Both improved and worsened outcomes observed across runs |
+| `weather-flood.json` | — | Trigger heavy rain; drill holes; charge water-sensitive explosive | Blast partially fails; reliability reduced; flood warning in state |
+
+#### 8.4.2 Full-Level Visual Playthrough Scenarios
+
+These drive a full level from opening state to a terminal outcome and produce screenshots after every significant action. **These must be run and inspected manually by the implementing agent after every rendering change** (see §8.5 for the full protocol).
+
+| Scenario File | Level | Outcome | Visual Checkpoints |
+|--------------|-------|---------|-------------------|
+| `level1-playthrough-win.json` | Level 1 | Win (profit threshold) | Initial terrain, first survey, first blast crater, first warehouse delivery, HUD score update, level-complete screen |
+| `level1-playthrough-revolt.json` | Level 1 | Loss (worker revolt) | Employee morale gauges declining, strike notification, game-over UI |
+| `level2-playthrough-win.json` | Level 2 | Win (profit threshold) | Multi-bench terrain visible, ramp built and used, vibration alert panel, level-complete screen |
+| `level2-playthrough-bankruptcy.json` | Level 2 | Loss (bankruptcy) | Balance declining in HUD, contract penalty dialog, bankruptcy screen |
+| `level3-playthrough-win.json` | Level 3 | Win (profit threshold) | Deep pit with multiple benches, Treranium vein ore tint visible, tropical weather sky, level-complete screen |
+| `level3-playthrough-ecology.json` | Level 3 | Loss (ecological shutdown) | Ecology score bar at 0, government notice event dialog, shutdown screen |
+
+### 8.5 Level Visualization Protocol
+
+This section defines how the implementing agent performs **manual visual validation** of the game's rendering at the level scale. These are the only non-automatic tests and must be executed before marking any rendering task complete.
+
+#### Procedure
+
+1. Start the dev server: `npm run dev &`
+2. Run a full-level playthrough scenario:
+   ```bash
+   PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium npx tsx scripts/scenario-test.ts --scenario level3-playthrough-win
+   ```
+3. After the run, open every screenshot from the output directory using the `view` tool
+4. Verify each checkpoint from the §8.4.2 table against the expected visual description
+5. If any checkpoint fails visually → do **not** mark the task complete → fix the rendering issue → re-run
+
+#### What to look for
+
+| Issue | How to detect |
+|-------|--------------|
+| Missing terrain mesh | Black void where ground should be |
+| Missing buildings | No structure visible at placed grid coordinates |
+| Missing vehicles / employees | No characters visible in the 3D scene |
+| Missing HUD / overlays | Score bars or cash counter absent from UI overlay |
+| Wrong colors | Employee role colors, ore tints, building tier colors mismatched |
+| Missing blast effects | No dust cloud, flash light, or fragment mesh during/after blast |
+| Z-fighting | Flickering surfaces where two meshes overlap |
+| Missing level-end screen | Win/loss UI absent after terminal condition reached |
+
+#### Mandatory check cadence
+
+| Trigger | Scenarios to run |
+|---------|-----------------|
+| After any terrain mesh change | `level1-playthrough-win.json` |
+| After any building renderer change | `building-lifecycle.json` + `level2-playthrough-win.json` |
+| After any employee / vehicle renderer change | `vehicle-traffic.json` + `level1-playthrough-win.json` |
+| After any blast renderer change | `blast-overcharge.json` + `level3-playthrough-win.json` |
+| After any UI / HUD change | All six level playthrough scenarios |
+| Before merging any PR | All six level playthrough scenarios |
+
+### 8.6 Regression Test Policy
 
 Any bug fix must be accompanied by a new unit or integration test that would have caught the bug. The test must fail on the buggy code and pass on the fix. This is enforced via PR review checklist.
 
-### 8.6 Test-Driven Workflow for New Features
+### 8.7 Test-Driven Workflow for New Features
 
 For each atomic task in chapters 1–7:
 
-1. Write the test first (red) [to be confirmed]
-2. Implement the minimum code to pass (green) [to be confirmed]
-3. Refactor for clarity if needed (refactor) [to be confirmed]
-4. Run `npm run validate` to confirm no regressions [to be confirmed]
-5. For visual changes: run the relevant scenario test and inspect screenshots [to be confirmed]
+1. Write the test first (red)
+2. Implement the minimum code to pass (green)
+3. Refactor for clarity if needed (refactor)
+4. Run `npm run validate` to confirm no regressions
+5. For visual changes: run the relevant scenario test and inspect screenshots per §8.5
 
-### 8.7 Performance Benchmarks
+### 8.8 Performance Benchmarks
 
 The following benchmarks must pass as part of CI (failing marks the build as yellow, not red):
 
-| Benchmark | Target | Measurement | [to be confirmed]
+| Benchmark | Target | Measurement |
 |-----------|--------|------------|
-| A\* path on 100×100 grid | < 2ms per request | `performance.now()` in unit test | [to be confirmed]
-| Full blast pipeline (500 voxels) | < 50ms | Unit test timing | [to be confirmed]
-| NavGrid full rebuild (100×100) | < 10ms | Unit test timing | [to be confirmed]
-| Frame tick at 8× speed, 20 agents | < 16ms | Integration test timing | [to be confirmed]
-| Survey estimation (radius 20) | < 5ms | Unit test timing | [to be confirmed]
+| A\* path on 100×100 grid | < 2ms per request | `performance.now()` in unit test |
+| Full blast pipeline (500 voxels) | < 50ms | Unit test timing |
+| NavGrid full rebuild (100×100) | < 10ms | Unit test timing |
+| Frame tick at 8× speed, 20 agents | < 16ms | Integration test timing |
+| Survey estimation (radius 20) | < 5ms | Unit test timing |
+| Full-level integration test (Level 1 win path) | < 30s wall clock | CI timing |
 
-### 8.8 Atomic Task Breakdown
+### 8.9 Atomic Task Breakdown
 
-| # | Task | File(s) | Test | [to be confirmed]
+| # | Task | File(s) | Test |
 |---|------|---------|------|
-| 8.8.1 | Add coverage reporter to `vitest.config.ts` (v8 provider, per-file thresholds) | `vitest.config.ts` | CI: coverage gate fails under threshold | [to be confirmed]
-| 8.8.2 | Create `tests/integration/` directory and add to test runner config | `vitest.config.ts`, `package.json` | Smoke: integration runner picks up test files | [to be confirmed]
-| 8.8.3 | Add 7 integration test suites (one per chapter) | `tests/integration/` | Each suite passes | [to be confirmed]
-| 8.8.4 | Add 7 scenario JSON files to `scripts/scenario-defs/` | `scripts/scenario-defs/` | Scenario runner executes all without crash | [to be confirmed]
-| 8.8.5 | Add performance benchmark suite | `tests/unit/benchmarks/` | Benchmarks log timing; thresholds enforced | [to be confirmed]
-| 8.8.6 | Add `npm run test:integration` and `npm run test:scenarios` scripts | `package.json` | Each script runs in isolation | [to be confirmed]
-| 8.8.7 | Update `npm run validate` to include integration tests | `package.json` | `npm run validate` exits 0 on clean repo | [to be confirmed]
-| 8.8.8 | Document test conventions in `README.md` under a "Testing" section | `README.md` | — | [to be confirmed]
+| 8.9.1 | Add coverage reporter to `vitest.config.ts` (v8 provider, per-file thresholds matching §8.2) | `vitest.config.ts` | CI: coverage gate fails when a module is below threshold |
+| 8.9.2 | Create `tests/integration/` and `tests/integration/full-level/` directories; add both to test runner config | `vitest.config.ts`, `package.json` | Smoke: both directories picked up by test runner |
+| 8.9.3 | Add 10 small integration test suites (§8.3.1, ≥ 8 scenarios each) | `tests/integration/` | Each suite passes; all scenario variants exercise distinct code paths |
+| 8.9.4 | Add 10 full-level integration tests (§8.3.2) | `tests/integration/full-level/` | Each test reaches the stated terminal condition with correct `levelEndReason` |
+| 8.9.5 | Add 15 feature scenario JSON files (§8.4.1) | `scripts/scenario-defs/` | Scenario runner executes all without crash; state JSON reflects expected outcome |
+| 8.9.6 | Add 6 full-level playthrough scenario JSON files (§8.4.2) | `scripts/scenario-defs/` | Each drives game to terminal state; screenshots captured at every checkpoint |
+| 8.9.7 | Add performance benchmark suite | `tests/unit/benchmarks/` | All benchmarks meet targets; results logged to CI output |
+| 8.9.8 | Add `npm run test:integration` and `npm run test:scenarios` scripts | `package.json` | Each script runs in full isolation without requiring the other |
+| 8.9.9 | Update `npm run validate` to include integration tests and coverage gate | `package.json` | `npm run validate` exits 0 on clean repo; non-zero on coverage failure |
+| 8.9.10 | Document test conventions and all script commands in `README.md` under a "Testing" section | `README.md` | Section covers all four test layers with example commands |
+| 8.9.11 | Run all six level playthrough scenarios after final renderer integration; inspect screenshots per §8.5 | Manual step | All visual checkpoints (§8.5) verified by agent before marking complete |
