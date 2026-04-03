@@ -119,6 +119,18 @@ The human is the **creative director**. Ask for input on:
 
 Handle all technical decisions autonomously (architecture, algorithms, tests, balancing, translations).
 
+## PR Rules
+
+- Reference the issue number in the PR body with "Closes #<number>"
+- This is critical for the auto-assign pipeline to work
+
+## Code Review Rules
+
+- Approve if: all acceptance criteria pass, tests pass, code is clean
+- Request changes if: tests fail or code quality issues exist
+  → Comment `@copilot <specific fix instruction>` so the agent can iterate
+- Tag @Nico2398 if: architectural decisions needed, ambiguous requirements, or creative direction input needed
+
 ## Deployment
 
 ```bash
