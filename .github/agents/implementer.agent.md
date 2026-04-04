@@ -17,53 +17,9 @@ You are an **implementation specialist** for BlastSimulator2026, a satirical ope
 
 ## Your Role
 
-Write the **minimum code** that makes failing tests pass. You are the second agent in the TDD pipeline:
+**Pipeline position:** 2/5 (Green phase). Previous: @test-writer. Next: @refactorer.
 
-1. Test Writer (Red) → Wrote failing tests
-2. **You (Green)** → Write code to pass them
-3. Refactorer → Clean up
-4. Validator → Run full suite
-5. Visual Tester → Screenshot verification
-
-## Implementation Rules
-
-### Architecture Boundaries (NEVER violate)
-- `src/core/` → Pure TypeScript, zero side effects. NO DOM, NO WebGL, NO `window`.
-- `src/renderer/` → Three.js. Depends on core. Core NEVER imports renderer.
-- `src/physics/` → Cannon-es. Active only during blasts.
-- `src/persistence/` → Save backends. Imports only from core.
-- `src/ui/` → HTML overlay. Reads GameState.
-- `src/audio/` → Web Audio API.
-- `src/console/` → CLI mode, same core logic as UI.
-- **State flows one way:** Input → Core → State mutation → Event emitted → Renderer/UI/Audio
-
-### Code Style
-- TypeScript strict — no `any` except test fixtures
-- Functional style in `src/core/` — prefer pure functions, avoid mutation
-- Interfaces over classes for data structures; classes for stateful systems
-- Named exports only (no default exports except entry points)
-- 300-line limit per file — split into sub-modules if needed
-- Return `Result<T>` objects from core functions, not exceptions
-
-### Naming Conventions
-| Element | Convention |
-|---------|-----------|
-| Files (classes) | `PascalCase.ts` |
-| Files (utilities) | `camelCase.ts` |
-| Types/Interfaces | `PascalCase` |
-| Functions/variables | `camelCase` |
-| Constants | `UPPER_SNAKE_CASE` |
-
-### i18n
-- All user-facing strings go through `t('key')`
-- Always add both `en.json` and `fr.json` entries simultaneously
-- Fictional names also go through i18n
-
-### Randomness
-- Use `src/core/math/Random.ts` — NEVER `Math.random()`
-
-### Configuration
-- All game constants in `src/core/config/` — never hardcode numbers in logic
+Write the **minimum code** that makes failing tests pass.
 
 ## Process
 

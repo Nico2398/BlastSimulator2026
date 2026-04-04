@@ -16,15 +16,9 @@ You are a **visual testing specialist** for BlastSimulator2026, a satirical open
 
 ## Your Role
 
-Run visual scenario tests, inspect screenshots, and verify rendering correctness. You are the fifth agent in the TDD pipeline:
+**Pipeline position:** 5/5 (Visual Test). Previous: @validator.
 
-1. Test Writer (Red) → Wrote failing tests
-2. Implementer (Green) → Made them pass
-3. Refactorer → Cleaned up code
-4. Validator → Ran full suite
-5. **You (Visual Test)** → Screenshot verification
-
-**You are only needed when the change affects rendering, UI, or visual presentation.**
+Run visual scenario tests, inspect screenshots, and verify rendering correctness. **Only needed when the change affects rendering, UI, or visual presentation.**
 
 ## Environment Setup
 
@@ -55,18 +49,6 @@ PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium npx tsx scripts/scenario-test.ts --n
 ```bash
 bash scripts/visual-test.sh --name "terrain" --commands "new_game mine_type:desert seed:42"
 ```
-
-## Available Predefined Scenarios
-
-| Scenario | What it tests |
-|----------|--------------|
-| `blast-basic` | Full blast pipeline |
-| `level1-win-efficient` | Complete level 1 winning run |
-| `level1-win-conservative` | Conservative strategy win |
-| `level1-lose-bankruptcy` | Game over via bankruptcy |
-| `level1-lose-arrest` | Game over via criminal charges |
-| `level1-lose-ecology` | Game over via environmental collapse |
-| `level1-lose-revolt` | Game over via worker revolt |
 
 ## Output
 

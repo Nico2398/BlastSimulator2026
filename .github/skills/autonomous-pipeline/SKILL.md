@@ -6,44 +6,9 @@ description: >
   Use when setting up, debugging, or modifying the CI/CD automation pipeline.
 ---
 
-## Architecture
+## Pipeline Flow
 
-```
-YOU ──► Write issues (backlog) ──► Label "ready"
-                                        │
-        ┌───────────────────────────────┘
-        ▼
-  ┌─────────────────────┐
-  │ AUTO-ASSIGN WORKFLOW │ (GitHub Actions on merge or on schedule)
-  │ Picks next "ready"   │
-  │ Assigns to @copilot  │
-  └──────────┬──────────┘
-             ▼
-  ┌─────────────────────┐
-  │ COPILOT CODING AGENT│ ◄── reads copilot-instructions.md
-  │ Writes code          │ ◄── runs in copilot-setup-steps.yml env
-  │ Runs tests           │ ◄── CI runs automatically
-  │ Opens PR             │
-  └──────────┬──────────┘
-             ▼
-  ┌─────────────────────┐
-  │ COPILOT CODE REVIEW │ (automatic, independent context)
-  │ Reviews PR quality   │
-  │ Checks acceptance    │
-  └──────┬─────────┬────┘
-         │         │
-      PASSES     FAILS
-         │         │
-         ▼         ▼
-  ┌──────────┐  ┌──────────────────┐
-  │AUTO-MERGE│  │ @copilot fix OR  │
-  │ + close  │  │ tag @you         │
-  │ issue    │  │ label "blocked"  │
-  └────┬─────┘  └──────────────────┘
-       │
-       ▼
-  AUTO-ASSIGN NEXT "ready" ISSUE ──► LOOP
-```
+`ready` label → **auto-assign-next.yml** assigns issue to @copilot → coding agent reads instructions + runs CI + opens PR → **Copilot code review**: pass → auto-approve + squash-merge + close issue + assign next `ready`; fail → comment `@copilot fix X` or label `blocked` → human review.
 
 ## Repository Settings (One-Time Setup)
 
@@ -77,12 +42,7 @@ YOU ──► Write issues (backlog) ──► Label "ready"
 
 ## The Reviewer Agent
 
-The Copilot code review agent creates a closed feedback loop:
-1. Coding agent opens PR → requests review
-2. Code review agent reviews → finds issue → comments `@copilot fix X`
-3. Coding agent pushes fix → CI runs
-4. Code review re-reviews → approves
-5. Auto-merge merges → chain assigns next issue
+Code review finds issue → comments `@copilot fix X` → coding agent pushes fix → CI re-runs → review re-approves → auto-merge.
 
 ## Writing Good Issues
 

@@ -16,13 +16,9 @@ You are a **validation specialist** for BlastSimulator2026, a satirical open-pit
 
 ## Your Role
 
-Run the complete validation suite and report results. You are the fourth agent in the TDD pipeline:
+**Pipeline position:** 4/5 (Validate). Previous: @refactorer. Next: @visual-tester (visual changes only).
 
-1. Test Writer (Red) → Wrote failing tests
-2. Implementer (Green) → Made them pass
-3. Refactorer → Cleaned up code
-4. **You (Validate)** → Run full suite
-5. Visual Tester → Screenshot verification (if visual changes)
+Run the complete validation suite and report results.
 
 ## Validation Steps
 
@@ -75,17 +71,6 @@ Compare the test results against the expected state:
 - Are there any tests that previously passed but now fail?
 - Are there any new compiler errors in unmodified files?
 - Does the build output size look reasonable?
-
-## Performance Benchmarks
-
-If benchmark tests exist, verify they meet targets:
-
-| Benchmark | Target |
-|-----------|--------|
-| A* path on 100×100 grid | < 2ms |
-| Full blast pipeline (500 voxels) | < 50ms |
-| NavGrid full rebuild (100×100) | < 10ms |
-| Frame tick at 8× speed, 20 agents | < 16ms |
 
 ## Interactive Verification (Optional)
 

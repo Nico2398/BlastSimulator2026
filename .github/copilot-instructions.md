@@ -2,25 +2,9 @@
 
 **What it is:** A satirical open-pit mine management game (Theme Hospital meets capitalism). Cartoon 3D visuals, blast physics, union strikes, mafia, lawsuits, 3-level campaign.
 
-## Skills — Domain Knowledge (auto-loaded when relevant)
+## Skills
 
-Skills in `.github/skills/` are progressively loaded by Copilot when their topic matches your task. You don't need to read them manually — they activate automatically. Available skills:
-
-| Skill | When it activates |
-|-------|------------------|
-| `architecture` | Structural changes, new modules, understanding system connections |
-| `blast-system` | Blast mechanics, full 4-step pipeline (energy propagation, Voronoi, Tier A/B physics) |
-| `buildings` | Buildings, construction, demolition, tier upgrades, training, Research Center |
-| `vehicle-fleet` | Vehicles, driving, traffic, hauling, drilling, digging, demolition |
-| `employee-skills` | Employee qualifications, proficiency, task queue, pending-action pool, ghost preview |
-| `survey-system` | Surveys, ore discovery, voxel rock composition, post-blast ore yield |
-| `navmesh` | Agent movement, A* pathfinding, ramps, dynamic navgrid updates |
-| `employee-needs` | Hunger/fatigue/break gauges, collapse, canteen/bunkhouse, shift system |
-| `game-design` | General game mechanics, economy, events, campaign, save system |
-| `testing-strategy` | Writing tests, integration suites, scenario definitions, benchmarks, validation |
-| `visual-testing` | Rendering, UI, screenshot/scenario testing, Puppeteer |
-| `coding-conventions` | Code style, naming, i18n, error handling, PR rules |
-| `autonomous-pipeline` | CI/CD pipeline setup or debugging |
+Skills in `.github/skills/` auto-load based on task relevance: `architecture`, `blast-system`, `buildings`, `vehicle-fleet`, `employee-skills`, `survey-system`, `navmesh`, `employee-needs`, `game-design`, `testing-strategy`, `visual-testing`, `coding-conventions`, `autonomous-pipeline`.
 
 ## Custom Agents — TDD Development Pipeline
 
