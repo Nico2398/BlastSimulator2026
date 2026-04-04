@@ -1,199 +1,239 @@
 ---
 name: blast-system
 description: >
-  Blast physics specification for BlastSimulator2026: energy calculation, fragmentation model,
-  terrain subtraction, fragment generation, detonation sequence, vibration, quality assessment,
-  and software upgrades. Use when working on blast mechanics, mining systems, or physics code.
+  Full blast pipeline specification for BlastSimulator2026: 4-step simulation (energy propagation,
+  Voronoi fragmentation, fragment shape generation, tiered physics). Covers voxel rock composition,
+  Delaunay/Voronoi algorithms, Tier A/B physics, balance constants, and atomic task breakdown.
+  Use when working on blast mechanics, mining systems, fragment physics, or voxel grid code.
 ---
 
-## Overview
+## Pipeline Overview
 
-When a blast is executed, the following pipeline runs:
-
-```
-BlastPlan → Energy Calculation → Fragmentation → Terrain Subtraction → Fragment Generation → Physics Simulation → Damage Assessment → State Update
-```
-
-## Energy Calculation
-
-For each hole `i` in the blast plan:
+The blast system is a four-step physical simulation, all tuning constants in `src/core/config/balance.ts`:
 
 ```
-E_i = explosive.energyPerKg * chargePlan[i].amountKg
+Step 1: Energy Propagation through voxel grid
+Step 2: Voxel Fragmentation + Collision Mesh Rebuild
+Step 3: Fragment Shape Generation (Voronoi)
+Step 4: Fragment Projection + Physics Settle
 ```
 
-The energy field at any point `P` in the rock is the sum of contributions from all holes:
+## Voxel Data Model
 
-```
-E(P) = Σ_i [ E_i / (distance(P, hole_i.position)² + ε) ]
-```
+**Voxel size:** 1 m × 1 m × 1 m cells (SI units throughout).
 
-Where `ε` is a small constant to avoid division by zero (e.g., 0.01).
-
-### Stemming Effect
-Stemming (inert material packed at the top of the hole) directs energy downward. If stemming is insufficient:
-- Energy bleeds upward → **upward projections**
-- Effective energy at depth is reduced
-
-```
-stemming_factor = clamp(stemmingHeight / (holeDepth * 0.3), 0, 1)
-effective_E_i = E_i * (0.5 + 0.5 * stemming_factor)   // energy at depth
-upward_E_i = E_i * (1 - stemming_factor) * 0.7         // energy directed upward (projection risk)
-```
-
-### Water Effect
-If the hole contains water (rain + porous rock + no tubing) and the explosive is water-sensitive:
-
-```
-if (hole.isFlooded && explosive.waterSensitive && !hole.hasTubing):
-    effective_E_i = effective_E_i * 0.1   // explosive mostly fails
-    reliability = 0.1                      // 10% chance it works at all
-```
-
-## Fragmentation Model
-
-### Fracture Threshold
-Each rock type has a `fractureThreshold` (energy needed to break it).
-
-```
-if E(voxel.center) >= rock.fractureThreshold:
-    voxel is fractured → becomes a fragment
-elif E(voxel.center) >= rock.fractureThreshold * 0.5:
-    voxel is cracked → weakened for future blasts (reduce threshold by 30%)
-else:
-    voxel is unaffected
-```
-
-### Fragment Size
-Fragment size depends on how much energy exceeds the threshold:
-
-```
-energy_ratio = E(voxel.center) / rock.fractureThreshold
-if energy_ratio >= 1.0 and energy_ratio < 2.0:
-    fragment_size = voxel_size * lerp(1.0, 0.3, (energy_ratio - 1.0))
-elif energy_ratio >= 2.0 and energy_ratio < 4.0:
-    fragment_size = voxel_size * lerp(0.3, 0.1, (energy_ratio - 2.0) / 2.0)
-elif energy_ratio >= 4.0:
-    fragment_size = voxel_size * 0.05   // Over-blasted — dust and projections
-```
-
-### Fragment Count
-Total volume of fragments must equal volume of fractured voxels (conservation of mass):
-```
-fragments_per_voxel = ceil(voxel_volume / fragment_volume)
-```
-
-## Terrain Subtraction
-
-When voxels are fractured:
-1. Their density in the VoxelGrid is set to 0 (empty)
-2. The marching cubes mesh must be recalculated for the affected region
-3. Cracked (but not fractured) voxels have their fracture threshold reduced but remain in the grid
-
-## Fragment Generation
-
-Each fragment is a data object:
+**Rock composition per voxel** — up to 4 rock types with coefficients summing to 1.0:
 
 ```typescript
-interface FragmentData {
-    id: string;
-    position: Vec3;
-    size: Vec3;
-    volume: number;           // m³
-    mass: number;             // kg (volume * rock.density)
-    rockType: string;
-    oreDensities: OreMap;
-    initialVelocity: Vec3;
-    isProjection: boolean;    // If energy_ratio >= 4.0
+export interface VoxelRockComposition {
+  rocks: Array<{ rockId: string; coefficient: number }>;
 }
 ```
 
-### Initial Velocity Calculation
+Generation: per-rock 3D Simplex noise field + level bias, normalized:
 ```
-direction = normalize(fragment.position - nearestHole.position)
-speed = sqrt(2 * E(fragment.position) / fragment.mass) * projection_factor
-```
-
-A fragment is classified as a **projection** if:
-- Its initial speed exceeds `projection_speed_threshold` (configurable, e.g., 15 m/s)
-- OR it originates from a voxel where `energy_ratio >= 4.0`
-
-## Detonation Sequence Simulation
-
-### Time Steps
-The blast is simulated in millisecond steps:
-```
-for t in range(0, max_delay + blast_duration, dt):
-    for each hole with delay == t:
-        detonate(hole)  → calculate energy, create fragments
-    advance_physics(dt)
+raw[r] = simplex3(x * r.noiseFreq, y * r.noiseFreq, z * r.noiseFreq) + r.levelBias
+coefficient[r] = max(0, raw[r]) / sum(max(0, raw))
 ```
 
-### Free Face Principle
-Holes should detonate toward a **free face** (an open surface where rock can move). If a hole detonates with no free face:
-- Energy converts to **vibrations** instead of fragmentation
-- Much worse vibration score impact
-- Fragmentation quality is poor (large blocks)
-
-```
-free_face_factor = calculateFreeFace(hole, currentTerrainState)
-effective_fragmentation = base_fragmentation * (0.3 + 0.7 * free_face_factor)
-vibration_multiplier = 1.0 + 2.0 * (1.0 - free_face_factor)
+**Ore veins** — not homogeneous. Each ore has a separate Simplex field with high threshold, producing elongated veins:
+```typescript
+export interface VoxelOreComposition {
+  ores: Array<{ oreId: string; density: number }>; // density 0–1
+}
 ```
 
-## Vibration Calculation
+## Step 1 — Energy Propagation
 
+**Per-voxel energy threshold** (weighted by rock composition):
 ```
-V(d) = Σ_i [ charge_per_delay_i^0.7 / d^1.5 ] * ground_factor
+T(v) = Σ_r [ coefficient[r] * rockDef[r].energyAbsorption ]
 ```
 
-Where `charge_per_delay_i` is the total charge detonating at the same millisecond delay. Spreading the sequence reduces vibrations.
+**Initial energy** (per charged hole cell):
+```
+E_init(v) = explosiveDef.energyPerKg * chargeKg * stemmingEfficiency(stemmingM, depthM)
+```
 
-## Blast Quality Assessment
+**Propagation loop** (iterative, guard at `MAX_PROPAGATION_ITERATIONS = 500`):
+```
+For each voxel v with overflowEnergy[v] > 0:
+  absorbed = min(incoming, T(v) - effectiveEnergy[v])
+  effectiveEnergy[v] += absorbed
+  leftover = incoming - absorbed
+  generatedOverflow[v] += leftover  // used in Step 4
+
+  if leftover > 0:
+    distribute share to up to 6 face-adjacent non-air neighbours
+```
+
+This naturally models confined blasts (strong rock → energy stays local) and overcharged blasts (energy radiates outward).
+
+## Step 2 — Fragmentation & Damage
+
+**Fragmentation criterion:**
+```
+if effectiveEnergy[v] >= FRAGMENTATION_MULTIPLIER * T(v):  → voxel becomes air (fragment)
+```
+`FRAGMENTATION_MULTIPLIER = 1.0` (balance constant).
+
+**Isolated rock islands:** After fragmentation pass, flood-fill from grid boundary. Solid clusters with no path to boundary are also fragmented (handles hanging rock arches).
+
+**Entity damage:**
+- Employees/vehicles on a fragmented voxel → instantly killed/destroyed
+- Buildings: sum `effectiveEnergy` of all voxels beneath footprint. If sum > `buildingDef.structuralResistance` → building destroyed. Occupant survival:
+  ```
+  deathProbability = clamp((totalEnergy / structuralResistance - 1.0) * 0.5, 0.30, 1.00)
+  ```
+  Uses seeded PRNG.
+
+**NavMesh update:** All fragmented voxels + new exposed surface cells → submitted as dirty region to NavGrid (Ch.6).
+
+## Step 3 — Fragment Shape Generation (Voronoi)
+
+**Fragmentation score per voxel:**
+```
+F(v) = FRAGMENTATION_SCORE_SCALE * (effectiveEnergy[v] / T(v))
+fragmentCount(v) = max(1, round(F(v)))
+```
+`FRAGMENTATION_SCORE_SCALE = 3.0`.
+
+**Voronoi seed sampling:** randomly sample `fragmentCount(v)` 3D points inside each fragmented voxel's unit cube. All points form a global point cloud P.
+
+**3D Voronoi decomposition:**
+1. **Bowyer–Watson Delaunay tetrahedralization** of point cloud P
+2. **Dual Voronoi cells**: circumcentres of Delaunay tetrahedra as vertices
+3. **Clip** each cell to the fragmented voxel union bounding box
+
+If `count(P) > MAX_VORONOI_POINTS (2000)`, cull lowest-score voxels first.
+
+**Merging pass** (non-convex, realistic shapes):
+```
+for each Voronoi cell C:
+  if rng.next() < MERGE_PROBABILITY (0.35):
+    merge with random face-adjacent neighbour N (union of convex hulls)
+```
+
+**RockFragment schema:**
+```typescript
+export interface RockFragment {
+  id: number;
+  cx: number; cy: number; cz: number;
+  graphicVertices: Float32Array;
+  collisionVertices: Float32Array;   // deflated inward by COLLISION_DEFLATE_AMOUNT (0.05m)
+  composition: VoxelRockComposition;
+  oreComposition: VoxelOreComposition;
+  volumeM3: number;
+  massKg: number;
+  overflowEnergy: number;            // inherited from source voxels
+  velocity: Vec3;
+  simulationTier: 'projected' | 'collapse';
+  state: 'flying' | 'settling' | 'static';
+}
+```
+
+## Step 4 — Projection Velocity & Physics Settle
+
+**Velocity assignment (energy gradient + surface proximity):**
+```
+grad_dir = normalize(-computeEnergyGradient(effectiveEnergy, C))
+distToAir = distanceToNearestAirVoxel(C)
+surfaceProximityFactor = exp(-distToAir * SURFACE_PROXIMITY_DECAY)  // decay = 0.5
+v_mag = sqrt(2 * fragment.overflowEnergy / fragment.massKg) * surfaceProximityFactor
+v_mag = min(v_mag, MAX_PROJECTION_VELOCITY)  // 80 m/s
+F.velocity = grad_dir * v_mag
+```
+
+**Classification:** `v_mag > PROJECTION_VELOCITY_THRESHOLD (2.0 m/s)` → `'projected'`; else `'collapse'`.
+
+**Tier A — Projected fragments:**
+- Full Cannon-es rigid body with `massKg` and convex hull collision
+- Hard cap: `PHYSICS_FRAGMENT_CAP = 200` full bodies; beyond cap → parabolic trajectory (analytic)
+- Aggressive sleep: `|velocity| < SLEEP_VELOCITY_THRESHOLD (0.1 m/s)` for `SLEEP_TICKS_REQUIRED (15)` ticks → `'static'`
+
+**Tier B — Collapse fragments:**
+- No Cannon-es body. Drops straight down each tick until hitting terrain or static fragment
+- Instantaneous landing → registers in surface grid → `'static'` (CPU-free)
+
+**Landing damage (both tiers):** if human, vehicle, or building in impact cell → apply `impactEnergy = massKg * v_mag²`.
+
+**Fragment collection rules:**
+```
+oversized = fragment.volumeM3 > OVERSIZED_FRAGMENT_THRESHOLD (0.5 m³)
+oversized  → must be broken by Rock Fragmenter first
+!oversized → Debris Hauler with capacity ≥ fragment.massKg can collect directly
+```
+
+## Balance Constants (`src/core/config/balance.ts`)
+
+```typescript
+export const MAX_PROPAGATION_ITERATIONS = 500;
+export const FRAGMENTATION_MULTIPLIER = 1.0;
+export const FRAGMENTATION_SCORE_SCALE = 3.0;
+export const MERGE_PROBABILITY = 0.35;
+export const COLLISION_DEFLATE_AMOUNT = 0.05;
+export const SURFACE_PROXIMITY_DECAY = 0.5;
+export const MAX_PROJECTION_VELOCITY = 80;
+export const PROJECTION_VELOCITY_THRESHOLD = 2.0;
+export const PHYSICS_FRAGMENT_CAP = 200;
+export const SLEEP_VELOCITY_THRESHOLD = 0.1;
+export const SLEEP_TICKS_REQUIRED = 15;
+export const MAX_VORONOI_POINTS = 2000;
+export const OVERSIZED_FRAGMENT_THRESHOLD = 0.5;
+```
+
+## Blast Quality Rating
 
 ```typescript
 interface BlastReport {
-    fragmentCount: number;
-    averageFragmentSize: number;
-    fragmentSizeStdDev: number;
-    oversizedFragments: number;
-    projectionCount: number;
-    maxProjectionDistance: number;
-    vibrationAtVillages: VillageVibration[];
-    casualties: number;
-    buildingsDestroyed: string[];
-    vehiclesDestroyed: string[];
-    totalRockVolume: number;
-    totalOreValue: number;
-    rating: 'perfect' | 'good' | 'mediocre' | 'bad' | 'catastrophic';
+  fragmentCount: number;
+  averageFragmentSize: number;
+  oversizedFragments: number;
+  projectionCount: number;
+  maxProjectionDistance: number;
+  vibrationAtVillages: VillageVibration[];
+  casualties: number;
+  buildingsDestroyed: string[];
+  totalRockVolume: number;
+  totalOreValue: number;
+  rating: 'perfect' | 'good' | 'mediocre' | 'bad' | 'catastrophic';
 }
 ```
 
-### Rating Criteria
-- **Perfect:** Good fragmentation, zero projections, low vibrations
-- **Good:** Acceptable fragmentation, 0-2 minor projections within safety zone
-- **Mediocre:** Some oversized blocks OR some projections beyond safety zone
-- **Bad:** Many oversized blocks OR casualties OR building damage
-- **Catastrophic:** Multiple deaths OR widespread destruction
-
 ## Software Upgrades (Prediction Tools)
 
-| Tier | Name | Shows | Cost |
-|------|------|-------|------|
-| 0 | None | Nothing — blind blasting | Free |
-| 1 | "BlastView Basic" | Energy heatmap (2D top-down) | $ |
-| 2 | "FragPredict" | Expected fragment size distribution | $$ |
-| 3 | "ProjectoScan" | Projection risk zones (3D overlay) | $$$ |
-| 4 | "VibroMap Pro" | Vibration propagation to villages | $$$$ |
+| Tier | Name | Shows |
+|------|------|-------|
+| 0 | None | Blind blasting |
+| 1 | "BlastView Basic" | Energy heatmap (2D top-down) |
+| 2 | "FragPredict" | Expected fragment size distribution |
+| 3 | "ProjectoScan" | Projection risk zones (3D overlay) |
+| 4 | "VibroMap Pro" | Vibration propagation to villages |
 
-## Implementation Priority
+## Atomic Task Breakdown
 
-1. **BlastCalc.ts** — Pure math: energy field, fragmentation, velocity
-2. **BlastResult.ts** — Data structures for blast outcomes
-3. **VoxelGrid terrain subtraction** — Removing fractured voxels
-4. **Fragment generation** — Creating fragment data objects
-5. **Sequence simulation** — Time-stepped detonation
-6. **Vibration calculation** — Score impact
-7. **Physics integration** — Cannon-es bodies for fragments
-8. **Collision/damage** — Fragment impacts on entities
-9. **Prediction overlays** — Software tier visualizations
+| # | Task | File(s) |
+|---|------|---------|
+| 5.7.0 | **Prerequisite:** Change `VoxelCell.rockId` to `VoxelCell.composition: VoxelRockComposition`; update TerrainGen + all callers | `src/core/voxels/VoxelGrid.ts`, `src/core/terrain/TerrainGen.ts` |
+| 5.7.1 | Assert voxel cell size = 1 m | `src/core/voxels/VoxelGrid.ts` |
+| 5.7.2 | Add `energyAbsorption` and `density` constants to each `RockDef` | `src/core/config/RockCatalog.ts` |
+| 5.7.3 | Implement `computeThreshold(voxel)` — weighted sum of rock coefficients × absorption | `src/core/mining/BlastCalc.ts` |
+| 5.7.4 | Implement `computeInitialEnergy(hole)` — explosive × kg × stemming efficiency | `src/core/mining/BlastCalc.ts` |
+| 5.7.5 | Implement `propagateEnergy(grid, initial)` — iterative overflow loop, guard at 500 | `src/core/mining/BlastCalc.ts` |
+| 5.7.6 | Implement `identifyFragmentedVoxels()` — fragmentation criterion + island flood-fill | `src/core/mining/BlastCalc.ts` |
+| 5.7.7 | Entity damage — instant kill for employees/vehicles; building sum + survival roll | `src/core/mining/BlastCalc.ts` |
+| 5.7.8 | Implement `computeFragmentationScore()` and Voronoi seed sampling | `src/physics/VoronoiFrag.ts` (new) |
+| 5.7.9 | Implement Bowyer-Watson Delaunay + dual Voronoi + clip; respect `MAX_VORONOI_POINTS` | `src/physics/VoronoiFrag.ts` |
+| 5.7.10 | Implement Voronoi merging pass (`MERGE_PROBABILITY ≈ 0.35`) | `src/physics/VoronoiFrag.ts` |
+| 5.7.11 | Generate `RockFragment` objects: graphic mesh, deflated collision mesh, `overflowEnergy` | `src/physics/FragmentSim.ts` (new) |
+| 5.7.12 | Implement Step 4 velocity: energy gradient × surface proximity; classify `simulationTier` | `src/physics/FragmentSim.ts` |
+| 5.7.13 | Implement Tier A cannon-es loop — full rigid body, cap, parabolic fallback | `src/physics/FragmentSim.ts` |
+| 5.7.14 | Implement Tier B gravity-drop — straight-down, column stack, immediate static | `src/physics/FragmentSim.ts` |
+| 5.7.15 | Implement aggressive sleep: stationary for `SLEEP_TICKS_REQUIRED` → `'static'` | `src/physics/FragmentSim.ts` |
+| 5.7.16 | Implement fragment support graph and stack-collapse on pickup | `src/physics/FragmentSim.ts` |
+| 5.7.17 | Implement fragment size check and oversized flag | `src/core/mining/BlastCalc.ts` |
+| 5.7.18 | Wire ore reporting: collect fragment → add to `GameState.collectedOre` | `src/core/GameState.ts` |
+| 5.7.19 | Trigger NavMesh dirty-region update after fragmentation pass | `src/core/voxels/NavGrid.ts` |
+| 5.7.20 | Add all balance constants to `balance.ts` | `src/core/config/balance.ts` |
+| 5.7.21 | Add i18n keys for blast damage events, oversized fragment alert (en + fr) | `src/core/i18n/locales/en.json`, `fr.json` |
+| 5.7.22 | Add `blast_preview` console command — prints energy map, fragment count, projected/collapse split | `src/console/commands/mining.ts` |

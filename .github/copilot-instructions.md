@@ -9,11 +9,17 @@ Skills in `.github/skills/` are progressively loaded by Copilot when their topic
 | Skill | When it activates |
 |-------|------------------|
 | `architecture` | Structural changes, new modules, understanding system connections |
-| `blast-system` | Blast mechanics, mining systems, physics code |
-| `game-design` | Any game mechanic or feature implementation |
-| `testing-strategy` | Writing tests, test infrastructure, validation |
-| `visual-testing` | Rendering, UI, screenshot/scenario testing |
-| `coding-conventions` | Code style, naming, i18n, error handling |
+| `blast-system` | Blast mechanics, full 4-step pipeline (energy propagation, Voronoi, Tier A/B physics) |
+| `buildings` | Buildings, construction, demolition, tier upgrades, training, Research Center |
+| `vehicle-fleet` | Vehicles, driving, traffic, hauling, drilling, digging, demolition |
+| `employee-skills` | Employee qualifications, proficiency, task queue, pending-action pool, ghost preview |
+| `survey-system` | Surveys, ore discovery, voxel rock composition, post-blast ore yield |
+| `navmesh` | Agent movement, A* pathfinding, ramps, dynamic navgrid updates |
+| `employee-needs` | Hunger/fatigue/break gauges, collapse, canteen/bunkhouse, shift system |
+| `game-design` | General game mechanics, economy, events, campaign, save system |
+| `testing-strategy` | Writing tests, integration suites, scenario definitions, benchmarks, validation |
+| `visual-testing` | Rendering, UI, screenshot/scenario testing, Puppeteer |
+| `coding-conventions` | Code style, naming, i18n, error handling, PR rules |
 | `autonomous-pipeline` | CI/CD pipeline setup or debugging |
 
 ## Custom Agents — TDD Development Pipeline
