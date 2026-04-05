@@ -7,7 +7,7 @@
 
 import * as THREE from 'three';
 import type { Building, BuildingType } from '../core/entities/Building.js';
-import { getBuildingDef } from '../core/entities/Building.js';
+import { getBuildingDef, getDefSize } from '../core/entities/Building.js';
 
 // ---------- Placeholder config per building type ----------
 
@@ -62,11 +62,8 @@ export class BuildingMesh {
     const isDestroyed = building.hp <= 0;
     const baseColor = isDestroyed ? DESTROYED_COLOR : vis.color;
 
-    // Compute bounding-box size from footprint
-    const xs = def.footprint.map(([dx]) => dx);
-    const zs = def.footprint.map(([, dz]) => dz);
-    const sizeX = Math.max(...xs) + 1;
-    const sizeZ = Math.max(...zs) + 1;
+    // Use cached bounding-box size derived from the def's footprint
+    const { sizeX, sizeZ } = getDefSize(def);
 
     // Base box — spans the full footprint
     const baseGeo = new THREE.BoxGeometry(sizeX, vis.height, sizeZ);

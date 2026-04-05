@@ -56,7 +56,12 @@ export interface BuildingDef {
   capacity: number;
   /** Max HP before destruction from blast damage. */
   maxHp: number;
-  /** Minimum cumulative blast energy (J) to trigger destruction. */
+  /**
+   * Reserved for future blast/damage modeling.
+   * Currently configuration-only and not consumed by runtime destruction logic.
+   * Will gate building destruction when the blast-projection energy accumulator
+   * is wired into the damage pipeline.
+   */
   structuralResistance: number;
   /** Score delta effects per tick while active. */
   scoreEffects: Partial<Record<ScoreId, number>>;
@@ -77,12 +82,37 @@ export function getAllBuildingTypes(): BuildingType[] {
 
 // ── Footprint helpers ──
 
-/** Derive bounding-box size from a footprint cell list. */
-function footprintSize(fp: ReadonlyArray<readonly [number, number]>): { sizeX: number; sizeZ: number } {
+/**
+ * Derive bounding-box size from a footprint cell list.
+ * The result is cached per `BuildingDef` reference; pass the same `def` object
+ * to avoid recomputing on repeated calls (e.g. in tight damage loops).
+ */
+export function getFootprintSize(fp: ReadonlyArray<readonly [number, number]>): { sizeX: number; sizeZ: number } {
   if (fp.length === 0) return { sizeX: 0, sizeZ: 0 };
-  const sizeX = Math.max(...fp.map(([dx]) => dx)) + 1;
-  const sizeZ = Math.max(...fp.map(([, dz]) => dz)) + 1;
-  return { sizeX, sizeZ };
+  let maxX = 0;
+  let maxZ = 0;
+  for (const [dx, dz] of fp) {
+    if (dx > maxX) maxX = dx;
+    if (dz > maxZ) maxZ = dz;
+  }
+  return { sizeX: maxX + 1, sizeZ: maxZ + 1 };
+}
+
+/** Pre-computed footprint bounds cache keyed by `BuildingDef` object identity. */
+const _footprintSizeCache = new WeakMap<BuildingDef, { sizeX: number; sizeZ: number }>();
+
+/**
+ * Return cached bounding-box size for a `BuildingDef`.
+ * On the first call for a given def object the size is derived from its footprint
+ * and stored; subsequent calls return the cached value with zero allocations.
+ */
+export function getDefSize(def: BuildingDef): { sizeX: number; sizeZ: number } {
+  let size = _footprintSizeCache.get(def);
+  if (size === undefined) {
+    size = getFootprintSize(def.footprint);
+    _footprintSizeCache.set(def, size);
+  }
+  return size;
 }
 
 // ── Building instance ──
@@ -129,7 +159,7 @@ export function placeBuilding(
   tier: BuildingTier = 1,
 ): PlaceBuildingResult {
   const def = getBuildingDef(type, tier);
-  const { sizeX, sizeZ } = footprintSize(def.footprint);
+  const { sizeX, sizeZ } = getDefSize(def);
 
   if (x < 0 || z < 0 || x + sizeX > gridSizeX || z + sizeZ > gridSizeZ) {
     return { success: false, error: 'Out of bounds' };
@@ -173,7 +203,7 @@ export function moveBuilding(
   if (!building) return { success: false, error: 'Building not found' };
 
   const def = getBuildingDef(building.type, building.tier);
-  const { sizeX, sizeZ } = footprintSize(def.footprint);
+  const { sizeX, sizeZ } = getDefSize(def);
 
   if (newX < 0 || newZ < 0 || newX + sizeX > gridSizeX || newZ + sizeZ > gridSizeZ) {
     return { success: false, error: 'Out of bounds' };
@@ -308,7 +338,7 @@ function isOccupied(
   for (const b of state.buildings) {
     if (excludeId !== undefined && b.id === excludeId) continue;
     const def = getBuildingDef(b.type, b.tier);
-    const { sizeX: bSX, sizeZ: bSZ } = footprintSize(def.footprint);
+    const { sizeX: bSX, sizeZ: bSZ } = getDefSize(def);
     if (x < b.x + bSX && x + sizeX > b.x &&
         z < b.z + bSZ && z + sizeZ > b.z) {
       return true;

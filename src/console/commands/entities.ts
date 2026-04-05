@@ -8,6 +8,7 @@ import {
   moveBuilding,
   getAllBuildingTypes,
   getBuildingDef,
+  getDefSize,
   type BuildingType,
 } from '../../core/entities/Building.js';
 import {
@@ -83,10 +84,7 @@ export function buildCommand(
       const lines = ['Building types:'];
       for (const type of getAllBuildingTypes()) {
         const def = getBuildingDef(type);
-        const xs = def.footprint.map(([dx]) => dx);
-        const zs = def.footprint.map(([, dz]) => dz);
-        const sizeX = Math.max(...xs) + 1;
-        const sizeZ = Math.max(...zs) + 1;
+        const { sizeX, sizeZ } = getDefSize(def);
         lines.push(`  ${type} — $${def.constructionCost} | ${sizeX}x${sizeZ} | HP: ${def.maxHp}`);
       }
       return { success: true, output: lines.join('\n') };

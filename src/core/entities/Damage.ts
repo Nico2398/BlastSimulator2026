@@ -5,7 +5,7 @@
 import type { FragmentData } from '../mining/BlastExecution.js';
 import { length } from '../math/Vec3.js';
 import type { BuildingState, Building } from './Building.js';
-import { getBuildingDef, destroyBuilding } from './Building.js';
+import { getBuildingDef, getDefSize, destroyBuilding } from './Building.js';
 import type { VehicleState, Vehicle } from './Vehicle.js';
 import { destroyVehicle } from './Vehicle.js';
 import type { EmployeeState, Employee } from './Employee.js';
@@ -174,11 +174,7 @@ function isNear(x1: number, z1: number, x2: number, z2: number): boolean {
 
 function isNearBuilding(fx: number, fz: number, b: Building): boolean {
   const def = getBuildingDef(b.type, b.tier);
-  // Check if fragment is within hit radius of building footprint centre
-  const xs = def.footprint.map(([dx]) => dx);
-  const zs = def.footprint.map(([, dz]) => dz);
-  const sizeX = Math.max(...xs) + 1;
-  const sizeZ = Math.max(...zs) + 1;
+  const { sizeX, sizeZ } = getDefSize(def);
   const cx = b.x + sizeX / 2;
   const cz = b.z + sizeZ / 2;
   return isNear(fx, fz, cx, cz);
