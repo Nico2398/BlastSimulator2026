@@ -33,10 +33,10 @@ describe('Score system', () => {
     expect(state.nuisance).toBe(50);
   });
 
-  it('building worker quarters increases well-being', () => {
+  it('building living quarters increases well-being', () => {
     const state = createScoreState();
     const buildings = createBuildingState();
-    placeBuilding(buildings, 'worker_quarters', 0, 0, 64, 64);
+    placeBuilding(buildings, 'living_quarters', 0, 0, 64, 64);
 
     updateScores(state, makeInputs({ buildings }));
     // Well-being should increase (building effect > decay)

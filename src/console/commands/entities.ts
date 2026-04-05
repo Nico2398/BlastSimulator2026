@@ -8,6 +8,7 @@ import {
   moveBuilding,
   getAllBuildingTypes,
   getBuildingDef,
+  getDefSize,
   type BuildingType,
 } from '../../core/entities/Building.js';
 import {
@@ -54,8 +55,8 @@ export function buildCommand(
       }
       const lines = ['Buildings:'];
       for (const b of state.buildings.buildings) {
-        const def = getBuildingDef(b.type);
-        lines.push(`  [${b.id}] ${b.type} at (${b.x},${b.z}) HP: ${b.hp}/${def.maxHp}`);
+        const def = getBuildingDef(b.type, b.tier);
+        lines.push(`  [${b.id}] ${b.type} T${b.tier} at (${b.x},${b.z}) HP: ${b.hp}/${def.maxHp}`);
       }
       return { success: true, output: lines.join('\n') };
     }
@@ -83,7 +84,8 @@ export function buildCommand(
       const lines = ['Building types:'];
       for (const type of getAllBuildingTypes()) {
         const def = getBuildingDef(type);
-        lines.push(`  ${type} — $${def.constructionCost} | ${def.sizeX}x${def.sizeZ} | HP: ${def.maxHp}`);
+        const { sizeX, sizeZ } = getDefSize(def);
+        lines.push(`  ${type} — $${def.constructionCost} | ${sizeX}x${sizeZ} | HP: ${def.maxHp}`);
       }
       return { success: true, output: lines.join('\n') };
     }

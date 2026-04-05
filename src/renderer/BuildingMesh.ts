@@ -7,7 +7,7 @@
 
 import * as THREE from 'three';
 import type { Building, BuildingType } from '../core/entities/Building.js';
-import { getBuildingDef } from '../core/entities/Building.js';
+import { getBuildingDef, getDefSize } from '../core/entities/Building.js';
 
 // ---------- Placeholder config per building type ----------
 
@@ -26,14 +26,15 @@ interface BuildingVisual {
 }
 
 const BUILDING_VISUALS: Record<BuildingType, BuildingVisual> = {
-  worker_quarters:    { color: 0x4488cc, height: 4, tier2: { color: 0x994422, height: 1.5, scaleXZ: 0.9 } },
-  storage_depot:      { color: 0x888888, height: 5 },
-  vehicle_depot:      { color: 0xddaa22, height: 4 },
-  office:             { color: 0x77bbdd, height: 3, tier2: { color: 0xaaddff, height: 0.5, scaleXZ: 0.95 } },
-  break_room:         { color: 0x66cc88, height: 2.5 },
-  canteen:            { color: 0xff8855, height: 3 },
-  medical_bay:        { color: 0xffffff, height: 3, tier2: { color: 0xff3333, height: 0.3, scaleXZ: 0.4 } },
-  explosives_magazine:{ color: 0xff2222, height: 3 },
+  driving_center:       { color: 0x44aaff, height: 3 },
+  blasting_academy:     { color: 0xff6600, height: 3, tier2: { color: 0xff3300, height: 1, scaleXZ: 0.7 } },
+  management_office:    { color: 0x77bbdd, height: 3, tier2: { color: 0xaaddff, height: 0.5, scaleXZ: 0.95 } },
+  geology_lab:          { color: 0x996633, height: 3 },
+  research_center:      { color: 0x9944cc, height: 4, tier2: { color: 0xcc66ff, height: 1, scaleXZ: 0.8 } },
+  living_quarters:      { color: 0x4488cc, height: 4, tier2: { color: 0x994422, height: 1.5, scaleXZ: 0.9 } },
+  explosive_warehouse:  { color: 0xff2222, height: 3 },
+  freight_warehouse:    { color: 0x888888, height: 5 },
+  vehicle_depot:        { color: 0xddaa22, height: 4 },
 };
 
 // ---------- Destroyed building appearance ----------
@@ -54,15 +55,18 @@ export class BuildingMesh {
    * Position is at grid cell (building.x, building.z), sitting on y=0.
    */
   addBuilding(building: Building): void {
-    const def = getBuildingDef(building.type);
+    const def = getBuildingDef(building.type, building.tier);
     const vis = BUILDING_VISUALS[building.type];
     const group = new THREE.Group();
 
     const isDestroyed = building.hp <= 0;
     const baseColor = isDestroyed ? DESTROYED_COLOR : vis.color;
 
+    // Use cached bounding-box size derived from the def's footprint
+    const { sizeX, sizeZ } = getDefSize(def);
+
     // Base box — spans the full footprint
-    const baseGeo = new THREE.BoxGeometry(def.sizeX, vis.height, def.sizeZ);
+    const baseGeo = new THREE.BoxGeometry(sizeX, vis.height, sizeZ);
     const baseMat = new THREE.MeshPhongMaterial({ color: baseColor, shininess: 20 });
     const baseMesh = new THREE.Mesh(baseGeo, baseMat);
     baseMesh.position.y = vis.height / 2; // sit on ground
@@ -72,9 +76,9 @@ export class BuildingMesh {
     if (vis.tier2 && !isDestroyed) {
       const t2 = vis.tier2;
       const t2Geo = new THREE.BoxGeometry(
-        def.sizeX * t2.scaleXZ,
+        sizeX * t2.scaleXZ,
         t2.height,
-        def.sizeZ * t2.scaleXZ,
+        sizeZ * t2.scaleXZ,
       );
       const t2Mat = new THREE.MeshPhongMaterial({ color: t2.color, shininess: 15 });
       const t2Mesh = new THREE.Mesh(t2Geo, t2Mat);
@@ -84,7 +88,7 @@ export class BuildingMesh {
 
     // Position: grid cell centre in world coords
     // Building.x/z are the top-left corner; centre = x + sizeX/2, z + sizeZ/2
-    group.position.set(building.x + def.sizeX / 2, 0, building.z + def.sizeZ / 2);
+    group.position.set(building.x + sizeX / 2, 0, building.z + sizeZ / 2);
 
     this.scene.add(group);
     this.buildings.set(building.id, group);

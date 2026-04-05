@@ -17,7 +17,7 @@ export const WEATHER_EVENTS_1: EventDef[] = [
   // 2 — Lightning strikes near explosives magazine
   ev('weather_lightning_strike', 'weather', {
     weight: (s) => 1.5 + 1.5 * (1 - r.sf(s)),
-    canFire: (ctx) => ctx.weatherId === 'storm' && ctx.hasBuilding('explosives_magazine'),
+    canFire: (ctx) => ctx.weatherId === 'storm' && ctx.hasBuilding('explosive_warehouse'),
     options: [
       { cashDelta: -30000, scoreDelta: { safety: 15 }, effectTag: 'lightning_rods' },
       { cashDelta: 0, scoreDelta: { safety: -20 }, probability: 0.4,

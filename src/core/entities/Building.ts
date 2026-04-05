@@ -1,91 +1,118 @@
 // BlastSimulator2026 — Building system
-// Buildings provide capacity, score bonuses, and cost upkeep.
-// All building type data stored here as centralized config.
+// Canonical 9 building types with 3 tiers each.
+// Ramps are directional voxel types (RampVoxelType), NOT buildings.
+
+import type { VoxelGrid } from '../world/VoxelGrid.js';
+import { BUILDING_DEFS } from './BuildingDefs.js';
 
 // ── Building types ──
 
+/**
+ * The 9 canonical building types.
+ * NOTE: Ramps are handled as RampVoxelType — directional voxels, not buildings.
+ */
 export type BuildingType =
-  | 'worker_quarters'
-  | 'storage_depot'
-  | 'vehicle_depot'
-  | 'office'
-  | 'break_room'
-  | 'canteen'
-  | 'medical_bay'
-  | 'explosives_magazine';
+  | 'driving_center'
+  | 'blasting_academy'
+  | 'management_office'
+  | 'geology_lab'
+  | 'research_center'
+  | 'living_quarters'
+  | 'explosive_warehouse'
+  | 'freight_warehouse'
+  | 'vehicle_depot';
 
-export interface BuildingDef {
-  type: BuildingType;
-  /** Grid footprint width x depth. */
-  sizeX: number;
-  sizeZ: number;
-  /** One-time construction cost ($). */
-  constructionCost: number;
-  /** Operating cost per tick ($). */
-  operatingCostPerTick: number;
-  /** Capacity: storage (kg), employee slots, vehicle slots, etc. */
-  capacity: number;
-  /** HP before destruction. */
-  maxHp: number;
-  /** Score effects per tick while active. */
-  scoreEffects: Partial<Record<ScoreId, number>>;
-}
+/** Building upgrade tier. Tier 1 is the base tier available from the start. */
+export type BuildingTier = 1 | 2 | 3;
+
+/**
+ * Ramp voxel direction. Ramps are carved into the VoxelGrid as directional
+ * voxels to connect bench levels for vehicle travel. They are NOT buildings.
+ */
+export type RampVoxelType = 'ramp_north' | 'ramp_south' | 'ramp_east' | 'ramp_west';
 
 export type ScoreId = 'wellBeing' | 'safety' | 'ecology' | 'nuisance';
 
-// ── Building catalog ──
-// Real-world mining: quarters house ~20 workers, depots ~500-2000t.
-// Scaled for gameplay pace.
+// ── Building definition ──
 
-const BUILDING_DEFS: Record<BuildingType, BuildingDef> = {
-  worker_quarters: {
-    type: 'worker_quarters', sizeX: 3, sizeZ: 3,
-    constructionCost: 8000, operatingCostPerTick: 5, capacity: 20, maxHp: 100,
-    scoreEffects: { wellBeing: 2 },
-  },
-  storage_depot: {
-    type: 'storage_depot', sizeX: 4, sizeZ: 4,
-    constructionCost: 12000, operatingCostPerTick: 8, capacity: 2000, maxHp: 150,
-    scoreEffects: {},
-  },
-  vehicle_depot: {
-    type: 'vehicle_depot', sizeX: 4, sizeZ: 3,
-    constructionCost: 15000, operatingCostPerTick: 10, capacity: 6, maxHp: 120,
-    scoreEffects: {},
-  },
-  office: {
-    type: 'office', sizeX: 2, sizeZ: 2,
-    constructionCost: 6000, operatingCostPerTick: 4, capacity: 5, maxHp: 80,
-    scoreEffects: { wellBeing: 1 },
-  },
-  break_room: {
-    type: 'break_room', sizeX: 2, sizeZ: 2,
-    constructionCost: 4000, operatingCostPerTick: 3, capacity: 15, maxHp: 60,
-    scoreEffects: { wellBeing: 3 },
-  },
-  canteen: {
-    type: 'canteen', sizeX: 3, sizeZ: 2,
-    constructionCost: 7000, operatingCostPerTick: 6, capacity: 30, maxHp: 80,
-    scoreEffects: { wellBeing: 2 },
-  },
-  medical_bay: {
-    type: 'medical_bay', sizeX: 2, sizeZ: 2,
-    constructionCost: 10000, operatingCostPerTick: 8, capacity: 10, maxHp: 100,
-    scoreEffects: { safety: 3, wellBeing: 1 },
-  },
-  explosives_magazine: {
-    type: 'explosives_magazine', sizeX: 2, sizeZ: 2,
-    constructionCost: 20000, operatingCostPerTick: 12, capacity: 500, maxHp: 200,
-    scoreEffects: { safety: -1 }, // Explosives on-site = slight safety concern
-  },
-};
-
-export function getBuildingDef(type: BuildingType): BuildingDef {
-  return BUILDING_DEFS[type];
+export interface BuildingDef {
+  type: BuildingType;
+  tier: BuildingTier;
+  /** i18n key for the tier-specific building name. */
+  nameKey: string;
+  /** Footprint as [dx, dz] cell offsets relative to the placement origin. */
+  footprint: ReadonlyArray<readonly [number, number]>;
+  /** Entry point as [dx, dz] offset from placement origin. */
+  entryPoint: readonly [number, number];
+  /** Exit point as [dx, dz] offset from placement origin. */
+  exitPoint: readonly [number, number];
+  /** One-time construction cost ($). */
+  constructionCost: number;
+  /** Demolish/removal cost ($). */
+  demolishCost: number;
+  /** Operating cost per game tick ($). */
+  operatingCostPerTick: number;
+  /** Capacity: employee beds, storage kg, vehicle slots, etc. */
+  capacity: number;
+  /** Max HP before destruction from blast damage. */
+  maxHp: number;
+  /**
+   * Reserved for future blast/damage modeling.
+   * Currently configuration-only and not consumed by runtime destruction logic.
+   * Will gate building destruction when the blast-projection energy accumulator
+   * is wired into the damage pipeline.
+   */
+  structuralResistance: number;
+  /** Score delta effects per tick while active. */
+  scoreEffects: Partial<Record<ScoreId, number>>;
 }
 
+// Re-export catalog for consumers.
+export { BUILDING_DEFS };
+
+/** Look up the definition for a building type and tier (defaults to tier 1). */
+export function getBuildingDef(type: BuildingType, tier: BuildingTier = 1): BuildingDef {
+  return BUILDING_DEFS[type][tier];
+}
+
+/** Return all canonical building types. */
 export function getAllBuildingTypes(): BuildingType[] {
   return Object.keys(BUILDING_DEFS) as BuildingType[];
+}
+
+// ── Footprint helpers ──
+
+/**
+ * Derive bounding-box size from a footprint cell list.
+ * The result is cached per `BuildingDef` reference; pass the same `def` object
+ * to avoid recomputing on repeated calls (e.g. in tight damage loops).
+ */
+export function getFootprintSize(fp: ReadonlyArray<readonly [number, number]>): { sizeX: number; sizeZ: number } {
+  if (fp.length === 0) return { sizeX: 0, sizeZ: 0 };
+  let maxX = 0;
+  let maxZ = 0;
+  for (const [dx, dz] of fp) {
+    if (dx > maxX) maxX = dx;
+    if (dz > maxZ) maxZ = dz;
+  }
+  return { sizeX: maxX + 1, sizeZ: maxZ + 1 };
+}
+
+/** Pre-computed footprint bounds cache keyed by `BuildingDef` object identity. */
+const _footprintSizeCache = new WeakMap<BuildingDef, { sizeX: number; sizeZ: number }>();
+
+/**
+ * Return cached bounding-box size for a `BuildingDef`.
+ * On the first call for a given def object the size is derived from its footprint
+ * and stored; subsequent calls return the cached value with zero allocations.
+ */
+export function getDefSize(def: BuildingDef): { sizeX: number; sizeZ: number } {
+  let size = _footprintSizeCache.get(def);
+  if (size === undefined) {
+    size = getFootprintSize(def.footprint);
+    _footprintSizeCache.set(def, size);
+  }
+  return size;
 }
 
 // ── Building instance ──
@@ -93,6 +120,8 @@ export function getAllBuildingTypes(): BuildingType[] {
 export interface Building {
   id: number;
   type: BuildingType;
+  /** Upgrade tier for this building instance. */
+  tier: BuildingTier;
   x: number;
   z: number;
   hp: number;
@@ -127,22 +156,23 @@ export function placeBuilding(
   z: number,
   gridSizeX: number,
   gridSizeZ: number,
+  tier: BuildingTier = 1,
 ): PlaceBuildingResult {
-  const def = getBuildingDef(type);
+  const def = getBuildingDef(type, tier);
+  const { sizeX, sizeZ } = getDefSize(def);
 
-  // Bounds check
-  if (x < 0 || z < 0 || x + def.sizeX > gridSizeX || z + def.sizeZ > gridSizeZ) {
+  if (x < 0 || z < 0 || x + sizeX > gridSizeX || z + sizeZ > gridSizeZ) {
     return { success: false, error: 'Out of bounds' };
   }
 
-  // Overlap check
-  if (isOccupied(state, x, z, def.sizeX, def.sizeZ)) {
+  if (isOccupied(state, x, z, sizeX, sizeZ)) {
     return { success: false, error: 'Space is occupied' };
   }
 
   const building: Building = {
     id: state.nextId++,
     type,
+    tier,
     x, z,
     hp: def.maxHp,
     active: true,
@@ -172,14 +202,14 @@ export function moveBuilding(
   const building = state.buildings.find(b => b.id === buildingId);
   if (!building) return { success: false, error: 'Building not found' };
 
-  const def = getBuildingDef(building.type);
+  const def = getBuildingDef(building.type, building.tier);
+  const { sizeX, sizeZ } = getDefSize(def);
 
-  if (newX < 0 || newZ < 0 || newX + def.sizeX > gridSizeX || newZ + def.sizeZ > gridSizeZ) {
+  if (newX < 0 || newZ < 0 || newX + sizeX > gridSizeX || newZ + sizeZ > gridSizeZ) {
     return { success: false, error: 'Out of bounds' };
   }
 
-  // Check overlap excluding self
-  if (isOccupied(state, newX, newZ, def.sizeX, def.sizeZ, buildingId)) {
+  if (isOccupied(state, newX, newZ, sizeX, sizeZ, building.id)) {
     return { success: false, error: 'Space is occupied' };
   }
 
@@ -194,18 +224,18 @@ export function getTotalOperatingCost(state: BuildingState): number {
   let total = 0;
   for (const b of state.buildings) {
     if (b.active) {
-      total += getBuildingDef(b.type).operatingCostPerTick;
+      total += getBuildingDef(b.type, b.tier).operatingCostPerTick;
     }
   }
   return total;
 }
 
-/** Get total storage capacity from storage depots. */
+/** Get total ore storage capacity from freight warehouses. */
 export function getStorageCapacity(state: BuildingState): number {
   let total = 0;
   for (const b of state.buildings) {
-    if (b.active && b.type === 'storage_depot') {
-      total += getBuildingDef(b.type).capacity;
+    if (b.active && b.type === 'freight_warehouse') {
+      total += getBuildingDef(b.type, b.tier).capacity;
     }
   }
   return total;
@@ -216,7 +246,7 @@ export function getBuildingScoreEffects(state: BuildingState): Record<ScoreId, n
   const effects: Record<ScoreId, number> = { wellBeing: 0, safety: 0, ecology: 0, nuisance: 0 };
   for (const b of state.buildings) {
     if (!b.active) continue;
-    const def = getBuildingDef(b.type);
+    const def = getBuildingDef(b.type, b.tier);
     for (const [key, val] of Object.entries(def.scoreEffects)) {
       effects[key as ScoreId] += val as number;
     }
@@ -224,7 +254,80 @@ export function getBuildingScoreEffects(state: BuildingState): Record<ScoreId, n
   return effects;
 }
 
-// ── Helpers ──
+// ── Placement grid ──────────────────────────────────────────────────────────
+//
+// The 2D placement grid maps every (x, z) surface cell to:
+//   - surfaceY: world-space Y of the first unoccupied voxel above solid ground.
+//   - BUSY: the cell is covered by a placed building's footprint.
+
+/** Sentinel value: this cell is under an existing building's footprint. */
+export const BUSY = -1 as const;
+
+export type SurfaceY = number | typeof BUSY;
+
+export interface PlacementCell {
+  /** World-space X coordinate. */
+  worldX: number;
+  /** World-space Z coordinate. */
+  worldZ: number;
+  /**
+   * Y of the highest solid voxel + 1 (i.e. the first empty layer above ground).
+   * Set to BUSY if the cell is occupied by a building footprint.
+   */
+  surfaceY: SurfaceY;
+}
+
+/** A 2-D grid indexed as [z][x] of PlacementCell. */
+export type PlacementGrid = PlacementCell[][];
+
+/**
+ * Build a placement grid by scanning every (x, z) column of the VoxelGrid for
+ * its surface height, then marking cells covered by building footprints as BUSY.
+ */
+export function buildPlacementGrid(
+  voxelGrid: VoxelGrid,
+  buildingState: BuildingState,
+): PlacementGrid {
+  const grid: PlacementGrid = [];
+
+  for (let z = 0; z < voxelGrid.sizeZ; z++) {
+    const row: PlacementCell[] = [];
+    for (let x = 0; x < voxelGrid.sizeX; x++) {
+      row.push({ worldX: x, worldZ: z, surfaceY: getSurfaceY(voxelGrid, x, z) });
+    }
+    grid.push(row);
+  }
+
+  // Mark every cell that falls under a building footprint as BUSY.
+  for (const building of buildingState.buildings) {
+    const def = getBuildingDef(building.type, building.tier);
+    for (const [dx, dz] of def.footprint) {
+      const cx = building.x + dx;
+      const cz = building.z + dz;
+      const row = grid[cz];
+      if (row !== undefined && cx >= 0 && cx < row.length) {
+        const cell = row[cx];
+        if (cell !== undefined) cell.surfaceY = BUSY;
+      }
+    }
+  }
+
+  return grid;
+}
+
+/**
+ * Return the Y coordinate of the first empty layer above the highest solid
+ * voxel in column (x, z), or 0 if the entire column is empty.
+ */
+export function getSurfaceY(voxelGrid: VoxelGrid, x: number, z: number): number {
+  for (let y = voxelGrid.sizeY - 1; y >= 0; y--) {
+    const voxel = voxelGrid.getVoxel(x, y, z);
+    if (voxel !== undefined && voxel.density > 0) return y + 1;
+  }
+  return 0;
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
 function isOccupied(
   state: BuildingState,
@@ -234,10 +337,10 @@ function isOccupied(
 ): boolean {
   for (const b of state.buildings) {
     if (excludeId !== undefined && b.id === excludeId) continue;
-    const def = getBuildingDef(b.type);
-    // AABB overlap
-    if (x < b.x + def.sizeX && x + sizeX > b.x &&
-        z < b.z + def.sizeZ && z + sizeZ > b.z) {
+    const def = getBuildingDef(b.type, b.tier);
+    const { sizeX: bSX, sizeZ: bSZ } = getDefSize(def);
+    if (x < b.x + bSX && x + sizeX > b.x &&
+        z < b.z + bSZ && z + sizeZ > b.z) {
       return true;
     }
   }

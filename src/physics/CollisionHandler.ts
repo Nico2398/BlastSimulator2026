@@ -10,7 +10,7 @@
 
 import type { FragmentSimResult } from './FragmentBody.js';
 import type { BuildingState, Building } from '../core/entities/Building.js';
-import { getBuildingDef, destroyBuilding } from '../core/entities/Building.js';
+import { getBuildingDef, getDefSize, destroyBuilding } from '../core/entities/Building.js';
 import type { VehicleState, Vehicle } from '../core/entities/Vehicle.js';
 import { destroyVehicle } from '../core/entities/Vehicle.js';
 import type { EmployeeState, Employee } from '../core/entities/Employee.js';
@@ -176,8 +176,9 @@ function isNear(x1: number, z1: number, x2: number, z2: number): boolean {
 }
 
 function isNearBuilding(fx: number, fz: number, b: Building): boolean {
-  const def = getBuildingDef(b.type);
-  const cx = b.x + def.sizeX / 2;
-  const cz = b.z + def.sizeZ / 2;
+  const def = getBuildingDef(b.type, b.tier);
+  const { sizeX, sizeZ } = getDefSize(def);
+  const cx = b.x + sizeX / 2;
+  const cz = b.z + sizeZ / 2;
   return isNear(fx, fz, cx, cz);
 }
