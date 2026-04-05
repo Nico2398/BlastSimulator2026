@@ -1,11 +1,9 @@
-name: "Pipeline: auto-approve and merge Copilot PRs"
+name: "Pipeline: auto-review and merge Copilot PRs"
 
 on:
   workflow_run:
     workflows: ["CI"]
     types: [completed]
-  pull_request_review:
-    types: [submitted]
 
 permissions:
   pull-requests: write
@@ -13,10 +11,12 @@ permissions:
   checks: read
 
 jobs:
-  auto-approve-and-merge:
+  auto-review-and-merge:
     runs-on: ubuntu-latest
+    # Only run when CI succeeds
+    if: github.event.workflow_run.conclusion == 'success'
     steps:
-      - name: Auto-approve and merge if Copilot PR with passing checks
+      - name: Auto-review and merge Copilot PRs
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
@@ -24,53 +24,45 @@ jobs:
             const owner = context.repo.owner;
             const repo = context.repo.repo;
 
-            let prNumber;
-
-            // Get PR number from event
-            if (context.payload.pull_request) {
-              prNumber = context.payload.pull_request.number;
-            } else if (context.payload.workflow_run) {
-              const prs = context.payload.workflow_run.pull_requests;
-              if (!prs || prs.length === 0) return;
-              // Only proceed if CI succeeded
-              if (context.payload.workflow_run.conclusion !== 'success') {
-                console.log(`CI concluded with '${context.payload.workflow_run.conclusion}', skipping.`);
-                return;
-              }
-              prNumber = prs[0].number;
+            // --- 1. Find the PR from the workflow run ---
+            const prs = context.payload.workflow_run.pull_requests;
+            if (!prs || prs.length === 0) {
+              console.log('No PRs associated with this CI run.');
+              return;
             }
+            const prNumber = prs[0].number;
 
-            if (!prNumber) return;
-
-            // Get full PR data
+            // --- 2. Get full PR data ---
             const { data: pr } = await github.rest.pulls.get({
               owner, repo, pull_number: prNumber
             });
 
-            // Only process Copilot PRs with strong provenance checks
+            // --- 3. Security: only process Copilot PRs from this repo ---
             if (!pr.head.ref.startsWith('copilot/')) {
-              console.log('Not a Copilot branch, skipping.');
+              console.log(`Not a Copilot branch (${pr.head.ref}), skipping.`);
               return;
             }
-
-            // Reject forked PRs — branch must originate from this repo
             if (pr.head.repo.full_name !== `${owner}/${repo}`) {
-              console.log(`PR originates from fork ${pr.head.repo.full_name}, skipping.`);
+              console.log(`PR from fork ${pr.head.repo.full_name}, skipping.`);
               return;
             }
-
-            // Verify the PR was authored by the Copilot bot
-            const expectedAuthors = ['copilot[bot]', 'github-copilot[bot]'];
+            const expectedAuthors = ['copilot[bot]', 'github-copilot[bot]', 'Copilot'];
             if (!expectedAuthors.includes(pr.user.login)) {
               console.log(`PR author ${pr.user.login} is not Copilot, skipping.`);
               return;
             }
+            if (pr.merged || pr.state === 'closed') {
+              console.log(`PR #${prNumber} is already merged/closed, skipping.`);
+              return;
+            }
 
-            // Convert draft to ready for review if needed (triggers Copilot reviewer automatically)
-            // The if (pr.draft) guard ensures this is safely skipped on subsequent CI passes
-            // when the PR is already ready for review after a fix commit
+            // Marker used both to build the comment body and to detect it later.
+            // Keeping it as a constant ensures the two stay in sync.
+            const REVIEW_REQUEST_MARKER = '@copilot Please review your own changes for this PR:';
+
+            // --- 4. If draft, mark ready for review (first CI pass) ---
             if (pr.draft) {
-              console.log(`PR #${prNumber} is a draft, converting to ready for review...`);
+              console.log(`PR #${prNumber} is a draft. Marking ready for review...`);
               await github.graphql(`
                 mutation($prId: ID!) {
                   markPullRequestReadyForReview(input: { pullRequestId: $prId }) {
@@ -78,37 +70,87 @@ jobs:
                   }
                 }
               `, { prId: pr.node_id });
-              console.log(`PR #${prNumber} marked as ready for review.`);
-              // Return here — the Copilot reviewer will now run and submit a review,
-              // which will re-trigger this workflow via pull_request_review: submitted
+
+              // Post a @copilot self-review request. The coding agent will review
+              // and push fixes if needed. This replaces the external Copilot reviewer.
+              const reviewPrompt = [
+                REVIEW_REQUEST_MARKER,
+                '',
+                '1. Verify all acceptance criteria from the linked issue are met',
+                '2. Check for architecture violations (core must not import renderer/physics/ui)',
+                '3. Ensure no hardcoded numbers in logic (use src/core/config/)',
+                '4. Verify i18n: all user-facing strings use t() with both en.json and fr.json entries',
+                '5. Check 300-line limit per file',
+                '6. Ensure seeded PRNG usage (no Math.random())',
+                '7. Verify all tests pass with `npm run validate`',
+                '',
+                'If everything looks good, comment "LGTM". If you find issues, fix them and push.',
+              ].join('\n');
+
+              await github.rest.issues.createComment({
+                owner, repo,
+                issue_number: prNumber,
+                body: reviewPrompt
+              });
+
+              console.log(`PR #${prNumber} marked ready + self-review requested via @copilot.`);
               return;
             }
 
-            // Only proceed to approve+merge if triggered by an approved review
-            if (!context.payload.review) {
-              console.log('No review payload found for this event. Skipping merge.');
+            // --- 5. PR is not draft — check if self-review was requested and completed ---
+            const { data: comments } = await github.rest.issues.listComments({
+              owner, repo,
+              issue_number: prNumber,
+              per_page: 100
+            });
+
+            const reviewRequestComment = comments.find(c =>
+              c.body?.includes(REVIEW_REQUEST_MARKER)
+            );
+
+            if (!reviewRequestComment) {
+              console.log('No self-review was requested. This may be a legacy PR. Skipping auto-merge.');
               return;
             }
 
-            if (context.payload.review.state !== 'approved') {
-              console.log(`Review state is '${context.payload.review.state}', not approved. Skipping merge.`);
+            // Check if the agent responded with a comment after the review request
+            const agentResponded = comments.some(c =>
+              expectedAuthors.includes(c.user?.login || '') &&
+              new Date(c.created_at) > new Date(reviewRequestComment.created_at)
+            );
+
+            // Check if there are commits pushed after the review request (agent fixed things)
+            const { data: commits } = await github.rest.pulls.listCommits({
+              owner, repo,
+              pull_number: prNumber,
+              per_page: 100
+            });
+
+            const hasPostReviewCommits = commits.some(c =>
+              new Date(c.commit.committer.date) > new Date(reviewRequestComment.created_at)
+            );
+
+            if (!agentResponded && !hasPostReviewCommits) {
+              console.log('Waiting for Copilot agent to complete self-review...');
               return;
             }
 
-            // Auto-approve the PR
+            console.log(`PR #${prNumber}: self-review complete, CI green. Approving and merging.`);
+
+            // --- 6. Approve ---
             try {
               await github.rest.pulls.createReview({
                 owner, repo,
                 pull_number: prNumber,
                 event: 'APPROVE',
-                body: '✅ Auto-approved: all checks passed.'
+                body: '✅ Auto-approved: CI passed + agent self-review complete.'
               });
               console.log(`Approved PR #${prNumber}`);
             } catch (e) {
               console.log(`Approval note: ${e.message}`);
             }
 
-            // Merge the PR
+            // --- 7. Merge ---
             try {
               await github.rest.pulls.merge({
                 owner, repo,
@@ -117,7 +159,7 @@ jobs:
               });
               console.log(`Merged PR #${prNumber}`);
             } catch (e) {
-              // If merge requirements not met yet, enable auto-merge
+              // If merge requirements not met yet, enable auto-merge via GraphQL
               console.log(`Direct merge failed, enabling auto-merge: ${e.message}`);
               try {
                 await github.graphql(`
