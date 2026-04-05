@@ -200,8 +200,8 @@ describe('Blast physics pipeline — integration (8.5)', () => {
     const employees = createEmployeeState();
     const damage = createDamageState();
 
-    // Storage depot at (5,5) → center at (7,7) — right at the blast center
-    placeBuilding(buildings, 'storage_depot', 5, 5, 15, 15);
+    // Freight warehouse at (5,5) → center at (7,7) — right at the blast center
+    placeBuilding(buildings, 'freight_warehouse', 5, 5, 15, 15);
     employees.employees.push(
       { id: 1, name: 'Worker A', role: 'driller', salary: 500, morale: 60,
         unionized: false, injured: false, alive: true, x: 6, z: 6 },

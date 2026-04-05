@@ -45,7 +45,7 @@ export const UNION_EVENTS_1: EventDef[] = [
   // 5 — Mandatory karaoke night
   ev('union_karaoke_demand', 'union', {
     weight: (s) => 0.7 + 0.8 * (1 - r.wb(s)),
-    canFire: (ctx) => ctx.hasBuilding('canteen'),
+    canFire: (ctx) => ctx.hasBuilding('living_quarters'),
     options: [
       { cashDelta: -3000, scoreDelta: { wellBeing: 8, nuisance: 5 } },
       { cashDelta: 0, scoreDelta: { wellBeing: -4 } },
@@ -63,7 +63,7 @@ export const UNION_EVENTS_1: EventDef[] = [
   // 7 — Break room TV channel war
   ev('union_tv_channel', 'union', {
     weight: (s) => 0.6 + 0.5 * (1 - r.wb(s)),
-    canFire: (ctx) => ctx.hasBuilding('canteen'),
+    canFire: (ctx) => ctx.hasBuilding('living_quarters'),
     options: [
       { cashDelta: -2000, scoreDelta: { wellBeing: 4 }, effectTag: 'extra_tvs' },
       { cashDelta: 0, scoreDelta: { wellBeing: -3 } },
@@ -101,7 +101,7 @@ export const UNION_EVENTS_1: EventDef[] = [
   // 11 — Lunch menu quality complaints
   ev('union_lunch_quality', 'union', {
     weight: (s) => 0.8 + 1.0 * (1 - r.wb(s)),
-    canFire: (ctx) => ctx.hasBuilding('canteen'),
+    canFire: (ctx) => ctx.hasBuilding('living_quarters'),
     options: [
       { cashDelta: -7000, scoreDelta: { wellBeing: 9 }, effectTag: 'gourmet_chef' },
       { cashDelta: 0, scoreDelta: { wellBeing: -7 } },

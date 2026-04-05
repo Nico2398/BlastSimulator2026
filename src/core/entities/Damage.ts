@@ -173,10 +173,14 @@ function isNear(x1: number, z1: number, x2: number, z2: number): boolean {
 }
 
 function isNearBuilding(fx: number, fz: number, b: Building): boolean {
-  const def = getBuildingDef(b.type);
-  // Check if fragment is within hit radius of building footprint
-  const cx = b.x + def.sizeX / 2;
-  const cz = b.z + def.sizeZ / 2;
+  const def = getBuildingDef(b.type, b.tier);
+  // Check if fragment is within hit radius of building footprint centre
+  const xs = def.footprint.map(([dx]) => dx);
+  const zs = def.footprint.map(([, dz]) => dz);
+  const sizeX = Math.max(...xs) + 1;
+  const sizeZ = Math.max(...zs) + 1;
+  const cx = b.x + sizeX / 2;
+  const cz = b.z + sizeZ / 2;
   return isNear(fx, fz, cx, cz);
 }
 

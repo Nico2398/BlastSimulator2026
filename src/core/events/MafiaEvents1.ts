@@ -131,7 +131,7 @@ export const MAFIA_EVENTS_1: EventDef[] = [
   // 13 — Gang tattoo artist in break room
   ev('mafia_tattoo_shop', 'mafia', {
     weight: (s) => 0.8 + 0.4 * (1 - r.wb(s)),
-    canFire: (ctx) => ctx.corruptionLevel >= 1 && ctx.hasBuilding('canteen'),
+    canFire: (ctx) => ctx.corruptionLevel >= 1 && ctx.hasBuilding('living_quarters'),
     options: [
       { cashDelta: 3000, corruptionDelta: 4, scoreDelta: { wellBeing: 5, safety: -4 } },
       { cashDelta: 0, scoreDelta: { wellBeing: -2 } },

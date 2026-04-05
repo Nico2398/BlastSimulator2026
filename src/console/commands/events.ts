@@ -131,7 +131,7 @@ export function tickCommand(
       buildings: state.buildings,
       avgMorale,
       recentAccidents: state.damage.accidents.filter(a => a.tick >= state.tickCount - 10).length,
-      hasSafetyEquipment: state.buildings.buildings.some(b => b.type === 'medical_bay'),
+      hasSafetyEquipment: state.buildings.buildings.some(b => b.type === 'management_office'),
       maxRecentVibration: 0,
       employeeCount: state.employees.employees.length,
     };

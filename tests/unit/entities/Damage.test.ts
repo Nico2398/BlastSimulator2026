@@ -26,7 +26,7 @@ function makeProjection(id: number, x: number, z: number, mass: number, velocity
 describe('Damage and casualty system', () => {
   it('fast heavy fragment hitting a building reduces its HP', () => {
     const buildings = createBuildingState();
-    placeBuilding(buildings, 'worker_quarters', 5, 5, 64, 64);
+    placeBuilding(buildings, 'living_quarters', 5, 5, 64, 64);
     const origHp = buildings.buildings[0]!.hp;
 
     const frag = makeProjection(1, 6.5, 6.5, 10, 20); // KE = 0.5*10*400 = 2000J
@@ -41,7 +41,7 @@ describe('Damage and casualty system', () => {
 
   it('building at 0 HP is destroyed', () => {
     const buildings = createBuildingState();
-    placeBuilding(buildings, 'office', 5, 5, 64, 64); // office has 80 HP
+    placeBuilding(buildings, 'management_office', 5, 5, 64, 64); // management_office has 80 HP
     buildings.buildings[0]!.hp = 10; // Set HP low
 
     // High energy fragment
@@ -126,7 +126,7 @@ describe('Damage and casualty system', () => {
 
   it('integration: overcharged blast near buildings → building damage', () => {
     const buildings = createBuildingState();
-    placeBuilding(buildings, 'canteen', 10, 10, 64, 64);
+    placeBuilding(buildings, 'living_quarters', 10, 10, 64, 64);
 
     // Simulate multiple high-energy projections from an overcharged blast
     const projections = [

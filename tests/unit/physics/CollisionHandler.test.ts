@@ -23,10 +23,10 @@ describe('CollisionHandler (8.4)', () => {
     const employees = createEmployeeState();
     const damage = createDamageState();
 
-    // Place a building at (5, 5) — center ≈ (6.5, 6) for 3×3 worker_quarters
-    placeBuilding(buildings, 'worker_quarters', 5, 5, 20, 20);
+    // Place a building at (5, 5) — center ≈ (6.5, 6) for 3×3 living_quarters
+    placeBuilding(buildings, 'living_quarters', 5, 5, 20, 20);
     const building = buildings.buildings[0]!;
-    const originalHp = building.hp; // 100
+    const originalHp = building.hp; // 120
 
     // Fragment with VERY high KE: mass=200kg, speed=30 m/s → KE=90000J
     // HP damage = round(90000/50) = 1800 >> 100 HP → destroyed
@@ -50,12 +50,12 @@ describe('CollisionHandler (8.4)', () => {
     const employees = createEmployeeState();
     const damage = createDamageState();
 
-    // worker_quarters at (5,5), maxHp=100
-    placeBuilding(buildings, 'worker_quarters', 5, 5, 20, 20);
+    // living_quarters at (5,5), maxHp=120
+    placeBuilding(buildings, 'living_quarters', 5, 5, 20, 20);
     const building = buildings.buildings[0]!;
 
     // mass=20kg, speed=10 m/s → KE=1000J > BUILDING_DAMAGE_THRESHOLD(500)
-    // HP damage = round(1000/50) = 20 → hp goes from 100 to 80 (not destroyed)
+    // HP damage = round(1000/50) = 20 → hp goes from 120 to 100 (not destroyed)
     const results = [makeResult(1, 6.5, 6, 10)];
     const massMap = buildMassMap([{ id: 1, mass: 20 }]);
 
@@ -63,7 +63,7 @@ describe('CollisionHandler (8.4)', () => {
 
     expect(accidents).toHaveLength(1);
     expect(accidents[0]!.type).toBe('building_damage');
-    expect(building.hp).toBe(80);
+    expect(building.hp).toBe(100);
     expect(buildings.buildings).toHaveLength(1); // Still standing
   });
 
@@ -73,7 +73,7 @@ describe('CollisionHandler (8.4)', () => {
     const employees = createEmployeeState();
     const damage = createDamageState();
 
-    placeBuilding(buildings, 'worker_quarters', 5, 5, 20, 20);
+    placeBuilding(buildings, 'living_quarters', 5, 5, 20, 20);
     const building = buildings.buildings[0]!;
     const originalHp = building.hp;
 
@@ -150,7 +150,7 @@ describe('CollisionHandler (8.4)', () => {
     const employees = createEmployeeState();
     const damage = createDamageState();
 
-    placeBuilding(buildings, 'worker_quarters', 0, 0, 20, 20);
+    placeBuilding(buildings, 'living_quarters', 0, 0, 20, 20);
 
     // Fragment lands at (15, 15) — far from building at (0,0)
     const results = [makeResult(1, 15, 15, 30)];
@@ -159,7 +159,7 @@ describe('CollisionHandler (8.4)', () => {
     const accidents = applyFragmentCollisions(results, massMap, buildings, vehicles, employees, damage, 1);
 
     expect(accidents).toHaveLength(0);
-    expect(buildings.buildings[0]!.hp).toBe(100); // Untouched
+    expect(buildings.buildings[0]!.hp).toBe(120); // Untouched
   });
 
   it('vehicle destroyed by high-energy impact', () => {

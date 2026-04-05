@@ -57,7 +57,7 @@ describe('Weather events (6.5)', () => {
     expect(ev.canFire(makeCtx({ weatherId: 'storm' }))).toBe(true);
   });
 
-  it('lightning strike requires storm AND explosives magazine', () => {
+  it('lightning strike requires storm AND explosive warehouse', () => {
     const ev = getEventById('weather_lightning_strike')!;
     expect(ev).toBeDefined();
 
@@ -65,7 +65,7 @@ describe('Weather events (6.5)', () => {
     expect(ev.canFire(makeCtx({ weatherId: 'storm' }))).toBe(false); // no building
     expect(ev.canFire(makeCtx({
       weatherId: 'storm',
-      hasBuilding: (t) => t === 'explosives_magazine',
+      hasBuilding: (t) => t === 'explosive_warehouse',
     }))).toBe(true);
   });
 
