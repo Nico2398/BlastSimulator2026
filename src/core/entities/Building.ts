@@ -277,6 +277,11 @@ export interface PlacementCell {
   surfaceY: SurfaceY;
 }
 
+export interface CanPlaceBuildingResult {
+  valid: boolean;
+  reason?: string;
+}
+
 /** A 2-D grid indexed as [z][x] of PlacementCell. */
 export type PlacementGrid = PlacementCell[][];
 
@@ -325,6 +330,55 @@ export function getSurfaceY(voxelGrid: VoxelGrid, x: number, z: number): number 
     if (voxel !== undefined && voxel.density > 0) return y + 1;
   }
   return 0;
+}
+
+/**
+ * Check whether a building of the given type and tier can be placed at (x, z)
+ * on the provided PlacementGrid.
+ *
+ * Checks (in order per footprint cell):
+ *   1. All cells are within grid bounds.
+ *   2. No cell is marked BUSY (occupied by an existing building).
+ *   3. All cells share the same surfaceY (flat surface required).
+ *
+ * Returns `{ valid: true }` when all checks pass, or `{ valid: false, reason }`
+ * describing the first failure encountered.
+ */
+export function canPlaceBuilding(
+  grid: PlacementGrid,
+  type: BuildingType,
+  x: number,
+  z: number,
+  tier: BuildingTier = 1,
+): CanPlaceBuildingResult {
+  const def = getBuildingDef(type, tier);
+  const gridSizeZ = grid.length;
+  const gridSizeX = grid[0]?.length ?? 0;
+
+  let referenceSurfaceY: number | undefined;
+
+  for (const [dx, dz] of def.footprint) {
+    const cx = x + dx;
+    const cz = z + dz;
+
+    if (cx < 0 || cz < 0 || cx >= gridSizeX || cz >= gridSizeZ) {
+      return { valid: false, reason: 'Out of bounds' };
+    }
+
+    const cell = grid[cz]![cx]!;
+
+    if (cell.surfaceY === BUSY) {
+      return { valid: false, reason: 'Overlap with existing building' };
+    }
+
+    if (referenceSurfaceY === undefined) {
+      referenceSurfaceY = cell.surfaceY;
+    } else if (cell.surfaceY !== referenceSurfaceY) {
+      return { valid: false, reason: 'Uneven surface' };
+    }
+  }
+
+  return { valid: true };
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
