@@ -1,14 +1,16 @@
 name: "Pipeline: auto-approve and merge Copilot PRs"
 
 on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
   pull_request_review:
     types: [submitted]
-  check_suite:
-    types: [completed]
 
 permissions:
   pull-requests: write
   contents: write
+  checks: read
 
 jobs:
   auto-approve-and-merge:
@@ -27,9 +29,14 @@ jobs:
             // Get PR number from event
             if (context.payload.pull_request) {
               prNumber = context.payload.pull_request.number;
-            } else if (context.payload.check_suite) {
-              const prs = context.payload.check_suite.pull_requests;
-              if (prs.length === 0) return;
+            } else if (context.payload.workflow_run) {
+              const prs = context.payload.workflow_run.pull_requests;
+              if (!prs || prs.length === 0) return;
+              // Only proceed if CI succeeded
+              if (context.payload.workflow_run.conclusion !== 'success') {
+                console.log(`CI concluded with '${context.payload.workflow_run.conclusion}', skipping.`);
+                return;
+              }
               prNumber = prs[0].number;
             }
 
@@ -59,19 +66,32 @@ jobs:
               return;
             }
 
-            // Check all status checks pass
-            const { data: checks } = await github.rest.checks.listForRef({
-              owner, repo, ref: pr.head.sha
-            });
+            // Convert draft to ready for review if needed (triggers Copilot reviewer automatically)
+            // The if (pr.draft) guard ensures this is safely skipped on subsequent CI passes
+            // when the PR is already ready for review after a fix commit
+            if (pr.draft) {
+              console.log(`PR #${prNumber} is a draft, converting to ready for review...`);
+              await github.graphql(`
+                mutation($prId: ID!) {
+                  markPullRequestReadyForReview(input: { pullRequestId: $prId }) {
+                    clientMutationId
+                  }
+                }
+              `, { prId: pr.node_id });
+              console.log(`PR #${prNumber} marked as ready for review.`);
+              // Return here — the Copilot reviewer will now run and submit a review,
+              // which will re-trigger this workflow via pull_request_review: submitted
+              return;
+            }
 
-            const allPassed = checks.check_runs.length > 0 &&
-              checks.check_runs.every(c =>
-                c.status === 'completed' &&
-                (c.conclusion === 'success' || c.conclusion === 'skipped' || c.conclusion === 'neutral')
-              );
+            // Only proceed to approve+merge if triggered by an approved review
+            if (!context.payload.review) {
+              console.log('No review payload found for this event. Skipping merge.');
+              return;
+            }
 
-            if (!allPassed) {
-              console.log('Checks not all passed yet.');
+            if (context.payload.review.state !== 'approved') {
+              console.log(`Review state is '${context.payload.review.state}', not approved. Skipping merge.`);
               return;
             }
 
