@@ -85,7 +85,12 @@ jobs:
             }
 
             // Only proceed to approve+merge if triggered by an approved review
-            if (context.payload.review && context.payload.review.state !== 'approved') {
+            if (!context.payload.review) {
+              console.log('No review payload found for this event. Skipping merge.');
+              return;
+            }
+
+            if (context.payload.review.state !== 'approved') {
               console.log(`Review state is '${context.payload.review.state}', not approved. Skipping merge.`);
               return;
             }
