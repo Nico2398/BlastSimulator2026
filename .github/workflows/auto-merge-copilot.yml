@@ -98,13 +98,14 @@ jobs:
             }
 
             // --- 5. PR is not draft — check if self-review was requested and completed ---
-            const { data: comments } = await github.rest.issues.listComments({
+            // Use paginate to handle PRs with more than 100 comments.
+            const allComments = await github.paginate(github.rest.issues.listComments, {
               owner, repo,
               issue_number: prNumber,
               per_page: 100
             });
 
-            const reviewRequestComment = comments.find(c =>
+            const reviewRequestComment = allComments.find(c =>
               c.body?.includes(REVIEW_REQUEST_MARKER)
             );
 
@@ -113,24 +114,27 @@ jobs:
               return;
             }
 
-            // Check if the agent responded with a comment after the review request
-            const agentResponded = comments.some(c =>
+            // Require an explicit "LGTM" from a Copilot account after the review request.
+            // A non-affirming response ("reviewing…", "found issues") must not trigger merge.
+            const agentLGTM = allComments.some(c =>
               expectedAuthors.includes(c.user?.login || '') &&
-              new Date(c.created_at) > new Date(reviewRequestComment.created_at)
+              new Date(c.created_at) > new Date(reviewRequestComment.created_at) &&
+              c.body?.toLowerCase().includes('lgtm')
             );
 
-            // Check if there are commits pushed after the review request (agent fixed things)
-            const { data: commits } = await github.rest.pulls.listCommits({
+            // Alternative signal: agent pushed fix commits after the review request.
+            // Use paginate so PRs with more than 100 commits are handled correctly.
+            const allCommits = await github.paginate(github.rest.pulls.listCommits, {
               owner, repo,
               pull_number: prNumber,
               per_page: 100
             });
 
-            const hasPostReviewCommits = commits.some(c =>
+            const hasPostReviewCommits = allCommits.some(c =>
               new Date(c.commit.committer.date) > new Date(reviewRequestComment.created_at)
             );
 
-            if (!agentResponded && !hasPostReviewCommits) {
+            if (!agentLGTM && !hasPostReviewCommits) {
               console.log('Waiting for Copilot agent to complete self-review...');
               return;
             }
