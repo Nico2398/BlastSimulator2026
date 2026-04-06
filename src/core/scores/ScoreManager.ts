@@ -93,6 +93,19 @@ export function recordVibration(state: ScoreState, vibrationMmS: number): void {
   state.ecology = clampScore(state.ecology - vibrationMmS * 0.02);
 }
 
+/**
+ * Record a building destruction event — immediate score penalties.
+ * For explosive warehouses, safety and well-being are hit harder.
+ */
+export function recordBuildingDestruction(state: ScoreState, isExplosiveWarehouse: boolean): void {
+  state.safety = clampScore(state.safety - 15);
+  state.ecology = clampScore(state.ecology - 8);
+  if (isExplosiveWarehouse) {
+    state.safety = clampScore(state.safety - 10);
+    state.wellBeing = clampScore(state.wellBeing - 5);
+  }
+}
+
 /** Record safety equipment investment — immediate safety boost. */
 export function recordSafetyInvestment(state: ScoreState, amount: number): void {
   // $1000 investment → +2 safety

@@ -126,6 +126,7 @@ export interface Building {
   z: number;
   hp: number;
   active: boolean;
+  storedExplosivesKg?: number;
 }
 
 // ── Building state ──
@@ -385,6 +386,18 @@ export function canPlaceBuilding(
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Returns true if the absolute grid cell (ax, az) falls within the given
+ * building's footprint.
+ */
+export function isBuildingFootprintCell(building: Building, ax: number, az: number): boolean {
+  const def = getBuildingDef(building.type, building.tier);
+  for (const [dx, dz] of def.footprint) {
+    if (building.x + dx === ax && building.z + dz === az) return true;
+  }
+  return false;
+}
 
 function isOccupied(
   state: BuildingState,
