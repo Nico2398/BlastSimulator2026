@@ -20,6 +20,7 @@ import {
 import { getRock } from '../world/RockCatalog.js';
 import { getOre } from '../world/OreCatalog.js';
 import type { VoxelGrid, VoxelData } from '../world/VoxelGrid.js';
+import { getBuildingDef, destroyBuilding, type BuildingState, type Building, type BuildingType } from '../entities/Building.js';
 
 // ── Config ──
 
@@ -53,6 +54,25 @@ export interface VillageVibration {
   vibration: number;
 }
 
+/** Information about a building removed by a blast. */
+export interface DestroyedBuildingInfo {
+  buildingId: number;
+  type: BuildingType;
+  x: number;
+  z: number;
+}
+
+/**
+ * Emitted when an `explosive_warehouse` with stored explosives is destroyed,
+ * indicating a secondary detonation chain should be simulated.
+ */
+export interface SecondaryBlastEvent {
+  buildingId: number;
+  x: number;
+  z: number;
+  explosivesKg: number;
+}
+
 export interface BlastResult {
   fragments: FragmentData[];
   fragmentCount: number;
@@ -66,6 +86,8 @@ export interface BlastResult {
   rating: BlastRating;
   crackedVoxels: number;
   clearedVoxels: number;
+  destroyedBuildings: DestroyedBuildingInfo[];
+  secondaryBlastEvents: SecondaryBlastEvent[];
 }
 
 // ── Village (for vibration targets) ──
@@ -96,6 +118,7 @@ export function executeBlast(
   grid: VoxelGrid,
   villages: readonly VillagePosition[],
   groundFactor: number = DEFAULT_GROUND_FACTOR,
+  buildingState?: BuildingState,
 ): BlastResult | null {
   // 1. Validate
   const errors = validateBlastPlan(plan);
@@ -198,6 +221,51 @@ export function executeBlast(
     grid.clearVoxel(x, y, z);
   }
 
+  // 5b. Check for building destruction: if any cleared voxel's (x, z) falls
+  //     within a building's footprint, the building is destroyed.
+  const destroyedBuildings: DestroyedBuildingInfo[] = [];
+  const secondaryBlastEvents: SecondaryBlastEvent[] = [];
+  if (buildingState && toClear.length > 0) {
+    // Build a set of unique (x, z) pairs from cleared voxels for fast lookup.
+    const clearedXZSet = new Set<string>();
+    for (const { x, z } of toClear) {
+      clearedXZSet.add(`${x},${z}`);
+    }
+
+    // Check each building; collect those hit by the blast.
+    const toDestroy: Building[] = [];
+    for (const building of buildingState.buildings) {
+      const def = getBuildingDef(building.type, building.tier);
+      let hit = false;
+      for (const [dx, dz] of def.footprint) {
+        if (clearedXZSet.has(`${building.x + dx},${building.z + dz}`)) {
+          hit = true;
+          break;
+        }
+      }
+      if (hit) toDestroy.push(building);
+    }
+
+    for (const building of toDestroy) {
+      destroyedBuildings.push({
+        buildingId: building.id,
+        type: building.type,
+        x: building.x,
+        z: building.z,
+      });
+      // Secondary blast for explosive_warehouse with stored explosives.
+      if (building.type === 'explosive_warehouse' && (building.storedExplosivesKg ?? 0) > 0) {
+        secondaryBlastEvents.push({
+          buildingId: building.id,
+          x: building.x,
+          z: building.z,
+          explosivesKg: building.storedExplosivesKg!,
+        });
+      }
+      destroyBuilding(buildingState, building.id);
+    }
+  }
+
   // 6. Calculate vibrations at villages
   // Apply per-explosive vibrationMod: average across all charged holes weighted equally.
   let vibModSum = 0;
@@ -252,6 +320,8 @@ export function executeBlast(
     rating,
     crackedVoxels,
     clearedVoxels,
+    destroyedBuildings,
+    secondaryBlastEvents,
   };
 }
 
