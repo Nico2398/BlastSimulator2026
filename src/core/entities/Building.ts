@@ -353,7 +353,6 @@ export function canPlaceBuilding(
 ): CanPlaceBuildingResult {
   const def = getBuildingDef(type, tier);
   const gridSizeZ = grid.length;
-  const gridSizeX = grid[0]?.length ?? 0;
 
   let referenceSurfaceY: number | undefined;
 
@@ -361,14 +360,18 @@ export function canPlaceBuilding(
     const cx = x + dx;
     const cz = z + dz;
 
-    if (cx < 0 || cz < 0 || cx >= gridSizeX || cz >= gridSizeZ) {
+    if (cz < 0 || cz >= gridSizeZ) {
+      return { valid: false, reason: 'Out of bounds' };
+    }
+    const row = grid[cz]!;
+    if (cx < 0 || cx >= row.length) {
       return { valid: false, reason: 'Out of bounds' };
     }
 
-    const cell = grid[cz]![cx]!;
+    const cell = row[cx]!;
 
     if (cell.surfaceY === BUSY) {
-      return { valid: false, reason: 'Overlap with existing building' };
+      return { valid: false, reason: 'Space is occupied' };
     }
 
     if (referenceSurfaceY === undefined) {

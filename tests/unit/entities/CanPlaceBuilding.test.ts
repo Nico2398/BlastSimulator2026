@@ -1,19 +1,10 @@
-// BlastSimulator2026 — canPlaceBuilding() unit tests (TDD Red phase)
-//
-// canPlaceBuilding() does NOT exist yet in Building.ts — these tests are
-// intentionally failing until the implementer adds the function.
-//
-// Checks exercised:
-//   1. All footprint cells are within grid bounds
-//   2. No footprint cell is marked BUSY (occupied by another building)
-//   3. All footprint cells share the same surfaceY (flat surface)
-//   4. Returns { valid: true } when all three checks pass
+// canPlaceBuilding() unit tests — bounds, overlap, and flat-surface checks
 
 import { describe, it, expect } from 'vitest';
 import {
   BUSY,
   canPlaceBuilding,
-  type CanPlaceBuildingResult,  // does not exist yet — import signals expected shape
+  type CanPlaceBuildingResult,
   type PlacementCell,
   type PlacementGrid,
 } from '../../../src/core/entities/Building.js';
@@ -40,8 +31,6 @@ function makeFlatGrid(sizeX: number, sizeZ: number, surfaceY: number): Placement
 
 describe('canPlaceBuilding', () => {
 
-  // ── Test 1: Valid placement accepted ───────────────────────────────────────
-
   it('returns { valid: true } for a flat, unoccupied, in-bounds placement', () => {
     // management_office T1 has a 2×2 footprint; a 10×10 flat grid easily contains it
     const grid = makeFlatGrid(10, 10, 5);
@@ -52,8 +41,6 @@ describe('canPlaceBuilding', () => {
     expect(result.reason).toBeUndefined();
   });
 
-  // ── Test 2: Out of bounds — negative x ────────────────────────────────────
-
   it('returns invalid with "Out of bounds" when x is negative', () => {
     const grid = makeFlatGrid(10, 10, 5);
 
@@ -62,8 +49,6 @@ describe('canPlaceBuilding', () => {
     expect(result.valid).toBe(false);
     expect(result.reason).toBe('Out of bounds');
   });
-
-  // ── Test 3: Out of bounds — negative z ────────────────────────────────────
 
   it('returns invalid with "Out of bounds" when z is negative', () => {
     const grid = makeFlatGrid(10, 10, 5);
@@ -74,11 +59,8 @@ describe('canPlaceBuilding', () => {
     expect(result.reason).toBe('Out of bounds');
   });
 
-  // ── Test 4: Out of bounds — footprint exceeds grid on X ───────────────────
-
   it('returns invalid with "Out of bounds" when footprint extends beyond grid width', () => {
-    // management_office T1: 2 cells wide; at x=9 on a 10-wide grid → needs cols 9 & 10,
-    // but valid columns are 0–9 only → col 10 is out of bounds
+    // management_office T1: 2 cells wide; at x=9 on a 10-wide grid col 10 is out of bounds
     const grid = makeFlatGrid(10, 10, 5);
 
     const result = canPlaceBuilding(grid, 'management_office', 9, 0);
@@ -87,11 +69,8 @@ describe('canPlaceBuilding', () => {
     expect(result.reason).toBe('Out of bounds');
   });
 
-  // ── Test 5: Out of bounds — footprint exceeds grid on Z ───────────────────
-
   it('returns invalid with "Out of bounds" when footprint extends beyond grid depth', () => {
-    // management_office T1: 2 cells deep; at z=9 on a 10-deep grid → needs rows 9 & 10,
-    // but valid rows are 0–9 only → row 10 is out of bounds
+    // management_office T1: 2 cells deep; at z=9 on a 10-deep grid row 10 is out of bounds
     const grid = makeFlatGrid(10, 10, 5);
 
     const result = canPlaceBuilding(grid, 'management_office', 0, 9);
@@ -100,19 +79,15 @@ describe('canPlaceBuilding', () => {
     expect(result.reason).toBe('Out of bounds');
   });
 
-  // ── Test 6: Overlap with BUSY cell ────────────────────────────────────────
-
-  it('returns invalid with "Overlap with existing building" when any footprint cell is BUSY', () => {
-    // 10×10 flat grid; manually mark cell (1,1) BUSY to simulate an existing building
+  it('returns invalid with "Space is occupied" when any footprint cell is BUSY', () => {
+    // management_office T1 (2×2) at (0,0) — footprint covers (0,0),(1,0),(0,1),(1,1)
     const grid = makeFlatGrid(10, 10, 5);
     grid[1]![1]!.surfaceY = BUSY;
 
-    // management_office T1 (2×2) at (0,0) → footprint covers (0,0),(1,0),(0,1),(1,1)
-    // → hits the BUSY cell at column 1, row 1
     const result = canPlaceBuilding(grid, 'management_office', 0, 0);
 
     expect(result.valid).toBe(false);
-    expect(result.reason).toBe('Overlap with existing building');
+    expect(result.reason).toBe('Space is occupied');
   });
 
   it('returns valid when the BUSY cell lies outside the footprint', () => {
@@ -124,8 +99,6 @@ describe('canPlaceBuilding', () => {
 
     expect(result.valid).toBe(true);
   });
-
-  // ── Test 7: Uneven surface ─────────────────────────────────────────────────
 
   it('returns invalid with "Uneven surface" when footprint cells have different surfaceY values', () => {
     // 10×10 grid: rows z=0 at surfaceY=3, rows z=1 at surfaceY=4
@@ -150,8 +123,6 @@ describe('canPlaceBuilding', () => {
     expect(result.valid).toBe(true);
   });
 
-  // ── Test 8: Tier 3 — valid placement with a larger footprint ──────────────
-
   it('accepts a valid tier-3 placement on a sufficiently large flat grid', () => {
     // living_quarters T3: footprint rect(5,4) = 20 cells; 20×20 flat grid has plenty of room
     const grid = makeFlatGrid(20, 20, 2);
@@ -171,8 +142,6 @@ describe('canPlaceBuilding', () => {
 
     expect(result.valid).toBe(true);
   });
-
-  // ── Test 9: Tier 3 — rejection when the larger footprint exceeds bounds ────
 
   it('returns invalid with "Out of bounds" when tier-3 footprint exceeds grid width', () => {
     // living_quarters T3: 5 cells wide; at x=7 on a 10-wide grid → needs cols 7–11, max is 9
@@ -194,19 +163,9 @@ describe('canPlaceBuilding', () => {
     expect(result.reason).toBe('Out of bounds');
   });
 
-  // ── Test 10: Non-rectangular (L-shape) BUSY region ────────────────────────
-  //
-  // Purpose: verify that the function performs per-cell checking, not a simple
-  // bounding-box overlap. We construct a grid with BUSY cells arranged in an
-  // L-shape, then confirm:
-  //   (a) a placement whose footprint intersects the L is correctly rejected
-  //   (b) a placement whose footprint lies in a gap of the L is correctly accepted
+  // ── L-shape BUSY region — verifies per-cell checking, not bounding-box overlap
 
   it('rejects placement when footprint cells intersect the L-shaped BUSY region', () => {
-    // 8×8 flat grid; L-shaped BUSY region:
-    //   col x=0, rows z=0,1,2  (vertical bar of the L)
-    //   col x=1, row  z=2      (horizontal foot of the L)
-    //
     //  x: 0  1  2  3 …
     //  z=0: B  .  .  .
     //  z=1: B  .  .  .
@@ -222,7 +181,7 @@ describe('canPlaceBuilding', () => {
     // → hits BUSY at (0,0) and (0,1) → must fail
     const overlapResult = canPlaceBuilding(grid, 'management_office', 0, 0);
     expect(overlapResult.valid).toBe(false);
-    expect(overlapResult.reason).toBe('Overlap with existing building');
+    expect(overlapResult.reason).toBe('Space is occupied');
   });
 
   it('accepts placement when footprint falls in the gap of the L-shaped BUSY region', () => {
@@ -248,18 +207,13 @@ describe('canPlaceBuilding', () => {
     // → hits BUSY at (1,2) → must fail
     const overlapResult = canPlaceBuilding(grid, 'management_office', 1, 2);
     expect(overlapResult.valid).toBe(false);
-    expect(overlapResult.reason).toBe('Overlap with existing building');
+    expect(overlapResult.reason).toBe('Space is occupied');
 
     // management_office T1 (2×2) at (2,2) → footprint covers (2,2),(3,2),(2,3),(3,3)
     // → none are BUSY → must pass
     const clearResult = canPlaceBuilding(grid, 'management_office', 2, 2);
     expect(clearResult.valid).toBe(true);
   });
-
-  // ── Test 11: Single-cell scenarios ────────────────────────────────────────
-  //
-  // Edge-cases around the tightest possible valid placement and the
-  // corresponding single-cell failure conditions.
 
   it('accepts placement when building footprint exactly fills the available grid area', () => {
     // management_office T1: 2×2 footprint; 2×2 grid → footprint exactly fills it
@@ -289,10 +243,10 @@ describe('canPlaceBuilding', () => {
     const result = canPlaceBuilding(grid, 'management_office', 0, 0);
 
     expect(result.valid).toBe(false);
-    expect(result.reason).toBe('Overlap with existing building');
+    expect(result.reason).toBe('Space is occupied');
   });
 
-  // ── Check priority: bounds is tested before BUSY and uneven-surface ────────
+  // ── Check priority: bounds before BUSY, BUSY before uneven-surface ─────────
 
   it('reports "Out of bounds" even when the origin also contains a BUSY cell', () => {
     // If bounds and BUSY both apply, the bounds error must be returned first
@@ -316,7 +270,7 @@ describe('canPlaceBuilding', () => {
     expect(result.reason).toBe('Out of bounds');
   });
 
-  // ── Tier parameter defaults to 1 ──────────────────────────────────────────
+  // ── Tier defaults to 1 when omitted ───────────────────────────────────────
 
   it('uses the tier-1 footprint when the tier parameter is omitted', () => {
     // management_office T1: 2×2; T3: 3×3
