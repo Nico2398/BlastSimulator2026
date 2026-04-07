@@ -127,6 +127,27 @@ jobs:
               return;
             }
 
+            // --- 5b. Guard: ensure the Copilot SWE agent session has fully exited ---
+            // The agent posts "APPROVED" before its session ends. If we merge immediately,
+            // the branch deletion cancels the still-running agent job (race condition).
+            // We check for any in-progress/queued check run from app ID 1143301 (Copilot SWE agent).
+            // If one exists, return early — the next CI completion event will re-evaluate.
+            const COPILOT_SWE_APP_ID = 1143301;
+            const { data: checksData } = await github.rest.checks.listForRef({
+              owner, repo,
+              ref: pr.head.sha,
+              app_id: COPILOT_SWE_APP_ID,
+              per_page: 100
+            });
+            const activeStatuses = new Set(['queued', 'in_progress', 'waiting', 'requested']);
+            const agentStillRunning = checksData.check_runs.some(run =>
+              activeStatuses.has(run.status)
+            );
+            if (agentStillRunning) {
+              console.log('Copilot SWE agent session is still in-progress. Deferring merge to next CI event.');
+              return;
+            }
+
             console.log(`PR #${prNumber}: self-review complete, CI green. Approving and merging.`);
 
             // --- 6. Approve ---

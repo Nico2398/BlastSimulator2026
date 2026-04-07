@@ -42,7 +42,13 @@ description: >
 
 ## The Reviewer Agent
 
-Code review finds issue → comments `@copilot fix X` → coding agent pushes fix → CI re-runs → review re-approves → auto-merge.
+Review flow:
+1. Run all checks (architecture, i18n, 300-line limit, no Math.random(), tests via `npm run validate`)
+2. If issues are found: push fixes, wait for CI to start on the new commit
+3. Post the `APPROVED` comment **as the very last action** — after all commits are pushed and no further changes are needed
+4. Exit immediately after posting the approval comment — do not perform any additional file operations, pushes, or API calls after this point
+
+The `APPROVED` comment is the session termination signal. Nothing must follow it.
 
 ## Writing Good Issues
 
