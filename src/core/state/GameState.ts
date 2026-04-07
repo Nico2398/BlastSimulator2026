@@ -13,7 +13,7 @@ import type { BuildingState } from '../entities/Building.js';
 import { createBuildingState } from '../entities/Building.js';
 import type { VehicleState } from '../entities/Vehicle.js';
 import { createVehicleState } from '../entities/Vehicle.js';
-import type { EmployeeState } from '../entities/Employee.js';
+import type { EmployeeState, SkillCategory } from '../entities/Employee.js';
 import { createEmployeeState } from '../entities/Employee.js';
 import type { ScoreState } from '../scores/ScoreManager.js';
 import { createScoreState } from '../scores/ScoreManager.js';
@@ -47,6 +47,15 @@ export interface GameConfig {
   seed: number;
   mineType?: string;
   startingCash?: number;
+}
+
+/** A pending action waiting for a qualified employee to execute it. */
+export interface PendingAction {
+  id: number;
+  requiredSkill: SkillCategory;
+  targetX: number;
+  targetZ: number;
+  payload: Record<string, unknown>;
 }
 
 /**
@@ -134,6 +143,8 @@ export interface GameState {
   levelEnded: boolean;
   /** Reason the level ended, or null if still active. */
   levelEndReason: 'completed' | 'bankruptcy' | 'arrest' | 'ecological_shutdown' | 'worker_revolt' | null;
+  /** Pending actions waiting for qualified employees. */
+  pendingActions: PendingAction[];
 }
 
 export interface WorldState {
@@ -190,5 +201,6 @@ export function createGame(config: GameConfig): GameState {
     levelStats: createLevelStats(),
     levelEnded: false,
     levelEndReason: null,
+    pendingActions: [],
   };
 }
