@@ -78,13 +78,13 @@ jobs:
                 '',
                 '1. Verify all acceptance criteria from the linked issue are met',
                 '2. Check for architecture violations (core must not import renderer/physics/ui)',
-                '3. Ensure no hardcoded numbers in logic (use src/core/config/)',
+                '3. Ensure no hardcoded numbers in logic (use src/core/config/) ',
                 '4. Verify i18n: all user-facing strings use t() with both en.json and fr.json entries',
                 '5. Check 300-line limit per file',
                 '6. Ensure seeded PRNG usage (no Math.random())',
                 '7. Verify all tests pass with `npm run validate`',
                 '',
-                'If everything looks good, comment "LGTM". If you find issues, fix them and push.',
+                'If everything looks good, comment "APPROVED". If you find issues, fix them and push.',
               ].join('\n');
 
               await github.rest.issues.createComment({
@@ -114,28 +114,16 @@ jobs:
               return;
             }
 
-            // Require an explicit "LGTM" from a Copilot account after the review request.
+            // Require an explicit "APPROVED" from a Copilot account after the review request.
             // A non-affirming response ("reviewing…", "found issues") must not trigger merge.
-            const agentLGTM = allComments.some(c =>
+            const agentApproved = allComments.some(c =>
               expectedAuthors.includes(c.user?.login || '') &&
               new Date(c.created_at) > new Date(reviewRequestComment.created_at) &&
-              c.body?.toLowerCase().includes('lgtm')
+              c.body?.toLowerCase().includes('approved')
             );
 
-            // Alternative signal: agent pushed fix commits after the review request.
-            // Use paginate so PRs with more than 100 commits are handled correctly.
-            const allCommits = await github.paginate(github.rest.pulls.listCommits, {
-              owner, repo,
-              pull_number: prNumber,
-              per_page: 100
-            });
-
-            const hasPostReviewCommits = allCommits.some(c =>
-              new Date(c.commit.committer.date) > new Date(reviewRequestComment.created_at)
-            );
-
-            if (!agentLGTM && !hasPostReviewCommits) {
-              console.log('Waiting for Copilot agent to complete self-review...');
+            if (!agentApproved) {
+              console.log('Waiting for Copilot agent to post APPROVED after completing self-review...');
               return;
             }
 
