@@ -4,6 +4,9 @@ on:
   workflow_run:
     workflows: ["CI"]
     types: [completed]
+  # Re-evaluate once the Copilot agent session ends, closing the deferred-merge loop.
+  check_run:
+    types: [completed]
 
 permissions:
   pull-requests: write
@@ -13,8 +16,10 @@ permissions:
 jobs:
   auto-review-and-merge:
     runs-on: ubuntu-latest
-    # Only run when CI succeeds
-    if: github.event.workflow_run.conclusion == 'success'
+    # Run when CI succeeds, or when the Copilot SWE agent check run completes (app 1143301).
+    if: |
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
+      (github.event_name == 'check_run' && github.event.check_run.app.id == 1143301)
     steps:
       - name: Auto-review and merge Copilot PRs
         uses: actions/github-script@v7
@@ -23,14 +28,27 @@ jobs:
           script: |
             const owner = context.repo.owner;
             const repo = context.repo.repo;
+            const COPILOT_SWE_APP_ID = 1143301;
 
-            // --- 1. Find the PR from the workflow run ---
-            const prs = context.payload.workflow_run.pull_requests;
-            if (!prs || prs.length === 0) {
-              console.log('No PRs associated with this CI run.');
-              return;
+            // --- 1. Find the PR ---
+            // Source differs depending on which trigger fired.
+            let prNumber;
+            if (context.eventName === 'workflow_run') {
+              const prs = context.payload.workflow_run.pull_requests;
+              if (!prs || prs.length === 0) {
+                console.log('No PRs associated with this CI run.');
+                return;
+              }
+              prNumber = prs[0].number;
+            } else {
+              // check_run trigger: Copilot agent session just ended.
+              const prs = context.payload.check_run.pull_requests;
+              if (!prs || prs.length === 0) {
+                console.log('No PRs associated with this agent check run.');
+                return;
+              }
+              prNumber = prs[0].number;
             }
-            const prNumber = prs[0].number;
 
             // --- 2. Get full PR data ---
             const { data: pr } = await github.rest.pulls.get({
@@ -127,7 +145,48 @@ jobs:
               return;
             }
 
-            console.log(`PR #${prNumber}: self-review complete, CI green. Approving and merging.`);
+            // --- 5b. Guard: ensure the agent session has exited before merging ---
+            // When triggered by CI completion, the agent may still be running (race condition:
+            // agent posts APPROVED then keeps its session alive briefly). Defer in that case —
+            // the check_run trigger below will re-evaluate once the agent exits.
+            // When triggered by the agent check_run itself, the session has just ended, skip guard.
+            if (context.eventName === 'workflow_run') {
+              const { data: checksData } = await github.rest.checks.listForRef({
+                owner, repo,
+                ref: pr.head.sha,
+                app_id: COPILOT_SWE_APP_ID,
+                per_page: 100
+              });
+              const activeStatuses = new Set(['queued', 'in_progress', 'waiting', 'requested']);
+              const agentStillRunning = checksData.check_runs.some(run =>
+                activeStatuses.has(run.status)
+              );
+              if (agentStillRunning) {
+                console.log('Copilot SWE agent still in-progress. Deferring — will retry when agent session ends.');
+                return;
+              }
+            }
+
+            // --- 5c. When triggered by agent session end, verify CI is still green ---
+            // The CI may not have fired after the agent's last push; check all non-agent runs.
+            if (context.eventName === 'check_run') {
+              const { data: { check_runs: allRuns } } = await github.rest.checks.listForRef({
+                owner, repo,
+                ref: pr.head.sha,
+                per_page: 100
+              });
+              const ciRuns = allRuns.filter(r => r.app?.id !== COPILOT_SWE_APP_ID);
+              const allCIGreen = ciRuns.length > 0 && ciRuns.every(r =>
+                r.status === 'completed' &&
+                ['success', 'skipped', 'neutral'].includes(r.conclusion || '')
+              );
+              if (!allCIGreen) {
+                console.log('CI not fully green yet. Waiting for CI to complete before merging.');
+                return;
+              }
+            }
+
+            console.log(`PR #${prNumber}: self-review complete, CI green, agent exited. Approving and merging.`);
 
             // --- 6. Approve ---
             try {
