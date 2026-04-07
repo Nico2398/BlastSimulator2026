@@ -140,3 +140,16 @@ export const MAX_TOTAL_FRAGMENTS = 2000;
 
 /** Terrain re-mesh radius in chunks after a blast (only nearby chunks update). */
 export const BLAST_REMESH_RADIUS_CHUNKS = 2;
+
+// ─── Buildings ─────────────────────────────────────────────────────────────────
+
+/** Productivity well-being multiplier from Living Quarters by tier (and absent). */
+export const LIVING_QUARTERS_WELLBEING_MULTIPLIERS = {
+  absent: 0.85,
+  t1: 0.90,
+  t2: 1.00,
+  t3: 1.10,
+} as const;
+
+/** Additional well-being penalty applied when employee count exceeds bed capacity. */
+export const LIVING_QUARTERS_OVERCAPACITY_PENALTY = 0.10;

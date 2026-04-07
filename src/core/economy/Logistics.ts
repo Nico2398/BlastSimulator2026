@@ -102,6 +102,17 @@ export function sellFragment(
   };
 }
 
+/**
+ * Synchronise logistics storage capacity with the freight warehouse total.
+ * Call after building placement or demolition to keep capacity in sync.
+ */
+export function syncLogisticsCapacity(
+  state: LogisticsState,
+  capacityKg: number,
+): void {
+  state.storageCapacityKg = capacityKg;
+}
+
 // ── Queries ──
 
 export interface FragmentCounts {
