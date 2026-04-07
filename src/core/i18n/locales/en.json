@@ -1608,5 +1608,17 @@
   "building.freight_warehouse.t3.name": "Hoarder's Paradise",
   "building.vehicle_depot.t1.name": "Rusty Garage",
   "building.vehicle_depot.t2.name": "Grease Palace",
-  "building.vehicle_depot.t3.name": "Mecha Hangar"
+  "building.vehicle_depot.t3.name": "Mecha Hangar",
+  "error.unqualified_task": "No qualified employee available for this task",
+  "research.unlock_tier": "Research: Unlock {type} Tier {tier}",
+  "skill.blasting": "Blasting",
+  "skill.driving.drill_rig": "Drill Rig Operation",
+  "skill.driving.excavator": "Excavator Operation",
+  "skill.driving.truck": "Truck Driving",
+  "skill.geology": "Geology",
+  "skill.management": "Management",
+  "training.blasting_academy": "Blasting Academy Training",
+  "training.driving_center": "Driving Center Training",
+  "training.geology_lab": "Geology Lab Training",
+  "training.management_office": "Management Office Training"
 }

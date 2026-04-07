@@ -39,6 +39,29 @@ function generateName(rng: Random): string {
   return `${rng.pick(FIRST_NAMES)} ${rng.pick(LAST_NAMES)}`;
 }
 
+// ── Skills & Training ──
+
+export type SkillCategory =
+  | 'driving.truck'
+  | 'driving.excavator'
+  | 'driving.drill_rig'
+  | 'blasting'
+  | 'management'
+  | 'geology';
+
+export interface SkillQualification {
+  category: SkillCategory;
+  proficiencyLevel: 1 | 2 | 3 | 4 | 5;
+  xp: number;
+}
+
+export interface TrainingState {
+  buildingId: number;
+  skill: SkillCategory;
+  ticksRemaining: number;
+  fee: number;
+}
+
 // ── Employee instance ──
 
 export interface Employee {
@@ -53,6 +76,8 @@ export interface Employee {
   /** Grid position. */
   x: number;
   z: number;
+  qualifications: SkillQualification[];
+  trainingState: TrainingState | null;
 }
 
 // ── Employee state ──
@@ -93,6 +118,8 @@ export function hireEmployee(
     injured: false,
     alive: true,
     x, z,
+    qualifications: [],
+    trainingState: null,
   };
   state.employees.push(employee);
   return { employee, hiringCost: HIRING_COSTS[role] };
@@ -183,3 +210,68 @@ export function killEmployee(state: EmployeeState, employeeId: number): boolean 
 }
 
 export { HIRING_COSTS, BASE_SALARIES };
+
+// ── Skill & Training functions ──
+
+/** Add or replace a qualification for an employee. Returns false if employee not found. */
+export function assignSkill(
+  state: EmployeeState,
+  employeeId: number,
+  category: SkillCategory,
+  level: 1 | 2 | 3 | 4 | 5,
+): boolean {
+  const emp = state.employees.find(e => e.id === employeeId);
+  if (!emp) return false;
+
+  const idx = emp.qualifications.findIndex(q => q.category === category);
+  const qual: SkillQualification = { category, proficiencyLevel: level, xp: 0 };
+  if (idx >= 0) {
+    emp.qualifications[idx] = qual;
+  } else {
+    emp.qualifications.push(qual);
+  }
+  return true;
+}
+
+/**
+ * Begin training an employee at a building.
+ * Fails if employee not found / not alive, or already in training.
+ */
+export function startTraining(
+  state: EmployeeState,
+  employeeId: number,
+  buildingId: number,
+  skill: SkillCategory,
+  durationTicks: number,
+  fee: number,
+): { success: boolean; fee?: number; error?: string } {
+  const emp = state.employees.find(e => e.id === employeeId);
+  if (!emp || !emp.alive) {
+    return { success: false, error: 'Employee not found or not alive' };
+  }
+  if (emp.trainingState !== null) {
+    return { success: false, error: 'Employee already in training' };
+  }
+  emp.trainingState = { buildingId, skill, ticksRemaining: durationTicks, fee };
+  return { success: true, fee };
+}
+
+/**
+ * Tick all training employees. When ticksRemaining reaches 0:
+ * - assign qualification with proficiencyLevel: 1, xp: 0 (if not already higher)
+ * - set trainingState = null
+ */
+export function tickTraining(state: EmployeeState): void {
+  for (const emp of state.employees) {
+    if (!emp.trainingState) continue;
+    emp.trainingState.ticksRemaining -= 1;
+    if (emp.trainingState.ticksRemaining <= 0) {
+      const skill = emp.trainingState.skill;
+      emp.trainingState = null;
+      const existing = emp.qualifications.find(q => q.category === skill);
+      if (!existing) {
+        emp.qualifications.push({ category: skill, proficiencyLevel: 1, xp: 0 });
+      }
+    }
+  }
+}

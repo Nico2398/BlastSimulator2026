@@ -1608,5 +1608,17 @@
   "building.freight_warehouse.t3.name": "Paradis de l'Entasseur",
   "building.vehicle_depot.t1.name": "Garage Rouillé",
   "building.vehicle_depot.t2.name": "Palais de la Graisse",
-  "building.vehicle_depot.t3.name": "Hangar Mecha"
+  "building.vehicle_depot.t3.name": "Hangar Mecha",
+  "error.unqualified_task": "Aucun employé qualifié disponible pour cette tâche",
+  "research.unlock_tier": "Recherche : Débloquer {type} Niveau {tier}",
+  "skill.blasting": "Dynamitage",
+  "skill.driving.drill_rig": "Conduite de foreuse",
+  "skill.driving.excavator": "Conduite d'excavatrice",
+  "skill.driving.truck": "Conduite de camion",
+  "skill.geology": "Géologie",
+  "skill.management": "Gestion",
+  "training.blasting_academy": "Formation à l'académie de dynamitage",
+  "training.driving_center": "Formation au centre de conduite",
+  "training.geology_lab": "Formation au laboratoire de géologie",
+  "training.management_office": "Formation au bureau de gestion"
 }
