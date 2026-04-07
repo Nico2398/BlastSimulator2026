@@ -5,6 +5,10 @@
 // Research Center queue: BuildingResearch.ts
 
 import { BUILDING_DEFS } from './BuildingDefs.js';
+import {
+  LIVING_QUARTERS_WELLBEING_MULTIPLIERS,
+  LIVING_QUARTERS_OVERCAPACITY_PENALTY,
+} from '../config/balance.js';
 
 // ── Building types ──
 
@@ -283,6 +287,128 @@ function isOccupied(
     }
   }
   return false;
+}
+
+/**
+ * Productivity well-being multiplier derived from the best active Living Quarters tier.
+ *
+ * | Situation                    | Multiplier |
+ * |------------------------------|-----------|
+ * | No active living quarters    | 0.85      |
+ * | Tier 1 ("The Cells")         | 0.90      |
+ * | Tier 2 ("Staff Dormitory")   | 1.00      |
+ * | Tier 3 ("Luxury Hotel")      | 1.10      |
+ * | Any tier + overcapacity      | −0.10 on top |
+ *
+ * Overcapacity = employeeCount > total beds across all active living quarters.
+ */
+export function getLivingQuartersWellbeingMultiplier(
+  state: BuildingState,
+  employeeCount: number,
+): number {
+  const lqs = state.buildings.filter(b => b.active && b.type === 'living_quarters');
+
+  if (lqs.length === 0) {
+    return LIVING_QUARTERS_WELLBEING_MULTIPLIERS.absent;
+  }
+
+  let totalBeds = 0;
+  let bestTier: BuildingTier = 1;
+  for (const lq of lqs) {
+    const def = getBuildingDef(lq.type, lq.tier);
+    totalBeds += def.capacity;
+    if (lq.tier > bestTier) bestTier = lq.tier as BuildingTier;
+  }
+
+  const key = `t${bestTier}` as keyof typeof LIVING_QUARTERS_WELLBEING_MULTIPLIERS;
+  let multiplier: number = LIVING_QUARTERS_WELLBEING_MULTIPLIERS[key];
+
+  if (employeeCount > totalBeds) {
+    multiplier -= LIVING_QUARTERS_OVERCAPACITY_PENALTY;
+  }
+
+  return multiplier;
+}
+
+/** Total explosive storage capacity (kg) across all active explosive warehouses. */
+export function getExplosivesCapacity(state: BuildingState): number {
+  let total = 0;
+  for (const b of state.buildings) {
+    if (b.active && b.type === 'explosive_warehouse') {
+      total += getBuildingDef(b.type, b.tier).capacity;
+    }
+  }
+  return total;
+}
+
+/** Total explosives currently stored (kg) across all active explosive warehouses. */
+export function getExplosivesInStock(state: BuildingState): number {
+  let total = 0;
+  for (const b of state.buildings) {
+    if (b.active && b.type === 'explosive_warehouse') {
+      total += b.storedExplosivesKg ?? 0;
+    }
+  }
+  return total;
+}
+
+/**
+ * Store explosives in available warehouse space.
+ * Distributes across warehouses in placement order.
+ * @returns Amount actually stored (may be less than requested if capacity is full).
+ */
+export function storeExplosives(state: BuildingState, amountKg: number): number {
+  let remaining = amountKg;
+  for (const b of state.buildings) {
+    if (!b.active || b.type !== 'explosive_warehouse' || remaining <= 0) continue;
+    const def = getBuildingDef(b.type, b.tier);
+    const current = b.storedExplosivesKg ?? 0;
+    const available = def.capacity - current;
+    if (available <= 0) continue;
+    const toStore = Math.min(remaining, available);
+    b.storedExplosivesKg = current + toStore;
+    remaining -= toStore;
+  }
+  return amountKg - remaining;
+}
+
+/**
+ * Consume explosives from warehouse(s).
+ * @returns true if sufficient stock was available and deducted; false otherwise (state unchanged).
+ */
+export function consumeExplosives(state: BuildingState, amountKg: number): boolean {
+  if (getExplosivesInStock(state) < amountKg) return false;
+
+  let remaining = amountKg;
+  for (const b of state.buildings) {
+    if (!b.active || b.type !== 'explosive_warehouse' || remaining <= 0) continue;
+    const current = b.storedExplosivesKg ?? 0;
+    if (current <= 0) continue;
+    const toConsume = Math.min(remaining, current);
+    b.storedExplosivesKg = current - toConsume;
+    remaining -= toConsume;
+  }
+  return true;
+}
+
+/** Returns true if at least one active explosive warehouse has stock > 0. */
+export function hasExplosivesForBlast(state: BuildingState): boolean {
+  return state.buildings.some(
+    b => b.active && b.type === 'explosive_warehouse' && (b.storedExplosivesKg ?? 0) > 0,
+  );
+}
+
+/**
+ * Check whether freight warehouses can accommodate additional material.
+ * @param currentStoredKg - Material already stored in logistics
+ * @param additionalKg - New material to accept
+ */
+export function freightWarehouseHasRoom(
+  state: BuildingState,
+  currentStoredKg: number,
+  additionalKg: number,
+): boolean {
+  return currentStoredKg + additionalKg <= getStorageCapacity(state);
 }
 
 // ── Re-exports from sub-modules ──────────────────────────────────────────────
