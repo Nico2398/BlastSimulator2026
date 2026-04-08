@@ -1,0 +1,15 @@
+{
+  "name": "building-lifecycle",
+  "description": "Building lifecycle: place, upgrade to T2, move, then demolish",
+  "steps": [
+    "new_game seed:42",
+    "build management_office at:5,5",
+    "build list",
+    "build upgrade 1",
+    "build list",
+    "build move 2 to:10,5",
+    "build list",
+    "build destroy 2",
+    "build list"
+  ]
+}
