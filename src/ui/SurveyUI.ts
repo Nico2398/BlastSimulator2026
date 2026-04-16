@@ -4,7 +4,9 @@
 import { t } from '../core/i18n/I18n.js';
 import type { GameState } from '../core/state/GameState.js';
 
-export type GameConsoleFn = (cmd: string) => string;
+import type { CommandResult } from '../console/ConsoleRunner.js';
+
+export type GameConsoleFn = (cmd: string) => CommandResult;
 
 export class SurveyUI {
   private readonly el: HTMLElement;

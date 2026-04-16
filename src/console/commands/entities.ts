@@ -10,6 +10,7 @@ import {
   getBuildingDef,
   getDefSize,
   type BuildingType,
+  type BuildingTier,
 } from '../../core/entities/Building.js';
 import {
   purchaseVehicle,
@@ -63,10 +64,36 @@ export function buildCommand(
     case 'destroy': {
       const id = parseInt(args[1] ?? '', 10);
       if (isNaN(id)) return { success: false, output: 'Usage: build destroy <id>' };
-      if (!destroyBuilding(state.buildings, id)) {
-        return { success: false, output: `Building #${id} not found.` };
+      const toDestroy = state.buildings.buildings.find(b => b.id === id);
+      if (!toDestroy) return { success: false, output: `Building #${id} not found.` };
+      const destroyDef = getBuildingDef(toDestroy.type, toDestroy.tier);
+      state.cash -= destroyDef.demolishCost;
+      addExpense(state.finances, destroyDef.demolishCost, 'construction', `Demolish ${toDestroy.type} #${id}`, state.tickCount);
+      destroyBuilding(state.buildings, id);
+      return { success: true, output: `Building #${id} demolished. Cost: $${destroyDef.demolishCost}` };
+    }
+    case 'upgrade': {
+      const id = parseInt(args[1] ?? '', 10);
+      if (isNaN(id)) return { success: false, output: 'Usage: build upgrade <id>' };
+      const toUpgrade = state.buildings.buildings.find(b => b.id === id);
+      if (!toUpgrade) return { success: false, output: `Building #${id} not found.` };
+      if (toUpgrade.tier >= 3) return { success: false, output: `Building #${id} is already at max tier (T3).` };
+      const nextTier = (toUpgrade.tier + 1) as BuildingTier;
+      const oldDef = getBuildingDef(toUpgrade.type, toUpgrade.tier);
+      const newDef = getBuildingDef(toUpgrade.type, nextTier);
+      const totalCost = oldDef.demolishCost + newDef.constructionCost;
+      const { x, z, type: upgradeType } = toUpgrade;
+      destroyBuilding(state.buildings, id);
+      const upgradeResult = placeBuilding(state.buildings, upgradeType, x, z, GRID_SIZE, GRID_SIZE, nextTier);
+      if (!upgradeResult.success) {
+        return { success: false, output: `Upgrade failed: ${upgradeResult.error}` };
       }
-      return { success: true, output: `Building #${id} destroyed.` };
+      state.cash -= totalCost;
+      addExpense(state.finances, totalCost, 'construction', `Upgrade ${upgradeType} to T${nextTier}`, state.tickCount);
+      return {
+        success: true,
+        output: `Upgraded ${upgradeType} #${id} to T${nextTier} (new #${upgradeResult.building!.id}). Cost: $${totalCost}`,
+      };
     }
     case 'move': {
       const id = parseInt(args[1] ?? '', 10);
@@ -90,20 +117,22 @@ export function buildCommand(
       return { success: true, output: lines.join('\n') };
     }
     default: {
-      // Try to place: build <type> at:x,z
+      // Try to place: build <type> at:x,z [tier:N]
       const type = sub as BuildingType;
       if (!getAllBuildingTypes().includes(type)) {
-        return { success: false, output: `Unknown subcommand or building type: "${sub}". Use: build (list|destroy|move|types|<type> at:x,z)` };
+        return { success: false, output: `Unknown subcommand or building type: "${sub}". Use: build (list|destroy|upgrade|move|types|<type> at:x,z [tier:N])` };
       }
       const atCoords = (named['at'] ?? '').split(',').map(Number);
       if (atCoords.length < 2 || atCoords.some(isNaN)) {
-        return { success: false, output: `Usage: build ${type} at:x,z` };
+        return { success: false, output: `Usage: build ${type} at:x,z [tier:1|2|3]` };
       }
-      const result = placeBuilding(state.buildings, type, atCoords[0]!, atCoords[1]!, GRID_SIZE, GRID_SIZE);
+      const tierParam = parseInt(named['tier'] ?? '1', 10);
+      const tier = ([1, 2, 3].includes(tierParam) ? tierParam : 1) as BuildingTier;
+      const result = placeBuilding(state.buildings, type, atCoords[0]!, atCoords[1]!, GRID_SIZE, GRID_SIZE, tier);
       if (!result.success) return { success: false, output: result.error! };
       state.cash -= result.cost!;
-      addExpense(state.finances, result.cost!, 'construction', `Build ${type}`, state.tickCount);
-      return { success: true, output: `Built ${type} #${result.building!.id} at (${atCoords[0]},${atCoords[1]}). Cost: $${result.cost}` };
+      addExpense(state.finances, result.cost!, 'construction', `Build ${type} T${tier}`, state.tickCount);
+      return { success: true, output: `Built ${type} T${tier} #${result.building!.id} at (${atCoords[0]},${atCoords[1]}). Cost: $${result.cost}` };
     }
   }
 }

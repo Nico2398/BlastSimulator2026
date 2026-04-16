@@ -6,7 +6,9 @@ import type { DrillHole } from '../core/mining/DrillPlan.js';
 import type { HoleCharge } from '../core/mining/ChargePlan.js';
 import { TileSelectOverlay } from './TileSelectOverlay.js';
 
-export type GameConsoleFn = (cmd: string) => string;
+import type { CommandResult } from '../console/ConsoleRunner.js';
+
+export type GameConsoleFn = (cmd: string) => CommandResult;
 
 export class BlastPlanUI {
   private readonly el: HTMLElement;
@@ -40,9 +42,9 @@ export class BlastPlanUI {
 
     const chargeAllBtn = this.makeBtn('bs-btn bs-btn-primary', t('ui.blast.charge_all'), () => this.chargeAllHoles());
     const seqBtn = this.makeBtn('bs-btn', t('ui.blast.auto_seq'), () => {
-      const output = this.gameConsole?.('sequence auto') ?? '';
-      if (output.includes('Auto')) this.showStatus(t('ui.blast.status_sequenced'), 'success');
-      else this.showStatus(output || t('ui.blast.status_no_holes'), 'error');
+      const result = this.gameConsole?.('sequence auto');
+      if (result?.success) this.showStatus(t('ui.blast.status_sequenced'), 'success');
+      else this.showStatus(result?.output || t('ui.blast.status_no_holes'), 'error');
     });
     const previewBtn = this.makeBtn('bs-btn', t('ui.blast.preview'), () => { this.gameConsole?.('preview energy'); });
     const execBtn = this.makeBtn('bs-btn bs-btn-primary bs-blast-btn', t('ui.blast.execute'), () => this.confirmBlast());
@@ -109,11 +111,11 @@ export class BlastPlanUI {
     const exp = explosiveEl?.value ?? 'boomite';
     const amt = amountEl?.value ?? '5';
     const stem = stemmingEl?.value ?? '2';
-    const output = this.gameConsole?.(`charge hole:* explosive:${exp} amount:${amt} stemming:${stem}`) ?? '';
-    if (output.includes('Charged')) {
+    const result = this.gameConsole?.(`charge hole:* explosive:${exp} amount:${amt} stemming:${stem}`);
+    if (result?.success) {
       this.showStatus(t('ui.blast.status_charged'), 'success');
-    } else if (output) {
-      this.showStatus(output, 'error');
+    } else if (result?.output) {
+      this.showStatus(result.output, 'error');
     } else {
       this.showStatus(t('ui.blast.status_no_holes'), 'error');
     }
@@ -184,13 +186,13 @@ export class BlastPlanUI {
       const exp = explosiveSelect.value;
       const amt = amountInput.value;
       const stem = stemmingInput.value;
-      const output = this.gameConsole?.(`charge hole:${this.selectedHoleId} explosive:${exp} amount:${amt} stemming:${stem}`) ?? '';
-      if (output.startsWith('Charged')) {
+      const result = this.gameConsole?.(`charge hole:${this.selectedHoleId} explosive:${exp} amount:${amt} stemming:${stem}`);
+      if (result?.success) {
         this.chargeForm.style.display = 'none';
         errorEl.style.display = 'none';
-        this.showStatus(output, 'success');
+        this.showStatus(result.output, 'success');
       } else {
-        errorEl.textContent = output || 'Failed to apply charge.';
+        errorEl.textContent = result?.output || 'Failed to apply charge.';
         errorEl.style.display = '';
       }
     });

@@ -120,7 +120,9 @@ async function runScenario(name: string, steps: ScenarioStep[]): Promise<StepRes
       // Execute command and capture output
       const commandOutput = await page.evaluate((cmd: string) => {
         if (typeof (window as any).__gameConsole === 'function') {
-          return (window as any).__gameConsole(cmd);
+          const result = (window as any).__gameConsole(cmd);
+          // __gameConsole returns CommandResult { success, output }
+          return typeof result === 'object' ? (result.output ?? '') : String(result);
         }
         return 'ERROR: __gameConsole not available';
       }, step.command);

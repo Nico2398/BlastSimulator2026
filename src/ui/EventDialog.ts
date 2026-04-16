@@ -5,7 +5,9 @@ import { t } from '../core/i18n/I18n.js';
 import type { GameState } from '../core/state/GameState.js';
 import { getEventById } from '../core/events/EventPool.js';
 
-export type GameConsoleFn = (cmd: string) => string;
+import type { CommandResult } from '../console/ConsoleRunner.js';
+
+export type GameConsoleFn = (cmd: string) => CommandResult;
 
 export class EventDialog {
   private readonly overlay: HTMLElement;
@@ -115,7 +117,7 @@ export class EventDialog {
           // which would hide this dialog since pendingEvent gets cleared.
           this.showingOutcome = true;
           const result = this.gameConsole?.(`event choose ${idx}`);
-          this.enterOutcomePhase(result ?? '');
+          this.enterOutcomePhase(result?.output ?? '');
         });
         this.optionsEl.appendChild(btn);
       }

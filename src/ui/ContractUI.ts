@@ -5,7 +5,9 @@ import { t } from '../core/i18n/I18n.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { Contract } from '../core/economy/Contract.js';
 
-export type GameConsoleFn = (cmd: string) => string;
+import type { CommandResult } from '../console/ConsoleRunner.js';
+
+export type GameConsoleFn = (cmd: string) => CommandResult;
 
 export class ContractUI {
   private readonly el: HTMLElement;

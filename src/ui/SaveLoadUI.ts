@@ -10,7 +10,9 @@ import { SAVE_SLOT_COUNT, AUTO_SAVE_INTERVAL_TICKS } from '../core/config/balanc
 
 export type OnLoadCallback = (state: GameState) => void;
 export type GetStateCallback = () => GameState | null;
-export type GameConsoleFn = (cmd: string) => string;
+import type { CommandResult } from '../console/ConsoleRunner.js';
+
+export type GameConsoleFn = (cmd: string) => CommandResult;
 
 const AUTO_SAVE_SLOT = 'auto';
 

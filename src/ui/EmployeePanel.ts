@@ -5,7 +5,9 @@ import { t } from '../core/i18n/I18n.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { Employee, EmployeeRole } from '../core/entities/Employee.js';
 
-export type GameConsoleFn = (cmd: string) => string;
+import type { CommandResult } from '../console/ConsoleRunner.js';
+
+export type GameConsoleFn = (cmd: string) => CommandResult;
 
 const ROLES: EmployeeRole[] = ['driller', 'blaster', 'driver', 'surveyor', 'manager'];
 const HIRE_COSTS: Record<EmployeeRole, number> = {
