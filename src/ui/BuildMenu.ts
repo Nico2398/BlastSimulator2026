@@ -13,7 +13,9 @@ import {
 } from '../core/entities/Building.js';
 import { TileSelectOverlay } from './TileSelectOverlay.js';
 
-export type GameConsoleFn = (cmd: string) => string;
+import type { CommandResult } from '../console/ConsoleRunner.js';
+
+export type GameConsoleFn = (cmd: string) => CommandResult;
 
 export class BuildMenu {
   private readonly el: HTMLElement;
@@ -156,9 +158,8 @@ export class BuildMenu {
         worldSizeZ: this.worldSizeZ,
         title: t(`building.${type}.t${tier}.name`),
         onConfirm: (result) => {
-          const output = this.gameConsole?.(`build ${type} at:${result.x},${result.z} tier:${tier}`);
-          const placed = output?.startsWith('Built');
-          this.setStatus(placed ? t('ui.build.placed') : (output ?? t('ui.build.invalid_placement')));
+          const cmdResult = this.gameConsole?.(`build ${type} at:${result.x},${result.z} tier:${tier}`);
+          this.setStatus(cmdResult?.success ? t('ui.build.placed') : (cmdResult?.output ?? t('ui.build.invalid_placement')));
         },
       });
     });
@@ -224,8 +225,8 @@ export class BuildMenu {
         worldSizeZ: this.worldSizeZ,
         title: `${t('ui.build.move')} #${b.id}`,
         onConfirm: (result) => {
-          const output = this.gameConsole?.(`build move ${b.id} to:${result.x},${result.z}`);
-          this.setStatus(output?.startsWith('Building') ? t('ui.build.moved') : (output ?? ''));
+          const cmdResult = this.gameConsole?.(`build move ${b.id} to:${result.x},${result.z}`);
+          this.setStatus(cmdResult?.success ? t('ui.build.moved') : (cmdResult?.output ?? ''));
         },
       });
     });
@@ -240,8 +241,8 @@ export class BuildMenu {
       upgradeBtn.title = `$${def.demolishCost + nextDef.constructionCost}`;
     }
     upgradeBtn.addEventListener('click', () => {
-      const output = this.gameConsole?.(`build upgrade ${b.id}`);
-      this.setStatus(output?.startsWith('Upgraded') ? t('ui.build.upgraded') : (output ?? ''));
+      const cmdResult = this.gameConsole?.(`build upgrade ${b.id}`);
+      this.setStatus(cmdResult?.success ? t('ui.build.upgraded') : (cmdResult?.output ?? ''));
     });
 
     const demolishBtn = document.createElement('button');
@@ -250,8 +251,8 @@ export class BuildMenu {
     demolishBtn.textContent = t('ui.build.demolish');
     demolishBtn.title = `$${def.demolishCost}`;
     demolishBtn.addEventListener('click', () => {
-      const output = this.gameConsole?.(`build destroy ${b.id}`);
-      this.setStatus(output?.startsWith('Building') ? t('ui.build.demolished') : (output ?? ''));
+      const cmdResult = this.gameConsole?.(`build destroy ${b.id}`);
+      this.setStatus(cmdResult?.success ? t('ui.build.demolished') : (cmdResult?.output ?? ''));
     });
 
     row.append(info, moveBtn, upgradeBtn, demolishBtn);

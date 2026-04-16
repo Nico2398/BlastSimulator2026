@@ -4,7 +4,9 @@
 
 import { t } from '../core/i18n/I18n.js';
 
-export type GameConsoleFn = (cmd: string) => string;
+import type { CommandResult } from '../console/ConsoleRunner.js';
+
+export type GameConsoleFn = (cmd: string) => CommandResult;
 
 const STEPS = [
   'tutorial.step1',

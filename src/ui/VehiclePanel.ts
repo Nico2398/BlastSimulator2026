@@ -6,7 +6,9 @@ import type { GameState } from '../core/state/GameState.js';
 import type { Vehicle } from '../core/entities/Vehicle.js';
 import { getAllVehicleTypes, getVehicleDef } from '../core/entities/Vehicle.js';
 
-export type GameConsoleFn = (cmd: string) => string;
+import type { CommandResult } from '../console/ConsoleRunner.js';
+
+export type GameConsoleFn = (cmd: string) => CommandResult;
 
 export class VehiclePanel {
   private readonly el: HTMLElement;

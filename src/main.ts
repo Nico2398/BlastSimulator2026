@@ -97,13 +97,13 @@ emitter.on('revolt:warning', ({ ticksRemaining }) => {
 
 declare global {
   interface Window {
-    __gameConsole: (cmd: string) => string;
+    __gameConsole: (cmd: string) => import('./console/ConsoleRunner.js').CommandResult;
     __gameState: () => Record<string, unknown> | null;
     __uiState: () => Record<string, unknown>;
   }
 }
 
-window.__gameConsole = (cmd: string): string => {
+window.__gameConsole = (cmd: string) => {
   const result = runner.run(cmd);
   // Sync the renderer after every command so visual changes appear immediately
   gameRenderer.syncFromContext(ctx);
@@ -128,7 +128,7 @@ window.__gameConsole = (cmd: string): string => {
 
   // Update UI after every command
   if (ctx.state) uiManager.update(ctx.state, ctx.weatherCycle?.current);
-  return result.output;
+  return result;
 };
 
 // --- State extraction bridges (used by scenario tests) ---
