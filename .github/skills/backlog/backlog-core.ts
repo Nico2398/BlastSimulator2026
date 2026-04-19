@@ -77,7 +77,10 @@ export function resolvedBlockers(tasks: BacklogTask[], task: BacklogTask): boole
 export function getNextTask(tasks: BacklogTask[]): BacklogTask | undefined {
   return tasks
     .filter(t => t.status === 'pending' && resolvedBlockers(tasks, t))
-    .sort((a, b) => a.chapter - b.chapter)[0];
+    .sort((a, b) => {
+      if (a.chapter !== b.chapter) return a.chapter - b.chapter;
+      return tasks.indexOf(a) - tasks.indexOf(b);
+    })[0];
 }
 
 // ---------------------------------------------------------------------------

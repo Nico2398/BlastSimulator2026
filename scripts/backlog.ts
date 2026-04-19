@@ -120,7 +120,16 @@ const [cmd, arg1] = args;
 switch (cmd) {
   case 'list': {
     const statusFilter = flag('--status') as TaskStatus | undefined;
-    const chapterFilter = flag('--chapter') ? Number(flag('--chapter')) : undefined;
+    const chapterRaw = flag('--chapter');
+    let chapterFilter: number | undefined;
+    if (chapterRaw !== undefined) {
+      const parsed = Number(chapterRaw);
+      if (!Number.isFinite(parsed) || parsed <= 0 || !Number.isInteger(parsed)) {
+        console.error(c('red', `Invalid --chapter value: ${chapterRaw}`));
+        process.exit(1);
+      }
+      chapterFilter = parsed;
+    }
     const tasks = filterTasks(loadBacklog(), { status: statusFilter, chapter: chapterFilter });
 
     if (tasks.length === 0) {
@@ -202,7 +211,16 @@ switch (cmd) {
 
   case 'done': {
     if (!arg1) { console.error(c('red', 'usage: done <id> [--pr <number>]')); process.exit(1); }
-    const pr = flag('--pr') ? Number(flag('--pr')) : undefined;
+    const prRaw = flag('--pr');
+    let pr: number | undefined;
+    if (prRaw !== undefined) {
+      const parsed = Number(prRaw);
+      if (!Number.isFinite(parsed) || parsed <= 0 || !Number.isInteger(parsed)) {
+        console.error(c('red', `Invalid --pr value: ${prRaw}`));
+        process.exit(1);
+      }
+      pr = parsed;
+    }
     const tasks = loadBacklog();
     const task = findTask(tasks, arg1);
     if (!task) {

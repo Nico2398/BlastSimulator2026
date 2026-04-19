@@ -40,10 +40,6 @@ function flag(name: string): string | undefined {
   return idx !== -1 ? args[idx + 1] : undefined;
 }
 
-function hasFlag(name: string): boolean {
-  return args.includes(name);
-}
-
 // ---------------------------------------------------------------------------
 // Formatters (terse, machine-readable)
 // ---------------------------------------------------------------------------
@@ -63,7 +59,16 @@ const [cmd, arg1] = args;
 switch (cmd) {
   case 'list': {
     const statusFilter = flag('--status') as TaskStatus | undefined;
-    const chapterFilter = flag('--chapter') ? Number(flag('--chapter')) : undefined;
+    const chapterRaw = flag('--chapter');
+    let chapterFilter: number | undefined;
+    if (chapterRaw !== undefined) {
+      const parsed = Number(chapterRaw);
+      if (!Number.isFinite(parsed) || parsed <= 0 || !Number.isInteger(parsed)) {
+        console.error(`INVALID --chapter value: ${chapterRaw}`);
+        process.exit(1);
+      }
+      chapterFilter = parsed;
+    }
     const tasks = filterTasks(loadBacklog(), { status: statusFilter, chapter: chapterFilter });
     for (const t of tasks) console.log(taskLine(t));
     break;
@@ -107,7 +112,16 @@ switch (cmd) {
 
   case 'done': {
     if (!arg1) { console.error('usage: done <id> [--pr <number>]'); process.exit(1); }
-    const pr = flag('--pr') ? Number(flag('--pr')) : undefined;
+    const prRaw = flag('--pr');
+    let pr: number | undefined;
+    if (prRaw !== undefined) {
+      const parsed = Number(prRaw);
+      if (!Number.isFinite(parsed) || parsed <= 0 || !Number.isInteger(parsed)) {
+        console.error(`INVALID --pr value: ${prRaw}`);
+        process.exit(1);
+      }
+      pr = parsed;
+    }
     const tasks = loadBacklog();
     const task = findTask(tasks, arg1);
     if (!task) { console.error(`NOT_FOUND id:${arg1}`); process.exit(1); }
@@ -123,6 +137,8 @@ switch (cmd) {
   case 'block': {
     if (!arg1) { console.error('usage: block <id>'); process.exit(1); }
     const tasks = loadBacklog();
+    const task = findTask(tasks, arg1);
+    if (!task) { console.error(`NOT_FOUND id:${arg1}`); process.exit(1); }
     saveBacklog(setStatus(tasks, arg1, 'blocked'));
     console.log(`OK id:${arg1} status:blocked`);
     break;
@@ -131,6 +147,8 @@ switch (cmd) {
   case 'reset': {
     if (!arg1) { console.error('usage: reset <id>'); process.exit(1); }
     const tasks = loadBacklog();
+    const task = findTask(tasks, arg1);
+    if (!task) { console.error(`NOT_FOUND id:${arg1}`); process.exit(1); }
     saveBacklog(setStatus(tasks, arg1, 'pending'));
     console.log(`OK id:${arg1} status:pending`);
     break;
