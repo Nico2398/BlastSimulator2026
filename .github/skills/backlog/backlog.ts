@@ -25,6 +25,7 @@ import {
   setStatus,
   computeStats,
   filterTasks,
+  resolvedBlockers,
   type TaskStatus,
 } from './backlog-core.js';
 
@@ -84,8 +85,19 @@ switch (cmd) {
     const tasks = loadBacklog();
     const task = findTask(tasks, arg1);
     if (!task) { console.error(`NOT_FOUND id:${arg1}`); process.exit(1); }
+    if (task.status === 'done' || task.status === 'blocked') {
+      console.error(`INVALID task ${arg1} has status:${task.status} and cannot be started`);
+      process.exit(1);
+    }
     if (tasks.some(t => t.status === 'in-progress')) {
       console.error('CONFLICT another task is already in-progress');
+      process.exit(1);
+    }
+    if (!resolvedBlockers(tasks, task)) {
+      const unresolved = task.blockedBy.filter(
+        id => !tasks.find(t => t.id === id && t.status === 'done'),
+      );
+      console.error(`BLOCKED id:${arg1} blockedBy:${unresolved.join(',')}`);
       process.exit(1);
     }
     saveBacklog(setStatus(tasks, arg1, 'in-progress'));
@@ -97,6 +109,11 @@ switch (cmd) {
     if (!arg1) { console.error('usage: done <id> [--pr <number>]'); process.exit(1); }
     const pr = flag('--pr') ? Number(flag('--pr')) : undefined;
     const tasks = loadBacklog();
+    const task = findTask(tasks, arg1);
+    if (!task) { console.error(`NOT_FOUND id:${arg1}`); process.exit(1); }
+    if (task.status !== 'in-progress') {
+      console.error(`WARN id:${arg1} was not in-progress (status:${task.status})`);
+    }
     saveBacklog(setStatus(tasks, arg1, 'done', pr));
     const prNote = pr ? ` pr:${pr}` : '';
     console.log(`OK id:${arg1} status:done${prNote}`);

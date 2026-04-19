@@ -71,15 +71,13 @@ export function resolvedBlockers(tasks: BacklogTask[], task: BacklogTask): boole
 }
 
 /**
- * Returns the next pending task whose blockers are all resolved.
- * Prefers tasks with no blockedBy at all; falls back to tasks with resolved blockers.
+ * Returns the next pending task whose blockers are all resolved,
+ * ordered by chapter then original array position.
  */
 export function getNextTask(tasks: BacklogTask[]): BacklogTask | undefined {
-  const pending = tasks.filter(t => t.status === 'pending');
-  return (
-    pending.find(t => t.blockedBy.length === 0) ??
-    pending.find(t => resolvedBlockers(tasks, t))
-  );
+  return tasks
+    .filter(t => t.status === 'pending' && resolvedBlockers(tasks, t))
+    .sort((a, b) => a.chapter - b.chapter)[0];
 }
 
 // ---------------------------------------------------------------------------

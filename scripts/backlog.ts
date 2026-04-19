@@ -178,10 +178,21 @@ switch (cmd) {
       console.error(c('red', `Task ${arg1} not found.`));
       process.exit(1);
     }
+    if (task.status === 'done' || task.status === 'blocked') {
+      console.error(c('red', `Cannot start ${arg1}: task is already ${task.status}.`));
+      process.exit(1);
+    }
     const active = tasks.find(t => t.status === 'in-progress');
     if (active) {
       console.error(c('red', `Cannot start ${arg1}: task ${active.id} is already in-progress.`));
       console.error(c('dim', `  Finish it first: npx tsx scripts/backlog.ts done ${active.id} --pr <number>`));
+      process.exit(1);
+    }
+    if (!resolvedBlockers(tasks, task)) {
+      const unresolved = task.blockedBy.filter(
+        id => !tasks.find(t => t.id === id && t.status === 'done'),
+      );
+      console.error(c('red', `Cannot start ${arg1}: unresolved dependencies: ${unresolved.join(', ')}`));
       process.exit(1);
     }
     saveBacklog(setStatus(tasks, arg1, 'in-progress'));
@@ -197,6 +208,9 @@ switch (cmd) {
     if (!task) {
       console.error(c('red', `Task ${arg1} not found.`));
       process.exit(1);
+    }
+    if (task.status !== 'in-progress') {
+      console.error(c('yellow', `Warning: task ${arg1} was not in-progress (status: ${task.status}).`));
     }
     saveBacklog(setStatus(tasks, arg1, 'done', pr));
     const prNote = pr ? c('dim', ` (PR #${pr})`) : '';
