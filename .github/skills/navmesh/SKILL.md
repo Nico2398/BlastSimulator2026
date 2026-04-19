@@ -111,15 +111,15 @@ Agents move at most `walkSpeed` cells/tick toward next waypoint. If next waypoin
 
 | # | Task | File(s) |
 |---|------|---------|
-| 6.7.1 | Define `NavCell`, `NavCellType`, `NavGrid` interfaces | `src/core/nav/NavGrid.ts` (new) |
-| 6.7.2 | Implement `buildNavGrid()` — derives NavGrid from VoxelGrid + buildings + holes | `src/core/nav/NavGrid.ts` |
-| 6.7.3 | Implement `patchNavGrid()` — incremental update for a bounding box | `src/core/nav/NavGrid.ts` |
-| 6.7.4 | Implement A* `findPath()` with 8-directional movement and octile heuristic | `src/core/nav/Pathfinding.ts` (new) |
-| 6.7.5 | Implement node budget cap (500) and direct-line fallback | `src/core/nav/Pathfinding.ts` |
-| 6.7.6 | Implement multi-level routing via ramp lookup | `src/core/nav/Pathfinding.ts` |
-| 6.7.7 | Implement `advanceAgent()` — move agent 1 step along waypoints per tick | `src/core/nav/AgentMovement.ts` (new) |
-| 6.7.8 | Implement stale-path detection and re-request on obstacle change | `src/core/nav/AgentMovement.ts` |
-| 6.7.9 | Implement `stuck` state and `agent_stuck` event | `src/core/nav/AgentMovement.ts` |
-| 6.7.10 | Integrate NavGrid build into `GameState` initialization | `src/core/state/GameState.ts` |
-| 6.7.11 | Wire NavGrid patch calls into blast pipeline and building placement | `src/core/engine/GameLoop.ts` |
-| 6.7.12 | Add i18n keys for pathfinding events (`agent_stuck`, `no_ramp_available`) | `src/core/i18n/locales/en.json`, `fr.json` |
+| 6.1 | Define `NavCell`, `NavCellType`, `NavGrid` interfaces | `src/core/nav/NavGrid.ts` (new) |
+| 6.2 | Implement `buildNavGrid()` — derives NavGrid from VoxelGrid + buildings + holes | `src/core/nav/NavGrid.ts` |
+| 6.3 | Implement `patchNavGrid()` — incremental update for a bounding box | `src/core/nav/NavGrid.ts` |
+| 6.4 | Implement A* `findPath()` with 8-directional movement and octile heuristic | `src/core/nav/Pathfinding.ts` (new) |
+| 6.5 | Implement node budget cap (500) and direct-line fallback | `src/core/nav/Pathfinding.ts` |
+| 6.6 | Implement multi-level routing via ramp lookup | `src/core/nav/Pathfinding.ts` |
+| 6.7 | Implement `advanceAgent()` — move agent 1 step along waypoints per tick | `src/core/nav/AgentMovement.ts` (new) |
+| 6.8 | Implement stale-path detection and re-request on obstacle change | `src/core/nav/AgentMovement.ts` |
+| 6.9 | Implement `stuck` state and `agent_stuck` event | `src/core/nav/AgentMovement.ts` |
+| 6.10 | Integrate NavGrid build into `GameState` initialization | `src/core/state/GameState.ts` |
+| 6.11 | Wire NavGrid patch calls into blast pipeline and building placement | `src/core/engine/GameLoop.ts` |
+| 6.12 | Add i18n keys for pathfinding events (`agent_stuck`, `no_ramp_available`) | `src/core/i18n/locales/en.json`, `fr.json` |

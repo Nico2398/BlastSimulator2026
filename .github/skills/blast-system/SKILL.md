@@ -214,26 +214,26 @@ interface BlastReport {
 
 | # | Task | File(s) |
 |---|------|---------|
-| 5.7.0 | **Prerequisite:** Change `VoxelCell.rockId` to `VoxelCell.composition: VoxelRockComposition`; update TerrainGen + all callers | `src/core/voxels/VoxelGrid.ts`, `src/core/terrain/TerrainGen.ts` |
-| 5.7.1 | Assert voxel cell size = 1 m | `src/core/voxels/VoxelGrid.ts` |
-| 5.7.2 | Add `energyAbsorption` and `density` constants to each `RockDef` | `src/core/config/RockCatalog.ts` |
-| 5.7.3 | Implement `computeThreshold(voxel)` — weighted sum of rock coefficients × absorption | `src/core/mining/BlastCalc.ts` |
-| 5.7.4 | Implement `computeInitialEnergy(hole)` — explosive × kg × stemming efficiency | `src/core/mining/BlastCalc.ts` |
-| 5.7.5 | Implement `propagateEnergy(grid, initial)` — iterative overflow loop, guard at 500 | `src/core/mining/BlastCalc.ts` |
-| 5.7.6 | Implement `identifyFragmentedVoxels()` — fragmentation criterion + island flood-fill | `src/core/mining/BlastCalc.ts` |
-| 5.7.7 | Entity damage — instant kill for employees/vehicles; building sum + survival roll | `src/core/mining/BlastCalc.ts` |
-| 5.7.8 | Implement `computeFragmentationScore()` and Voronoi seed sampling | `src/physics/VoronoiFrag.ts` (new) |
-| 5.7.9 | Implement Bowyer-Watson Delaunay + dual Voronoi + clip; respect `MAX_VORONOI_POINTS` | `src/physics/VoronoiFrag.ts` |
-| 5.7.10 | Implement Voronoi merging pass (`MERGE_PROBABILITY ≈ 0.35`) | `src/physics/VoronoiFrag.ts` |
-| 5.7.11 | Generate `RockFragment` objects: graphic mesh, deflated collision mesh, `overflowEnergy` | `src/physics/FragmentSim.ts` (new) |
-| 5.7.12 | Implement Step 4 velocity: energy gradient × surface proximity; classify `simulationTier` | `src/physics/FragmentSim.ts` |
-| 5.7.13 | Implement Tier A cannon-es loop — full rigid body, cap, parabolic fallback | `src/physics/FragmentSim.ts` |
-| 5.7.14 | Implement Tier B gravity-drop — straight-down, column stack, immediate static | `src/physics/FragmentSim.ts` |
-| 5.7.15 | Implement aggressive sleep: stationary for `SLEEP_TICKS_REQUIRED` → `'static'` | `src/physics/FragmentSim.ts` |
-| 5.7.16 | Implement fragment support graph and stack-collapse on pickup | `src/physics/FragmentSim.ts` |
-| 5.7.17 | Implement fragment size check and oversized flag | `src/core/mining/BlastCalc.ts` |
-| 5.7.18 | Wire ore reporting: collect fragment → add to `GameState.collectedOre` | `src/core/GameState.ts` |
-| 5.7.19 | Trigger NavMesh dirty-region update after fragmentation pass | `src/core/voxels/NavGrid.ts` |
-| 5.7.20 | Add all balance constants to `balance.ts` | `src/core/config/balance.ts` |
-| 5.7.21 | Add i18n keys for blast damage events, oversized fragment alert (en + fr) | `src/core/i18n/locales/en.json`, `fr.json` |
-| 5.7.22 | Add `blast_preview` console command — prints energy map, fragment count, projected/collapse split | `src/console/commands/mining.ts` |
+| 5.0 | **Prerequisite:** Change `VoxelCell.rockId` to `VoxelCell.composition: VoxelRockComposition`; update TerrainGen + all callers | `src/core/voxels/VoxelGrid.ts`, `src/core/terrain/TerrainGen.ts` |
+| 5.1 | Assert voxel cell size = 1 m | `src/core/voxels/VoxelGrid.ts` |
+| 5.2 | Add `energyAbsorption` and `density` constants to each `RockDef` | `src/core/config/RockCatalog.ts` |
+| 5.3 | Implement `computeThreshold(voxel)` — weighted sum of rock coefficients × absorption | `src/core/mining/BlastCalc.ts` |
+| 5.4 | Implement `computeInitialEnergy(hole)` — explosive × kg × stemming efficiency | `src/core/mining/BlastCalc.ts` |
+| 5.5 | Implement `propagateEnergy(grid, initial)` — iterative overflow loop, guard at 500 | `src/core/mining/BlastCalc.ts` |
+| 5.6 | Implement `identifyFragmentedVoxels()` — fragmentation criterion + island flood-fill | `src/core/mining/BlastCalc.ts` |
+| 5.7 | Entity damage — instant kill for employees/vehicles; building sum + survival roll | `src/core/mining/BlastCalc.ts` |
+| 5.8 | Implement `computeFragmentationScore()` and Voronoi seed sampling | `src/physics/VoronoiFrag.ts` (new) |
+| 5.9 | Implement Bowyer-Watson Delaunay + dual Voronoi + clip; respect `MAX_VORONOI_POINTS` | `src/physics/VoronoiFrag.ts` |
+| 5.10 | Implement Voronoi merging pass (`MERGE_PROBABILITY ≈ 0.35`) | `src/physics/VoronoiFrag.ts` |
+| 5.11 | Generate `RockFragment` objects: graphic mesh, deflated collision mesh, `overflowEnergy` | `src/physics/FragmentSim.ts` (new) |
+| 5.12 | Implement Step 4 velocity: energy gradient × surface proximity; classify `simulationTier` | `src/physics/FragmentSim.ts` |
+| 5.13 | Implement Tier A cannon-es loop — full rigid body, cap, parabolic fallback | `src/physics/FragmentSim.ts` |
+| 5.14 | Implement Tier B gravity-drop — straight-down, column stack, immediate static | `src/physics/FragmentSim.ts` |
+| 5.15 | Implement aggressive sleep: stationary for `SLEEP_TICKS_REQUIRED` → `'static'` | `src/physics/FragmentSim.ts` |
+| 5.16 | Implement fragment support graph and stack-collapse on pickup | `src/physics/FragmentSim.ts` |
+| 5.17 | Implement fragment size check and oversized flag | `src/core/mining/BlastCalc.ts` |
+| 5.18 | Wire ore reporting: collect fragment → add to `GameState.collectedOre` | `src/core/GameState.ts` |
+| 5.19 | Trigger NavMesh dirty-region update after fragmentation pass | `src/core/voxels/NavGrid.ts` |
+| 5.20 | Add all balance constants to `balance.ts` | `src/core/config/balance.ts` |
+| 5.21 | Add i18n keys for blast damage events, oversized fragment alert (en + fr) | `src/core/i18n/locales/en.json`, `fr.json` |
+| 5.22 | Add `blast_preview` console command — prints energy map, fragment count, projected/collapse split | `src/console/commands/mining.ts` |

@@ -63,7 +63,7 @@ npx tsx .github/skills/backlog/backlog.ts <command> [args]
 Each task entry:
 ```json
 {
-  "id": "2.8.1",
+  "id": "2.1",
   "chapter": 2,
   "title": "Define VehicleRole union and rename existing VehicleType → VehicleRole",
   "files": ["src/core/entities/Vehicle.ts"],

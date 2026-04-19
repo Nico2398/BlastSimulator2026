@@ -137,18 +137,18 @@ export interface Employee {
 
 | # | Task | File(s) |
 |---|------|---------|
-| 3.8.1 | Define `SkillQualification`, `SkillCategory`, proficiency levels on `Employee` | `src/core/entities/Employee.ts` |
-| 3.8.2 | Add `PROFICIENCY_MULTIPLIERS` and XP thresholds to `balance.ts` | `src/core/config/balance.ts` |
-| 3.8.3 | Implement `gainXp()` — per-qualification XP, triggers level-up event | `src/core/entities/Employee.ts` |
-| 3.8.4 | Implement salary calculation — base + sum of qualification level bonuses | `src/core/entities/Employee.ts` |
-| 3.8.5 | Define `PendingAction`, `ActionType`, `pendingActions` in `GameState` | `src/core/GameState.ts` |
-| 3.8.6 | Implement claim logic in `tickEmployees()` — match pending actions to idle qualified employees | `src/core/engine/GameLoop.ts` |
-| 3.8.7 | Implement `UnqualifiedTaskError` event — fires when no roster employee has required skill | `src/core/events/EventEngine.ts` |
-| 3.8.8 | Implement ghost-preview list in `GameState` (mirrors `pendingActions` for renderer) | `src/core/GameState.ts` |
-| 3.8.9 | Ghost mesh rendering — blue fresnel translucent, pulsing | `src/renderer/GhostMesh.ts` (new) |
-| 3.8.10 | Implement need meters on `Employee` — see employee-needs skill for detail | `src/core/entities/Employee.ts` |
-| 3.8.11 | Implement need restoration — auto-route to building at threshold | `src/core/engine/GameLoop.ts` |
-| 3.8.12 | Implement `SitePolicy` and policy tick logic | `src/core/entities/SitePolicy.ts` (new) |
-| 3.8.13 | Implement `computeTaskDuration()` — proficiency × wellbeing × event modifiers | `src/core/entities/Employee.ts` |
-| 3.8.14 | Add i18n keys for skill categories, proficiency labels, policy names, need labels (en + fr) | `src/core/i18n/locales/en.json`, `fr.json` |
-| 3.8.15 | Wire `hire`, `assign_skill`, `set_policy` console commands | `src/console/commands/entities.ts` |
+| 3.1 | Define `SkillQualification`, `SkillCategory`, proficiency levels on `Employee` | `src/core/entities/Employee.ts` |
+| 3.2 | Add `PROFICIENCY_MULTIPLIERS` and XP thresholds to `balance.ts` | `src/core/config/balance.ts` |
+| 3.3 | Implement `gainXp()` — per-qualification XP, triggers level-up event | `src/core/entities/Employee.ts` |
+| 3.4 | Implement salary calculation — base + sum of qualification level bonuses | `src/core/entities/Employee.ts` |
+| 3.5 | Define `PendingAction`, `ActionType`, `pendingActions` in `GameState` | `src/core/GameState.ts` |
+| 3.6 | Implement claim logic in `tickEmployees()` — match pending actions to idle qualified employees | `src/core/engine/GameLoop.ts` |
+| 3.7 | Implement `UnqualifiedTaskError` event — fires when no roster employee has required skill | `src/core/events/EventEngine.ts` |
+| 3.8 | Implement ghost-preview list in `GameState` (mirrors `pendingActions` for renderer) | `src/core/GameState.ts` |
+| 3.9 | Ghost mesh rendering — blue fresnel translucent, pulsing | `src/renderer/GhostMesh.ts` (new) |
+| 3.10 | Implement need meters on `Employee` — see employee-needs skill for detail | `src/core/entities/Employee.ts` |
+| 3.11 | Implement need restoration — auto-route to building at threshold | `src/core/engine/GameLoop.ts` |
+| 3.12 | Implement `SitePolicy` and policy tick logic | `src/core/entities/SitePolicy.ts` (new) |
+| 3.13 | Implement `computeTaskDuration()` — proficiency × wellbeing × event modifiers | `src/core/entities/Employee.ts` |
+| 3.14 | Add i18n keys for skill categories, proficiency labels, policy names, need labels (en + fr) | `src/core/i18n/locales/en.json`, `fr.json` |
+| 3.15 | Wire `hire`, `assign_skill`, `set_policy` console commands | `src/console/commands/entities.ts` |
