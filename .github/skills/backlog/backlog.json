@@ -28,7 +28,7 @@
   {
     "id": "1.3",
     "chapter": 1,
-    "title": "Implement canPlaceBuilding() \u2014 flat surface check + overlap check",
+    "title": "Implement canPlaceBuilding() — flat surface check + overlap check",
     "files": [
       "src/core/entities/Building.ts"
     ],
@@ -42,7 +42,7 @@
   {
     "id": "1.4",
     "chapter": 1,
-    "title": "Implement protected-voxel check \u2014 block drill/blast under building footprint",
+    "title": "Implement protected-voxel check — block drill/blast under building footprint",
     "files": [
       "src/core/mining/DrillPlan.ts"
     ],
@@ -56,7 +56,7 @@
   {
     "id": "1.5",
     "chapter": 1,
-    "title": "Implement building destruction on blast \u2014 check footprint overlap with blast AABB",
+    "title": "Implement building destruction on blast — check footprint overlap with blast AABB",
     "files": [
       "src/core/mining/BlastCalc.ts"
     ],
@@ -84,7 +84,7 @@
   {
     "id": "1.7",
     "chapter": 1,
-    "title": "Implement Research Center task queue \u2014 paid tasks unlock building tiers",
+    "title": "Implement Research Center task queue — paid tasks unlock building tiers",
     "files": [
       "src/core/entities/Building.ts"
     ],
@@ -98,7 +98,7 @@
   {
     "id": "1.8",
     "chapter": 1,
-    "title": "Implement training task in training buildings \u2014 time cost + fee + skill grant",
+    "title": "Implement training task in training buildings — time cost + fee + skill grant",
     "files": [
       "src/core/entities/Building.ts",
       "src/core/entities/Employee.ts"
@@ -113,7 +113,7 @@
   {
     "id": "1.9",
     "chapter": 1,
-    "title": "Implement qualified-employee check \u2014 emit error on unqualified task assignment",
+    "title": "Implement qualified-employee check — emit error on unqualified task assignment",
     "files": [
       "src/core/engine/GameLoop.ts"
     ],
@@ -186,7 +186,7 @@
   {
     "id": "1.14",
     "chapter": 1,
-    "title": "Update building renderer \u2014 footprint pattern shape and tier visuals",
+    "title": "Update building renderer — footprint pattern shape and tier visuals",
     "files": [
       "src/renderer/BuildingMesh.ts"
     ],
@@ -205,7 +205,7 @@
       "src/core/entities/Vehicle.ts"
     ],
     "testFile": "tests/unit/entities/Vehicle.test.ts",
-    "status": "pending",
+    "status": "in-progress",
     "blockedBy": [],
     "closedInPR": null
   },
@@ -269,7 +269,7 @@
   {
     "id": "2.6",
     "chapter": 2,
-    "title": "Implement assignDriver() \u2014 validates employee has licence for this role",
+    "title": "Implement assignDriver() — validates employee has licence for this role",
     "files": [
       "src/core/entities/Vehicle.ts"
     ],
@@ -283,7 +283,7 @@
   {
     "id": "2.7",
     "chapter": 2,
-    "title": "Implement tickVehicle() \u2014 advances movement along navmesh path, handles waiting state on cell collision",
+    "title": "Implement tickVehicle() — advances movement along navmesh path, handles waiting state on cell collision",
     "files": [
       "src/core/engine/GameLoop.ts"
     ],
@@ -297,7 +297,7 @@
   {
     "id": "2.8",
     "chapter": 2,
-    "title": "Implement TrafficJamEvent \u2014 fires when >=3 vehicles waiting on same path >=10 ticks",
+    "title": "Implement TrafficJamEvent — fires when >=3 vehicles waiting on same path >=10 ticks",
     "files": [
       "src/core/events/EventEngine.ts"
     ],
@@ -311,7 +311,7 @@
   {
     "id": "2.9",
     "chapter": 2,
-    "title": "Implement demolishBuilding() task \u2014 removes building from grid, updates navmesh",
+    "title": "Implement demolishBuilding() task — removes building from grid, updates navmesh",
     "files": [
       "src/core/entities/Building.ts"
     ],
@@ -325,7 +325,7 @@
   {
     "id": "2.10",
     "chapter": 2,
-    "title": "Implement digVoxel() task for Rock Digger \u2014 removes single voxel, updates surface + navmesh",
+    "title": "Implement digVoxel() task for Rock Digger — removes single voxel, updates surface + navmesh",
     "files": [
       "src/core/mining/DrillPlan.ts"
     ],
@@ -339,7 +339,7 @@
   {
     "id": "2.11",
     "chapter": 2,
-    "title": "Implement fragmentBoulder() task \u2014 converts oversized debris to transportable fragments",
+    "title": "Implement fragmentBoulder() task — converts oversized debris to transportable fragments",
     "files": [
       "src/core/mining/BlastCalc.ts"
     ],
@@ -369,7 +369,7 @@
   {
     "id": "2.13",
     "chapter": 2,
-    "title": "Update vehicle renderer \u2014 role-specific mesh, tier color/scale variation",
+    "title": "Update vehicle renderer — role-specific mesh, tier color/scale variation",
     "files": [
       "src/renderer/VehicleMesh.ts"
     ],
@@ -410,7 +410,7 @@
   {
     "id": "3.3",
     "chapter": 3,
-    "title": "Implement gainXp() \u2014 per-qualification XP, triggers level-up event",
+    "title": "Implement gainXp() — per-qualification XP, triggers level-up event",
     "files": [
       "src/core/entities/Employee.ts"
     ],
@@ -425,7 +425,7 @@
   {
     "id": "3.4",
     "chapter": 3,
-    "title": "Implement salary calculation \u2014 base + sum of qualification level bonuses",
+    "title": "Implement salary calculation — base + sum of qualification level bonuses",
     "files": [
       "src/core/entities/Employee.ts"
     ],
@@ -454,7 +454,7 @@
   {
     "id": "3.6",
     "chapter": 3,
-    "title": "Implement claim logic in tickEmployees() \u2014 match pending actions to idle qualified employees",
+    "title": "Implement claim logic in tickEmployees() — match pending actions to idle qualified employees",
     "files": [
       "src/core/engine/GameLoop.ts"
     ],
@@ -469,7 +469,7 @@
   {
     "id": "3.7",
     "chapter": 3,
-    "title": "Implement UnqualifiedTaskError event \u2014 fires when no roster employee has the required skill",
+    "title": "Implement UnqualifiedTaskError event — fires when no roster employee has the required skill",
     "files": [
       "src/core/events/EventEngine.ts"
     ],
@@ -497,7 +497,7 @@
   {
     "id": "3.9",
     "chapter": 3,
-    "title": "Add ghost mesh rendering in renderer \u2014 blue fresnel translucent, pulsing",
+    "title": "Add ghost mesh rendering in renderer — blue fresnel translucent, pulsing",
     "files": [
       "src/renderer/GhostMesh.ts"
     ],
@@ -525,7 +525,7 @@
   {
     "id": "3.11",
     "chapter": 3,
-    "title": "Implement need restoration \u2014 employee auto-routes to Living Quarters when threshold crossed",
+    "title": "Implement need restoration — employee auto-routes to Living Quarters when threshold crossed",
     "files": [
       "src/core/engine/GameLoop.ts"
     ],
@@ -539,7 +539,7 @@
   {
     "id": "3.12",
     "chapter": 3,
-    "title": "Implement SitePolicy and policy tick logic \u2014 enforces shift/rest scheduling",
+    "title": "Implement SitePolicy and policy tick logic — enforces shift/rest scheduling",
     "files": [
       "src/core/entities/SitePolicy.ts"
     ],
@@ -553,7 +553,7 @@
   {
     "id": "3.13",
     "chapter": 3,
-    "title": "Implement computeTaskDuration() \u2014 proficiency x wellbeing x event multipliers",
+    "title": "Implement computeTaskDuration() — proficiency x wellbeing x event multipliers",
     "files": [
       "src/core/entities/Employee.ts"
     ],
@@ -614,7 +614,7 @@
   {
     "id": "4.2",
     "chapter": 4,
-    "title": "Implement estimateSurveyResult() \u2014 noise + skill scaling",
+    "title": "Implement estimateSurveyResult() — noise + skill scaling",
     "files": [
       "src/core/mining/SurveyCalc.ts"
     ],
@@ -628,7 +628,7 @@
   {
     "id": "4.3",
     "chapter": 4,
-    "title": "Implement isSurveyStale() \u2014 returns true after 100 ticks",
+    "title": "Implement isSurveyStale() — returns true after 100 ticks",
     "files": [
       "src/core/mining/SurveyCalc.ts"
     ],
@@ -668,7 +668,7 @@
   {
     "id": "4.6",
     "chapter": 4,
-    "title": "Implement runSurvey() \u2014 validates surveyor, deducts cost, enqueues task",
+    "title": "Implement runSurvey() — validates surveyor, deducts cost, enqueues task",
     "files": [
       "src/core/mining/SurveyCalc.ts"
     ],
@@ -684,7 +684,7 @@
   {
     "id": "4.7",
     "chapter": 4,
-    "title": "Implement computeBlastOreReport() \u2014 yields from destroyed voxels",
+    "title": "Implement computeBlastOreReport() — yields from destroyed voxels",
     "files": [
       "src/core/mining/SurveyCalc.ts"
     ],
@@ -797,7 +797,7 @@
   {
     "id": "5.3",
     "chapter": 5,
-    "title": "Implement computeThreshold(voxel) \u2014 weighted sum of rock coefficients x absorption",
+    "title": "Implement computeThreshold(voxel) — weighted sum of rock coefficients x absorption",
     "files": [
       "src/core/mining/BlastCalc.ts"
     ],
@@ -811,7 +811,7 @@
   {
     "id": "5.4",
     "chapter": 5,
-    "title": "Implement computeInitialEnergy(hole) \u2014 explosiveDef x kg x stemming efficiency",
+    "title": "Implement computeInitialEnergy(hole) — explosiveDef x kg x stemming efficiency",
     "files": [
       "src/core/mining/BlastCalc.ts"
     ],
@@ -825,7 +825,7 @@
   {
     "id": "5.5",
     "chapter": 5,
-    "title": "Implement propagateEnergy(grid, initial) \u2014 iterative overflow loop tracking generatedOverflow per voxel",
+    "title": "Implement propagateEnergy(grid, initial) — iterative overflow loop tracking generatedOverflow per voxel",
     "files": [
       "src/core/mining/BlastCalc.ts"
     ],
@@ -840,7 +840,7 @@
   {
     "id": "5.6",
     "chapter": 5,
-    "title": "Implement identifyFragmentedVoxels(grid) \u2014 fragmentation criterion + island flood-fill",
+    "title": "Implement identifyFragmentedVoxels(grid) — fragmentation criterion + island flood-fill",
     "files": [
       "src/core/mining/BlastCalc.ts"
     ],
@@ -854,7 +854,7 @@
   {
     "id": "5.7",
     "chapter": 5,
-    "title": "Implement entity damage from blast \u2014 employee/vehicle instant kill, building sum + survival roll",
+    "title": "Implement entity damage from blast — employee/vehicle instant kill, building sum + survival roll",
     "files": [
       "src/core/mining/BlastCalc.ts"
     ],
@@ -938,7 +938,7 @@
   {
     "id": "5.13",
     "chapter": 5,
-    "title": "Implement Tier A (projected) cannon-es loop \u2014 full rigid body, PHYSICS_FRAGMENT_CAP, parabolic fallback, stick-on-land",
+    "title": "Implement Tier A (projected) cannon-es loop — full rigid body, PHYSICS_FRAGMENT_CAP, parabolic fallback, stick-on-land",
     "files": [
       "src/physics/FragmentSim.ts"
     ],
@@ -952,7 +952,7 @@
   {
     "id": "5.14",
     "chapter": 5,
-    "title": "Implement Tier B (collapse) gravity-drop \u2014 straight-down, column stack, immediate static",
+    "title": "Implement Tier B (collapse) gravity-drop — straight-down, column stack, immediate static",
     "files": [
       "src/physics/FragmentSim.ts"
     ],
@@ -1009,7 +1009,7 @@
   {
     "id": "5.18",
     "chapter": 5,
-    "title": "Wire ore reporting: collect fragment \u2014 add to GameState.collectedOre",
+    "title": "Wire ore reporting: collect fragment — add to GameState.collectedOre",
     "files": [
       "src/core/GameState.ts"
     ],
@@ -1064,7 +1064,7 @@
   {
     "id": "5.22",
     "chapter": 5,
-    "title": "Add blast_preview console command \u2014 prints energy map, predicted fragment count, and projected/collapse split",
+    "title": "Add blast_preview console command — prints energy map, predicted fragment count, and projected/collapse split",
     "files": [
       "src/console/commands/mining.ts"
     ],
@@ -1090,7 +1090,7 @@
   {
     "id": "6.2",
     "chapter": 6,
-    "title": "Implement buildNavGrid() \u2014 derives NavGrid from VoxelGrid + buildings + holes",
+    "title": "Implement buildNavGrid() — derives NavGrid from VoxelGrid + buildings + holes",
     "files": [
       "src/core/nav/NavGrid.ts"
     ],
@@ -1104,7 +1104,7 @@
   {
     "id": "6.3",
     "chapter": 6,
-    "title": "Implement patchNavGrid() \u2014 incremental update for a bounding box",
+    "title": "Implement patchNavGrid() — incremental update for a bounding box",
     "files": [
       "src/core/nav/NavGrid.ts"
     ],
@@ -1160,7 +1160,7 @@
   {
     "id": "6.7",
     "chapter": 6,
-    "title": "Implement advanceAgent() \u2014 move agent 1 step along waypoints per tick",
+    "title": "Implement advanceAgent() — move agent 1 step along waypoints per tick",
     "files": [
       "src/core/nav/AgentMovement.ts"
     ],
@@ -1269,7 +1269,7 @@
   {
     "id": "7.3",
     "chapter": 7,
-    "title": "Implement tickNeedGauges() \u2014 drain gauges based on task state + morale modifier",
+    "title": "Implement tickNeedGauges() — drain gauges based on task state + morale modifier",
     "files": [
       "src/core/entities/Employee.ts"
     ],
@@ -1284,7 +1284,7 @@
   {
     "id": "7.4",
     "chapter": 7,
-    "title": "Implement needsMoraleEffect() \u2014 compute tick-level morale delta from all gauges",
+    "title": "Implement needsMoraleEffect() — compute tick-level morale delta from all gauges",
     "files": [
       "src/core/entities/Employee.ts"
     ],
@@ -1298,7 +1298,7 @@
   {
     "id": "7.5",
     "chapter": 7,
-    "title": "Implement replenishNeed() \u2014 fill gauge at building tier rate, enforce capacity",
+    "title": "Implement replenishNeed() — fill gauge at building tier rate, enforce capacity",
     "files": [
       "src/core/entities/Employee.ts"
     ],
@@ -1312,7 +1312,7 @@
   {
     "id": "7.6",
     "chapter": 7,
-    "title": "Implement checkCollapse() \u2014 interrupt task queue, prepend rest task",
+    "title": "Implement checkCollapse() — interrupt task queue, prepend rest task",
     "files": [
       "src/core/entities/Employee.ts"
     ],
@@ -1327,7 +1327,7 @@
   {
     "id": "7.7",
     "chapter": 7,
-    "title": "Implement autoInsertNeedTasks() \u2014 proactive queue insertion at warning thresholds",
+    "title": "Implement autoInsertNeedTasks() — proactive queue insertion at warning thresholds",
     "files": [
       "src/core/entities/Employee.ts"
     ],
@@ -1399,7 +1399,7 @@
   {
     "id": "7.12",
     "chapter": 7,
-    "title": "Add needs console command \u2014 print all employees gauge values",
+    "title": "Add needs console command — print all employees gauge values",
     "files": [
       "src/console/commands/entities.ts"
     ],
