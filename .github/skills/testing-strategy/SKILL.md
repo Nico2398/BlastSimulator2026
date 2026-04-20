@@ -178,14 +178,14 @@ Any bug fix must be accompanied by a new unit or integration test that:
 
 | # | Task | File(s) |
 |---|------|---------|
-| 8.9.1 | Add coverage reporter to `vitest.config.ts` (v8, per-file thresholds) | `vitest.config.ts` |
-| 8.9.2 | Create `tests/integration/` and `tests/integration/full-level/` | `vitest.config.ts`, `package.json` |
-| 8.9.3 | Add 10 small integration test suites (≥ 8 scenarios each) | `tests/integration/` |
-| 8.9.4 | Add 10 full-level integration tests | `tests/integration/full-level/` |
-| 8.9.5 | Add 15 feature scenario JSON files | `scripts/scenario-defs/` |
-| 8.9.6 | Add 6 full-level playthrough scenario JSON files | `scripts/scenario-defs/` |
-| 8.9.7 | Add performance benchmark suite | `tests/unit/benchmarks/` |
-| 8.9.8 | Add `npm run test:integration` and `npm run test:scenarios` scripts | `package.json` |
-| 8.9.9 | Update `npm run validate` to include integration tests and coverage gate | `package.json` |
-| 8.9.10 | Document test conventions in `README.md` under "Testing" section | `README.md` |
-| 8.9.11 | Run all 6 level playthrough scenarios after final renderer integration; inspect screenshots | Manual step |
+| 8.1 | Add coverage reporter to `vitest.config.ts` (v8, per-file thresholds) | `vitest.config.ts` |
+| 8.2 | Create `tests/integration/` and `tests/integration/full-level/` | `vitest.config.ts`, `package.json` |
+| 8.3 | Add 10 small integration test suites (≥ 8 scenarios each) | `tests/integration/` |
+| 8.4 | Add 10 full-level integration tests | `tests/integration/full-level/` |
+| 8.5 | Add 15 feature scenario JSON files | `scripts/scenario-defs/` |
+| 8.6 | Add 6 full-level playthrough scenario JSON files | `scripts/scenario-defs/` |
+| 8.7 | Add performance benchmark suite | `tests/unit/benchmarks/` |
+| 8.8 | Add `npm run test:integration` and `npm run test:scenarios` scripts | `package.json` |
+| 8.9 | Update `npm run validate` to include integration tests and coverage gate | `package.json` |
+| 8.10 | Document test conventions in `README.md` under "Testing" section | `README.md` |
+| 8.11 | Run all 6 level playthrough scenarios after final renderer integration; inspect screenshots | Manual step |

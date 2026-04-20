@@ -116,16 +116,16 @@ Vehicles use shared navmesh (Ch.6) with A* pathfinding. Congestion is gameplay-r
 
 | # | Task | File(s) |
 |---|------|---------|
-| 2.8.1 | Define `VehicleRole` union; rename `VehicleType` → `VehicleRole` | `src/core/entities/Vehicle.ts` |
-| 2.8.2 | Define `VehicleTier`, `VehicleDef`, `VehicleState` types | `src/core/entities/Vehicle.ts` |
-| 2.8.3 | Create `VEHICLE_DEFS` catalog (5 roles × 3 tiers = 15 entries) with tier multipliers | `src/core/entities/Vehicle.ts` |
-| 2.8.4 | Add i18n keys for all 15 vehicle tier names (en + fr) | `src/core/i18n/locales/en.json`, `fr.json` |
-| 2.8.5 | Add `driverId`, `state`, `payloadKg`, `targetX/Z` fields to `Vehicle` | `src/core/entities/Vehicle.ts` |
-| 2.8.6 | Implement `assignDriver()` — validate employee has licence for this role | `src/core/entities/Vehicle.ts` |
-| 2.8.7 | Implement `tickVehicle()` — advance movement along navmesh; `waiting` on cell collision | `src/core/engine/GameLoop.ts` |
-| 2.8.8 | Implement `TrafficJamEvent` — fires at ≥3 vehicles waiting ≥10 ticks | `src/core/events/EventEngine.ts` |
-| 2.8.9 | Implement `demolishBuilding()` task — remove building, update navmesh | `src/core/entities/Building.ts` |
-| 2.8.10 | Implement `digVoxel()` task for Rock Digger — remove single voxel, update navmesh | `src/core/mining/DrillPlan.ts` |
-| 2.8.11 | Implement `fragmentBoulder()` task — convert oversized debris to transportable fragments | `src/core/mining/BlastCalc.ts` |
-| 2.8.12 | Wire vehicle purchase, assign-driver, task dispatch into console commands | `src/console/commands/entities.ts` |
-| 2.8.13 | Update vehicle renderer — role-specific mesh, tier color/scale variation | `src/renderer/VehicleMesh.ts` |
+| 2.1 | Define `VehicleRole` union; rename `VehicleType` → `VehicleRole` | `src/core/entities/Vehicle.ts` |
+| 2.2 | Define `VehicleTier`, `VehicleDef`, `VehicleState` types | `src/core/entities/Vehicle.ts` |
+| 2.3 | Create `VEHICLE_DEFS` catalog (5 roles × 3 tiers = 15 entries) with tier multipliers | `src/core/entities/Vehicle.ts` |
+| 2.4 | Add i18n keys for all 15 vehicle tier names (en + fr) | `src/core/i18n/locales/en.json`, `fr.json` |
+| 2.5 | Add `driverId`, `state`, `payloadKg`, `targetX/Z` fields to `Vehicle` | `src/core/entities/Vehicle.ts` |
+| 2.6 | Implement `assignDriver()` — validate employee has licence for this role | `src/core/entities/Vehicle.ts` |
+| 2.7 | Implement `tickVehicle()` — advance movement along navmesh; `waiting` on cell collision | `src/core/engine/GameLoop.ts` |
+| 2.8 | Implement `TrafficJamEvent` — fires at ≥3 vehicles waiting ≥10 ticks | `src/core/events/EventEngine.ts` |
+| 2.9 | Implement `demolishBuilding()` task — remove building, update navmesh | `src/core/entities/Building.ts` |
+| 2.10 | Implement `digVoxel()` task for Rock Digger — remove single voxel, update navmesh | `src/core/mining/DrillPlan.ts` |
+| 2.11 | Implement `fragmentBoulder()` task — convert oversized debris to transportable fragments | `src/core/mining/BlastCalc.ts` |
+| 2.12 | Wire vehicle purchase, assign-driver, task dispatch into console commands | `src/console/commands/entities.ts` |
+| 2.13 | Update vehicle renderer — role-specific mesh, tier color/scale variation | `src/renderer/VehicleMesh.ts` |

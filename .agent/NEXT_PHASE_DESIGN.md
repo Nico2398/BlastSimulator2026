@@ -126,20 +126,20 @@ A single building type with multiple tier grades, each representing a different 
 
 | # | Task | File(s) | Test |
 |---|------|---------|------|
-| 1.10.1 | Define `BuildingType` union with all 9 building types | `src/core/entities/Building.ts` | `tests/unit/entities/Building.test.ts` |
-| 1.10.2 | Define `BuildingTier`, per-type footprint patterns, and `BUILDING_DEFS` catalog | `src/core/entities/Building.ts` | Test: every type has correct footprint per tier; costs increase per tier |
-| 1.10.3 | Implement `canPlaceBuilding()` — flat surface check + overlap check | `src/core/entities/Building.ts` | Test: rejects sloped terrain; rejects overlapping footprints |
-| 1.10.4 | Implement protected-voxel check — block drill/blast under building footprint | `src/core/mining/DrillPlan.ts` | Test: drill command rejected when target cell is under a building |
-| 1.10.5 | Implement building destruction on blast — check footprint overlap with blast AABB | `src/core/mining/BlastCalc.ts` | Test: building destroyed when voxel underneath is within blast zone |
-| 1.10.6 | Implement Explosive Warehouse secondary blast on destruction | `src/core/mining/BlastCalc.ts` | Test: secondary blast event fires when warehouse destroyed with stock |
-| 1.10.7 | Implement Research Center task queue — paid tasks unlock building tiers | `src/core/entities/Building.ts` | Test: tier locked before research completes; unlocked after |
-| 1.10.8 | Implement training task in training buildings — time cost + fee + skill grant | `src/core/entities/Building.ts`, `src/core/entities/Employee.ts` | Test: employee gains skill qualification after required training ticks |
-| 1.10.9 | Implement qualified-employee check — emit error on unqualified task assignment | `src/core/engine/GameLoop.ts` | Test: error event emitted; task not queued when no qualified employee available |
-| 1.10.10 | Implement Living Quarters well-being multiplier per tier | `src/core/entities/Building.ts`, `src/core/scores/` | Test: productivity multiplier matches tier; overcapacity triggers penalty |
-| 1.10.11 | Implement Freight Warehouse ore storage and contract sell interface | `src/core/entities/Building.ts` | Test: ore stored on haul arrival; contract triggers revenue deduction |
-| 1.10.12 | Add i18n keys for all 9 building types, all tier names, training course names (en + fr) | `src/core/i18n/locales/en.json`, `fr.json` | Test: all keys resolve |
-| 1.10.13 | Wire `build`, `demolish`, and `research` console commands | `src/console/commands/entities.ts` | Integration test |
-| 1.10.14 | Update building renderer — footprint pattern shape and tier visuals | `src/renderer/BuildingMesh.ts` | Visual test |
+| 1.1 | Define `BuildingType` union with all 9 building types | `src/core/entities/Building.ts` | `tests/unit/entities/Building.test.ts` |
+| 1.2 | Define `BuildingTier`, per-type footprint patterns, and `BUILDING_DEFS` catalog | `src/core/entities/Building.ts` | Test: every type has correct footprint per tier; costs increase per tier |
+| 1.3 | Implement `canPlaceBuilding()` — flat surface check + overlap check | `src/core/entities/Building.ts` | Test: rejects sloped terrain; rejects overlapping footprints |
+| 1.4 | Implement protected-voxel check — block drill/blast under building footprint | `src/core/mining/DrillPlan.ts` | Test: drill command rejected when target cell is under a building |
+| 1.5 | Implement building destruction on blast — check footprint overlap with blast AABB | `src/core/mining/BlastCalc.ts` | Test: building destroyed when voxel underneath is within blast zone |
+| 1.6 | Implement Explosive Warehouse secondary blast on destruction | `src/core/mining/BlastCalc.ts` | Test: secondary blast event fires when warehouse destroyed with stock |
+| 1.7 | Implement Research Center task queue — paid tasks unlock building tiers | `src/core/entities/Building.ts` | Test: tier locked before research completes; unlocked after |
+| 1.8 | Implement training task in training buildings — time cost + fee + skill grant | `src/core/entities/Building.ts`, `src/core/entities/Employee.ts` | Test: employee gains skill qualification after required training ticks |
+| 1.9 | Implement qualified-employee check — emit error on unqualified task assignment | `src/core/engine/GameLoop.ts` | Test: error event emitted; task not queued when no qualified employee available |
+| 1.10 | Implement Living Quarters well-being multiplier per tier | `src/core/entities/Building.ts`, `src/core/scores/` | Test: productivity multiplier matches tier; overcapacity triggers penalty |
+| 1.11 | Implement Freight Warehouse ore storage and contract sell interface | `src/core/entities/Building.ts` | Test: ore stored on haul arrival; contract triggers revenue deduction |
+| 1.12 | Add i18n keys for all 9 building types, all tier names, training course names (en + fr) | `src/core/i18n/locales/en.json`, `fr.json` | Test: all keys resolve |
+| 1.13 | Wire `build`, `demolish`, and `research` console commands | `src/console/commands/entities.ts` | Integration test |
+| 1.14 | Update building renderer — footprint pattern shape and tier visuals | `src/renderer/BuildingMesh.ts` | Visual test |
 
 ---
 
@@ -263,19 +263,19 @@ Vehicles use the shared navmesh (Chapter 6) with A\* pathfinding. Congestion is 
 
 | # | Task | File(s) | Test |
 |---|------|---------|------|
-| 2.8.1 | Define `VehicleRole` union and rename existing `VehicleType` → `VehicleRole` | `src/core/entities/Vehicle.ts` | `tests/unit/entities/Vehicle.test.ts` |
-| 2.8.2 | Define `VehicleTier`, `VehicleDef`, and `VehicleState` types | `src/core/entities/Vehicle.ts` | Test: schema completeness |
-| 2.8.3 | Create `VEHICLE_DEFS` catalog (5 roles × 3 tiers, 15 entries) with tier multipliers | `src/core/entities/Vehicle.ts` | Test: every role has 3 tiers; stats scale correctly |
-| 2.8.4 | Add i18n keys for all 15 vehicle tier names (en + fr) | `src/core/i18n/locales/en.json`, `fr.json` | Test: all keys resolve |
-| 2.8.5 | Add `driverId`, `state`, `payloadKg`, `targetX/Z` fields to `Vehicle` interface | `src/core/entities/Vehicle.ts` | Test: defaults on purchase |
-| 2.8.6 | Implement `assignDriver()` — validates employee has licence for this role | `src/core/entities/Vehicle.ts` | Test: unqualified employee rejected |
-| 2.8.7 | Implement `tickVehicle()` — advances movement along navmesh path, handles `waiting` state on cell collision | `src/core/engine/GameLoop.ts` | Test: two vehicles converging on same cell — one enters waiting |
-| 2.8.8 | Implement `TrafficJamEvent` — fires when ≥ 3 vehicles waiting on same path ≥ 10 ticks | `src/core/events/EventEngine.ts` | Test: event fires at correct threshold |
-| 2.8.9 | Implement `demolishBuilding()` task — removes building from grid, updates navmesh | `src/core/entities/Building.ts` | Test: footprint cells freed after demolition |
-| 2.8.10 | Implement `digVoxel()` task for Rock Digger — removes single voxel, updates surface + navmesh | `src/core/mining/DrillPlan.ts` | Test: voxel removed; navmesh updated |
-| 2.8.11 | Implement `fragmentBoulder()` task — converts oversized debris to transportable fragments | `src/core/mining/BlastCalc.ts` | Test: oversized debris flagged; becomes transportable after fragmenting |
-| 2.8.12 | Wire vehicle purchase, assign-driver, and task dispatch into console commands | `src/console/commands/entities.ts` | Integration test |
-| 2.8.13 | Update vehicle renderer — role-specific mesh, tier color/scale variation | `src/renderer/VehicleMesh.ts` | Visual test |
+| 2.1 | Define `VehicleRole` union and rename existing `VehicleType` → `VehicleRole` | `src/core/entities/Vehicle.ts` | `tests/unit/entities/Vehicle.test.ts` |
+| 2.2 | Define `VehicleTier`, `VehicleDef`, and `VehicleState` types | `src/core/entities/Vehicle.ts` | Test: schema completeness |
+| 2.3 | Create `VEHICLE_DEFS` catalog (5 roles × 3 tiers, 15 entries) with tier multipliers | `src/core/entities/Vehicle.ts` | Test: every role has 3 tiers; stats scale correctly |
+| 2.4 | Add i18n keys for all 15 vehicle tier names (en + fr) | `src/core/i18n/locales/en.json`, `fr.json` | Test: all keys resolve |
+| 2.5 | Add `driverId`, `state`, `payloadKg`, `targetX/Z` fields to `Vehicle` interface | `src/core/entities/Vehicle.ts` | Test: defaults on purchase |
+| 2.6 | Implement `assignDriver()` — validates employee has licence for this role | `src/core/entities/Vehicle.ts` | Test: unqualified employee rejected |
+| 2.7 | Implement `tickVehicle()` — advances movement along navmesh path, handles `waiting` state on cell collision | `src/core/engine/GameLoop.ts` | Test: two vehicles converging on same cell — one enters waiting |
+| 2.8 | Implement `TrafficJamEvent` — fires when ≥ 3 vehicles waiting on same path ≥ 10 ticks | `src/core/events/EventEngine.ts` | Test: event fires at correct threshold |
+| 2.9 | Implement `demolishBuilding()` task — removes building from grid, updates navmesh | `src/core/entities/Building.ts` | Test: footprint cells freed after demolition |
+| 2.10 | Implement `digVoxel()` task for Rock Digger — removes single voxel, updates surface + navmesh | `src/core/mining/DrillPlan.ts` | Test: voxel removed; navmesh updated |
+| 2.11 | Implement `fragmentBoulder()` task — converts oversized debris to transportable fragments | `src/core/mining/BlastCalc.ts` | Test: oversized debris flagged; becomes transportable after fragmenting |
+| 2.12 | Wire vehicle purchase, assign-driver, and task dispatch into console commands | `src/console/commands/entities.ts` | Integration test |
+| 2.13 | Update vehicle renderer — role-specific mesh, tier color/scale variation | `src/renderer/VehicleMesh.ts` | Visual test |
 
 ---
 
@@ -425,21 +425,21 @@ When the player clicks an employee, the detail panel shows:
 
 | # | Task | File(s) | Test |
 |---|------|---------|------|
-| 3.8.1 | Define `SkillQualification`, `SkillCategory`, proficiency levels on `Employee` | `src/core/entities/Employee.ts` | `tests/unit/entities/Employee.test.ts` |
-| 3.8.2 | Add `PROFICIENCY_MULTIPLIERS` and XP thresholds to `balance.ts` | `src/core/config/balance.ts` | Test: XP → proficiency level transitions |
-| 3.8.3 | Implement `gainXp()` — per-qualification XP, triggers level-up event | `src/core/entities/Employee.ts` | Test: level up at correct threshold |
-| 3.8.4 | Implement salary calculation — base + sum of qualification level bonuses | `src/core/entities/Employee.ts` | Test: multi-skill employee costs more |
-| 3.8.5 | Define `PendingAction`, `ActionType`, and `pendingActions` in `GameState` | `src/core/GameState.ts` | Test: initial state has empty array |
-| 3.8.6 | Implement claim logic in `tickEmployees()` — match pending actions to idle qualified employees | `src/core/engine/GameLoop.ts` | Test: correct employee claims matching action; unmatched action emits error |
-| 3.8.7 | Implement `UnqualifiedTaskError` event — fires when no roster employee has the required skill | `src/core/events/EventEngine.ts` | Test: event fires for truly unqualified; not fired when temporarily busy |
-| 3.8.8 | Implement ghost-preview list in `GameState` (mirrors `pendingActions` for renderer) | `src/core/GameState.ts` | Test: ghost entry added on action dispatch, removed on claim |
-| 3.8.9 | Add ghost mesh rendering in renderer — blue fresnel translucent, pulsing | `src/renderer/GhostMesh.ts` (new file) | Visual test |
-| 3.8.10 | Implement need meters (Hunger, Fatigue, Social, Comfort) on `Employee` | `src/core/entities/Employee.ts` | Test: meters deplete at correct rates; productivity multipliers apply |
-| 3.8.11 | Implement need restoration — employee auto-routes to Living Quarters when threshold crossed | `src/core/engine/GameLoop.ts` | Test: hungry employee claims meal slot; task queue paused during meal |
-| 3.8.12 | Implement `SitePolicy` and policy tick logic — enforces shift/rest scheduling | `src/core/entities/SitePolicy.ts` (new file) | Test: shift_8h policy triggers rest after correct tick count |
-| 3.8.13 | Implement `computeTaskDuration()` — proficiency × wellbeing × event multipliers | `src/core/entities/Employee.ts` | Test: all modifier combinations produce correct duration |
-| 3.8.14 | Add i18n keys for skill categories, proficiency labels, policy names, need labels (en + fr) | `src/core/i18n/locales/en.json`, `fr.json` | Test: all keys resolve |
-| 3.8.15 | Wire `hire`, `assign_skill`, `set_policy` console commands | `src/console/commands/entities.ts` | Integration test |
+| 3.1 | Define `SkillQualification`, `SkillCategory`, proficiency levels on `Employee` | `src/core/entities/Employee.ts` | `tests/unit/entities/Employee.test.ts` |
+| 3.2 | Add `PROFICIENCY_MULTIPLIERS` and XP thresholds to `balance.ts` | `src/core/config/balance.ts` | Test: XP → proficiency level transitions |
+| 3.3 | Implement `gainXp()` — per-qualification XP, triggers level-up event | `src/core/entities/Employee.ts` | Test: level up at correct threshold |
+| 3.4 | Implement salary calculation — base + sum of qualification level bonuses | `src/core/entities/Employee.ts` | Test: multi-skill employee costs more |
+| 3.5 | Define `PendingAction`, `ActionType`, and `pendingActions` in `GameState` | `src/core/GameState.ts` | Test: initial state has empty array |
+| 3.6 | Implement claim logic in `tickEmployees()` — match pending actions to idle qualified employees | `src/core/engine/GameLoop.ts` | Test: correct employee claims matching action; unmatched action emits error |
+| 3.7 | Implement `UnqualifiedTaskError` event — fires when no roster employee has the required skill | `src/core/events/EventEngine.ts` | Test: event fires for truly unqualified; not fired when temporarily busy |
+| 3.8 | Implement ghost-preview list in `GameState` (mirrors `pendingActions` for renderer) | `src/core/GameState.ts` | Test: ghost entry added on action dispatch, removed on claim |
+| 3.9 | Add ghost mesh rendering in renderer — blue fresnel translucent, pulsing | `src/renderer/GhostMesh.ts` (new file) | Visual test |
+| 3.10 | Implement need meters (Hunger, Fatigue, Social, Comfort) on `Employee` | `src/core/entities/Employee.ts` | Test: meters deplete at correct rates; productivity multipliers apply |
+| 3.11 | Implement need restoration — employee auto-routes to Living Quarters when threshold crossed | `src/core/engine/GameLoop.ts` | Test: hungry employee claims meal slot; task queue paused during meal |
+| 3.12 | Implement `SitePolicy` and policy tick logic — enforces shift/rest scheduling | `src/core/entities/SitePolicy.ts` (new file) | Test: shift_8h policy triggers rest after correct tick count |
+| 3.13 | Implement `computeTaskDuration()` — proficiency × wellbeing × event multipliers | `src/core/entities/Employee.ts` | Test: all modifier combinations produce correct duration |
+| 3.14 | Add i18n keys for skill categories, proficiency labels, policy names, need labels (en + fr) | `src/core/i18n/locales/en.json`, `fr.json` | Test: all keys resolve |
+| 3.15 | Wire `hire`, `assign_skill`, `set_policy` console commands | `src/console/commands/entities.ts` | Integration test |
 
 ---
 
@@ -529,17 +529,17 @@ After a blast, the game computes the **actual ore yield** from destroyed voxels 
 
 | # | Task | File(s) | Test |
 |---|------|---------|------|
-| 4.7.1 | Add `SurveyMethod`, `SurveyResult` interfaces | `src/core/mining/SurveyCalc.ts` (new file) | `tests/unit/mining/SurveyCalc.test.ts` |
-| 4.7.2 | Implement `estimateSurveyResult()` — noise + skill scaling | `src/core/mining/SurveyCalc.ts` | Test: estimate within expected error bounds (seeded RNG) |
-| 4.7.3 | Implement `isSurveyStale()` — returns true after 100 ticks | `src/core/mining/SurveyCalc.ts` | Test: stale at tick 101, fresh at 99 |
-| 4.7.4 | Add `surveyResults: SurveyResult[]` and `nextSurveyId` to `GameState` | `src/core/GameState.ts` | Test: initial state has empty array |
-| 4.7.5 | Add survey cost constants to `balance.ts` | `src/core/config/balance.ts` | — |
-| 4.7.6 | Implement `runSurvey()` — validates surveyor, deducts cost, enqueues task | `src/core/mining/SurveyCalc.ts` | Test: insufficient funds returns error |
-| 4.7.7 | Implement `computeBlastOreReport()` — yields from destroyed voxels | `src/core/mining/SurveyCalc.ts` | Test: ore mass = Σ(density × voxelVolume × rockDensity) |
-| 4.7.8 | Wire ore report events to event system | `src/core/events/EventEngine.ts` | Test: lucky strike fires at >120% |
-| 4.7.9 | Add i18n keys for survey methods and events (en + fr) | `src/core/i18n/locales/en.json`, `fr.json` | Test: all keys resolve |
-| 4.7.10 | Add `survey` console command (`survey seismic x:10 z:10`) | `src/console/commands/mining.ts` | Integration test |
-| 4.7.11 | Render survey confidence overlay in `TerrainMesh.ts` | `src/renderer/TerrainMesh.ts` | Visual test |
+| 4.1 | Add `SurveyMethod`, `SurveyResult` interfaces | `src/core/mining/SurveyCalc.ts` (new file) | `tests/unit/mining/SurveyCalc.test.ts` |
+| 4.2 | Implement `estimateSurveyResult()` — noise + skill scaling | `src/core/mining/SurveyCalc.ts` | Test: estimate within expected error bounds (seeded RNG) |
+| 4.3 | Implement `isSurveyStale()` — returns true after 100 ticks | `src/core/mining/SurveyCalc.ts` | Test: stale at tick 101, fresh at 99 |
+| 4.4 | Add `surveyResults: SurveyResult[]` and `nextSurveyId` to `GameState` | `src/core/GameState.ts` | Test: initial state has empty array |
+| 4.5 | Add survey cost constants to `balance.ts` | `src/core/config/balance.ts` | — |
+| 4.6 | Implement `runSurvey()` — validates surveyor, deducts cost, enqueues task | `src/core/mining/SurveyCalc.ts` | Test: insufficient funds returns error |
+| 4.7 | Implement `computeBlastOreReport()` — yields from destroyed voxels | `src/core/mining/SurveyCalc.ts` | Test: ore mass = Σ(density × voxelVolume × rockDensity) |
+| 4.8 | Wire ore report events to event system | `src/core/events/EventEngine.ts` | Test: lucky strike fires at >120% |
+| 4.9 | Add i18n keys for survey methods and events (en + fr) | `src/core/i18n/locales/en.json`, `fr.json` | Test: all keys resolve |
+| 4.10 | Add `survey` console command (`survey seismic x:10 z:10`) | `src/console/commands/mining.ts` | Integration test |
+| 4.11 | Render survey confidence overlay in `TerrainMesh.ts` | `src/renderer/TerrainMesh.ts` | Visual test |
 
 ---
 
@@ -906,28 +906,28 @@ export const OVERSIZED_FRAGMENT_THRESHOLD = 0.5;
 | # | Task | File(s) | Test |
 |---|------|---------|------|
 | **5.7.0** | **Prerequisite — multi-rock VoxelGrid:** Change `VoxelCell.rockId: string` to `VoxelCell.composition: VoxelRockComposition`; update `TerrainGen` to populate coefficients via Simplex noise + level bias; update all callers | `src/core/voxels/VoxelGrid.ts`, `src/core/terrain/TerrainGen.ts` | Test: coefficients sum to 1.0 per voxel; pure-rock voxel = single entry coeff 1.0 |
-| 5.7.1 | Assert voxel cell size = 1 m and document it | `src/core/voxels/VoxelGrid.ts` | Test: grid dimensions in meters |
-| 5.7.2 | Add `energyAbsorption` and `density` constants to each `RockDef` in `RockCatalog` | `src/core/config/RockCatalog.ts` | Test: all rock defs have positive absorption and density |
-| 5.7.3 | Implement `computeThreshold(voxel)` — weighted sum of rock coefficients × absorption | `src/core/mining/BlastCalc.ts` | Test: pure rock = rock absorption; 50/50 mix = average |
-| 5.7.4 | Implement `computeInitialEnergy(hole)` — explosiveDef × kg × stemming efficiency | `src/core/mining/BlastCalc.ts` | Test: more charge = more energy; full stemming = 100% efficiency |
-| 5.7.5 | Implement `propagateEnergy(grid, initial)` — iterative overflow loop tracking `generatedOverflow[v]` | `src/core/mining/BlastCalc.ts` | Test: energy stays local for strong rock; spreads for weak rock; guard terminates; generatedOverflow = 0 for unsaturated voxels |
-| 5.7.6 | Implement `identifyFragmentedVoxels(grid)` — fragmentation criterion + island flood-fill | `src/core/mining/BlastCalc.ts` | Test: isolated island flagged; exact threshold boundary |
-| 5.7.7 | Implement entity damage from blast — employee/vehicle instant kill, building sum + survival roll | `src/core/mining/BlastCalc.ts` | Test: building at 1.5× resistance → death probability ≈ 55% |
-| 5.7.8 | Implement `computeFragmentationScore(voxel)` and Voronoi seed sampling | `src/physics/VoronoiFrag.ts` (new) | Test: fragment count scales with E/T ratio; min 1 per voxel |
-| 5.7.9 | Implement Bowyer–Watson incremental Delaunay tetrahedralization; compute dual Voronoi cells; clip to fragmented voxel union; respect `MAX_VORONOI_POINTS` cap | `src/physics/VoronoiFrag.ts` | Test: all volume covered; no overlaps; circumsphere property holds |
-| 5.7.10 | Implement Voronoi merging pass (`MERGE_PROBABILITY ≈ 0.35`) | `src/physics/VoronoiFrag.ts` | Test: merge probability respected within ±10% over 1000 runs (seeded) |
-| 5.7.11 | Generate `RockFragment` objects: graphic mesh, deflated collision mesh, `overflowEnergy` from source voxels | `src/physics/FragmentSim.ts` (new) | Test: collision mesh volume < graphic mesh volume; overflowEnergy ≥ 0 |
-| 5.7.12 | Implement Step 4 velocity assignment: energy gradient × surface proximity factor; classify `simulationTier` | `src/physics/FragmentSim.ts` | Test: deep fragment v ≈ 0; surface over-charged fragment v near MAX; poor-stemming blast → upward gradient |
-| 5.7.13 | Implement Tier A (projected) cannon-es loop — full rigid body, `PHYSICS_FRAGMENT_CAP`, parabolic fallback, stick-on-land | `src/physics/FragmentSim.ts` | Test: fragment sticks after landing; cap enforced; parabolic fallback lands at correct position |
-| 5.7.14 | Implement Tier B (collapse) gravity-drop — straight-down, column stack, immediate static | `src/physics/FragmentSim.ts` | Test: collapse fragment rests on terrain; no lateral movement |
-| 5.7.15 | Implement aggressive sleep: stationary for `SLEEP_TICKS_REQUIRED` ticks → `'static'` | `src/physics/FragmentSim.ts` | Test: body sleeps within expected tick window |
-| 5.7.16 | Implement fragment support graph and stack-collapse on pickup | `src/physics/FragmentSim.ts` | Test: removing bottom fragment triggers Tier B drop for supported fragments |
-| 5.7.17 | Implement fragment size check and oversized flag | `src/core/mining/BlastCalc.ts` | Test: volume above threshold flagged correctly |
-| 5.7.18 | Wire ore reporting: collect fragment → add to `GameState.collectedOre` | `src/core/GameState.ts` | Test: ore yield matches source voxel composition |
-| 5.7.19 | Trigger NavMesh dirty-region update after fragmentation pass | `src/core/voxels/NavGrid.ts` | Test: fragmented voxels removed from walkable set |
-| 5.7.20 | Add all balance constants to `balance.ts` | `src/core/config/balance.ts` | — |
-| 5.7.21 | Add i18n keys for blast damage events, oversized fragment alert (en + fr) | `src/core/i18n/locales/en.json`, `fr.json` | Test: all keys resolve |
-| 5.7.22 | Add `blast_preview` console command — prints energy map, predicted fragment count, and projected/collapse split | `src/console/commands/mining.ts` | Integration test |
+| 5.1 | Assert voxel cell size = 1 m and document it | `src/core/voxels/VoxelGrid.ts` | Test: grid dimensions in meters |
+| 5.2 | Add `energyAbsorption` and `density` constants to each `RockDef` in `RockCatalog` | `src/core/config/RockCatalog.ts` | Test: all rock defs have positive absorption and density |
+| 5.3 | Implement `computeThreshold(voxel)` — weighted sum of rock coefficients × absorption | `src/core/mining/BlastCalc.ts` | Test: pure rock = rock absorption; 50/50 mix = average |
+| 5.4 | Implement `computeInitialEnergy(hole)` — explosiveDef × kg × stemming efficiency | `src/core/mining/BlastCalc.ts` | Test: more charge = more energy; full stemming = 100% efficiency |
+| 5.5 | Implement `propagateEnergy(grid, initial)` — iterative overflow loop tracking `generatedOverflow[v]` | `src/core/mining/BlastCalc.ts` | Test: energy stays local for strong rock; spreads for weak rock; guard terminates; generatedOverflow = 0 for unsaturated voxels |
+| 5.6 | Implement `identifyFragmentedVoxels(grid)` — fragmentation criterion + island flood-fill | `src/core/mining/BlastCalc.ts` | Test: isolated island flagged; exact threshold boundary |
+| 5.7 | Implement entity damage from blast — employee/vehicle instant kill, building sum + survival roll | `src/core/mining/BlastCalc.ts` | Test: building at 1.5× resistance → death probability ≈ 55% |
+| 5.8 | Implement `computeFragmentationScore(voxel)` and Voronoi seed sampling | `src/physics/VoronoiFrag.ts` (new) | Test: fragment count scales with E/T ratio; min 1 per voxel |
+| 5.9 | Implement Bowyer–Watson incremental Delaunay tetrahedralization; compute dual Voronoi cells; clip to fragmented voxel union; respect `MAX_VORONOI_POINTS` cap | `src/physics/VoronoiFrag.ts` | Test: all volume covered; no overlaps; circumsphere property holds |
+| 5.10 | Implement Voronoi merging pass (`MERGE_PROBABILITY ≈ 0.35`) | `src/physics/VoronoiFrag.ts` | Test: merge probability respected within ±10% over 1000 runs (seeded) |
+| 5.11 | Generate `RockFragment` objects: graphic mesh, deflated collision mesh, `overflowEnergy` from source voxels | `src/physics/FragmentSim.ts` (new) | Test: collision mesh volume < graphic mesh volume; overflowEnergy ≥ 0 |
+| 5.12 | Implement Step 4 velocity assignment: energy gradient × surface proximity factor; classify `simulationTier` | `src/physics/FragmentSim.ts` | Test: deep fragment v ≈ 0; surface over-charged fragment v near MAX; poor-stemming blast → upward gradient |
+| 5.13 | Implement Tier A (projected) cannon-es loop — full rigid body, `PHYSICS_FRAGMENT_CAP`, parabolic fallback, stick-on-land | `src/physics/FragmentSim.ts` | Test: fragment sticks after landing; cap enforced; parabolic fallback lands at correct position |
+| 5.14 | Implement Tier B (collapse) gravity-drop — straight-down, column stack, immediate static | `src/physics/FragmentSim.ts` | Test: collapse fragment rests on terrain; no lateral movement |
+| 5.15 | Implement aggressive sleep: stationary for `SLEEP_TICKS_REQUIRED` ticks → `'static'` | `src/physics/FragmentSim.ts` | Test: body sleeps within expected tick window |
+| 5.16 | Implement fragment support graph and stack-collapse on pickup | `src/physics/FragmentSim.ts` | Test: removing bottom fragment triggers Tier B drop for supported fragments |
+| 5.17 | Implement fragment size check and oversized flag | `src/core/mining/BlastCalc.ts` | Test: volume above threshold flagged correctly |
+| 5.18 | Wire ore reporting: collect fragment → add to `GameState.collectedOre` | `src/core/GameState.ts` | Test: ore yield matches source voxel composition |
+| 5.19 | Trigger NavMesh dirty-region update after fragmentation pass | `src/core/voxels/NavGrid.ts` | Test: fragmented voxels removed from walkable set |
+| 5.20 | Add all balance constants to `balance.ts` | `src/core/config/balance.ts` | — |
+| 5.21 | Add i18n keys for blast damage events, oversized fragment alert (en + fr) | `src/core/i18n/locales/en.json`, `fr.json` | Test: all keys resolve |
+| 5.22 | Add `blast_preview` console command — prints energy map, predicted fragment count, and projected/collapse split | `src/console/commands/mining.ts` | Integration test |
 
 ---
 
@@ -1048,18 +1048,18 @@ Agents follow waypoints by moving at most `walkSpeed` cells per tick toward the 
 
 | # | Task | File(s) | Test |
 |---|------|---------|------|
-| 6.7.1 | Define `NavCell`, `NavCellType`, `NavGrid` interfaces | `src/core/nav/NavGrid.ts` (new file) | `tests/unit/nav/NavGrid.test.ts` |
-| 6.7.2 | Implement `buildNavGrid()` — derives NavGrid from VoxelGrid + buildings + holes | `src/core/nav/NavGrid.ts` | Test: blocked cells match building footprints |
-| 6.7.3 | Implement `patchNavGrid()` — incremental update for a bounding box | `src/core/nav/NavGrid.ts` | Test: patch only affects specified region |
-| 6.7.4 | Implement A\* `findPath()` with 8-directional movement and octile heuristic | `src/core/nav/Pathfinding.ts` (new file) | Test: correct path length on simple grid; impassable tiles are avoided |
-| 6.7.5 | Implement node budget cap and direct-line fallback | `src/core/nav/Pathfinding.ts` | Test: falls back when grid is very large and budget is hit |
-| 6.7.6 | Implement multi-level routing via ramp lookup | `src/core/nav/Pathfinding.ts` | Test: 3-segment path when ramp present; `found: false` when no ramp |
-| 6.7.7 | Implement `advanceAgent()` — move agent 1 step along waypoints per tick | `src/core/nav/AgentMovement.ts` (new file) | Test: agent reaches destination in expected ticks |
-| 6.7.8 | Implement stale-path detection and re-request on obstacle change | `src/core/nav/AgentMovement.ts` | Test: path re-requested when cell blocked mid-route |
-| 6.7.9 | Implement `stuck` state and `agent_stuck` event | `src/core/nav/AgentMovement.ts` | Test: stuck state after 3 failed re-requests |
-| 6.7.10 | Integrate NavGrid build into `GameState` initialization | `src/core/state/GameState.ts` | Smoke test: GameState serializes NavGrid |
-| 6.7.11 | Wire NavGrid patch calls into blast pipeline and building placement | `src/core/engine/GameLoop.ts` | Test: NavGrid reflects new hole after drill |
-| 6.7.12 | Add i18n keys for pathfinding events (`agent_stuck`, `no_ramp_available`) | `src/core/i18n/locales/en.json`, `fr.json` | Test: all keys resolve |
+| 6.1 | Define `NavCell`, `NavCellType`, `NavGrid` interfaces | `src/core/nav/NavGrid.ts` (new file) | `tests/unit/nav/NavGrid.test.ts` |
+| 6.2 | Implement `buildNavGrid()` — derives NavGrid from VoxelGrid + buildings + holes | `src/core/nav/NavGrid.ts` | Test: blocked cells match building footprints |
+| 6.3 | Implement `patchNavGrid()` — incremental update for a bounding box | `src/core/nav/NavGrid.ts` | Test: patch only affects specified region |
+| 6.4 | Implement A\* `findPath()` with 8-directional movement and octile heuristic | `src/core/nav/Pathfinding.ts` (new file) | Test: correct path length on simple grid; impassable tiles are avoided |
+| 6.5 | Implement node budget cap and direct-line fallback | `src/core/nav/Pathfinding.ts` | Test: falls back when grid is very large and budget is hit |
+| 6.6 | Implement multi-level routing via ramp lookup | `src/core/nav/Pathfinding.ts` | Test: 3-segment path when ramp present; `found: false` when no ramp |
+| 6.7 | Implement `advanceAgent()` — move agent 1 step along waypoints per tick | `src/core/nav/AgentMovement.ts` (new file) | Test: agent reaches destination in expected ticks |
+| 6.8 | Implement stale-path detection and re-request on obstacle change | `src/core/nav/AgentMovement.ts` | Test: path re-requested when cell blocked mid-route |
+| 6.9 | Implement `stuck` state and `agent_stuck` event | `src/core/nav/AgentMovement.ts` | Test: stuck state after 3 failed re-requests |
+| 6.10 | Integrate NavGrid build into `GameState` initialization | `src/core/state/GameState.ts` | Smoke test: GameState serializes NavGrid |
+| 6.11 | Wire NavGrid patch calls into blast pipeline and building placement | `src/core/engine/GameLoop.ts` | Test: NavGrid reflects new hole after drill |
+| 6.12 | Add i18n keys for pathfinding events (`agent_stuck`, `no_ramp_available`) | `src/core/i18n/locales/en.json`, `fr.json` | Test: all keys resolve |
 
 ---
 
@@ -1164,18 +1164,18 @@ If the player builds a **Bunkhouse Tier 2+**, an 8-tick shift cycle activates: e
 
 | # | Task | File(s) | Test |
 |---|------|---------|------|
-| 7.9.1 | Add `hunger`, `fatigue`, `breakNeed`, `collapsing` fields to `Employee` interface | `src/core/entities/Employee.ts` | Test: new fields initialized on hire |
-| 7.9.2 | Add `NEED_DRAIN_RATES`, `NEED_WARNING_THRESHOLDS`, `NEED_COLLAPSE_THRESHOLDS` to `balance.ts` | `src/core/config/balance.ts` | — |
-| 7.9.3 | Implement `tickNeedGauges()` — drain gauges based on task state + morale modifier | `src/core/entities/Employee.ts` | Test: drain rates match table; active task drains faster |
-| 7.9.4 | Implement `needsMoraleEffect()` — compute tick-level morale delta from all gauges | `src/core/entities/Employee.ts` | Test: zero effect above 50; −3/tick at critical |
-| 7.9.5 | Implement `replenishNeed()` — fill gauge at building tier rate, enforce capacity | `src/core/entities/Employee.ts` | Test: gauge fills at correct rate per tier |
-| 7.9.6 | Implement `checkCollapse()` — interrupt task queue, prepend `rest` task | `src/core/entities/Employee.ts` | Test: interrupted task re-queued; `collapsing` flag set |
-| 7.9.7 | Implement `autoInsertNeedTasks()` — proactive queue insertion at warning thresholds | `src/core/entities/Employee.ts` | Test: `rest` inserted after current task; skipped if queue full |
-| 7.9.8 | Deduct per-visit food/break costs from cash balance | `src/core/engine/GameLoop.ts` | Test: canteen visit deducts $10; tier 3 deducts $6 |
-| 7.9.9 | Implement shift cycle for Bunkhouse Tier 2+ | `src/core/engine/GameLoop.ts` | Test: shift cycle fires at tick 6; sleep rest queued |
-| 7.9.10 | Wire all need events into event system (`need_warning`, `employee_collapsed`, `employee_shift_change`) | `src/core/events/EventSystem.ts` | Test: events fire at correct gauge levels |
-| 7.9.11 | Add i18n keys for all need events and building-full message (en + fr) | `src/core/i18n/locales/en.json`, `fr.json` | Test: all keys resolve |
-| 7.9.12 | Add `needs` console command — print all employees' gauge values | `src/console/commands/entities.ts` | Integration test |
+| 7.1 | Add `hunger`, `fatigue`, `breakNeed`, `collapsing` fields to `Employee` interface | `src/core/entities/Employee.ts` | Test: new fields initialized on hire |
+| 7.2 | Add `NEED_DRAIN_RATES`, `NEED_WARNING_THRESHOLDS`, `NEED_COLLAPSE_THRESHOLDS` to `balance.ts` | `src/core/config/balance.ts` | — |
+| 7.3 | Implement `tickNeedGauges()` — drain gauges based on task state + morale modifier | `src/core/entities/Employee.ts` | Test: drain rates match table; active task drains faster |
+| 7.4 | Implement `needsMoraleEffect()` — compute tick-level morale delta from all gauges | `src/core/entities/Employee.ts` | Test: zero effect above 50; −3/tick at critical |
+| 7.5 | Implement `replenishNeed()` — fill gauge at building tier rate, enforce capacity | `src/core/entities/Employee.ts` | Test: gauge fills at correct rate per tier |
+| 7.6 | Implement `checkCollapse()` — interrupt task queue, prepend `rest` task | `src/core/entities/Employee.ts` | Test: interrupted task re-queued; `collapsing` flag set |
+| 7.7 | Implement `autoInsertNeedTasks()` — proactive queue insertion at warning thresholds | `src/core/entities/Employee.ts` | Test: `rest` inserted after current task; skipped if queue full |
+| 7.8 | Deduct per-visit food/break costs from cash balance | `src/core/engine/GameLoop.ts` | Test: canteen visit deducts $10; tier 3 deducts $6 |
+| 7.9 | Implement shift cycle for Bunkhouse Tier 2+ | `src/core/engine/GameLoop.ts` | Test: shift cycle fires at tick 6; sleep rest queued |
+| 7.10 | Wire all need events into event system (`need_warning`, `employee_collapsed`, `employee_shift_change`) | `src/core/events/EventSystem.ts` | Test: events fire at correct gauge levels |
+| 7.11 | Add i18n keys for all need events and building-full message (en + fr) | `src/core/i18n/locales/en.json`, `fr.json` | Test: all keys resolve |
+| 7.12 | Add `needs` console command — print all employees' gauge values | `src/console/commands/entities.ts` | Integration test |
 
 ---
 
@@ -1361,14 +1361,14 @@ The following benchmarks must pass as part of CI (failing marks the build as yel
 
 | # | Task | File(s) | Test |
 |---|------|---------|------|
-| 8.9.1 | Add coverage reporter to `vitest.config.ts` (v8 provider, per-file thresholds matching §8.2) | `vitest.config.ts` | CI: coverage gate fails when a module is below threshold |
-| 8.9.2 | Create `tests/integration/` and `tests/integration/full-level/` directories; add both to test runner config | `vitest.config.ts`, `package.json` | Smoke: both directories picked up by test runner |
-| 8.9.3 | Add 10 small integration test suites (§8.3.1, ≥ 8 scenarios each) | `tests/integration/` | Each suite passes; all scenario variants exercise distinct code paths |
-| 8.9.4 | Add 10 full-level integration tests (§8.3.2) | `tests/integration/full-level/` | Each test reaches the stated terminal condition with correct `levelEndReason` |
-| 8.9.5 | Add 15 feature scenario JSON files (§8.4.1) | `scripts/scenario-defs/` | Scenario runner executes all without crash; state JSON reflects expected outcome |
-| 8.9.6 | Add 6 full-level playthrough scenario JSON files (§8.4.2) | `scripts/scenario-defs/` | Each drives game to terminal state; screenshots captured at every checkpoint |
-| 8.9.7 | Add performance benchmark suite | `tests/unit/benchmarks/` | All benchmarks meet targets; results logged to CI output |
-| 8.9.8 | Add `npm run test:integration` and `npm run test:scenarios` scripts | `package.json` | Each script runs in full isolation without requiring the other |
-| 8.9.9 | Update `npm run validate` to include integration tests and coverage gate | `package.json` | `npm run validate` exits 0 on clean repo; non-zero on coverage failure |
-| 8.9.10 | Document test conventions and all script commands in `README.md` under a "Testing" section | `README.md` | Section covers all four test layers with example commands |
-| 8.9.11 | Run all six level playthrough scenarios after final renderer integration; inspect screenshots per §8.5 | Manual step | All visual checkpoints (§8.5) verified by agent before marking complete |
+| 8.1 | Add coverage reporter to `vitest.config.ts` (v8 provider, per-file thresholds matching §8.2) | `vitest.config.ts` | CI: coverage gate fails when a module is below threshold |
+| 8.2 | Create `tests/integration/` and `tests/integration/full-level/` directories; add both to test runner config | `vitest.config.ts`, `package.json` | Smoke: both directories picked up by test runner |
+| 8.3 | Add 10 small integration test suites (§8.3.1, ≥ 8 scenarios each) | `tests/integration/` | Each suite passes; all scenario variants exercise distinct code paths |
+| 8.4 | Add 10 full-level integration tests (§8.3.2) | `tests/integration/full-level/` | Each test reaches the stated terminal condition with correct `levelEndReason` |
+| 8.5 | Add 15 feature scenario JSON files (§8.4.1) | `scripts/scenario-defs/` | Scenario runner executes all without crash; state JSON reflects expected outcome |
+| 8.6 | Add 6 full-level playthrough scenario JSON files (§8.4.2) | `scripts/scenario-defs/` | Each drives game to terminal state; screenshots captured at every checkpoint |
+| 8.7 | Add performance benchmark suite | `tests/unit/benchmarks/` | All benchmarks meet targets; results logged to CI output |
+| 8.8 | Add `npm run test:integration` and `npm run test:scenarios` scripts | `package.json` | Each script runs in full isolation without requiring the other |
+| 8.9 | Update `npm run validate` to include integration tests and coverage gate | `package.json` | `npm run validate` exits 0 on clean repo; non-zero on coverage failure |
+| 8.10 | Document test conventions and all script commands in `README.md` under a "Testing" section | `README.md` | Section covers all four test layers with example commands |
+| 8.11 | Run all six level playthrough scenarios after final renderer integration; inspect screenshots per §8.5 | Manual step | All visual checkpoints (§8.5) verified by agent before marking complete |

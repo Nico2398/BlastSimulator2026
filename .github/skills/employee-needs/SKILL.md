@@ -110,15 +110,15 @@ export interface Employee {
 
 | # | Task | File(s) |
 |---|------|---------|
-| 7.9.1 | Add `hunger`, `fatigue`, `breakNeed`, `collapsing` fields to `Employee` | `src/core/entities/Employee.ts` |
-| 7.9.2 | Add `NEED_DRAIN_RATES`, `NEED_WARNING_THRESHOLDS`, `NEED_COLLAPSE_THRESHOLDS` to `balance.ts` | `src/core/config/balance.ts` |
-| 7.9.3 | Implement `tickNeedGauges()` — drain rates based on task state + morale modifier | `src/core/entities/Employee.ts` |
-| 7.9.4 | Implement `needsMoraleEffect()` — morale delta from all gauges per tick | `src/core/entities/Employee.ts` |
-| 7.9.5 | Implement `replenishNeed()` — fill gauge at building tier rate, enforce capacity | `src/core/entities/Employee.ts` |
-| 7.9.6 | Implement `checkCollapse()` — interrupt task queue, prepend `rest` task | `src/core/entities/Employee.ts` |
-| 7.9.7 | Implement `autoInsertNeedTasks()` — proactive queue insertion at warning thresholds | `src/core/entities/Employee.ts` |
-| 7.9.8 | Deduct per-visit food/break costs from cash balance | `src/core/engine/GameLoop.ts` |
-| 7.9.9 | Implement shift cycle for Bunkhouse Tier 2+ | `src/core/engine/GameLoop.ts` |
-| 7.9.10 | Wire need events into event system (`need_warning`, `employee_collapsed`, `employee_shift_change`) | `src/core/events/EventSystem.ts` |
-| 7.9.11 | Add i18n keys for need events and building-full message (en + fr) | `src/core/i18n/locales/en.json`, `fr.json` |
-| 7.9.12 | Add `needs` console command — print all employees' gauge values | `src/console/commands/entities.ts` |
+| 7.1 | Add `hunger`, `fatigue`, `breakNeed`, `collapsing` fields to `Employee` | `src/core/entities/Employee.ts` |
+| 7.2 | Add `NEED_DRAIN_RATES`, `NEED_WARNING_THRESHOLDS`, `NEED_COLLAPSE_THRESHOLDS` to `balance.ts` | `src/core/config/balance.ts` |
+| 7.3 | Implement `tickNeedGauges()` — drain rates based on task state + morale modifier | `src/core/entities/Employee.ts` |
+| 7.4 | Implement `needsMoraleEffect()` — morale delta from all gauges per tick | `src/core/entities/Employee.ts` |
+| 7.5 | Implement `replenishNeed()` — fill gauge at building tier rate, enforce capacity | `src/core/entities/Employee.ts` |
+| 7.6 | Implement `checkCollapse()` — interrupt task queue, prepend `rest` task | `src/core/entities/Employee.ts` |
+| 7.7 | Implement `autoInsertNeedTasks()` — proactive queue insertion at warning thresholds | `src/core/entities/Employee.ts` |
+| 7.8 | Deduct per-visit food/break costs from cash balance | `src/core/engine/GameLoop.ts` |
+| 7.9 | Implement shift cycle for Bunkhouse Tier 2+ | `src/core/engine/GameLoop.ts` |
+| 7.10 | Wire need events into event system (`need_warning`, `employee_collapsed`, `employee_shift_change`) | `src/core/events/EventSystem.ts` |
+| 7.11 | Add i18n keys for need events and building-full message (en + fr) | `src/core/i18n/locales/en.json`, `fr.json` |
+| 7.12 | Add `needs` console command — print all employees' gauge values | `src/console/commands/entities.ts` |

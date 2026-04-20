@@ -1,0 +1,1600 @@
+[
+  {
+    "id": "1.1",
+    "chapter": 1,
+    "title": "Define BuildingType union with all 9 building types",
+    "files": [
+      "src/core/entities/Building.ts"
+    ],
+    "testFile": "tests/unit/entities/Building.test.ts",
+    "status": "done",
+    "blockedBy": [],
+    "closedInPR": null
+  },
+  {
+    "id": "1.2",
+    "chapter": 1,
+    "title": "Define BuildingTier, per-type footprint patterns, and BUILDING_DEFS catalog",
+    "files": [
+      "src/core/entities/Building.ts"
+    ],
+    "testFile": "tests/unit/entities/Building.test.ts",
+    "status": "done",
+    "blockedBy": [
+      "1.1"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "1.3",
+    "chapter": 1,
+    "title": "Implement canPlaceBuilding() \u2014 flat surface check + overlap check",
+    "files": [
+      "src/core/entities/Building.ts"
+    ],
+    "testFile": "tests/unit/entities/Building.test.ts",
+    "status": "done",
+    "blockedBy": [
+      "1.2"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "1.4",
+    "chapter": 1,
+    "title": "Implement protected-voxel check \u2014 block drill/blast under building footprint",
+    "files": [
+      "src/core/mining/DrillPlan.ts"
+    ],
+    "testFile": "tests/unit/mining/DrillPlan.test.ts",
+    "status": "done",
+    "blockedBy": [
+      "1.2"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "1.5",
+    "chapter": 1,
+    "title": "Implement building destruction on blast \u2014 check footprint overlap with blast AABB",
+    "files": [
+      "src/core/mining/BlastCalc.ts"
+    ],
+    "testFile": "tests/unit/mining/BlastCalc.test.ts",
+    "status": "done",
+    "blockedBy": [
+      "1.2"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "1.6",
+    "chapter": 1,
+    "title": "Implement Explosive Warehouse secondary blast on destruction",
+    "files": [
+      "src/core/mining/BlastCalc.ts"
+    ],
+    "testFile": "tests/unit/mining/BlastCalc.test.ts",
+    "status": "done",
+    "blockedBy": [
+      "1.5"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "1.7",
+    "chapter": 1,
+    "title": "Implement Research Center task queue \u2014 paid tasks unlock building tiers",
+    "files": [
+      "src/core/entities/Building.ts"
+    ],
+    "testFile": "tests/unit/entities/Building.test.ts",
+    "status": "done",
+    "blockedBy": [
+      "1.2"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "1.8",
+    "chapter": 1,
+    "title": "Implement training task in training buildings \u2014 time cost + fee + skill grant",
+    "files": [
+      "src/core/entities/Building.ts",
+      "src/core/entities/Employee.ts"
+    ],
+    "testFile": "tests/unit/entities/Building.test.ts",
+    "status": "done",
+    "blockedBy": [
+      "1.2"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "1.9",
+    "chapter": 1,
+    "title": "Implement qualified-employee check \u2014 emit error on unqualified task assignment",
+    "files": [
+      "src/core/engine/GameLoop.ts"
+    ],
+    "testFile": "tests/unit/engine/GameLoop.test.ts",
+    "status": "done",
+    "blockedBy": [
+      "1.8"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "1.10",
+    "chapter": 1,
+    "title": "Implement Living Quarters well-being multiplier per tier",
+    "files": [
+      "src/core/entities/Building.ts",
+      "src/core/scores/Scores.ts"
+    ],
+    "testFile": "tests/unit/entities/Building.test.ts",
+    "status": "done",
+    "blockedBy": [
+      "1.2"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "1.11",
+    "chapter": 1,
+    "title": "Implement Freight Warehouse ore storage and contract sell interface",
+    "files": [
+      "src/core/entities/Building.ts"
+    ],
+    "testFile": "tests/unit/entities/Building.test.ts",
+    "status": "done",
+    "blockedBy": [
+      "1.2"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "1.12",
+    "chapter": 1,
+    "title": "Add i18n keys for all 9 building types, all tier names, training course names (en + fr)",
+    "files": [
+      "src/core/i18n/locales/en.json",
+      "src/core/i18n/locales/fr.json"
+    ],
+    "testFile": "tests/unit/i18n/i18n.test.ts",
+    "status": "done",
+    "blockedBy": [
+      "1.2"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "1.13",
+    "chapter": 1,
+    "title": "Wire build, demolish, and research console commands",
+    "files": [
+      "src/console/commands/entities.ts"
+    ],
+    "testFile": null,
+    "status": "done",
+    "blockedBy": [
+      "1.3",
+      "1.7"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "1.14",
+    "chapter": 1,
+    "title": "Update building renderer \u2014 footprint pattern shape and tier visuals",
+    "files": [
+      "src/renderer/BuildingMesh.ts"
+    ],
+    "testFile": null,
+    "status": "done",
+    "blockedBy": [
+      "1.2"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "2.1",
+    "chapter": 2,
+    "title": "Define VehicleRole union and rename existing VehicleType to VehicleRole",
+    "files": [
+      "src/core/entities/Vehicle.ts"
+    ],
+    "testFile": "tests/unit/entities/Vehicle.test.ts",
+    "status": "pending",
+    "blockedBy": [],
+    "closedInPR": null
+  },
+  {
+    "id": "2.2",
+    "chapter": 2,
+    "title": "Define VehicleTier, VehicleDef, and VehicleState types",
+    "files": [
+      "src/core/entities/Vehicle.ts"
+    ],
+    "testFile": "tests/unit/entities/Vehicle.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "2.1"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "2.3",
+    "chapter": 2,
+    "title": "Create VEHICLE_DEFS catalog (5 roles x 3 tiers, 15 entries) with tier multipliers",
+    "files": [
+      "src/core/entities/Vehicle.ts"
+    ],
+    "testFile": "tests/unit/entities/Vehicle.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "2.2"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "2.4",
+    "chapter": 2,
+    "title": "Add i18n keys for all 15 vehicle tier names (en + fr)",
+    "files": [
+      "src/core/i18n/locales/en.json",
+      "src/core/i18n/locales/fr.json"
+    ],
+    "testFile": "tests/unit/i18n/i18n.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "2.3"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "2.5",
+    "chapter": 2,
+    "title": "Add driverId, state, payloadKg, targetX/Z fields to Vehicle interface",
+    "files": [
+      "src/core/entities/Vehicle.ts"
+    ],
+    "testFile": "tests/unit/entities/Vehicle.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "2.2"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "2.6",
+    "chapter": 2,
+    "title": "Implement assignDriver() \u2014 validates employee has licence for this role",
+    "files": [
+      "src/core/entities/Vehicle.ts"
+    ],
+    "testFile": "tests/unit/entities/Vehicle.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "2.5"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "2.7",
+    "chapter": 2,
+    "title": "Implement tickVehicle() \u2014 advances movement along navmesh path, handles waiting state on cell collision",
+    "files": [
+      "src/core/engine/GameLoop.ts"
+    ],
+    "testFile": "tests/unit/engine/GameLoop.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "2.5"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "2.8",
+    "chapter": 2,
+    "title": "Implement TrafficJamEvent \u2014 fires when >=3 vehicles waiting on same path >=10 ticks",
+    "files": [
+      "src/core/events/EventEngine.ts"
+    ],
+    "testFile": "tests/unit/events/EventEngine.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "2.7"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "2.9",
+    "chapter": 2,
+    "title": "Implement demolishBuilding() task \u2014 removes building from grid, updates navmesh",
+    "files": [
+      "src/core/entities/Building.ts"
+    ],
+    "testFile": "tests/unit/entities/Building.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "2.1"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "2.10",
+    "chapter": 2,
+    "title": "Implement digVoxel() task for Rock Digger \u2014 removes single voxel, updates surface + navmesh",
+    "files": [
+      "src/core/mining/DrillPlan.ts"
+    ],
+    "testFile": "tests/unit/mining/DrillPlan.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "2.1"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "2.11",
+    "chapter": 2,
+    "title": "Implement fragmentBoulder() task \u2014 converts oversized debris to transportable fragments",
+    "files": [
+      "src/core/mining/BlastCalc.ts"
+    ],
+    "testFile": "tests/unit/mining/BlastCalc.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "2.1"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "2.12",
+    "chapter": 2,
+    "title": "Wire vehicle purchase, assign-driver, and task dispatch into console commands",
+    "files": [
+      "src/console/commands/entities.ts"
+    ],
+    "testFile": null,
+    "status": "pending",
+    "blockedBy": [
+      "2.3",
+      "2.6",
+      "2.7"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "2.13",
+    "chapter": 2,
+    "title": "Update vehicle renderer \u2014 role-specific mesh, tier color/scale variation",
+    "files": [
+      "src/renderer/VehicleMesh.ts"
+    ],
+    "testFile": null,
+    "status": "pending",
+    "blockedBy": [
+      "2.3",
+      "2.5"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "3.1",
+    "chapter": 3,
+    "title": "Define SkillQualification, SkillCategory, proficiency levels on Employee",
+    "files": [
+      "src/core/entities/Employee.ts"
+    ],
+    "testFile": "tests/unit/entities/Employee.test.ts",
+    "status": "pending",
+    "blockedBy": [],
+    "closedInPR": null
+  },
+  {
+    "id": "3.2",
+    "chapter": 3,
+    "title": "Add PROFICIENCY_MULTIPLIERS and XP thresholds to balance.ts",
+    "files": [
+      "src/core/config/balance.ts"
+    ],
+    "testFile": "tests/unit/config/balance.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "3.1"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "3.3",
+    "chapter": 3,
+    "title": "Implement gainXp() \u2014 per-qualification XP, triggers level-up event",
+    "files": [
+      "src/core/entities/Employee.ts"
+    ],
+    "testFile": "tests/unit/entities/Employee.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "3.1",
+      "3.2"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "3.4",
+    "chapter": 3,
+    "title": "Implement salary calculation \u2014 base + sum of qualification level bonuses",
+    "files": [
+      "src/core/entities/Employee.ts"
+    ],
+    "testFile": "tests/unit/entities/Employee.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "3.1",
+      "3.2"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "3.5",
+    "chapter": 3,
+    "title": "Define PendingAction, ActionType, and pendingActions in GameState",
+    "files": [
+      "src/core/GameState.ts"
+    ],
+    "testFile": "tests/unit/GameState.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "3.1"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "3.6",
+    "chapter": 3,
+    "title": "Implement claim logic in tickEmployees() \u2014 match pending actions to idle qualified employees",
+    "files": [
+      "src/core/engine/GameLoop.ts"
+    ],
+    "testFile": "tests/unit/engine/GameLoop.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "3.3",
+      "3.5"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "3.7",
+    "chapter": 3,
+    "title": "Implement UnqualifiedTaskError event \u2014 fires when no roster employee has the required skill",
+    "files": [
+      "src/core/events/EventEngine.ts"
+    ],
+    "testFile": "tests/unit/events/EventEngine.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "3.6"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "3.8",
+    "chapter": 3,
+    "title": "Implement ghost-preview list in GameState (mirrors pendingActions for renderer)",
+    "files": [
+      "src/core/GameState.ts"
+    ],
+    "testFile": "tests/unit/GameState.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "3.5"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "3.9",
+    "chapter": 3,
+    "title": "Add ghost mesh rendering in renderer \u2014 blue fresnel translucent, pulsing",
+    "files": [
+      "src/renderer/GhostMesh.ts"
+    ],
+    "testFile": null,
+    "status": "pending",
+    "blockedBy": [
+      "3.8"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "3.10",
+    "chapter": 3,
+    "title": "Implement need meters (Hunger, Fatigue, Social, Comfort) on Employee",
+    "files": [
+      "src/core/entities/Employee.ts"
+    ],
+    "testFile": "tests/unit/entities/Employee.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "3.1"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "3.11",
+    "chapter": 3,
+    "title": "Implement need restoration \u2014 employee auto-routes to Living Quarters when threshold crossed",
+    "files": [
+      "src/core/engine/GameLoop.ts"
+    ],
+    "testFile": "tests/unit/engine/GameLoop.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "3.10"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "3.12",
+    "chapter": 3,
+    "title": "Implement SitePolicy and policy tick logic \u2014 enforces shift/rest scheduling",
+    "files": [
+      "src/core/entities/SitePolicy.ts"
+    ],
+    "testFile": "tests/unit/entities/SitePolicy.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "3.10"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "3.13",
+    "chapter": 3,
+    "title": "Implement computeTaskDuration() \u2014 proficiency x wellbeing x event multipliers",
+    "files": [
+      "src/core/entities/Employee.ts"
+    ],
+    "testFile": "tests/unit/entities/Employee.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "3.3",
+      "3.10"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "3.14",
+    "chapter": 3,
+    "title": "Add i18n keys for skill categories, proficiency labels, policy names, need labels (en + fr)",
+    "files": [
+      "src/core/i18n/locales/en.json",
+      "src/core/i18n/locales/fr.json"
+    ],
+    "testFile": "tests/unit/i18n/i18n.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "3.1",
+      "3.10",
+      "3.12"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "3.15",
+    "chapter": 3,
+    "title": "Wire hire, assign_skill, set_policy console commands",
+    "files": [
+      "src/console/commands/entities.ts"
+    ],
+    "testFile": null,
+    "status": "pending",
+    "blockedBy": [
+      "3.4",
+      "3.5",
+      "3.12",
+      "3.14"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "4.1",
+    "chapter": 4,
+    "title": "Add SurveyMethod, SurveyResult interfaces",
+    "files": [
+      "src/core/mining/SurveyCalc.ts"
+    ],
+    "testFile": "tests/unit/mining/SurveyCalc.test.ts",
+    "status": "pending",
+    "blockedBy": [],
+    "closedInPR": null
+  },
+  {
+    "id": "4.2",
+    "chapter": 4,
+    "title": "Implement estimateSurveyResult() \u2014 noise + skill scaling",
+    "files": [
+      "src/core/mining/SurveyCalc.ts"
+    ],
+    "testFile": "tests/unit/mining/SurveyCalc.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "4.1"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "4.3",
+    "chapter": 4,
+    "title": "Implement isSurveyStale() \u2014 returns true after 100 ticks",
+    "files": [
+      "src/core/mining/SurveyCalc.ts"
+    ],
+    "testFile": "tests/unit/mining/SurveyCalc.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "4.1"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "4.4",
+    "chapter": 4,
+    "title": "Add surveyResults and nextSurveyId to GameState",
+    "files": [
+      "src/core/GameState.ts"
+    ],
+    "testFile": "tests/unit/GameState.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "4.1"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "4.5",
+    "chapter": 4,
+    "title": "Add survey cost constants to balance.ts",
+    "files": [
+      "src/core/config/balance.ts"
+    ],
+    "testFile": null,
+    "status": "pending",
+    "blockedBy": [],
+    "closedInPR": null
+  },
+  {
+    "id": "4.6",
+    "chapter": 4,
+    "title": "Implement runSurvey() \u2014 validates surveyor, deducts cost, enqueues task",
+    "files": [
+      "src/core/mining/SurveyCalc.ts"
+    ],
+    "testFile": "tests/unit/mining/SurveyCalc.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "4.2",
+      "4.4",
+      "4.5"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "4.7",
+    "chapter": 4,
+    "title": "Implement computeBlastOreReport() \u2014 yields from destroyed voxels",
+    "files": [
+      "src/core/mining/SurveyCalc.ts"
+    ],
+    "testFile": "tests/unit/mining/SurveyCalc.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "4.1"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "4.8",
+    "chapter": 4,
+    "title": "Wire ore report events to event system (Lucky Strike, Barren Blast, Legendary Vein, Absurdium Jackpot)",
+    "files": [
+      "src/core/events/EventEngine.ts"
+    ],
+    "testFile": "tests/unit/events/EventEngine.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "4.7"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "4.9",
+    "chapter": 4,
+    "title": "Add i18n keys for survey methods and events (en + fr)",
+    "files": [
+      "src/core/i18n/locales/en.json",
+      "src/core/i18n/locales/fr.json"
+    ],
+    "testFile": "tests/unit/i18n/i18n.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "4.1"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "4.10",
+    "chapter": 4,
+    "title": "Add survey console command (e.g. survey seismic x:10 z:10)",
+    "files": [
+      "src/console/commands/mining.ts"
+    ],
+    "testFile": null,
+    "status": "pending",
+    "blockedBy": [
+      "4.6",
+      "4.9"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "4.11",
+    "chapter": 4,
+    "title": "Render survey confidence overlay in TerrainMesh.ts",
+    "files": [
+      "src/renderer/TerrainMesh.ts"
+    ],
+    "testFile": null,
+    "status": "pending",
+    "blockedBy": [
+      "4.4"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "5.0",
+    "chapter": 5,
+    "title": "Prerequisite: change VoxelCell.rockId to VoxelCell.composition; update TerrainGen with Simplex noise coefficients; update all callers",
+    "files": [
+      "src/core/voxels/VoxelGrid.ts",
+      "src/core/terrain/TerrainGen.ts"
+    ],
+    "testFile": "tests/unit/voxels/VoxelGrid.test.ts",
+    "status": "pending",
+    "blockedBy": [],
+    "closedInPR": null
+  },
+  {
+    "id": "5.1",
+    "chapter": 5,
+    "title": "Assert voxel cell size = 1 m and document it",
+    "files": [
+      "src/core/voxels/VoxelGrid.ts"
+    ],
+    "testFile": "tests/unit/voxels/VoxelGrid.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "5.0"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "5.2",
+    "chapter": 5,
+    "title": "Add energyAbsorption and density constants to each RockDef in RockCatalog",
+    "files": [
+      "src/core/config/RockCatalog.ts"
+    ],
+    "testFile": "tests/unit/config/RockCatalog.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "5.0"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "5.3",
+    "chapter": 5,
+    "title": "Implement computeThreshold(voxel) \u2014 weighted sum of rock coefficients x absorption",
+    "files": [
+      "src/core/mining/BlastCalc.ts"
+    ],
+    "testFile": "tests/unit/mining/BlastCalc.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "5.2"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "5.4",
+    "chapter": 5,
+    "title": "Implement computeInitialEnergy(hole) \u2014 explosiveDef x kg x stemming efficiency",
+    "files": [
+      "src/core/mining/BlastCalc.ts"
+    ],
+    "testFile": "tests/unit/mining/BlastCalc.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "5.2"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "5.5",
+    "chapter": 5,
+    "title": "Implement propagateEnergy(grid, initial) \u2014 iterative overflow loop tracking generatedOverflow per voxel",
+    "files": [
+      "src/core/mining/BlastCalc.ts"
+    ],
+    "testFile": "tests/unit/mining/BlastCalc.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "5.3",
+      "5.4"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "5.6",
+    "chapter": 5,
+    "title": "Implement identifyFragmentedVoxels(grid) \u2014 fragmentation criterion + island flood-fill",
+    "files": [
+      "src/core/mining/BlastCalc.ts"
+    ],
+    "testFile": "tests/unit/mining/BlastCalc.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "5.5"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "5.7",
+    "chapter": 5,
+    "title": "Implement entity damage from blast \u2014 employee/vehicle instant kill, building sum + survival roll",
+    "files": [
+      "src/core/mining/BlastCalc.ts"
+    ],
+    "testFile": "tests/unit/mining/BlastCalc.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "5.6"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "5.8",
+    "chapter": 5,
+    "title": "Implement computeFragmentationScore(voxel) and Voronoi seed sampling",
+    "files": [
+      "src/physics/VoronoiFrag.ts"
+    ],
+    "testFile": "tests/unit/physics/VoronoiFrag.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "5.6"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "5.9",
+    "chapter": 5,
+    "title": "Implement Bowyer-Watson Delaunay tetrahedralization; compute dual Voronoi cells; clip to fragmented voxel union; respect MAX_VORONOI_POINTS cap",
+    "files": [
+      "src/physics/VoronoiFrag.ts"
+    ],
+    "testFile": "tests/unit/physics/VoronoiFrag.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "5.8"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "5.10",
+    "chapter": 5,
+    "title": "Implement Voronoi merging pass (MERGE_PROBABILITY ~0.35)",
+    "files": [
+      "src/physics/VoronoiFrag.ts"
+    ],
+    "testFile": "tests/unit/physics/VoronoiFrag.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "5.9"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "5.11",
+    "chapter": 5,
+    "title": "Generate RockFragment objects: graphic mesh, deflated collision mesh, overflowEnergy from source voxels",
+    "files": [
+      "src/physics/FragmentSim.ts"
+    ],
+    "testFile": "tests/unit/physics/FragmentSim.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "5.10"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "5.12",
+    "chapter": 5,
+    "title": "Implement Step 4 velocity assignment: energy gradient x surface proximity factor; classify simulationTier",
+    "files": [
+      "src/physics/FragmentSim.ts"
+    ],
+    "testFile": "tests/unit/physics/FragmentSim.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "5.11"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "5.13",
+    "chapter": 5,
+    "title": "Implement Tier A (projected) cannon-es loop \u2014 full rigid body, PHYSICS_FRAGMENT_CAP, parabolic fallback, stick-on-land",
+    "files": [
+      "src/physics/FragmentSim.ts"
+    ],
+    "testFile": "tests/unit/physics/FragmentSim.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "5.12"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "5.14",
+    "chapter": 5,
+    "title": "Implement Tier B (collapse) gravity-drop \u2014 straight-down, column stack, immediate static",
+    "files": [
+      "src/physics/FragmentSim.ts"
+    ],
+    "testFile": "tests/unit/physics/FragmentSim.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "5.12"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "5.15",
+    "chapter": 5,
+    "title": "Implement aggressive sleep: stationary for SLEEP_TICKS_REQUIRED ticks converts fragment to static",
+    "files": [
+      "src/physics/FragmentSim.ts"
+    ],
+    "testFile": "tests/unit/physics/FragmentSim.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "5.13"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "5.16",
+    "chapter": 5,
+    "title": "Implement fragment support graph and stack-collapse on pickup",
+    "files": [
+      "src/physics/FragmentSim.ts"
+    ],
+    "testFile": "tests/unit/physics/FragmentSim.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "5.13",
+      "5.14"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "5.17",
+    "chapter": 5,
+    "title": "Implement fragment size check and oversized flag",
+    "files": [
+      "src/core/mining/BlastCalc.ts"
+    ],
+    "testFile": "tests/unit/mining/BlastCalc.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "5.11"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "5.18",
+    "chapter": 5,
+    "title": "Wire ore reporting: collect fragment \u2014 add to GameState.collectedOre",
+    "files": [
+      "src/core/GameState.ts"
+    ],
+    "testFile": "tests/unit/GameState.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "5.17"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "5.19",
+    "chapter": 5,
+    "title": "Trigger NavMesh dirty-region update after fragmentation pass",
+    "files": [
+      "src/core/voxels/NavGrid.ts"
+    ],
+    "testFile": "tests/unit/voxels/NavGrid.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "5.6"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "5.20",
+    "chapter": 5,
+    "title": "Add all blast pipeline balance constants to balance.ts",
+    "files": [
+      "src/core/config/balance.ts"
+    ],
+    "testFile": null,
+    "status": "pending",
+    "blockedBy": [],
+    "closedInPR": null
+  },
+  {
+    "id": "5.21",
+    "chapter": 5,
+    "title": "Add i18n keys for blast damage events and oversized fragment alert (en + fr)",
+    "files": [
+      "src/core/i18n/locales/en.json",
+      "src/core/i18n/locales/fr.json"
+    ],
+    "testFile": "tests/unit/i18n/i18n.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "5.7"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "5.22",
+    "chapter": 5,
+    "title": "Add blast_preview console command \u2014 prints energy map, predicted fragment count, and projected/collapse split",
+    "files": [
+      "src/console/commands/mining.ts"
+    ],
+    "testFile": null,
+    "status": "pending",
+    "blockedBy": [
+      "5.5"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "6.1",
+    "chapter": 6,
+    "title": "Define NavCell, NavCellType, NavGrid interfaces",
+    "files": [
+      "src/core/nav/NavGrid.ts"
+    ],
+    "testFile": "tests/unit/nav/NavGrid.test.ts",
+    "status": "pending",
+    "blockedBy": [],
+    "closedInPR": null
+  },
+  {
+    "id": "6.2",
+    "chapter": 6,
+    "title": "Implement buildNavGrid() \u2014 derives NavGrid from VoxelGrid + buildings + holes",
+    "files": [
+      "src/core/nav/NavGrid.ts"
+    ],
+    "testFile": "tests/unit/nav/NavGrid.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "6.1"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "6.3",
+    "chapter": 6,
+    "title": "Implement patchNavGrid() \u2014 incremental update for a bounding box",
+    "files": [
+      "src/core/nav/NavGrid.ts"
+    ],
+    "testFile": "tests/unit/nav/NavGrid.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "6.2"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "6.4",
+    "chapter": 6,
+    "title": "Implement A* findPath() with 8-directional movement and octile heuristic",
+    "files": [
+      "src/core/nav/Pathfinding.ts"
+    ],
+    "testFile": "tests/unit/nav/Pathfinding.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "6.1"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "6.5",
+    "chapter": 6,
+    "title": "Implement node budget cap and direct-line fallback",
+    "files": [
+      "src/core/nav/Pathfinding.ts"
+    ],
+    "testFile": "tests/unit/nav/Pathfinding.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "6.4"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "6.6",
+    "chapter": 6,
+    "title": "Implement multi-level routing via ramp lookup",
+    "files": [
+      "src/core/nav/Pathfinding.ts"
+    ],
+    "testFile": "tests/unit/nav/Pathfinding.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "6.4"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "6.7",
+    "chapter": 6,
+    "title": "Implement advanceAgent() \u2014 move agent 1 step along waypoints per tick",
+    "files": [
+      "src/core/nav/AgentMovement.ts"
+    ],
+    "testFile": "tests/unit/nav/AgentMovement.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "6.4"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "6.8",
+    "chapter": 6,
+    "title": "Implement stale-path detection and re-request on obstacle change",
+    "files": [
+      "src/core/nav/AgentMovement.ts"
+    ],
+    "testFile": "tests/unit/nav/AgentMovement.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "6.7"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "6.9",
+    "chapter": 6,
+    "title": "Implement stuck state and agent_stuck event",
+    "files": [
+      "src/core/nav/AgentMovement.ts"
+    ],
+    "testFile": "tests/unit/nav/AgentMovement.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "6.8"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "6.10",
+    "chapter": 6,
+    "title": "Integrate NavGrid build into GameState initialization",
+    "files": [
+      "src/core/state/GameState.ts"
+    ],
+    "testFile": "tests/unit/state/GameState.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "6.2"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "6.11",
+    "chapter": 6,
+    "title": "Wire NavGrid patch calls into blast pipeline and building placement",
+    "files": [
+      "src/core/engine/GameLoop.ts"
+    ],
+    "testFile": "tests/unit/engine/GameLoop.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "6.3"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "6.12",
+    "chapter": 6,
+    "title": "Add i18n keys for pathfinding events (agent_stuck, no_ramp_available)",
+    "files": [
+      "src/core/i18n/locales/en.json",
+      "src/core/i18n/locales/fr.json"
+    ],
+    "testFile": "tests/unit/i18n/i18n.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "6.9"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "7.1",
+    "chapter": 7,
+    "title": "Add hunger, fatigue, breakNeed, collapsing fields to Employee interface",
+    "files": [
+      "src/core/entities/Employee.ts"
+    ],
+    "testFile": "tests/unit/entities/Employee.test.ts",
+    "status": "pending",
+    "blockedBy": [],
+    "closedInPR": null
+  },
+  {
+    "id": "7.2",
+    "chapter": 7,
+    "title": "Add NEED_DRAIN_RATES, NEED_WARNING_THRESHOLDS, NEED_COLLAPSE_THRESHOLDS to balance.ts",
+    "files": [
+      "src/core/config/balance.ts"
+    ],
+    "testFile": null,
+    "status": "pending",
+    "blockedBy": [],
+    "closedInPR": null
+  },
+  {
+    "id": "7.3",
+    "chapter": 7,
+    "title": "Implement tickNeedGauges() \u2014 drain gauges based on task state + morale modifier",
+    "files": [
+      "src/core/entities/Employee.ts"
+    ],
+    "testFile": "tests/unit/entities/Employee.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "7.1",
+      "7.2"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "7.4",
+    "chapter": 7,
+    "title": "Implement needsMoraleEffect() \u2014 compute tick-level morale delta from all gauges",
+    "files": [
+      "src/core/entities/Employee.ts"
+    ],
+    "testFile": "tests/unit/entities/Employee.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "7.1"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "7.5",
+    "chapter": 7,
+    "title": "Implement replenishNeed() \u2014 fill gauge at building tier rate, enforce capacity",
+    "files": [
+      "src/core/entities/Employee.ts"
+    ],
+    "testFile": "tests/unit/entities/Employee.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "7.1"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "7.6",
+    "chapter": 7,
+    "title": "Implement checkCollapse() \u2014 interrupt task queue, prepend rest task",
+    "files": [
+      "src/core/entities/Employee.ts"
+    ],
+    "testFile": "tests/unit/entities/Employee.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "7.1",
+      "7.3"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "7.7",
+    "chapter": 7,
+    "title": "Implement autoInsertNeedTasks() \u2014 proactive queue insertion at warning thresholds",
+    "files": [
+      "src/core/entities/Employee.ts"
+    ],
+    "testFile": "tests/unit/entities/Employee.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "7.6"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "7.8",
+    "chapter": 7,
+    "title": "Deduct per-visit food/break costs from cash balance",
+    "files": [
+      "src/core/engine/GameLoop.ts"
+    ],
+    "testFile": "tests/unit/engine/GameLoop.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "7.5"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "7.9",
+    "chapter": 7,
+    "title": "Implement shift cycle for Bunkhouse Tier 2+",
+    "files": [
+      "src/core/engine/GameLoop.ts"
+    ],
+    "testFile": "tests/unit/engine/GameLoop.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "7.6"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "7.10",
+    "chapter": 7,
+    "title": "Wire all need events into event system (need_warning, employee_collapsed, employee_shift_change)",
+    "files": [
+      "src/core/events/EventSystem.ts"
+    ],
+    "testFile": "tests/unit/events/EventSystem.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "7.6",
+      "7.7"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "7.11",
+    "chapter": 7,
+    "title": "Add i18n keys for all need events and building-full message (en + fr)",
+    "files": [
+      "src/core/i18n/locales/en.json",
+      "src/core/i18n/locales/fr.json"
+    ],
+    "testFile": "tests/unit/i18n/i18n.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "7.1"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "7.12",
+    "chapter": 7,
+    "title": "Add needs console command \u2014 print all employees gauge values",
+    "files": [
+      "src/console/commands/entities.ts"
+    ],
+    "testFile": null,
+    "status": "pending",
+    "blockedBy": [
+      "7.3"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "8.1",
+    "chapter": 8,
+    "title": "Add coverage reporter to vitest.config.ts (v8 provider, per-file thresholds)",
+    "files": [
+      "vitest.config.ts"
+    ],
+    "testFile": null,
+    "status": "pending",
+    "blockedBy": [],
+    "closedInPR": null
+  },
+  {
+    "id": "8.2",
+    "chapter": 8,
+    "title": "Create tests/integration/ and tests/integration/full-level/ directories; add both to test runner config",
+    "files": [
+      "vitest.config.ts",
+      "package.json"
+    ],
+    "testFile": null,
+    "status": "pending",
+    "blockedBy": [
+      "8.1"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "8.3",
+    "chapter": 8,
+    "title": "Add 10 small integration test suites (>=8 scenarios each)",
+    "files": [
+      "tests/integration/buildings.integration.test.ts",
+      "tests/integration/vehicles.integration.test.ts",
+      "tests/integration/skills.integration.test.ts",
+      "tests/integration/survey.integration.test.ts",
+      "tests/integration/blast-enhanced.integration.test.ts",
+      "tests/integration/navmesh.integration.test.ts",
+      "tests/integration/needs.integration.test.ts",
+      "tests/integration/economy.integration.test.ts",
+      "tests/integration/events.integration.test.ts",
+      "tests/integration/campaign.integration.test.ts"
+    ],
+    "testFile": null,
+    "status": "pending",
+    "blockedBy": [
+      "8.2"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "8.4",
+    "chapter": 8,
+    "title": "Add 10 full-level integration tests (level 1-3 win/loss scenarios)",
+    "files": [
+      "tests/integration/full-level/level1-win.integration.test.ts",
+      "tests/integration/full-level/level1-lose-bankruptcy.integration.test.ts",
+      "tests/integration/full-level/level1-lose-revolt.integration.test.ts",
+      "tests/integration/full-level/level1-lose-ecology.integration.test.ts",
+      "tests/integration/full-level/level1-lose-arrest.integration.test.ts",
+      "tests/integration/full-level/level2-win.integration.test.ts",
+      "tests/integration/full-level/level2-lose-bankruptcy.integration.test.ts",
+      "tests/integration/full-level/level2-lose-revolt.integration.test.ts",
+      "tests/integration/full-level/level3-win.integration.test.ts",
+      "tests/integration/full-level/level3-lose-ecology.integration.test.ts"
+    ],
+    "testFile": null,
+    "status": "pending",
+    "blockedBy": [
+      "8.2"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "8.5",
+    "chapter": 8,
+    "title": "Add 15 feature scenario JSON files",
+    "files": [
+      "scripts/scenario-defs/survey-then-blast.json",
+      "scripts/scenario-defs/skill-progression.json",
+      "scripts/scenario-defs/multi-deck-blast.json",
+      "scripts/scenario-defs/presplit-wall.json",
+      "scripts/scenario-defs/needs-cycle.json",
+      "scripts/scenario-defs/ramp-navigation.json",
+      "scripts/scenario-defs/vibration-budget.json",
+      "scripts/scenario-defs/building-lifecycle.json",
+      "scripts/scenario-defs/vehicle-traffic.json",
+      "scripts/scenario-defs/employee-training.json",
+      "scripts/scenario-defs/blast-undercharge.json",
+      "scripts/scenario-defs/blast-overcharge.json",
+      "scripts/scenario-defs/collapse-recovery.json",
+      "scripts/scenario-defs/contract-negotiation.json",
+      "scripts/scenario-defs/weather-flood.json"
+    ],
+    "testFile": null,
+    "status": "pending",
+    "blockedBy": [],
+    "closedInPR": null
+  },
+  {
+    "id": "8.6",
+    "chapter": 8,
+    "title": "Add 6 full-level playthrough scenario JSON files",
+    "files": [
+      "scripts/scenario-defs/level1-playthrough-win.json",
+      "scripts/scenario-defs/level1-playthrough-revolt.json",
+      "scripts/scenario-defs/level2-playthrough-win.json",
+      "scripts/scenario-defs/level2-playthrough-bankruptcy.json",
+      "scripts/scenario-defs/level3-playthrough-win.json",
+      "scripts/scenario-defs/level3-playthrough-ecology.json"
+    ],
+    "testFile": null,
+    "status": "pending",
+    "blockedBy": [],
+    "closedInPR": null
+  },
+  {
+    "id": "8.7",
+    "chapter": 8,
+    "title": "Add performance benchmark suite",
+    "files": [
+      "tests/unit/benchmarks/benchmarks.test.ts"
+    ],
+    "testFile": "tests/unit/benchmarks/benchmarks.test.ts",
+    "status": "pending",
+    "blockedBy": [
+      "8.2"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "8.8",
+    "chapter": 8,
+    "title": "Add npm run test:integration and npm run test:scenarios scripts to package.json",
+    "files": [
+      "package.json"
+    ],
+    "testFile": null,
+    "status": "pending",
+    "blockedBy": [
+      "8.2"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "8.9",
+    "chapter": 8,
+    "title": "Update npm run validate to include integration tests and coverage gate",
+    "files": [
+      "package.json"
+    ],
+    "testFile": null,
+    "status": "pending",
+    "blockedBy": [
+      "8.8",
+      "8.1"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "8.10",
+    "chapter": 8,
+    "title": "Document test conventions and all script commands in README.md under a Testing section",
+    "files": [
+      "README.md"
+    ],
+    "testFile": null,
+    "status": "pending",
+    "blockedBy": [
+      "8.3",
+      "8.4"
+    ],
+    "closedInPR": null
+  },
+  {
+    "id": "8.11",
+    "chapter": 8,
+    "title": "Run all six level playthrough scenarios after final renderer integration; inspect screenshots per visual protocol",
+    "files": [],
+    "testFile": null,
+    "status": "pending",
+    "blockedBy": [
+      "8.5",
+      "8.6"
+    ],
+    "closedInPR": null
+  }
+]
