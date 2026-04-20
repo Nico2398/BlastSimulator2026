@@ -16,8 +16,8 @@ import {
   purchaseVehicle,
   assignVehicle,
   moveVehicle,
-  getAllVehicleTypes,
-  type VehicleType,
+  getAllVehicleRoles,
+  type VehicleRole,
   type VehicleTask,
 } from '../../core/entities/Vehicle.js';
 import {
@@ -161,9 +161,9 @@ export function vehicleCommand(
       return { success: true, output: lines.join('\n') };
     }
     case 'buy': {
-      const type = (args[1] ?? '') as VehicleType;
-      if (!getAllVehicleTypes().includes(type)) {
-        return { success: false, output: `Usage: vehicle buy (${getAllVehicleTypes().join('|')})` };
+      const type = (args[1] ?? '') as VehicleRole;
+      if (!getAllVehicleRoles().includes(type)) {
+        return { success: false, output: `Usage: vehicle buy (${getAllVehicleRoles().join('|')})` };
       }
       // Spawn near grid centre so vehicles are visible from default camera
       const spawnX = state.world ? state.world.sizeX / 2 : 32;
