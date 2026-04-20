@@ -4,7 +4,7 @@
 import { t } from '../core/i18n/I18n.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { Vehicle } from '../core/entities/Vehicle.js';
-import { getAllVehicleTypes, getVehicleDef } from '../core/entities/Vehicle.js';
+import { getAllVehicleRoles, getVehicleDef } from '../core/entities/Vehicle.js';
 
 import type { CommandResult } from '../console/ConsoleRunner.js';
 
@@ -104,7 +104,7 @@ export class VehiclePanel {
   }
 
   private buildBuySection(): void {
-    for (const type of getAllVehicleTypes()) {
+    for (const type of getAllVehicleRoles()) {
       const def = getVehicleDef(type);
       const row = document.createElement('div');
       row.style.cssText = 'display:flex;align-items:center;gap:6px;margin-bottom:4px';

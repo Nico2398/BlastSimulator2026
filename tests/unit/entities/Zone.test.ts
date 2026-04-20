@@ -24,7 +24,7 @@ const zone: ZoneBounds = { x1: 10, z1: 10, x2: 30, z2: 30 };
 describe('Zone clearing and evacuation', () => {
   it('clearZone moves all entities out of the defined area', () => {
     const vehicles = createVehicleState();
-    const { vehicle } = purchaseVehicle(vehicles, 'truck', 15, 15);
+    const { vehicle } = purchaseVehicle(vehicles, 'debris_hauler', 15, 15);
     const employees = createEmployeeState();
     addEmployee(employees, 20, 20);
     addEmployee(employees, 5, 5); // Outside zone
@@ -38,7 +38,7 @@ describe('Zone clearing and evacuation', () => {
 
   it('isZoneClear returns true when no entities remain', () => {
     const vehicles = createVehicleState();
-    purchaseVehicle(vehicles, 'truck', 15, 15);
+    purchaseVehicle(vehicles, 'debris_hauler', 15, 15);
     const employees = createEmployeeState();
     addEmployee(employees, 20, 20);
 

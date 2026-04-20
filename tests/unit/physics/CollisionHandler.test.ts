@@ -168,8 +168,8 @@ describe('CollisionHandler (8.4)', () => {
     const employees = createEmployeeState();
     const damage = createDamageState();
 
-    // truck at (10, 10), maxHp=100
-    purchaseVehicle(vehicles, 'truck', 10, 10);
+    // debris_hauler at (10, 10), maxHp=100
+    purchaseVehicle(vehicles, 'debris_hauler', 10, 10);
 
     // mass=200kg, speed=30 m/s → KE=90000J, dmg=round(90000/40)=2250 >> 100hp
     const results = [makeResult(1, 10, 10, 30)];

@@ -13,25 +13,25 @@ describe('VehicleMesh', () => {
   it('addVehicle adds group to scene', () => {
     const scene = new THREE.Scene();
     const vm = new VehicleMesh(scene);
-    vm.addVehicle(makeVehicle(1, 'truck'));
+    vm.addVehicle(makeVehicle(1, 'debris_hauler'));
     expect(scene.children.length).toBe(1);
     expect(vm.count).toBe(1);
     vm.dispose();
   });
 
-  it('all vehicle types can be added', () => {
+  it('all vehicle roles can be added', () => {
     const scene = new THREE.Scene();
     const vm = new VehicleMesh(scene);
-    const types: Vehicle['type'][] = ['truck', 'excavator', 'drill_rig', 'bulldozer'];
+    const types: Vehicle['type'][] = ['debris_hauler', 'rock_digger', 'drill_rig', 'building_destroyer', 'rock_fragmenter'];
     types.forEach((t, i) => vm.addVehicle(makeVehicle(i, t, i * 5, 0)));
-    expect(vm.count).toBe(4);
+    expect(vm.count).toBe(5);
     vm.dispose();
   });
 
   it('vehicles have multiple children (composed shapes)', () => {
     const scene = new THREE.Scene();
     const vm = new VehicleMesh(scene);
-    const types: Vehicle['type'][] = ['truck', 'excavator', 'drill_rig', 'bulldozer'];
+    const types: Vehicle['type'][] = ['debris_hauler', 'rock_digger', 'drill_rig', 'building_destroyer', 'rock_fragmenter'];
     for (const type of types) {
       vm.addVehicle(makeVehicle(0, type));
       const group = scene.children[0] as THREE.Group;
@@ -44,7 +44,7 @@ describe('VehicleMesh', () => {
   it('update lerps vehicle toward new position', () => {
     const scene = new THREE.Scene();
     const vm = new VehicleMesh(scene);
-    const v = makeVehicle(1, 'truck', 0, 0);
+    const v = makeVehicle(1, 'debris_hauler', 0, 0);
     vm.addVehicle(v);
 
     // Move vehicle target far away
@@ -64,7 +64,7 @@ describe('VehicleMesh', () => {
   it('snapPosition moves vehicle immediately', () => {
     const scene = new THREE.Scene();
     const vm = new VehicleMesh(scene);
-    vm.addVehicle(makeVehicle(1, 'bulldozer', 0, 0));
+    vm.addVehicle(makeVehicle(1, 'building_destroyer', 0, 0));
     vm.snapPosition(1, 50, 75);
     const group = scene.children[0] as THREE.Group;
     expect(group.position.x).toBeCloseTo(50);
@@ -75,8 +75,8 @@ describe('VehicleMesh', () => {
   it('removeVehicle removes specific mesh', () => {
     const scene = new THREE.Scene();
     const vm = new VehicleMesh(scene);
-    vm.addVehicle(makeVehicle(1, 'truck'));
-    vm.addVehicle(makeVehicle(2, 'excavator'));
+    vm.addVehicle(makeVehicle(1, 'debris_hauler'));
+    vm.addVehicle(makeVehicle(2, 'rock_digger'));
     vm.removeVehicle(1);
     expect(scene.children.length).toBe(1);
     expect(vm.count).toBe(1);
@@ -86,7 +86,7 @@ describe('VehicleMesh', () => {
   it('clearAll removes all vehicles', () => {
     const scene = new THREE.Scene();
     const vm = new VehicleMesh(scene);
-    vm.addVehicle(makeVehicle(1, 'truck'));
+    vm.addVehicle(makeVehicle(1, 'debris_hauler'));
     vm.addVehicle(makeVehicle(2, 'drill_rig'));
     vm.clearAll();
     expect(scene.children.length).toBe(0);

@@ -2,15 +2,16 @@
 // Placeholder shapes for mine vehicles — recognizable silhouettes, cartoon yellow.
 //
 // Shapes:
-//   truck      → yellow box body + 4 wheel cylinders
-//   excavator  → yellow box body + arm (cylinder) + bucket (small box)
-//   drill_rig  → tall grey cylinder with yellow top
-//   bulldozer  → low yellow box + front blade (flat box)
+//   debris_hauler     → yellow box body + 4 wheel cylinders
+//   rock_digger       → yellow box body + arm (cylinder) + bucket (small box)
+//   drill_rig         → tall grey cylinder with yellow top
+//   building_destroyer → low yellow box + front blade (flat box)
+//   rock_fragmenter   → yellow box body + crusher head
 //
 // Vehicles move smoothly to their target position via lerp each frame.
 
 import * as THREE from 'three';
-import type { Vehicle, VehicleType } from '../core/entities/Vehicle.js';
+import type { Vehicle, VehicleRole } from '../core/entities/Vehicle.js';
 
 // ---------- Colors ----------
 const YELLOW = 0xf5c518;   // Caterpillar yellow
@@ -22,8 +23,8 @@ const ORANGE = 0xff7700;    // Accent / active highlight
 
 type GroupBuilder = () => THREE.Group;
 
-const VEHICLE_BUILDERS: Record<VehicleType, GroupBuilder> = {
-  truck: () => {
+const VEHICLE_BUILDERS: Record<VehicleRole, GroupBuilder> = {
+  debris_hauler: () => {
     const g = new THREE.Group();
     // Body
     const body = boxMesh(2.5, 1.2, 1.4, YELLOW);
@@ -43,7 +44,7 @@ const VEHICLE_BUILDERS: Record<VehicleType, GroupBuilder> = {
     return g;
   },
 
-  excavator: () => {
+  rock_digger: () => {
     const g = new THREE.Group();
     // Tracks (flat boxes)
     for (const wz of [0.7, -0.7] as const) {
@@ -91,7 +92,7 @@ const VEHICLE_BUILDERS: Record<VehicleType, GroupBuilder> = {
     return g;
   },
 
-  bulldozer: () => {
+  building_destroyer: () => {
     const g = new THREE.Group();
     // Tracks
     for (const wz of [0.6, -0.6] as const) {
@@ -111,6 +112,25 @@ const VEHICLE_BUILDERS: Record<VehicleType, GroupBuilder> = {
     const blade = boxMesh(0.15, 0.9, 1.6, STEEL);
     blade.position.set(0.95, 0.65, 0);
     g.add(blade);
+    return g;
+  },
+
+  rock_fragmenter: () => {
+    const g = new THREE.Group();
+    // Tracks
+    for (const wz of [0.6, -0.6] as const) {
+      const track = boxMesh(2.2, 0.35, 0.35, DARK_GREY);
+      track.position.set(0, 0.175, wz);
+      g.add(track);
+    }
+    // Body
+    const body = boxMesh(1.5, 0.85, 1.0, YELLOW);
+    body.position.set(0, 0.7, 0);
+    g.add(body);
+    // Crusher head
+    const crusher = boxMesh(0.5, 0.7, 1.4, STEEL);
+    crusher.position.set(0.9, 0.6, 0);
+    g.add(crusher);
     return g;
   },
 };
