@@ -24,7 +24,7 @@ export type VehicleOperationalState = 'idle' | 'moving' | 'working' | 'waiting' 
 
 // ── VehicleTask ──
 
-/** Granular task label assigned to a vehicle (legacy; see VehicleOperationalState for broader states). */
+/** Granular task label used by vehicle assignment and cost logic. */
 export type VehicleTask = 'idle' | 'moving' | 'transport' | 'loading' | 'drilling' | 'clearing';
 
 export interface VehicleDef {
