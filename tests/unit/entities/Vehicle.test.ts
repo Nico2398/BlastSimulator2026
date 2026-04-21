@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   type VehicleRole,
+  type VehicleTier,
+  type VehicleOperationalState,
   createVehicleState,
   purchaseVehicle,
   assignVehicle,
@@ -259,5 +261,159 @@ describe('getExcavatorLoadingRate', () => {
     const vehicle = state.vehicles[0]!;
 
     expect(getExcavatorLoadingRate(vehicle)).toBe(0);
+  });
+});
+
+// ── VehicleTier type ──────────────────────────────────────────────────────────
+
+describe('VehicleTier', () => {
+  it('tier value 1 is a valid VehicleTier (compile-time satisfies check)', () => {
+    const tier = (1 satisfies VehicleTier);
+    expect(tier).toBe(1);
+  });
+
+  it('tier value 2 is a valid VehicleTier (compile-time satisfies check)', () => {
+    const tier = (2 satisfies VehicleTier);
+    expect(tier).toBe(2);
+  });
+
+  it('tier value 3 is a valid VehicleTier (compile-time satisfies check)', () => {
+    const tier = (3 satisfies VehicleTier);
+    expect(tier).toBe(3);
+  });
+});
+
+// ── VehicleOperationalState type ──────────────────────────────────────────────
+
+describe('VehicleOperationalState', () => {
+  it('"idle" is a valid VehicleOperationalState (compile-time satisfies check)', () => {
+    const state = ('idle' satisfies VehicleOperationalState);
+    expect(state).toBe('idle');
+  });
+
+  it('"moving" is a valid VehicleOperationalState (compile-time satisfies check)', () => {
+    const state = ('moving' satisfies VehicleOperationalState);
+    expect(state).toBe('moving');
+  });
+
+  it('"working" is a valid VehicleOperationalState (compile-time satisfies check)', () => {
+    const state = ('working' satisfies VehicleOperationalState);
+    expect(state).toBe('working');
+  });
+
+  it('"waiting" is a valid VehicleOperationalState (compile-time satisfies check)', () => {
+    const state = ('waiting' satisfies VehicleOperationalState);
+    expect(state).toBe('waiting');
+  });
+
+  it('"broken" is a valid VehicleOperationalState (compile-time satisfies check)', () => {
+    const state = ('broken' satisfies VehicleOperationalState);
+    expect(state).toBe('broken');
+  });
+});
+
+// ── VehicleDef.tier ───────────────────────────────────────────────────────────
+
+describe('VehicleDef.tier', () => {
+  it('debris_hauler def has a tier field that is 1, 2, or 3', () => {
+    const { tier } = getVehicleDef('debris_hauler');
+    expect([1, 2, 3]).toContain(tier);
+  });
+
+  it('rock_digger def has a tier field that is 1, 2, or 3', () => {
+    const { tier } = getVehicleDef('rock_digger');
+    expect([1, 2, 3]).toContain(tier);
+  });
+
+  it('drill_rig def has a tier field that is 1, 2, or 3', () => {
+    const { tier } = getVehicleDef('drill_rig');
+    expect([1, 2, 3]).toContain(tier);
+  });
+
+  it('building_destroyer def has a tier field that is 1, 2, or 3', () => {
+    const { tier } = getVehicleDef('building_destroyer');
+    expect([1, 2, 3]).toContain(tier);
+  });
+
+  it('rock_fragmenter def has a tier field that is 1, 2, or 3', () => {
+    const { tier } = getVehicleDef('rock_fragmenter');
+    expect([1, 2, 3]).toContain(tier);
+  });
+
+  it('every role def has a tier field satisfying VehicleTier', () => {
+    const roles: VehicleRole[] = getAllVehicleRoles();
+    for (const role of roles) {
+      const tier: VehicleTier = getVehicleDef(role).tier;
+      expect([1, 2, 3]).toContain(tier);
+    }
+  });
+});
+
+// ── VehicleDef.nameKey ────────────────────────────────────────────────────────
+
+describe('VehicleDef.nameKey', () => {
+  it('debris_hauler def has a non-empty nameKey string', () => {
+    expect(getVehicleDef('debris_hauler').nameKey).toBeTypeOf('string');
+    expect(getVehicleDef('debris_hauler').nameKey.length).toBeGreaterThan(0);
+  });
+
+  it('rock_digger def has a non-empty nameKey string', () => {
+    expect(getVehicleDef('rock_digger').nameKey).toBeTypeOf('string');
+    expect(getVehicleDef('rock_digger').nameKey.length).toBeGreaterThan(0);
+  });
+
+  it('drill_rig def has a non-empty nameKey string', () => {
+    expect(getVehicleDef('drill_rig').nameKey).toBeTypeOf('string');
+    expect(getVehicleDef('drill_rig').nameKey.length).toBeGreaterThan(0);
+  });
+
+  it('building_destroyer def has a non-empty nameKey string', () => {
+    expect(getVehicleDef('building_destroyer').nameKey).toBeTypeOf('string');
+    expect(getVehicleDef('building_destroyer').nameKey.length).toBeGreaterThan(0);
+  });
+
+  it('rock_fragmenter def has a non-empty nameKey string', () => {
+    expect(getVehicleDef('rock_fragmenter').nameKey).toBeTypeOf('string');
+    expect(getVehicleDef('rock_fragmenter').nameKey.length).toBeGreaterThan(0);
+  });
+
+  it('every role def nameKey starts with "vehicle."', () => {
+    const roles: VehicleRole[] = getAllVehicleRoles();
+    for (const role of roles) {
+      expect(getVehicleDef(role).nameKey).toMatch(/^vehicle\./);
+    }
+  });
+});
+
+// ── VehicleDef.workRate ───────────────────────────────────────────────────────
+
+describe('VehicleDef.workRate', () => {
+  it('debris_hauler def has a workRate greater than 0', () => {
+    expect(getVehicleDef('debris_hauler').workRate).toBeGreaterThan(0);
+  });
+
+  it('rock_digger def has a workRate greater than 0', () => {
+    expect(getVehicleDef('rock_digger').workRate).toBeGreaterThan(0);
+  });
+
+  it('drill_rig def has a workRate greater than 0', () => {
+    expect(getVehicleDef('drill_rig').workRate).toBeGreaterThan(0);
+  });
+
+  it('building_destroyer def has a workRate greater than 0', () => {
+    expect(getVehicleDef('building_destroyer').workRate).toBeGreaterThan(0);
+  });
+
+  it('rock_fragmenter def has a workRate greater than 0', () => {
+    expect(getVehicleDef('rock_fragmenter').workRate).toBeGreaterThan(0);
+  });
+
+  it('every role def has a workRate that is a finite positive number', () => {
+    const roles: VehicleRole[] = getAllVehicleRoles();
+    for (const role of roles) {
+      const { workRate } = getVehicleDef(role);
+      expect(Number.isFinite(workRate)).toBe(true);
+      expect(workRate).toBeGreaterThan(0);
+    }
   });
 });

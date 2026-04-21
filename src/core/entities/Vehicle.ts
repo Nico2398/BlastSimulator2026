@@ -12,10 +12,29 @@ export type VehicleRole =
   | 'rock_digger'
   | 'rock_fragmenter';
 
+// ── VehicleTier ──
+
+/** Equipment tier: 1 = base, 2 = upgraded, 3 = elite. */
+export type VehicleTier = 1 | 2 | 3;
+
+// ── VehicleOperationalState ──
+
+/** High-level operational state for a vehicle instance. */
+export type VehicleOperationalState = 'idle' | 'moving' | 'working' | 'waiting' | 'broken';
+
+// ── VehicleTask ──
+
+/** Granular task label used by vehicle assignment and cost logic. */
 export type VehicleTask = 'idle' | 'moving' | 'transport' | 'loading' | 'drilling' | 'clearing';
 
 export interface VehicleDef {
   type: VehicleRole;
+  /** Tier level (1 = base, 2 = upgraded, 3 = elite). */
+  tier: VehicleTier;
+  /** Localisation key for the vehicle name. */
+  nameKey: string;
+  /** Work output rate (role-specific units per tick). */
+  workRate: number;
   /** Purchase cost ($). */
   purchaseCost: number;
   /** Maintenance cost per tick ($). */
@@ -33,6 +52,9 @@ export interface VehicleDef {
 const VEHICLE_DEFS: Record<VehicleRole, VehicleDef> = {
   debris_hauler: {
     type: 'debris_hauler',
+    tier: 1,
+    nameKey: 'vehicle.debris_hauler.tier1',
+    workRate: 10,           // kg/tick effective transport throughput
     purchaseCost: 25000, // Real: $1-5M scaled down for game
     maintenanceCostPerTick: 3,
     fuelCostPerTick: 5, // Real: diesel ~$150/hr scaled
@@ -42,6 +64,9 @@ const VEHICLE_DEFS: Record<VehicleRole, VehicleDef> = {
   },
   rock_digger: {
     type: 'rock_digger',
+    tier: 1,
+    nameKey: 'vehicle.rock_digger.tier1',
+    workRate: 8,            // m³/tick excavation rate
     purchaseCost: 50000, // Key bottleneck — expensive
     maintenanceCostPerTick: 5,
     fuelCostPerTick: 8,
@@ -51,6 +76,9 @@ const VEHICLE_DEFS: Record<VehicleRole, VehicleDef> = {
   },
   drill_rig: {
     type: 'drill_rig',
+    tier: 1,
+    nameKey: 'vehicle.drill_rig.tier1',
+    workRate: 5,            // progress units/tick per hole
     purchaseCost: 35000,
     maintenanceCostPerTick: 4,
     fuelCostPerTick: 6,
@@ -60,6 +88,9 @@ const VEHICLE_DEFS: Record<VehicleRole, VehicleDef> = {
   },
   building_destroyer: {
     type: 'building_destroyer',
+    tier: 1,
+    nameKey: 'vehicle.building_destroyer.tier1',
+    workRate: 12,           // damage units/tick
     purchaseCost: 30000,
     maintenanceCostPerTick: 4,
     fuelCostPerTick: 7,
@@ -69,6 +100,9 @@ const VEHICLE_DEFS: Record<VehicleRole, VehicleDef> = {
   },
   rock_fragmenter: {
     type: 'rock_fragmenter',
+    tier: 1,
+    nameKey: 'vehicle.rock_fragmenter.tier1',
+    workRate: 9,            // fragments/tick output rate
     purchaseCost: 32000,
     maintenanceCostPerTick: 4,
     fuelCostPerTick: 7,
