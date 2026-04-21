@@ -11,6 +11,7 @@ import {
   getExcavatorLoadingRate,
   getVehicleDef,
   getAllVehicleRoles,
+  getVehicleDefByTier,
 } from '../../../src/core/entities/Vehicle.js';
 
 // ── Role catalogue ────────────────────────────────────────────────────────────
@@ -415,5 +416,352 @@ describe('VehicleDef.workRate', () => {
       expect(Number.isFinite(workRate)).toBe(true);
       expect(workRate).toBeGreaterThan(0);
     }
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// TASK 2.3 — getVehicleDefByTier: 15-entry catalog (5 roles × 3 tiers)
+// ═════════════════════════════════════════════════════════════════════════════
+
+// Helper constant used across all task-2.3 suites
+const ALL_ROLES: VehicleRole[] = [
+  'building_destroyer',
+  'debris_hauler',
+  'drill_rig',
+  'rock_digger',
+  'rock_fragmenter',
+];
+const ALL_TIERS: VehicleTier[] = [1, 2, 3];
+
+// ── Catalog completeness ──────────────────────────────────────────────────────
+
+describe('getVehicleDefByTier — catalog completeness (5 roles × 3 tiers = 15 entries)', () => {
+  it('all 15 role×tier combinations return a defined, non-null VehicleDef', () => {
+    for (const role of ALL_ROLES) {
+      for (const tier of ALL_TIERS) {
+        expect(getVehicleDefByTier(role, tier)).toBeDefined();
+      }
+    }
+  });
+
+  it('getVehicleDefByTier(role, 1) returns a def with tier field equal to 1 for every role', () => {
+    for (const role of ALL_ROLES) {
+      expect(getVehicleDefByTier(role, 1).tier).toBe(1);
+    }
+  });
+
+  it('getVehicleDefByTier(role, 2) returns a def with tier field equal to 2 for every role', () => {
+    for (const role of ALL_ROLES) {
+      expect(getVehicleDefByTier(role, 2).tier).toBe(2);
+    }
+  });
+
+  it('getVehicleDefByTier(role, 3) returns a def with tier field equal to 3 for every role', () => {
+    for (const role of ALL_ROLES) {
+      expect(getVehicleDefByTier(role, 3).tier).toBe(3);
+    }
+  });
+
+  it('getVehicleDefByTier(role, tier) type field equals the requested role for every combination', () => {
+    for (const role of ALL_ROLES) {
+      for (const tier of ALL_TIERS) {
+        expect(getVehicleDefByTier(role, tier).type).toBe(role);
+      }
+    }
+  });
+});
+
+// ── Tier 1 backward compatibility ─────────────────────────────────────────────
+
+describe('getVehicleDefByTier — tier 1 is consistent with getVehicleDef (backward compat)', () => {
+  it('building_destroyer tier 1 stats match getVehicleDef("building_destroyer")', () => {
+    const byTier = getVehicleDefByTier('building_destroyer', 1);
+    const legacy = getVehicleDef('building_destroyer');
+    expect(byTier.speed).toBe(legacy.speed);
+    expect(byTier.capacity).toBe(legacy.capacity);
+    expect(byTier.workRate).toBe(legacy.workRate);
+    expect(byTier.maxHp).toBe(legacy.maxHp);
+    expect(byTier.purchaseCost).toBe(legacy.purchaseCost);
+    expect(byTier.maintenanceCostPerTick).toBe(legacy.maintenanceCostPerTick);
+  });
+
+  it('debris_hauler tier 1 stats match getVehicleDef("debris_hauler")', () => {
+    const byTier = getVehicleDefByTier('debris_hauler', 1);
+    const legacy = getVehicleDef('debris_hauler');
+    expect(byTier.speed).toBe(legacy.speed);
+    expect(byTier.capacity).toBe(legacy.capacity);
+    expect(byTier.workRate).toBe(legacy.workRate);
+    expect(byTier.maxHp).toBe(legacy.maxHp);
+    expect(byTier.purchaseCost).toBe(legacy.purchaseCost);
+    expect(byTier.maintenanceCostPerTick).toBe(legacy.maintenanceCostPerTick);
+  });
+
+  it('drill_rig tier 1 stats match getVehicleDef("drill_rig")', () => {
+    const byTier = getVehicleDefByTier('drill_rig', 1);
+    const legacy = getVehicleDef('drill_rig');
+    expect(byTier.speed).toBe(legacy.speed);
+    expect(byTier.capacity).toBe(legacy.capacity);
+    expect(byTier.workRate).toBe(legacy.workRate);
+    expect(byTier.maxHp).toBe(legacy.maxHp);
+    expect(byTier.purchaseCost).toBe(legacy.purchaseCost);
+    expect(byTier.maintenanceCostPerTick).toBe(legacy.maintenanceCostPerTick);
+  });
+
+  it('rock_digger tier 1 stats match getVehicleDef("rock_digger")', () => {
+    const byTier = getVehicleDefByTier('rock_digger', 1);
+    const legacy = getVehicleDef('rock_digger');
+    expect(byTier.speed).toBe(legacy.speed);
+    expect(byTier.capacity).toBe(legacy.capacity);
+    expect(byTier.workRate).toBe(legacy.workRate);
+    expect(byTier.maxHp).toBe(legacy.maxHp);
+    expect(byTier.purchaseCost).toBe(legacy.purchaseCost);
+    expect(byTier.maintenanceCostPerTick).toBe(legacy.maintenanceCostPerTick);
+  });
+
+  it('rock_fragmenter tier 1 stats match getVehicleDef("rock_fragmenter")', () => {
+    const byTier = getVehicleDefByTier('rock_fragmenter', 1);
+    const legacy = getVehicleDef('rock_fragmenter');
+    expect(byTier.speed).toBe(legacy.speed);
+    expect(byTier.capacity).toBe(legacy.capacity);
+    expect(byTier.workRate).toBe(legacy.workRate);
+    expect(byTier.maxHp).toBe(legacy.maxHp);
+    expect(byTier.purchaseCost).toBe(legacy.purchaseCost);
+    expect(byTier.maintenanceCostPerTick).toBe(legacy.maintenanceCostPerTick);
+  });
+});
+
+// ── nameKey pattern: vehicle.<role>.tier<N> ───────────────────────────────────
+
+describe('getVehicleDefByTier — nameKey follows "vehicle.<role>.tier<N>" pattern', () => {
+  it('all 15 defs have a nameKey matching /^vehicle\\.[a-z_]+\\.tier[123]$/', () => {
+    for (const role of ALL_ROLES) {
+      for (const tier of ALL_TIERS) {
+        expect(getVehicleDefByTier(role, tier).nameKey).toMatch(
+          /^vehicle\.[a-z_]+\.tier[123]$/,
+        );
+      }
+    }
+  });
+
+  it('debris_hauler tier 1 nameKey is exactly "vehicle.debris_hauler.tier1"', () => {
+    expect(getVehicleDefByTier('debris_hauler', 1).nameKey).toBe('vehicle.debris_hauler.tier1');
+  });
+
+  it('debris_hauler tier 2 nameKey is exactly "vehicle.debris_hauler.tier2"', () => {
+    expect(getVehicleDefByTier('debris_hauler', 2).nameKey).toBe('vehicle.debris_hauler.tier2');
+  });
+
+  it('debris_hauler tier 3 nameKey is exactly "vehicle.debris_hauler.tier3"', () => {
+    expect(getVehicleDefByTier('debris_hauler', 3).nameKey).toBe('vehicle.debris_hauler.tier3');
+  });
+
+  it('rock_digger tier 2 nameKey is exactly "vehicle.rock_digger.tier2"', () => {
+    expect(getVehicleDefByTier('rock_digger', 2).nameKey).toBe('vehicle.rock_digger.tier2');
+  });
+
+  it('rock_digger tier 3 nameKey is exactly "vehicle.rock_digger.tier3"', () => {
+    expect(getVehicleDefByTier('rock_digger', 3).nameKey).toBe('vehicle.rock_digger.tier3');
+  });
+
+  it('drill_rig tier 2 nameKey is exactly "vehicle.drill_rig.tier2"', () => {
+    expect(getVehicleDefByTier('drill_rig', 2).nameKey).toBe('vehicle.drill_rig.tier2');
+  });
+
+  it('drill_rig tier 3 nameKey is exactly "vehicle.drill_rig.tier3"', () => {
+    expect(getVehicleDefByTier('drill_rig', 3).nameKey).toBe('vehicle.drill_rig.tier3');
+  });
+
+  it('building_destroyer tier 2 nameKey is exactly "vehicle.building_destroyer.tier2"', () => {
+    expect(getVehicleDefByTier('building_destroyer', 2).nameKey).toBe(
+      'vehicle.building_destroyer.tier2',
+    );
+  });
+
+  it('building_destroyer tier 3 nameKey is exactly "vehicle.building_destroyer.tier3"', () => {
+    expect(getVehicleDefByTier('building_destroyer', 3).nameKey).toBe(
+      'vehicle.building_destroyer.tier3',
+    );
+  });
+
+  it('rock_fragmenter tier 2 nameKey is exactly "vehicle.rock_fragmenter.tier2"', () => {
+    expect(getVehicleDefByTier('rock_fragmenter', 2).nameKey).toBe(
+      'vehicle.rock_fragmenter.tier2',
+    );
+  });
+
+  it('rock_fragmenter tier 3 nameKey is exactly "vehicle.rock_fragmenter.tier3"', () => {
+    expect(getVehicleDefByTier('rock_fragmenter', 3).nameKey).toBe(
+      'vehicle.rock_fragmenter.tier3',
+    );
+  });
+});
+
+// ── Tier 2 stat multipliers ───────────────────────────────────────────────────
+
+describe('getVehicleDefByTier — tier 2 applies ×1.3 speed multiplier', () => {
+  it('tier 2 speed is approximately tier 1 speed × 1.3 for every role', () => {
+    for (const role of ALL_ROLES) {
+      const t1 = getVehicleDefByTier(role, 1);
+      const t2 = getVehicleDefByTier(role, 2);
+      expect(t2.speed).toBeCloseTo(t1.speed * 1.3, 5);
+    }
+  });
+});
+
+describe('getVehicleDefByTier — tier 2 applies ×1.6 capacity multiplier', () => {
+  it('tier 2 capacity is approximately tier 1 capacity × 1.6 for every role', () => {
+    for (const role of ALL_ROLES) {
+      const t1 = getVehicleDefByTier(role, 1);
+      const t2 = getVehicleDefByTier(role, 2);
+      expect(t2.capacity).toBeCloseTo(t1.capacity * 1.6, 5);
+    }
+  });
+});
+
+describe('getVehicleDefByTier — tier 2 applies ×1.4 workRate multiplier', () => {
+  it('tier 2 workRate is approximately tier 1 workRate × 1.4 for every role', () => {
+    for (const role of ALL_ROLES) {
+      const t1 = getVehicleDefByTier(role, 1);
+      const t2 = getVehicleDefByTier(role, 2);
+      expect(t2.workRate).toBeCloseTo(t1.workRate * 1.4, 5);
+    }
+  });
+});
+
+describe('getVehicleDefByTier — tier 2 applies ×1.5 maxHp multiplier', () => {
+  it('tier 2 maxHp is approximately tier 1 maxHp × 1.5 for every role', () => {
+    for (const role of ALL_ROLES) {
+      const t1 = getVehicleDefByTier(role, 1);
+      const t2 = getVehicleDefByTier(role, 2);
+      expect(t2.maxHp).toBeCloseTo(t1.maxHp * 1.5, 5);
+    }
+  });
+});
+
+describe('getVehicleDefByTier — tier 2 applies ×1.4 maintenanceCostPerTick multiplier', () => {
+  it('tier 2 maintenanceCostPerTick is approximately tier 1 × 1.4 for every role', () => {
+    for (const role of ALL_ROLES) {
+      const t1 = getVehicleDefByTier(role, 1);
+      const t2 = getVehicleDefByTier(role, 2);
+      expect(t2.maintenanceCostPerTick).toBeCloseTo(t1.maintenanceCostPerTick * 1.4, 5);
+    }
+  });
+});
+
+// ── Tier 3 stat multipliers ───────────────────────────────────────────────────
+
+describe('getVehicleDefByTier — tier 3 applies ×1.8 speed multiplier', () => {
+  it('tier 3 speed is approximately tier 1 speed × 1.8 for every role', () => {
+    for (const role of ALL_ROLES) {
+      const t1 = getVehicleDefByTier(role, 1);
+      const t3 = getVehicleDefByTier(role, 3);
+      expect(t3.speed).toBeCloseTo(t1.speed * 1.8, 5);
+    }
+  });
+});
+
+describe('getVehicleDefByTier — tier 3 applies ×2.5 capacity multiplier', () => {
+  it('tier 3 capacity is approximately tier 1 capacity × 2.5 for every role', () => {
+    for (const role of ALL_ROLES) {
+      const t1 = getVehicleDefByTier(role, 1);
+      const t3 = getVehicleDefByTier(role, 3);
+      expect(t3.capacity).toBeCloseTo(t1.capacity * 2.5, 5);
+    }
+  });
+});
+
+describe('getVehicleDefByTier — tier 3 applies ×2.0 workRate multiplier', () => {
+  it('tier 3 workRate is approximately tier 1 workRate × 2.0 for every role', () => {
+    for (const role of ALL_ROLES) {
+      const t1 = getVehicleDefByTier(role, 1);
+      const t3 = getVehicleDefByTier(role, 3);
+      expect(t3.workRate).toBeCloseTo(t1.workRate * 2.0, 5);
+    }
+  });
+});
+
+describe('getVehicleDefByTier — tier 3 applies ×2.2 maxHp multiplier', () => {
+  it('tier 3 maxHp is approximately tier 1 maxHp × 2.2 for every role', () => {
+    for (const role of ALL_ROLES) {
+      const t1 = getVehicleDefByTier(role, 1);
+      const t3 = getVehicleDefByTier(role, 3);
+      expect(t3.maxHp).toBeCloseTo(t1.maxHp * 2.2, 5);
+    }
+  });
+});
+
+describe('getVehicleDefByTier — tier 3 applies ×2.0 maintenanceCostPerTick multiplier', () => {
+  it('tier 3 maintenanceCostPerTick is approximately tier 1 × 2.0 for every role', () => {
+    for (const role of ALL_ROLES) {
+      const t1 = getVehicleDefByTier(role, 1);
+      const t3 = getVehicleDefByTier(role, 3);
+      expect(t3.maintenanceCostPerTick).toBeCloseTo(t1.maintenanceCostPerTick * 2.0, 5);
+    }
+  });
+});
+
+// ── purchaseCost multipliers — per role (constraints 8 & 9) ──────────────────
+
+describe('getVehicleDefByTier — tier 2 purchaseCost = tier 1 purchaseCost × 2.0 (per role)', () => {
+  it('debris_hauler tier 2 purchaseCost equals tier 1 purchaseCost × 2.0', () => {
+    const t1 = getVehicleDefByTier('debris_hauler', 1);
+    const t2 = getVehicleDefByTier('debris_hauler', 2);
+    expect(t2.purchaseCost).toBeCloseTo(t1.purchaseCost * 2.0, 5);
+  });
+
+  it('rock_digger tier 2 purchaseCost equals tier 1 purchaseCost × 2.0', () => {
+    const t1 = getVehicleDefByTier('rock_digger', 1);
+    const t2 = getVehicleDefByTier('rock_digger', 2);
+    expect(t2.purchaseCost).toBeCloseTo(t1.purchaseCost * 2.0, 5);
+  });
+
+  it('drill_rig tier 2 purchaseCost equals tier 1 purchaseCost × 2.0', () => {
+    const t1 = getVehicleDefByTier('drill_rig', 1);
+    const t2 = getVehicleDefByTier('drill_rig', 2);
+    expect(t2.purchaseCost).toBeCloseTo(t1.purchaseCost * 2.0, 5);
+  });
+
+  it('building_destroyer tier 2 purchaseCost equals tier 1 purchaseCost × 2.0', () => {
+    const t1 = getVehicleDefByTier('building_destroyer', 1);
+    const t2 = getVehicleDefByTier('building_destroyer', 2);
+    expect(t2.purchaseCost).toBeCloseTo(t1.purchaseCost * 2.0, 5);
+  });
+
+  it('rock_fragmenter tier 2 purchaseCost equals tier 1 purchaseCost × 2.0', () => {
+    const t1 = getVehicleDefByTier('rock_fragmenter', 1);
+    const t2 = getVehicleDefByTier('rock_fragmenter', 2);
+    expect(t2.purchaseCost).toBeCloseTo(t1.purchaseCost * 2.0, 5);
+  });
+});
+
+describe('getVehicleDefByTier — tier 3 purchaseCost = tier 1 purchaseCost × 4.0 (per role)', () => {
+  it('debris_hauler tier 3 purchaseCost equals tier 1 purchaseCost × 4.0', () => {
+    const t1 = getVehicleDefByTier('debris_hauler', 1);
+    const t3 = getVehicleDefByTier('debris_hauler', 3);
+    expect(t3.purchaseCost).toBeCloseTo(t1.purchaseCost * 4.0, 5);
+  });
+
+  it('rock_digger tier 3 purchaseCost equals tier 1 purchaseCost × 4.0', () => {
+    const t1 = getVehicleDefByTier('rock_digger', 1);
+    const t3 = getVehicleDefByTier('rock_digger', 3);
+    expect(t3.purchaseCost).toBeCloseTo(t1.purchaseCost * 4.0, 5);
+  });
+
+  it('drill_rig tier 3 purchaseCost equals tier 1 purchaseCost × 4.0', () => {
+    const t1 = getVehicleDefByTier('drill_rig', 1);
+    const t3 = getVehicleDefByTier('drill_rig', 3);
+    expect(t3.purchaseCost).toBeCloseTo(t1.purchaseCost * 4.0, 5);
+  });
+
+  it('building_destroyer tier 3 purchaseCost equals tier 1 purchaseCost × 4.0', () => {
+    const t1 = getVehicleDefByTier('building_destroyer', 1);
+    const t3 = getVehicleDefByTier('building_destroyer', 3);
+    expect(t3.purchaseCost).toBeCloseTo(t1.purchaseCost * 4.0, 5);
+  });
+
+  it('rock_fragmenter tier 3 purchaseCost equals tier 1 purchaseCost × 4.0', () => {
+    const t1 = getVehicleDefByTier('rock_fragmenter', 1);
+    const t3 = getVehicleDefByTier('rock_fragmenter', 3);
+    expect(t3.purchaseCost).toBeCloseTo(t1.purchaseCost * 4.0, 5);
   });
 });

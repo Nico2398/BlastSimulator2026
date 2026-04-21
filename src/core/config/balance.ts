@@ -153,3 +153,31 @@ export const LIVING_QUARTERS_WELLBEING_MULTIPLIERS = {
 
 /** Additional well-being penalty applied when employee count exceeds bed capacity. */
 export const LIVING_QUARTERS_OVERCAPACITY_PENALTY = 0.10;
+
+// ─── Vehicles ──────────────────────────────────────────────────────────────────
+
+/**
+ * Speed, capacity, workRate, HP, and cost scaling multipliers per equipment tier.
+ * Tier 1 is the baseline (×1.0 for all stats).
+ * Real-world reference: CAT 797F hauls ~363t; Liebherr R 9800 excavates ~42m³/pass.
+ * Values scaled for gameplay.
+ */
+export const VEHICLE_TIER_MULTIPLIERS = {
+  1: { speed: 1.0, capacity: 1.0, workRate: 1.0, maxHp: 1.0, purchaseCost: 1.0, maintenanceCostPerTick: 1.0, fuelCostPerTick: 1.0 },
+  2: { speed: 1.3, capacity: 1.6, workRate: 1.4, maxHp: 1.5, purchaseCost: 2.0, maintenanceCostPerTick: 1.4, fuelCostPerTick: 1.4 },
+  3: { speed: 1.8, capacity: 2.5, workRate: 2.0, maxHp: 2.2, purchaseCost: 4.0, maintenanceCostPerTick: 2.0, fuelCostPerTick: 2.0 },
+} as const;
+
+/** Tier-1 (base) stats for each vehicle role. Units: $, kg, m³, grid cells/tick. */
+export const VEHICLE_BASE_STATS = {
+  /** ~200 kg payload; cost scaled from real $1–5M dump trucks; diesel ~$150/hr scaled. */
+  debris_hauler:      { workRate: 10, purchaseCost: 25_000, maintenanceCostPerTick: 3, fuelCostPerTick: 5, capacity: 200, speed: 3, maxHp: 100 },
+  /** ~8 m³/tick excavation; most expensive vehicle — the key production bottleneck. */
+  rock_digger:        { workRate: 8,  purchaseCost: 50_000, maintenanceCostPerTick: 5, fuelCostPerTick: 8, capacity: 50,  speed: 1, maxHp: 150 },
+  /** 5 progress units/tick per hole; capacity = 2 holes/tick. */
+  drill_rig:          { workRate: 5,  purchaseCost: 35_000, maintenanceCostPerTick: 4, fuelCostPerTick: 6, capacity: 2,   speed: 1, maxHp: 120 },
+  /** 12 damage units/tick; ~100 kg/tick clearing rate. */
+  building_destroyer: { workRate: 12, purchaseCost: 30_000, maintenanceCostPerTick: 4, fuelCostPerTick: 7, capacity: 100, speed: 2, maxHp: 130 },
+  /** 9 fragments/tick output; ~90 kg/tick fragmentation throughput. */
+  rock_fragmenter:    { workRate: 9,  purchaseCost: 32_000, maintenanceCostPerTick: 4, fuelCostPerTick: 7, capacity: 90,  speed: 2, maxHp: 125 },
+} as const;
