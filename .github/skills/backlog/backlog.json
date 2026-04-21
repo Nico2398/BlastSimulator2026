@@ -231,7 +231,7 @@
       "src/core/entities/Vehicle.ts"
     ],
     "testFile": "tests/unit/entities/Vehicle.test.ts",
-    "status": "pending",
+    "status": "in-progress",
     "blockedBy": [
       "2.2"
     ],
