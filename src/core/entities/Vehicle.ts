@@ -1,7 +1,8 @@
 // BlastSimulator2026 — Vehicle system
 // Debris haulers, rock diggers, drill rigs, building destroyers, and rock fragmenters.
-// Real mining: CAT 797F hauls ~363t, Liebherr R 9800 excavates ~42m³/pass.
-// Scaled for gameplay.
+// Base stats and tier multipliers live in src/core/config/balance.ts.
+
+import { VEHICLE_BASE_STATS, VEHICLE_TIER_MULTIPLIERS } from '../config/balance.js';
 
 // ── Vehicle roles ──
 
@@ -49,73 +50,62 @@ export interface VehicleDef {
   maxHp: number;
 }
 
-const VEHICLE_DEFS: Record<VehicleRole, VehicleDef> = {
-  debris_hauler: {
-    type: 'debris_hauler',
-    tier: 1,
-    nameKey: 'vehicle.debris_hauler.tier1',
-    workRate: 10,           // kg/tick effective transport throughput
-    purchaseCost: 25000, // Real: $1-5M scaled down for game
-    maintenanceCostPerTick: 3,
-    fuelCostPerTick: 5, // Real: diesel ~$150/hr scaled
-    capacity: 200, // kg payload
-    speed: 3,
-    maxHp: 100,
-  },
-  rock_digger: {
-    type: 'rock_digger',
-    tier: 1,
-    nameKey: 'vehicle.rock_digger.tier1',
-    workRate: 8,            // m³/tick excavation rate
-    purchaseCost: 50000, // Key bottleneck — expensive
-    maintenanceCostPerTick: 5,
-    fuelCostPerTick: 8,
-    capacity: 50, // kg/tick loading rate
-    speed: 1,
-    maxHp: 150,
-  },
-  drill_rig: {
-    type: 'drill_rig',
-    tier: 1,
-    nameKey: 'vehicle.drill_rig.tier1',
-    workRate: 5,            // progress units/tick per hole
-    purchaseCost: 35000,
-    maintenanceCostPerTick: 4,
-    fuelCostPerTick: 6,
-    capacity: 2, // holes per tick
-    speed: 1,
-    maxHp: 120,
-  },
-  building_destroyer: {
-    type: 'building_destroyer',
-    tier: 1,
-    nameKey: 'vehicle.building_destroyer.tier1',
-    workRate: 12,           // damage units/tick
-    purchaseCost: 30000,
-    maintenanceCostPerTick: 4,
-    fuelCostPerTick: 7,
-    capacity: 100, // kg/tick clearing rate
-    speed: 2,
-    maxHp: 130,
-  },
-  rock_fragmenter: {
-    type: 'rock_fragmenter',
-    tier: 1,
-    nameKey: 'vehicle.rock_fragmenter.tier1',
-    workRate: 9,            // fragments/tick output rate
-    purchaseCost: 32000,
-    maintenanceCostPerTick: 4,
-    fuelCostPerTick: 7,
-    capacity: 90, // kg/tick fragmentation rate
-    speed: 2,
-    maxHp: 125,
-  },
-};
+// ── Base stats shape ──────────────────────────────────────────────────────────
 
-export function getVehicleDef(role: VehicleRole): VehicleDef {
-  return VEHICLE_DEFS[role];
+/** Shape of tier-1 stats sourced from VEHICLE_BASE_STATS in balance config. */
+interface BaseStats {
+  readonly workRate: number;
+  readonly purchaseCost: number;
+  readonly maintenanceCostPerTick: number;
+  readonly fuelCostPerTick: number;
+  readonly capacity: number;
+  readonly speed: number;
+  readonly maxHp: number;
 }
 
+// ── Catalog builder ───────────────────────────────────────────────────────────
+
+/** Generate all three tier VehicleDefs from a role's base (tier-1) stats. */
+function makeTiers(role: VehicleRole, base: BaseStats): Record<VehicleTier, VehicleDef> {
+  const tiers: VehicleTier[] = [1, 2, 3];
+  const result = {} as Record<VehicleTier, VehicleDef>;
+  for (const tier of tiers) {
+    const m = VEHICLE_TIER_MULTIPLIERS[tier];
+    result[tier] = {
+      type: role,
+      tier,
+      nameKey: `vehicle.${role}.tier${tier}`,
+      workRate: base.workRate * m.workRate,
+      purchaseCost: base.purchaseCost * m.purchaseCost,
+      maintenanceCostPerTick: base.maintenanceCostPerTick * m.maintenanceCostPerTick,
+      fuelCostPerTick: base.fuelCostPerTick * m.fuelCostPerTick,
+      capacity: base.capacity * m.capacity,
+      speed: base.speed * m.speed,
+      maxHp: base.maxHp * m.maxHp,
+    };
+  }
+  return result;
+}
+
+const VEHICLE_DEFS: Record<VehicleRole, Record<VehicleTier, VehicleDef>> = {
+  debris_hauler:      makeTiers('debris_hauler',      VEHICLE_BASE_STATS.debris_hauler),
+  rock_digger:        makeTiers('rock_digger',         VEHICLE_BASE_STATS.rock_digger),
+  drill_rig:          makeTiers('drill_rig',           VEHICLE_BASE_STATS.drill_rig),
+  building_destroyer: makeTiers('building_destroyer',  VEHICLE_BASE_STATS.building_destroyer),
+  rock_fragmenter:    makeTiers('rock_fragmenter',     VEHICLE_BASE_STATS.rock_fragmenter),
+};
+
+/** Returns the tier-1 def for backward compatibility. */
+export function getVehicleDef(role: VehicleRole): VehicleDef {
+  return VEHICLE_DEFS[role][1];
+}
+
+/** Returns the def for the given role and tier. */
+export function getVehicleDefByTier(role: VehicleRole, tier: VehicleTier): VehicleDef {
+  return VEHICLE_DEFS[role][tier];
+}
+
+/** Returns all registered vehicle roles in catalog order. */
 export function getAllVehicleRoles(): VehicleRole[] {
   return Object.keys(VEHICLE_DEFS) as VehicleRole[];
 }
