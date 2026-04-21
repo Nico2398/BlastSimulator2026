@@ -12,7 +12,7 @@ description: >
 |-------|-----------|---------|
 | Language | TypeScript (strict mode) | Type safety enables autonomous agent validation |
 | Build | Vite | Fast HMR, instant feedback loop |
-| 3D Rendering | Three.js | Industry standard web 3D, huge ecosystem |
+| 3D Rendering | Three.js | Industry standard web 3D |
 | Physics | Cannon-es | Maintained JS physics engine for blast simulation |
 | Testing | Vitest | Unit + integration testing, Node.js native |
 | Visual Testing | Puppeteer | Headless Chrome screenshots for render validation |
@@ -28,16 +28,16 @@ description: >
 - `src/persistence/` → Save backends (IndexedDB, File, Download). Imports only from core.
 - `src/ui/` → HTML overlay. Reads GameState.
 - `src/audio/` → Web Audio API.
-- `src/console/` → CLI mode, same core logic as the UI.
+- `src/console/` → CLI mode, same core logic as UI.
 
 **State flows one way:** Input → Core → State mutation → Event emitted → Renderer/UI/Audio
 
 ## Key Architectural Principles
 
-- **Core purity:** `src/core/` = zero side effects; no DOM, `window`, WebGL, or file I/O. Fully testable in Node.js. `SaveBackend` interface lives in core; implementations in `src/persistence/`.
+- **Core purity:** `src/core/` = zero side effects; no DOM, `window`, WebGL, or file I/O. `SaveBackend` interface in core; implementations in `src/persistence/`.
 - **Single serializable GameState:** enables save/load (JSON), console mode, deterministic tests.
-- **Tick loop steps:** (1) advance time, (2) weather, (3) events, (4) vehicles+tasks, (5) physics (blast only), (6) scores, (7) win/lose check, (8) emit state-change events. Renderer runs at 60fps and interpolates between ticks.
-- **Event-driven renderer:** Core emits `terrain:updated`, `blast:started`, `fragment:created`, etc. Renderer subscribes. Dependency is one-way: renderer → core, never reverse.
+- **Tick loop steps:** (1) advance time, (2) weather, (3) events, (4) vehicles+tasks, (5) physics (blast only), (6) scores, (7) win/lose check, (8) emit state-change events. Renderer runs at 60fps, interpolates between ticks.
+- **Event-driven renderer:** Core emits `terrain:updated`, `blast:started`, `fragment:created`, etc. Renderer subscribes. Dependency one-way: renderer → core, never reverse.
 - **Asset replaceability:** AssetManager maps IDs → geometry/material; placeholders = Three.js primitives. Replace assets by updating AssetManager only.
 
 ## Data Flow
@@ -63,7 +63,7 @@ Player Input (UI click / Console command)
 
 ## Console Mode
 
-Node.js CLI (`npx tsx src/console.ts`). Creates GameState, reads stdin commands, dispatches to same core logic as UI. Every feature is testable without a browser.
+Node.js CLI (`npx tsx src/console.ts`). Creates GameState, reads stdin commands, dispatches to same core logic as UI. Every feature testable without browser.
 
 ## Physics Integration
 

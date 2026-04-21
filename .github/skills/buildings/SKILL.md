@@ -9,11 +9,11 @@ description: >
 
 ## Design Philosophy
 
-Buildings are the player's infrastructure layer. They gate actions behind qualified employees and physical capacity.
+Buildings are player's infrastructure layer. Gate actions behind qualified employees + physical capacity.
 
-- **Every action requires a qualified employee.** No qualified employee → immediate error, not silent queue.
-- **Training buildings** upskill employees for time + fee. Hiring pre-qualified staff is generally cheaper.
-- **Research Center** is the prerequisite for unlocking higher tiers of all other buildings.
+- **Every action requires qualified employee.** No qualified employee → immediate error, not silent queue.
+- **Training buildings** upskill employees for time + fee. Hiring pre-qualified staff generally cheaper.
+- **Research Center** prerequisite for unlocking higher tiers of all other buildings.
 - **Placement tradeoff:** Far-from-pit reduces projection damage risk but increases travel time (productivity loss).
 
 ## Building Types & Tier Names
@@ -49,7 +49,7 @@ Tier 1 is available from the start. Higher tiers unlocked by paid Research Cente
 | Management Office | HR and commercial operations |
 | Geology Lab | Survey techniques and rock analysis |
 
-Employee travels to building, stays for fixed ticks (unavailable + paid salary). Training costs a direct fee.
+Employee travels to building, stays for fixed ticks (unavailable + paid salary). Training costs direct fee.
 
 ## Living Quarters Well-Being Effects
 

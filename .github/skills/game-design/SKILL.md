@@ -9,7 +9,7 @@ description: >
 
 ## Concept
 
-**BlastSimulator2026** is a wacky open-pit mine management game in the spirit of Theme Hospital / Two Point Hospital. The player manages an open-pit quarry, dealing with blasting rock, recovering rubble, and evacuating materials. An unabashed **caricature of capitalism** — dark humor, ethical dilemmas, corruption, union-busting, and environmental destruction.
+**BlastSimulator2026** — wacky open-pit mine management game in spirit of Theme Hospital / Two Point Hospital. Player manages open-pit quarry: blasting rock, recovering rubble, evacuating materials. Unabashed **caricature of capitalism** — dark humor, ethical dilemmas, corruption, union-busting, environmental destruction.
 
 **Tone:** Satirical, absurd, Minion-like characters, exaggerated consequences.
 
@@ -56,7 +56,7 @@ Fragments picked up by excavators → loaded onto trucks → sold via contracts
 
 ### Buildings
 Worker quarters, storage depots, vehicle depot, office, break rooms, medical bay, explosives magazine.
-Buildings can be placed, moved, destroyed. Projections can destroy them.
+Can be placed, moved, destroyed. Projections can destroy them.
 
 ### Vehicle Fleet
 Trucks, excavators, drill rigs, bulldozers. Each has purchase/maintenance/fuel cost, capacity, speed.
@@ -76,7 +76,7 @@ Unionized employees cannot be fired. Affected by well-being score.
 ## Event System
 
 ### Architecture
-Events grouped into categories with independent timers. When timer fires: check available events → roll weighted selection → fire event. Weights and values depend on player scores.
+Events grouped into categories with independent timers. Timer fires → check available events → roll weighted selection → fire event. Weights + values depend on player scores.
 
 ### Categories
 - **Unions:** Strike threats, wage demands, safety complaints, overtime protests
@@ -86,7 +86,7 @@ Events grouped into categories with independent timers. When timer fires: check 
 - **Lawsuits:** Triggered by accidents/deaths/environmental damage
 
 ### Resolution
-Each event presents 2-4 decision options with different consequences on scores, finances, and future event probabilities.
+Each event presents 2-4 decision options with different consequences on scores, finances, future event probabilities.
 
 ## Corruption & Mafia Gameplay
 
@@ -143,7 +143,7 @@ Level 1 unlocked at start → profit threshold unlocks next → star ratings (1-
 
 - **Backends:** IndexedDB (web primary), File system (local), File download/upload (fallback)
 - **Multiple slots** with full GameState + campaign progression + metadata
-- **Auto-save** every 2 game minutes in a dedicated slot
+- **Auto-save** every 2 game minutes in dedicated slot
 - **Cross-session persistence** via IndexedDB
 
 ## Time Management

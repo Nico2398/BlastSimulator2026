@@ -9,12 +9,12 @@ description: >
 
 ## Design Philosophy
 
-Employees are not interchangeable tokens. Each has skill qualifications with proficiency levels and autonomously executes queued work.
+Employees not interchangeable tokens. Each has skill qualifications with proficiency levels, executes queued work autonomously.
 
 - **Every physical action is queued, not instant.** Commands → global pending-action pool → free qualified employee auto-claims.
-- **Pending actions show a 3D ghost.** Semi-transparent blue fresnel-effect mesh at the target position — distinguishes pending from completed.
-- **No qualified employee = immediate error** (not silent queue). Fired when zero employees on the roster have the required skill.
-- **Some tasks require a vehicle.** Hauling and drilling require an employee to board a vehicle of the appropriate role.
+- **Pending actions show 3D ghost.** Semi-transparent blue fresnel-effect mesh at target position — distinguishes pending from completed.
+- **No qualified employee = immediate error** (not silent queue). Fired when zero employees have required skill.
+- **Some tasks require vehicle.** Hauling + drilling require employee to board vehicle of appropriate role.
 
 ## Skill Categories
 
@@ -89,11 +89,11 @@ export type ActionType =
 3. If NO employee with the skill exists on roster at all → emit `UnqualifiedTaskError` immediately
 4. If qualified employees exist but all temporarily busy → wait silently (no error)
 
-**Ghost rendering:** For every `PendingAction`, renderer creates a blue fresnel-effect translucent mesh with pulsing animation. Ghost removed on claim.
+**Ghost rendering:** For every `PendingAction`, renderer creates blue fresnel-effect translucent mesh with pulsing animation. Ghost removed on claim.
 
 ## Salary Calculation
 
-Salary = base + sum of (qualification level bonuses). A multi-skilled employee is more expensive than a single-skill specialist.
+Salary = base + sum of qualification level bonuses. Multi-skilled employee costs more than single-skill specialist.
 
 ## Work & Rest Policies
 

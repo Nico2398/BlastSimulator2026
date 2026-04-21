@@ -24,8 +24,8 @@ description: >
 | Workflow | File | Trigger | Purpose |
 |----------|------|---------|---------|
 | Auto-assign next | `auto-assign-next.yml` | PR closed (merged) | Close done issue, assign next `ready` issue to Copilot |
-| Auto-merge | `auto-merge-copilot.yml` | CI completed **or** Copilot agent check run completed | Auto-approve and squash-merge passing Copilot PRs |
-| Handle failure | `handle-failure.yml` | Issue labeled `blocked` | Comment and notify maintainer |
+| Auto-merge | `auto-merge-copilot.yml` | CI completed **or** Copilot agent check run completed | Auto-approve + squash-merge passing Copilot PRs |
+| Handle failure | `handle-failure.yml` | Issue labeled `blocked` | Comment + notify maintainer |
 | Scheduled kickstart | `scheduled-assign.yml` | Cron (3x daily) + manual | Pick up stalled pipeline |
 | CI | `ci.yml` | Push / PR | Standard CI checks |
 | Setup steps | `copilot-setup-steps.yml` | Agent session | Pre-install dependencies for agent |
@@ -40,17 +40,17 @@ description: >
 | `done` | Purple | Merged and closed |
 | `agent-task` | Blue | Identifies agent-processable issues |
 
-## The Reviewer Agent
+## Reviewer Agent
 
 Review flow:
 1. Run all checks (architecture, i18n, 300-line limit, no Math.random(), tests via `npm run validate`)
-2. If issues are found: push fixes, wait for CI to start on the new commit
-3. Post the `APPROVED` comment **as the very last action** — after all commits are pushed and no further changes are needed
-4. Exit immediately after posting the approval comment — do not perform any additional file operations, pushes, or API calls after this point
+2. If issues found: push fixes, wait for CI to start on new commit
+3. Post `APPROVED` comment **as very last action** — after all commits pushed, no further changes needed
+4. Exit immediately after posting approval comment — no additional file ops, pushes, or API calls after this point
 
-The `APPROVED` comment is the session termination signal. Nothing must follow it.
+`APPROVED` comment is session termination signal. Nothing must follow it.
 
-### Merge loop (closed-loop, fully autonomous)
+### Merge Loop (closed-loop, fully autonomous)
 
 ```
 Agent posts APPROVED → agent session ends
@@ -59,15 +59,15 @@ Agent posts APPROVED → agent session ends
   → sees APPROVED + CI green + agent gone → squash-merge
 ```
 
-If CI fires before the agent exits, the `workflow_run` path defers the merge ("agent still running").
-The `check_run` path then closes the loop when the session ends — no polling, no manual intervention.
+If CI fires before agent exits, `workflow_run` path defers merge ("agent still running").
+`check_run` path closes loop when session ends — no polling, no manual intervention.
 
 ## Writing Good Issues
 
-As **Customer**: Write the "what" and "why"
-As **Lead Developer**: Write the "how" and testing commands
+As **Customer**: Write "what" + "why"
+As **Lead Developer**: Write "how" + testing commands
 
-The better the issues, the more autonomous the pipeline. Use the agent-task template.
+Better issues → more autonomous pipeline. Use agent-task template.
 
 ## Budget (Copilot Pro $10/mo)
 

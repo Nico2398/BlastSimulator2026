@@ -9,11 +9,11 @@ description: >
 
 ## Philosophy
 
-No layer is optional. **More tests are always better** — do not limit the number of test cases.
+No layer optional. **More tests always better** — do not limit test cases.
 
 1. **Unit tests** — Every exported pure function in `src/core/` has exhaustive coverage. Fast, no I/O, seeded PRNG.
 2. **Small integration tests** — Console command sequences covering partial gameplay loops with huge scenario variation.
-3. **Full-level integration tests** — Complete runs from `new_game` to a terminal outcome (win or each loss condition).
+3. **Full-level integration tests** — Complete runs from `new_game` to terminal outcome (win or each loss condition).
 4. **Visual scenario tests** — Full browser sessions (Puppeteer). Screenshots + JSON state dumps after every command.
 
 All four layers must pass before any PR is merged. `npm run validate` runs TS type-check + unit + integration tests + build.
@@ -68,7 +68,7 @@ Always use seeded PRNG: `{ seed: 42 }`. Never use `Math.random()` in tests.
 
 **Location:** `tests/integration/` and `tests/integration/full-level/`
 
-Same Vitest runner. May import from `src/console/` (command layer). Must exercise at least one full round-trip through the game loop. No DOM, no Three.js.
+Same Vitest runner. May import from `src/console/` (command layer). Must exercise at least one full round-trip through game loop. No DOM, no Three.js.
 
 ### Small Integration Tests (≥ 8 scenarios per suite)
 
@@ -170,7 +170,7 @@ After any rendering change:
 
 ## Regression Test Policy
 
-Any bug fix must be accompanied by a new unit or integration test that:
+Any bug fix must include new unit or integration test that:
 - Fails on the buggy code
 - Passes on the fix
 

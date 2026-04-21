@@ -9,10 +9,10 @@ description: >
 
 ## Design Philosophy
 
-Vehicles are the player's operational muscle. Every vehicle needs a **qualified driver** (trained at Driving Center for that specific role). Vehicles share the navmesh with employees; congestion is intentional gameplay.
+Vehicles are player's operational muscle. Every vehicle needs **qualified driver** (trained at Driving Center for that specific role). Vehicles share navmesh with employees; congestion is intentional gameplay.
 
-- **Traffic congestion** — poorly laid out ramps, clustered warehouses, or neglected debris clearance cause queuing and lost productivity.
-- **Navmesh shared** — vehicles and employees navigate the same 2D nav grid (Ch.6); rock debris immediately marks cells as blocked.
+- **Traffic congestion** — poorly laid out ramps, clustered warehouses, neglected debris clearance → queuing + lost productivity.
+- **Navmesh shared** — vehicles + employees navigate same 2D nav grid (Ch.6); rock debris immediately marks cells as blocked.
 
 ## Vehicle Roles & Tier Names
 
@@ -85,10 +85,10 @@ export type VehicleState =
 
 ## Driver Qualification
 
-- Each vehicle role requires a distinct driving licence from the **Driving Center**
-- Employee without the licence for a role cannot be assigned to that vehicle
+- Each vehicle role requires distinct driving licence from **Driving Center**
+- Employee without licence for role cannot be assigned to that vehicle
 - One driver per vehicle; one vehicle per driver at a time
-- If driver is injured or leaves → vehicle becomes idle until qualified replacement assigned
+- Driver injured or leaves → vehicle idles until qualified replacement assigned
 
 ## Traffic & Routing
 
@@ -98,7 +98,7 @@ Vehicles use shared navmesh (Ch.6) with A* pathfinding. Congestion is gameplay-r
 - Rock debris after blast immediately marks cells as blocked until cleared
 - Destroyed building collapses into debris cell → blocks navmesh until removed
 
-**Player solutions to congestion:** widen ramps, build parallel haulage routes, relocate Freight Warehouse, clear debris with Rock Fragmenters before hauling.
+**Player solutions to congestion:** Widen ramps, build parallel haulage routes, relocate Freight Warehouse, clear debris with Rock Fragmenters before hauling.
 
 ## Vehicle Tasks
 
