@@ -106,8 +106,8 @@ describe('vehicle tier names match spec-defined humorous names (en)', () => {
     expect(t('vehicle.rock_digger.tier2')).toBe('Scoop Sergeant');
   });
 
-  it('rock_digger tier 3 is "Voxel Vanquisher"', () => {
-    expect(t('vehicle.rock_digger.tier3')).toBe('Voxel Vanquisher');
+  it('rock_digger tier 3 is "Rock Reaper"', () => {
+    expect(t('vehicle.rock_digger.tier3')).toBe('Rock Reaper');
   });
 
   it('rock_fragmenter tier 1 is "Cracky"', () => {
