@@ -1,6 +1,6 @@
 # BlastSimulator2026 — Copilot Instructions
 
-**What it is:** A satirical open-pit mine management game (Theme Hospital meets capitalism). Cartoon 3D visuals, blast physics, union strikes, mafia, lawsuits, 3-level campaign.
+**What it is:** Satirical open-pit mine management game (Theme Hospital meets capitalism). Cartoon 3D visuals, blast physics, union strikes, mafia, lawsuits, 3-level campaign.
 
 ## Skills
 
@@ -8,7 +8,7 @@ Skills in `.github/skills/` auto-load based on task relevance: `architecture`, `
 
 ## Custom Agents — TDD Development Pipeline
 
-For every feature or bug fix, follow the **test-driven development pipeline** using specialized agents. Each agent has focused context and tools for its phase:
+For every feature or bug fix, follow **test-driven development pipeline** using specialized agents. Each agent has focused context + tools for its phase:
 
 ### The TDD Pipeline
 
@@ -21,19 +21,20 @@ For every feature or bug fix, follow the **test-driven development pipeline** us
 ```
 
 **How to use agents:**
-- For a **new feature**: Start with `@test-writer` to define expected behavior as tests, then `@implementer` to make them pass, `@refactorer` to clean up, and `@validator` to confirm.
-- For a **bug fix**: Start with `@test-writer` to capture the bug as a failing test, then `@implementer` to fix it.
-- For a **visual change**: After the main pipeline, also run `@visual-tester` to capture and inspect screenshots.
-- For **simple tasks** (docs, config, typos): Skip the pipeline and make changes directly.
+- **New feature**: `@test-writer` → `@implementer` → `@refactorer` → `@validator`
+- **Bug fix**: `@test-writer` to capture bug → `@implementer` to fix
+- **Visual change**: After main pipeline, also run `@visual-tester`
+- **Simple tasks** (docs, config, typos): Skip pipeline, make changes directly
+- **PR review**: Use `@reviewer` outside the pipeline to audit a PR + post APPROVED to trigger auto-merge
 
-Agents are defined in `.github/agents/` and can be invoked as sub-agents from this main context.
+Agents defined in `.github/agents/`, invoked as sub-agents from main context.
 
 ### Agent Handoff Protocol
 
 Each agent should:
-1. Clearly state what it produced (files created/modified)
-2. Report pass/fail status of its verification step
-3. Identify the next agent in the pipeline
+1. State what it produced (files created/modified)
+2. Report pass/fail status of verification step
+3. Identify next agent in pipeline
 
 ## Architecture (never violate these boundaries)
 
@@ -43,7 +44,7 @@ Each agent should:
 - `src/persistence/` → Save backends (IndexedDB, File, Download). Imports only from core.
 - `src/ui/` → HTML overlay. Reads GameState.
 - `src/audio/` → Web Audio API.
-- `src/console/` → CLI mode, same core logic as the UI.
+- `src/console/` → CLI mode, same core logic as UI.
 - **State flows one way:** Input → Core → State mutation → Event emitted → Renderer/UI/Audio
 
 Key patterns: single serializable `GameState`, tick-based loop with `timeScale`/`isPaused`, typed `EventEmitter` for core→renderer communication, seeded PRNG for all randomness.
@@ -88,16 +89,27 @@ Available scenarios: `blast-basic`, `level1-win-efficient`, `level1-win-conserva
 
 ## Backlog
 
-The next phase of features to implement is documented in `.agent/NEXT_PHASE_DESIGN.md`. This is the feature backlog with atomic task breakdowns for 8 major systems (buildings, vehicles, employee skills, rock composition, blast algorithm, navmesh, employee needs, and testing strategy).
+Next phase features documented in `.agent/NEXT_PHASE_DESIGN.md`. Feature backlog with atomic task breakdowns for 8 major systems (buildings, vehicles, employee skills, rock composition, blast algorithm, navmesh, employee needs, testing strategy).
 
 ## Creative Direction
 
-The human is the **creative director**. Ask for input on:
+Human is **creative director**. Ask for input on:
 - New fictional names (rocks, ores, explosives, characters, levels)
 - New event content — propose 3–5 examples first, get tone approval
 - Game feel decisions (how punishing, how fast, etc.)
 
 Handle all technical decisions autonomously.
+
+## Tone and Style
+
+Short sentences. No filler. Simple words. Applies to chat responses, code comments, and markdown files.
+
+- "I fix bug. Tests pass. Done." not "I have successfully resolved the issue and all tests are now passing."
+- "Code bad here. I change." not "The implementation in this area could benefit from some refactoring."
+- "Need more info. What you want?" not "Could you please provide additional clarification on the requirements?"
+- No sorry. No please. No "Great question!". Just answer.
+
+Technical precision still required — short style, not shallow thinking.
 
 ## Code Review Rules
 

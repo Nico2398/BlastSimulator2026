@@ -9,10 +9,10 @@ description: >
 
 ## When to Load This Skill
 
-Load this skill whenever you need to:
+Load when you need to:
 - Identify what to work on next
-- Claim a task before starting any coding work
-- Mark a task done after merging a PR
+- Claim task before starting any coding work
+- Mark task done after merging PR
 - Check what is blocked or in-progress
 
 ---
@@ -80,21 +80,20 @@ Statuses: `"pending"` | `"in-progress"` | `"done"` | `"blocked"`
 
 ## Rules
 
-1. **Only one task `in-progress` at a time** per agent session. The `start` command enforces this.
-2. **Always call `done` after the PR is merged.** Pass `--pr <number>` to record the PR reference.
-3. **Prefer tasks with all `blockedBy` IDs resolved.** The `next` command handles this automatically.
-4. **Never skip `start`.** Claiming a task before coding prevents two agents working on the same item.
-5. If you cannot complete a task, call `block <id>` and note the reason in your PR description.
+1. **Only one task `in-progress` at a time** per agent session. `start` command enforces this.
+2. **Always call `done` after PR is merged.** Pass `--pr <number>` to record PR reference.
+3. **Prefer tasks with all `blockedBy` IDs resolved.** `next` command handles this automatically.
+4. **Never skip `start`.** Claiming task before coding prevents two agents on same item.
+5. Can't complete task → call `block <id>` + note reason in PR description.
 
 ---
 
 ## Developer Script
 
-A richer, colour-formatted version of the same commands is available for humans:
+Richer, colour-formatted version of same commands for humans:
 
 ```bash
 npx tsx scripts/backlog.ts <command> [args]
 ```
 
-Both scripts read and write the same `backlog.json` file. Use the developer script locally to
-inspect progress; use the agent script in automated pipelines.
+Both scripts read/write same `backlog.json`. Use developer script locally to inspect progress; use agent script in automated pipelines.

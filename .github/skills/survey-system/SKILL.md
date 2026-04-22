@@ -9,7 +9,7 @@ description: >
 
 ## Design Goals
 
-Players should not know exactly what ore is in the ground — discovery is rewarding and creates strategic decisions. Before blasting, surveys reveal ore density maps that help choose blast patterns, explosive types, and contract targets. The existing `VoxelGrid` stores `oreDensities` per voxel; this system adds the **player-visible layer**: surveys, reveal mechanics, and estimation error.
+Players should not know exactly what ore is in ground — discovery is rewarding, creates strategic decisions. Before blasting, surveys reveal ore density maps to help choose blast patterns, explosive types, contract targets. Existing `VoxelGrid` stores `oreDensities` per voxel; this system adds **player-visible layer**: surveys, reveal mechanics, estimation error.
 
 ## Survey Methods
 
@@ -46,7 +46,7 @@ export interface SurveyResult {
 }
 ```
 
-Survey results are **stale after 100 ticks** (terrain disturbed by blasts). UI renders a confidence heatmap overlay.
+Survey results **stale after 100 ticks** (terrain disturbed by blasts). UI renders confidence heatmap overlay.
 
 ## Estimation Algorithm (`SurveyCalc.ts`)
 
@@ -64,7 +64,7 @@ Always use seeded PRNG (`src/core/math/Random.ts`) — never `Math.random()`.
 
 ## Rock Composition (Voxel Data Model, Ch.5 prerequisite)
 
-Each voxel stores a mixture of up to 4 rock types with coefficients summing to 1.0:
+Each voxel stores mixture of up to 4 rock types with coefficients summing to 1.0:
 
 ```typescript
 export interface VoxelRockComposition {
@@ -72,11 +72,11 @@ export interface VoxelRockComposition {
 }
 ```
 
-Generation: per-rock Simplex noise field + level bias, normalized. This data feeds both texture rendering and blast energy threshold calculation.
+Generation: per-rock Simplex noise field + level bias, normalized. Feeds texture rendering + blast energy threshold calculation.
 
 ## Ore Veins
 
-Ores are not spread homogeneously. Each ore type has a separate Simplex field with a high threshold, producing elongated vein shapes. Surface veins are visible as color tints. Sub-surface veins require survey to detect.
+Ores not spread homogeneously. Each ore type has separate Simplex field with high threshold → elongated vein shapes. Surface veins visible as color tints. Sub-surface veins require survey to detect.
 
 ## Ore Grade Reporting Post-Blast
 

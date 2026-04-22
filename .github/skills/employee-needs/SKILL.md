@@ -9,7 +9,7 @@ description: >
 
 ## Design Goals
 
-Employees have three biological needs modelled as gauges that fill over time and must be satisfied by visiting buildings. Unmet needs drain morale, reduce effectiveness, and cause collapse. This connects to Buildings (Ch.1) and the Task Queue system (Ch.3).
+3 biological needs modelled as gauges — fill over time, satisfied by visiting buildings. Unmet needs drain morale, reduce effectiveness, cause collapse. Connects to Buildings (Ch.1) + Task Queue (Ch.3).
 
 ## Need Gauges
 
@@ -64,7 +64,7 @@ If no suitable building within 20 cells: employee collapses in place, rest durat
 | Bunkhouse | +8 fatigue/tick | +14 fatigue/tick | +20 fatigue/tick |
 | Break Room | +10 breakNeed/tick | +16 breakNeed/tick | +22 breakNeed/tick |
 
-If building is full → employee waits in queue (gauges drain at normal awake rate while waiting). Must route to next nearest if no capacity.
+Building full → employee waits in queue (gauges drain at normal awake rate while waiting). Route to next nearest if no capacity.
 
 ## Proactive Need Queuing
 
@@ -76,7 +76,7 @@ Auto-insert rest tasks at warning thresholds — don't wait for collapse:
 | `fatigue` | 25 | Insert `rest(bunkhouse)` after current task if not already queued |
 | `breakNeed` | 30 | Insert `rest(break_room)` after current task if not already queued |
 
-If queue full → skip auto-insert + emit `need_warning` event for player.
+Queue full → skip auto-insert + emit `need_warning` event for player.
 
 ## Cost of Needs
 

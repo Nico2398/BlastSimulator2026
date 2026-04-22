@@ -9,13 +9,13 @@ description: >
 
 ## Design Goals
 
-Employees and vehicles navigate the mine surface autonomously, routing around drill holes, buildings, parked vehicles, and pit edges. As blasts create craters and benches, the navigable surface changes dynamically. Must be fast enough for 20+ simultaneous agents at 8× game speed without frame drops.
+Employees + vehicles navigate mine surface autonomously, routing around drill holes, buildings, parked vehicles, pit edges. Blasts create craters + benches → navigable surface changes dynamically. Must handle 20+ simultaneous agents at 8× speed without frame drops.
 
-Implementation: **2D navigation grid** derived from VoxelGrid surface, refreshed incrementally after blasts. Full 3D pathfinding not required — vertical movement via dedicated ramps.
+**2D navigation grid** derived from VoxelGrid surface, refreshed incrementally after blasts. No full 3D pathfinding — vertical movement via dedicated ramps.
 
 ## Navigation Grid
 
-The `NavGrid` is a 2D array of `NavCell` mirroring the VoxelGrid's X×Z footprint:
+The `NavGrid` is 2D array of `NavCell` mirroring VoxelGrid's X×Z footprint:
 
 ```typescript
 export type NavCellType =
@@ -79,16 +79,16 @@ h(a, b) = max(|dx|, |dz|) + (√2 − 1) * min(|dx|, |dz|)
 
 ## Ramps & Multi-Level Navigation
 
-The pit descends in bench levels. Employees and vehicles access lower benches via **ramp structures** (building type `'ramp'`, footprint 1×4 cells, oriented N/S/E/W). Ramps appear as `ramp` cells bridging two bench levels.
+Pit descends in bench levels. Employees + vehicles access lower benches via **ramp structures** (building type `'ramp'`, footprint 1×4 cells, oriented N/S/E/W). Ramps appear as `ramp` cells bridging two bench levels.
 
 Multi-level path planning:
 1. Same bench level → standard A*
 2. Different levels → find nearest ramp connecting required levels → 3-query route: `start → ramp entrance → ramp exit → destination`
-3. No ramp exists for required levels → `found: false`, emit `no_ramp_available` event
+3. No ramp for required levels → `found: false`, emit `no_ramp_available` event
 
 ## Dynamic NavGrid Updates
 
-The NavGrid is **incrementally updated** — full rebuild is too expensive.
+NavGrid is **incrementally updated** — full rebuild too expensive.
 
 | Trigger | Region Updated |
 |---------|---------------|
@@ -98,11 +98,11 @@ The NavGrid is **incrementally updated** — full rebuild is too expensive.
 | Drill hole added | Single cell |
 | Ramp built | 1×4 footprint + adjacent cells |
 
-Paths that cross an updated region are marked stale and re-requested next tick. Paths outside the region remain valid.
+Paths crossing updated region → marked stale, re-requested next tick. Paths outside region remain valid.
 
 ## Path Following & Stuck State
 
-Agents move at most `walkSpeed` cells/tick toward next waypoint. If next waypoint becomes `blocked` mid-path → re-request from current position. After **3 consecutive failed re-requests** → `stuck` state:
+Agents move at most `walkSpeed` cells/tick toward next waypoint. Next waypoint becomes `blocked` mid-path → re-request from current position. After **3 consecutive failed re-requests** → `stuck` state:
 - Idle, morale −2/tick
 - Emits `agent_stuck` event
 - Resumes when path clears

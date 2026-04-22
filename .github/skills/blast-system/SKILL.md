@@ -9,7 +9,7 @@ description: >
 
 ## Pipeline Overview
 
-The blast system is a four-step physical simulation, all tuning constants in `src/core/config/balance.ts`:
+Four-step physical simulation. All tuning constants in `src/core/config/balance.ts`:
 
 ```
 Step 1: Energy Propagation through voxel grid
@@ -67,7 +67,7 @@ For each voxel v with overflowEnergy[v] > 0:
     distribute share to up to 6 face-adjacent non-air neighbours
 ```
 
-This naturally models confined blasts (strong rock → energy stays local) and overcharged blasts (energy radiates outward).
+This naturally models confined blasts (strong rock → energy stays local) + overcharged blasts (energy radiates outward).
 
 ## Step 2 — Fragmentation & Damage
 
@@ -77,7 +77,7 @@ if effectiveEnergy[v] >= FRAGMENTATION_MULTIPLIER * T(v):  → voxel becomes air
 ```
 `FRAGMENTATION_MULTIPLIER = 1.0` (balance constant).
 
-**Isolated rock islands:** After fragmentation pass, flood-fill from grid boundary. Solid clusters with no path to boundary are also fragmented (handles hanging rock arches).
+**Isolated rock islands:** After fragmentation pass, flood-fill from grid boundary. Solid clusters with no path to boundary also fragmented (handles hanging rock arches).
 
 **Entity damage:**
 - Employees/vehicles on a fragmented voxel → instantly killed/destroyed
@@ -98,7 +98,7 @@ fragmentCount(v) = max(1, round(F(v)))
 ```
 `FRAGMENTATION_SCORE_SCALE = 3.0`.
 
-**Voronoi seed sampling:** randomly sample `fragmentCount(v)` 3D points inside each fragmented voxel's unit cube. All points form a global point cloud P.
+**Voronoi seed sampling:** randomly sample `fragmentCount(v)` 3D points inside each fragmented voxel's unit cube. All points form global point cloud P.
 
 **3D Voronoi decomposition:**
 1. **Bowyer–Watson Delaunay tetrahedralization** of point cloud P
