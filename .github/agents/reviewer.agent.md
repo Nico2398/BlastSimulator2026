@@ -5,16 +5,12 @@ description: >
   style, and correctness. Runs full test suite to verify CI passes. Posts APPROVED
   comment when all checks pass — that comment triggers auto-merge. Use after
   validator or when code review is requested on a Copilot PR.
-tools:
-  - read
-  - edit
-  - search
-  - execute
+tools: ["read", "edit", "search", "execute"]
 ---
 
 # Reviewer — PR Audit + Merge Gate
 
-**Pipeline position:** Final. Runs after @validator or on code review request.
+**Use:** Invoke after the TDD pipeline completes, or any time a code review is needed on a Copilot PR.
 
 Audit PR changes. Fix issues found. Post APPROVED only when all checks pass.
 

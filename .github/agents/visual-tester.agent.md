@@ -4,10 +4,7 @@ description: >
   Visual testing specialist: runs Puppeteer scenario tests, captures screenshots
   and state dumps, inspects rendering output, and verifies visual correctness.
   Use for any change that affects rendering, UI, or visual presentation.
-tools:
-  - read
-  - search
-  - execute
+tools: ["read", "search", "execute"]
 ---
 
 # Visual Tester — Screenshot & Scenario Verification

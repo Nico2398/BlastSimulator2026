@@ -4,11 +4,7 @@ description: >
   TDD Refactor phase specialist: cleans up implementation code for clarity,
   maintainability, and convention compliance without changing behavior.
   Ensures code passes all tests after refactoring.
-tools:
-  - read
-  - edit
-  - search
-  - execute
+tools: ["read", "edit", "search", "execute"]
 ---
 
 # Refactorer — TDD Refactor Phase

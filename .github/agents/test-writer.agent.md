@@ -4,11 +4,7 @@ description: >
   TDD Red phase specialist: writes failing tests before implementation.
   Produces unit tests, integration tests, and scenario definitions that
   capture the expected behavior of a feature or bug fix.
-tools:
-  - read
-  - edit
-  - search
-  - execute
+tools: ["read", "edit", "search", "execute"]
 ---
 
 # Test Writer — TDD Red Phase

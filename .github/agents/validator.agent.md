@@ -4,10 +4,7 @@ description: >
   Validation specialist: runs the full test suite, type checking, and build
   verification. Detects regressions, type errors, and build failures.
   Reports pass/fail status with actionable diagnostics.
-tools:
-  - read
-  - search
-  - execute
+tools: ["read", "search", "execute"]
 ---
 
 # Validator — Full Suite Verification

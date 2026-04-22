@@ -18,7 +18,6 @@ For every feature or bug fix, follow **test-driven development pipeline** using 
 3. @refactorer     → Clean up code for clarity (Refactor phase)
 4. @validator      → Run full validation suite
 5. @visual-tester  → Screenshot verification (only for visual changes)
-6. @reviewer       → PR audit + merge gate (autonomous pipeline)
 ```
 
 **How to use agents:**
@@ -26,7 +25,7 @@ For every feature or bug fix, follow **test-driven development pipeline** using 
 - **Bug fix**: `@test-writer` to capture bug → `@implementer` to fix
 - **Visual change**: After main pipeline, also run `@visual-tester`
 - **Simple tasks** (docs, config, typos): Skip pipeline, make changes directly
-- **PR review**: `@reviewer` audits + posts APPROVED to trigger auto-merge
+- **PR review**: Use `@reviewer` outside the pipeline to audit a PR + post APPROVED to trigger auto-merge
 
 Agents defined in `.github/agents/`, invoked as sub-agents from main context.
 

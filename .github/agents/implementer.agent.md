@@ -4,11 +4,7 @@ description: >
   TDD Green phase specialist: writes the minimum code needed to make
   failing tests pass. Focuses on correctness over elegance, respecting
   architecture boundaries and coding conventions.
-tools:
-  - read
-  - edit
-  - search
-  - execute
+tools: ["read", "edit", "search", "execute"]
 ---
 
 # Implementer — TDD Green Phase

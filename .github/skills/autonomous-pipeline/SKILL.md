@@ -42,6 +42,8 @@ description: >
 
 ## Reviewer Agent
 
+Separate from the TDD pipeline. Invoke to audit a PR and post `APPROVED` as the auto-merge trigger.
+
 Review flow:
 1. Run all checks (architecture, i18n, 300-line limit, no Math.random(), tests via `npm run validate`)
 2. If issues found: push fixes, wait for CI to start on new commit
