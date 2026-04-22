@@ -122,6 +122,12 @@ export interface Vehicle {
   /** Target coordinates for movement/task. */
   targetX: number;
   targetZ: number;
+  /** ID of the employee currently driving this vehicle (null = unassigned). */
+  driverId: number | null;
+  /** High-level operational state. */
+  state: VehicleOperationalState;
+  /** Current payload in kg. */
+  payloadKg: number;
 }
 
 // ── Fleet state ──
@@ -152,6 +158,9 @@ export function purchaseVehicle(
     task: 'idle',
     targetX: x,
     targetZ: z,
+    driverId: null,
+    state: 'idle',
+    payloadKg: 0,
   };
   state.vehicles.push(vehicle);
   return { vehicle, cost: def.purchaseCost };

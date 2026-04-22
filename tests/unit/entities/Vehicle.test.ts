@@ -765,3 +765,162 @@ describe('getVehicleDefByTier — tier 3 purchaseCost = tier 1 purchaseCost × 4
     expect(t3.purchaseCost).toBeCloseTo(t1.purchaseCost * 4.0, 5);
   });
 });
+
+// ═════════════════════════════════════════════════════════════════════════════
+// TASK 2.5 — Vehicle interface fields: driverId, state, payloadKg, targetX/Z
+// ═════════════════════════════════════════════════════════════════════════════
+
+// ── Vehicle interface fields ──────────────────────────────────────────────────
+
+describe('Vehicle interface fields', () => {
+  it('newly purchased vehicle has driverId initialised to null (unassigned)', () => {
+    // driverId: number | null — null means no driver is currently assigned.
+    // Fails (Red) until Vehicle interface adds driverId and purchaseVehicle() sets it to null.
+    const vs = createVehicleState();
+    const { vehicle } = purchaseVehicle(vs, 'debris_hauler');
+    expect(vehicle.driverId).toBeNull();
+  });
+
+  it('driverId is null for every vehicle role immediately after purchase', () => {
+    // Exhaustively checks every role so no role-specific initialisation path is missed.
+    const vs = createVehicleState();
+    for (const role of ALL_ROLES) {
+      const { vehicle } = purchaseVehicle(vs, role);
+      expect(vehicle.driverId).toBeNull();
+    }
+  });
+
+  it('newly purchased vehicle has state initialised to "idle"', () => {
+    // state: VehicleOperationalState — must be 'idle' on a fresh vehicle with no assigned work.
+    // Fails (Red) until Vehicle interface adds state and purchaseVehicle() sets it to 'idle'.
+    const vs = createVehicleState();
+    const { vehicle } = purchaseVehicle(vs, 'rock_digger');
+    expect(vehicle.state).toBe('idle');
+  });
+
+  it('state is "idle" for every vehicle role immediately after purchase', () => {
+    // Exhaustively checks every role so no role-specific initialisation path is missed.
+    const vs = createVehicleState();
+    for (const role of ALL_ROLES) {
+      const { vehicle } = purchaseVehicle(vs, role);
+      expect(vehicle.state).toBe('idle');
+    }
+  });
+
+  it('newly purchased vehicle has payloadKg initialised to 0', () => {
+    // payloadKg: number — 0 means the vehicle is carrying nothing when first purchased.
+    // Fails (Red) until Vehicle interface adds payloadKg and purchaseVehicle() sets it to 0.
+    const vs = createVehicleState();
+    const { vehicle } = purchaseVehicle(vs, 'debris_hauler');
+    expect(vehicle.payloadKg).toBe(0);
+  });
+
+  it('payloadKg is 0 for every vehicle role immediately after purchase', () => {
+    // Exhaustively checks every role so no role-specific initialisation path is missed.
+    const vs = createVehicleState();
+    for (const role of ALL_ROLES) {
+      const { vehicle } = purchaseVehicle(vs, role);
+      expect(vehicle.payloadKg).toBe(0);
+    }
+  });
+
+  it('newly purchased vehicle has payloadKg that is a non-negative finite number', () => {
+    // Guards against -0, NaN, Infinity being used as the zero payload sentinel.
+    const vs = createVehicleState();
+    const { vehicle } = purchaseVehicle(vs, 'rock_fragmenter');
+    expect(vehicle.payloadKg).toBeGreaterThanOrEqual(0);
+    expect(Number.isFinite(vehicle.payloadKg)).toBe(true);
+  });
+
+  it('targetX equals the x coordinate passed to purchaseVehicle (confirmatory)', () => {
+    // targetX already exists on Vehicle; confirms it is initialised to the spawn position.
+    // This test passes today and must continue to pass after task-2.5 changes land.
+    const vs = createVehicleState();
+    const { vehicle } = purchaseVehicle(vs, 'drill_rig', 7, 3);
+    expect(vehicle.targetX).toBe(7);
+  });
+
+  it('targetZ equals the z coordinate passed to purchaseVehicle (confirmatory)', () => {
+    // targetZ already exists on Vehicle; confirms it is initialised to the spawn position.
+    // This test passes today and must continue to pass after task-2.5 changes land.
+    const vs = createVehicleState();
+    const { vehicle } = purchaseVehicle(vs, 'building_destroyer', 2, 11);
+    expect(vehicle.targetZ).toBe(11);
+  });
+
+  it('targetX and targetZ both equal the spawn coordinates when x and z differ (confirmatory)', () => {
+    // Ensures neither axis is accidentally cross-assigned (x→targetZ or z→targetX).
+    const vs = createVehicleState();
+    const { vehicle } = purchaseVehicle(vs, 'rock_digger', 4, 9);
+    expect(vehicle.targetX).toBe(4);
+    expect(vehicle.targetZ).toBe(9);
+  });
+});
+
+// ── Vehicle.state field ───────────────────────────────────────────────────────
+
+describe('Vehicle.state field', () => {
+  // Each test uses the `satisfies` operator to express a compile-time constraint:
+  // vehicle.state must be typed as VehicleOperationalState on the Vehicle interface.
+  // At runtime these also fail (Red) because purchaseVehicle() does not yet initialise
+  // vehicle.state, leaving it undefined — which does not satisfy any of the checks below.
+
+  it('Vehicle.state field holds "idle" after purchase — satisfies VehicleOperationalState', () => {
+    // Both a runtime assertion (state === 'idle') and a type-level annotation.
+    // Fails (Red) until Vehicle.state is added to the interface and set to 'idle' in purchaseVehicle().
+    const vs = createVehicleState();
+    const { vehicle } = purchaseVehicle(vs, 'debris_hauler');
+    const s = (vehicle.state satisfies VehicleOperationalState);
+    expect(s).toBe('idle' satisfies VehicleOperationalState);
+  });
+
+  it('Vehicle.state field is defined immediately after purchase', () => {
+    // A field that is not initialised by purchaseVehicle() will be undefined.
+    // Fails (Red) until purchaseVehicle() sets vehicle.state to a VehicleOperationalState value.
+    const vs = createVehicleState();
+    const { vehicle } = purchaseVehicle(vs, 'rock_digger');
+    expect(vehicle.state).toBeDefined();
+  });
+
+  it('"moving" is a valid Vehicle.state value — satisfies VehicleOperationalState', () => {
+    // Compile-time: vehicle.state must accept 'moving' without a type error.
+    // Runtime: confirms the field exists on a freshly purchased vehicle, then verifies a
+    // 'moving' assignment round-trips correctly once the field is present on the interface.
+    // Fails (Red) because vehicle.state is undefined until purchaseVehicle() initialises it.
+    const vs = createVehicleState();
+    const { vehicle } = purchaseVehicle(vs, 'debris_hauler');
+    expect(vehicle.state).toBeDefined(); // fails red — field not yet initialised
+    vehicle.state = ('moving' satisfies VehicleOperationalState);
+    expect(vehicle.state satisfies VehicleOperationalState).toBe('moving');
+  });
+
+  it('"working" is a valid Vehicle.state value — satisfies VehicleOperationalState', () => {
+    // Same pattern as "moving": verifies the field is defined before mutating it.
+    // Fails (Red) because vehicle.state is undefined until purchaseVehicle() initialises it.
+    const vs = createVehicleState();
+    const { vehicle } = purchaseVehicle(vs, 'drill_rig');
+    expect(vehicle.state).toBeDefined(); // fails red — field not yet initialised
+    vehicle.state = ('working' satisfies VehicleOperationalState);
+    expect(vehicle.state satisfies VehicleOperationalState).toBe('working');
+  });
+
+  it('"waiting" is a valid Vehicle.state value — satisfies VehicleOperationalState', () => {
+    // Same pattern as "moving": verifies the field is defined before mutating it.
+    // Fails (Red) because vehicle.state is undefined until purchaseVehicle() initialises it.
+    const vs = createVehicleState();
+    const { vehicle } = purchaseVehicle(vs, 'rock_fragmenter');
+    expect(vehicle.state).toBeDefined(); // fails red — field not yet initialised
+    vehicle.state = ('waiting' satisfies VehicleOperationalState);
+    expect(vehicle.state satisfies VehicleOperationalState).toBe('waiting');
+  });
+
+  it('"broken" is a valid Vehicle.state value — satisfies VehicleOperationalState', () => {
+    // Same pattern as "moving": verifies the field is defined before mutating it.
+    // Fails (Red) because vehicle.state is undefined until purchaseVehicle() initialises it.
+    const vs = createVehicleState();
+    const { vehicle } = purchaseVehicle(vs, 'building_destroyer');
+    expect(vehicle.state).toBeDefined(); // fails red — field not yet initialised
+    vehicle.state = ('broken' satisfies VehicleOperationalState);
+    expect(vehicle.state satisfies VehicleOperationalState).toBe('broken');
+  });
+});
