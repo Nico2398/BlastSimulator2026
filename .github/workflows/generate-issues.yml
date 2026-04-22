@@ -104,7 +104,7 @@ jobs:
             }
 
             if (created === 0) {
-              console.log('All eligible tasks already have open issues.');
+              console.log('All eligible tasks already have issues (open or closed).');
             } else {
               console.log(`Done — created ${created} issue(s).`);
             }
