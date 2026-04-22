@@ -274,7 +274,7 @@
       "src/core/entities/Vehicle.ts"
     ],
     "testFile": "tests/unit/entities/Vehicle.test.ts",
-    "status": "in-progress",
+    "status": "done",
     "blockedBy": [
       "2.5"
     ],

@@ -224,11 +224,11 @@ export function getVehicleCostsPerTick(state: VehicleState): number {
 // ── Licence mapping ──
 
 const ROLE_LICENCE_REQUIRED: Record<VehicleRole, SkillCategory> = {
-  debris_hauler:      'driving.truck',
+  debris_hauler: 'driving.truck',
   building_destroyer: 'driving.truck',
-  rock_digger:        'driving.excavator',
-  rock_fragmenter:    'driving.excavator',
-  drill_rig:          'driving.drill_rig',
+  rock_digger: 'driving.excavator',
+  rock_fragmenter: 'driving.excavator',
+  drill_rig: 'driving.drill_rig',
 };
 
 /** Assign a driver (employee) to a vehicle, enforcing licence and availability checks. */
