@@ -12,6 +12,9 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: generate-issues-from-backlog
+  cancel-in-progress: false
 jobs:
   generate:
     runs-on: ubuntu-latest
