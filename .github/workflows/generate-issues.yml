@@ -9,7 +9,8 @@ on:
         default: "1"
         type: string
 
-permissions: {}
+permissions:
+  contents: read
 
 jobs:
   generate:
@@ -28,7 +29,8 @@ jobs:
 
             const owner = context.repo.owner;
             const repo  = context.repo.repo;
-            const maxCount = Math.min(parseInt('${{ inputs.count }}', 10) || 1, 5);
+            const parsedCount = parseInt(context.payload.inputs?.count ?? '1', 10);
+            const maxCount = Math.max(1, Math.min(Number.isNaN(parsedCount) ? 1 : parsedCount, 5));
 
             // --- Load backlog ---
             const backlogPath = path.join(process.env.GITHUB_WORKSPACE, '.github/skills/backlog/backlog.json');
@@ -36,22 +38,24 @@ jobs:
 
             const doneIds = new Set(tasks.filter(t => t.status === 'done').map(t => t.id));
 
-            const candidates = tasks.filter(t =>
-              t.status === 'pending' &&
-              t.blockedBy.every(id => doneIds.has(id))
-            );
+            const candidates = tasks
+              .filter(t =>
+                t.status === 'pending' &&
+                t.blockedBy.every(id => doneIds.has(id))
+              )
+              .sort((a, b) => a.chapter - b.chapter);
 
             if (candidates.length === 0) {
               console.log('No pending tasks with resolved blockers found.');
               return;
             }
 
-            // --- Fetch existing open issues to avoid duplicates ---
-            const { data: existingIssues } = await github.rest.issues.listForRepo({
+            // --- Fetch ALL existing issues (open + closed) to avoid duplicates ---
+            const existingIssues = await github.paginate(github.rest.issues.listForRepo, {
               owner, repo,
-              state: 'open',
+              state: 'all',
+              labels: 'agent-task',
               per_page: 100,
-              labels: 'agent-task'
             });
 
             const existingBacklogIds = new Set(
@@ -66,30 +70,14 @@ jobs:
               if (created >= maxCount) break;
 
               if (existingBacklogIds.has(task.id)) {
-                console.log(`Skipping task ${task.id} — open issue already exists.`);
+                console.log(`Skipping task ${task.id} — issue already exists.`);
                 continue;
               }
-
-              const fileList = task.files.map(f => `- \`${f}\``).join('\n');
-              const testLine = task.testFile ? `- \`${task.testFile}\`` : '_(none)_';
-              const depLine  = task.blockedBy.length > 0
-                ? task.blockedBy.map(id => `- \`${id}\``).join('\n')
-                : '_(none)_';
 
               const body = [
                 `backlog-id: ${task.id}`,
                 '',
-                `## Task`,
-                `Chapter ${task.chapter} — ${task.title}`,
-                '',
-                `## Files`,
-                fileList,
-                '',
-                `## Test file`,
-                testLine,
-                '',
-                `## Resolved dependencies`,
-                depLine,
+                `See \`.github/skills/backlog/backlog.json\` (id: \`${task.id}\`) for the full story details, files, test file, and resolved dependencies.`,
                 '',
                 `## Agent Instructions`,
                 `Follow the TDD pipeline:`,
