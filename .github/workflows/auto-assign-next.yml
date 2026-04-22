@@ -60,11 +60,6 @@ jobs:
 
               // Assign to Copilot
               console.log(`Assigning #${issue.number} to Copilot.`);
-              await github.rest.issues.addAssignees({
-                owner, repo,
-                issue_number: issue.number,
-                assignees: ['copilot']
-              });
               await github.rest.issues.removeLabel({
                 owner, repo,
                 issue_number: issue.number,
@@ -75,6 +70,15 @@ jobs:
                 issue_number: issue.number,
                 labels: ['in-progress']
               });
+
+              // Trigger Copilot coding agent via comment (addAssignees silently drops
+              // the 'copilot' bot user when called via PAT — no issues.assigned event fires)
+              await github.rest.issues.createComment({
+                owner, repo,
+                issue_number: issue.number,
+                body: '@copilot Please work on this issue following the TDD pipeline instructions in the issue body.'
+              });
+              console.log(`Copilot triggered via comment on #${issue.number}`);
 
               return; // Only assign one at a time
             }
