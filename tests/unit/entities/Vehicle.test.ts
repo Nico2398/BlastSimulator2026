@@ -12,7 +12,17 @@ import {
   getVehicleDef,
   getAllVehicleRoles,
   getVehicleDefByTier,
+  // ── Task 2.6 — not yet implemented in Vehicle.ts (Red phase) ────────────────
+  assignDriver,
 } from '../../../src/core/entities/Vehicle.js';
+import { Random } from '../../../src/core/math/Random.js';
+import {
+  createEmployeeState,
+  hireEmployee,
+  assignSkill,
+  killEmployee,
+} from '../../../src/core/entities/Employee.js';
+import type { SkillCategory } from '../../../src/core/entities/Employee.js';
 
 // ── Role catalogue ────────────────────────────────────────────────────────────
 
@@ -922,5 +932,475 @@ describe('Vehicle.state field', () => {
     expect(vehicle.state).toBeDefined(); // fails red — field not yet initialised
     vehicle.state = ('broken' satisfies VehicleOperationalState);
     expect(vehicle.state satisfies VehicleOperationalState).toBe('broken');
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// TASK 2.6 — assignDriver(): validate employee licence for vehicle role
+// ═════════════════════════════════════════════════════════════════════════════
+//
+// WHY THESE TESTS FAIL (Red phase):
+//   `assignDriver` is not yet exported from Vehicle.ts.  When the module is
+//   imported the named export resolves to `undefined`.  Every test that calls
+//   `assignDriver(...)` therefore throws "TypeError: assignDriver is not a
+//   function".  No implementation changes should be made here — all changes go
+//   in src/core/entities/Vehicle.ts.
+//
+// Licence mapping under test (VehicleRole → required SkillCategory):
+//   debris_hauler      → driving.truck
+//   building_destroyer → driving.truck
+//   rock_digger        → driving.excavator
+//   rock_fragmenter    → driving.excavator
+//   drill_rig          → driving.drill_rig
+
+// ── Fixture helpers ───────────────────────────────────────────────────────────
+
+/** Deterministic seed used for all task-2.6 RNG calls. */
+const ASSIGN_DRIVER_SEED = 42;
+
+/**
+ * Creates a minimal, self-consistent test fixture:
+ *   - One VehicleState containing exactly one purchased vehicle of `vehicleRole`.
+ *   - One EmployeeState containing exactly one alive 'driver' employee.
+ *   - If `licenceCategory` is provided, the employee is given that skill at
+ *     proficiency level 1 via assignSkill().  If omitted, the employee has no
+ *     qualifications at all.
+ *
+ * Returns the states plus the IDs needed by assignDriver().
+ */
+function makeDriverFixture(
+  vehicleRole: VehicleRole,
+  licenceCategory?: string,
+): { vs: ReturnType<typeof createVehicleState>; es: ReturnType<typeof createEmployeeState>; vehicleId: number; empId: number } {
+  const vs = createVehicleState();
+  const { vehicle } = purchaseVehicle(vs, vehicleRole);
+
+  const es = createEmployeeState();
+  const rng = new Random(ASSIGN_DRIVER_SEED);
+  const { employee } = hireEmployee(es, 'driver', rng);
+
+  if (licenceCategory !== undefined) {
+    assignSkill(es, employee.id, licenceCategory as SkillCategory, 1);
+  }
+
+  return { vs, es, vehicleId: vehicle.id, empId: employee.id };
+}
+
+/**
+ * Same as makeDriverFixture but places the employee as `driverId` on a
+ * *second* vehicle in the fleet, simulating an existing driver assignment
+ * without calling assignDriver() itself.  The first vehicle (the target) has
+ * no driver so only the "already driving" rule fires.
+ */
+function makeAlreadyDrivingFixture(
+  targetRole: VehicleRole,
+  licenceCategory: string,
+): { vs: ReturnType<typeof createVehicleState>; es: ReturnType<typeof createEmployeeState>; vehicleId: number; empId: number } {
+  const { vs, es, vehicleId, empId } = makeDriverFixture(targetRole, licenceCategory);
+
+  // Purchase a second vehicle of any role and directly assign our employee
+  // as its driver — bypassing assignDriver() to set up the precondition.
+  const { vehicle: otherVehicle } = purchaseVehicle(vs, 'debris_hauler');
+  otherVehicle.driverId = empId;
+
+  return { vs, es, vehicleId, empId };
+}
+
+/**
+ * Same as makeDriverFixture but the target vehicle already has a driver
+ * (driverId set to a placeholder id 999), simulating a pre-occupied vehicle.
+ * The incoming employee is fully qualified so only the "vehicle taken" rule fires.
+ */
+function makeVehicleTakenFixture(
+  vehicleRole: VehicleRole,
+  licenceCategory: string,
+): { vs: ReturnType<typeof createVehicleState>; es: ReturnType<typeof createEmployeeState>; vehicleId: number; empId: number; originalDriverId: number } {
+  const { vs, es, vehicleId, empId } = makeDriverFixture(vehicleRole, licenceCategory);
+
+  // Directly set a pre-existing driver on the vehicle.
+  const vehicle = vs.vehicles.find(v => v.id === vehicleId)!;
+  const originalDriverId = 999;
+  vehicle.driverId = originalDriverId;
+
+  return { vs, es, vehicleId, empId, originalDriverId };
+}
+
+// ── Happy path — qualified driver successfully assigned ───────────────────────
+
+describe('assignDriver — happy path: debris_hauler requires driving.truck', () => {
+  it('returns { success: true } when employee holds driving.truck licence', () => {
+    const { vs, es, vehicleId, empId } = makeDriverFixture('debris_hauler', 'driving.truck');
+    const result = assignDriver(vs, es, vehicleId, empId);
+    expect(result.success).toBe(true);
+  });
+
+  it('sets vehicle.driverId to the employee id on success', () => {
+    const { vs, es, vehicleId, empId } = makeDriverFixture('debris_hauler', 'driving.truck');
+    assignDriver(vs, es, vehicleId, empId);
+    const vehicle = vs.vehicles.find(v => v.id === vehicleId)!;
+    expect(vehicle.driverId).toBe(empId);
+  });
+
+  it('returns no error property on success (error is undefined)', () => {
+    const { vs, es, vehicleId, empId } = makeDriverFixture('debris_hauler', 'driving.truck');
+    const result = assignDriver(vs, es, vehicleId, empId);
+    expect(result.error).toBeUndefined();
+  });
+});
+
+describe('assignDriver — happy path: building_destroyer requires driving.truck', () => {
+  it('returns { success: true } when employee holds driving.truck licence', () => {
+    const { vs, es, vehicleId, empId } = makeDriverFixture('building_destroyer', 'driving.truck');
+    const result = assignDriver(vs, es, vehicleId, empId);
+    expect(result.success).toBe(true);
+  });
+
+  it('sets vehicle.driverId to the employee id on success', () => {
+    const { vs, es, vehicleId, empId } = makeDriverFixture('building_destroyer', 'driving.truck');
+    assignDriver(vs, es, vehicleId, empId);
+    const vehicle = vs.vehicles.find(v => v.id === vehicleId)!;
+    expect(vehicle.driverId).toBe(empId);
+  });
+});
+
+describe('assignDriver — happy path: rock_digger requires driving.excavator', () => {
+  it('returns { success: true } when employee holds driving.excavator licence', () => {
+    const { vs, es, vehicleId, empId } = makeDriverFixture('rock_digger', 'driving.excavator');
+    const result = assignDriver(vs, es, vehicleId, empId);
+    expect(result.success).toBe(true);
+  });
+
+  it('sets vehicle.driverId to the employee id on success', () => {
+    const { vs, es, vehicleId, empId } = makeDriverFixture('rock_digger', 'driving.excavator');
+    assignDriver(vs, es, vehicleId, empId);
+    const vehicle = vs.vehicles.find(v => v.id === vehicleId)!;
+    expect(vehicle.driverId).toBe(empId);
+  });
+});
+
+describe('assignDriver — happy path: rock_fragmenter requires driving.excavator', () => {
+  it('returns { success: true } when employee holds driving.excavator licence', () => {
+    const { vs, es, vehicleId, empId } = makeDriverFixture('rock_fragmenter', 'driving.excavator');
+    const result = assignDriver(vs, es, vehicleId, empId);
+    expect(result.success).toBe(true);
+  });
+
+  it('sets vehicle.driverId to the employee id on success', () => {
+    const { vs, es, vehicleId, empId } = makeDriverFixture('rock_fragmenter', 'driving.excavator');
+    assignDriver(vs, es, vehicleId, empId);
+    const vehicle = vs.vehicles.find(v => v.id === vehicleId)!;
+    expect(vehicle.driverId).toBe(empId);
+  });
+});
+
+describe('assignDriver — happy path: drill_rig requires driving.drill_rig', () => {
+  it('returns { success: true } when employee holds driving.drill_rig licence', () => {
+    const { vs, es, vehicleId, empId } = makeDriverFixture('drill_rig', 'driving.drill_rig');
+    const result = assignDriver(vs, es, vehicleId, empId);
+    expect(result.success).toBe(true);
+  });
+
+  it('sets vehicle.driverId to the employee id on success', () => {
+    const { vs, es, vehicleId, empId } = makeDriverFixture('drill_rig', 'driving.drill_rig');
+    assignDriver(vs, es, vehicleId, empId);
+    const vehicle = vs.vehicles.find(v => v.id === vehicleId)!;
+    expect(vehicle.driverId).toBe(empId);
+  });
+});
+
+describe('assignDriver — happy path: higher proficiency level still qualifies', () => {
+  it('employee with proficiencyLevel 3 for driving.truck can drive a debris_hauler', () => {
+    // Any proficiency level in the right category grants the licence — level does not gate access.
+    const vs = createVehicleState();
+    const { vehicle } = purchaseVehicle(vs, 'debris_hauler');
+    const es = createEmployeeState();
+    const rng = new Random(ASSIGN_DRIVER_SEED);
+    const { employee } = hireEmployee(es, 'driver', rng);
+    assignSkill(es, employee.id, 'driving.truck' as SkillCategory, 3);
+
+    const result = assignDriver(vs, es, vehicle.id, employee.id);
+    expect(result.success).toBe(true);
+    expect(vs.vehicles.find(v => v.id === vehicle.id)!.driverId).toBe(employee.id);
+  });
+
+  it('employee with proficiencyLevel 5 for driving.drill_rig can drive a drill_rig', () => {
+    const vs = createVehicleState();
+    const { vehicle } = purchaseVehicle(vs, 'drill_rig');
+    const es = createEmployeeState();
+    const rng = new Random(ASSIGN_DRIVER_SEED + 1);
+    const { employee } = hireEmployee(es, 'driver', rng);
+    assignSkill(es, employee.id, 'driving.drill_rig' as SkillCategory, 5);
+
+    const result = assignDriver(vs, es, vehicle.id, employee.id);
+    expect(result.success).toBe(true);
+  });
+});
+
+// ── Error: vehicle not found ──────────────────────────────────────────────────
+
+describe('assignDriver — error: vehicle not found', () => {
+  it('returns { success: false } when vehicleId does not exist in the fleet', () => {
+    const vs = createVehicleState();
+    const es = createEmployeeState();
+    const rng = new Random(ASSIGN_DRIVER_SEED);
+    const { employee } = hireEmployee(es, 'driver', rng);
+    assignSkill(es, employee.id, 'driving.truck' as SkillCategory, 1);
+
+    const result = assignDriver(vs, es, 9999, employee.id);
+    expect(result.success).toBe(false);
+  });
+
+  it('error message is exactly "Vehicle not found" when vehicleId is absent', () => {
+    const vs = createVehicleState();
+    const es = createEmployeeState();
+    const rng = new Random(ASSIGN_DRIVER_SEED);
+    const { employee } = hireEmployee(es, 'driver', rng);
+
+    const result = assignDriver(vs, es, 9999, employee.id);
+    expect(result.error).toBe('Vehicle not found');
+  });
+
+  it('fleet vehicles array is unchanged after a vehicle-not-found failure', () => {
+    // No vehicles purchased — fleet stays empty.
+    const vs = createVehicleState();
+    const es = createEmployeeState();
+    const rng = new Random(ASSIGN_DRIVER_SEED);
+    const { employee } = hireEmployee(es, 'driver', rng);
+
+    assignDriver(vs, es, 9999, employee.id);
+    expect(vs.vehicles).toHaveLength(0);
+  });
+});
+
+// ── Error: employee not found ─────────────────────────────────────────────────
+
+describe('assignDriver — error: employee not found', () => {
+  it('returns { success: false } when employeeId does not exist in employee state', () => {
+    const { vs, es, vehicleId } = makeDriverFixture('debris_hauler', 'driving.truck');
+    const result = assignDriver(vs, es, vehicleId, 9999);
+    expect(result.success).toBe(false);
+  });
+
+  it('error message is exactly "Employee not found" when employeeId is absent', () => {
+    const { vs, es, vehicleId } = makeDriverFixture('debris_hauler', 'driving.truck');
+    const result = assignDriver(vs, es, vehicleId, 9999);
+    expect(result.error).toBe('Employee not found');
+  });
+
+  it('vehicle.driverId stays null after an employee-not-found failure', () => {
+    const { vs, es, vehicleId } = makeDriverFixture('debris_hauler', 'driving.truck');
+    assignDriver(vs, es, vehicleId, 9999);
+    const vehicle = vs.vehicles.find(v => v.id === vehicleId)!;
+    expect(vehicle.driverId).toBeNull();
+  });
+});
+
+// ── Error: employee not alive (killed) ────────────────────────────────────────
+
+describe('assignDriver — error: employee not alive', () => {
+  it('returns { success: false } when the employee exists but alive is false', () => {
+    const { vs, es, vehicleId, empId } = makeDriverFixture('debris_hauler', 'driving.truck');
+    killEmployee(es, empId); // sets alive: false
+    const result = assignDriver(vs, es, vehicleId, empId);
+    expect(result.success).toBe(false);
+  });
+
+  it('error message is "Employee not found" for a dead employee (not alive ≡ not found)', () => {
+    // Rule 2 collapses "not found" and "not alive" into a single error string.
+    const { vs, es, vehicleId, empId } = makeDriverFixture('debris_hauler', 'driving.truck');
+    killEmployee(es, empId);
+    const result = assignDriver(vs, es, vehicleId, empId);
+    expect(result.error).toBe('Employee not found');
+  });
+
+  it('vehicle.driverId stays null after a dead-employee failure', () => {
+    const { vs, es, vehicleId, empId } = makeDriverFixture('rock_digger', 'driving.excavator');
+    killEmployee(es, empId);
+    assignDriver(vs, es, vehicleId, empId);
+    const vehicle = vs.vehicles.find(v => v.id === vehicleId)!;
+    expect(vehicle.driverId).toBeNull();
+  });
+});
+
+// ── Error: employee lacks licence — no qualifications ─────────────────────────
+
+describe('assignDriver — error: employee lacks licence (no qualifications at all)', () => {
+  it('debris_hauler: employee with zero qualifications → { success: false }', () => {
+    const { vs, es, vehicleId, empId } = makeDriverFixture('debris_hauler');
+    const result = assignDriver(vs, es, vehicleId, empId);
+    expect(result.success).toBe(false);
+  });
+
+  it('building_destroyer: employee with zero qualifications → { success: false }', () => {
+    const { vs, es, vehicleId, empId } = makeDriverFixture('building_destroyer');
+    const result = assignDriver(vs, es, vehicleId, empId);
+    expect(result.success).toBe(false);
+  });
+
+  it('rock_digger: employee with zero qualifications → { success: false }', () => {
+    const { vs, es, vehicleId, empId } = makeDriverFixture('rock_digger');
+    const result = assignDriver(vs, es, vehicleId, empId);
+    expect(result.success).toBe(false);
+  });
+
+  it('rock_fragmenter: employee with zero qualifications → { success: false }', () => {
+    const { vs, es, vehicleId, empId } = makeDriverFixture('rock_fragmenter');
+    const result = assignDriver(vs, es, vehicleId, empId);
+    expect(result.success).toBe(false);
+  });
+
+  it('drill_rig: employee with zero qualifications → { success: false }', () => {
+    const { vs, es, vehicleId, empId } = makeDriverFixture('drill_rig');
+    const result = assignDriver(vs, es, vehicleId, empId);
+    expect(result.success).toBe(false);
+  });
+
+  it('error message is exactly "Employee lacks licence for this role"', () => {
+    // Use drill_rig as a representative case.
+    const { vs, es, vehicleId, empId } = makeDriverFixture('drill_rig');
+    const result = assignDriver(vs, es, vehicleId, empId);
+    expect(result.error).toBe('Employee lacks licence for this role');
+  });
+
+  it('vehicle.driverId stays null after a no-licence failure', () => {
+    const { vs, es, vehicleId, empId } = makeDriverFixture('debris_hauler');
+    assignDriver(vs, es, vehicleId, empId);
+    const vehicle = vs.vehicles.find(v => v.id === vehicleId)!;
+    expect(vehicle.driverId).toBeNull();
+  });
+});
+
+// ── Error: wrong licence (cross-role mismatch) ────────────────────────────────
+//
+// Each test ensures a driving licence for one category is *not* accepted as a
+// substitute for a different required category.  All five licence slots are
+// exercised so that every mapping edge is independently confirmed.
+
+describe('assignDriver — error: wrong licence (cross-role mismatch)', () => {
+  it('debris_hauler needs driving.truck; employee with only driving.excavator is rejected', () => {
+    // debris_hauler requires driving.truck — driving.excavator must not count.
+    const { vs, es, vehicleId, empId } = makeDriverFixture('debris_hauler', 'driving.excavator');
+    const result = assignDriver(vs, es, vehicleId, empId);
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Employee lacks licence for this role');
+  });
+
+  it('building_destroyer needs driving.truck; employee with only driving.drill_rig is rejected', () => {
+    // building_destroyer requires driving.truck — driving.drill_rig must not count.
+    const { vs, es, vehicleId, empId } = makeDriverFixture('building_destroyer', 'driving.drill_rig');
+    const result = assignDriver(vs, es, vehicleId, empId);
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Employee lacks licence for this role');
+  });
+
+  it('rock_digger needs driving.excavator; employee with only driving.truck is rejected', () => {
+    // rock_digger requires driving.excavator — driving.truck must not count.
+    const { vs, es, vehicleId, empId } = makeDriverFixture('rock_digger', 'driving.truck');
+    const result = assignDriver(vs, es, vehicleId, empId);
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Employee lacks licence for this role');
+  });
+
+  it('rock_fragmenter needs driving.excavator; employee with only driving.drill_rig is rejected', () => {
+    // rock_fragmenter requires driving.excavator — driving.drill_rig must not count.
+    const { vs, es, vehicleId, empId } = makeDriverFixture('rock_fragmenter', 'driving.drill_rig');
+    const result = assignDriver(vs, es, vehicleId, empId);
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Employee lacks licence for this role');
+  });
+
+  it('drill_rig needs driving.drill_rig; employee with only driving.truck is rejected', () => {
+    // drill_rig requires driving.drill_rig — driving.truck must not count.
+    const { vs, es, vehicleId, empId } = makeDriverFixture('drill_rig', 'driving.truck');
+    const result = assignDriver(vs, es, vehicleId, empId);
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Employee lacks licence for this role');
+  });
+
+  it('drill_rig needs driving.drill_rig; employee with only driving.excavator is rejected', () => {
+    // Covers the remaining excavator → drill_rig mismatch direction.
+    const { vs, es, vehicleId, empId } = makeDriverFixture('drill_rig', 'driving.excavator');
+    const result = assignDriver(vs, es, vehicleId, empId);
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Employee lacks licence for this role');
+  });
+
+  it('vehicle.driverId stays null after a wrong-licence failure', () => {
+    const { vs, es, vehicleId, empId } = makeDriverFixture('rock_digger', 'driving.truck');
+    assignDriver(vs, es, vehicleId, empId);
+    const vehicle = vs.vehicles.find(v => v.id === vehicleId)!;
+    expect(vehicle.driverId).toBeNull();
+  });
+});
+
+// ── Error: employee already driving another vehicle ───────────────────────────
+
+describe('assignDriver — error: employee already driving another vehicle', () => {
+  it('returns { success: false } when the employee is driverId on a different vehicle', () => {
+    // The employee is fully qualified and the target vehicle has no driver.
+    // The only failing condition is that the employee is already assigned elsewhere.
+    const { vs, es, vehicleId, empId } = makeAlreadyDrivingFixture(
+      'debris_hauler',
+      'driving.truck',
+    );
+    const result = assignDriver(vs, es, vehicleId, empId);
+    expect(result.success).toBe(false);
+  });
+
+  it('error message is exactly "Employee already driving another vehicle"', () => {
+    const { vs, es, vehicleId, empId } = makeAlreadyDrivingFixture(
+      'rock_digger',
+      'driving.excavator',
+    );
+    const result = assignDriver(vs, es, vehicleId, empId);
+    expect(result.error).toBe('Employee already driving another vehicle');
+  });
+
+  it('target vehicle.driverId remains null after an already-driving failure', () => {
+    // The target vehicle must not receive the driverId when the call fails.
+    const { vs, es, vehicleId, empId } = makeAlreadyDrivingFixture(
+      'drill_rig',
+      'driving.drill_rig',
+    );
+    assignDriver(vs, es, vehicleId, empId);
+    const targetVehicle = vs.vehicles.find(v => v.id === vehicleId)!;
+    expect(targetVehicle.driverId).toBeNull();
+  });
+});
+
+// ── Error: vehicle already has a driver ──────────────────────────────────────
+
+describe('assignDriver — error: vehicle already has a driver', () => {
+  it('returns { success: false } when vehicle.driverId is already non-null', () => {
+    // The incoming employee is fully qualified and not already driving.
+    // The only failing condition is that the target vehicle is already occupied.
+    const { vs, es, vehicleId, empId } = makeVehicleTakenFixture(
+      'debris_hauler',
+      'driving.truck',
+    );
+    const result = assignDriver(vs, es, vehicleId, empId);
+    expect(result.success).toBe(false);
+  });
+
+  it('error message is exactly "Vehicle already has a driver"', () => {
+    const { vs, es, vehicleId, empId } = makeVehicleTakenFixture(
+      'rock_fragmenter',
+      'driving.excavator',
+    );
+    const result = assignDriver(vs, es, vehicleId, empId);
+    expect(result.error).toBe('Vehicle already has a driver');
+  });
+
+  it('original driverId is preserved and not overwritten after a vehicle-taken failure', () => {
+    // The pre-existing driverId (999) must survive the failed call intact.
+    const { vs, es, vehicleId, empId, originalDriverId } = makeVehicleTakenFixture(
+      'drill_rig',
+      'driving.drill_rig',
+    );
+    assignDriver(vs, es, vehicleId, empId);
+    const vehicle = vs.vehicles.find(v => v.id === vehicleId)!;
+    expect(vehicle.driverId).toBe(originalDriverId);
+    // And must definitely not be overwritten with the incoming empId.
+    expect(vehicle.driverId).not.toBe(empId);
   });
 });

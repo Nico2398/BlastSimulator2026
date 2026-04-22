@@ -3,6 +3,7 @@
 // Base stats and tier multipliers live in src/core/config/balance.ts.
 
 import { VEHICLE_BASE_STATS, VEHICLE_TIER_MULTIPLIERS } from '../config/balance.js';
+import type { EmployeeState, SkillCategory } from '../entities/Employee.js';
 
 // ── Vehicle roles ──
 
@@ -218,6 +219,42 @@ export function getVehicleCostsPerTick(state: VehicleState): number {
     }
   }
   return total;
+}
+
+// ── Licence mapping ──
+
+const ROLE_LICENCE_REQUIRED: Record<VehicleRole, SkillCategory> = {
+  debris_hauler:      'driving.truck',
+  building_destroyer: 'driving.truck',
+  rock_digger:        'driving.excavator',
+  rock_fragmenter:    'driving.excavator',
+  drill_rig:          'driving.drill_rig',
+};
+
+/** Assign a driver (employee) to a vehicle, enforcing licence and availability checks. */
+export function assignDriver(
+  vehicleState: VehicleState,
+  employeeState: EmployeeState,
+  vehicleId: number,
+  employeeId: number,
+): { success: boolean; error?: string } {
+  const vehicle = vehicleState.vehicles.find(v => v.id === vehicleId);
+  if (!vehicle) return { success: false, error: 'Vehicle not found' };
+
+  const employee = employeeState.employees.find(e => e.id === employeeId);
+  if (!employee || !employee.alive) return { success: false, error: 'Employee not found' };
+
+  const requiredLicence = ROLE_LICENCE_REQUIRED[vehicle.type];
+  const hasLicence = employee.qualifications.some(q => q.category === requiredLicence);
+  if (!hasLicence) return { success: false, error: 'Employee lacks licence for this role' };
+
+  const alreadyDriving = vehicleState.vehicles.some(v => v.driverId === employeeId);
+  if (alreadyDriving) return { success: false, error: 'Employee already driving another vehicle' };
+
+  if (vehicle.driverId !== null) return { success: false, error: 'Vehicle already has a driver' };
+
+  vehicle.driverId = employeeId;
+  return { success: true };
 }
 
 /**
