@@ -12,6 +12,9 @@ on:
 permissions:
   contents: read
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 concurrency:
   group: generate-issues-from-backlog
   cancel-in-progress: false
@@ -41,18 +44,6 @@ jobs:
 
             const doneIds = new Set(tasks.filter(t => t.status === 'done').map(t => t.id));
 
-            const candidates = tasks
-              .filter(t =>
-                t.status === 'pending' &&
-                t.blockedBy.every(id => doneIds.has(id))
-              )
-              .sort((a, b) => a.chapter - b.chapter);
-
-            if (candidates.length === 0) {
-              console.log('No pending tasks with resolved blockers found.');
-              return;
-            }
-
             // --- Fetch ALL existing issues (open + closed) to avoid duplicates ---
             const existingIssues = await github.paginate(github.rest.issues.listForRepo, {
               owner, repo,
@@ -66,6 +57,22 @@ jobs:
                 .map(i => (i.body || '').match(/^backlog-id:\s*(\S+)/m)?.[1])
                 .filter(Boolean)
             );
+
+            // Tasks with an existing issue are treated as resolved blockers so
+            // their dependents become eligible on the next run.
+            for (const id of existingBacklogIds) doneIds.add(id);
+
+            const candidates = tasks
+              .filter(t =>
+                t.status === 'pending' &&
+                t.blockedBy.every(id => doneIds.has(id))
+              )
+              .sort((a, b) => a.chapter - b.chapter);
+
+            if (candidates.length === 0) {
+              console.log('No pending tasks with resolved blockers found.');
+              return;
+            }
 
             // --- Create up to maxCount issues ---
             let created = 0;
