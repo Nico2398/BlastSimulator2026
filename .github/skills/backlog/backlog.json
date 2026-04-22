@@ -246,7 +246,7 @@
       "src/core/i18n/locales/fr.json"
     ],
     "testFile": "tests/unit/i18n/i18n.test.ts",
-    "status": "pending",
+    "status": "in-progress",
     "blockedBy": [
       "2.3"
     ],
