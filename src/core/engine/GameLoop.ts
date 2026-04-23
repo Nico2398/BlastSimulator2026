@@ -3,6 +3,7 @@
 // Pure logic: no timers, no DOM. The caller drives the loop.
 
 import type { GameState } from '../state/GameState.js';
+import type { Vehicle } from '../entities/Vehicle.js';
 import type { Random } from '../math/Random.js';
 import type { EventContext } from '../events/EventPool.js';
 import { tickEventSystem, type FiredEvent } from '../events/EventSystem.js';
@@ -102,4 +103,54 @@ export function resume(state: GameState): void {
 /** Check if a speed value is valid. */
 export function isValidSpeed(speed: number): speed is SpeedMultiplier {
   return VALID_SPEEDS.includes(speed as SpeedMultiplier);
+}
+
+/**
+ * Process one vehicle movement step.
+ * Moves at most one grid cell toward target and waits if the next cell is occupied.
+ */
+export function tickVehicle(state: GameState, vehicle: Vehicle): void {
+  if (!canTickVehicle(vehicle)) return;
+
+  const deltaX = vehicle.targetX - vehicle.x;
+  const deltaZ = vehicle.targetZ - vehicle.z;
+
+  if (deltaX === 0 && deltaZ === 0) return setVehicleIdle(vehicle);
+
+  let nextX = vehicle.x;
+  let nextZ = vehicle.z;
+  if (deltaX !== 0) {
+    nextX += Math.sign(deltaX);
+  } else if (deltaZ !== 0) {
+    nextZ += Math.sign(deltaZ);
+  }
+
+  const isOccupied = isCellOccupiedByOtherVehicle(state, vehicle, nextX, nextZ);
+  if (isOccupied) {
+    vehicle.state = 'waiting';
+    return;
+  }
+
+  vehicle.x = nextX;
+  vehicle.z = nextZ;
+  vehicle.state = 'moving';
+
+  if (vehicle.x === vehicle.targetX && vehicle.z === vehicle.targetZ) {
+    setVehicleIdle(vehicle);
+  }
+}
+
+function canTickVehicle(vehicle: Vehicle): boolean {
+  if (vehicle.task !== 'moving') return false;
+  // moveVehicle() sets task='moving' and target but may leave state='idle' until first tick.
+  return vehicle.state === 'idle' || vehicle.state === 'moving' || vehicle.state === 'waiting';
+}
+
+function setVehicleIdle(vehicle: Vehicle): void {
+  vehicle.task = 'idle';
+  vehicle.state = 'idle';
+}
+
+function isCellOccupiedByOtherVehicle(state: GameState, vehicle: Vehicle, x: number, z: number): boolean {
+  return state.vehicles.vehicles.some(v => v.id !== vehicle.id && v.x === x && v.z === z);
 }

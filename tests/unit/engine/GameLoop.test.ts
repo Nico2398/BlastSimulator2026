@@ -10,10 +10,12 @@ import {
   resume,
   isValidSpeed,
   BASE_TICK_MS,
+  tickVehicle,
 } from '../../../src/core/engine/GameLoop.js';
 import type { EventContext } from '../../../src/core/events/EventPool.js';
 import { setupEvents } from '../../../src/core/events/index.js';
 import { clearEvents, registerEvents } from '../../../src/core/events/EventPool.js';
+import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 
 function buildContext(state: GameState): EventContext {
   return {
@@ -126,5 +128,87 @@ describe('GameLoop', () => {
     expect(isValidSpeed(3)).toBe(false);
     expect(isValidSpeed(0)).toBe(false);
     expect(isValidSpeed(16)).toBe(false);
+  });
+});
+
+const VEHICLE_TICK_SEED = 42;
+
+describe('tickVehicle (Task 2.7)', () => {
+  it('advances a moving vehicle toward its target cell', () => {
+    const state = createGame({ seed: VEHICLE_TICK_SEED });
+    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 0);
+    vehicle.task = 'moving';
+    vehicle.state = 'moving';
+    vehicle.targetX = 2;
+    vehicle.targetZ = 0;
+
+    tickVehicle(state, vehicle);
+    expect(vehicle.x).toBe(1);
+    expect(vehicle.z).toBe(0);
+    expect(vehicle.state).toBe('moving');
+    expect(vehicle.task).toBe('moving');
+
+    tickVehicle(state, vehicle);
+    expect(vehicle.x).toBe(2);
+    expect(vehicle.z).toBe(0);
+    expect(vehicle.state).toBe('idle');
+    expect(vehicle.task).toBe('idle');
+  });
+
+  it('puts one vehicle into waiting when two vehicles converge on the same target cell', () => {
+    const state = createGame({ seed: VEHICLE_TICK_SEED });
+    const { vehicle: left } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 0);
+    const { vehicle: right } = purchaseVehicle(state.vehicles, 'drill_rig', 2, 0);
+
+    left.task = 'moving';
+    left.state = 'moving';
+    left.targetX = 1;
+    left.targetZ = 0;
+
+    right.task = 'moving';
+    right.state = 'moving';
+    right.targetX = 1;
+    right.targetZ = 0;
+
+    tickVehicle(state, left);
+    tickVehicle(state, right);
+
+    const waitingVehicles = [left, right].filter(v => v.state === 'waiting');
+    expect(waitingVehicles).toHaveLength(1);
+    const movingVehicles = [left, right].filter(v => v.state !== 'waiting');
+    expect(movingVehicles).toHaveLength(1);
+    expect(movingVehicles[0]!.x).toBe(1);
+    expect(movingVehicles[0]!.z).toBe(0);
+  });
+
+  it('resumes waiting vehicle movement when the blocked cell becomes free', () => {
+    const state = createGame({ seed: VEHICLE_TICK_SEED });
+    const { vehicle: blocker } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 0);
+    const { vehicle: waiting } = purchaseVehicle(state.vehicles, 'drill_rig', 2, 0);
+
+    blocker.task = 'moving';
+    blocker.state = 'moving';
+    blocker.targetX = 1;
+    blocker.targetZ = 0;
+
+    waiting.task = 'moving';
+    waiting.state = 'moving';
+    waiting.targetX = 1;
+    waiting.targetZ = 0;
+
+    tickVehicle(state, blocker);
+    tickVehicle(state, waiting);
+    expect(waiting.state).toBe('waiting');
+
+    blocker.task = 'moving';
+    blocker.state = 'moving';
+    blocker.targetX = 0;
+    blocker.targetZ = 0;
+    tickVehicle(state, blocker);
+
+    tickVehicle(state, waiting);
+    expect(waiting.x).toBe(1);
+    expect(waiting.z).toBe(0);
+    expect(waiting.state).toBe('idle');
   });
 });

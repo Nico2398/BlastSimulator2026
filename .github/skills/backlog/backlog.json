@@ -288,11 +288,11 @@
       "src/core/engine/GameLoop.ts"
     ],
     "testFile": "tests/unit/engine/GameLoop.test.ts",
-    "status": "pending",
+    "status": "done",
     "blockedBy": [
       "2.5"
     ],
-    "closedInPR": null
+    "closedInPR": 55
   },
   {
     "id": "2.8",
