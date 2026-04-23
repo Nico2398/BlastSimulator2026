@@ -117,8 +117,8 @@ export function tickVehicle(state: GameState, vehicle: Vehicle): void {
 
   if (deltaX === 0 && deltaZ === 0) return setVehicleIdle(vehicle);
 
-  const nextX = vehicle.x + Math.sign(deltaX);
-  const nextZ = vehicle.z + Math.sign(deltaZ);
+  const nextX = vehicle.x + (deltaX !== 0 ? Math.sign(deltaX) : 0);
+  const nextZ = vehicle.z + (deltaX === 0 ? Math.sign(deltaZ) : 0);
 
   const isOccupied = isCellOccupiedByOtherVehicle(state, vehicle, nextX, nextZ);
   if (isOccupied) {
@@ -136,7 +136,8 @@ export function tickVehicle(state: GameState, vehicle: Vehicle): void {
 }
 
 function canTickVehicle(vehicle: Vehicle): boolean {
-  return vehicle.task === 'moving' || vehicle.state === 'moving' || vehicle.state === 'waiting';
+  if (vehicle.task !== 'moving') return false;
+  return vehicle.state === 'idle' || vehicle.state === 'moving' || vehicle.state === 'waiting';
 }
 
 function setVehicleIdle(vehicle: Vehicle): void {

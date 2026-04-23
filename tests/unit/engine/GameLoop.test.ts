@@ -145,6 +145,14 @@ describe('tickVehicle (Task 2.7)', () => {
     tickVehicle(state, vehicle);
     expect(vehicle.x).toBe(1);
     expect(vehicle.z).toBe(0);
+    expect(vehicle.state).toBe('moving');
+    expect(vehicle.task).toBe('moving');
+
+    tickVehicle(state, vehicle);
+    expect(vehicle.x).toBe(2);
+    expect(vehicle.z).toBe(0);
+    expect(vehicle.state).toBe('idle');
+    expect(vehicle.task).toBe('idle');
   });
 
   it('puts one vehicle into waiting when two vehicles converge on the same target cell', () => {
@@ -167,5 +175,9 @@ describe('tickVehicle (Task 2.7)', () => {
 
     const waitingVehicles = [left, right].filter(v => v.state === 'waiting');
     expect(waitingVehicles).toHaveLength(1);
+    const movingVehicles = [left, right].filter(v => v.state !== 'waiting');
+    expect(movingVehicles).toHaveLength(1);
+    expect(movingVehicles[0]!.x).toBe(1);
+    expect(movingVehicles[0]!.z).toBe(0);
   });
 });
