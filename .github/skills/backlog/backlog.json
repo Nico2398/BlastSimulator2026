@@ -288,7 +288,7 @@
       "src/core/engine/GameLoop.ts"
     ],
     "testFile": "tests/unit/engine/GameLoop.test.ts",
-    "status": "pending",
+    "status": "in-progress",
     "blockedBy": [
       "2.5"
     ],
