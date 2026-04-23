@@ -316,7 +316,7 @@
       "src/core/entities/Building.ts"
     ],
     "testFile": "tests/unit/entities/Building.test.ts",
-    "status": "pending",
+    "status": "in-progress",
     "blockedBy": [
       "2.1"
     ],
