@@ -142,6 +142,7 @@ export function tickVehicle(state: GameState, vehicle: Vehicle): void {
 
 function canTickVehicle(vehicle: Vehicle): boolean {
   if (vehicle.task !== 'moving') return false;
+  // moveVehicle() sets task='moving' and target but may leave state='idle' until first tick.
   return vehicle.state === 'idle' || vehicle.state === 'moving' || vehicle.state === 'waiting';
 }
 

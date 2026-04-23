@@ -180,4 +180,35 @@ describe('tickVehicle (Task 2.7)', () => {
     expect(movingVehicles[0]!.x).toBe(1);
     expect(movingVehicles[0]!.z).toBe(0);
   });
+
+  it('resumes waiting vehicle movement when the blocked cell becomes free', () => {
+    const state = createGame({ seed: VEHICLE_TICK_SEED });
+    const { vehicle: blocker } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 0);
+    const { vehicle: waiting } = purchaseVehicle(state.vehicles, 'drill_rig', 2, 0);
+
+    blocker.task = 'moving';
+    blocker.state = 'moving';
+    blocker.targetX = 1;
+    blocker.targetZ = 0;
+
+    waiting.task = 'moving';
+    waiting.state = 'moving';
+    waiting.targetX = 1;
+    waiting.targetZ = 0;
+
+    tickVehicle(state, blocker);
+    tickVehicle(state, waiting);
+    expect(waiting.state).toBe('waiting');
+
+    blocker.task = 'moving';
+    blocker.state = 'moving';
+    blocker.targetX = 0;
+    blocker.targetZ = 0;
+    tickVehicle(state, blocker);
+
+    tickVehicle(state, waiting);
+    expect(waiting.x).toBe(1);
+    expect(waiting.z).toBe(0);
+    expect(waiting.state).toBe('idle');
+  });
 });
