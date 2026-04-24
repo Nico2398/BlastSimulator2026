@@ -52,11 +52,14 @@ jobs:
               per_page: 100,
             });
 
-            const existingBacklogIds = new Set(
-              existingIssues
-                .map(i => (i.body || '').match(/^backlog-id:\s*(\S+)/m)?.[1])
-                .filter(Boolean)
-            );
+            // Map backlog-id → GitHub issue number for dependency references
+            const backlogIdToIssueNumber = new Map();
+            for (const i of existingIssues) {
+              const m = (i.body || '').match(/^backlog-id:\s*(\S+)/m);
+              if (m) backlogIdToIssueNumber.set(m[1], i.number);
+            }
+
+            const existingBacklogIds = new Set(backlogIdToIssueNumber.keys());
 
             // Tasks with an existing issue are treated as resolved blockers so
             // their dependents become eligible on the next run.
@@ -84,10 +87,15 @@ jobs:
                 continue;
               }
 
+              const dependsOnLines = (task.blockedBy || [])
+                .filter(id => backlogIdToIssueNumber.has(id))
+                .map(id => `Depends on: #${backlogIdToIssueNumber.get(id)}`);
+
               const body = [
                 `backlog-id: ${task.id}`,
                 '',
                 `See \`.github/skills/backlog/backlog.json\` (id: \`${task.id}\`) for the full story details, files, test file, and resolved dependencies.`,
+                ...(dependsOnLines.length > 0 ? ['', ...dependsOnLines] : []),
                 '',
                 `## Agent Instructions`,
                 `Follow the TDD pipeline:`,
