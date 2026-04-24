@@ -41,7 +41,7 @@ import type { LevelStats } from '../campaign/SuccessTracker.js';
 import { createLevelStats } from '../campaign/SuccessTracker.js';
 
 /** Save format version — increment when GameState shape changes. */
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 
 export interface GameConfig {
   seed: number;

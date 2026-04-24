@@ -74,6 +74,25 @@ jobs:
               return;
             }
 
+            // Guard: skip if the Copilot agent session is still running.
+            // Posting a new @copilot comment while a session is active would spawn
+            // a second concurrent session — the running one will observe CI itself.
+            const COPILOT_SWE_APP_ID = 1143301;
+            const { data: checksData } = await github.rest.checks.listForRef({
+              owner, repo,
+              ref: context.payload.workflow_run.head_sha,
+              app_id: COPILOT_SWE_APP_ID,
+              per_page: 100
+            });
+            const activeStatuses = new Set(['queued', 'in_progress', 'waiting', 'requested']);
+            const agentStillRunning = checksData.check_runs.some(run =>
+              activeStatuses.has(run.status)
+            );
+            if (agentStillRunning) {
+              console.log(`Copilot agent session still active on PR #${prNumber}. Skipping — the running session will handle CI.`);
+              return;
+            }
+
             const runUrl = context.payload.workflow_run.html_url;
             await github.rest.issues.createComment({
               owner, repo,

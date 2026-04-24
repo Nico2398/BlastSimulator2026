@@ -14,6 +14,7 @@ import { MAFIA_EVENTS_2 } from './MafiaEvents2.js';
 import { LAWSUIT_EVENTS_1 } from './LawsuitEvents1.js';
 import { LAWSUIT_EVENTS_2 } from './LawsuitEvents2.js';
 import { FOLLOWUP_EVENTS } from './FollowUpEvents.js';
+import { TRAFFIC_JAM_EVENTS } from './TrafficJamEvents.js';
 
 /** Register all 258 events into the global pool. Call once at app init. */
 export function setupEvents(): void {
@@ -28,4 +29,5 @@ export function setupEvents(): void {
   registerEvents(LAWSUIT_EVENTS_1);
   registerEvents(LAWSUIT_EVENTS_2);
   registerEvents(FOLLOWUP_EVENTS);
+  registerEvents(TRAFFIC_JAM_EVENTS);
 }

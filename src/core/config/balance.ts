@@ -105,6 +105,14 @@ export const EVENT_BASE_TIMERS = {
   lawsuit: 35,
 } as const;
 
+// ─── Traffic ───────────────────────────────────────────────────────────────────
+
+/** Minimum number of vehicles waiting on the same target cell to trigger a traffic jam. */
+export const TRAFFIC_JAM_MIN_VEHICLES = 3;
+
+/** Minimum consecutive waiting ticks per vehicle before it counts toward a traffic jam. */
+export const TRAFFIC_JAM_MIN_TICKS = 10;
+
 // ─── Mining & Blasting ─────────────────────────────────────────────────────────
 
 /** Max fragments generated per voxel during a blast. Caps fragment count for performance. */

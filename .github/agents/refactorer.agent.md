@@ -24,6 +24,7 @@ Clean up code for clarity, maintainability, convention compliance — without ch
 - Remove dead code, unused imports, unnecessary complexity
 - Ensure seeded PRNG usage (no `Math.random()`)
 - Move hardcoded numbers to `src/core/config/`
+- Remove stale scaffolding from every changed file (see Diff Review below)
 
 ## What You NEVER Do
 
@@ -51,11 +52,18 @@ Clean up code for clarity, maintainability, convention compliance — without ch
 
 ## Process
 
-1. Review all files changed by implementer
-2. Apply refactoring improvements
-3. Run `npx vitest run` — all tests must still pass
-4. Run `npx tsc --noEmit` — no type errors
-5. Hand off to validator
+1. Get the full diff of all changed files: `git diff main...HEAD`
+2. **Diff Review** — for every file in the diff, check:
+   - Comments that describe a state no longer true (e.g. "not yet implemented", "will be added later", "placeholder")
+   - Workaround type casts (`as any`, `as unknown`) used to paper over a missing type that now exists
+   - `TODO`/`FIXME` markers whose task has been completed by this PR
+   - Variable names, function signatures, or inline explanations that no longer match the actual logic
+   - Any assertion or test comment that contradicts what the production code now does
+   Fix every mismatch found before moving on.
+3. Apply structural refactoring improvements
+4. Run `npx vitest run` — all tests must still pass
+5. Run `npx tsc --noEmit` — no type errors
+6. Hand off to validator
 
 ## Key References
 

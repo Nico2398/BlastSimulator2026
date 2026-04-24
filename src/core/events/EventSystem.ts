@@ -9,8 +9,14 @@ import { EVENT_BASE_TIMERS } from '../config/balance.js';
 
 // ── Config (imported from centralized balance) ──
 
-/** Base timer reset values per category (in ticks). */
-const BASE_TIMER: Record<EventCategory, number> = { ...EVENT_BASE_TIMERS };
+/**
+ * Categories that use the countdown-timer system.
+ * 'traffic' is excluded because traffic jams are detected by EventEngine, not timers.
+ */
+export type TimerCategory = Exclude<EventCategory, 'traffic'>;
+
+/** Base timer reset values per timer category (in ticks). */
+const BASE_TIMER: Record<TimerCategory, number> = { ...EVENT_BASE_TIMERS };
 
 // ── Timer state ──
 
@@ -36,7 +42,7 @@ export interface FiredEvent {
 }
 
 export function createEventSystemState(): EventSystemState {
-  const categories: EventCategory[] = ['union', 'politics', 'weather', 'mafia', 'lawsuit'];
+  const categories: TimerCategory[] = ['union', 'politics', 'weather', 'mafia', 'lawsuit'];
   return {
     timers: categories.map(cat => ({
       category: cat,

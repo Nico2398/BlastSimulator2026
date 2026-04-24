@@ -42,6 +42,22 @@ export function deserialize(json: string): GameState {
 
   // Future: add migration logic for older versions here.
 
+  // v2 → v3: waitingTicks added to Vehicle interface.
+  // Older saves may have vehicles without this field — default to 0.
+  if ((obj['version'] as number) < 3) {
+    const vehiclesRaw = obj['vehicles'] as Record<string, unknown> | undefined;
+    if (vehiclesRaw) {
+      const vehicleList = vehiclesRaw['vehicles'] as Array<Record<string, unknown>> | undefined;
+      if (Array.isArray(vehicleList)) {
+        for (const v of vehicleList) {
+          if (typeof v['waitingTicks'] !== 'number') {
+            v['waitingTicks'] = 0;
+          }
+        }
+      }
+    }
+  }
+
   // Restore Set<string> for surveyedPositions
   const raw = obj['surveyedPositions'] as unknown;
   if (raw && typeof raw === 'object' && '__type' in (raw as Record<string, unknown>)) {

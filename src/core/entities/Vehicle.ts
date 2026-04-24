@@ -129,6 +129,8 @@ export interface Vehicle {
   state: VehicleOperationalState;
   /** Current payload in kg. */
   payloadKg: number;
+  /** Number of consecutive ticks the vehicle has spent in the waiting state. */
+  waitingTicks: number;
 }
 
 // ── Fleet state ──
@@ -162,6 +164,7 @@ export function purchaseVehicle(
     driverId: null,
     state: 'idle',
     payloadKg: 0,
+    waitingTicks: 0,
   };
   state.vehicles.push(vehicle);
   return { vehicle, cost: def.purchaseCost };
@@ -181,6 +184,7 @@ export function assignVehicle(
   vehicle.task = task;
   if (targetX !== undefined) vehicle.targetX = targetX;
   if (targetZ !== undefined) vehicle.targetZ = targetZ;
+  if (task === 'moving') vehicle.waitingTicks = 0;
   return true;
 }
 
@@ -197,6 +201,7 @@ export function moveVehicle(
   vehicle.task = 'moving';
   vehicle.targetX = targetX;
   vehicle.targetZ = targetZ;
+  vehicle.waitingTicks = 0;
   return true;
 }
 

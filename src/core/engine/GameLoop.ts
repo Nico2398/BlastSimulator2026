@@ -7,6 +7,7 @@ import type { Vehicle } from '../entities/Vehicle.js';
 import type { Random } from '../math/Random.js';
 import type { EventContext } from '../events/EventPool.js';
 import { tickEventSystem, type FiredEvent } from '../events/EventSystem.js';
+import { detectTrafficJam } from '../events/EventEngine.js';
 
 // ── Config ──
 
@@ -75,6 +76,16 @@ export function processFrame(
       autoPauseReason = `Event requires decision: ${fired.eventId}`;
       break; // Stop processing further ticks
     }
+
+    // No event from timers — check for traffic jam condition
+    const jamEvent = detectTrafficJam(state.vehicles.vehicles, state.events, state.tickCount);
+    if (jamEvent) {
+      firedEvents.push(jamEvent);
+      state.isPaused = true;
+      autoPaused = true;
+      autoPauseReason = `Event requires decision: ${jamEvent.eventId}`;
+      break;
+    }
   }
 
   return { ticksProcessed, firedEvents, autoPaused, autoPauseReason };
@@ -127,13 +138,19 @@ export function tickVehicle(state: GameState, vehicle: Vehicle): void {
 
   const isOccupied = isCellOccupiedByOtherVehicle(state, vehicle, nextX, nextZ);
   if (isOccupied) {
-    vehicle.state = 'waiting';
+    if (vehicle.state !== 'waiting') {
+      vehicle.state = 'waiting';
+      vehicle.waitingTicks = 1;
+    } else {
+      vehicle.waitingTicks = (vehicle.waitingTicks ?? 0) + 1;
+    }
     return;
   }
 
   vehicle.x = nextX;
   vehicle.z = nextZ;
   vehicle.state = 'moving';
+  vehicle.waitingTicks = 0;
 
   if (vehicle.x === vehicle.targetX && vehicle.z === vehicle.targetZ) {
     setVehicleIdle(vehicle);
@@ -149,6 +166,7 @@ function canTickVehicle(vehicle: Vehicle): boolean {
 function setVehicleIdle(vehicle: Vehicle): void {
   vehicle.task = 'idle';
   vehicle.state = 'idle';
+  vehicle.waitingTicks = 0;
 }
 
 function isCellOccupiedByOtherVehicle(state: GameState, vehicle: Vehicle, x: number, z: number): boolean {
