@@ -14,8 +14,7 @@ permissions:
   checks: read
 
 env:
-  # Temporary kill-switch. Set to 'true' to re-enable auto-merge.
-  AUTO_MERGE_ENABLED: 'false'
+  AUTO_MERGE_ENABLED: 'true'
 
 jobs:
   auto-review-and-merge:
