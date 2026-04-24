@@ -316,11 +316,11 @@
       "src/core/entities/Building.ts"
     ],
     "testFile": "tests/unit/entities/Building.test.ts",
-    "status": "pending",
+    "status": "done",
     "blockedBy": [
       "2.1"
     ],
-    "closedInPR": null
+    "closedInPR": 56
   },
   {
     "id": "2.10",

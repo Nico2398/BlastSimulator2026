@@ -201,6 +201,29 @@ export function destroyBuilding(state: BuildingState, buildingId: number): boole
   return true;
 }
 
+export interface DemolishBuildingResult {
+  success: boolean;
+  /** Absolute grid cells freed by the demolition (for navmesh update). */
+  freedCells: Array<{ x: number; z: number }>;
+  error?: string;
+}
+
+/**
+ * Demolish a building: remove it from the grid and return the freed footprint
+ * cells so the caller can patch the navmesh incrementally.
+ */
+export function demolishBuilding(state: BuildingState, buildingId: number): DemolishBuildingResult {
+  const building = state.buildings.find(b => b.id === buildingId);
+  if (!building) return { success: false, freedCells: [], error: 'Building not found' };
+
+  const def = getBuildingDef(building.type, building.tier);
+  const freedCells = def.footprint.map(([dx, dz]) => ({ x: building.x + dx, z: building.z + dz }));
+
+  destroyBuilding(state, buildingId);
+
+  return { success: true, freedCells };
+}
+
 /** Move a building to new coordinates. Returns relocation cost (50% of construction). */
 export function moveBuilding(
   state: BuildingState,

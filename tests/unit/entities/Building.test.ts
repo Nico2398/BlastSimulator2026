@@ -3,6 +3,7 @@ import {
   createBuildingState,
   placeBuilding,
   destroyBuilding,
+  demolishBuilding,
   getTotalOperatingCost,
   getStorageCapacity,
   getBuildingScoreEffects,
@@ -78,5 +79,53 @@ describe('Building system', () => {
     const oob = placeBuilding(state, 'freight_warehouse', 62, 62, 64, 64);
     expect(oob.success).toBe(false);
     expect(oob.error).toBe('Out of bounds');
+  });
+});
+
+describe('demolishBuilding()', () => {
+  it('removes the building and returns freed footprint cells', () => {
+    const state = createBuildingState();
+    placeBuilding(state, 'management_office', 5, 3, 64, 64);
+    const buildingId = state.buildings[0]!.id;
+    const def = getBuildingDef('management_office');
+
+    const result = demolishBuilding(state, buildingId);
+
+    expect(result.success).toBe(true);
+    expect(state.buildings.length).toBe(0);
+    expect(result.freedCells.length).toBe(def.footprint.length);
+  });
+
+  it('freed cells match absolute grid positions of the footprint', () => {
+    const state = createBuildingState();
+    placeBuilding(state, 'management_office', 5, 3, 64, 64);
+    const buildingId = state.buildings[0]!.id;
+    const def = getBuildingDef('management_office');
+
+    const result = demolishBuilding(state, buildingId);
+
+    const expected = def.footprint.map(([dx, dz]) => ({ x: 5 + dx, z: 3 + dz }));
+    expect(result.freedCells).toEqual(expected);
+  });
+
+  it('footprint cells can be placed on after demolition', () => {
+    const state = createBuildingState();
+    placeBuilding(state, 'management_office', 0, 0, 64, 64);
+    const buildingId = state.buildings[0]!.id;
+
+    demolishBuilding(state, buildingId);
+
+    // Previously occupied origin is now free
+    const second = placeBuilding(state, 'management_office', 0, 0, 64, 64);
+    expect(second.success).toBe(true);
+  });
+
+  it('returns failure for unknown building ID', () => {
+    const state = createBuildingState();
+    const result = demolishBuilding(state, 9999);
+
+    expect(result.success).toBe(false);
+    expect(result.freedCells).toHaveLength(0);
+    expect(result.error).toContain('not found');
   });
 });
