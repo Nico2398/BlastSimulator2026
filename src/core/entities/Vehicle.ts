@@ -184,6 +184,7 @@ export function assignVehicle(
   vehicle.task = task;
   if (targetX !== undefined) vehicle.targetX = targetX;
   if (targetZ !== undefined) vehicle.targetZ = targetZ;
+  if (task === 'moving') vehicle.waitingTicks = 0;
   return true;
 }
 
@@ -200,6 +201,7 @@ export function moveVehicle(
   vehicle.task = 'moving';
   vehicle.targetX = targetX;
   vehicle.targetZ = targetZ;
+  vehicle.waitingTicks = 0;
   return true;
 }
 

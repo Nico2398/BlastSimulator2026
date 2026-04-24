@@ -138,8 +138,12 @@ export function tickVehicle(state: GameState, vehicle: Vehicle): void {
 
   const isOccupied = isCellOccupiedByOtherVehicle(state, vehicle, nextX, nextZ);
   if (isOccupied) {
-    vehicle.state = 'waiting';
-    vehicle.waitingTicks++;
+    if (vehicle.state !== 'waiting') {
+      vehicle.state = 'waiting';
+      vehicle.waitingTicks = 1;
+    } else {
+      vehicle.waitingTicks = (vehicle.waitingTicks ?? 0) + 1;
+    }
     return;
   }
 

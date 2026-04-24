@@ -1,6 +1,4 @@
 // BlastSimulator2026 — Tests for EventEngine detectTrafficJam (Task 2.8)
-// RED PHASE: all tests are expected to fail until EventEngine.ts,
-// TrafficJamEvents.ts, and the Vehicle.waitingTicks field are implemented.
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
@@ -17,13 +15,6 @@ import { clearEvents, getEventById } from '../../../src/core/events/EventPool.js
 import { setupEvents } from '../../../src/core/events/index.js';
 
 // ── Fixture builder ──────────────────────────────────────────────────────────
-//
-// Vehicle.waitingTicks is the new field added in Task 2.8.  It does not exist
-// on the Vehicle interface yet, so we extend it locally and cast through
-// `unknown` to keep the test file syntactically valid TypeScript while the
-// production type is still missing the field.
-
-type VehicleWithWaitingTicks = Vehicle & { waitingTicks: number };
 
 let _nextId = 1;
 
@@ -35,7 +26,7 @@ function makeWaitingVehicle(
   targetX: number,
   targetZ: number,
   waitingTicks: number,
-): VehicleWithWaitingTicks {
+): Vehicle {
   return {
     id: _nextId++,
     type: 'debris_hauler',
@@ -49,7 +40,7 @@ function makeWaitingVehicle(
     state: 'waiting',
     payloadKg: 0,
     waitingTicks,
-  } as unknown as VehicleWithWaitingTicks;
+  };
 }
 
 // ── detectTrafficJam ─────────────────────────────────────────────────────────
@@ -198,7 +189,7 @@ describe('EventEngine — detectTrafficJam (Task 2.8)', () => {
     const vehicles: Vehicle[] = [
       makeWaitingVehicle(8, 0, 10), // waiting — qualifies
       makeWaitingVehicle(8, 0, 10), // waiting — qualifies
-      movingBystander as unknown as Vehicle,
+      movingBystander,
     ];
     // Only 2 waiting vehicles qualify — below MIN_VEHICLES=3
     const result = detectTrafficJam(vehicles, eventState, 100);
