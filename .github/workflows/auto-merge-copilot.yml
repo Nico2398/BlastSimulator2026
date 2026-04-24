@@ -13,19 +13,14 @@ permissions:
   contents: write
   checks: read
 
-env:
-  AUTO_MERGE_ENABLED: 'true'
-
 jobs:
   auto-review-and-merge:
     runs-on: ubuntu-latest
     # Run when CI succeeds, or when the Copilot SWE agent check run completes (app 1143301).
-    if: |
-      env.AUTO_MERGE_ENABLED == 'true' &&
-      (
-        (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
-        (github.event_name == 'check_run' && github.event.check_run.app.id == 1143301)
-      )
+    # Note: env context is not available in job-level if conditions; use github/vars/needs/inputs only.
+    if: >
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
+      (github.event_name == 'check_run' && github.event.check_run.app.id == 1143301)
     steps:
       - name: Check PAT_TOKEN_COPILOT_AUTOMATION is configured
         env:
