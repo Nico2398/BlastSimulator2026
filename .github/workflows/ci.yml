@@ -109,36 +109,3 @@ jobs:
         with:
           name: build-artifacts
           path: dist/
-
-  backlog-check:
-    name: Backlog — no in-progress tasks
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
-      - name: Cache npm dependencies
-        uses: actions/cache@v4
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-npm-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-npm-
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Check no backlog task is in-progress
-        run: |
-          npx tsx .github/skills/backlog/backlog.ts list --status in-progress > /tmp/in_progress.txt
-          if [ -s /tmp/in_progress.txt ]; then
-            echo "FAIL: backlog still has in-progress tasks — mark the task done before merging:"
-            cat /tmp/in_progress.txt
-            exit 1
-          fi
-          echo "OK: no in-progress tasks"

@@ -11,6 +11,14 @@ jobs:
     if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     steps:
+      - name: Check PAT_TOKEN_COPILOT_AUTOMATION is configured
+        env:
+          TOKEN: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "::error::PAT_TOKEN_COPILOT_AUTOMATION secret is not set. Add it in Settings → Secrets → Actions."
+            exit 1
+          fi
       - name: Close done issue + assign next to Copilot
         uses: actions/github-script@v7
         with:
@@ -31,11 +39,52 @@ jobs:
 
             const n = parseInt(issueNum);
             console.log(`Closing issue #${n} as done.`);
+
+            // Fetch issue body before closing (needed for backlog-id extraction)
+            const { data: closedIssue } = await github.rest.issues.get({ owner, repo, issue_number: n });
+
             await github.rest.issues.update({ owner, repo, issue_number: n, state: 'closed' });
             await github.rest.issues.addLabels({ owner, repo, issue_number: n, labels: ['done'] });
             await github.rest.issues.removeLabel({ owner, repo, issue_number: n, name: 'in-progress' }).catch(() => {});
 
-            // --- 2. Find next ready issue (oldest first) ---
+            // --- 2. Update backlog.json to mark the closed task as done ---
+            const backlogIdMatch = closedIssue.body?.match(/^backlog-id:\s*(\S+)/m);
+            if (backlogIdMatch) {
+              const backlogId = backlogIdMatch[1];
+              const prNumber = context.payload.pull_request.number;
+              try {
+                const { data: fileData } = await github.rest.repos.getContent({
+                  owner, repo, path: '.github/skills/backlog/backlog.json'
+                });
+                const raw = Buffer.from(fileData.content, 'base64').toString('utf8');
+                const tasks = JSON.parse(raw);
+                const task = tasks.find(t => t.id === backlogId);
+                if (task && task.status !== 'done') {
+                  task.status = 'done';
+                  task.closedInPR = prNumber;
+                  const updated = JSON.stringify(tasks, null, 2) + '\n';
+                  await github.rest.repos.createOrUpdateFileContents({
+                    owner, repo,
+                    path: '.github/skills/backlog/backlog.json',
+                    message: `chore: mark backlog task ${backlogId} as done [skip ci]`,
+                    content: Buffer.from(updated).toString('base64'),
+                    sha: fileData.sha,
+                    branch: 'main'
+                  });
+                  console.log(`Backlog task ${backlogId} marked as done (PR #${prNumber}).`);
+                } else if (task?.status === 'done') {
+                  console.log(`Backlog task ${backlogId} already done.`);
+                } else {
+                  console.log(`Backlog task ${backlogId} not found in backlog.json.`);
+                }
+              } catch (e) {
+                console.log(`Failed to update backlog.json: ${e.message}`);
+              }
+            } else {
+              console.log('No backlog-id in issue body — skipping backlog update.');
+            }
+
+            // --- 3. Find next ready issue (oldest first) ---
             const { data: ready } = await github.rest.issues.listForRepo({
               owner, repo,
               labels: 'ready',

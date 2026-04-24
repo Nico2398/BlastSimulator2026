@@ -17,7 +17,7 @@ description: >
 3. **Enable Auto-Merge:** Settings → General → Pull Requests → Allow auto-merge
 4. **Enable Copilot Code Review:** Settings → Copilot → Code review → Enable + ruleset requiring Copilot review on `main`
 5. **Workflow Permissions:** Settings → Actions → General → Read and write + Allow create/approve PRs
-6. **PAT Token:** Fine-grained PAT with Issues, Pull requests, Contents permissions → store as `PAT_TOKEN` secret
+6. **PAT Token:** Fine-grained PAT with Issues, Pull requests, Contents permissions → store as `PAT_TOKEN_COPILOT_AUTOMATION` secret
 
 ## Automation Workflows
 
@@ -26,7 +26,7 @@ description: >
 | Auto-assign next | `auto-assign-next.yml` | PR closed (merged) | Close done issue, assign next `ready` issue to Copilot |
 | Auto-merge | `auto-merge-copilot.yml` | CI completed **or** Copilot agent check run completed | Auto-approve + squash-merge passing Copilot PRs |
 | Handle failure | `handle-failure.yml` | Issue labeled `blocked` | Comment + notify maintainer |
-| Scheduled kickstart | `scheduled-assign.yml` | Cron (3x daily) + manual | Pick up stalled pipeline |
+| Manual kickstart | `scheduled-assign.yml` | Manual dispatch only | Kick off pipeline manually |
 | CI | `ci.yml` | Push / PR | Standard CI checks |
 | Setup steps | `copilot-setup-steps.yml` | Agent session | Pre-install dependencies for agent |
 
@@ -91,6 +91,6 @@ Better issues → more autonomous pipeline. Use agent-task template.
 | Agent doesn't pick up issue | Verify coding agent enabled, issue assigned to `copilot`, check quota |
 | CI requires manual approval | Disable "Require approval" in Copilot settings |
 | Auto-merge doesn't fire | Enable auto-merge in settings, verify PAT has `contents: write` |
-| Pipeline stalls | scheduled-assign.yml cron catches this, or manual trigger |
+| Pipeline stalls | Manually trigger scheduled-assign.yml from Actions tab |
 | Agent keeps failing | Label `blocked`, review logs, add context, consider splitting task |
 | PR doesn't reference issue | Ensure instructions stress "Closes #<number>" in PR body |
