@@ -302,7 +302,7 @@
       "src/core/events/EventEngine.ts"
     ],
     "testFile": "tests/unit/events/EventEngine.test.ts",
-    "status": "pending",
+    "status": "in-progress",
     "blockedBy": [
       "2.7"
     ],
