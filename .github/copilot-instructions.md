@@ -92,9 +92,7 @@ Available scenarios: `blast-basic`, `level1-win-efficient`, `level1-win-conserva
 Next phase features documented in `.agent/NEXT_PHASE_DESIGN.md`. Feature backlog with atomic task breakdowns for 8 major systems (buildings, vehicles, employee skills, rock composition, blast algorithm, navmesh, employee needs, testing strategy).
 
 **Required steps when working on a backlog task:**
-1. Before coding: `npx tsx .github/skills/backlog/backlog.ts start <id>`
-2. After opening the PR: include `Closes #<number>` in the PR body
-3. **Before the final commit/push**: `npx tsx .github/skills/backlog/backlog.ts done <id> --pr <pr_number>` — CI blocks merge until no task is `in-progress`
+1. After opening the PR: include `Closes #<number>` in the PR body — the pipeline auto-updates `backlog.json` after merge.
 
 ## Creative Direction
 
