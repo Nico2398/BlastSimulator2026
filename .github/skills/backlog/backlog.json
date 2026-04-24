@@ -330,7 +330,7 @@
       "src/core/mining/DrillPlan.ts"
     ],
     "testFile": "tests/unit/mining/DrillPlan.test.ts",
-    "status": "in-progress",
+    "status": "done",
     "blockedBy": [
       "2.1"
     ],
