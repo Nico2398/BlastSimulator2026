@@ -212,3 +212,89 @@ describe('tickVehicle (Task 2.7)', () => {
     expect(waiting.state).toBe('idle');
   });
 });
+
+// ── Task 2.8: Vehicle.waitingTicks tracking ──────────────────────────────────
+
+describe('tickVehicle — waitingTicks (Task 2.8)', () => {
+  // Vehicle.waitingTicks is added to the Vehicle interface in Task 2.8.
+  // It is not present yet, so we access it via `(v as any).waitingTicks` to
+  // keep the existing TypeScript type-check clean while these tests are red.
+
+  it('increments waitingTicks by 1 on each tick the vehicle remains in waiting state', () => {
+    const state = createGame({ seed: VEHICLE_TICK_SEED });
+    const { vehicle: blocker } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 0);
+    const { vehicle: waiting } = purchaseVehicle(state.vehicles, 'debris_hauler', 2, 0);
+
+    // Both vehicles head for the same cell (1, 0)
+    blocker.task = 'moving'; blocker.state = 'moving';
+    blocker.targetX = 1;     blocker.targetZ = 0;
+
+    waiting.task = 'moving'; waiting.state = 'moving';
+    waiting.targetX = 1;     waiting.targetZ = 0;
+
+    // Tick 1 — blocker arrives at (1,0); debris_hauler is blocked → waiting
+    tickVehicle(state, blocker);
+    tickVehicle(state, waiting);
+    expect(waiting.state).toBe('waiting');
+    expect((waiting as any).waitingTicks).toBe(1);
+
+    // Tick 2 — blocker is idle at (1,0), still blocking; waitingTicks → 2
+    tickVehicle(state, blocker); // no-op (task = 'idle')
+    tickVehicle(state, waiting);
+    expect((waiting as any).waitingTicks).toBe(2);
+
+    // Tick 3 — same situation; waitingTicks → 3
+    tickVehicle(state, blocker);
+    tickVehicle(state, waiting);
+    expect((waiting as any).waitingTicks).toBe(3);
+  });
+
+  it('resets waitingTicks to 0 when the vehicle transitions from waiting to moving', () => {
+    const state = createGame({ seed: VEHICLE_TICK_SEED });
+    const { vehicle: blocker } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 0);
+    const { vehicle: waiting } = purchaseVehicle(state.vehicles, 'debris_hauler', 2, 0);
+
+    blocker.task = 'moving'; blocker.state = 'moving';
+    blocker.targetX = 1;     blocker.targetZ = 0;
+
+    waiting.task = 'moving'; waiting.state = 'moving';
+    waiting.targetX = 1;     waiting.targetZ = 0;
+
+    // Build up waitingTicks
+    tickVehicle(state, blocker);
+    tickVehicle(state, waiting);
+    expect(waiting.state).toBe('waiting');
+    expect((waiting as any).waitingTicks).toBe(1);
+
+    tickVehicle(state, blocker); // no-op
+    tickVehicle(state, waiting);
+    expect((waiting as any).waitingTicks).toBe(2);
+
+    // Teleport the blocker away so cell (1,0) is free
+    blocker.x = 99;
+    blocker.z = 99;
+
+    // Next tickVehicle — waiting vehicle finally moves; waitingTicks must reset
+    tickVehicle(state, waiting);
+    expect(waiting.state).not.toBe('waiting');
+    expect((waiting as any).waitingTicks).toBe(0);
+  });
+
+  it('resets waitingTicks to 0 when the vehicle reaches its target and becomes idle', () => {
+    const state = createGame({ seed: VEHICLE_TICK_SEED });
+    const { vehicle: v } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
+
+    // Manually prime waitingTicks to a non-zero value (simulates prior waiting)
+    (v as any).waitingTicks = 5;
+
+    // Vehicle moves straight to its target — no blocking
+    v.task = 'moving'; v.state = 'moving';
+    v.targetX = 1;     v.targetZ = 0;
+
+    tickVehicle(state, v);
+
+    // Vehicle reached target → idle; waitingTicks must be 0
+    expect(v.state).toBe('idle');
+    expect((v as any).waitingTicks).toBe(0);
+  });
+});

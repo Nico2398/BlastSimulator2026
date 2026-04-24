@@ -129,6 +129,8 @@ export interface Vehicle {
   state: VehicleOperationalState;
   /** Current payload in kg. */
   payloadKg: number;
+  /** Number of consecutive ticks the vehicle has spent in the waiting state. */
+  waitingTicks: number;
 }
 
 // ── Fleet state ──
@@ -162,6 +164,7 @@ export function purchaseVehicle(
     driverId: null,
     state: 'idle',
     payloadKg: 0,
+    waitingTicks: 0,
   };
   state.vehicles.push(vehicle);
   return { vehicle, cost: def.purchaseCost };

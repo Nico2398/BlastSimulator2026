@@ -302,11 +302,11 @@
       "src/core/events/EventEngine.ts"
     ],
     "testFile": "tests/unit/events/EventEngine.test.ts",
-    "status": "in-progress",
+    "status": "done",
     "blockedBy": [
       "2.7"
     ],
-    "closedInPR": null
+    "closedInPR": 58
   },
   {
     "id": "2.9",
