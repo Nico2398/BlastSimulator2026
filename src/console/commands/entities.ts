@@ -15,6 +15,7 @@ import {
 import {
   purchaseVehicle,
   assignVehicle,
+  assignDriver,
   moveVehicle,
   getAllVehicleRoles,
   type VehicleRole,
@@ -156,7 +157,8 @@ export function vehicleCommand(
       }
       const lines = ['Fleet:'];
       for (const v of state.vehicles.vehicles) {
-        lines.push(`  [${v.id}] ${v.type} at (${v.x},${v.z}) task: ${v.task} HP: ${v.hp}`);
+        const driverInfo = v.driverId !== null ? `driver:#${v.driverId}` : 'driver:none';
+        lines.push(`  [${v.id}] ${v.type} at (${v.x},${v.z}) task: ${v.task} HP: ${v.hp} ${driverInfo}`);
       }
       return { success: true, output: lines.join('\n') };
     }
@@ -196,8 +198,23 @@ export function vehicleCommand(
       }
       return { success: true, output: `Vehicle #${id} moving to (${toCoords[0]},${toCoords[1]}).` };
     }
+    case 'driver': {
+      const vehicleId = parseInt(args[1] ?? '', 10);
+      const employeeId = parseInt(args[2] ?? '', 10);
+      if (isNaN(vehicleId) || isNaN(employeeId)) {
+        return { success: false, output: 'Usage: vehicle driver <vehicleId> <employeeId>' };
+      }
+      if (!state.vehicles.vehicles.find(v => v.id === vehicleId)) {
+        return { success: false, output: `Vehicle #${vehicleId} not found.` };
+      }
+      const result = assignDriver(state.vehicles, state.employees, vehicleId, employeeId);
+      if (!result.success) {
+        return { success: false, output: result.error! };
+      }
+      return { success: true, output: `Driver #${employeeId} assigned to vehicle #${vehicleId}.` };
+    }
     default:
-      return { success: false, output: 'Usage: vehicle (list|buy|assign|move)' };
+      return { success: false, output: 'Usage: vehicle (list|buy|assign|move|driver)' };
   }
 }
 
