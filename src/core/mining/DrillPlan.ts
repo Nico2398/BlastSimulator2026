@@ -1,7 +1,7 @@
 // BlastSimulator2026 — Drill plan definition
 // A drill plan is a set of holes. Each hole has position, depth, and diameter.
 
-import { VoxelGrid } from '../world/VoxelGrid.js';
+import type { VoxelGrid } from '../world/VoxelGrid.js';
 
 export interface DrillHole {
   id: string;
@@ -86,8 +86,8 @@ export function digVoxel(
     return fail(`Coordinates (${x}, ${y}, ${z}) are out of bounds.`);
   }
 
-  const voxel = grid.getVoxel(x, y, z);
-  if (voxel === undefined || voxel.density === 0) {
+  const voxel = grid.getVoxel(x, y, z)!;
+  if (voxel.density === 0) {
     return fail(`Voxel at (${x}, ${y}, ${z}) is already empty.`);
   }
 
@@ -96,8 +96,8 @@ export function digVoxel(
   // Top-down scan to find the new surface Y.
   let newSurfaceY = -1;
   for (let scanY = grid.sizeY - 1; scanY >= 0; scanY--) {
-    const v = grid.getVoxel(x, scanY, z);
-    if (v !== undefined && v.density > 0) {
+    const v = grid.getVoxel(x, scanY, z)!;
+    if (v.density > 0) {
       newSurfaceY = scanY;
       break;
     }
