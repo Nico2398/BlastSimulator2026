@@ -358,7 +358,7 @@
       "src/console/commands/entities.ts"
     ],
     "testFile": null,
-    "status": "pending",
+    "status": "in-progress",
     "blockedBy": [
       "2.3",
       "2.6",
