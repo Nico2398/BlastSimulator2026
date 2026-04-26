@@ -7,6 +7,11 @@ on:
   # Re-evaluate once the Copilot agent session ends, closing the deferred-merge loop.
   check_run:
     types: [completed]
+  # Most reliable trigger: fires the moment APPROVED is posted as a PR comment.
+  issue_comment:
+    types: [created]
+  # Escape hatch: maintainer can manually re-trigger if the pipeline stalls.
+  workflow_dispatch: {}
 
 permissions:
   pull-requests: write
@@ -16,11 +21,14 @@ permissions:
 jobs:
   auto-review-and-merge:
     runs-on: ubuntu-latest
-    # Run when CI succeeds, or when the Copilot SWE agent check run completes (app 1143301).
+    # Run when CI succeeds, when the Copilot SWE agent check run completes (app 1143301),
+    # when an issue/PR comment is created (catches APPROVED immediately), or on manual dispatch.
     # Note: env context is not available in job-level if conditions; use github/vars/needs/inputs only.
     if: >
       (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
-      (github.event_name == 'check_run' && github.event.check_run.app.id == 1143301)
+      (github.event_name == 'check_run' && github.event.check_run.app.id == 1143301) ||
+      (github.event_name == 'issue_comment' && github.event.action == 'created') ||
+      (github.event_name == 'workflow_dispatch')
     steps:
       - name: Check PAT_TOKEN_COPILOT_AUTOMATION is configured
         env:
@@ -38,6 +46,9 @@ jobs:
             const owner = context.repo.owner;
             const repo = context.repo.repo;
             const COPILOT_SWE_APP_ID = 1143301;
+            const expectedAuthors = ['copilot[bot]', 'github-copilot[bot]', 'Copilot'];
+            // Marker used both to build the comment body and to detect it later.
+            const REVIEW_REQUEST_MARKER = '@copilot Please review your own changes for this PR:';
 
             // --- 1. Find the PR ---
             // Source differs depending on which trigger fired.
@@ -49,14 +60,52 @@ jobs:
                 return;
               }
               prNumber = prs[0].number;
-            } else {
-              // check_run trigger: Copilot agent session just ended.
+            } else if (context.eventName === 'check_run') {
+              // Copilot agent session just ended.
               const prs = context.payload.check_run.pull_requests;
               if (!prs || prs.length === 0) {
                 console.log('No PRs associated with this agent check run.');
                 return;
               }
               prNumber = prs[0].number;
+            } else if (context.eventName === 'issue_comment') {
+              // Fast path: fired the moment a comment is created on a PR.
+              // Only proceed if the comment is APPROVED from Copilot — everything else is noise.
+              const comment = context.payload.comment;
+              const issue = context.payload.issue;
+              if (!issue.pull_request) {
+                console.log('Comment is on an issue, not a PR. Skipping.');
+                return;
+              }
+              if (!expectedAuthors.includes(comment.user?.login || '')) {
+                console.log(`Comment by ${comment.user?.login}, not Copilot. Skipping.`);
+                return;
+              }
+              if (!comment.body?.toLowerCase().includes('approved')) {
+                console.log('Comment does not contain APPROVED. Skipping.');
+                return;
+              }
+              prNumber = issue.number;
+            } else if (context.eventName === 'workflow_dispatch') {
+              // Manual trigger: scan all open Copilot PRs and merge the first one ready.
+              console.log('Manual dispatch: scanning open Copilot PRs...');
+              const { data: openPRs } = await github.rest.pulls.list({
+                owner, repo, state: 'open', per_page: 100
+              });
+              const copilotPRs = openPRs.filter(p =>
+                p.head.ref.startsWith('copilot/') &&
+                expectedAuthors.includes(p.user.login)
+              );
+              if (copilotPRs.length === 0) {
+                console.log('No open Copilot PRs found.');
+                return;
+              }
+              // Pick the first PR — re-entrant logic below will handle checks + merge.
+              prNumber = copilotPRs[0].number;
+              console.log(`Found ${copilotPRs.length} open Copilot PR(s). Processing #${prNumber}.`);
+            } else {
+              console.log(`Unhandled event: ${context.eventName}`);
+              return;
             }
 
             // --- 2. Get full PR data ---
@@ -73,7 +122,6 @@ jobs:
               console.log(`PR from fork ${pr.head.repo.full_name}, skipping.`);
               return;
             }
-            const expectedAuthors = ['copilot[bot]', 'github-copilot[bot]', 'Copilot'];
             if (!expectedAuthors.includes(pr.user.login)) {
               console.log(`PR author ${pr.user.login} is not Copilot, skipping.`);
               return;
@@ -83,13 +131,27 @@ jobs:
               return;
             }
 
-            // Marker used both to build the comment body and to detect it later.
-            // Keeping it as a constant ensures the two stay in sync.
-            const REVIEW_REQUEST_MARKER = '@copilot Please review your own changes for this PR:';
+            // --- 4. Agent-still-running guard (applies to ALL paths, including draft) ---
+            // This must run BEFORE posting the review request to avoid triggering a review
+            // session while the implementation agent is still in the middle of its work.
+            const activeStatuses = new Set(['queued', 'in_progress', 'waiting', 'requested']);
+            const { data: agentChecksData } = await github.rest.checks.listForRef({
+              owner, repo,
+              ref: pr.head.sha,
+              app_id: COPILOT_SWE_APP_ID,
+              per_page: 100
+            });
+            const agentStillRunning = agentChecksData.check_runs.some(run =>
+              activeStatuses.has(run.status)
+            );
+            if (agentStillRunning) {
+              console.log('Copilot SWE agent still in-progress. Deferring all actions until session ends.');
+              return;
+            }
 
-            // --- 4. If draft, mark ready for review (first CI pass) ---
+            // --- 5. If draft, mark ready for review (agent has finished its session) ---
             if (pr.draft) {
-              console.log(`PR #${prNumber} is a draft. Marking ready for review...`);
+              console.log(`PR #${prNumber} is a draft. Agent is done — marking ready for review...`);
               await github.graphql(`
                 mutation($prId: ID!) {
                   markPullRequestReadyForReview(input: { pullRequestId: $prId }) {
@@ -98,8 +160,7 @@ jobs:
                 }
               `, { prId: pr.node_id });
 
-              // Post a @copilot self-review request. The coding agent will review
-              // and push fixes if needed. This replaces the external Copilot reviewer.
+              // Post a @copilot self-review request only after the implementation agent has exited.
               const reviewPrompt = [
                 REVIEW_REQUEST_MARKER,
                 '',
@@ -120,11 +181,11 @@ jobs:
                 body: reviewPrompt
               });
 
-              console.log(`PR #${prNumber} marked ready + self-review requested via @copilot.`);
+              console.log(`PR #${prNumber} marked ready + self-review requested.`);
               return;
             }
 
-            // --- 5. PR is not draft — check if self-review was requested and completed ---
+            // --- 6. PR is not draft — check if self-review was requested and completed ---
             // Use paginate to handle PRs with more than 100 comments.
             const allComments = await github.paginate(github.rest.issues.listComments, {
               owner, repo,
@@ -154,30 +215,27 @@ jobs:
               return;
             }
 
-            // --- 5b. Guard: ensure the agent session has exited before merging ---
-            // When triggered by CI completion, the agent may still be running (race condition:
-            // agent posts APPROVED then keeps its session alive briefly). Defer in that case —
-            // the check_run trigger below will re-evaluate once the agent exits.
-            // When triggered by the agent check_run itself, the session has just ended, skip guard.
-            if (context.eventName === 'workflow_run') {
-              const { data: checksData } = await github.rest.checks.listForRef({
+            // --- 6b. For non-issue_comment triggers, verify CI is green before merging ---
+            // The issue_comment path fires immediately on APPROVED; CI may still be running.
+            // For CI (workflow_run) and check_run paths, CI has already been evaluated.
+            if (context.eventName === 'issue_comment' || context.eventName === 'workflow_dispatch') {
+              const { data: { check_runs: allRuns } } = await github.rest.checks.listForRef({
                 owner, repo,
                 ref: pr.head.sha,
-                app_id: COPILOT_SWE_APP_ID,
                 per_page: 100
               });
-              const activeStatuses = new Set(['queued', 'in_progress', 'waiting', 'requested']);
-              const agentStillRunning = checksData.check_runs.some(run =>
-                activeStatuses.has(run.status)
+              const ciRuns = allRuns.filter(r => r.app?.id !== COPILOT_SWE_APP_ID);
+              const allCIGreen = ciRuns.length > 0 && ciRuns.every(r =>
+                r.status === 'completed' &&
+                ['success', 'skipped', 'neutral'].includes(r.conclusion || '')
               );
-              if (agentStillRunning) {
-                console.log('Copilot SWE agent still in-progress. Deferring — will retry when agent session ends.');
+              if (!allCIGreen) {
+                console.log('CI not fully green. Waiting for CI to complete before merging.');
                 return;
               }
             }
 
-            // --- 5c. When triggered by agent session end, verify CI is still green ---
-            // The CI may not have fired after the agent's last push; check all non-agent runs.
+            // --- 6c. When triggered by agent session end (check_run), verify CI is still green ---
             if (context.eventName === 'check_run') {
               const { data: { check_runs: allRuns } } = await github.rest.checks.listForRef({
                 owner, repo,
@@ -197,7 +255,7 @@ jobs:
 
             console.log(`PR #${prNumber}: self-review complete, CI green, agent exited. Approving and merging.`);
 
-            // --- 6. Approve ---
+            // --- 7. Approve ---
             try {
               await github.rest.pulls.createReview({
                 owner, repo,
@@ -210,7 +268,7 @@ jobs:
               console.log(`Approval note: ${e.message}`);
             }
 
-            // --- 7. Merge ---
+            // --- 8. Merge ---
             try {
               await github.rest.pulls.merge({
                 owner, repo,

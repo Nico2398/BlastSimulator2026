@@ -24,7 +24,7 @@ description: >
 | Workflow | File | Trigger | Purpose |
 |----------|------|---------|---------|
 | Auto-assign next | `auto-assign-next.yml` | PR closed (merged) | Close done issue, assign next `ready` issue to Copilot |
-| Auto-merge | `auto-merge-copilot.yml` | CI completed **or** Copilot agent check run completed | Auto-approve + squash-merge passing Copilot PRs |
+| Auto-merge | `auto-merge-copilot.yml` | CI completed **or** Copilot agent check run completed **or** PR comment created **or** manual dispatch | Auto-approve + squash-merge passing Copilot PRs |
 | Handle failure | `handle-failure.yml` | Issue labeled `blocked` | Comment + notify maintainer |
 | Manual kickstart | `scheduled-assign.yml` | Manual dispatch only | Kick off pipeline manually |
 | CI | `ci.yml` | Push / PR | Standard CI checks |
@@ -55,14 +55,21 @@ Review flow:
 ### Merge Loop (closed-loop, fully autonomous)
 
 ```
-Agent posts APPROVED → agent session ends
-  → check_run:completed fires (app 1143301)
+Agent posts APPROVED comment
+  → issue_comment:created fires immediately (most reliable path)
   → auto-merge-copilot.yml wakes up
-  → sees APPROVED + CI green + agent gone → squash-merge
+  → verifies CI green + no agent running → squash-merge
+
+Fallback paths (if issue_comment trigger misses):
+  → check_run:completed fires when agent session ends (app 1143301)
+  → workflow_run:completed fires when CI passes (defers if agent still running)
+  → workflow_dispatch: maintainer triggers manually from Actions tab
 ```
 
-If CI fires before agent exits, `workflow_run` path defers merge ("agent still running").
-`check_run` path closes loop when session ends — no polling, no manual intervention.
+**Agent-still-running guard** runs on ALL paths (including draft PRs) to prevent the review
+request from firing while the implementation session is still active.
+
+Review is only requested AFTER the agent session ends — not on the first CI pass.
 
 ## Writing Good Issues
 
@@ -90,7 +97,8 @@ Better issues → more autonomous pipeline. Use agent-task template.
 |---------|----------|
 | Agent doesn't pick up issue | Verify coding agent enabled, issue assigned to `copilot`, check quota |
 | CI requires manual approval | Disable "Require approval" in Copilot settings |
-| Auto-merge doesn't fire | Enable auto-merge in settings, verify PAT has `contents: write` |
+| Auto-merge doesn't fire | Enable auto-merge in settings, verify PAT has `contents: write`; use `workflow_dispatch` as escape hatch |
+| Review comment posted too early | Guard in workflow prevents this — review is only requested after agent session ends (agent-still-running check runs before draft block) |
 | Pipeline stalls | Manually trigger scheduled-assign.yml from Actions tab |
 | Agent keeps failing | Label `blocked`, review logs, add context, consider splitting task |
 | PR doesn't reference issue | Ensure instructions stress "Closes #<number>" in PR body |
