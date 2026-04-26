@@ -282,3 +282,7 @@ function distSquared(a: Vec3, b: Vec3): number {
 }
 
 export { PROJECTION_SPEED_THRESHOLD };
+
+// Boulder fragmentation lives in its own sub-module; re-exported here so that
+// all callers importing from 'BlastCalc.js' continue to work unchanged.
+export { isOversized, fragmentBoulder, resetBoulderFragIds, OVERSIZED_FRAGMENT_THRESHOLD, type Boulder, type FragmentBoulderResult } from './BoulderFragmentation.js';
