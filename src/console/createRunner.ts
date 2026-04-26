@@ -30,11 +30,11 @@ import {
 } from './commands/economy.js';
 import {
   buildCommand,
-  vehicleCommand,
   employeeCommand,
   scoresCommand,
   zoneCommand,
 } from './commands/entities.js';
+import { vehicleCommand } from './commands/vehicle.js';
 import {
   tickCommand,
   eventCommand,
