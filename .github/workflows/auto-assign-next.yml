@@ -94,6 +94,8 @@ jobs:
               per_page: 10
             });
 
+            ready.sort((a, b) => a.number - b.number);
+
             for (const issue of ready) {
               // Check dependencies
               const depMatch = issue.body?.match(/[Dd]epends?\s+on:?\s*#(\d+)/);
