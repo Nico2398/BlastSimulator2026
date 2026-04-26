@@ -12,11 +12,20 @@ import {
   calculateVibrations,
   groupChargesByDelay,
   PROJECTION_SPEED_THRESHOLD,
+  fragmentBoulder,
+  isOversized,
+  OVERSIZED_FRAGMENT_THRESHOLD,
+  resetBoulderFragIds,
+  type Boulder,
 } from '../../../src/core/mining/BlastCalc.js';
 import { vec3, length } from '../../../src/core/math/Vec3.js';
 import { createGridPlan, resetHoleIds } from '../../../src/core/mining/DrillPlan.js';
+import { Random } from '../../../src/core/math/Random.js';
 
-beforeEach(() => resetHoleIds());
+beforeEach(() => {
+  resetHoleIds();
+  resetBoulderFragIds();
+});
 
 // ── 3.6: Energy calculation ──
 
@@ -203,5 +212,131 @@ describe('BlastCalc — vibration', () => {
     const groups = groupChargesByDelay(holes, charges, delays);
     expect(groups).toContain(10); // two holes at delay 0: 5+5=10
     expect(groups).toContain(5);  // one hole at delay 25: 5
+  });
+});
+
+// ── 2.11: Boulder fragmentation ──
+
+describe('BlastCalc — fragmentBoulder', () => {
+  // ── Deterministic fixtures ──────────────────────────────────────────────────
+  // Oversized boulder: 2.0 m³, granite density 2 700 kg/m³ → 5 400 kg.
+  // oreDensities are fractions that must sum to 1 (blingite 30 % + dirtite 70 %).
+  const oversizedBoulder: Boulder = {
+    id: 1,
+    volume: 2.0,
+    mass: 5_400,
+    rockId: 'granite',
+    oreDensities: { blingite: 0.3, dirtite: 0.7 },
+  };
+
+  // Non-oversized boulder: 0.3 m³ — below the 0.5 m³ threshold.
+  const normalBoulder: Boulder = {
+    id: 2,
+    volume: 0.3,
+    mass: 810,
+    rockId: 'granite',
+    oreDensities: { blingite: 0.3, dirtite: 0.7 },
+  };
+
+  // Exactly-at-threshold boulder: 0.5 m³ — boundary, must NOT be oversized.
+  const boundaryBoulder: Boulder = {
+    id: 3,
+    volume: 0.5,
+    mass: 1_350,
+    rockId: 'granite',
+    oreDensities: { dirtite: 1.0 },
+  };
+
+  // ── isOversized helper ──────────────────────────────────────────────────────
+
+  it('isOversized returns true for volume strictly above the threshold', () => {
+    expect(isOversized(OVERSIZED_FRAGMENT_THRESHOLD + 0.001)).toBe(true);
+    expect(isOversized(1.0)).toBe(true);
+    expect(isOversized(10.0)).toBe(true);
+  });
+
+  it('isOversized returns false for volume at or below the threshold', () => {
+    expect(isOversized(OVERSIZED_FRAGMENT_THRESHOLD)).toBe(false);
+    expect(isOversized(OVERSIZED_FRAGMENT_THRESHOLD - 0.001)).toBe(false);
+    expect(isOversized(0.0)).toBe(false);
+  });
+
+  // ── Rejection of non-oversized input ───────────────────────────────────────
+
+  it('rejects a boulder below the threshold: success false, empty fragments, error set', () => {
+    const result = fragmentBoulder(normalBoulder, new Random(42));
+    expect(result.success).toBe(false);
+    expect(result.fragments).toEqual([]);
+    expect(result.error).toBeDefined();
+    expect(typeof result.error).toBe('string');
+    expect((result.error as string).length).toBeGreaterThan(0);
+  });
+
+  it('rejects a boulder exactly at the threshold: success false, empty fragments, error set', () => {
+    const result = fragmentBoulder(boundaryBoulder, new Random(42));
+    expect(result.success).toBe(false);
+    expect(result.fragments).toEqual([]);
+    expect(result.error).toBeDefined();
+  });
+
+  // ── Fragment volume constraint ──────────────────────────────────────────────
+
+  it('every output fragment has volume strictly below OVERSIZED_FRAGMENT_THRESHOLD', () => {
+    const result = fragmentBoulder(oversizedBoulder, new Random(42));
+    expect(result.success).toBe(true);
+    for (const frag of result.fragments) {
+      expect(frag.volume).toBeLessThan(OVERSIZED_FRAGMENT_THRESHOLD);
+    }
+  });
+
+  // ── Mass conservation ───────────────────────────────────────────────────────
+
+  it('fragment masses sum to the original boulder mass (mass conservation, 6 d.p.)', () => {
+    const result = fragmentBoulder(oversizedBoulder, new Random(42));
+    expect(result.success).toBe(true);
+    const totalMass = result.fragments.reduce((acc, f) => acc + f.mass, 0);
+    expect(totalMass).toBeCloseTo(oversizedBoulder.mass, 6);
+  });
+
+  // ── Volume conservation ─────────────────────────────────────────────────────
+
+  it('fragment volumes sum to the original boulder volume (volume conservation, 6 d.p.)', () => {
+    const result = fragmentBoulder(oversizedBoulder, new Random(42));
+    expect(result.success).toBe(true);
+    const totalVolume = result.fragments.reduce((acc, f) => acc + f.volume, 0);
+    expect(totalVolume).toBeCloseTo(oversizedBoulder.volume, 6);
+  });
+
+  // ── Ore density preservation ────────────────────────────────────────────────
+
+  it('ore densities are preserved identically in every sub-fragment', () => {
+    const result = fragmentBoulder(oversizedBoulder, new Random(42));
+    expect(result.success).toBe(true);
+    for (const frag of result.fragments) {
+      expect(frag.oreDensities).toEqual(oversizedBoulder.oreDensities);
+    }
+  });
+
+  // ── Minimum fragment count ──────────────────────────────────────────────────
+
+  it('produces at least 2 sub-fragments from an oversized boulder', () => {
+    const result = fragmentBoulder(oversizedBoulder, new Random(42));
+    expect(result.success).toBe(true);
+    expect(result.fragments.length).toBeGreaterThanOrEqual(2);
+  });
+
+  // ── ID uniqueness ───────────────────────────────────────────────────────────
+
+  it('sub-fragment IDs are all unique and none equals the parent boulder ID', () => {
+    const result = fragmentBoulder(oversizedBoulder, new Random(42));
+    expect(result.success).toBe(true);
+    const ids = result.fragments.map(f => f.id);
+    const uniqueIds = new Set(ids);
+    // Every fragment gets its own distinct ID
+    expect(uniqueIds.size).toBe(ids.length);
+    // No fragment recycles the parent's ID
+    for (const id of ids) {
+      expect(id).not.toBe(oversizedBoulder.id);
+    }
   });
 });

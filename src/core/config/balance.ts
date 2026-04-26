@@ -118,6 +118,9 @@ export const TRAFFIC_JAM_MIN_TICKS = 10;
 /** Max fragments generated per voxel during a blast. Caps fragment count for performance. */
 export const MAX_FRAGMENTS_PER_VOXEL = 20;
 
+/** Maximum fragment volume (m³) that can be hauled directly without secondary fragmentation. */
+export const OVERSIZED_FRAGMENT_THRESHOLD = 0.5;
+
 /** Speed threshold (m/s) above which a fragment is classified as a dangerous projection.
  *  Real blasting: fly-rock can travel 500m+ at high speed. Scaled for gameplay. */
 export const PROJECTION_SPEED_THRESHOLD = 15;
