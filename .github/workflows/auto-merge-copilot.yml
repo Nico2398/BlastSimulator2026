@@ -241,6 +241,7 @@ jobs:
                   console.log(`Approved PR #${prNumber}`);
                 } catch (e) { console.log(`Approval note: ${e.message}`); }
                 // Enable GitHub native auto-merge so the PR merges the moment CI goes green.
+                let autoMergeEnabled = false;
                 try {
                   await github.graphql(`
                     mutation($prId: ID!) {
@@ -251,8 +252,13 @@ jobs:
                     }
                   `, { prId: pr.node_id });
                   console.log(`Auto-merge enabled for PR #${prNumber}. Will merge once CI is green.`);
-                } catch (e2) { console.log(`Auto-merge enable failed: ${e2.message}`); }
-                return;
+                  autoMergeEnabled = true;
+                } catch (e2) {
+                  console.log(`Auto-merge enable failed: ${e2.message}`);
+                  // "Clean status" means no branch protection rules — PR is directly mergeable.
+                  // Fall through to steps 7-8 for a direct merge attempt.
+                }
+                if (autoMergeEnabled) return;
               }
             }
 
