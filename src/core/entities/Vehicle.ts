@@ -116,6 +116,7 @@ export function getAllVehicleRoles(): VehicleRole[] {
 export interface Vehicle {
   id: number;
   type: VehicleRole;
+  tier: VehicleTier;
   x: number;
   z: number;
   hp: number;
@@ -152,11 +153,14 @@ export function purchaseVehicle(
   role: VehicleRole,
   x: number = 0,
   z: number = 0,
+  tier: VehicleTier = 1,
 ): { vehicle: Vehicle; cost: number } {
-  const def = getVehicleDef(role);
+  const def = getVehicleDefByTier(role, tier);
   const vehicle: Vehicle = {
     id: state.nextId++,
-    type: role, x, z,
+    type: role,
+    tier,
+    x, z,
     hp: def.maxHp,
     task: 'idle',
     targetX: x,

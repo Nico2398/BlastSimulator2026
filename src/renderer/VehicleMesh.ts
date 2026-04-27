@@ -1,5 +1,6 @@
-// BlastSimulator2026 — Vehicle Meshes (Placeholders)
-// Placeholder shapes for mine vehicles — recognizable silhouettes, cartoon yellow.
+// BlastSimulator2026 — Vehicle Meshes
+// Recognizable silhouettes, cartoon yellow. Tier 2/3 vehicles are scaled up
+// and color-brightened via applyTierVariation().
 //
 // Shapes:
 //   debris_hauler     → yellow box body + 4 wheel cylinders
@@ -11,13 +12,17 @@
 // Vehicles move smoothly to their target position via lerp each frame.
 
 import * as THREE from 'three';
-import type { Vehicle, VehicleRole } from '../core/entities/Vehicle.js';
+import type { Vehicle, VehicleRole, VehicleTier } from '../core/entities/Vehicle.js';
 
 // ---------- Colors ----------
 const YELLOW = 0xf5c518;   // Caterpillar yellow
 const DARK_GREY = 0x444444; // Tracks / wheels
 const STEEL = 0x8888aa;     // Drill rig body
 const ORANGE = 0xff7700;    // Accent / active highlight
+
+// ---------- Tier variation ----------
+const TIER_SCALE_MULT: Record<VehicleTier, number> = { 1: 1.0, 2: 1.15, 3: 1.3 };
+const TIER_BRIGHT_SHIFT: Record<VehicleTier, number> = { 1: 0.0, 2: 0.12, 3: 0.26 };
 
 // ---------- Vehicle visual builders ----------
 
@@ -152,6 +157,7 @@ export class VehicleMesh {
   addVehicle(vehicle: Vehicle): void {
     const builder = VEHICLE_BUILDERS[vehicle.type];
     const group = builder();
+    applyTierVariation(group, vehicle.tier);
     group.position.set(vehicle.x, 0, vehicle.z);
     this.scene.add(group);
     this.vehicles.set(vehicle.id, { group, vehicle });
@@ -227,5 +233,35 @@ function disposeGroup(group: THREE.Group): void {
       child.geometry.dispose();
       (child.material as THREE.Material).dispose();
     }
+  }
+}
+
+/**
+ * Linearly brighten a packed hex color toward white.
+ * @param hex   - e.g. 0xf5c518
+ * @param shift - 0 = unchanged, 1 = white
+ */
+function brightenColor(hex: number, shift: number): number {
+  if (shift <= 0) return hex;
+  const r = (hex >> 16) & 0xff;
+  const g = (hex >> 8)  & 0xff;
+  const b =  hex        & 0xff;
+  return (
+    (Math.round(r + (0xff - r) * shift) << 16) |
+    (Math.round(g + (0xff - g) * shift) << 8)  |
+     Math.round(b + (0xff - b) * shift)
+  );
+}
+
+function applyTierVariation(group: THREE.Group, tier: VehicleTier): void {
+  group.scale.setScalar(TIER_SCALE_MULT[tier]);
+  const shift = TIER_BRIGHT_SHIFT[tier];
+  if (shift > 0) {
+    group.traverse((obj) => {
+      if (obj instanceof THREE.Mesh) {
+        const mat = obj.material as THREE.MeshPhongMaterial;
+        mat.color.setHex(brightenColor(mat.color.getHex(), shift));
+      }
+    });
   }
 }

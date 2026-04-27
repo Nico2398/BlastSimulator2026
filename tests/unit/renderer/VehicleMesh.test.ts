@@ -2,11 +2,11 @@
 
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
-import type { Vehicle } from '../../../src/core/entities/Vehicle.js';
+import type { Vehicle, VehicleTier } from '../../../src/core/entities/Vehicle.js';
 import { VehicleMesh } from '../../../src/renderer/VehicleMesh.js';
 
-function makeVehicle(id: number, type: Vehicle['type'], x = 0, z = 0): Vehicle {
-  return { id, type, x, z, hp: 100, task: 'idle', targetX: x, targetZ: z };
+function makeVehicle(id: number, type: Vehicle['type'], x = 0, z = 0, tier = 1 as VehicleTier): Vehicle {
+  return { id, type, x, z, hp: 100, task: 'idle', targetX: x, targetZ: z, tier } as Vehicle;
 }
 
 describe('VehicleMesh', () => {
@@ -91,5 +91,68 @@ describe('VehicleMesh', () => {
     vm.clearAll();
     expect(scene.children.length).toBe(0);
     vm.dispose();
+  });
+});
+
+// ── Task 2.13: tier-specific scale and color variation ────────────────────────
+// Role used throughout: debris_hauler.
+//   • children[0] of its group is the yellow body mesh — the first part built,
+//     and the one whose material color reflects the tier tint.
+//   • group.scale.x reflects the uniform scale applied via group.scale.setScalar().
+
+describe('VehicleMesh — tier scale variation', () => {
+  /** Helper: add a debris_hauler at the given tier, return group.scale.x. */
+  const getScale = (tier: VehicleTier): number => {
+    const scene = new THREE.Scene();
+    const vm = new VehicleMesh(scene);
+    vm.addVehicle(makeVehicle(1, 'debris_hauler', 0, 0, tier));
+    const group = scene.children[0] as THREE.Group;
+    const sx = group.scale.x;
+    vm.dispose();
+    return sx;
+  };
+
+  it('T2 vehicle group scale is larger than T1', () => {
+    // Higher tier → bigger vehicle → setScalar(value > 1) for T2 relative to T1.
+    expect(getScale(2)).toBeGreaterThan(getScale(1));
+  });
+
+  it('T3 vehicle group scale is larger than T2', () => {
+    // T3 must be strictly larger than T2.
+    expect(getScale(3)).toBeGreaterThan(getScale(2));
+  });
+});
+
+describe('VehicleMesh — tier color brightening', () => {
+  /**
+   * Helper: add a debris_hauler at the given tier and return the RGB components
+   * of the first child mesh's MeshPhongMaterial color.
+   * The first child of debris_hauler is the yellow body (children[0]).
+   */
+  const getBodyColor = (tier: VehicleTier): { r: number; g: number; b: number } => {
+    const scene = new THREE.Scene();
+    const vm = new VehicleMesh(scene);
+    vm.addVehicle(makeVehicle(1, 'debris_hauler', 0, 0, tier));
+    const group = scene.children[0] as THREE.Group;
+    const bodyMesh = group.children[0] as THREE.Mesh;
+    const color = (bodyMesh.material as THREE.MeshPhongMaterial).color;
+    vm.dispose();
+    return { r: color.r, g: color.g, b: color.b };
+  };
+
+  it('T2 debris_hauler body color is brighter than T1', () => {
+    // Higher tier → brighter tint on the body material.
+    const c1 = getBodyColor(1);
+    const c2 = getBodyColor(2);
+    const brighter = c2.r > c1.r || c2.g > c1.g || c2.b > c1.b;
+    expect(brighter).toBe(true);
+  });
+
+  it('T3 debris_hauler body color is brighter than T2', () => {
+    // T3 must be strictly brighter than T2 on at least one channel.
+    const c2 = getBodyColor(2);
+    const c3 = getBodyColor(3);
+    const brighter = c3.r > c2.r || c3.g > c2.g || c3.b > c2.b;
+    expect(brighter).toBe(true);
   });
 });
