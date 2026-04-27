@@ -141,6 +141,13 @@ jobs:
               app_id: COPILOT_SWE_APP_ID,
               per_page: 100
             });
+            // Zero check runs means the agent hasn't registered its session yet — treat
+            // that as "still running" so we don't promote the draft or post the review
+            // request before the agent has even started.
+            if (agentChecksData.check_runs.length === 0) {
+              console.log('No Copilot check runs on PR head SHA yet — agent has not registered. Deferring.');
+              return;
+            }
             const agentStillRunning = agentChecksData.check_runs.some(run =>
               activeStatuses.has(run.status)
             );
@@ -218,6 +225,7 @@ jobs:
             // --- 6b. For non-issue_comment triggers, verify CI is green before merging ---
             // The issue_comment path fires immediately on APPROVED; CI may still be running.
             // For CI (workflow_run) and check_run paths, CI has already been evaluated.
+            let alreadyApproved = false;
             if (context.eventName === 'issue_comment' || context.eventName === 'workflow_dispatch') {
               const { data: { check_runs: allRuns } } = await github.rest.checks.listForRef({
                 owner, repo,
@@ -238,10 +246,10 @@ jobs:
                     event: 'APPROVE',
                     body: '✅ Auto-approved: agent self-review complete. Auto-merge will fire once all CI checks pass.',
                   });
+                  alreadyApproved = true;
                   console.log(`Approved PR #${prNumber}`);
                 } catch (e) { console.log(`Approval note: ${e.message}`); }
                 // Enable GitHub native auto-merge so the PR merges the moment CI goes green.
-                let autoMergeEnabled = false;
                 try {
                   await github.graphql(`
                     mutation($prId: ID!) {
@@ -252,13 +260,13 @@ jobs:
                     }
                   `, { prId: pr.node_id });
                   console.log(`Auto-merge enabled for PR #${prNumber}. Will merge once CI is green.`);
-                  autoMergeEnabled = true;
                 } catch (e2) {
                   console.log(`Auto-merge enable failed: ${e2.message}`);
-                  // "Clean status" means no branch protection rules — PR is directly mergeable.
-                  // Fall through to steps 7-8 for a direct merge attempt.
                 }
-                if (autoMergeEnabled) return;
+                // Option B: always return here. The workflow_run trigger will re-fire once CI
+                // passes and handle the final merge — regardless of whether enablePullRequestAutoMerge
+                // succeeded. Falling through would cause a double approval (issue 3).
+                return;
               }
             }
 
@@ -283,16 +291,19 @@ jobs:
             console.log(`PR #${prNumber}: self-review complete, CI green, agent exited. Approving and merging.`);
 
             // --- 7. Approve ---
-            try {
-              await github.rest.pulls.createReview({
-                owner, repo,
-                pull_number: prNumber,
-                event: 'APPROVE',
-                body: '✅ Auto-approved: CI passed + agent self-review complete.'
-              });
-              console.log(`Approved PR #${prNumber}`);
-            } catch (e) {
-              console.log(`Approval note: ${e.message}`);
+            // Option A safeguard: skip if already approved in step 6b to avoid double approval.
+            if (!alreadyApproved) {
+              try {
+                await github.rest.pulls.createReview({
+                  owner, repo,
+                  pull_number: prNumber,
+                  event: 'APPROVE',
+                  body: '✅ Auto-approved: CI passed + agent self-review complete.'
+                });
+                console.log(`Approved PR #${prNumber}`);
+              } catch (e) {
+                console.log(`Approval note: ${e.message}`);
+              }
             }
 
             // --- 8. Merge ---
