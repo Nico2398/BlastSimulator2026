@@ -65,27 +65,31 @@ jobs:
             // their dependents become eligible on the next run.
             for (const id of existingBacklogIds) doneIds.add(id);
 
-            const candidates = tasks
-              .filter(t =>
-                t.status === 'pending' &&
-                t.blockedBy.every(id => doneIds.has(id))
-              )
-              .sort((a, b) => a.chapter - b.chapter);
-
-            if (candidates.length === 0) {
-              console.log('No pending tasks with resolved blockers found.');
-              return;
-            }
-
             // --- Create up to maxCount issues ---
+            // Candidates are recomputed after each creation so that a newly
+            // created issue immediately unlocks its dependents within the
+            // same run (e.g. creating 3.1 makes 3.2 eligible on the next
+            // iteration instead of skipping to 4.1).
             let created = 0;
-            for (const task of candidates) {
-              if (created >= maxCount) break;
 
-              if (existingBacklogIds.has(task.id)) {
-                console.log(`Skipping task ${task.id} — issue already exists.`);
-                continue;
+            while (created < maxCount) {
+              const candidates = tasks
+                .filter(t =>
+                  t.status === 'pending' &&
+                  !existingBacklogIds.has(t.id) &&
+                  t.blockedBy.every(id => doneIds.has(id))
+                )
+                .sort((a, b) =>
+                  a.chapter - b.chapter ||
+                  a.id.localeCompare(b.id, undefined, { numeric: true })
+                );
+
+              if (candidates.length === 0) {
+                console.log('No pending tasks with resolved blockers found.');
+                break;
               }
+
+              const task = candidates[0];
 
               const dependsOnLines = (task.blockedBy || [])
                 .filter(id => backlogIdToIssueNumber.has(id))
@@ -115,6 +119,13 @@ jobs:
               });
 
               console.log(`Created issue #${issue.number}: ${issue.html_url}`);
+
+              // Update tracking state so the next iteration sees this task as
+              // resolved and can unlock its dependents.
+              backlogIdToIssueNumber.set(task.id, issue.number);
+              existingBacklogIds.add(task.id);
+              doneIds.add(task.id);
+
               created++;
             }
 
