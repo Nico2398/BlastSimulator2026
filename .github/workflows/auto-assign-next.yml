@@ -38,12 +38,11 @@ jobs:
             }
 
             const n = parseInt(issueNum);
-            console.log(`Closing issue #${n} as done.`);
+            console.log(`Updating labels for issue #${n} (closed by native GitHub auto-close).`);
 
-            // Fetch issue body before closing (needed for backlog-id extraction)
+            // Fetch issue body (needed for backlog-id extraction)
             const { data: closedIssue } = await github.rest.issues.get({ owner, repo, issue_number: n });
 
-            await github.rest.issues.update({ owner, repo, issue_number: n, state: 'closed' });
             await github.rest.issues.addLabels({ owner, repo, issue_number: n, labels: ['done'] });
             await github.rest.issues.removeLabel({ owner, repo, issue_number: n, name: 'in-progress' }).catch(() => {});
 
