@@ -192,3 +192,29 @@ export const VEHICLE_BASE_STATS = {
   /** 9 fragments/tick output; ~90 kg/tick fragmentation throughput. */
   rock_fragmenter:    { workRate: 9,  purchaseCost: 32_000, maintenanceCostPerTick: 4, fuelCostPerTick: 7, capacity: 90,  speed: 2, maxHp: 125 },
 } as const;
+
+// ─── Employee Skills ───────────────────────────────────────────────────────────
+
+/**
+ * Task-duration multipliers by proficiency level (1–5). Lower value = faster execution.
+ * Rookie (1) is the baseline; Master (5) completes tasks 2.5× faster.
+ */
+export const PROFICIENCY_MULTIPLIERS = {
+  1: 1.00,
+  2: 0.85,
+  3: 0.70,
+  4: 0.55,
+  5: 0.40,
+} as const;
+
+/**
+ * Cumulative XP required to reach each proficiency level. Level 1 is the starting level (0 XP).
+ * XP is earned per tick of active work: xpPerTick = 1 + floor(currentLevel × 0.5).
+ */
+export const XP_THRESHOLDS = {
+  1: 0,
+  2: 100,
+  3: 300,
+  4: 600,
+  5: 1000,
+} as const;
