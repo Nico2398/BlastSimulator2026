@@ -6,8 +6,8 @@ import type { EventEmitter } from '../state/EventEmitter.js';
 
 export interface GainXpResult {
   leveledUp: boolean;
-  oldLevel: number;
-  newLevel: number;
+  oldLevel: 1 | 2 | 3 | 4 | 5;
+  newLevel: 1 | 2 | 3 | 4 | 5;
 }
 
 /** Award XP to an employee skill; levels up when XP_THRESHOLDS are crossed. Emits 'employee:levelup' per level gained. Returns null if employee or skill not found. */
@@ -20,6 +20,10 @@ export function gainXp(
 ): GainXpResult | null {
   const emp = state.employees.find(e => e.id === employeeId);
   if (!emp) return null;
+
+  if (!Number.isFinite(xpAmount) || !Number.isInteger(xpAmount) || xpAmount < 0) {
+    throw new RangeError('xpAmount must be a finite, non-negative integer');
+  }
 
   const qual = emp.qualifications.find(q => q.category === category);
   if (!qual) return null;

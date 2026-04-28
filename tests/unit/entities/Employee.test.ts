@@ -250,8 +250,7 @@ describe('gainXp() (3.3)', () => {
     assignSkill(state, employee.id, 'blasting', 1);
 
     const emitter = new EventEmitter();
-    const emitSpy = vi.fn();
-    emitter.emit = emitSpy as typeof emitter.emit;
+    const emitSpy = vi.spyOn(emitter, 'emit');
 
     gainXp(state, employee.id, 'blasting', XP_THRESHOLDS[2], emitter);
 
