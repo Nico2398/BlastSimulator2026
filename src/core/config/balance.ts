@@ -219,3 +219,16 @@ export const XP_THRESHOLDS = {
   4: 600,
   5: 1000,
 } as const;
+
+/**
+ * Salary bonus per pay cycle for each qualification proficiency level ($).
+ * Salary = BASE_SALARY[role] + sum(QUALIFICATION_SALARY_BONUS[level]) for each qualification.
+ * Bonuses are strictly increasing: higher skill = higher pay demand.
+ */
+export const QUALIFICATION_SALARY_BONUS: Record<1 | 2 | 3 | 4 | 5, number> = {
+  1: 50,
+  2: 120,
+  3: 220,
+  4: 350,
+  5: 500,
+} as const;

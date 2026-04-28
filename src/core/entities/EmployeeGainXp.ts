@@ -1,6 +1,6 @@
 // BlastSimulator2026 — XP gain and level-up logic for employee skills.
 
-import type { EmployeeState, SkillCategory } from './Employee.js';
+import { type EmployeeState, type SkillCategory, calculateSalary } from './Employee.js';
 import { XP_THRESHOLDS } from '../config/balance.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 
@@ -37,6 +37,10 @@ export function gainXp(
     const prevLevel = qual.proficiencyLevel;
     qual.proficiencyLevel = nextLevel;
     emitter?.emit('employee:levelup', { employeeId, category, oldLevel: prevLevel, newLevel: nextLevel });
+  }
+
+  if (qual.proficiencyLevel > oldLevel) {
+    emp.salary = calculateSalary(emp);
   }
 
   return { leveledUp: qual.proficiencyLevel > oldLevel, oldLevel, newLevel: qual.proficiencyLevel };
