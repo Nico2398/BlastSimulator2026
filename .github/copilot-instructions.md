@@ -77,6 +77,19 @@ PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium npx tsx scripts/scenario-test.ts --s
 
 Available scenarios: `blast-basic`, `level1-win-efficient`, `level1-win-conservative`, `level1-lose-bankruptcy`, `level1-lose-arrest`, `level1-lose-ecology`, `level1-lose-revolt`.
 
+## ⚠️ MANDATORY: PR body must include `Closes #<number>`
+
+**Every PR opened from an issue MUST contain `Closes #<issue-number>` in the PR body.**
+
+- Use the exact `create_pull_request` tool and set `description` to include `Closes #<N>` where `<N>` is the issue number you are working on.
+- The pipeline checks for this before merging. If it is absent the merge is blocked and you will be asked to fix it.
+- Do not open a PR without this. There is no exception.
+
+Example PR body (minimum):
+```
+Closes #42
+```
+
 ## Essential Rules
 
 - **300-line limit** per code file — split into sub-modules if needed (data/i18n files exempt)

@@ -131,6 +131,27 @@ jobs:
               return;
             }
 
+            // --- 3b. Closes directive guard ---
+            // Every Copilot PR opened from an issue MUST include "Closes #N" in the body
+            // so the issue is automatically closed on merge. Block the pipeline until fixed.
+            const closesPattern = /[Cc]loses?\s+#\d+/;
+            if (!closesPattern.test(pr.body || '')) {
+              const CLOSES_MARKER = '<!-- closes-directive-reminder -->';
+              const existingComments = await github.paginate(github.rest.issues.listComments, {
+                owner, repo, issue_number: prNumber, per_page: 100
+              });
+              const alreadyReminded = existingComments.some(c => c.body?.includes(CLOSES_MARKER));
+              if (!alreadyReminded) {
+                await github.rest.issues.createComment({
+                  owner, repo,
+                  issue_number: prNumber,
+                  body: `${CLOSES_MARKER}\n@copilot Your PR body is missing a \`Closes #<issue-number>\` directive. Please edit the PR description to add it (e.g. \`Closes #42\`). The pipeline will resume once it is present.`
+                });
+              }
+              console.log(`PR #${prNumber} body missing "Closes #N". Blocked until fixed.`);
+              return;
+            }
+
             // --- 4. Agent-still-running guard (applies to ALL paths, including draft) ---
             // This must run BEFORE posting the review request to avoid triggering a review
             // session while the implementation agent is still in the middle of its work.
