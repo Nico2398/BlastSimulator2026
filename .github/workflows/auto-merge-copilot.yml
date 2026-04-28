@@ -172,8 +172,19 @@ jobs:
               }
 
               if (!agentFound) {
-                console.log('No Copilot check runs found on any PR commit — agent has not registered yet. Deferring.');
-                return;
+                // The Copilot SWE agent's session check is not always visible via
+                // checks.listForRef on PR commits. When CI just passed on the PR's
+                // current HEAD SHA we know the agent has finished pushing — use that
+                // as a reliable end-of-session signal instead of deferring forever.
+                const ciSha = context.eventName === 'workflow_run'
+                  ? context.payload.workflow_run.head_sha
+                  : null;
+                if (ciSha && ciSha === pr.head.sha) {
+                  console.log('No Copilot check runs found, but CI passed on PR HEAD — treating agent as done.');
+                } else {
+                  console.log('No Copilot check runs found on any PR commit — agent has not registered yet. Deferring.');
+                  return;
+                }
               }
               if (agentStillRunning) {
                 console.log('Copilot SWE agent still in-progress. Deferring all actions until session ends.');
