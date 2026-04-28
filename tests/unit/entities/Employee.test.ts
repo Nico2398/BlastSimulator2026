@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { Random } from '../../../src/core/math/Random.js';
 import {
   createEmployeeState,
@@ -8,11 +8,15 @@ import {
   processPayCycle,
   getEffectiveness,
   injureEmployee,
+  assignSkill,
+  gainXp,
   PAY_CYCLE_TICKS,
   HIRING_COSTS,
   type SkillQualification,
   type SkillCategory,
 } from '../../../src/core/entities/Employee.js';
+import { XP_THRESHOLDS } from '../../../src/core/config/balance.js';
+import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 
 describe('Employee system', () => {
   it('hiring adds employee and deducts hiring cost', () => {
@@ -156,5 +160,172 @@ describe('Employee — skill qualification fields (3.1)', () => {
       const qual: SkillQualification = { category: 'geology', proficiencyLevel: level, xp: 0 };
       expect(qual.proficiencyLevel).toBe(level);
     }
+  });
+});
+
+describe('gainXp() (3.3)', () => {
+  // ── Test 1 ──────────────────────────────────────────────────────────────────
+  it('returns null when the employee does not exist', () => {
+    const state = createEmployeeState();
+
+    const result = gainXp(state, 999, 'blasting', 50);
+
+    expect(result).toBeNull();
+  });
+
+  // ── Test 2 ──────────────────────────────────────────────────────────────────
+  it('returns null when the employee has no qualification for the given category', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'blaster', rng);
+    // employee has an empty qualifications array — no 'blasting' entry
+
+    const result = gainXp(state, employee.id, 'blasting', 50);
+
+    expect(result).toBeNull();
+  });
+
+  // ── Test 3 ──────────────────────────────────────────────────────────────────
+  it('adds XP to the matching qualification without leveling up (XP below threshold)', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'blaster', rng);
+    assignSkill(state, employee.id, 'blasting', 1); // level 1, xp = 0
+
+    gainXp(state, employee.id, 'blasting', 50); // 50 < XP_THRESHOLDS[2] (100)
+
+    const qual = employee.qualifications.find(q => q.category === 'blasting')!;
+    expect(qual.xp).toBe(50);
+    expect(qual.proficiencyLevel).toBe(1);
+  });
+
+  // ── Test 4 ──────────────────────────────────────────────────────────────────
+  it('returns leveledUp: false when no level-up occurred', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'blaster', rng);
+    assignSkill(state, employee.id, 'blasting', 1);
+
+    const result = gainXp(state, employee.id, 'blasting', 50);
+
+    expect(result).not.toBeNull();
+    expect(result!.leveledUp).toBe(false);
+    expect(result!.oldLevel).toBe(1);
+    expect(result!.newLevel).toBe(1);
+  });
+
+  // ── Test 5 ──────────────────────────────────────────────────────────────────
+  it('levels up from 1 to 2 when XP crosses the 100 threshold', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'blaster', rng);
+    assignSkill(state, employee.id, 'blasting', 1);
+
+    gainXp(state, employee.id, 'blasting', XP_THRESHOLDS[2]); // exactly 100
+
+    const qual = employee.qualifications.find(q => q.category === 'blasting')!;
+    expect(qual.proficiencyLevel).toBe(2);
+  });
+
+  // ── Test 6 ──────────────────────────────────────────────────────────────────
+  it('returns leveledUp: true with correct oldLevel and newLevel on level-up', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'blaster', rng);
+    assignSkill(state, employee.id, 'blasting', 1);
+
+    const result = gainXp(state, employee.id, 'blasting', XP_THRESHOLDS[2]); // 100
+
+    expect(result).not.toBeNull();
+    expect(result!.leveledUp).toBe(true);
+    expect(result!.oldLevel).toBe(1);
+    expect(result!.newLevel).toBe(2);
+  });
+
+  // ── Test 7 ──────────────────────────────────────────────────────────────────
+  it('emits employee:levelup event with correct payload when an emitter is provided', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'blaster', rng);
+    assignSkill(state, employee.id, 'blasting', 1);
+
+    const emitter = new EventEmitter();
+    const emitSpy = vi.fn();
+    emitter.emit = emitSpy as typeof emitter.emit;
+
+    gainXp(state, employee.id, 'blasting', XP_THRESHOLDS[2], emitter);
+
+    expect(emitSpy).toHaveBeenCalledOnce();
+    expect(emitSpy.mock.calls[0]![0]).toBe('employee:levelup');
+    expect(emitSpy.mock.calls[0]![1]).toEqual({
+      employeeId: employee.id,
+      category: 'blasting',
+      oldLevel: 1,
+      newLevel: 2,
+    });
+  });
+
+  // ── Test 8 ──────────────────────────────────────────────────────────────────
+  it('does not emit event when no emitter is provided', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'blaster', rng);
+    assignSkill(state, employee.id, 'blasting', 1);
+
+    // Passing no emitter must not throw and must still return a valid result
+    const result = gainXp(state, employee.id, 'blasting', XP_THRESHOLDS[2]);
+
+    expect(result).not.toBeNull();
+    expect(result!.leveledUp).toBe(true);
+  });
+
+  // ── Test 9 ──────────────────────────────────────────────────────────────────
+  it('does not level up beyond level 5 (at level 5, XP accumulates but proficiency stays at 5)', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'blaster', rng);
+    assignSkill(state, employee.id, 'blasting', 5);
+    // Manually prime xp to the level-5 threshold so there is no ambiguity
+    const qual = employee.qualifications.find(q => q.category === 'blasting')!;
+    qual.xp = XP_THRESHOLDS[5]; // 1000
+
+    gainXp(state, employee.id, 'blasting', 500);
+
+    expect(qual.proficiencyLevel).toBe(5);
+    expect(qual.xp).toBe(XP_THRESHOLDS[5] + 500); // xp still added: 1500
+  });
+
+  // ── Test 10 ─────────────────────────────────────────────────────────────────
+  it('XP accumulates correctly across multiple calls (no level-up each time)', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'blaster', rng);
+    assignSkill(state, employee.id, 'blasting', 1);
+
+    gainXp(state, employee.id, 'blasting', 30);
+    gainXp(state, employee.id, 'blasting', 30);
+    gainXp(state, employee.id, 'blasting', 30);
+
+    const qual = employee.qualifications.find(q => q.category === 'blasting')!;
+    expect(qual.xp).toBe(90);              // 30 + 30 + 30
+    expect(qual.proficiencyLevel).toBe(1); // 90 < threshold[2] (100), still level 1
+  });
+
+  // ── Test 11 ─────────────────────────────────────────────────────────────────
+  it('handles multiple level-ups in a single gainXp call (XP jumps two levels at once)', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'blaster', rng);
+    assignSkill(state, employee.id, 'blasting', 1); // start at level 1, xp = 0
+
+    // XP_THRESHOLDS[3] === 300 — crosses both the level-2 (100) and level-3 (300) thresholds
+    const result = gainXp(state, employee.id, 'blasting', XP_THRESHOLDS[3]);
+
+    const qual = employee.qualifications.find(q => q.category === 'blasting')!;
+    expect(qual.proficiencyLevel).toBe(3);
+    expect(result).not.toBeNull();
+    expect(result!.leveledUp).toBe(true);
+    expect(result!.oldLevel).toBe(1);
+    expect(result!.newLevel).toBe(3);
   });
 });
