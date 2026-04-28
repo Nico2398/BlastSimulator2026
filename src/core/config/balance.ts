@@ -196,8 +196,10 @@ export const VEHICLE_BASE_STATS = {
 // ─── Employee Skills ───────────────────────────────────────────────────────────
 
 /**
- * Task-duration multipliers by proficiency level (1–5). Lower value = faster execution.
- * Rookie (1) is the baseline; Master (5) completes tasks 2.5× faster.
+ * Task-duration multipliers by proficiency level (1–5).
+ * Applied as: ticksRequired = baseDuration / PROFICIENCY_MULTIPLIERS[level].
+ * Lower value = shorter task duration. Rookie (1) is the baseline (×1.00);
+ * Master (5) completes tasks 2.5× faster (×0.40).
  */
 export const PROFICIENCY_MULTIPLIERS = {
   1: 1.00,
@@ -209,7 +211,6 @@ export const PROFICIENCY_MULTIPLIERS = {
 
 /**
  * Cumulative XP required to reach each proficiency level. Level 1 is the starting level (0 XP).
- * XP is earned per tick of active work: xpPerTick = 1 + floor(currentLevel × 0.5).
  */
 export const XP_THRESHOLDS = {
   1: 0,
