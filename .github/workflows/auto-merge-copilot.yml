@@ -134,26 +134,53 @@ jobs:
             // --- 4. Agent-still-running guard (applies to ALL paths, including draft) ---
             // This must run BEFORE posting the review request to avoid triggering a review
             // session while the implementation agent is still in the middle of its work.
+            //
+            // Option B implementation:
+            //   • When the trigger IS the completed Copilot agent check_run the event is
+            //     definitive proof the session has ended — skip the guard entirely.
+            //   • For every other trigger, scan ALL commits in the PR (not just pr.head.sha)
+            //     so that extra commits pushed by the agent during its session never hide
+            //     the original check run that was registered on an earlier SHA.
             const activeStatuses = new Set(['queued', 'in_progress', 'waiting', 'requested']);
-            const { data: agentChecksData } = await github.rest.checks.listForRef({
-              owner, repo,
-              ref: pr.head.sha,
-              app_id: COPILOT_SWE_APP_ID,
-              per_page: 100
-            });
-            // Zero check runs means the agent hasn't registered its session yet — treat
-            // that as "still running" so we don't promote the draft or post the review
-            // request before the agent has even started.
-            if (agentChecksData.check_runs.length === 0) {
-              console.log('No Copilot check runs on PR head SHA yet — agent has not registered. Deferring.');
-              return;
-            }
-            const agentStillRunning = agentChecksData.check_runs.some(run =>
-              activeStatuses.has(run.status)
-            );
-            if (agentStillRunning) {
-              console.log('Copilot SWE agent still in-progress. Deferring all actions until session ends.');
-              return;
+            const triggerIsAgentDone =
+              context.eventName === 'check_run' &&
+              context.payload.check_run.app?.id === COPILOT_SWE_APP_ID &&
+              context.payload.check_run.status === 'completed';
+
+            if (!triggerIsAgentDone) {
+              // Fetch every commit SHA that belongs to this PR.
+              const prCommits = await github.paginate(github.rest.pulls.listCommits, {
+                owner, repo, pull_number: prNumber, per_page: 100
+              });
+
+              let agentFound = false;
+              let agentStillRunning = false;
+
+              for (const commit of prCommits) {
+                const { data: checksData } = await github.rest.checks.listForRef({
+                  owner, repo,
+                  ref: commit.sha,
+                  app_id: COPILOT_SWE_APP_ID,
+                  per_page: 100
+                });
+                if (checksData.check_runs.length === 0) continue;
+                agentFound = true;
+                if (checksData.check_runs.some(r => activeStatuses.has(r.status))) {
+                  agentStillRunning = true;
+                  break;
+                }
+              }
+
+              if (!agentFound) {
+                console.log('No Copilot check runs found on any PR commit — agent has not registered yet. Deferring.');
+                return;
+              }
+              if (agentStillRunning) {
+                console.log('Copilot SWE agent still in-progress. Deferring all actions until session ends.');
+                return;
+              }
+            } else {
+              console.log('Trigger is the completed Copilot agent check run — agent is definitively done. Guard skipped.');
             }
 
             // --- 5. If draft, mark ready for review (agent has finished its session) ---
