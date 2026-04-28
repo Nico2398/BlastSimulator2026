@@ -445,11 +445,11 @@
       "src/core/GameState.ts"
     ],
     "testFile": "tests/unit/GameState.test.ts",
-    "status": "pending",
+    "status": "done",
     "blockedBy": [
       "3.1"
     ],
-    "closedInPR": null
+    "closedInPR": 84
   },
   {
     "id": "3.6",
