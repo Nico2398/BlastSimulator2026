@@ -176,11 +176,16 @@ jobs:
                 // checks.listForRef on PR commits. When CI just passed on the PR's
                 // current HEAD SHA we know the agent has finished pushing — use that
                 // as a reliable end-of-session signal instead of deferring forever.
+                // Similarly, an APPROVED comment from the agent IS proof the session
+                // ended — the agent cannot post it while still running.
                 const ciSha = context.eventName === 'workflow_run'
                   ? context.payload.workflow_run.head_sha
                   : null;
+                const approvedByAgent = context.eventName === 'issue_comment';
                 if (ciSha && ciSha === pr.head.sha) {
                   console.log('No Copilot check runs found, but CI passed on PR HEAD — treating agent as done.');
+                } else if (approvedByAgent) {
+                  console.log('No Copilot check runs found, but APPROVED comment from agent — treating agent as done.');
                 } else {
                   console.log('No Copilot check runs found on any PR commit — agent has not registered yet. Deferring.');
                   return;
