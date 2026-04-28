@@ -1,6 +1,8 @@
 // BlastSimulator2026 — Typed event emitter for core→renderer communication
 // Pure TypeScript, no DOM. Core emits events; renderer/UI/audio subscribe.
 
+import type { SkillCategory } from '../entities/Employee.js';
+
 /** Map of all game events and their payload types. */
 export interface GameEventMap {
   'terrain:updated': undefined;
@@ -18,6 +20,7 @@ export interface GameEventMap {
   'ecology:shutdown': Record<string, never>;
   'revolt:warning': { ticksRemaining: number };
   'revolt:triggered': Record<string, never>;
+  'employee:levelup': { employeeId: number; category: SkillCategory; oldLevel: number; newLevel: number };
 }
 
 type EventHandler<T> = (data: T) => void;

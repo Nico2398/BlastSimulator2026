@@ -275,3 +275,7 @@ export function tickTraining(state: EmployeeState): void {
     }
   }
 }
+
+export type { GainXpResult } from './EmployeeGainXp.js';
+export { gainXp } from './EmployeeGainXp.js';
+
