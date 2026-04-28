@@ -2,7 +2,7 @@
 // Workers with roles, morale, union status, and injury tracking.
 
 import { Random } from '../math/Random.js';
-import { HIRING_COSTS as _HIRING_COSTS, BASE_SALARIES as _BASE_SALARIES, PAY_CYCLE_TICKS as _PAY_CYCLE_TICKS } from '../config/balance.js';
+import { HIRING_COSTS as _HIRING_COSTS, BASE_SALARIES as _BASE_SALARIES, PAY_CYCLE_TICKS as _PAY_CYCLE_TICKS, QUALIFICATION_SALARY_BONUS } from '../config/balance.js';
 
 // ── Roles ──
 
@@ -176,6 +176,12 @@ export function processPayCycle(state: EmployeeState): number {
   return totalSalaries;
 }
 
+/** Calculate the total salary for an employee: base salary + sum of qualification bonuses. */
+export function calculateSalary(employee: Employee): number {
+  return BASE_SALARIES[employee.role] +
+    employee.qualifications.reduce((sum, q) => sum + QUALIFICATION_SALARY_BONUS[q.proficiencyLevel], 0);
+}
+
 /** Get effectiveness multiplier based on morale (0.5–1.2). */
 export function getEffectiveness(employee: Employee): number {
   if (employee.injured || !employee.alive) return 0;
@@ -230,6 +236,7 @@ export function assignSkill(
   } else {
     emp.qualifications.push(qual);
   }
+  emp.salary = calculateSalary(emp);
   return true;
 }
 

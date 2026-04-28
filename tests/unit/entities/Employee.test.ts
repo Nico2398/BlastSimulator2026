@@ -10,12 +10,14 @@ import {
   injureEmployee,
   assignSkill,
   gainXp,
+  calculateSalary,
+  BASE_SALARIES,
   PAY_CYCLE_TICKS,
   HIRING_COSTS,
   type SkillQualification,
   type SkillCategory,
 } from '../../../src/core/entities/Employee.js';
-import { XP_THRESHOLDS } from '../../../src/core/config/balance.js';
+import { XP_THRESHOLDS, QUALIFICATION_SALARY_BONUS } from '../../../src/core/config/balance.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 
 describe('Employee system', () => {
@@ -326,5 +328,138 @@ describe('gainXp() (3.3)', () => {
     expect(result!.leveledUp).toBe(true);
     expect(result!.oldLevel).toBe(1);
     expect(result!.newLevel).toBe(3);
+  });
+});
+
+describe('calculateSalary() (3.4)', () => {
+  // ── Test 1 ──────────────────────────────────────────────────────────────────
+  it('returns BASE_SALARIES[role] for an employee with no qualifications', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    // Ensure qualifications array is empty (freshly hired)
+    employee.qualifications = [];
+
+    const salary = calculateSalary(employee);
+
+    expect(salary).toBe(BASE_SALARIES['driller']);
+  });
+
+  // ── Test 2 ──────────────────────────────────────────────────────────────────
+  it('a newly hired employee has employee.salary equal to BASE_SALARIES[role]', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'blaster', rng);
+
+    // No qualifications assigned yet — salary should match the role's base salary
+    expect(employee.salary).toBe(BASE_SALARIES['blaster']);
+  });
+
+  // ── Test 3 ──────────────────────────────────────────────────────────────────
+  it('returns base + QUALIFICATION_SALARY_BONUS[1] for exactly one level-1 qualification', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    assignSkill(state, employee.id, 'blasting', 1);
+
+    const salary = calculateSalary(employee);
+    const expected = BASE_SALARIES['driller'] + QUALIFICATION_SALARY_BONUS[1];
+
+    expect(salary).toBe(expected);
+  });
+
+  // ── Test 4 ──────────────────────────────────────────────────────────────────
+  it('an employee with one level-1 qualification has salary greater than base salary alone', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    assignSkill(state, employee.id, 'geology', 1);
+
+    const salary = calculateSalary(employee);
+
+    expect(salary).toBeGreaterThan(BASE_SALARIES['driller']);
+  });
+
+  // ── Test 5 ──────────────────────────────────────────────────────────────────
+  it('two qualifications yield a higher salary than one qualification', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+
+    assignSkill(state, employee.id, 'blasting', 1);
+    const salaryOneQual = calculateSalary(employee);
+
+    assignSkill(state, employee.id, 'geology', 1);
+    const salaryTwoQuals = calculateSalary(employee);
+
+    expect(salaryTwoQuals).toBeGreaterThan(salaryOneQual);
+  });
+
+  // ── Test 6 ──────────────────────────────────────────────────────────────────
+  it('a higher-level qualification produces a higher salary than the same qualification at a lower level', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+
+    const { employee: empLow } = hireEmployee(state, 'driller', rng);
+    assignSkill(state, empLow.id, 'blasting', 1);
+    const salaryLevel1 = calculateSalary(empLow);
+
+    const { employee: empHigh } = hireEmployee(state, 'driller', rng);
+    assignSkill(state, empHigh.id, 'blasting', 3);
+    const salaryLevel3 = calculateSalary(empHigh);
+
+    expect(salaryLevel3).toBeGreaterThan(salaryLevel1);
+  });
+
+  // ── Test 7 ──────────────────────────────────────────────────────────────────
+  it('sums all qualification bonuses: base + QUALIFICATION_SALARY_BONUS[level] for each qual', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'surveyor', rng);
+    assignSkill(state, employee.id, 'geology', 2);
+    assignSkill(state, employee.id, 'management', 4);
+
+    const expected =
+      BASE_SALARIES['surveyor'] +
+      QUALIFICATION_SALARY_BONUS[2] +
+      QUALIFICATION_SALARY_BONUS[4];
+
+    expect(calculateSalary(employee)).toBe(expected);
+  });
+
+  // ── Test 8 ──────────────────────────────────────────────────────────────────
+  it('employee.salary is recalculated upward when assignSkill() is called', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'blaster', rng);
+    const salaryBefore = employee.salary;
+
+    assignSkill(state, employee.id, 'blasting', 1);
+
+    expect(employee.salary).toBeGreaterThan(salaryBefore);
+    expect(employee.salary).toBe(BASE_SALARIES['blaster'] + QUALIFICATION_SALARY_BONUS[1]);
+  });
+
+  // ── Test 9 ──────────────────────────────────────────────────────────────────
+  it('employee.salary is recalculated upward when gainXp() causes a level-up', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'blaster', rng);
+    assignSkill(state, employee.id, 'blasting', 1);
+    const salaryAtLevel1 = employee.salary;
+
+    // Enough XP to level up from 1 → 2
+    gainXp(state, employee.id, 'blasting', XP_THRESHOLDS[2]);
+
+    expect(employee.salary).toBeGreaterThan(salaryAtLevel1);
+    expect(employee.salary).toBe(BASE_SALARIES['blaster'] + QUALIFICATION_SALARY_BONUS[2]);
+  });
+
+  // ── Test 10 ─────────────────────────────────────────────────────────────────
+  it('QUALIFICATION_SALARY_BONUS values are strictly increasing from level 1 through 5', () => {
+    expect(QUALIFICATION_SALARY_BONUS[2]).toBeGreaterThan(QUALIFICATION_SALARY_BONUS[1]);
+    expect(QUALIFICATION_SALARY_BONUS[3]).toBeGreaterThan(QUALIFICATION_SALARY_BONUS[2]);
+    expect(QUALIFICATION_SALARY_BONUS[4]).toBeGreaterThan(QUALIFICATION_SALARY_BONUS[3]);
+    expect(QUALIFICATION_SALARY_BONUS[5]).toBeGreaterThan(QUALIFICATION_SALARY_BONUS[4]);
   });
 });
