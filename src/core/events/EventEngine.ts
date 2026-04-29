@@ -39,3 +39,22 @@ export function detectTrafficJam(
 
   return null;
 }
+
+/**
+ * Detects an unqualified task error: fires when at least one pending action
+ * has no qualified employee on the roster.
+ * Sets state.pendingEvent and returns the FiredEvent when detected.
+ * Returns null if an event is already pending or no unqualified actions exist.
+ */
+export function detectUnqualifiedTask(
+  unqualifiedActionIds: number[],
+  state: EventSystemState,
+  tickCount: number,
+): FiredEvent | null {
+  if (state.pendingEvent) return null;
+  if (unqualifiedActionIds.length === 0) return null;
+
+  const event: FiredEvent = { eventId: 'unqualified_task_error', firedAtTick: tickCount };
+  state.pendingEvent = event;
+  return event;
+}
