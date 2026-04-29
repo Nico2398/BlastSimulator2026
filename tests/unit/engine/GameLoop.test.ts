@@ -11,7 +11,10 @@ import {
   isValidSpeed,
   BASE_TICK_MS,
   tickVehicle,
+  tickEmployees,
 } from '../../../src/core/engine/GameLoop.js';
+import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
+import type { PendingAction } from '../../../src/core/state/GameState.js';
 import type { EventContext } from '../../../src/core/events/EventPool.js';
 import { setupEvents } from '../../../src/core/events/index.js';
 import { clearEvents, registerEvents } from '../../../src/core/events/EventPool.js';
@@ -292,5 +295,193 @@ describe('tickVehicle — waitingTicks (Task 2.8)', () => {
     // Vehicle reached target → idle; waitingTicks must be 0
     expect(v.state).toBe('idle');
     expect(v.waitingTicks).toBe(0);
+  });
+});
+
+// ── Task 3.6: tickEmployees — claim logic ────────────────────────────────────
+
+describe('tickEmployees — claim logic (Task 3.6)', () => {
+  const SEED = 42;
+
+  /** Build a minimal PendingAction for tests. */
+  function makePendingAction(
+    overrides: Partial<PendingAction> & { id: number; requiredSkill: PendingAction['requiredSkill'] },
+  ): PendingAction {
+    return {
+      type: 'drill_hole',
+      requiredVehicleRole: null,
+      targetX: 0,
+      targetZ: 0,
+      targetY: 0,
+      payload: {},
+      ...overrides,
+    };
+  }
+
+  it('assigns idle qualified employee to matching pending action', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    assignSkill(state.employees, employee.id, 'blasting', 1);
+
+    const action = makePendingAction({ id: 1, requiredSkill: 'blasting' });
+    state.pendingActions.push(action);
+
+    tickEmployees(state);
+
+    // Action should have been claimed — removed from pendingActions
+    expect(state.pendingActions).toHaveLength(0);
+    // Employee should hold the action's id
+    expect((employee as any).activeActionId).toBe(action.id);
+  });
+
+  it('returns claimed action ID in result.claimed', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    assignSkill(state.employees, employee.id, 'blasting', 1);
+
+    const action = makePendingAction({ id: 7, requiredSkill: 'blasting' });
+    state.pendingActions.push(action);
+
+    const result = tickEmployees(state);
+
+    expect(result.claimed).toContain(7);
+  });
+
+  it('leaves unmatched action in pendingActions when roster is empty', () => {
+    const state = createGame({ seed: SEED });
+    // No employees hired
+
+    const action = makePendingAction({ id: 2, requiredSkill: 'geology' });
+    state.pendingActions.push(action);
+
+    tickEmployees(state);
+
+    // No employees at all — action must stay pending
+    expect(state.pendingActions).toHaveLength(1);
+    expect(state.pendingActions[0]!.id).toBe(2);
+  });
+
+  it('returns unqualified action ID in result.unqualified when no roster employee has the skill', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    // Hire an employee with a different skill
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    assignSkill(state.employees, employee.id, 'driving.truck', 1);
+
+    // Action requires a skill nobody on the roster has
+    const action = makePendingAction({ id: 3, requiredSkill: 'geology' });
+    state.pendingActions.push(action);
+
+    const result = tickEmployees(state);
+
+    expect(result.unqualified).toContain(3);
+  });
+
+  it('returns waiting action ID when qualified employees all have activeActionId set', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'blaster', rng);
+    assignSkill(state.employees, employee.id, 'blasting', 2);
+    // Simulate the employee already being busy
+    (employee as any).activeActionId = 99;
+
+    const action = makePendingAction({ id: 4, requiredSkill: 'blasting' });
+    state.pendingActions.push(action);
+
+    const result = tickEmployees(state);
+
+    expect(result.waiting).toContain(4);
+    // Action must not be consumed
+    expect(state.pendingActions).toHaveLength(1);
+  });
+
+  it('injured employee is not idle — does not claim action', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    assignSkill(state.employees, employee.id, 'blasting', 1);
+    employee.injured = true;
+
+    const action = makePendingAction({ id: 5, requiredSkill: 'blasting' });
+    state.pendingActions.push(action);
+
+    tickEmployees(state);
+
+    // Injured employee cannot work — action stays pending
+    expect(state.pendingActions).toHaveLength(1);
+    expect((employee as any).activeActionId).toBeNull();
+  });
+
+  it('employee in training is not idle — does not claim action', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    assignSkill(state.employees, employee.id, 'blasting', 1);
+    // Simulate employee being in training
+    employee.trainingState = { buildingId: 10, skill: 'blasting', ticksRemaining: 5, fee: 500 };
+
+    const action = makePendingAction({ id: 6, requiredSkill: 'blasting' });
+    state.pendingActions.push(action);
+
+    tickEmployees(state);
+
+    // Employee in training cannot work — action stays pending
+    expect(state.pendingActions).toHaveLength(1);
+    expect((employee as any).activeActionId).toBeNull();
+  });
+
+  it('multiple pending actions claimed by multiple idle employees', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee: emp1 } = hireEmployee(state.employees, 'blaster', rng);
+    assignSkill(state.employees, emp1.id, 'blasting', 1);
+
+    const { employee: emp2 } = hireEmployee(state.employees, 'blaster', rng);
+    assignSkill(state.employees, emp2.id, 'blasting', 1);
+
+    const action1 = makePendingAction({ id: 10, requiredSkill: 'blasting' });
+    const action2 = makePendingAction({ id: 11, requiredSkill: 'blasting' });
+    state.pendingActions.push(action1, action2);
+
+    tickEmployees(state);
+
+    // Both actions must have been claimed
+    expect(state.pendingActions).toHaveLength(0);
+    // Each employee holds one of the action IDs
+    const assignedIds = [
+      (emp1 as any).activeActionId,
+      (emp2 as any).activeActionId,
+    ];
+    expect(assignedIds).toContain(10);
+    expect(assignedIds).toContain(11);
+    // Each employee has a distinct assignment
+    expect(assignedIds[0]).not.toBe(assignedIds[1]);
+  });
+
+  it('each employee can only claim one action per tick', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'blaster', rng);
+    assignSkill(state.employees, employee.id, 'blasting', 1);
+
+    const action1 = makePendingAction({ id: 20, requiredSkill: 'blasting' });
+    const action2 = makePendingAction({ id: 21, requiredSkill: 'blasting' });
+    state.pendingActions.push(action1, action2);
+
+    tickEmployees(state);
+
+    // Only one action can be assigned to the single employee per tick
+    expect(state.pendingActions).toHaveLength(1);
+    expect((employee as any).activeActionId).not.toBeNull();
   });
 });

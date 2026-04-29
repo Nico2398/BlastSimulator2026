@@ -78,6 +78,8 @@ export interface Employee {
   z: number;
   qualifications: SkillQualification[];
   trainingState: TrainingState | null;
+  /** ID of the PendingAction currently claimed by this employee, or null if idle. */
+  activeActionId: number | null;
 }
 
 // ── Employee state ──
@@ -120,6 +122,7 @@ export function hireEmployee(
     x, z,
     qualifications: [],
     trainingState: null,
+    activeActionId: null,
   };
   state.employees.push(employee);
   return { employee, hiringCost: HIRING_COSTS[role] };
