@@ -2,7 +2,7 @@
 // Manages tick processing with variable speed (1x, 2x, 4x, 8x) and pause.
 // Pure logic: no timers, no DOM. The caller drives the loop.
 
-import type { GameState } from '../state/GameState.js';
+import type { GameState, PendingAction } from '../state/GameState.js';
 import type { Vehicle } from '../entities/Vehicle.js';
 import type { Random } from '../math/Random.js';
 import type { EventContext } from '../events/EventPool.js';
@@ -171,4 +171,50 @@ function setVehicleIdle(vehicle: Vehicle): void {
 
 function isCellOccupiedByOtherVehicle(state: GameState, vehicle: Vehicle, x: number, z: number): boolean {
   return state.vehicles.vehicles.some(v => v.id !== vehicle.id && v.x === x && v.z === z);
+}
+
+// ── Employee dispatch ──
+
+export interface TickEmployeesResult {
+  claimed: number[];     // IDs of PendingActions that were claimed
+  unqualified: number[]; // IDs of PendingActions no roster employee can ever do
+  waiting: number[];     // IDs of PendingActions where skill exists but all busy
+}
+
+/**
+ * Match pending actions to idle qualified employees.
+ * Mutates state: removes claimed actions from pendingActions and sets activeActionId on employees.
+ */
+export function tickEmployees(state: GameState): TickEmployeesResult {
+  const result: TickEmployeesResult = { claimed: [], unqualified: [], waiting: [] };
+  const remaining: PendingAction[] = [];
+
+  for (const action of state.pendingActions) {
+    const allWithSkill = state.employees.employees.filter(
+      emp => emp.alive && emp.qualifications.some(q => q.category === action.requiredSkill),
+    );
+
+    if (allWithSkill.length === 0) {
+      result.unqualified.push(action.id);
+      remaining.push(action);
+      continue;
+    }
+
+    const idleMatch = allWithSkill.find(
+      emp => !emp.injured && emp.trainingState === null && emp.activeActionId === null,
+    );
+
+    if (!idleMatch) {
+      result.waiting.push(action.id);
+      remaining.push(action);
+      continue;
+    }
+
+    idleMatch.activeActionId = action.id;
+    result.claimed.push(action.id);
+    // action is consumed — not pushed to remaining
+  }
+
+  state.pendingActions = remaining;
+  return result;
 }

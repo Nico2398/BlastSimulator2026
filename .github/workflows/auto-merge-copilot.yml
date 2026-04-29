@@ -268,6 +268,8 @@ jobs:
             // --- 6b. For non-issue_comment triggers, verify CI is green before merging ---
             // The issue_comment path fires immediately on APPROVED; CI may still be running.
             // For CI (workflow_run) and check_run paths, CI has already been evaluated.
+            // NOTE: exclude this workflow's own check run ('auto-review-and-merge') — it is
+            // in_progress while this script runs and would otherwise cause a false "CI not green".
             let alreadyApproved = false;
             if (context.eventName === 'issue_comment' || context.eventName === 'workflow_dispatch') {
               const { data: { check_runs: allRuns } } = await github.rest.checks.listForRef({
@@ -275,7 +277,10 @@ jobs:
                 ref: pr.head.sha,
                 per_page: 100
               });
-              const ciRuns = allRuns.filter(r => r.app?.id !== COPILOT_SWE_APP_ID);
+              const ciRuns = allRuns.filter(r =>
+                r.app?.id !== COPILOT_SWE_APP_ID &&
+                r.name !== 'auto-review-and-merge'
+              );
               const allCIGreen = ciRuns.length > 0 && ciRuns.every(r =>
                 r.status === 'completed' &&
                 ['success', 'skipped', 'neutral'].includes(r.conclusion || '')
@@ -293,6 +298,9 @@ jobs:
                   console.log(`Approved PR #${prNumber}`);
                 } catch (e) { console.log(`Approval note: ${e.message}`); }
                 // Enable GitHub native auto-merge so the PR merges the moment CI goes green.
+                // If this fails with "clean status" (no required branch checks configured),
+                // fall through to attempt a direct merge rather than returning and stalling.
+                let autoMergeEnabled = false;
                 try {
                   await github.graphql(`
                     mutation($prId: ID!) {
@@ -303,13 +311,15 @@ jobs:
                     }
                   `, { prId: pr.node_id });
                   console.log(`Auto-merge enabled for PR #${prNumber}. Will merge once CI is green.`);
+                  autoMergeEnabled = true;
                 } catch (e2) {
                   console.log(`Auto-merge enable failed: ${e2.message}`);
+                  // "Pull request is in clean status" = no required checks, PR is already mergeable.
+                  // Fall through to attempt direct merge below instead of stalling.
                 }
-                // Option B: always return here. The workflow_run trigger will re-fire once CI
-                // passes and handle the final merge — regardless of whether enablePullRequestAutoMerge
-                // succeeded. Falling through would cause a double approval (issue 3).
-                return;
+                // Only defer if auto-merge was successfully queued to wait for CI.
+                // If auto-merge is unavailable, fall through to direct merge.
+                if (autoMergeEnabled) return;
               }
             }
 
@@ -320,7 +330,10 @@ jobs:
                 ref: pr.head.sha,
                 per_page: 100
               });
-              const ciRuns = allRuns.filter(r => r.app?.id !== COPILOT_SWE_APP_ID);
+              const ciRuns = allRuns.filter(r =>
+                r.app?.id !== COPILOT_SWE_APP_ID &&
+                r.name !== 'auto-review-and-merge'
+              );
               const allCIGreen = ciRuns.length > 0 && ciRuns.every(r =>
                 r.status === 'completed' &&
                 ['success', 'skipped', 'neutral'].includes(r.conclusion || '')
