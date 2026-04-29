@@ -15,6 +15,7 @@ import type { VehicleState } from '../entities/Vehicle.js';
 import { createVehicleState } from '../entities/Vehicle.js';
 import type { EmployeeState, SkillCategory } from '../entities/Employee.js';
 import { createEmployeeState } from '../entities/Employee.js';
+import type { VehicleRole } from '../entities/Vehicle.js';
 import type { ScoreState } from '../scores/ScoreManager.js';
 import { createScoreState } from '../scores/ScoreManager.js';
 import type { DamageState } from '../entities/Damage.js';
@@ -49,12 +50,28 @@ export interface GameConfig {
   startingCash?: number;
 }
 
+/** The type of action a player has issued, waiting for an employee to execute. */
+export type ActionType =
+  | 'drill_hole'
+  | 'charge_hole'
+  | 'set_sequence'
+  | 'place_building'
+  | 'demolish_building'
+  | 'survey'
+  | 'fragment_debris'
+  | 'haul_debris';
+
 /** A pending action waiting for a qualified employee to execute it. */
 export interface PendingAction {
   id: number;
+  type: ActionType;
   requiredSkill: SkillCategory;
+  /** Required vehicle role, or null if on-foot task. */
+  requiredVehicleRole: VehicleRole | null;
+  /** Grid position for ghost rendering and employee pathfinding. */
   targetX: number;
   targetZ: number;
+  targetY: number;
   payload: Record<string, unknown>;
 }
 
