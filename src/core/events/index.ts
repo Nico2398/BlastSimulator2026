@@ -15,8 +15,9 @@ import { LAWSUIT_EVENTS_1 } from './LawsuitEvents1.js';
 import { LAWSUIT_EVENTS_2 } from './LawsuitEvents2.js';
 import { FOLLOWUP_EVENTS } from './FollowUpEvents.js';
 import { TRAFFIC_JAM_EVENTS } from './TrafficJamEvents.js';
+import { UNQUALIFIED_TASK_EVENTS } from './UnqualifiedTaskEvents.js';
 
-/** Register all 258 events into the global pool. Call once at app init. */
+/** Register all 260 events into the global pool. Call once at app init. */
 export function setupEvents(): void {
   registerEvents(UNION_EVENTS_1);
   registerEvents(UNION_EVENTS_2);
@@ -30,4 +31,5 @@ export function setupEvents(): void {
   registerEvents(LAWSUIT_EVENTS_2);
   registerEvents(FOLLOWUP_EVENTS);
   registerEvents(TRAFFIC_JAM_EVENTS);
+  registerEvents(UNQUALIFIED_TASK_EVENTS);
 }
