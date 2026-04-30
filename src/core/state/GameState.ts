@@ -4,6 +4,7 @@
 import { STARTING_CASH } from '../config/balance.js';
 import type { DrillHole } from '../mining/DrillPlan.js';
 import type { HoleCharge } from '../mining/ChargePlan.js';
+import type { SurveyResult } from '../mining/SurveyCalc.js';
 import type { FinanceState } from '../economy/Finance.js';
 import { createFinanceState } from '../economy/Finance.js';
 import type { ContractState } from '../economy/Contract.js';
@@ -45,7 +46,7 @@ import type { SitePolicy } from '../entities/SitePolicy.js';
 import { createSitePolicy } from '../entities/SitePolicy.js';
 
 /** Save format version — increment when GameState shape changes. */
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
 
 export interface GameConfig {
   seed: number;
@@ -116,6 +117,10 @@ export interface GameState {
 
   /** Set of surveyed column keys "x,z". */
   surveyedPositions: Set<string>;
+  /** Completed survey records, ordered by completedTick. */
+  surveyResults: SurveyResult[];
+  /** Next ID to assign to a newly created SurveyResult. */
+  nextSurveyId: number;
 
   /** Player cash balance. */
   cash: number;
@@ -212,6 +217,8 @@ export function createGame(config: GameConfig): GameState {
     mineType: config.mineType ?? 'desert',
     world: null,
     surveyedPositions: new Set(),
+    surveyResults: [],
+    nextSurveyId: 1,
     cash: config.startingCash ?? STARTING_CASH,
     drillHoles: [],
     chargesByHole: {},

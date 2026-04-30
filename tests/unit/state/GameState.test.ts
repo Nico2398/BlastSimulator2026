@@ -283,3 +283,19 @@ describe('claimPendingAction (task 3.8)', () => {
     expect(ghosts.map(g => g.id)).toContain(101);
   });
 });
+
+// =============================================================================
+// Task 4.4 — surveyResults and nextSurveyId fields in GameState
+// =============================================================================
+
+describe('createGame — surveyResults and nextSurveyId (task 4.4)', () => {
+  it('initialises surveyResults as an empty array', () => {
+    const state = createGame({ seed: 42 });
+    expect(state.surveyResults).toEqual([]);
+  });
+
+  it('initialises nextSurveyId as 1', () => {
+    const state = createGame({ seed: 42 });
+    expect(state.nextSurveyId).toBe(1);
+  });
+});
