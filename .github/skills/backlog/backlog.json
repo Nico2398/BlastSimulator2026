@@ -488,7 +488,7 @@
       "src/core/GameState.ts"
     ],
     "testFile": "tests/unit/GameState.test.ts",
-    "status": "in-progress",
+    "status": "done",
     "blockedBy": [
       "3.5"
     ],
@@ -502,7 +502,7 @@
       "src/renderer/GhostMesh.ts"
     ],
     "testFile": null,
-    "status": "pending",
+    "status": "in-progress",
     "blockedBy": [
       "3.8"
     ],
