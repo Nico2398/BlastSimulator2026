@@ -1,6 +1,7 @@
 // BlastSimulator2026 — Central game state
 // Pure data. No side effects. All game data lives here.
 
+import { STARTING_CASH } from '../config/balance.js';
 import type { DrillHole } from '../mining/DrillPlan.js';
 import type { HoleCharge } from '../mining/ChargePlan.js';
 import type { FinanceState } from '../economy/Finance.js';
@@ -60,6 +61,15 @@ export type ActionType =
   | 'survey'
   | 'fragment_debris'
   | 'haul_debris';
+
+/** A lightweight renderer preview entry — mirrors a PendingAction for ghost-mesh display. */
+export interface GhostPreview {
+  id: number;
+  type: ActionType;
+  targetX: number;
+  targetZ: number;
+  targetY: number;
+}
 
 /** A pending action waiting for a qualified employee to execute it. */
 export interface PendingAction {
@@ -142,7 +152,7 @@ export interface GameState {
   /** Mafia state (exposure, smuggling, frames). */
   mafia: MafiaState;
 
-  // ── Phase 7: Campaign & Win/Lose ──
+  // ── Campaign & Win/Lose ──
 
   /** Campaign progression (unlocked levels, profit history). Persists across level restarts. */
   campaign: CampaignState;
@@ -162,6 +172,8 @@ export interface GameState {
   levelEndReason: 'completed' | 'bankruptcy' | 'arrest' | 'ecological_shutdown' | 'worker_revolt' | null;
   /** Pending actions waiting for qualified employees. */
   pendingActions: PendingAction[];
+  /** Lightweight ghost-mesh preview entries for the renderer. */
+  ghostPreviews: GhostPreview[];
 }
 
 export interface WorldState {
@@ -178,9 +190,6 @@ export interface SavedBlastPlan {
   sequenceDelays: Record<string, number>;
 }
 
-import { STARTING_CASH } from '../config/balance.js';
-const DEFAULT_STARTING_CASH = STARTING_CASH;
-
 /** Create a fresh GameState from config. */
 export function createGame(config: GameConfig): GameState {
   return {
@@ -193,12 +202,12 @@ export function createGame(config: GameConfig): GameState {
     mineType: config.mineType ?? 'desert',
     world: null,
     surveyedPositions: new Set(),
-    cash: config.startingCash ?? DEFAULT_STARTING_CASH,
+    cash: config.startingCash ?? STARTING_CASH,
     drillHoles: [],
     chargesByHole: {},
     sequenceDelays: {},
     savedPlans: {},
-    finances: createFinanceState(config.startingCash ?? DEFAULT_STARTING_CASH),
+    finances: createFinanceState(config.startingCash ?? STARTING_CASH),
     contracts: createContractState(),
     logistics: createLogisticsState(),
     buildings: createBuildingState(),
@@ -219,5 +228,6 @@ export function createGame(config: GameConfig): GameState {
     levelEnded: false,
     levelEndReason: null,
     pendingActions: [],
+    ghostPreviews: [],
   };
 }
