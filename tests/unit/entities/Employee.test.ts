@@ -19,6 +19,8 @@ import {
   getNeedMultiplier,
   tickNeedMorale,
   replenishNeed,
+  // ── 3.13: task-duration function ──
+  computeTaskDuration,
   type SkillQualification,
   type SkillCategory,
   type NeedKey,
@@ -31,6 +33,8 @@ import {
   NEED_THRESHOLDS,
   NEED_PRODUCTIVITY_MULTIPLIERS,
   NEED_MORALE_PENALTIES,
+  // ── 3.13: proficiency multipliers ──
+  PROFICIENCY_MULTIPLIERS,
 } from '../../../src/core/config/balance.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 
@@ -707,4 +711,122 @@ describe('Employee — need meters (3.10)', () => {
 
     expect(employee.hunger).toBe(100);
   });
+});
+
+// ── Task 3.13 — computeTaskDuration ─────────────────────────────────────────
+describe('Employee — computeTaskDuration (3.13)', () => {
+
+  // ── Test 1 ──────────────────────────────────────────────────────────────────
+  it('baseline: Rookie (level 1), all multipliers 1.0 → returns baseDuration unchanged', () => {
+    // ceil(100 * PROFICIENCY_MULTIPLIERS[1] / (1.0 * 1.0 * 1.0))
+    // = ceil(100 * 1.00 / 1.0) = 100
+    const result = computeTaskDuration(100, 1, 1.0, 1.0, 1.0);
+    expect(result).toBe(Math.ceil(100 * PROFICIENCY_MULTIPLIERS[1] / (1.0 * 1.0 * 1.0)));
+    expect(result).toBe(100);
+  });
+
+  // ── Test 2 ──────────────────────────────────────────────────────────────────
+  it('proficiency level 5: Master, all other multipliers 1.0 → returns ceil(baseDuration * 0.40)', () => {
+    // ceil(100 * PROFICIENCY_MULTIPLIERS[5] / (1.0 * 1.0 * 1.0))
+    // = ceil(100 * 0.40 / 1.0) = 40
+    const result = computeTaskDuration(100, 5, 1.0, 1.0, 1.0);
+    expect(result).toBe(Math.ceil(100 * PROFICIENCY_MULTIPLIERS[5] / (1.0 * 1.0 * 1.0)));
+    expect(result).toBe(40);
+  });
+
+  // ── Test 3 ──────────────────────────────────────────────────────────────────
+  it('proficiency level 2: Competent, all other multipliers 1.0 → returns ceil(baseDuration * 0.85)', () => {
+    // ceil(100 * PROFICIENCY_MULTIPLIERS[2] / (1.0 * 1.0 * 1.0))
+    // = ceil(100 * 0.85 / 1.0) = 85
+    const result = computeTaskDuration(100, 2, 1.0, 1.0, 1.0);
+    expect(result).toBe(Math.ceil(100 * PROFICIENCY_MULTIPLIERS[2] / (1.0 * 1.0 * 1.0)));
+    expect(result).toBe(85);
+  });
+
+  // ── Test 4 ──────────────────────────────────────────────────────────────────
+  it('hungry worker: level 1, needMultiplier=0.80 → returns ceil(baseDuration * 1.00 / 0.80)', () => {
+    // Productivity penalty < 1.0 increases duration
+    // ceil(100 * 1.00 / (0.80 * 1.0 * 1.0)) = ceil(125) = 125
+    const result = computeTaskDuration(100, 1, 0.80, 1.0, 1.0);
+    expect(result).toBe(Math.ceil(100 * PROFICIENCY_MULTIPLIERS[1] / (0.80 * 1.0 * 1.0)));
+    expect(result).toBe(125);
+  });
+
+  // ── Test 5 ──────────────────────────────────────────────────────────────────
+  it('starving worker: level 1, needMultiplier=0.60 → returns ceil(baseDuration * 1.00 / 0.60)', () => {
+    // ceil(100 * 1.00 / (0.60 * 1.0 * 1.0)) = ceil(166.666...) = 167
+    const result = computeTaskDuration(100, 1, 0.60, 1.0, 1.0);
+    expect(result).toBe(Math.ceil(100 * PROFICIENCY_MULTIPLIERS[1] / (0.60 * 1.0 * 1.0)));
+    expect(result).toBe(167);
+  });
+
+  // ── Test 6 ──────────────────────────────────────────────────────────────────
+  it('LQ Tier 3 bonus: level 1, lqMultiplier=1.10 → returns ceil(baseDuration / 1.10)', () => {
+    // lqMultiplier > 1.0 reduces duration (productivity bonus)
+    // ceil(100 * 1.00 / (1.0 * 1.10 * 1.0)) = ceil(90.909...) = 91
+    const result = computeTaskDuration(100, 1, 1.0, 1.10, 1.0);
+    expect(result).toBe(Math.ceil(100 * PROFICIENCY_MULTIPLIERS[1] / (1.0 * 1.10 * 1.0)));
+    expect(result).toBe(91);
+  });
+
+  // ── Test 7 ──────────────────────────────────────────────────────────────────
+  it('LQ penalty: level 1, lqMultiplier=0.85 → returns ceil(baseDuration / 0.85)', () => {
+    // lqMultiplier < 1.0 increases duration (productivity penalty)
+    // ceil(100 * 1.00 / (1.0 * 0.85 * 1.0)) = ceil(117.647...) = 118
+    const result = computeTaskDuration(100, 1, 1.0, 0.85, 1.0);
+    expect(result).toBe(Math.ceil(100 * PROFICIENCY_MULTIPLIERS[1] / (1.0 * 0.85 * 1.0)));
+    expect(result).toBe(118);
+  });
+
+  // ── Test 8 ──────────────────────────────────────────────────────────────────
+  it('event boost: level 1, eventMultiplier=1.20 → returns ceil(baseDuration / 1.20)', () => {
+    // eventMultiplier > 1.0 reduces duration (union happy hour, etc.)
+    // ceil(100 * 1.00 / (1.0 * 1.0 * 1.20)) = ceil(83.333...) = 84
+    const result = computeTaskDuration(100, 1, 1.0, 1.0, 1.20);
+    expect(result).toBe(Math.ceil(100 * PROFICIENCY_MULTIPLIERS[1] / (1.0 * 1.0 * 1.20)));
+    expect(result).toBe(84);
+  });
+
+  // ── Test 9 ──────────────────────────────────────────────────────────────────
+  it('event penalty: level 1, eventMultiplier=0.85 → returns ceil(baseDuration / 0.85)', () => {
+    // eventMultiplier < 1.0 increases duration (heatwave, etc.)
+    // ceil(100 * 1.00 / (1.0 * 1.0 * 0.85)) = ceil(117.647...) = 118
+    const result = computeTaskDuration(100, 1, 1.0, 1.0, 0.85);
+    expect(result).toBe(Math.ceil(100 * PROFICIENCY_MULTIPLIERS[1] / (1.0 * 1.0 * 0.85)));
+    expect(result).toBe(118);
+  });
+
+  // ── Test 10 ─────────────────────────────────────────────────────────────────
+  it('all modifiers combined: level 5, needMultiplier=0.80, lqMultiplier=1.10, eventMultiplier=1.20', () => {
+    // ceil(100 * 0.40 / (0.80 * 1.10 * 1.20))
+    // = ceil(40 / 1.056) = ceil(37.878...) = 38
+    const result = computeTaskDuration(100, 5, 0.80, 1.10, 1.20);
+    expect(result).toBe(Math.ceil(100 * PROFICIENCY_MULTIPLIERS[5] / (0.80 * 1.10 * 1.20)));
+    expect(result).toBe(38);
+  });
+
+  // ── Test 11 ─────────────────────────────────────────────────────────────────
+  it('minimum of 1: baseDuration=1, level 5, all multipliers 1.0 → result is at least 1', () => {
+    // ceil(1 * 0.40 / 1.0) = ceil(0.40) = 1 → enforces floor of 1
+    const result = computeTaskDuration(1, 5, 1.0, 1.0, 1.0);
+    expect(result).toBeGreaterThanOrEqual(1);
+    expect(result).toBe(1);
+  });
+
+  // ── Test 12 ─────────────────────────────────────────────────────────────────
+  it('integer result: result is always a whole number (Math.ceil output)', () => {
+    // Non-round calculation: ceil(7 * 0.85 / 1.0) = ceil(5.95) = 6
+    const result = computeTaskDuration(7, 2, 1.0, 1.0, 1.0);
+    expect(Number.isInteger(result)).toBe(true);
+    expect(result).toBe(Math.ceil(7 * PROFICIENCY_MULTIPLIERS[2] / (1.0 * 1.0 * 1.0)));
+    expect(result).toBe(6);
+  });
+
+  // ── Test 13 ─────────────────────────────────────────────────────────────────
+  it('baseDuration=1: level 1, all multipliers 1.0 → returns exactly 1', () => {
+    // ceil(1 * 1.00 / (1.0 * 1.0 * 1.0)) = ceil(1.0) = 1
+    const result = computeTaskDuration(1, 1, 1.0, 1.0, 1.0);
+    expect(result).toBe(1);
+  });
+
 });

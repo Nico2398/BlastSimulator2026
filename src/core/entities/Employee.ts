@@ -227,7 +227,6 @@ export function killEmployee(state: EmployeeState, employeeId: number): boolean 
 }
 
 export { HIRING_COSTS, BASE_SALARIES };
-
 // ── Skill & Training functions ──
 
 /** Add or replace a qualification for an employee. Returns false if employee not found. */
@@ -298,3 +297,4 @@ export type { GainXpResult } from './EmployeeGainXp.js';
 export { gainXp } from './EmployeeGainXp.js';
 export type { NeedKey } from './EmployeeNeeds.js';
 export { tickNeeds, getNeedMultiplier, tickNeedMorale, replenishNeed } from './EmployeeNeeds.js';
+export { computeTaskDuration } from './EmployeeTaskDuration.js';
