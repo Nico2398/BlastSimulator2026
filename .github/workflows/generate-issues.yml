@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       count:
-        description: "Number of issues to create (1–5)"
+        description: "Number of issues to create (1–50)"
         required: false
         default: "1"
         type: string
@@ -36,7 +36,7 @@ jobs:
             const owner = context.repo.owner;
             const repo  = context.repo.repo;
             const parsedCount = parseInt(context.payload.inputs?.count ?? '1', 10);
-            const maxCount = Math.max(1, Math.min(Number.isNaN(parsedCount) ? 1 : parsedCount, 5));
+            const maxCount = Math.max(1, Math.min(Number.isNaN(parsedCount) ? 1 : parsedCount, 50));
 
             // --- Load backlog ---
             const backlogPath = path.join(process.env.GITHUB_WORKSPACE, '.github/skills/backlog/backlog.json');
