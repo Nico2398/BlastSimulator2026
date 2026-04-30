@@ -8,6 +8,7 @@ import {
   SURVEY_SKILL_BONUS_PER_LEVEL,
   SURVEY_SEISMIC_GROUP_SIZE,
   SURVEY_ESTIMATE_STEP,
+  SURVEY_STALE_TICKS,
 } from '../config/balance.js';
 
 /** The three supported methods for surveying a mining site. */
@@ -194,5 +195,13 @@ export function estimateSurveyResult(
   }
 
   return { id, method, centerX, centerZ, surveyorId, completedTick, estimates, confidence };
+}
+
+/**
+ * Returns `true` when the elapsed ticks since survey completion exceed `SURVEY_STALE_TICKS`.
+ * A result aged by exactly `SURVEY_STALE_TICKS` ticks is still considered fresh.
+ */
+export function isSurveyStale(result: SurveyResult, currentTick: number): boolean {
+  return currentTick - result.completedTick > SURVEY_STALE_TICKS;
 }
 

@@ -314,3 +314,6 @@ export const SURVEY_SEISMIC_GROUP_SIZE = 3;
 
 /** Ore estimate quantisation step: estimates are rounded to the nearest 0.05 band. */
 export const SURVEY_ESTIMATE_STEP = 0.05;
+
+/** Number of ticks after which a survey result is considered stale. */
+export const SURVEY_STALE_TICKS = 100;
