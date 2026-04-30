@@ -41,6 +41,8 @@ import type { RevoltState } from '../campaign/WorkerRevolt.js';
 import { createRevoltState } from '../campaign/WorkerRevolt.js';
 import type { LevelStats } from '../campaign/SuccessTracker.js';
 import { createLevelStats } from '../campaign/SuccessTracker.js';
+import type { SitePolicy } from '../entities/SitePolicy.js';
+import { createSitePolicy } from '../entities/SitePolicy.js';
 
 /** Save format version — increment when GameState shape changes. */
 export const SAVE_VERSION = 3;
@@ -170,6 +172,8 @@ export interface GameState {
   revolt: RevoltState;
   /** Per-level success statistics. */
   levelStats: LevelStats;
+  /** Site policy governing shift scheduling and rest thresholds. */
+  sitePolicy: SitePolicy;
   /** Whether the current level has ended (any game-over or completion). */
   levelEnded: boolean;
   /** Reason the level ended, or null if still active. */
@@ -231,6 +235,7 @@ export function createGame(config: GameConfig): GameState {
     ecological: createEcologicalState(),
     revolt: createRevoltState(),
     levelStats: createLevelStats(),
+    sitePolicy: createSitePolicy('shift_8h'),
     levelEnded: false,
     levelEndReason: null,
     pendingActions: [],
