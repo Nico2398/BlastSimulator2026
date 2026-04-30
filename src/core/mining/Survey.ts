@@ -6,7 +6,8 @@ import type { GameState } from '../state/GameState.js';
 /** Cost to survey one column position. */
 const SURVEY_COST = 100;
 
-export interface SurveyResult {
+/** Outcome returned by {@link performSurvey} — distinct from the survey data record in SurveyCalc. */
+export interface PerformSurveyResult {
   success: boolean;
   message: string;
   alreadySurveyed: boolean;
@@ -21,7 +22,7 @@ export function isSurveyed(state: GameState, x: number, z: number): boolean {
  * Perform a survey at (x, z). Marks the column as revealed and deducts cost.
  * Re-surveying an already surveyed position is a no-op (no extra cost).
  */
-export function performSurvey(state: GameState, x: number, z: number): SurveyResult {
+export function performSurvey(state: GameState, x: number, z: number): PerformSurveyResult {
   const key = `${x},${z}`;
 
   if (state.surveyedPositions.has(key)) {
