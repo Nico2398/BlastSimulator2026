@@ -317,3 +317,17 @@ export const SURVEY_ESTIMATE_STEP = 0.05;
 
 /** Number of ticks after which a survey result is considered stale. */
 export const SURVEY_STALE_TICKS = 100;
+
+/** Survey cost ($) for each method. */
+export const SURVEY_COSTS = {
+  seismic:     3000,
+  core_sample:  800,
+  aerial:      1500,
+} as const;
+
+/** Survey duration (ticks) for each method. 1 tick = 1 game-hour. */
+export const SURVEY_DURATION_TICKS = {
+  seismic:     8,
+  core_sample: 4,
+  aerial:      3,
+} as const;
