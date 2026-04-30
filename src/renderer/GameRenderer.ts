@@ -17,6 +17,7 @@ import { FragmentMesh } from './FragmentMesh.js';
 import { BlastEffects } from './BlastEffects.js';
 import { DistantScenery } from './DistantScenery.js';
 import { BlastPlanOverlay } from './BlastPlanOverlay.js';
+import { GhostMesh } from './GhostMesh.js';
 
 export class GameRenderer {
   private readonly sm: SceneManager;
@@ -30,6 +31,7 @@ export class GameRenderer {
   private blastEffects: BlastEffects | null = null;
   private scenery: DistantScenery | null = null;
   private blastOverlay: BlastPlanOverlay | null = null;
+  private ghosts: GhostMesh | null = null;
   private lastGrid: VoxelGrid | null = null;
 
   /** Seed of the currently loaded game — used to detect new_game calls. */
@@ -62,6 +64,11 @@ export class GameRenderer {
 
     // Sync entities added since last call
     this.syncEntities(ctx.state);
+
+    // Sync ghost previews for pending actions
+    if (this.ghosts) {
+      this.ghosts.sync(ctx.state.ghostPreviews);
+    }
 
     // Sync weather
     if (this.skybox && ctx.weatherCycle) {
@@ -137,6 +144,10 @@ export class GameRenderer {
 
     if (this.vehicles && this.lastState) {
       this.vehicles.update(this.lastState.vehicles.vehicles);
+    }
+
+    if (this.ghosts) {
+      this.ghosts.update(dt);
     }
   }
 
@@ -279,6 +290,9 @@ export class GameRenderer {
     // Blast plan overlay (hidden until shown)
     this.blastOverlay = new BlastPlanOverlay(scene);
 
+    // Ghost previews (initially empty)
+    this.ghosts = new GhostMesh(scene);
+
     // Point camera at terrain centre
     cameraController.setTarget(grid.sizeX / 2, 0, grid.sizeZ / 2);
   }
@@ -293,6 +307,7 @@ export class GameRenderer {
     this.blastEffects?.dispose();
     this.scenery?.clear();
     this.blastOverlay?.dispose();
+    this.ghosts?.dispose();
 
     this.terrain = null;
     this.buildings = null;
@@ -303,6 +318,7 @@ export class GameRenderer {
     this.blastEffects = null;
     this.scenery = null;
     this.blastOverlay = null;
+    this.ghosts = null;
     this.lastGrid = null;
 
     this.renderedBuildingIds.clear();

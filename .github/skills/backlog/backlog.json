@@ -502,7 +502,7 @@
       "src/renderer/GhostMesh.ts"
     ],
     "testFile": null,
-    "status": "in-progress",
+    "status": "done",
     "blockedBy": [
       "3.8"
     ],
