@@ -232,3 +232,39 @@ export const QUALIFICATION_SALARY_BONUS: Record<1 | 2 | 3 | 4 | 5, number> = {
   4: 350,
   5: 500,
 } as const;
+
+// ─── Employee Needs ────────────────────────────────────────────────────────────
+
+/** Drain rates per tick for each need gauge. */
+export const NEED_DRAIN_RATES = {
+  hunger:  { working: 1,   idle: 0.5  },
+  fatigue: { working: 2,   idle: 0.5  },
+  social:  { working: 1,   idle: 1    },
+  comfort: { working: 0.3, idle: 0.3  },
+} as const;
+
+/** Threshold values for productivity/morale effects. */
+export const NEED_THRESHOLDS = {
+  hunger:  { low: 30, critical: 10 },
+  fatigue: { low: 40, critical: 15 },
+  social:  { low: 20 },
+  comfort: { low: 30 },
+} as const;
+
+/**
+ * Productivity multipliers applied when a need gauge falls below a threshold.
+ * `low` = uncomfortable but functioning; `critical` = severe impairment.
+ * Multipliers are applied to the base effectiveness value.
+ */
+export const NEED_PRODUCTIVITY_MULTIPLIERS = {
+  hunger:  { low: 0.80, critical: 0.60 },
+  fatigue: { low: 0.75, critical: 0.50 },
+} as const;
+
+/**
+ * Morale penalty (per tick) applied when a social or comfort gauge falls below its threshold.
+ */
+export const NEED_MORALE_PENALTIES = {
+  social:  -2,
+  comfort: -1,
+} as const;

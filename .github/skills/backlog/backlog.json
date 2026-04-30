@@ -389,7 +389,7 @@
       "src/core/entities/Employee.ts"
     ],
     "testFile": "tests/unit/entities/Employee.test.ts",
-    "status": "pending",
+    "status": "done",
     "blockedBy": [],
     "closedInPR": null
   },
@@ -516,7 +516,7 @@
       "src/core/entities/Employee.ts"
     ],
     "testFile": "tests/unit/entities/Employee.test.ts",
-    "status": "pending",
+    "status": "in-progress",
     "blockedBy": [
       "3.1"
     ],
