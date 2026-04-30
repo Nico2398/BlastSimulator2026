@@ -358,7 +358,7 @@
       "src/console/commands/entities.ts"
     ],
     "testFile": null,
-    "status": "in-progress",
+    "status": "pending",
     "blockedBy": [
       "2.3",
       "2.6",
@@ -488,7 +488,7 @@
       "src/core/GameState.ts"
     ],
     "testFile": "tests/unit/GameState.test.ts",
-    "status": "pending",
+    "status": "in-progress",
     "blockedBy": [
       "3.5"
     ],
