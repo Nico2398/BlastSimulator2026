@@ -60,7 +60,8 @@ export type ActionType =
   | 'demolish_building'
   | 'survey'
   | 'fragment_debris'
-  | 'haul_debris';
+  | 'haul_debris'
+  | 'rest';
 
 /** A lightweight renderer preview entry — mirrors a PendingAction for ghost-mesh display. */
 export interface GhostPreview {
@@ -75,7 +76,8 @@ export interface GhostPreview {
 export interface PendingAction {
   id: number;
   type: ActionType;
-  requiredSkill: SkillCategory;
+  /** Required skill category, or null if no skill is required (e.g. rest). */
+  requiredSkill: SkillCategory | null;
   /** Required vehicle role, or null if on-foot task. */
   requiredVehicleRole: VehicleRole | null;
   /** Grid position for ghost rendering and employee pathfinding. */
@@ -83,6 +85,8 @@ export interface PendingAction {
   targetZ: number;
   targetY: number;
   payload: Record<string, unknown>;
+  /** If set, only this employee may claim the action. null/undefined = any qualified employee. */
+  targetEmployeeId?: number | null;
 }
 
 /**
@@ -172,6 +176,8 @@ export interface GameState {
   levelEndReason: 'completed' | 'bankruptcy' | 'arrest' | 'ecological_shutdown' | 'worker_revolt' | null;
   /** Pending actions waiting for qualified employees. */
   pendingActions: PendingAction[];
+  /** Next ID to assign to a newly created PendingAction. */
+  nextPendingActionId: number;
   /** Lightweight ghost-mesh preview entries for the renderer. */
   ghostPreviews: GhostPreview[];
 }
@@ -228,6 +234,7 @@ export function createGame(config: GameConfig): GameState {
     levelEnded: false,
     levelEndReason: null,
     pendingActions: [],
+    nextPendingActionId: 1,
     ghostPreviews: [],
   };
 }

@@ -12,7 +12,11 @@ import {
   BASE_TICK_MS,
   tickVehicle,
   tickEmployees,
+  // tickNeedRestoration is imported here for Task 3.11 tests.
+  // It does not exist yet — tests will fail (Red phase) until the implementation lands.
+  tickNeedRestoration,
 } from '../../../src/core/engine/GameLoop.js';
+import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
 import type { EventContext } from '../../../src/core/events/EventPool.js';
@@ -483,5 +487,220 @@ describe('tickEmployees — claim logic (Task 3.6)', () => {
     // Only one action can be assigned to the single employee per tick
     expect(state.pendingActions).toHaveLength(1);
     expect((employee as any).activeActionId).not.toBeNull();
+  });
+});
+
+// ── Task 3.11: tickNeedRestoration ───────────────────────────────────────────
+//
+// Tests cover the auto-routing of employees whose need gauges (hunger < 35 OR
+// fatigue < 25) drop below warning thresholds to the nearest active
+// living_quarters building via a `rest` PendingAction.
+//
+// These tests are in the RED phase: tickNeedRestoration does not exist yet.
+// They are expected to FAIL until the implementation is provided.
+//
+// Required additions to the production code before these can go green:
+//   • GameLoop.ts   — export tickNeedRestoration(state): NeedRestorationResult
+//   • GameState.ts  — ActionType includes 'rest'; PendingAction gains
+//                     targetEmployeeId: number | null and requiredSkill: SkillCategory | null;
+//                     GameState gains nextPendingActionId: number
+//   • balance.ts    — export NEED_RESTORATION_THRESHOLDS = { hunger: 35, fatigue: 25 }
+
+describe('tickNeedRestoration (Task 3.11)', () => {
+  const SEED = 42;
+
+  // ── Shared result type (mirrors NeedRestorationResult to be added to GameLoop) ──
+  type NeedRestorationResult = { routed: number[]; noBuilding: number[] };
+
+  // Casts tickNeedRestoration to any so the test file remains parseable while
+  // the export does not exist. Tests will fail at runtime with
+  // "tickNeedRestoration is not a function" — the correct Red phase failure.
+  const callTickNeedRestoration = (tickNeedRestoration as unknown as
+    (state: ReturnType<typeof createGame>) => NeedRestorationResult);
+
+  // ── Test 1 ──────────────────────────────────────────────────────────────────
+  it('routes a hungry employee (hunger < 35) to rest when a living_quarters is active', () => {
+    const state = createGame({ seed: SEED });
+    const rng   = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    // Hunger 30 is below the NEED_RESTORATION_THRESHOLDS.hunger = 35 threshold.
+    employee.hunger  = 30;
+    employee.fatigue = 80; // well above the fatigue threshold of 25
+
+    // Place one active living_quarters on the grid.
+    placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100);
+
+    const result = callTickNeedRestoration(state);
+
+    // Employee must be added to the routed list.
+    expect(result.routed).toContain(employee.id);
+
+    // Employee must have been assigned an action (no longer idle).
+    expect(employee.activeActionId).not.toBeNull();
+
+    // A rest action targeting this employee must exist in pendingActions.
+    const restAction = state.pendingActions.find(
+      (a: any) => a.type === 'rest' && a.targetEmployeeId === employee.id,
+    );
+    expect(restAction).toBeDefined();
+  });
+
+  // ── Test 2 ──────────────────────────────────────────────────────────────────
+  it('routes a fatigued employee (fatigue < 25) to rest when a living_quarters is active', () => {
+    const state = createGame({ seed: SEED });
+    const rng   = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'blaster', rng);
+    employee.hunger  = 80; // well above the hunger threshold of 35
+    // Fatigue 20 is below the NEED_RESTORATION_THRESHOLDS.fatigue = 25 threshold.
+    employee.fatigue = 20;
+
+    placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100);
+
+    const result = callTickNeedRestoration(state);
+
+    expect(result.routed).toContain(employee.id);
+    expect(employee.activeActionId).not.toBeNull();
+
+    const restAction = state.pendingActions.find(
+      (a: any) => a.type === 'rest' && a.targetEmployeeId === employee.id,
+    );
+    expect(restAction).toBeDefined();
+  });
+
+  // ── Test 3 ──────────────────────────────────────────────────────────────────
+  it('does NOT route an employee whose gauges are comfortably above both thresholds', () => {
+    const state = createGame({ seed: SEED });
+    const rng   = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    // Both gauges well above their respective thresholds (35 / 25).
+    employee.hunger  = 80;
+    employee.fatigue = 80;
+
+    placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100);
+
+    const result = callTickNeedRestoration(state);
+
+    // No routing should occur.
+    expect(result.routed).toHaveLength(0);
+    expect(employee.activeActionId).toBeNull();
+  });
+
+  // ── Test 4 ──────────────────────────────────────────────────────────────────
+  it('does NOT route an already-busy employee even when they are hungry', () => {
+    const state = createGame({ seed: SEED });
+    const rng   = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    // Employee is critically hungry but already claimed a different action.
+    employee.hunger        = 10; // far below hunger threshold of 35
+    employee.activeActionId = 99; // already busy
+
+    placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100);
+
+    const result = callTickNeedRestoration(state);
+
+    // Busy employees must be skipped entirely.
+    expect(result.routed).toHaveLength(0);
+    // The pre-existing activeActionId must remain untouched.
+    expect(employee.activeActionId).toBe(99);
+  });
+
+  // ── Test 5 ──────────────────────────────────────────────────────────────────
+  it('adds employee to noBuilding when need is below threshold but no living_quarters exists', () => {
+    const state = createGame({ seed: SEED });
+    const rng   = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.hunger = 20; // below hunger threshold of 35
+    // No buildings placed — living_quarters is absent.
+
+    const result = callTickNeedRestoration(state);
+
+    // With no available building, the employee cannot be routed.
+    expect(result.noBuilding).toContain(employee.id);
+    // Employee must NOT be assigned any action.
+    expect(employee.activeActionId).toBeNull();
+    // Result routed list must be empty.
+    expect(result.routed).toHaveLength(0);
+  });
+
+  // ── Test 6 ──────────────────────────────────────────────────────────────────
+  it('tickEmployees does not reassign an employee who is currently resting', () => {
+    // An employee already holding a rest action (activeActionId != null) must be
+    // treated as "busy" by tickEmployees — work actions must stay in pendingActions.
+    const state = createGame({ seed: SEED });
+    const rng   = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'blaster', rng);
+    assignSkill(state.employees, employee.id, 'blasting', 1);
+
+    // Simulate the employee being mid-rest: their activeActionId is set.
+    const REST_ACTION_ID = 500;
+    employee.activeActionId = REST_ACTION_ID;
+
+    // A new blast work action is now pending.
+    const workAction: any = {
+      id: 600,
+      type: 'drill_hole',
+      requiredSkill: 'blasting',
+      requiredVehicleRole: null,
+      targetX: 5,
+      targetZ: 5,
+      targetY: 0,
+      payload: {},
+    };
+    state.pendingActions.push(workAction);
+
+    tickEmployees(state);
+
+    // The work action must remain in pendingActions — the resting employee cannot
+    // claim it while their activeActionId is non-null.
+    expect(state.pendingActions).toHaveLength(1);
+    expect(state.pendingActions[0]!.id).toBe(600);
+
+    // The employee's rest assignment must be undisturbed.
+    expect(employee.activeActionId).toBe(REST_ACTION_ID);
+  });
+
+  // ── Test 7 ──────────────────────────────────────────────────────────────────
+  it('selects the nearest active living_quarters by Euclidean distance', () => {
+    // Employee is at (0, 0).
+    // Two living_quarters buildings are placed:
+    //   • near:  origin (5, 0)  — Euclidean distance from employee ≈ 5
+    //   • far:   origin (50, 50) — Euclidean distance from employee ≈ 70.7
+    // The routing logic must pick the nearer building.
+    //
+    // Note: living_quarters tier 1 has a 3×3 footprint, so both buildings
+    // fit comfortably within the 100×100 grid without overlapping.
+    const state = createGame({ seed: SEED });
+    const rng   = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.x       = 0;
+    employee.z       = 0;
+    employee.hunger  = 20; // below hunger threshold of 35
+
+    // Near building: origin (5, 0)
+    const nearResult = placeBuilding(state.buildings, 'living_quarters', 5, 0, 100, 100);
+    expect(nearResult.success).toBe(true); // guard: placement must succeed
+
+    // Far building: origin (50, 50)  — 3×3 footprint keeps it within grid
+    const farResult = placeBuilding(state.buildings, 'living_quarters', 50, 50, 100, 100);
+    expect(farResult.success).toBe(true); // guard: placement must succeed
+
+    callTickNeedRestoration(state);
+
+    // The created rest action must target the nearer building, not the far one.
+    const restAction = state.pendingActions.find((a: any) => a.type === 'rest');
+    expect(restAction).toBeDefined();
+
+    // targetX and targetZ must correspond to the near building's location (x=5, z=0),
+    // not the far building's location (x=50, z=50).
+    expect((restAction as any).targetX).toBe(nearResult.building!.x);
+    expect((restAction as any).targetZ).toBe(nearResult.building!.z);
+    expect((restAction as any).targetX).not.toBe(farResult.building!.x);
   });
 });
