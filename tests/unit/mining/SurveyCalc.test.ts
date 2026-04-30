@@ -4,6 +4,8 @@ import { SURVEY_METHODS } from '../../../src/core/mining/SurveyCalc.js';
 import type { SurveyMethod, SurveyResult } from '../../../src/core/mining/SurveyCalc.js';
 // ── Task 4.2 additions ────────────────────────────────────────────────────────
 import { estimateSurveyResult, type EstimateSurveyParams } from '../../../src/core/mining/SurveyCalc.js';
+// ── Task 4.3 additions ────────────────────────────────────────────────────────
+import { isSurveyStale } from '../../../src/core/mining/SurveyCalc.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { Random } from '../../../src/core/math/Random.js';
 
@@ -495,5 +497,64 @@ describe('SurveyCalc — estimateSurveyResult', () => {
     const colEstimates = result.estimates['50,50'];
     expect(colEstimates).toBeDefined();
     expect(colEstimates!['silver']).toBeDefined();
+  });
+});
+
+// ── 4.3: isSurveyStale ────────────────────────────────────────────────────────
+
+describe('SurveyCalc — isSurveyStale (4.3)', () => {
+  // ── Fixture helpers ──────────────────────────────────────────────────────────
+  // Build a minimal SurveyResult with a given completedTick. All other fields
+  // are taken from BASE_RESULT so the shape always satisfies the interface.
+  function makeResult(completedTick: number): SurveyResult {
+    return { ...BASE_RESULT, completedTick };
+  }
+
+  // ── Boundary: still fresh ────────────────────────────────────────────────────
+
+  it('returns false when 0 ticks have elapsed (currentTick === completedTick)', () => {
+    // elapsed = 100 - 100 = 0  →  0 ≤ 100  →  fresh
+    const result = makeResult(100);
+    expect(isSurveyStale(result, 100)).toBe(false);
+  });
+
+  it('returns false when 99 ticks have elapsed (design-doc "fresh" example)', () => {
+    // elapsed = 199 - 100 = 99  →  99 ≤ 100  →  fresh
+    const result = makeResult(100);
+    expect(isSurveyStale(result, 199)).toBe(false);
+  });
+
+  it('returns false when exactly 100 ticks have elapsed (inclusive boundary)', () => {
+    // elapsed = 200 - 100 = 100  →  100 ≤ 100  →  still fresh, not yet stale
+    const result = makeResult(100);
+    expect(isSurveyStale(result, 200)).toBe(false);
+  });
+
+  // ── Boundary: now stale ──────────────────────────────────────────────────────
+
+  it('returns true when 101 ticks have elapsed (design-doc "stale" example)', () => {
+    // elapsed = 201 - 100 = 101  →  101 > 100  →  stale
+    const result = makeResult(100);
+    expect(isSurveyStale(result, 201)).toBe(true);
+  });
+
+  it('returns true when many ticks have elapsed (1000 ticks)', () => {
+    // elapsed = 1100 - 100 = 1000  →  1000 > 100  →  stale
+    const result = makeResult(100);
+    expect(isSurveyStale(result, 1100)).toBe(true);
+  });
+
+  // ── Edge: completedTick = 0 ───────────────────────────────────────────────────
+
+  it('returns false when completedTick is 0 and currentTick is 100 (exactly 100 elapsed)', () => {
+    // elapsed = 100 - 0 = 100  →  100 ≤ 100  →  fresh
+    const result = makeResult(0);
+    expect(isSurveyStale(result, 100)).toBe(false);
+  });
+
+  it('returns true when completedTick is 0 and currentTick is 101 (101 elapsed)', () => {
+    // elapsed = 101 - 0 = 101  →  101 > 100  →  stale
+    const result = makeResult(0);
+    expect(isSurveyStale(result, 101)).toBe(true);
   });
 });
