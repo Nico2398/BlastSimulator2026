@@ -9,7 +9,10 @@ import {
   SURVEY_SEISMIC_GROUP_SIZE,
   SURVEY_ESTIMATE_STEP,
   SURVEY_STALE_TICKS,
+  SURVEY_COSTS,
+  SURVEY_DURATION_TICKS,
 } from '../config/balance.js';
+import type { GameState } from '../state/GameState.js';
 
 /** The three supported methods for surveying a mining site. */
 export type SurveyMethod = 'seismic' | 'core_sample' | 'aerial';
@@ -203,5 +206,86 @@ export function estimateSurveyResult(
  */
 export function isSurveyStale(result: SurveyResult, currentTick: number): boolean {
   return currentTick - result.completedTick > SURVEY_STALE_TICKS;
+}
+
+/** Input parameters for {@link runSurvey}. */
+export interface RunSurveyParams {
+  /** Survey method that determines cost, coverage, and duration. */
+  method: SurveyMethod;
+  /** World-space X coordinate of the survey centre. */
+  centerX: number;
+  /** World-space Z coordinate of the survey centre. */
+  centerZ: number;
+}
+
+/**
+ * Result returned by {@link runSurvey}.
+ *
+ * On success `actionId` is always present; on failure `error` is always present.
+ */
+export interface RunSurveyResult {
+  success: boolean;
+  error?: 'insufficient_funds' | 'no_surveyor';
+  actionId?: number;
+}
+
+/**
+ * Validate preconditions, deduct cost, and enqueue a `survey` PendingAction.
+ *
+ * Guards (checked in order, state is never mutated on failure):
+ * 1. `state.cash >= SURVEY_COSTS[method]` — otherwise returns `'insufficient_funds'`.
+ * 2. At least one alive employee with a `'geology'` qualification exists —
+ *    otherwise returns `'no_surveyor'`.
+ *
+ * On success the function:
+ * - Deducts `SURVEY_COSTS[method]` from `state.cash`.
+ * - Pushes a `PendingAction` (type `'survey'`, skill `'geology'`) with a
+ *   payload containing `{ method, centerX, centerZ }`.
+ * - Pushes a matching `GhostPreview` for the renderer.
+ * - Returns `{ success: true, actionId }`.
+ *
+ * Duration of the action is governed by `SURVEY_DURATION_TICKS[method]` and is
+ * applied by the action-execution system when the assigned employee begins work.
+ */
+export function runSurvey(state: GameState, params: RunSurveyParams): RunSurveyResult {
+  const { method, centerX, centerZ } = params;
+  const cost = SURVEY_COSTS[method];
+
+  if (state.cash < cost) {
+    return { success: false, error: 'insufficient_funds' };
+  }
+
+  const hasSurveyor = state.employees.employees.some(
+    emp => emp.alive && emp.qualifications.some(q => q.category === 'geology'),
+  );
+  if (!hasSurveyor) {
+    return { success: false, error: 'no_surveyor' };
+  }
+
+  state.cash -= cost;
+
+  const actionId = state.nextPendingActionId++;
+
+  state.pendingActions.push({
+    id: actionId,
+    type: 'survey',
+    requiredSkill: 'geology',
+    requiredVehicleRole: null,
+    targetX: centerX,
+    targetZ: centerZ,
+    targetY: 0,
+    payload: { method, centerX, centerZ, durationTicks: SURVEY_DURATION_TICKS[method] },
+    targetEmployeeId: null,
+  });
+
+  state.ghostPreviews.push({
+    id: actionId,
+    type: 'survey',
+    targetX: centerX,
+    targetZ: centerZ,
+    targetY: 0,
+  });
+
+  return { success: true, actionId };
 }
 

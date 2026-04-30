@@ -8,6 +8,15 @@ import { estimateSurveyResult, type EstimateSurveyParams } from '../../../src/co
 import { isSurveyStale } from '../../../src/core/mining/SurveyCalc.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { Random } from '../../../src/core/math/Random.js';
+// ── Task 4.6 additions ────────────────────────────────────────────────────────
+import { createGame } from '../../../src/core/state/GameState.js';
+import { SURVEY_COSTS } from '../../../src/core/config/balance.js';
+import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
+import {
+  runSurvey,
+  type RunSurveyParams,
+  type RunSurveyResult,
+} from '../../../src/core/mining/SurveyCalc.js';
 
 // ── Deterministic fixture ─────────────────────────────────────────────────────
 // All required fields are set to fixed values so every test that derives a
@@ -556,5 +565,148 @@ describe('SurveyCalc — isSurveyStale (4.3)', () => {
     // elapsed = 101 - 0 = 101  →  101 > 100  →  stale
     const result = makeResult(0);
     expect(isSurveyStale(result, 101)).toBe(true);
+  });
+});
+
+// ── 4.6: runSurvey ────────────────────────────────────────────────────────────
+
+describe('SurveyCalc — runSurvey (4.6)', () => {
+  // ── Fixture helpers ──────────────────────────────────────────────────────────
+
+  // Create a fresh GameState pre-loaded with the given cash amount.
+  // Seed is fixed (42) for determinism across all 4.6 tests.
+  function makeState(cash: number): ReturnType<typeof createGame> {
+    return createGame({ seed: 42, startingCash: cash });
+  }
+
+  // Add one employee with a 'geology' skill qualification to the given state.
+  // Uses a fixed RNG seed (99) to keep name generation deterministic.
+  function addGeologySurveyor(state: ReturnType<typeof createGame>): void {
+    const rng = new Random(99);
+    const { employee } = hireEmployee(state.employees, 'surveyor', rng);
+    assignSkill(state.employees, employee.id, 'geology', 1);
+  }
+
+  // Reusable valid params; most tests override only what they need via spread.
+  const BASE_PARAMS: RunSurveyParams = { method: 'seismic', centerX: 10, centerZ: 20 };
+
+  // ── Insufficient funds ───────────────────────────────────────────────────────
+
+  it('returns { success: false, error: "insufficient_funds" } when cash < SURVEY_COSTS[method]', () => {
+    // State has one less dollar than the seismic survey costs (3000).
+    // A geology-qualified employee IS present so the funds check is isolated.
+    const state = makeState(SURVEY_COSTS.seismic - 1);
+    addGeologySurveyor(state);
+
+    const result = runSurvey(state, BASE_PARAMS);
+
+    expect(result).toEqual({ success: false, error: 'insufficient_funds' });
+  });
+
+  it('does not deduct cash when funds are insufficient', () => {
+    // Verify the guard returns before mutating state.cash.
+    const cashBefore = SURVEY_COSTS.seismic - 1;
+    const state = makeState(cashBefore);
+    addGeologySurveyor(state);
+
+    runSurvey(state, BASE_PARAMS);
+
+    expect(state.cash).toBe(cashBefore);
+  });
+
+  // ── No surveyor ──────────────────────────────────────────────────────────────
+
+  it('returns { success: false, error: "no_surveyor" } when no geology-qualified employee exists', () => {
+    // State has ample cash (funds check passes) but zero employees.
+    const state = makeState(SURVEY_COSTS.seismic + 5000);
+
+    const result = runSurvey(state, BASE_PARAMS);
+
+    expect(result).toEqual({ success: false, error: 'no_surveyor' });
+  });
+
+  it('does not deduct cash when no surveyor is available', () => {
+    // Guard must bail out before touching state.cash when surveyor is missing.
+    const cashBefore = SURVEY_COSTS.seismic + 5000;
+    const state = makeState(cashBefore);
+
+    runSurvey(state, BASE_PARAMS);
+
+    expect(state.cash).toBe(cashBefore);
+  });
+
+  // ── Success path ─────────────────────────────────────────────────────────────
+
+  it('returns { success: true } when funds and surveyor are both available', () => {
+    const state = makeState(SURVEY_COSTS.seismic + 5000);
+    addGeologySurveyor(state);
+
+    const result = runSurvey(state, BASE_PARAMS);
+
+    expect(result.success).toBe(true);
+    expect(result.error).toBeUndefined();
+  });
+
+  it('deducts SURVEY_COSTS[method] from state.cash on success', () => {
+    // Uses core_sample (800) to confirm the cost is method-specific.
+    const startCash = SURVEY_COSTS.core_sample + 1000;
+    const state = makeState(startCash);
+    addGeologySurveyor(state);
+
+    runSurvey(state, { method: 'core_sample', centerX: 5, centerZ: 5 });
+
+    expect(state.cash).toBe(startCash - SURVEY_COSTS.core_sample);
+  });
+
+  // ── Pending action enqueue ───────────────────────────────────────────────────
+
+  it("enqueues a PendingAction with type 'survey' and requiredSkill 'geology'", () => {
+    const state = makeState(SURVEY_COSTS.seismic + 5000);
+    addGeologySurveyor(state);
+
+    runSurvey(state, BASE_PARAMS);
+
+    expect(state.pendingActions).toHaveLength(1);
+    const action = state.pendingActions[0]!;
+    expect(action.type).toBe('survey');
+    expect(action.requiredSkill).toBe('geology');
+  });
+
+  it('enqueued action payload contains correct centerX and centerZ', () => {
+    // Uses aerial + non-default coordinates to verify payload is not hard-coded.
+    const state = makeState(SURVEY_COSTS.aerial + 5000);
+    addGeologySurveyor(state);
+    const params: RunSurveyParams = { method: 'aerial', centerX: 15, centerZ: 30 };
+
+    runSurvey(state, params);
+
+    const action = state.pendingActions[0]!;
+    expect(action.payload).toMatchObject({ method: 'aerial', centerX: 15, centerZ: 30 });
+  });
+
+  it('increments nextPendingActionId after enqueueing the action', () => {
+    // nextPendingActionId starts at 1 (createGame default); must become 2 after one call.
+    const state = makeState(SURVEY_COSTS.seismic + 5000);
+    addGeologySurveyor(state);
+    const idBefore = state.nextPendingActionId;
+
+    runSurvey(state, BASE_PARAMS);
+
+    expect(state.nextPendingActionId).toBe(idBefore + 1);
+  });
+
+  // ── Ghost preview ────────────────────────────────────────────────────────────
+
+  it('adds a ghost preview entry whose id matches the enqueued PendingAction id', () => {
+    // Ghost previews drive renderer overlays — id linkage to PendingAction is mandatory.
+    const state = makeState(SURVEY_COSTS.seismic + 5000);
+    addGeologySurveyor(state);
+
+    runSurvey(state, BASE_PARAMS);
+
+    expect(state.ghostPreviews).toHaveLength(1);
+    const preview = state.ghostPreviews[0]!;
+    expect(preview.type).toBe('survey');
+    expect(preview.id).toBe(state.pendingActions[0]!.id);
   });
 });
