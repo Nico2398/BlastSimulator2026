@@ -232,3 +232,21 @@ export const QUALIFICATION_SALARY_BONUS: Record<1 | 2 | 3 | 4 | 5, number> = {
   4: 350,
   5: 500,
 } as const;
+
+// ─── Employee Needs ────────────────────────────────────────────────────────────
+
+/** Drain rates per tick for each need gauge. */
+export const NEED_DRAIN_RATES = {
+  hunger:  { working: 1,   idle: 0.5  },
+  fatigue: { working: 2,   idle: 0.5  },
+  social:  { working: 1,   idle: 1    },
+  comfort: { working: 0.3, idle: 0.3  },
+} as const;
+
+/** Threshold values for productivity/morale effects. */
+export const NEED_THRESHOLDS = {
+  hunger:  { low: 30, critical: 10 },
+  fatigue: { low: 40, critical: 15 },
+  social:  { low: 20 },
+  comfort: { low: 30 },
+} as const;

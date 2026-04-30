@@ -80,6 +80,10 @@ export interface Employee {
   trainingState: TrainingState | null;
   /** ID of the PendingAction currently claimed by this employee, or null if idle. */
   activeActionId: number | null;
+  hunger: number;  // 0-100
+  fatigue: number; // 0-100
+  social: number;  // 0-100
+  comfort: number; // 0-100
 }
 
 // ── Employee state ──
@@ -123,6 +127,10 @@ export function hireEmployee(
     qualifications: [],
     trainingState: null,
     activeActionId: null,
+    hunger: 100,
+    fatigue: 100,
+    social: 100,
+    comfort: 100,
   };
   state.employees.push(employee);
   return { employee, hiringCost: HIRING_COSTS[role] };
@@ -288,4 +296,5 @@ export function tickTraining(state: EmployeeState): void {
 
 export type { GainXpResult } from './EmployeeGainXp.js';
 export { gainXp } from './EmployeeGainXp.js';
-
+export type { NeedKey } from './EmployeeNeeds.js';
+export { tickNeeds, getNeedMultiplier, tickNeedMorale, replenishNeed } from './EmployeeNeeds.js';
