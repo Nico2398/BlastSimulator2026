@@ -2,6 +2,13 @@
 
 import { VoxelGrid } from '../world/VoxelGrid.js';
 import { Random } from '../math/Random.js';
+import {
+  SURVEY_BASE_ERROR,
+  SURVEY_COVERAGE_RADIUS,
+  SURVEY_SKILL_BONUS_PER_LEVEL,
+  SURVEY_SEISMIC_GROUP_SIZE,
+  SURVEY_ESTIMATE_STEP,
+} from '../config/balance.js';
 
 /** The three supported methods for surveying a mining site. */
 export type SurveyMethod = 'seismic' | 'core_sample' | 'aerial';
@@ -36,31 +43,6 @@ export interface SurveyResult {
   confidence: number;
 }
 
-// ── Method-specific constants ─────────────────────────────────────────────────
-
-/** Baseline noise (std-dev) applied to estimates before skill adjustment. */
-const BASE_ERROR: Record<SurveyMethod, number> = {
-  seismic: 0.15,
-  core_sample: 0.05,
-  aerial: 0.25,
-};
-
-/** Disc radius (in grid cells) around the survey centre that each method covers. */
-const COVERAGE_RADIUS: Record<SurveyMethod, number> = {
-  seismic: 20,
-  core_sample: 0,
-  aerial: 30,
-};
-
-/** Error reduction applied per skill level above 1. */
-const SKILL_BONUS_PER_LEVEL = 0.12;
-
-/** Number of Y-levels grouped together in a single seismic reading. */
-const SEISMIC_GROUP_SIZE = 3;
-
-/** Ore estimate resolution expressed as a step size (rounds to nearest 0.05). */
-const ESTIMATE_STEP = 0.05;
-
 /** Parameters required to compute a noisy survey estimate from a VoxelGrid. */
 export interface EstimateSurveyParams {
   id: number;
@@ -79,9 +61,9 @@ function clamp(val: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, val));
 }
 
-/** Round a value to the nearest ESTIMATE_STEP (0.05). */
+/** Round a value to the nearest SURVEY_ESTIMATE_STEP (0.05). */
 function roundToEstimateStep(val: number): number {
-  return Math.round(val / ESTIMATE_STEP) * ESTIMATE_STEP;
+  return Math.round(val / SURVEY_ESTIMATE_STEP) * SURVEY_ESTIMATE_STEP;
 }
 
 /** Scan top→bottom to find the first solid voxel; return y+1, or 0 if all empty. */
@@ -116,7 +98,7 @@ function averageSolidOreDensity(
 
 /**
  * Seismic density estimate: split `yLevels` into consecutive groups of
- * SEISMIC_GROUP_SIZE, average solid voxels within each group, then average
+ * SURVEY_SEISMIC_GROUP_SIZE, average solid voxels within each group, then average
  * the group averages. Returns `undefined` if no solid voxels are found.
  */
 function computeSeismicOreDensity(
@@ -127,8 +109,8 @@ function computeSeismicOreDensity(
   oreId: string,
 ): number | undefined {
   const groupAvgs: number[] = [];
-  for (let i = 0; i < yLevels.length; i += SEISMIC_GROUP_SIZE) {
-    const avg = averageSolidOreDensity(grid, x, z, yLevels.slice(i, i + SEISMIC_GROUP_SIZE), oreId);
+  for (let i = 0; i < yLevels.length; i += SURVEY_SEISMIC_GROUP_SIZE) {
+    const avg = averageSolidOreDensity(grid, x, z, yLevels.slice(i, i + SURVEY_SEISMIC_GROUP_SIZE), oreId);
     if (avg !== undefined) groupAvgs.push(avg);
   }
   return groupAvgs.length > 0
@@ -152,11 +134,11 @@ export function estimateSurveyResult(
 ): SurveyResult {
   const { id, method, centerX, centerZ, surveyorId, skillLevel, completedTick } = params;
 
-  const skillBonus = (skillLevel - 1) * SKILL_BONUS_PER_LEVEL;
-  const finalError = BASE_ERROR[method] * (1 - skillBonus);
+  const skillBonus = (skillLevel - 1) * SURVEY_SKILL_BONUS_PER_LEVEL;
+  const finalError = SURVEY_BASE_ERROR[method] * (1 - skillBonus);
   const confidence = clamp(1 - finalError, 0, 1);
 
-  const radius = COVERAGE_RADIUS[method];
+  const radius = SURVEY_COVERAGE_RADIUS[method];
   const estimates: Record<string, Record<string, number>> = {};
 
   const xMin = Math.max(0, Math.floor(centerX - radius));
