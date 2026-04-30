@@ -17,6 +17,8 @@ import { FragmentMesh } from './FragmentMesh.js';
 import { BlastEffects } from './BlastEffects.js';
 import { DistantScenery } from './DistantScenery.js';
 import { BlastPlanOverlay } from './BlastPlanOverlay.js';
+import { GhostMesh } from './GhostMesh.js';
+import { syncEntitySets } from './EntitySync.js';
 
 export class GameRenderer {
   private readonly sm: SceneManager;
@@ -30,6 +32,7 @@ export class GameRenderer {
   private blastEffects: BlastEffects | null = null;
   private scenery: DistantScenery | null = null;
   private blastOverlay: BlastPlanOverlay | null = null;
+  private ghosts: GhostMesh | null = null;
   private lastGrid: VoxelGrid | null = null;
 
   /** Seed of the currently loaded game — used to detect new_game calls. */
@@ -61,61 +64,16 @@ export class GameRenderer {
     this.lastState = ctx.state;
 
     // Sync entities added since last call
-    this.syncEntities(ctx.state);
+    syncEntitySets(ctx.state, this.buildings, this.renderedBuildingIds, this.vehicles, this.renderedVehicleIds, this.characters, this.renderedEmployeeIds);
+
+    // Sync ghost previews for pending actions
+    if (this.ghosts) {
+      this.ghosts.sync(ctx.state.ghostPreviews);
+    }
 
     // Sync weather
     if (this.skybox && ctx.weatherCycle) {
       this.skybox.setWeather(ctx.weatherCycle.current);
-    }
-  }
-
-  private syncEntities(state: GameState): void {
-    if (this.buildings) {
-      for (const b of state.buildings.buildings) {
-        if (!this.renderedBuildingIds.has(b.id)) {
-          this.buildings.addBuilding(b);
-          this.renderedBuildingIds.add(b.id);
-        } else {
-          this.buildings.updateBuilding(b);
-        }
-      }
-      // Remove destroyed buildings
-      for (const id of [...this.renderedBuildingIds]) {
-        if (!state.buildings.buildings.find(b => b.id === id)) {
-          this.buildings.removeBuilding(id);
-          this.renderedBuildingIds.delete(id);
-        }
-      }
-    }
-
-    if (this.vehicles) {
-      for (const v of state.vehicles.vehicles) {
-        if (!this.renderedVehicleIds.has(v.id)) {
-          this.vehicles.addVehicle(v);
-          this.renderedVehicleIds.add(v.id);
-        }
-      }
-      for (const id of [...this.renderedVehicleIds]) {
-        if (!state.vehicles.vehicles.find(v => v.id === id)) {
-          this.vehicles.removeVehicle(id);
-          this.renderedVehicleIds.delete(id);
-        }
-      }
-    }
-
-    if (this.characters) {
-      for (const e of state.employees.employees) {
-        if (!this.renderedEmployeeIds.has(e.id)) {
-          this.characters.addEmployee(e);
-          this.renderedEmployeeIds.add(e.id);
-        }
-      }
-      for (const id of [...this.renderedEmployeeIds]) {
-        if (!state.employees.employees.find(e => e.id === id)) {
-          this.characters.removeEmployee(id);
-          this.renderedEmployeeIds.delete(id);
-        }
-      }
     }
   }
 
@@ -137,6 +95,10 @@ export class GameRenderer {
 
     if (this.vehicles && this.lastState) {
       this.vehicles.update(this.lastState.vehicles.vehicles);
+    }
+
+    if (this.ghosts) {
+      this.ghosts.update(dt);
     }
   }
 
@@ -279,6 +241,9 @@ export class GameRenderer {
     // Blast plan overlay (hidden until shown)
     this.blastOverlay = new BlastPlanOverlay(scene);
 
+    // Ghost previews (initially empty)
+    this.ghosts = new GhostMesh(scene);
+
     // Point camera at terrain centre
     cameraController.setTarget(grid.sizeX / 2, 0, grid.sizeZ / 2);
   }
@@ -293,6 +258,7 @@ export class GameRenderer {
     this.blastEffects?.dispose();
     this.scenery?.clear();
     this.blastOverlay?.dispose();
+    this.ghosts?.dispose();
 
     this.terrain = null;
     this.buildings = null;
@@ -303,6 +269,7 @@ export class GameRenderer {
     this.blastEffects = null;
     this.scenery = null;
     this.blastOverlay = null;
+    this.ghosts = null;
     this.lastGrid = null;
 
     this.renderedBuildingIds.clear();
