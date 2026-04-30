@@ -633,7 +633,7 @@
       "src/core/mining/SurveyCalc.ts"
     ],
     "testFile": "tests/unit/mining/SurveyCalc.test.ts",
-    "status": "in-progress",
+    "status": "done",
     "blockedBy": [
       "4.1"
     ],
@@ -689,7 +689,7 @@
       "src/core/mining/SurveyCalc.ts"
     ],
     "testFile": "tests/unit/mining/SurveyCalc.test.ts",
-    "status": "pending",
+    "status": "in-progress",
     "blockedBy": [
       "4.1"
     ],
