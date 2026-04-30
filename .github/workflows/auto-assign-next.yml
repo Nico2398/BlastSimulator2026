@@ -45,7 +45,7 @@ jobs:
               // Calling the API explicitly was redundant and caused double-close race conditions.
               // This workflow only manages labels and pipeline state (backlog + next assignment).
 
-              await github.rest.issues.addLabels({ owner, repo, issue_number: n, labels: ['done'] });
+              await github.rest.issues.addLabels({ owner, repo, issue_number: n, labels: ['done'] }).catch(() => {});
               await github.rest.issues.removeLabel({ owner, repo, issue_number: n, name: 'in-progress' }).catch(() => {});
             }
 
