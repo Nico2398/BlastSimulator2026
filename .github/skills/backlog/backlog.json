@@ -558,7 +558,7 @@
       "src/core/entities/Employee.ts"
     ],
     "testFile": "tests/unit/entities/Employee.test.ts",
-    "status": "in-progress",
+    "status": "pending",
     "blockedBy": [
       "3.3",
       "3.10"
@@ -607,7 +607,7 @@
       "src/core/mining/SurveyCalc.ts"
     ],
     "testFile": "tests/unit/mining/SurveyCalc.test.ts",
-    "status": "pending",
+    "status": "in-progress",
     "blockedBy": [],
     "closedInPR": null
   },
