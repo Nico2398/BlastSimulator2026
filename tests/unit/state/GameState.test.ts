@@ -283,7 +283,6 @@ describe('claimPendingAction (task 3.8)', () => {
     expect(ghosts.map(g => g.id)).toContain(101);
   });
 });
-
 // =============================================================================
 // Task 4.4 — surveyResults and nextSurveyId fields in GameState
 // =============================================================================
