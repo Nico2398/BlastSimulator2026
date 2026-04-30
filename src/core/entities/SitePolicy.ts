@@ -21,7 +21,7 @@ export interface SitePolicy {
 export function createSitePolicy(mode: ShiftMode = 'shift_8h'): SitePolicy {
   return {
     shiftMode: mode,
-    hungerRestThreshold:  SITE_POLICY_DEFAULT_THRESHOLDS.hungerRest,
+    hungerRestThreshold: SITE_POLICY_DEFAULT_THRESHOLDS.hungerRest,
     fatigueRestThreshold: SITE_POLICY_DEFAULT_THRESHOLDS.fatigueRest,
     socialBreakThreshold: SITE_POLICY_DEFAULT_THRESHOLDS.socialBreak,
     customThresholds: {},
