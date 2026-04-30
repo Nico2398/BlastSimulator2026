@@ -85,8 +85,8 @@ export interface PendingAction {
   targetZ: number;
   targetY: number;
   payload: Record<string, unknown>;
-  /** If set, only this employee may claim the action. null/undefined = any qualified employee. */
-  targetEmployeeId?: number | null;
+  /** If set, only this employee may claim the action. null = any qualified employee. */
+  targetEmployeeId: number | null;
 }
 
 /**

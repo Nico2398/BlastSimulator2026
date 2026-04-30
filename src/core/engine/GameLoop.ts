@@ -205,7 +205,7 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
     }
 
     // Find an idle match, optionally restricted to a specific employee.
-    const idleMatch = action.targetEmployeeId != null
+    const idleMatch = action.targetEmployeeId !== null
       ? allWithSkill.find(emp => emp.id === action.targetEmployeeId && emp.activeActionId === null)
       : allWithSkill.find(emp => emp.activeActionId === null);
 
