@@ -2,7 +2,7 @@
 // Tracks four need gauges: hunger, fatigue, social, and comfort (all 0–100).
 
 import { type Employee } from './Employee.js';
-import { NEED_DRAIN_RATES, NEED_THRESHOLDS } from '../config/balance.js';
+import { NEED_DRAIN_RATES, NEED_THRESHOLDS, NEED_PRODUCTIVITY_MULTIPLIERS, NEED_MORALE_PENALTIES } from '../config/balance.js';
 
 /** The four need gauges tracked on every Employee. */
 export type NeedKey = 'hunger' | 'fatigue' | 'social' | 'comfort';
@@ -36,11 +36,11 @@ export function tickNeeds(employee: Employee, isWorking: boolean): void {
  * Social and comfort do not affect productivity (they affect morale — see tickNeedMorale).
  */
 export function getNeedMultiplier(employee: Employee): number {
-  const hungerMult  = employee.hunger  < NEED_THRESHOLDS.hunger.critical  ? 0.60
-                    : employee.hunger  < NEED_THRESHOLDS.hunger.low        ? 0.80
+  const hungerMult  = employee.hunger  < NEED_THRESHOLDS.hunger.critical  ? NEED_PRODUCTIVITY_MULTIPLIERS.hunger.critical
+                    : employee.hunger  < NEED_THRESHOLDS.hunger.low        ? NEED_PRODUCTIVITY_MULTIPLIERS.hunger.low
                     : 1.0;
-  const fatigueMult = employee.fatigue < NEED_THRESHOLDS.fatigue.critical ? 0.50
-                    : employee.fatigue < NEED_THRESHOLDS.fatigue.low       ? 0.75
+  const fatigueMult = employee.fatigue < NEED_THRESHOLDS.fatigue.critical ? NEED_PRODUCTIVITY_MULTIPLIERS.fatigue.critical
+                    : employee.fatigue < NEED_THRESHOLDS.fatigue.low       ? NEED_PRODUCTIVITY_MULTIPLIERS.fatigue.low
                     : 1.0;
   return hungerMult * fatigueMult;
 }
@@ -56,8 +56,8 @@ export function getNeedMultiplier(employee: Employee): number {
  */
 export function tickNeedMorale(employee: Employee): number {
   let delta = 0;
-  if (employee.social  < NEED_THRESHOLDS.social.low)  delta -= 2;
-  if (employee.comfort < NEED_THRESHOLDS.comfort.low) delta -= 1;
+  if (employee.social  < NEED_THRESHOLDS.social.low)  delta += NEED_MORALE_PENALTIES.social;
+  if (employee.comfort < NEED_THRESHOLDS.comfort.low) delta += NEED_MORALE_PENALTIES.comfort;
   return delta;
 }
 

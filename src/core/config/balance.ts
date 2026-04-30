@@ -250,3 +250,21 @@ export const NEED_THRESHOLDS = {
   social:  { low: 20 },
   comfort: { low: 30 },
 } as const;
+
+/**
+ * Productivity multipliers applied when a need gauge falls below a threshold.
+ * `low` = uncomfortable but functioning; `critical` = severe impairment.
+ * Multipliers are applied to the base effectiveness value.
+ */
+export const NEED_PRODUCTIVITY_MULTIPLIERS = {
+  hunger:  { low: 0.80, critical: 0.60 },
+  fatigue: { low: 0.75, critical: 0.50 },
+} as const;
+
+/**
+ * Morale penalty (per tick) applied when a social or comfort gauge falls below its threshold.
+ */
+export const NEED_MORALE_PENALTIES = {
+  social:  -2,
+  comfort: -1,
+} as const;
