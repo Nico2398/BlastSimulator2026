@@ -4,6 +4,7 @@
 
 import type { GameState, PendingAction } from '../state/GameState.js';
 import type { Vehicle } from '../entities/Vehicle.js';
+import type { Building } from '../entities/Building.js';
 import type { Random } from '../math/Random.js';
 import type { EventContext } from '../events/EventPool.js';
 import { tickEventSystem, type FiredEvent } from '../events/EventSystem.js';
@@ -11,7 +12,7 @@ import { detectTrafficJam } from '../events/EventEngine.js';
 
 // ── Config ──
 
-import { BASE_TICK_MS as _BASE_TICK_MS, VALID_SPEEDS as _VALID_SPEEDS } from '../config/balance.js';
+import { BASE_TICK_MS as _BASE_TICK_MS, VALID_SPEEDS as _VALID_SPEEDS, NEED_RESTORATION_THRESHOLDS } from '../config/balance.js';
 
 /** Milliseconds per base tick at 1x speed. */
 export const BASE_TICK_MS = _BASE_TICK_MS;
@@ -116,10 +117,7 @@ export function isValidSpeed(speed: number): speed is SpeedMultiplier {
   return VALID_SPEEDS.includes(speed as SpeedMultiplier);
 }
 
-/**
- * Process one vehicle movement step.
- * Moves at most one grid cell toward target and waits if the next cell is occupied.
- */
+/** Process one vehicle movement step; advances at most one grid cell per tick, waits if the next cell is occupied. */
 export function tickVehicle(state: GameState, vehicle: Vehicle): void {
   if (!canTickVehicle(vehicle)) return;
 
@@ -158,9 +156,9 @@ export function tickVehicle(state: GameState, vehicle: Vehicle): void {
 }
 
 function canTickVehicle(vehicle: Vehicle): boolean {
-  if (vehicle.task !== 'moving') return false;
-  // moveVehicle() sets task='moving' and target but may leave state='idle' until first tick.
-  return vehicle.state === 'idle' || vehicle.state === 'moving' || vehicle.state === 'waiting';
+  // moveVehicle() sets task='moving'; vehicle state may still be 'idle' on the very first tick.
+  return vehicle.task === 'moving' &&
+    (vehicle.state === 'idle' || vehicle.state === 'moving' || vehicle.state === 'waiting');
 }
 
 function setVehicleIdle(vehicle: Vehicle): void {
@@ -190,9 +188,15 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
   const remaining: PendingAction[] = [];
 
   for (const action of state.pendingActions) {
-    const allWithSkill = state.employees.employees.filter(
-      emp => emp.alive && emp.qualifications.some(q => q.category === action.requiredSkill),
+    // Base eligibility: alive, not injured, not in training.
+    const eligible = state.employees.employees.filter(
+      emp => emp.alive && !emp.injured && emp.trainingState === null,
     );
+
+    // Determine the pool of employees who could ever do this action.
+    const allWithSkill = action.requiredSkill !== null
+      ? eligible.filter(emp => emp.qualifications.some(q => q.category === action.requiredSkill))
+      : eligible;
 
     if (allWithSkill.length === 0) {
       result.unqualified.push(action.id);
@@ -200,9 +204,10 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
       continue;
     }
 
-    const idleMatch = allWithSkill.find(
-      emp => !emp.injured && emp.trainingState === null && emp.activeActionId === null,
-    );
+    // Find an idle match, optionally restricted to a specific employee.
+    const idleMatch = action.targetEmployeeId !== null
+      ? allWithSkill.find(emp => emp.id === action.targetEmployeeId && emp.activeActionId === null)
+      : allWithSkill.find(emp => emp.activeActionId === null);
 
     if (!idleMatch) {
       result.waiting.push(action.id);
@@ -217,4 +222,75 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
 
   state.pendingActions = remaining;
   return result;
+}
+
+// ── Need restoration routing ──
+
+export interface NeedRestorationResult {
+  /** Employee IDs that were routed to a rest action. */
+  routed: number[];
+  /** Employee IDs that need rest but no living_quarters building was available. */
+  noBuilding: number[];
+}
+
+/**
+ * Auto-routes idle employees to the nearest active living_quarters building
+ * when hunger or fatigue drops below its warning threshold.
+ * Busy (activeActionId set), injured, and dead employees are skipped;
+ * unreachable employees (no living_quarters available) are recorded in result.noBuilding.
+ */
+export function tickNeedRestoration(state: GameState): NeedRestorationResult {
+  const result: NeedRestorationResult = { routed: [], noBuilding: [] };
+
+  for (const emp of state.employees.employees) {
+    if (!emp.alive || emp.injured || emp.activeActionId !== null) continue;
+    const needsRest =
+      emp.hunger  < NEED_RESTORATION_THRESHOLDS.hunger ||
+      emp.fatigue < NEED_RESTORATION_THRESHOLDS.fatigue;
+
+    if (!needsRest) continue;
+
+    const building = findNearestLivingQuarters(state, emp.x, emp.z);
+    if (!building) {
+      result.noBuilding.push(emp.id);
+      continue;
+    }
+
+    const actionId = state.nextPendingActionId++;
+    const restAction: PendingAction = {
+      id: actionId,
+      type: 'rest',
+      requiredSkill: null,
+      requiredVehicleRole: null,
+      targetX: building.x,
+      targetZ: building.z,
+      targetY: 0,
+      payload: { buildingId: building.id },
+      targetEmployeeId: emp.id,
+    };
+
+    state.pendingActions.push(restAction);
+    emp.activeActionId = actionId;
+    result.routed.push(emp.id);
+  }
+
+  return result;
+}
+
+function findNearestLivingQuarters(
+  state: GameState,
+  empX: number,
+  empZ: number,
+): Building | null {
+  let nearest: Building | null = null;
+  let bestDistSq = Infinity;
+  for (const b of state.buildings.buildings) {
+    if (!b.active || b.type !== 'living_quarters') continue;
+    const distSq = (b.x - empX) ** 2 + (b.z - empZ) ** 2;
+    if (distSq < bestDistSq) {
+      bestDistSq = distSq;
+      nearest = b;
+    }
+  }
+  return nearest;
 }

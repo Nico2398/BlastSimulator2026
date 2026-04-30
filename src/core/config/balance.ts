@@ -268,3 +268,9 @@ export const NEED_MORALE_PENALTIES = {
   social:  -2,
   comfort: -1,
 } as const;
+
+/** Warning thresholds that trigger proactive rest routing. */
+export const NEED_RESTORATION_THRESHOLDS = {
+  hunger:  35,
+  fatigue: 25,
+} as const;
