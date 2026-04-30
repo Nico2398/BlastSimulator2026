@@ -298,3 +298,4 @@ export type { GainXpResult } from './EmployeeGainXp.js';
 export { gainXp } from './EmployeeGainXp.js';
 export type { NeedKey } from './EmployeeNeeds.js';
 export { tickNeeds, getNeedMultiplier, tickNeedMorale, replenishNeed } from './EmployeeNeeds.js';
+export { computeTaskDuration } from './EmployeeTaskDuration.js';

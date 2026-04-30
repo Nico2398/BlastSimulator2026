@@ -197,7 +197,7 @@ export const VEHICLE_BASE_STATS = {
 
 /**
  * Task-duration multipliers by proficiency level (1–5).
- * Applied as: ticksRequired = baseDuration / PROFICIENCY_MULTIPLIERS[level].
+ * Applied as: ticksRequired = ceil(baseDuration * PROFICIENCY_MULTIPLIERS[level] / productivityMultiplier).
  * Lower value = shorter task duration. Rookie (1) is the baseline (×1.00);
  * Master (5) completes tasks 2.5× faster (×0.40).
  */
