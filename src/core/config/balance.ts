@@ -274,3 +274,18 @@ export const NEED_RESTORATION_THRESHOLDS = {
   hunger:  35,
   fatigue: 25,
 } as const;
+
+// ─── Shift / Rest Scheduling ────────────────────────────────────────────────
+
+/** Shift duration in ticks for each policy mode. 1 tick = 1 game-hour. */
+export const SHIFT_DURATIONS_TICKS = {
+  shift_8h:  8,
+  shift_12h: 12,
+} as const;
+
+/** Default rest/break thresholds used by createSitePolicy(). All gauges are 0–100. */
+export const SITE_POLICY_DEFAULT_THRESHOLDS = {
+  hungerRest:  40,
+  fatigueRest: 25,
+  socialBreak: 20,
+} as const;

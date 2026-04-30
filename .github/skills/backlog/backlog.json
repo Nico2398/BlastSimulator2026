@@ -544,7 +544,7 @@
       "src/core/entities/SitePolicy.ts"
     ],
     "testFile": "tests/unit/entities/SitePolicy.test.ts",
-    "status": "pending",
+    "status": "in-progress",
     "blockedBy": [
       "3.10"
     ],
