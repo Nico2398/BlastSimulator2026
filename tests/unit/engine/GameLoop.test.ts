@@ -318,6 +318,7 @@ describe('tickEmployees — claim logic (Task 3.6)', () => {
       targetZ: 0,
       targetY: 0,
       payload: {},
+      targetEmployeeId: null,
       ...overrides,
     };
   }
@@ -495,28 +496,9 @@ describe('tickEmployees — claim logic (Task 3.6)', () => {
 // Tests cover the auto-routing of employees whose need gauges (hunger < 35 OR
 // fatigue < 25) drop below warning thresholds to the nearest active
 // living_quarters building via a `rest` PendingAction.
-//
-// These tests are in the RED phase: tickNeedRestoration does not exist yet.
-// They are expected to FAIL until the implementation is provided.
-//
-// Required additions to the production code before these can go green:
-//   • GameLoop.ts   — export tickNeedRestoration(state): NeedRestorationResult
-//   • GameState.ts  — ActionType includes 'rest'; PendingAction gains
-//                     targetEmployeeId: number | null and requiredSkill: SkillCategory | null;
-//                     GameState gains nextPendingActionId: number
-//   • balance.ts    — export NEED_RESTORATION_THRESHOLDS = { hunger: 35, fatigue: 25 }
 
 describe('tickNeedRestoration (Task 3.11)', () => {
   const SEED = 42;
-
-  // ── Shared result type (mirrors NeedRestorationResult to be added to GameLoop) ──
-  type NeedRestorationResult = { routed: number[]; noBuilding: number[] };
-
-  // Casts tickNeedRestoration to any so the test file remains parseable while
-  // the export does not exist. Tests will fail at runtime with
-  // "tickNeedRestoration is not a function" — the correct Red phase failure.
-  const callTickNeedRestoration = (tickNeedRestoration as unknown as
-    (state: ReturnType<typeof createGame>) => NeedRestorationResult);
 
   // ── Test 1 ──────────────────────────────────────────────────────────────────
   it('routes a hungry employee (hunger < 35) to rest when a living_quarters is active', () => {
@@ -531,7 +513,7 @@ describe('tickNeedRestoration (Task 3.11)', () => {
     // Place one active living_quarters on the grid.
     placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100);
 
-    const result = callTickNeedRestoration(state);
+    const result = tickNeedRestoration(state);
 
     // Employee must be added to the routed list.
     expect(result.routed).toContain(employee.id);
@@ -541,7 +523,7 @@ describe('tickNeedRestoration (Task 3.11)', () => {
 
     // A rest action targeting this employee must exist in pendingActions.
     const restAction = state.pendingActions.find(
-      (a: any) => a.type === 'rest' && a.targetEmployeeId === employee.id,
+      (a: PendingAction) => a.type === 'rest' && a.targetEmployeeId === employee.id,
     );
     expect(restAction).toBeDefined();
   });
@@ -558,13 +540,13 @@ describe('tickNeedRestoration (Task 3.11)', () => {
 
     placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100);
 
-    const result = callTickNeedRestoration(state);
+    const result = tickNeedRestoration(state);
 
     expect(result.routed).toContain(employee.id);
     expect(employee.activeActionId).not.toBeNull();
 
     const restAction = state.pendingActions.find(
-      (a: any) => a.type === 'rest' && a.targetEmployeeId === employee.id,
+      (a: PendingAction) => a.type === 'rest' && a.targetEmployeeId === employee.id,
     );
     expect(restAction).toBeDefined();
   });
@@ -581,9 +563,7 @@ describe('tickNeedRestoration (Task 3.11)', () => {
 
     placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100);
 
-    const result = callTickNeedRestoration(state);
-
-    // No routing should occur.
+    const result = tickNeedRestoration(state);
     expect(result.routed).toHaveLength(0);
     expect(employee.activeActionId).toBeNull();
   });
@@ -600,7 +580,7 @@ describe('tickNeedRestoration (Task 3.11)', () => {
 
     placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100);
 
-    const result = callTickNeedRestoration(state);
+    const result = tickNeedRestoration(state);
 
     // Busy employees must be skipped entirely.
     expect(result.routed).toHaveLength(0);
@@ -617,7 +597,7 @@ describe('tickNeedRestoration (Task 3.11)', () => {
     employee.hunger = 20; // below hunger threshold of 35
     // No buildings placed — living_quarters is absent.
 
-    const result = callTickNeedRestoration(state);
+    const result = tickNeedRestoration(state);
 
     // With no available building, the employee cannot be routed.
     expect(result.noBuilding).toContain(employee.id);
@@ -642,7 +622,7 @@ describe('tickNeedRestoration (Task 3.11)', () => {
     employee.activeActionId = REST_ACTION_ID;
 
     // A new blast work action is now pending.
-    const workAction: any = {
+    const workAction: PendingAction = {
       id: 600,
       type: 'drill_hole',
       requiredSkill: 'blasting',
@@ -651,6 +631,7 @@ describe('tickNeedRestoration (Task 3.11)', () => {
       targetZ: 5,
       targetY: 0,
       payload: {},
+      targetEmployeeId: null,
     };
     state.pendingActions.push(workAction);
 
@@ -691,16 +672,16 @@ describe('tickNeedRestoration (Task 3.11)', () => {
     const farResult = placeBuilding(state.buildings, 'living_quarters', 50, 50, 100, 100);
     expect(farResult.success).toBe(true); // guard: placement must succeed
 
-    callTickNeedRestoration(state);
+    tickNeedRestoration(state);
 
     // The created rest action must target the nearer building, not the far one.
-    const restAction = state.pendingActions.find((a: any) => a.type === 'rest');
+    const restAction = state.pendingActions.find((a: PendingAction) => a.type === 'rest');
     expect(restAction).toBeDefined();
 
     // targetX and targetZ must correspond to the near building's location (x=5, z=0),
     // not the far building's location (x=50, z=50).
-    expect((restAction as any).targetX).toBe(nearResult.building!.x);
-    expect((restAction as any).targetZ).toBe(nearResult.building!.z);
-    expect((restAction as any).targetX).not.toBe(farResult.building!.x);
+    expect(restAction!.targetX).toBe(nearResult.building!.x);
+    expect(restAction!.targetZ).toBe(nearResult.building!.z);
+    expect(restAction!.targetX).not.toBe(farResult.building!.x);
   });
 });

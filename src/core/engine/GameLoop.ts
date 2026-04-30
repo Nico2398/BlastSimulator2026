@@ -188,14 +188,15 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
   const remaining: PendingAction[] = [];
 
   for (const action of state.pendingActions) {
+    // Base eligibility: alive, not injured, not in training.
+    const eligible = state.employees.employees.filter(
+      emp => emp.alive && !emp.injured && emp.trainingState === null,
+    );
+
     // Determine the pool of employees who could ever do this action.
     const allWithSkill = action.requiredSkill !== null
-      ? state.employees.employees.filter(
-          emp => emp.alive && emp.qualifications.some(q => q.category === action.requiredSkill),
-        )
-      : state.employees.employees.filter(
-          emp => emp.alive && !emp.injured && emp.trainingState === null,
-        );
+      ? eligible.filter(emp => emp.qualifications.some(q => q.category === action.requiredSkill))
+      : eligible;
 
     if (allWithSkill.length === 0) {
       result.unqualified.push(action.id);
@@ -205,13 +206,8 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
 
     // Find an idle match, optionally restricted to a specific employee.
     const idleMatch = action.targetEmployeeId != null
-      ? allWithSkill.find(
-          emp => emp.id === action.targetEmployeeId &&
-                 !emp.injured && emp.trainingState === null && emp.activeActionId === null,
-        )
-      : allWithSkill.find(
-          emp => !emp.injured && emp.trainingState === null && emp.activeActionId === null,
-        );
+      ? allWithSkill.find(emp => emp.id === action.targetEmployeeId && emp.activeActionId === null)
+      : allWithSkill.find(emp => emp.activeActionId === null);
 
     if (!idleMatch) {
       result.waiting.push(action.id);
