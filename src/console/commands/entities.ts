@@ -16,11 +16,18 @@ import {
   hireEmployee,
   giveRaise,
   fireEmployee,
+  assignSkill,
   type EmployeeRole,
+  type SkillCategory,
 } from '../../core/entities/Employee.js';
 import { addExpense } from '../../core/economy/Finance.js';
 import { Random } from '../../core/math/Random.js';
 import { defineZone, clearZone, isZoneClear, type ZoneBounds } from '../../core/entities/Zone.js';
+
+const VALID_SKILL_CATEGORIES: SkillCategory[] = [
+  'driving.truck', 'driving.excavator', 'driving.drill_rig',
+  'blasting', 'management', 'geology',
+];
 
 function requireGame(ctx: GameContext): CommandResult | null {
   if (!ctx.state) return { success: false, output: 'No game loaded. Use new_game first.' };
@@ -186,8 +193,25 @@ export function employeeCommand(
       if (!result.success) return { success: false, output: result.error! };
       return { success: true, output: `Employee #${id} fired.` };
     }
+    case 'assign_skill': {
+      const id = parseInt(args[1] ?? '', 10);
+      const skillRaw = named['skill'] ?? '';
+      const levelRaw = named['level'] ?? '';
+      const level = parseInt(levelRaw, 10);
+      const usageMsg = 'Usage: employee assign_skill <id> skill:<category> level:1-5';
+
+      if (isNaN(id)) return { success: false, output: usageMsg };
+      if (!VALID_SKILL_CATEGORIES.includes(skillRaw as SkillCategory)) return { success: false, output: usageMsg };
+      if (isNaN(level) || level < 1 || level > 5) return { success: false, output: usageMsg };
+
+      const emp = state.employees.employees.find(e => e.id === id);
+      if (!emp) return { success: false, output: `Employee #${id} not found.` };
+
+      assignSkill(state.employees, id, skillRaw as SkillCategory, level as 1 | 2 | 3 | 4 | 5);
+      return { success: true, output: `Employee #${id} assigned skill: ${skillRaw} (level ${level}).` };
+    }
     default:
-      return { success: false, output: 'Usage: employee (list|hire|raise|fire)' };
+      return { success: false, output: 'Usage: employee (list|hire|raise|fire|assign_skill)' };
   }
 }
 

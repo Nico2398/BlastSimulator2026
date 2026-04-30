@@ -34,6 +34,7 @@ import {
   scoresCommand,
   zoneCommand,
 } from './commands/entities.js';
+import { setPolicyCommand } from './commands/policy.js';
 import { vehicleCommand } from './commands/vehicle.js';
 import {
   tickCommand,
@@ -141,7 +142,7 @@ export function createRunner(): RunnerWithContext {
   runner.register('vehicle', 'Manage vehicles (list|buy|assign|move)', (args, named) =>
     vehicleCommand(ctx, args, named),
   );
-  runner.register('employee', 'Manage employees (list|hire|raise|fire)', (args, named) =>
+  runner.register('employee', 'Manage employees (list|hire|raise|fire|assign_skill)', (args, named) =>
     employeeCommand(ctx, args, named),
   );
   runner.register('scores', 'Show all four scores', (args, named) =>
@@ -149,6 +150,9 @@ export function createRunner(): RunnerWithContext {
   );
   runner.register('zone', 'Safety zones (clear|status)', (args, named) =>
     zoneCommand(ctx, args, named),
+  );
+  runner.register('set_policy', 'Set site policy (mode:shift_8h|shift_12h|continuous|custom [hunger:N] [fatigue:N] [social:N])', (args, named) =>
+    setPolicyCommand(ctx, args, named),
   );
 
   // --- Event commands (Phase 6) ---
