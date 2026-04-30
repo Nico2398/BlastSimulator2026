@@ -530,11 +530,11 @@
       "src/core/engine/GameLoop.ts"
     ],
     "testFile": "tests/unit/engine/GameLoop.test.ts",
-    "status": "in-progress",
+    "status": "done",
     "blockedBy": [
       "3.10"
     ],
-    "closedInPR": null
+    "closedInPR": 101
   },
   {
     "id": "3.12",
