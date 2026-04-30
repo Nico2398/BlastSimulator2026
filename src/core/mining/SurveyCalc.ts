@@ -289,3 +289,4 @@ export function runSurvey(state: GameState, params: RunSurveyParams): RunSurveyR
   return { success: true, actionId };
 }
 
+export { computeBlastOreReport, type BlastOreReport } from './BlastOreReport.js';
