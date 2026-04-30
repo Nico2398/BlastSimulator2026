@@ -289,3 +289,28 @@ export const SITE_POLICY_DEFAULT_THRESHOLDS = {
   fatigueRest: 25,
   socialBreak: 20,
 } as const;
+
+// ─── Survey System ────────────────────────────────────────────────────────────
+
+/** Baseline noise std-dev applied to ore density estimates before skill adjustment. */
+export const SURVEY_BASE_ERROR = {
+  seismic:     0.15,
+  core_sample: 0.05,
+  aerial:      0.25,
+} as const;
+
+/** Survey disc radius (grid cells) around the centre point for each method. */
+export const SURVEY_COVERAGE_RADIUS = {
+  seismic:     20,
+  core_sample:  0,
+  aerial:      30,
+} as const;
+
+/** Error reduction applied per skill level above 1 (e.g. skill 3 → 2 × 0.12 = 0.24 reduction). */
+export const SURVEY_SKILL_BONUS_PER_LEVEL = 0.12;
+
+/** Number of consecutive Y-levels averaged together in a single seismic reading. */
+export const SURVEY_SEISMIC_GROUP_SIZE = 3;
+
+/** Ore estimate quantisation step: estimates are rounded to the nearest 0.05 band. */
+export const SURVEY_ESTIMATE_STEP = 0.05;

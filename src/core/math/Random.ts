@@ -42,4 +42,12 @@ export class Random {
   pick<T>(array: readonly T[]): T {
     return array[Math.floor(this.next() * array.length)] as T;
   }
+
+  /** Box-Muller transform — returns a sample from N(mean, stdDev). */
+  gaussian(mean: number, stdDev: number): number {
+    const u1 = Math.max(this.next(), 1e-10); // avoid log(0)
+    const u2 = this.next();
+    const z0 = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+    return mean + stdDev * z0;
+  }
 }
