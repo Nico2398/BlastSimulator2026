@@ -99,6 +99,7 @@ jobs:
           python -m open_swe.cli \
             --repo ${{ github.repository }} \
             --issue ${{ github.event.issue.number }}
+```
 
 ## Step 4: Trigger and Verify the Agent (Manual)
 
