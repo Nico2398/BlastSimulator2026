@@ -1,0 +1,234 @@
+name: Open SWE Agent
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  run-open-swe:
+    name: Execute Open SWE
+    # Trigger only if the comment contains '@openswe' and the event is on an Issue (not a PR)
+    if: ${{ !github.event.issue.pull_request && contains(github.event.comment.body, '@openswe') }}
+    runs-on: ubuntu-latest
+
+    # These write permissions are required:
+    #  - issues:write       → post the 👀 reaction
+    #  - contents:write     → push the agent's branch
+    #  - pull-requests:write → open the PR
+    permissions:
+      issues: write
+      contents: write
+      pull-requests: write
+
+    steps:
+      # ── 1. Acknowledge ──────────────────────────────────────────────────────
+      - name: Acknowledge Request
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.reactions.createForIssueComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: context.payload.comment.id,
+              content: 'eyes'
+            })
+
+      # ── 2. Checkout Open SWE ────────────────────────────────────────────────
+      - name: Checkout Open SWE Repository
+        uses: actions/checkout@v4
+        with:
+          repository: langchain-ai/open-swe
+          path: open-swe
+
+      # ── 3. Python + uv ──────────────────────────────────────────────────────
+      # langgraph.json specifies python_version 3.12
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Open SWE Dependencies
+        working-directory: ./open-swe
+        run: |
+          pip install uv
+          uv sync --all-extras
+
+      # ── 4. Patch make_model() for DeepSeek ──────────────────────────────────
+      # Open-SWE's make_model() in agent/utils/model.py always overrides base_url
+      # to wss://api.openai.com/v1 (the OpenAI Responses WebSocket) for any model
+      # with the "openai:" prefix. That breaks DeepSeek's OpenAI-compatible endpoint.
+      # This one-line patch makes it skip the override when OPENAI_BASE_URL is set.
+      - name: Patch model.py for OpenAI-compatible providers
+        working-directory: ./open-swe
+        run: |
+          python - <<'EOF'
+          path = 'agent/utils/model.py'
+          src = open(path).read()
+          if 'import os\n' not in src:
+              src = 'import os\n' + src
+          src = src.replace(
+              'if model_id.startswith("openai:"):',
+              'if model_id.startswith("openai:") and not os.environ.get("OPENAI_BASE_URL"):'
+          )
+          open(path, 'w').write(src)
+          print("Patch applied to", path)
+          EOF
+
+      # ── 5. Configure git identity ────────────────────────────────────────────
+      # The agent's commit_and_open_pr tool needs git credentials.
+      # GITHUB_TOKEN (auto-provisioned) is used for HTTPS pushes via the URL rewrite.
+      - name: Configure git credentials
+        run: |
+          git config --global user.email "open-swe-bot@github.com"
+          git config --global user.name "Open SWE Bot"
+          git config --global \
+            url."https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf \
+            "https://github.com/"
+
+      # ── 6. Fetch issue content ───────────────────────────────────────────────
+      - name: Fetch Issue Details
+        id: issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = await github.rest.issues.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number
+            });
+            core.setOutput('title', issue.data.title);
+            core.setOutput('body', issue.data.body || '');
+
+      # ── 7. Start server + run agent ──────────────────────────────────────────
+      #
+      # MODEL
+      #   LLM_MODEL_ID=openai:deepseek-v4-flash
+      #     "openai:" prefix → uses langchain-openai (ChatOpenAI) as the provider.
+      #     OPENAI_BASE_URL  → points ChatOpenAI at DeepSeek's OpenAI-compatible endpoint.
+      #     OPENAI_API_KEY   → your DeepSeek API key (stored as DEEPSEEK_API_KEY secret).
+      #
+      # SANDBOX
+      #   SANDBOX_TYPE=local runs every shell command directly on this Actions runner.
+      #   The multi-agent "task" tool (subagent spawning) works in local mode —
+      #   subagents share the same runner environment.
+      #
+      #   For full isolated cloud sandboxes per subagent (true multi-agent parallelism),
+      #   add these secrets and switch SANDBOX_TYPE to "langsmith":
+      #     LANGSMITH_API_KEY_PROD    → your LangSmith API key
+      #     LANGSMITH_TENANT_ID_PROD  → LangSmith tenant UUID
+      #     DEFAULT_SANDBOX_SNAPSHOT_ID → LangSmith sandbox snapshot UUID
+      #
+      # GITHUB CREDENTIALS
+      #   The built-in GITHUB_TOKEN is used here for git push and PR creation.
+      #   For full per-user identity (commits attributed to the triggering user),
+      #   set up a GitHub App (see INSTALLATION.md) and add:
+      #     GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY, GITHUB_APP_INSTALLATION_ID
+      #
+      - name: Run Open SWE Agent
+        working-directory: ./open-swe
+        env:
+          # DeepSeek via OpenAI-compatible API
+          OPENAI_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          OPENAI_BASE_URL: "https://api.deepseek.com/v1"
+          LLM_MODEL_ID: "openai:deepseek-v4-flash"
+
+          # Sandbox (local = run directly on this Actions runner)
+          SANDBOX_TYPE: "local"
+
+          # Target repository
+          DEFAULT_REPO_OWNER: ${{ github.repository_owner }}
+          DEFAULT_REPO_NAME: ${{ github.event.repository.name }}
+
+          # GitHub token for git push + PR creation
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+          # Disable remote LangSmith tracing (no account required for basic tests)
+          LANGCHAIN_TRACING_V2: "false"
+
+          # Issue context
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_TITLE: ${{ steps.issue.outputs.title }}
+          ISSUE_BODY: ${{ steps.issue.outputs.body }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+
+        run: |
+          # Start the LangGraph in-memory server in the background.
+          # All env vars above are inherited by the background process.
+          nohup uv run langgraph dev --port 2024 > /tmp/langgraph.log 2>&1 &
+
+          # Wait up to 90 s for the health endpoint to respond.
+          echo "Waiting for LangGraph server..."
+          for i in $(seq 1 90); do
+            if curl -sf http://localhost:2024/ok > /dev/null 2>&1; then
+              echo "Server ready after ${i}s"; break
+            fi
+            sleep 1
+          done
+          curl -sf http://localhost:2024/ok || { echo "Server failed to start:"; cat /tmp/langgraph.log; exit 1; }
+
+          # Invoke the agent via the LangGraph Python SDK.
+          uv run python - <<'PYEOF'
+          import asyncio
+          import os
+          import sys
+
+          from langgraph_sdk import get_client
+
+          async def main():
+              client = get_client(url="http://localhost:2024")
+
+              repo_owner   = os.environ["DEFAULT_REPO_OWNER"]
+              repo_name    = os.environ["DEFAULT_REPO_NAME"]
+              issue_number = os.environ["ISSUE_NUMBER"]
+              issue_title  = os.environ["ISSUE_TITLE"]
+              issue_body   = os.environ.get("ISSUE_BODY", "")
+              comment_body = os.environ["COMMENT_BODY"]
+
+              task = (
+                  f"Resolve GitHub issue #{issue_number} in {repo_owner}/{repo_name}.\n\n"
+                  f"Title: {issue_title}\n\n"
+                  f"Description:\n{issue_body}\n\n"
+                  f"User instruction:\n{comment_body}"
+              )
+
+              # Deterministic thread ID so follow-up comments route to the same run.
+              thread_id = f"github-{repo_owner}-{repo_name}-{issue_number}"
+
+              print(f"Starting agent run for {repo_owner}/{repo_name}#{issue_number}...")
+
+              run = await client.runs.create(
+                  thread_id,
+                  "agent",
+                  input={"messages": [{"role": "user", "content": task}]},
+                  config={"configurable": {
+                      "repo": {"owner": repo_owner, "name": repo_name},
+                      "source": "github",
+                      "__is_for_execution__": True,
+                  }},
+                  if_not_exists="create",
+              )
+
+              print(f"Run ID: {run['run_id']}")
+
+              # Poll until the run reaches a terminal state.
+              while True:
+                  run = await client.runs.get(thread_id, run["run_id"])
+                  status = run["status"]
+                  print(f"Status: {status}")
+                  if status in ("success", "error", "interrupted"):
+                      break
+                  await asyncio.sleep(10)
+
+              if run["status"] != "success":
+                  print("Agent run did not succeed.", file=sys.stderr)
+                  sys.exit(1)
+
+              print("Agent completed successfully.")
+
+          asyncio.run(main())
+          PYEOF
+
+      # ── 8. Debug logs on failure ─────────────────────────────────────────────
+      - name: Dump LangGraph server log
+        if: failure()
+        run: cat /tmp/langgraph.log || true

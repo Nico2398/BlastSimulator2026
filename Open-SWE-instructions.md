@@ -7,7 +7,7 @@ GitHub Copilot can read this document and execute the automated code steps direc
 ## Status Tracker
 - [ ] **Step 1:** Configure Repository Permissions (Manual)
 - [ ] **Step 2:** Configure Repository Secrets (Manual)
-- [ ] **Step 3:** Create the GitHub Actions Workflow File (Copilot)
+- [x] **Step 3:** Create the GitHub Actions Workflow File (Copilot) — see `.github/workflows/open-swe-agent.yml`
 - [ ] **Step 4:** Trigger and Verify the Agent (Manual)
 
 ---
