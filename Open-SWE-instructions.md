@@ -86,7 +86,7 @@ jobs:
         env:
           # DeepSeek configuration leveraging OpenAI compatibility
           OPENAI_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
-          OPENAI_API_BASE: "[https://api.deepseek.com/v1](https://api.deepseek.com/v1)"
+          OPENAI_API_BASE: "https://api.deepseek.com/v1"
           MODEL_NAME: "deepseek-chat"
           
           # GitHub context
@@ -99,10 +99,13 @@ jobs:
           python -m open_swe.cli \
             --repo ${{ github.repository }} \
             --issue ${{ github.event.issue.number }}
+```
 
-Step 4: Trigger and Verify the Agent (Manual)
-​Once Copilot has committed the workflow file from Step 3:
-​Open a new Issue in your GitHub repository detailing a bug or a feature.
-​Add a comment on that issue containing the tag: @openswe please implement this.
-​Go to the Actions tab in your repository. You should see the workflow spin up.
-​The bot will acknowledge the comment with an 👀 reaction, clone the repository in the GitHub Action runner, use DeepSeek to resolve the issue inside a Docker container, and finally open a Pull Request.
+## Step 4: Trigger and Verify the Agent (Manual)
+
+Once Copilot has committed the workflow file from Step 3:
+
+1. Open a new Issue in your GitHub repository detailing a bug or a feature.
+2. Add a comment on that issue containing the tag: `@openswe please implement this`.
+3. Go to the **Actions** tab in your repository. You should see the workflow spin up.
+4. The bot will acknowledge the comment with an 👀 reaction, clone the repository in the GitHub Action runner, use DeepSeek to resolve the issue inside a Docker container, and finally open a Pull Request.
