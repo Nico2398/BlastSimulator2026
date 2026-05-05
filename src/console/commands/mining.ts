@@ -1,5 +1,5 @@
 // BlastSimulator2026 — Console commands for mining operations
-// drill_plan, charge, sequence, blast, preview, build, weather, tubing
+// drill_plan, charge, sequence, blast, preview, build, weather, tubing, survey
 
 import type { CommandResult } from '../ConsoleRunner.js';
 import type { GameContext } from './world.js';
@@ -26,6 +26,8 @@ import {
 import { Random } from '../../core/math/Random.js';
 import { buyTubing, installTubing, createTubingState } from '../../core/mining/Tubing.js';
 import type { FragmentData } from '../../core/mining/BlastExecution.js';
+import { runSurvey, SURVEY_METHODS, type SurveyMethod } from '../../core/mining/SurveyCalc.js';
+import { SURVEY_COSTS } from '../../core/config/balance.js';
 
 // ── Extended context for mining ──
 
@@ -449,4 +451,77 @@ export function tubingCommand(
   }
 
   return { success: true, output: `Tubing inventory: ${ctx.tubingState.inventory}, installed: ${ctx.tubingState.installedHoles.size} holes` };
+}
+
+// ── Survey command ──
+
+export function surveyCommand(
+  ctx: MiningContext,
+  args: string[],
+  named: Record<string, string>,
+): CommandResult {
+  const err = requireGame(ctx);
+  if (err) return { success: false, output: err };
+
+  const sub = args[0];
+
+  if (sub === 'show') {
+    const pending = ctx.state!.pendingActions.filter(a => a.type === 'survey');
+    if (pending.length === 0) return { success: true, output: 'No pending surveys.' };
+    // payload['method'] is Record<string, unknown> — String() narrows to a printable value
+    const lines = pending.map(
+      a => `  [${a.id}] ${String(a.payload['method'])} at (${a.targetX}, ${a.targetZ})`,
+    );
+    return { success: true, output: `Pending surveys:\n${lines.join('\n')}` };
+  }
+
+  if (!sub) {
+    return { success: false, output: 'Usage: survey <seismic|core_sample|aerial> x:<X> z:<Z>' };
+  }
+  if (!(SURVEY_METHODS as string[]).includes(sub)) {
+    return {
+      success: false,
+      output: `Unknown method "${sub}". Usage: survey <seismic|core_sample|aerial> x:<X> z:<Z>`,
+    };
+  }
+
+  // sub is a validated SurveyMethod from this point
+  const method = sub as SurveyMethod;
+
+  if (named['x'] === undefined || named['z'] === undefined) {
+    return {
+      success: false,
+      output: 'Usage: survey <seismic|core_sample|aerial> x:<X> z:<Z>',
+    };
+  }
+
+  const x = parseInt(named['x'], 10);
+  const z = parseInt(named['z'], 10);
+  if (isNaN(x) || isNaN(z)) {
+    return { success: false, output: 'Invalid coordinates: x and z must be integers.' };
+  }
+
+  if (!ctx.grid!.isInBounds(x, 0, z)) {
+    return {
+      success: false,
+      output: `Out of bounds: (${x}, ${z}). Grid is ${ctx.grid!.sizeX}×${ctx.grid!.sizeZ}.`,
+    };
+  }
+
+  const result = runSurvey(ctx.state!, { method, centerX: x, centerZ: z });
+
+  if (!result.success) {
+    if (result.error === 'insufficient_funds') {
+      return { success: false, output: `Insufficient funds. ${method} survey costs $${SURVEY_COSTS[method]}.` };
+    }
+    if (result.error === 'no_surveyor') {
+      return { success: false, output: 'No available surveyor. Hire an employee with geology qualification.' };
+    }
+    return { success: false, output: 'Survey failed.' };
+  }
+
+  return {
+    success: true,
+    output: `${method} survey queued at (${x}, ${z}). Action ID: ${result.actionId}.`,
+  };
 }
