@@ -145,6 +145,9 @@ jobs:
           # Disable remote LangSmith tracing (no account required for basic tests)
           LANGCHAIN_TRACING_V2: "false"
 
+          # Custom project instructions — injected as the default prompt
+          DEFAULT_PROMPT_PATH: ${{ github.workspace }}/.openswe/AGENTS.md
+
           # Issue context
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           ISSUE_TITLE: ${{ steps.issue.outputs.title }}
