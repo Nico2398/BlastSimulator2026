@@ -155,11 +155,12 @@ describe('surveyCommand', () => {
 
   // ── guard: missing / invalid method ────────────────────────────────────────
 
-  it('returns success:false with usage hint when no method argument is provided', () => {
+  it('returns success:false with usage hint (no "Unknown method") when no method argument is provided', () => {
     const ctx = makeMiningContext();
     const result = surveyCommand(ctx, [], {});
     expect(result.success).toBe(false);
     expect(result.output).toContain('Usage');
+    expect(result.output).not.toContain('Unknown method');
   });
 
   it('returns success:false mentioning "Unknown method" for an unrecognized method', () => {
@@ -167,6 +168,14 @@ describe('surveyCommand', () => {
     const result = surveyCommand(ctx, ['foobar'], { x: '10', z: '10' });
     expect(result.success).toBe(false);
     expect(result.output).toContain('Unknown method');
+  });
+
+  it('returns usage hint (not "Unknown method") when the provided token is empty string', () => {
+    const ctx = makeMiningContext();
+    const result = surveyCommand(ctx, [''], {});
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('Usage');
+    expect(result.output).not.toContain('Unknown method');
   });
 
   // ── guard: missing coordinates ──────────────────────────────────────────────
@@ -183,6 +192,38 @@ describe('surveyCommand', () => {
     const ctx = makeMiningContext();
     const result = surveyCommand(ctx, ['aerial'], {});
     expect(result.success).toBe(false);
+  });
+
+  // ── guard: out-of-bounds coordinates ───────────────────────────────────────
+
+  it('returns success:false mentioning "Out of bounds" for negative x', () => {
+    const ctx = makeMiningContext();
+    const result = surveyCommand(ctx, ['seismic'], { x: '-1', z: '10' });
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('Out of bounds');
+  });
+
+  it('returns success:false mentioning "Out of bounds" for x beyond grid width', () => {
+    const ctx = makeMiningContext();
+    // makeMiningContext creates a 32×32 grid
+    const result = surveyCommand(ctx, ['seismic'], { x: '100', z: '10' });
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('Out of bounds');
+  });
+
+  it('returns success:false mentioning "Out of bounds" for z beyond grid depth', () => {
+    const ctx = makeMiningContext();
+    const result = surveyCommand(ctx, ['aerial'], { x: '10', z: '200' });
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('Out of bounds');
+  });
+
+  it('does not deduct cash when coordinates are out of bounds', () => {
+    const ctx = makeMiningContext();
+    hireSurveyor(ctx);
+    ctx.state!.cash = 10_000;
+    surveyCommand(ctx, ['seismic'], { x: '-5', z: '5' });
+    expect(ctx.state!.cash).toBe(10_000);
   });
 
   // ── guard: insufficient funds ───────────────────────────────────────────────

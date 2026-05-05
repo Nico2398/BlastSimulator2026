@@ -475,10 +475,13 @@ export function surveyCommand(
     return { success: true, output: `Pending surveys:\n${lines.join('\n')}` };
   }
 
-  if (!sub || !(SURVEY_METHODS as string[]).includes(sub)) {
+  if (!sub) {
+    return { success: false, output: 'Usage: survey <seismic|core_sample|aerial> x:<X> z:<Z>' };
+  }
+  if (!(SURVEY_METHODS as string[]).includes(sub)) {
     return {
       success: false,
-      output: `Unknown method "${sub ?? ''}". Usage: survey <seismic|core_sample|aerial> x:<X> z:<Z>`,
+      output: `Unknown method "${sub}". Usage: survey <seismic|core_sample|aerial> x:<X> z:<Z>`,
     };
   }
 
@@ -496,6 +499,13 @@ export function surveyCommand(
   const z = parseInt(named['z'], 10);
   if (isNaN(x) || isNaN(z)) {
     return { success: false, output: 'Invalid coordinates: x and z must be integers.' };
+  }
+
+  if (!ctx.grid!.isInBounds(x, 0, z)) {
+    return {
+      success: false,
+      output: `Out of bounds: (${x}, ${z}). Grid is ${ctx.grid!.sizeX}×${ctx.grid!.sizeZ}.`,
+    };
   }
 
   const result = runSurvey(ctx.state!, { method, centerX: x, centerZ: z });
