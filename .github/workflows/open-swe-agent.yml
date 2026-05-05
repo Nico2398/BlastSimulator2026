@@ -188,8 +188,10 @@ jobs:
           # GitHub token for git push + PR creation
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-          # Disable remote LangSmith tracing (no account required for basic tests)
-          LANGCHAIN_TRACING_V2: "false"
+          # LangSmith tracing — set LANGSMITH_API_KEY in repo secrets to enable
+          LANGCHAIN_TRACING_V2: ${{ secrets.LANGSMITH_API_KEY != '' && 'true' || 'false' }}
+          LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
+          LANGCHAIN_PROJECT: "BlastSimulator2026-openswe"
 
           # Custom project instructions — injected as the default prompt
           DEFAULT_PROMPT_PATH: ${{ github.workspace }}/.openswe/AGENTS.md
