@@ -8,7 +8,8 @@ permissions: {}
 
 jobs:
   chain-next-task:
-    if: github.event.pull_request.merged == true
+    # Temporarily disabled — set back to `github.event.pull_request.merged == true` to re-enable
+    if: false
     runs-on: ubuntu-latest
     steps:
       - name: Check PAT_TOKEN_COPILOT_AUTOMATION is configured
