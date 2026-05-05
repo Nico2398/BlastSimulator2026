@@ -7,7 +7,6 @@ import {
   newGameCommand,
   inspectCommand,
   terrainInfoCommand,
-  surveyCommand,
 } from './commands/world.js';
 import {
   type MiningContext,
@@ -21,6 +20,7 @@ import {
   buildRampCommand,
   weatherCommand,
   tubingCommand,
+  surveyCommand,
 } from './commands/mining.js';
 import { createTubingState } from '../core/mining/Tubing.js';
 import {
@@ -82,7 +82,7 @@ export function createRunner(): RunnerWithContext {
   runner.register('terrain_info', 'Show terrain grid info', (args, named) =>
     terrainInfoCommand(ctx, args, named),
   );
-  runner.register('survey', 'Survey terrain at x,z', (args, named) =>
+  runner.register('survey', 'Survey terrain (seismic|core_sample|aerial) x:<X> z:<Z>', (args, named) =>
     surveyCommand(ctx, args, named),
   );
 
