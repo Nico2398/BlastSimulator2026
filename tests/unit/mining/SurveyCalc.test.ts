@@ -17,6 +17,13 @@ import {
   type RunSurveyParams,
   type RunSurveyResult,
 } from '../../../src/core/mining/SurveyCalc.js';
+// ── Task 4.7 additions ────────────────────────────────────────────────────────
+import {
+  computeBlastOreReport,
+  type BlastOreReport,
+} from '../../../src/core/mining/SurveyCalc.js';
+import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
+import { vec3 } from '../../../src/core/math/Vec3.js';
 
 // ── Deterministic fixture ─────────────────────────────────────────────────────
 // All required fields are set to fixed values so every test that derives a
@@ -708,5 +715,207 @@ describe('SurveyCalc — runSurvey (4.6)', () => {
     const preview = state.ghostPreviews[0]!;
     expect(preview.type).toBe('survey');
     expect(preview.id).toBe(state.pendingActions[0]!.id);
+  });
+});
+
+// ── 4.7: computeBlastOreReport ───────────────────────────────────────────────
+
+describe('SurveyCalc — computeBlastOreReport (4.7)', () => {
+  // ── Fixture helpers ──────────────────────────────────────────────────────────
+
+  /**
+   * Build a minimal FragmentData with configurable position, volume, and
+   * oreDensities. All non-ore fields are fixed so tests stay focused on yield.
+   */
+  function makeFragment(
+    id: number,
+    position: ReturnType<typeof vec3>,
+    volume: number,
+    oreDensities: Record<string, number>,
+  ): FragmentData {
+    return {
+      id,
+      position,
+      volume,
+      mass: 1000,
+      rockId: 'granite',
+      oreDensities,
+      initialVelocity: vec3(0, 0, 0),
+      isProjection: false,
+    };
+  }
+
+  /**
+   * Build a minimal SurveyResult with configurable estimates and completedTick.
+   * All other fields are fixed to keep survey-comparison tests unambiguous.
+   */
+  function makeSurvey(
+    estimates: Record<string, Record<string, number>>,
+    completedTick = 10,
+  ): SurveyResult {
+    return {
+      id: 1,
+      method: 'seismic',
+      centerX: 0,
+      centerZ: 0,
+      completedTick,
+      surveyorId: 1,
+      estimates,
+      confidence: 0.8,
+    };
+  }
+
+  // ── a. Export presence ───────────────────────────────────────────────────────
+
+  it('computeBlastOreReport is exported as a function', () => {
+    // The named export must exist and be callable; if not implemented the
+    // import resolves to undefined and typeof returns 'undefined'.
+    expect(typeof computeBlastOreReport).toBe('function');
+  });
+
+  // ── b. Return shape ──────────────────────────────────────────────────────────
+
+  it('return value has all 6 required BlastOreReport fields', () => {
+    // Every field of BlastOreReport must be present on the returned object so
+    // callers can destructure without optional-chaining guards.
+    const report: BlastOreReport = computeBlastOreReport([]);
+    expect(report).toHaveProperty('oreYields');
+    expect(report).toHaveProperty('totalYieldKg');
+    expect(report).toHaveProperty('estimatedYieldKg');
+    expect(report).toHaveProperty('yieldRatio');
+    expect(report).toHaveProperty('hasTreranium');
+    expect(report).toHaveProperty('absurdiumFraction');
+  });
+
+  // ── c. Empty fragments ───────────────────────────────────────────────────────
+
+  it('returns an all-zero/default report when the fragment array is empty', () => {
+    // No rock was blasted → no ore, no estimates, ratio defaults to 1.0.
+    const report = computeBlastOreReport([]);
+    expect(report.totalYieldKg).toBe(0);
+    expect(report.estimatedYieldKg).toBe(0);
+    expect(report.yieldRatio).toBe(1.0);
+    expect(report.hasTreranium).toBe(false);
+    expect(report.absurdiumFraction).toBe(0);
+    expect(Object.keys(report.oreYields)).toHaveLength(0);
+  });
+
+  // ── d. Single-ore fragment ───────────────────────────────────────────────────
+
+  it('computes ore mass as volume × density × 2500 for a single-ore fragment', () => {
+    // volume=2.0, rustite density=0.5  →  2.0 × 0.5 × 2500 = 2500 kg
+    const fragment = makeFragment(0, vec3(10, 5, 10), 2.0, { rustite: 0.5 });
+    const report = computeBlastOreReport([fragment]);
+    expect(report.oreYields['rustite']).toBeCloseTo(2500, 5);
+  });
+
+  // ── e. Multi-ore fragment ────────────────────────────────────────────────────
+
+  it('correctly sums multiple ore types within a single fragment', () => {
+    // volume=1.0, rustite=0.4 → 1000 kg; blingite=0.3 → 750 kg
+    // Both ore entries must be independently correct; no cross-ore contamination.
+    const fragment = makeFragment(0, vec3(0, 0, 0), 1.0, { rustite: 0.4, blingite: 0.3 });
+    const report = computeBlastOreReport([fragment]);
+    expect(report.oreYields['rustite']).toBeCloseTo(1000, 5);
+    expect(report.oreYields['blingite']).toBeCloseTo(750, 5);
+  });
+
+  // ── f. Multiple fragments ────────────────────────────────────────────────────
+
+  it('accumulates ore yields correctly across multiple fragments', () => {
+    // frag1: volume=1.0, rustite=0.2  →  500 kg
+    // frag2: volume=2.0, rustite=0.3  → 1500 kg
+    // combined rustite                → 2000 kg
+    const frag1 = makeFragment(0, vec3(0, 0, 0), 1.0, { rustite: 0.2 });
+    const frag2 = makeFragment(1, vec3(10, 0, 10), 2.0, { rustite: 0.3 });
+    const report = computeBlastOreReport([frag1, frag2]);
+    expect(report.oreYields['rustite']).toBeCloseTo(2000, 5);
+  });
+
+  // ── g. hasTreranium = false ──────────────────────────────────────────────────
+
+  it('hasTreranium is false when no fragments contain treranium', () => {
+    // Only rustite is present; the legendary-vein flag must stay false.
+    const fragment = makeFragment(0, vec3(0, 0, 0), 1.0, { rustite: 0.8 });
+    const report = computeBlastOreReport([fragment]);
+    expect(report.hasTreranium).toBe(false);
+  });
+
+  // ── h. hasTreranium = true ───────────────────────────────────────────────────
+
+  it('hasTreranium is true when at least one fragment contains treranium', () => {
+    // frag2 carries even a small treranium density → flag must fire.
+    const frag1 = makeFragment(0, vec3(0, 0, 0), 1.0, { rustite: 0.5 });
+    const frag2 = makeFragment(1, vec3(5, 0, 5), 1.0, { treranium: 0.1 });
+    const report = computeBlastOreReport([frag1, frag2]);
+    expect(report.hasTreranium).toBe(true);
+  });
+
+  // ── i. absurdiumFraction ─────────────────────────────────────────────────────
+
+  it('absurdiumFraction is the correct proportion of total yield when absurdium is present', () => {
+    // volume=1.0, rustite=0.5 → 1250 kg; absurdium=0.5 → 1250 kg
+    // total = 2500 kg  →  absurdiumFraction = 1250 / 2500 = 0.5
+    const fragment = makeFragment(0, vec3(0, 0, 0), 1.0, { rustite: 0.5, absurdium: 0.5 });
+    const report = computeBlastOreReport([fragment]);
+    expect(report.absurdiumFraction).toBeCloseTo(0.5, 5);
+  });
+
+  // ── j. absurdiumFraction = 0 ─────────────────────────────────────────────────
+
+  it('absurdiumFraction is 0 when no absurdium is present', () => {
+    // No absurdium ore in the blast → fraction must be exactly 0, not NaN.
+    const fragment = makeFragment(0, vec3(0, 0, 0), 1.0, { rustite: 0.8, blingite: 0.2 });
+    const report = computeBlastOreReport([fragment]);
+    expect(report.absurdiumFraction).toBe(0);
+  });
+
+  // ── k. No survey provided ─────────────────────────────────────────────────────
+
+  it('estimatedYieldKg is 0 and yieldRatio is 1.0 when no surveyResults argument is provided', () => {
+    // Without a survey the comparison baseline is undefined;
+    // spec mandates estimatedYieldKg=0 and yieldRatio=1.0 as neutral defaults.
+    const fragment = makeFragment(0, vec3(5, 3, 8), 2.0, { rustite: 0.5 });
+    const report = computeBlastOreReport([fragment]);
+    expect(report.estimatedYieldKg).toBe(0);
+    expect(report.yieldRatio).toBe(1.0);
+  });
+
+  // ── l. Survey matching column ─────────────────────────────────────────────────
+
+  it('computes estimatedYieldKg and yieldRatio correctly when a survey column matches a fragment', () => {
+    // Fragment at (5, 3, 8): Math.round(5)=5, Math.round(8)=8 → column key "5,8"
+    // Actual:   volume=2.0 × rustite density 0.5 × 2500 = 2500 kg
+    // Estimate: volume=2.0 × survey density 0.4 × 2500 = 2000 kg
+    // yieldRatio = 2500 / 2000 = 1.25
+    const fragment = makeFragment(0, vec3(5, 3, 8), 2.0, { rustite: 0.5 });
+    const survey = makeSurvey({ '5,8': { rustite: 0.4 } });
+    const report = computeBlastOreReport([fragment], [survey]);
+    expect(report.estimatedYieldKg).toBeCloseTo(2000, 5);
+    expect(report.yieldRatio).toBeCloseTo(1.25, 5);
+  });
+
+  // ── m. Survey with no coverage ────────────────────────────────────────────────
+
+  it('estimatedYieldKg is 0 and yieldRatio is 1.0 when no survey column key matches any fragment', () => {
+    // Fragment column key "5,8" but survey only covers "0,0" → no overlap.
+    // With no estimate available the function must fall back to neutral defaults.
+    const fragment = makeFragment(0, vec3(5, 3, 8), 2.0, { rustite: 0.5 });
+    const survey = makeSurvey({ '0,0': { rustite: 0.4 } });
+    const report = computeBlastOreReport([fragment], [survey]);
+    expect(report.estimatedYieldKg).toBe(0);
+    expect(report.yieldRatio).toBe(1.0);
+  });
+
+  // ── n. totalYieldKg ───────────────────────────────────────────────────────────
+
+  it('totalYieldKg equals the sum of all per-ore oreYields values', () => {
+    // volume=1.0, rustite=0.2 → 500 kg, blingite=0.3 → 750 kg, total = 1250 kg
+    // totalYieldKg must equal the arithmetic sum of every value in oreYields.
+    const fragment = makeFragment(0, vec3(0, 0, 0), 1.0, { rustite: 0.2, blingite: 0.3 });
+    const report = computeBlastOreReport([fragment]);
+    const sumOfOreYields = Object.values(report.oreYields).reduce((s, v) => s + v, 0);
+    expect(report.totalYieldKg).toBeCloseTo(sumOfOreYields, 5);
+    expect(report.totalYieldKg).toBeCloseTo(1250, 5);
   });
 });

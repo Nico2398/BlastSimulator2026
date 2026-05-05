@@ -331,3 +331,6 @@ export const SURVEY_DURATION_TICKS = {
   core_sample: 4,
   aerial:      3,
 } as const;
+
+/** Assumed bulk density of ore-bearing rock used for mass calculations (kg/m³). */
+export const ORE_DENSITY_KG_M3 = 2500;
