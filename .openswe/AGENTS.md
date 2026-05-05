@@ -75,7 +75,24 @@ Closes #42
 
 ## Backlog
 
-Next phase features in `.agent/NEXT_PHASE_DESIGN.md`. After opening a PR: include `Closes #<number>` in the body — the pipeline auto-updates `backlog.json` after merge.
+Next phase features in `.agent/NEXT_PHASE_DESIGN.md`. Use the built-in backlog tools to manage tasks:
+
+| Tool | When to call |
+|------|-------------|
+| `backlog_stats()` | Check overall progress |
+| `backlog_list(status?, chapter?)` | Browse tasks |
+| `backlog_next()` | Find the next available task |
+| `backlog_start(task_id)` | Claim a task before coding — required |
+| `backlog_done(task_id, pr_number?)` | Mark done after PR merges |
+| `backlog_block(task_id)` | Mark as blocked if you can't complete it |
+| `backlog_reset(task_id)` | Reset to pending |
+
+**Rules:**
+- Always call `backlog_start` before writing any code.
+- Only one task `in-progress` at a time — `start` enforces this.
+- Call `backlog_done` with `pr_number` after the PR merges.
+- Can't finish a task → call `backlog_block` and note the reason in the PR.
+- After opening the PR: include `Closes #<number>` in the body.
 
 ## Creative Direction
 

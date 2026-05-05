@@ -74,7 +74,53 @@ jobs:
           print("Patch applied to", path)
           EOF
 
-      # ── 5. Configure git identity ────────────────────────────────────────────
+      # ── 5. Inject backlog tools ─────────────────────────────────────────────
+      # Copies .openswe/tools/backlog_tools.py into open-swe's tools package and
+      # patches agent/server.py to import and register the seven backlog functions.
+      - name: Inject backlog tools
+        run: |
+          cp $GITHUB_WORKSPACE/.openswe/tools/backlog_tools.py ./open-swe/agent/tools/backlog_tools.py
+
+          python - <<'EOF'
+          path = 'open-swe/agent/server.py'
+          src = open(path).read()
+
+          # Import the seven backlog functions before the existing .tools import
+          old_import = 'from .tools import ('
+          new_import = (
+              'from .tools.backlog_tools import (\n'
+              '    backlog_block,\n'
+              '    backlog_done,\n'
+              '    backlog_list,\n'
+              '    backlog_next,\n'
+              '    backlog_reset,\n'
+              '    backlog_start,\n'
+              '    backlog_stats,\n'
+              ')\n'
+              'from .tools import ('
+          )
+          src = src.replace(old_import, new_import, 1)
+
+          # Append backlog tools after slack_thread_reply in the tools list
+          old_tools = '            slack_read_thread_messages,\n            slack_thread_reply,'
+          new_tools = (
+              '            slack_read_thread_messages,\n'
+              '            slack_thread_reply,\n'
+              '            backlog_block,\n'
+              '            backlog_done,\n'
+              '            backlog_list,\n'
+              '            backlog_next,\n'
+              '            backlog_reset,\n'
+              '            backlog_start,\n'
+              '            backlog_stats,'
+          )
+          src = src.replace(old_tools, new_tools, 1)
+
+          open(path, 'w').write(src)
+          print('Backlog tools patched into agent/server.py')
+          EOF
+
+      # ── 6. Configure git identity ────────────────────────────────────────────
       # The agent's commit_and_open_pr tool needs git credentials.
       # GITHUB_TOKEN (auto-provisioned) is used for HTTPS pushes via the URL rewrite.
       - name: Configure git credentials
@@ -85,7 +131,7 @@ jobs:
             url."https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf \
             "https://github.com/"
 
-      # ── 6. Fetch issue content ───────────────────────────────────────────────
+      # ── 7. Fetch issue content ───────────────────────────────────────────────
       - name: Fetch Issue Details
         id: issue
         uses: actions/github-script@v7
@@ -99,7 +145,7 @@ jobs:
             core.setOutput('title', issue.data.title);
             core.setOutput('body', issue.data.body || '');
 
-      # ── 7. Start server + run agent ──────────────────────────────────────────
+      # ── 8. Start server + run agent ──────────────────────────────────────────
       #
       # MODEL
       #   LLM_MODEL_ID=openai:deepseek-v4-flash
@@ -231,7 +277,7 @@ jobs:
           asyncio.run(main())
           PYEOF
 
-      # ── 8. Debug logs on failure ─────────────────────────────────────────────
+      # ── 9. Debug logs on failure ─────────────────────────────────────────────
       - name: Dump LangGraph server log
         if: failure()
         run: cat /tmp/langgraph.log || true
