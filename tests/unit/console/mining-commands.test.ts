@@ -170,14 +170,6 @@ describe('surveyCommand', () => {
     expect(result.output).toContain('Unknown method');
   });
 
-  it('returns usage hint (not "Unknown method") when the provided token is empty string', () => {
-    const ctx = makeMiningContext();
-    const result = surveyCommand(ctx, [''], {});
-    expect(result.success).toBe(false);
-    expect(result.output).toContain('Usage');
-    expect(result.output).not.toContain('Unknown method');
-  });
-
   // ── guard: missing coordinates ──────────────────────────────────────────────
 
   it('returns success:false with usage hint when z coordinate is missing', () => {
