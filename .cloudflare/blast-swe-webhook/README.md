@@ -9,33 +9,34 @@ GitHub webhook relay that bridges the `blast-swe-bot` GitHub App to the `open-sw
 3. Worker verifies the HMAC-SHA256 signature, filters for bot-targeted events, then calls `POST /repos/.../actions/workflows/open-swe-agent.yml/dispatches` with the issue number and triggering text as inputs.
 4. The workflow runs as if it were triggered natively.
 
-## Setup
+## Setup (no local machine required — everything runs in GitHub Actions)
 
 ### Prerequisites
 
 - Cloudflare account with Workers enabled
-- `wrangler` CLI installed (`npm i -g wrangler`) and authenticated (`wrangler login`)
 - A `blast-swe-bot` GitHub App installed on `Nico2398/BlastSimulator2026`
 - A fine-grained PAT with **Actions: Read & Write** on `BlastSimulator2026`
 
+### One-time: add GitHub Actions secrets
+
+Go to **GitHub → Settings → Secrets and variables → Actions → New repository secret** and add:
+
+| Secret name | Value |
+|---|---|
+| `CF_API_TOKEN` | Cloudflare API token with **Edit Workers** permission |
+| `CF_ACCOUNT_ID` | Your Cloudflare account ID (visible on the Workers dashboard) |
+| `CF_WEBHOOK_SECRET` | The GitHub App webhook secret you generated |
+| `CF_GH_PAT` | Fine-grained PAT with Actions: Read & Write on this repo |
+
 ### Deploy
 
-```bash
-cd .cloudflare/blast-swe-webhook
-npm install
-wrangler secret put WEBHOOK_SECRET   # GitHub App webhook secret
-wrangler secret put GH_PAT           # Fine-grained PAT
-npm run deploy
-# → https://blast-swe-webhook.<your-account>.workers.dev
-```
+Push any change to `.cloudflare/blast-swe-webhook/` on `main` **or** trigger the workflow manually:
 
-Copy the deployed URL and paste it into the GitHub App's **Webhook URL** field.
+> **GitHub → Actions → Deploy Cloudflare Worker → Run workflow**
 
-### Local development
+The workflow installs dependencies, deploys the Worker, and pushes `WEBHOOK_SECRET` and `GH_PAT` as Cloudflare secrets — all in the cloud.
 
-```bash
-npm run dev   # starts a local tunnel via wrangler dev
-```
+Copy the deployed URL (`https://blast-swe-webhook.<your-account>.workers.dev`) and paste it into the GitHub App's **Webhook URL** field.
 
 ## Environment variables
 

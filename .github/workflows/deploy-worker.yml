@@ -1,0 +1,47 @@
+name: Deploy Cloudflare Worker
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.cloudflare/blast-swe-webhook/**'
+      - '.github/workflows/deploy-worker.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy blast-swe-webhook
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: .cloudflare/blast-swe-webhook
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: .cloudflare/blast-swe-webhook/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Push the two runtime secrets into the Worker.
+      # Values come from GitHub Actions secrets — set them once in:
+      #   GitHub → Settings → Secrets and variables → Actions
+      #   Required secret names: CF_WEBHOOK_SECRET, CF_GH_PAT
+      - name: Deploy Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          workingDirectory: .cloudflare/blast-swe-webhook
+          secrets: |
+            WEBHOOK_SECRET
+            GH_PAT
+        env:
+          WEBHOOK_SECRET: ${{ secrets.CF_WEBHOOK_SECRET }}
+          GH_PAT: ${{ secrets.CF_GH_PAT }}
