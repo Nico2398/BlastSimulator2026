@@ -1,0 +1,10 @@
+name = "blast-swe-webhook"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+
+# Non-secret configuration. Secrets are set via `wrangler secret put`.
+[vars]
+REPO_OWNER    = "Nico2398"
+REPO_NAME     = "BlastSimulator2026"
+WORKFLOW_FILE = "open-swe-agent.yml"
+BOT_LOGIN     = "blast-swe-bot[bot]"
