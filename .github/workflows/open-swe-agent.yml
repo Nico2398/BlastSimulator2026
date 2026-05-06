@@ -12,11 +12,11 @@ jobs:
   run-open-swe:
     name: Execute Open SWE
     # Trigger when:
-    #  - a comment on an issue or PR contains '@openswe'
+    #  - a comment on an issue or PR contains '@openswe' (only repo owners)
     #  - the issue/PR is assigned to the openswe bot
     #  - openswe is requested as a reviewer on a PR
     if: |
-      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@openswe')) ||
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@openswe') && github.event.comment.author_association == 'OWNER') ||
       (github.event_name == 'issues' && github.event.action == 'assigned' && github.event.assignee.login == 'openswe') ||
       (github.event_name == 'pull_request' && github.event.action == 'assigned' && github.event.assignee.login == 'openswe') ||
       (github.event_name == 'pull_request' && github.event.action == 'review_requested' && github.event.requested_reviewer.login == 'openswe')
@@ -51,7 +51,7 @@ jobs:
                 content: 'eyes'
               });
             } else {
-              // Post a comment on the issue/PR to acknowledge the assignment
+              // Post a comment to acknowledge assignment or review request
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
