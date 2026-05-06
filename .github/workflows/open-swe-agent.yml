@@ -3,12 +3,23 @@ name: Open SWE Agent
 on:
   issue_comment:
     types: [created]
+  issues:
+    types: [assigned]
+  pull_request:
+    types: [assigned, review_requested]
 
 jobs:
   run-open-swe:
     name: Execute Open SWE
-    # Trigger only if the comment contains '@openswe' and the event is on an Issue (not a PR)
-    if: ${{ !github.event.issue.pull_request && contains(github.event.comment.body, '@openswe') }}
+    # Trigger when:
+    #  - a comment on an issue or PR contains '@openswe' (only repo owners)
+    #  - the issue/PR is assigned to the openswe bot
+    #  - openswe is requested as a reviewer on a PR
+    if: |
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@openswe') && github.event.comment.author_association == 'OWNER') ||
+      (github.event_name == 'issues' && github.event.action == 'assigned' && github.event.assignee.login == 'openswe') ||
+      (github.event_name == 'pull_request' && github.event.action == 'assigned' && github.event.assignee.login == 'openswe') ||
+      (github.event_name == 'pull_request' && github.event.action == 'review_requested' && github.event.requested_reviewer.login == 'openswe')
     runs-on: ubuntu-latest
 
     # These write permissions are required:
@@ -26,12 +37,28 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            github.rest.reactions.createForIssueComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              comment_id: context.payload.comment.id,
-              content: 'eyes'
-            })
+            const issueNumber =
+              context.payload.comment
+                ? context.issue.number
+                : (context.payload.issue?.number ?? context.payload.pull_request?.number);
+
+            if (context.payload.comment) {
+              // React to the triggering comment
+              await github.rest.reactions.createForIssueComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: context.payload.comment.id,
+                content: 'eyes'
+              });
+            } else {
+              // Post a comment to acknowledge assignment or review request
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+                body: '👀 Open SWE Agent picking this up…'
+              });
+            }
 
       # ── 2. Checkout Open SWE ────────────────────────────────────────────────
       - name: Checkout Open SWE Repository
@@ -137,10 +164,12 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
+            const issueNumber =
+              context.payload.issue?.number ?? context.payload.pull_request?.number;
             const issue = await github.rest.issues.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: context.issue.number
+              issue_number: issueNumber
             });
             core.setOutput('title', issue.data.title);
             core.setOutput('body', issue.data.body || '');
@@ -188,17 +217,19 @@ jobs:
           # GitHub token for git push + PR creation
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-          # Disable remote LangSmith tracing (no account required for basic tests)
-          LANGCHAIN_TRACING_V2: "false"
+          # LangSmith tracing — set LANGSMITH_API_KEY in repo secrets to enable
+          LANGCHAIN_TRACING_V2: ${{ secrets.LANGSMITH_API_KEY != '' && 'true' || 'false' }}
+          LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
+          LANGCHAIN_PROJECT: "BlastSimulator2026-openswe"
 
           # Custom project instructions — injected as the default prompt
           DEFAULT_PROMPT_PATH: ${{ github.workspace }}/.openswe/AGENTS.md
 
-          # Issue context
-          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          # Issue/PR context (works for comment, assignment, and review-request events)
+          ISSUE_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number }}
           ISSUE_TITLE: ${{ steps.issue.outputs.title }}
           ISSUE_BODY: ${{ steps.issue.outputs.body }}
-          COMMENT_BODY: ${{ github.event.comment.body }}
+          COMMENT_BODY: ${{ github.event.comment.body || format('@openswe triggered via {0} on #{1}', github.event.action, github.event.issue.number || github.event.pull_request.number) }}
 
         run: |
           # Start the LangGraph in-memory server in the background.
