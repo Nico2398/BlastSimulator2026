@@ -275,9 +275,16 @@ All secrets go in **GitHub → repo → Settings → Secrets and variables → A
 
 GitHub App bots are **not** listed in the default assignee dropdown — only human collaborators appear there. You must **type the bot name** (e.g. `blast-swe-bot`) in the search field; it will then appear and can be selected.
 
-If it still doesn't appear after typing:
-- Confirm the app is installed on this repo: **GitHub → Settings → Developer settings → GitHub Apps → blast-swe-bot → Install App** — the repo should be listed with a green checkmark.
-- Confirm **Issues: Read & Write** was set under Repository permissions in Step 1a. If it wasn't, edit the app permissions, save, and re-accept the permission update prompt that GitHub sends to the installation.
+If it still doesn't appear after typing, the cause is that GitHub's assignee search only returns accounts that have previously interacted with the repo (comments, commits, etc.). A freshly installed bot has no activity, so it's invisible to the picker.
+
+**Fix — add the bot as a collaborator:**
+
+1. Go to **repo → Settings → Collaborators → Add people**.
+2. Search for `blast-swe-bot[bot]` (or `blast-swe-bot` if the `[bot]` suffix returns no results).
+3. Grant **Write** role.
+4. Reload the issue — the bot now appears in the assignee dropdown.
+
+This is a one-time step. After the first assignment + successful run, the bot's activity on the repo means it appears in the picker without needing collaborator access, but keeping it as a collaborator is harmless.
 
 ### Bot doesn't respond to assignment
 
