@@ -28,7 +28,7 @@ The GitHub App is the identity of the bot. It receives GitHub events (assignment
 2. Fill in:
    - **GitHub App name:** `blast-swe-bot` (or any name you prefer)
    - **Homepage URL:** your repo URL (`https://github.com/Nico2398/BlastSimulator2026`)
-   - **Webhook URL:** *(leave blank for now — you'll fill this in after deploying the Worker in Step 3)*
+   - **Webhook URL:** *(leave blank for now — you'll fill this in after deploying the Worker in Step 5)*
    - **Webhook secret:** click the **"Generate"** button next to the field — GitHub will fill in a cryptographically random value. Copy it and save it somewhere (a password manager or a text note). **You will need this exact value later in Step 4.** If you miss it, you can always set a new one and update the secret in Step 4.
 
 3. Under **Permissions → Repository permissions**, set:
@@ -57,6 +57,8 @@ After creation, you land on the app settings page. Copy the **App ID** — you m
 3. Click **Install**.
 
 After installation, GitHub will show the app's bot account as `blast-swe-bot[bot]`. This is the login the Worker checks against (`BOT_LOGIN` in `wrangler.toml`).
+
+> **Note:** The bot only appears in the issue **Assignees** picker after this install step. If you open an issue before completing Step 1c and don't see `blast-swe-bot[bot]` in the list, come back, complete the install, then reload the issue page.
 
 ---
 
