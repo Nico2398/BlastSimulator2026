@@ -58,8 +58,6 @@ After creation, you land on the app settings page. Copy the **App ID** — you m
 
 After installation, GitHub will show the app's bot account as `blast-swe-bot[bot]`. This is the login the Worker checks against (`BOT_LOGIN` in `wrangler.toml`).
 
-> **Note:** The bot only appears in the issue **Assignees** picker after this install step. If you open an issue before completing Step 1c and don't see `blast-swe-bot[bot]` in the list, come back, complete the install, then reload the issue page.
-
 ---
 
 ## Step 2 — Collect Cloudflare credentials
@@ -272,6 +270,14 @@ All secrets go in **GitHub → repo → Settings → Secrets and variables → A
 ---
 
 ## Troubleshooting
+
+### Bot not visible in the assignee picker
+
+GitHub App bots are **not** listed in the default assignee dropdown — only human collaborators appear there. You must **type the bot name** (e.g. `blast-swe-bot`) in the search field; it will then appear and can be selected.
+
+If it still doesn't appear after typing:
+- Confirm the app is installed on this repo: **GitHub → Settings → Developer settings → GitHub Apps → blast-swe-bot → Install App** — the repo should be listed with a green checkmark.
+- Confirm **Issues: Read & Write** was set under Repository permissions in Step 1a. If it wasn't, edit the app permissions, save, and re-accept the permission update prompt that GitHub sends to the installation.
 
 ### Bot doesn't respond to assignment
 
