@@ -1,7 +1,7 @@
 # Setup Guide — BlastSimulator2026 Cloud SWE Agent
 
 Full step-by-step installation for the Cloudflare + open-swe + LangSmith pipeline.
-No local machine required after initial setup.
+**No local machine required at any point.** Every step is done in the browser.
 
 > **Already set up?** See [README.md](./README.md) for a workflow overview.
 
@@ -29,7 +29,7 @@ The GitHub App is the identity of the bot. It receives GitHub events (assignment
    - **GitHub App name:** `blast-swe-bot` (or any name you prefer)
    - **Homepage URL:** your repo URL (`https://github.com/Nico2398/BlastSimulator2026`)
    - **Webhook URL:** *(leave blank for now — you'll fill this in after deploying the Worker in Step 3)*
-   - **Webhook secret:** generate a random string (e.g. `openssl rand -hex 32` in any shell, or use a password manager). **Save this value** — you will need it in Steps 2 and 4.
+   - **Webhook secret:** click the **"Generate"** button next to the field — GitHub will fill in a cryptographically random value. Copy it and save it somewhere (a password manager or a text note). **You will need this exact value later in Step 4.** If you miss it, you can always set a new one and update the secret in Step 4.
 
 3. Under **Permissions → Repository permissions**, set:
    - **Issues:** Read & Write
