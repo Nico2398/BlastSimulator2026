@@ -53,7 +53,7 @@ GitHub events  (@openswe comment / manual dispatch)
 3. **Checkout open-swe** — Clones `langchain-ai/open-swe` into `./open-swe`.
 4. **Install Python + uv** — Python 3.12, `uv sync --all-extras`.
 5. **Patch model.py** — Adds a guard so `OPENAI_BASE_URL` is respected for any OpenAI-compatible provider (DeepSeek, Together, etc.) without forking open-swe.
-6. **Inject tools and context** — Copies `.openswe/tools/backlog_tools.py` into open-swe and patches `agent/server.py` to register the seven backlog functions. Also copies `.openswe/AGENTS.md` (the agent's system prompt) into open-swe so it is available at the path referenced by `DEFAULT_PROMPT_PATH`.
+6. **Inject tools and context** — Copies every `*.py` file from `.openswe/tools/` into the open-swe tools package, then auto-discovers all public top-level functions in those files and patches `agent/server.py` to import and register them. Also copies `.openswe/AGENTS.md` (the agent's system prompt) into open-swe so it is available at the path referenced by `DEFAULT_PROMPT_PATH`.
 7. **Configure git** — Sets identity and rewrites `github.com` pushes to use `GITHUB_TOKEN`.
 8. **Fetch issue** — Gets the issue/PR title and body via the GitHub API.
 9. **Start LangGraph server + run agent** — Starts `langgraph dev` on port 2024, then invokes the agent via the LangGraph Python SDK. Polls until `success`, `error`, or `interrupted`.

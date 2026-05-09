@@ -41,11 +41,15 @@ jobs:
         with:
           script: |
             const isDispatch = context.eventName === 'workflow_dispatch';
-            const issueNumber = isDispatch
-              ? parseInt(context.payload.inputs.issue_number)
-              : context.payload.comment
+            let issueNumber;
+            if (isDispatch) {
+              issueNumber = parseInt(context.payload.inputs.issue_number.replace(/\D/g, ''), 10);
+              if (!issueNumber) core.setFailed('issue_number must be a valid integer'); return;
+            } else {
+              issueNumber = context.payload.comment
                 ? context.issue.number
                 : (context.payload.issue?.number ?? context.payload.pull_request?.number);
+            }
 
             if (!isDispatch && context.payload.comment) {
               // React to the triggering comment
@@ -110,53 +114,95 @@ jobs:
           print("Patch applied to", path)
           EOF
 
-      # ── 6. Inject backlog tools and agent context ───────────────────────────
-      # Copies .openswe/tools/backlog_tools.py into open-swe's tools package and
-      # patches agent/server.py to import and register the seven backlog functions.
+      # ── 6. Inject custom tools and agent context ───────────────────────────
+      # Copies every *.py file from .openswe/tools/ into open-swe's tools package,
+      # then auto-discovers all public (non-underscore) top-level functions in those
+      # files and patches agent/server.py to import and register them.
       # Also copies AGENTS.md (the agent's system prompt) into the open-swe directory
       # so it is available at the path referenced by DEFAULT_PROMPT_PATH.
-      - name: Inject backlog tools and agent context
+      - name: Inject custom tools and agent context
         run: |
-          cp $GITHUB_WORKSPACE/.openswe/tools/backlog_tools.py ./open-swe/agent/tools/backlog_tools.py
+          # Copy every tool file and AGENTS.md
+          cp $GITHUB_WORKSPACE/.openswe/tools/*.py ./open-swe/agent/tools/
           cp $GITHUB_WORKSPACE/.openswe/AGENTS.md ./open-swe/AGENTS.md
 
           python - <<'EOF'
-          path = 'open-swe/agent/server.py'
-          src = open(path).read()
+          import ast, glob, os
 
-          # Import the seven backlog functions before the existing .tools import
-          old_import = 'from .tools import ('
-          new_import = (
-              'from .tools.backlog_tools import (\n'
-              '    backlog_block,\n'
-              '    backlog_done,\n'
-              '    backlog_list,\n'
-              '    backlog_next,\n'
-              '    backlog_reset,\n'
-              '    backlog_start,\n'
-              '    backlog_stats,\n'
-              ')\n'
-              'from .tools import ('
-          )
-          src = src.replace(old_import, new_import, 1)
+          tools_src = os.environ["GITHUB_WORKSPACE"] + "/.openswe/tools"
+          server_path = "open-swe/agent/server.py"
 
-          # Append backlog tools after slack_thread_reply in the tools list
-          old_tools = '            slack_read_thread_messages,\n            slack_thread_reply,'
-          new_tools = (
-              '            slack_read_thread_messages,\n'
-              '            slack_thread_reply,\n'
-              '            backlog_block,\n'
-              '            backlog_done,\n'
-              '            backlog_list,\n'
-              '            backlog_next,\n'
-              '            backlog_reset,\n'
-              '            backlog_start,\n'
-              '            backlog_stats,'
-          )
-          src = src.replace(old_tools, new_tools, 1)
+          # Discover public top-level functions per tool module
+          module_fns: dict[str, list[str]] = {}
+          for fpath in sorted(glob.glob(f"{tools_src}/*.py")):
+              mod = os.path.splitext(os.path.basename(fpath))[0]
+              top_fns = [
+                  n.name for n in ast.parse(open(fpath).read()).body
+                  if isinstance(n, ast.FunctionDef) and not n.name.startswith("_")
+              ]
+              if top_fns:
+                  module_fns[mod] = top_fns
 
-          open(path, 'w').write(src)
-          print('Backlog tools patched into agent/server.py')
+          if not module_fns:
+              print("No public tool functions found — skipping server.py patch")
+              raise SystemExit(0)
+
+          # Build import block
+          import_block = ""
+          for mod, fns in module_fns.items():
+              import_block += f"from .tools.{mod} import (\n"
+              for fn in fns:
+                  import_block += f"    {fn},\n"
+              import_block += ")\n"
+
+          # Flat list of all tool function names
+          tool_entries = [fn for fns in module_fns.values() for fn in fns]
+
+          # Patch server.py
+          src = open(server_path).read()
+
+          # 1. Inject imports before the existing '.tools' package import
+          anchor_import = "from .tools import ("
+          src = src.replace(anchor_import, import_block + anchor_import, 1)
+
+          # 2. Append tool entries just before the closing ']' of the tools list.
+          #    Parse the *original* src (before import insertion) to find the line.
+          orig_src = open(server_path).read()
+          tree = ast.parse(orig_src)
+          insert_line = None
+          for node in ast.walk(tree):
+              if (
+                  isinstance(node, ast.Assign)
+                  and any(isinstance(t, ast.Name) and t.id == "tools" for t in node.targets)
+                  and isinstance(node.value, ast.List)
+              ):
+                  insert_line = node.value.end_lineno  # 1-based line of closing ']'
+                  break
+
+          if insert_line:
+              lines = src.splitlines(keepends=True)
+              # After import insertion the line numbers shifted by the number of
+              # import lines added, so recalculate from the modified src.
+              tree2 = ast.parse(src)
+              for node in ast.walk(tree2):
+                  if (
+                      isinstance(node, ast.Assign)
+                      and any(isinstance(t, ast.Name) and t.id == "tools" for t in node.targets)
+                      and isinstance(node.value, ast.List)
+                  ):
+                      insert_line = node.value.end_lineno
+                      break
+              lines = src.splitlines(keepends=True)
+              indent = "            "
+              new_entries = "".join(f"{indent}{fn},\n" for fn in tool_entries)
+              lines.insert(insert_line - 1, new_entries)
+              src = "".join(lines)
+          else:
+              print("WARNING: could not locate tools list in server.py via AST")
+
+          open(server_path, "w").write(src)
+          all_fns = ", ".join(tool_entries)
+          print(f"Injected tools: {all_fns}")
           EOF
 
       # ── 7. Configure git identity ────────────────────────────────────────────
@@ -177,7 +223,7 @@ jobs:
         with:
           script: |
             const issueNumber = context.eventName === 'workflow_dispatch'
-              ? parseInt(context.payload.inputs.issue_number)
+              ? parseInt(context.payload.inputs.issue_number.replace(/\D/g, ''), 10)
               : (context.payload.issue?.number ?? context.payload.pull_request?.number);
             const issue = await github.rest.issues.get({
               owner: context.repo.owner,
@@ -242,7 +288,7 @@ jobs:
           ISSUE_NUMBER: ${{ github.event.inputs.issue_number || github.event.issue.number || github.event.pull_request.number }}
           ISSUE_TITLE: ${{ steps.issue.outputs.title }}
           ISSUE_BODY: ${{ steps.issue.outputs.body }}
-          COMMENT_BODY: ${{ github.event.inputs.comment_body || github.event.comment.body || format('@openswe triggered via {0} on #{1}', github.event.action, github.event.issue.number || github.event.pull_request.number) }}
+          COMMENT_BODY: ${{ github.event.inputs.comment_body || github.event.comment.body || format('@openswe triggered manually on #{0}', github.event.inputs.issue_number) }}
 
         run: |
           # Start the LangGraph in-memory server in the background.
