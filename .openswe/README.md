@@ -13,8 +13,6 @@ The agent is powered by [open-swe](https://github.com/langchain-ai/open-swe) —
 | Action | How | Who can use |
 |---|---|---|
 | **@mention** | Post `@openswe <instruction>` in a comment | Repo owner only |
-| **Assignment** | Assign `openswe` to any issue or PR | Anyone with write access |
-| **Review request** | Request `openswe` as a PR reviewer | Anyone with write access |
 | **Manual dispatch** | **Actions → Open SWE Agent → Run workflow** | Anyone with Actions access |
 
 The agent replies with 👀, implements the task, and opens a PR.
@@ -24,14 +22,14 @@ The agent replies with 👀, implements the task, and opens a PR.
 ## Architecture
 
 ```
-GitHub events  (comment / assignment / review request / manual dispatch)
+GitHub events  (@openswe comment / manual dispatch)
     │
     ▼
 [GitHub Actions: open-swe-agent.yml]
-    │  1. checkout open-swe
-    │  2. patch model.py for any OpenAI-compatible provider
-    │  3. inject custom tools (backlog_tools.py)
-    │  4. inject agent context (AGENTS.md)
+    │  1. checkout this repo
+    │  2. checkout open-swe
+    │  3. patch model.py for any OpenAI-compatible provider
+    │  4. inject custom tools (backlog_tools.py) + context (AGENTS.md)
     │  5. start LangGraph server
     │  6. invoke agent via SDK
     ▼
@@ -51,14 +49,15 @@ GitHub events  (comment / assignment / review request / manual dispatch)
 **What it does, step by step:**
 
 1. **Acknowledge** — Posts 👀 reaction or comment so the user knows the agent started.
-2. **Checkout open-swe** — Clones `langchain-ai/open-swe` into `./open-swe`.
-3. **Install Python + uv** — Python 3.12, `uv sync --all-extras`.
-4. **Patch model.py** — Adds a guard so `OPENAI_BASE_URL` is respected for any OpenAI-compatible provider (DeepSeek, Together, etc.) without forking open-swe.
-5. **Inject tools** — Copies `.openswe/tools/backlog_tools.py` into open-swe and patches `agent/server.py` to register the seven backlog functions as agent tools.
-6. **Configure git** — Sets identity and rewrites `github.com` pushes to use `GITHUB_TOKEN`.
-7. **Fetch issue** — Gets the issue/PR title and body via the GitHub API.
-8. **Start LangGraph server + run agent** — Starts `langgraph dev` on port 2024, then invokes the agent via the LangGraph Python SDK. Polls until `success`, `error`, or `interrupted`.
-9. **Debug on failure** — Dumps `/tmp/langgraph.log` if anything fails.
+2. **Checkout this repo** — Checks out BlastSimulator2026 to the workspace root so all `.openswe/` files are available.
+3. **Checkout open-swe** — Clones `langchain-ai/open-swe` into `./open-swe`.
+4. **Install Python + uv** — Python 3.12, `uv sync --all-extras`.
+5. **Patch model.py** — Adds a guard so `OPENAI_BASE_URL` is respected for any OpenAI-compatible provider (DeepSeek, Together, etc.) without forking open-swe.
+6. **Inject tools and context** — Copies `.openswe/tools/backlog_tools.py` into open-swe and patches `agent/server.py` to register the seven backlog functions. Also copies `.openswe/AGENTS.md` (the agent's system prompt) into open-swe so it is available at the path referenced by `DEFAULT_PROMPT_PATH`.
+7. **Configure git** — Sets identity and rewrites `github.com` pushes to use `GITHUB_TOKEN`.
+8. **Fetch issue** — Gets the issue/PR title and body via the GitHub API.
+9. **Start LangGraph server + run agent** — Starts `langgraph dev` on port 2024, then invokes the agent via the LangGraph Python SDK. Polls until `success`, `error`, or `interrupted`.
+10. **Debug on failure** — Dumps `/tmp/langgraph.log` if anything fails.
 
 **LLM is fully configurable** via environment variables — see [SETUP.md § LLM configuration](./SETUP.md#llm-configuration).
 

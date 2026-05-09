@@ -13,25 +13,16 @@ on:
         type: string
   issue_comment:
     types: [created]
-  issues:
-    types: [assigned]
-  pull_request:
-    types: [assigned, review_requested]
 
 jobs:
   run-open-swe:
     name: Execute Open SWE
     # Trigger when:
-    #  - dispatched by the blast-swe-bot Cloudflare Worker (workflow_dispatch)
-    #  - a comment on an issue or PR contains '@openswe' (only repo owners)
-    #  - the issue/PR is assigned to the openswe bot or blast-swe-bot[bot]
-    #  - openswe or blast-swe-bot[bot] is requested as a reviewer on a PR
+    #  - manually dispatched from the Actions tab (workflow_dispatch)
+    #  - a comment on an issue or PR contains '@openswe' (repo owner only)
     if: |
       github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@openswe') && github.event.comment.author_association == 'OWNER') ||
-      (github.event_name == 'issues' && github.event.action == 'assigned' && (github.event.assignee.login == 'openswe' || github.event.assignee.login == 'blast-swe-bot[bot]')) ||
-      (github.event_name == 'pull_request' && github.event.action == 'assigned' && (github.event.assignee.login == 'openswe' || github.event.assignee.login == 'blast-swe-bot[bot]')) ||
-      (github.event_name == 'pull_request' && github.event.action == 'review_requested' && (github.event.requested_reviewer.login == 'openswe' || github.event.requested_reviewer.login == 'blast-swe-bot[bot]'))
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@openswe') && github.event.comment.author_association == 'OWNER')
     runs-on: ubuntu-latest
 
     # These write permissions are required:
@@ -74,14 +65,18 @@ jobs:
               });
             }
 
-      # ── 2. Checkout Open SWE ────────────────────────────────────────────────
+      # ── 2. Checkout this repository ─────────────────────────────────────────
+      - name: Checkout BlastSimulator2026
+        uses: actions/checkout@v4
+
+      # ── 3. Checkout Open SWE ────────────────────────────────────────────────
       - name: Checkout Open SWE Repository
         uses: actions/checkout@v4
         with:
           repository: langchain-ai/open-swe
           path: open-swe
 
-      # ── 3. Python + uv ──────────────────────────────────────────────────────
+      # ── 4. Python + uv ──────────────────────────────────────────────────────
       # langgraph.json specifies python_version 3.12
       - name: Setup Python 3.12
         uses: actions/setup-python@v5
@@ -94,7 +89,7 @@ jobs:
           pip install uv
           uv sync --all-extras
 
-      # ── 4. Patch make_model() for DeepSeek ──────────────────────────────────
+      # ── 5. Patch make_model() for DeepSeek ──────────────────────────────────
       # Open-SWE's make_model() in agent/utils/model.py always overrides base_url
       # to wss://api.openai.com/v1 (the OpenAI Responses WebSocket) for any model
       # with the "openai:" prefix. That breaks DeepSeek's OpenAI-compatible endpoint.
@@ -115,12 +110,15 @@ jobs:
           print("Patch applied to", path)
           EOF
 
-      # ── 5. Inject backlog tools ─────────────────────────────────────────────
+      # ── 6. Inject backlog tools and agent context ───────────────────────────
       # Copies .openswe/tools/backlog_tools.py into open-swe's tools package and
       # patches agent/server.py to import and register the seven backlog functions.
-      - name: Inject backlog tools
+      # Also copies AGENTS.md (the agent's system prompt) into the open-swe directory
+      # so it is available at the path referenced by DEFAULT_PROMPT_PATH.
+      - name: Inject backlog tools and agent context
         run: |
           cp $GITHUB_WORKSPACE/.openswe/tools/backlog_tools.py ./open-swe/agent/tools/backlog_tools.py
+          cp $GITHUB_WORKSPACE/.openswe/AGENTS.md ./open-swe/AGENTS.md
 
           python - <<'EOF'
           path = 'open-swe/agent/server.py'
@@ -161,7 +159,7 @@ jobs:
           print('Backlog tools patched into agent/server.py')
           EOF
 
-      # ── 6. Configure git identity ────────────────────────────────────────────
+      # ── 7. Configure git identity ────────────────────────────────────────────
       # The agent's commit_and_open_pr tool needs git credentials.
       # GITHUB_TOKEN (auto-provisioned) is used for HTTPS pushes via the URL rewrite.
       - name: Configure git credentials
@@ -172,7 +170,7 @@ jobs:
             url."https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf \
             "https://github.com/"
 
-      # ── 7. Fetch issue content ───────────────────────────────────────────────
+      # ── 8. Fetch issue content ───────────────────────────────────────────────
       - name: Fetch Issue Details
         id: issue
         uses: actions/github-script@v7
@@ -189,7 +187,7 @@ jobs:
             core.setOutput('title', issue.data.title);
             core.setOutput('body', issue.data.body || '');
 
-      # ── 8. Start server + run agent ──────────────────────────────────────────
+      # ── 9. Start server + run agent ──────────────────────────────────────────
       #
       # MODEL
       #   LLM_MODEL_ID=openai:deepseek-v4-flash
@@ -237,10 +235,10 @@ jobs:
           LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
           LANGCHAIN_PROJECT: "BlastSimulator2026-openswe"
 
-          # Custom project instructions — injected as the default prompt
-          DEFAULT_PROMPT_PATH: ${{ github.workspace }}/.openswe/AGENTS.md
+          # Custom project instructions — injected as the default prompt (copied in step 6)
+          DEFAULT_PROMPT_PATH: ${{ github.workspace }}/open-swe/AGENTS.md
 
-          # Issue/PR context (works for comment, assignment, review-request, and dispatch events)
+          # Issue/PR context (works for comment and dispatch events)
           ISSUE_NUMBER: ${{ github.event.inputs.issue_number || github.event.issue.number || github.event.pull_request.number }}
           ISSUE_TITLE: ${{ steps.issue.outputs.title }}
           ISSUE_BODY: ${{ steps.issue.outputs.body }}
@@ -323,7 +321,7 @@ jobs:
           asyncio.run(main())
           PYEOF
 
-      # ── 9. Debug logs on failure ─────────────────────────────────────────────
+      # ── 10. Debug logs on failure ────────────────────────────────────────────
       - name: Dump LangGraph server log
         if: failure()
         run: cat /tmp/langgraph.log || true
