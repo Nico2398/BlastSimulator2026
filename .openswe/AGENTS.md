@@ -20,6 +20,21 @@ Detailed specs for each system live in `.github/skills/`. Read the relevant file
 | `testing-strategy` | `.github/skills/testing-strategy/SKILL.md` | Test pyramid, Vitest patterns |
 | `coding-conventions` | `.github/skills/coding-conventions/SKILL.md` | TypeScript style, naming, i18n |
 
+## GitHub Tools — Fetch Task Context First
+
+At the start of every task, fetch full context before writing any code:
+
+```
+github_get_issue(N)              → title, state, labels, body
+github_list_issue_comments(N)    → all discussion on the issue
+github_get_pr(N)                 → PR head/base, file count, body (if N is a PR)
+github_get_pr_files(N)           → files changed in the PR
+github_get_pr_reviews(N)         → reviewer decisions
+github_get_pr_review_comments(N) → inline code review comments
+```
+
+`GITHUB_TOKEN` is already set — no extra auth needed.
+
 ## Architecture (never violate these boundaries)
 
 - `src/core/` → pure TypeScript, zero side effects, no DOM/WebGL/window. Fully testable in Node.js.

@@ -216,22 +216,19 @@ jobs:
             url."https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf \
             "https://github.com/"
 
-      # ── 8. Fetch issue content ───────────────────────────────────────────────
-      - name: Fetch Issue Details
+      # ── 8. Resolve issue number ──────────────────────────────────────────────
+      # Only the number is needed here. The agent fetches full context itself
+      # via the github_get_issue / github_get_pr tools injected in step 6.
+      - name: Resolve Issue Number
         id: issue
         uses: actions/github-script@v7
         with:
           script: |
-            const issueNumber = context.eventName === 'workflow_dispatch'
+            const isDispatch = context.eventName === 'workflow_dispatch';
+            const issueNumber = isDispatch
               ? parseInt(context.payload.inputs.issue_number.replace(/\D/g, ''), 10)
               : (context.payload.issue?.number ?? context.payload.pull_request?.number);
-            const issue = await github.rest.issues.get({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: issueNumber
-            });
-            core.setOutput('title', issue.data.title);
-            core.setOutput('body', issue.data.body || '');
+            core.setOutput('number', String(issueNumber));
 
       # ── 9. Start server + run agent ──────────────────────────────────────────
       #
@@ -284,10 +281,9 @@ jobs:
           # Custom project instructions — injected as the default prompt (copied in step 6)
           DEFAULT_PROMPT_PATH: ${{ github.workspace }}/open-swe/AGENTS.md
 
-          # Issue/PR context (works for comment and dispatch events)
-          ISSUE_NUMBER: ${{ github.event.inputs.issue_number || github.event.issue.number || github.event.pull_request.number }}
-          ISSUE_TITLE: ${{ steps.issue.outputs.title }}
-          ISSUE_BODY: ${{ steps.issue.outputs.body }}
+          # Issue/PR context — only the number is passed; the agent fetches the
+          # rest via the github_get_issue / github_get_pr tools.
+          ISSUE_NUMBER: ${{ steps.issue.outputs.number }}
           COMMENT_BODY: ${{ github.event.inputs.comment_body || github.event.comment.body || format('@openswe triggered manually on #{0}', github.event.inputs.issue_number) }}
 
         run: |
@@ -319,14 +315,17 @@ jobs:
               repo_owner   = os.environ["DEFAULT_REPO_OWNER"]
               repo_name    = os.environ["DEFAULT_REPO_NAME"]
               issue_number = os.environ["ISSUE_NUMBER"]
-              issue_title  = os.environ["ISSUE_TITLE"]
-              issue_body   = os.environ.get("ISSUE_BODY", "")
               comment_body = os.environ["COMMENT_BODY"]
 
+              # Minimal context: just the reference. The agent fetches full
+              # details via github_get_issue() / github_get_pr() tools.
               task = (
                   f"Resolve GitHub issue #{issue_number} in {repo_owner}/{repo_name}.\n\n"
-                  f"Title: {issue_title}\n\n"
-                  f"Description:\n{issue_body}\n\n"
+                  f"Start by calling github_get_issue({issue_number}) to read the full issue, "
+                  f"then call github_list_issue_comments({issue_number}) to see all discussion.\n"
+                  f"If the issue references or is a pull request, also call "
+                  f"github_get_pr({issue_number}), github_get_pr_files({issue_number}), and "
+                  f"github_get_pr_reviews({issue_number}) to understand the full context.\n\n"
                   f"User instruction:\n{comment_body}"
               )
 
