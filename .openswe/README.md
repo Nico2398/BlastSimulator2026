@@ -12,13 +12,15 @@ The agent is powered by [open-swe](https://github.com/langchain-ai/open-swe) —
 
 Three ways to start the agent on any issue or PR:
 
-| Action | How |
-|---|---|
-| **Assign** | Assign the issue or PR to `blast-swe-bot` |
-| **Comment** | Post `@openswe <instruction>` on an issue (repo owner only) |
-| **Review request** | Request `blast-swe-bot` as a reviewer on a PR |
+| Action | How | Who can use |
+|---|---|---|
+| **Label** | Add the `openswe` label to any issue or PR | Anyone with triage access |
+| **Slash command** | Post `/openswe <instruction>` as the first line of a comment | Anyone with write access |
+| **Comment mention** | Post `@openswe <instruction>` in a comment | Repo owner only |
 
 The agent replies with 👀, implements the task, and opens a PR.
+
+> **Note on bot assignment:** GitHub App bot accounts (those ending in `[bot]`) are of type `Bot`, not `User`. GitHub's assignee picker only surfaces `User` accounts, so `blast-swe-bot[bot]` cannot be added as a collaborator or appear in the picker. Use the label or slash command triggers instead.
 
 ---
 
@@ -62,9 +64,11 @@ GitHub events  (assign / comment / review request)
 
 | GitHub event | Trigger condition | Passes to workflow |
 |---|---|---|
-| `issues.assigned` | Assignee is `blast-swe-bot[bot]` | `issue_number` |
-| `issue_comment.created` | Body contains `@openswe`, sender is a User | `issue_number` + `comment_body` |
-| `pull_request.assigned` / `review_requested` | Assignee or reviewer is `blast-swe-bot[bot]` | PR number |
+| `issues.labeled` | Label name is `openswe` | `issue_number` |
+| `issue_comment.created` | First line is `/openswe …`, sender has write access | `issue_number` + `comment_body` |
+| `issue_comment.created` | Body contains `@openswe`, sender is repo owner | `issue_number` + `comment_body` |
+| `pull_request.labeled` | Label name is `openswe` | PR number |
+| `pull_request_review_comment.created` | First line is `/openswe …`, sender has write access | PR number + `comment_body` |
 
 All other events return `ignored` immediately.
 

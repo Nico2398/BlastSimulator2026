@@ -164,17 +164,37 @@ GitHub will now send all subscribed events to your Worker, signed with that secr
 
 ## Step 7 — Test the full pipeline
 
+### Option A — Label trigger (recommended)
+
 1. Open any issue in the repository.
-2. Assign the issue to `blast-swe-bot[bot]`.
+2. Add the `openswe` label to the issue.
 3. Within a few seconds, the bot should post a comment: `👀 Open SWE Agent picking this up…`
 4. Go to **GitHub → Actions** to see the `open-swe-agent.yml` run in progress.
 5. The agent will implement the task and open a PR with `Closes #<issue-number>` in the body.
 
-You can also trigger via comment:
+The same works on pull requests — add the `openswe` label to a PR to trigger the agent.
+
+### Option B — Slash command in a comment
+
+Anyone with **write access** to the repository can trigger the agent by posting a comment whose first line starts with `/openswe`:
+
+```
+/openswe fix the null pointer exception in VoxelGrid
+```
+
+This is the standard [ChatOps slash-command pattern](https://github.com/peter-evans/slash-command-dispatch) used across the GitHub ecosystem. The command is parsed from the first line of the comment; the rest of the comment body is passed as the instruction.
+
+Works on both issues and pull requests. The agent reacts with 👀 to acknowledge the command.
+
+### Option C — @mention (owner only)
+
+Repo owners can also trigger via a full mention in any comment body:
+
 ```
 @openswe please implement this feature
 ```
-(Only repo owners can trigger via comment — this is enforced by the workflow.)
+
+This bypasses the slash-command permission check and is only available to the repository owner.
 
 ---
 
