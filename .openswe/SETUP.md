@@ -1,7 +1,6 @@
 # Setup Guide — BlastSimulator2026 Cloud SWE Agent
 
-Full step-by-step installation for the Cloudflare + open-swe + LangSmith pipeline.
-**No local machine required at any point.** Every step is done in the browser.
+Two steps. No local machine. No external infrastructure.
 
 > **Already set up?** See [README.md](./README.md) for a workflow overview.
 
@@ -9,192 +8,35 @@ Full step-by-step installation for the Cloudflare + open-swe + LangSmith pipelin
 
 ## Prerequisites
 
-You need accounts on:
 - **GitHub** — repo owner access
-- **Cloudflare** — free plan is enough
 - **An LLM provider** — DeepSeek (default), OpenAI, Anthropic, or any OpenAI-compatible API
 - **LangSmith** *(optional)* — [smith.langchain.com](https://smith.langchain.com)
 
 ---
 
-## Step 1 — Create the GitHub App
+## Step 1 — Add your LLM API key as a GitHub Actions secret
 
-The GitHub App is the identity of the bot. It receives GitHub events (assignments, comments, review requests) and sends them as signed webhooks to the Cloudflare Worker.
-
-### 1a. Create the app
-
-1. Go to **GitHub → Settings → Developer settings → GitHub Apps → New GitHub App**
-   (or: `https://github.com/settings/apps/new`)
-2. Fill in:
-   - **GitHub App name:** `blast-swe-bot` (or any name you prefer)
-   - **Homepage URL:** your repo URL (`https://github.com/Nico2398/BlastSimulator2026`)
-   - **Webhook URL:** *(leave blank for now — you'll fill this in after deploying the Worker in Step 5)*
-   - **Webhook secret:** click the **"Generate"** button next to the field — GitHub will fill in a cryptographically random value. Copy it and save it somewhere (a password manager or a text note). **You will need this exact value later in Step 4.** If you miss it, you can always set a new one and update the secret in Step 4.
-
-3. Under **Permissions → Repository permissions**, set:
-   - **Issues:** Read & Write
-   - **Pull requests:** Read & Write
-   - **Contents:** Read & Write
-   - **Metadata:** Read-only *(required by GitHub)*
-
-4. Under **Subscribe to events**, check:
-   - **Issues**
-   - **Issue comment**
-   - **Pull request**
-
-5. Under **Where can this GitHub App be installed?** — select **Only on this account**.
-
-6. Click **Create GitHub App**.
-
-### 1b. Note down the App ID
-
-After creation, you land on the app settings page. Copy the **App ID** — you may need it if you later switch to per-user identity commits. For now, it's informational.
-
-### 1c. Install the app on your repository
-
-1. On the app settings page, click **Install App** in the left sidebar.
-2. Select your account, then choose **Only select repositories** → pick `BlastSimulator2026`.
-3. Click **Install**.
-
-After installation, GitHub will show the app's bot account as `blast-swe-bot[bot]`. This is the login the Worker checks against (`BOT_LOGIN` in `wrangler.toml`).
-
----
-
-## Step 2 — Collect Cloudflare credentials
-
-You need two values from Cloudflare before deploying the Worker.
-
-### 2a. Cloudflare Account ID
-
-1. Log in to [dash.cloudflare.com](https://dash.cloudflare.com).
-2. Click **Workers & Pages** in the left sidebar.
-3. Your **Account ID** is shown in the right sidebar under "Account ID". Copy it.
-
-### 2b. Cloudflare API Token
-
-1. Go to [dash.cloudflare.com/profile/api-tokens](https://dash.cloudflare.com/profile/api-tokens).
-2. Click **Create Token**.
-3. Use the **"Edit Cloudflare Workers"** template.
-4. Under **Account Resources** — select your account.
-5. Under **Zone Resources** — leave as "All zones" or set to "None" (Workers don't need zone access).
-6. Click **Continue to summary → Create Token**.
-7. Copy the token. **You cannot view it again after leaving the page.**
-
----
-
-## Step 3 — Create a Fine-Grained PAT for the Worker
-
-The Worker calls the GitHub Actions API to dispatch workflows. It needs a token with Actions write access.
-
-1. Go to **GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token**.
-2. Set:
-   - **Token name:** `blast-swe-worker-pat`
-   - **Expiration:** set to your preference (1 year recommended)
-   - **Repository access:** Only select repositories → `BlastSimulator2026`
-   - **Permissions → Repository permissions → Actions:** Read & Write
-3. Click **Generate token**. Copy it — you cannot view it again.
-
----
-
-## Step 4 — Add GitHub Actions secrets
-
-All secrets are stored in **GitHub → your repo → Settings → Secrets and variables → Actions → New repository secret**.
-
-Add these six secrets:
+1. Go to **GitHub → your repo → Settings → Secrets and variables → Actions → New repository secret**.
+2. Add:
 
 | Secret name | Value |
 |---|---|
-| `CF_API_TOKEN` | Cloudflare API token from Step 2b |
-| `CF_ACCOUNT_ID` | Cloudflare Account ID from Step 2a |
-| `CF_WEBHOOK_SECRET` | The random string you generated in Step 1a |
-| `CF_GH_PAT` | Fine-grained PAT from Step 3 |
-| `DEEPSEEK_API_KEY` | Your DeepSeek API key (or see [LLM configuration](#llm-configuration) to use a different provider) |
+| `DEEPSEEK_API_KEY` | Your DeepSeek API key (or see [LLM configuration](#llm-configuration) for other providers) |
 | `LANGSMITH_API_KEY` | *(optional)* LangSmith API key — tracing auto-enables when present |
 
 ---
 
-## Step 5 — Deploy the Cloudflare Worker
+## Step 2 — Trigger the agent
 
-The Worker is deployed automatically by CI. No local tools needed.
-
-1. Go to **GitHub → your repo → Actions → "Deploy Cloudflare Worker"**.
-2. Click **Run workflow → Run workflow**.
-3. Wait ~60 seconds for the job to complete.
-
-The workflow:
-- Checks out `.cloudflare/blast-swe-webhook/`
-- Runs `npm ci`
-- Uses `cloudflare/wrangler-action` to deploy the Worker and push `WEBHOOK_SECRET` + `GH_PAT` as Cloudflare secrets
-
-**Future deploys happen automatically** on every push to `main` that touches the Worker files.
-
-### Find the Worker URL
-
-After the first deploy:
-1. Go to [dash.cloudflare.com](https://dash.cloudflare.com) → **Workers & Pages**.
-2. Click **blast-swe-webhook**.
-3. The Worker URL is shown at the top: `https://blast-swe-webhook.<YOUR_SUBDOMAIN>.workers.dev`
-
-> The `<YOUR_SUBDOMAIN>` part is your Cloudflare workers subdomain, visible on the Worker detail page. It looks like `blast-swe-webhook.abc123.workers.dev`.
-
-**Copy this URL** — you need it in the next step.
-
----
-
-## Step 6 — Configure the GitHub App webhook
-
-Now that the Worker is deployed and you have its URL:
-
-1. Go to **GitHub → Settings → Developer settings → GitHub Apps → blast-swe-bot → Edit**.
-2. Under **Webhook**:
-   - **Webhook URL:** paste the Worker URL from Step 5 (`https://blast-swe-webhook.<YOUR_SUBDOMAIN>.workers.dev`)
-   - **Webhook secret:** paste the same random string you used in Step 1a and stored as `CF_WEBHOOK_SECRET`
-   - **SSL verification:** Enable
-3. Click **Save changes**.
-
-GitHub will now send all subscribed events to your Worker, signed with that secret.
-
-### Verify the webhook
-
-1. Still on the app edit page, click **Advanced** in the left sidebar.
-2. Click **Redeliver** next to any recent delivery, or trigger a test event by assigning an issue to `blast-swe-bot`.
-3. You should see a `202` response. If you see `401`, the webhook secret doesn't match — double-check `CF_WEBHOOK_SECRET` in GitHub Actions secrets and the value entered in the app settings.
-
----
-
-## Step 7 — Test the full pipeline
-
-### Option A — Label trigger (recommended)
-
-1. Open any issue in the repository.
-2. Add the `openswe` label to the issue.
-3. Within a few seconds, the bot should post a comment: `👀 Open SWE Agent picking this up…`
-4. Go to **GitHub → Actions** to see the `open-swe-agent.yml` run in progress.
-5. The agent will implement the task and open a PR with `Closes #<issue-number>` in the body.
-
-The same works on pull requests — add the `openswe` label to a PR to trigger the agent.
-
-### Option B — Slash command in a comment
-
-Anyone with **write access** to the repository can trigger the agent by posting a comment whose first line starts with `/openswe`:
+The agent starts when you post `@openswe` in a comment on any issue or PR (repo owner only):
 
 ```
-/openswe fix the null pointer exception in VoxelGrid
+@openswe implement the navmesh ramp routing feature
 ```
 
-This is the standard [ChatOps slash-command pattern](https://github.com/peter-evans/slash-command-dispatch) used across the GitHub ecosystem. The command is parsed from the first line of the comment; the rest of the comment body is passed as the instruction.
+The agent replies with 👀, implements the task, and opens a PR.
 
-Works on both issues and pull requests. The agent reacts with 👀 to acknowledge the command.
-
-### Option C — @mention (owner only)
-
-Repo owners can also trigger via a full mention in any comment body:
-
-```
-@openswe please implement this feature
-```
-
-This bypasses the slash-command permission check and is only available to the repository owner.
+You can also trigger manually: **GitHub → Actions → "Open SWE Agent" → Run workflow** and enter the issue number.
 
 ---
 
@@ -280,10 +122,6 @@ All secrets go in **GitHub → repo → Settings → Secrets and variables → A
 
 | Secret | Required | Purpose |
 |---|---|---|
-| `CF_API_TOKEN` | Yes | Cloudflare API token — deploys the Worker |
-| `CF_ACCOUNT_ID` | Yes | Cloudflare account ID — deploys the Worker |
-| `CF_WEBHOOK_SECRET` | Yes | HMAC key — must match the GitHub App webhook secret |
-| `CF_GH_PAT` | Yes | Fine-grained PAT — Worker calls `workflow_dispatch` |
 | `DEEPSEEK_API_KEY` | Yes* | LLM API key (*or replace with your provider) |
 | `LANGSMITH_API_KEY` | No | LangSmith tracing — auto-enables when present |
 
@@ -291,41 +129,11 @@ All secrets go in **GitHub → repo → Settings → Secrets and variables → A
 
 ## Troubleshooting
 
-### Bot not visible in the assignee picker
-
-GitHub App bots are **not** listed in the default assignee dropdown — only human collaborators appear there. You must **type the bot name** (e.g. `blast-swe-bot`) in the search field; it will then appear and can be selected.
-
-If it still doesn't appear after typing, the cause is that GitHub's assignee search only returns accounts that have previously interacted with the repo (comments, commits, etc.). A freshly installed bot has no activity, so it's invisible to the picker.
-
-**Fix — add the bot as a collaborator:**
-
-1. Go to **repo → Settings → Collaborators → Add people**.
-2. Search for `blast-swe-bot[bot]` (or `blast-swe-bot` if the `[bot]` suffix returns no results).
-3. Grant **Write** role.
-4. Reload the issue — the bot now appears in the assignee dropdown.
-
-This is a one-time step. After the first assignment + successful run, the bot's activity on the repo means it appears in the picker without needing collaborator access, but keeping it as a collaborator is harmless.
-
-### Bot doesn't respond to assignment
-
-1. Check **GitHub → Settings → Developer settings → GitHub Apps → blast-swe-bot → Advanced** — look at recent webhook deliveries.
-2. If the delivery shows `401` → the `CF_WEBHOOK_SECRET` in GitHub Actions secrets doesn't match the secret in the app settings.
-3. If the delivery shows `ignored` → the bot login in `wrangler.toml` (`BOT_LOGIN`) doesn't match the actual bot login. Check the bot's username in the issue assignees.
-4. If there's no delivery at all → the app may not be installed on the repo, or the event type isn't subscribed.
-
 ### Workflow starts but agent fails immediately
 
 1. Check the Actions run log.
 2. Look at the "Dump LangGraph server log" step — it shows the raw LangGraph server output including import errors and model call failures.
 3. Common causes: wrong `LLM_MODEL_ID` format, missing or expired API key, `OPENAI_BASE_URL` not set when using a third-party provider.
-
-### Webhook delivers but workflow_dispatch fails
-
-The `GH_PAT` may have expired or the repo access may have been revoked. Generate a new token (Step 3) and update the `CF_GH_PAT` secret.
-
-### Worker not updating after code changes
-
-The deploy workflow triggers automatically on push to `main` that touches `.cloudflare/blast-swe-webhook/**`. You can also trigger it manually: **Actions → Deploy Cloudflare Worker → Run workflow**.
 
 ---
 
@@ -339,15 +147,7 @@ The deploy workflow triggers automatically on push to `main` that touches `.clou
   tools/
     backlog_tools.py     ← custom tools injected into open-swe at runtime
 
-.cloudflare/
-  blast-swe-webhook/
-    src/index.ts         ← Worker: HMAC verify + workflow_dispatch relay
-    wrangler.toml        ← non-secret config (repo owner, workflow file, bot login)
-    package.json
-    package-lock.json
-
 .github/
   workflows/
     open-swe-agent.yml   ← agent runner workflow
-    deploy-worker.yml    ← auto-deploys Worker on push to main
 ```

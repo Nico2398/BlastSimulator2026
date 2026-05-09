@@ -1,41 +1,31 @@
-# BlastSimulator2026 — Full Cloud SWE Agent
+# BlastSimulator2026 — Cloud SWE Agent
 
 A fully autonomous cloud SWE agent for BlastSimulator2026. No local machine, no CLI, no manual deploys. Every component runs in the cloud.
 
 The agent is powered by [open-swe](https://github.com/langchain-ai/open-swe) — LangChain's open-source software engineering agent — running inside GitHub Actions. It works with **any LLM**: OpenAI, Anthropic, DeepSeek, Together, Azure, or any OpenAI-compatible provider.
 
-> **First time setup?** See [SETUP.md](./SETUP.md) for the full step-by-step installation guide.
+> **First time setup?** See [SETUP.md](./SETUP.md) for the full installation guide.
 
 ---
 
 ## How to trigger the agent
 
-Three ways to start the agent on any issue or PR:
-
 | Action | How | Who can use |
 |---|---|---|
-| **Label** | Add the `openswe` label to any issue or PR | Anyone with triage access |
-| **Slash command** | Post `/openswe <instruction>` as the first line of a comment | Anyone with write access |
-| **Comment mention** | Post `@openswe <instruction>` in a comment | Repo owner only |
+| **@mention** | Post `@openswe <instruction>` in a comment | Repo owner only |
+| **Assignment** | Assign `openswe` to any issue or PR | Anyone with write access |
+| **Review request** | Request `openswe` as a PR reviewer | Anyone with write access |
+| **Manual dispatch** | **Actions → Open SWE Agent → Run workflow** | Anyone with Actions access |
 
 The agent replies with 👀, implements the task, and opens a PR.
-
-> **Note on bot assignment:** GitHub App bot accounts (those ending in `[bot]`) are of type `Bot`, not `User`. GitHub's assignee picker only surfaces `User` accounts, so `blast-swe-bot[bot]` cannot be added as a collaborator or appear in the picker. Use the label or slash command triggers instead.
 
 ---
 
 ## Architecture
 
 ```
-GitHub events  (assign / comment / review request)
+GitHub events  (comment / assignment / review request / manual dispatch)
     │
-    ▼
-[blast-swe-bot GitHub App]
-    │  signed webhook POST  →  https://blast-swe-webhook.<subdomain>.workers.dev
-    ▼
-[Cloudflare Worker: blast-swe-webhook]
-    │  HMAC-SHA256 signature verification
-    │  GitHub API: POST workflow_dispatch
     ▼
 [GitHub Actions: open-swe-agent.yml]
     │  1. checkout open-swe
@@ -54,31 +44,7 @@ GitHub events  (assign / comment / review request)
 
 ---
 
-## The three layers
-
-### Layer 1 — Cloudflare Worker (webhook relay)
-
-**Why it exists:** GitHub Apps cannot directly trigger `workflow_dispatch`. The Worker bridges the gap: it receives GitHub's signed webhook, verifies the HMAC-SHA256 signature, and calls the GitHub Actions API to dispatch the workflow.
-
-**What it handles:**
-
-| GitHub event | Trigger condition | Passes to workflow |
-|---|---|---|
-| `issues.labeled` | Label name is `openswe` | `issue_number` |
-| `issue_comment.created` | First line is `/openswe …`, sender has write access | `issue_number` + `comment_body` |
-| `issue_comment.created` | Body contains `@openswe`, sender is repo owner | `issue_number` + `comment_body` |
-| `pull_request.labeled` | Label name is `openswe` | PR number |
-| `pull_request_review_comment.created` | First line is `/openswe …`, sender has write access | PR number + `comment_body` |
-
-All other events return `ignored` immediately.
-
-**Security:** The Worker uses constant-time HMAC comparison (Web Crypto API). Any request with an invalid or missing signature returns `401` before any logic runs.
-
-**Deployed automatically** by `.github/workflows/deploy-worker.yml` on every push to `main` that touches `.cloudflare/blast-swe-webhook/**`, or manually from the Actions tab.
-
----
-
-### Layer 2 — GitHub Actions workflow (agent runner)
+## GitHub Actions workflow (agent runner)
 
 **Location:** `.github/workflows/open-swe-agent.yml`
 
@@ -98,7 +64,7 @@ All other events return `ignored` immediately.
 
 ---
 
-### Layer 3 — Agent context and tools
+## Agent context and tools
 
 **`AGENTS.md`** — The agent's system prompt. Injected via `DEFAULT_PROMPT_PATH`. Contains project overview, architecture rules, skill table, validation commands, backlog rules, and PR conventions.
 
@@ -135,19 +101,12 @@ All runs appear under the `BlastSimulator2026-openswe` LangSmith project.
 ```
 .openswe/
   README.md              ← this file (workflow overview)
-  SETUP.md               ← full installation tutorial
+  SETUP.md               ← installation guide
   AGENTS.md              ← agent system prompt
   tools/
     backlog_tools.py     ← custom tools injected into open-swe at runtime
 
-.cloudflare/
-  blast-swe-webhook/
-    src/index.ts         ← Worker: HMAC verify + workflow_dispatch
-    wrangler.toml        ← non-secret config (repo, workflow file, bot login)
-    package.json / package-lock.json
-
 .github/
   workflows/
     open-swe-agent.yml   ← agent runner
-    deploy-worker.yml    ← auto-deploys the Worker from CI
 ```
