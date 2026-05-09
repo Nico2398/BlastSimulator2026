@@ -29,7 +29,7 @@ GitHub events  (@openswe comment / manual dispatch)
     │  1. checkout this repo
     │  2. checkout open-swe
     │  3. patch model.py for any OpenAI-compatible provider
-    │  4. inject custom tools (backlog_tools.py) + context (AGENTS.md)
+    │  4. inject custom tools + context (AGENTS.md)
     │  5. start LangGraph server
     │  6. invoke agent via SDK
     ▼
@@ -67,17 +67,7 @@ GitHub events  (@openswe comment / manual dispatch)
 
 **`AGENTS.md`** — The agent's system prompt. Injected via `DEFAULT_PROMPT_PATH`. Contains project overview, architecture rules, skill table, validation commands, backlog rules, and PR conventions.
 
-**`tools/backlog_tools.py`** — Seven tools patched into open-swe at runtime. The agent uses these to read the task backlog, claim tasks, and mark them done. All reads/writes go through the GitHub REST API; no local file access needed.
-
-| Tool | Purpose |
-|---|---|
-| `backlog_stats()` | Progress overview |
-| `backlog_list(status, chapter)` | Browse tasks |
-| `backlog_next()` | Next unblocked task |
-| `backlog_start(task_id)` | Claim a task (enforces one active at a time) |
-| `backlog_done(task_id, pr_number)` | Mark done after merge |
-| `backlog_block(task_id)` | Mark blocked |
-| `backlog_reset(task_id)` | Reset to pending |
+**`tools/`** — Custom Python tools patched into open-swe at runtime. Each file in this directory exposes functions that are registered as agent tools and injected into `agent/server.py` at startup. Add, remove, or replace tool files here to extend what the agent can do — no fork of open-swe needed.
 
 ---
 
@@ -103,7 +93,7 @@ All runs appear under the `BlastSimulator2026-openswe` LangSmith project.
   SETUP.md               ← installation guide
   AGENTS.md              ← agent system prompt
   tools/
-    backlog_tools.py     ← custom tools injected into open-swe at runtime
+    *.py                 ← custom tools injected into open-swe at runtime
 
 .github/
   workflows/
