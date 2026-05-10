@@ -289,7 +289,7 @@ jobs:
           # Issue/PR context — only the number is passed; the agent fetches the
           # rest via the github_get_issue / github_get_pr tools.
           ISSUE_NUMBER: ${{ steps.issue.outputs.number }}
-          COMMENT_BODY: ${{ github.event.inputs.comment_body || github.event.comment.body || format('@openswe triggered manually on #{0}', github.event.inputs.issue_number) }}
+          COMMENT_BODY: "${{ github.event.inputs.comment_body || github.event.comment.body || format('@openswe triggered manually on #{0}', github.event.inputs.issue_number) }}"
 
         run: |
           # Start the LangGraph in-memory server in the background.
