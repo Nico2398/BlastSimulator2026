@@ -8,7 +8,6 @@ import json
 import os
 import urllib.error
 import urllib.request
-from typing import Optional
 
 
 # ---------------------------------------------------------------------------
@@ -36,13 +35,18 @@ def _api(path: str) -> str:
     return f"https://api.github.com/repos/{owner}/{name}/{path}"
 
 
+_REQUEST_TIMEOUT = 30  # seconds
+
+
 def _get(url: str) -> dict | list:
     req = urllib.request.Request(url, headers=_headers())
     try:
-        with urllib.request.urlopen(req) as resp:
+        with urllib.request.urlopen(req, timeout=_REQUEST_TIMEOUT) as resp:
             return json.loads(resp.read())
     except urllib.error.HTTPError as exc:
         raise RuntimeError(f"GitHub API {exc.code}: {exc.reason} — {url}") from exc
+    except (urllib.error.URLError, TimeoutError) as exc:
+        raise RuntimeError(f"GitHub API network error — {url}: {exc}") from exc
 
 
 def _paginate(url: str) -> list[dict]:
@@ -116,7 +120,7 @@ def github_get_pr(pr_number: int) -> str:
 
     Returns:
         Formatted string with title, state, base/head branches, body,
-        changed file count, and review status.
+        changed file count, and merge status.
     """
     data = _get(_api(f"pulls/{pr_number}"))
     labels = ", ".join(lb["name"] for lb in data.get("labels", [])) or "none"

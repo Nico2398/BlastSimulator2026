@@ -225,9 +225,16 @@ jobs:
         with:
           script: |
             const isDispatch = context.eventName === 'workflow_dispatch';
-            const issueNumber = isDispatch
-              ? parseInt(context.payload.inputs.issue_number.replace(/\D/g, ''), 10)
-              : (context.payload.issue?.number ?? context.payload.pull_request?.number);
+            let issueNumber;
+            if (isDispatch) {
+              issueNumber = parseInt(context.payload.inputs.issue_number.replace(/\D/g, ''), 10);
+            } else {
+              issueNumber = context.payload.issue?.number ?? context.payload.pull_request?.number;
+            }
+            if (!issueNumber || isNaN(issueNumber)) {
+              core.setFailed(`Could not resolve a valid issue/PR number (got: ${issueNumber})`);
+              return;
+            }
             core.setOutput('number', String(issueNumber));
 
       # ── 9. Start server + run agent ──────────────────────────────────────────
@@ -314,25 +321,33 @@ jobs:
 
               repo_owner   = os.environ["DEFAULT_REPO_OWNER"]
               repo_name    = os.environ["DEFAULT_REPO_NAME"]
-              issue_number = os.environ["ISSUE_NUMBER"]
               comment_body = os.environ["COMMENT_BODY"]
+
+              raw_issue = os.environ.get("ISSUE_NUMBER", "")
+              try:
+                  issue_number = int(raw_issue)
+              except ValueError:
+                  print(f"ERROR: ISSUE_NUMBER is not a valid integer: {raw_issue!r}", file=sys.stderr)
+                  sys.exit(1)
+
+              issue_number_str = str(issue_number)
 
               # Minimal context: just the reference. The agent fetches full
               # details via github_get_issue() / github_get_pr() tools.
               task = (
-                  f"Resolve GitHub issue #{issue_number} in {repo_owner}/{repo_name}.\n\n"
-                  f"Start by calling github_get_issue({issue_number}) to read the full issue, "
-                  f"then call github_list_issue_comments({issue_number}) to see all discussion.\n"
+                  f"Resolve GitHub issue #{issue_number_str} in {repo_owner}/{repo_name}.\n\n"
+                  f"Start by calling github_get_issue({issue_number_str}) to read the full issue, "
+                  f"then call github_list_issue_comments({issue_number_str}) to see all discussion.\n"
                   f"If the issue references or is a pull request, also call "
-                  f"github_get_pr({issue_number}), github_get_pr_files({issue_number}), and "
-                  f"github_get_pr_reviews({issue_number}) to understand the full context.\n\n"
+                  f"github_get_pr({issue_number_str}), github_get_pr_files({issue_number_str}), and "
+                  f"github_get_pr_reviews({issue_number_str}) to understand the full context.\n\n"
                   f"User instruction:\n{comment_body}"
               )
 
               # Deterministic thread ID so follow-up comments route to the same run.
-              thread_id = f"github-{repo_owner}-{repo_name}-{issue_number}"
+              thread_id = f"github-{repo_owner}-{repo_name}-{issue_number_str}"
 
-              print(f"Starting agent run for {repo_owner}/{repo_name}#{issue_number}...")
+              print(f"Starting agent run for {repo_owner}/{repo_name}#{issue_number_str}...")
 
               run = await client.runs.create(
                   thread_id,
