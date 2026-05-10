@@ -20,9 +20,7 @@ jobs:
     # Trigger when:
     #  - manually dispatched from the Actions tab (workflow_dispatch)
     #  - a comment on an issue or PR contains '@openswe' (repo owner only)
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@openswe') && github.event.comment.author_association == 'OWNER')
+    if: "github.event_name == 'workflow_dispatch' || (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@openswe') && github.event.comment.author_association == 'OWNER')"
     runs-on: ubuntu-latest
 
     # These write permissions are required:
