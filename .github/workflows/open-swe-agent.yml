@@ -335,13 +335,18 @@ jobs:
               # Minimal context: just the reference. The agent fetches full
               # details via github_get_issue() / github_get_pr() tools.
               task = (
-                  f"Resolve GitHub issue #{issue_number_str} in {repo_owner}/{repo_name}.\n\n"
-                  f"Start by calling github_get_issue({issue_number_str}) to read the full issue, "
-                  f"then call github_list_issue_comments({issue_number_str}) to see all discussion.\n"
-                  f"If the issue references or is a pull request, also call "
-                  f"github_get_pr({issue_number_str}), github_get_pr_files({issue_number_str}), and "
-                  f"github_get_pr_reviews({issue_number_str}) to understand the full context.\n\n"
-                  f"User instruction:\n{comment_body}"
+                  f"Task: resolve GitHub issue #{issue_number_str} in {repo_owner}/{repo_name}.\n\n"
+                  f"## Step 1 — fetch issue context (always required)\n"
+                  f"  github_get_issue({issue_number_str})\n"
+                  f"  github_list_issue_comments({issue_number_str})\n\n"
+                  f"## Step 2 — fetch PR context (when the task involves a pull request)\n"
+                  f"If the issue IS a PR, or the user instruction mentions PR review feedback:\n"
+                  f"  github_get_pr({issue_number_str})\n"
+                  f"  github_get_pr_files({issue_number_str})\n"
+                  f"  github_get_pr_reviews({issue_number_str})\n"
+                  f"  github_get_pr_review_comments({issue_number_str})  ← inline code comments\n\n"
+                  f"Do not write any code until you have read all relevant context above.\n\n"
+                  f"## User instruction\n{comment_body}"
               )
 
               # Deterministic thread ID so follow-up comments route to the same run.

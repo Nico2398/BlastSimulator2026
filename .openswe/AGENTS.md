@@ -20,18 +20,32 @@ Detailed specs for each system live in `.github/skills/`. Read the relevant file
 | `testing-strategy` | `.github/skills/testing-strategy/SKILL.md` | Test pyramid, Vitest patterns |
 | `coding-conventions` | `.github/skills/coding-conventions/SKILL.md` | TypeScript style, naming, i18n |
 
-## GitHub Tools — Fetch Task Context First
+## GitHub Tools — Mandatory Context Protocol
 
-At the start of every task, fetch full context before writing any code:
+Always follow this protocol before writing any code:
 
+### Step 1 — Fetch the issue (always)
+
+```python
+github_get_issue(N)           # title, state, labels, full body
+github_list_issue_comments(N) # all discussion: user instructions, bot replies
 ```
-github_get_issue(N)              → title, state, labels, body
-github_list_issue_comments(N)    → all discussion on the issue
-github_get_pr(N)                 → PR head/base, file count, body (if N is a PR)
-github_get_pr_files(N)           → files changed in the PR
-github_get_pr_reviews(N)         → reviewer decisions
-github_get_pr_review_comments(N) → inline code review comments
+
+### Step 2 — Fetch PR context (when the task involves a pull request)
+
+Call these when the issue number IS a PR, or when the user instruction mentions a PR:
+
+```python
+github_get_pr(N)                 # head/base branches, file count, body
+github_get_pr_files(N)           # list of changed files with diff stats
+github_get_pr_reviews(N)         # high-level reviewer decisions (APPROVED / CHANGES_REQUESTED)
+github_get_pr_review_comments(N) # inline code comments — THE most important source for review tasks
 ```
+
+### When the task is "apply review feedback"
+
+The user instruction will mention review comments. Call **all four** PR tools above.
+`github_get_pr_review_comments(N)` contains the exact file+line feedback you must address.
 
 `GITHUB_TOKEN` is already set — no extra auth needed.
 
@@ -66,6 +80,20 @@ npm run validate        # TypeScript → tests → build (run after every change
 npm run test            # Tests only
 npx tsx src/console.ts  # Interactive gameplay testing (no browser)
 ```
+
+## Development Workflow (TDD Pipeline)
+
+For every feature or bug fix, follow this order:
+
+1. **Write failing tests first** — capture expected behaviour before implementation
+2. **Write minimum code to pass tests** — correctness over elegance
+3. **Refactor** — clean up for clarity without changing behaviour
+4. **Validate** — run `npm run validate` and fix all errors
+
+**Rules:**
+- Never commit code that breaks `npm run validate`
+- Never skip the test step — tests prove the fix works
+- One logical change per commit; PR body must include `Closes #<number>`
 
 ## ⚠️ MANDATORY: PR body must include `Closes #<number>`
 
