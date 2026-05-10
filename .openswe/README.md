@@ -67,7 +67,14 @@ GitHub events  (@openswe comment / manual dispatch)
 
 **`AGENTS.md`** — The agent's system prompt. Injected via `DEFAULT_PROMPT_PATH`. Contains project overview, architecture rules, skill table, validation commands, backlog rules, and PR conventions.
 
-**`tools/`** — Custom Python tools patched into open-swe at runtime. Each file in this directory exposes functions that are registered as agent tools and injected into `agent/server.py` at startup. Add, remove, or replace tool files here to extend what the agent can do — no fork of open-swe needed.
+**`tools/`** — Custom Python tools patched into open-swe at runtime. Each file exposes functions registered as agent tools and injected into `agent/server.py` at startup. Current tools:
+
+| Tool | Function | Purpose |
+|------|----------|---------|
+| `backlog_tools.py` | `backlog_list`, `backlog_next`, `backlog_start`, `backlog_done`, `backlog_block`, `backlog_reset`, `backlog_stats` | Manage the task backlog via GitHub API |
+| `github_tools.py` | `github_get_issue`, `github_list_issue_comments`, `github_get_pr`, `github_get_pr_files`, `github_get_pr_reviews`, `github_get_pr_review_comments` | Fetch full issue/PR context from GitHub |
+
+Add, remove, or replace tool files to extend the agent — no fork of open-swe needed.
 
 ---
 

@@ -216,22 +216,26 @@ jobs:
             url."https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf \
             "https://github.com/"
 
-      # ── 8. Fetch issue content ───────────────────────────────────────────────
-      - name: Fetch Issue Details
+      # ── 8. Resolve issue number ──────────────────────────────────────────────
+      # Only the number is needed here. The agent fetches full context itself
+      # via the github_get_issue / github_get_pr tools injected in step 6.
+      - name: Resolve Issue Number
         id: issue
         uses: actions/github-script@v7
         with:
           script: |
-            const issueNumber = context.eventName === 'workflow_dispatch'
-              ? parseInt(context.payload.inputs.issue_number.replace(/\D/g, ''), 10)
-              : (context.payload.issue?.number ?? context.payload.pull_request?.number);
-            const issue = await github.rest.issues.get({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: issueNumber
-            });
-            core.setOutput('title', issue.data.title);
-            core.setOutput('body', issue.data.body || '');
+            const isDispatch = context.eventName === 'workflow_dispatch';
+            let issueNumber;
+            if (isDispatch) {
+              issueNumber = parseInt(context.payload.inputs.issue_number.replace(/\D/g, ''), 10);
+            } else {
+              issueNumber = context.payload.issue?.number ?? context.payload.pull_request?.number;
+            }
+            if (!issueNumber || isNaN(issueNumber)) {
+              core.setFailed(`Could not resolve a valid issue/PR number (got: ${issueNumber})`);
+              return;
+            }
+            core.setOutput('number', String(issueNumber));
 
       # ── 9. Start server + run agent ──────────────────────────────────────────
       #
@@ -284,10 +288,9 @@ jobs:
           # Custom project instructions — injected as the default prompt (copied in step 6)
           DEFAULT_PROMPT_PATH: ${{ github.workspace }}/open-swe/AGENTS.md
 
-          # Issue/PR context (works for comment and dispatch events)
-          ISSUE_NUMBER: ${{ github.event.inputs.issue_number || github.event.issue.number || github.event.pull_request.number }}
-          ISSUE_TITLE: ${{ steps.issue.outputs.title }}
-          ISSUE_BODY: ${{ steps.issue.outputs.body }}
+          # Issue/PR context — only the number is passed; the agent fetches the
+          # rest via the github_get_issue / github_get_pr tools.
+          ISSUE_NUMBER: ${{ steps.issue.outputs.number }}
           COMMENT_BODY: ${{ github.event.inputs.comment_body || github.event.comment.body || format('@openswe triggered manually on #{0}', github.event.inputs.issue_number) }}
 
         run: |
@@ -318,22 +321,38 @@ jobs:
 
               repo_owner   = os.environ["DEFAULT_REPO_OWNER"]
               repo_name    = os.environ["DEFAULT_REPO_NAME"]
-              issue_number = os.environ["ISSUE_NUMBER"]
-              issue_title  = os.environ["ISSUE_TITLE"]
-              issue_body   = os.environ.get("ISSUE_BODY", "")
               comment_body = os.environ["COMMENT_BODY"]
 
+              raw_issue = os.environ.get("ISSUE_NUMBER", "")
+              try:
+                  issue_number = int(raw_issue)
+              except ValueError:
+                  print(f"ERROR: ISSUE_NUMBER is not a valid integer: {raw_issue!r}", file=sys.stderr)
+                  sys.exit(1)
+
+              issue_number_str = str(issue_number)
+
+              # Minimal context: just the reference. The agent fetches full
+              # details via github_get_issue() / github_get_pr() tools.
               task = (
-                  f"Resolve GitHub issue #{issue_number} in {repo_owner}/{repo_name}.\n\n"
-                  f"Title: {issue_title}\n\n"
-                  f"Description:\n{issue_body}\n\n"
-                  f"User instruction:\n{comment_body}"
+                  f"Task: resolve GitHub issue #{issue_number_str} in {repo_owner}/{repo_name}.\n\n"
+                  f"## Step 1 — fetch issue context (always required)\n"
+                  f"  github_get_issue({issue_number_str})\n"
+                  f"  github_list_issue_comments({issue_number_str})\n\n"
+                  f"## Step 2 — fetch PR context (when the task involves a pull request)\n"
+                  f"If the issue IS a PR, or the user instruction mentions PR review feedback:\n"
+                  f"  github_get_pr({issue_number_str})\n"
+                  f"  github_get_pr_files({issue_number_str})\n"
+                  f"  github_get_pr_reviews({issue_number_str})\n"
+                  f"  github_get_pr_review_comments({issue_number_str})  ← inline code comments\n\n"
+                  f"Do not write any code until you have read all relevant context above.\n\n"
+                  f"## User instruction\n{comment_body}"
               )
 
               # Deterministic thread ID so follow-up comments route to the same run.
-              thread_id = f"github-{repo_owner}-{repo_name}-{issue_number}"
+              thread_id = f"github-{repo_owner}-{repo_name}-{issue_number_str}"
 
-              print(f"Starting agent run for {repo_owner}/{repo_name}#{issue_number}...")
+              print(f"Starting agent run for {repo_owner}/{repo_name}#{issue_number_str}...")
 
               run = await client.runs.create(
                   thread_id,
