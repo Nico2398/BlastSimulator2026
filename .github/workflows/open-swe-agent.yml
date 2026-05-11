@@ -351,7 +351,8 @@ jobs:
 
               # Deterministic UUID thread ID so follow-up comments route to the same run.
               # LangGraph requires thread IDs to be UUIDs — derive one via uuid5.
-              _ns = uuid.UUID('6ba7b810-9dad-11d1-80b4-00c04fd430c8')  # URL namespace
+              # Keep the existing DNS namespace so thread IDs stay stable across follow-up comments.
+              _ns = uuid.NAMESPACE_DNS
               thread_id = str(uuid.uuid5(_ns, f"github-{repo_owner}-{repo_name}-{issue_number_str}"))
 
               print(f"Starting agent run for {repo_owner}/{repo_name}#{issue_number_str}...")
