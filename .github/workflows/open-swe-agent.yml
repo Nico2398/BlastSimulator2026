@@ -112,6 +112,37 @@ jobs:
           print("Patch applied to", path)
           EOF
 
+      # ── 5b. Patch auth.py to fall back to GITHUB_TOKEN ──────────────────────
+      # resolve_github_token() looks up github_login → email → LangSmith OAuth.
+      # We don't use LangSmith OAuth here — GITHUB_TOKEN from the runner is
+      # sufficient. Insert a short-circuit: if GITHUB_TOKEN is in env, use it
+      # directly and skip the email-mapping lookup entirely.
+      - name: Patch auth.py to use GITHUB_TOKEN
+        working-directory: ./open-swe
+        run: |
+          python - <<'EOF'
+          import re, sys
+          path = 'agent/utils/auth.py'
+          src = open(path).read()
+          # Ensure 'import os' is present (handle any whitespace variation)
+          if not re.search(r'^import os\b', src, re.MULTILINE):
+              src = 'import os\n' + src
+          old = '            github_login = configurable.get("github_login")'
+          new = (
+              '            env_token = os.environ.get("GITHUB_TOKEN", "")\n'
+              '            if env_token:\n'
+              '                encrypted = await persist_encrypted_github_token(thread_id, env_token)\n'
+              '                return env_token, encrypted, None\n'
+              '            github_login = configurable.get("github_login")'
+          )
+          if old not in src:
+              print("ERROR: anchor not found in auth.py — cannot apply patch", file=sys.stderr)
+              sys.exit(1)
+          src = src.replace(old, new, 1)
+          open(path, 'w').write(src)
+          print("Patch applied to", path)
+          EOF
+
       # ── 6. Inject custom tools and agent context ───────────────────────────
       # Copies every *.py file from .openswe/tools/ into open-swe's tools package,
       # then auto-discovers all public (non-underscore) top-level functions in those
