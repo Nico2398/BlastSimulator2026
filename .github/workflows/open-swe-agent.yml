@@ -266,6 +266,21 @@ jobs:
             }
             core.setOutput('number', String(issueNumber));
 
+      # ── 8b. Generate ephemeral Fernet encryption key ────────────────────────
+      # open-swe's encryption.py requires TOKEN_ENCRYPTION_KEY to be a valid
+      # Fernet key. It is only used within this single run (ephemeral).
+      - name: Generate encryption key
+        run: |
+          python - <<'PY'
+          import base64
+          import os
+
+          key = base64.urlsafe_b64encode(os.urandom(32)).decode()
+          with open(os.environ["GITHUB_ENV"], "a") as f:
+              f.write(f"TOKEN_ENCRYPTION_KEY={key}\n")
+          print("TOKEN_ENCRYPTION_KEY generated.")
+          PY
+
       # ── 9. Start server + run agent ──────────────────────────────────────────
       #
       # MODEL
@@ -308,6 +323,9 @@ jobs:
 
           # GitHub token for git push + PR creation
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+          # Fernet key for token encryption inside open-swe (generated in step 8b)
+          TOKEN_ENCRYPTION_KEY: ${{ env.TOKEN_ENCRYPTION_KEY }}
 
           # LangSmith tracing — set LANGSMITH_API_KEY in repo secrets to enable
           LANGCHAIN_TRACING_V2: ${{ secrets.LANGSMITH_API_KEY != '' && 'true' || 'false' }}
