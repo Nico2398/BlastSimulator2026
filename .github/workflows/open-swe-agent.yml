@@ -143,6 +143,18 @@ jobs:
           print("Patch applied to", path)
           EOF
 
+      # ── 5c. Patch langchain for DeepSeek reasoning_content ──────────────────
+      # DeepSeek thinking models (e.g. deepseek-v4-flash) return `reasoning_content`
+      # in assistant messages. LangChain drops this field when serializing message
+      # history, causing DeepSeek to reject multi-turn conversations with:
+      #   "The reasoning_content in the thinking mode must be passed back to the API."
+      # The injection is guarded by LLM_MODEL_ID so it is a no-op for non-DeepSeek
+      # providers, even if a thread previously ran with DeepSeek (edge-case safety).
+      # See .github/scripts/patch_langchain_reasoning.py for the full logic.
+      - name: Patch langchain for DeepSeek reasoning_content
+        working-directory: ./open-swe
+        run: uv run python $GITHUB_WORKSPACE/.github/scripts/patch_langchain_reasoning.py
+
       # ── 6. Inject custom tools and agent context ───────────────────────────
       # Copies every *.py file from .openswe/tools/ into open-swe's tools package,
       # then auto-discovers all public (non-underscore) top-level functions in those
@@ -341,6 +353,14 @@ jobs:
           COMMENT_BODY: "${{ github.event.inputs.comment_body || github.event.comment.body || format('@openswe triggered manually on #{0}', github.event.inputs.issue_number) }}"
 
         run: |
+          echo "=== Open SWE Agent run ==="
+          echo "Issue   : $ISSUE_NUMBER"
+          echo "Repo    : $DEFAULT_REPO_OWNER/$DEFAULT_REPO_NAME"
+          echo "Model   : $LLM_MODEL_ID"
+          echo "Sandbox : $SANDBOX_TYPE"
+          echo "Comment : $COMMENT_BODY"
+          echo "==========================="
+
           # Start the LangGraph in-memory server in the background.
           # All env vars above are inherited by the background process.
           nohup uv run langgraph dev --port 2024 > /tmp/langgraph.log 2>&1 &
@@ -405,6 +425,7 @@ jobs:
               thread_id = str(uuid.uuid5(_ns, f"github-{repo_owner}-{repo_name}-{issue_number_str}"))
 
               print(f"Starting agent run for {repo_owner}/{repo_name}#{issue_number_str}...")
+              sys.stdout.flush()
 
               run = await client.runs.create(
                   thread_id,
@@ -419,17 +440,36 @@ jobs:
               )
 
               print(f"Run ID: {run['run_id']}")
+              sys.stdout.flush()
 
               # Poll until the run reaches a terminal state.
               while True:
                   run = await client.runs.get(thread_id, run["run_id"])
                   status = run["status"]
                   print(f"Status: {status}")
+                  sys.stdout.flush()
                   if status in ("success", "error", "interrupted"):
                       break
                   await asyncio.sleep(10)
 
               if run["status"] != "success":
+                  # Print any structured error details from the run object
+                  run_error = run.get("error") or run.get("kwargs", {}).get("error")
+                  if run_error:
+                      print(f"Run error: {run_error}", file=sys.stderr)
+                  # Tail the server log to surface the real exception inline
+                  print("\n--- LangGraph server log (last 60 lines) ---", file=sys.stderr)
+                  try:
+                      import subprocess
+                      tail = subprocess.run(
+                          ["tail", "-n", "60", "/tmp/langgraph.log"],
+                          capture_output=True, text=True,
+                      )
+                      sys.stderr.write(tail.stdout)
+                  except Exception as le:
+                      print(f"(could not read langgraph.log: {le})", file=sys.stderr)
+                  print("--- end of server log ---", file=sys.stderr)
+                  sys.stderr.flush()
                   print("Agent run did not succeed.", file=sys.stderr)
                   sys.exit(1)
 
@@ -441,4 +481,7 @@ jobs:
       # ── 10. Debug logs on failure ────────────────────────────────────────────
       - name: Dump LangGraph server log
         if: failure()
-        run: cat /tmp/langgraph.log || true
+        run: |
+          echo "=== LangGraph server log ==="
+          cat /tmp/langgraph.log || echo "(log not found)"
+          echo "=== end of server log ==="
