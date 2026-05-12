@@ -271,14 +271,15 @@ jobs:
       # Fernet key. It is only used within this single run (ephemeral).
       - name: Generate encryption key
         run: |
-          python -c "
-          from cryptography.fernet import Fernet
+          python - <<'PY'
+          import base64
           import os
-          key = Fernet.generate_key().decode()
-          with open(os.environ['GITHUB_ENV'], 'a') as f:
-              f.write(f'TOKEN_ENCRYPTION_KEY={key}\n')
-          print('TOKEN_ENCRYPTION_KEY generated.')
-          "
+
+          key = base64.urlsafe_b64encode(os.urandom(32)).decode()
+          with open(os.environ["GITHUB_ENV"], "a") as f:
+              f.write(f"TOKEN_ENCRYPTION_KEY={key}\n")
+          print("TOKEN_ENCRYPTION_KEY generated.")
+          PY
 
       # ── 9. Start server + run agent ──────────────────────────────────────────
       #
