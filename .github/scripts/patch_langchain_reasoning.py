@@ -147,22 +147,26 @@ try:
     # role == "assistant" branch of _convert_dict_to_message.
     # ---------------------------------------------------------------------------
     SENTINEL1B = "# deepseek-reasoning-p1b"
-    if SENTINEL1B in cmb_src or SENTINEL1 in cmb_src:
+    if SENTINEL1B in cmb_src:
         print("Patch 3a (parse): already applied")
     else:
+        # Use detected indent_unit to build the anchor dynamically so the
+        # match is resilient to indentation style changes.
+        _i = cmb_indent_unit
+        _ai2 = _i * 2
         _audio_anchor = (
-            '        if audio := _dict.get("audio"):\n'
-            '            additional_kwargs["audio"] = audio\n'
-            '        return AIMessage('
+            f'{_ai2}if audio := _dict.get("audio"):\n'
+            f'{_ai2}{_i}additional_kwargs["audio"] = audio\n'
+            f'{_ai2}return AIMessage('
         )
         if _audio_anchor in cmb_src:
             _inject1b = (
-                '        if audio := _dict.get("audio"):\n'
-                '            additional_kwargs["audio"] = audio\n'
-                f'        {SENTINEL1B}\n'
-                '        if _dict.get("reasoning_content"):\n'
-                '            additional_kwargs["reasoning_content"] = _dict["reasoning_content"]\n'
-                '        return AIMessage('
+                f'{_ai2}if audio := _dict.get("audio"):\n'
+                f'{_ai2}{_i}additional_kwargs["audio"] = audio\n'
+                f'{_ai2}{SENTINEL1B}\n'
+                f'{_ai2}if _dict.get("reasoning_content"):\n'
+                f'{_ai2}{_i}additional_kwargs["reasoning_content"] = _dict["reasoning_content"]\n'
+                f'{_ai2}return AIMessage('
             )
             cmb_src = cmb_src.replace(_audio_anchor, _inject1b, 1)
             cmb_changed = True
@@ -178,7 +182,9 @@ try:
     if SENTINEL3 in cmb_src:
         print("Patch 3b (serialize): already applied")
     else:
-        m3 = re.search(r'([ \t]+)(elif "function_call" in message\.additional_kwargs:)', cmb_src)
+        # Match both `if` and `elif` to handle langchain_openai versions that
+        # differ in whether function_call is the first or a subsequent branch.
+        m3 = re.search(r'([ \t]+)((?:el)?if "function_call" in message\.additional_kwargs:)', cmb_src)
         if m3:
             indent3 = m3.group(1)
             child3 = indent3 + cmb_indent_unit
