@@ -183,7 +183,11 @@ jobs:
                   changed = True
                   print("Patch 1: applied — reasoning_content preserved in convert_dict_to_message")
               else:
-                  print("Patch 1: WARNING — anchor not found in", path, file=sys.stderr)
+                  print(
+                      "Patch 1: WARNING — anchor r'([ \\t]+)(additional_kwargs\\s*:\\s*Dict\\s*=\\s*\\{\\})'"
+                      f" not found in {path}; reasoning_content will NOT be preserved",
+                      file=sys.stderr,
+                  )
 
           # --- Patch 2: convert_message_to_dict ---
           # Re-include reasoning_content from AIMessage.additional_kwargs in API request dict
@@ -205,7 +209,11 @@ jobs:
                   changed = True
                   print("Patch 2: applied — reasoning_content re-injected in convert_message_to_dict")
               else:
-                  print("Patch 2: WARNING — anchor not found in", path, file=sys.stderr)
+                  print(
+                      "Patch 2: WARNING — anchor r'([ \\t]+)(if \"function_call\" in message\\.additional_kwargs:)'"
+                      f" not found in {path}; reasoning_content will NOT be re-injected",
+                      file=sys.stderr,
+                  )
 
           if changed:
               open(path, 'w').write(src)
@@ -234,9 +242,9 @@ jobs:
                       open(cmb_path, 'w').write(cmb_src)
                       print(f"Patch 3: applied to langchain_openai ({cmb_path})")
                   else:
-                      print(f"Patch 3: anchor not found in langchain_openai (likely not needed)")
+                      print(f"Patch 3: anchor not found in langchain_openai — same fix may not be needed there")
           except Exception as e:
-              print(f"Patch 3: skipped ({e})")
+              print(f"Patch 3: skipped (failed to import/patch langchain_openai: {e})")
 
           print("=== Patch complete ===")
           EOF
