@@ -143,6 +143,104 @@ jobs:
           print("Patch applied to", path)
           EOF
 
+      # ── 5c. Patch langchain for DeepSeek reasoning_content ──────────────────
+      # DeepSeek thinking models (e.g. deepseek-v4-flash) return `reasoning_content`
+      # in assistant messages. LangChain drops this field when serializing message
+      # history, causing DeepSeek to reject multi-turn conversations with:
+      #   "The reasoning_content in the thinking mode must be passed back to the API."
+      # Patch 1: preserve reasoning_content (API response → AIMessage.additional_kwargs)
+      # Patch 2: re-inject reasoning_content (AIMessage.additional_kwargs → API request)
+      # Patch 3: same fix applied to langchain_openai if it imports the fn locally
+      - name: Patch langchain for DeepSeek reasoning_content
+        working-directory: ./open-swe
+        run: |
+          uv run python - <<'EOF'
+          import inspect, re, sys
+          print("=== DeepSeek reasoning_content patch ===")
+
+          import langchain_core.messages.utils as mu
+          path = inspect.getfile(mu)
+          src = open(path).read()
+          print(f"File: {path}")
+          changed = False
+
+          # --- Patch 1: convert_dict_to_message ---
+          # Store reasoning_content into AIMessage.additional_kwargs when parsing response
+          SENTINEL1 = "# deepseek-reasoning-p1"
+          if SENTINEL1 in src:
+              print("Patch 1: already applied")
+          else:
+              m = re.search(r'([ \t]+)(additional_kwargs\s*:\s*Dict\s*=\s*\{\})', src)
+              if m:
+                  indent = m.group(1)
+                  anchor = m.group(0)
+                  inject = (
+                      f"\n{indent}{SENTINEL1}\n"
+                      f"{indent}if _dict.get(\"reasoning_content\"):\n"
+                      f"{indent}    additional_kwargs[\"reasoning_content\"] = _dict[\"reasoning_content\"]\n"
+                  )
+                  src = src.replace(anchor, anchor + inject, 1)
+                  changed = True
+                  print("Patch 1: applied — reasoning_content preserved in convert_dict_to_message")
+              else:
+                  print("Patch 1: WARNING — anchor not found in", path, file=sys.stderr)
+
+          # --- Patch 2: convert_message_to_dict ---
+          # Re-include reasoning_content from AIMessage.additional_kwargs in API request dict
+          SENTINEL2 = "# deepseek-reasoning-p2"
+          if SENTINEL2 in src:
+              print("Patch 2: already applied")
+          else:
+              m2 = re.search(r'([ \t]+)(if "function_call" in message\.additional_kwargs:)', src)
+              if m2:
+                  indent2 = m2.group(1)
+                  anchor2 = m2.group(0)
+                  inject2 = (
+                      f"{indent2}{SENTINEL2}\n"
+                      f"{indent2}if \"reasoning_content\" in message.additional_kwargs:\n"
+                      f"{indent2}    message_dict[\"reasoning_content\"] = message.additional_kwargs[\"reasoning_content\"]\n"
+                      f"{anchor2}"
+                  )
+                  src = src.replace(anchor2, inject2, 1)
+                  changed = True
+                  print("Patch 2: applied — reasoning_content re-injected in convert_message_to_dict")
+              else:
+                  print("Patch 2: WARNING — anchor not found in", path, file=sys.stderr)
+
+          if changed:
+              open(path, 'w').write(src)
+              print(f"Written: {path}")
+
+          # --- Patch 3: langchain_openai (may import convert_message_to_dict locally) ---
+          try:
+              import langchain_openai.chat_models.base as cmb
+              cmb_path = inspect.getfile(cmb)
+              cmb_src = open(cmb_path).read()
+              SENTINEL3 = "# deepseek-reasoning-p3"
+              if SENTINEL3 in cmb_src:
+                  print("Patch 3: already applied")
+              else:
+                  m3 = re.search(r'([ \t]+)(if "function_call" in message\.additional_kwargs:)', cmb_src)
+                  if m3:
+                      indent3 = m3.group(1)
+                      anchor3 = m3.group(0)
+                      inject3 = (
+                          f"{indent3}{SENTINEL3}\n"
+                          f"{indent3}if \"reasoning_content\" in message.additional_kwargs:\n"
+                          f"{indent3}    message_dict[\"reasoning_content\"] = message.additional_kwargs[\"reasoning_content\"]\n"
+                          f"{anchor3}"
+                      )
+                      cmb_src = cmb_src.replace(anchor3, inject3, 1)
+                      open(cmb_path, 'w').write(cmb_src)
+                      print(f"Patch 3: applied to langchain_openai ({cmb_path})")
+                  else:
+                      print(f"Patch 3: anchor not found in langchain_openai (likely not needed)")
+          except Exception as e:
+              print(f"Patch 3: skipped ({e})")
+
+          print("=== Patch complete ===")
+          EOF
+
       # ── 6. Inject custom tools and agent context ───────────────────────────
       # Copies every *.py file from .openswe/tools/ into open-swe's tools package,
       # then auto-discovers all public (non-underscore) top-level functions in those
@@ -341,6 +439,14 @@ jobs:
           COMMENT_BODY: "${{ github.event.inputs.comment_body || github.event.comment.body || format('@openswe triggered manually on #{0}', github.event.inputs.issue_number) }}"
 
         run: |
+          echo "=== Open SWE Agent run ==="
+          echo "Issue   : $ISSUE_NUMBER"
+          echo "Repo    : $DEFAULT_REPO_OWNER/$DEFAULT_REPO_NAME"
+          echo "Model   : $LLM_MODEL_ID"
+          echo "Sandbox : $SANDBOX_TYPE"
+          echo "Comment : $COMMENT_BODY"
+          echo "==========================="
+
           # Start the LangGraph in-memory server in the background.
           # All env vars above are inherited by the background process.
           nohup uv run langgraph dev --port 2024 > /tmp/langgraph.log 2>&1 &
@@ -405,6 +511,7 @@ jobs:
               thread_id = str(uuid.uuid5(_ns, f"github-{repo_owner}-{repo_name}-{issue_number_str}"))
 
               print(f"Starting agent run for {repo_owner}/{repo_name}#{issue_number_str}...")
+              sys.stdout.flush()
 
               run = await client.runs.create(
                   thread_id,
@@ -419,17 +526,33 @@ jobs:
               )
 
               print(f"Run ID: {run['run_id']}")
+              sys.stdout.flush()
 
               # Poll until the run reaches a terminal state.
               while True:
                   run = await client.runs.get(thread_id, run["run_id"])
                   status = run["status"]
                   print(f"Status: {status}")
+                  sys.stdout.flush()
                   if status in ("success", "error", "interrupted"):
                       break
                   await asyncio.sleep(10)
 
               if run["status"] != "success":
+                  # Print any structured error details from the run object
+                  run_error = run.get("error") or run.get("kwargs", {}).get("error")
+                  if run_error:
+                      print(f"Run error: {run_error}", file=sys.stderr)
+                  # Tail the server log to surface the real exception inline
+                  print("\n--- LangGraph server log (last 60 lines) ---", file=sys.stderr)
+                  try:
+                      with open("/tmp/langgraph.log") as lf:
+                          lines = lf.readlines()
+                          sys.stderr.write("".join(lines[-60:]))
+                  except Exception as le:
+                      print(f"(could not read langgraph.log: {le})", file=sys.stderr)
+                  print("--- end of server log ---", file=sys.stderr)
+                  sys.stderr.flush()
                   print("Agent run did not succeed.", file=sys.stderr)
                   sys.exit(1)
 
@@ -441,4 +564,7 @@ jobs:
       # ── 10. Debug logs on failure ────────────────────────────────────────────
       - name: Dump LangGraph server log
         if: failure()
-        run: cat /tmp/langgraph.log || true
+        run: |
+          echo "=== LangGraph server log ==="
+          cat /tmp/langgraph.log || echo "(log not found)"
+          echo "=== end of server log ==="
