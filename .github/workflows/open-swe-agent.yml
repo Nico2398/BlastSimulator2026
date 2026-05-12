@@ -155,7 +155,7 @@ jobs:
         working-directory: ./open-swe
         run: |
           uv run python - <<'EOF'
-          import inspect, re, sys
+          import inspect, re, subprocess, sys
           print("=== DeepSeek reasoning_content patch ===")
 
           import langchain_core.messages.utils as mu
@@ -163,6 +163,15 @@ jobs:
           src = open(path).read()
           print(f"File: {path}")
           changed = False
+
+          def detect_indent_unit(text):
+              """Return the smallest indent unit found in text (spaces or tab)."""
+              if re.search(r'^\t', text, re.MULTILINE):
+                  return "\t"
+              widths = [len(m.group()) for m in re.finditer(r'^ +(?=\S)', text, re.MULTILINE) if m.group()]
+              return " " * min(widths) if widths else "    "
+
+          indent_unit = detect_indent_unit(src)
 
           # --- Patch 1: convert_dict_to_message ---
           # Store reasoning_content into AIMessage.additional_kwargs when parsing response
@@ -173,21 +182,24 @@ jobs:
               m = re.search(r'([ \t]+)(additional_kwargs\s*:\s*Dict\s*=\s*\{\})', src)
               if m:
                   indent = m.group(1)
-                  anchor = m.group(0)
+                  child = indent + indent_unit
                   inject = (
                       f"\n{indent}{SENTINEL1}\n"
                       f"{indent}if _dict.get(\"reasoning_content\"):\n"
-                      f"{indent}    additional_kwargs[\"reasoning_content\"] = _dict[\"reasoning_content\"]\n"
+                      f"{child}additional_kwargs[\"reasoning_content\"] = _dict[\"reasoning_content\"]\n"
                   )
-                  src = src.replace(anchor, anchor + inject, 1)
+                  # Insert after the matched anchor using span — avoids replace() choosing the wrong occurrence
+                  end = m.end()
+                  src = src[:end] + inject + src[end:]
                   changed = True
                   print("Patch 1: applied — reasoning_content preserved in convert_dict_to_message")
               else:
                   print(
-                      "Patch 1: WARNING — anchor r'([ \\t]+)(additional_kwargs\\s*:\\s*Dict\\s*=\\s*\\{\\})'"
-                      f" not found in {path}; reasoning_content will NOT be preserved",
+                      "Patch 1: FATAL — anchor r'([ \\t]+)(additional_kwargs\\s*:\\s*Dict\\s*=\\s*\\{\\})'"
+                      f" not found in {path}; cannot apply DeepSeek reasoning_content fix",
                       file=sys.stderr,
                   )
+                  sys.exit(1)
 
           # --- Patch 2: convert_message_to_dict ---
           # Re-include reasoning_content from AIMessage.additional_kwargs in API request dict
@@ -198,22 +210,24 @@ jobs:
               m2 = re.search(r'([ \t]+)(if "function_call" in message\.additional_kwargs:)', src)
               if m2:
                   indent2 = m2.group(1)
-                  anchor2 = m2.group(0)
+                  child2 = indent2 + indent_unit
                   inject2 = (
                       f"{indent2}{SENTINEL2}\n"
                       f"{indent2}if \"reasoning_content\" in message.additional_kwargs:\n"
-                      f"{indent2}    message_dict[\"reasoning_content\"] = message.additional_kwargs[\"reasoning_content\"]\n"
-                      f"{anchor2}"
+                      f"{child2}message_dict[\"reasoning_content\"] = message.additional_kwargs[\"reasoning_content\"]\n"
                   )
-                  src = src.replace(anchor2, inject2, 1)
+                  # Insert before the matched anchor using span
+                  start2 = m2.start()
+                  src = src[:start2] + inject2 + src[start2:]
                   changed = True
                   print("Patch 2: applied — reasoning_content re-injected in convert_message_to_dict")
               else:
                   print(
-                      "Patch 2: WARNING — anchor r'([ \\t]+)(if \"function_call\" in message\\.additional_kwargs:)'"
-                      f" not found in {path}; reasoning_content will NOT be re-injected",
+                      "Patch 2: FATAL — anchor r'([ \\t]+)(if \"function_call\" in message\\.additional_kwargs:)'"
+                      f" not found in {path}; cannot apply DeepSeek reasoning_content fix",
                       file=sys.stderr,
                   )
+                  sys.exit(1)
 
           if changed:
               open(path, 'w').write(src)
@@ -224,6 +238,7 @@ jobs:
               import langchain_openai.chat_models.base as cmb
               cmb_path = inspect.getfile(cmb)
               cmb_src = open(cmb_path).read()
+              cmb_indent_unit = detect_indent_unit(cmb_src)
               SENTINEL3 = "# deepseek-reasoning-p3"
               if SENTINEL3 in cmb_src:
                   print("Patch 3: already applied")
@@ -231,14 +246,14 @@ jobs:
                   m3 = re.search(r'([ \t]+)(if "function_call" in message\.additional_kwargs:)', cmb_src)
                   if m3:
                       indent3 = m3.group(1)
-                      anchor3 = m3.group(0)
+                      child3 = indent3 + cmb_indent_unit
                       inject3 = (
                           f"{indent3}{SENTINEL3}\n"
                           f"{indent3}if \"reasoning_content\" in message.additional_kwargs:\n"
-                          f"{indent3}    message_dict[\"reasoning_content\"] = message.additional_kwargs[\"reasoning_content\"]\n"
-                          f"{anchor3}"
+                          f"{child3}message_dict[\"reasoning_content\"] = message.additional_kwargs[\"reasoning_content\"]\n"
                       )
-                      cmb_src = cmb_src.replace(anchor3, inject3, 1)
+                      start3 = m3.start()
+                      cmb_src = cmb_src[:start3] + inject3 + cmb_src[start3:]
                       open(cmb_path, 'w').write(cmb_src)
                       print(f"Patch 3: applied to langchain_openai ({cmb_path})")
                   else:
@@ -554,9 +569,12 @@ jobs:
                   # Tail the server log to surface the real exception inline
                   print("\n--- LangGraph server log (last 60 lines) ---", file=sys.stderr)
                   try:
-                      with open("/tmp/langgraph.log") as lf:
-                          lines = lf.readlines()
-                          sys.stderr.write("".join(lines[-60:]))
+                      import subprocess
+                      tail = subprocess.run(
+                          ["tail", "-n", "60", "/tmp/langgraph.log"],
+                          capture_output=True, text=True,
+                      )
+                      sys.stderr.write(tail.stdout)
                   except Exception as le:
                       print(f"(could not read langgraph.log: {le})", file=sys.stderr)
                   print("--- end of server log ---", file=sys.stderr)
