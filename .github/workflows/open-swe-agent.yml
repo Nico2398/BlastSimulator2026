@@ -90,27 +90,7 @@ jobs:
         run: |
           pip install uv
           uv sync --all-extras
-
-      # ── 5. Patch make_model() for DeepSeek ──────────────────────────────────
-      # Open-SWE's make_model() in agent/utils/model.py always overrides base_url
-      # to wss://api.openai.com/v1 (the OpenAI Responses WebSocket) for any model
-      # with the "openai:" prefix. That breaks DeepSeek's OpenAI-compatible endpoint.
-      # This one-line patch makes it skip the override when OPENAI_BASE_URL is set.
-      - name: Patch model.py for OpenAI-compatible providers
-        working-directory: ./open-swe
-        run: |
-          python - <<'EOF'
-          path = 'agent/utils/model.py'
-          src = open(path).read()
-          if 'import os\n' not in src:
-              src = 'import os\n' + src
-          src = src.replace(
-              'if model_id.startswith("openai:"):',
-              'if model_id.startswith("openai:") and not os.environ.get("OPENAI_BASE_URL"):'
-          )
-          open(path, 'w').write(src)
-          print("Patch applied to", path)
-          EOF
+          uv pip install langchain-deepseek
 
       # ── 5b. Patch auth.py to fall back to GITHUB_TOKEN ──────────────────────
       # resolve_github_token() looks up github_login → email → LangSmith OAuth.
@@ -143,15 +123,13 @@ jobs:
           print("Patch applied to", path)
           EOF
 
-      # ── 5c. Patch langchain for DeepSeek reasoning_content ──────────────────
-      # DeepSeek thinking models (e.g. deepseek-v4-flash) return `reasoning_content`
-      # in assistant messages. LangChain drops this field when serializing message
-      # history, causing DeepSeek to reject multi-turn conversations with:
-      #   "The reasoning_content in the thinking mode must be passed back to the API."
-      # The injection is guarded by LLM_MODEL_ID so it is a no-op for non-DeepSeek
-      # providers, even if a thread previously ran with DeepSeek (edge-case safety).
-      # See .github/scripts/patch_langchain_reasoning.py for the full logic.
-      - name: Patch langchain for DeepSeek reasoning_content
+      # ── 5c. Patch ChatDeepSeek for reasoning_content ───────────────────────
+      # DeepSeek thinking models return `reasoning_content` in assistant messages.
+      # ChatDeepSeek stores it in AIMessage.additional_kwargs but does not pass it
+      # back in subsequent requests, causing a 400 error on multi-turn tool calls.
+      # The patch overrides ChatDeepSeek._get_request_payload to inject it back.
+      # See .github/scripts/patch_langchain_reasoning.py and issue #34166.
+      - name: Patch ChatDeepSeek for DeepSeek reasoning_content
         working-directory: ./open-swe
         run: uv run python $GITHUB_WORKSPACE/.github/scripts/patch_langchain_reasoning.py
 
@@ -296,10 +274,9 @@ jobs:
       # ── 9. Start server + run agent ──────────────────────────────────────────
       #
       # MODEL
-      #   LLM_MODEL_ID=openai:deepseek-v4-flash
-      #     "openai:" prefix → uses langchain-openai (ChatOpenAI) as the provider.
-      #     OPENAI_BASE_URL  → points ChatOpenAI at DeepSeek's OpenAI-compatible endpoint.
-      #     OPENAI_API_KEY   → your DeepSeek API key (stored as DEEPSEEK_API_KEY secret).
+      #   LLM_MODEL_ID=deepseek:deepseek-v4-flash
+      #     "deepseek:" prefix → uses langchain-deepseek (ChatDeepSeek) as the provider.
+      #     DEEPSEEK_API_KEY   → your DeepSeek API key (stored as DEEPSEEK_API_KEY secret).
       #
       # SANDBOX
       #   SANDBOX_TYPE=local runs every shell command directly on this Actions runner.
@@ -321,10 +298,9 @@ jobs:
       - name: Run Open SWE Agent
         working-directory: ./open-swe
         env:
-          # DeepSeek via OpenAI-compatible API
-          OPENAI_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
-          OPENAI_BASE_URL: "https://api.deepseek.com/v1"
-          LLM_MODEL_ID: "openai:deepseek-v4-flash"
+          # DeepSeek via native langchain-deepseek integration
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          LLM_MODEL_ID: "deepseek:deepseek-v4-flash"
 
           # Sandbox (local = run directly on this Actions runner)
           SANDBOX_TYPE: "local"
