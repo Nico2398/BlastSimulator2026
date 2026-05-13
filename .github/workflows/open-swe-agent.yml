@@ -90,7 +90,7 @@ jobs:
         run: |
           pip install uv
           uv sync --all-extras
-          uv pip install langchain-deepseek
+          uv pip install "langchain-deepseek>=1.0.1,<2"
 
       # ── 5b. Patch auth.py to fall back to GITHUB_TOKEN ──────────────────────
       # resolve_github_token() looks up github_login → email → LangSmith OAuth.
@@ -127,11 +127,16 @@ jobs:
       # DeepSeek thinking models return `reasoning_content` in assistant messages.
       # ChatDeepSeek stores it in AIMessage.additional_kwargs but does not pass it
       # back in subsequent requests, causing a 400 error on multi-turn tool calls.
-      # The patch overrides ChatDeepSeek._get_request_payload to inject it back.
+      # The patch is installed as sitecustomize.py in the uv venv so it is loaded
+      # automatically by every Python process (langgraph dev + agent runner).
+      # The patch is a no-op when langchain-deepseek is not installed (other provider).
       # See .github/scripts/patch_langchain_reasoning.py and issue #34166.
       - name: Patch ChatDeepSeek for DeepSeek reasoning_content
         working-directory: ./open-swe
-        run: uv run python $GITHUB_WORKSPACE/.github/scripts/patch_langchain_reasoning.py
+        run: |
+          UV_SITE=$(uv run python -c "import sysconfig; print(sysconfig.get_path('purelib'))")
+          cp $GITHUB_WORKSPACE/.github/scripts/patch_langchain_reasoning.py "${UV_SITE}/sitecustomize.py"
+          echo "Installed sitecustomize.py → ${UV_SITE}"
 
       # ── 6. Inject custom tools and agent context ───────────────────────────
       # Copies every *.py file from .openswe/tools/ into open-swe's tools package,
