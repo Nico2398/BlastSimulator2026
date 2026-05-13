@@ -113,6 +113,17 @@ export const TRAFFIC_JAM_MIN_VEHICLES = 3;
 /** Minimum consecutive waiting ticks per vehicle before it counts toward a traffic jam. */
 export const TRAFFIC_JAM_MIN_TICKS = 10;
 
+// ─── Ore Report Events ───────────────────────────────────────────────────────────
+
+/** Yield ratio threshold above which a blast is considered "Lucky Strike" (got more ore than surveyed). */
+export const ORE_REPORT_LUCKY_RATIO = 1.2;
+
+/** Yield ratio threshold below which a blast is considered "Barren Blast" (got less ore than surveyed). */
+export const ORE_REPORT_BARREN_RATIO = 0.5;
+
+/** Absurdium fraction threshold above which "Absurdium Jackpot" fires. */
+export const ORE_REPORT_ABSURDIUM_FRACTION = 0.3;
+
 // ─── Mining & Blasting ─────────────────────────────────────────────────────────
 
 /** Max fragments generated per voxel during a blast. Caps fragment count for performance. */
