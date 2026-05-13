@@ -303,9 +303,22 @@ jobs:
       - name: Run Open SWE Agent
         working-directory: ./open-swe
         env:
-          # DeepSeek via native langchain-deepseek integration
-          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          # ── LLM provider ───────────────────────────────────────────────────────
+          # To switch provider, change LLM_MODEL_ID and ensure the matching secret
+          # is set in the repo — no other files need to be modified.
+          #
+          #   deepseek:deepseek-v4-flash  → uses DEEPSEEK_API_KEY
+          #   openai:gpt-4o               → uses OPENAI_API_KEY
+          #   anthropic:claude-3-7-sonnet-20250219 → uses ANTHROPIC_API_KEY
+          #
+          # All three keys are forwarded; only the one matching the active provider
+          # is consumed by the LangGraph runtime (extras are ignored).
+          # The DeepSeek reasoning_content patch (sitecustomize.py) is a no-op
+          # when ChatDeepSeek is not the active provider.
           LLM_MODEL_ID: "deepseek:deepseek-v4-flash"
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
           # Sandbox (local = run directly on this Actions runner)
           SANDBOX_TYPE: "local"
