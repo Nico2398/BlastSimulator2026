@@ -3,7 +3,14 @@
 
 import type { Vehicle } from '../entities/Vehicle.js';
 import type { EventSystemState, FiredEvent } from './EventSystem.js';
-import { TRAFFIC_JAM_MIN_VEHICLES, TRAFFIC_JAM_MIN_TICKS } from '../config/balance.js';
+import type { BlastOreReport } from '../mining/BlastOreReport.js';
+import {
+  TRAFFIC_JAM_MIN_VEHICLES,
+  TRAFFIC_JAM_MIN_TICKS,
+  ORE_REPORT_LUCKY_RATIO,
+  ORE_REPORT_BARREN_RATIO,
+  ORE_REPORT_ABSURDIUM_FRACTION,
+} from '../config/balance.js';
 
 export { TRAFFIC_JAM_MIN_VEHICLES, TRAFFIC_JAM_MIN_TICKS };
 
@@ -57,4 +64,49 @@ export function detectUnqualifiedTask(
   const event: FiredEvent = { eventId: 'unqualified_task_error', firedAtTick: tickCount };
   state.pendingEvent = event;
   return event;
+}
+
+/**
+ * Detects ore report events after a blast.
+ * Checks conditions in priority order:
+ *   1. Legendary Vein — treranium found
+ *   2. Absurdium Jackpot — absurdium fraction > threshold
+ *   3. Lucky Strike — yield ratio > lucky threshold
+ *   4. Barren Blast — yield ratio < barren threshold
+ * Only the highest-priority matching event fires.
+ * Returns null if an event is already pending or no condition is met.
+ */
+export function detectOreReport(
+  report: BlastOreReport,
+  state: EventSystemState,
+  tickCount: number,
+): FiredEvent | null {
+  if (state.pendingEvent) return null;
+
+  let eventId: string | null = null;
+
+  // Priority 1: Legendary Vein (rarest, most exciting)
+  if (report.hasTreranium) {
+    eventId = 'legendary_vein';
+  }
+  // Priority 2: Absurdium Jackpot
+  else if (report.absurdiumFraction >= ORE_REPORT_ABSURDIUM_FRACTION) {
+    eventId = 'absurdium_jackpot';
+  }
+  // Priority 3: Lucky Strike (got more ore than survey estimated)
+  else if (report.yieldRatio > ORE_REPORT_LUCKY_RATIO) {
+    eventId = 'lucky_strike';
+  }
+  // Priority 4: Barren Blast (got much less ore than survey estimated)
+  else if (report.yieldRatio < ORE_REPORT_BARREN_RATIO) {
+    eventId = 'barren_blast';
+  }
+
+  if (eventId) {
+    const event: FiredEvent = { eventId, firedAtTick: tickCount };
+    state.pendingEvent = event;
+    return event;
+  }
+
+  return null;
 }

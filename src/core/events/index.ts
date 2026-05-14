@@ -16,6 +16,7 @@ import { LAWSUIT_EVENTS_2 } from './LawsuitEvents2.js';
 import { FOLLOWUP_EVENTS } from './FollowUpEvents.js';
 import { TRAFFIC_JAM_EVENTS } from './TrafficJamEvents.js';
 import { UNQUALIFIED_TASK_EVENTS } from './UnqualifiedTaskEvents.js';
+import { ORE_REPORT_EVENTS } from './OreReportEvents.js';
 
 /** Register all 260 events into the global pool. Call once at app init. */
 export function setupEvents(): void {
@@ -32,4 +33,5 @@ export function setupEvents(): void {
   registerEvents(FOLLOWUP_EVENTS);
   registerEvents(TRAFFIC_JAM_EVENTS);
   registerEvents(UNQUALIFIED_TASK_EVENTS);
+  registerEvents(ORE_REPORT_EVENTS);
 }

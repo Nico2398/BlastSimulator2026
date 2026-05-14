@@ -11,9 +11,9 @@ import { EVENT_BASE_TIMERS } from '../config/balance.js';
 
 /**
  * Categories that use the countdown-timer system.
- * 'traffic' is excluded because traffic jams are detected by EventEngine, not timers.
+ * 'traffic' and 'mining' are excluded because they are detected by EventEngine, not timers.
  */
-export type TimerCategory = Exclude<EventCategory, 'traffic'>;
+export type TimerCategory = Exclude<EventCategory, 'traffic' | 'mining'>;
 
 /** Base timer reset values per timer category (in ticks). */
 const BASE_TIMER: Record<TimerCategory, number> = { ...EVENT_BASE_TIMERS };

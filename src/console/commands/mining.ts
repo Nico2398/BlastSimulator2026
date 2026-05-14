@@ -26,8 +26,9 @@ import {
 import { Random } from '../../core/math/Random.js';
 import { buyTubing, installTubing, createTubingState } from '../../core/mining/Tubing.js';
 import type { FragmentData } from '../../core/mining/BlastExecution.js';
-import { runSurvey, SURVEY_METHODS, type SurveyMethod } from '../../core/mining/SurveyCalc.js';
+import { runSurvey, SURVEY_METHODS, type SurveyMethod, computeBlastOreReport } from '../../core/mining/SurveyCalc.js';
 import { SURVEY_COSTS } from '../../core/config/balance.js';
+import { detectOreReport } from '../../core/events/EventEngine.js';
 
 // ── Extended context for mining ──
 
@@ -235,6 +236,10 @@ export function blastCommand(
   state.damage.blastCount++;
   recordBlastResult(state.levelStats, result.fragments);
   snapshotStats(state.levelStats, state);
+
+  // Trigger one post-blast ore report event when conditions are met.
+  const oreReport = computeBlastOreReport(result.fragments, state.surveyResults);
+  detectOreReport(oreReport, state.events, state.tickCount);
 
   // Clear drill plan after blast (holes are consumed)
   state.drillHoles = [];

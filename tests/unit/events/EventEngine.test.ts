@@ -3,6 +3,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   detectTrafficJam,
+  detectOreReport,
   TRAFFIC_JAM_MIN_VEHICLES,
   TRAFFIC_JAM_MIN_TICKS,
 } from '../../../src/core/events/EventEngine.js';
@@ -236,4 +237,186 @@ describe('EventPool — traffic_jam EventDef registration (Task 2.8)', () => {
     const event = getEventById('traffic_jam');
     expect(event!.consequences.length).toBe(event!.options.length);
   });
+});
+
+// ── detectOreReport ───────────────────────────────────────────────────────────
+
+describe('EventEngine — detectOreReport (Task 4.8)', () => {
+  let eventState: EventSystemState;
+
+  beforeEach(() => {
+    eventState = createEventSystemState();
+  });
+
+  // ── Test: no event when no condition is met ──
+
+  it('returns null when no ore report condition is met', () => {
+    const report = {
+      oreYields: { dirtite: 500 },
+      totalYieldKg: 500,
+      estimatedYieldKg: 500,
+      yieldRatio: 1.0,
+      hasTreranium: false,
+      absurdiumFraction: 0,
+    };
+    const result = detectOreReport(report, eventState, 100);
+    expect(result).toBeNull();
+  });
+
+  // ── Test: Lucky Strike (yieldRatio > 1.2) ──
+
+  it('fires lucky_strike when yieldRatio > 1.2', () => {
+    const report = {
+      oreYields: { dirtite: 1300 },
+      totalYieldKg: 1300,
+      estimatedYieldKg: 1000,
+      yieldRatio: 1.3,
+      hasTreranium: false,
+      absurdiumFraction: 0,
+    };
+    const result = detectOreReport(report, eventState, 200);
+    expect(result).not.toBeNull();
+    expect(result!.eventId).toBe('lucky_strike');
+    expect(result!.firedAtTick).toBe(200);
+  });
+
+  it('sets state.pendingEvent for lucky_strike', () => {
+    const report = {
+      oreYields: { rustite: 2500 },
+      totalYieldKg: 2500,
+      estimatedYieldKg: 1800,
+      yieldRatio: 1.39,
+      hasTreranium: false,
+      absurdiumFraction: 0,
+    };
+    detectOreReport(report, eventState, 50);
+    expect(eventState.pendingEvent).not.toBeNull();
+    expect(eventState.pendingEvent!.eventId).toBe('lucky_strike');
+  });
+
+  // ── Test: Barren Blast (yieldRatio < 0.5) ──
+
+  it('fires barren_blast when yieldRatio < 0.5', () => {
+    const report = {
+      oreYields: { dirtite: 200 },
+      totalYieldKg: 200,
+      estimatedYieldKg: 600,
+      yieldRatio: 0.33,
+      hasTreranium: false,
+      absurdiumFraction: 0,
+    };
+    const result = detectOreReport(report, eventState, 300);
+    expect(result).not.toBeNull();
+    expect(result!.eventId).toBe('barren_blast');
+  });
+
+  // ── Test: Legendary Vein (hasTreranium) — highest priority ──
+
+  it('fires legendary_vein when hasTreranium is true (overrides other conditions)', () => {
+    const report = {
+      oreYields: { treranium: 10, dirtite: 100 },
+      totalYieldKg: 110,
+      estimatedYieldKg: 100,
+      yieldRatio: 1.1,
+      hasTreranium: true,
+      absurdiumFraction: 0,
+    };
+    const result = detectOreReport(report, eventState, 400);
+    expect(result).not.toBeNull();
+    expect(result!.eventId).toBe('legendary_vein');
+  });
+
+  // ── Test: Absurdium Jackpot (absurdiumFraction > 0.3) ──
+
+  it('fires absurdium_jackpot when absurdiumFraction >= threshold', () => {
+    const report = {
+      oreYields: { absurdium: 400, dirtite: 600 },
+      totalYieldKg: 1000,
+      estimatedYieldKg: 1000,
+      yieldRatio: 1.0,
+      hasTreranium: false,
+      absurdiumFraction: 0.4,
+    };
+    const result = detectOreReport(report, eventState, 500);
+    expect(result).not.toBeNull();
+    expect(result!.eventId).toBe('absurdium_jackpot');
+  });
+
+  // ── Test: legendary_vein overrides absurdium_jackpot ──
+
+  it('legendary_vein fires instead of absurdium_jackpot when both conditions are true', () => {
+    const report = {
+      oreYields: { treranium: 5, absurdium: 400, dirtite: 600 },
+      totalYieldKg: 1005,
+      estimatedYieldKg: 1000,
+      yieldRatio: 1.005,
+      hasTreranium: true,
+      absurdiumFraction: 0.4,
+    };
+    const result = detectOreReport(report, eventState, 600);
+    expect(result).not.toBeNull();
+    expect(result!.eventId).toBe('legendary_vein');
+  });
+
+  // ── Test: already pending event — no double-fire ──
+
+  it('returns null when an event is already pending', () => {
+    eventState.pendingEvent = { eventId: 'union_strike', firedAtTick: 700 };
+    const report = {
+      oreYields: { dirtite: 1300 },
+      totalYieldKg: 1300,
+      estimatedYieldKg: 1000,
+      yieldRatio: 1.3,
+      hasTreranium: false,
+      absurdiumFraction: 0,
+    };
+    const result = detectOreReport(report, eventState, 800);
+    expect(result).toBeNull();
+    expect(eventState.pendingEvent!.eventId).toBe('union_strike');
+  });
+});
+
+// ── Ore report EventDef registration ──────────────────────────────────────────
+
+describe('EventPool — ore report EventDef registration (Task 4.8)', () => {
+  beforeEach(() => {
+    clearEvents();
+    setupEvents();
+  });
+
+  const eventIds = ['lucky_strike', 'barren_blast', 'legendary_vein', 'absurdium_jackpot'];
+
+  for (const eventId of eventIds) {
+    it(`${eventId} event is retrievable from the pool after setupEvents()`, () => {
+      const event = getEventById(eventId);
+      expect(event).toBeDefined();
+    });
+
+    it(`${eventId} event has category "mining"`, () => {
+      const event = getEventById(eventId);
+      expect(event!.category).toBe('mining');
+    });
+
+    it(`${eventId} event has a non-empty titleKey`, () => {
+      const event = getEventById(eventId);
+      expect(typeof event!.titleKey).toBe('string');
+      expect(event!.titleKey.length).toBeGreaterThan(0);
+    });
+
+    it(`${eventId} event has a non-empty descKey`, () => {
+      const event = getEventById(eventId);
+      expect(typeof event!.descKey).toBe('string');
+      expect(event!.descKey.length).toBeGreaterThan(0);
+    });
+
+    it(`${eventId} event has at least 2 decision options`, () => {
+      const event = getEventById(eventId);
+      expect(event!.options.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it(`${eventId} event has consequences for every option`, () => {
+      const event = getEventById(eventId);
+      expect(event!.consequences.length).toBe(event!.options.length);
+    });
+  }
 });

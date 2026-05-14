@@ -5,7 +5,7 @@ import type { ScoreState } from '../scores/ScoreManager.js';
 
 // ── Event types ──
 
-export type EventCategory = 'union' | 'politics' | 'weather' | 'mafia' | 'lawsuit' | 'traffic';
+export type EventCategory = 'union' | 'politics' | 'weather' | 'mafia' | 'lawsuit' | 'traffic' | 'mining';
 
 export interface EventOption {
   /** i18n key for option text. */
