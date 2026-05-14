@@ -6,7 +6,7 @@ import type { EventDef } from './EventPool.js';
 
 export const ORE_REPORT_EVENTS: EventDef[] = [
   // lucky_strike — blast yielded significantly more ore than survey estimated
-  ev('lucky_strike', 'traffic', {
+  ev('lucky_strike', 'mining', {
     weight: () => 1,
     options: [
       { cashDelta: 10000, effectTag: 'bonus_paid' },
@@ -16,7 +16,7 @@ export const ORE_REPORT_EVENTS: EventDef[] = [
   }),
 
   // barren_blast — blast yielded far less ore than survey estimated
-  ev('barren_blast', 'traffic', {
+  ev('barren_blast', 'mining', {
     weight: () => 1,
     options: [
       { cashDelta: -5000, effectTag: 'geologist_review' },
@@ -26,7 +26,7 @@ export const ORE_REPORT_EVENTS: EventDef[] = [
   }),
 
   // legendary_vein — treranium was found in the blast yield
-  ev('legendary_vein', 'traffic', {
+  ev('legendary_vein', 'mining', {
     weight: () => 1,
     options: [
       { cashDelta: 25000, effectTag: 'celebrate_find' },
@@ -36,7 +36,7 @@ export const ORE_REPORT_EVENTS: EventDef[] = [
   }),
 
   // absurdium_jackpot — absurdium makes up >30% of blast yield
-  ev('absurdium_jackpot', 'traffic', {
+  ev('absurdium_jackpot', 'mining', {
     weight: () => 1,
     options: [
       { cashDelta: 50000, effectTag: 'jackpot_bonus' },

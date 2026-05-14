@@ -392,6 +392,11 @@ describe('EventPool — ore report EventDef registration (Task 4.8)', () => {
       expect(event).toBeDefined();
     });
 
+    it(`${eventId} event has category "mining"`, () => {
+      const event = getEventById(eventId);
+      expect(event!.category).toBe('mining');
+    });
+
     it(`${eventId} event has a non-empty titleKey`, () => {
       const event = getEventById(eventId);
       expect(typeof event!.titleKey).toBe('string');

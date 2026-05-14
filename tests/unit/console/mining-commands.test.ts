@@ -1,17 +1,22 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { newGameCommand } from '../../../src/console/commands/world.js';
 import type { MiningContext } from '../../../src/console/commands/mining.js';
 import {
+  blastCommand,
   blastPlanCommand,
   buySoftwareCommand,
+  chargeCommand,
   drillPlanCommand,
+  sequenceCommand,
   surveyCommand,
 } from '../../../src/console/commands/mining.js';
 import { createTubingState } from '../../../src/core/mining/Tubing.js';
 import { resetHoleIds } from '../../../src/core/mining/DrillPlan.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
 import { Random } from '../../../src/core/math/Random.js';
+import * as SurveyCalcModule from '../../../src/core/mining/SurveyCalc.js';
+import * as EventEngineModule from '../../../src/core/events/EventEngine.js';
 
 function makeMiningContext(): MiningContext {
   const ctx: MiningContext = {
@@ -26,6 +31,7 @@ function makeMiningContext(): MiningContext {
 }
 
 beforeEach(() => resetHoleIds());
+afterEach(() => vi.restoreAllMocks());
 
 // ── blast_plan list ──────────────────────────────────────────────────────────
 
@@ -358,5 +364,35 @@ describe('surveyCommand', () => {
     expect(result.success).toBe(true);
     expect(result.output).toContain('seismic');
     expect(result.output).toContain('aerial');
+  });
+});
+
+describe('blastCommand — ore report event wiring', () => {
+  it('computes post-blast ore report and triggers detectOreReport with game event state', () => {
+    const ctx = makeMiningContext();
+
+    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+    chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
+    sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
+
+    const mockedReport = {
+      oreYields: { dirtite: 1300 },
+      totalYieldKg: 1300,
+      estimatedYieldKg: 1000,
+      yieldRatio: 1.3,
+      hasTreranium: false,
+      absurdiumFraction: 0,
+    };
+    const computeSpy = vi.spyOn(SurveyCalcModule, 'computeBlastOreReport').mockReturnValue(mockedReport);
+    const detectSpy = vi.spyOn(EventEngineModule, 'detectOreReport');
+
+    const result = blastCommand(ctx, [], {});
+
+    expect(result.success).toBe(true);
+    expect(computeSpy).toHaveBeenCalledOnce();
+    expect(computeSpy).toHaveBeenCalledWith(expect.any(Array), ctx.state!.surveyResults);
+    expect(detectSpy).toHaveBeenCalledOnce();
+    expect(detectSpy).toHaveBeenCalledWith(mockedReport, ctx.state!.events, ctx.state!.tickCount);
+    expect(ctx.state!.events.pendingEvent?.eventId).toBe('lucky_strike');
   });
 });
