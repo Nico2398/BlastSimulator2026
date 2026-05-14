@@ -19,8 +19,8 @@ jobs:
     name: Execute Open SWE
     # Trigger when:
     #  - manually dispatched from the Actions tab (workflow_dispatch)
-    #  - a comment on an issue or PR contains '@openswe' (repo owner only)
-    if: "github.event_name == 'workflow_dispatch' || (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@openswe') && github.event.comment.author_association == 'OWNER')"
+    #  - a comment on an issue or PR contains '@open-swe' (repo owner only)
+    if: "github.event_name == 'workflow_dispatch' || (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@open-swe') && github.event.comment.author_association == 'OWNER')"
     runs-on: ubuntu-latest
 
     # These write permissions are required:
@@ -342,7 +342,7 @@ jobs:
           # Issue/PR context — only the number is passed; the agent fetches the
           # rest via the github_get_issue / github_get_pr tools.
           ISSUE_NUMBER: ${{ steps.issue.outputs.number }}
-          COMMENT_BODY: "${{ github.event.inputs.comment_body || github.event.comment.body || format('@openswe triggered manually on #{0}', github.event.inputs.issue_number) }}"
+          COMMENT_BODY: "${{ github.event.inputs.comment_body || github.event.comment.body || format('@open-swe triggered manually on #{0}', github.event.inputs.issue_number) }}"
 
         run: |
           echo "=== Open SWE Agent run ==="
