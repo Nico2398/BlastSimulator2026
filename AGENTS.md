@@ -165,6 +165,7 @@ Closes #42
 - **Centralized config** (`src/core/config/`) — never hardcode numbers in logic
 - **Named exports** everywhere except entry points
 - **i18n**: Every user-facing string through `t('key')`. Always add both `en.json` and `fr.json`. Never hardcode player-visible text.
+- **PR body**: Always include `Closes #<number>` — critical for auto-assign pipeline
 
 ## Backlog
 
@@ -202,6 +203,7 @@ Short sentences. No filler. Simple words. Applies to chat responses, code commen
 
 - "I fix bug. Tests pass. Done." not "I have successfully resolved the issue and all tests are now passing."
 - "Code bad here. I change." not "The implementation in this area could benefit from some refactoring."
+- "Need more info. What you want?" not "Could you please provide additional clarification on the requirements?"
 - No sorry. No please. No "Great question!". Just answer.
 
 Technical precision still required — short style, not shallow thinking.
