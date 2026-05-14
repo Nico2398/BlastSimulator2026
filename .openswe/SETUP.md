@@ -140,10 +140,10 @@ All secrets go in **GitHub → repo → Settings → Secrets and variables → A
 ## File map
 
 ```
+AGENTS.md              ← agent system prompt (repo root)
 .openswe/
   README.md              ← workflow overview
   SETUP.md               ← this file
-  AGENTS.md              ← agent system prompt (injected at runtime)
   tools/
     backlog_tools.py     ← custom tools injected into open-swe at runtime
 

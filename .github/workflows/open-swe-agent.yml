@@ -138,17 +138,15 @@ jobs:
           cp $GITHUB_WORKSPACE/.github/scripts/patch_langchain_reasoning.py "${UV_SITE}/sitecustomize.py"
           echo "Installed sitecustomize.py → ${UV_SITE}"
 
-      # ── 6. Inject custom tools and agent context ───────────────────────────
+      # ── 6. Inject custom tools ─────────────────────────────────────────────
       # Copies every *.py file from .openswe/tools/ into open-swe's tools package,
       # then auto-discovers all public (non-underscore) top-level functions in those
       # files and patches agent/server.py to import and register them.
-      # Also copies AGENTS.md (the agent's system prompt) into the open-swe directory
-      # so it is available at the path referenced by DEFAULT_PROMPT_PATH.
-      - name: Inject custom tools and agent context
+      # AGENTS.md lives at the repo root and is referenced directly via DEFAULT_PROMPT_PATH.
+      - name: Inject custom tools
         run: |
-          # Copy every tool file and AGENTS.md
+          # Copy every tool file
           cp $GITHUB_WORKSPACE/.openswe/tools/*.py ./open-swe/agent/tools/
-          cp $GITHUB_WORKSPACE/.openswe/AGENTS.md ./open-swe/AGENTS.md
 
           python - <<'EOF'
           import ast, glob, os
@@ -338,8 +336,8 @@ jobs:
           LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
           LANGCHAIN_PROJECT: "BlastSimulator2026-openswe"
 
-          # Custom project instructions — injected as the default prompt (copied in step 6)
-          DEFAULT_PROMPT_PATH: ${{ github.workspace }}/open-swe/AGENTS.md
+          # Custom project instructions — lives at repo root, read directly
+          DEFAULT_PROMPT_PATH: ${{ github.workspace }}/AGENTS.md
 
           # Issue/PR context — only the number is passed; the agent fetches the
           # rest via the github_get_issue / github_get_pr tools.
