@@ -1,7 +1,9 @@
-// BlastSimulator2026 — CH3.14: i18n key resolution tests for proficiency labels,
-// policy names, need labels, and skill keys.
+// BlastSimulator2026 — CH3.14 + CH4.9: i18n key resolution tests for proficiency
+// labels, policy names, need labels, skill keys, survey methods, and ore report
+// events.
 //
-// Verifies that every key in the proficiency.*, policy.*, need.*, and skill.*
+// Verifies that every key in the proficiency.*, policy.*, need.*, skill.*,
+// survey.*, and event.(lucky_strike|barren_blast|legendary_vein|absurdium_jackpot).*
 // namespaces resolves (i.e. returns a non-empty string that is NOT the key
 // itself) in both 'en' and 'fr' locales, and that en/fr translations differ
 // for at least one representative key in each group.
@@ -10,6 +12,8 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { t, setLocale } from '../../../src/core/i18n/I18n.js';
 import type { ShiftMode } from '../../../src/core/entities/SitePolicy.js';
 import type { NeedKey }   from '../../../src/core/entities/EmployeeNeeds.js';
+import { SURVEY_METHODS } from '../../../src/core/mining/SurveyCalc.js';
+import { ORE_REPORT_EVENTS } from '../../../src/core/events/OreReportEvents.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -29,6 +33,14 @@ const SKILL_KEYS = [
   'skill.geology',
   'skill.management',
 ] as const;
+
+const SURVEY_METHOD_KEYS = SURVEY_METHODS.map(method => `survey.${method}`);
+
+const ORE_REPORT_EVENT_KEYS = ORE_REPORT_EVENTS.flatMap(event => [
+  event.titleKey,
+  event.descKey,
+  ...event.options.map(option => option.labelKey),
+]);
 
 // ─── Setup ────────────────────────────────────────────────────────────────────
 
@@ -184,5 +196,69 @@ describe('skill label keys — en and fr translations differ', () => {
     expect(en, 'skill.driving.truck must resolve in en').not.toBe('skill.driving.truck');
     expect(fr, 'skill.driving.truck must resolve in fr').not.toBe('skill.driving.truck');
     expect(en, 'en and fr translations for skill.driving.truck must differ').not.toBe(fr);
+  });
+});
+
+// ── Survey method names (survey.seismic, survey.core_sample, survey.aerial) ──
+
+describe('survey method keys resolve in both locales', () => {
+  for (const locale of LOCALES) {
+    it(`locale ${locale}: all survey.* keys resolve`, () => {
+      setLocale(locale);
+      for (const key of SURVEY_METHOD_KEYS) {
+        const result = t(key);
+        expect(result, `key "${key}" must resolve in ${locale}`).not.toBe(key);
+        expect(result.length, `key "${key}" must be non-empty in ${locale}`).toBeGreaterThan(0);
+      }
+    });
+  }
+});
+
+describe('survey method keys — en and fr translations differ', () => {
+  it('survey.seismic is translated differently in en vs fr', () => {
+    setLocale('en');
+    const en = t('survey.seismic');
+    setLocale('fr');
+    const fr = t('survey.seismic');
+    expect(en, 'survey.seismic must resolve in en').not.toBe('survey.seismic');
+    expect(fr, 'survey.seismic must resolve in fr').not.toBe('survey.seismic');
+    expect(en, 'en and fr translations for survey.seismic must differ').not.toBe(fr);
+  });
+});
+
+// ── Ore report event keys (event.lucky_strike.*, event.barren_blast.*, event.legendary_vein.*, event.absurdium_jackpot.*) ─
+
+describe('ore report event keys resolve in both locales', () => {
+  for (const locale of LOCALES) {
+    it(`locale ${locale}: all ore report event keys resolve`, () => {
+      setLocale(locale);
+      for (const key of ORE_REPORT_EVENT_KEYS) {
+        const result = t(key);
+        expect(result, `key "${key}" must resolve in ${locale}`).not.toBe(key);
+        expect(result.length, `key "${key}" must be non-empty in ${locale}`).toBeGreaterThan(0);
+      }
+    });
+  }
+});
+
+describe('ore report event keys — en and fr translations differ', () => {
+  it('event.lucky_strike.title is translated differently in en vs fr', () => {
+    setLocale('en');
+    const en = t('event.lucky_strike.title');
+    setLocale('fr');
+    const fr = t('event.lucky_strike.title');
+    expect(en, 'event.lucky_strike.title must resolve in en').not.toBe('event.lucky_strike.title');
+    expect(fr, 'event.lucky_strike.title must resolve in fr').not.toBe('event.lucky_strike.title');
+    expect(en, 'en and fr translations for event.lucky_strike.title must differ').not.toBe(fr);
+  });
+
+  it('event.absurdium_jackpot.desc is translated differently in en vs fr', () => {
+    setLocale('en');
+    const en = t('event.absurdium_jackpot.desc');
+    setLocale('fr');
+    const fr = t('event.absurdium_jackpot.desc');
+    expect(en, 'event.absurdium_jackpot.desc must resolve in en').not.toBe('event.absurdium_jackpot.desc');
+    expect(fr, 'event.absurdium_jackpot.desc must resolve in fr').not.toBe('event.absurdium_jackpot.desc');
+    expect(en, 'en and fr translations for event.absurdium_jackpot.desc must differ').not.toBe(fr);
   });
 });
