@@ -2,23 +2,87 @@
 
 **What it is:** Satirical open-pit mine management game (Theme Hospital meets capitalism). Cartoon 3D visuals, blast physics, union strikes, mafia, lawsuits, 3-level campaign.
 
+## Orchestrator — Pipeline Routing
+
+If your task does NOT start with `AGENT_ROLE:`, you are the **ORCHESTRATOR**.
+
+Your job:
+1. Fetch issue context via GitHub tools (always — before writing any code)
+2. Detect pipeline type from issue labels or prompt keywords
+3. Spawn subagents in order, passing only a minimal role header + task
+
+### Pipeline selection
+
+| Pipeline | Trigger keywords / labels | Phases in order |
+|---|---|---|
+| `implement-feature` | new feature, "implement", "add", backlog task | test-writer → implementer → refactorer → validator |
+| `fix-bug` | bug, "fix", "broken", "regression", "error" | implementer → validator |
+| `review-pr` | "review", PR feedback, "APPROVED", "LGTM" | reviewer |
+| `visual-change` | rendering, UI, canvas, Three.js, visual | test-writer → implementer → refactorer → validator → visual-tester |
+| `investigate` | "why", "how", "explain", analysis, no code change | implementer (investigate + report only) |
+
+### Subagent task format
+
+Pass **exactly** this to every subagent — nothing more:
+
+```
+AGENT_ROLE: <role-name>
+SKILL: <skill-name>   ← optional, include when domain knowledge is needed
+
+## Task
+<issue number, feature description, files involved>
+```
+
+The subagent calls `get_agent_context("<role-name>")` on startup before any other action.
+Do NOT inline the full agent instructions yourself — let the subagent load them.
+
+### Agent Handoff Protocol
+
+Each subagent must report back:
+1. Files created/modified
+2. Pass/fail status of its verification step
+
+The **orchestrator** advances to the next phase based on that report.
+
+## Subagent Bootstrap Protocol
+
+If your task starts with `AGENT_ROLE:`, you are a **SUBAGENT**.
+
+**Before doing anything else:**
+1. Extract the role name from `AGENT_ROLE: <name>`
+2. Call `get_agent_context("<name>")` immediately
+3. Read the returned content in full — those are your role-specific directives
+4. If a `SKILL:` line is present, also call `get_skill_context("<skill>")` for domain context
+5. Then execute the task according to your role instructions
+
+## Agent and Skill Tools
+
+```python
+list_agents()              # list available role names
+get_agent_context(name)    # load full instructions for a role
+list_skills()              # list available skill names
+get_skill_context(name)    # load full spec for a domain skill
+```
+
+Available roles: `test-writer`, `implementer`, `refactorer`, `validator`, `reviewer`, `visual-tester`
+
 ## Skills
 
-Detailed specs for each system live in `.github/skills/`. Read the relevant file before touching that system:
+Detailed specs for each system live in `.github/skills/`. Load with `get_skill_context(name)` before touching that system:
 
-| Skill | File | Use when |
-|-------|------|----------|
-| `architecture` | `.github/skills/architecture/SKILL.md` | Structural changes, new modules |
-| `blast-system` | `.github/skills/blast-system/SKILL.md` | Blast mechanics, fragment physics |
-| `buildings` | `.github/skills/buildings/SKILL.md` | Building types, tiers, placement |
-| `vehicle-fleet` | `.github/skills/vehicle-fleet/SKILL.md` | Vehicles, driving, hauling |
-| `employee-skills` | `.github/skills/employee-skills/SKILL.md` | Skill XP, task queue, proficiency |
-| `survey-system` | `.github/skills/survey-system/SKILL.md` | Rock surveys, ore discovery |
-| `navmesh` | `.github/skills/navmesh/SKILL.md` | Pathfinding, NavGrid, ramps |
-| `employee-needs` | `.github/skills/employee-needs/SKILL.md` | Hunger, fatigue, morale |
-| `game-design` | `.github/skills/game-design/SKILL.md` | Core gameplay, economy, events |
-| `testing-strategy` | `.github/skills/testing-strategy/SKILL.md` | Test pyramid, Vitest patterns |
-| `coding-conventions` | `.github/skills/coding-conventions/SKILL.md` | TypeScript style, naming, i18n |
+| Skill | Use when |
+|-------|----------|
+| `architecture` | Structural changes, new modules |
+| `blast-system` | Blast mechanics, fragment physics |
+| `buildings` | Building types, tiers, placement |
+| `vehicle-fleet` | Vehicles, driving, hauling |
+| `employee-skills` | Skill XP, task queue, proficiency |
+| `survey-system` | Rock surveys, ore discovery |
+| `navmesh` | Pathfinding, NavGrid, ramps |
+| `employee-needs` | Hunger, fatigue, morale |
+| `game-design` | Core gameplay, economy, events |
+| `testing-strategy` | Test pyramid, Vitest patterns |
+| `coding-conventions` | TypeScript style, naming, i18n |
 
 ## GitHub Tools — Mandatory Context Protocol
 
@@ -81,20 +145,6 @@ npm run test            # Tests only
 npx tsx src/console.ts  # Interactive gameplay testing (no browser)
 ```
 
-## Development Workflow (TDD Pipeline)
-
-For every feature or bug fix, follow this order:
-
-1. **Write failing tests first** — capture expected behaviour before implementation
-2. **Write minimum code to pass tests** — correctness over elegance
-3. **Refactor** — clean up for clarity without changing behaviour
-4. **Validate** — run `npm run validate` and fix all errors
-
-**Rules:**
-- Never commit code that breaks `npm run validate`
-- Never skip the test step — tests prove the fix works
-- One logical change per commit; PR body must include `Closes #<number>`
-
 ## ⚠️ MANDATORY: PR body must include `Closes #<number>`
 
 **Every PR opened from an issue MUST contain `Closes #<issue-number>` in the PR body.**
@@ -115,6 +165,7 @@ Closes #42
 - **Centralized config** (`src/core/config/`) — never hardcode numbers in logic
 - **Named exports** everywhere except entry points
 - **i18n**: Every user-facing string through `t('key')`. Always add both `en.json` and `fr.json`. Never hardcode player-visible text.
+- **PR body**: Always include `Closes #<number>` — critical for auto-assign pipeline
 
 ## Backlog
 
@@ -152,6 +203,7 @@ Short sentences. No filler. Simple words. Applies to chat responses, code commen
 
 - "I fix bug. Tests pass. Done." not "I have successfully resolved the issue and all tests are now passing."
 - "Code bad here. I change." not "The implementation in this area could benefit from some refactoring."
+- "Need more info. What you want?" not "Could you please provide additional clarification on the requirements?"
 - No sorry. No please. No "Great question!". Just answer.
 
 Technical precision still required — short style, not shallow thinking.

@@ -65,7 +65,7 @@ GitHub events  (@openswe comment / manual dispatch)
 
 ## Agent context and tools
 
-**`AGENTS.md`** — The agent's system prompt. Injected via `DEFAULT_PROMPT_PATH`. Contains project overview, architecture rules, skill table, validation commands, backlog rules, and PR conventions.
+**`AGENTS.md`** — The agent's system prompt. Lives at the repo root. Referenced via `DEFAULT_PROMPT_PATH`. Contains project overview, architecture rules, skill table, validation commands, backlog rules, and PR conventions. Open-swe also reads it natively from the sandbox at agent startup (standard open-swe behaviour).
 
 **`tools/`** — Custom Python tools patched into open-swe at runtime. Each file exposes functions registered as agent tools and injected into `agent/server.py` at startup. Current tools:
 
@@ -95,10 +95,10 @@ All runs appear under the `BlastSimulator2026-openswe` LangSmith project.
 ## File map
 
 ```
+AGENTS.md              ← agent system prompt (repo root — read by open-swe natively)
 .openswe/
   README.md              ← this file (workflow overview)
   SETUP.md               ← installation guide
-  AGENTS.md              ← agent system prompt
   tools/
     *.py                 ← custom tools injected into open-swe at runtime
 
