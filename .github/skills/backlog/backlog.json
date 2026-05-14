@@ -703,11 +703,11 @@
       "src/core/events/EventEngine.ts"
     ],
     "testFile": "tests/unit/events/EventEngine.test.ts",
-    "status": "pending",
+    "status": "done",
     "blockedBy": [
       "4.7"
     ],
-    "closedInPR": null
+    "closedInPR": 151
   },
   {
     "id": "4.9",
@@ -718,11 +718,11 @@
       "src/core/i18n/locales/fr.json"
     ],
     "testFile": "tests/unit/i18n/i18n.test.ts",
-    "status": "pending",
+    "status": "done",
     "blockedBy": [
       "4.1"
     ],
-    "closedInPR": null
+    "closedInPR": 153
   },
   {
     "id": "4.10",
@@ -732,12 +732,12 @@
       "src/console/commands/mining.ts"
     ],
     "testFile": null,
-    "status": "pending",
+    "status": "done",
     "blockedBy": [
       "4.6",
       "4.9"
     ],
-    "closedInPR": null
+    "closedInPR": 137
   },
   {
     "id": "4.11",
