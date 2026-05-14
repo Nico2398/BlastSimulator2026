@@ -13,8 +13,20 @@ workflow) to locate the repository root.
 
 import glob as _glob
 import os
+import re
 
 _REPO_ROOT = os.environ.get("GITHUB_WORKSPACE", ".")
+
+# Only allow simple identifier-style names: letters, digits, hyphens, underscores.
+# This blocks path traversal via "..", "/", "\" etc.
+_SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9_-]+$")
+
+
+def _validate_name(name: str, kind: str) -> str | None:
+    """Return an error string if *name* is unsafe, else None."""
+    if not _SAFE_NAME_RE.match(name):
+        return f"error: invalid {kind} name '{name}' — only letters, digits, hyphens, and underscores are allowed"
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -50,6 +62,9 @@ def get_agent_context(agent_name: str) -> str:
         Full markdown content of .github/agents/{agent_name}.agent.md.
         Returns an error message if the agent is not found.
     """
+    err = _validate_name(agent_name, "agent")
+    if err:
+        return err
     path = f"{_REPO_ROOT}/.github/agents/{agent_name}.agent.md"
     try:
         with open(path) as f:
@@ -99,6 +114,9 @@ def get_skill_context(skill_name: str) -> str:
         Full markdown content of .github/skills/{skill_name}/SKILL.md.
         Returns an error message if the skill is not found.
     """
+    err = _validate_name(skill_name, "skill")
+    if err:
+        return err
     path = f"{_REPO_ROOT}/.github/skills/{skill_name}/SKILL.md"
     try:
         with open(path) as f:
