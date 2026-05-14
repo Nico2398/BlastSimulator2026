@@ -12,6 +12,8 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { t, setLocale } from '../../../src/core/i18n/I18n.js';
 import type { ShiftMode } from '../../../src/core/entities/SitePolicy.js';
 import type { NeedKey }   from '../../../src/core/entities/EmployeeNeeds.js';
+import { SURVEY_METHODS } from '../../../src/core/mining/SurveyCalc.js';
+import { ORE_REPORT_EVENTS } from '../../../src/core/events/OreReportEvents.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -32,34 +34,13 @@ const SKILL_KEYS = [
   'skill.management',
 ] as const;
 
-const SURVEY_METHOD_KEYS = [
-  'survey.seismic',
-  'survey.core_sample',
-  'survey.aerial',
-] as const;
+const SURVEY_METHOD_KEYS = SURVEY_METHODS.map(method => `survey.${method}`);
 
-const ORE_REPORT_EVENT_KEYS = [
-  'event.lucky_strike.title',
-  'event.lucky_strike.desc',
-  'event.lucky_strike.opt0',
-  'event.lucky_strike.opt1',
-  'event.lucky_strike.opt2',
-  'event.barren_blast.title',
-  'event.barren_blast.desc',
-  'event.barren_blast.opt0',
-  'event.barren_blast.opt1',
-  'event.barren_blast.opt2',
-  'event.legendary_vein.title',
-  'event.legendary_vein.desc',
-  'event.legendary_vein.opt0',
-  'event.legendary_vein.opt1',
-  'event.legendary_vein.opt2',
-  'event.absurdium_jackpot.title',
-  'event.absurdium_jackpot.desc',
-  'event.absurdium_jackpot.opt0',
-  'event.absurdium_jackpot.opt1',
-  'event.absurdium_jackpot.opt2',
-] as const;
+const ORE_REPORT_EVENT_KEYS = ORE_REPORT_EVENTS.flatMap(event => [
+  event.titleKey,
+  event.descKey,
+  ...event.options.map(option => option.labelKey),
+]);
 
 // ─── Setup ────────────────────────────────────────────────────────────────────
 
