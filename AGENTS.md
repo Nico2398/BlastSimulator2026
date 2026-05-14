@@ -2,23 +2,79 @@
 
 **What it is:** Satirical open-pit mine management game (Theme Hospital meets capitalism). Cartoon 3D visuals, blast physics, union strikes, mafia, lawsuits, 3-level campaign.
 
+## Orchestrator — Pipeline Routing
+
+If your task does NOT start with `AGENT_ROLE:`, you are the **ORCHESTRATOR**.
+
+Your job:
+1. Fetch issue context via GitHub tools (always — before writing any code)
+2. Detect pipeline type from issue labels or prompt keywords
+3. Spawn subagents in order, passing only a minimal role header + task
+
+### Pipeline selection
+
+| Pipeline | Trigger keywords / labels | Phases in order |
+|---|---|---|
+| `implement-feature` | new feature, "implement", "add", backlog task | test-writer → implementer → refactorer → validator |
+| `fix-bug` | bug, "fix", "broken", "regression", "error" | implementer → validator |
+| `review-pr` | "review", PR feedback, "APPROVED", "LGTM" | reviewer |
+| `visual-change` | rendering, UI, canvas, Three.js, visual | test-writer → implementer → refactorer → validator → visual-tester |
+| `investigate` | "why", "how", "explain", analysis, no code change | implementer (investigate + report only) |
+
+### Subagent task format
+
+Pass **exactly** this to every subagent — nothing more:
+
+```
+AGENT_ROLE: <role-name>
+SKILL: <skill-name>   ← optional, include when domain knowledge is needed
+
+## Task
+<issue number, feature description, files involved>
+```
+
+The subagent calls `get_agent_context("<role-name>")` on startup before any other action.
+Do NOT inline the full agent instructions yourself — let the subagent load them.
+
+## Subagent Bootstrap Protocol
+
+If your task starts with `AGENT_ROLE:`, you are a **SUBAGENT**.
+
+**Before doing anything else:**
+1. Extract the role name from `AGENT_ROLE: <name>`
+2. Call `get_agent_context("<name>")` immediately
+3. Read the returned content in full — those are your role-specific directives
+4. If a `SKILL:` line is present, also call `get_skill_context("<skill>")` for domain context
+5. Then execute the task according to your role instructions
+
+## Agent and Skill Tools
+
+```python
+list_agents()              # list available role names
+get_agent_context(name)    # load full instructions for a role
+list_skills()              # list available skill names
+get_skill_context(name)    # load full spec for a domain skill
+```
+
+Available roles: `test-writer`, `implementer`, `refactorer`, `validator`, `reviewer`, `visual-tester`
+
 ## Skills
 
-Detailed specs for each system live in `.github/skills/`. Read the relevant file before touching that system:
+Detailed specs for each system live in `.github/skills/`. Load with `get_skill_context(name)` before touching that system:
 
-| Skill | File | Use when |
-|-------|------|----------|
-| `architecture` | `.github/skills/architecture/SKILL.md` | Structural changes, new modules |
-| `blast-system` | `.github/skills/blast-system/SKILL.md` | Blast mechanics, fragment physics |
-| `buildings` | `.github/skills/buildings/SKILL.md` | Building types, tiers, placement |
-| `vehicle-fleet` | `.github/skills/vehicle-fleet/SKILL.md` | Vehicles, driving, hauling |
-| `employee-skills` | `.github/skills/employee-skills/SKILL.md` | Skill XP, task queue, proficiency |
-| `survey-system` | `.github/skills/survey-system/SKILL.md` | Rock surveys, ore discovery |
-| `navmesh` | `.github/skills/navmesh/SKILL.md` | Pathfinding, NavGrid, ramps |
-| `employee-needs` | `.github/skills/employee-needs/SKILL.md` | Hunger, fatigue, morale |
-| `game-design` | `.github/skills/game-design/SKILL.md` | Core gameplay, economy, events |
-| `testing-strategy` | `.github/skills/testing-strategy/SKILL.md` | Test pyramid, Vitest patterns |
-| `coding-conventions` | `.github/skills/coding-conventions/SKILL.md` | TypeScript style, naming, i18n |
+| Skill | Use when |
+|-------|----------|
+| `architecture` | Structural changes, new modules |
+| `blast-system` | Blast mechanics, fragment physics |
+| `buildings` | Building types, tiers, placement |
+| `vehicle-fleet` | Vehicles, driving, hauling |
+| `employee-skills` | Skill XP, task queue, proficiency |
+| `survey-system` | Rock surveys, ore discovery |
+| `navmesh` | Pathfinding, NavGrid, ramps |
+| `employee-needs` | Hunger, fatigue, morale |
+| `game-design` | Core gameplay, economy, events |
+| `testing-strategy` | Test pyramid, Vitest patterns |
+| `coding-conventions` | TypeScript style, naming, i18n |
 
 ## GitHub Tools — Mandatory Context Protocol
 
@@ -73,6 +129,31 @@ Key patterns: single serializable `GameState`, tick-based loop with `timeScale`/
 | Score system | `game-design` | `src/core/scores/` |
 | Scenario tests | `visual-testing` | `scripts/scenario-test.ts`, `scripts/scenario-defs/` |
 
+## Development Workflow — TDD Pipeline
+
+For every feature or bug fix, use the TDD pipeline via specialized subagents:
+
+```
+1. test-writer   → Write failing tests (Red phase)
+2. implementer   → Write minimum code to pass tests (Green phase)
+3. refactorer    → Clean up code for clarity (Refactor phase)
+4. validator     → Run full validation suite
+5. visual-tester → Screenshot verification (visual changes only)
+```
+
+**Pipeline selection:**
+- **New feature / backlog task**: `implement-feature` pipeline
+- **Bug fix**: `fix-bug` pipeline
+- **PR review**: `reviewer` only
+- **Docs / config / typos**: skip pipeline, make changes directly
+
+### Agent Handoff Protocol
+
+Each subagent must:
+1. State what it produced (files created/modified)
+2. Report pass/fail status of its verification step
+3. Identify the next agent in the pipeline
+
 ## Validation Commands
 
 ```bash
@@ -81,19 +162,14 @@ npm run test            # Tests only
 npx tsx src/console.ts  # Interactive gameplay testing (no browser)
 ```
 
-## Development Workflow (TDD Pipeline)
+## Scenario Testing
 
-For every feature or bug fix, follow this order:
+```bash
+npm run dev &
+PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium npx tsx scripts/scenario-test.ts --scenario blast-basic
+```
 
-1. **Write failing tests first** — capture expected behaviour before implementation
-2. **Write minimum code to pass tests** — correctness over elegance
-3. **Refactor** — clean up for clarity without changing behaviour
-4. **Validate** — run `npm run validate` and fix all errors
-
-**Rules:**
-- Never commit code that breaks `npm run validate`
-- Never skip the test step — tests prove the fix works
-- One logical change per commit; PR body must include `Closes #<number>`
+Available scenarios: `blast-basic`, `level1-win-efficient`, `level1-win-conservative`, `level1-lose-bankruptcy`, `level1-lose-arrest`, `level1-lose-ecology`, `level1-lose-revolt`.
 
 ## ⚠️ MANDATORY: PR body must include `Closes #<number>`
 
@@ -136,6 +212,12 @@ Next phase features in `.agent/NEXT_PHASE_DESIGN.md`. Use the built-in backlog t
 - Call `backlog_done` with `pr_number` after the PR merges.
 - Can't finish a task → call `backlog_block` and note the reason in the PR.
 - After opening the PR: include `Closes #<number>` in the body.
+
+## Code Review Rules
+
+- **Approve** if: all acceptance criteria pass, tests pass, code is clean
+- **Request changes** if: tests fail or code quality issues → comment `@copilot <specific fix instruction>`
+- **Tag @Nico2398** if: architectural decisions needed, ambiguous requirements, or creative direction needed
 
 ## Creative Direction
 
