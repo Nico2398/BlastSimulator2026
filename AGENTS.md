@@ -36,6 +36,14 @@ SKILL: <skill-name>   ← optional, include when domain knowledge is needed
 The subagent calls `get_agent_context("<role-name>")` on startup before any other action.
 Do NOT inline the full agent instructions yourself — let the subagent load them.
 
+### Agent Handoff Protocol
+
+Each subagent must report back:
+1. Files created/modified
+2. Pass/fail status of its verification step
+
+The **orchestrator** advances to the next phase based on that report.
+
 ## Subagent Bootstrap Protocol
 
 If your task starts with `AGENT_ROLE:`, you are a **SUBAGENT**.
@@ -129,31 +137,6 @@ Key patterns: single serializable `GameState`, tick-based loop with `timeScale`/
 | Score system | `game-design` | `src/core/scores/` |
 | Scenario tests | `visual-testing` | `scripts/scenario-test.ts`, `scripts/scenario-defs/` |
 
-## Development Workflow — TDD Pipeline
-
-For every feature or bug fix, use the TDD pipeline via specialized subagents:
-
-```
-1. test-writer   → Write failing tests (Red phase)
-2. implementer   → Write minimum code to pass tests (Green phase)
-3. refactorer    → Clean up code for clarity (Refactor phase)
-4. validator     → Run full validation suite
-5. visual-tester → Screenshot verification (visual changes only)
-```
-
-**Pipeline selection:**
-- **New feature / backlog task**: `implement-feature` pipeline
-- **Bug fix**: `fix-bug` pipeline
-- **PR review**: `reviewer` only
-- **Docs / config / typos**: skip pipeline, make changes directly
-
-### Agent Handoff Protocol
-
-Each subagent must:
-1. State what it produced (files created/modified)
-2. Report pass/fail status of its verification step
-3. Identify the next agent in the pipeline
-
 ## Validation Commands
 
 ```bash
@@ -161,15 +144,6 @@ npm run validate        # TypeScript → tests → build (run after every change
 npm run test            # Tests only
 npx tsx src/console.ts  # Interactive gameplay testing (no browser)
 ```
-
-## Scenario Testing
-
-```bash
-npm run dev &
-PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium npx tsx scripts/scenario-test.ts --scenario blast-basic
-```
-
-Available scenarios: `blast-basic`, `level1-win-efficient`, `level1-win-conservative`, `level1-lose-bankruptcy`, `level1-lose-arrest`, `level1-lose-ecology`, `level1-lose-revolt`.
 
 ## ⚠️ MANDATORY: PR body must include `Closes #<number>`
 
@@ -212,12 +186,6 @@ Next phase features in `.agent/NEXT_PHASE_DESIGN.md`. Use the built-in backlog t
 - Call `backlog_done` with `pr_number` after the PR merges.
 - Can't finish a task → call `backlog_block` and note the reason in the PR.
 - After opening the PR: include `Closes #<number>` in the body.
-
-## Code Review Rules
-
-- **Approve** if: all acceptance criteria pass, tests pass, code is clean
-- **Request changes** if: tests fail or code quality issues → comment `@copilot <specific fix instruction>`
-- **Tag @Nico2398** if: architectural decisions needed, ambiguous requirements, or creative direction needed
 
 ## Creative Direction
 
