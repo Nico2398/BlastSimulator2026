@@ -94,6 +94,12 @@ def orchestrate(state: dict) -> dict:
     pipeline = _classify(labels, issue_title, comment_body)
     skill = _select_skill(issue_title, issue_text)
 
+    # Skip integration/scenario tests for pipelines that don't need them.
+    # fix-bug: only unit tests are pertinent.
+    # investigate / review-pr: no test writing at all.
+    skip_integration = pipeline in ("fix-bug", "investigate", "review-pr")
+    skip_scenario = pipeline in ("fix-bug", "investigate", "review-pr")
+
     return {
         "issue_title": issue_title,
         "issue_body": issue_body,
@@ -102,4 +108,6 @@ def orchestrate(state: dict) -> dict:
         "skill": skill,
         "current_role": "orchestrate",
         "retry_count": 0,
+        "skip_integration_tests": skip_integration,
+        "skip_scenario_tests": skip_scenario,
     }

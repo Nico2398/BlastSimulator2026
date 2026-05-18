@@ -21,13 +21,25 @@ Purpose-built LangGraph graph replacing open-swe. Every pipeline path is a typed
 
 | Name | Trigger | Nodes |
 |---|---|---|
-| `implement-feature` | `agent-task` label, "implement", "add" | orchestrate → test-writer → implementer → refactorer → validator → open-pr |
-| `fix-bug` | `bug` label, "fix", "broken", "error" | orchestrate → implementer → validator → open-pr |
+| `implement-feature` | `agent-task` label, "implement", "add" | orchestrate → unit-tests → integration-tests → scenario-tests → implementer → qualimetry → refactorer → validator → open-pr |
+| `fix-bug` | `bug` label, "fix", "broken", "error" | orchestrate → unit-tests → implementer → qualimetry → validator → open-pr |
 | `review-pr` | "review", "APPROVED", "LGTM" | orchestrate → reviewer → END |
-| `visual-change` | "rendering", "UI", "canvas", "three.js" | orchestrate → test-writer → implementer → refactorer → validator → visual-tester → open-pr |
+| `visual-change` | "rendering", "UI", "canvas", "three.js" | orchestrate → unit-tests → integration-tests → scenario-tests → implementer → qualimetry → refactorer → validator → visual-tester → open-pr |
 | `investigate` | "why", "how", "explain", "analyze" | orchestrate → implementer (read-only) → END |
 
-Retry logic: `validator` failure → back to `implementer` (max 3×). After 3 failures: `interrupt()` posts a comment and pauses the run.
+**Test writing — 3 focused agents, each skippable:**
+
+| Node | Scope | Skipped when |
+|---|---|---|
+| `unit_test_writer` | Atomic unit tests (one function/class, zero I/O) | investigate, review-pr |
+| `integration_test_writer` | Feature-scale tests (multiple components) | fix-bug, investigate, review-pr |
+| `scenario_test_writer` | Full game flows (Puppeteer scenarios) | fix-bug, investigate, review-pr |
+
+**Qualimetry — non-agentic quality gate after implementer:**
+
+Runs [`jscpd`](https://github.com/kucherenko/jscpd) on `src/` to detect copy-paste duplication. No LLM involved — deterministic pass/fail. Threshold: 5% duplicate lines. On failure, returns to `implementer` with the duplication report as context. Skipped for `investigate` and `review-pr` pipelines.
+
+Retry logic: any coding node failure → back to `implementer` (max 3×). After 3 failures: `interrupt()` posts a comment and pauses the run.
 
 ---
 
@@ -154,15 +166,18 @@ Each trace shows:
   checkpointer.py        ← Checkpointer: MemorySaver (local) or PostgreSQL (CI)
   nodes/
     __init__.py
-    _base.py             ← shared tool sets + build_react_agent / extract_ok
-    orchestrate.py       ← classify issue, set pipeline + skill
-    test_writer.py       ← TDD Red: write failing tests
-    implementer.py       ← TDD Green: minimum code to pass tests
-    refactorer.py        ← TDD Refactor: clean up for clarity
-    validator.py         ← run npm run validate, increment retry_count on failure
-    visual_tester.py     ← Puppeteer scenario tests
-    reviewer.py          ← PR audit + post APPROVED comment
-    open_pr.py           ← create PR with "Closes #N" body
+    _base.py                    ← shared tool sets + build_react_agent / extract_ok
+    orchestrate.py              ← classify issue, set pipeline + skill + skip flags
+    unit_test_writer.py         ← TDD Red: atomic unit tests (one function/class)
+    integration_test_writer.py  ← TDD Red: feature-scale integration tests
+    scenario_test_writer.py     ← TDD Red: full game-flow scenario tests
+    implementer.py              ← TDD Green: minimum code to pass tests
+    qualimetry_node.py          ← non-agentic: jscpd duplication gate
+    refactorer.py               ← TDD Refactor: clean up for clarity
+    validator.py                ← run npm run validate, increment retry_count on failure
+    visual_tester.py            ← Puppeteer scenario tests
+    reviewer.py                 ← PR audit + post APPROVED comment
+    open_pr.py                  ← create PR with "Closes #N" body
   tools/
     __init__.py
     agent_tools.py       ← list/get agents + skills (from .github/agents/ + .github/skills/)
@@ -171,6 +186,7 @@ Each trace shows:
     github_write.py      ← GitHub write API (create PR, post comment, labels)
     fs_tools.py          ← read/write/delete files, list_dir, grep
     shell_tools.py       ← run_shell, git_commit, git_push, git_checkout_branch
+    qualimetry.py        ← jscpd wrapper: detect code duplication, return QualimetryReport
 
 .github/workflows/
   langgraph-agent.yml    ← agent runner (replaces open-swe-agent.yml)
