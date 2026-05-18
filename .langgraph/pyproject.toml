@@ -1,0 +1,23 @@
+[project]
+name = "blastsimulator-langgraph"
+version = "0.1.0"
+description = "LangGraph autonomous development pipeline for BlastSimulator2026"
+requires-python = ">=3.12"
+dependencies = [
+    "langgraph>=0.2.0",
+    "langchain>=0.3.0",
+    "langchain-core>=0.3.0",
+    "langchain-openai>=0.2.0",
+    "langchain-anthropic>=0.2.0",
+    "langchain-deepseek>=1.0.1",
+    "langgraph-sdk>=0.1.0",
+]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
