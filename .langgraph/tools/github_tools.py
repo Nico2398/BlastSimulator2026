@@ -1,4 +1,4 @@
-"""GitHub REST API tools for the open-swe agent.
+"""GitHub REST API tools for the LangGraph pipeline.
 
 Provides functions to fetch issues, PRs, comments, and files from GitHub.
 Uses GITHUB_TOKEN, DEFAULT_REPO_OWNER, and DEFAULT_REPO_NAME from the environment.

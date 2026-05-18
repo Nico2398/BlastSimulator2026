@@ -1,4 +1,4 @@
-"""Agent and skill context tools for the open-swe orchestrator.
+"""Agent and skill context tools for the LangGraph orchestrator.
 
 Provides functions to list and read agent role definitions and domain skill
 specs from the repository's .github/agents/ and .github/skills/ directories.
