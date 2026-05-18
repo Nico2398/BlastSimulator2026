@@ -168,7 +168,11 @@ def _route_from_visual_tester(state: AgentState) -> str:
     return "__interrupt__" if retry >= MAX_RETRIES else "implementer"
 
 
-def _interrupt_node(state: AgentState) -> dict:
+def _route_from_reviewer(state: AgentState) -> str:
+    return END  # reviewer posts APPROVED comment itself; graph ends here
+
+
+
     """Request human intervention after max retries."""
     message = (
         f"Pipeline paused after {state.get('retry_count', 0)} failed attempts "
@@ -249,7 +253,7 @@ def build_graph():
         "implementer": "implementer",
         "__interrupt__": "__interrupt__",
     })
-    builder.add_conditional_edges("reviewer", lambda _: END, {END: END})
+    builder.add_conditional_edges("reviewer", _route_from_reviewer, {END: END})
     builder.add_edge("open_pr", END)
     builder.add_edge("__interrupt__", END)
 

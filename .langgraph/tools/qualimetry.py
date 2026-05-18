@@ -13,7 +13,9 @@ import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
-DUPLICATE_THRESHOLD_PCT: float = 5.0  # fail if >5% of code is duplicated
+DUPLICATE_THRESHOLD_PCT: float = float(
+    os.environ.get("QUALIMETRY_DUPLICATE_THRESHOLD", "5.0")
+)
 _SRC_DIR = "src"
 
 
