@@ -54,18 +54,39 @@ def route_from_implementer(state: dict) -> str:
 
 def route_from_cherry_pick(state: dict) -> str:
     if state.get("cherry_pick_ok", False):
-        return "qualimetry"
+        return "test_runner"  # run tests before qualimetry
     return "__interrupt__" if state.get("retry_count", 0) >= MAX_RETRIES else "conflict_resolver"
 
 
 def route_from_conflict_resolver(state: dict) -> str:
     if state.get("conflict_resolver_ok", False):
-        return "qualimetry"
+        return "test_runner"
     return "__interrupt__" if state.get("retry_count", 0) >= MAX_RETRIES else "implementer"
+
+
+def route_from_test_runner(state: dict) -> str:
+    if state.get("test_runner_ok", False):
+        return "qualimetry"
+    return "__interrupt__" if state.get("retry_count", 0) >= MAX_RETRIES else "fixer"
+
+
+def route_from_fixer(state: dict) -> str:
+    # After every fixer attempt, re-run tests to verify the fix.
+    # If retries are exhausted, interrupt instead of attempting another fix.
+    if state.get("retry_count", 0) >= MAX_RETRIES:
+        return "__interrupt__"
+    return "test_runner"
 
 
 def route_from_qualimetry(state: dict) -> str:
     if state.get("qualimetry_ok", False):
+        return "code_review"  # code review gate after qualimetry
+    return "__interrupt__" if state.get("retry_count", 0) >= MAX_RETRIES else "implementer"
+
+
+def route_from_code_review(state: dict) -> str:
+    if state.get("code_review_ok", False):
+        # fix-bug skips refactorer (no integration/scenario tests to worry about)
         return "validator" if state.get("pipeline") == "fix-bug" else "refactorer"
     return "__interrupt__" if state.get("retry_count", 0) >= MAX_RETRIES else "implementer"
 

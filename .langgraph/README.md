@@ -23,8 +23,8 @@ Purpose-built LangGraph graph replacing open-swe. Every pipeline path is a typed
 
 | Name | Trigger | Nodes |
 |---|---|---|
-| `implement-feature` | `agent-task` label, "implement", "add" | orchestrate → skeleton_writer → unit-tests → integration-tests → scenario-tests → implementer → cherry_pick → [conflict_resolver] → qualimetry → refactorer → validator → open_pr |
-| `fix-bug` | `bug` label, "fix", "broken", "error" | orchestrate → skeleton_writer → unit-tests → implementer → cherry_pick → qualimetry → validator → open_pr |
+| `implement-feature` | `agent-task` label, "implement", "add" | orchestrate → skeleton_writer → unit-tests → integration-tests → scenario-tests → implementer → cherry_pick → [conflict_resolver] → **test_runner** → [**fixer**] → qualimetry → **code_review** → refactorer → validator → open_pr |
+| `fix-bug` | `bug` label, "fix", "broken", "error" | orchestrate → skeleton_writer → unit-tests → implementer → cherry_pick → **test_runner** → [**fixer**] → qualimetry → **code_review** → validator → open_pr |
 | `review-pr` | "review", "APPROVED", "LGTM" | orchestrate → reviewer → END |
 | `visual-change` | "rendering", "UI", "canvas", "three.js" | same as implement-feature + visual_tester before open_pr |
 | `investigate` | "why", "how", "explain", "analyze" | orchestrate → implementer (read-only) → END |
@@ -76,9 +76,48 @@ Each node auto-commits its work after the agent finishes. Commit messages follow
 
 ---
 
-## Qualimetry — non-agentic quality gate after implementer
+## Quality gates (in order after cherry_pick)
 
-Runs [`jscpd`](https://github.com/kucherenko/jscpd) on `src/` to detect copy-paste duplication. No LLM involved — deterministic pass/fail. Threshold: 5% duplicate lines. On failure, returns to `implementer` with the duplication report as context. Skipped for `investigate` and `review-pr` pipelines.
+Four sequential gates run after the implementation is merged onto the test branch. Deterministic gates run first; agentic gates run after.
+
+### 1. `test_runner` — non-agentic test suite
+
+Runs `npx vitest run --reporter verbose`. No LLM — pure pass/fail from exit code.
+
+- **Pass** → qualimetry
+- **Fail** → fixer (receives failure output only, not test source)
+
+### 2. `fixer` — agentic independent fixer
+
+An independent agent that receives only the Vitest failure output — not the test source code. This keeps the fix unbiased: the agent reads stack traces and error messages, then inspects only the implementation files mentioned.
+
+- Role: `fixer` (separate prompt from `implementer`)
+- Commits with `fix(impl): fix failing tests for #N`
+- Loops back to `test_runner` after each fix (max `MAX_RETRIES` total)
+
+### 3. `qualimetry` — non-agentic duplication check
+
+Runs [`jscpd`](https://github.com/kucherenko/jscpd) on `src/`. Threshold: 5% duplicate lines (configurable via `QUALIMETRY_DUPLICATE_THRESHOLD`).
+
+- **Pass** → code_review
+- **Fail** → implementer (with duplication report as context)
+
+### 4. `code_review` — agentic architecture audit
+
+Reviews the implementation against the project's quality rules before the refactorer:
+
+| Check | Rule |
+|---|---|
+| Architecture boundaries | `src/core/` must not import DOM/WebGL/window |
+| Randomness | No `Math.random()` — only `src/core/math/Random.ts` |
+| File size | 300-line limit per file (data/i18n exempt) |
+| Exports | Named exports everywhere (except entry points) |
+| i18n | All user-facing strings via `t('key')` |
+| TypeScript | No `any` except in test fixtures |
+| Config | No hardcoded balance numbers — use `src/core/config/` |
+
+- **Pass** → refactorer (or validator for fix-bug)
+- **Fail** → implementer (with review report as context)
 
 Retry logic: any coding node failure → back to `implementer` (max 3×). After 3 failures: `interrupt()` posts a comment and pauses the run.
 
@@ -218,7 +257,10 @@ Each trace shows:
     implementer.py              ← TDD Green: impl_branch from skeleton_commit_sha
     cherry_pick.py              ← non-agentic: cherry-pick impl onto test_branch
     conflict_resolver.py        ← agentic: resolve cherry-pick merge conflicts
+    test_runner.py              ← non-agentic: run Vitest; record pass/fail + output
+    fixer.py                    ← agentic (independent): fix impl from error output only
     qualimetry_node.py          ← non-agentic: jscpd duplication gate
+    code_review.py              ← agentic: architecture / convention audit
     refactorer.py               ← TDD Refactor: clean up for clarity
     validator.py                ← run npm run validate, increment retry_count on failure
     visual_tester.py            ← Puppeteer scenario tests

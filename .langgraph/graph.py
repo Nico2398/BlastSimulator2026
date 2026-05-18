@@ -3,21 +3,20 @@
 Pipeline paths:
   implement-feature  orchestrate → skeleton_writer → unit-tests → integration-tests
                      → scenario-tests → implementer → cherry_pick → [conflict_resolver]
-                     → qualimetry → refactorer → validator → open_pr
+                     → test_runner → [fixer] → qualimetry → code_review
+                     → refactorer → validator → open_pr
   fix-bug            orchestrate → skeleton_writer → unit-tests → implementer
-                     → cherry_pick → qualimetry → validator → open_pr
+                     → cherry_pick → test_runner → [fixer] → qualimetry
+                     → code_review → validator → open_pr
   review-pr          orchestrate → reviewer → END
   visual-change      same as implement-feature + visual_tester before open_pr
   investigate        orchestrate → implementer (read-only) → END
 
-Branch isolation:
-  skeleton_writer   creates test_branch from main HEAD; writes empty stubs;
-                    records skeleton_commit_sha.
-  implementer       creates impl_branch from skeleton_commit_sha (never sees
-                    test commits); auto-commits implementation; records
-                    impl_commit_sha.
-  cherry_pick       switches to test_branch; cherry-picks impl_commit_sha.
-  conflict_resolver (agentic) resolves any cherry-pick conflicts.
+Quality gates (in order after cherry_pick):
+  test_runner   non-agentic: runs Vitest, fails → fixer
+  fixer         agentic: fixes impl from error output only (unbiased); loops back to test_runner
+  qualimetry    non-agentic: jscpd duplication check; fails → implementer
+  code_review   agentic: architecture / convention audit; fails → implementer
 
 See routing.py for all conditional-edge functions.
 """
@@ -52,6 +51,9 @@ from nodes.visual_tester import visual_tester
 from nodes.reviewer import reviewer
 from nodes.cherry_pick import cherry_pick
 from nodes.conflict_resolver import conflict_resolver
+from nodes.test_runner import test_runner
+from nodes.fixer import fixer
+from nodes.code_review import code_review
 from nodes.open_pr import open_pr
 from routing import (
     MAX_RETRIES,
@@ -63,7 +65,10 @@ from routing import (
     route_from_implementer,
     route_from_cherry_pick,
     route_from_conflict_resolver,
+    route_from_test_runner,
+    route_from_fixer,
     route_from_qualimetry,
+    route_from_code_review,
     route_from_validator,
     route_from_visual_tester,
     route_from_reviewer,
@@ -113,8 +118,13 @@ class AgentState(TypedDict):
     cherry_pick_ok: bool
     cherry_pick_conflicts: list[str]
     conflict_resolver_ok: bool
+    test_runner_ok: bool
+    test_output: str
+    fixer_ok: bool
     qualimetry_ok: bool
     qualimetry_report: str
+    code_review_ok: bool
+    code_review_report: str
     refactorer_ok: bool
     validator_ok: bool
     visual_tester_ok: bool
@@ -159,7 +169,10 @@ def build_graph():
         ("implementer", implementer),
         ("cherry_pick", cherry_pick),
         ("conflict_resolver", conflict_resolver),
+        ("test_runner", test_runner),
+        ("fixer", fixer),
         ("qualimetry", qualimetry_node),
+        ("code_review", code_review),
         ("refactorer", refactorer),
         ("validator", validator),
         ("visual_tester", visual_tester),
@@ -206,16 +219,30 @@ def build_graph():
         "__interrupt__": "__interrupt__",
     })
     builder.add_conditional_edges("cherry_pick", route_from_cherry_pick, {
-        "qualimetry": "qualimetry",
+        "test_runner": "test_runner",
         "conflict_resolver": "conflict_resolver",
         "__interrupt__": "__interrupt__",
     })
     builder.add_conditional_edges("conflict_resolver", route_from_conflict_resolver, {
-        "qualimetry": "qualimetry",
+        "test_runner": "test_runner",
         "implementer": "implementer",
         "__interrupt__": "__interrupt__",
     })
+    builder.add_conditional_edges("test_runner", route_from_test_runner, {
+        "qualimetry": "qualimetry",
+        "fixer": "fixer",
+        "__interrupt__": "__interrupt__",
+    })
+    builder.add_conditional_edges("fixer", route_from_fixer, {
+        "test_runner": "test_runner",
+        "__interrupt__": "__interrupt__",
+    })
     builder.add_conditional_edges("qualimetry", route_from_qualimetry, {
+        "code_review": "code_review",
+        "implementer": "implementer",
+        "__interrupt__": "__interrupt__",
+    })
+    builder.add_conditional_edges("code_review", route_from_code_review, {
         "refactorer": "refactorer",
         "validator": "validator",
         "implementer": "implementer",
