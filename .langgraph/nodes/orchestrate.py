@@ -100,6 +100,9 @@ def orchestrate(state: dict) -> dict:
     skip_integration = pipeline in ("fix-bug", "investigate", "review-pr")
     skip_scenario = pipeline in ("fix-bug", "investigate", "review-pr")
 
+    test_branch = f"langgraph/tests-{issue_number}"
+    impl_branch = f"langgraph/impl-{issue_number}"
+
     return {
         "issue_title": issue_title,
         "issue_body": issue_body,
@@ -110,4 +113,8 @@ def orchestrate(state: dict) -> dict:
         "retry_count": 0,
         "skip_integration_tests": skip_integration,
         "skip_scenario_tests": skip_scenario,
+        # Branch names set here; skeleton_writer creates them.
+        "test_branch": test_branch,
+        "impl_branch": impl_branch,
+        "branch_name": test_branch,
     }

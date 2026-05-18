@@ -10,20 +10,62 @@ if str(_HERE) not in sys.path:
 
 from llm import build_llm
 from nodes._base import WRITE_TOOLS, READ_ONLY_TOOLS, build_react_agent, extract_ok
+from tools.git_tools import (
+    git_checkout_branch,
+    git_commit,
+    git_push,
+    git_get_head_sha,
+)
 
 
 def implementer(state: dict) -> dict:
-    """Implement the feature or fix. Read-only mode when pipeline=investigate."""
+    """Implement the feature or fix. Read-only mode when pipeline=investigate.
+
+    Isolation strategy:
+    - Creates `impl_branch` forked from `skeleton_commit_sha` so the agent
+      never sees test commits.
+    - After the agent finishes, auto-commits any uncommitted changes.
+    - Records `impl_commit_sha` for the downstream cherry_pick node.
+    """
     investigate = state.get("pipeline") == "investigate"
     tools = READ_ONLY_TOOLS if investigate else WRITE_TOOLS
+
+    if not investigate:
+        impl_branch = state.get("impl_branch", "")
+        skeleton_sha = state.get("skeleton_commit_sha", "")
+        # Create impl_branch from skeleton_commit_sha (before test commits).
+        checkout_msg = git_checkout_branch(impl_branch, from_ref=skeleton_sha or None)
+    else:
+        checkout_msg = ""
+        impl_branch = ""
 
     llm = build_llm()
     agent = build_react_agent("implementer", tools, llm, extra_context=_build_context(state))
     result = agent.invoke({"messages": state.get("messages", [])})
     ok = extract_ok(result)
+    messages = result["messages"]
+
+    impl_commit_sha = ""
+    if not investigate:
+        issue_number = state.get("issue_number", 0)
+        # Auto-commit any uncommitted work the agent left behind.
+        commit_result = git_commit(
+            f"feat(impl): implementation for #{issue_number}"
+        )
+        # After git_commit, HEAD has either advanced (new commit) or stayed
+        # at the same SHA (nothing to commit). Either way, record the current HEAD.
+        impl_commit_sha = git_get_head_sha()
+        push_result = git_push(impl_branch)
+        messages = messages + [
+            {"role": "assistant", "content": checkout_msg},
+            {"role": "assistant", "content": commit_result},
+            {"role": "assistant", "content": push_result},
+        ]
+
     return {
-        "messages": result["messages"],
+        "messages": messages,
         "implementer_ok": ok,
+        "impl_commit_sha": impl_commit_sha,
         "current_role": "implementer",
     }
 
@@ -38,5 +80,11 @@ def _build_context(state: dict) -> str:
         lines.append(f"Relevant skill: {state['skill']}")
     if state.get("pipeline") == "investigate":
         lines.append("MODE: investigate — read files only, do NOT write or commit.")
+    else:
+        lines.append(
+            "NOTE: You are on the implementation branch. "
+            "Test files are on a separate branch — you do NOT see them. "
+            "Implement the feature so that tests (once merged) will pass."
+        )
     lines.append("\n## Issue Body\n" + state.get("issue_body", ""))
     return "\n".join(lines)

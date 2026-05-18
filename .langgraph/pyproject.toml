@@ -11,6 +11,8 @@ dependencies = [
     "langchain-anthropic>=0.2.0",
     "langchain-deepseek>=1.0.1",
     "langgraph-sdk>=0.1.0",
+    "gitpython>=3.1.44",
+    "PyGithub>=2.5.0",
 ]
 
 [tool.uv]

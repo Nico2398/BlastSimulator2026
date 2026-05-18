@@ -19,6 +19,7 @@ from tools.github_tools import (
 )
 from tools.fs_tools import read_file, write_file, delete_file, list_dir, grep
 from tools.shell_tools import run_shell, git_commit, git_push, git_checkout_branch
+from tools.git_tools import git_checkout_existing
 from tools.github_write import (
     github_create_pr, github_post_comment, github_add_label, github_remove_label,
 )
@@ -42,7 +43,7 @@ READ_ONLY_TOOLS = [lc_tool(f) for f in [
 
 WRITE_TOOLS = READ_ONLY_TOOLS + [lc_tool(f) for f in [
     write_file, delete_file, run_shell,
-    git_commit, git_push, git_checkout_branch,
+    git_commit, git_push, git_checkout_branch, git_checkout_existing,
 ]]
 
 BACKLOG_TOOLS = [lc_tool(f) for f in [

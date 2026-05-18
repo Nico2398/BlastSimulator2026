@@ -2,10 +2,24 @@
 
 Coding agents (implementer, refactorer, test-writer, reviewer) use these
 to run validation commands, commit changes, and push branches.
+
+Git operations delegate to tools.git_tools (gitpython-based).
 """
 
 import os
 import subprocess
+import sys
+from pathlib import Path
+
+_HERE = Path(__file__).parent
+if str(_HERE) not in sys.path:
+    sys.path.insert(0, str(_HERE))
+
+from git_tools import (  # noqa: E402
+    git_commit as _git_commit,
+    git_push as _git_push,
+    git_checkout_branch as _git_checkout_branch,
+)
 
 _REPO_ROOT = os.environ.get("GITHUB_WORKSPACE", ".")
 _CMD_TIMEOUT = 300  # 5 minutes max per shell command
@@ -43,35 +57,19 @@ def run_shell(cmd: str, cwd: str | None = None) -> str:
 
 
 def git_commit(message: str) -> str:
-    """Stage all changes and create a git commit.
+    """Stage all changes and create a git commit (via gitpython).
 
     Args:
         message: Commit message.
 
     Returns:
-        Git output or error message.
+        Short SHA + message on success, or 'nothing to commit'.
     """
-    result_add = subprocess.run(
-        ["git", "add", "-A"],
-        capture_output=True, text=True, cwd=_REPO_ROOT
-    )
-    if result_add.returncode != 0:
-        return f"error staging: {result_add.stderr}"
-
-    result_commit = subprocess.run(
-        ["git", "commit", "-m", message],
-        capture_output=True, text=True, cwd=_REPO_ROOT
-    )
-    if result_commit.returncode != 0:
-        stderr = result_commit.stderr
-        if "nothing to commit" in stderr or "nothing added" in stderr:
-            return "nothing to commit — working tree clean"
-        return f"error committing: {stderr}"
-    return result_commit.stdout.strip()
+    return _git_commit(message)
 
 
 def git_push(branch: str) -> str:
-    """Push a branch to the remote origin.
+    """Push a branch to origin (via gitpython).
 
     Args:
         branch: Branch name to push (e.g. 'langgraph/fix-navmesh-42').
@@ -79,17 +77,11 @@ def git_push(branch: str) -> str:
     Returns:
         Git output or error message.
     """
-    result = subprocess.run(
-        ["git", "push", "--set-upstream", "origin", branch],
-        capture_output=True, text=True, cwd=_REPO_ROOT
-    )
-    if result.returncode != 0:
-        return f"error pushing: {result.stderr}"
-    return result.stdout.strip() or result.stderr.strip()
+    return _git_push(branch)
 
 
 def git_checkout_branch(branch: str) -> str:
-    """Create and switch to a new branch (or switch if it already exists).
+    """Create and switch to a new branch (via gitpython).
 
     Args:
         branch: Branch name (e.g. 'langgraph/implement-navmesh-42').
@@ -97,18 +89,4 @@ def git_checkout_branch(branch: str) -> str:
     Returns:
         Git output or error message.
     """
-    # Try creating new branch
-    result = subprocess.run(
-        ["git", "checkout", "-b", branch],
-        capture_output=True, text=True, cwd=_REPO_ROOT
-    )
-    if result.returncode == 0:
-        return f"created and switched to branch '{branch}'"
-    # If it already exists, just switch
-    result2 = subprocess.run(
-        ["git", "checkout", branch],
-        capture_output=True, text=True, cwd=_REPO_ROOT
-    )
-    if result2.returncode == 0:
-        return f"switched to branch '{branch}'"
-    return f"error: {result.stderr} / {result2.stderr}"
+    return _git_checkout_branch(branch)

@@ -14,6 +14,8 @@ Purpose-built LangGraph graph replacing open-swe. Every pipeline path is a typed
 | Pipeline routing by LLM reading AGENTS.md | Hard-coded conditional edges in `graph.py` |
 | Opaque subagent spawning | Named nodes with typed state transitions |
 | Retry logic in LLM prompt | `MAX_RETRIES` counter + `interrupt()` escalation |
+| Subprocess git calls | gitpython (`tools/git_tools.py`) |
+| urllib PR creation | PyGithub (`tools/pygithub_tools.py`, non-agentic `open_pr`) |
 
 ---
 
@@ -21,21 +23,60 @@ Purpose-built LangGraph graph replacing open-swe. Every pipeline path is a typed
 
 | Name | Trigger | Nodes |
 |---|---|---|
-| `implement-feature` | `agent-task` label, "implement", "add" | orchestrate → unit-tests → integration-tests → scenario-tests → implementer → qualimetry → refactorer → validator → open-pr |
-| `fix-bug` | `bug` label, "fix", "broken", "error" | orchestrate → unit-tests → implementer → qualimetry → validator → open-pr |
+| `implement-feature` | `agent-task` label, "implement", "add" | orchestrate → skeleton_writer → unit-tests → integration-tests → scenario-tests → implementer → cherry_pick → [conflict_resolver] → qualimetry → refactorer → validator → open_pr |
+| `fix-bug` | `bug` label, "fix", "broken", "error" | orchestrate → skeleton_writer → unit-tests → implementer → cherry_pick → qualimetry → validator → open_pr |
 | `review-pr` | "review", "APPROVED", "LGTM" | orchestrate → reviewer → END |
-| `visual-change` | "rendering", "UI", "canvas", "three.js" | orchestrate → unit-tests → integration-tests → scenario-tests → implementer → qualimetry → refactorer → validator → visual-tester → open-pr |
+| `visual-change` | "rendering", "UI", "canvas", "three.js" | same as implement-feature + visual_tester before open_pr |
 | `investigate` | "why", "how", "explain", "analyze" | orchestrate → implementer (read-only) → END |
 
-**Test writing — 3 focused agents, each skippable:**
+---
 
-| Node | Scope | Skipped when |
-|---|---|---|
-| `unit_test_writer` | Atomic unit tests (one function/class, zero I/O) | investigate, review-pr |
-| `integration_test_writer` | Feature-scale tests (multiple components) | fix-bug, investigate, review-pr |
-| `scenario_test_writer` | Full game flows (Puppeteer scenarios) | fix-bug, investigate, review-pr |
+## Branch isolation strategy
 
-**Qualimetry — non-agentic quality gate after implementer:**
+Each coding pipeline uses two separate branches to keep test code and implementation code fully apart:
+
+```
+main
+ └─ skeleton_writer creates langgraph/tests-<N>
+      │ commit: chore(skeleton): empty stubs for #N   ← skeleton_commit_sha
+      │
+      ├─ unit_test_writer:      commit: test(unit): ...
+      ├─ integration_test_writer: commit: test(integration): ...
+      ├─ scenario_test_writer:  commit: test(scenario): ...
+      │
+      └─ langgraph/impl-<N>  (forked from skeleton_commit_sha)
+           └─ implementer: commit: feat(impl): ...   ← impl_commit_sha
+                  ↓
+           cherry_pick → lands on langgraph/tests-<N>
+           conflict_resolver (if needed)
+                  ↓
+           qualimetry → refactorer → validator → open_pr
+```
+
+**Why:** The implementer starts from the skeleton commit (empty stubs) and never sees the test commits. This prevents the LLM from reverse-engineering implementations from test assertions.
+
+**Git operations:** all managed by gitpython (`tools/git_tools.py`). No subprocess git calls.
+
+**PR creation:** non-agentic, uses PyGithub (`tools/pygithub_tools.py`). No LLM involved.
+
+---
+
+## Test writing — 3 focused agents, each skippable
+
+| Node | Scope | Skipped when | Auto-commits to |
+|---|---|---|---|
+| `unit_test_writer` | Atomic unit tests (one function/class, zero I/O) | investigate, review-pr | `test_branch` |
+| `integration_test_writer` | Feature-scale tests (multiple components) | fix-bug, investigate, review-pr | `test_branch` |
+| `scenario_test_writer` | Full game flows (Puppeteer scenarios) | fix-bug, investigate, review-pr | `test_branch` |
+
+Each node auto-commits its work after the agent finishes. Commit messages follow the pattern:
+- `test(unit): unit tests for #N`
+- `test(integration): integration tests for #N`
+- `test(scenario): scenario tests for #N`
+
+---
+
+## Qualimetry — non-agentic quality gate after implementer
 
 Runs [`jscpd`](https://github.com/kucherenko/jscpd) on `src/` to detect copy-paste duplication. No LLM involved — deterministic pass/fail. Threshold: 5% duplicate lines. On failure, returns to `implementer` with the duplication report as context. Skipped for `investigate` and `review-pr` pipelines.
 
@@ -68,8 +109,10 @@ The agent replies with 👀, runs the pipeline, and opens a PR.
 2. Installs Python deps (uv sync)
 3. Configures git credentials
 4. Runs: uv run python runner.py
-5. Graph executes: orchestrate → [pipeline nodes] → open-pr
-6. PR opened with "Closes #<issue>" in body
+5. Graph executes:
+   orchestrate → skeleton_writer → [test writers] → implementer
+   → cherry_pick → qualimetry → refactorer → validator → open_pr
+6. PR opened automatically with "Closes #<issue>" in body
 ```
 
 No LangGraph server started. No HTTP polling. Direct Python execution.
@@ -156,7 +199,7 @@ Each trace shows:
 ```
 .langgraph/
   README.md              ← this file
-  pyproject.toml         ← Python deps (langgraph, langchain-*, etc.)
+  pyproject.toml         ← Python deps (langgraph, langchain-*, gitpython, PyGithub)
   langgraph.json         ← graph entrypoint for `langgraph dev`
   .env.example           ← env template (copy to .env, never commit .env)
   .gitignore             ← excludes .env, caches, .venv
@@ -167,25 +210,30 @@ Each trace shows:
   nodes/
     __init__.py
     _base.py                    ← shared tool sets + build_react_agent / extract_ok
-    orchestrate.py              ← classify issue, set pipeline + skill + skip flags
+    orchestrate.py              ← classify issue, set pipeline + skill + branch names
+    skeleton_writer.py          ← create test_branch from main; write empty stubs
     unit_test_writer.py         ← TDD Red: atomic unit tests (one function/class)
     integration_test_writer.py  ← TDD Red: feature-scale integration tests
     scenario_test_writer.py     ← TDD Red: full game-flow scenario tests
-    implementer.py              ← TDD Green: minimum code to pass tests
+    implementer.py              ← TDD Green: impl_branch from skeleton_commit_sha
+    cherry_pick.py              ← non-agentic: cherry-pick impl onto test_branch
+    conflict_resolver.py        ← agentic: resolve cherry-pick merge conflicts
     qualimetry_node.py          ← non-agentic: jscpd duplication gate
     refactorer.py               ← TDD Refactor: clean up for clarity
     validator.py                ← run npm run validate, increment retry_count on failure
     visual_tester.py            ← Puppeteer scenario tests
     reviewer.py                 ← PR audit + post APPROVED comment
-    open_pr.py                  ← create PR with "Closes #N" body
+    open_pr.py                  ← non-agentic: create PR via PyGithub
   tools/
     __init__.py
     agent_tools.py       ← list/get agents + skills (from .github/agents/ + .github/skills/)
     backlog_tools.py     ← backlog CRUD via GitHub API
     github_tools.py      ← GitHub read API (issues, PRs, comments)
-    github_write.py      ← GitHub write API (create PR, post comment, labels)
+    github_write.py      ← GitHub write API (legacy; open_pr now uses pygithub_tools)
+    pygithub_tools.py    ← PyGithub: create_pr, add_label, remove_label
+    git_tools.py         ← gitpython: all git operations (branch, commit, push, cherry-pick)
     fs_tools.py          ← read/write/delete files, list_dir, grep
-    shell_tools.py       ← run_shell, git_commit, git_push, git_checkout_branch
+    shell_tools.py       ← run_shell + git wrappers (delegates to git_tools)
     qualimetry.py        ← jscpd wrapper: detect code duplication, return QualimetryReport
 
 .github/workflows/
