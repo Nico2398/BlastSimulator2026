@@ -179,7 +179,7 @@ def build_graph():
         ("visual_tester", visual_tester),
         ("reviewer", reviewer),
         ("open_pr", open_pr),
-        ("__interrupt__", _interrupt_node),
+        ("handle_interrupt", _interrupt_node),
     ]:
         builder.add_node(name, fn)
 
@@ -193,76 +193,76 @@ def build_graph():
     builder.add_conditional_edges("skeleton_writer", route_from_skeleton_writer, {
         "unit_test_writer": "unit_test_writer",
         "skeleton_writer": "skeleton_writer",
-        "__interrupt__": "__interrupt__",
+        "handle_interrupt": "handle_interrupt",
     })
     builder.add_conditional_edges("unit_test_writer", route_from_unit_test_writer, {
         "integration_test_writer": "integration_test_writer",
         "implementer": "implementer",
         "unit_test_writer": "unit_test_writer",
-        "__interrupt__": "__interrupt__",
+        "handle_interrupt": "handle_interrupt",
     })
     builder.add_conditional_edges(
         "integration_test_writer", route_from_integration_test_writer, {
             "scenario_test_writer": "scenario_test_writer",
             "implementer": "implementer",
             "integration_test_writer": "integration_test_writer",
-            "__interrupt__": "__interrupt__",
+            "handle_interrupt": "handle_interrupt",
         })
     builder.add_conditional_edges("scenario_test_writer", route_from_scenario_test_writer, {
         "implementer": "implementer",
         "scenario_test_writer": "scenario_test_writer",
-        "__interrupt__": "__interrupt__",
+        "handle_interrupt": "handle_interrupt",
     })
     builder.add_conditional_edges("implementer", route_from_implementer, {
         "cherry_pick": "cherry_pick",
         "implementer": "implementer",
         END: END,
-        "__interrupt__": "__interrupt__",
+        "handle_interrupt": "handle_interrupt",
     })
     builder.add_conditional_edges("cherry_pick", route_from_cherry_pick, {
         "test_runner": "test_runner",
         "conflict_resolver": "conflict_resolver",
-        "__interrupt__": "__interrupt__",
+        "handle_interrupt": "handle_interrupt",
     })
     builder.add_conditional_edges("conflict_resolver", route_from_conflict_resolver, {
         "test_runner": "test_runner",
         "implementer": "implementer",
-        "__interrupt__": "__interrupt__",
+        "handle_interrupt": "handle_interrupt",
     })
     builder.add_conditional_edges("test_runner", route_from_test_runner, {
         "qualimetry": "qualimetry",
         "fixer": "fixer",
-        "__interrupt__": "__interrupt__",
+        "handle_interrupt": "handle_interrupt",
     })
     builder.add_conditional_edges("fixer", route_from_fixer, {
         "test_runner": "test_runner",
-        "__interrupt__": "__interrupt__",
+        "handle_interrupt": "handle_interrupt",
     })
     builder.add_conditional_edges("qualimetry", route_from_qualimetry, {
         "code_review": "code_review",
         "implementer": "implementer",
-        "__interrupt__": "__interrupt__",
+        "handle_interrupt": "handle_interrupt",
     })
     builder.add_conditional_edges("code_review", route_from_code_review, {
         "refactorer": "refactorer",
         "validator": "validator",
         "implementer": "implementer",
-        "__interrupt__": "__interrupt__",
+        "handle_interrupt": "handle_interrupt",
     })
     builder.add_edge("refactorer", "validator")
     builder.add_conditional_edges("validator", route_from_validator, {
         "open_pr": "open_pr",
         "visual_tester": "visual_tester",
         "implementer": "implementer",
-        "__interrupt__": "__interrupt__",
+        "handle_interrupt": "handle_interrupt",
     })
     builder.add_conditional_edges("visual_tester", route_from_visual_tester, {
         "open_pr": "open_pr",
         "implementer": "implementer",
-        "__interrupt__": "__interrupt__",
+        "handle_interrupt": "handle_interrupt",
     })
     builder.add_conditional_edges("reviewer", route_from_reviewer, {END: END})
     builder.add_edge("open_pr", END)
-    builder.add_edge("__interrupt__", END)
+    builder.add_edge("handle_interrupt", END)
 
     return builder.compile(checkpointer=build_checkpointer())
