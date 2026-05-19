@@ -29,7 +29,7 @@ from tools.git_tools import (
     git_push,
 )
 from llm import build_llm
-from nodes._base import WRITE_TOOLS, build_react_agent, extract_ok
+from nodes._base import CODING_TOOLS, build_react_agent, extract_ok
 
 
 def skeleton_writer(state: dict) -> dict:
@@ -54,7 +54,7 @@ def skeleton_writer(state: dict) -> dict:
         llm = build_llm()
         agent = build_react_agent(
             "implementer",
-            WRITE_TOOLS,
+            CODING_TOOLS,
             llm,
             extra_context=_build_context(state),
         )

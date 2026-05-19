@@ -18,7 +18,7 @@ if str(_HERE) not in sys.path:
 
 from tools.git_tools import git_continue_cherry_pick, git_push, git_get_head_sha
 from llm import build_llm
-from nodes._base import WRITE_TOOLS, build_react_agent, extract_ok
+from nodes._base import CODING_TOOLS, build_react_agent, extract_ok
 
 
 def conflict_resolver(state: dict) -> dict:
@@ -30,7 +30,7 @@ def conflict_resolver(state: dict) -> dict:
     llm = build_llm()
     agent = build_react_agent(
         "implementer",
-        WRITE_TOOLS,
+        CODING_TOOLS,
         llm,
         extra_context=_build_context(state, conflicts),
     )

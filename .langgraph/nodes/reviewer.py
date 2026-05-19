@@ -9,17 +9,15 @@ if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
 from llm import build_llm
-from nodes._base import WRITE_TOOLS, GITHUB_WRITE_TOOLS, build_react_agent, extract_ok
+from nodes._base import REVIEW_TOOLS, build_react_agent, extract_ok
 
 
 def reviewer(state: dict) -> dict:
     """Review a PR, push fixes if needed, post APPROVED comment when ready."""
-    tools = WRITE_TOOLS + GITHUB_WRITE_TOOLS
-
     llm = build_llm()
     agent = build_react_agent(
         "reviewer",
-        tools,
+        REVIEW_TOOLS,
         llm,
         extra_context=_build_context(state),
     )
@@ -39,7 +37,7 @@ def _build_context(state: dict) -> str:
         "1. Fetch PR diff and inline review comments.\n"
         "2. Check: architecture boundaries, i18n strings, 300-line limit, no Math.random().\n"
         "3. Run: npm run validate\n"
-        "4. If fixes needed: write files, git commit, git push.\n"
+        "4. If minor fixes needed: write the files (run_shell to re-validate after).\n"
         "5. Post APPROVED comment as the FINAL action — nothing after it.\n"
         "APPROVED comment triggers auto-merge. Post it only when all checks pass."
     )

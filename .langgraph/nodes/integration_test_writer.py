@@ -12,7 +12,7 @@ if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
 from llm import build_llm
-from nodes._base import WRITE_TOOLS, build_react_agent, extract_ok
+from nodes._base import CODING_TOOLS, build_react_agent, extract_ok
 from tools.git_tools import git_commit, git_push
 
 
@@ -24,7 +24,7 @@ def integration_test_writer(state: dict) -> dict:
     llm = build_llm()
     agent = build_react_agent(
         "test-writer",
-        WRITE_TOOLS,
+        CODING_TOOLS,
         llm,
         extra_context=_build_context(state),
     )

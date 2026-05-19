@@ -10,7 +10,7 @@ if str(_HERE) not in sys.path:
 
 from llm import build_llm
 from nodes._base import (
-    WRITE_TOOLS,
+    CODING_TOOLS,
     READ_ONLY_TOOLS,
     build_fresh_messages,
     build_react_agent,
@@ -36,7 +36,7 @@ def implementer(state: dict) -> dict:
     - Records `impl_commit_sha` for the downstream cherry_pick node.
     """
     investigate = state.get("pipeline") == "investigate"
-    tools = READ_ONLY_TOOLS if investigate else WRITE_TOOLS
+    tools = READ_ONLY_TOOLS if investigate else CODING_TOOLS
 
     if not investigate:
         impl_branch = state.get("impl_branch", "")

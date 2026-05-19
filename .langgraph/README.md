@@ -333,12 +333,13 @@ Set `LANGSMITH_API_KEY` as a repo secret for deeper traces. All runs appear unde
     agent_tools.py       ← list/get agents + skills (from .github/agents/ + .github/skills/)
     backlog_tools.py     ← backlog CRUD via GitHub API
     github_tools.py      ← GitHub read API (issues, PRs, comments)
-    github_write.py      ← GitHub write API (legacy; open_pr now uses pygithub_tools)
-    pygithub_tools.py    ← PyGithub: create_pr, add_label, remove_label
+    github_write.py      ← GitHub write API (post comment, add/remove label)
+    pygithub_tools.py    ← PyGithub: create_pr (non-agentic open_pr only)
     git_tools.py         ← gitpython: all git operations (branch, commit, push, cherry-pick)
     fs_tools.py          ← read/write/delete files, list_dir, grep
-    shell_tools.py       ← run_shell + git wrappers (delegates to git_tools)
+    shell_tools.py       ← run_shell (delegates git ops to git_tools)
     qualimetry.py        ← jscpd wrapper: detect code duplication, return QualimetryReport
+    todo_tools.py        ← per-session TODO list: todo_add / todo_list / todo_done / todo_clear
 
 .github/workflows/
   langgraph-agent.yml    ← agent runner (replaces open-swe-agent.yml)
@@ -349,8 +350,56 @@ Set `LANGSMITH_API_KEY` as a repo secret for deeper traces. All runs appear unde
 ## Adding custom tools
 
 1. Add a `.py` file in `tools/` with plain Python functions.
-2. Import them in `nodes/_base.py` and add to the appropriate tool set (`READ_ONLY_TOOLS`, `WRITE_TOOLS`, etc.).
+2. Import them in `nodes/_base.py` and add to the appropriate tool set.
 3. No other files need updating — nodes pick up tools from `_base.py`.
+
+---
+
+## Tool sets per node
+
+All tool sets are defined in `nodes/_base.py`. Git operations and PR creation are intentionally absent from every agent tool set — those are performed exclusively by non-agentic nodes (`skeleton_writer`, `cherry_pick`, `open_pr`).
+
+| Tool set | Composed of | Used by |
+|---|---|---|
+| `READ_ONLY_TOOLS` | context tools + file reads + TODO | `code_review`, `implementer` (investigate mode) |
+| `CODING_TOOLS` | context tools + file r/w + `run_shell` + TODO | all test writers, `implementer`, `fixer`, `refactorer` |
+| `REVIEW_TOOLS` | `CODING_TOOLS` + GitHub write (post comment / label) | `reviewer` |
+
+**Context tools** (read-only GitHub):
+`list_agents`, `get_agent_context`, `list_skills`, `get_skill_context`,
+`github_get_issue`, `github_list_issue_comments`,
+`github_get_pr`, `github_get_pr_files`, `github_get_pr_reviews`, `github_get_pr_review_comments`
+
+**Code tools** (filesystem + shell):
+Read: `read_file`, `list_dir`, `grep`
+Write: `write_file`, `delete_file`, `run_shell`
+
+**Not exposed to agents:** `git_commit`, `git_push`, `git_checkout_branch`, `github_create_pr`.
+
+---
+
+## TODO list tool
+
+Every agent has access to a lightweight task manager:
+
+| Tool | Description |
+|---|---|
+| `todo_add(task)` | Add a sub-task to the list |
+| `todo_list()` | Show all items with ☐/☑ status |
+| `todo_done(index)` | Mark item N as complete |
+| `todo_clear()` | Remove completed items |
+
+The list is stored in `/tmp/langgraph_todo_<issue_number>.json` — it persists across tool calls within the same agent session.
+
+Every agent system prompt includes this reminder:
+
+```
+## Task Management
+Use the `todo_add`, `todo_list`, `todo_done` tools to manage your work:
+1. Start: call `todo_list` to see pending items; then `todo_add` to record each sub-step.
+2. Work: complete one item at a time, then call `todo_done` with its index.
+3. Finish: call `todo_list` again to confirm all planned work is done before you stop.
+```
 
 ---
 
