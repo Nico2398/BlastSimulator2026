@@ -203,6 +203,17 @@ No LangGraph server started. No HTTP polling. Direct Python execution.
 
 ### Prerequisites
 
+#### GitHub token scopes
+
+Generate a classic PAT at **github.com → Settings → Developer settings → Personal access tokens → Tokens (classic)**.
+
+| Scope | Why it is needed |
+|---|---|
+| `repo` | Read issues, PRs, comments, labels; push branches; create PRs |
+| `workflow` | Push branches that may touch `.github/workflows/` files |
+
+`read:org` is only needed if the repository belongs to an organisation and the token owner is not already a member.
+
 ```bash
 cd .langgraph
 cp .env.example .env
