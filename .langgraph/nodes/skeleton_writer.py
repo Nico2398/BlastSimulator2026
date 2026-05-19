@@ -100,7 +100,6 @@ def _build_context(state: dict) -> str:
         "- Do NOT write any real logic. Do NOT write tests.",
         "- Commit nothing — the graph will commit after you finish.",
     ]
-    if state.get("skill"):
-        lines.append(skill_hint(state.get("skill", "")))
+    lines.append(skill_hint(state.get("skill", "")))
     lines.append("\n## Issue Body\n" + state.get("issue_body", ""))
     return "\n".join(lines)

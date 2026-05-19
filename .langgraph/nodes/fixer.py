@@ -80,8 +80,7 @@ def _build_context(state: dict, _tool_names: list | None = None) -> str:
         "## Test Failure Output",
         state.get("test_output", "(no output captured)"),
     ]
-    if state.get("skill"):
-        lines.append(skill_hint(state.get("skill", "")))
+    lines.append(skill_hint(state.get("skill", "")))
     return "\n".join(lines)
 
 
