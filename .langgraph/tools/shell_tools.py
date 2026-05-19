@@ -21,7 +21,9 @@ from git_tools import (  # noqa: E402
     git_checkout_branch as _git_checkout_branch,
 )
 
-_REPO_ROOT = os.environ.get("GITHUB_WORKSPACE", ".")
+_REPO_ROOT = os.environ.get("GITHUB_WORKSPACE") or str(
+    Path(__file__).parent.parent.parent
+)
 _CMD_TIMEOUT = 300  # 5 minutes max per shell command
 
 
