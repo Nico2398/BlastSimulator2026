@@ -48,8 +48,8 @@ def test_runner(state: dict) -> dict:
         output = (result.stdout + result.stderr).strip()
         ok = result.returncode == 0
     except subprocess.TimeoutExpired as exc:
-        stdout = _safe_decode(exc.stdout)
-        stderr = _safe_decode(exc.stderr)
+        stdout = _safe_decode(getattr(exc, "stdout", None))
+        stderr = _safe_decode(getattr(exc, "stderr", None))
         timeout_note = f"error: vitest timed out after {_TEST_TIMEOUT}s"
         output = "\n".join(part for part in [timeout_note, stdout, stderr] if part).strip()
         ok = False

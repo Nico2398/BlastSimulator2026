@@ -111,18 +111,17 @@ def _build_task_prompt(state: dict) -> str:
 
 
 def _retry_feedback(state: dict) -> list[str]:
-    role = state.get("current_role", "")
     feedback: list[str] = []
 
     if state.get("human_feedback"):
         feedback.append("\n## Human Feedback\n" + state["human_feedback"])
-    if role == "qualimetry" and state.get("qualimetry_report"):
+    if state.get("qualimetry_report"):
         feedback.append("\n## Qualimetry Feedback\n" + state["qualimetry_report"])
-    if role == "code-review" and state.get("code_review_report"):
+    if state.get("code_review_report"):
         feedback.append("\n## Code Review Feedback\n" + state["code_review_report"])
-    if role == "validator" and state.get("validator_report"):
+    if state.get("validator_report"):
         feedback.append("\n## Validator Feedback\n" + state["validator_report"])
-    if role == "conflict-resolver" and state.get("cherry_pick_conflicts"):
+    if state.get("cherry_pick_conflicts"):
         conflict_list = "\n".join(f"- {path}" for path in state["cherry_pick_conflicts"])
         feedback.append("\n## Cherry-pick Conflicts Still Open\n" + conflict_list)
 

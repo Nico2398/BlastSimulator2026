@@ -15,6 +15,7 @@ Output:
 """
 
 from __future__ import annotations
+import re
 import sys
 from pathlib import Path
 
@@ -82,8 +83,8 @@ def _extract_code_review_ok(agent_result: dict) -> bool:
         return False
 
     content = get_message_content(messages[-1]).lower()
-    if "code review passed" in content:
+    if re.search(r"^✅ code review passed\b", content, re.MULTILINE):
         return True
-    if "code review failed" in content:
+    if re.search(r"^❌ code review failed\b", content, re.MULTILINE):
         return False
     return extract_ok(agent_result)
