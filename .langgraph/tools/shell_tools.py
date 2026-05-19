@@ -41,12 +41,13 @@ def run_shell(cmd: str, cwd: str | None = None) -> str:
             cmd,
             shell=True,
             capture_output=True,
-            text=True,
             cwd=work_dir,
             timeout=_CMD_TIMEOUT,
             env={**os.environ},
         )
-        output = (result.stdout + result.stderr).strip()
+        stdout = result.stdout.decode("utf-8", errors="replace") if result.stdout else ""
+        stderr = result.stderr.decode("utf-8", errors="replace") if result.stderr else ""
+        output = (stdout + stderr).strip()
         if result.returncode != 0:
             return f"[exit {result.returncode}]\n{output}"
         return output or "(no output)"
