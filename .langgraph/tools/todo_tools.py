@@ -4,7 +4,8 @@ Each agent can maintain a private TODO list to break down its work into steps,
 track progress, and avoid missing tasks. The list is stored in a temp file so
 it survives multiple tool calls within the same agent session.
 
-Storage: /tmp/langgraph_todo_<issue_number>.json
+Storage: <tempdir>/langgraph_todo_<issue_number>.json  (tempdir = tempfile.gettempdir(),
+cross-platform on Linux, macOS, and Windows).
 Issue number is read from the ISSUE_NUMBER env var (always set by the workflow).
 """
 
@@ -12,9 +13,10 @@ from __future__ import annotations
 
 import json
 import os
+import tempfile
 from pathlib import Path
 
-_TODO_DIR = Path("/tmp")
+_TODO_DIR = Path(tempfile.gettempdir())
 
 
 def _todo_file() -> Path:
