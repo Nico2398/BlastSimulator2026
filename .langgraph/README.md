@@ -259,20 +259,40 @@ Change `LLM_MODEL_ID` to switch providers. No other files need updating.
 
 ---
 
-## LangSmith tracing
+## GitHub Actions logs
 
-Set `LANGSMITH_API_KEY` (in repo secrets for CI, or in `.env` for local). Tracing auto-enables.
+Every pipeline run produces fully traceable logs in the **Run LangGraph pipeline** step.
 
-All runs appear under the **`BlastSimulator2026-langgraph`** project in LangSmith.
+### Collapsible groups per node
 
-Each trace shows:
-- Per-node spans with typed inputs/outputs
-- Conditional edge decisions annotated on the trace
-- Tool call inputs and outputs
-- Retry count surfaced as metadata
-- Exact failure point per node
+Each graph node emits a `::group::Node: <name>` / `::endgroup::` pair. In the GitHub Actions UI click any group to expand/collapse it:
 
----
+```
+▶ Node: orchestrate          pipeline: implement-feature  skill: navmesh  …
+▶ Node: skeleton_writer      skeleton_writer_ok: ✅  sha: abc1234
+▶ Node: unit_test_writer     → tool: write_file(…)  ← tool: write_file → ok  LLM: …
+▶ Node: implementer          → tool: write_file(…)  ← tool: …  LLM: …
+▶ Node: cherry_pick          cherry_pick_ok: ✅
+▶ Node: test_runner          ✅ TESTS PASSED  (full Vitest output inside)
+▶ Node: qualimetry           ✅ QUALIMETRY PASSED  0.3% duplicate lines
+▶ Node: open_pr              PR #157 opened
+```
+
+### What each group contains
+
+| Node type | Content |
+|---|---|
+| **Agentic** (implementer, fixer, reviewers …) | Every `tool_call` name + truncated input → output, then final LLM response (truncated to 600 chars) |
+| **Non-agentic** (test_runner, qualimetry, cherry_pick, open_pr …) | Full structured output: status flag, report text, commit SHA, PR number, conflict list … |
+
+This is implemented in `pipeline_logger.py` — no LangSmith account required.
+
+### LangSmith (optional but richer)
+
+Set `LANGSMITH_API_KEY` as a repo secret for deeper traces. All runs appear under the **`BlastSimulator2026-langgraph`** project. LangSmith adds:
+- Per-token latency and cost breakdown
+- Conditional edge decisions annotated on the graph visualisation
+- Replay of any past run from its checkpoint
 
 ## File map
 
@@ -285,6 +305,7 @@ Each trace shows:
   .gitignore             ← excludes .env, caches, .venv
   graph.py               ← StateGraph: all nodes, conditional edges, retry logic
   runner.py              ← CLI/CI entrypoint (direct invocation, no HTTP server)
+  pipeline_logger.py     ← astream_events processor: per-node groups, tool/LLM logs
   llm.py                 ← LLM factory: parses LLM_MODEL_ID → ChatModel
   checkpointer.py        ← Checkpointer: MemorySaver (local) or PostgreSQL (CI)
   nodes/
