@@ -117,7 +117,9 @@ def build_react_agent(role: str, tools: list, llm, extra_context: str = ""):
     system_prompt = load_agent_prompt(role) + _TODO_REMINDER
     if extra_context:
         system_prompt = system_prompt + "\n\n## Additional Context\n" + extra_context
-    return lg_react_agent(llm, tools, prompt=system_prompt)
+    return lg_react_agent(llm, tools, prompt=system_prompt).with_config(
+        {"recursion_limit": 100}
+    )
 
 
 def build_fresh_messages(*parts: str) -> list[HumanMessage]:
