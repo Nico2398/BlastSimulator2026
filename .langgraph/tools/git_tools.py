@@ -11,11 +11,13 @@ from pathlib import Path
 
 import git
 
-_REPO_ROOT = os.environ.get("GITHUB_WORKSPACE", ".")
+_REPO_ROOT = os.environ.get("GITHUB_WORKSPACE") or str(
+    Path(__file__).parent.parent.parent
+)
 
 
 def _repo() -> git.Repo:
-    return git.Repo(_REPO_ROOT)
+    return git.Repo(_REPO_ROOT, search_parent_directories=True)
 
 
 # ---------------------------------------------------------------------------
