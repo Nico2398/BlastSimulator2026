@@ -44,13 +44,15 @@ main
       ├─ integration_test_writer: commit: test(integration): ...
       ├─ scenario_test_writer:  commit: test(scenario): ...
       │
-      └─ langgraph/impl-<N>  (forked from skeleton_commit_sha)
-           └─ implementer: commit: feat(impl): ...   ← impl_commit_sha
-                  ↓
-           cherry_pick → lands on langgraph/tests-<N>
-           conflict_resolver (if needed)
-                  ↓
-           qualimetry → refactorer → validator → open_pr
+           └─ langgraph/impl-<N>  (forked from skeleton_commit_sha)
+                └─ implementer: commit: feat(impl): ...   ← impl_commit_sha
+                   ↓
+            cherry_pick → lands on langgraph/tests-<N>
+            conflict_resolver (if needed)
+                   ↓
+            test_runner → [fixer → test_runner → ...]
+                   ↓
+            qualimetry → code_review → refactorer → validator → open_pr
 ```
 
 **Why:** The implementer starts from the skeleton commit (empty stubs) and never sees the test commits. This prevents the LLM from reverse-engineering implementations from test assertions.
@@ -123,6 +125,44 @@ Retry logic: any coding node failure → back to `implementer` (max 3×). After 
 
 ---
 
+## Context model and isolation rules
+
+The graph state stores global metadata (`issue_*`, branch names, SHAs, retry counters, gate outputs, PR number). Nodes can read that state directly.
+
+Agent context is narrower than graph state:
+
+| Agentic step | What it gets | What it does **not** get |
+|---|---|---|
+| `skeleton_writer` | issue metadata + skeleton-writing instructions in node context | no test commits yet |
+| `unit_test_writer` / `integration_test_writer` / `scenario_test_writer` | issue metadata + test-writing scope | implementation branch contents |
+| `implementer` | issue metadata, skeleton SHA/branch setup, safe retry feedback (`qualimetry_report`, `code_review_report`, `validator_report`, conflict file list, human feedback) | prior graph message history, test-writer message history, test branch commits |
+| `conflict_resolver` | issue metadata + explicit conflicted file list | unrelated historical context |
+| `fixer` | issue metadata + `test_output` from `test_runner` only | prior graph message history, test source/assertions |
+| `code_review` | issue metadata + repository read access | write tools, fixer/test-writer history requirements |
+| `refactorer` / `validator` / `reviewer` / `visual_tester` | full node-specific system context for their role | no hidden extra privileges beyond their tool set |
+
+Two important details:
+
+- `implementer` now starts from a **fresh message set** and re-checks out `impl_branch` on retries, so it never inherits test-writer chat history.
+- `fixer` also starts from a **fresh message set** and works only from stored Vitest output.
+
+## Role prompts
+
+Each reusable agent role has its own prompt file in `.github/agents/`:
+
+- `test-writer.agent.md`
+- `implementer.agent.md`
+- `refactorer.agent.md`
+- `validator.agent.md`
+- `reviewer.agent.md`
+- `visual-tester.agent.md`
+- `fixer.agent.md`
+- `code-reviewer.agent.md`
+
+Node-specific steps such as `skeleton_writer` and `conflict_resolver` currently reuse an existing role prompt plus extra node context assembled in Python.
+
+---
+
 ## Trigger via GitHub Actions
 
 ### Option A — comment on any issue
@@ -150,7 +190,8 @@ The agent replies with 👀, runs the pipeline, and opens a PR.
 4. Runs: uv run python runner.py
 5. Graph executes:
    orchestrate → skeleton_writer → [test writers] → implementer
-   → cherry_pick → qualimetry → refactorer → validator → open_pr
+   → cherry_pick → test_runner → [fixer] → qualimetry → code_review
+   → refactorer → validator → open_pr
 6. PR opened automatically with "Closes #<issue>" in body
 ```
 
@@ -262,7 +303,7 @@ Each trace shows:
     qualimetry_node.py          ← non-agentic: jscpd duplication gate
     code_review.py              ← agentic: architecture / convention audit
     refactorer.py               ← TDD Refactor: clean up for clarity
-    validator.py                ← run npm run validate, increment retry_count on failure
+    validator.py                ← run npm run validate, record validator_report on failure
     visual_tester.py            ← Puppeteer scenario tests
     reviewer.py                 ← PR audit + post APPROVED comment
     open_pr.py                  ← non-agentic: create PR via PyGithub

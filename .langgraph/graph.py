@@ -127,6 +127,7 @@ class AgentState(TypedDict):
     code_review_report: str
     refactorer_ok: bool
     validator_ok: bool
+    validator_report: str
     visual_tester_ok: bool
     reviewer_ok: bool
 

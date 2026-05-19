@@ -83,6 +83,7 @@ def skeleton_writer(state: dict) -> dict:
         "test_branch": test_branch,
         "branch_name": test_branch,  # keep branch_name pointing at test_branch
         "skeleton_writer_ok": skeleton_ok,
+        "retry_count": state.get("retry_count", 0) + (0 if skeleton_ok else 1),
         "current_role": "skeleton-writer",
     }
 

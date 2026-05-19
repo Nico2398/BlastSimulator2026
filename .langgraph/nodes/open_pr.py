@@ -41,18 +41,6 @@ def open_pr(state: dict) -> dict:
             body=pr_body,
             base="main",
         )
-
-        remove_label(issue_number, "in-progress")
-        add_label(issue_number, "in-review")
-
-        return {
-            "pr_number": pr_num,
-            "current_role": "open-pr",
-            "messages": state.get("messages", []) + [
-                {"role": "assistant",
-                 "content": f"PR #{pr_num} created: {pr_url}"}
-            ],
-        }
     except RuntimeError as exc:
         return {
             "pr_number": None,
@@ -61,6 +49,26 @@ def open_pr(state: dict) -> dict:
                 {"role": "assistant", "content": f"error creating PR: {exc}"}
             ],
         }
+
+    messages = state.get("messages", []) + [
+        {"role": "assistant", "content": f"PR #{pr_num} created: {pr_url}"}
+    ]
+    for op in (
+        lambda: remove_label(issue_number, "in-progress"),
+        lambda: add_label(issue_number, "in-review"),
+    ):
+        try:
+            messages = messages + [{"role": "assistant", "content": op()}]
+        except Exception as exc:  # best-effort label updates after PR creation
+            messages = messages + [
+                {"role": "assistant", "content": f"warning: label update failed: {exc}"}
+            ]
+
+    return {
+        "pr_number": pr_num,
+        "current_role": "open-pr",
+        "messages": messages,
+    }
 
 
 def _pr_title(pipeline: str, issue_title: str) -> str:

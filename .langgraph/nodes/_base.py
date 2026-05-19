@@ -10,6 +10,7 @@ _HERE = Path(__file__).parent.parent
 if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
+from langchain_core.messages import HumanMessage
 from langchain_core.tools import tool as lc_tool
 
 from tools.agent_tools import list_agents, get_agent_context, list_skills, get_skill_context
@@ -73,12 +74,22 @@ def build_react_agent(role: str, tools: list, llm, extra_context: str = ""):
     return lg_react_agent(llm, tools, prompt=system_prompt)
 
 
+def build_fresh_messages(*parts: str) -> list[HumanMessage]:
+    """Build a fresh message list for nodes that must not inherit old history."""
+    content = "\n\n".join(part.strip() for part in parts if part and part.strip())
+    return [HumanMessage(content=content)] if content else []
+
+
+def get_message_content(message) -> str:
+    """Return plain text content from a LangChain message-like object."""
+    return getattr(message, "content", "") or ""
+
+
 def extract_ok(agent_result: dict) -> bool:
     """Determine if the agent run succeeded by inspecting final messages."""
     messages = agent_result.get("messages", [])
     if not messages:
         return False
-    last = messages[-1]
-    content = getattr(last, "content", "") or ""
+    content = get_message_content(messages[-1])
     fail_signals = ["validation failed", "tests fail", "error:", "cannot", "blocked"]
     return not any(sig in content.lower() for sig in fail_signals)

@@ -23,7 +23,7 @@ if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
 from llm import build_llm
-from nodes._base import READ_ONLY_TOOLS, build_react_agent, extract_ok
+from nodes._base import READ_ONLY_TOOLS, build_react_agent, extract_ok, get_message_content
 
 
 def code_review(state: dict) -> dict:
@@ -36,14 +36,13 @@ def code_review(state: dict) -> dict:
         extra_context=_build_context(state),
     )
     result = agent.invoke({"messages": state.get("messages", [])})
-    ok = extract_ok(result)
+    ok = _extract_code_review_ok(result)
     messages = result["messages"]
 
     # Extract final review summary from last message.
     last_content = ""
     if messages:
-        last = messages[-1]
-        last_content = getattr(last, "content", "") or ""
+        last_content = get_message_content(messages[-1])
 
     retry = state.get("retry_count", 0)
     return {
@@ -75,3 +74,16 @@ def _build_context(state: dict) -> str:
         "  ✅ CODE REVIEW PASSED — ready for refactor\n"
         "  ❌ CODE REVIEW FAILED — list each violation with file + line number\n"
     )
+
+
+def _extract_code_review_ok(agent_result: dict) -> bool:
+    messages = agent_result.get("messages", [])
+    if not messages:
+        return False
+
+    content = get_message_content(messages[-1]).lower()
+    if "✅ code review passed" in content:
+        return True
+    if "❌ code review failed" in content or "code review failed" in content:
+        return False
+    return extract_ok(agent_result)

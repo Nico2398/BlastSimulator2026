@@ -9,9 +9,17 @@ if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
 from llm import build_llm
-from nodes._base import WRITE_TOOLS, READ_ONLY_TOOLS, build_react_agent, extract_ok
+from nodes._base import (
+    WRITE_TOOLS,
+    READ_ONLY_TOOLS,
+    build_fresh_messages,
+    build_react_agent,
+    extract_ok,
+)
 from tools.git_tools import (
+    git_branch_exists,
     git_checkout_branch,
+    git_checkout_existing,
     git_commit,
     git_push,
     git_get_head_sha,
@@ -34,14 +42,17 @@ def implementer(state: dict) -> dict:
         impl_branch = state.get("impl_branch", "")
         skeleton_sha = state.get("skeleton_commit_sha", "")
         # Create impl_branch from skeleton_commit_sha (before test commits).
-        checkout_msg = git_checkout_branch(impl_branch, from_ref=skeleton_sha or None)
+        if git_branch_exists(impl_branch):
+            checkout_msg = git_checkout_existing(impl_branch)
+        else:
+            checkout_msg = git_checkout_branch(impl_branch, from_ref=skeleton_sha or None)
     else:
         checkout_msg = ""
         impl_branch = ""
 
     llm = build_llm()
     agent = build_react_agent("implementer", tools, llm, extra_context=_build_context(state))
-    result = agent.invoke({"messages": state.get("messages", [])})
+    result = agent.invoke({"messages": build_fresh_messages(_build_task_prompt(state))})
     ok = extract_ok(result)
     messages = result["messages"]
 
@@ -86,5 +97,33 @@ def _build_context(state: dict) -> str:
             "Test files are on a separate branch — you do NOT see them. "
             "Implement the feature so that tests (once merged) will pass."
         )
+    lines.extend(_retry_feedback(state))
     lines.append("\n## Issue Body\n" + state.get("issue_body", ""))
     return "\n".join(lines)
+
+
+def _build_task_prompt(state: dict) -> str:
+    return (
+        f"Implement issue #{state.get('issue_number')}. "
+        "Use the system context and repository files. "
+        "Do not rely on prior graph message history."
+    )
+
+
+def _retry_feedback(state: dict) -> list[str]:
+    role = state.get("current_role", "")
+    feedback: list[str] = []
+
+    if state.get("human_feedback"):
+        feedback.append("\n## Human Feedback\n" + state["human_feedback"])
+    if role == "qualimetry" and state.get("qualimetry_report"):
+        feedback.append("\n## Qualimetry Feedback\n" + state["qualimetry_report"])
+    if role == "code-review" and state.get("code_review_report"):
+        feedback.append("\n## Code Review Feedback\n" + state["code_review_report"])
+    if role == "validator" and state.get("validator_report"):
+        feedback.append("\n## Validator Feedback\n" + state["validator_report"])
+    if role == "conflict-resolver" and state.get("cherry_pick_conflicts"):
+        conflict_list = "\n".join(f"- {path}" for path in state["cherry_pick_conflicts"])
+        feedback.append("\n## Cherry-pick Conflicts Still Open\n" + conflict_list)
+
+    return feedback

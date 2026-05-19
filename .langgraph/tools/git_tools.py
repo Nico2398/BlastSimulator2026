@@ -39,7 +39,7 @@ def git_get_head_sha() -> str:
 def git_get_conflict_files() -> list[str]:
     """Return a list of paths with unresolved merge/cherry-pick conflicts."""
     repo = _repo()
-    return [item.a_path for item in repo.index.unmerged_blobs()]
+    return list(repo.index.unmerged_blobs().keys())
 
 
 # ---------------------------------------------------------------------------
@@ -65,6 +65,12 @@ def git_checkout_branch(branch: str, from_ref: str | None = None) -> str:
         return f"created and switched to branch '{branch}' from {start.hexsha[:12]}"
     except git.GitCommandError as exc:
         return f"error creating branch '{branch}': {exc}"
+
+
+def git_branch_exists(branch: str) -> bool:
+    """Return True when a local branch exists."""
+    repo = _repo()
+    return any(head.name == branch for head in repo.heads)
 
 
 def git_checkout_existing(branch: str) -> str:

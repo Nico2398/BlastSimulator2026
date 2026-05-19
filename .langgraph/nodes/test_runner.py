@@ -29,17 +29,24 @@ _TEST_TIMEOUT = 300  # 5 minutes
 
 def test_runner(state: dict) -> dict:
     """Run the Vitest test suite. Non-agentic — no LLM call."""
-    result = subprocess.run(
-        "npx vitest run --reporter verbose",
-        shell=True,
-        capture_output=True,
-        text=True,
-        cwd=_REPO_ROOT,
-        timeout=_TEST_TIMEOUT,
-        env={**os.environ},
-    )
-    output = (result.stdout + result.stderr).strip()
-    ok = result.returncode == 0
+    try:
+        result = subprocess.run(
+            "npx vitest run --reporter verbose",
+            shell=True,
+            capture_output=True,
+            text=True,
+            cwd=_REPO_ROOT,
+            timeout=_TEST_TIMEOUT,
+            env={**os.environ},
+        )
+        output = (result.stdout + result.stderr).strip()
+        ok = result.returncode == 0
+    except subprocess.TimeoutExpired as exc:
+        stdout = exc.stdout or ""
+        stderr = exc.stderr or ""
+        timeout_note = f"error: vitest timed out after {_TEST_TIMEOUT}s"
+        output = "\n".join(part for part in [timeout_note, stdout, stderr] if part).strip()
+        ok = False
 
     status = "✅ TESTS PASSED" if ok else "❌ TESTS FAILED"
     message = AIMessage(content=f"[test_runner]\n{status}\n\n{output}")

@@ -22,7 +22,7 @@ if str(_HERE) not in sys.path:
 
 from tools.git_tools import git_commit, git_push
 from llm import build_llm
-from nodes._base import WRITE_TOOLS, build_react_agent, extract_ok
+from nodes._base import WRITE_TOOLS, build_fresh_messages, build_react_agent, extract_ok
 
 
 def fixer(state: dict) -> dict:
@@ -39,7 +39,7 @@ def fixer(state: dict) -> dict:
         llm,
         extra_context=_build_context(state),
     )
-    result = agent.invoke({"messages": state.get("messages", [])})
+    result = agent.invoke({"messages": build_fresh_messages(_build_task_prompt(state))})
     ok = extract_ok(result)
     messages = result["messages"]
 
@@ -83,3 +83,10 @@ def _build_context(state: dict, _tool_names: list | None = None) -> str:
     if state.get("skill"):
         lines.append(f"\nRelevant skill: {state['skill']}")
     return "\n".join(lines)
+
+
+def _build_task_prompt(state: dict) -> str:
+    return (
+        f"Fix the failing implementation for issue #{state.get('issue_number')}. "
+        "Use only the failure output from the system context and repository source files."
+    )
