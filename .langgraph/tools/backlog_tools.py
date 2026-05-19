@@ -1,67 +1,61 @@
 """Backlog management tools for BlastSimulator2026.
 
 Reads and writes .github/skills/backlog/backlog.json in the target repository
-via the GitHub REST API. Relies on GITHUB_TOKEN, DEFAULT_REPO_OWNER, and
+via PyGithub. Relies on GITHUB_TOKEN, DEFAULT_REPO_OWNER, and
 DEFAULT_REPO_NAME environment variables (all injected by the workflow).
+All GitHub operations go through PyGithub — no direct HTTP calls.
 """
 
-import base64
 import json
 import os
-import urllib.error
-import urllib.request
 from typing import Optional
+
+from github import Github, GithubException
 
 _BACKLOG_PATH = ".github/skills/backlog/backlog.json"
 
 
 # ---------------------------------------------------------------------------
-# GitHub API helpers
+# PyGithub helpers
 # ---------------------------------------------------------------------------
 
 
-def _headers() -> dict:
+def _client() -> Github:
     token = os.environ.get("GITHUB_TOKEN", "")
-    return {
-        "Authorization": f"Bearer {token}",
-        "Accept": "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28",
-        "Content-Type": "application/json",
-    }
+    if not token:
+        raise RuntimeError("GITHUB_TOKEN environment variable is not set")
+    return Github(token)
 
 
-def _contents_url() -> str:
+def _repo():
     owner = os.environ.get("DEFAULT_REPO_OWNER", "")
     name = os.environ.get("DEFAULT_REPO_NAME", "")
-    return f"https://api.github.com/repos/{owner}/{name}/contents/{_BACKLOG_PATH}"
+    if not owner or not name:
+        raise RuntimeError(
+            "DEFAULT_REPO_OWNER and DEFAULT_REPO_NAME must both be set"
+        )
+    return _client().get_repo(f"{owner}/{name}")
 
 
 def _get_backlog() -> tuple[list[dict], str]:
-    """Fetch backlog.json from the repo. Returns (tasks, sha)."""
-    req = urllib.request.Request(_contents_url(), headers=_headers())
+    """Fetch backlog.json from the repo via PyGithub. Returns (tasks, sha)."""
     try:
-        with urllib.request.urlopen(req) as resp:
-            data = json.loads(resp.read())
-    except urllib.error.HTTPError as exc:
-        raise RuntimeError(f"GitHub API error {exc.code}: {exc.reason}") from exc
-    content = base64.b64decode(data["content"]).decode("utf-8")
-    return json.loads(content), data["sha"]
+        repo = _repo()
+        content_file = repo.get_contents(_BACKLOG_PATH)
+    except GithubException as exc:
+        raise RuntimeError(f"GitHub error reading backlog: {exc.data}") from exc
+    tasks = json.loads(content_file.decoded_content.decode("utf-8"))
+    return tasks, content_file.sha
 
 
 def _put_backlog(tasks: list[dict], sha: str, message: str) -> None:
-    """Commit updated backlog.json back to the default branch."""
-    content_b64 = base64.b64encode(
-        (json.dumps(tasks, indent=2) + "\n").encode("utf-8")
-    ).decode("utf-8")
-    body = json.dumps({"message": message, "content": content_b64, "sha": sha}).encode("utf-8")
-    req = urllib.request.Request(
-        _contents_url(), data=body, headers=_headers(), method="PUT"
-    )
+    """Commit updated backlog.json back to the default branch via PyGithub."""
+    content = json.dumps(tasks, indent=2) + "\n"
     try:
-        with urllib.request.urlopen(req) as resp:
-            resp.read()
-    except urllib.error.HTTPError as exc:
-        raise RuntimeError(f"GitHub API error {exc.code}: {exc.reason}") from exc
+        repo = _repo()
+        repo.update_file(_BACKLOG_PATH, message, content, sha)
+    except GithubException as exc:
+        raise RuntimeError(f"GitHub error writing backlog: {exc.data}") from exc
 
 
 # ---------------------------------------------------------------------------

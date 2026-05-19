@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from langgraph.graph import END
 
-MAX_RETRIES = 3
+MAX_RETRIES = 7
 
 
 def route_from_orchestrate(state: dict) -> str:

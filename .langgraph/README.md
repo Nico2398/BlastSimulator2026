@@ -121,7 +121,7 @@ Reviews the implementation against the project's quality rules before the refact
 - **Pass** → refactorer (or validator for fix-bug)
 - **Fail** → implementer (with review report as context)
 
-Retry logic: any coding node failure → back to `implementer` (max 3×). After 3 failures: `interrupt()` posts a comment and pauses the run.
+Retry logic: any coding node failure → back to `implementer` (max 7×). After 7 failures: `interrupt()` posts a comment and pauses the run.
 
 ---
 
@@ -405,7 +405,7 @@ Use the `todo_add`, `todo_list`, `todo_done` tools to manage your work:
 
 ## Human-in-the-loop
 
-After `MAX_RETRIES = 3` failures at any coding node, the graph calls `interrupt()`. This:
+After `MAX_RETRIES = 7` failures at any coding node, the graph calls `interrupt()`. This:
 
 - **In GitHub Actions:** pauses the run and posts a comment on the issue explaining what failed. Re-trigger the workflow after adding clarification to the issue.
 - **In LangGraph Studio:** shows an input box inline. Enter guidance → click Resume → graph continues from the interrupted node.

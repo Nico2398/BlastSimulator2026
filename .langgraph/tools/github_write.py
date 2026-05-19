@@ -1,52 +1,42 @@
-"""GitHub write API tools for the LangGraph pipeline.
+"""GitHub write operations for the LangGraph pipeline.
 
 Provides functions to create PRs, post comments, and manage labels.
 Uses GITHUB_TOKEN, DEFAULT_REPO_OWNER, and DEFAULT_REPO_NAME from env.
+All operations go through PyGithub — no direct HTTP calls.
 """
 
-import json
+from __future__ import annotations
+
 import os
-import urllib.error
-import urllib.request
+
+from github import Github, GithubException
 
 
-def _headers() -> dict:
+# ---------------------------------------------------------------------------
+# Internal helpers
+# ---------------------------------------------------------------------------
+
+
+def _client() -> Github:
     token = os.environ.get("GITHUB_TOKEN", "")
-    return {
-        "Authorization": f"Bearer {token}",
-        "Accept": "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28",
-        "Content-Type": "application/json",
-    }
+    if not token:
+        raise RuntimeError("GITHUB_TOKEN environment variable is not set")
+    return Github(token)
 
 
-def _repo() -> tuple[str, str]:
+def _repo():
     owner = os.environ.get("DEFAULT_REPO_OWNER", "")
     name = os.environ.get("DEFAULT_REPO_NAME", "")
-    return owner, name
-
-
-def _api(path: str) -> str:
-    owner, name = _repo()
-    return f"https://api.github.com/repos/{owner}/{name}/{path}"
-
-
-_TIMEOUT = 30
-
-
-def _request(method: str, url: str, body: dict | None = None) -> dict | list | None:
-    data = json.dumps(body).encode() if body else None
-    req = urllib.request.Request(url, data=data, headers=_headers(), method=method)
-    try:
-        with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
-            raw = resp.read()
-            return json.loads(raw) if raw else None
-    except urllib.error.HTTPError as exc:
+    if not owner or not name:
         raise RuntimeError(
-            f"GitHub API {exc.code} {exc.reason} — {url}: {exc.read().decode()}"
-        ) from exc
-    except (urllib.error.URLError, TimeoutError) as exc:
-        raise RuntimeError(f"GitHub API network error — {url}: {exc}") from exc
+            "DEFAULT_REPO_OWNER and DEFAULT_REPO_NAME must both be set"
+        )
+    return _client().get_repo(f"{owner}/{name}")
+
+
+# ---------------------------------------------------------------------------
+# Tools
+# ---------------------------------------------------------------------------
 
 
 def github_create_pr(branch: str, title: str, body: str, base: str = "main") -> str:
@@ -61,13 +51,12 @@ def github_create_pr(branch: str, title: str, body: str, base: str = "main") -> 
     Returns:
         PR URL and number on success.
     """
-    data = _request("POST", _api("pulls"), {
-        "title": title,
-        "head": branch,
-        "base": base,
-        "body": body,
-    })
-    return f"PR #{data['number']} created: {data['html_url']}"
+    try:
+        repo = _repo()
+        pr = repo.create_pull(title=title, body=body, head=branch, base=base)
+        return f"PR #{pr.number} created: {pr.html_url}"
+    except GithubException as exc:
+        raise RuntimeError(f"failed to create PR: {exc.data}") from exc
 
 
 def github_post_comment(issue_number: int, body: str) -> str:
@@ -80,8 +69,13 @@ def github_post_comment(issue_number: int, body: str) -> str:
     Returns:
         Comment URL on success.
     """
-    data = _request("POST", _api(f"issues/{issue_number}/comments"), {"body": body})
-    return f"Comment posted: {data['html_url']}"
+    try:
+        repo = _repo()
+        issue = repo.get_issue(issue_number)
+        comment = issue.create_comment(body)
+        return f"Comment posted: {comment.html_url}"
+    except GithubException as exc:
+        raise RuntimeError(f"failed to post comment on #{issue_number}: {exc.data}") from exc
 
 
 def github_add_label(issue_number: int, label: str) -> str:
@@ -94,8 +88,13 @@ def github_add_label(issue_number: int, label: str) -> str:
     Returns:
         Confirmation message.
     """
-    _request("POST", _api(f"issues/{issue_number}/labels"), {"labels": [label]})
-    return f"Label '{label}' added to #{issue_number}"
+    try:
+        repo = _repo()
+        issue = repo.get_issue(issue_number)
+        issue.add_to_labels(label)
+        return f"Label '{label}' added to #{issue_number}"
+    except GithubException as exc:
+        raise RuntimeError(f"failed to add label '{label}' to #{issue_number}: {exc.data}") from exc
 
 
 def github_remove_label(issue_number: int, label: str) -> str:
@@ -109,9 +108,11 @@ def github_remove_label(issue_number: int, label: str) -> str:
         Confirmation message.
     """
     try:
-        _request("DELETE", _api(f"issues/{issue_number}/labels/{label}"))
+        repo = _repo()
+        issue = repo.get_issue(issue_number)
+        issue.remove_from_labels(label)
         return f"Label '{label}' removed from #{issue_number}"
-    except RuntimeError as exc:
-        if "404" in str(exc):
+    except GithubException as exc:
+        if exc.status == 404:
             return f"Label '{label}' was not present on #{issue_number}"
-        raise
+        raise RuntimeError(f"failed to remove label '{label}' from #{issue_number}: {exc.data}") from exc
