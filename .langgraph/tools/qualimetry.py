@@ -55,13 +55,19 @@ def run_qualimetry(repo_root: str | None = None) -> QualimetryReport:
             "--silent",
         ]
         try:
-            subprocess.run(
+            proc = subprocess.run(
                 cmd,
                 cwd=str(root),
                 capture_output=True,
                 text=True,
                 timeout=120,
             )
+            if proc.returncode not in (0, 1):  # 1 = duplicates found (expected)
+                return QualimetryReport(
+                    ok=False,
+                    duplicate_pct=0.0,
+                    error=f"jscpd exited with code {proc.returncode}: {proc.stderr.strip()}",
+                )
         except subprocess.TimeoutExpired:
             return QualimetryReport(ok=False, duplicate_pct=0.0, error="jscpd timed out")
         except FileNotFoundError:

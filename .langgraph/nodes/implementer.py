@@ -74,10 +74,15 @@ def implementer(state: dict) -> dict:
             {"role": "assistant", "content": push_result},
         ]
 
+    retry_count = state.get("retry_count", 0)
+    if not ok:
+        retry_count += 1
+
     return {
         "messages": messages,
         "implementer_ok": ok,
         "impl_commit_sha": impl_commit_sha,
+        "retry_count": retry_count,
         "current_role": "implementer",
     }
 

@@ -91,6 +91,13 @@ def route_from_code_review(state: dict) -> str:
     return "handle_interrupt" if state.get("retry_count", 0) >= MAX_RETRIES else "implementer"
 
 
+def route_from_refactorer(state: dict) -> str:
+    if state.get("refactorer_ok", False):
+        return "validator"
+    retry_count = state.get("retry_count", 0)
+    return "handle_interrupt" if retry_count >= MAX_RETRIES else "implementer"
+
+
 def route_from_validator(state: dict) -> str:
     if state.get("validator_ok", False):
         return "visual_tester" if state.get("pipeline") == "visual-change" else "open_pr"

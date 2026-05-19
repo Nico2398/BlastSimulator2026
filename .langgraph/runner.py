@@ -123,6 +123,10 @@ def main() -> None:
         else os.environ.get("COMMENT_BODY", "")
     )
 
+    # Ensure env vars are set so tools that read them (e.g. todo_tools) work correctly.
+    os.environ["ISSUE_NUMBER"] = str(issue_number)
+    os.environ["COMMENT_BODY"] = comment_body
+
     asyncio.run(run(issue_number, comment_body))
 
 

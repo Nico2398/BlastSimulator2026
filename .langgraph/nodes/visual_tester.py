@@ -31,9 +31,13 @@ def visual_tester(state: dict) -> dict:
     )
     result = agent.invoke({"messages": build_fresh_messages(_build_task_prompt(state))})
     ok = extract_ok(result)
+    retry_count = state.get("retry_count", 0)
+    if not ok:
+        retry_count += 1
     return {
         "messages": result["messages"],
         "visual_tester_ok": ok,
+        "retry_count": retry_count,
         "current_role": "visual-tester",
     }
 

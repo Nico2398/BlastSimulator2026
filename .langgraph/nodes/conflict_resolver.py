@@ -51,10 +51,15 @@ def conflict_resolver(state: dict) -> dict:
     push_result = git_push(test_branch)
     messages = messages + [{"role": "assistant", "content": push_result}]
 
+    retry_count = state.get("retry_count", 0)
+    if not ok:
+        retry_count += 1
+
     return {
         "messages": messages,
         "conflict_resolver_ok": ok,
         "impl_commit_sha": impl_sha,
+        "retry_count": retry_count,
         "current_role": "conflict-resolver",
     }
 

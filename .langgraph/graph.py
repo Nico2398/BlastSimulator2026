@@ -69,6 +69,7 @@ from routing import (
     route_from_fixer,
     route_from_qualimetry,
     route_from_code_review,
+    route_from_refactorer,
     route_from_validator,
     route_from_visual_tester,
     route_from_reviewer,
@@ -249,7 +250,11 @@ def build_graph():
         "implementer": "implementer",
         "handle_interrupt": "handle_interrupt",
     })
-    builder.add_edge("refactorer", "validator")
+    builder.add_conditional_edges("refactorer", route_from_refactorer, {
+        "validator": "validator",
+        "implementer": "implementer",
+        "handle_interrupt": "handle_interrupt",
+    })
     builder.add_conditional_edges("validator", route_from_validator, {
         "open_pr": "open_pr",
         "visual_tester": "visual_tester",

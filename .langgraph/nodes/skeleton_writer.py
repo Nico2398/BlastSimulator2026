@@ -23,7 +23,9 @@ if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
 from tools.git_tools import (
+    git_branch_exists,
     git_checkout_branch,
+    git_checkout_existing,
     git_get_head_sha,
     git_commit,
     git_push,
@@ -38,8 +40,12 @@ def skeleton_writer(state: dict) -> dict:
     test_branch = state.get("test_branch", f"langgraph/tests-{issue_number}")
     pipeline = state.get("pipeline", "implement-feature")
 
-    # 1. Create test_branch from HEAD (main).
-    checkout_msg = git_checkout_branch(test_branch)
+    # 1. Create or switch to test_branch from HEAD (main).
+    if git_branch_exists(test_branch):
+        checkout_msg = git_checkout_existing(test_branch)
+    else:
+        checkout_msg = git_checkout_branch(test_branch)
+    skeleton_ok = not checkout_msg.startswith("error")
 
     # 2. Record skeleton_commit_sha = current HEAD on test_branch.
     skeleton_sha = git_get_head_sha()
@@ -49,8 +55,7 @@ def skeleton_writer(state: dict) -> dict:
     ]
 
     # 3. For coding pipelines that need new code: write empty stubs via LLM.
-    skeleton_ok = True
-    if pipeline in ("implement-feature", "visual-change"):
+    if skeleton_ok and pipeline in ("implement-feature", "visual-change"):
         llm = build_llm()
         agent = build_react_agent(
             "implementer",
@@ -62,20 +67,22 @@ def skeleton_writer(state: dict) -> dict:
         skeleton_ok = extract_ok(result)
         messages = result["messages"]
 
-        # Auto-commit stubs; SHA only advances when files were actually written.
-        commit_result = git_commit(
-            f"chore(skeleton): empty stubs for #{issue_number}"
-        )
-        skeleton_sha = git_get_head_sha()  # unchanged if nothing was committed
-        messages = messages + [
-            {"role": "assistant", "content": commit_result}
-        ]
+        if skeleton_ok:
+            # Auto-commit stubs; SHA only advances when files were actually written.
+            commit_result = git_commit(
+                f"chore(skeleton): empty stubs for #{issue_number}"
+            )
+            skeleton_sha = git_get_head_sha()  # unchanged if nothing was committed
+            messages = messages + [
+                {"role": "assistant", "content": commit_result}
+            ]
 
-    # 4. Push test_branch so it exists on origin.
-    push_result = git_push(test_branch)
-    messages = messages + [
-        {"role": "assistant", "content": push_result}
-    ]
+    # 4. Push test_branch so it exists on origin (only when checkout succeeded).
+    if skeleton_ok:
+        push_result = git_push(test_branch)
+        messages = messages + [
+            {"role": "assistant", "content": push_result}
+        ]
 
     return {
         "messages": messages,

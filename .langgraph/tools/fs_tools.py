@@ -5,6 +5,7 @@ All paths are resolved relative to GITHUB_WORKSPACE (the checked-out repo root).
 """
 
 import os
+import shlex
 import subprocess
 
 _REPO_ROOT = os.environ.get("GITHUB_WORKSPACE", ".")
@@ -112,9 +113,10 @@ def grep(pattern: str, path: str = ".", flags: str = "") -> str:
         return f"error: {exc}"
 
     # Try ripgrep first, fall back to grep
+    flag_args = shlex.split(flags) if flags else []
     for cmd in [["rg", "--no-heading", "-n"], ["grep", "-rn"]]:
         try:
-            args = cmd + ([flags] if flags else []) + [pattern, resolved]
+            args = cmd + flag_args + [pattern, resolved]
             result = subprocess.run(
                 args, capture_output=True, text=True, timeout=30
             )

@@ -28,7 +28,7 @@ _TRUNCATE = 600
 # Deterministic nodes — no LLM, we print their full return dict directly.
 _NON_AGENTIC = frozenset({
     "orchestrate", "skeleton_writer", "cherry_pick",
-    "test_runner", "qualimetry", "open_pr", "__interrupt__",
+    "test_runner", "qualimetry", "open_pr", "handle_interrupt",
 })
 
 
