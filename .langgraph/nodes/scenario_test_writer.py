@@ -14,10 +14,14 @@ if str(_HERE) not in sys.path:
 
 from llm import build_llm
 from nodes._base import WRITE_TOOLS, build_react_agent, extract_ok
+from tools.git_tools import git_commit, git_push
 
 
 def scenario_test_writer(state: dict) -> dict:
-    """Write failing full-scenario tests (game-level flows, Puppeteer scenarios)."""
+    """Write failing full-scenario tests (game-level flows, Puppeteer scenarios).
+
+    Auto-commits scenario files to test_branch after the agent finishes.
+    """
     llm = build_llm()
     agent = build_react_agent(
         "test-writer",
@@ -27,8 +31,20 @@ def scenario_test_writer(state: dict) -> dict:
     )
     result = agent.invoke({"messages": state.get("messages", [])})
     ok = extract_ok(result)
+    messages = result["messages"]
+
+    issue_number = state.get("issue_number", 0)
+    test_branch = state.get("test_branch", state.get("branch_name", ""))
+
+    commit_result = git_commit(f"test(scenario): scenario tests for #{issue_number}")
+    push_result = git_push(test_branch)
+    messages = messages + [
+        {"role": "assistant", "content": commit_result},
+        {"role": "assistant", "content": push_result},
+    ]
+
     return {
-        "messages": result["messages"],
+        "messages": messages,
         "scenario_test_writer_ok": ok,
         "current_role": "scenario-test-writer",
     }
@@ -42,6 +58,7 @@ def _build_context(state: dict) -> str:
         "Add or extend scenario definitions in scripts/scenario-defs/ if applicable.",
         "Reference existing scenarios: blast-basic, level1-win-efficient, level1-lose-bankruptcy.",
         "Tests must fail before any implementation is written.",
+        "Do NOT commit — the graph commits after you finish.",
     ]
     if state.get("skill"):
         lines.append(f"Relevant skill: {state['skill']}")
