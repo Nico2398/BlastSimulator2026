@@ -1,16 +1,6 @@
 """GitHub read-only tools for the LangGraph pipeline.
 
-Provides functions that have no equivalent in the LangChain GitHub toolkit:
-  - github_get_issue            used directly by orchestrate.py (non-agent)
-  - github_list_issue_comments  no toolkit equivalent — available to agents
-  - github_get_pr_reviews       no toolkit equivalent — available to agents
-  - github_get_pr_review_comments  no toolkit equivalent — available to agents
-
-Replaced by langchain_community toolkit (see tools/langchain_github.py):
-  - github_get_issue (agent-facing only) → "Get Issue"
-  - github_get_pr                        → "Get Pull Request"
-  - github_get_pr_files                  → "List Pull Requests' Files"
-
+Provides functions to fetch issues, PRs, comments, and files from GitHub.
 Uses GITHUB_TOKEN, DEFAULT_REPO_OWNER, and DEFAULT_REPO_NAME from the environment.
 All requests go through PyGithub — no direct HTTP calls.
 """
@@ -51,9 +41,6 @@ def _repo():
 
 def github_get_issue(issue_number: int) -> str:
     """Fetch full details of a GitHub issue, including body, labels, and state.
-
-    Used directly by orchestrate.py — not exposed as an agent tool
-    (agents use the langchain toolkit's "Get Issue" tool instead).
 
     Args:
         issue_number: The issue or PR number.
@@ -151,4 +138,58 @@ def github_get_pr_review_comments(pr_number: int) -> str:
         line = getattr(c, "line", None) or getattr(c, "original_line", "?")
         lines.append(f"--- {c.user.login} on {c.path}:{line} ---")
         lines.append(c.body or "(empty)")
+    return "\n".join(lines)
+
+
+def github_get_pr(pr_number: int) -> str:
+    """Fetch full details of a GitHub pull request.
+
+    Args:
+        pr_number: The pull request number.
+
+    Returns:
+        Formatted string with title, state, base/head branches, body,
+        and reviewer list.
+    """
+    try:
+        repo = _repo()
+        pr = repo.get_pull(pr_number)
+    except GithubException as exc:
+        raise RuntimeError(f"GitHub error fetching PR #{pr_number}: {exc.data}") from exc
+    reviewers = ", ".join(u.login for u in pr.requested_reviewers) or "none"
+    labels = ", ".join(lb.name for lb in pr.labels) or "none"
+    return (
+        f"PR #{pr.number} [{pr.state.upper()}] {pr.title}\n"
+        f"Author: {pr.user.login}\n"
+        f"Base: {pr.base.ref}  ←  Head: {pr.head.ref}\n"
+        f"Labels: {labels}\n"
+        f"Reviewers: {reviewers}\n"
+        f"Mergeable: {pr.mergeable}\n"
+        f"URL: {pr.html_url}\n\n"
+        f"Body:\n{pr.body or '(no description)'}"
+    )
+
+
+def github_get_pr_files(pr_number: int) -> str:
+    """List files changed in a pull request.
+
+    Args:
+        pr_number: The pull request number.
+
+    Returns:
+        Each changed file with its status and patch summary.
+    """
+    try:
+        repo = _repo()
+        pr = repo.get_pull(pr_number)
+        files = list(pr.get_files())
+    except GithubException as exc:
+        raise RuntimeError(f"GitHub error fetching PR files for #{pr_number}: {exc.data}") from exc
+    if not files:
+        return "no changed files"
+    lines = []
+    for f in files:
+        lines.append(f"[{f.status.upper()}] {f.filename}  (+{f.additions} -{f.deletions})")
+        if f.patch:
+            lines.append(f.patch[:500] + ("…" if len(f.patch) > 500 else ""))
     return "\n".join(lines)
