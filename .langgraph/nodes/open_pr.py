@@ -12,6 +12,8 @@ _HERE = Path(__file__).parent.parent
 if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
+from github import GithubException
+
 from tools.pygithub_tools import create_pr, add_label, remove_label
 
 
@@ -56,7 +58,7 @@ def open_pr(state: dict) -> dict:
     try:
         remove_result = remove_label(issue_number, "in-progress")
         messages = messages + [{"role": "assistant", "content": remove_result}]
-    except Exception as exc:  # best-effort label updates after PR creation
+    except (RuntimeError, GithubException) as exc:  # best-effort label updates after PR creation
         messages = messages + [
             {"role": "assistant", "content": f"warning: label update failed: {exc}"}
         ]
@@ -64,7 +66,7 @@ def open_pr(state: dict) -> dict:
     try:
         add_result = add_label(issue_number, "in-review")
         messages = messages + [{"role": "assistant", "content": add_result}]
-    except Exception as exc:  # best-effort label updates after PR creation
+    except (RuntimeError, GithubException) as exc:  # best-effort label updates after PR creation
         messages = messages + [
             {"role": "assistant", "content": f"warning: label update failed: {exc}"}
         ]

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import sys
+from typing import Any
 from pathlib import Path
 
 _HERE = Path(__file__).parent.parent
@@ -80,7 +81,7 @@ def build_fresh_messages(*parts: str) -> list[HumanMessage]:
     return [HumanMessage(content=content)] if content else []
 
 
-def get_message_content(message) -> str:
+def get_message_content(message: Any) -> str:
     """Return plain text content from a LangChain message-like object."""
     return getattr(message, "content", "") or ""
 

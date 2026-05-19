@@ -27,6 +27,12 @@ _REPO_ROOT = os.environ.get("GITHUB_WORKSPACE", ".")
 _TEST_TIMEOUT = 300  # 5 minutes
 
 
+def _safe_decode(data: str | bytes | None) -> str:
+    if isinstance(data, bytes):
+        return data.decode()
+    return data or ""
+
+
 def test_runner(state: dict) -> dict:
     """Run the Vitest test suite. Non-agentic — no LLM call."""
     try:
@@ -42,8 +48,8 @@ def test_runner(state: dict) -> dict:
         output = (result.stdout + result.stderr).strip()
         ok = result.returncode == 0
     except subprocess.TimeoutExpired as exc:
-        stdout = exc.stdout.decode() if isinstance(exc.stdout, bytes) else (exc.stdout or "")
-        stderr = exc.stderr.decode() if isinstance(exc.stderr, bytes) else (exc.stderr or "")
+        stdout = _safe_decode(exc.stdout)
+        stderr = _safe_decode(exc.stderr)
         timeout_note = f"error: vitest timed out after {_TEST_TIMEOUT}s"
         output = "\n".join(part for part in [timeout_note, stdout, stderr] if part).strip()
         ok = False

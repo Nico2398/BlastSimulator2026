@@ -82,8 +82,8 @@ def _extract_code_review_ok(agent_result: dict) -> bool:
         return False
 
     content = get_message_content(messages[-1]).lower()
-    if "✅ code review passed" in content:
+    if "code review passed" in content:
         return True
-    if "❌ code review failed" in content or "code review failed" in content:
+    if "code review failed" in content:
         return False
     return extract_ok(agent_result)
