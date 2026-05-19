@@ -1,41 +1,31 @@
 """TODO list tool for LangGraph pipeline agents.
 
 Each agent can maintain a private TODO list to break down its work into steps,
-track progress, and avoid missing tasks. The list is stored in a temp file so
-it survives multiple tool calls within the same agent session.
+track progress, and avoid missing tasks.
 
-Storage: <tempdir>/langgraph_todo_<issue_number>.json  (tempdir = tempfile.gettempdir(),
-cross-platform on Linux, macOS, and Windows).
-Issue number is read from the ISSUE_NUMBER env var (always set by the workflow).
+Storage: module-level dict keyed by issue number — pure Python, no I/O, no
+temp files. All tool calls happen in the same process so the dict lives for
+the duration of the run.
 """
 
 from __future__ import annotations
 
-import json
 import os
-import tempfile
-from pathlib import Path
 
-_TODO_DIR = Path(tempfile.gettempdir())
+# { issue_number: [{"task": str, "done": bool}, ...] }
+_TODO: dict[str, list[dict]] = {}
 
 
-def _todo_file() -> Path:
-    issue = os.environ.get("ISSUE_NUMBER", "0")
-    return _TODO_DIR / f"langgraph_todo_{issue}.json"
+def _key() -> str:
+    return os.environ.get("ISSUE_NUMBER", "0")
 
 
 def _load() -> list[dict]:
-    f = _todo_file()
-    if f.exists():
-        try:
-            return json.loads(f.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            return []
-    return []
+    return _TODO.setdefault(_key(), [])
 
 
 def _save(tasks: list[dict]) -> None:
-    _todo_file().write_text(json.dumps(tasks, indent=2), encoding="utf-8")
+    _TODO[_key()] = tasks
 
 
 def todo_add(task: str) -> str:
