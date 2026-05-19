@@ -30,10 +30,15 @@ def read_file(path: str) -> str:
         File contents as a string, or an error message if not found.
     """
     try:
-        with open(_resolve(path), encoding="utf-8") as f:
+        resolved = _resolve(path)
+        if os.path.isdir(resolved):
+            return f"error: '{path}' is a directory, not a file — use list_dir instead"
+        with open(resolved, encoding="utf-8") as f:
             return f.read()
     except FileNotFoundError:
         return f"error: file not found: {path}"
+    except PermissionError:
+        return f"error: permission denied: {path} — this may be a directory"
     except ValueError as exc:
         return f"error: {exc}"
 
