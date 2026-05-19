@@ -58,7 +58,7 @@ def open_pr(state: dict) -> dict:
     try:
         remove_result = remove_label(issue_number, "in-progress")
         messages = messages + [{"role": "assistant", "content": remove_result}]
-    except (RuntimeError, GithubException) as exc:  # best-effort label updates after PR creation
+    except (RuntimeError, GithubException) as exc:  # PR exists already; label cleanup must not turn success into failure
         messages = messages + [
             {"role": "assistant", "content": f"warning: label update failed: {exc}"}
         ]
@@ -66,7 +66,7 @@ def open_pr(state: dict) -> dict:
     try:
         add_result = add_label(issue_number, "in-review")
         messages = messages + [{"role": "assistant", "content": add_result}]
-    except (RuntimeError, GithubException) as exc:  # best-effort label updates after PR creation
+    except (RuntimeError, GithubException) as exc:  # PR exists already; label cleanup must not turn success into failure
         messages = messages + [
             {"role": "assistant", "content": f"warning: label update failed: {exc}"}
         ]

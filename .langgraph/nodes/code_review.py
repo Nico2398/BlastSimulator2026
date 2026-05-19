@@ -82,9 +82,9 @@ def _extract_code_review_ok(agent_result: dict) -> bool:
     if not messages:
         return False
 
-    content = get_message_content(messages[-1]).lower()
-    if re.search(r"^✅ code review passed\b", content, re.MULTILINE):
+    content = get_message_content(messages[-1])
+    if re.search(r"^✅ CODE REVIEW PASSED\b", content, re.MULTILINE):
         return True
-    if re.search(r"^❌ code review failed\b", content, re.MULTILINE):
+    if re.search(r"^❌ CODE REVIEW FAILED\b", content, re.MULTILINE):
         return False
     return extract_ok(agent_result)

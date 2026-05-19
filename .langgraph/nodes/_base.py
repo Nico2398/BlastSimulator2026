@@ -76,7 +76,10 @@ def build_react_agent(role: str, tools: list, llm, extra_context: str = ""):
 
 
 def build_fresh_messages(*parts: str) -> list[HumanMessage]:
-    """Build a fresh message list for nodes that must not inherit old history."""
+    """Build a fresh message list for nodes that must not inherit old history.
+
+    Returns an empty list when no non-empty parts are provided.
+    """
     content = "\n\n".join(part.strip() for part in parts if part and part.strip())
     return [HumanMessage(content=content)] if content else []
 
