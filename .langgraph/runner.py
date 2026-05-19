@@ -105,6 +105,10 @@ async def run(issue_number: int, comment_body: str) -> None:
 
 
 def main() -> None:
+    # Load .env from the same directory as this script before reading any env vars.
+    from dotenv import load_dotenv
+    load_dotenv(_HERE / ".env", override=False)
+
     args = _parse_args()
 
     if args.model:
