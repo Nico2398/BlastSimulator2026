@@ -5,10 +5,14 @@ All paths are resolved relative to GITHUB_WORKSPACE (the checked-out repo root).
 """
 
 import os
+import re
 import shlex
 import subprocess
+from pathlib import Path
 
-_REPO_ROOT = os.environ.get("GITHUB_WORKSPACE", ".")
+_REPO_ROOT = os.environ.get("GITHUB_WORKSPACE") or str(
+    Path(__file__).parent.parent.parent
+)
 
 
 def _resolve(path: str) -> str:
@@ -134,4 +138,33 @@ def grep(pattern: str, path: str = ".", flags: str = "") -> str:
             continue
         except subprocess.TimeoutExpired:
             return "error: search timed out"
-    return "error: neither rg nor grep is available"
+    return _py_grep(pattern, resolved)
+
+
+def _py_grep(pattern: str, root: str) -> str:
+    """Pure-Python recursive regex search (Windows fallback)."""
+    try:
+        rx = re.compile(pattern)
+    except re.error as exc:
+        return f"error: invalid pattern: {exc}"
+    matches: list[str] = []
+    paths = [root] if os.path.isfile(root) else [
+        os.path.join(dp, fn)
+        for dp, dirs, files in os.walk(root)
+        for fn in files
+        if not any(p in dp for p in [".git", "node_modules", "dist"])
+        for _ in (dirs.__setitem__(slice(None), [d for d in dirs if not d.startswith(".")]),)
+    ]
+    for filepath in paths:
+        try:
+            with open(filepath, encoding="utf-8", errors="replace") as f:
+                for i, line in enumerate(f, 1):
+                    if rx.search(line):
+                        rel = os.path.relpath(filepath, _REPO_ROOT).replace("\\", "/")
+                        matches.append(f"{rel}:{i}:{line.rstrip()}")
+                        if len(matches) >= 200:
+                            matches.append("... (truncated at 200 matches)")
+                            return "\n".join(matches)
+        except (OSError, UnicodeDecodeError):
+            continue
+    return "\n".join(matches) if matches else "no matches"
