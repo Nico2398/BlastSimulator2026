@@ -27,7 +27,7 @@ def unit_test_writer(state: dict) -> dict:
         extra_context=_build_context(state),
     )
     result = agent.invoke({"messages": build_fresh_messages(_build_task_prompt(state))})
-    ok = extract_ok(result)
+    ok = extract_ok(result, allow_expected_failures=True)
     messages = result["messages"]
 
     retry_count = state.get("retry_count", 0)
