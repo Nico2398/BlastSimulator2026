@@ -389,7 +389,7 @@ Every agent has access to a lightweight task manager:
 | `todo_done(index)` | Mark item N as complete |
 | `todo_clear()` | Remove completed items |
 
-The list is stored in `/tmp/langgraph_todo_<issue_number>.json` — it persists across tool calls within the same agent session.
+State is keyed by issue number and lives in a module-level dict — zero overhead, no disk access, automatically cleaned up when the process exits.
 
 Every agent system prompt includes this reminder:
 
