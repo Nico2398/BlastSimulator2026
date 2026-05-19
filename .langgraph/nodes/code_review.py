@@ -24,11 +24,15 @@ if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
 from llm import build_llm
-from nodes._base import READ_ONLY_TOOLS, build_react_agent, extract_ok, extract_message_content
+from nodes._base import READ_ONLY_TOOLS, build_fresh_messages, build_react_agent, extract_ok, extract_message_content, skill_hint
 
 
 def code_review(state: dict) -> dict:
-    """Agentic code review — checks quality gates before refactoring."""
+    """Agentic code review — checks quality gates before refactoring.
+
+    Uses a fresh message set so the reviewer reads implementation files
+    directly via tools, unbiased by the implementer's message history.
+    """
     llm = build_llm()
     agent = build_react_agent(
         "code-reviewer",
@@ -36,7 +40,7 @@ def code_review(state: dict) -> dict:
         llm,
         extra_context=_build_context(state),
     )
-    result = agent.invoke({"messages": state.get("messages", [])})
+    result = agent.invoke({"messages": build_fresh_messages(_build_task_prompt(state))})
     ok = _extract_code_review_ok(result)
     messages = result["messages"]
 
@@ -56,24 +60,36 @@ def code_review(state: dict) -> dict:
 
 
 def _build_context(state: dict) -> str:
+    lines = [
+        f"Issue #{state.get('issue_number')}: {state.get('issue_title', '')}",
+        f"Pipeline: {state.get('pipeline', '')}",
+        f"Retry #{state.get('retry_count', 0)}",
+        "",
+        "TASK: Review the implementation that was just written.",
+        "Check ALL of the following:",
+        "1. Architecture boundaries: src/core/ has no DOM/WebGL/window imports.",
+        "2. No Math.random() — only seeded PRNG from src/core/math/Random.ts.",
+        "3. 300-line limit per file (data/i18n files exempt).",
+        "4. Named exports everywhere (except entry points).",
+        "5. All user-facing strings use t('key') — no hardcoded player-visible text.",
+        "6. TypeScript strict — no 'any' except in test fixtures.",
+        "7. No hardcoded balance numbers — use src/core/config/.",
+        "",
+        "Read the relevant implementation files with read_file / grep before judging.",
+        "Conclude with either:",
+        "  ✅ CODE REVIEW PASSED — ready for refactor",
+        "  ❌ CODE REVIEW FAILED — list each violation with file + line number",
+    ]
+    lines.append(skill_hint(state.get("skill", "")))
+    if state.get("issue_body"):
+        lines.append("\n## Issue Body\n" + state["issue_body"])
+    return "\n".join(lines)
+
+
+def _build_task_prompt(state: dict) -> str:
     return (
-        f"Issue #{state.get('issue_number')}: {state.get('issue_title', '')}\n"
-        f"Pipeline: {state.get('pipeline', '')}\n"
-        "\n"
-        "TASK: Review the implementation that was just written.\n"
-        "Check ALL of the following:\n"
-        "1. Architecture boundaries: src/core/ has no DOM/WebGL/window imports.\n"
-        "2. No Math.random() — only seeded PRNG from src/core/math/Random.ts.\n"
-        "3. 300-line limit per file (data/i18n files exempt).\n"
-        "4. Named exports everywhere (except entry points).\n"
-        "5. All user-facing strings use t('key') — no hardcoded player-visible text.\n"
-        "6. TypeScript strict — no 'any' except in test fixtures.\n"
-        "7. No hardcoded balance numbers — use src/core/config/.\n"
-        "\n"
-        "Read the relevant implementation files with read_file / grep before judging.\n"
-        "Conclude with either:\n"
-        "  ✅ CODE REVIEW PASSED — ready for refactor\n"
-        "  ❌ CODE REVIEW FAILED — list each violation with file + line number\n"
+        f"Review the implementation for issue #{state.get('issue_number')}. "
+        "Read implementation files in src/ using your tools before making a judgment."
     )
 
 

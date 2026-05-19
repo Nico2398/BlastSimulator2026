@@ -11,12 +11,15 @@ if str(_HERE) not in sys.path:
 from langchain_core.tools import tool as lc_tool
 
 from llm import build_llm
-from nodes._base import READ_ONLY_TOOLS, build_react_agent, extract_ok
+from nodes._base import READ_ONLY_TOOLS, build_fresh_messages, build_react_agent, extract_ok
 from tools.shell_tools import run_shell
 
 
 def visual_tester(state: dict) -> dict:
-    """Run visual scenario tests with Puppeteer."""
+    """Run visual scenario tests with Puppeteer.
+
+    Starts from a fresh message set — independent of the build pipeline history.
+    """
     tools = READ_ONLY_TOOLS + [lc_tool(run_shell)]
 
     llm = build_llm()
@@ -26,7 +29,7 @@ def visual_tester(state: dict) -> dict:
         llm,
         extra_context=_build_context(state),
     )
-    result = agent.invoke({"messages": state.get("messages", [])})
+    result = agent.invoke({"messages": build_fresh_messages(_build_task_prompt(state))})
     ok = extract_ok(result)
     return {
         "messages": result["messages"],
@@ -45,4 +48,11 @@ def _build_context(state: dict) -> str:
         "Available scenarios: blast-basic, level1-win-efficient, level1-win-conservative,\n"
         "  level1-lose-bankruptcy, level1-lose-arrest, level1-lose-ecology, level1-lose-revolt\n"
         "Report pass/fail for each scenario."
+    )
+
+
+def _build_task_prompt(state: dict) -> str:
+    return (
+        f"Run visual scenario tests for issue #{state.get('issue_number')}. "
+        "Follow the commands in the system context and report pass/fail for each scenario."
     )

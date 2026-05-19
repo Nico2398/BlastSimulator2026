@@ -22,7 +22,7 @@ if str(_HERE) not in sys.path:
 
 from tools.git_tools import git_commit, git_push
 from llm import build_llm
-from nodes._base import CODING_TOOLS, build_fresh_messages, build_react_agent, extract_ok
+from nodes._base import CODING_TOOLS, build_fresh_messages, build_react_agent, extract_ok, skill_hint
 
 
 def fixer(state: dict) -> dict:
@@ -81,7 +81,7 @@ def _build_context(state: dict, _tool_names: list | None = None) -> str:
         state.get("test_output", "(no output captured)"),
     ]
     if state.get("skill"):
-        lines.append(f"\nRelevant skill: {state['skill']}")
+        lines.append(skill_hint(state.get("skill", "")))
     return "\n".join(lines)
 
 

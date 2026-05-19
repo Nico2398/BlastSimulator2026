@@ -13,7 +13,7 @@ if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
 from llm import build_llm
-from nodes._base import CODING_TOOLS, build_react_agent, extract_ok
+from nodes._base import CODING_TOOLS, build_fresh_messages, build_react_agent, extract_ok, skill_hint
 from tools.git_tools import git_commit, git_push
 
 
@@ -21,6 +21,7 @@ def scenario_test_writer(state: dict) -> dict:
     """Write failing full-scenario tests (game-level flows, Puppeteer scenarios).
 
     Auto-commits scenario files to test_branch after the agent finishes.
+    Starts from a fresh message set — does not inherit prior agent history.
     """
     llm = build_llm()
     agent = build_react_agent(
@@ -29,7 +30,7 @@ def scenario_test_writer(state: dict) -> dict:
         llm,
         extra_context=_build_context(state),
     )
-    result = agent.invoke({"messages": state.get("messages", [])})
+    result = agent.invoke({"messages": build_fresh_messages(_build_task_prompt(state))})
     ok = extract_ok(result)
     messages = result["messages"]
 
@@ -58,9 +59,17 @@ def _build_context(state: dict) -> str:
         "Add or extend scenario definitions in scripts/scenario-defs/ if applicable.",
         "Reference existing scenarios: blast-basic, level1-win-efficient, level1-lose-bankruptcy.",
         "Tests must fail before any implementation is written.",
+        "Read existing scenario files before writing to avoid duplication.",
         "Do NOT commit — the graph commits after you finish.",
     ]
-    if state.get("skill"):
-        lines.append(f"Relevant skill: {state['skill']}")
+    lines.append(skill_hint(state.get("skill", "")))
     lines.append("\n## Issue Body\n" + state.get("issue_body", ""))
     return "\n".join(lines)
+
+
+def _build_task_prompt(state: dict) -> str:
+    return (
+        f"Write failing scenario tests for issue #{state.get('issue_number')}. "
+        "Read the issue body from the system context. "
+        "Use read_file and list_dir to inspect existing scenarios before writing new ones."
+    )

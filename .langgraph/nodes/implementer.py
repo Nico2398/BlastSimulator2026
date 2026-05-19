@@ -15,6 +15,7 @@ from nodes._base import (
     build_fresh_messages,
     build_react_agent,
     extract_ok,
+    skill_hint,
 )
 from tools.git_tools import (
     git_branch_exists,
@@ -87,8 +88,6 @@ def _build_context(state: dict) -> str:
         f"Pipeline: {state.get('pipeline', '')}",
         f"Retry #{state.get('retry_count', 0)}",
     ]
-    if state.get("skill"):
-        lines.append(f"Relevant skill: {state['skill']}")
     if state.get("pipeline") == "investigate":
         lines.append("MODE: investigate — read files only, do NOT write or commit.")
     else:
@@ -97,6 +96,7 @@ def _build_context(state: dict) -> str:
             "Test files are on a separate branch — you do NOT see them. "
             "Implement the feature so that tests (once merged) will pass."
         )
+    lines.append(skill_hint(state.get("skill", "")))
     lines.extend(_retry_feedback(state))
     lines.append("\n## Issue Body\n" + state.get("issue_body", ""))
     return "\n".join(lines)

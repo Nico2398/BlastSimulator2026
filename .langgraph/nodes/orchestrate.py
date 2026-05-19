@@ -16,7 +16,7 @@ _HERE = Path(__file__).parent.parent
 if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
-from tools.github_tools import github_get_issue, github_list_issue_comments
+from tools.github_tools import github_get_issue
 
 
 # ---------------------------------------------------------------------------
@@ -76,7 +76,6 @@ def orchestrate(state: dict) -> dict:
     comment_body = state.get("comment_body", "")
 
     issue_text = github_get_issue(issue_number)
-    github_list_issue_comments(issue_number)
 
     labels: list[str] = []
     issue_title = ""

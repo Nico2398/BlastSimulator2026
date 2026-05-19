@@ -16,13 +16,16 @@ from langchain_core.tools import tool as lc_tool
 
 from tools.agent_tools import list_agents, get_agent_context, list_skills, get_skill_context
 from tools.github_tools import (
-    github_get_issue, github_list_issue_comments,
-    github_get_pr, github_get_pr_files, github_get_pr_reviews, github_get_pr_review_comments,
+    github_list_issue_comments,
+    github_get_pr_reviews, github_get_pr_review_comments,
 )
+# github_get_issue, github_get_pr, github_get_pr_files replaced by langchain toolkit below.
+# github_post_comment replaced by langchain toolkit below.
+from tools.langchain_github import get_github_read_tools, get_github_write_tools
 from tools.fs_tools import read_file, write_file, delete_file, list_dir, grep
 from tools.shell_tools import run_shell
 from tools.github_write import (
-    github_post_comment, github_add_label, github_remove_label,
+    github_add_label, github_remove_label,
 )
 from tools.backlog_tools import (
     backlog_list, backlog_next, backlog_start, backlog_done,
@@ -39,11 +42,17 @@ _REPO_ROOT = os.environ.get("GITHUB_WORKSPACE", ".")
 # ---------------------------------------------------------------------------
 
 # Context tools: fetch issue/PR data and agent/skill context from GitHub.
-_CONTEXT_TOOLS = [lc_tool(f) for f in [
-    list_agents, get_agent_context, list_skills, get_skill_context,
-    github_get_issue, github_list_issue_comments,
-    github_get_pr, github_get_pr_files, github_get_pr_reviews, github_get_pr_review_comments,
-]]
+# get_github_read_tools() provides: "Get Issue", "Get Pull Request",
+#   "List Pull Requests' Files" — via langchain_community GitHubToolkit.
+# Custom PyGithub tools kept for operations with no toolkit equivalent.
+_CONTEXT_TOOLS = (
+    [lc_tool(f) for f in [
+        list_agents, get_agent_context, list_skills, get_skill_context,
+        github_list_issue_comments,
+        github_get_pr_reviews, github_get_pr_review_comments,
+    ]]
+    + get_github_read_tools()
+)
 
 # Filesystem read tools: inspect repository files.
 _CODE_READ_TOOLS = [lc_tool(f) for f in [read_file, list_dir, grep]]
@@ -61,9 +70,12 @@ BACKLOG_TOOLS = [lc_tool(f) for f in [
 ]]
 
 # GitHub write: post comments and manage labels (reviewer only).
-_GH_WRITE_TOOLS = [lc_tool(f) for f in [
-    github_post_comment, github_add_label, github_remove_label,
-]]
+# get_github_write_tools() provides: "Comment on Issue" — via langchain toolkit.
+# Custom PyGithub tools kept for label management (no toolkit equivalent).
+_GH_WRITE_TOOLS = (
+    get_github_write_tools()
+    + [lc_tool(f) for f in [github_add_label, github_remove_label]]
+)
 
 # ---------------------------------------------------------------------------
 # Composed tool sets — one per agent role
@@ -139,3 +151,14 @@ def extract_ok(agent_result: dict) -> bool:
     content = extract_message_content(messages[-1])
     fail_signals = ["validation failed", "tests fail", "error:", "cannot", "blocked"]
     return not any(sig in content.lower() for sig in fail_signals)
+
+
+def skill_hint(skill: str) -> str:
+    """Return a prompt snippet encouraging the agent to load the skill spec."""
+    if not skill:
+        return ""
+    return (
+        f"\nRelevant skill: **{skill}**\n"
+        f"Call `get_skill_context('{skill}')` to load the full system specification "
+        "before starting your work."
+    )

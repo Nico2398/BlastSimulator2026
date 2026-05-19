@@ -1,6 +1,13 @@
 """GitHub write operations for the LangGraph pipeline.
 
-Provides functions to create PRs, post comments, and manage labels.
+Provides direct Python functions for non-agentic node use:
+  - github_create_pr    used by open_pr node directly
+  - github_add_label    available to agents + used by open_pr
+  - github_remove_label available to agents + used by open_pr
+
+Replaced by langchain_community toolkit (see tools/langchain_github.py):
+  - github_post_comment → "Comment on Issue"
+
 Uses GITHUB_TOKEN, DEFAULT_REPO_OWNER, and DEFAULT_REPO_NAME from env.
 All operations go through PyGithub — no direct HTTP calls.
 """
@@ -57,25 +64,6 @@ def github_create_pr(branch: str, title: str, body: str, base: str = "main") -> 
         return f"PR #{pr.number} created: {pr.html_url}"
     except GithubException as exc:
         raise RuntimeError(f"failed to create PR: {exc.data}") from exc
-
-
-def github_post_comment(issue_number: int, body: str) -> str:
-    """Post a comment on an issue or PR.
-
-    Args:
-        issue_number: Issue or PR number.
-        body: Comment body (markdown).
-
-    Returns:
-        Comment URL on success.
-    """
-    try:
-        repo = _repo()
-        issue = repo.get_issue(issue_number)
-        comment = issue.create_comment(body)
-        return f"Comment posted: {comment.html_url}"
-    except GithubException as exc:
-        raise RuntimeError(f"failed to post comment on #{issue_number}: {exc.data}") from exc
 
 
 def github_add_label(issue_number: int, label: str) -> str:

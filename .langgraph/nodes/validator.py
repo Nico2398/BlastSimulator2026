@@ -11,17 +11,20 @@ if str(_HERE) not in sys.path:
 from langchain_core.tools import tool as lc_tool
 
 from llm import build_llm
-from nodes._base import READ_ONLY_TOOLS, build_react_agent, extract_ok, extract_message_content
+from nodes._base import READ_ONLY_TOOLS, build_fresh_messages, build_react_agent, extract_ok, extract_message_content
 from tools.shell_tools import run_shell
 
 
 def validator(state: dict) -> dict:
-    """Run the full validation suite and report results."""
+    """Run the full validation suite and report results.
+
+    Starts from a fresh message set — runs validation commands directly.
+    """
     llm = build_llm()
     tools = READ_ONLY_TOOLS + [lc_tool(run_shell)]
 
     agent = build_react_agent("validator", tools, llm, extra_context=_build_context(state))
-    result = agent.invoke({"messages": state.get("messages", [])})
+    result = agent.invoke({"messages": build_fresh_messages(_build_task_prompt(state))})
     ok = extract_ok(result)
     report = extract_message_content(result["messages"][-1]) if result.get("messages") else ""
     return {
@@ -34,10 +37,20 @@ def validator(state: dict) -> dict:
 
 
 def _build_context(state: dict) -> str:
+    lines = [
+        f"Issue #{state.get('issue_number')}: {state.get('issue_title', '')}",
+        f"Retry count so far: {state.get('retry_count', 0)}",
+        "Run: npm run validate",
+        "All three steps must pass: TypeScript type check, Vitest tests, Vite build.",
+        "Report ✅ VALIDATION PASSED or ❌ VALIDATION FAILED with exact errors.",
+    ]
+    if state.get("validator_report"):
+        lines.append("\n## Previous Validation Output\n" + state["validator_report"])
+    return "\n".join(lines)
+
+
+def _build_task_prompt(state: dict) -> str:
     return (
-        f"Issue #{state.get('issue_number')}: {state.get('issue_title', '')}\n"
-        f"Retry count so far: {state.get('retry_count', 0)}\n"
-        "Run: npm run validate\n"
-        "All three steps must pass: TypeScript type check, Vitest tests, Vite build.\n"
-        "Report ✅ VALIDATION PASSED or ❌ VALIDATION FAILED with exact errors."
+        f"Validate the implementation for issue #{state.get('issue_number')}. "
+        "Run `npm run validate` via run_shell and report the result."
     )

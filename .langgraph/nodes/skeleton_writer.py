@@ -29,7 +29,7 @@ from tools.git_tools import (
     git_push,
 )
 from llm import build_llm
-from nodes._base import CODING_TOOLS, build_react_agent, extract_ok
+from nodes._base import CODING_TOOLS, build_react_agent, extract_ok, skill_hint
 
 
 def skeleton_writer(state: dict) -> dict:
@@ -101,6 +101,6 @@ def _build_context(state: dict) -> str:
         "- Commit nothing — the graph will commit after you finish.",
     ]
     if state.get("skill"):
-        lines.append(f"Relevant skill: {state['skill']}")
+        lines.append(skill_hint(state.get("skill", "")))
     lines.append("\n## Issue Body\n" + state.get("issue_body", ""))
     return "\n".join(lines)

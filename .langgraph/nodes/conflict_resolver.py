@@ -18,11 +18,14 @@ if str(_HERE) not in sys.path:
 
 from tools.git_tools import git_continue_cherry_pick, git_push, git_get_head_sha
 from llm import build_llm
-from nodes._base import CODING_TOOLS, build_react_agent, extract_ok
+from nodes._base import CODING_TOOLS, build_fresh_messages, build_react_agent, extract_ok
 
 
 def conflict_resolver(state: dict) -> dict:
-    """Resolve cherry-pick conflicts and finalise the merge."""
+    """Resolve cherry-pick conflicts and finalise the merge.
+
+    Uses a fresh message set — the full conflict list is in the context.
+    """
     test_branch = state.get("test_branch", state.get("branch_name", ""))
     conflicts = state.get("cherry_pick_conflicts", [])
     issue_number = state.get("issue_number", 0)
@@ -34,7 +37,7 @@ def conflict_resolver(state: dict) -> dict:
         llm,
         extra_context=_build_context(state, conflicts),
     )
-    result = agent.invoke({"messages": state.get("messages", [])})
+    result = agent.invoke({"messages": build_fresh_messages(_build_task_prompt(conflicts))})
     ok = extract_ok(result)
     messages = result["messages"]
 
@@ -75,3 +78,13 @@ def _build_context(state: dict, conflicts: list[str]) -> str:
         "DO NOT commit — the graph commits after you finish.",
     ]
     return "\n".join(lines)
+
+
+def _build_task_prompt(conflicts: list[str]) -> str:
+    conflict_list = "\n".join(f"  - {f}" for f in conflicts)
+    return (
+        "Resolve the following cherry-pick conflicts. "
+        "For each file, read it, remove conflict markers, merge both sides cleanly, "
+        "and write the resolved file back:\n"
+        + conflict_list
+    )
