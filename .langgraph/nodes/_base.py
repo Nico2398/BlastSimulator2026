@@ -84,7 +84,7 @@ def build_fresh_messages(*parts: str) -> list[HumanMessage]:
     return [HumanMessage(content=content)] if content else []
 
 
-def get_message_content(message: Any) -> str:
+def extract_message_content(message: Any) -> str:
     """Return plain text content from a LangChain message-like object."""
     return getattr(message, "content", "") or ""
 
@@ -94,6 +94,6 @@ def extract_ok(agent_result: dict) -> bool:
     messages = agent_result.get("messages", [])
     if not messages:
         return False
-    content = get_message_content(messages[-1])
+    content = extract_message_content(messages[-1])
     fail_signals = ["validation failed", "tests fail", "error:", "cannot", "blocked"]
     return not any(sig in content.lower() for sig in fail_signals)

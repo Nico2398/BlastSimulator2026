@@ -11,7 +11,7 @@ if str(_HERE) not in sys.path:
 from langchain_core.tools import tool as lc_tool
 
 from llm import build_llm
-from nodes._base import READ_ONLY_TOOLS, build_react_agent, extract_ok, get_message_content
+from nodes._base import READ_ONLY_TOOLS, build_react_agent, extract_ok, extract_message_content
 from tools.shell_tools import run_shell
 
 
@@ -23,7 +23,7 @@ def validator(state: dict) -> dict:
     agent = build_react_agent("validator", tools, llm, extra_context=_build_context(state))
     result = agent.invoke({"messages": state.get("messages", [])})
     ok = extract_ok(result)
-    report = get_message_content(result["messages"][-1]) if result.get("messages") else ""
+    report = extract_message_content(result["messages"][-1]) if result.get("messages") else ""
     return {
         "messages": result["messages"],
         "validator_ok": ok,
