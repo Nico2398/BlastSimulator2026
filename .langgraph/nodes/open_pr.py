@@ -53,16 +53,21 @@ def open_pr(state: dict) -> dict:
     messages = state.get("messages", []) + [
         {"role": "assistant", "content": f"PR #{pr_num} created: {pr_url}"}
     ]
-    for op in (
-        lambda: remove_label(issue_number, "in-progress"),
-        lambda: add_label(issue_number, "in-review"),
-    ):
-        try:
-            messages = messages + [{"role": "assistant", "content": op()}]
-        except Exception as exc:  # best-effort label updates after PR creation
-            messages = messages + [
-                {"role": "assistant", "content": f"warning: label update failed: {exc}"}
-            ]
+    try:
+        remove_result = remove_label(issue_number, "in-progress")
+        messages = messages + [{"role": "assistant", "content": remove_result}]
+    except Exception as exc:  # best-effort label updates after PR creation
+        messages = messages + [
+            {"role": "assistant", "content": f"warning: label update failed: {exc}"}
+        ]
+
+    try:
+        add_result = add_label(issue_number, "in-review")
+        messages = messages + [{"role": "assistant", "content": add_result}]
+    except Exception as exc:  # best-effort label updates after PR creation
+        messages = messages + [
+            {"role": "assistant", "content": f"warning: label update failed: {exc}"}
+        ]
 
     return {
         "pr_number": pr_num,
