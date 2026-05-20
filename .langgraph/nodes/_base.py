@@ -202,10 +202,17 @@ def invoke_agent(agent, messages: list | dict, timeout_s: int = _AGENT_TIMEOUT_S
     thread.join(timeout=timeout_s)
 
     if thread.is_alive():
-        raise RuntimeError(
-            f"Agent invocation exceeded hard timeout of {timeout_s}s. "
-            "Background thread leaked — will stop when httpx timeout fires."
-        )
+        # Return a failure message rather than raising so the node can return a
+        # clean failure state and the pipeline router handles the retry/abort.
+        from langchain_core.messages import AIMessage  # local import to avoid cycles
+        return {
+            "messages": [
+                AIMessage(content=(
+                    f"error: agent invocation timed out after {timeout_s}s. "
+                    "Background thread leaked — will stop when httpx timeout fires."
+                ))
+            ]
+        }
     if error[0] is not None:
         raise error[0]
     assert result[0] is not None, "Worker exited without result or error"

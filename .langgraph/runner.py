@@ -32,6 +32,12 @@ os.environ.setdefault("PYTHONUNBUFFERED", "1")
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(line_buffering=True)  # type: ignore[union-attr]
 
+# Set GITHUB_WORKSPACE to the repo root (one level above this .langgraph/ dir).
+# All tool modules fall back to os.environ.get("GITHUB_WORKSPACE", ".") — without
+# this the fallback resolves to the CWD (.langgraph/) and file operations break.
+_REPO_ROOT_PATH = Path(__file__).parent.parent
+os.environ.setdefault("GITHUB_WORKSPACE", str(_REPO_ROOT_PATH))
+
 _HERE = Path(__file__).parent
 if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
