@@ -45,15 +45,12 @@ def run_qualimetry(repo_root: str | None = None) -> QualimetryReport:
         )
 
     with tempfile.TemporaryDirectory() as tmp:
-        cmd = [
-            "npx", "--yes", "jscpd",
-            str(src),
-            "--min-lines", "5",
-            "--min-tokens", "50",
-            "--reporters", "json",
-            "--output", tmp,
-            "--silent",
-        ]
+        # Build as a string + shell=True so Windows can resolve npx.cmd
+        cmd = (
+            f'npx --yes jscpd "{src}"'
+            " --min-lines 5 --min-tokens 50"
+            f' --reporters json --output "{tmp}" --silent'
+        )
         try:
             proc = subprocess.run(
                 cmd,
@@ -61,17 +58,23 @@ def run_qualimetry(repo_root: str | None = None) -> QualimetryReport:
                 capture_output=True,
                 text=True,
                 timeout=120,
+                shell=True,
             )
             if proc.returncode not in (0, 1):  # 1 = duplicates found (expected)
+                msg = f"jscpd exited with code {proc.returncode}: {proc.stderr.strip()}"
                 return QualimetryReport(
-                    ok=False,
-                    duplicate_pct=0.0,
-                    error=f"jscpd exited with code {proc.returncode}: {proc.stderr.strip()}",
+                    ok=False, duplicate_pct=0.0, error=msg, summary=msg
                 )
         except subprocess.TimeoutExpired:
-            return QualimetryReport(ok=False, duplicate_pct=0.0, error="jscpd timed out")
+            return QualimetryReport(
+                ok=False, duplicate_pct=0.0,
+                error="jscpd timed out", summary="error: jscpd timed out"
+            )
         except FileNotFoundError:
-            return QualimetryReport(ok=False, duplicate_pct=0.0, error="npx not found")
+            return QualimetryReport(
+                ok=False, duplicate_pct=0.0,
+                error="npx not found", summary="error: npx not found on PATH"
+            )
 
         json_files = sorted(Path(tmp).glob("*.json"))
         if not json_files:
