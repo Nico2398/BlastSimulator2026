@@ -15,6 +15,7 @@ from nodes._base import (
     build_fresh_messages,
     build_react_agent,
     extract_ok,
+    invoke_agent,
     skill_hint,
 )
 from tools.git_tools import (
@@ -53,7 +54,7 @@ def implementer(state: dict) -> dict:
 
     llm = build_llm()
     agent = build_react_agent("implementer", tools, llm, extra_context=_build_context(state))
-    result = agent.invoke({"messages": build_fresh_messages(_build_task_prompt(state))})
+    result = invoke_agent(agent, build_fresh_messages(_build_task_prompt(state)))
     ok = extract_ok(result)
     messages = result["messages"]
 

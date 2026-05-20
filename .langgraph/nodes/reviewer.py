@@ -9,7 +9,7 @@ if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
 from llm import build_llm
-from nodes._base import REVIEW_TOOLS, build_fresh_messages, build_react_agent, extract_ok
+from nodes._base import REVIEW_TOOLS, build_fresh_messages, build_react_agent, extract_ok, invoke_agent
 
 
 def reviewer(state: dict) -> dict:
@@ -25,7 +25,7 @@ def reviewer(state: dict) -> dict:
         llm,
         extra_context=_build_context(state),
     )
-    result = agent.invoke({"messages": build_fresh_messages(_build_task_prompt(state))})
+    result = invoke_agent(agent, build_fresh_messages(_build_task_prompt(state)))
     ok = extract_ok(result)
     return {
         "messages": result["messages"],

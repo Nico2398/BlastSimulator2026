@@ -11,7 +11,7 @@ if str(_HERE) not in sys.path:
 from langchain_core.tools import tool as lc_tool
 
 from llm import build_llm
-from nodes._base import READ_ONLY_TOOLS, build_fresh_messages, build_react_agent, extract_ok
+from nodes._base import READ_ONLY_TOOLS, build_fresh_messages, build_react_agent, extract_ok, invoke_agent
 from tools.shell_tools import run_shell
 
 
@@ -29,7 +29,7 @@ def visual_tester(state: dict) -> dict:
         llm,
         extra_context=_build_context(state),
     )
-    result = agent.invoke({"messages": build_fresh_messages(_build_task_prompt(state))})
+    result = invoke_agent(agent, build_fresh_messages(_build_task_prompt(state)))
     ok = extract_ok(result)
     retry_count = state.get("retry_count", 0)
     if not ok:

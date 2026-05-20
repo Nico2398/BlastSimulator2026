@@ -18,7 +18,7 @@ if str(_HERE) not in sys.path:
 
 from tools.git_tools import git_continue_cherry_pick, git_push, git_get_head_sha
 from llm import build_llm
-from nodes._base import CODING_TOOLS, build_fresh_messages, build_react_agent, extract_ok
+from nodes._base import CODING_TOOLS, build_fresh_messages, build_react_agent, extract_ok, invoke_agent
 
 
 def conflict_resolver(state: dict) -> dict:
@@ -37,7 +37,7 @@ def conflict_resolver(state: dict) -> dict:
         llm,
         extra_context=_build_context(state, conflicts),
     )
-    result = agent.invoke({"messages": build_fresh_messages(_build_task_prompt(conflicts))})
+    result = invoke_agent(agent, build_fresh_messages(_build_task_prompt(conflicts)))
     ok = extract_ok(result)
     messages = result["messages"]
 

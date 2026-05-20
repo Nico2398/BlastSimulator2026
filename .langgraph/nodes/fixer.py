@@ -22,7 +22,7 @@ if str(_HERE) not in sys.path:
 
 from tools.git_tools import git_commit, git_push
 from llm import build_llm
-from nodes._base import CODING_TOOLS, build_fresh_messages, build_react_agent, extract_ok, skill_hint
+from nodes._base import CODING_TOOLS, build_fresh_messages, build_react_agent, extract_ok, invoke_agent, skill_hint
 
 
 def fixer(state: dict) -> dict:
@@ -39,7 +39,7 @@ def fixer(state: dict) -> dict:
         llm,
         extra_context=_build_context(state),
     )
-    result = agent.invoke({"messages": build_fresh_messages(_build_task_prompt(state))})
+    result = invoke_agent(agent, build_fresh_messages(_build_task_prompt(state)))
     ok = extract_ok(result)
     messages = result["messages"]
 

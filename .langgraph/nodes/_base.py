@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import sys
+import threading
 from typing import Any
 from pathlib import Path
 
@@ -165,3 +166,47 @@ def skill_hint(skill: str) -> str:
         f"Call `get_skill_context('{skill}')` to load the full system specification "
         "before starting your work."
     )
+
+
+# ---------------------------------------------------------------------------
+# Hard wall-clock timeout for agent invocations
+# ---------------------------------------------------------------------------
+
+_AGENT_TIMEOUT_S = int(os.environ.get("AGENT_TIMEOUT", "360"))
+
+
+def invoke_agent(agent, messages: list | dict, timeout_s: int = _AGENT_TIMEOUT_S) -> dict:
+    """Invoke an agent with a hard wall-clock timeout.
+
+    The LLM client's per-read httpx timeout only fires when the server stops
+    sending *chunks*; a very slow streaming response never triggers it.
+    This wrapper enforces a total elapsed-time limit via a daemon thread.
+
+    The thread leaks when the timeout fires — the leaked thread will stop on
+    its own once the httpx timeout eventually triggers (or the process exits).
+    """
+    result: list[dict | None] = [None]
+    error: list[BaseException | None] = [None]
+
+    # Normalise: agents expect {"messages": [...]}
+    payload = messages if isinstance(messages, dict) else {"messages": messages}
+
+    def _worker() -> None:
+        try:
+            result[0] = agent.invoke(payload)
+        except BaseException as exc:  # noqa: BLE001
+            error[0] = exc
+
+    thread = threading.Thread(target=_worker, daemon=True, name="agent-invoke")
+    thread.start()
+    thread.join(timeout=timeout_s)
+
+    if thread.is_alive():
+        raise RuntimeError(
+            f"Agent invocation exceeded hard timeout of {timeout_s}s. "
+            "Background thread leaked — will stop when httpx timeout fires."
+        )
+    if error[0] is not None:
+        raise error[0]
+    assert result[0] is not None, "Worker exited without result or error"
+    return result[0]

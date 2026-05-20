@@ -31,7 +31,7 @@ from tools.git_tools import (
     git_push,
 )
 from llm import build_llm
-from nodes._base import CODING_TOOLS, build_react_agent, extract_ok, skill_hint
+from nodes._base import CODING_TOOLS, build_react_agent, extract_ok, invoke_agent, skill_hint
 
 
 def skeleton_writer(state: dict) -> dict:
@@ -63,7 +63,7 @@ def skeleton_writer(state: dict) -> dict:
             llm,
             extra_context=_build_context(state),
         )
-        result = agent.invoke({"messages": messages})
+        result = invoke_agent(agent, messages)
         skeleton_ok = extract_ok(result)
         messages = result["messages"]
 
