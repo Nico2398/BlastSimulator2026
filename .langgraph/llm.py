@@ -69,7 +69,8 @@ def _build_deepseek(model_name: str):
     if not api_key:
         raise ValueError("DEEPSEEK_API_KEY environment variable is not set")
 
-    return ChatDeepSeek(model=model_name, api_key=api_key)
+    timeout = int(os.environ.get("LLM_TIMEOUT", "180"))
+    return ChatDeepSeek(model=model_name, api_key=api_key, timeout=timeout)
 
 
 def _build_openai(model_name: str):

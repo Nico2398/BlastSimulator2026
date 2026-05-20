@@ -27,6 +27,11 @@ import os
 import sys
 from pathlib import Path
 
+# Flush stdout/stderr immediately so Tee-Object / CI log captures real-time output.
+os.environ.setdefault("PYTHONUNBUFFERED", "1")
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(line_buffering=True)  # type: ignore[union-attr]
+
 _HERE = Path(__file__).parent
 if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))

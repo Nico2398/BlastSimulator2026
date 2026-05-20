@@ -146,9 +146,11 @@ def extract_ok(agent_result: dict, *, allow_expected_failures: bool = False) -> 
         return False
     content = extract_message_content(messages[-1])
     cl = content.lower()
-    if allow_expected_failures and "as expected" in cl:
+    if allow_expected_failures and ("as expected" in cl or "failing" in cl):
         # Red phase: tests intentionally fail — don't treat that as a pipeline failure.
-        hard_fails = ["validation failed", "error:", "cannot", "blocked"]
+        # Note: do NOT include "error:" here — test output routinely contains
+        # "Error: not implemented" which is exactly the expected Red phase output.
+        hard_fails = ["validation failed", "cannot write", "permission denied", "blocked"]
         return not any(sig in cl for sig in hard_fails)
     fail_signals = ["validation failed", "tests fail", "error:", "cannot", "blocked"]
     return not any(sig in cl for sig in fail_signals)
