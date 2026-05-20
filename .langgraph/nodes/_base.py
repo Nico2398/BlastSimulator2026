@@ -133,14 +133,25 @@ def extract_message_content(message: Any) -> str:
     return getattr(message, "content", "") or ""
 
 
-def extract_ok(agent_result: dict) -> bool:
-    """Determine if the agent run succeeded by inspecting final messages."""
+def extract_ok(agent_result: dict, *, allow_expected_failures: bool = False) -> bool:
+    """Determine if the agent run succeeded by inspecting final messages.
+
+    Args:
+        agent_result: The dict returned by agent.invoke().
+        allow_expected_failures: When True (Red phase test writers), treat
+            "tests fail as expected" as success rather than failure.
+    """
     messages = agent_result.get("messages", [])
     if not messages:
         return False
     content = extract_message_content(messages[-1])
+    cl = content.lower()
+    if allow_expected_failures and "as expected" in cl:
+        # Red phase: tests intentionally fail — don't treat that as a pipeline failure.
+        hard_fails = ["validation failed", "error:", "cannot", "blocked"]
+        return not any(sig in cl for sig in hard_fails)
     fail_signals = ["validation failed", "tests fail", "error:", "cannot", "blocked"]
-    return not any(sig in content.lower() for sig in fail_signals)
+    return not any(sig in cl for sig in fail_signals)
 
 
 def skill_hint(skill: str) -> str:

@@ -40,16 +40,19 @@ def test_runner(state: dict) -> dict:
             "npx vitest run --reporter verbose",
             shell=True,
             capture_output=True,
-            text=True,
             cwd=_REPO_ROOT,
             timeout=_TEST_TIMEOUT,
             env={**os.environ},
         )
-        output = (result.stdout + result.stderr).strip()
+        stdout = result.stdout.decode("utf-8", errors="replace") if result.stdout else ""
+        stderr = result.stderr.decode("utf-8", errors="replace") if result.stderr else ""
+        output = (stdout + stderr).strip()
         ok = result.returncode == 0
     except subprocess.TimeoutExpired as exc:
-        stdout = _safe_decode(getattr(exc, "stdout", None))
-        stderr = _safe_decode(getattr(exc, "stderr", None))
+        raw_out = getattr(exc, "stdout", None)
+        raw_err = getattr(exc, "stderr", None)
+        stdout = raw_out.decode("utf-8", errors="replace") if isinstance(raw_out, bytes) else (raw_out or "")
+        stderr = raw_err.decode("utf-8", errors="replace") if isinstance(raw_err, bytes) else (raw_err or "")
         timeout_note = f"error: vitest timed out after {_TEST_TIMEOUT}s"
         output = "\n".join(part for part in [timeout_note, stdout, stderr] if part).strip()
         ok = False
