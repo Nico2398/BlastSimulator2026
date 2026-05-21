@@ -97,6 +97,9 @@ def git_checkout_existing(branch: str) -> str:
 # ---------------------------------------------------------------------------
 
 
+_LANGGRAPH_ACTOR = git.Actor("langgraph", "langgraph@noreply.github.com")
+
+
 def git_commit(message: str) -> str:
     """Stage all changes and create a git commit.
 
@@ -110,7 +113,7 @@ def git_commit(message: str) -> str:
     if not repo.is_dirty(untracked_files=True):
         return "nothing to commit — working tree clean"
     repo.git.add("-A")
-    commit = repo.index.commit(message)
+    commit = repo.index.commit(message, author=_LANGGRAPH_ACTOR, committer=_LANGGRAPH_ACTOR)
     return f"[{commit.hexsha[:12]}] {message}"
 
 
@@ -181,5 +184,5 @@ def git_continue_cherry_pick(message: str) -> str:
         return f"cherry-pick continued: [{sha}]"
     except git.GitCommandError:
         # Fall back to a regular commit if --continue fails
-        commit = repo.index.commit(message)
+        commit = repo.index.commit(message, author=_LANGGRAPH_ACTOR, committer=_LANGGRAPH_ACTOR)
         return f"cherry-pick resolved via commit: [{commit.hexsha[:12]}]"
