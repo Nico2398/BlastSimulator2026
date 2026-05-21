@@ -172,7 +172,7 @@ def skill_hint(skill: str) -> str:
 # Hard wall-clock timeout for agent invocations
 # ---------------------------------------------------------------------------
 
-_AGENT_TIMEOUT_S = int(os.environ.get("AGENT_TIMEOUT", "360"))
+_AGENT_TIMEOUT_S = int(os.environ.get("AGENT_TIMEOUT", "900"))
 
 
 def invoke_agent(agent, messages: list | dict, timeout_s: int = _AGENT_TIMEOUT_S) -> dict:

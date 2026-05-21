@@ -61,7 +61,7 @@ def github_create_pr(branch: str, title: str, body: str, base: str = "main") -> 
         pr = repo.create_pull(title=title, body=body, head=branch, base=base)
         return f"PR #{pr.number} created: {pr.html_url}"
     except GithubException as exc:
-        raise RuntimeError(f"failed to create PR: {exc.data}") from exc
+        return f"error: failed to create PR: {exc.data}"
 
 
 def github_post_comment(issue_number: int, body: str) -> str:
@@ -80,7 +80,7 @@ def github_post_comment(issue_number: int, body: str) -> str:
         comment = issue.create_comment(body)
         return f"Comment posted: {comment.html_url}"
     except GithubException as exc:
-        raise RuntimeError(f"failed to post comment on #{issue_number}: {exc.data}") from exc
+        return f"error: failed to post comment on #{issue_number}: {exc.data}"
 
 
 def github_add_label(issue_number: int, label: str) -> str:
@@ -99,7 +99,7 @@ def github_add_label(issue_number: int, label: str) -> str:
         issue.add_to_labels(label)
         return f"Label '{label}' added to #{issue_number}"
     except GithubException as exc:
-        raise RuntimeError(f"failed to add label '{label}' to #{issue_number}: {exc.data}") from exc
+        return f"error: failed to add label '{label}' to #{issue_number}: {exc.data}"
 
 
 def github_remove_label(issue_number: int, label: str) -> str:
@@ -120,4 +120,4 @@ def github_remove_label(issue_number: int, label: str) -> str:
     except GithubException as exc:
         if exc.status == 404:
             return f"Label '{label}' was not present on #{issue_number}"
-        raise RuntimeError(f"failed to remove label '{label}' from #{issue_number}: {exc.data}") from exc
+        return f"error: failed to remove label '{label}' from #{issue_number}: {exc.data}"

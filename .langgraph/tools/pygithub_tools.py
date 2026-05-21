@@ -59,7 +59,7 @@ def create_pr(
         )
         return pr.number, pr.html_url
     except GithubException as exc:
-        raise RuntimeError(f"failed to create PR: {exc.data}") from exc
+        return 0, f"error: failed to create PR: {exc.data}"
 
 
 def add_label(issue_number: int, label: str) -> str:

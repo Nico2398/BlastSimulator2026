@@ -76,6 +76,8 @@ def orchestrate(state: dict) -> dict:
     comment_body = state.get("comment_body", "")
 
     issue_text = github_get_issue(issue_number)
+    if issue_text.startswith("error:"):
+        return {"messages": [{"role": "assistant", "content": issue_text}]}
 
     labels: list[str] = []
     issue_title = ""

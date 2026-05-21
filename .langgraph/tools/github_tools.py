@@ -52,7 +52,7 @@ def github_get_issue(issue_number: int) -> str:
         repo = _repo()
         issue = repo.get_issue(issue_number)
     except GithubException as exc:
-        raise RuntimeError(f"GitHub error fetching issue #{issue_number}: {exc.data}") from exc
+        return f"error: GitHub error fetching issue #{issue_number}: {exc.data}"
     labels = ", ".join(lb.name for lb in issue.labels) or "none"
     assignees = ", ".join(u.login for u in issue.assignees) or "none"
     return (
@@ -80,7 +80,7 @@ def github_list_issue_comments(issue_number: int) -> str:
         issue = repo.get_issue(issue_number)
         comments = list(issue.get_comments())
     except GithubException as exc:
-        raise RuntimeError(f"GitHub error listing comments on #{issue_number}: {exc.data}") from exc
+        return f"error: GitHub error listing comments on #{issue_number}: {exc.data}"
     if not comments:
         return "no comments"
     lines = []
@@ -104,7 +104,7 @@ def github_get_pr_reviews(pr_number: int) -> str:
         pr = repo.get_pull(pr_number)
         reviews = list(pr.get_reviews())
     except GithubException as exc:
-        raise RuntimeError(f"GitHub error fetching reviews for PR #{pr_number}: {exc.data}") from exc
+        return f"error: GitHub error fetching reviews for PR #{pr_number}: {exc.data}"
     if not reviews:
         return "no reviews"
     lines = []
@@ -128,9 +128,7 @@ def github_get_pr_review_comments(pr_number: int) -> str:
         pr = repo.get_pull(pr_number)
         comments = list(pr.get_review_comments())
     except GithubException as exc:
-        raise RuntimeError(
-            f"GitHub error fetching review comments for PR #{pr_number}: {exc.data}"
-        ) from exc
+        return f"error: GitHub error fetching review comments for PR #{pr_number}: {exc.data}"
     if not comments:
         return "no inline review comments"
     lines = []
@@ -155,7 +153,7 @@ def github_get_pr(pr_number: int) -> str:
         repo = _repo()
         pr = repo.get_pull(pr_number)
     except GithubException as exc:
-        raise RuntimeError(f"GitHub error fetching PR #{pr_number}: {exc.data}") from exc
+        return f"error: GitHub error fetching PR #{pr_number}: {exc.data}"
     reviewers = ", ".join(u.login for u in pr.requested_reviewers) or "none"
     labels = ", ".join(lb.name for lb in pr.labels) or "none"
     return (
@@ -184,7 +182,7 @@ def github_get_pr_files(pr_number: int) -> str:
         pr = repo.get_pull(pr_number)
         files = list(pr.get_files())
     except GithubException as exc:
-        raise RuntimeError(f"GitHub error fetching PR files for #{pr_number}: {exc.data}") from exc
+        return f"error: GitHub error fetching PR files for #{pr_number}: {exc.data}"
     if not files:
         return "no changed files"
     lines = []

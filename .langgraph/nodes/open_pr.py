@@ -36,19 +36,18 @@ def open_pr(state: dict) -> dict:
     pr_title = _pr_title(pipeline, issue_title)
     pr_body = _pr_body(issue_number, state)
 
-    try:
-        pr_num, pr_url = create_pr(
-            branch=branch,
-            title=pr_title,
-            body=pr_body,
-            base="main",
-        )
-    except RuntimeError as exc:
+    pr_num, pr_url = create_pr(
+        branch=branch,
+        title=pr_title,
+        body=pr_body,
+        base="main",
+    )
+    if pr_num == 0:
         return {
             "pr_number": None,
             "current_role": "open-pr",
             "messages": state.get("messages", []) + [
-                {"role": "assistant", "content": f"error creating PR: {exc}"}
+                {"role": "assistant", "content": pr_url}
             ],
         }
 
