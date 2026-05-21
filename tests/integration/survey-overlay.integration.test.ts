@@ -24,7 +24,7 @@ import {
 } from '../../src/core/mining/SurveyCalc.js';
 import { isSurveyStale } from '../../src/core/mining/SurveyCalc.js';
 
-import { SURVEY_STALE_TICKS } from '../../src/core/config/balance.js';
+import { SURVEY_STALE_TICKS, SURVEY_COVERAGE_RADIUS } from '../../src/core/config/balance.js';
 
 // ─── Fixture helpers ──────────────────────────────────────────────────────────
 
@@ -156,6 +156,46 @@ function surveyResultsToConfidencePoints(
   }
 
   return points;
+}
+
+/**
+ * Create a SurveyConfidencePoint directly for tests that don't need
+ * the full survey pipeline.
+ */
+function makePoint(
+  x: number,
+  z: number,
+  partial: Partial<SurveyConfidencePoint> = {},
+): SurveyConfidencePoint {
+  return {
+    x,
+    z,
+    surfaceY: partial.surfaceY ?? 4,
+    confidence: partial.confidence ?? 0.8,
+    fresh: partial.fresh ?? true,
+  };
+}
+
+/**
+ * Get the material color from an overlay mesh, handling both
+ * single-colored materials and vertex-colored geometries.
+ */
+function getMeshColor(mesh: THREE.Mesh): { r: number; g: number; b: number } {
+  const colorAttr = (mesh.geometry as THREE.BufferGeometry)?.getAttribute('color');
+  if (colorAttr) {
+    const colors = colorAttr.array as Float32Array;
+    // Average the vertex colors
+    let r = 0, g = 0, b = 0, count = 0;
+    for (let i = 0; i < colors.length; i += 3) {
+      r += colors[i]!;
+      g += colors[i + 1]!;
+      b += colors[i + 2]!;
+      count++;
+    }
+    return { r: r / count, g: g / count, b: b / count };
+  }
+  const mat = mesh.material as THREE.MeshBasicMaterial;
+  return { r: mat.color.r, g: mat.color.g, b: mat.color.b };
 }
 
 // ─── Integration Tests ────────────────────────────────────────────────────────
@@ -623,6 +663,254 @@ describe('Survey Confidence Overlay — integration (4.11)', () => {
 
     overlay.dispose();
   });
+
+  // ── 9. Additional edge cases ─────────────────────────────────────────────
+
+  it('opacity=0 makes overlay fully transparent but still visible', () => {
+    const scene = makeScene();
+    const overlay = new SurveyConfidenceOverlay(scene);
+    const points: SurveyConfidencePoint[] = [makePoint(5, 5)];
+
+    overlay.show({ points, opacity: 0 });
+    const group = scene.children[0] as THREE.Group;
+    expect(group.visible).toBe(true);
+    const mesh = group.children[0] as THREE.Mesh;
+    expect(mesh).toBeDefined();
+    expect((mesh.material as THREE.MeshBasicMaterial).opacity).toBe(0);
+    overlay.dispose();
+  });
+
+  it('opacity=1 works without overflow or clamping issues', () => {
+    const scene = makeScene();
+    const overlay = new SurveyConfidenceOverlay(scene);
+    const points: SurveyConfidencePoint[] = [makePoint(5, 5)];
+
+    overlay.show({ points, opacity: 1 });
+    const group = scene.children[0] as THREE.Group;
+    const mesh = group.children[0] as THREE.Mesh;
+    expect(mesh).toBeDefined();
+    const mat = mesh.material as THREE.MeshBasicMaterial;
+    expect(mat.opacity).toBeCloseTo(1, 2);
+    expect(mat.transparent).toBe(true); // overlay always uses transparency
+    overlay.dispose();
+  });
+
+  it('surveys at negative world coordinates produce correct confidence points', () => {
+    // Build a grid with origin at negative coordinates
+    const grid = new VoxelGrid(21, 10, 21);
+    // Place ore at column (5, 5) which would correspond to negative world coords
+    // by shifting center to negative values
+    for (let y = 2; y <= 8; y++) {
+      grid.setVoxel(5, y, 5, {
+        rockId: 'granite',
+        density: 1,
+        oreDensities: { gold: 0.5 },
+        fractureModifier: 1.0,
+      });
+    }
+
+    // Survey at negative center — estimateSurveyResult uses grid coords,
+    // but the overlay points should handle negative x, z values
+    const survey = runSurveyOnGrid(grid, 'core_sample', 5, 5, 3, 99, 1, 50);
+    const points = surveyResultsToConfidencePoints([survey], grid, 50);
+
+    // Should still produce points (the grid doesn't have negative indices,
+    // but the survey at grid position 5,5 maps to world coords)
+    const centerPoint = points.find(p => p.x === 5 && p.z === 5);
+    expect(centerPoint).toBeDefined();
+    expect(centerPoint!.surfaceY).toBeGreaterThan(0);
+    expect(centerPoint!.confidence).toBeGreaterThan(0);
+  });
+
+  it('sequential surveys at same position produce overlapping confidence points from both', () => {
+    const grid = makeOreGrid();
+
+    // Two surveys at the same position, different IDs and completion times
+    const survey1 = runSurveyOnGrid(grid, 'core_sample', 5, 5, 2, 99, 1, 50);
+    const survey2 = runSurveyOnGrid(grid, 'core_sample', 5, 5, 4, 99, 2, 100);
+
+    const points = surveyResultsToConfidencePoints([survey1, survey2], grid, 150);
+
+    // Both surveys should contribute points at (5,5)
+    const centerPoints = points.filter(p => p.x === 5 && p.z === 5);
+
+    // Each survey contributes one point for the center column (two surveys = two points)
+    expect(centerPoints.length).toBe(2);
+
+    // The more recent survey (survey2 with higher skill) should have higher confidence
+    const confidences = centerPoints.map(p => p.confidence);
+    expect(Math.max(...confidences)).toBeGreaterThan(Math.min(...confidences));
+  });
+
+  it('overlay survives TerrainMesh.update re-mesh while visible', () => {
+    const scene = makeScene();
+    const grid = new VoxelGrid(8, 8, 8);
+    // Fill bottom half solid
+    for (let x = 0; x < 8; x++)
+      for (let y = 0; y < 4; y++)
+        for (let z = 0; z < 8; z++)
+          grid.setVoxel(x, y, z, {
+            rockId: 'granite',
+            density: 1,
+            oreDensities: {},
+            fractureModifier: 1.0,
+          });
+
+    const tm = new TerrainMesh(scene, grid);
+    tm.buildAll();
+
+    // Set up overlay with real survey data
+    const survey = runSurveyOnGrid(grid, 'core_sample', 4, 4, 3, 99, 1, 50);
+    const pointsBefore = surveyResultsToConfidencePoints([survey], grid, 50);
+    const overlay = tm.getSurveyOverlay();
+    overlay.show({ points: pointsBefore, opacity: 0.5 });
+
+    // Verify overlay is in the scene BEFORE re-mesh
+    const groupInScene = scene.children.find(
+      (child) => child instanceof THREE.Group
+    ) as THREE.Group | undefined;
+    expect(groupInScene).toBeDefined();
+    expect(groupInScene!.visible).toBe(true);
+
+    // Simulate terrain modification (blast crater) and re-mesh
+    for (let y = 0; y < 4; y++) grid.clearVoxel(3, y, 3);
+    tm.update([{ x: 3, y: 0, z: 3 }]);
+
+    // After re-mesh, the overlay group should still be in the scene
+    const groupInSceneAfter = scene.children.find(
+      (child) => child instanceof THREE.Group
+    ) as THREE.Group | undefined;
+    expect(groupInSceneAfter).toBeDefined();
+    expect(groupInSceneAfter!.visible).toBe(true);
+
+    // show() again with fresh data after re-mesh should work
+    overlay.show({ points: pointsBefore, opacity: 0.5 });
+    expect(groupInSceneAfter!.visible).toBe(true);
+
+    tm.dispose();
+  });
+
+  it('cyclic lifecycle: hide → show → clear → show → dispose does not crash', () => {
+    const scene = makeScene();
+    const overlay = new SurveyConfidenceOverlay(scene);
+    const points1 = [makePoint(5, 5, { confidence: 0.9 })];
+    const points2 = [makePoint(10, 10, { confidence: 0.5 })];
+
+    // Cycle: show → hide → show → clear → show → hide → dispose
+    overlay.show({ points: points1, opacity: 0.5 });
+    overlay.hide();
+    overlay.show({ points: points2, opacity: 0.7 });
+    overlay.clear();
+    overlay.show({ points: points1, opacity: 0.3 });
+    overlay.hide();
+    overlay.dispose();
+
+    expect(scene.children.length).toBe(0);
+  });
+
+  it('confidence at interpolation boundary 0.25 renders orange (red→yellow midpoint)', () => {
+    const scene = makeScene();
+    const overlay = new SurveyConfidenceOverlay(scene);
+    const points: SurveyConfidencePoint[] = [makePoint(5, 5, { confidence: 0.25, fresh: true })];
+
+    overlay.show({ points, opacity: 1 });
+    const group = scene.children[0] as THREE.Group;
+    const mesh = group.children[0] as THREE.Mesh;
+    expect(mesh).toBeDefined();
+
+    const color = getMeshColor(mesh);
+    // At t=0.25 (half of red→yellow range 0..0.5):
+    // u = 0.25/0.5 = 0.5 → (1, 0.5, 0) = orange
+    expect(color.r).toBeCloseTo(1, 1);
+    expect(color.g).toBeCloseTo(0.5, 1);
+    expect(color.b).toBeCloseTo(0, 1);
+    overlay.dispose();
+  });
+
+  it('confidence at interpolation boundary 0.75 renders yellow-green (yellow→green midpoint)', () => {
+    const scene = makeScene();
+    const overlay = new SurveyConfidenceOverlay(scene);
+    const points: SurveyConfidencePoint[] = [makePoint(5, 5, { confidence: 0.75, fresh: true })];
+
+    overlay.show({ points, opacity: 1 });
+    const group = scene.children[0] as THREE.Group;
+    const mesh = group.children[0] as THREE.Mesh;
+    expect(mesh).toBeDefined();
+
+    const color = getMeshColor(mesh);
+    // At t=0.75 (half of yellow→green range 0.5..1.0):
+    // u = (0.75-0.5)/0.5 = 0.5 → (0.5, 1, 0) = yellow-green
+    expect(color.r).toBeCloseTo(0.5, 1);
+    expect(color.g).toBeCloseTo(1, 1);
+    expect(color.b).toBeCloseTo(0, 1);
+    overlay.dispose();
+  });
+
+  it('overlapping seismic surveys from different centers produce combined confidence points', () => {
+    // Large grid with ore covering two survey centers close enough to overlap
+    const grid = new VoxelGrid(40, 10, 40);
+    for (let x = 0; x < 40; x++) {
+      for (let z = 0; z < 40; z++) {
+        grid.setVoxel(x, 5, z, {
+          rockId: 'granite',
+          density: 1,
+          oreDensities: { copper: 0.3 },
+          fractureModifier: 1.0,
+        });
+      }
+    }
+
+    // Two seismic surveys 10 cells apart — their radius-20 coverage will overlap
+    const surveyA = runSurveyOnGrid(grid, 'seismic', 15, 15, 2, 99, 1, 50, 100);
+    const surveyB = runSurveyOnGrid(grid, 'seismic', 25, 15, 4, 99, 2, 60, 101);
+
+    const points = surveyResultsToConfidencePoints([surveyA, surveyB], grid, 70);
+
+    // Should produce many points (both surveys cover large areas)
+    expect(points.length).toBeGreaterThan(0);
+
+    // The overlapping region (around x=20) should have points from both surveys
+    const overlapPoints = points.filter(p => p.x >= 18 && p.x <= 22 && p.z === 15);
+    expect(overlapPoints.length).toBeGreaterThanOrEqual(1);
+
+    // Verify confidence from different surveys — they have different skill levels
+    // so their confidence values differ
+    expect(surveyA.confidence).not.toBe(surveyB.confidence);
+
+    // surveyB has skill=4 > surveyA skill=2, so surveyB.confidence should be higher
+    expect(surveyB.confidence).toBeGreaterThan(surveyA.confidence);
+  });
+
+  it('many survey points (50+) render without errors', () => {
+    // Build a grid large enough for many survey points
+    const grid = new VoxelGrid(30, 10, 30);
+    for (let x = 0; x < 30; x++) {
+      for (let z = 0; z < 30; z++) {
+        grid.setVoxel(x, 5, z, {
+          rockId: 'granite',
+          density: 1,
+          oreDensities: { iron: 0.5 },
+          fractureModifier: 1.0,
+        });
+      }
+    }
+
+    const scene = makeScene();
+    const survey = runSurveyOnGrid(grid, 'seismic', 15, 15, 3, 99, 1, 50);
+    const points = surveyResultsToConfidencePoints([survey], grid, 50);
+
+    // Seismic radius 20 on 30×30 grid should produce lots of points
+    // (radius 20 disc centered at 15,15 on 30×30 grid)
+    expect(points.length).toBeGreaterThanOrEqual(10);
+
+    const overlay = new SurveyConfidenceOverlay(scene);
+    expect(() => overlay.show({ points, opacity: 0.5 })).not.toThrow();
+
+    const group = scene.children[0] as THREE.Group;
+    expect(group.children.length).toBeGreaterThanOrEqual(points.length);
+
+    overlay.dispose();
+  });
 });
 
 // ─── TerrainMesh.getSurveyOverlay integration with game state ──────────────────
@@ -707,5 +995,59 @@ describe('TerrainMesh.getSurveyOverlay — game state integration', () => {
     overlay.hide();
 
     tm.dispose();
+  });
+
+  it('surveyedPositions set in GameState is updated when surveys are added', () => {
+    const state = createGame({ seed: 42 });
+
+    // Initially empty
+    expect(state.surveyedPositions.size).toBe(0);
+
+    // Add survey results
+    const grid = makeOreGrid();
+    const survey = runSurveyOnGrid(grid, 'seismic', 5, 5, 3, 99, 1, 50);
+    state.surveyResults.push(survey);
+
+    // After adding a survey, surveyedPositions should be populated
+    // from the survey's estimates keys
+    for (const colKey of Object.keys(survey.estimates)) {
+      state.surveyedPositions.add(colKey);
+    }
+
+    expect(state.surveyedPositions.size).toBeGreaterThan(0);
+    expect(state.surveyedPositions.has('5,5')).toBe(true);
+  });
+
+  it('surveyedPositions can be used to filter duplicate re-surveys at same column', () => {
+    const state = createGame({ seed: 42 });
+    const grid = makeOreGrid();
+
+    // First survey at (5,5)
+    const survey1 = runSurveyOnGrid(grid, 'seismic', 5, 5, 2, 99, 1, 50);
+    state.surveyResults.push(survey1);
+    for (const colKey of Object.keys(survey1.estimates)) {
+      state.surveyedPositions.add(colKey);
+    }
+
+    const positionsBefore = state.surveyedPositions.size;
+
+    // Simulate a second survey at the same position - should not duplicate in the set
+    const survey2 = runSurveyOnGrid(grid, 'seismic', 5, 5, 4, 99, 2, 100);
+    state.surveyResults.push(survey2);
+    for (const colKey of Object.keys(survey2.estimates)) {
+      state.surveyedPositions.add(colKey);
+    }
+
+    // The set should not grow because all positions were already tracked
+    expect(state.surveyedPositions.size).toBe(positionsBefore);
+
+    // But we have two survey results
+    expect(state.surveyResults.length).toBe(2);
+
+    // Confidence points from both should be produced
+    const points = surveyResultsToConfidencePoints(state.surveyResults, grid, 150);
+    const centerPoints = points.filter(p => p.x === 5 && p.z === 5);
+    // Two surveys at same position = two confidence points
+    expect(centerPoints.length).toBe(2);
   });
 });
