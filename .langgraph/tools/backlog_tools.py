@@ -1,67 +1,62 @@
 """Backlog management tools for BlastSimulator2026.
 
 Reads and writes .github/skills/backlog/backlog.json in the target repository
-via the GitHub REST API. Relies on GITHUB_TOKEN, DEFAULT_REPO_OWNER, and
+via PyGithub. Relies on GITHUB_TOKEN, DEFAULT_REPO_OWNER, and
 DEFAULT_REPO_NAME environment variables (all injected by the workflow).
+All GitHub operations go through PyGithub — no direct HTTP calls.
 """
 
-import base64
 import json
 import os
-import urllib.error
-import urllib.request
 from typing import Optional
+
+from github import Github, GithubException
 
 _BACKLOG_PATH = ".github/skills/backlog/backlog.json"
 
 
 # ---------------------------------------------------------------------------
-# GitHub API helpers
+# PyGithub helpers
 # ---------------------------------------------------------------------------
 
 
-def _headers() -> dict:
+def _client() -> Github:
     token = os.environ.get("GITHUB_TOKEN", "")
-    return {
-        "Authorization": f"Bearer {token}",
-        "Accept": "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28",
-        "Content-Type": "application/json",
-    }
+    if not token:
+        raise RuntimeError("GITHUB_TOKEN environment variable is not set")
+    return Github(token)
 
 
-def _contents_url() -> str:
+def _repo():
     owner = os.environ.get("DEFAULT_REPO_OWNER", "")
     name = os.environ.get("DEFAULT_REPO_NAME", "")
-    return f"https://api.github.com/repos/{owner}/{name}/contents/{_BACKLOG_PATH}"
+    if not owner or not name:
+        raise RuntimeError(
+            "DEFAULT_REPO_OWNER and DEFAULT_REPO_NAME must both be set"
+        )
+    return _client().get_repo(f"{owner}/{name}")
 
 
-def _get_backlog() -> tuple[list[dict], str]:
-    """Fetch backlog.json from the repo. Returns (tasks, sha)."""
-    req = urllib.request.Request(_contents_url(), headers=_headers())
+def _get_backlog() -> tuple[Optional[list[dict]], Optional[str]]:
+    """Fetch backlog.json from the repo via PyGithub. Returns (tasks, sha)."""
     try:
-        with urllib.request.urlopen(req) as resp:
-            data = json.loads(resp.read())
-    except urllib.error.HTTPError as exc:
-        raise RuntimeError(f"GitHub API error {exc.code}: {exc.reason}") from exc
-    content = base64.b64decode(data["content"]).decode("utf-8")
-    return json.loads(content), data["sha"]
+        repo = _repo()
+        content_file = repo.get_contents(_BACKLOG_PATH)
+    except GithubException as exc:
+        return None, f"error: GitHub error reading backlog: {exc.data}"
+    tasks = json.loads(content_file.decoded_content.decode("utf-8"))
+    return tasks, content_file.sha
 
 
-def _put_backlog(tasks: list[dict], sha: str, message: str) -> None:
-    """Commit updated backlog.json back to the default branch."""
-    content_b64 = base64.b64encode(
-        (json.dumps(tasks, indent=2) + "\n").encode("utf-8")
-    ).decode("utf-8")
-    body = json.dumps({"message": message, "content": content_b64, "sha": sha}).encode("utf-8")
-    req = urllib.request.Request(
-        _contents_url(), data=body, headers=_headers(), method="PUT"
-    )
+def _put_backlog(tasks: list[dict], sha: str, message: str) -> Optional[str]:
+    """Commit updated backlog.json back to the default branch via PyGithub."""
+    content = json.dumps(tasks, indent=2) + "\n"
     try:
-        with urllib.request.urlopen(req) as resp:
-            resp.read()
-    except urllib.error.HTTPError as exc:
-        raise RuntimeError(f"GitHub API error {exc.code}: {exc.reason}") from exc
+        repo = _repo()
+        repo.update_file(_BACKLOG_PATH, message, content, sha)
+    except GithubException as exc:
+        return f"error: GitHub error writing backlog: {exc.data}"
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -89,7 +84,9 @@ def backlog_list(status: Optional[str] = None, chapter: Optional[int] = None) ->
     Returns:
         One task per line: id:X chapter:N status:S title:T
     """
-    tasks, _ = _get_backlog()
+    tasks, err = _get_backlog()
+    if tasks is None:
+        return err
     result = tasks
     if status:
         result = [t for t in result if t["status"] == status]
@@ -110,7 +107,9 @@ def backlog_next() -> str:
         Task details (id, chapter, title, files, testFile, blockedBy) or a
         'no pending tasks available' message.
     """
-    tasks, _ = _get_backlog()
+    tasks, err = _get_backlog()
+    if tasks is None:
+        return err
     candidates = [
         t for t in tasks
         if t["status"] == "pending" and _resolved_blockers(tasks, t)
@@ -141,7 +140,9 @@ def backlog_start(task_id: str) -> str:
     Returns:
         Confirmation or error message.
     """
-    tasks, sha = _get_backlog()
+    tasks, sha_or_err = _get_backlog()
+    if tasks is None:
+        return sha_or_err
     in_progress = [t for t in tasks if t["status"] == "in-progress"]
     if in_progress:
         return f"error: task {in_progress[0]['id']} is already in-progress — finish it first"
@@ -151,7 +152,9 @@ def backlog_start(task_id: str) -> str:
     if task["status"] != "pending":
         return f"error: task {task_id} is '{task['status']}', not 'pending'"
     task["status"] = "in-progress"
-    _put_backlog(tasks, sha, f"backlog: start {task_id}")
+    put_err = _put_backlog(tasks, sha_or_err, f"backlog: start {task_id}")
+    if put_err:
+        return put_err
     return f"ok: task {task_id} is now in-progress"
 
 
@@ -165,7 +168,9 @@ def backlog_done(task_id: str, pr_number: Optional[int] = None) -> str:
     Returns:
         Confirmation or error message.
     """
-    tasks, sha = _get_backlog()
+    tasks, sha_or_err = _get_backlog()
+    if tasks is None:
+        return sha_or_err
     task = next((t for t in tasks if t["id"] == task_id), None)
     if task is None:
         return f"error: task {task_id} not found"
@@ -173,7 +178,9 @@ def backlog_done(task_id: str, pr_number: Optional[int] = None) -> str:
     if pr_number is not None:
         task["closedInPR"] = pr_number
     msg = f"backlog: done {task_id}" + (f" pr#{pr_number}" if pr_number else "")
-    _put_backlog(tasks, sha, msg)
+    put_err = _put_backlog(tasks, sha_or_err, msg)
+    if put_err:
+        return put_err
     suffix = f" (PR #{pr_number})" if pr_number else ""
     return f"ok: task {task_id} marked done{suffix}"
 
@@ -187,12 +194,16 @@ def backlog_block(task_id: str) -> str:
     Returns:
         Confirmation or error message.
     """
-    tasks, sha = _get_backlog()
+    tasks, sha_or_err = _get_backlog()
+    if tasks is None:
+        return sha_or_err
     task = next((t for t in tasks if t["id"] == task_id), None)
     if task is None:
         return f"error: task {task_id} not found"
     task["status"] = "blocked"
-    _put_backlog(tasks, sha, f"backlog: block {task_id}")
+    put_err = _put_backlog(tasks, sha_or_err, f"backlog: block {task_id}")
+    if put_err:
+        return put_err
     return f"ok: task {task_id} marked blocked"
 
 
@@ -205,12 +216,16 @@ def backlog_reset(task_id: str) -> str:
     Returns:
         Confirmation or error message.
     """
-    tasks, sha = _get_backlog()
+    tasks, sha_or_err = _get_backlog()
+    if tasks is None:
+        return sha_or_err
     task = next((t for t in tasks if t["id"] == task_id), None)
     if task is None:
         return f"error: task {task_id} not found"
     task["status"] = "pending"
-    _put_backlog(tasks, sha, f"backlog: reset {task_id}")
+    put_err = _put_backlog(tasks, sha_or_err, f"backlog: reset {task_id}")
+    if put_err:
+        return put_err
     return f"ok: task {task_id} reset to pending"
 
 
@@ -220,7 +235,9 @@ def backlog_stats() -> str:
     Returns:
         Stats in format: done:N in-progress:N pending:N blocked:N total:N
     """
-    tasks, _ = _get_backlog()
+    tasks, err = _get_backlog()
+    if tasks is None:
+        return err
     done = sum(1 for t in tasks if t["status"] == "done")
     in_progress = sum(1 for t in tasks if t["status"] == "in-progress")
     pending = sum(1 for t in tasks if t["status"] == "pending")

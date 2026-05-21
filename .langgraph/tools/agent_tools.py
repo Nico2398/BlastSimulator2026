@@ -1,4 +1,4 @@
-"""Agent and skill context tools for the open-swe orchestrator.
+"""Agent and skill context tools for the LangGraph orchestrator.
 
 Provides functions to list and read agent role definitions and domain skill
 specs from the repository's .github/agents/ and .github/skills/ directories.
@@ -14,8 +14,9 @@ workflow) to locate the repository root.
 import glob as _glob
 import os
 import re
+from pathlib import Path
 
-_REPO_ROOT = os.environ.get("GITHUB_WORKSPACE", ".")
+_REPO_ROOT = os.environ.get("GITHUB_WORKSPACE") or str(Path(__file__).parent.parent.parent)
 
 # Only allow simple identifier-style names: letters, digits, hyphens, underscores.
 # This blocks path traversal via "..", "/", "\" etc.
