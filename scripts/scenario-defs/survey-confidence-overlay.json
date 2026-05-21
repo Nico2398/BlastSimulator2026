@@ -1,6 +1,6 @@
 {
   "name": "survey-confidence-overlay",
-  "description": "Dedicated scenario for survey confidence overlay: multiple survey methods at the same location showing confidence differences, stale/fresh rendering, and overlay lifecycle. The final screenshot must show colour-coded confidence markers (green = high, red/yellow = low, grey = stale).",
+  "description": "Dedicated scenario for survey confidence overlay: multiple survey methods at the same location showing confidence differences, stale/fresh rendering, and overlay lifecycle. The final screenshot must show colour-coded confidence markers (green = high, red/yellow = low, grey = stale). This scenario FAILS until GameRenderer wires getSurveyOverlay().show() into syncFromContext().",
   "steps": [
     "new_game seed:42",
     "campaign start level:dusty_hollow",
@@ -13,39 +13,62 @@
     "employee assign_skill 2 geology 1",
     "employee list",
 
+    "state full",
+
     "survey core_sample x:20 z:20",
     "survey seismic x:20 z:20",
     "survey aerial x:20 z:20",
     "survey show",
+    "state full",
+
     "tick 8",
     "event choose 0",
+    "state full",
+
     "tick 8",
     "event choose 0",
+    "state full",
+
     "tick 8",
     "event choose 0",
+    "state full",
+
     "tick 8",
     "event choose 0",
+    "state full",
+
     "tick 8",
     "event choose 0",
+    "state full",
+
     "tick 8",
     "event choose 0",
     "survey show",
+    "state full",
 
     "survey core_sample x:35 z:20",
     "survey core_sample x:20 z:35",
+    "survey core_sample x:35 z:35",
+    "survey show",
+    "state full",
+
     "tick 8",
     "event choose 0",
     "tick 8",
     "event choose 0",
+    "state full",
+
     "tick 8",
     "event choose 0",
     "tick 8",
     "event choose 0",
     "survey show",
+    "state full",
 
     "inspect 20,5,20",
     "inspect 35,5,20",
     "inspect 20,5,35",
+    "inspect 35,5,35",
 
     "finances",
     "scores",
