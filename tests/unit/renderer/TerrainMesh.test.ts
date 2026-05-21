@@ -403,6 +403,141 @@ describe('SurveyConfidenceOverlay', () => {
     expect(group.children.length).toBeGreaterThanOrEqual(points.length);
     overlay.dispose();
   });
+
+  // ── Edge case: empty points array ──
+  it('show with empty points array does not crash', () => {
+    const scene = makeScene();
+    const overlay = new SurveyConfidenceOverlay(scene);
+    expect(() => overlay.show(makeOverlayOptions({ points: [] }))).not.toThrow();
+    const group = scene.children[0] as THREE.Group;
+    expect(group.visible).toBe(true);
+    expect(group.children.length).toBe(0);
+    overlay.dispose();
+  });
+
+  // ── Stale point opacity (STALE_OPACITY = 0.25) ──
+  it('stale point has opacity multiplied by STALE_OPACITY (0.25)', () => {
+    const scene = makeScene();
+    const overlay = new SurveyConfidenceOverlay(scene);
+    // Fresh point with opacity 0.6 → material opacity = 0.6 * 1.0 = 0.6
+    overlay.show(makeOverlayOptions({
+      points: [makeConfidencePoint(5, 5, { fresh: true, confidence: 0.5 })],
+      opacity: 0.6,
+    }));
+    const group = scene.children[0] as THREE.Group;
+    const freshMesh = group.children[0] as THREE.Mesh;
+    const freshMat = freshMesh.material as THREE.MeshBasicMaterial;
+    const freshOpacity = freshMat.opacity;
+
+    // Now show a stale point with same global opacity
+    overlay.show(makeOverlayOptions({
+      points: [makeConfidencePoint(5, 5, { fresh: false, confidence: 0.5 })],
+      opacity: 0.6,
+    }));
+    const staleMesh = group.children[0] as THREE.Mesh;
+    const staleMat = staleMesh.material as THREE.MeshBasicMaterial;
+
+    // Stale opacity should be 0.25x the fresh opacity
+    // Fresh: 0.6 * 1.0 = 0.6
+    // Stale: 0.6 * 0.25 = 0.15
+    expect(freshOpacity).toBeCloseTo(0.6, 2);
+    expect(staleMat.opacity).toBeCloseTo(0.15, 2);
+    overlay.dispose();
+  });
+
+  // ── renderOrder ──
+  it('each overlay quad has renderOrder set to 100', () => {
+    const scene = makeScene();
+    const overlay = new SurveyConfidenceOverlay(scene);
+    overlay.show(makeOverlayOptions({
+      points: [
+        makeConfidencePoint(5, 5),
+        makeConfidencePoint(10, 10),
+      ],
+    }));
+    const group = scene.children[0] as THREE.Group;
+    for (const child of group.children) {
+      const mesh = child as THREE.Mesh;
+      expect(mesh.renderOrder).toBe(100);
+    }
+    overlay.dispose();
+  });
+
+  // ── Quad rotation ──
+  it('each overlay quad is rotated to lie flat (rotation.x = -PI/2)', () => {
+    const scene = makeScene();
+    const overlay = new SurveyConfidenceOverlay(scene);
+    overlay.show(makeOverlayOptions({
+      points: [makeConfidencePoint(5, 5)],
+    }));
+    const group = scene.children[0] as THREE.Group;
+    const mesh = group.children[0] as THREE.Mesh;
+    expect(mesh.rotation.x).toBeCloseTo(-Math.PI / 2, 5);
+    overlay.dispose();
+  });
+
+  // ── confidenceToColor at exact boundaries ──
+  it('confidence 0 renders pure red (r=1, g=0, b=0)', () => {
+    const scene = makeScene();
+    const overlay = new SurveyConfidenceOverlay(scene);
+    overlay.show(makeOverlayOptions({
+      points: [makeConfidencePoint(5, 5, { confidence: 0, fresh: true })],
+    }));
+    const group = scene.children[0] as THREE.Group;
+    const mesh = group.children[0] as THREE.Mesh;
+    const mat = mesh.material as THREE.MeshBasicMaterial;
+    expect(mat.color.r).toBeCloseTo(1, 2);
+    expect(mat.color.g).toBeCloseTo(0, 2);
+    expect(mat.color.b).toBeCloseTo(0, 2);
+    overlay.dispose();
+  });
+
+  it('confidence 1 renders pure green (r=0, g=1, b=0)', () => {
+    const scene = makeScene();
+    const overlay = new SurveyConfidenceOverlay(scene);
+    overlay.show(makeOverlayOptions({
+      points: [makeConfidencePoint(5, 5, { confidence: 1, fresh: true })],
+    }));
+    const group = scene.children[0] as THREE.Group;
+    const mesh = group.children[0] as THREE.Mesh;
+    const mat = mesh.material as THREE.MeshBasicMaterial;
+    expect(mat.color.r).toBeCloseTo(0, 2);
+    expect(mat.color.g).toBeCloseTo(1, 2);
+    expect(mat.color.b).toBeCloseTo(0, 2);
+    overlay.dispose();
+  });
+
+  it('confidence 0.5 renders pure yellow (r=1, g=1, b=0)', () => {
+    const scene = makeScene();
+    const overlay = new SurveyConfidenceOverlay(scene);
+    overlay.show(makeOverlayOptions({
+      points: [makeConfidencePoint(5, 5, { confidence: 0.5, fresh: true })],
+    }));
+    const group = scene.children[0] as THREE.Group;
+    const mesh = group.children[0] as THREE.Mesh;
+    const mat = mesh.material as THREE.MeshBasicMaterial;
+    expect(mat.color.r).toBeCloseTo(1, 2);
+    expect(mat.color.g).toBeCloseTo(1, 2);
+    expect(mat.color.b).toBeCloseTo(0, 2);
+    overlay.dispose();
+  });
+
+  // ── Hide then show ──
+  it('hide then show restores overlay visibility and data', () => {
+    const scene = makeScene();
+    const overlay = new SurveyConfidenceOverlay(scene);
+    overlay.show(makeOverlayOptions({
+      points: [makeConfidencePoint(5, 5)],
+    }));
+    overlay.hide();
+    overlay.show(makeOverlayOptions({
+      points: [makeConfidencePoint(10, 10), makeConfidencePoint(20, 20)],
+    }));
+    const group = scene.children[0] as THREE.Group;
+    expect(group.visible).toBe(true);
+    expect(group.children.length).toBe(2);
+    overlay.dispose();
+  });
 });
 
 // ─── TerrainMesh.getSurveyOverlay ───────────────────────────────────────────────
@@ -425,5 +560,16 @@ describe('TerrainMesh.getSurveyOverlay', () => {
     const b = tm.getSurveyOverlay();
     expect(a).toBe(b);
     tm.dispose();
+  });
+
+  it('TerrainMesh.dispose disposes the survey overlay when it was created', () => {
+    const scene = makeScene();
+    const grid = new VoxelGrid(4, 4, 4);
+    const tm = new TerrainMesh(scene, grid);
+    const overlay = tm.getSurveyOverlay();
+    overlay.show(makeOverlayOptions({ points: [makeConfidencePoint(5, 5)] }));
+    tm.dispose();
+    // After dispose, the overlay group should be removed from the scene
+    expect(scene.children.length).toBe(0);
   });
 });
