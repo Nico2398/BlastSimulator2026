@@ -1,0 +1,36 @@
+{
+  "name": "survey-then-blast",
+  "description": "Seismic survey → confidence overlay → blast → ore report. Validates survey confidence overlay rendering before and after detonation.",
+  "steps": [
+    "new_game seed:42",
+    "campaign start level:dusty_hollow",
+    "time resume",
+    "scores",
+    "finances",
+
+    "employee hire role:surveyor",
+    "employee assign_skill 1 geology 3",
+    "employee list",
+
+    "survey seismic x:25 z:25",
+    "survey show",
+    "tick 10",
+    "event choose 0",
+    "tick 10",
+    "event choose 0",
+    "tick 10",
+    "event choose 0",
+    "tick 10",
+    "event choose 0",
+    "survey show",
+
+    "drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:25,25",
+    "charge hole:* explosive:boomite amount:5 stemming:2",
+    "sequence auto delay_step:25",
+    "blast",
+
+    "finances",
+    "scores",
+    "stats"
+  ]
+}
