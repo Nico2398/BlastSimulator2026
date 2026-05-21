@@ -79,6 +79,24 @@ def orchestrate(state: dict) -> dict:
     if issue_text.startswith("error:"):
         return {"messages": [{"role": "assistant", "content": issue_text}]}
 
+    # If the issue fetch failed, treat it as an error — return minimal state.
+    if issue_text.startswith("error"):
+        return {
+            "issue_title": "",
+            "issue_body": issue_text,
+            "issue_labels": [],
+            "pipeline": "implement-feature",
+            "skill": "",
+            "current_role": "orchestrate",
+            "retry_count": 1,
+            "skip_integration_tests": True,
+            "skip_scenario_tests": True,
+            "test_branch": f"langgraph/tests-{issue_number}",
+            "impl_branch": f"langgraph/impl-{issue_number}",
+            "branch_name": f"langgraph/tests-{issue_number}",
+            "orchestrate_ok": False,
+        }
+
     labels: list[str] = []
     issue_title = ""
     issue_body = issue_text

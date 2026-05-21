@@ -55,6 +55,7 @@ def github_create_pr(branch: str, title: str, body: str, base: str = "main") -> 
 
     Returns:
         PR URL and number on success.
+        Returns an error message prefixed with 'error:' on failure.
     """
     try:
         repo = _repo()
@@ -73,6 +74,7 @@ def github_post_comment(issue_number: int, body: str) -> str:
 
     Returns:
         Comment URL on success.
+        Returns an error message prefixed with 'error:' on failure.
     """
     try:
         repo = _repo()
@@ -92,6 +94,7 @@ def github_add_label(issue_number: int, label: str) -> str:
 
     Returns:
         Confirmation message.
+        Returns an error message prefixed with 'error:' on failure.
     """
     try:
         repo = _repo()

@@ -61,6 +61,72 @@ function interpVertex(
   );
 }
 
+// ---------- Survey Confidence Overlay ----------
+
+/**
+ * Data needed to render a single survey confidence point on the terrain surface.
+ *
+ * Each point corresponds to a surveyed column (x, z) with a confidence value
+ * that degrades over time (stale = expired).
+ */
+export interface SurveyConfidencePoint {
+  /** World-space X coordinate of the surveyed column. */
+  x: number;
+  /** World-space Z coordinate of the surveyed column. */
+  z: number;
+  /** Terrain surface Y at this column (for vertical placement). */
+  surfaceY: number;
+  /** Confidence value in [0, 1] — 1 = highest certainty. */
+  confidence: number;
+  /** Whether this survey point is still fresh (not stale). */
+  fresh: boolean;
+}
+
+/** Parameters to configure the survey confidence overlay appearance. */
+export interface SurveyConfidenceOverlayOptions {
+  /** Array of confidence points across the terrain. */
+  points: SurveyConfidencePoint[];
+  /** Global opacity of the overlay in [0, 1]. */
+  opacity: number;
+}
+
+/**
+ * Renders a colour-coded semi-transparent overlay on terrain surfaces showing
+ * survey confidence levels. High confidence = green, low confidence = red.
+ * Stale survey points are shown in grey.
+ *
+ * Create via {@link TerrainMesh.getSurveyOverlay}, then call `show()` to
+ * activate or `hide()` to remove from view.
+ */
+export class SurveyConfidenceOverlay {
+  constructor(_scene: THREE.Scene) {
+    throw new Error('not implemented');
+  }
+
+  /**
+   * Display the confidence overlay with the given points.
+   * Replaces any previously shown overlay data.
+   */
+  show(_options: SurveyConfidenceOverlayOptions): void {
+    throw new Error('not implemented');
+  }
+
+  /** Hide the overlay without clearing data. */
+  hide(): void {
+    throw new Error('not implemented');
+  }
+
+  /** Remove all overlay meshes from the scene. */
+  clear(): void {
+    throw new Error('not implemented');
+  }
+
+  /** Remove overlay and release all GPU resources. */
+  dispose(): void {
+    throw new Error('not implemented');
+  }
+}
+
 // ---------- Main class ----------
 
 /** Chunk key → Three.js Mesh */
@@ -71,6 +137,7 @@ export class TerrainMesh {
   private readonly grid: VoxelGrid;
   private readonly chunks = new Map<ChunkKey, THREE.Mesh>();
   private readonly material: THREE.MeshPhongMaterial;
+  private surveyOverlay: SurveyConfidenceOverlay | null = null;
 
   constructor(scene: THREE.Scene, grid: VoxelGrid) {
     this.scene = scene;
@@ -125,6 +192,21 @@ export class TerrainMesh {
     }
     this.chunks.clear();
     this.material.dispose();
+    this.surveyOverlay?.dispose();
+    this.surveyOverlay = null;
+  }
+
+  /**
+   * Get or lazily create the survey confidence overlay for this terrain.
+   *
+   * Usage:
+   * ```ts
+   * const overlay = terrain.getSurveyOverlay();
+   * overlay.show({ points: [...], opacity: 0.6 });
+   * ```
+   */
+  getSurveyOverlay(): SurveyConfidenceOverlay {
+    throw new Error('not implemented');
   }
 
   // ---------- Internal ----------
