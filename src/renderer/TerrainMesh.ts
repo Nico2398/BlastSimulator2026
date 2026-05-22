@@ -10,6 +10,11 @@ import * as THREE from 'three';
 import type { VoxelGrid } from '../core/world/VoxelGrid.js';
 import { EDGE_TABLE, TRI_TABLE } from './MarchingCubesTables.js';
 import { sampleRockColor, clearColorSampleCache } from './ProceduralTexture.js';
+import { SurveyConfidenceOverlay } from './SurveyConfidenceOverlay.js';
+
+// Re-export survey overlay types/class so consumers can import from either location.
+export { SurveyConfidenceOverlay, confidenceToColor } from './SurveyConfidenceOverlay.js';
+export type { SurveyConfidencePoint, SurveyConfidenceOverlayOptions } from './SurveyConfidenceOverlay.js';
 
 // ---------- Constants ----------
 // 16 voxels per chunk side — standard for MC chunk streaming
@@ -63,14 +68,12 @@ function interpVertex(
 
 // ---------- Main class ----------
 
-/** Chunk key → Three.js Mesh */
-type ChunkKey = string;
-
 export class TerrainMesh {
   private readonly scene: THREE.Scene;
   private readonly grid: VoxelGrid;
-  private readonly chunks = new Map<ChunkKey, THREE.Mesh>();
+  private mesh: THREE.Mesh | null = null;
   private readonly material: THREE.MeshPhongMaterial;
+  private surveyOverlay: SurveyConfidenceOverlay | null = null;
 
   constructor(scene: THREE.Scene, grid: VoxelGrid) {
     this.scene = scene;
@@ -86,85 +89,20 @@ export class TerrainMesh {
 
   /** Build all chunks from scratch. Call once after grid is populated. */
   buildAll(): void {
-    const cx = Math.ceil(this.grid.sizeX / CHUNK_SIZE);
-    const cy = Math.ceil(this.grid.sizeY / CHUNK_SIZE);
-    const cz = Math.ceil(this.grid.sizeZ / CHUNK_SIZE);
-    for (let z = 0; z < cz; z++) {
-      for (let y = 0; y < cy; y++) {
-        for (let x = 0; x < cx; x++) {
-          this.buildChunk(x, y, z);
-        }
-      }
-    }
-  }
-
-  /**
-   * Re-mesh chunks containing the given dirty voxel positions.
-   * Call after blast or any voxel mutation.
-   */
-  update(dirtyPositions: { x: number; y: number; z: number }[]): void {
-    const dirty = new Set<ChunkKey>();
-    for (const { x, y, z } of dirtyPositions) {
-      dirty.add(this.chunkKey(
-        Math.floor(x / CHUNK_SIZE),
-        Math.floor(y / CHUNK_SIZE),
-        Math.floor(z / CHUNK_SIZE),
-      ));
-    }
-    for (const key of dirty) {
-      const [cx, cy, cz] = key.split(',').map(Number) as [number, number, number];
-      this.buildChunk(cx, cy, cz);
-    }
-  }
-
-  /** Remove all terrain meshes from the scene and release geometry. */
-  dispose(): void {
-    for (const mesh of this.chunks.values()) {
-      this.scene.remove(mesh);
-      mesh.geometry.dispose();
-    }
-    this.chunks.clear();
-    this.material.dispose();
-  }
-
-  // ---------- Internal ----------
-
-  private chunkKey(cx: number, cy: number, cz: number): ChunkKey {
-    return `${cx},${cy},${cz}`;
-  }
-
-  private buildChunk(cx: number, cy: number, cz: number): void {
-    // Clear color cache before rebuilding — prevents unbounded growth across
-    // all chunks and gives high hit-rate within a single chunk's vertices
-    clearColorSampleCache();
-
-    const key = this.chunkKey(cx, cy, cz);
-
-    // Remove existing mesh
-    const existing = this.chunks.get(key);
-    if (existing) {
-      this.scene.remove(existing);
-      existing.geometry.dispose();
-      this.chunks.delete(key);
-    }
-
-    // World-space origin of this chunk
-    const ox = cx * CHUNK_SIZE;
-    const oy = cy * CHUNK_SIZE;
-    const oz = cz * CHUNK_SIZE;
+    // Remove any existing mesh
+    this.removeMesh();
 
     const positions: number[] = [];
     const colors: number[] = [];
 
-    // Iterate every cell within the chunk (and one voxel past for neighbour lookup)
-    const xEnd = Math.min(ox + CHUNK_SIZE, this.grid.sizeX - 1);
-    const yEnd = Math.min(oy + CHUNK_SIZE, this.grid.sizeY - 1);
-    const zEnd = Math.min(oz + CHUNK_SIZE, this.grid.sizeZ - 1);
+    const cx = Math.ceil(this.grid.sizeX / CHUNK_SIZE);
+    const cy = Math.ceil(this.grid.sizeY / CHUNK_SIZE);
+    const cz = Math.ceil(this.grid.sizeZ / CHUNK_SIZE);
 
-    for (let z = oz; z < zEnd; z++) {
-      for (let y = oy; y < yEnd; y++) {
-        for (let x = ox; x < xEnd; x++) {
-          this.marchCube(x, y, z, positions, colors);
+    for (let czIdx = 0; czIdx < cz; czIdx++) {
+      for (let cyIdx = 0; cyIdx < cy; cyIdx++) {
+        for (let cxIdx = 0; cxIdx < cx; cxIdx++) {
+          this.marchChunk(cxIdx, cyIdx, czIdx, positions, colors);
         }
       }
     }
@@ -175,13 +113,76 @@ export class TerrainMesh {
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
     geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
     geometry.computeVertexNormals();
-    // Required for frustum culling — Three.js skips off-screen chunks automatically
     geometry.computeBoundingSphere();
 
-    const mesh = new THREE.Mesh(geometry, this.material);
-    mesh.frustumCulled = true;
-    this.scene.add(mesh);
-    this.chunks.set(key, mesh);
+    this.mesh = new THREE.Mesh(geometry, this.material);
+    this.mesh.frustumCulled = true;
+    this.scene.add(this.mesh);
+  }
+
+  /**
+   * Re-mesh the terrain after voxel mutations.
+   * Rebuilds the entire mesh from scratch (simple but correct).
+   */
+  update(_dirtyPositions: { x: number; y: number; z: number }[]): void {
+    this.buildAll();
+  }
+
+  /** Remove all terrain meshes from the scene and release geometry. */
+  dispose(): void {
+    this.removeMesh();
+    this.material.dispose();
+    this.surveyOverlay?.dispose();
+    this.surveyOverlay = null;
+  }
+
+  /**
+   * Get or lazily create the survey confidence overlay for this terrain.
+   *
+   * Usage:
+   * ```ts
+   * const overlay = terrain.getSurveyOverlay();
+   * overlay.show({ points: [...], opacity: 0.6 });
+   * ```
+   */
+  getSurveyOverlay(): SurveyConfidenceOverlay {
+    if (!this.surveyOverlay) {
+      this.surveyOverlay = new SurveyConfidenceOverlay(this.scene);
+    }
+    return this.surveyOverlay;
+  }
+
+  // ---------- Internal ----------
+
+  /** Remove the current terrain mesh from the scene and release its geometry. */
+  private removeMesh(): void {
+    if (this.mesh) {
+      this.scene.remove(this.mesh);
+      this.mesh.geometry.dispose();
+      this.mesh = null;
+    }
+  }
+
+  /** March all cubes within a single CHUNK_SIZE³ region, appending to the shared arrays. */
+  private marchChunk(cx: number, cy: number, cz: number, outPos: number[], outColor: number[]): void {
+    // Clear color cache before each chunk to keep cache size bounded
+    clearColorSampleCache();
+
+    const ox = cx * CHUNK_SIZE;
+    const oy = cy * CHUNK_SIZE;
+    const oz = cz * CHUNK_SIZE;
+
+    const xEnd = Math.min(ox + CHUNK_SIZE, this.grid.sizeX - 1);
+    const yEnd = Math.min(oy + CHUNK_SIZE, this.grid.sizeY - 1);
+    const zEnd = Math.min(oz + CHUNK_SIZE, this.grid.sizeZ - 1);
+
+    for (let z = oz; z < zEnd; z++) {
+      for (let y = oy; y < yEnd; y++) {
+        for (let x = ox; x < xEnd; x++) {
+          this.marchCube(x, y, z, outPos, outColor);
+        }
+      }
+    }
   }
 
   private marchCube(

@@ -1,0 +1,57 @@
+{
+  "name": "survey-overlay-lifecycle",
+  "description": "Survey confidence overlay lifecycle: fresh survey rendering → tick past stale threshold → new survey refreshes overlay → blast terrain remesh preserves overlay. FAILS until GameRenderer wires getSurveyOverlay().show() in syncFromContext().",
+  "steps": [
+    "new_game seed:42",
+    "campaign start level:dusty_hollow",
+    "time resume",
+
+    "employee hire role:surveyor",
+    "employee hire role:surveyor",
+    "employee assign_skill 1 geology 5",
+    "employee assign_skill 2 geology 1",
+    "employee list",
+    "state full",
+
+    "survey seismic x:20 z:20",
+    "survey core_sample x:20 z:20",
+    "survey show",
+    "state full",
+
+    "tick 10",
+    "event choose 0",
+    "tick 10",
+    "event choose 0",
+    "tick 10",
+    "event choose 0",
+    "tick 10",
+    "event choose 0",
+    "survey show",
+    "state full",
+
+    "survey aerial x:20 z:20",
+    "survey show",
+    "state full",
+
+    "tick 10",
+    "event choose 0",
+    "tick 10",
+    "event choose 0",
+    "tick 10",
+    "event choose 0",
+    "tick 10",
+    "event choose 0",
+    "survey show",
+    "state full",
+
+    "drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:20,20",
+    "charge hole:* explosive:boomite amount:5 stemming:2",
+    "sequence auto delay_step:25",
+    "blast",
+    "state full",
+
+    "finances",
+    "scores",
+    "stats"
+  ]
+}

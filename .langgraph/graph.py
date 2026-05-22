@@ -270,4 +270,6 @@ def build_graph():
     builder.add_edge("open_pr", END)
     builder.add_edge("handle_interrupt", END)
 
-    return builder.compile(checkpointer=build_checkpointer())
+    return builder.compile(checkpointer=build_checkpointer()).with_config(
+        {"recursion_limit": 150}
+    )

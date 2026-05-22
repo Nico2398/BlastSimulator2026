@@ -46,7 +46,7 @@ def create_pr(
         draft: Open as draft PR (default: False).
 
     Returns:
-        (pr_number, html_url)
+        (pr_number, html_url) on success, or (0, error_message) on failure.
     """
     repo = _repo()
     try:

@@ -1,0 +1,62 @@
+{
+  "name": "survey-then-blast-playthrough",
+  "description": "Full playthrough: new game → hire surveyor → seismic survey → confidence overlay visible → drill + charge + blast → ore report event → overlay updates after terrain remesh. FAILS until GameRenderer wires the survey confidence overlay.",
+  "steps": [
+    "new_game seed:42",
+    "campaign start level:dusty_hollow",
+    "time resume",
+    "scores",
+    "finances",
+
+    "employee hire role:surveyor",
+    "employee hire role:driller",
+    "employee hire role:blaster",
+    "employee assign_skill 1 geology 4",
+    "employee list",
+    "state full",
+
+    "survey seismic x:25 z:25",
+    "survey core_sample x:25 z:25",
+    "survey show",
+    "state full",
+
+    "tick 10",
+    "event choose 0",
+    "tick 10",
+    "event choose 0",
+    "tick 10",
+    "event choose 0",
+    "tick 10",
+    "event choose 0",
+    "state full",
+
+    "tick 8",
+    "event choose 0",
+    "tick 8",
+    "event choose 0",
+    "tick 8",
+    "event choose 0",
+    "tick 8",
+    "event choose 0",
+    "survey show",
+    "state full",
+
+    "drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:25,25",
+    "charge hole:* explosive:boomite amount:5 stemming:2",
+    "sequence auto delay_step:25",
+    "blast",
+    "state full",
+
+    "tick 5",
+    "event choose 0",
+    "tick 5",
+    "event choose 0",
+    "contract list",
+    "contract accept 1",
+    "contract deliver 1 amount:500",
+
+    "finances",
+    "scores",
+    "stats"
+  ]
+}

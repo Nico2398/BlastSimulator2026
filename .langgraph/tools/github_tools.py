@@ -47,6 +47,7 @@ def github_get_issue(issue_number: int) -> str:
 
     Returns:
         Formatted string with title, state, labels, body, and comment count.
+        Returns an error message prefixed with 'error:' on failure.
     """
     try:
         repo = _repo()
@@ -74,6 +75,7 @@ def github_list_issue_comments(issue_number: int) -> str:
 
     Returns:
         All comments, each prefixed with author and timestamp.
+        Returns an error message prefixed with 'error:' on failure.
     """
     try:
         repo = _repo()
@@ -98,6 +100,7 @@ def github_get_pr_reviews(pr_number: int) -> str:
 
     Returns:
         Each review with reviewer, state, and body.
+        Returns an error message prefixed with 'error:' on failure.
     """
     try:
         repo = _repo()
@@ -122,6 +125,7 @@ def github_get_pr_review_comments(pr_number: int) -> str:
 
     Returns:
         Each comment with file, line, author, and body.
+        Returns an error message prefixed with 'error:' on failure.
     """
     try:
         repo = _repo()
@@ -148,6 +152,7 @@ def github_get_pr(pr_number: int) -> str:
     Returns:
         Formatted string with title, state, base/head branches, body,
         and reviewer list.
+        Returns an error message prefixed with 'error:' on failure.
     """
     try:
         repo = _repo()
@@ -176,6 +181,7 @@ def github_get_pr_files(pr_number: int) -> str:
 
     Returns:
         Each changed file with its status and patch summary.
+        Returns an error message prefixed with 'error:' on failure.
     """
     try:
         repo = _repo()
