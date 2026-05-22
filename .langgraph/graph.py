@@ -47,7 +47,7 @@ from nodes.skeleton_writer import skeleton_writer
 from nodes.unit_test_writer import unit_test_writer
 from nodes.integration_test_writer import integration_test_writer
 from nodes.scenario_test_writer import scenario_test_writer
-from nodes.test_fan_out import test_fan_out
+from nodes.test_fan_out import test_fan_out, route_from_test_fan_out
 from nodes.test_fan_in import test_fan_in
 from nodes.implementer import implementer
 from nodes.qualimetry_node import qualimetry_node
@@ -241,7 +241,7 @@ def build_graph():
     })
     # Fan-out: dispatches to unit/integration/scenario test writers in parallel.
     # Each test writer node sends its result to test_fan_in.
-    builder.add_conditional_edges("test_fan_out", test_fan_out, ["unit_test_writer", "integration_test_writer", "scenario_test_writer"])
+    builder.add_conditional_edges("test_fan_out", route_from_test_fan_out, ["unit_test_writer", "integration_test_writer", "scenario_test_writer"])
     # Each test writer routes to test_fan_in on completion.
     builder.add_edge("unit_test_writer", "test_fan_in")
     builder.add_edge("integration_test_writer", "test_fan_in")
