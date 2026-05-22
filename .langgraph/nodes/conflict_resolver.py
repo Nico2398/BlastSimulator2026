@@ -32,7 +32,7 @@ def conflict_resolver(state: dict) -> dict:
 
     llm = build_llm()
     agent = build_react_agent(
-        "implementer",
+        "conflict-resolver",
         CODING_TOOLS,
         llm,
         extra_context=_build_context(state, conflicts),

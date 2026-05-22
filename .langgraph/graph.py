@@ -1,8 +1,8 @@
 """BlastSimulator2026 LangGraph pipeline graph.
 
 Pipeline paths:
-  implement-feature  orchestrate → skeleton_writer → unit-tests → integration-tests
-                     → scenario-tests → implementer → cherry_pick → [conflict_resolver]
+  implement-feature  orchestrate → skeleton_writer → [unit-tests ‖ integration-tests ‖ scenario-tests]
+                     → implementer → cherry_pick → [conflict_resolver]
                      → test_runner → [fixer] → qualimetry → code_review
                      → refactorer → validator → open_pr
   fix-bug            orchestrate → skeleton_writer → unit-tests → implementer
@@ -11,6 +11,9 @@ Pipeline paths:
   review-pr          orchestrate → reviewer → END
   visual-change      same as implement-feature + visual_tester before open_pr
   investigate        orchestrate → implementer (read-only) → END
+
+Test writing uses fan-out parallelism: unit/integration/scenario tests run
+concurrently when not skipped. A fan-in node merges results before implementer.
 
 Quality gates (in order after cherry_pick):
   test_runner   non-agentic: runs Vitest, fails → fixer
@@ -33,16 +36,19 @@ if str(_HERE) not in sys.path:
 
 from langgraph.graph import StateGraph, END
 from langgraph.graph.message import add_messages
-from langgraph.types import interrupt
+from langgraph.types import interrupt, Send
 from langchain_core.messages import BaseMessage
 from typing_extensions import TypedDict
 
 from checkpointer import build_checkpointer
 from nodes.orchestrate import orchestrate
+from nodes.planner import planner
 from nodes.skeleton_writer import skeleton_writer
 from nodes.unit_test_writer import unit_test_writer
 from nodes.integration_test_writer import integration_test_writer
 from nodes.scenario_test_writer import scenario_test_writer
+from nodes.test_fan_out import test_fan_out
+from nodes.test_fan_in import test_fan_in
 from nodes.implementer import implementer
 from nodes.qualimetry_node import qualimetry_node
 from nodes.refactorer import refactorer
@@ -54,14 +60,15 @@ from nodes.conflict_resolver import conflict_resolver
 from nodes.test_runner import test_runner
 from nodes.fixer import fixer
 from nodes.code_review import code_review
+from nodes.review_fan_out import review_fan_out, security_reviewer, quality_reviewer, i18n_reviewer
+from nodes.review_fan_in import review_fan_in
 from nodes.open_pr import open_pr
 from routing import (
     MAX_RETRIES,
     route_from_orchestrate,
+    route_from_planner,
     route_from_skeleton_writer,
-    route_from_unit_test_writer,
-    route_from_integration_test_writer,
-    route_from_scenario_test_writer,
+    route_from_test_fan_in,
     route_from_implementer,
     route_from_cherry_pick,
     route_from_conflict_resolver,
@@ -69,6 +76,7 @@ from routing import (
     route_from_fixer,
     route_from_qualimetry,
     route_from_code_review,
+    route_from_review_fan_in,
     route_from_refactorer,
     route_from_validator,
     route_from_visual_tester,
@@ -92,8 +100,17 @@ class AgentState(TypedDict):
     issue_labels: list[str]
     pipeline: str   # implement-feature | fix-bug | review-pr | visual-change | investigate
     skill: str
+    # Step-skip flags — set by orchestrate based on issue analysis
     skip_integration_tests: bool
     skip_scenario_tests: bool
+    skip_code_review: bool
+    skip_qualimetry: bool
+    skip_refactorer: bool
+    skip_visual_tester: bool
+
+    # Set by planner
+    plan: str
+    planner_ok: bool
 
     # Branch strategy (set by orchestrate + skeleton_writer)
     test_branch: str           # langgraph/tests-<N>  — holds tests + final code
@@ -126,11 +143,24 @@ class AgentState(TypedDict):
     qualimetry_report: str
     code_review_ok: bool
     code_review_report: str
+    # Sub-reviewer reports (from review fan-out)
+    security_review_ok: bool
+    security_review_report: str
+    quality_review_ok: bool
+    quality_review_report: str
+    i18n_review_ok: bool
+    i18n_review_report: str
     refactorer_ok: bool
     validator_ok: bool
     validator_report: str
     visual_tester_ok: bool
     reviewer_ok: bool
+
+    # Diff-aware context (computed after cherry_pick)
+    changed_files: list[str]       # files modified vs skeleton_commit_sha
+    git_diff: str                  # short inline diff summary (≤2000 chars)
+    diff_dir: str                  # path to per-file patch directory (agents read from disk)
+    risk_tier: str                 # "trivial" | "lite" | "full" — controls review depth
 
     # Human-in-the-loop
     human_feedback: str | None
@@ -164,6 +194,7 @@ def build_graph():
 
     for name, fn in [
         ("orchestrate", orchestrate),
+        ("planner", planner),
         ("skeleton_writer", skeleton_writer),
         ("unit_test_writer", unit_test_writer),
         ("integration_test_writer", integration_test_writer),
@@ -175,6 +206,11 @@ def build_graph():
         ("fixer", fixer),
         ("qualimetry", qualimetry_node),
         ("code_review", code_review),
+        ("review_fan_out", review_fan_out),
+        ("security_reviewer", security_reviewer),
+        ("quality_reviewer", quality_reviewer),
+        ("i18n_reviewer", i18n_reviewer),
+        ("review_fan_in", review_fan_in),
         ("refactorer", refactorer),
         ("validator", validator),
         ("visual_tester", visual_tester),
@@ -187,31 +223,31 @@ def build_graph():
     builder.set_entry_point("orchestrate")
 
     builder.add_conditional_edges("orchestrate", route_from_orchestrate, {
-        "skeleton_writer": "skeleton_writer",
+        "planner": "planner",
         "implementer": "implementer",
         "reviewer": "reviewer",
     })
+    builder.add_conditional_edges("planner", route_from_planner, {
+        "skeleton_writer": "skeleton_writer",
+        "planner": "planner",
+        "handle_interrupt": "handle_interrupt",
+    })
     builder.add_conditional_edges("skeleton_writer", route_from_skeleton_writer, {
-        "unit_test_writer": "unit_test_writer",
+        "test_fan_out": "test_fan_out",
         "skeleton_writer": "skeleton_writer",
         "handle_interrupt": "handle_interrupt",
     })
-    builder.add_conditional_edges("unit_test_writer", route_from_unit_test_writer, {
-        "integration_test_writer": "integration_test_writer",
+    # Fan-out: dispatches to unit/integration/scenario test writers in parallel.
+    # Each test writer node sends its result to test_fan_in.
+    builder.add_conditional_edges("test_fan_out", test_fan_out, ["unit_test_writer", "integration_test_writer", "scenario_test_writer"])
+    # Each test writer routes to test_fan_in on completion.
+    builder.add_edge("unit_test_writer", "test_fan_in")
+    builder.add_edge("integration_test_writer", "test_fan_in")
+    builder.add_edge("scenario_test_writer", "test_fan_in")
+    # Fan-in: merges results, routes to implementer or retry.
+    builder.add_conditional_edges("test_fan_in", route_from_test_fan_in, {
         "implementer": "implementer",
-        "unit_test_writer": "unit_test_writer",
-        "handle_interrupt": "handle_interrupt",
-    })
-    builder.add_conditional_edges(
-        "integration_test_writer", route_from_integration_test_writer, {
-            "scenario_test_writer": "scenario_test_writer",
-            "implementer": "implementer",
-            "integration_test_writer": "integration_test_writer",
-            "handle_interrupt": "handle_interrupt",
-        })
-    builder.add_conditional_edges("scenario_test_writer", route_from_scenario_test_writer, {
-        "implementer": "implementer",
-        "scenario_test_writer": "scenario_test_writer",
+        "test_fan_out": "test_fan_out",
         "handle_interrupt": "handle_interrupt",
     })
     builder.add_conditional_edges("implementer", route_from_implementer, {
@@ -232,6 +268,10 @@ def build_graph():
     })
     builder.add_conditional_edges("test_runner", route_from_test_runner, {
         "qualimetry": "qualimetry",
+        "review_fan_out": "review_fan_out",
+        "code_review": "code_review",
+        "refactorer": "refactorer",
+        "validator": "validator",
         "fixer": "fixer",
         "handle_interrupt": "handle_interrupt",
     })
@@ -240,7 +280,23 @@ def build_graph():
         "handle_interrupt": "handle_interrupt",
     })
     builder.add_conditional_edges("qualimetry", route_from_qualimetry, {
+        "review_fan_out": "review_fan_out",
         "code_review": "code_review",
+        "refactorer": "refactorer",
+        "validator": "validator",
+        "implementer": "implementer",
+        "handle_interrupt": "handle_interrupt",
+    })
+    # Review fan-out: dispatches to specialized sub-reviewers in parallel.
+    builder.add_conditional_edges("review_fan_out", review_fan_out, ["security_reviewer", "quality_reviewer", "i18n_reviewer"])
+    # Each sub-reviewer routes to review_fan_in on completion.
+    builder.add_edge("security_reviewer", "review_fan_in")
+    builder.add_edge("quality_reviewer", "review_fan_in")
+    builder.add_edge("i18n_reviewer", "review_fan_in")
+    # Review fan-in: coordinator merges findings, routes to refactorer or retry.
+    builder.add_conditional_edges("review_fan_in", route_from_review_fan_in, {
+        "refactorer": "refactorer",
+        "validator": "validator",
         "implementer": "implementer",
         "handle_interrupt": "handle_interrupt",
     })

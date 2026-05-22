@@ -60,29 +60,60 @@ def code_review(state: dict) -> dict:
 
 
 def _build_context(state: dict) -> str:
+    risk_tier = state.get("risk_tier", "full")
+    tier_note = {
+        "trivial": "Risk tier: TRIVIAL — light review. Focus on architecture + PRNG only. Skip i18n, file size, config checks.",
+        "lite": "Risk tier: LITE — standard review. All checks. Skip cross-file impact analysis.",
+        "full": "Risk tier: FULL — deep review. All checks + cross-file impact + regression risk.",
+    }.get(risk_tier, "Risk tier: FULL — deep review.")
+
     lines = [
         f"Issue #{state.get('issue_number')}: {state.get('issue_title', '')}",
         f"Pipeline: {state.get('pipeline', '')}",
         f"Retry #{state.get('retry_count', 0)}",
+        tier_note,
         "",
-        "TASK: Review the implementation that was just written.",
-        "Check ALL of the following:",
-        "1. Architecture boundaries: src/core/ has no DOM/WebGL/window imports.",
-        "2. No Math.random() — only seeded PRNG from src/core/math/Random.ts.",
-        "3. 300-line limit per file (data/i18n files exempt).",
-        "4. Named exports everywhere (except entry points).",
-        "5. All user-facing strings use t('key') — no hardcoded player-visible text.",
-        "6. TypeScript strict — no 'any' except in test fixtures.",
-        "7. No hardcoded balance numbers — use src/core/config/.",
+        "TASK: Review the implementation against the ISSUE REQUIREMENTS below.",
+        "Check ALL of the following (adjusted by risk tier):",
+        "1. **Issue requirements met** — every acceptance criterion from the issue is implemented.",
+        "2. **Architecture boundaries** — src/core/ has no DOM/WebGL/window imports.",
+        "3. **No Math.random()** — only seeded PRNG from src/core/math/Random.ts.",
+        "4. **300-line limit** per file (data/i18n files exempt).",
+        "5. **Named exports** everywhere (except entry points).",
+        "6. **All user-facing strings** use t('key') — no hardcoded player-visible text.",
+        "7. **TypeScript strict** — no 'any' except in test fixtures.",
+        "8. **No hardcoded balance numbers** — use src/core/config/.",
         "",
         "Read the relevant implementation files with read_file / grep before judging.",
+        "",
+        "## Diff Access",
+        "Per-file patches are on disk. Read the SUMMARY first, then specific patches:",
+        "  read_file('<diff_dir>/SUMMARY.md')  — file list + stats",
+        "  read_file('<diff_dir>/path__to__file.ts.patch')  — specific file's diff",
+        "Do NOT read every patch. Read only files relevant to your review focus.",
+        "",
         "Conclude with either:",
         "  ✅ CODE REVIEW PASSED — ready for refactor",
-        "  ❌ CODE REVIEW FAILED — list each violation with file + line number",
+        "  ❌ CODE REVIEW FAILED — list each violation with file + line + [severity]",
+        "",
+        "Severity tags: [critical] (blocks merge), [warning] (should fix), [suggestion] (nice to have).",
+        "Bias toward approval. Single [warning] = still PASSED. Only [critical] = FAILED.",
     ]
     lines.append(skill_hint(state.get("skill", "")))
+    if state.get("skill"):
+        lines.append(
+            f"\nCall `get_skill_context('{state['skill']}')` to load the domain spec. "
+            "Verify the implementation follows ALL rules in that spec."
+        )
     if state.get("issue_body"):
         lines.append("\n## Issue Body\n" + state["issue_body"])
+    if state.get("plan"):
+        lines.append("\n## Implementation Plan\n" + state["plan"])
+    if state.get("changed_files"):
+        file_list = "\n".join(f"  - {f}" for f in state["changed_files"])
+        lines.append(f"\n## Changed Files\n{file_list}")
+    if state.get("diff_dir"):
+        lines.append(f"\n## Diff Directory\n{state['diff_dir']}")
     return "\n".join(lines)
 
 
@@ -94,6 +125,14 @@ def _build_task_prompt(state: dict) -> str:
 
 
 def _extract_code_review_ok(agent_result: dict) -> bool:
+    """Determine if code review passed.
+
+    Priority:
+    1. Explicit ✅/❌ marker in last message.
+    2. Severity-based: only [critical] items cause failure.
+       [warning] and [suggestion] still pass (bias toward approval).
+    3. Fallback to extract_ok().
+    """
     messages = agent_result.get("messages", [])
     if not messages:
         return False
@@ -102,4 +141,10 @@ def _extract_code_review_ok(agent_result: dict) -> bool:
     match = re.search(r"^(✅ CODE REVIEW PASSED|❌ CODE REVIEW FAILED)\b", content, re.MULTILINE)
     if match:
         return match.group(1) == "✅ CODE REVIEW PASSED"
+
+    # Severity-based: count critical items
+    critical_count = len(re.findall(r"\[critical\]", content, re.IGNORECASE))
+    if critical_count > 0:
+        return False
+
     return extract_ok(agent_result)

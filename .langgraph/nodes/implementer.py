@@ -104,6 +104,8 @@ def _build_context(state: dict) -> str:
         )
     lines.append(skill_hint(state.get("skill", "")))
     lines.extend(_retry_feedback(state))
+    if state.get("plan"):
+        lines.append("\n## Implementation Plan\n" + state["plan"])
     lines.append("\n## Issue Body\n" + state.get("issue_body", ""))
     return "\n".join(lines)
 

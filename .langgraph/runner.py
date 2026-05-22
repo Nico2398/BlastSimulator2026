@@ -110,6 +110,22 @@ async def run(issue_number: int, comment_body: str) -> None:
         "impl_commit_sha": "",
         "skip_integration_tests": False,
         "skip_scenario_tests": False,
+        "skip_code_review": False,
+        "skip_qualimetry": False,
+        "skip_refactorer": False,
+        "skip_visual_tester": True,
+        "planner_ok": False,
+        "plan": "",
+        "changed_files": [],
+        "git_diff": "",
+        "diff_dir": "",
+        "risk_tier": "full",
+        "security_review_ok": False,
+        "security_review_report": "",
+        "quality_review_ok": False,
+        "quality_review_report": "",
+        "i18n_review_ok": False,
+        "i18n_review_report": "",
     }
 
     log.info("Starting pipeline for issue #%d", issue_number)

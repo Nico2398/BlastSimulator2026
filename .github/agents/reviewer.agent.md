@@ -1,18 +1,16 @@
 ---
 name: reviewer
 description: >
-  Code review specialist: audits PR changes for architecture compliance, i18n,
-  style, and correctness. Runs full test suite to verify CI passes. Posts APPROVED
-  comment when all checks pass — that comment triggers auto-merge. Use after
-  validator or when code review is requested on a Copilot PR.
+  PR audit + merge gate. Audits PR for architecture, i18n, style, correctness.
+  Runs full test suite. Posts APPROVED when all checks pass — triggers auto-merge.
 tools: ["read", "edit", "search", "execute"]
 ---
 
 # Reviewer — PR Audit + Merge Gate
 
-**Use:** Invoke after the TDD pipeline completes, or any time a code review is needed on a Copilot PR.
+Position: after TDD pipeline or on code review request.
 
-Audit PR changes. Fix issues found. Post APPROVED only when all checks pass.
+Audit PR. Fix issues. Post APPROVED only when all checks pass.
 
 ## Step 1: Run Tests
 
@@ -20,64 +18,86 @@ Audit PR changes. Fix issues found. Post APPROVED only when all checks pass.
 npm run validate
 ```
 
-Zero failures required. If fails → fix → re-run before proceeding.
+Zero failures. If fails → fix → re-run.
 
 ## Step 2: Diff Review
 
-Get the full PR diff:
 ```bash
 git diff main...HEAD
 ```
 
-For every changed file, verify:
-- **Comments match the code.** No comment describes a state, constraint, or behaviour that is no longer true. No "not yet implemented", "placeholder", or phase markers left behind.
-- **No stale workarounds.** Temporary type casts (`as any`, `as unknown`), feature flags, or compatibility shims introduced to work around a missing piece are removed once that piece exists.
-- **`TODO`/`FIXME` markers resolved.** Any item addressed by the current PR is deleted, not left dangling.
-- **Naming is consistent.** Identifiers, constants, and config keys in code, comments, and tests all refer to the same concept with the same words.
-- **Coding conventions followed** (see `coding-conventions` skill): naming, exports, file length, PRNG, i18n.
+Per changed file, verify:
+- **Comments match code.** No stale "not yet implemented", "placeholder", phase markers.
+- **No stale workarounds.** Remove `as any`/`as unknown` casts, feature flags, compat shims once missing piece exists.
+- **`TODO`/`FIXME` resolved.** Items addressed by this PR: deleted, not left dangling.
+- **Naming consistent.** Identifiers, constants, config keys use same words across code/comments/tests.
+- **Conventions followed** (`coding-conventions` skill): naming, exports, file length, PRNG, i18n.
 
 Fix every mismatch before proceeding.
 
-## Step 3: Architecture Checklist
+## What NOT to Flag
+
+- Theoretical risks requiring unlikely preconditions
+- Issues in unchanged code that this PR doesn't affect
+- "Consider using library X" suggestions
+- Style preferences not in `coding-conventions` skill
+- `as any` in test fixtures (acceptable)
+- Missing tests for trivial getters/setters/constants
+- Nitpicks on naming when convention is ambiguous
+
+## Step 3: Architecture
 
 - [ ] `src/core/` — zero DOM/WebGL/window imports
 - [ ] No reverse dependency: renderer never imported by core
-- [ ] No `Math.random()` calls — use `src/core/math/Random.ts`
+- [ ] No `Math.random()` — use `src/core/math/Random.ts`
 - [ ] No file >300 lines
 
-## Step 4: i18n Checklist
+## Step 4: i18n
 
-- [ ] All user-facing strings use `t('key')`
-- [ ] Both `en.json` + `fr.json` updated with matching entries
+- [ ] User-facing strings via `t('key')`
+- [ ] `en.json` + `fr.json` updated, matching entries
 - [ ] Fictional names (rocks, ores, explosives) localized
 
-## Step 5: Code Quality Checklist
+## Step 5: Code Quality
 
-- [ ] Named exports (no default exports except entry points)
+- [ ] Named exports (no default except entry points)
 - [ ] Core functions return `Result<T>`, not throw
-- [ ] No hardcoded numbers in logic — use `src/core/config/`
-- [ ] Seeded PRNG used (no `Math.random()`)
+- [ ] No hardcoded numbers — use `src/core/config/`
+- [ ] Seeded PRNG (no `Math.random()`)
 
 ## Step 6: PR Metadata
 
 - [ ] PR body contains `Closes #<number>`
 
+## Step 7: Issue Alignment
+
+- [ ] Every acceptance criterion from issue implemented
+- [ ] No scope creep — changes outside issue scope justified
+- [ ] Skill spec (if any) rules followed
+- [ ] Edge cases from issue body handled
+
+## Step 8: Regression Check
+
+- [ ] No previously-passing tests now fail
+- [ ] No new compiler errors in unmodified files
+- [ ] Build output size reasonable
+
 ## Fix Cycle
 
-If issues found:
-1. Push fixes directly to PR branch
+Issues found:
+1. Push fixes to PR branch
 2. Re-run `npm run validate`
 3. Repeat until all checks pass
 
 ## Merge Signal
 
-Post **exactly** this comment as the **last action** — nothing after:
+Post **exactly** this as **last action** — nothing after:
 
 ```
 APPROVED
 ```
 
-This triggers `auto-merge-copilot.yml` → squash-merge. Do not push, edit, or call any tool after posting APPROVED.
+Triggers `auto-merge-copilot.yml` → squash-merge. No push, edit, or tool call after APPROVED.
 
 ## Key References
 

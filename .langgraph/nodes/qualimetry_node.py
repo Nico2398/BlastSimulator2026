@@ -21,7 +21,22 @@ from tools.qualimetry import run_qualimetry
 
 
 def qualimetry_node(state: dict) -> dict:
-    """Run code duplication check. No LLM — deterministic pass/fail."""
+    """Run code duplication check. No LLM — deterministic pass/fail.
+
+    Skip entirely when fewer than 3 files changed — small diffs don't
+    warrant a full duplication scan.
+    """
+    changed = state.get("changed_files", [])
+    if len(changed) < 3:
+        message = AIMessage(content="[qualimetry] skipped — <3 files changed")
+        return {
+            "messages": [message],
+            "qualimetry_ok": True,
+            "qualimetry_report": "skipped: small diff",
+            "current_role": "qualimetry",
+            "retry_count": state.get("retry_count", 0),
+        }
+
     repo_root = os.environ.get("GITHUB_WORKSPACE", ".")
     report = run_qualimetry(repo_root)
 

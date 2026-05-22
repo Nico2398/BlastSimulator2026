@@ -108,5 +108,7 @@ def _build_context(state: dict) -> str:
         "- Commit nothing — the graph will commit after you finish.",
     ]
     lines.append(skill_hint(state.get("skill", "")))
+    if state.get("plan"):
+        lines.append("\n## Implementation Plan\n" + state["plan"])
     lines.append("\n## Issue Body\n" + state.get("issue_body", ""))
     return "\n".join(lines)
