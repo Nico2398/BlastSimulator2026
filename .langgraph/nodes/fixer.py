@@ -81,6 +81,15 @@ def _build_context(state: dict, _tool_names: list | None = None) -> str:
         state.get("test_output", "(no output captured)"),
     ]
     lines.append(skill_hint(state.get("skill", "")))
+    if state.get("diff_dir"):
+        lines.append(f"\n## Diff Directory\n{state['diff_dir']}")
+        lines.append("Read specific .patch files to see what changed recently.")
+    elif state.get("git_diff"):
+        # Fallback: short inline diff when diff_dir not available
+        diff = state["git_diff"]
+        if len(diff) > 2000:
+            diff = diff[:2000] + f"\n... ({len(diff) - 2000} chars omitted)"
+        lines.append("\n## Recent Changes (git diff)\n```\n" + diff + "\n```")
     return "\n".join(lines)
 
 

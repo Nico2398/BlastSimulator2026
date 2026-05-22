@@ -1,6 +1,14 @@
 """Conditional-edge routing functions for the BlastSimulator2026 pipeline.
 
 Imported by graph.py. Kept separate to stay under the 300-line file limit.
+
+Skip flags (set by orchestrate) control which optional nodes are bypassed:
+- skip_integration_tests  → unit_test_writer routes directly to implementer
+- skip_scenario_tests     → integration_test_writer routes directly to implementer
+- skip_code_review        → qualimetry routes directly to refactorer (or validator for fix-bug)
+- skip_qualimetry         → test_runner routes directly to code_review
+- skip_refactorer         → code_review routes directly to validator
+- skip_visual_tester      → validator routes directly to open_pr (default True)
 """
 
 from __future__ import annotations
@@ -16,32 +24,37 @@ def route_from_orchestrate(state: dict) -> str:
         return "reviewer"
     if pipeline == "investigate":
         return "implementer"
-    return "skeleton_writer"
+    # All coding pipelines go through planner first.
+    return "planner"
+
+
+def route_from_planner(state: dict) -> str:
+    """Route after planner: on success → skeleton_writer, on failure → retry/interrupt."""
+    if state.get("planner_ok", False):
+        return "skeleton_writer"
+    return "handle_interrupt" if state.get("retry_count", 0) >= MAX_RETRIES else "planner"
 
 
 def route_from_skeleton_writer(state: dict) -> str:
     if state.get("skeleton_writer_ok", False):
-        return "unit_test_writer"
+        return "test_fan_out"
     return "handle_interrupt" if state.get("retry_count", 0) >= MAX_RETRIES else "skeleton_writer"
 
 
-def route_from_unit_test_writer(state: dict) -> str:
-    if state.get("unit_test_writer_ok", False):
-        return "implementer" if state.get("skip_integration_tests") else "integration_test_writer"
-    return "handle_interrupt" if state.get("retry_count", 0) >= MAX_RETRIES else "unit_test_writer"
+def route_from_test_fan_in(state: dict) -> str:
+    """Route after all parallel test writers complete.
 
+    Checks all test writer success flags. If all pass → implementer.
+    If any fail → handle_interrupt or retry via test_fan_out.
+    """
+    unit_ok = state.get("unit_test_writer_ok", False)
+    integration_ok = state.get("integration_test_writer_ok", True)
+    scenario_ok = state.get("scenario_test_writer_ok", True)
+    all_ok = unit_ok and integration_ok and scenario_ok
 
-def route_from_integration_test_writer(state: dict) -> str:
-    if state.get("integration_test_writer_ok", False):
-        return "implementer" if state.get("skip_scenario_tests") else "scenario_test_writer"
-    retry = state.get("retry_count", 0)
-    return "handle_interrupt" if retry >= MAX_RETRIES else "integration_test_writer"
-
-
-def route_from_scenario_test_writer(state: dict) -> str:
-    if state.get("scenario_test_writer_ok", False):
+    if all_ok:
         return "implementer"
-    return "handle_interrupt" if state.get("retry_count", 0) >= MAX_RETRIES else "scenario_test_writer"
+    return "handle_interrupt" if state.get("retry_count", 0) >= MAX_RETRIES else "test_fan_out"
 
 
 def route_from_implementer(state: dict) -> str:
@@ -66,6 +79,9 @@ def route_from_conflict_resolver(state: dict) -> str:
 
 def route_from_test_runner(state: dict) -> str:
     if state.get("test_runner_ok", False):
+        # Skip qualimetry when flag set (e.g. config-only, i18n-only changes)
+        if state.get("skip_qualimetry"):
+            return _route_after_qualimetry(state)
         return "qualimetry"
     return "handle_interrupt" if state.get("retry_count", 0) >= MAX_RETRIES else "fixer"
 
@@ -78,16 +94,45 @@ def route_from_fixer(state: dict) -> str:
     return "test_runner"
 
 
+def _route_after_qualimetry(state: dict) -> str:
+    """Determine next step after qualimetry (or when qualimetry is skipped)."""
+    if state.get("skip_code_review"):
+        # Skip code_review too — route to refactorer or validator
+        return _route_after_code_review(state)
+    # Use fan-out review (specialized sub-reviewers + coordinator)
+    return "review_fan_out"
+
+
 def route_from_qualimetry(state: dict) -> str:
     if state.get("qualimetry_ok", False):
-        return "code_review"  # code review gate after qualimetry
+        return _route_after_qualimetry(state)
     return "handle_interrupt" if state.get("retry_count", 0) >= MAX_RETRIES else "implementer"
+
+
+def _route_after_code_review(state: dict) -> str:
+    """Determine next step after code_review (or when code_review is skipped)."""
+    if state.get("skip_refactorer"):
+        # fix-bug or config-only: skip refactorer, go straight to validator
+        return "validator"
+    # fix-bug skips refactorer (no integration/scenario tests to worry about)
+    if state.get("pipeline") == "fix-bug":
+        return "validator"
+    return "refactorer"
 
 
 def route_from_code_review(state: dict) -> str:
     if state.get("code_review_ok", False):
-        # fix-bug skips refactorer (no integration/scenario tests to worry about)
-        return "validator" if state.get("pipeline") == "fix-bug" else "refactorer"
+        return _route_after_code_review(state)
+    return "handle_interrupt" if state.get("retry_count", 0) >= MAX_RETRIES else "implementer"
+
+
+def route_from_review_fan_in(state: dict) -> str:
+    """Route after review coordinator merges sub-reviewer findings.
+
+    Same logic as route_from_code_review — the coordinator sets code_review_ok.
+    """
+    if state.get("code_review_ok", False):
+        return _route_after_code_review(state)
     return "handle_interrupt" if state.get("retry_count", 0) >= MAX_RETRIES else "implementer"
 
 
@@ -100,7 +145,9 @@ def route_from_refactorer(state: dict) -> str:
 
 def route_from_validator(state: dict) -> str:
     if state.get("validator_ok", False):
-        return "visual_tester" if state.get("pipeline") == "visual-change" else "open_pr"
+        if state.get("skip_visual_tester", True):
+            return "open_pr"
+        return "visual_tester"
     return "handle_interrupt" if state.get("retry_count", 0) >= MAX_RETRIES else "implementer"
 
 

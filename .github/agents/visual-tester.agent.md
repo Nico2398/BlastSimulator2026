@@ -1,38 +1,34 @@
 ---
 name: visual-tester
 description: >
-  Visual testing specialist: runs Puppeteer scenario tests, captures screenshots
-  and state dumps, inspects rendering output, and verifies visual correctness.
-  Use for any change that affects rendering, UI, or visual presentation.
+  Visual testing: Puppeteer scenario tests, screenshots, state dumps.
+  Use when change affects rendering, UI, or visual presentation.
 tools: ["read", "search", "execute"]
 ---
 
 # Visual Tester — Screenshot & Scenario Verification
 
-**Pipeline position:** 5/5 (Visual Test). Previous: @validator.
+Position: 5/5 (Visual Test). Prev: @validator.
 
-Run visual scenario tests, inspect screenshots, verify rendering correctness. **Only needed when change affects rendering, UI, or visual presentation.**
+Run visual scenario tests, inspect screenshots, verify rendering. **Only for rendering/UI/visual changes.**
 
 ## Environment Setup
 
 ```bash
-# 1. Start dev server (must be running for Puppeteer)
 npm run dev &
-
-# 2. Wait for server ready
 sleep 5
 ```
 
-Puppeteer executable: `/usr/bin/chromium`
+Puppeteer executable: `$env:PUPPETEER_EXECUTABLE_PATH` or `/usr/bin/chromium` (Linux CI).
 
 ## Running Scenario Tests
 
-### Predefined Scenarios
+### Predefined
 ```bash
 PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium npx tsx scripts/scenario-test.ts --scenario blast-basic
 ```
 
-### Custom Inline Scenarios
+### Custom
 ```bash
 PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium npx tsx scripts/scenario-test.ts --name my-test \
   --commands "new_game seed:42; drill_plan grid rows:2 cols:3 spacing:4 depth:6 start:15,15; charge hole:* explosive:boomite amount:5 stemming:2; sequence auto; blast"
@@ -45,14 +41,12 @@ bash scripts/visual-test.sh --name "terrain" --commands "new_game mine_type:dese
 
 ## Output
 
-Each scenario step produces:
+Per scenario step:
 - `screenshots/scenario-{name}/step-NN-cmd.png` — screenshot
-- `screenshots/scenario-{name}/step-NN-cmd.json` — game state + UI state
+- `screenshots/scenario-{name}/step-NN-cmd.json` — game + UI state
 - `screenshots/scenario-{name}/report.json` — summary
 
 ## What to Evaluate
-
-For each screenshot, check:
 
 ### Geometry
 - [ ] Expected meshes appear (terrain, buildings, vehicles, characters)
@@ -66,19 +60,19 @@ For each screenshot, check:
 
 ### State Coherence
 - [ ] JSON state dump matches visual presentation
-- [ ] Command output in JSON matches expected state changes
-- [ ] UI state (button visibility, panel states) is correct
+- [ ] Command output matches expected state changes
+- [ ] UI state (button visibility, panel states) correct
 
 ### Headless Chrome Limitations (NOT bugs)
-- Jagged edges on geometry (no MSAA in software rasterizer)
-- Slightly darker shadows than real browser
+- Jagged edges (no MSAA in software rasterizer)
+- Slightly darker shadows
 
 ## Before/After Comparison
 
-When fixing visual issue:
-1. Capture `--name "before-fix"` before change
-2. Capture `--name "after-fix"` after change
-3. Compare both → confirm no visual regression
+Fixing visual issue:
+1. Capture `--name "before-fix"`
+2. Capture `--name "after-fix"`
+3. Compare → confirm no regression
 
 ## UI Button Diagnostics
 
@@ -86,17 +80,15 @@ When fixing visual issue:
 PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium npx tsx scripts/ui-diagnostic.ts
 ```
 
-Tests all buttons, reports computed styles.
-
-## State Extraction Bridges
+## State Extraction
 
 Browser exposes:
 - `window.__gameState()` — full serialized game state
-- `window.__uiState()` — panel visibility, button states, pointer-events
+- `window.__uiState()` — panel visibility, button states
 
 ## Completion Criteria
 
-Never approve visual change unless:
+Never approve unless:
 - [ ] Screenshot confirms geometry visible + correct
 - [ ] State dumps confirm logical correctness
 - [ ] `npm run validate` passes

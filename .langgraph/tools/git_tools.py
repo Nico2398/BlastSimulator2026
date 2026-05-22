@@ -186,3 +186,141 @@ def git_continue_cherry_pick(message: str) -> str:
         # Fall back to a regular commit if --continue fails
         commit = repo.index.commit(message, author=_LANGGRAPH_ACTOR, committer=_LANGGRAPH_ACTOR)
         return f"cherry-pick resolved via commit: [{commit.hexsha[:12]}]"
+
+
+# ---------------------------------------------------------------------------
+# Diff helpers
+# ---------------------------------------------------------------------------
+
+
+def git_diff_since(ref: str) -> tuple[str, list[str]]:
+    """Return the diff and list of changed file paths since a given ref.
+
+    Args:
+        ref: Commit SHA or branch to diff against (e.g. skeleton_commit_sha).
+
+    Returns:
+        (diff_text, changed_files) — diff_text is the full unified diff,
+        changed_files is a list of file paths modified/added/deleted.
+    """
+    repo = _repo()
+    try:
+        diff_text = repo.git.diff(ref, "--", no_color=True)
+        # Parse changed files from the diff
+        diff_names = repo.git.diff(ref, "--name-only").strip()
+        changed_files = [f for f in diff_names.splitlines() if f] if diff_names else []
+        return diff_text, changed_files
+    except git.GitCommandError as exc:
+        return f"error computing diff: {exc}", []
+
+
+def git_write_diff_to_file(ref: str, dest_dir: str = ".langgraph/diffs") -> tuple[str, list[str]]:
+    """Write per-file patches to disk and return (diff_dir, changed_files).
+
+    Instead of embedding the full diff in agent prompts (token waste),
+    write each changed file's patch to a separate file in dest_dir.
+    Agents read only the patches they need via read_file tool.
+
+    Also writes a shared summary file with file list and stats.
+
+    Noise files (lock files, vendored deps, generated assets) are excluded
+    from patches — agents never see them.
+
+    Returns:
+        (diff_dir_path, changed_files) — absolute path to diff directory,
+        list of changed file paths (noise files excluded).
+    """
+    import re
+
+    diff_text, changed_files = git_diff_since(ref)
+    if not diff_text or diff_text.startswith("error"):
+        return "", changed_files
+
+    diff_dir = Path(_REPO_ROOT) / dest_dir
+    diff_dir.mkdir(parents=True, exist_ok=True)
+
+    # --- Noise filtering: skip files that don't need review ---
+    _NOISE_PATTERNS = [
+        # Lock files
+        "bun.lock", "package-lock.json", "yarn.lock", "pnpm-lock.yaml",
+        "Cargo.lock", "go.sum", "poetry.lock", "Pipfile.lock", "flake.lock",
+        # Vendored / generated
+        "node_modules/", "vendor/", ".venv/",
+        # Minified / bundled assets
+        ".min.js", ".min.css", ".bundle.js", ".map",
+        # Generated files (unless they're DB migrations)
+        ".generated.", ".auto.",
+    ]
+    _NOISE_EXTENSIONS = {".lock", ".min.js", ".min.css", ".map", ".svg", ".ico"}
+
+    def _is_noise(filepath: str) -> bool:
+        """Return True if the file should be excluded from review."""
+        lower = filepath.lower()
+        # Check extension
+        if any(lower.endswith(ext) for ext in _NOISE_EXTENSIONS):
+            return True
+        # Check known noise patterns
+        if any(pat.lower() in lower for pat in _NOISE_PATTERNS):
+            return True
+        # DB migrations are never noise even if "generated"
+        if "migration" in lower:
+            return False
+        return False
+
+    # Split unified diff into per-file patches.
+    # A new file's diff starts with "diff --git a/..." at the beginning of a line.
+    file_patches: dict[str, str] = {}
+    current_file: str | None = None
+    current_lines: list[str] = []
+
+    for line in diff_text.splitlines():
+        if line.startswith("diff --git "):
+            # Flush previous file
+            if current_file and current_lines:
+                file_patches[current_file] = "\n".join(current_lines)
+            # Extract file path from "diff --git a/path b/path"
+            match = re.match(r"diff --git a/(.+?) b/(.+)", line)
+            current_file = match.group(2) if match else "unknown"
+            current_lines = [line]
+        else:
+            current_lines.append(line)
+
+    # Flush last file
+    if current_file and current_lines:
+        file_patches[current_file] = "\n".join(current_lines)
+
+    # Filter out noise files
+    filtered_files = [f for f in changed_files if not _is_noise(f)]
+    filtered_patches = {f: p for f, p in file_patches.items() if not _is_noise(f)}
+
+    # Write each patch to a file (slug the path for safety)
+    for filepath, patch in filtered_patches.items():
+        safe_name = filepath.replace("/", "__").replace("\\", "__")
+        (diff_dir / f"{safe_name}.patch").write_text(patch, encoding="utf-8")
+
+    # Write shared summary
+    summary_lines = [
+        f"Diff vs {ref}",
+        f"Files changed: {len(filtered_files)} ({len(changed_files) - len(filtered_files)} noise files excluded)",
+        "",
+        "## Changed Files",
+    ]
+    for f in filtered_files:
+        patch_lines = filtered_patches.get(f, "")
+        added = sum(1 for l in patch_lines.splitlines() if l.startswith("+") and not l.startswith("+++"))
+        removed = sum(1 for l in patch_lines.splitlines() if l.startswith("-") and not l.startswith("---"))
+        summary_lines.append(f"  {f} (+{added}/-{removed})")
+
+    summary_lines.extend([
+        "",
+        "## Patch Files",
+        "Each changed file has a .patch file in this directory.",
+        "Use read_file to read specific patches instead of the full diff.",
+    ])
+    for f in filtered_files:
+        safe_name = f.replace("/", "__").replace("\\", "__")
+        summary_lines.append(f"  {safe_name}.patch → {f}")
+
+    (diff_dir / "SUMMARY.md").write_text("\n".join(summary_lines), encoding="utf-8")
+
+    return str(diff_dir), filtered_files

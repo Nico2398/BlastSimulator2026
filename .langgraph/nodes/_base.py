@@ -88,6 +88,21 @@ REVIEW_TOOLS = CODING_TOOLS + _GH_WRITE_TOOLS
 GITHUB_WRITE_TOOLS = _GH_WRITE_TOOLS
 
 # ---------------------------------------------------------------------------
+# Caveman micro preamble — token efficiency for all agent outputs
+# Based on https://github.com/kuba-guzik/caveman-micro (85 tokens, 14-21% savings)
+# ---------------------------------------------------------------------------
+
+_CAVEMAN_PREAMBLE = """
+Respond like smart caveman. Cut all filler, keep technical substance.
+- Drop articles (a, an, the), filler (just, really, basically, actually).
+- Drop pleasantries (sure, certainly, happy to).
+- No hedging. Fragments fine. Short synonyms.
+- Technical terms stay exact. Code blocks unchanged.
+- Pattern: [thing] [action] [reason]. [next step].
+- End with `## RESULT: OK` or `## RESULT: FAIL` on its own line.
+"""
+
+# ---------------------------------------------------------------------------
 # TODO usage reminder injected into every agent system prompt
 # ---------------------------------------------------------------------------
 
@@ -115,7 +130,7 @@ def load_agent_prompt(role: str) -> str:
 def build_react_agent(role: str, tools: list, llm, extra_context: str = ""):
     """Build a LangGraph ReAct agent for a given role."""
     from langgraph.prebuilt import create_react_agent as lg_react_agent
-    system_prompt = load_agent_prompt(role) + _TODO_REMINDER
+    system_prompt = _CAVEMAN_PREAMBLE + load_agent_prompt(role) + _TODO_REMINDER
     if extra_context:
         system_prompt = system_prompt + "\n\n## Additional Context\n" + extra_context
     return lg_react_agent(llm, tools, prompt=system_prompt).with_config(
@@ -137,6 +152,10 @@ def extract_message_content(message: Any) -> str:
 def extract_ok(agent_result: dict, *, allow_expected_failures: bool = False) -> bool:
     """Determine if the agent run succeeded by inspecting final messages.
 
+    Priority:
+    1. Explicit `## RESULT: OK` / `## RESULT: FAIL` marker in last message.
+    2. Heuristic fallback (string matching) for agents that don't use markers.
+
     Args:
         agent_result: The dict returned by agent.invoke().
         allow_expected_failures: When True (Red phase test writers), treat
@@ -147,10 +166,15 @@ def extract_ok(agent_result: dict, *, allow_expected_failures: bool = False) -> 
         return False
     content = extract_message_content(messages[-1])
     cl = content.lower()
+
+    # 1. Explicit marker — highest confidence
+    if "## result: ok" in cl:
+        return True
+    if "## result: fail" in cl:
+        return False
+
+    # 2. Heuristic fallback
     if allow_expected_failures and ("as expected" in cl or "failing" in cl):
-        # Red phase: tests intentionally fail — don't treat that as a pipeline failure.
-        # Note: do NOT include "error:" here — test output routinely contains
-        # "Error: not implemented" which is exactly the expected Red phase output.
         hard_fails = ["validation failed", "cannot write", "permission denied", "blocked"]
         return not any(sig in cl for sig in hard_fails)
     fail_signals = ["validation failed", "tests fail", "error:", "cannot", "blocked"]
