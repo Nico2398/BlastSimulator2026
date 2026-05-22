@@ -60,7 +60,7 @@ from nodes.conflict_resolver import conflict_resolver
 from nodes.test_runner import test_runner
 from nodes.fixer import fixer
 from nodes.code_review import code_review
-from nodes.review_fan_out import review_fan_out, security_reviewer, quality_reviewer, i18n_reviewer
+from nodes.review_fan_out import review_fan_out, route_from_review_fan_out, security_reviewer, quality_reviewer, i18n_reviewer
 from nodes.review_fan_in import review_fan_in
 from nodes.open_pr import open_pr
 from routing import (
@@ -196,9 +196,11 @@ def build_graph():
         ("orchestrate", orchestrate),
         ("planner", planner),
         ("skeleton_writer", skeleton_writer),
+        ("test_fan_out", test_fan_out),
         ("unit_test_writer", unit_test_writer),
         ("integration_test_writer", integration_test_writer),
         ("scenario_test_writer", scenario_test_writer),
+        ("test_fan_in", test_fan_in),
         ("implementer", implementer),
         ("cherry_pick", cherry_pick),
         ("conflict_resolver", conflict_resolver),
@@ -288,7 +290,7 @@ def build_graph():
         "handle_interrupt": "handle_interrupt",
     })
     # Review fan-out: dispatches to specialized sub-reviewers in parallel.
-    builder.add_conditional_edges("review_fan_out", review_fan_out, ["security_reviewer", "quality_reviewer", "i18n_reviewer"])
+    builder.add_conditional_edges("review_fan_out", route_from_review_fan_out, ["security_reviewer", "quality_reviewer", "i18n_reviewer"])
     # Each sub-reviewer routes to review_fan_in on completion.
     builder.add_edge("security_reviewer", "review_fan_in")
     builder.add_edge("quality_reviewer", "review_fan_in")

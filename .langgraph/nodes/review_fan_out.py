@@ -24,18 +24,25 @@ from nodes._base import READ_ONLY_TOOLS, build_fresh_messages, build_react_agent
 from llm import build_llm
 
 
-def review_fan_out(state: dict) -> list[Send]:
+def review_fan_out(state: dict) -> dict:
+    """Node function — pass-through router. Returns empty dict (no state change).
+
+    The actual fan-out logic is in route_from_review_fan_out, used as the
+    conditional-edge function from this node.
+    """
+    return {}
+
+
+def route_from_review_fan_out(state: dict) -> list[Send]:
     """Dispatch specialized sub-reviewers based on risk tier.
 
     Returns a list of Send objects targeting the sub-reviewer nodes.
     """
     risk_tier = state.get("risk_tier", "full")
-
-    # Build shared context for all sub-reviewers
     reviewers = _select_reviewers(risk_tier)
 
     sends = []
-    for reviewer_name, reviewer_fn in reviewers:
+    for reviewer_name, _ in reviewers:
         sends.append(Send(reviewer_name, state))
 
     return sends
