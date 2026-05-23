@@ -24,7 +24,12 @@ from nodes._base import READ_ONLY_TOOLS, build_fresh_messages, build_react_agent
 from llm import build_llm
 
 
-def review_fan_out(state: dict) -> list[Send]:
+def review_fan_out(state: dict) -> dict:
+    """Fan-out node: no-op, returns empty dict. Routing is done via route_from_review_fan_out."""
+    return {}
+
+
+def route_from_review_fan_out(state: dict) -> list[Send]:
     """Dispatch specialized sub-reviewers based on risk tier.
 
     Returns a list of Send objects targeting the sub-reviewer nodes.
