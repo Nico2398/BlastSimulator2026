@@ -10,7 +10,7 @@ function makeFloorGrid(): VoxelGrid {
   // Solid floor at Y=0
   for (let x = 0; x < 20; x++) {
     for (let z = 0; z < 20; z++) {
-      grid.setVoxel(x, 0, z, { rockId: 'cruite', density: 1.0, oreDensities: {}, fractureModifier: 1.0 });
+      grid.setVoxel(x, 0, z, { composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] }, density: 1.0, oreDensities: {}, fractureModifier: 1.0 });
     }
   }
   return grid;
@@ -68,7 +68,7 @@ describe('FragmentBody (8.3)', () => {
 
     const results = fb.getResults();
     expect(results).toHaveLength(1);
-    // Fragment should be near the floor (y≈1.5 = floor y=0 + half-voxel 0.5 + fragment half 0.5)
+    // Fragment should be near the floor (yâ‰ˆ1.5 = floor y=0 + half-voxel 0.5 + fragment half 0.5)
     expect(results[0]!.finalPosition.y).toBeGreaterThan(0.5);
     expect(results[0]!.finalPosition.y).toBeLessThan(5.0);
 

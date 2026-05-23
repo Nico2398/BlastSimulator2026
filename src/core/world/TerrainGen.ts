@@ -48,7 +48,7 @@ export function generateTerrain(config: TerrainConfig): VoxelGrid {
 
         const composition = computeComposition(x, y, z, rocks, noise3dRock);
         const dominantRockId = getDominantRockId(composition);
-        const dominantRock = dominantRockId ? rocks.find(r => r.id === dominantRockId) : undefined;
+        void dominantRockId;
         const inBorder = isInBorderZone(x, z, sizeX, sizeZ, preset.borderWidth);
         const oreDensities = inBorder
           ? {}

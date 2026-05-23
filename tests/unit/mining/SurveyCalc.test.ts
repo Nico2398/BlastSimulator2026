@@ -229,7 +229,7 @@ function makeOreGrid(): VoxelGrid {
   const grid = new VoxelGrid(11, 11, 11);
   for (let y = 2; y <= 8; y++) {
     grid.setVoxel(5, y, 5, {
-      rockId: 'granite',
+      composition: { rocks: [{ rockId: 'granite', coefficient: 1.0 }] },
       density: 1,
       oreDensities: { gold: 0.5 },
       fractureModifier: 1.0,
@@ -248,7 +248,7 @@ function makeFilledOreGrid(): VoxelGrid {
     for (let z = 0; z < 11; z++) {
       for (let y = 2; y <= 8; y++) {
         grid.setVoxel(x, y, z, {
-          rockId: 'granite',
+          composition: { rocks: [{ rockId: 'granite', coefficient: 1.0 }] },
           density: 1,
           oreDensities: { gold: 0.5 },
           fractureModifier: 1.0,
@@ -269,7 +269,7 @@ function makeAerialGrid(): VoxelGrid {
   for (let x = 0; x < 101; x++) {
     for (let z = 0; z < 101; z++) {
       grid.setVoxel(x, 5, z, {
-        rockId: 'granite',
+        composition: { rocks: [{ rockId: 'granite', coefficient: 1.0 }] },
         density: 1,
         oreDensities: { copper: 0.4 },
         fractureModifier: 1.0,
@@ -427,7 +427,7 @@ describe('SurveyCalc — estimateSurveyResult', () => {
     const grid = new VoxelGrid(11, 11, 11);
     for (let y = 0; y < 11; y++) {
       grid.setVoxel(5, y, 5, {
-        rockId: 'granite',
+        composition: { rocks: [{ rockId: 'granite', coefficient: 1.0 }] },
         density: 1,
         oreDensities: { gold: 0.5 },
         fractureModifier: 1.0,
@@ -447,7 +447,7 @@ describe('SurveyCalc — estimateSurveyResult', () => {
     const grid = new VoxelGrid(11, 11, 11);
     for (let y = 0; y < 11; y++) {
       grid.setVoxel(5, y, 5, {
-        rockId: 'granite',
+        composition: { rocks: [{ rockId: 'granite', coefficient: 1.0 }] },
         density: 1,
         oreDensities: { gold: 0.6 },
         fractureModifier: 1.0,
@@ -497,7 +497,7 @@ describe('SurveyCalc — estimateSurveyResult', () => {
     // The 'silver' ore key must therefore appear in estimates['50,50'].
     const grid = new VoxelGrid(101, 10, 101);
     grid.setVoxel(50, 7, 50, {
-      rockId: 'basalt',
+      composition: { rocks: [{ rockId: 'basalt', coefficient: 1.0 }] },
       density: 1,
       oreDensities: { silver: 0.35 },
       fractureModifier: 1.0,
