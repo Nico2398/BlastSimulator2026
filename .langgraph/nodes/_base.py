@@ -238,6 +238,11 @@ def invoke_agent(agent, messages: list | dict, timeout_s: int = _AGENT_TIMEOUT_S
             ]
         }
     if error[0] is not None:
-        raise error[0]
+        from langchain_core.messages import AIMessage
+        return {
+            "messages": [
+                AIMessage(content=f"error: agent invocation failed - {error[0]}")
+            ]
+        }
     assert result[0] is not None, "Worker exited without result or error"
     return result[0]

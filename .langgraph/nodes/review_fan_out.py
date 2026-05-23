@@ -24,16 +24,7 @@ from nodes._base import READ_ONLY_TOOLS, build_fresh_messages, build_react_agent
 from llm import build_llm
 
 
-def review_fan_out(state: dict) -> dict:
-    """Node function — pass-through router. Returns empty dict (no state change).
-
-    The actual fan-out logic is in route_from_review_fan_out, used as the
-    conditional-edge function from this node.
-    """
-    return {}
-
-
-def route_from_review_fan_out(state: dict) -> list[Send]:
+def review_fan_out(state: dict) -> list[Send]:
     """Dispatch specialized sub-reviewers based on risk tier.
 
     Returns a list of Send objects targeting the sub-reviewer nodes.
@@ -110,7 +101,6 @@ def security_reviewer(state: dict) -> dict:
         "messages": messages,
         "security_review_ok": ok,
         "security_review_report": content,
-        "current_role": "security-reviewer",
     }
 
 
@@ -135,7 +125,6 @@ def quality_reviewer(state: dict) -> dict:
         "messages": messages,
         "quality_review_ok": ok,
         "quality_review_report": content,
-        "current_role": "quality-reviewer",
     }
 
 
@@ -160,5 +149,4 @@ def i18n_reviewer(state: dict) -> dict:
         "messages": messages,
         "i18n_review_ok": ok,
         "i18n_review_report": content,
-        "current_role": "i18n-reviewer",
     }
