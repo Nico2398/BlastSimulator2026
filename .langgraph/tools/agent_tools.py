@@ -68,7 +68,7 @@ def get_agent_context(agent_name: str) -> str:
         return err
     path = f"{_REPO_ROOT}/.github/agents/{agent_name}.agent.md"
     try:
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             return f.read()
     except FileNotFoundError:
         return (
@@ -77,39 +77,30 @@ def get_agent_context(agent_name: str) -> str:
         )
 
 
-# ---------------------------------------------------------------------------
-# Skill tools
-# ---------------------------------------------------------------------------
+def list_skills(agent_name: str = "") -> str:
+    """List available skill files in .github/skills/.
 
-
-def list_skills() -> str:
-    """List available skill names from .github/skills/.
+    Args:
+        agent_name: Optional agent name to filter by (skills may be tagged).
 
     Returns:
-        One skill name per line.
-        Returns 'no skills found' if the directory is empty or missing.
+        Newline-separated list of skill names, or all skills if no filter.
     """
-    skills_dir = f"{_REPO_ROOT}/.github/skills"
-    try:
-        dirs = sorted(
-            d for d in os.listdir(skills_dir)
-            if os.path.isdir(os.path.join(skills_dir, d))
-        )
-    except FileNotFoundError:
-        return "no skills found"
-    return "\n".join(dirs) if dirs else "no skills found"
+    skills_dir = Path(f"{_REPO_ROOT}/.github/skills")
+    if not skills_dir.is_dir():
+        return "error: .github/skills/ directory not found"
+    all_skills = sorted(s.name for s in skills_dir.iterdir() if s.is_dir())
+    if not agent_name:
+        return "\n".join(all_skills)
+    tagged = [s for s in all_skills if _skill_tagged_for_agent(s, agent_name)]
+    return "\n".join(tagged) if tagged else f"no skills tagged for '{agent_name}'"
 
 
 def get_skill_context(skill_name: str) -> str:
-    """Return the full specification for a domain skill.
-
-    Use this to load domain-specific context before working on a feature.
-    The orchestrator may include a relevant skill name in the subagent task;
-    the subagent should call this after loading its role context.
+    """Read the full content of a skill's SKILL.md file.
 
     Args:
-        skill_name: Skill name, e.g. 'blast-system', 'navmesh', 'buildings'.
-                    Call list_skills() to see all available skill names.
+        skill_name: Name of the skill directory under .github/skills/.
 
     Returns:
         Full markdown content of .github/skills/{skill_name}/SKILL.md.
@@ -120,7 +111,7 @@ def get_skill_context(skill_name: str) -> str:
         return err
     path = f"{_REPO_ROOT}/.github/skills/{skill_name}/SKILL.md"
     try:
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             return f.read()
     except FileNotFoundError:
         return (
