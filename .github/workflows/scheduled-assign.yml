@@ -3,24 +3,18 @@ name: "Pipeline: scheduled kickstart"
 on:
   workflow_dispatch:  # manual trigger only
 
-permissions: {}
+permissions:
+  issues: write
+  actions: write
 
 jobs:
   kickstart:
     runs-on: ubuntu-latest
     steps:
-      - name: Check PAT_TOKEN_COPILOT_AUTOMATION is configured
-        env:
-          TOKEN: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
-        run: |
-          if [ -z "$TOKEN" ]; then
-            echo "::error::PAT_TOKEN_COPILOT_AUTOMATION secret is not set. Add it in Settings → Secrets → Actions."
-            exit 1
-          fi
       - name: Check for idle ready issues
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const owner = context.repo.owner;
             const repo = context.repo.repo;
@@ -66,7 +60,7 @@ jobs:
                 }
               }
 
-              console.log(`Kickstarting pipeline with issue #${issue.number}`);
+              console.log(`Kickstarting LangGraph pipeline with issue #${issue.number}`);
 
               await github.rest.issues.removeLabel({
                 owner, repo,
@@ -79,23 +73,26 @@ jobs:
                 labels: ['in-progress']
               });
 
-              // Assign Copilot coding agent to the issue
-              await github.request('POST /repos/{owner}/{repo}/issues/{issue_number}/assignees', {
+              // Acknowledge on the issue
+              await github.rest.issues.createComment({
                 owner, repo,
                 issue_number: issue.number,
-                assignees: ['copilot-swe-agent[bot]'],
-                agent_assignment: {
-                  target_repo: `${owner}/${repo}`,
-                  base_branch: 'main',
-                  custom_instructions: '',
-                  custom_agent: '',
-                  model: ''
-                },
-                headers: { 'X-GitHub-Api-Version': '2022-11-28' }
+                body: `🤖 LangGraph agent picking this up via scheduled kickstart…`
               });
-              console.log(`Issue #${issue.number} assigned to Copilot coding agent.`);
 
-              return; // Only assign one at a time
+              // Dispatch the LangGraph pipeline workflow
+              await github.rest.actions.createWorkflowDispatch({
+                owner, repo,
+                workflow_id: 'langgraph-agent.yml',
+                ref: 'main',
+                inputs: {
+                  issue_number: String(issue.number),
+                  comment_body: 'scheduled kickstart'
+                }
+              });
+              console.log(`LangGraph pipeline dispatched for issue #${issue.number}.`);
+
+              return; // Only start one at a time
             }
 
             console.log('No assignable ready issues (all have unmet dependencies). Pipeline idle.');

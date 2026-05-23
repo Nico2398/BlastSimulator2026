@@ -3,11 +3,9 @@ name: "Pipeline: handle agent failure"
 on:
   issues:
     types: [labeled]
-  workflow_run:
-    workflows: ["CI"]
-    types: [completed]
 
-permissions: {}
+permissions:
+  issues: write
 
 jobs:
   notify:
@@ -17,86 +15,20 @@ jobs:
       - name: Comment and notify
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.payload.issue.number,
               body: [
-                '🚨 **Pipeline paused — agent blocked on this issue.**',
+                '🚨 **Pipeline paused — LangGraph agent blocked on this issue.**',
                 '',
                 '@Nico2398 — please review:',
                 '1. The PR and agent session logs',
                 '2. Add clarification to this issue',
-                '3. Remove `blocked`, add `ready`, and re-assign to `copilot` to resume',
+                '3. Remove `blocked`, add `ready`, and trigger the kickstart workflow to resume',
                 '',
                 'Or complete the task manually and the pipeline will auto-continue on merge.'
               ].join('\n')
             });
-
-  ci-failure-fix:
-    name: Re-engage Copilot on CI failure
-    if: |
-      github.event_name == 'workflow_run' &&
-      github.event.workflow_run.conclusion == 'failure' &&
-      github.event.workflow_run.head_branch != 'main'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Comment on PR to trigger Copilot fix
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
-          script: |
-            const owner = context.repo.owner;
-            const repo = context.repo.repo;
-            const prs = context.payload.workflow_run.pull_requests;
-
-            if (!prs || prs.length === 0) {
-              console.log('No PRs associated with this failed CI run.');
-              return;
-            }
-
-            const prNumber = prs[0].number;
-            const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: prNumber });
-
-            const expectedAuthors = ['copilot[bot]', 'github-copilot[bot]', 'Copilot'];
-            if (!expectedAuthors.includes(pr.user.login)) {
-              console.log(`PR #${prNumber} not by Copilot (author: ${pr.user.login}), skipping.`);
-              return;
-            }
-            if (!pr.head.ref.startsWith('copilot/')) {
-              console.log(`Branch ${pr.head.ref} is not a Copilot branch, skipping.`);
-              return;
-            }
-            if (pr.merged || pr.state === 'closed') {
-              console.log(`PR #${prNumber} already merged/closed, skipping.`);
-              return;
-            }
-
-            // Guard: skip if the Copilot agent session is still running.
-            // Posting a new @copilot comment while a session is active would spawn
-            // a second concurrent session — the running one will observe CI itself.
-            const COPILOT_SWE_APP_ID = 1143301;
-            const { data: checksData } = await github.rest.checks.listForRef({
-              owner, repo,
-              ref: context.payload.workflow_run.head_sha,
-              app_id: COPILOT_SWE_APP_ID,
-              per_page: 100
-            });
-            const activeStatuses = new Set(['queued', 'in_progress', 'waiting', 'requested']);
-            const agentStillRunning = checksData.check_runs.some(run =>
-              activeStatuses.has(run.status)
-            );
-            if (agentStillRunning) {
-              console.log(`Copilot agent session still active on PR #${prNumber}. Skipping — the running session will handle CI.`);
-              return;
-            }
-
-            const runUrl = context.payload.workflow_run.html_url;
-            await github.rest.issues.createComment({
-              owner, repo,
-              issue_number: prNumber,
-              body: `@copilot CI is failing on this PR. Please investigate the failure and push a fix: ${runUrl}`
-            });
-            console.log(`Posted CI failure comment on PR #${prNumber}`);

@@ -1,32 +1,28 @@
 ---
 name: autonomous-pipeline
 description: >
-  Guide for the fully autonomous AI development pipeline using GitHub Copilot: repository settings,
-  automation workflows, code review strategy, issue management, budget, and troubleshooting.
+  Guide for the fully autonomous AI development pipeline using LangGraph: repository settings,
+  automation workflows, code review strategy, issue management, and troubleshooting.
   Use when setting up, debugging, or modifying the CI/CD automation pipeline.
 ---
 
 ## Pipeline Flow
 
-`ready` label → **auto-assign-next.yml** assigns issue to @copilot → coding agent reads instructions + runs CI + opens PR → **Copilot code review**: pass → auto-approve + squash-merge + close issue + assign next `ready`; fail → comment `@copilot fix X` or label `blocked` → human review.
+`ready` label → **scheduled-assign.yml** (manual) or **auto-assign-next.yml** (PR merge) dispatches **langgraph-agent.yml** → LangGraph agent runs TDD pipeline (plan → tests → implement → review → PR) → PR merged → next `ready` issue auto-assigned.
 
 ## Repository Settings (One-Time Setup)
 
-1. **Enable Copilot Coding Agent:** Settings → Copilot → Coding agent → Enable
-2. **Disable CI Approval Requirement:** Settings → Copilot → Coding agent → Actions workflow approval → Disable "Require approval"
-3. **Enable Auto-Merge:** Settings → General → Pull Requests → Allow auto-merge
-4. **Enable Copilot Code Review:** Settings → Copilot → Code review → Enable + ruleset requiring Copilot review on `main`
-5. **Workflow Permissions:** Settings → Actions → General → Read and write + Allow create/approve PRs
-6. **PAT Token:** Fine-grained PAT with Issues, Pull requests, Contents permissions → store as `PAT_TOKEN_COPILOT_AUTOMATION` secret
+1. **Workflow Permissions:** Settings → Actions → General → Read and write + Allow create/approve PRs
+2. **Enable Auto-Merge:** Settings → General → Pull Requests → Allow auto-merge
 
 ## Automation Workflows
 
 | Workflow | File | Trigger | Purpose |
 |----------|------|---------|---------|
-| Auto-assign next | `auto-assign-next.yml` | PR closed (merged) | Close done issue, assign next `ready` issue to Copilot |
-| Auto-merge | `auto-merge-copilot.yml` | CI completed **or** Copilot agent check run completed **or** PR comment created **or** manual dispatch | Auto-approve + squash-merge passing Copilot PRs |
+| Auto-assign next | `auto-assign-next.yml` | PR closed (merged) | Close done issue, dispatch LangGraph for next `ready` issue |
 | Handle failure | `handle-failure.yml` | Issue labeled `blocked` | Comment + notify maintainer |
-| Manual kickstart | `scheduled-assign.yml` | Manual dispatch only | Kick off pipeline manually |
+| Manual kickstart | `scheduled-assign.yml` | Manual dispatch only | Kick off LangGraph pipeline manually |
+| LangGraph agent | `langgraph-agent.yml` | Issue comment (`@langgraph`) or workflow dispatch | Run the autonomous TDD pipeline |
 | CI | `ci.yml` | Push / PR | Standard CI checks |
 | Setup steps | `copilot-setup-steps.yml` | Agent session | Pre-install dependencies for agent |
 
@@ -52,25 +48,6 @@ Review flow:
 
 `APPROVED` comment is session termination signal. Nothing must follow it.
 
-### Merge Loop (closed-loop, fully autonomous)
-
-```
-Agent posts APPROVED comment
-  → issue_comment:created fires immediately (most reliable path)
-  → auto-merge-copilot.yml wakes up
-  → verifies CI green + no agent running → squash-merge
-
-Fallback paths (if issue_comment trigger misses):
-  → check_run:completed fires when agent session ends (app 1143301)
-  → workflow_run:completed fires when CI passes (defers if agent still running)
-  → workflow_dispatch: maintainer triggers manually from Actions tab
-```
-
-**Agent-still-running guard** runs on ALL paths (including draft PRs) to prevent the review
-request from firing while the implementation session is still active.
-
-Review is only requested AFTER the agent session ends — not on the first CI pass.
-
 ## Writing Good Issues
 
 As **Customer**: Write "what" + "why"
@@ -78,27 +55,15 @@ As **Lead Developer**: Write "how" + testing commands
 
 Better issues → more autonomous pipeline. Use agent-task template.
 
-## Budget (Copilot Pro $10/mo)
-
-- ~100-150 tasks/month with 300 premium requests
-- Public repos: unlimited Actions minutes
-- Extra requests: $0.04 each
-
 ## Security Notes
 
 - CI auto-approval means unreviewed code runs Actions. Scope secrets tightly.
-- Auto-merge safety net = required Copilot code review
 - Use fine-grained PAT scoped to this repo only
-- Coding agent only pushes to `copilot/*` branches
 
 ## Troubleshooting
 
 | Problem | Solution |
 |---------|----------|
-| Agent doesn't pick up issue | Verify coding agent enabled, issue assigned to `copilot`, check quota |
-| CI requires manual approval | Disable "Require approval" in Copilot settings |
-| Auto-merge doesn't fire | Enable auto-merge in settings, verify PAT has `contents: write`; use `workflow_dispatch` as escape hatch |
-| Review comment posted too early | Guard in workflow prevents this — review is only requested after agent session ends (agent-still-running check runs before draft block) |
 | Pipeline stalls | Manually trigger scheduled-assign.yml from Actions tab |
 | Agent keeps failing | Label `blocked`, review logs, add context, consider splitting task |
 | PR doesn't reference issue | Ensure instructions stress "Closes #<number>" in PR body |
