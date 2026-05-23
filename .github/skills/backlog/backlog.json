@@ -762,7 +762,7 @@
       "src/core/terrain/TerrainGen.ts"
     ],
     "testFile": "tests/unit/voxels/VoxelGrid.test.ts",
-    "status": "pending",
+    "status": "done",
     "blockedBy": [],
     "closedInPR": null
   },
