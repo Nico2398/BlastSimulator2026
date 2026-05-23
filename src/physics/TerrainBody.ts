@@ -5,13 +5,10 @@
 // smooth terrain), but it correctly handles craters and blast modifications.
 // Must be rebuilt after each blast (terrain changes).
 
-import type { VoxelGrid } from '../core/world/VoxelGrid.js';
+import { VoxelGrid } from '../core/world/VoxelGrid.js';
 import type { PhysicsWorld, PhysicsBodyId } from './PhysicsWorld.js';
 
 // ── Config ──
-
-/** Voxel size in meters. Must match VOXEL_SIZE in BlastExecution. */
-const VOXEL_SIZE = 1.0;
 
 /**
  * Number of surface layers to include in the collision body.
@@ -50,10 +47,10 @@ export class TerrainBody {
           const voxel = grid.getVoxel(x, y, z);
           if (!voxel || voxel.density <= 0) continue;
 
-          const half = VOXEL_SIZE / 2;
-          const cx = x * VOXEL_SIZE + half;
-          const cy = y * VOXEL_SIZE + half;
-          const cz = z * VOXEL_SIZE + half;
+          const half = VoxelGrid.CELL_SIZE / 2;
+          const cx = x * VoxelGrid.CELL_SIZE + half;
+          const cy = y * VoxelGrid.CELL_SIZE + half;
+          const cz = z * VoxelGrid.CELL_SIZE + half;
 
           const handle = this.world.addBody(
             'box',

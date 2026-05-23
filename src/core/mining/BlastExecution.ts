@@ -19,15 +19,13 @@ import {
 } from './BlastCalc.js';
 import { getRock } from '../world/RockCatalog.js';
 import { getOre } from '../world/OreCatalog.js';
-import { getDominantRockId, type VoxelGrid, type VoxelData } from '../world/VoxelGrid.js';
+import { getDominantRockId, VoxelGrid, type VoxelData } from '../world/VoxelGrid.js';
 import { getBuildingDef, destroyBuilding, type BuildingState, type Building, type BuildingType } from '../entities/Building.js';
 
 // ── Config ──
 
 /** Blast zone radius around each hole (voxels). */
 const BLAST_ZONE_RADIUS = 5;
-/** Default voxel size in meters. */
-const VOXEL_SIZE = 1.0;
 /** Default ground factor for vibration. */
 const DEFAULT_GROUND_FACTOR = 1.0;
 
@@ -168,7 +166,7 @@ export function executeBlast(
         const frag = calculateFragmentation(energy, threshold);
 
         if (frag.result === 'fractured') {
-          const voxelVolume = VOXEL_SIZE * VOXEL_SIZE * VOXEL_SIZE;
+          const voxelVolume = VoxelGrid.CELL_SIZE * VoxelGrid.CELL_SIZE * VoxelGrid.CELL_SIZE;
           const fragCount = calculateFragmentCount(voxelVolume, frag.fragmentSizeFraction);
           const mass = (rock.density * voxelVolume) / fragCount;
 
@@ -194,7 +192,7 @@ export function executeBlast(
           }
 
           // Accumulate ore value
-          totalOreValue += calculateOreValue(voxel, VOXEL_SIZE);
+          totalOreValue += calculateOreValue(voxel, VoxelGrid.CELL_SIZE);
           totalRockVolume += voxelVolume;
 
           // Check oversized: fragment size > 0.8 voxel is "oversized" (barely fractured, needs secondary blast)

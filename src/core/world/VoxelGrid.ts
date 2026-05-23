@@ -1,5 +1,7 @@
 // BlastSimulator2026 — 3D voxel grid for terrain representation
 // Each cell holds rock composition, density, ore densities, and fracture modifier.
+// Voxel cell size: 1 m × 1 m × 1 m (SI units throughout).
+// All grid coordinates are in metres, with each cell spanning exactly 1.0 m per axis.
 
 export interface VoxelRockComposition {
   /** Up to N rock types with coefficients summing to 1.0. Empty for air. */
@@ -43,8 +45,12 @@ function emptyVoxel(): VoxelData {
 /**
  * 3D grid of voxels. Stored as a flat array indexed by (x, y, z).
  * Coordinate system: x = east, y = up, z = north.
+ * Each cell represents 1 m × 1 m × 1 m. All grid coordinates are in metres.
  */
 export class VoxelGrid {
+  /** Size (in metres) of one voxel cell along each axis. Always 1.0 m. */
+  static readonly CELL_SIZE = 1.0;
+
   readonly sizeX: number;
   readonly sizeY: number;
   readonly sizeZ: number;
