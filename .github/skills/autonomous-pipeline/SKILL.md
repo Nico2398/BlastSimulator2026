@@ -8,7 +8,7 @@ description: >
 
 ## Pipeline Flow
 
-`ready` label → **scheduled-assign.yml** (manual) or **auto-assign-next.yml** (PR merge) dispatches **langgraph-agent.yml** → LangGraph agent runs TDD pipeline (plan → tests → implement → review → PR) → PR merged → next `ready` issue auto-assigned.
+`ready` label → **agentic-trigger.yml** (manual) or **auto-assign-next.yml** (PR merge) dispatches **langgraph-agent.yml** → agent runs TDD pipeline (plan → tests → implement → review → PR) → PR merged → next `ready` issue auto-assigned.
 
 ## Repository Settings (One-Time Setup)
 
@@ -21,10 +21,10 @@ description: >
 |----------|------|---------|---------|
 | Auto-assign next | `auto-assign-next.yml` | PR closed (merged) | Close done issue, dispatch LangGraph for next `ready` issue |
 | Handle failure | `handle-failure.yml` | Issue labeled `blocked` | Comment + notify maintainer |
-| Manual kickstart | `scheduled-assign.yml` | Manual dispatch only | Kick off LangGraph pipeline manually |
+| Manual kickstart | `agentic-trigger.yml` | Manual dispatch only | Trigger agent on next ready issue |
 | LangGraph agent | `langgraph-agent.yml` | Issue comment (`@langgraph`) or workflow dispatch | Run the autonomous TDD pipeline |
 | CI | `ci.yml` | Push / PR | Standard CI checks |
-| Setup steps | `copilot-setup-steps.yml` | Agent session | Pre-install dependencies for agent |
+| Setup steps | `agentic-setup-steps.yml` | Agent session | Pre-install dependencies for agent |
 
 ## Labels
 
@@ -64,6 +64,6 @@ Better issues → more autonomous pipeline. Use agent-task template.
 
 | Problem | Solution |
 |---------|----------|
-| Pipeline stalls | Manually trigger scheduled-assign.yml from Actions tab |
+| Pipeline stalls | Manually trigger agentic-trigger.yml from Actions tab |
 | Agent keeps failing | Label `blocked`, review logs, add context, consider splitting task |
 | PR doesn't reference issue | Ensure instructions stress "Closes #<number>" in PR body |

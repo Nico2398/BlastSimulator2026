@@ -1,12 +1,12 @@
 # BlastSimulator2026 — LangGraph Autonomous Pipeline
 
-Purpose-built LangGraph graph replacing open-swe. Every pipeline path is a typed graph edge — no prompting needed to decide next step. Runs identically in GitHub Actions and locally.
+Purpose-built LangGraph graph replacing the previous agent system. Every pipeline path is a typed graph edge — no prompting needed to decide next step. Runs identically in GitHub Actions and locally.
 
 ---
 
-## What changed from open-swe
+## What changed from the previous agent system
 
-| open-swe | LangGraph |
+| Legacy agent | LangGraph |
 |---|---|
 | Clone third-party repo at runtime | Self-contained in `.langgraph/` |
 | AST-patch server.py to inject tools | Tools are plain Python in `tools/` |
@@ -353,7 +353,7 @@ Set `LANGSMITH_API_KEY` as a repo secret for deeper traces. All runs appear unde
     todo_tools.py        ← per-session TODO list: todo_add / todo_list / todo_done / todo_clear
 
 .github/workflows/
-  langgraph-agent.yml    ← agent runner (replaces open-swe-agent.yml)
+  langgraph-agent.yml    ← agent runner
 ```
 
 ---
