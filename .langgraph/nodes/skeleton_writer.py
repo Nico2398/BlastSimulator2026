@@ -99,6 +99,11 @@ def _build_context(state: dict) -> str:
         "TASK: Write EMPTY TypeScript stubs only. No implementation logic.",
         "- Add exported function/class/interface skeletons to the correct src/ files.",
         "- Each stub body must be `throw new Error('not implemented')` or `return undefined`.",
+        "- For constants: use `undefined as any` or `0 // TODO` — never the real value.",
+        "- Do NOT add JSDoc, comments or documentation strings.",
+        "- Do NOT write test code (no describe/it/expect blocks).",
+        "- Do NOT restore deleted code — the implementer will do that.",
+        "- Only touch files listed in the issue's `files` field.",
         "- Do NOT write any real logic. Do NOT write tests.",
         "- Commit nothing — the graph will commit after you finish.",
     ]
