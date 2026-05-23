@@ -4,8 +4,10 @@ export interface RockType {
   readonly descKey: string;
   readonly hardnessTier: number;
   readonly fractureThreshold: number;
-  readonly energyAbsorption: 0;
-  readonly density: 0;
+  /** Energy absorption coefficient for blast energy propagation (game energy units per m³). */
+  readonly energyAbsorption: number;
+  /** Bulk density in kg/m³. */
+  readonly density: number;
   readonly porosity: number;
   readonly oreProbabilities: Readonly<Record<string, number>>;
   readonly color: string;
