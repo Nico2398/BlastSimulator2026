@@ -1,4 +1,4 @@
-name: "Pipeline: scheduled kickstart"
+name: "Pipeline: run agent on next ready issue"
 
 on:
   workflow_dispatch:  # manual trigger only
@@ -60,7 +60,7 @@ jobs:
                 }
               }
 
-              console.log(`Kickstarting LangGraph pipeline with issue #${issue.number}`);
+              console.log(`Agent pipeline picking up issue #${issue.number}`);
 
               await github.rest.issues.removeLabel({
                 owner, repo,
@@ -77,20 +77,20 @@ jobs:
               await github.rest.issues.createComment({
                 owner, repo,
                 issue_number: issue.number,
-                body: `🤖 LangGraph agent picking this up via scheduled kickstart…`
+                body: '🤖 Agent picking this up via manual trigger…'
               });
 
-              // Dispatch the LangGraph pipeline workflow
+              // Dispatch the agent pipeline workflow
               await github.rest.actions.createWorkflowDispatch({
                 owner, repo,
                 workflow_id: 'langgraph-agent.yml',
                 ref: 'main',
                 inputs: {
                   issue_number: String(issue.number),
-                  comment_body: 'scheduled kickstart'
+                  comment_body: 'manual trigger'
                 }
               });
-              console.log(`LangGraph pipeline dispatched for issue #${issue.number}.`);
+              console.log(`Agent pipeline dispatched for issue #${issue.number}.`);
 
               return; // Only start one at a time
             }
