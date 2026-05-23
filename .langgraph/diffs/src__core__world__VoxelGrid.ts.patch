@@ -1,0 +1,81 @@
+diff --git a/src/core/world/VoxelGrid.ts b/src/core/world/VoxelGrid.ts
+index c64fe8e..5d8a358 100644
+--- a/src/core/world/VoxelGrid.ts
++++ b/src/core/world/VoxelGrid.ts
+@@ -1,9 +1,15 @@
+ // BlastSimulator2026 — 3D voxel grid for terrain representation
+-// Each cell holds rock type, density, ore densities, and fracture modifier.
++// Each cell holds rock composition, density, ore densities, and fracture modifier.
++// Voxel size: 1 m × 1 m × 1 m (SI units throughout).
+ 
+-export interface VoxelData {
+-  /** Rock type ID, or '' for empty/air. */
+-  rockId: string;
++export interface VoxelRockComposition {
++  /** Up to 4 rock types with coefficients summing to 1.0. Empty array = air. */
++  rocks: Array<{ rockId: string; coefficient: number }>;
++}
++
++export interface VoxelCell {
++  /** Rock composition (empty = air). */
++  composition: VoxelRockComposition;
+   /** 0 = empty/air, 1 = fully solid. */
+   density: number;
+   /** Map of ore_id → density (0.0–1.0). */
+@@ -16,11 +22,29 @@ export interface RegionEntry {
+   x: number;
+   y: number;
+   z: number;
+-  data: VoxelData;
++  data: VoxelCell;
++}
++
++/** Helper: get the rockId with the highest coefficient from a composition. Returns empty string if empty. */
++export function getPrimaryRockId(composition: VoxelRockComposition): string {
++  let best = '';
++  let bestCoeff = 0;
++  for (const r of composition.rocks) {
++    if (r.coefficient > bestCoeff) {
++      bestCoeff = r.coefficient;
++      best = r.rockId;
++    }
++  }
++  return best;
++}
++
++/** Helper: check if a cell is air (density === 0 or composition empty). */
++export function isAirCell(cell: VoxelCell): boolean {
++  return cell.density === 0 || cell.composition.rocks.length === 0;
+ }
+ 
+-function emptyVoxel(): VoxelData {
+-  return { rockId: '', density: 0, oreDensities: {}, fractureModifier: 1.0 };
++function emptyVoxel(): VoxelCell {
++  return { composition: { rocks: [] }, density: 0, oreDensities: {}, fractureModifier: 1.0 };
+ }
+ 
+ /**
+@@ -31,7 +55,7 @@ export class VoxelGrid {
+   readonly sizeX: number;
+   readonly sizeY: number;
+   readonly sizeZ: number;
+-  private readonly data: VoxelData[];
++  private readonly data: VoxelCell[];
+ 
+   constructor(sizeX: number, sizeY: number, sizeZ: number) {
+     this.sizeX = sizeX;
+@@ -53,12 +77,12 @@ export class VoxelGrid {
+     return x + y * this.sizeX + z * this.sizeX * this.sizeY;
+   }
+ 
+-  getVoxel(x: number, y: number, z: number): VoxelData | undefined {
++  getVoxel(x: number, y: number, z: number): VoxelCell | undefined {
+     if (!this.isInBounds(x, y, z)) return undefined;
+     return this.data[this.index(x, y, z)];
+   }
+ 
+-  setVoxel(x: number, y: number, z: number, voxel: VoxelData): void {
++  setVoxel(x: number, y: number, z: number, voxel: VoxelCell): void {
+     if (!this.isInBounds(x, y, z)) return;
+     this.data[this.index(x, y, z)] = voxel;
+   }

@@ -1,0 +1,36 @@
+diff --git a/src/console/commands/world.ts b/src/console/commands/world.ts
+index 8d3adb6..e827b6c 100644
+--- a/src/console/commands/world.ts
++++ b/src/console/commands/world.ts
+@@ -7,6 +7,7 @@ import { generateTerrain } from '../../core/world/TerrainGen.js';
+ import { getRock } from '../../core/world/RockCatalog.js';
+ import { getOre } from '../../core/world/OreCatalog.js';
+ import type { VoxelGrid } from '../../core/world/VoxelGrid.js';
++import { getPrimaryRockId } from '../../core/world/VoxelGrid.js';
+ import { EventEmitter } from '../../core/state/EventEmitter.js';
+ 
+ /** Shared game context for console commands. */
+@@ -69,8 +70,9 @@ export function inspectCommand(
+     return { success: true, output: `(${x},${y},${z}): Air (empty)` };
+   }
+ 
+-  const rock = getRock(v.rockId);
+-  const rockName = rock ? rock.id : v.rockId;
++  const primaryRockId = getPrimaryRockId(v.composition);
++  const rock = getRock(primaryRockId);
++  const rockName = rock ? rock.id : primaryRockId;
+   const oreLines = Object.entries(v.oreDensities)
+     .map(([id, d]) => {
+       const ore = getOre(id);
+@@ -153,8 +155,9 @@ export function surveyCommand(
+   }
+ 
+   const v = ctx.grid.getVoxel(x, surfaceY, z)!;
+-  const rock = getRock(v.rockId);
+-  const rockName = rock ? rock.id : v.rockId;
++  const primaryRockId = getPrimaryRockId(v.composition);
++  const rock = getRock(primaryRockId);
++  const rockName = rock ? rock.id : primaryRockId;
+   const oreLines = Object.entries(v.oreDensities)
+     .map(([id, d]) => `${id}: ${(d * 100).toFixed(0)}%`);
+   const oreStr = oreLines.length > 0 ? oreLines.join(', ') : 'none';

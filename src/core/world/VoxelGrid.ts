@@ -10,6 +10,8 @@ export interface VoxelRockComposition {
 export interface VoxelCell {
   /** Rock composition (empty = air). */
   composition: VoxelRockComposition;
+  /** Legacy convenience: primary rock ID from composition (empty string for air). */
+  rockId: string;
   /** 0 = empty/air, 1 = fully solid. */
   density: number;
   /** Map of ore_id → density (0.0–1.0). */
@@ -25,8 +27,9 @@ export interface RegionEntry {
   data: VoxelCell;
 }
 
-/** Helper: get the rockId with the highest coefficient from a composition. Returns empty string if empty. */
-export function getPrimaryRockId(composition: VoxelRockComposition): string {
+/** Helper: get the rockId with the highest coefficient from a composition. Returns empty string if empty or undefined. */
+export function getPrimaryRockId(composition: VoxelRockComposition | undefined): string {
+  if (!composition || !composition.rocks || composition.rocks.length === 0) return '';
   let best = '';
   let bestCoeff = 0;
   for (const r of composition.rocks) {
@@ -40,11 +43,11 @@ export function getPrimaryRockId(composition: VoxelRockComposition): string {
 
 /** Helper: check if a cell is air (density === 0 or composition empty). */
 export function isAirCell(cell: VoxelCell): boolean {
-  return cell.density === 0 || cell.composition.rocks.length === 0;
+  return cell.density === 0 || !cell.composition || cell.composition.rocks.length === 0;
 }
 
 function emptyVoxel(): VoxelCell {
-  return { composition: { rocks: [] }, density: 0, oreDensities: {}, fractureModifier: 1.0 };
+  return { composition: { rocks: [] }, rockId: '', density: 0, oreDensities: {}, fractureModifier: 1.0 };
 }
 
 /**

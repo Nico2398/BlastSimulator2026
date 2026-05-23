@@ -4,7 +4,7 @@
 
 import { createNoise2D, createNoise3D } from 'simplex-noise';
 import { Random } from '../math/Random.js';
-import { VoxelGrid, type VoxelCell } from './VoxelGrid.js';
+import { VoxelGrid, type VoxelCell, getPrimaryRockId } from './VoxelGrid.js';
 import { getAllRocks, type RockType } from './RockCatalog.js';
 import type { MinePreset } from './MineType.js';
 
@@ -53,8 +53,12 @@ export function generateTerrain(config: TerrainConfig): VoxelGrid {
           ? {}
           : computeOreDensities(x, y, z, rocks, composition, preset.oreRichness, noise3dOre);
 
+        // Set rockId from composition for backward compat
+        const rockId = getPrimaryRockId(composition);
+
         const voxel: VoxelCell = {
           composition,
+          rockId,
           density: 1.0,
           oreDensities,
           fractureModifier: 1.0,

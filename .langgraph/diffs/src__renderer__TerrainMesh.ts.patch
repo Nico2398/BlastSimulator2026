@@ -1,0 +1,21 @@
+diff --git a/src/renderer/TerrainMesh.ts b/src/renderer/TerrainMesh.ts
+index dbb165d..a71f49c 100644
+--- a/src/renderer/TerrainMesh.ts
++++ b/src/renderer/TerrainMesh.ts
+@@ -8,6 +8,7 @@
+ 
+ import * as THREE from 'three';
+ import type { VoxelGrid } from '../core/world/VoxelGrid.js';
++import { getPrimaryRockId } from '../core/world/VoxelGrid.js';
+ import { EDGE_TABLE, TRI_TABLE } from './MarchingCubesTables.js';
+ import { sampleRockColor, clearColorSampleCache } from './ProceduralTexture.js';
+ import { SurveyConfidenceOverlay } from './SurveyConfidenceOverlay.js';
+@@ -197,7 +198,7 @@ export class TerrainMesh {
+       const [dx, dy, dz] = CORNER_OFFSETS[i]!;
+       const voxel = this.grid.getVoxel(x + dx, y + dy, z + dz);
+       densities[i] = voxel?.density ?? 0;
+-      rockIds[i] = voxel?.rockId ?? '';
++      rockIds[i] = voxel ? getPrimaryRockId(voxel.composition) : '';
+     }
+ 
+     // Compute cube index
