@@ -19,9 +19,7 @@ from nodes._base import (
     skill_hint,
 )
 from tools.git_tools import (
-    git_branch_exists,
-    git_checkout_branch,
-    git_checkout_existing,
+    git_force_checkout_branch,
     git_commit,
     git_push,
     git_get_head_sha,
@@ -43,11 +41,8 @@ def implementer(state: dict) -> dict:
     if not investigate:
         impl_branch = state.get("impl_branch", "")
         skeleton_sha = state.get("skeleton_commit_sha", "")
-        # Create impl_branch from skeleton_commit_sha (before test commits).
-        if git_branch_exists(impl_branch):
-            checkout_msg = git_checkout_existing(impl_branch)
-        else:
-            checkout_msg = git_checkout_branch(impl_branch, from_ref=skeleton_sha or None)
+        # Create (or overwrite) impl_branch from skeleton_commit_sha (before test commits).
+        checkout_msg = git_force_checkout_branch(impl_branch, from_ref=skeleton_sha or None)
     else:
         checkout_msg = ""
         impl_branch = ""

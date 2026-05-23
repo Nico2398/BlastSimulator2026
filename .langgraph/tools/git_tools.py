@@ -69,6 +69,22 @@ def git_checkout_branch(branch: str, from_ref: str | None = None) -> str:
         return f"error creating branch '{branch}': {exc}"
 
 
+def git_force_checkout_branch(branch: str, from_ref: str | None = None) -> str:
+    """Force-create a branch (overwriting if exists) and switch to it.
+    Like ``git switch -C <branch> [<from_ref>]``.
+    """
+    repo = _repo()
+    start = repo.commit(from_ref) if from_ref else repo.head.commit
+    try:
+        if any(head.name == branch for head in repo.heads):
+            repo.delete_head(branch, force=True)
+        new_branch = repo.create_head(branch, commit=start)
+        new_branch.checkout()
+        return f"created and switched to branch '{branch}' from {start.hexsha[:12]}"
+    except git.GitCommandError as exc:
+        return f"error creating branch '{branch}': {exc}"
+
+
 def git_branch_exists(branch: str) -> bool:
     """Return True when a local branch exists."""
     repo = _repo()

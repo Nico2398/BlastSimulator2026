@@ -23,9 +23,7 @@ if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
 from tools.git_tools import (
-    git_branch_exists,
-    git_checkout_branch,
-    git_checkout_existing,
+    git_force_checkout_branch,
     git_get_head_sha,
     git_commit,
     git_push,
@@ -40,11 +38,8 @@ def skeleton_writer(state: dict) -> dict:
     test_branch = state.get("test_branch", f"langgraph/tests-{issue_number}")
     pipeline = state.get("pipeline", "implement-feature")
 
-    # 1. Create or switch to test_branch from HEAD (main).
-    if git_branch_exists(test_branch):
-        checkout_msg = git_checkout_existing(test_branch)
-    else:
-        checkout_msg = git_checkout_branch(test_branch)
+    # 1. Create (or overwrite) test_branch from HEAD (main).
+    checkout_msg = git_force_checkout_branch(test_branch)
     skeleton_ok = not checkout_msg.startswith("error")
 
     # 2. Record skeleton_commit_sha = current HEAD on test_branch.
