@@ -3,7 +3,7 @@
 
 import { createNoise2D, createNoise3D } from 'simplex-noise';
 import { Random } from '../math/Random.js';
-import { VoxelGrid, type VoxelData, type VoxelRockComposition, getDominantRockId } from './VoxelGrid.js';
+import { VoxelGrid, type VoxelData, type VoxelRockComposition } from './VoxelGrid.js';
 import { getAllRocks, type RockType } from './RockCatalog.js';
 import type { MinePreset } from './MineType.js';
 
@@ -47,8 +47,6 @@ export function generateTerrain(config: TerrainConfig): VoxelGrid {
         }
 
         const composition = computeComposition(x, y, z, rocks, noise3dRock);
-        const dominantRockId = getDominantRockId(composition);
-        void dominantRockId;
         const inBorder = isInBorderZone(x, z, sizeX, sizeZ, preset.borderWidth);
         const oreDensities = inBorder
           ? {}
@@ -119,23 +117,23 @@ export function computeComposition(
   noise3d: ReturnType<typeof createNoise3D>,
 ): VoxelRockComposition {
   const rawValues: number[] = [];
+  const clippedValues: number[] = [];
   for (const rock of rocks) {
     const raw = noise3d(x * rock.noiseFreq, y * rock.noiseFreq, z * rock.noiseFreq) + rock.levelBias;
-    rawValues.push(Math.max(0, raw));
+    rawValues.push(raw);
+    clippedValues.push(Math.max(0, raw));
   }
 
-  const sum = rawValues.reduce((a, b) => a + b, 0);
+  const sum = clippedValues.reduce((a, b) => a + b, 0);
   const composition: VoxelRockComposition = { rocks: [] };
 
   if (sum > 0) {
     for (let i = 0; i < rocks.length; i++) {
-      const coeff = rawValues[i]! / sum;
-      // Only include rocks with coefficient > 0.01 (avoid noise artifacts)
+      const coeff = clippedValues[i]! / sum;
       if (coeff > 0.01) {
         composition.rocks.push({ rockId: rocks[i]!.id, coefficient: Math.round(coeff * 100) / 100 });
       }
     }
-    // Renormalize after truncation
     const finalSum = composition.rocks.reduce((s, r) => s + r.coefficient, 0);
     if (finalSum > 0 && Math.abs(finalSum - 1.0) > 0.001) {
       for (const r of composition.rocks) {
@@ -144,9 +142,15 @@ export function computeComposition(
     }
   }
 
-  // Fallback: all raw values were ≤ 0
+  // Fallback: all clipped values are ≤ 0 — pick the rock with the highest raw value
   if (composition.rocks.length === 0 && rocks.length > 0) {
-    composition.rocks.push({ rockId: rocks[0]!.id, coefficient: 1.0 });
+    let bestIdx = 0;
+    for (let i = 1; i < rocks.length; i++) {
+      if (rawValues[i]! > rawValues[bestIdx]!) {
+        bestIdx = i;
+      }
+    }
+    composition.rocks.push({ rockId: rocks[bestIdx]!.id, coefficient: 1.0 });
   }
 
   return composition;
@@ -164,7 +168,9 @@ function isInBorderZone(
 
 /**
  * Compute ore densities for a voxel based on the composition and rock catalog.
- * Uses dominant rock for ore probability lookup (preserves existing behavior).
+ * Each rock in the composition contributes its own ore probabilities, weighted
+ * by the rock's coefficient. This ensures that even non-dominant rock types
+ * contribute ores with their characteristic thresholds.
  */
 function computeOreDensities(
   x: number, y: number, z: number,
@@ -173,27 +179,27 @@ function computeOreDensities(
   richnessMod: number,
   noise3d: ReturnType<typeof createNoise3D>,
 ): Record<string, number> {
-  const dominantRockId = getDominantRockId(composition);
-  const dominantRock = rocks.find(r => r.id === dominantRockId);
-  if (!dominantRock) return {};
-
   const ores: Record<string, number> = {};
 
-  for (const [oreId, probability] of Object.entries(dominantRock.oreProbabilities)) {
-    // Use noise with ore-specific offset for vein-like patterns
-    const oreHash = simpleHash(oreId);
-    const n = noise3d(
-      (x + oreHash) * 0.1,
-      y * 0.12,
-      (z + oreHash * 0.7) * 0.1,
-    );
-    // n is in [-1, 1]; threshold determines if ore is present
-    const threshold = 1 - probability * 2; // higher probability = lower threshold
-    if (n > threshold) {
-      // Scale density by how far above threshold, capped at 1.0
-      const density = Math.min(1.0, (n - threshold) * richnessMod * 2);
-      if (density > 0.01) {
-        ores[oreId] = Math.round(density * 100) / 100;
+  for (const comp of composition.rocks) {
+    const rock = rocks.find(r => r.id === comp.rockId);
+    if (!rock) continue;
+
+    for (const [oreId, probability] of Object.entries(rock.oreProbabilities)) {
+      const oreHash = simpleHash(oreId);
+      const n = noise3d(
+        (x + oreHash) * 0.1,
+        y * 0.12,
+        (z + oreHash * 0.7) * 0.1,
+      );
+      const threshold = 1 - probability * 2;
+      if (n > threshold) {
+        const density = Math.min(1.0, (n - threshold) * richnessMod * 2);
+        if (density > 0.01) {
+          if (!ores[oreId] || density > ores[oreId]) {
+            ores[oreId] = Math.round(density * 100) / 100;
+          }
+        }
       }
     }
   }
