@@ -47,7 +47,7 @@ function fillRegion(
     for (let y = y0; y <= y1; y++)
       for (let x = x0; x <= x1; x++)
         grid.setVoxel(x, y, z, {
-          rockId: 'cruite',
+          composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
           density: 1.0,
           oreDensities: {},
           fractureModifier: 1.0,

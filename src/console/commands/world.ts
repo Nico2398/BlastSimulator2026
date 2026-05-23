@@ -6,6 +6,7 @@ import { getMinePreset, getAllMinePresets } from '../../core/world/MineType.js';
 import { generateTerrain } from '../../core/world/TerrainGen.js';
 import { getRock } from '../../core/world/RockCatalog.js';
 import { getOre } from '../../core/world/OreCatalog.js';
+import { getDominantRockId } from '../../core/world/VoxelGrid.js';
 import type { VoxelGrid } from '../../core/world/VoxelGrid.js';
 import { EventEmitter } from '../../core/state/EventEmitter.js';
 
@@ -69,8 +70,9 @@ export function inspectCommand(
     return { success: true, output: `(${x},${y},${z}): Air (empty)` };
   }
 
-  const rock = getRock(v.rockId);
-  const rockName = rock ? rock.id : v.rockId;
+  const dominantRockId = getDominantRockId(v.composition);
+  const rock = getRock(dominantRockId);
+  const rockName = rock ? rock.id : dominantRockId;
   const oreLines = Object.entries(v.oreDensities)
     .map(([id, d]) => {
       const ore = getOre(id);
@@ -78,9 +80,14 @@ export function inspectCommand(
     });
   const oreStr = oreLines.length > 0 ? '\nOres:\n' + oreLines.join('\n') : '\nOres: none';
 
+  // Show composition breakdown
+  const compStr = v.composition.rocks.length > 0
+    ? v.composition.rocks.map(r => `${r.rockId} ${(r.coefficient * 100).toFixed(0)}%`).join(', ')
+    : 'none';
+
   return {
     success: true,
-    output: `(${x},${y},${z}): ${rockName} | density: ${v.density} | fracture mod: ${v.fractureModifier}${oreStr}`,
+    output: `(${x},${y},${z}): ${rockName} | composition: ${compStr} | density: ${v.density} | fracture mod: ${v.fractureModifier}${oreStr}`,
   };
 }
 
@@ -153,8 +160,9 @@ export function surveyCommand(
   }
 
   const v = ctx.grid.getVoxel(x, surfaceY, z)!;
-  const rock = getRock(v.rockId);
-  const rockName = rock ? rock.id : v.rockId;
+  const dominantRockId = getDominantRockId(v.composition);
+  const rock = getRock(dominantRockId);
+  const rockName = rock ? rock.id : dominantRockId;
   const oreLines = Object.entries(v.oreDensities)
     .map(([id, d]) => `${id}: ${(d * 100).toFixed(0)}%`);
   const oreStr = oreLines.length > 0 ? oreLines.join(', ') : 'none';

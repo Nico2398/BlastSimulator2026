@@ -17,7 +17,7 @@ function makeScene(): THREE.Scene {
 }
 
 function makeSolidVoxel(rockId = 'sandite'): import('../../../src/core/world/VoxelGrid.js').VoxelData {
-  return { rockId, density: 1.0, oreDensities: {}, fractureModifier: 1.0 };
+  return { composition: { rocks: [{ rockId, coefficient: 1.0 }] }, density: 1.0, oreDensities: {}, fractureModifier: 1.0 };
 }
 
 function makeConfidencePoint(

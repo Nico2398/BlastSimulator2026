@@ -40,7 +40,7 @@ function fillRegion(
   for (let z = minZ; z <= maxZ; z++) {
     for (let y = minY; y <= maxY; y++) {
       for (let x = minX; x <= maxX; x++) {
-        grid.setVoxel(x, y, z, { rockId, density: 1.0, oreDensities: {}, fractureModifier: 1.0 });
+        grid.setVoxel(x, y, z, { composition: { rocks: [{ rockId, coefficient: 1.0 }] }, density: 1.0, oreDensities: {}, fractureModifier: 1.0 });
       }
     }
   }

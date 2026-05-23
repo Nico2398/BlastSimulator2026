@@ -48,7 +48,7 @@ describe('DrillPlan', () => {
 
 /** A fully solid voxel fixture. */
 function solidVoxel(): VoxelData {
-  return { rockId: 'cruite', density: 1, oreDensities: {}, fractureModifier: 1 };
+  return { composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] }, density: 1, oreDensities: {}, fractureModifier: 1 };
 }
 
 describe('digVoxel', () => {

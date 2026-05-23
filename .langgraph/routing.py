@@ -79,6 +79,9 @@ def route_from_conflict_resolver(state: dict) -> str:
 
 def route_from_test_runner(state: dict) -> str:
     if state.get("test_runner_ok", False):
+        # If coming from refactorer (qualimetry/code_review already done), go to validator
+        if state.get("refactorer_ok", False):
+            return "validator"
         # Skip qualimetry when flag set (e.g. config-only, i18n-only changes)
         if state.get("skip_qualimetry"):
             return _route_after_qualimetry(state)
@@ -138,7 +141,7 @@ def route_from_review_fan_in(state: dict) -> str:
 
 def route_from_refactorer(state: dict) -> str:
     if state.get("refactorer_ok", False):
-        return "validator"
+        return "test_runner"
     retry_count = state.get("retry_count", 0)
     return "handle_interrupt" if retry_count >= MAX_RETRIES else "implementer"
 

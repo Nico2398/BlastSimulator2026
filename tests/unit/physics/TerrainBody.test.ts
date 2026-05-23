@@ -9,7 +9,7 @@ function makeFlatGrid(): VoxelGrid {
   for (let x = 0; x < 10; x++) {
     for (let z = 0; z < 10; z++) {
       for (let y = 0; y < 2; y++) {
-        grid.setVoxel(x, y, z, { rockId: 'cruite', density: 1.0, oreDensities: {}, fractureModifier: 1.0 });
+        grid.setVoxel(x, y, z, { composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] }, density: 1.0, oreDensities: {}, fractureModifier: 1.0 });
       }
     }
   }
@@ -33,7 +33,7 @@ describe('TerrainBody (8.2)', () => {
 
     const pos = world.getBodyPosition(fragHandle)!;
     // Surface is at y=1 (top of Y=1 voxel which spans 1–2m).
-    // Fragment radius = 0.3m, so it should rest near y ≈ 2.3
+    // Fragment radius = 0.3m, so it should rest near y â‰ˆ 2.3
     expect(pos.y).toBeGreaterThan(1.5);
     // Should not have fallen below the terrain
     expect(pos.y).toBeLessThan(5.0);
@@ -79,10 +79,10 @@ describe('TerrainBody (8.2)', () => {
     world.init();
 
     const terrain = new TerrainBody(world);
-    const grid = makeFlatGrid(); // 10×10 columns, 2 solid layers → expect ≤ 200 bodies
+    const grid = makeFlatGrid(); // 10Ã—10 columns, 2 solid layers â†’ expect â‰¤ 200 bodies
     terrain.build(grid);
 
-    // Each column gets up to SURFACE_LAYERS=2 bodies; 10×10=100 columns
+    // Each column gets up to SURFACE_LAYERS=2 bodies; 10Ã—10=100 columns
     expect(terrain.bodyCount).toBeGreaterThan(0);
     expect(terrain.bodyCount).toBeLessThanOrEqual(200);
 

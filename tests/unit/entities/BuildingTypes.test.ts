@@ -35,7 +35,7 @@ function makeFilledGrid(sizeX: number, sizeY: number, sizeZ: number, fillUpToY: 
   for (let y = 0; y < fillUpToY; y++) {
     for (let z = 0; z < sizeZ; z++) {
       for (let x = 0; x < sizeX; x++) {
-        grid.setVoxel(x, y, z, { rockId: 'sandite', density: 1, oreDensities: {}, fractureModifier: 1 });
+        grid.setVoxel(x, y, z, { composition: { rocks: [{ rockId: 'sandite', coefficient: 1.0 }] }, density: 1, oreDensities: {}, fractureModifier: 1 });
       }
     }
   }
@@ -248,7 +248,7 @@ describe('getSurfaceY', () => {
 
   it('returns 1 when only the bottom voxel is solid', () => {
     const grid = new VoxelGrid(4, 8, 4);
-    grid.setVoxel(0, 0, 0, { rockId: 'sandite', density: 1, oreDensities: {}, fractureModifier: 1 });
+    grid.setVoxel(0, 0, 0, { composition: { rocks: [{ rockId: 'sandite', coefficient: 1.0 }] }, density: 1, oreDensities: {}, fractureModifier: 1 });
     expect(getSurfaceY(grid, 0, 0)).toBe(1);
   });
 
@@ -261,7 +261,7 @@ describe('getSurfaceY', () => {
   it('ignores air voxels (density=0) above solid ones', () => {
     const grid = makeFilledGrid(4, 8, 4, 3);
     // Add a zero-density voxel above the solid surface — surface should still be 3
-    grid.setVoxel(1, 3, 1, { rockId: '', density: 0, oreDensities: {}, fractureModifier: 1 });
+    grid.setVoxel(1, 3, 1, { composition: { rocks: [] }, density: 0, oreDensities: {}, fractureModifier: 1 });
     expect(getSurfaceY(grid, 1, 1)).toBe(3);
   });
 });

@@ -41,7 +41,7 @@ function makeOreGrid(): VoxelGrid {
   const grid = new VoxelGrid(11, 11, 11);
   for (let y = 2; y <= 8; y++) {
     grid.setVoxel(5, y, 5, {
-      rockId: 'granite',
+      composition: { rocks: [{ rockId: 'granite', coefficient: 1.0 }] },
       density: 1,
       oreDensities: { gold: 0.5 },
       fractureModifier: 1.0,
@@ -60,7 +60,7 @@ function makeMultiOreGrid(positions: { x: number; z: number }[]): VoxelGrid {
   for (const { x, z } of positions) {
     for (let y = 2; y <= 8; y++) {
       grid.setVoxel(x, y, z, {
-        rockId: 'granite',
+        composition: { rocks: [{ rockId: 'granite', coefficient: 1.0 }] },
         density: 1,
         oreDensities: { gold: 0.5 },
         fractureModifier: 1.0,
@@ -248,7 +248,7 @@ describe('Survey Confidence Overlay — integration (4.11)', () => {
     for (let x = 0; x < 101; x++) {
       for (let z = 0; z < 101; z++) {
         grid.setVoxel(x, 5, z, {
-          rockId: 'granite',
+          composition: { rocks: [{ rockId: 'granite', coefficient: 1.0 }] },
           density: 1,
           oreDensities: { copper: 0.4 },
           fractureModifier: 1.0,
@@ -702,7 +702,7 @@ describe('Survey Confidence Overlay — integration (4.11)', () => {
     // by shifting center to negative values
     for (let y = 2; y <= 8; y++) {
       grid.setVoxel(5, y, 5, {
-        rockId: 'granite',
+        composition: { rocks: [{ rockId: 'granite', coefficient: 1.0 }] },
         density: 1,
         oreDensities: { gold: 0.5 },
         fractureModifier: 1.0,
@@ -750,7 +750,7 @@ describe('Survey Confidence Overlay — integration (4.11)', () => {
       for (let y = 0; y < 4; y++)
         for (let z = 0; z < 8; z++)
           grid.setVoxel(x, y, z, {
-            rockId: 'granite',
+            composition: { rocks: [{ rockId: 'granite', coefficient: 1.0 }] },
             density: 1,
             oreDensities: {},
             fractureModifier: 1.0,
@@ -852,7 +852,7 @@ describe('Survey Confidence Overlay — integration (4.11)', () => {
     for (let x = 0; x < 40; x++) {
       for (let z = 0; z < 40; z++) {
         grid.setVoxel(x, 5, z, {
-          rockId: 'granite',
+          composition: { rocks: [{ rockId: 'granite', coefficient: 1.0 }] },
           density: 1,
           oreDensities: { copper: 0.3 },
           fractureModifier: 1.0,
@@ -887,7 +887,7 @@ describe('Survey Confidence Overlay — integration (4.11)', () => {
     for (let x = 0; x < 30; x++) {
       for (let z = 0; z < 30; z++) {
         grid.setVoxel(x, 5, z, {
-          rockId: 'granite',
+          composition: { rocks: [{ rockId: 'granite', coefficient: 1.0 }] },
           density: 1,
           oreDensities: { iron: 0.5 },
           fractureModifier: 1.0,

@@ -309,7 +309,7 @@ def build_graph():
         "handle_interrupt": "handle_interrupt",
     })
     builder.add_conditional_edges("refactorer", route_from_refactorer, {
-        "validator": "validator",
+        "test_runner": "test_runner",
         "implementer": "implementer",
         "handle_interrupt": "handle_interrupt",
     })
