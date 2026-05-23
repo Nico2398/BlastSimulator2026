@@ -2,6 +2,20 @@ import { describe, it, expect } from 'vitest';
 import { VoxelGrid, getDominantRockId } from '../../../src/core/world/VoxelGrid.js';
 
 describe('VoxelGrid', () => {
+  describe('CELL_SIZE', () => {
+    it('is exactly 1 metre', () => {
+      expect(VoxelGrid.CELL_SIZE).toBe(1);
+    });
+
+    it('is a finite number', () => {
+      expect(Number.isFinite(VoxelGrid.CELL_SIZE)).toBe(true);
+    });
+
+    it('is positive', () => {
+      expect(VoxelGrid.CELL_SIZE).toBeGreaterThan(0);
+    });
+  });
+
   it('set and get a voxel at specific coordinates', () => {
     const grid = new VoxelGrid(10, 10, 10);
     grid.setVoxel(3, 4, 5, {
