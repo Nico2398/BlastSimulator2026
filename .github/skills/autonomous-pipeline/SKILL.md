@@ -24,7 +24,7 @@ description: >
 | Manual kickstart | `scheduled-assign.yml` | Manual dispatch only | Kick off LangGraph pipeline manually |
 | LangGraph agent | `langgraph-agent.yml` | Issue comment (`@langgraph`) or workflow dispatch | Run the autonomous TDD pipeline |
 | CI | `ci.yml` | Push / PR | Standard CI checks |
-| Setup steps | `copilot-setup-steps.yml` | Agent session | Pre-install dependencies for agent |
+| Setup steps | `agentic-setup-steps.yml` | Agent session | Pre-install dependencies for agent |
 
 ## Labels
 
