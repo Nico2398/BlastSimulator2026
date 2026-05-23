@@ -21,7 +21,7 @@ function makeTestPlan() {
   for (let z = 5; z <= 20; z++)
     for (let y = 0; y <= 8; y++)
       for (let x = 5; x <= 20; x++)
-        grid.setVoxel(x, y, z, { rockId: 'molite', density: 1.0, oreDensities: {}, fractureModifier: 1.0 });
+        grid.setVoxel(x, y, z, { composition: { rocks: [{ rockId: 'molite', coefficient: 1.0 }] }, density: 1.0, oreDensities: {}, fractureModifier: 1.0 });
 
   const holes = createGridPlan({ x: 10, z: 10 }, 2, 2, 3, 6, 0.15);
   const holeIds = holes.map(h => h.id);

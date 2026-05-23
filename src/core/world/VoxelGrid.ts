@@ -1,9 +1,14 @@
 // BlastSimulator2026 — 3D voxel grid for terrain representation
-// Each cell holds rock type, density, ore densities, and fracture modifier.
+// Each cell holds rock composition, density, ore densities, and fracture modifier.
+
+export interface VoxelRockComposition {
+  /** Up to N rock types with coefficients summing to 1.0. Empty for air. */
+  rocks: Array<{ rockId: string; coefficient: number }>;
+}
 
 export interface VoxelData {
-  /** Rock type ID, or '' for empty/air. */
-  rockId: string;
+  /** Rock composition: up to 4 rock types with coefficients summing to 1.0. Empty array for air. */
+  composition: VoxelRockComposition;
   /** 0 = empty/air, 1 = fully solid. */
   density: number;
   /** Map of ore_id → density (0.0–1.0). */
@@ -19,8 +24,20 @@ export interface RegionEntry {
   data: VoxelData;
 }
 
+/** Return the rock ID with the highest coefficient, or '' if composition is empty. */
+export function getDominantRockId(composition: VoxelRockComposition): string {
+  if (composition.rocks.length === 0) return '';
+  let best = composition.rocks[0]!;
+  for (let i = 1; i < composition.rocks.length; i++) {
+    if (composition.rocks[i]!.coefficient > best.coefficient) {
+      best = composition.rocks[i]!;
+    }
+  }
+  return best.rockId;
+}
+
 function emptyVoxel(): VoxelData {
-  return { rockId: '', density: 0, oreDensities: {}, fractureModifier: 1.0 };
+  return { composition: { rocks: [] }, density: 0, oreDensities: {}, fractureModifier: 1.0 };
 }
 
 /**
