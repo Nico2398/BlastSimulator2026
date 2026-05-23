@@ -97,7 +97,7 @@ Post **exactly** this as **last action** — nothing after:
 APPROVED
 ```
 
-Triggers `auto-merge-copilot.yml` → squash-merge. No push, edit, or tool call after APPROVED.
+Triggers `langgraph-agent.yml` → PR merge. No push, edit, or tool call after APPROVED.
 
 ## Key References
 
