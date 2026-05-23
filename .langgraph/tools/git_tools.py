@@ -312,7 +312,11 @@ def git_write_diff_to_file(ref: str, dest_dir: str = ".langgraph/diffs") -> tupl
     # Write each patch to a file (slug the path for safety)
     for filepath, patch in filtered_patches.items():
         safe_name = filepath.replace("/", "__").replace("\\", "__")
-        (diff_dir / f"{safe_name}.patch").write_text(patch, encoding="utf-8")
+        try:
+            (diff_dir / f"{safe_name}.patch").write_text(patch, encoding="utf-8")
+        except UnicodeEncodeError:
+            # Binary file with surrogate chars — skip the patch
+            pass
 
     # Write shared summary
     summary_lines = [
