@@ -19,7 +19,7 @@ import {
 } from './BlastCalc.js';
 import { getRock } from '../world/RockCatalog.js';
 import { getOre } from '../world/OreCatalog.js';
-import type { VoxelGrid, VoxelData } from '../world/VoxelGrid.js';
+import { getDominantRockId, type VoxelGrid, type VoxelData } from '../world/VoxelGrid.js';
 import { getBuildingDef, destroyBuilding, type BuildingState, type Building, type BuildingType } from '../entities/Building.js';
 
 // ── Config ──
@@ -158,7 +158,8 @@ export function executeBlast(
         const voxel = grid.getVoxel(x, y, z);
         if (!voxel || voxel.density <= 0) continue;
 
-        const rock = getRock(voxel.rockId);
+        const dominantRockId = getDominantRockId(voxel.composition);
+        const rock = getRock(dominantRockId);
         if (!rock) continue;
 
         const point = vec3(x, y, z);
@@ -185,7 +186,7 @@ export function executeBlast(
               position: point,
               volume: voxelVolume / fragCount,
               mass,
-              rockId: voxel.rockId,
+              rockId: dominantRockId,
               oreDensities: { ...voxel.oreDensities },
               initialVelocity: vel,
               isProjection: frag.isProjection || speed > 15,

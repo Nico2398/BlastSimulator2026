@@ -24,7 +24,7 @@ function fillRegion(
         const ores: Record<string, number> = {};
         if (oreId && oreDensity) ores[oreId] = oreDensity;
         grid.setVoxel(x, y, z, {
-          rockId: rock,
+          composition: { rocks: [{ rockId: rock, coefficient: 1.0 }] },
           density: 1.0,
           oreDensities: ores,
           fractureModifier: 1.0,

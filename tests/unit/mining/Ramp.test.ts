@@ -6,7 +6,7 @@ function fillGrid(grid: VoxelGrid) {
   for (let z = 0; z < grid.sizeZ; z++)
     for (let y = 0; y < grid.sizeY; y++)
       for (let x = 0; x < grid.sizeX; x++)
-        grid.setVoxel(x, y, z, { rockId: 'cruite', density: 1.0, oreDensities: {}, fractureModifier: 1.0 });
+        grid.setVoxel(x, y, z, { composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] }, density: 1.0, oreDensities: {}, fractureModifier: 1.0 });
 }
 
 describe('Ramp building', () => {

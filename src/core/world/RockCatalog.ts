@@ -10,6 +10,8 @@ export interface RockType {
   readonly hardnessTier: number;
   /** Energy threshold to fracture, in game energy units. */
   readonly fractureThreshold: number;
+  /** Energy absorption coefficient for energy propagation (matches fractureThreshold for now; refined in 5.2). */
+  readonly energyAbsorption: number;
   /** kg/m³. */
   readonly density: number;
   /** 0–1 scale. Affects water infiltration into drill holes. */
@@ -18,10 +20,18 @@ export interface RockType {
   readonly oreProbabilities: Readonly<Record<string, number>>;
   /** Hex color for placeholder textures. */
   readonly color: string;
+  /** Frequency for 3D Simplex noise in terrain generation. Higher = more detail. */
+  readonly noiseFreq: number;
+  /** Level bias for terrain generation. Higher = more common. Range ~[-1, 1]. */
+  readonly levelBias: number;
 }
 
 // Fracture threshold formula: tier² × 150 + base
 // This gives a smooth curve from ~200 (tier 1) to ~4000 (tier 5).
+//
+// Noise frequency: softer rocks (tier 1) → higher freq (more chaotic);
+// harder rocks (tier 5) → lower freq (more uniform).
+// Level bias: softer rocks → lower bias (rarer); harder → higher bias (more common).
 
 const ROCKS: readonly RockType[] = [
   {
@@ -29,110 +39,140 @@ const ROCKS: readonly RockType[] = [
     nameKey: 'rock.cruite.name',
     descKey: 'rock.cruite.desc',
     hardnessTier: 1,
-    fractureThreshold: 200,   // Soft chalk/marl, real ~2–5 MPa compressive strength
-    density: 2100,             // Real chalk: ~2000–2200 kg/m³
-    porosity: 0.35,            // Real chalk: ~30–40%
+    fractureThreshold: 200,
+    energyAbsorption: 200,
+    density: 2100,
+    porosity: 0.35,
     oreProbabilities: { dirtite: 0.40, rustite: 0.15 },
     color: '#e8dcc8',
+    noiseFreq: 0.08,
+    levelBias: -0.3,
   },
   {
     id: 'sandite',
     nameKey: 'rock.sandite.name',
     descKey: 'rock.sandite.desc',
     hardnessTier: 1,
-    fractureThreshold: 250,   // Sandstone, real ~20–50 MPa
-    density: 2200,             // Real sandstone: ~2200–2400 kg/m³
-    porosity: 0.30,            // Real sandstone: ~15–35%
+    fractureThreshold: 250,
+    energyAbsorption: 250,
+    density: 2200,
+    porosity: 0.30,
     oreProbabilities: { dirtite: 0.30, rustite: 0.20 },
     color: '#d4b483',
+    noiseFreq: 0.10,
+    levelBias: -0.2,
   },
   {
     id: 'molite',
     nameKey: 'rock.molite.name',
     descKey: 'rock.molite.desc',
     hardnessTier: 2,
-    fractureThreshold: 500,   // Limestone, real ~50–100 MPa
-    density: 2400,             // Real limestone: ~2400–2600 kg/m³
-    porosity: 0.20,            // Real limestone: ~10–25%
+    fractureThreshold: 500,
+    energyAbsorption: 500,
+    density: 2400,
+    porosity: 0.20,
     oreProbabilities: { rustite: 0.25, blingite: 0.10, dirtite: 0.15 },
     color: '#c9bfa3',
+    noiseFreq: 0.07,
+    levelBias: 0.0,
   },
   {
     id: 'grumpite',
     nameKey: 'rock.grumpite.name',
     descKey: 'rock.grumpite.desc',
     hardnessTier: 2,
-    fractureThreshold: 600,   // Dolomite, real ~80–120 MPa
-    density: 2550,             // Real dolomite: ~2500–2600 kg/m³
-    porosity: 0.18,            // Real dolomite: ~10–20%
+    fractureThreshold: 600,
+    energyAbsorption: 600,
+    density: 2550,
+    porosity: 0.18,
     oreProbabilities: { rustite: 0.20, blingite: 0.15, gloomium: 0.05 },
     color: '#8a7f72',
+    noiseFreq: 0.06,
+    levelBias: 0.1,
   },
   {
     id: 'clunkite',
     nameKey: 'rock.clunkite.name',
     descKey: 'rock.clunkite.desc',
     hardnessTier: 3,
-    fractureThreshold: 1100,  // Andesite, real ~100–150 MPa
-    density: 2650,             // Real andesite: ~2500–2800 kg/m³
+    fractureThreshold: 1100,
+    energyAbsorption: 1100,
+    density: 2650,
     porosity: 0.12,
     oreProbabilities: { blingite: 0.15, gloomium: 0.10, sparkium: 0.05 },
     color: '#6b6b6b',
+    noiseFreq: 0.05,
+    levelBias: 0.2,
   },
   {
     id: 'stubite',
     nameKey: 'rock.stubite.name',
     descKey: 'rock.stubite.desc',
     hardnessTier: 3,
-    fractureThreshold: 1300,  // Granite, real ~130–200 MPa
-    density: 2700,             // Real granite: ~2600–2800 kg/m³
-    porosity: 0.10,            // Real granite: ~1–5% (boosted for gameplay)
+    fractureThreshold: 1300,
+    energyAbsorption: 1300,
+    density: 2700,
+    porosity: 0.10,
     oreProbabilities: { blingite: 0.12, gloomium: 0.12, sparkium: 0.08 },
     color: '#9e8e7e',
+    noiseFreq: 0.05,
+    levelBias: 0.3,
   },
   {
     id: 'obstiite',
     nameKey: 'rock.obstiite.name',
     descKey: 'rock.obstiite.desc',
     hardnessTier: 4,
-    fractureThreshold: 2200,  // Basalt, real ~150–300 MPa
-    density: 2800,             // Real basalt: ~2800–3000 kg/m³
+    fractureThreshold: 2200,
+    energyAbsorption: 2200,
+    density: 2800,
     porosity: 0.06,
     oreProbabilities: { sparkium: 0.12, craktonite: 0.08, absurdium: 0.03 },
     color: '#3d3d3d',
+    noiseFreq: 0.04,
+    levelBias: 0.4,
   },
   {
     id: 'gnarlite',
     nameKey: 'rock.gnarlite.name',
     descKey: 'rock.gnarlite.desc',
     hardnessTier: 4,
-    fractureThreshold: 2600,  // Gabbro, real ~200–350 MPa
-    density: 2900,             // Real gabbro: ~2900–3100 kg/m³
+    fractureThreshold: 2600,
+    energyAbsorption: 2600,
+    density: 2900,
     porosity: 0.05,
     oreProbabilities: { sparkium: 0.10, craktonite: 0.10, absurdium: 0.05 },
     color: '#2a4a2a',
+    noiseFreq: 0.03,
+    levelBias: 0.5,
   },
   {
     id: 'absurdite',
     nameKey: 'rock.absurdite.name',
     descKey: 'rock.absurdite.desc',
     hardnessTier: 5,
-    fractureThreshold: 3500,  // Quartzite, real ~200–350 MPa (game-scaled higher)
-    density: 3100,             // Real quartzite: ~2600–2700 (game-inflated)
+    fractureThreshold: 3500,
+    energyAbsorption: 3500,
+    density: 3100,
     porosity: 0.03,
     oreProbabilities: { craktonite: 0.08, absurdium: 0.08, treranium: 0.03 },
     color: '#c46bdb',
+    noiseFreq: 0.03,
+    levelBias: 0.6,
   },
   {
     id: 'titanite',
     nameKey: 'rock.titanite.name',
     descKey: 'rock.titanite.desc',
     hardnessTier: 5,
-    fractureThreshold: 4000,  // Fantasy endgame, loosely based on peridotite
-    density: 3300,             // Real peridotite: ~3200–3400 kg/m³
+    fractureThreshold: 4000,
+    energyAbsorption: 4000,
+    density: 3300,
     porosity: 0.02,
     oreProbabilities: { absurdium: 0.10, treranium: 0.08 },
     color: '#1a1a3a',
+    noiseFreq: 0.02,
+    levelBias: 0.7,
   },
 ] as const;
 
