@@ -1,6 +1,16 @@
 // BlastSimulator2026 — 3D voxel grid for terrain representation
 // Each cell holds rock composition, density, ore densities, and fracture modifier.
 
+/**
+ * Voxel cell size in meters.
+ *
+ * One voxel cell = 1 m × 1 m × 1 m (SI units throughout).
+ * All coordinates in the system are in grid-cell units (integer x,y,z).
+ * Multiplying by VOXEL_CELL_SIZE yields world-space meters.
+ * This is an invariant of the grid — do not change.
+ */
+export const VOXEL_CELL_SIZE = 1;
+
 export interface VoxelRockComposition {
   /** Up to N rock types with coefficients summing to 1.0. Empty for air. */
   rocks: Array<{ rockId: string; coefficient: number }>;

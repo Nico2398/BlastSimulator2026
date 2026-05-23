@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { VoxelGrid, getDominantRockId } from '../../../src/core/world/VoxelGrid.js';
+import { VoxelGrid, getDominantRockId, VOXEL_CELL_SIZE } from '../../../src/core/world/VoxelGrid.js';
 
 describe('VoxelGrid', () => {
   it('set and get a voxel at specific coordinates', () => {
@@ -91,5 +91,10 @@ describe('VoxelGrid', () => {
 
   it('getDominantRockId returns empty string for empty composition', () => {
     expect(getDominantRockId({ rocks: [] })).toBe('');
+  });
+
+  it('VOXEL_CELL_SIZE is exported and equals 1 (one meter per cell)', () => {
+    expect(VOXEL_CELL_SIZE).toBeDefined();
+    expect(VOXEL_CELL_SIZE).toBe(1);
   });
 });
