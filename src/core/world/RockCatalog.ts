@@ -18,6 +18,10 @@ export interface RockType {
   readonly oreProbabilities: Readonly<Record<string, number>>;
   /** Hex color for placeholder textures. */
   readonly color: string;
+  /** Frequency scale for Simplex noise terrain generation (per rock type). */
+  readonly noiseFreq: number;
+  /** Level bias for Simplex noise terrain generation. Higher = more common. */
+  readonly levelBias: number;
 }
 
 // Fracture threshold formula: tier² × 150 + base
@@ -34,6 +38,8 @@ const ROCKS: readonly RockType[] = [
     porosity: 0.35,            // Real chalk: ~30–40%
     oreProbabilities: { dirtite: 0.40, rustite: 0.15 },
     color: '#e8dcc8',
+    noiseFreq: 0.04,
+    levelBias: 0.3,
   },
   {
     id: 'sandite',
@@ -45,6 +51,8 @@ const ROCKS: readonly RockType[] = [
     porosity: 0.30,            // Real sandstone: ~15–35%
     oreProbabilities: { dirtite: 0.30, rustite: 0.20 },
     color: '#d4b483',
+    noiseFreq: 0.05,
+    levelBias: 0.2,
   },
   {
     id: 'molite',
@@ -52,10 +60,12 @@ const ROCKS: readonly RockType[] = [
     descKey: 'rock.molite.desc',
     hardnessTier: 2,
     fractureThreshold: 500,   // Limestone, real ~50–100 MPa
-    density: 2400,             // Real limestone: ~2400–2600 kg/m³
+    density: 2400,             // Real limestone: ~2400-2600 kg/m³
     porosity: 0.20,            // Real limestone: ~10–25%
     oreProbabilities: { rustite: 0.25, blingite: 0.10, dirtite: 0.15 },
     color: '#c9bfa3',
+    noiseFreq: 0.06,
+    levelBias: 0.1,
   },
   {
     id: 'grumpite',
@@ -67,6 +77,8 @@ const ROCKS: readonly RockType[] = [
     porosity: 0.18,            // Real dolomite: ~10–20%
     oreProbabilities: { rustite: 0.20, blingite: 0.15, gloomium: 0.05 },
     color: '#8a7f72',
+    noiseFreq: 0.06,
+    levelBias: 0.1,
   },
   {
     id: 'clunkite',
@@ -78,6 +90,8 @@ const ROCKS: readonly RockType[] = [
     porosity: 0.12,
     oreProbabilities: { blingite: 0.15, gloomium: 0.10, sparkium: 0.05 },
     color: '#6b6b6b',
+    noiseFreq: 0.07,
+    levelBias: 0.0,
   },
   {
     id: 'stubite',
@@ -89,6 +103,8 @@ const ROCKS: readonly RockType[] = [
     porosity: 0.10,            // Real granite: ~1–5% (boosted for gameplay)
     oreProbabilities: { blingite: 0.12, gloomium: 0.12, sparkium: 0.08 },
     color: '#9e8e7e',
+    noiseFreq: 0.07,
+    levelBias: 0.0,
   },
   {
     id: 'obstiite',
@@ -100,6 +116,8 @@ const ROCKS: readonly RockType[] = [
     porosity: 0.06,
     oreProbabilities: { sparkium: 0.12, craktonite: 0.08, absurdium: 0.03 },
     color: '#3d3d3d',
+    noiseFreq: 0.08,
+    levelBias: -0.1,
   },
   {
     id: 'gnarlite',
@@ -111,6 +129,8 @@ const ROCKS: readonly RockType[] = [
     porosity: 0.05,
     oreProbabilities: { sparkium: 0.10, craktonite: 0.10, absurdium: 0.05 },
     color: '#2a4a2a',
+    noiseFreq: 0.08,
+    levelBias: -0.2,
   },
   {
     id: 'absurdite',
@@ -122,6 +142,8 @@ const ROCKS: readonly RockType[] = [
     porosity: 0.03,
     oreProbabilities: { craktonite: 0.08, absurdium: 0.08, treranium: 0.03 },
     color: '#c46bdb',
+    noiseFreq: 0.09,
+    levelBias: -0.3,
   },
   {
     id: 'titanite',
@@ -133,6 +155,8 @@ const ROCKS: readonly RockType[] = [
     porosity: 0.02,
     oreProbabilities: { absurdium: 0.10, treranium: 0.08 },
     color: '#1a1a3a',
+    noiseFreq: 0.10,
+    levelBias: -0.4,
   },
 ] as const;
 

@@ -1,9 +1,10 @@
 // BlastSimulator2026 — Procedural terrain generation
 // Uses simplex noise + seeded PRNG to populate a VoxelGrid.
+// Per-voxel rock composition: per-rock 3D Simplex noise field + level bias, normalized.
 
 import { createNoise2D, createNoise3D } from 'simplex-noise';
 import { Random } from '../math/Random.js';
-import { VoxelGrid, type VoxelData } from './VoxelGrid.js';
+import { VoxelGrid, type VoxelCell } from './VoxelGrid.js';
 import { getAllRocks, type RockType } from './RockCatalog.js';
 import type { MinePreset } from './MineType.js';
 
@@ -19,7 +20,7 @@ export interface TerrainConfig {
  * Generate terrain into a new VoxelGrid.
  * Algorithm:
  *   1. Compute surface height per (x, z) using layered 2D simplex noise
- *   2. Fill voxels below surface with rock (type chosen by 3D noise biome)
+ *   2. Fill voxels below surface with rock composition (per-rock 3D simplex + bias, normalized)
  *   3. Distribute ore veins using separate 3D noise per ore type
  *   4. Clear border zone of ores (neutral zone)
  */
@@ -46,14 +47,14 @@ export function generateTerrain(config: TerrainConfig): VoxelGrid {
           continue;
         }
 
-        const rock = pickRock(x, y, z, rocks, noise3dRock);
+        const composition = computeComposition(x, y, z, rocks, noise3dRock);
         const inBorder = isInBorderZone(x, z, sizeX, sizeZ, preset.borderWidth);
         const oreDensities = inBorder
           ? {}
-          : computeOreDensities(x, y, z, rock, preset.oreRichness, noise3dOre);
+          : computeOreDensities(x, y, z, rocks, composition, preset.oreRichness, noise3dOre);
 
-        const voxel: VoxelData = {
-          rockId: rock.id,
+        const voxel: VoxelCell = {
+          composition,
           density: 1.0,
           oreDensities,
           fractureModifier: 1.0,
@@ -91,7 +92,7 @@ function computeSurfaceHeight(
   return Math.max(1, Math.min(sizeY - 1, Math.round(height)));
 }
 
-/** Select and weight rocks based on the preset's dominant rock list. */
+/** Select rocks based on the preset's dominant rock list. */
 function selectRocksByPreset(preset: MinePreset): RockType[] {
   const allRocks = getAllRocks();
   const selected: RockType[] = [];
@@ -103,17 +104,40 @@ function selectRocksByPreset(preset: MinePreset): RockType[] {
   return selected.length > 0 ? selected : [...allRocks];
 }
 
-/** Pick a rock type for a given voxel using 3D noise as biome selector. */
-function pickRock(
+/**
+ * Compute rock composition for a voxel using per-rock 3D Simplex noise + level bias.
+ * Normalized so coefficients sum to 1.0.
+ * 
+ * raw[r] = simplex3(x * r.noiseFreq, y * r.noiseFreq, z * r.noiseFreq) + r.levelBias
+ * coefficient[r] = max(0, raw[r]) / sum(max(0, raw))
+ */
+function computeComposition(
   x: number, y: number, z: number,
   rocks: RockType[],
   noise3d: ReturnType<typeof createNoise3D>,
-): RockType {
-  // Use 3D noise to smoothly blend between rock types
-  const n = noise3d(x * 0.05, y * 0.08, z * 0.05);
-  // Map [-1, 1] to [0, rocks.length)
-  const idx = Math.floor(((n + 1) / 2) * rocks.length);
-  return rocks[Math.min(idx, rocks.length - 1)]!;
+): { rocks: Array<{ rockId: string; coefficient: number }> } {
+  const raw: number[] = [];
+  let sumPos = 0;
+
+  for (const rock of rocks) {
+    const n = noise3d(x * rock.noiseFreq, y * rock.noiseFreq, z * rock.noiseFreq);
+    const rawVal = n + rock.levelBias;
+    const pos = Math.max(0, rawVal);
+    raw.push(pos);
+    sumPos += pos;
+  }
+
+  const result: Array<{ rockId: string; coefficient: number }> = [];
+  if (sumPos > 0) {
+    for (let i = 0; i < rocks.length; i++) {
+      const coeff = raw[i]! / sumPos;
+      if (coeff > 0.001) {
+        result.push({ rockId: rocks[i]!.id, coefficient: Math.round(coeff * 1000) / 1000 });
+      }
+    }
+  }
+
+  return { rocks: result };
 }
 
 /** Check if a position is in the neutral border zone. */
@@ -126,16 +150,28 @@ function isInBorderZone(
     || z < borderWidth || z >= sizeZ - borderWidth;
 }
 
-/** Compute ore densities for a voxel based on rock type and noise. */
+/** Compute ore densities for a voxel based on rock types and noise. */
 function computeOreDensities(
   x: number, y: number, z: number,
-  rock: RockType,
+  rocks: RockType[],
+  composition: { rocks: Array<{ rockId: string; coefficient: number }> },
   richnessMod: number,
   noise3d: ReturnType<typeof createNoise3D>,
 ): Record<string, number> {
   const ores: Record<string, number> = {};
 
-  for (const [oreId, probability] of Object.entries(rock.oreProbabilities)) {
+  // Collect all ore probabilities weighted by rock composition coefficients
+  const oreProbMap = new Map<string, number>();
+  for (const comp of composition.rocks) {
+    const rock = rocks.find(r => r.id === comp.rockId);
+    if (!rock) continue;
+    for (const [oreId, probability] of Object.entries(rock.oreProbabilities)) {
+      const current = oreProbMap.get(oreId) ?? 0;
+      oreProbMap.set(oreId, current + probability * comp.coefficient);
+    }
+  }
+
+  for (const [oreId, probability] of oreProbMap) {
     // Use noise with ore-specific offset for vein-like patterns
     const oreHash = simpleHash(oreId);
     const n = noise3d(

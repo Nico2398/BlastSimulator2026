@@ -6,6 +6,7 @@ import type { HoleCharge } from '../mining/ChargePlan.js';
 import { getRock } from '../world/RockCatalog.js';
 import { getExplosive } from '../world/ExplosiveCatalog.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
+import { getPrimaryRockId } from '../world/VoxelGrid.js';
 import { rainIntensity, type WeatherState } from './WeatherCycle.js';
 
 // ── Hole flooding ──
@@ -91,8 +92,9 @@ export function getHolePorosity(
 
   for (let y = 0; y < hole.depth; y++) {
     const voxel = grid.getVoxel(Math.round(hole.x), y, Math.round(hole.z));
-    if (voxel && voxel.rockId) {
-      const rock = getRock(voxel.rockId);
+    if (voxel && voxel.composition.rocks.length > 0) {
+      const primaryRockId = getPrimaryRockId(voxel.composition);
+      const rock = getRock(primaryRockId);
       if (rock) {
         totalPorosity += rock.porosity;
         count++;

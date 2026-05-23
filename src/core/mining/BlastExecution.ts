@@ -19,7 +19,8 @@ import {
 } from './BlastCalc.js';
 import { getRock } from '../world/RockCatalog.js';
 import { getOre } from '../world/OreCatalog.js';
-import type { VoxelGrid, VoxelData } from '../world/VoxelGrid.js';
+import type { VoxelGrid, VoxelCell } from '../world/VoxelGrid.js';
+import { getPrimaryRockId } from '../world/VoxelGrid.js';
 import { getBuildingDef, destroyBuilding, type BuildingState, type Building, type BuildingType } from '../entities/Building.js';
 
 // ── Config ──
@@ -158,7 +159,8 @@ export function executeBlast(
         const voxel = grid.getVoxel(x, y, z);
         if (!voxel || voxel.density <= 0) continue;
 
-        const rock = getRock(voxel.rockId);
+        const primaryRockId = getPrimaryRockId(voxel.composition);
+        const rock = getRock(primaryRockId);
         if (!rock) continue;
 
         const point = vec3(x, y, z);
@@ -185,7 +187,7 @@ export function executeBlast(
               position: point,
               volume: voxelVolume / fragCount,
               mass,
-              rockId: voxel.rockId,
+              rockId: primaryRockId,
               oreDensities: { ...voxel.oreDensities },
               initialVelocity: vel,
               isProjection: frag.isProjection || speed > 15,
@@ -395,7 +397,7 @@ function calculateBlastCenter(holes: readonly DrillHole[]): { x: number; z: numb
   return { x: sx / holes.length, z: sz / holes.length };
 }
 
-function calculateOreValue(voxel: VoxelData, voxelSize: number): number {
+function calculateOreValue(voxel: VoxelCell, voxelSize: number): number {
   const volume = voxelSize * voxelSize * voxelSize;
   let value = 0;
   for (const [oreId, density] of Object.entries(voxel.oreDensities)) {

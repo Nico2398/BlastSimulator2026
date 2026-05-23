@@ -4,6 +4,7 @@
 
 import type { BlastPlan } from './BlastPlan.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
+import { getPrimaryRockId } from '../world/VoxelGrid.js';
 import type { VillagePosition } from './BlastExecution.js';
 import { vec3 } from '../math/Vec3.js';
 import { getRock } from '../world/RockCatalog.js';
@@ -138,7 +139,8 @@ export function previewFragments(
       for (let x = bbox.minX; x <= bbox.maxX; x++) {
         const voxel = grid.getVoxel(x, y, z);
         if (!voxel || voxel.density <= 0) continue;
-        const rock = getRock(voxel.rockId);
+        const primaryRockId = getPrimaryRockId(voxel.composition);
+        const rock = getRock(primaryRockId);
         if (!rock) continue;
 
         const energy = calculateEnergyField(vec3(x, y, z), plan.holes, plan.charges, holeDepths, holeSurfaceYs);
@@ -185,7 +187,8 @@ export function previewProjections(
       for (let x = bbox.minX; x <= bbox.maxX; x++) {
         const voxel = grid.getVoxel(x, y, z);
         if (!voxel || voxel.density <= 0) continue;
-        const rock = getRock(voxel.rockId);
+        const primaryRockId = getPrimaryRockId(voxel.composition);
+        const rock = getRock(primaryRockId);
         if (!rock) continue;
 
         const energy = calculateEnergyField(vec3(x, y, z), plan.holes, plan.charges, holeDepths, holeSurfaceYs);
