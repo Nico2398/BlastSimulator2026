@@ -3,8 +3,8 @@ name: reviewer
 description: >
   PR audit + merge gate. Audits PR for architecture, i18n, style, correctness.
   Runs full test suite. Posts APPROVED when all checks pass — triggers auto-merge.
-mode: subagent
-hidden: true
+user-invocable: false
+disable-model-invocation: true
 tools: ["read", "edit", "search", "execute"]
 ---
 

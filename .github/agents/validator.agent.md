@@ -4,8 +4,8 @@ description: >
   Validation specialist: runs full test suite, type checking, build.
   Detects regressions, type errors, build failures.
   Reports pass/fail with actionable diagnostics.
-mode: subagent
-hidden: true
+user-invocable: false
+disable-model-invocation: true
 tools: ["read", "search", "execute"]
 ---
 

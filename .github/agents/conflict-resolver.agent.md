@@ -3,8 +3,8 @@ name: conflict-resolver
 description: >
   Resolves git cherry-pick merge conflicts. Reads conflicted files, merges both sides,
   removes conflict markers, stages resolved files.
-mode: subagent
-hidden: true
+user-invocable: false
+disable-model-invocation: true
 tools: ["read", "edit", "search", "execute"]
 ---
 

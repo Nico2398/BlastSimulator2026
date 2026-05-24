@@ -3,8 +3,8 @@ name: implementer
 description: >
   TDD Green phase: minimum code to make failing tests pass.
   Correctness over elegance. Respects architecture + conventions.
-mode: subagent
-hidden: true
+user-invocable: false
+disable-model-invocation: true
 tools: ["read", "edit", "search", "execute"]
 ---
 

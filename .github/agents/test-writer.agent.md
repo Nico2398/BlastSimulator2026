@@ -3,8 +3,8 @@ name: test-writer
 description: >
   TDD Red phase: writes failing tests before implementation.
   Unit tests, integration tests, scenario definitions.
-mode: subagent
-hidden: true
+user-invocable: false
+disable-model-invocation: true
 tools: ["read", "edit", "search", "execute"]
 ---
 

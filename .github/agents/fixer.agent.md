@@ -3,8 +3,8 @@ name: fixer
 description: >
   Independent bug-fix specialist: fixes failing tests from error output
   and stack traces only — never reads test source. Non-biased fix.
-mode: subagent
-hidden: true
+user-invocable: false
+disable-model-invocation: true
 tools: ["read", "edit", "search", "execute"]
 ---
 

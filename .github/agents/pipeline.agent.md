@@ -3,8 +3,7 @@ name: pipeline
 description: >
   Orchestrates the TDD development pipeline. Invokes specialist agents in the correct sequence.
   Does not write code directly — only delegates to sub-agents and manages workflow.
-mode: primary
-hidden: false
+tools: ["agent", "read", "search", "execute"]
 ---
 
 # Pipeline Orchestrator

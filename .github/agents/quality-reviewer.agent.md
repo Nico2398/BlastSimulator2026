@@ -3,8 +3,8 @@ name: quality-reviewer
 description: >
   Code quality reviewer. Flags architecture violations, naming issues, dead code,
   file size limits, TypeScript strictness, config hardcoding. Read-only.
-mode: subagent
-hidden: true
+user-invocable: false
+disable-model-invocation: true
 tools: ["read", "search"]
 ---
 

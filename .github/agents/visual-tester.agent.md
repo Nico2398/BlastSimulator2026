@@ -3,8 +3,8 @@ name: visual-tester
 description: >
   Visual testing: Puppeteer scenario tests, screenshots, state dumps.
   Use when change affects rendering, UI, or visual presentation.
-mode: subagent
-hidden: true
+user-invocable: false
+disable-model-invocation: true
 tools: ["read", "search", "execute"]
 ---
 

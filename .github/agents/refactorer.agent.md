@@ -4,8 +4,8 @@ description: >
   TDD Refactor phase: cleans up implementation for clarity,
   maintainability, convention compliance. No behavior change.
   All tests must still pass after refactoring.
-mode: subagent
-hidden: true
+user-invocable: false
+disable-model-invocation: true
 tools: ["read", "edit", "search", "execute"]
 ---
 

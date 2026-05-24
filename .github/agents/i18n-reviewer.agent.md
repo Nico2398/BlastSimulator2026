@@ -3,8 +3,8 @@ name: i18n-reviewer
 description: >
   Internationalization reviewer. Flags hardcoded user-facing strings, missing
   translation keys, en.json/fr.json mismatches. Read-only.
-mode: subagent
-hidden: true
+user-invocable: false
+disable-model-invocation: true
 tools: ["read", "search"]
 ---
 
