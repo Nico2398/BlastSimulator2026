@@ -329,7 +329,9 @@ function isAirVoxel(voxel: VoxelData): boolean {
 /**
  * Propagate energy through the voxel grid using iterative overflow.
  * Each voxel absorbs up to T(v) - already_absorbed, then distributes
- * leftover energy equally among up to 6 face-adjacent non-air neighbours.
+ * leftover energy equally among face-adjacent non-air neighbours that
+ * still have remaining absorption capacity.  This prevents energy from
+ * bouncing endlessly between already-saturated voxels.
  *
  * Pure function — does not mutate the VoxelGrid.
  *
@@ -416,7 +418,9 @@ export function propagateEnergy(
         // Track overflow that passed through this voxel
         generatedOverflow.set(key, (generatedOverflow.get(key) ?? 0) + leftover);
 
-        // Distribute leftover equally to valid face-adjacent non-air neighbours
+        // Distribute leftover equally to face-adjacent non-air neighbours
+        // that still have remaining absorption capacity.
+        // Skipping already-saturated neighbours prevents endless bounce loops.
         const validNeighbors: string[] = [];
 
         for (const [dx, dy, dz] of NEIGHBOR_OFFSETS) {
@@ -429,7 +433,13 @@ export function propagateEnergy(
           const nvoxel = grid.getVoxel(nx, ny, nz);
           if (!nvoxel || isAirVoxel(nvoxel)) continue;
 
-          validNeighbors.push(`${nx},${ny},${nz}`);
+          // Only distribute to neighbours that still have capacity to absorb
+          const nkey = `${nx},${ny},${nz}`;
+          const neighborThreshold = computeThreshold(nvoxel);
+          const neighborEffective = effectiveEnergy.get(nkey) ?? 0;
+          if (neighborEffective < neighborThreshold) {
+            validNeighbors.push(nkey);
+          }
         }
 
         if (validNeighbors.length > 0) {
@@ -439,7 +449,7 @@ export function propagateEnergy(
           }
           anyChange = true;
         }
-        // If no valid neighbors, leftover stays in generatedOverflow (cannot dissipate).
+        // If no valid unsaturated neighbors, leftover stays in generatedOverflow (cannot dissipate).
         // Loop will detect no change next iteration and break.
       }
     }
