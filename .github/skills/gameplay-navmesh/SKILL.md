@@ -1,5 +1,5 @@
 ---
-name: navmesh
+name: gameplay-navmesh
 description: >
   NavMesh and pathfinding specification for BlastSimulator2026: 2D NavGrid derived from
   VoxelGrid surface, A* with 8-directional movement and octile heuristic, multi-level

@@ -1,5 +1,5 @@
 ---
-name: visual-testing
+name: dev-visual-testing
 description: >
   Visual and scenario testing guide for BlastSimulator2026: taking screenshots, running
   Puppeteer scenario tests, inspecting state dumps, UI diagnostics, and before/after

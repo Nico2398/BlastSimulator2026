@@ -4,7 +4,13 @@
 
 ## Skills
 
-Skills in `.github/skills/` auto-load based on task relevance: `architecture`, `blast-system`, `buildings`, `vehicle-fleet`, `employee-skills`, `survey-system`, `navmesh`, `employee-needs`, `game-design`, `testing-strategy`, `visual-testing`, `coding-conventions`, `autonomous-pipeline`.
+Skills in `.github/skills/` auto-load based on task relevance. Organized by prefix:
+
+| Category | Prefix | Skills |
+|----------|--------|--------|
+| **Gameplay** | `gameplay-*` | `blast-system`, `buildings`, `vehicle-fleet`, `employee-skills`, `employee-needs`, `survey-system`, `navmesh`, `game-design` |
+| **Dev** | `dev-*` | `architecture`, `coding-conventions`, `testing-strategy`, `visual-testing` |
+| **Agentic** | `agentic-*` | `backlog`, `autonomous-pipeline` |
 
 ## Custom Agents — TDD Development Pipeline
 
@@ -53,12 +59,12 @@ Key patterns: single serializable `GameState`, tick-based loop with `timeScale`/
 
 | System | Skill | Location |
 |--------|-------|----------|
-| Blast pipeline | `blast-system` | `src/core/mining/BlastCalc.ts` |
-| Event system | `game-design` | `src/core/events/` |
-| Campaign/levels | `game-design` | `src/core/campaign/` |
-| Save system | `architecture` | `src/persistence/` |
-| Score system | `game-design` | `src/core/scores/` |
-| Scenario tests | `visual-testing` | `scripts/scenario-test.ts`, `scripts/scenario-defs/` |
+| Blast pipeline | `gameplay-blast-system` | `src/core/mining/BlastCalc.ts` |
+| Event system | `gameplay-game-design` | `src/core/events/` |
+| Campaign/levels | `gameplay-game-design` | `src/core/campaign/` |
+| Save system | `dev-architecture` | `src/persistence/` |
+| Score system | `gameplay-game-design` | `src/core/scores/` |
+| Scenario tests | `dev-visual-testing` | `scripts/scenario-test.ts`, `scripts/scenario-defs/` |
 
 ## Quick Reference — Validation Commands
 

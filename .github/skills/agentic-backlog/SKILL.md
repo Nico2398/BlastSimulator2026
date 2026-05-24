@@ -1,5 +1,5 @@
 ---
-name: backlog
+name: agentic-backlog
 description: >
   Backlog management for BlastSimulator2026: task list derived from NEXT_PHASE_DESIGN.md,
   CLI operations (list, next, start, done, block, reset, stats), pipeline integration rules,

@@ -3,6 +3,8 @@ name: review-coordinator
 description: >
   Merges findings from specialized sub-reviewers. Deduplicates, re-categorizes,
   drops false positives, makes final pass/fail decision. Read-only.
+mode: subagent
+hidden: true
 tools: ["read", "search"]
 ---
 

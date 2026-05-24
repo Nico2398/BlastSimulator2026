@@ -3,6 +3,8 @@ name: implementer
 description: >
   TDD Green phase: minimum code to make failing tests pass.
   Correctness over elegance. Respects architecture + conventions.
+mode: subagent
+hidden: true
 tools: ["read", "edit", "search", "execute"]
 ---
 
@@ -31,8 +33,8 @@ Adding/modifying console command:
 
 ## Key References
 
-- `architecture` — module boundaries, data flow
-- `coding-conventions` — style, naming, error handling
-- `blast-system` — blast mechanics
-- `game-design` — game features
-- `testing-strategy` — test expectations
+- `dev-architecture` — module boundaries, data flow
+- `dev-coding-conventions` — style, naming, error handling
+- `gameplay-blast-system` — blast mechanics
+- `gameplay-game-design` — game features
+- `dev-testing-strategy` — test expectations

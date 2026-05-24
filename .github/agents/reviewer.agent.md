@@ -3,6 +3,8 @@ name: reviewer
 description: >
   PR audit + merge gate. Audits PR for architecture, i18n, style, correctness.
   Runs full test suite. Posts APPROVED when all checks pass — triggers auto-merge.
+mode: subagent
+hidden: true
 tools: ["read", "edit", "search", "execute"]
 ---
 
@@ -31,7 +33,7 @@ Per changed file, verify:
 - **No stale workarounds.** Remove `as any`/`as unknown` casts, feature flags, compat shims once missing piece exists.
 - **`TODO`/`FIXME` resolved.** Items addressed by this PR: deleted, not left dangling.
 - **Naming consistent.** Identifiers, constants, config keys use same words across code/comments/tests.
-- **Conventions followed** (`coding-conventions` skill): naming, exports, file length, PRNG, i18n.
+- **Conventions followed** (`dev-coding-conventions` skill): naming, exports, file length, PRNG, i18n.
 
 Fix every mismatch before proceeding.
 
@@ -40,7 +42,7 @@ Fix every mismatch before proceeding.
 - Theoretical risks requiring unlikely preconditions
 - Issues in unchanged code that this PR doesn't affect
 - "Consider using library X" suggestions
-- Style preferences not in `coding-conventions` skill
+- Style preferences not in `dev-coding-conventions` skill
 - `as any` in test fixtures (acceptable)
 - Missing tests for trivial getters/setters/constants
 - Nitpicks on naming when convention is ambiguous
@@ -101,6 +103,6 @@ Triggers `langgraph-agent.yml` → PR merge. No push, edit, or tool call after A
 
 ## Key References
 
-- `coding-conventions` — full quality checklist
-- `architecture` — module boundaries + data flow constraints
-- `autonomous-pipeline` — merge loop mechanics
+- `dev-coding-conventions` — full quality checklist
+- `dev-architecture` — module boundaries + data flow constraints
+- `agentic-autonomous-pipeline` — merge loop mechanics

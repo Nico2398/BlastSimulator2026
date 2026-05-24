@@ -1,5 +1,5 @@
 ---
-name: autonomous-pipeline
+name: agentic-autonomous-pipeline
 description: >
   Guide for the fully autonomous AI development pipeline using LangGraph: repository settings,
   automation workflows, code review strategy, issue management, and troubleshooting.

@@ -1,5 +1,5 @@
 ---
-name: blast-system
+name: gameplay-blast-system
 description: >
   Full blast pipeline specification for BlastSimulator2026: 4-step simulation (energy propagation,
   Voronoi fragmentation, fragment shape generation, tiered physics). Covers voxel rock composition,

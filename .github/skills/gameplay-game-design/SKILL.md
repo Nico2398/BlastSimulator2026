@@ -1,5 +1,5 @@
 ---
-name: game-design
+name: gameplay-game-design
 description: >
   Complete game design document for BlastSimulator2026: satirical open-pit mine management game.
   Covers core gameplay loop, mining mechanics, economy, events, corruption, world generation,

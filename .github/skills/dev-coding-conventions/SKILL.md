@@ -1,5 +1,5 @@
 ---
-name: coding-conventions
+name: dev-coding-conventions
 description: >
   Coding conventions, workflow rules, and style guidelines for BlastSimulator2026: TypeScript strict,
   naming conventions, i18n rules, error handling, console command patterns, and performance

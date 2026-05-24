@@ -1,5 +1,5 @@
 ---
-name: employee-needs
+name: gameplay-employee-needs
 description: >
   Employee needs system for BlastSimulator2026: 3 need gauges (hunger, fatigue, break pressure),
   morale effects, collapse and interruption, proactive queue insertion, building replenishment

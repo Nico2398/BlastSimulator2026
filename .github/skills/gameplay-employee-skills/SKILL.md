@@ -1,5 +1,5 @@
 ---
-name: employee-skills
+name: gameplay-employee-skills
 description: >
   Employee skills and task queue system for BlastSimulator2026: skill categories,
   proficiency levels (1-5), XP gain, task duration formula, pending-action pool,

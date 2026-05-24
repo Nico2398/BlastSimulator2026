@@ -1,5 +1,5 @@
 ---
-name: survey-system
+name: gameplay-survey-system
 description: >
   Rock composition and survey system for BlastSimulator2026: 3 survey methods (seismic,
   core sample, aerial), estimation algorithm with Gaussian noise and skill scaling,

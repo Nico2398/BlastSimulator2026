@@ -1,5 +1,5 @@
 ---
-name: testing-strategy
+name: dev-testing-strategy
 description: >
   Testing strategy and conventions for BlastSimulator2026: 4-layer test pyramid (unit, integration,
   visual, scenario), Vitest patterns, per-chapter coverage goals, integration test suites with

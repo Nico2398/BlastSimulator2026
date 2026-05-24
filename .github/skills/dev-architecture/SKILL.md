@@ -1,5 +1,5 @@
 ---
-name: architecture
+name: dev-architecture
 description: >
   Technical architecture of BlastSimulator2026: module boundaries, data flow, state management,
   tick-based game loop, event-driven communication, and deployment. Use when working on any

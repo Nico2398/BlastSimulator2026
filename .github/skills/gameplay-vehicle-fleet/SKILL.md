@@ -1,5 +1,5 @@
 ---
-name: vehicle-fleet
+name: gameplay-vehicle-fleet
 description: >
   Vehicle fleet specification for BlastSimulator2026: 5 vehicle roles with 3 tiers each,
   TypeScript schemas, driver qualification, traffic and routing logic, task types,

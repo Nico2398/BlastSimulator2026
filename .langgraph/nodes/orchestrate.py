@@ -51,17 +51,20 @@ def _classify(labels: list[str], title: str, comment: str) -> str:
 
 
 _SKILL_KEYWORDS: dict[str, list[str]] = {
-    "blast-system": ["blast", "explosion", "fragment", "voronoi", "energy"],
-    "navmesh": ["navmesh", "pathfind", "ramp", "navigation", "movement"],
-    "buildings": ["building", "canteen", "bunkhouse", "warehouse"],
-    "vehicle-fleet": ["vehicle", "truck", "drill", "haul", "driver"],
-    "employee-skills": ["skill", "xp", "proficiency", "levelup", "level up"],
-    "employee-needs": ["hunger", "fatigue", "morale", "need", "rest"],
-    "survey-system": ["survey", "seismic", "core sample", "ore grade"],
-    "game-design": ["event", "campaign", "economy", "score"],
-    "architecture": ["module", "architecture", "refactor", "structure"],
-    "testing-strategy": ["test", "vitest", "coverage", "unit test"],
-    "coding-conventions": ["convention", "style", "lint", "naming"],
+    "gameplay-blast-system": ["blast", "explosion", "fragment", "voronoi", "energy"],
+    "gameplay-navmesh": ["navmesh", "pathfind", "ramp", "navigation", "movement"],
+    "gameplay-buildings": ["building", "canteen", "bunkhouse", "warehouse"],
+    "gameplay-vehicle-fleet": ["vehicle", "truck", "drill", "haul", "driver"],
+    "gameplay-employee-skills": ["skill", "xp", "proficiency", "levelup", "level up"],
+    "gameplay-employee-needs": ["hunger", "fatigue", "morale", "need", "rest"],
+    "gameplay-survey-system": ["survey", "seismic", "core sample", "ore grade"],
+    "gameplay-game-design": ["event", "campaign", "economy", "score"],
+    "dev-architecture": ["module", "architecture", "refactor", "structure"],
+    "dev-testing-strategy": ["test", "vitest", "coverage", "unit test"],
+    "dev-coding-conventions": ["convention", "style", "lint", "naming"],
+    "dev-visual-testing": ["visual", "screenshot", "puppeteer", "rendering"],
+    "agentic-backlog": ["backlog"],
+    "agentic-autonomous-pipeline": ["pipeline", "langgraph", "autonomous"],
 }
 
 

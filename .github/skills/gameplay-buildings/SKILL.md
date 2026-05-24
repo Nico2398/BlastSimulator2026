@@ -1,5 +1,5 @@
 ---
-name: buildings
+name: gameplay-buildings
 description: >
   Buildings system specification for BlastSimulator2026: 9 building types with 3 tiers each,
   placement rules, training buildings, living quarters, warehouses, Research Center,
