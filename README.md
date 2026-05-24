@@ -104,22 +104,4 @@ scripts/
   validate.sh         Full validation pipeline
   visual-test.sh      One-command screenshot capture helper
   screenshot.ts       Puppeteer-based screenshot script
-
-.agent/               Technical documentation (see below)
 ```
-
----
-
-## Technical Documentation
-
-Detailed specs live in `.agent/`:
-
-| Document | Contents |
-|----------|----------|
-| `.agent/ARCHITECTURE.md` | Layer rules, directory structure, data flow diagrams |
-| `.agent/BLAST_SYSTEM.md` | Blast physics algorithm specification |
-| `.agent/GAME_DESIGN.md` | Game design bible: mechanics, events, campaign, tone |
-| `.agent/TESTING.md` | Testing strategy, patterns, coverage goals |
-| `.agent/WORKFLOW.md` | How to approach bug fixes and feature requests |
-| `.agent/VISUAL_TESTING.md` | Visual verification with screenshots |
-| `.agent/archive/` | Historical development phase records |
