@@ -16,8 +16,11 @@ import {
   isOversized,
   OVERSIZED_FRAGMENT_THRESHOLD,
   resetBoulderFragIds,
+  computeThreshold,
   type Boulder,
 } from '../../../src/core/mining/BlastCalc.js';
+import type { VoxelData } from '../../../src/core/world/VoxelGrid.js';
+import { getRock } from '../../../src/core/world/RockCatalog.js';
 import { vec3, length } from '../../../src/core/math/Vec3.js';
 import { createGridPlan, resetHoleIds } from '../../../src/core/mining/DrillPlan.js';
 import { Random } from '../../../src/core/math/Random.js';
@@ -338,5 +341,152 @@ describe('BlastCalc — fragmentBoulder', () => {
     for (const id of ids) {
       expect(id).not.toBe(oversizedBoulder.id);
     }
+  });
+});
+
+// ── 5.3: computeThreshold ──
+
+describe('BlastCalc — computeThreshold', () => {
+  // ── Known rock data from RockCatalog ────────────────────────────────────────
+  // cruite:     hardnessTier 1, energyAbsorption = 200
+  // sandite:    hardnessTier 1, energyAbsorption = 250
+  // titanite:   hardnessTier 5, energyAbsorption = 4000
+
+  const cruiteAbsorption = getRock('cruite')!.energyAbsorption;   // 200
+  const sanditeAbsorption = getRock('sandite')!.energyAbsorption;  // 250
+  const titaniteAbsorption = getRock('titanite')!.energyAbsorption; // 4000
+
+  it('returns 0 for an air voxel (empty composition)', () => {
+    const voxel: VoxelData = {
+      composition: { rocks: [] },
+      density: 0,
+      oreDensities: {},
+      fractureModifier: 1.0,
+    };
+    expect(computeThreshold(voxel)).toBe(0);
+  });
+
+  it('returns the rock energyAbsorption for a single rock type with coefficient 1.0', () => {
+    const voxel: VoxelData = {
+      composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
+      density: 1.0,
+      oreDensities: {},
+      fractureModifier: 1.0,
+    };
+    expect(computeThreshold(voxel)).toBe(cruiteAbsorption);
+  });
+
+  it('returns correct weighted sum for multiple rock types', () => {
+    // 0.6 × cruite (200) + 0.4 × titanite (4000)
+    const expected = 0.6 * cruiteAbsorption + 0.4 * titaniteAbsorption;
+    const voxel: VoxelData = {
+      composition: {
+        rocks: [
+          { rockId: 'cruite', coefficient: 0.6 },
+          { rockId: 'titanite', coefficient: 0.4 },
+        ],
+      },
+      density: 1.0,
+      oreDensities: {},
+      fractureModifier: 1.0,
+    };
+    expect(computeThreshold(voxel)).toBeCloseTo(expected, 10);
+  });
+
+  it('returns correct weighted sum for three rock types', () => {
+    // 0.5 × cruite (200) + 0.3 × sandite (250) + 0.2 × titanite (4000)
+    const expected = 0.5 * cruiteAbsorption + 0.3 * sanditeAbsorption + 0.2 * titaniteAbsorption;
+    const voxel: VoxelData = {
+      composition: {
+        rocks: [
+          { rockId: 'cruite', coefficient: 0.5 },
+          { rockId: 'sandite', coefficient: 0.3 },
+          { rockId: 'titanite', coefficient: 0.2 },
+        ],
+      },
+      density: 1.0,
+      oreDensities: {},
+      fractureModifier: 1.0,
+    };
+    expect(computeThreshold(voxel)).toBeCloseTo(expected, 10);
+  });
+
+  it('returns 0 when all coefficients are 0', () => {
+    const voxel: VoxelData = {
+      composition: {
+        rocks: [
+          { rockId: 'cruite', coefficient: 0 },
+          { rockId: 'titanite', coefficient: 0 },
+        ],
+      },
+      density: 1.0,
+      oreDensities: {},
+      fractureModifier: 1.0,
+    };
+    expect(computeThreshold(voxel)).toBe(0);
+  });
+
+  it('gracefully handles unknown rockId (treats as zero contribution)', () => {
+    const voxel: VoxelData = {
+      composition: {
+        rocks: [
+          { rockId: 'nonexistent_rock', coefficient: 1.0 },
+        ],
+      },
+      density: 1.0,
+      oreDensities: {},
+      fractureModifier: 1.0,
+    };
+    // Unknown rock → getRock returns undefined → contribution is 0
+    expect(computeThreshold(voxel)).toBe(0);
+  });
+
+  it('gracefully handles unknown rockId in multi-rock composition', () => {
+    // 0.7 × cruite (200) + 0.3 × nonexistent (0)
+    const expected = 0.7 * cruiteAbsorption;
+    const voxel: VoxelData = {
+      composition: {
+        rocks: [
+          { rockId: 'cruite', coefficient: 0.7 },
+          { rockId: 'made_up_rock', coefficient: 0.3 },
+        ],
+      },
+      density: 1.0,
+      oreDensities: {},
+      fractureModifier: 1.0,
+    };
+    expect(computeThreshold(voxel)).toBeCloseTo(expected, 10);
+  });
+
+  it('returns correct result with partial fill (coefficients sum < 1.0)', () => {
+    // 0.5 × cruite (200) — only one rock, sum = 0.5 (partial void/porosity)
+    const expected = 0.5 * cruiteAbsorption;
+    const voxel: VoxelData = {
+      composition: {
+        rocks: [
+          { rockId: 'cruite', coefficient: 0.5 },
+        ],
+      },
+      density: 0.5,
+      oreDensities: {},
+      fractureModifier: 1.0,
+    };
+    expect(computeThreshold(voxel)).toBeCloseTo(expected, 10);
+  });
+
+  it('does not mutate the input voxel object', () => {
+    const voxel: VoxelData = {
+      composition: {
+        rocks: [
+          { rockId: 'cruite', coefficient: 1.0 },
+        ],
+      },
+      density: 1.0,
+      oreDensities: {},
+      fractureModifier: 1.0,
+    };
+    const snapshot = JSON.parse(JSON.stringify(voxel));
+    computeThreshold(voxel);
+    expect(voxel).toEqual(snapshot);
   });
 });
