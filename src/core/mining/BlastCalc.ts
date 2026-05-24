@@ -6,7 +6,7 @@ import type { Vec3 } from '../math/Vec3.js';
 import { vec3, sub, normalize, scale, length as vecLength } from '../math/Vec3.js';
 import type { DrillHole } from './DrillPlan.js';
 import type { HoleCharge } from './ChargePlan.js';
-import type { VoxelData } from '../world/VoxelGrid.js';
+import type { VoxelData, VoxelGrid } from '../world/VoxelGrid.js';
 import { getExplosive } from '../world/ExplosiveCatalog.js';
 import { getRock } from '../world/RockCatalog.js';
 import { BLAST_ENERGY_EPSILON, MAX_FRAGMENTS_PER_VOXEL, PROJECTION_SPEED_THRESHOLD } from '../config/balance.js';
@@ -296,6 +296,31 @@ export function groupChargesByDelay(
     }
   }
   return [...delayGroups.values()];
+}
+
+// ────────────────────────────────────────────────────────
+// § 5.5: Energy Propagation
+// ────────────────────────────────────────────────────────
+
+export interface PropagationResult {
+  effectiveEnergy: Map<string, number>;
+  generatedOverflow: Map<string, number>;
+}
+
+/**
+ * Propagate energy through the voxel grid using iterative overflow.
+ * Each voxel absorbs up to T(v) - already_absorbed, then distributes
+ * leftover energy equally among up to 6 face-adjacent non-air neighbours.
+ *
+ * @param grid - VoxelGrid (read-only).
+ * @param initial - Map of "x,y,z" → initial overflow energy per voxel.
+ * @returns PropagationResult with effectiveEnergy and generatedOverflow maps.
+ */
+export function propagateEnergy(
+  grid: VoxelGrid,
+  initial: Map<string, number>,
+): PropagationResult {
+  throw new Error('not implemented');
 }
 
 // ────────────────────────────────────────────────────────
