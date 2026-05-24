@@ -4,6 +4,8 @@ description: >
   Validation specialist: runs full test suite, type checking, build.
   Detects regressions, type errors, build failures.
   Reports pass/fail with actionable diagnostics.
+user-invocable: false
+disable-model-invocation: true
 tools: ["read", "search", "execute"]
 ---
 
@@ -68,8 +70,8 @@ Spot-check: `new_game seed:42` → `state summary` → `drill_plan` → `blast` 
 
 ## Key References
 
-- `testing-strategy` — test pyramid, coverage goals
-- `architecture` — build system, project structure
+- `dev-testing-strategy` — test pyramid, coverage goals
+- `dev-architecture` — build system, project structure
 ```bash
 npx tsx src/console.ts
 ```
@@ -83,5 +85,5 @@ Key spot-check commands:
 
 ## Key References
 
-- `testing-strategy` — test pyramid, coverage goals, validation workflow
-- `architecture` — build system, project structure
+- `dev-testing-strategy` — test pyramid, coverage goals, validation workflow
+- `dev-architecture` — build system, project structure

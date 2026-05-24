@@ -4,6 +4,8 @@ description: >
   TDD Refactor phase: cleans up implementation for clarity,
   maintainability, convention compliance. No behavior change.
   All tests must still pass after refactoring.
+user-invocable: false
+disable-model-invocation: true
 tools: ["read", "edit", "search", "execute"]
 ---
 
@@ -67,6 +69,6 @@ Clean up code — clarity, maintainability, conventions. No behavior change.
 
 ## Key References
 
-- `coding-conventions` — style, naming, error handling
-- `architecture` — module boundaries, data flow
-- `testing-strategy` — test conventions
+- `dev-coding-conventions` — style, naming, error handling
+- `dev-architecture` — module boundaries, data flow
+- `dev-testing-strategy` — test conventions

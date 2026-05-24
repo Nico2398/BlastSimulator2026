@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import sys
 import threading
 from typing import Any
@@ -88,17 +89,11 @@ REVIEW_TOOLS = CODING_TOOLS + _GH_WRITE_TOOLS
 GITHUB_WRITE_TOOLS = _GH_WRITE_TOOLS
 
 # ---------------------------------------------------------------------------
-# Caveman micro preamble — token efficiency for all agent outputs
-# Based on https://github.com/kuba-guzik/caveman-micro (85 tokens, 14-21% savings)
+# LangGraph-specific markers — used by extract_ok() for graph routing
+# Communication style comes from copilot-instructions.md
 # ---------------------------------------------------------------------------
 
-_CAVEMAN_PREAMBLE = """
-Respond like smart caveman. Cut all filler, keep technical substance.
-- Drop articles (a, an, the), filler (just, really, basically, actually).
-- Drop pleasantries (sure, certainly, happy to).
-- No hedging. Fragments fine. Short synonyms.
-- Technical terms stay exact. Code blocks unchanged.
-- Pattern: [thing] [action] [reason]. [next step].
+_LANGGRAPH_RESULT_MARKER = """
 - End with `## RESULT: OK` or `## RESULT: FAIL` on its own line.
 """
 
@@ -119,18 +114,57 @@ Use the `todo_add`, `todo_list`, `todo_done` tools to manage your work:
 # ---------------------------------------------------------------------------
 
 
-def load_agent_prompt(role: str) -> str:
-    """Load the agent role system prompt from .github/agents/<role>.agent.md."""
-    path = Path(_REPO_ROOT) / ".github" / "agents" / f"{role}.agent.md"
+def load_copilot_instructions() -> str:
+    """Load global instructions from .github/copilot-instructions.md."""
+    path = Path(_REPO_ROOT) / ".github" / "copilot-instructions.md"
     if path.exists():
         return path.read_text(encoding="utf-8")
+    return ""
+
+
+def _strip_yaml_frontmatter(content: str) -> str:
+    """Remove YAML frontmatter (--- ... ---) from markdown content."""
+    pattern = r"^---\n.*?\n---\n"
+    match = re.match(pattern, content, re.DOTALL)
+    if match:
+        return content[match.end() :]
+    return content
+
+
+def load_agent_prompt(role: str) -> str:
+    """Load the agent role system prompt from .github/agents/<role>.agent.md.
+
+    Strips YAML frontmatter (name, description, user-invocable, tools, etc.)
+    since those are GitHub Copilot config fields, not agent instructions.
+    """
+    path = Path(_REPO_ROOT) / ".github" / "agents" / f"{role}.agent.md"
+    if path.exists():
+        content = path.read_text(encoding="utf-8")
+        return _strip_yaml_frontmatter(content)
     return f"You are the {role} agent. Follow project conventions."
 
 
 def build_react_agent(role: str, tools: list, llm, extra_context: str = ""):
-    """Build a LangGraph ReAct agent for a given role."""
+    """Build a LangGraph ReAct agent for a given role.
+
+    Prompt hierarchy:
+    1. copilot-instructions.md (global context, communication style)
+    2. <role>.agent.md (agent-specific instructions)
+    3. _TODO_REMINDER (LangGraph todo tools)
+    4. _LANGGRAPH_RESULT_MARKER (RESULT: OK/FAIL for graph routing)
+    """
     from langgraph.prebuilt import create_react_agent as lg_react_agent
-    system_prompt = _CAVEMAN_PREAMBLE + load_agent_prompt(role) + _TODO_REMINDER
+
+    parts = []
+    copilot_instructions = load_copilot_instructions()
+    if copilot_instructions:
+        parts.append(copilot_instructions)
+    parts.append(load_agent_prompt(role))
+    parts.append(_TODO_REMINDER)
+    parts.append(_LANGGRAPH_RESULT_MARKER)
+
+    system_prompt = "\n\n".join(p.strip() for p in parts if p and p.strip())
+
     if extra_context:
         system_prompt = system_prompt + "\n\n## Additional Context\n" + extra_context
     return lg_react_agent(llm, tools, prompt=system_prompt).with_config(

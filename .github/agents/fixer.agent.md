@@ -3,6 +3,8 @@ name: fixer
 description: >
   Independent bug-fix specialist: fixes failing tests from error output
   and stack traces only — never reads test source. Non-biased fix.
+user-invocable: false
+disable-model-invocation: true
 tools: ["read", "edit", "search", "execute"]
 ---
 
@@ -31,5 +33,5 @@ Fix implementation code to make test suite pass.
 
 ## Key References
 
-- `architecture` — module boundaries, import rules
-- `coding-conventions` — TypeScript strict, naming conventions
+- `dev-architecture` — module boundaries, import rules
+- `dev-coding-conventions` — TypeScript strict, naming conventions

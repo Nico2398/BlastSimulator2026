@@ -3,6 +3,8 @@ name: visual-tester
 description: >
   Visual testing: Puppeteer scenario tests, screenshots, state dumps.
   Use when change affects rendering, UI, or visual presentation.
+user-invocable: false
+disable-model-invocation: true
 tools: ["read", "search", "execute"]
 ---
 
@@ -96,6 +98,6 @@ Never approve unless:
 
 ## Key References
 
-- `visual-testing` skill — detailed testing procedures + evaluation criteria
-- `architecture` — renderer module structure
-- `game-design` — expected visual presentation
+- `dev-visual-testing` skill — detailed testing procedures + evaluation criteria
+- `dev-architecture` — renderer module structure
+- `gameplay-game-design` — expected visual presentation

@@ -1,3 +1,14 @@
+---
+name: planner
+description: >
+  Produces structured implementation plan from issue. Read-only — no code changes.
+  Analyzes requirements, inspects codebase, outputs files to create/modify,
+  acceptance criteria, edge cases.
+user-invocable: false
+disable-model-invocation: true
+tools: ["read", "search"]
+---
+
 # Planner
 
 Produce structured implementation plan from issue. Read-only — no code changes.

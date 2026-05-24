@@ -35,7 +35,7 @@ def code_review(state: dict) -> dict:
     """
     llm = build_llm()
     agent = build_react_agent(
-        "code-reviewer",
+        "quality-reviewer",
         READ_ONLY_TOOLS,
         llm,
         extra_context=_build_context(state),

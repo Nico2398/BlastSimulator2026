@@ -3,6 +3,8 @@ name: test-writer
 description: >
   TDD Red phase: writes failing tests before implementation.
   Unit tests, integration tests, scenario definitions.
+user-invocable: false
+disable-model-invocation: true
 tools: ["read", "edit", "search", "execute"]
 ---
 
@@ -29,8 +31,8 @@ Before handoff to implementer:
 
 ## Key References
 
-- `testing-strategy` — patterns + conventions
-- `architecture` — module boundaries + data flow
-- `coding-conventions` — naming, style, error handling
-- `blast-system` — blast-related tests
-- `game-design` — gameplay-related tests
+- `dev-testing-strategy` — patterns + conventions
+- `dev-architecture` — module boundaries + data flow
+- `dev-coding-conventions` — naming, style, error handling
+- `gameplay-blast-system` — blast-related tests
+- `gameplay-game-design` — gameplay-related tests

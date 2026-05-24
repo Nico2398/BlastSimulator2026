@@ -3,6 +3,8 @@ name: security-reviewer
 description: >
   Security-focused code reviewer. Flags exploitable vulnerabilities, auth bypasses,
   injection patterns, hardcoded secrets. Read-only — never modifies files.
+user-invocable: false
+disable-model-invocation: true
 tools: ["read", "search"]
 ---
 
