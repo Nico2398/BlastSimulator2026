@@ -1,0 +1,134 @@
+// BlastSimulator2026 — RockCatalog config tests (5.2)
+// Verifies energyAbsorption and density constants exist on every RockDef
+// in the config/RockCatalog.ts module.
+
+import { describe, it, expect } from 'vitest';
+import { getRock, getAllRocks } from '../../../src/core/config/RockCatalog.js';
+
+// ─── Task 5.2: energyAbsorption per RockDef ──────────────────────────────────
+
+describe('RockCatalog config — energyAbsorption (5.2)', () => {
+  it('getRock returns a valid RockType for cruite with energyAbsorption > 0', () => {
+    const rock = getRock('cruite');
+    expect(rock).toBeDefined();
+    expect(rock!.energyAbsorption).toBeGreaterThan(0);
+  });
+
+  it('getRock returns a valid RockType for titanite with energyAbsorption > 0', () => {
+    const rock = getRock('titanite');
+    expect(rock).toBeDefined();
+    expect(rock!.energyAbsorption).toBeGreaterThan(0);
+  });
+
+  it('every rock from getAllRocks has energyAbsorption > 0', () => {
+    for (const rock of getAllRocks()) {
+      expect(rock.energyAbsorption, `${rock.id} missing energyAbsorption`).toBeGreaterThan(0);
+    }
+  });
+
+  it('energyAbsorption increases with hardnessTier (harder rocks absorb more energy)', () => {
+    const rocks = [...getAllRocks()].sort((a, b) => a.hardnessTier - b.hardnessTier || a.energyAbsorption - b.energyAbsorption);
+    for (let i = 1; i < rocks.length; i++) {
+      const prev = rocks[i - 1]!;
+      const curr = rocks[i]!;
+      if (curr.hardnessTier > prev.hardnessTier) {
+        // Each higher tier should have strictly higher energy absorption
+        // (tier 2 rocks absorb more than tier 1, etc.)
+        // Allow rocks within same tier to have slight overlap
+        expect(curr.energyAbsorption, `${curr.id} (tier ${curr.hardnessTier}) energyAbsorption should exceed ${prev.id} (tier ${prev.hardnessTier})`)
+          .toBeGreaterThan(prev.energyAbsorption);
+      }
+    }
+  });
+
+  it('energyAbsorption values are within physically plausible range [100, 5000]', () => {
+    for (const rock of getAllRocks()) {
+      expect(rock.energyAbsorption, `${rock.id} energyAbsorption out of range`).toBeGreaterThanOrEqual(100);
+      expect(rock.energyAbsorption, `${rock.id} energyAbsorption out of range`).toBeLessThanOrEqual(5000);
+    }
+  });
+
+  it('energyAbsorption matches fractureThreshold (initial implementation, refined later)', () => {
+    for (const rock of getAllRocks()) {
+      expect(rock.energyAbsorption, `${rock.id} energyAbsorption should equal fractureThreshold`).toBe(rock.fractureThreshold);
+    }
+  });
+});
+
+// ─── Task 5.2: density per RockDef ───────────────────────────────────────────
+
+describe('RockCatalog config — density (5.2)', () => {
+  it('getRock returns a valid RockType for cruite with density > 0', () => {
+    const rock = getRock('cruite');
+    expect(rock).toBeDefined();
+    expect(rock!.density).toBeGreaterThan(0);
+  });
+
+  it('getRock returns a valid RockType for titanite with density > 0', () => {
+    const rock = getRock('titanite');
+    expect(rock).toBeDefined();
+    expect(rock!.density).toBeGreaterThan(0);
+  });
+
+  it('every rock from getAllRocks has density > 0', () => {
+    for (const rock of getAllRocks()) {
+      expect(rock.density, `${rock.id} missing density`).toBeGreaterThan(0);
+    }
+  });
+
+  it('density values are geologically plausible (2000–3500 kg/m³)', () => {
+    for (const rock of getAllRocks()) {
+      expect(rock.density, `${rock.id} density ${rock.density} kg/m³ out of range`).toBeGreaterThanOrEqual(2000);
+      expect(rock.density, `${rock.id} density ${rock.density} kg/m³ out of range`).toBeLessThanOrEqual(3500);
+    }
+  });
+
+  it('density increases with hardnessTier (harder rocks are denser)', () => {
+    const rocks = [...getAllRocks()].sort((a, b) => a.hardnessTier - b.hardnessTier || a.density - b.density);
+    for (let i = 1; i < rocks.length; i++) {
+      const prev = rocks[i - 1]!;
+      const curr = rocks[i]!;
+      if (curr.hardnessTier > prev.hardnessTier) {
+        // Harder rock tiers should be denser on average
+        // Allow rocks within same tier to have slight overlap
+        expect(curr.density, `${curr.id} (tier ${curr.hardnessTier}) density should exceed ${prev.id} (tier ${prev.hardnessTier})`)
+          .toBeGreaterThan(prev.density);
+      }
+    }
+  });
+});
+
+// ─── Task 5.2: catalog completeness ──────────────────────────────────────────
+
+describe('RockCatalog config — catalog completeness (5.2)', () => {
+  it('getAllRocks returns at least 8 rock types', () => {
+    expect(getAllRocks().length).toBeGreaterThanOrEqual(8);
+  });
+
+  it('all rock IDs are unique', () => {
+    const rocks = getAllRocks();
+    const ids = rocks.map(r => r.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('all rock types span hardness tiers 1 through 5', () => {
+    const rocks = getAllRocks();
+    const tiers = new Set(rocks.map(r => r.hardnessTier));
+    for (let t = 1; t <= 5; t++) {
+      expect(tiers, `no rock at hardness tier ${t}`).toContain(t);
+    }
+  });
+
+  it('every rockDef has both energyAbsorption and density as finite numbers', () => {
+    for (const rock of getAllRocks()) {
+      expect(typeof rock.energyAbsorption, `${rock.id} energyAbsorption type`).toBe('number');
+      expect(Number.isFinite(rock.energyAbsorption), `${rock.id} energyAbsorption not finite`).toBe(true);
+      expect(typeof rock.density, `${rock.id} density type`).toBe('number');
+      expect(Number.isFinite(rock.density), `${rock.id} density not finite`).toBe(true);
+    }
+  });
+
+  it('getRock returns undefined for unknown rock ID', () => {
+    expect(getRock('nonexistent_rock')).toBeUndefined();
+  });
+});
