@@ -1,0 +1,11 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "default_agent": "pipeline",
+  "agent": {
+    "pipeline": {
+      "mode": "primary",
+      "description": "Orchestrates the TDD development pipeline. Invokes specialist agents in the correct sequence."
+    }
+  },
+  "instructions": ["AGENTS.md"]
+}
