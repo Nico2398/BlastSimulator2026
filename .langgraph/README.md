@@ -150,14 +150,16 @@ Two important details:
 
 Each reusable agent role has its own prompt file in `.github/agents/`:
 
-- `test-writer.agent.md`
-- `implementer.agent.md`
-- `refactorer.agent.md`
-- `validator.agent.md`
-- `reviewer.agent.md`
-- `visual-tester.agent.md`
-- `fixer.agent.md`
-- `code-reviewer.agent.md`
+- `test-writer.agent.md` — test writers (unit, integration, scenario)
+- `implementer.agent.md` — TDD Green phase
+- `refactorer.agent.md` — TDD Refactor phase
+- `validator.agent.md` — full suite validation
+- `reviewer.agent.md` — PR audit + merge gate
+- `visual-tester.agent.md` — screenshot verification
+- `fixer.agent.md` — independent test-failure fix
+- `quality-reviewer.agent.md` — code quality review
+- `security-reviewer.agent.md` — security audit
+- `i18n-reviewer.agent.md` — i18n audit
 
 Node-specific steps such as `skeleton_writer` and `conflict_resolver` currently reuse an existing role prompt plus extra node context assembled in Python.
 

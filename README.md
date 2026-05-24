@@ -104,4 +104,25 @@ scripts/
   validate.sh         Full validation pipeline
   visual-test.sh      One-command screenshot capture helper
   screenshot.ts       Puppeteer-based screenshot script
+
+.github/              Agent context (primary — edit here)
+  copilot-instructions.md  Global instruction layer
+  agents/             Agent role definitions (.agent.md)
+  skills/             Domain-specific skill specs (SKILL.md)
+  workflows/          GitHub Actions CI/CD
+
+.claude/              Claude Code — derived copy of .github/
+  CLAUDE.md           Project context
+  agents/             Agent role definitions
+  skills/             Domain-specific skill specs
+
+.opencode/            OpenCode — derived copy of .github/
+  AGENTS.md           Project context
+  agents/             Agent role definitions
+  skills/             Domain-specific skill specs
+
+.langgraph/           LangGraph typed-state pipeline
+  graph.py            StateGraph definition
+  nodes/              Per-step node implementations
+  tools/              Shared tool implementations
 ```
