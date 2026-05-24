@@ -6,10 +6,36 @@ import type { Vec3 } from '../math/Vec3.js';
 import { vec3, sub, normalize, scale, length as vecLength } from '../math/Vec3.js';
 import type { DrillHole } from './DrillPlan.js';
 import type { HoleCharge } from './ChargePlan.js';
+import type { VoxelData } from '../world/VoxelGrid.js';
 import { getExplosive } from '../world/ExplosiveCatalog.js';
 import { getRock } from '../world/RockCatalog.js';
-import type { VoxelData } from '../world/VoxelGrid.js';
 import { BLAST_ENERGY_EPSILON, MAX_FRAGMENTS_PER_VOXEL, PROJECTION_SPEED_THRESHOLD } from '../config/balance.js';
+
+// ────────────────────────────────────────────────────────
+// § 1: Voxel Threshold
+// ────────────────────────────────────────────────────────
+
+/**
+ * Compute the energy threshold for a voxel based on its rock composition.
+ * T(v) = Σ_r [ coefficient[r] * rockDef[r].energyAbsorption ]
+ *
+ * Returns 0 for air voxels (empty composition).
+ * Unknown rock IDs are silently treated as zero contribution.
+ */
+export function computeThreshold(voxel: VoxelData): number {
+  const { rocks } = voxel.composition;
+  if (rocks.length === 0) return 0;
+
+  let sum = 0;
+  for (const rock of rocks) {
+    const rockDef = getRock(rock.rockId);
+    if (rockDef) {
+      sum += rock.coefficient * rockDef.energyAbsorption;
+    }
+    // Unknown rock ID → treat contribution as 0
+  }
+  return sum;
+}
 
 // ────────────────────────────────────────────────────────
 // § 2: Energy Calculation
@@ -103,32 +129,6 @@ export function calculateEnergyField(
     }
   }
   return total;
-}
-
-// ────────────────────────────────────────────────────────
-// § 5.3: Energy Threshold
-// ────────────────────────────────────────────────────────
-
-/**
- * Compute the energy threshold for a voxel based on its rock composition.
- * T(v) = Σ_r [ coefficient[r] * rockDef[r].energyAbsorption ]
- *
- * Returns 0 for air voxels (empty composition).
- * Unknown rock IDs are silently treated as zero contribution.
- */
-export function computeThreshold(voxel: VoxelData): number {
-  const { rocks } = voxel.composition;
-  if (rocks.length === 0) return 0;
-
-  let sum = 0;
-  for (const rock of rocks) {
-    const rockDef = getRock(rock.rockId);
-    if (rockDef) {
-      sum += rock.coefficient * rockDef.energyAbsorption;
-    }
-    // Unknown rock ID → treat contribution as 0
-  }
-  return sum;
 }
 
 // ────────────────────────────────────────────────────────
