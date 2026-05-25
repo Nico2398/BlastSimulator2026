@@ -145,15 +145,22 @@ jobs:
                 labels: ['in-progress']
               });
 
+              // Acknowledge assignment on the issue
+              await github.rest.issues.createComment({
+                owner, repo,
+                issue_number: issue.number,
+                body: `⚙️ Auto-assigned from merged PR #${context.payload.pull_request.number}`
+              });
+
               // Dispatch the LangGraph pipeline workflow
               await github.rest.actions.createWorkflowDispatch({
                 owner, repo,
                 workflow_id: 'langgraph-agent.yml',
                 ref: 'main',
-                inputs: {
-                  issue_number: String(issue.number),
-                  comment_body: 'auto-assigned from merged PR'
-                }
+                 inputs: {
+                   issue_number: String(issue.number),
+                   comment_body: `auto-assigned from merged PR #${context.payload.pull_request.number}`
+                 }
               });
               console.log(`LangGraph pipeline dispatched for issue #${issue.number}.`);
 

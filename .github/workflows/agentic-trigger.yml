@@ -74,11 +74,11 @@ jobs:
                 labels: ['in-progress']
               });
 
-              // Acknowledge on the issue
+              // Acknowledge assignment on the issue
               await github.rest.issues.createComment({
                 owner, repo,
                 issue_number: issue.number,
-                body: '🤖 Agent picking this up via manual trigger…'
+                body: '⚙️ Assigned via manual trigger'
               });
 
               // Dispatch the agent pipeline workflow
