@@ -126,6 +126,7 @@ jobs:
 
           # ── GitHub ───────────────────────────────────────────────────────────
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AGENTIC_AUTO_MERGE_ENABLED: ${{ vars.AGENTIC_AUTO_MERGE_ENABLED }}
           GITHUB_WORKSPACE: ${{ github.workspace }}
           DEFAULT_REPO_OWNER: ${{ github.repository_owner }}
           DEFAULT_REPO_NAME: ${{ github.event.repository.name }}
