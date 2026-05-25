@@ -1,4 +1,4 @@
-"""reviewer node — audit PR for architecture compliance and post APPROVED."""
+"""reviewer node — audit PR for architecture compliance and report outcome."""
 
 from __future__ import annotations
 import sys
@@ -13,7 +13,7 @@ from nodes._base import REVIEW_TOOLS, build_fresh_messages, build_react_agent, e
 
 
 def reviewer(state: dict) -> dict:
-    """Review a PR, push fixes if needed, post APPROVED comment when ready.
+    """Review a PR, push fixes if needed, post review outcome when ready.
 
     Starts from a fresh message set so the reviewer focuses on the PR diff,
     not on noise accumulated from the build pipeline.
@@ -51,8 +51,7 @@ def _build_context(state: dict) -> str:
         "3. Verify issue acceptance criteria are ALL met.",
         "4. Run: npm run validate",
         "5. If minor fixes needed: write the files (run_shell to re-validate after).",
-        "6. Post APPROVED comment as the FINAL action — nothing after it.",
-        "APPROVED comment triggers auto-merge. Post it only when all checks pass.",
+        "6. Post review summary as the FINAL action — nothing after it.",
         "",
         "## What NOT to Flag",
         "- Theoretical risks requiring unlikely preconditions",

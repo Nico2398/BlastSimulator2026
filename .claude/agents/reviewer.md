@@ -1,6 +1,6 @@
 ---
 name: reviewer
-description: PR audit + merge gate. Audits PR for architecture, i18n, style, correctness. Runs full test suite. Posts APPROVED when all checks pass — triggers auto-merge. 
+description: PR audit gate. Audits PR for architecture, i18n, style, correctness. Runs full test suite. Reports pass/fail. 
 allowed-tools: Read Edit Search Execute
 user-invocable: false
 disable-model-invocation: true
@@ -9,7 +9,7 @@ disable-model-invocation: true
 
 Position: after TDD pipeline or on code review request.
 
-Audit PR. Fix issues. Post APPROVED only when all checks pass.
+Audit PR. Fix issues. Report pass when all checks pass.
 
 ## Step 1: Run Tests
 
@@ -87,16 +87,6 @@ Issues found:
 1. Push fixes to PR branch
 2. Re-run `npm run validate`
 3. Repeat until all checks pass
-
-## Merge Signal
-
-Post **exactly** this as **last action** — nothing after:
-
-```
-APPROVED
-```
-
-Triggers `langgraph-agent.yml` → PR merge. No push, edit, or tool call after APPROVED.
 
 ## Key References
 

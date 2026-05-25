@@ -46,7 +46,7 @@ First, classify the task:
 ## Review PR Pipeline
 
 ```
-1. @reviewer → Audit PR, run checks, post APPROVED if passes
+1. @reviewer → Audit PR, run checks, report outcome
 ```
 
 ## Your Responsibilities
