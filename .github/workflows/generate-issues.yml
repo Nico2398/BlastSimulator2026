@@ -111,6 +111,9 @@ jobs:
                 `After opening the PR, include \`Closes #<this issue number>\` in the PR body.`,
               ].join('\n');
 
+              // Delay to ensure distinct timestamps (GitHub API second-level granularity)
+              await new Promise(r => setTimeout(r, 2000));
+
               const { data: issue } = await github.rest.issues.create({
                 owner, repo,
                 title: `[${task.id}] ${task.title}`,
