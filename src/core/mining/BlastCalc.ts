@@ -617,7 +617,11 @@ export interface BlastEntityDamageResult {
   destroyedBuildingIds: number[];
   /** Casualty count from occupant survival rolls in destroyed buildings. */
   occupantCasualties: number;
-  /** Total death count = killedEmployeeIds.length + occupantCasualties. */
+  /**
+   * Total death count = unique employees who died (deduplicated).
+   * killedEmployeeIds may contain duplicates when an employee is both
+   * instant-killed and an occupant who dies in the survival roll.
+   */
   totalDeaths: number;
 }
 
@@ -639,7 +643,7 @@ export interface BlastEntityDamageResult {
  *
  * killedEmployeeIds stores both instant-kill IDs and occupant IDs (may contain
  * duplicates when an employee is both instant-killed and an occupant who dies
- * in the survival roll).  totalDeaths = killedEmployeeIds.length + occupantCasualties.
+ * in the survival roll).  totalDeaths counts unique employee IDs via Set.
  *
  * @param fragmentedVoxels - Set of "x,y,z" keys for fragmented voxels.
  * @param effectiveEnergy - Map of "x,y,z" keys to effective energy values.
@@ -729,11 +733,9 @@ export function computeBlastEntityDamage(
       if (structuralResistance > 0) {
         const deathProb = Math.max(0.30, Math.min(1.00, (totalEnergy / structuralResistance - 1.0) * 0.5));
 
-        // Find employees inside this building's footprint.
-        // Push their IDs to killedEmployeeIds and count in occupantCasualties.
-        // Note: an employee who was already instant-killed (already in
-        // killedEmployeeIds) gets pushed again — this is intentional so that
-        // totalDeaths = killedEmployeeIds.length + occupantCasualties holds.
+        // Find employees inside this building's footprint and roll for survival.
+        // Push their IDs to killedEmployeeIds (may duplicate instant-kill IDs).
+        // occupantCasualties counts how many occupant deaths occur.
         for (const emp of employees) {
           if (!emp.alive) continue;
           const ex = Math.floor(emp.x);
@@ -750,11 +752,10 @@ export function computeBlastEntityDamage(
     }
   }
 
-  // totalDeaths = killedEmployeeIds.length + occupantCasualties.
+  // totalDeaths = unique count of employees who died.
   // killedEmployeeIds may contain duplicates (same employee instant-killed
-  // and also rolled as occupant), and occupantCasualties counts occupant
-  // deaths independently — the formula is a raw sum.
-  const totalDeaths = killedEmployeeIds.length + occupantCasualties;
+  // and also rolled as occupant), so deduplicate with a Set.
+  const totalDeaths = new Set(killedEmployeeIds).size;
 
   return {
     killedEmployeeIds,
