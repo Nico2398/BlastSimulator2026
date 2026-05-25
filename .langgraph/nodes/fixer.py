@@ -76,6 +76,8 @@ def _build_context(state: dict, _tool_names: list | None = None) -> str:
         "- Only modify implementation files in src/ (not test files).",
         "- Fix only what the errors indicate — do not rewrite working code.",
         "- Do NOT call git yourself — the graph auto-commits your changes after you finish.",
+        "- After each fix attempt, run `npx vitest run <failing-test-file>` (extract file path from stack trace).",
+        "  If the test still fails, read the new output and iterate until it passes or you are genuinely stuck.",
         "",
         "## Test Failure Output",
         state.get("test_output", "(no output captured)"),

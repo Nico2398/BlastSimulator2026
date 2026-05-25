@@ -116,9 +116,15 @@ def _log_end_status(node: str, output: dict) -> None:
 # Main stream processor
 # ---------------------------------------------------------------------------
 
-async def stream_pipeline(graph: Any, initial_state: dict, config: dict) -> None:
-    """Process astream_events and emit per-node structured logs."""
+async def stream_pipeline(graph: Any, initial_state: dict, config: dict) -> bool:
+    """Process astream_events and emit per-node structured logs.
+
+    Returns:
+        True if the pipeline was paused by an interrupt (handle_interrupt node
+        fired or LangGraph emitted an __interrupt__ event); False otherwise.
+    """
     current_node: str = ""
+    interrupted: bool = False
 
     async for event in graph.astream_events(initial_state, config=config, version="v2"):
         kind: str = event.get("event", "")
@@ -126,6 +132,11 @@ async def stream_pipeline(graph: Any, initial_state: dict, config: dict) -> None
         metadata: dict = event.get("metadata", {})
         data: dict = event.get("data", {})
         node: str = metadata.get("langgraph_node", "")
+
+        # Detect interrupt — either the handle_interrupt node started, or
+        # LangGraph emitted its own __interrupt__ event.
+        if node == "handle_interrupt" or (kind == "on_chain_start" and name == "__interrupt__"):
+            interrupted = True
 
         # Open a new collapsible group when the active node changes.
         if node and node != current_node and node not in ("LangGraph", ""):
@@ -172,3 +183,5 @@ async def stream_pipeline(graph: Any, initial_state: dict, config: dict) -> None
     # Close the final open group.
     if current_node:
         _gha_endgroup()
+
+    return interrupted
