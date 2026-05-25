@@ -22,11 +22,27 @@ from llm import build_llm
 from nodes._base import READ_ONLY_TOOLS, build_fresh_messages, build_react_agent, extract_ok, invoke_agent, skill_hint, extract_message_content
 
 
+_HUMAN_REVIEW_MARKER = "🧑 HUMAN REVIEW NEEDED:"
+
+
+def _extract_human_review(text: str) -> "str | None":
+    """Return the human-review reason from the planner output, or None."""
+    for line in text.splitlines():
+        if _HUMAN_REVIEW_MARKER in line:
+            return line.split(_HUMAN_REVIEW_MARKER, 1)[1].strip() or None
+    return None
+
+
 def planner(state: dict) -> dict:
     """Produce a structured implementation plan from the issue.
 
     Uses read-only tools to inspect the codebase before planning.
     The plan is stored in state for all downstream agents.
+
+    If the task requires artistic input or a critical design decision that
+    cannot be automated, the planner emits ``🧑 HUMAN REVIEW NEEDED: <reason>``
+    which is captured in ``needs_human_review`` so ``open_pr`` can pause
+    auto-merge and request human input instead.
     """
     llm = build_llm()
     agent = build_react_agent(
@@ -54,6 +70,7 @@ def planner(state: dict) -> dict:
         "planner_ok": ok,
         "retry_count": retry_count,
         "current_role": "planner",
+        "needs_human_review": _extract_human_review(plan),
     }
 
 
@@ -86,7 +103,13 @@ def _build_context(state: dict) -> str:
         "- note about module boundaries, data flow, etc.",
         "",
         "Be specific. Include file paths. Reference skill specs if relevant.",
-        "End with: ✅ PLAN COMPLETE or ❌ PLAN FAILED",
+        "End with ONE of:",
+        "  ✅ PLAN COMPLETE",
+        "  ❌ PLAN FAILED",
+        "  🧑 HUMAN REVIEW NEEDED: <concise reason>  ← use when the task requires",
+        "     artistic direction or a critical design decision that cannot be automated",
+        "     (e.g. choice of public-facing feature name, game-balance value needing",
+        "     creative input, UI style not covered by existing conventions).",
     ]
     lines.append(skill_hint(state.get("skill", "")))
     if state.get("skill"):
