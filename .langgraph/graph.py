@@ -166,6 +166,11 @@ class AgentState(TypedDict):
     human_feedback: str | None
     awaiting_human: bool
 
+    # Human-review signal — when set, open_pr skips auto-merge and posts
+    # a comment with this reason string instead. Used for tasks needing
+    # artistic input or critical software design decisions.
+    needs_human_review: str | None
+
 
 # ---------------------------------------------------------------------------
 # Interrupt node

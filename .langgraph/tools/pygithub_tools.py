@@ -97,3 +97,41 @@ def remove_label(issue_number: int, label: str) -> str:
         if exc.status == 404:
             return f"label '{label}' was not present on #{issue_number}"
         raise
+
+
+def enable_automerge(pr_number: int, merge_method: str = "squash") -> str:
+    """Enable GitHub native auto-merge on a PR.
+
+    Args:
+        pr_number: PR number.
+        merge_method: Merge method — "merge", "squash", or "rebase".
+
+    Returns:
+        Confirmation message.
+    """
+    repo = _repo()
+    pr = repo.get_pull(pr_number)
+    try:
+        pr.enable_automerge(merge_method=merge_method)
+        return f"auto-merge ({merge_method}) enabled on #{pr_number}"
+    except GithubException as exc:
+        return f"warning: failed to enable auto-merge on #{pr_number}: {exc.data}"
+
+
+def create_pr_comment(pr_number: int, body: str) -> str:
+    """Post a comment on a PR.
+
+    Args:
+        pr_number: PR number.
+        body: Comment body (markdown).
+
+    Returns:
+        Confirmation message.
+    """
+    repo = _repo()
+    pr = repo.get_pull(pr_number)
+    try:
+        pr.create_issue_comment(body)
+        return f"comment posted on #{pr_number}"
+    except GithubException as exc:
+        return f"warning: failed to post comment on #{pr_number}: {exc.data}"

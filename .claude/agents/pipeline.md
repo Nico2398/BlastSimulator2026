@@ -85,6 +85,20 @@ First, classify the task:
   - What files were modified by previous agents
   - Current state (passing/failing)
 
+## Auto-Merge
+
+After creating the PR and before finishing, run:
+
+```
+gh pr merge --auto --squash <pr-url>
+```
+
+This is the **default**. Only skip it if the issue explicitly requires human artistic input or a critical software design decision. In that case, run instead:
+
+```
+gh pr comment <pr-url> --body "Auto-merge paused — human input needed: <reason>"
+```
+
 ## Output Format
 
 After each agent completes:

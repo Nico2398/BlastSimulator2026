@@ -97,3 +97,9 @@ Create a pull request from `langgraph/tests-<N>` to `main` with:
 - Labels updated: `in-progress` removed, `in-review` added
 
 This operation is always non-agentic (no LLM involved).
+
+### Auto-Merge
+
+Default: **enable GitHub native auto-merge** on every PR — via `pr.enable_automerge("squash")` (LangGraph) or `gh pr merge --auto --squash` (agents).
+
+Only skip auto-merge when the pipeline has explicitly flagged that human input is needed (artistic direction, critical architecture design decision). In that case, post a PR comment with the reason from the pipeline state instead. This is always non-agentic (no LLM involved).
