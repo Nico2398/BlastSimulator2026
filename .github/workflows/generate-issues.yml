@@ -39,7 +39,7 @@ jobs:
             const maxCount = Math.max(1, Math.min(Number.isNaN(parsedCount) ? 1 : parsedCount, 50));
 
             // --- Load backlog ---
-            const backlogPath = path.join(process.env.GITHUB_WORKSPACE, '.github/skills/backlog/backlog.json');
+            const backlogPath = path.join(process.env.GITHUB_WORKSPACE, '.github/skills/agentic-backlog/backlog.json');
             const tasks = JSON.parse(fs.readFileSync(backlogPath, 'utf8'));
 
             const doneIds = new Set(tasks.filter(t => t.status === 'done').map(t => t.id));
@@ -110,6 +110,9 @@ jobs:
                 ``,
                 `After opening the PR, include \`Closes #<this issue number>\` in the PR body.`,
               ].join('\n');
+
+              // Delay to ensure distinct timestamps (GitHub API second-level granularity)
+              await new Promise(r => setTimeout(r, 2000));
 
               const { data: issue } = await github.rest.issues.create({
                 owner, repo,
