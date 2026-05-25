@@ -19,6 +19,7 @@ if str(_HERE) not in sys.path:
 
 from llm import build_llm
 from nodes._base import READ_ONLY_TOOLS, build_fresh_messages, build_react_agent, extract_ok, invoke_agent, extract_message_content, skill_hint
+from nodes.planner import _HUMAN_REVIEW_MARKER, _extract_human_review
 
 
 def review_fan_in(state: dict) -> dict:
@@ -50,6 +51,7 @@ def review_fan_in(state: dict) -> dict:
         "code_review_report": last_content,
         "current_role": "review-coordinator",
         "retry_count": retry + (0 if ok else 1),
+        "needs_human_review": _extract_human_review(last_content),
     }
 
 
@@ -65,6 +67,13 @@ def _build_coordinator_context(state: dict) -> str:
         "You are the REVIEW COORDINATOR. Merge findings from sub-reviewers below.",
         "Deduplicate, filter false positives, verify uncertain items by reading source.",
         "Make final pass/fail decision. Bias toward approval.",
+        "",
+        "End your response with ONE of:",
+        "  ✅ CODE REVIEW PASSED",
+        "  ❌ CODE REVIEW FAILED",
+        "  🧑 HUMAN REVIEW NEEDED: <concise reason>  ← use when a finding cannot be",
+        "     resolved without human judgment (e.g. ambiguous design tradeoff, missing",
+        "     acceptance criteria, security concern requiring product decision).",
     ]
     lines.append(skill_hint(state.get("skill", "")))
     if state.get("skill"):
@@ -115,6 +124,10 @@ def _extract_coordinator_ok(agent_result: dict) -> bool:
     match = re.search(r"^(✅ CODE REVIEW PASSED|❌ CODE REVIEW FAILED)\b", content, re.MULTILINE)
     if match:
         return match.group(1) == "✅ CODE REVIEW PASSED"
+
+    # Human-review sentinel counts as a pass — open_pr will handle the pause.
+    if _HUMAN_REVIEW_MARKER in content:
+        return True
 
     # Severity-based: count critical items
     critical_count = len(re.findall(r"\[critical\]", content, re.IGNORECASE))
