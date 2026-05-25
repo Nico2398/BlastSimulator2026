@@ -697,18 +697,22 @@ export function computeBlastEntityDamage(
     const def = getBuildingDef(building.type, building.tier);
     const { structuralResistance } = def;
 
-    // Sum effectiveEnergy of all solid voxels under each footprint cell
+    // Sum effectiveEnergy of solid voxels at the ground surface level
+    // under each footprint cell. Buildings sit on the topmost solid voxel,
+    // so only that y-level contributes — not all voxel layers below ground.
     let totalEnergy = 0;
     for (const [dx, dz] of def.footprint) {
       const bx = building.x + dx;
       const bz = building.z + dz;
       if (!grid.isInBounds(bx, 0, bz)) continue;
-      for (let y = 0; y < grid.sizeY; y++) {
+      // Find the topmost solid voxel (surface level) for this footprint cell
+      for (let y = grid.sizeY - 1; y >= 0; y--) {
         if (isSolid(bx, y, bz)) {
           const e = effectiveEnergy.get(`${bx},${y},${bz}`);
           if (e !== undefined) {
             totalEnergy += e;
           }
+          break;
         }
       }
     }
@@ -738,12 +742,18 @@ export function computeBlastEntityDamage(
     }
   }
 
+  // Compute totalDeaths as the count of unique employees who died,
+  // avoiding double-count when an employee is both instant-killed
+  // and an occupant casualty.
+  const uniqueDeadIds = new Set(killedEmployeeIds);
+  const totalDeaths = uniqueDeadIds.size;
+
   return {
     killedEmployeeIds,
     destroyedVehicleIds,
     destroyedBuildingIds,
     occupantCasualties,
-    totalDeaths: killedEmployeeIds.length + occupantCasualties,
+    totalDeaths,
   };
 }
 
