@@ -53,6 +53,19 @@ export function calculateHoleEnergy(charge: HoleCharge): number {
 }
 
 /**
+ * Compute initial blast energy for a hole charge.
+ * Per BLAST_SYSTEM.md §2:
+ *   E_init(v) = explosiveDef.energyPerKg * chargeKg * stemmingEfficiency(stemmingHeight, depthM)
+ *
+ * Returns 0 if the explosive ID is not found in the catalog.
+ */
+export function computeInitialEnergy(charge: HoleCharge, holeDepth: number): number {
+  const explosive = getExplosive(charge.explosiveId);
+  if (!explosive) return 0;
+  return explosive.energyPerKg * charge.amountKg * stemmingEfficiency(charge.stemmingM, holeDepth);
+}
+
+/**
  * Stemming factor: 0–1 indicating how well energy is directed downward.
  * Per BLAST_SYSTEM.md §2.1:
  *   stemming_factor = clamp(stemmingHeight / (holeDepth * 0.3), 0, 1)
@@ -60,6 +73,18 @@ export function calculateHoleEnergy(charge: HoleCharge): number {
 export function stemmingFactor(stemmingHeight: number, holeDepth: number): number {
   if (holeDepth <= 0) return 0;
   return Math.max(0, Math.min(1, stemmingHeight / (holeDepth * 0.3)));
+}
+
+/**
+ * Stemming efficiency: fraction of explosive energy retained by stemming.
+ * Per BLAST_SYSTEM.md §2.1:
+ *   stemming_efficiency = 0.5 + 0.5 * stemmingFactor(stemmingHeight, holeDepth)
+ *
+ * When stemming = 0 (no stemming), efficiency = 0.5 (50% of energy lost upward).
+ * When stemming is adequate (≥0.3 × holeDepth), efficiency = 1.0 (all energy directed downward).
+ */
+export function stemmingEfficiency(stemmingHeight: number, holeDepth: number): number {
+  return 0.5 + 0.5 * stemmingFactor(stemmingHeight, holeDepth);
 }
 
 /**

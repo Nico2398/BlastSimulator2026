@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   calculateHoleEnergy,
   stemmingFactor,
+  stemmingEfficiency,
   waterEffect,
   calculateEnergyField,
   calculateFragmentation,
@@ -17,11 +18,14 @@ import {
   OVERSIZED_FRAGMENT_THRESHOLD,
   resetBoulderFragIds,
   computeThreshold,
+  computeInitialEnergy,
+  effectiveHoleEnergy,
   propagateEnergy,
   type PropagationResult,
   type Boulder,
 } from '../../../src/core/mining/BlastCalc.js';
 import { VoxelGrid, type VoxelData } from '../../../src/core/world/VoxelGrid.js';
+import type { HoleCharge } from '../../../src/core/mining/ChargePlan.js';
 import { getRock } from '../../../src/core/world/RockCatalog.js';
 import { MAX_PROPAGATION_ITERATIONS } from '../../../src/core/config/balance.js';
 import { vec3, length } from '../../../src/core/math/Vec3.js';
@@ -881,5 +885,84 @@ describe('BlastCalc — propagateEnergy', () => {
 
   it('imports MAX_PROPAGATION_ITERATIONS constant and it is 500', () => {
     expect(MAX_PROPAGATION_ITERATIONS).toBe(500);
+  });
+});
+
+// ── 5.4: computeInitialEnergy & stemmingEfficiency ──
+
+describe('BlastCalc — stemmingEfficiency', () => {
+  it('returns 0.5 with no stemming (stemmingM = 0)', () => {
+    expect(stemmingEfficiency(0, 8)).toBe(0.5);
+  });
+
+  it('returns 1.0 with adequate stemming (2.4m for 8m depth)', () => {
+    expect(stemmingEfficiency(2.4, 8)).toBe(1.0);
+  });
+
+  it('returns ≈0.6042 with partial stemming (0.5m for 8m depth)', () => {
+    // 0.5 + 0.5 * (0.5 / (8 * 0.3)) = 0.5 + 0.5 * 0.20833… = 0.604166…
+    expect(stemmingEfficiency(0.5, 8)).toBeCloseTo(0.6042, 4);
+  });
+
+  it('clamps stemming > holeDepth to 1.0', () => {
+    expect(stemmingEfficiency(10, 8)).toBe(1.0);
+  });
+
+  it('returns 0.5 when holeDepth is 0 (stemmingFactor returns 0)', () => {
+    expect(stemmingEfficiency(0, 0)).toBe(0.5);
+  });
+
+  it('returns 0.5 with negative stemming (clamped to 0 by stemmingFactor)', () => {
+    expect(stemmingEfficiency(-1, 8)).toBe(0.5);
+  });
+});
+
+describe('BlastCalc — computeInitialEnergy', () => {
+  /** Reusable charge fixture for boomite tests. */
+  function makeCharge(
+    explosiveId: string,
+    amountKg: number,
+    stemmingM: number,
+  ): HoleCharge {
+    return { explosiveId, amountKg, stemmingM };
+  }
+
+  it('known explosive with adequate stemming → full efficiency energy', () => {
+    // boomite: 340 energyPerKg, 5kg, depth 8m, stemming 2.4m → 340 * 5 * 1.0 = 1700
+    const charge = makeCharge('boomite', 5, 2.4);
+    expect(computeInitialEnergy(charge, 8)).toBe(1700);
+  });
+
+  it('known explosive with no stemming → 50% efficiency energy', () => {
+    // boomite: 340 energyPerKg, 5kg, depth 8m, stemming 0m → 340 * 5 * 0.5 = 850
+    const charge = makeCharge('boomite', 5, 0);
+    expect(computeInitialEnergy(charge, 8)).toBe(850);
+  });
+
+  it('unknown explosive ID returns 0', () => {
+    const charge = makeCharge('nonexistent_explosive', 5, 2.4);
+    expect(computeInitialEnergy(charge, 8)).toBe(0);
+  });
+
+  it('zero charge amount returns 0', () => {
+    const charge = makeCharge('boomite', 0, 2.4);
+    expect(computeInitialEnergy(charge, 8)).toBe(0);
+  });
+
+  it('valid explosive with zero hole depth uses stemmingEfficiency with zero depth', () => {
+    // stemmingEfficiency(2.4, 0) = 0.5 (stemmingFactor returns 0 for holeDepth <= 0)
+    // 340 * 5 * 0.5 = 850
+    const charge = makeCharge('boomite', 5, 2.4);
+    expect(computeInitialEnergy(charge, 0)).toBe(850);
+  });
+
+  it('consistent with effectiveHoleEnergy.downward for dry non-water-sensitive conditions', () => {
+    // For a dry hole with adequate stemming, effectiveHoleEnergy.downward should
+    // equal computeInitialEnergy when waterEffect = 1.0.
+    const charge = makeCharge('boomite', 5, 2.4);
+    const holeDepth = 8;
+    const initial = computeInitialEnergy(charge, holeDepth);
+    const effective = effectiveHoleEnergy(charge, holeDepth, false, false);
+    expect(effective.downward).toBe(initial);
   });
 });
