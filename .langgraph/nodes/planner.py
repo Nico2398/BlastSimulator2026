@@ -25,7 +25,7 @@ from nodes._base import READ_ONLY_TOOLS, build_fresh_messages, build_react_agent
 _HUMAN_REVIEW_MARKER = "🧑 HUMAN REVIEW NEEDED:"
 
 
-def _extract_human_review(text: str) -> "str | None":
+def _extract_human_review(text: str) -> str | None:
     """Return the human-review reason from the planner output, or None."""
     for line in text.splitlines():
         if _HUMAN_REVIEW_MARKER in line:
