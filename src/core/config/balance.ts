@@ -139,6 +139,13 @@ export const PROJECTION_SPEED_THRESHOLD = 15;
 /** Epsilon for blast energy attenuation formula (prevents division by zero). */
 export const BLAST_ENERGY_EPSILON = 4.0;
 
+/** Maximum iterations for the energy propagation overflow loop.
+ *  Prevents infinite loops when energy is trapped with no dissipating neighbors.
+ *  Real blasting energy dissipates in microseconds; this is a computational guard.
+ *  Each iteration distributes overflow to neighbors. 500 iterations ensures
+ *  energy can traverse at least 500 voxels (500 m) before forced termination. */
+export const MAX_PROPAGATION_ITERATIONS = 500;
+
 // ─── Game Loop ──────────────────────────────────────────────────────────────────
 
 /** Duration of one game tick in real milliseconds at 1× speed. 1 tick = 1 game-hour. */

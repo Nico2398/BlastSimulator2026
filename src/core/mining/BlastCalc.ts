@@ -6,10 +6,10 @@ import type { Vec3 } from '../math/Vec3.js';
 import { vec3, sub, normalize, scale, length as vecLength } from '../math/Vec3.js';
 import type { DrillHole } from './DrillPlan.js';
 import type { HoleCharge } from './ChargePlan.js';
-import type { VoxelData } from '../world/VoxelGrid.js';
+import type { VoxelData, VoxelGrid } from '../world/VoxelGrid.js';
 import { getExplosive } from '../world/ExplosiveCatalog.js';
 import { getRock } from '../world/RockCatalog.js';
-import { BLAST_ENERGY_EPSILON, MAX_FRAGMENTS_PER_VOXEL, PROJECTION_SPEED_THRESHOLD } from '../config/balance.js';
+import { BLAST_ENERGY_EPSILON, MAX_FRAGMENTS_PER_VOXEL, PROJECTION_SPEED_THRESHOLD, MAX_PROPAGATION_ITERATIONS } from '../config/balance.js';
 
 // ────────────────────────────────────────────────────────
 // § 1: Voxel Threshold
@@ -296,6 +296,172 @@ export function groupChargesByDelay(
     }
   }
   return [...delayGroups.values()];
+}
+
+// ────────────────────────────────────────────────────────
+// § 5.5: Energy Propagation
+// ────────────────────────────────────────────────────────
+
+export interface PropagationResult {
+  effectiveEnergy: Map<string, number>;
+  generatedOverflow: Map<string, number>;
+}
+
+/** Epsilon threshold for propagation leftover. Values below this are treated as zero
+ *  to prevent floating-point drift causing infinite sub-epsilon propagation loops. */
+const PROPAGATION_EPSILON = 1e-12;
+
+/** Face-adjacent neighbor offsets: 6 directions (±x, ±y, ±z). */
+const NEIGHBOR_OFFSETS: readonly [number, number, number][] = [
+  [ 1,  0,  0],
+  [-1,  0,  0],
+  [ 0,  1,  0],
+  [ 0, -1,  0],
+  [ 0,  0,  1],
+  [ 0,  0, -1],
+];
+
+/** Check if a voxel is air (no solid material). */
+function isAirVoxel(voxel: VoxelData): boolean {
+  return voxel.density <= 0 || voxel.composition.rocks.length === 0;
+}
+
+/**
+ * Propagate energy through the voxel grid using iterative overflow.
+ * Each voxel absorbs up to T(v) - already_absorbed, then distributes
+ * leftover energy equally among face-adjacent non-air neighbours that
+ * still have remaining absorption capacity.  This prevents energy from
+ * bouncing endlessly between already-saturated voxels.
+ *
+ * Pure function — does not mutate the VoxelGrid.
+ *
+ * @param grid - VoxelGrid (read-only).
+ * @param initial - Map of "x,y,z" → initial overflow energy per voxel.
+ * @returns PropagationResult with effectiveEnergy and generatedOverflow maps.
+ */
+export function propagateEnergy(
+  grid: VoxelGrid,
+  initial: Map<string, number>,
+): PropagationResult {
+  const effectiveEnergy = new Map<string, number>();
+  const generatedOverflow = new Map<string, number>();
+
+  // ── Filter and sanitize initial input ────────────────────────────────────────
+  const overflow = new Map<string, number>();
+  for (const [key, rawEnergy] of initial) {
+    // Clamp NaN and negative to 0
+    let energy = rawEnergy;
+    if (typeof energy !== 'number' || !Number.isFinite(energy)) {
+      energy = 0;
+    }
+    if (energy < 0) {
+      energy = 0;
+    }
+    if (energy <= PROPAGATION_EPSILON) {
+      continue;
+    }
+
+    // Parse coordinates
+    const parts = key.split(',');
+    if (parts.length !== 3) continue;
+    const x = parseInt(parts[0]!, 10);
+    const y = parseInt(parts[1]!, 10);
+    const z = parseInt(parts[2]!, 10);
+    if (Number.isNaN(x) || Number.isNaN(y) || Number.isNaN(z)) continue;
+
+    // Skip out-of-bounds keys
+    if (!grid.isInBounds(x, y, z)) continue;
+
+    overflow.set(key, energy);
+  }
+
+  // ── Propagate: empty grid or all-air → return clean maps early ──────────────
+  if (overflow.size === 0) {
+    return { effectiveEnergy, generatedOverflow };
+  }
+
+  // ── Iterative propagation loop ───────────────────────────────────────────────
+  let currentOverflow = overflow;
+
+  for (let iter = 0; iter < MAX_PROPAGATION_ITERATIONS; iter++) {
+    if (currentOverflow.size === 0) break;
+
+    const nextOverflow = new Map<string, number>();
+    let anyChange = false;
+
+    for (const [key, incoming] of currentOverflow) {
+      if (incoming <= PROPAGATION_EPSILON) continue;
+
+      const parts = key.split(',');
+      const x = parseInt(parts[0]!, 10);
+      const y = parseInt(parts[1]!, 10);
+      const z = parseInt(parts[2]!, 10);
+
+      const voxel = grid.getVoxel(x, y, z);
+      if (!voxel) continue;
+
+      // Compute threshold and already-absorbed energy for this voxel
+      const threshold = computeThreshold(voxel);
+      const currentEffective = effectiveEnergy.get(key) ?? 0;
+
+      // Absorb up to remaining capacity
+      const canAbsorb = Math.max(0, threshold - currentEffective);
+      const absorbed = Math.min(incoming, canAbsorb);
+
+      if (absorbed > 0) {
+        effectiveEnergy.set(key, currentEffective + absorbed);
+      }
+
+      const leftover = incoming - absorbed;
+
+      if (leftover > PROPAGATION_EPSILON) {
+        // Track overflow that passed through this voxel
+        generatedOverflow.set(key, (generatedOverflow.get(key) ?? 0) + leftover);
+
+        // Distribute leftover equally to face-adjacent non-air neighbours
+        // that still have remaining absorption capacity.
+        // Skipping already-saturated neighbours prevents endless bounce loops.
+        const validNeighbors: string[] = [];
+
+        for (const [dx, dy, dz] of NEIGHBOR_OFFSETS) {
+          const nx = x + dx;
+          const ny = y + dy;
+          const nz = z + dz;
+
+          if (!grid.isInBounds(nx, ny, nz)) continue;
+
+          const nvoxel = grid.getVoxel(nx, ny, nz);
+          if (!nvoxel || isAirVoxel(nvoxel)) continue;
+
+          // Only distribute to neighbours that still have capacity to absorb
+          const nkey = `${nx},${ny},${nz}`;
+          const neighborThreshold = computeThreshold(nvoxel);
+          const neighborEffective = effectiveEnergy.get(nkey) ?? 0;
+          if (neighborEffective < neighborThreshold) {
+            validNeighbors.push(nkey);
+          }
+        }
+
+        if (validNeighbors.length > 0) {
+          const share = leftover / validNeighbors.length;
+          for (const nkey of validNeighbors) {
+            nextOverflow.set(nkey, (nextOverflow.get(nkey) ?? 0) + share);
+          }
+          anyChange = true;
+        }
+        // If no valid unsaturated neighbors, leftover stays in generatedOverflow (cannot dissipate).
+        // Loop will detect no change next iteration and break.
+      }
+    }
+
+    currentOverflow = nextOverflow;
+
+    if (!anyChange) {
+      break;
+    }
+  }
+
+  return { effectiveEnergy, generatedOverflow };
 }
 
 // ────────────────────────────────────────────────────────
