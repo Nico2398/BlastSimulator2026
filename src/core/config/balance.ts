@@ -145,6 +145,8 @@ export const BLAST_ENERGY_EPSILON = 4.0;
  *  Each iteration distributes overflow to neighbors. 500 iterations ensures
  *  energy can traverse at least 500 voxels (500 m) before forced termination. */
 export const MAX_PROPAGATION_ITERATIONS = 500;
+/** Energy must reach this multiple of a voxel's threshold to fragment it. */
+export const FRAGMENTATION_MULTIPLIER = 1.0;
 
 // ─── Game Loop ──────────────────────────────────────────────────────────────────
 
