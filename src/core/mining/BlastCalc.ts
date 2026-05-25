@@ -1,4 +1,4 @@
-// BlastSimulator2026 — Blast calculation engine
+// BlastSimulator2026 â€” Blast calculation engine
 // Pure math functions for energy, fragmentation, velocity, free face, vibration.
 // Every formula from BLAST_SYSTEM.md is implemented here.
 
@@ -12,12 +12,12 @@ import { getRock } from '../world/RockCatalog.js';
 import { BLAST_ENERGY_EPSILON, MAX_FRAGMENTS_PER_VOXEL, PROJECTION_SPEED_THRESHOLD, MAX_PROPAGATION_ITERATIONS, FRAGMENTATION_MULTIPLIER } from '../config/balance.js';
 
 // --------------------------------------------------------
-// § 1: Voxel Threshold
+// Â§ 1: Voxel Threshold
 // --------------------------------------------------------
 
 /**
  * Compute the energy threshold for a voxel based on its rock composition.
- * T(v) = S_r [ coefficient[r] * rockDef[r].energyAbsorption ]
+ * T(v) = Î£_r [ coefficient[r] * rockDef[r].energyAbsorption ]
  *
  * Returns 0 for air voxels (empty composition).
  * Unknown rock IDs are silently treated as zero contribution.
@@ -38,10 +38,10 @@ export function computeThreshold(voxel: VoxelData): number {
 }
 
 // --------------------------------------------------------
-// § 2: Energy Calculation
+// Â§ 2: Energy Calculation
 // --------------------------------------------------------
 
-// Minimum effective distance² for energy field (imported from balance config).
+// Minimum effective distanceÂ² for energy field (imported from balance config).
 // Real blasting: near field is uniform within ~2x borehole radius (~2m).
 const EPSILON = BLAST_ENERGY_EPSILON;
 
@@ -54,7 +54,7 @@ export function calculateHoleEnergy(charge: HoleCharge): number {
 
 /**
  * Compute initial blast energy for a hole charge.
- * Per BLAST_SYSTEM.md §2:
+ * Per BLAST_SYSTEM.md Â§2:
  *   E_init(v) = explosiveDef.energyPerKg * chargeKg * stemmingEfficiency(stemmingHeight, depthM)
  *
  * Returns 0 if the explosive ID is not found in the catalog.
@@ -66,8 +66,8 @@ export function computeInitialEnergy(charge: HoleCharge, holeDepth: number): num
 }
 
 /**
- * Stemming factor: 0–1 indicating how well energy is directed downward.
- * Per BLAST_SYSTEM.md §2.1:
+ * Stemming factor: 0â€“1 indicating how well energy is directed downward.
+ * Per BLAST_SYSTEM.md Â§2.1:
  *   stemming_factor = clamp(stemmingHeight / (holeDepth * 0.3), 0, 1)
  */
 export function stemmingFactor(stemmingHeight: number, holeDepth: number): number {
@@ -77,11 +77,11 @@ export function stemmingFactor(stemmingHeight: number, holeDepth: number): numbe
 
 /**
  * Stemming efficiency: fraction of explosive energy retained by stemming.
- * Per BLAST_SYSTEM.md §2.1:
+ * Per BLAST_SYSTEM.md Â§2.1:
  *   stemming_efficiency = 0.5 + 0.5 * stemmingFactor(stemmingHeight, holeDepth)
  *
  * When stemming = 0 (no stemming), efficiency = 0.5 (50% of energy lost upward).
- * When stemming is adequate (=0.3 × holeDepth), efficiency = 1.0 (all energy directed downward).
+ * When stemming is adequate (â‰¥0.3 Ã— holeDepth), efficiency = 1.0 (all energy directed downward).
  */
 export function stemmingEfficiency(stemmingHeight: number, holeDepth: number): number {
   return 0.5 + 0.5 * stemmingFactor(stemmingHeight, holeDepth);
@@ -89,7 +89,7 @@ export function stemmingEfficiency(stemmingHeight: number, holeDepth: number): n
 
 /**
  * Water effect on energy.
- * Per BLAST_SYSTEM.md §2.2:
+ * Per BLAST_SYSTEM.md Â§2.2:
  *   Water-sensitive explosive in flooded hole without tubing ? 10% energy.
  */
 export function waterEffect(
@@ -125,8 +125,8 @@ export function effectiveHoleEnergy(
  * Total energy field at a point from all holes.
  * Downward energy radiates from the mid-column source downward into the rock.
  * Upward energy (from insufficient stemming) radiates from the collar (hole top)
- * and adds energy to surface voxels above — creating fly-rock projections.
- * E(P) = S [ E_downward_i / (dist_from_midcolumn² + e) + E_upward_i / (dist_from_collar² + e) ]
+ * and adds energy to surface voxels above â€” creating fly-rock projections.
+ * E(P) = Î£ [ E_downward_i / (dist_from_midcolumnÂ² + Îµ) + E_upward_i / (dist_from_collarÂ² + Îµ) ]
  */
 export function calculateEnergyField(
   point: Vec3,
@@ -157,7 +157,7 @@ export function calculateEnergyField(
 }
 
 // --------------------------------------------------------
-// § 3: Fragmentation
+// Â§ 3: Fragmentation
 // --------------------------------------------------------
 
 export type FractureResult = 'fractured' | 'cracked' | 'unaffected';
@@ -173,7 +173,7 @@ export interface FragmentationResult {
 
 /**
  * Determine fragmentation result for a voxel.
- * Per BLAST_SYSTEM.md §3.1–3.2.
+ * Per BLAST_SYSTEM.md Â§3.1â€“3.2.
  */
 export function calculateFragmentation(
   energy: number,
@@ -188,7 +188,7 @@ export function calculateFragmentation(
     return { result: 'unaffected', fragmentSizeFraction: 1, isProjection: false, energyRatio: ratio };
   }
   if (ratio < 1.0) {
-    // Cracked — threshold reduced by 30% for future blasts
+    // Cracked â€” threshold reduced by 30% for future blasts
     return { result: 'cracked', fragmentSizeFraction: 1, isProjection: false, energyRatio: ratio };
   }
   if (ratio < 2.0) {
@@ -202,7 +202,7 @@ export function calculateFragmentation(
     const size = 0.3 - 0.2 * t; // lerp(0.3, 0.1, t)
     return { result: 'fractured', fragmentSizeFraction: size, isProjection: false, energyRatio: ratio };
   }
-  // Over-blasted — dust + projection
+  // Over-blasted â€” dust + projection
   return { result: 'fractured', fragmentSizeFraction: 0.05, isProjection: true, energyRatio: ratio };
 }
 
@@ -223,7 +223,7 @@ export function calculateFragmentCount(
 }
 
 // --------------------------------------------------------
-// § 5.1: Initial Velocity
+// Â§ 5.1: Initial Velocity
 // --------------------------------------------------------
 
 // PROJECTION_SPEED_THRESHOLD imported from balance config above
@@ -252,7 +252,7 @@ export function classifyProjection(speed: number, energyRatio: number): boolean 
 }
 
 // --------------------------------------------------------
-// § 6.2: Free Face
+// Â§ 6.2: Free Face
 // --------------------------------------------------------
 
 /**
@@ -283,14 +283,14 @@ export function calculateFreeFace(
 }
 
 // --------------------------------------------------------
-// § 7: Vibration
+// Â§ 7: Vibration
 // --------------------------------------------------------
 
 /**
  * Calculate vibration at distance d from the blast.
  * Uses the scaled-distance law: V = max(charge_per_delay)^0.7 / d^1.5 * groundFactor
  * Real blasting vibration is dominated by the maximum charge per delay,
- * not the sum — splitting charge across delays reduces peak vibration.
+ * not the sum â€” splitting charge across delays reduces peak vibration.
  */
 export function calculateVibrations(
   chargePerDelay: number[],
@@ -324,7 +324,7 @@ export function groupChargesByDelay(
 }
 
 // --------------------------------------------------------
-// § 5.5: Energy Propagation
+// Â§ 5.5: Energy Propagation
 // --------------------------------------------------------
 
 export interface PropagationResult {
@@ -336,7 +336,7 @@ export interface PropagationResult {
  *  to prevent floating-point drift causing infinite sub-epsilon propagation loops. */
 const PROPAGATION_EPSILON = 1e-12;
 
-/** Face-adjacent neighbor offsets: 6 directions (±x, ±y, ±z). */
+/** Face-adjacent neighbor offsets: 6 directions (Â±x, Â±y, Â±z). */
 const NEIGHBOR_OFFSETS: readonly [number, number, number][] = [
   [ 1,  0,  0],
   [-1,  0,  0],
@@ -358,7 +358,7 @@ function isAirVoxel(voxel: VoxelData): boolean {
  * still have remaining absorption capacity.  This prevents energy from
  * bouncing endlessly between already-saturated voxels.
  *
- * Pure function — does not mutate the VoxelGrid.
+ * Pure function â€” does not mutate the VoxelGrid.
  *
  * @param grid - VoxelGrid (read-only).
  * @param initial - Map of "x,y,z" ? initial overflow energy per voxel.
@@ -484,7 +484,7 @@ export function propagateEnergy(
   return { effectiveEnergy, generatedOverflow };
 }
 // --------------------------------------------------------
-// ? 5.6: Identify Fragmented Voxels
+// Â§ 5.6: Identify Fragmented Voxels
 // --------------------------------------------------------
 
 /**
@@ -492,11 +492,12 @@ export function propagateEnergy(
  *
  * Two fragmentation mechanisms:
  * 1. Energy criterion: effectiveEnergy[v] >= FRAGMENTATION_MULTIPLIER * T(v)
- * 2. Island flood-fill: solid clusters with no path to any boundary cell
- *    THROUGH NON-FRAGMENTED SPACE are also fragmented (handles hanging rock arches).
- *    Fragmented voxels act as barriers; air and solid both form traversable space.
+ * 2. Island flood-fill: solid clusters with no SOLID path to any boundary cell
+ *    are also fragmented (handles hanging rock arches).
+ *    Fragmented voxels and air cells are barriers â€” only solid non-fragmented
+ *    neighbors are traversable in the BFS.
  *
- * Pure function ? does not mutate the grid.
+ * Pure function â€” does not mutate the grid.
  *
  * @param grid - VoxelGrid (read-only).
  * @param result - PropagationResult from propagateEnergy.
@@ -524,21 +525,23 @@ export function identifyFragmentedVoxels(
   }
 
   // -- Step 2: Island flood-fill from boundary -------------------------------
-  // BFS seeds: ALL boundary cells that are not in the fragmented set.
-  // Traversal: any cell not in fragmented set (solid or air).
-  // Fragmented voxels are barriers ? islands are solid clusters completely
-  // enclosed by fragmented cells with no non-fragmented path to the boundary.
+  // BFS seeds: boundary SOLID cells that are not in the fragmented set.
+  // Traversal: solid cells not in fragmented set only â€” air does not connect solids.
+  // Fragmented voxels are barriers; islands are solid clusters with no solid path
+  // to the boundary (e.g. separated from boundary by air or by fragmented rock).
   const visited = new Set<string>();
   const queue: [number, number, number][] = [];
 
-  const isNonFragmented = (x: number, y: number, z: number): boolean => {
+  const isSolidNonFragmented = (x: number, y: number, z: number): boolean => {
     if (!grid.isInBounds(x, y, z)) return false;
-    return !fragmented.has(`${x},${y},${z}`);
+    if (fragmented.has(`${x},${y},${z}`)) return false;
+    const v = grid.getVoxel(x, y, z);
+    return v !== undefined && !isAirVoxel(v);
   };
 
   const maybeSeed = (x: number, y: number, z: number): void => {
     const key = `${x},${y},${z}`;
-    if (isNonFragmented(x, y, z) && !visited.has(key)) {
+    if (isSolidNonFragmented(x, y, z) && !visited.has(key)) {
       visited.add(key);
       queue.push([x, y, z]);
     }
@@ -571,7 +574,7 @@ export function identifyFragmentedVoxels(
       const ny = cy + dy;
       const nz = cz + dz;
       const nkey = `${nx},${ny},${nz}`;
-      if (!visited.has(nkey) && isNonFragmented(nx, ny, nz)) {
+      if (!visited.has(nkey) && isSolidNonFragmented(nx, ny, nz)) {
         visited.add(nkey);
         queue.push([nx, ny, nz]);
       }

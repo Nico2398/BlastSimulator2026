@@ -971,7 +971,7 @@ describe('BlastCalc â€” computeInitialEnergy', () => {
 
 // -- identifyFragmentedVoxels --
 
-describe('BlastCalc — identifyFragmentedVoxels', () => {
+describe('BlastCalc â€” identifyFragmentedVoxels', () => {
   // -- Local helpers (mirrors those in propagateEnergy describe) ------------
 
   function filledGrid(
@@ -1032,23 +1032,46 @@ describe('BlastCalc — identifyFragmentedVoxels', () => {
     expect(fragmented.has('1,1,1')).toBe(true);
   });
 
-  // -- c. Single voxel below threshold ? not fragmented --------------------
+  // -- c. Single boundary voxel below threshold ? not fragmented -----------
+  // Voxel at (0,0,0) is on the grid boundary, so it has a solid path to the
+  // boundary and is NOT an island. Energy below threshold means it is also not
+  // energy-fragmented, so it must not appear in the result at all.
 
-  it('single voxel with energy < threshold * FRAGMENTATION_MULTIPLIER ? not fragmented', () => {
-    const grid = singleSolidGrid(1, 1, 1, 'cruite');
+  it('single boundary voxel with energy < threshold * FRAGMENTATION_MULTIPLIER ? not fragmented', () => {
+    const grid = singleSolidGrid(0, 0, 0, 'cruite');
     const result: PropagationResult = {
-      effectiveEnergy: new Map([['1,1,1', CRUITE_ABSORPTION * FRAGMENTATION_MULTIPLIER * 0.99]]),
+      effectiveEnergy: new Map([['0,0,0', CRUITE_ABSORPTION * FRAGMENTATION_MULTIPLIER * 0.99]]),
       generatedOverflow: new Map(),
     };
     const fragmented = identifyFragmentedVoxels(grid, result);
-    expect(fragmented.has('1,1,1')).toBe(false);
+    expect(fragmented.has('0,0,0')).toBe(false);
+  });
+
+  // -- c2. Interior solid with no solid path to boundary ? island -----------
+  // Air does not connect solids: a solid voxel at the grid interior surrounded
+  // entirely by air has no SOLID path to the boundary and must be classified as
+  // an island even if its energy is below the fragmentation threshold.
+
+  it('interior solid separated from boundary by air corridor ? classified as island', () => {
+    // 3Ã—3Ã—3 grid, only (1,1,1) is solid cruite; all other cells are air.
+    // Energy for (1,1,1) is well below the fragmentation threshold, so it is
+    // not energy-fragmented in Step 1.
+    // Flood-fill seeds only solid boundary cells â€” there are none â€” so (1,1,1)
+    // is never visited and must be marked as an island in Step 3.
+    const grid = singleSolidGrid(1, 1, 1, 'cruite');
+    const result: PropagationResult = {
+      effectiveEnergy: new Map([['1,1,1', CRUITE_ABSORPTION * FRAGMENTATION_MULTIPLIER * 0.1]]),
+      generatedOverflow: new Map(),
+    };
+    const fragmented = identifyFragmentedVoxels(grid, result);
+    expect(fragmented.has('1,1,1')).toBe(true);
   });
 
   // -- d. Multiple voxels: some above, some below threshold -----------------
 
-  it('multiple voxels — only those above threshold appear in result', () => {
-    // 3×3×3 grid with three solid voxels: (0,0,0) above, (1,0,0) below, (2,0,0) above
-    // (1,0,0) has y=0 ? on boundary ? reachable by BFS ? not an island
+  it('multiple voxels â€” only those above threshold appear in result', () => {
+    // 3Ã—3Ã—3 grid with three solid voxels: (0,0,0) above, (1,0,0) below, (2,0,0) above
+    // (1,0,0) has y=0 â†’ on boundary â†’ reachable by BFS â†’ not an island
     const grid = new VoxelGrid(3, 3, 3);
     const solid: VoxelData = {
       composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
@@ -1078,8 +1101,8 @@ describe('BlastCalc — identifyFragmentedVoxels', () => {
   // -- e. Island detection: interior cluster surrounded by fragmented shell --
 
   it('interior solid cluster fully surrounded by fragmented voxels ? classified as islands', () => {
-    // 5×5×5 filled grid. Energy-fragment the entire outer shell (98 voxels).
-    // Interior 3×3×3 (27 voxels, x/y/z in 1–3) has no energy ? not energy-fragmented.
+    // 5Ã—5Ã—5 filled grid. Energy-fragment the entire outer shell (98 voxels).
+    // Interior 3Ã—3Ã—3 (27 voxels, x/y/z in 1â€“3) has no energy ? not energy-fragmented.
     // BFS seeds: boundary cells that are solid non-fragmented ? none (all fragmented).
     // Interior 27 voxels unreachable ? become islands ? all 125 in result.
     const grid = filledGrid(5, 5, 5, 'cruite');
@@ -1111,8 +1134,8 @@ describe('BlastCalc — identifyFragmentedVoxels', () => {
   // -- f. Connected to boundary through chain ? not an island --------------
 
   it('solid chain connected to boundary ? none become islands', () => {
-    // 5×1×1 grid, all solid cruite. Energy-fragment only (4,0,0).
-    // Cells 0–3,0,0 are solid non-fragmented.
+    // 5Ã—1Ã—1 grid, all solid cruite. Energy-fragment only (4,0,0).
+    // Cells 0â€“3,0,0 are solid non-fragmented.
     // sizeY=1 and sizeZ=1 ? every cell is on a boundary face (y=0=sizeY-1, z=0=sizeZ-1).
     // So 0,0,0..3,0,0 are all BFS seeds ? reachable ? none are islands.
     const grid = filledGrid(5, 1, 1, 'cruite');
@@ -1135,13 +1158,13 @@ describe('BlastCalc — identifyFragmentedVoxels', () => {
   // -- g. Air voxels never fragmented --------------------------------------
 
   it('air voxels never appear in result even if their key is in effectiveEnergy', () => {
-    // 3×3×3 grid with only (1,1,1) solid; rest are air.
+    // 3Ã—3Ã—3 grid with only (1,1,1) solid; rest are air.
     // Set effectiveEnergy for an air voxel (0,0,0) with very high energy.
     // Air has threshold=0; without explicit air check this could be mis-fragmented.
     const grid = singleSolidGrid(1, 1, 1, 'cruite');
     const result: PropagationResult = {
       effectiveEnergy: new Map([
-        ['0,0,0', 9999],  // air voxel — must NOT appear in result
+        ['0,0,0', 9999],  // air voxel â€” must NOT appear in result
         ['1,1,1', CRUITE_ABSORPTION * FRAGMENTATION_MULTIPLIER * 0.5],  // solid but below threshold
       ]),
       generatedOverflow: new Map(),
@@ -1151,23 +1174,25 @@ describe('BlastCalc — identifyFragmentedVoxels', () => {
   });
 
   // -- h. FRAGMENTATION_MULTIPLIER exact boundary ---------------------------
+  // Use a boundary-connected solid (0,0,0) so island detection does not interfere,
+  // isolating the energy-threshold boundary check.
 
   it('energy just below threshold*FRAGMENTATION_MULTIPLIER ? not fragmented; at threshold ? fragmented', () => {
-    const gridBelow = singleSolidGrid(1, 1, 1, 'cruite');
-    const gridAt = singleSolidGrid(1, 1, 1, 'cruite');
+    const gridBelow = singleSolidGrid(0, 0, 0, 'cruite');
+    const gridAt = singleSolidGrid(0, 0, 0, 'cruite');
     const threshold = CRUITE_ABSORPTION * FRAGMENTATION_MULTIPLIER;
     const epsilon = 1e-9;
 
     const resultBelow: PropagationResult = {
-      effectiveEnergy: new Map([['1,1,1', threshold - epsilon]]),
+      effectiveEnergy: new Map([['0,0,0', threshold - epsilon]]),
       generatedOverflow: new Map(),
     };
     const resultAt: PropagationResult = {
-      effectiveEnergy: new Map([['1,1,1', threshold]]),
+      effectiveEnergy: new Map([['0,0,0', threshold]]),
       generatedOverflow: new Map(),
     };
 
-    expect(identifyFragmentedVoxels(gridBelow, resultBelow).has('1,1,1')).toBe(false);
-    expect(identifyFragmentedVoxels(gridAt, resultAt).has('1,1,1')).toBe(true);
+    expect(identifyFragmentedVoxels(gridBelow, resultBelow).has('0,0,0')).toBe(false);
+    expect(identifyFragmentedVoxels(gridAt, resultAt).has('0,0,0')).toBe(true);
   });
 });
