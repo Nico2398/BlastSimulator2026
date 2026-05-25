@@ -25,7 +25,7 @@ Purpose-built LangGraph graph replacing the previous agent system. Every pipelin
 |---|---|---|
 | `implement-feature` | `agent-task` label, "implement", "add" | orchestrate → skeleton_writer → unit-tests → integration-tests → scenario-tests → implementer → cherry_pick → [conflict_resolver] → **test_runner** → [**fixer**] → qualimetry → **code_review** → refactorer → validator → open_pr |
 | `fix-bug` | `bug` label, "fix", "broken", "error" | orchestrate → skeleton_writer → unit-tests → implementer → cherry_pick → **test_runner** → [**fixer**] → qualimetry → **code_review** → validator → open_pr |
-| `review-pr` | "review", "APPROVED", "LGTM" | orchestrate → reviewer → END |
+| `review-pr` | "review", "LGTM" | orchestrate → reviewer → END |
 | `visual-change` | "rendering", "UI", "canvas", "three.js" | same as implement-feature + visual_tester before open_pr |
 | `investigate` | "why", "how", "explain", "analyze" | orchestrate → implementer (read-only) → END |
 
@@ -339,7 +339,7 @@ Set `LANGSMITH_API_KEY` as a repo secret for deeper traces. All runs appear unde
     refactorer.py               ← TDD Refactor: clean up for clarity
     validator.py                ← run npm run validate, record validator_report on failure
     visual_tester.py            ← Puppeteer scenario tests
-    reviewer.py                 ← PR audit + post APPROVED comment
+    reviewer.py                 ← PR audit + review report
     open_pr.py                  ← non-agentic: create PR via PyGithub
   tools/
     __init__.py

@@ -45,7 +45,7 @@ The pipeline classifies each issue into a path, then runs the appropriate TDD se
 | Full feature | feature, implement, add | Plan → Test (Red) → Implement (Green) → Quality gates → Code review → Refactor → Validate → PR |
 | Bug fix | bug, fix, broken, regression | Plan → Unit test → Implement → Quality gates → Code review → Validate → PR |
 | Visual change | rendering, UI, canvas | Full feature + visual verification before PR |
-| PR review | review, APPROVED, LGTM | Audit PR → post APPROVED merge signal |
+| PR review | review, LGTM | Audit PR → pass/fail report |
 | Investigate | why, how, explain, analyze | Read-only exploration → END |
 
 Each TDD step follows the standard Red-Green-Refactor cycle. The specific agents and their granularity may evolve — the pipeline is defined by the sequence, not the agent count.

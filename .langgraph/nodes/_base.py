@@ -82,7 +82,7 @@ READ_ONLY_TOOLS = _CONTEXT_TOOLS + _CODE_READ_TOOLS + _TODO_TOOLS
 CODING_TOOLS = _CONTEXT_TOOLS + _CODE_READ_TOOLS + _CODE_WRITE_TOOLS + _TODO_TOOLS
 
 # REVIEW_TOOLS: like CODING_TOOLS + GitHub write.
-# Use for: reviewer (can post APPROVED comment and push last-minute fixes).
+# Use for: reviewer (can post review comment and push last-minute fixes).
 REVIEW_TOOLS = CODING_TOOLS + _GH_WRITE_TOOLS
 
 # Kept for any node that explicitly still needs GitHub write tools.
