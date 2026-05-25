@@ -10,6 +10,7 @@ After creation:
 """
 
 from __future__ import annotations
+import os
 import sys
 from pathlib import Path
 
@@ -72,13 +73,19 @@ def open_pr(state: dict) -> dict:
                 {"role": "assistant", "content": f"warning: comment failed: {exc}"}
             ]
     else:
-        try:
-            auto_msg = enable_automerge(pr_num, merge_method="squash")
-            messages = messages + [{"role": "assistant", "content": auto_msg}]
-        except (RuntimeError, GithubException) as exc:
+        auto_merge_enabled = os.environ.get("AGENTIC_AUTO_MERGE_ENABLED", "true")
+        if auto_merge_enabled == "false":
             messages = messages + [
-                {"role": "assistant", "content": f"warning: auto-merge failed: {exc}"}
+                {"role": "assistant", "content": "auto-merge skipped: AGENTIC_AUTO_MERGE_ENABLED is false"}
             ]
+        else:
+            try:
+                auto_msg = enable_automerge(pr_num, merge_method="squash")
+                messages = messages + [{"role": "assistant", "content": auto_msg}]
+            except (RuntimeError, GithubException) as exc:
+                messages = messages + [
+                    {"role": "assistant", "content": f"warning: auto-merge failed: {exc}"}
+                ]
 
     try:
         remove_result = remove_label(issue_number, "in-progress")
