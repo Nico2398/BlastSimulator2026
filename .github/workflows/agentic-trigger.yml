@@ -9,6 +9,7 @@ permissions:
 
 jobs:
   kickstart:
+    if: vars.LANGGRAPH_AUTO_ASSIGN_ENABLED != 'false'
     runs-on: ubuntu-latest
     steps:
       - name: Check for idle ready issues

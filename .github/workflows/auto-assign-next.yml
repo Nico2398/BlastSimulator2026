@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   chain-next-task:
-    if: github.event.pull_request.merged == true
+    if: github.event.pull_request.merged == true && vars.LANGGRAPH_AUTO_ASSIGN_ENABLED != 'false' && github.event.pull_request.user.type == 'Bot'
     runs-on: ubuntu-latest
     steps:
       - name: Close done issue + assign next ready issue to LangGraph
@@ -78,6 +78,35 @@ jobs:
               console.log('No backlog-id in issue body — skipping backlog update.');
             }
 
+            // --- 2.5 Check for stalled in-progress issues ---
+            const { data: inProgress } = await github.rest.issues.listForRepo({
+              owner, repo,
+              labels: 'in-progress',
+              state: 'open',
+              per_page: 10
+            });
+
+            for (const stuck of inProgress) {
+              if (stuck.number === n) continue;
+
+              const { data: events } = await github.rest.issues.listEventsForTimeline({
+                owner, repo,
+                issue_number: stuck.number,
+                per_page: 100
+              });
+
+              const hasPR = events.some(e => e.event === 'cross-referenced' && e.source?.issue?.pull_request);
+              if (!hasPR) {
+                console.log(`Issue #${stuck.number} is in-progress but has no linked PR. Halting chain.`);
+                await github.rest.issues.createComment({
+                  owner, repo,
+                  issue_number: stuck.number,
+                  body: '⏸️ Pipeline halted — this issue was marked **in-progress** but no linked PR was created. Please diagnose manually, then either close it or remove `in-progress` and add `ready`.'
+                });
+                return;
+              }
+            }
+
             // --- 3. Find next ready issue (oldest first) ---
             const { data: ready } = await github.rest.issues.listForRepo({
               owner, repo,
@@ -114,13 +143,6 @@ jobs:
                 owner, repo,
                 issue_number: issue.number,
                 labels: ['in-progress']
-              });
-
-              // Acknowledge on the issue
-              await github.rest.issues.createComment({
-                owner, repo,
-                issue_number: issue.number,
-                body: `🤖 LangGraph agent picking this up (chained from merged PR #${context.payload.pull_request.number})…`
               });
 
               // Dispatch the LangGraph pipeline workflow
