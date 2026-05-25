@@ -128,6 +128,7 @@ async def run(issue_number: int, comment_body: str) -> None:
         "quality_review_report": "",
         "i18n_review_ok": False,
         "i18n_review_report": "",
+        "needs_human_review": None,
     }
 
     log.info("Starting pipeline for issue #%d", issue_number)
