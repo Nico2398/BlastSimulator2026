@@ -10,6 +10,11 @@ import type { VoxelData, VoxelGrid } from '../world/VoxelGrid.js';
 import { getExplosive } from '../world/ExplosiveCatalog.js';
 import { getRock } from '../world/RockCatalog.js';
 import { BLAST_ENERGY_EPSILON, MAX_FRAGMENTS_PER_VOXEL, PROJECTION_SPEED_THRESHOLD, MAX_PROPAGATION_ITERATIONS, FRAGMENTATION_MULTIPLIER } from '../config/balance.js';
+import type { Employee } from '../entities/Employee.js';
+import type { Vehicle } from '../entities/Vehicle.js';
+import type { BuildingState } from '../entities/Building.js';
+import { getBuildingDef } from '../entities/Building.js';
+import { Random } from '../math/Random.js';
 
 // --------------------------------------------------------
 // § 1: Voxel Threshold
@@ -599,6 +604,148 @@ export function identifyFragmentedVoxels(
   return fragmented;
 }
 
+// --------------------------------------------------------
+// § 5.7: Entity Damage from Blast
+// --------------------------------------------------------
+
+export interface BlastEntityDamageResult {
+  /** IDs of employees killed by standing on a fragmented voxel. */
+  killedEmployeeIds: number[];
+  /** IDs of vehicles destroyed by standing on a fragmented voxel. */
+  destroyedVehicleIds: number[];
+  /** IDs of buildings destroyed by cumulative energy exceeding structuralResistance. */
+  destroyedBuildingIds: number[];
+  /** Casualty count from occupant survival rolls in destroyed buildings. */
+  occupantCasualties: number;
+  /** Total death count (instant kills + occupant casualties). */
+  totalDeaths: number;
+}
+
+/**
+ * Compute entity damage from blast energy.
+ *
+ * Pure function — reads entity state and grid, returns a damage result struct.
+ * The caller applies mutations using killEmployee / destroyVehicle / destroyBuilding.
+ *
+ * Employee/vehicle instant kill:
+ *   If any voxel at (entity.x, y, entity.z) for any y in [0, grid.sizeY-1]
+ *   is in fragmentedVoxels, the entity is killed/destroyed.
+ *
+ * Building sum + survival roll:
+ *   Sum effectiveEnergy of all solid voxels under each footprint cell.
+ *   If sum > structuralResistance → building is destroyed.
+ *   For each employee inside the destroyed building, roll death probability:
+ *     deathProb = clamp((sum / structuralResistance - 1.0) * 0.5, 0.30, 1.00)
+ *
+ * @param fragmentedVoxels - Set of "x,y,z" keys for fragmented voxels.
+ * @param effectiveEnergy - Map of "x,y,z" keys to effective energy values.
+ * @param grid - VoxelGrid (read-only).
+ * @param employees - readonly array of Employee objects.
+ * @param vehicles - readonly array of Vehicle objects.
+ * @param buildings - BuildingState (read-only).
+ * @param rng - Seeded PRNG for occupant survival rolls.
+ * @returns BlastEntityDamageResult with IDs of killed/destroyed entities.
+ */
+export function computeBlastEntityDamage(
+  fragmentedVoxels: Set<string>,
+  effectiveEnergy: Map<string, number>,
+  grid: VoxelGrid,
+  employees: readonly Employee[],
+  vehicles: readonly Vehicle[],
+  buildings: BuildingState,
+  rng: Random,
+): BlastEntityDamageResult {
+  const killedEmployeeIds: number[] = [];
+  const destroyedVehicleIds: number[] = [];
+  const destroyedBuildingIds: number[] = [];
+  let occupantCasualties = 0;
+
+  // Helper: check if entity at (x, z) stands on a fragmented voxel in any y-layer.
+  // Uses Math.floor to map continuous coordinates to integer voxel indices.
+  const hasFragmentedVoxelAt = (x: number, z: number): boolean => {
+    const ix = Math.floor(x);
+    const iz = Math.floor(z);
+    for (let y = 0; y < grid.sizeY; y++) {
+      if (fragmentedVoxels.has(`${ix},${y},${iz}`)) return true;
+    }
+    return false;
+  };
+
+  // Helper: check if a voxel is solid (non-air).
+  const isSolid = (x: number, y: number, z: number): boolean => {
+    const v = grid.getVoxel(x, y, z);
+    return v !== undefined && v.density > 0 && v.composition.rocks.length > 0;
+  };
+
+  // -- Employee instant kill -----------------------------------------------
+  for (const emp of employees) {
+    if (!emp.alive) continue;
+    if (hasFragmentedVoxelAt(emp.x, emp.z)) {
+      killedEmployeeIds.push(emp.id);
+    }
+  }
+
+  // -- Vehicle instant destroy ---------------------------------------------
+  for (const veh of vehicles) {
+    if (hasFragmentedVoxelAt(veh.x, veh.z)) {
+      destroyedVehicleIds.push(veh.id);
+    }
+  }
+
+  // -- Building sum + survival roll ----------------------------------------
+  for (const building of buildings.buildings) {
+    const def = getBuildingDef(building.type, building.tier);
+    const { structuralResistance } = def;
+
+    // Sum effectiveEnergy of all solid voxels under each footprint cell
+    let totalEnergy = 0;
+    for (const [dx, dz] of def.footprint) {
+      const bx = building.x + dx;
+      const bz = building.z + dz;
+      if (!grid.isInBounds(bx, 0, bz)) continue;
+      for (let y = 0; y < grid.sizeY; y++) {
+        if (isSolid(bx, y, bz)) {
+          const e = effectiveEnergy.get(`${bx},${y},${bz}`);
+          if (e !== undefined) {
+            totalEnergy += e;
+          }
+        }
+      }
+    }
+
+    // Compare to structuralResistance
+    if (structuralResistance <= 0 || totalEnergy > structuralResistance) {
+      destroyedBuildingIds.push(building.id);
+
+      // Occupant survival roll
+      if (structuralResistance > 0) {
+        const deathProb = Math.max(0.30, Math.min(1.00, (totalEnergy / structuralResistance - 1.0) * 0.5));
+
+        // Find employees inside this building's footprint
+        for (const emp of employees) {
+          if (!emp.alive) continue;
+          const ex = Math.floor(emp.x);
+          const ez = Math.floor(emp.z);
+          const isInside = def.footprint.some(
+            ([dx, dz]) => ex === building.x + dx && ez === building.z + dz,
+          );
+          if (isInside && rng.chance(deathProb)) {
+            killedEmployeeIds.push(emp.id);
+            occupantCasualties++;
+          }
+        }
+      }
+    }
+  }
+
+  return {
+    killedEmployeeIds,
+    destroyedVehicleIds,
+    destroyedBuildingIds,
+    occupantCasualties,
+    totalDeaths: killedEmployeeIds.length + occupantCasualties,
+  };
+}
 
 // --------------------------------------------------------
 // Helpers
