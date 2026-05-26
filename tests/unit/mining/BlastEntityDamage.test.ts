@@ -426,35 +426,27 @@ describe('BlastCalc — computeBlastEntityDamage', () => {
       expect(result.killedEmployeeIds).toContain(1);
     });
 
-    // AC: Clamped death probability: min 0.30, max 1.00.
-    it('clamped death probability — low energy, deathProb = 0.30', () => {
+    // AC: Energy exactly equal to structuralResistance → building NOT destroyed (condition is strictly >).
+    it('energy equal to structuralResistance → building NOT destroyed', () => {
       const grid = filledGrid(6, 5, 6, 'cruite');
       const buildings = createBuildingState();
-      addBuilding(buildings, 'driving_center', 1, 2, 2);
+      const bId = addBuilding(buildings, 'driving_center', 1, 2, 2);
 
-      // structuralResistance = 3000, exactly 3000 total → total/resistance = 1.0
-      // deathProb = clamp((1.0 - 1.0) * 0.5, 0.30, 1.00) = clamp(0, 0.30, 1.00) = 0.30
+      // structuralResistance = 3000; set exactly 3000 total (4 cells × 750 = 3000)
+      // Condition is totalE > structuralResistance, so exactly equal → NOT destroyed
       const effectiveEnergy = new Map<string, number>();
-      // 4 cells × 750 = 3000 — exactly equal
       setBuildingFootprintEnergy(effectiveEnergy, grid, { x: 2, z: 2 }, 'driving_center', 1, 750);
 
       const employees = [makeEmployee(1, 2, 2)];
       const vehicles: Vehicle[] = [];
       const fragmented = new Set<string>();
-
-      // With deathProb=0.30, use a seeded RNG
-      // We can't predict the outcome exactly, but we can verify deathProb is not below 0.30
-      // by checking occupantCasualties can be 0 or 1 (both valid at 30%)
       const rng = new Random(42);
+
       const result = computeBlastEntityDamage(
         fragmented, effectiveEnergy, grid, employees, vehicles, buildings, rng,
       );
-      // Building must be destroyed (total=3000 == resistance=3000? Actually spec says >
-      // Let me re-read: "If sum > structuralResistance → destroy building"
-      // At exactly equal, building is NOT destroyed
-      // So to test death prob clamping we need sum > structuralResistance
-      // Let me use just enough to exceed: 3001
-      expect(result.destroyedBuildingIds.length).toBeGreaterThanOrEqual(0);
+      expect(result.destroyedBuildingIds).not.toContain(bId);
+      expect(result.occupantCasualties).toBe(0);
     });
 
     it('deathProb clamped to 0.30 minimum when energy just exceeds structuralResistance', () => {
@@ -616,8 +608,9 @@ describe('BlastCalc — computeBlastEntityDamage', () => {
 
   describe('aggregate results', () => {
 
-    // AC: totalDeaths = killedEmployeeIds.length + occupantCasualties.
-    it('totalDeaths = killedEmployeeIds.length + occupantCasualties', () => {
+    // AC: totalDeaths equals the count of unique killed employees (killedEmployeeIds includes
+    // both instant kills and occupant kills; totalDeaths must not double-count).
+    it('totalDeaths equals unique killedEmployeeIds count (no double-counting)', () => {
       const grid = filledGrid(8, 5, 8, 'cruite');
       const buildings = createBuildingState();
       const bId = addBuilding(buildings, 'driving_center', 1, 4, 4);
@@ -639,9 +632,12 @@ describe('BlastCalc — computeBlastEntityDamage', () => {
       const result = computeBlastEntityDamage(
         fragmented, effectiveEnergy, grid, employees, vehicles, buildings, rng,
       );
-      expect(result.totalDeaths).toBe(
-        result.killedEmployeeIds.length + result.occupantCasualties,
-      );
+      // totalDeaths must equal the number of unique killed employees (not double-count occupants)
+      expect(result.totalDeaths).toBe(result.killedEmployeeIds.length);
+      // Verify both kills actually happened in this scenario
+      expect(result.killedEmployeeIds).toContain(1);
+      expect(result.killedEmployeeIds).toContain(2);
+      expect(result.totalDeaths).toBe(2);
     });
   });
 
@@ -793,19 +789,11 @@ describe('BlastCalc — computeBlastEntityDamage', () => {
       expect(result).toBeDefined();
     });
 
-    // Building with structuralResistance = 0 (guard) → always destroyed.
-    it('building with structuralResistance 0 → always destroyed', () => {
+    // Building with zero incoming energy (no blast near it) → NOT destroyed.
+    it('building with zero incoming energy → NOT destroyed', () => {
       const grid = filledGrid(6, 5, 6, 'cruite');
       const buildings = createBuildingState();
 
-      // Manually add a building with resistance effectively 0 (we'll give it energy)
-      // Actually we can't set structuralResistance — it's on the Def, not the instance.
-      // We place a normal building but give it 0 energy — structuralResistance > 0 means not destroyed.
-      // To test this edge case, we'd need a buildingDef with structuralResistance=0,
-      // which doesn't exist in the catalog. Skip setting energy and sum = 0 + 0 + ... = 0
-      // If structuralResistance = 0, then sum > 0 is always true.
-      // But we don't have such a def. Instead we note the guard condition exists.
-      // Using a normal building with structuralResistance=3000 and giving it 0 energy:
       const bId = addBuilding(buildings, 'driving_center', 1, 2, 2);
       const effectiveEnergy = new Map<string, number>();
       const fragmented = new Set<string>();

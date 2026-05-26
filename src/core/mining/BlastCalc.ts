@@ -383,7 +383,7 @@ export function computeBlastEntityDamage(
   }
 
   const killedEmployeeIds = [...killedSet];
-  return { killedEmployeeIds, destroyedVehicleIds, destroyedBuildingIds, occupantCasualties, totalDeaths: killedSet.size + occupantCasualties };
+  return { killedEmployeeIds, destroyedVehicleIds, destroyedBuildingIds, occupantCasualties, totalDeaths: killedSet.size };
 }
 
 // --------------------------------------------------------
