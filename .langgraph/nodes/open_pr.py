@@ -80,7 +80,7 @@ def open_pr(state: dict) -> dict:
             ]
         else:
             try:
-                auto_msg = enable_automerge(pr_num, merge_method="squash")
+                auto_msg = enable_automerge(pr_num, merge_method="SQUASH")
                 messages = messages + [{"role": "assistant", "content": auto_msg}]
             except (RuntimeError, GithubException) as exc:
                 messages = messages + [
@@ -136,8 +136,8 @@ def _pr_body(issue_number: int, state: dict) -> str:
         "## Commits",
         "| Branch | Purpose |",
         "|---|---|",
-        f"| `{state.get('test_branch', '')}` | Tests + refactor |",
-        f"| `{state.get('impl_branch', '')}` | Implementation (cherry-picked) |",
+        f"| `{state.get('test_branch', '')}` | Tests |",
+        f"| `{state.get('impl_branch', '')}` | Implementation (merged into full) |",
         "",
         "## Validation",
         "- [ ] TypeScript: `npx tsc --noEmit`",
