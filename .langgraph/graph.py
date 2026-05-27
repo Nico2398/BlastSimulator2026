@@ -1,22 +1,36 @@
 """BlastSimulator2026 LangGraph pipeline graph.
 
+Branch isolation:
+  All branch creation and switching is done by non-agentic nodes.
+  Agentic nodes never receive git-switch tools (run_shell blocks git
+  write commands). Branch lifecycle:
+    1. setup_branches creates skeleton_branch from main
+    2. skeleton_writer commits stubs on skeleton_branch
+    3. switch_to_test_branch creates test_branch from skeleton
+    4. test writers commit tests on test_branch
+    5. switch_to_impl_branch creates impl_branch from skeleton
+    6. implementer commits implementation on impl_branch
+    7. merge_branches merges test + impl into full_branch
+    8. Rest of pipeline stays on full_branch
+
 Pipeline paths:
-  implement-feature  orchestrate → skeleton_writer → [unit-tests ‖ integration-tests ‖ scenario-tests]
-                     → implementer → cherry_pick → [conflict_resolver]
+  implement-feature  orchestrate → planner → setup_branches → skeleton_writer
+                     → switch_to_test_branch → test_fan_out → [unit/integration/scenario]
+                     → test_fan_in → switch_to_impl_branch → implementer
+                     → merge_branches → [conflict_resolver]
                      → test_runner → [fixer] → qualimetry → code_review
                      → refactorer → validator → open_pr
-  fix-bug            orchestrate → skeleton_writer → unit-tests → implementer
-                     → cherry_pick → test_runner → [fixer] → qualimetry
-                     → code_review → validator → open_pr
+  fix-bug            orchestrate → planner → setup_branches → skeleton_writer
+                     → switch_to_test_branch → test_fan_out → test_fan_in
+                     → switch_to_impl_branch → implementer → merge_branches
+                     → test_runner → [fixer] → qualimetry → code_review
+                     → validator → open_pr
   review-pr          orchestrate → review_fan_out → [security ‖ quality ‖ i18n ‖ duplication]
                      → review_fan_in (coordinator) → reviewer → END
   visual-change      same as implement-feature + visual_tester before open_pr
   investigate        orchestrate → implementer (read-only) → END
 
-Test writing uses fan-out parallelism: unit/integration/scenario tests run
-concurrently when not skipped. A fan-in node merges results before implementer.
-
-Quality gates (in order after cherry_pick):
+Quality gates (in order after merge_branches):
   test_runner         non-agentic: runs Vitest, fails → fixer
   fixer               agentic: fixes impl from error output only (unbiased); loops back to test_runner
   qualimetry          non-agentic: jscpd syntactic duplication check; fails → implementer
@@ -49,34 +63,39 @@ from typing_extensions import TypedDict
 from checkpointer import build_checkpointer
 from nodes.orchestrate import orchestrate
 from nodes.planner import planner
+from nodes.setup_branches import setup_branches
 from nodes.skeleton_writer import skeleton_writer
+from nodes.switch_branch import switch_to_test_branch, switch_to_impl_branch
 from nodes.unit_test_writer import unit_test_writer
 from nodes.integration_test_writer import integration_test_writer
 from nodes.scenario_test_writer import scenario_test_writer
 from nodes.test_fan_out import test_fan_out, route_from_test_fan_out
 from nodes.test_fan_in import test_fan_in
 from nodes.implementer import implementer
+from nodes.merge_branches import merge_branches
+from nodes.conflict_resolver import conflict_resolver
+from nodes.test_runner import test_runner
+from nodes.fixer import fixer
 from nodes.qualimetry_node import qualimetry_node
+from nodes.code_review import code_review
+from nodes.review_fan_out import review_fan_out, route_from_review_fan_out, security_reviewer, quality_reviewer, i18n_reviewer, duplication_reviewer
+from nodes.review_fan_in import review_fan_in
 from nodes.refactorer import refactorer
 from nodes.validator import validator
 from nodes.visual_tester import visual_tester
 from nodes.reviewer import reviewer
-from nodes.cherry_pick import cherry_pick
-from nodes.conflict_resolver import conflict_resolver
-from nodes.test_runner import test_runner
-from nodes.fixer import fixer
-from nodes.code_review import code_review
-from nodes.review_fan_out import review_fan_out, route_from_review_fan_out, security_reviewer, quality_reviewer, i18n_reviewer, duplication_reviewer
-from nodes.review_fan_in import review_fan_in
 from nodes.open_pr import open_pr
 from routing import (
     MAX_RETRIES,
     route_from_orchestrate,
     route_from_planner,
+    route_from_setup_branches,
     route_from_skeleton_writer,
+    route_from_switch_to_test_branch,
     route_from_test_fan_in,
+    route_from_switch_to_impl_branch,
     route_from_implementer,
-    route_from_cherry_pick,
+    route_from_merge_branches,
     route_from_conflict_resolver,
     route_from_test_runner,
     route_from_fixer,
@@ -95,10 +114,14 @@ from routing import (
 # ---------------------------------------------------------------------------
 
 
-class AgentState(TypedDict):
-    # Inputs
+class InputState(TypedDict):
+    """Only these fields are visible for input in LangGraph Studio."""
     issue_number: int
     comment_body: str
+
+
+class AgentState(InputState):
+    """Full pipeline state — all fields beyond InputState are internal."""
 
     # Set by orchestrate
     issue_title: str
@@ -118,11 +141,14 @@ class AgentState(TypedDict):
     plan: str
     planner_ok: bool
 
-    # Branch strategy (set by orchestrate + skeleton_writer)
-    test_branch: str           # langgraph/tests-<N>  — holds tests + final code
-    impl_branch: str           # langgraph/impl-<N>   — isolates implementer
-    branch_name: str           # alias for test_branch
-    skeleton_commit_sha: str   # HEAD of test_branch after stubs committed
+    # Branch strategy — set by orchestrate, managed by non-agentic nodes.
+    # All branches are created from skeleton_commit_sha to ensure isolation.
+    skeleton_branch: str       # langgraph/skeleton-<N>  — holds empty stubs
+    test_branch: str           # langgraph/tests-<N>     — holds test commits
+    impl_branch: str           # langgraph/impl-<N>      — holds implementation
+    full_branch: str           # langgraph/full-<N>      — merge of test + impl, rest of pipeline runs here
+    branch_name: str           # current active branch (updated by switch nodes)
+    skeleton_commit_sha: str   # HEAD of skeleton_branch after stubs committed
     impl_commit_sha: str       # HEAD of impl_branch after implementation
 
     # Message history (append-only)
@@ -135,12 +161,15 @@ class AgentState(TypedDict):
 
     # Per-node success flags
     skeleton_writer_ok: bool
+    setup_branches_ok: bool
+    switch_to_test_ok: bool
+    switch_to_impl_ok: bool
     unit_test_writer_ok: bool
     integration_test_writer_ok: bool
     scenario_test_writer_ok: bool
     implementer_ok: bool
-    cherry_pick_ok: bool
-    cherry_pick_conflicts: list[str]
+    merge_ok: bool
+    merge_conflicts: list[str]
     conflict_resolver_ok: bool
     test_runner_ok: bool
     test_output: str
@@ -164,7 +193,7 @@ class AgentState(TypedDict):
     visual_tester_ok: bool
     reviewer_ok: bool
 
-    # Diff-aware context (computed after cherry_pick)
+    # Diff-aware context (computed after merge_branches)
     changed_files: list[str]       # files modified vs skeleton_commit_sha
     git_diff: str                  # short inline diff summary (≤2000 chars)
     diff_dir: str                  # path to per-file patch directory (agents read from disk)
@@ -203,19 +232,22 @@ def _interrupt_node(state: AgentState) -> dict:
 
 def build_graph():
     """Build and compile the BlastSimulator2026 LangGraph pipeline."""
-    builder = StateGraph(AgentState)
+    builder = StateGraph(AgentState, input=InputState)
 
     for name, fn in [
         ("orchestrate", orchestrate),
         ("planner", planner),
+        ("setup_branches", setup_branches),
         ("skeleton_writer", skeleton_writer),
+        ("switch_to_test_branch", switch_to_test_branch),
         ("test_fan_out", test_fan_out),
         ("unit_test_writer", unit_test_writer),
         ("integration_test_writer", integration_test_writer),
         ("scenario_test_writer", scenario_test_writer),
         ("test_fan_in", test_fan_in),
+        ("switch_to_impl_branch", switch_to_impl_branch),
         ("implementer", implementer),
-        ("cherry_pick", cherry_pick),
+        ("merge_branches", merge_branches),
         ("conflict_resolver", conflict_resolver),
         ("test_runner", test_runner),
         ("fixer", fixer),
@@ -244,13 +276,23 @@ def build_graph():
         "review_fan_out": "review_fan_out",
     })
     builder.add_conditional_edges("planner", route_from_planner, {
-        "skeleton_writer": "skeleton_writer",
+        "setup_branches": "setup_branches",
         "planner": "planner",
         "handle_interrupt": "handle_interrupt",
     })
-    builder.add_conditional_edges("skeleton_writer", route_from_skeleton_writer, {
-        "test_fan_out": "test_fan_out",
+    builder.add_conditional_edges("setup_branches", route_from_setup_branches, {
         "skeleton_writer": "skeleton_writer",
+        "setup_branches": "setup_branches",
+        "handle_interrupt": "handle_interrupt",
+    })
+    builder.add_conditional_edges("skeleton_writer", route_from_skeleton_writer, {
+        "switch_to_test_branch": "switch_to_test_branch",
+        "skeleton_writer": "skeleton_writer",
+        "handle_interrupt": "handle_interrupt",
+    })
+    builder.add_conditional_edges("switch_to_test_branch", route_from_switch_to_test_branch, {
+        "test_fan_out": "test_fan_out",
+        "switch_to_test_branch": "switch_to_test_branch",
         "handle_interrupt": "handle_interrupt",
     })
     # Fan-out: dispatches to unit/integration/scenario test writers in parallel.
@@ -260,19 +302,24 @@ def build_graph():
     builder.add_edge("unit_test_writer", "test_fan_in")
     builder.add_edge("integration_test_writer", "test_fan_in")
     builder.add_edge("scenario_test_writer", "test_fan_in")
-    # Fan-in: merges results, routes to implementer or retry.
+    # Fan-in: merges results, routes to switch_to_impl_branch or retry.
     builder.add_conditional_edges("test_fan_in", route_from_test_fan_in, {
-        "implementer": "implementer",
+        "switch_to_impl_branch": "switch_to_impl_branch",
         "test_fan_out": "test_fan_out",
         "handle_interrupt": "handle_interrupt",
     })
+    builder.add_conditional_edges("switch_to_impl_branch", route_from_switch_to_impl_branch, {
+        "implementer": "implementer",
+        "switch_to_impl_branch": "switch_to_impl_branch",
+        "handle_interrupt": "handle_interrupt",
+    })
     builder.add_conditional_edges("implementer", route_from_implementer, {
-        "cherry_pick": "cherry_pick",
+        "merge_branches": "merge_branches",
         "implementer": "implementer",
         END: END,
         "handle_interrupt": "handle_interrupt",
     })
-    builder.add_conditional_edges("cherry_pick", route_from_cherry_pick, {
+    builder.add_conditional_edges("merge_branches", route_from_merge_branches, {
         "test_runner": "test_runner",
         "conflict_resolver": "conflict_resolver",
         "handle_interrupt": "handle_interrupt",

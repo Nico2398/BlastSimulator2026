@@ -23,53 +23,62 @@ def route_from_orchestrate(state: dict) -> str:
     if pipeline == "investigate":
         return "implementer"
     if pipeline == "review-pr":
-        # Fan-out sub-reviewers first (static analysis + duplication), then
-        # the coordinator merges findings, then reviewer does runtime validation.
         return "review_fan_out"
-    # All coding pipelines go through planner first.
     return "planner"
 
 
 def route_from_planner(state: dict) -> str:
-    """Route after planner: on success → skeleton_writer, on failure → retry/interrupt."""
     if state.get("planner_ok", False):
-        return "skeleton_writer"
+        return "setup_branches"
     return "handle_interrupt" if state.get("retry_count", 0) >= MAX_RETRIES else "planner"
+
+
+def route_from_setup_branches(state: dict) -> str:
+    if state.get("setup_branches_ok", False):
+        return "skeleton_writer"
+    return "handle_interrupt" if state.get("retry_count", 0) >= MAX_RETRIES else "setup_branches"
 
 
 def route_from_skeleton_writer(state: dict) -> str:
     if state.get("skeleton_writer_ok", False):
-        return "test_fan_out"
+        return "switch_to_test_branch"
     return "handle_interrupt" if state.get("retry_count", 0) >= MAX_RETRIES else "skeleton_writer"
 
 
-def route_from_test_fan_in(state: dict) -> str:
-    """Route after all parallel test writers complete.
+def route_from_switch_to_test_branch(state: dict) -> str:
+    if state.get("switch_to_test_ok", False):
+        return "test_fan_out"
+    return "handle_interrupt" if state.get("retry_count", 0) >= MAX_RETRIES else "switch_to_test_branch"
 
-    Checks all test writer success flags. If all pass → implementer.
-    If any fail → handle_interrupt or retry via test_fan_out.
-    """
+
+def route_from_test_fan_in(state: dict) -> str:
     unit_ok = state.get("unit_test_writer_ok", False)
     integration_ok = state.get("integration_test_writer_ok", True)
     scenario_ok = state.get("scenario_test_writer_ok", True)
     all_ok = unit_ok and integration_ok and scenario_ok
 
     if all_ok:
-        return "implementer"
+        return "switch_to_impl_branch"
     return "handle_interrupt" if state.get("retry_count", 0) >= MAX_RETRIES else "test_fan_out"
+
+
+def route_from_switch_to_impl_branch(state: dict) -> str:
+    if state.get("switch_to_impl_ok", False):
+        return "implementer"
+    return "handle_interrupt" if state.get("retry_count", 0) >= MAX_RETRIES else "switch_to_impl_branch"
 
 
 def route_from_implementer(state: dict) -> str:
     if state.get("pipeline") == "investigate":
         return END
     if state.get("implementer_ok", False):
-        return "cherry_pick"
+        return "merge_branches"
     return "handle_interrupt" if state.get("retry_count", 0) >= MAX_RETRIES else "implementer"
 
 
-def route_from_cherry_pick(state: dict) -> str:
-    if state.get("cherry_pick_ok", False):
-        return "test_runner"  # run tests before qualimetry
+def route_from_merge_branches(state: dict) -> str:
+    if state.get("merge_ok", False):
+        return "test_runner"
     return "handle_interrupt" if state.get("retry_count", 0) >= MAX_RETRIES else "conflict_resolver"
 
 

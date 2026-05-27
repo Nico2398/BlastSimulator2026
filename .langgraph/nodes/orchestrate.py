@@ -239,6 +239,7 @@ def orchestrate(state: dict) -> dict:
 
     # If the issue fetch failed, treat it as an error — return minimal state.
     if issue_text.startswith("error"):
+        n = issue_number
         return {
             "issue_title": "",
             "issue_body": issue_text,
@@ -249,9 +250,11 @@ def orchestrate(state: dict) -> dict:
             "retry_count": 1,
             "skip_integration_tests": True,
             "skip_scenario_tests": True,
-            "test_branch": f"langgraph/tests-{issue_number}",
-            "impl_branch": f"langgraph/impl-{issue_number}",
-            "branch_name": f"langgraph/tests-{issue_number}",
+            "skeleton_branch": f"langgraph/skeleton-{n}",
+            "test_branch": f"langgraph/tests-{n}",
+            "impl_branch": f"langgraph/impl-{n}",
+            "full_branch": f"langgraph/full-{n}",
+            "branch_name": f"langgraph/skeleton-{n}",
             "orchestrate_ok": False,
         }
 
@@ -274,8 +277,11 @@ def orchestrate(state: dict) -> dict:
     # Analyze issue scope to determine skip flags.
     skip_flags = _analyze_scope(issue_title, issue_body, skill, pipeline, labels)
 
-    test_branch = f"langgraph/tests-{issue_number}"
-    impl_branch = f"langgraph/impl-{issue_number}"
+    n = issue_number
+    skeleton_branch = f"langgraph/skeleton-{n}"
+    test_branch = f"langgraph/tests-{n}"
+    impl_branch = f"langgraph/impl-{n}"
+    full_branch = f"langgraph/full-{n}"
 
     return {
         "issue_title": issue_title,
@@ -286,8 +292,9 @@ def orchestrate(state: dict) -> dict:
         "current_role": "orchestrate",
         "retry_count": 0,
         **skip_flags,
-        # Branch names set here; skeleton_writer creates them.
+        "skeleton_branch": skeleton_branch,
         "test_branch": test_branch,
         "impl_branch": impl_branch,
-        "branch_name": test_branch,
+        "full_branch": full_branch,
+        "branch_name": skeleton_branch,
     }

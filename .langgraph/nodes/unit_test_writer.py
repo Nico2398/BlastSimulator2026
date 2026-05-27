@@ -1,4 +1,9 @@
-"""unit_test_writer node — TDD Red phase: write failing atomic unit tests."""
+"""unit_test_writer node — TDD Red phase: write failing atomic unit tests.
+
+Already on test_branch (switched by switch_to_test_branch).
+Auto-commits test files after the agent finishes.
+Starts from a fresh message set — does not inherit prior agent history.
+"""
 
 from __future__ import annotations
 import sys
@@ -33,9 +38,9 @@ def unit_test_writer(state: dict) -> dict:
     retry_count = state.get("retry_count", 0)
     if ok:
         issue_number = state.get("issue_number", 0)
-        test_branch = state.get("test_branch", state.get("branch_name", ""))
+        current_branch = state.get("branch_name", state.get("test_branch", ""))
         commit_result = git_commit(f"test(unit): unit tests for #{issue_number}")
-        push_result = git_push(test_branch)
+        push_result = git_push(current_branch)
         messages = messages + [
             {"role": "assistant", "content": commit_result},
             {"role": "assistant", "content": push_result},

@@ -1,10 +1,10 @@
-"""conflict_resolver node — resolve cherry-pick merge conflicts.
+"""conflict_resolver node — resolve merge conflicts.
 
-Invoked only when cherry_pick detects conflicts. The agent:
+Invoked when merge_branches detects conflicts. The agent:
 - Reads each conflicted file.
 - Removes conflict markers and writes clean content.
-- Stages all files and finalises the cherry-pick.
-- The node then auto-commits and pushes.
+- Stages all files and finalises the merge.
+- The node then pushes.
 """
 
 from __future__ import annotations
@@ -16,18 +16,20 @@ _HERE = Path(__file__).parent.parent
 if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
-from tools.git_tools import git_continue_cherry_pick, git_push, git_get_head_sha
+import git as gitpy
+
+from tools.git_tools import git_push, git_get_head_sha
 from llm import build_llm
 from nodes._base import CODING_TOOLS, build_fresh_messages, build_react_agent, extract_ok, invoke_agent
 
 
 def conflict_resolver(state: dict) -> dict:
-    """Resolve cherry-pick conflicts and finalise the merge.
+    """Resolve merge conflicts and finalise the merge.
 
     Uses a fresh message set — the full conflict list is in the context.
     """
-    test_branch = state.get("test_branch", state.get("branch_name", ""))
-    conflicts = state.get("cherry_pick_conflicts", [])
+    current_branch = state.get("branch_name", state.get("full_branch", ""))
+    conflicts = state.get("merge_conflicts", state.get("cherry_pick_conflicts", []))
     issue_number = state.get("issue_number", 0)
 
     llm = build_llm()
@@ -41,14 +43,19 @@ def conflict_resolver(state: dict) -> dict:
     ok = extract_ok(result)
     messages = result["messages"]
 
-    # Finalise cherry-pick (stages all files + commits).
-    commit_msg = f"fix(cherry-pick): resolve conflicts for #{issue_number}"
-    continue_result = git_continue_cherry_pick(commit_msg)
-    messages = messages + [{"role": "assistant", "content": continue_result}]
+    # Stage resolved files and complete the merge.
+    repo = gitpy.Repo(Path(__file__).parent.parent.parent, search_parent_directories=True)
+    repo.git.add("-A")
+    try:
+        done_msg = _finish_merge(repo, issue_number)
+    except gitpy.GitCommandError as exc:
+        done_msg = f"error finalising merge: {exc}"
 
-    impl_sha = git_get_head_sha()
+    messages = messages + [{"role": "assistant", "content": done_msg}]
 
-    push_result = git_push(test_branch)
+    merge_sha = git_get_head_sha()
+
+    push_result = git_push(current_branch)
     messages = messages + [{"role": "assistant", "content": push_result}]
 
     retry_count = state.get("retry_count", 0)
@@ -58,22 +65,41 @@ def conflict_resolver(state: dict) -> dict:
     return {
         "messages": messages,
         "conflict_resolver_ok": ok,
-        "impl_commit_sha": impl_sha,
+        "merge_sha": merge_sha,
         "retry_count": retry_count,
         "current_role": "conflict-resolver",
     }
+
+
+def _finish_merge(repo, issue_number: int) -> str:
+    """Finalise the in-progress merge by staging and committing."""
+    from git import Actor
+
+    actor = Actor("langgraph", "langgraph@noreply.github.com")
+    try:
+        repo.git.merge("--continue", "--no-edit")
+        sha = repo.head.commit.hexsha[:12]
+        return f"merge continued: [{sha}]"
+    except gitpy.GitCommandError:
+        commit = repo.index.commit(
+            f"fix(merge): resolve conflicts for #{issue_number}",
+            author=actor,
+            committer=actor,
+        )
+        return f"merge resolved via commit: [{commit.hexsha[:12]}]"
 
 
 def _build_context(state: dict, conflicts: list[str]) -> str:
     lines = [
         f"Issue #{state.get('issue_number')}: {state.get('issue_title', '')}",
         "",
-        "TASK: Resolve cherry-pick merge conflicts.",
+        "TASK: Resolve merge conflicts.",
         "The following files contain conflict markers (<<<<<<, =======, >>>>>>>):",
         *[f"  - {f}" for f in conflicts],
         "",
-        "Context: the conflict is between test code (<<<<<<< HEAD, the test_branch) "
-        "and implementation code (>>>>>>> the impl_branch cherry-pick).",
+        "Context: two branches are being merged into a full branch:",
+        "  - test_branch (test code)",
+        "  - impl_branch (implementation code)",
         "Resolution rule: keep BOTH sides merged cleanly. The implementation logic "
         "must coexist with the test file content — do not discard either side.",
         "For each conflicted file:",
@@ -88,7 +114,7 @@ def _build_context(state: dict, conflicts: list[str]) -> str:
 def _build_task_prompt(conflicts: list[str]) -> str:
     conflict_list = "\n".join(f"  - {f}" for f in conflicts)
     return (
-        "Resolve the following cherry-pick conflicts. "
+        "Resolve the following merge conflicts. "
         "For each file, read it, remove conflict markers, merge both sides cleanly, "
         "and write the resolved file back:\n"
         + conflict_list

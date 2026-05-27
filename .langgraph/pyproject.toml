@@ -14,6 +14,7 @@ dependencies = [
     "gitpython>=3.1.44",
     "PyGithub>=2.5.0",
     "python-dotenv>=1.0.0",
+    "langgraph-cli[inmem]>=0.4.26",
 ]
 
 [tool.uv]

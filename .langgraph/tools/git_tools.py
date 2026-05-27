@@ -133,18 +133,22 @@ def git_commit(message: str) -> str:
     return f"[{commit.hexsha[:12]}] {message}"
 
 
-def git_push(branch: str) -> str:
+def git_push(branch: str, force: bool = False) -> str:
     """Push a branch to origin.
 
     Args:
         branch: Branch name to push.
+        force: Use --force (safe for setup/switch non-agentic nodes).
 
     Returns:
         Confirmation message.
     """
     repo = _repo()
     try:
-        result = repo.git.push("--set-upstream", "origin", branch)
+        args = ["--set-upstream", "origin", branch]
+        if force:
+            args.insert(0, "--force")
+        result = repo.git.push(*args)
         return result or f"pushed '{branch}' to origin"
     except git.GitCommandError as exc:
         return f"error pushing '{branch}': {exc}"
