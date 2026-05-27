@@ -45,7 +45,9 @@ First, classify the task:
 ## Review PR Pipeline
 
 ```
-1. @reviewer → Audit PR, run checks, report outcome
+1. Code review (parallel): @quality-reviewer + @security-reviewer + @i18n-reviewer + @duplication-reviewer
+2. @review-coordinator → Merge sub-reviewer findings
+3. @reviewer           → Runtime validation: run tests, fix any critical items, post review outcome
 ```
 
 ## Your Responsibilities

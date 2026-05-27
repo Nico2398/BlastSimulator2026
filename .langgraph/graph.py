@@ -8,7 +8,8 @@ Pipeline paths:
   fix-bug            orchestrate → skeleton_writer → unit-tests → implementer
                      → cherry_pick → test_runner → [fixer] → qualimetry
                      → code_review → validator → open_pr
-  review-pr          orchestrate → reviewer → END
+  review-pr          orchestrate → review_fan_out → [security ‖ quality ‖ i18n ‖ duplication]
+                     → review_fan_in (coordinator) → reviewer → END
   visual-change      same as implement-feature + visual_tester before open_pr
   investigate        orchestrate → implementer (read-only) → END
 
@@ -240,7 +241,7 @@ def build_graph():
     builder.add_conditional_edges("orchestrate", route_from_orchestrate, {
         "planner": "planner",
         "implementer": "implementer",
-        "reviewer": "reviewer",
+        "review_fan_out": "review_fan_out",
     })
     builder.add_conditional_edges("planner", route_from_planner, {
         "skeleton_writer": "skeleton_writer",
@@ -309,11 +310,12 @@ def build_graph():
     builder.add_edge("quality_reviewer", "review_fan_in")
     builder.add_edge("i18n_reviewer", "review_fan_in")
     builder.add_edge("duplication_reviewer", "review_fan_in")
-    # Review fan-in: coordinator merges findings, routes to refactorer or retry.
+    # Review fan-in: coordinator merges findings, routes to refactorer, retry, or reviewer.
     builder.add_conditional_edges("review_fan_in", route_from_review_fan_in, {
         "refactorer": "refactorer",
         "validator": "validator",
         "implementer": "implementer",
+        "reviewer": "reviewer",
         "handle_interrupt": "handle_interrupt",
     })
     builder.add_conditional_edges("code_review", route_from_code_review, {

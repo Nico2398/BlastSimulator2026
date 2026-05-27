@@ -1,13 +1,15 @@
 """review_fan_out — dispatch specialized sub-reviewers in parallel.
 
-Replaces the single code_review node with a fan-out of domain-specific
-reviewers (security, quality, i18n). Each runs as a separate agent call.
-The review_fan_in node merges their findings.
+Used in two pipeline paths:
+  - Development pipeline (implement-feature, fix-bug, visual-change): runs after qualimetry,
+    before refactorer. Fan-in (coordinator) routes to refactorer or implementer.
+  - Review-PR pipeline: runs immediately after orchestrate (user-triggered review request).
+    Fan-in (coordinator) routes to reviewer for runtime validation.
 
 Risk tier controls which reviewers run:
   trivial — quality only (1 reviewer)
-  lite    — quality + i18n (2 reviewers)
-  full    — security + quality + i18n (3 reviewers)
+  lite    — quality + i18n + duplication (3 reviewers)
+  full    — security + quality + i18n + duplication (4 reviewers)
 """
 
 from __future__ import annotations

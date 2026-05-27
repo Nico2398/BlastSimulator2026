@@ -80,6 +80,14 @@ def _build_context(state: dict) -> str:
     if state.get("changed_files"):
         file_list = "\n".join(f"  - {f}" for f in state["changed_files"])
         lines.append(f"\n## Changed Files\n{file_list}")
+    # Include coordinator's consolidated review when coming from review-pr fan-out.
+    if state.get("code_review_report"):
+        lines.append(
+            "\n## Sub-Reviewer Findings (from static analysis)\n"
+            + state["code_review_report"]
+            + "\n\nFocus your runtime checks on items flagged above. "
+            "Do NOT re-audit what the static reviewers already covered."
+        )
     return "\n".join(lines)
 
 
