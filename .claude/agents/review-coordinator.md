@@ -11,7 +11,7 @@ Position: after parallel sub-reviewers, before refactorer. Read-only.
 
 ## Task
 
-Merge findings from security, quality, and i18n sub-reviewers into one coherent review.
+Merge findings from security, quality, i18n, and duplication sub-reviewers into one coherent review.
 
 ## Steps
 

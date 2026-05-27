@@ -83,11 +83,16 @@ The implementation commit is cherry-picked from the impl branch onto the test br
 
 After the code lands on the test branch, these gates run in sequence:
 1. **Test runner** (non-agentic) — run test suite, pass → continue, fail → fixer loop
-2. **Duplication check** (non-agentic) — jscpd, fail → back to implementer
-3. **Code review** (agentic) — architecture, convention audit, fail → back to implementer
-4. **Refactor** — clean up conventions, no behavior change
-5. **Validator** — full suite: TypeScript → tests → build
-6. **Visual verification** (visual changes only) — screenshot comparison
+2. **Duplication check** (non-agentic) — jscpd syntactic clone detection, fail → back to implementer
+3. **Code review fan-out** (agentic, parallel) — specialized sub-reviewers by risk tier:
+   - `security_reviewer` — exploitable vulnerabilities (full tier)
+   - `quality_reviewer` — architecture, naming intent, coding conventions, TypeScript strictness (all tiers)
+   - `i18n_reviewer` — hardcoded strings, locale mismatches (lite + full tiers)
+   - `duplication_reviewer` — semantic duplication, non-atomic functions, generic code placement (lite + full tiers)
+4. **Review coordinator** (agentic) — merges sub-reviewer findings, final pass/fail
+5. **Refactor** — clean up conventions, no behavior change
+6. **Validator** — full suite: TypeScript → tests → build
+7. **Visual verification** (visual changes only) — screenshot comparison
 
 ### PR Creation
 

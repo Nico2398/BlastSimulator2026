@@ -34,6 +34,19 @@ Adjust review depth based on `risk_tier` from context:
 - **Dead code** — unreachable branches, unused imports, commented-out code.
 - **Naming** — inconsistent identifiers vs conventions in `dev-coding-conventions` skill.
 
+### Coding Conventions (Naming & Intent)
+- **Names translate intent** — a reader unfamiliar with the codebase must understand what a
+  function/variable does from its name alone. Flag names that require reading the body to
+  understand (e.g. `process()`, `handle()`, `doStuff()`, `temp`, `data` without qualifier).
+- **Verb-object clarity** — function names must start with an action verb that describes the
+  operation: `calculate`, `validate`, `render`, `apply`, `emit`, not vague nouns or adjectives.
+- **Consistent abstraction level** — a function's name should match the level of abstraction
+  of its body. `saveGame()` must not contain low-level byte manipulation inline.
+- **Boolean names** — boolean variables and functions must be predicates: `isLoaded`,
+  `hasEnoughFuel`, `canExplode`, not `loaded`, `fuel`, `explode`.
+- **No misleading names** — a name that implies side effects but the function is pure (or
+  vice versa) must be flagged [critical].
+
 ### Additional Checks (also have dedicated sub-reviewers)
 - **i18n** — user-visible strings via `t('key')`. No hardcoded text in logic/UI.
 - **Issue alignment** — every acceptance criterion from the issue is implemented.
