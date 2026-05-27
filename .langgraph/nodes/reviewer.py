@@ -70,8 +70,6 @@ def _build_context(state: dict) -> str:
             f"\nCall `get_skill_context('{state['skill']}')` to load the domain spec. "
             "Verify the PR follows ALL rules in that spec."
         )
-    if state.get("issue_body"):
-        lines.append("\n## Issue Body\n" + state["issue_body"])
     if state.get("plan"):
         lines.append("\n## Implementation Plan\n" + state["plan"])
     if state.get("diff_dir"):
@@ -94,6 +92,7 @@ def _build_context(state: dict) -> str:
 def _build_task_prompt(state: dict) -> str:
     return (
         f"Review PR/issue #{state.get('issue_number')}. "
+        "Use github_get_issue to read the issue body and acceptance criteria. "
         "Fetch the PR details and diff using your tools, then audit the changes. "
         "Verify every acceptance criterion from the issue is implemented."
     )

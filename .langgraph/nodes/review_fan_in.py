@@ -80,8 +80,6 @@ def _build_coordinator_context(state: dict) -> str:
         lines.append(
             f"\nCall `get_skill_context('{state['skill']}')` to verify domain spec compliance."
         )
-    if state.get("issue_body"):
-        lines.append("\n## Issue Body\n" + state["issue_body"])
     if state.get("plan"):
         lines.append("\n## Implementation Plan\n" + state["plan"])
     if state.get("changed_files"):
@@ -106,6 +104,7 @@ def _build_coordinator_context(state: dict) -> str:
 def _build_coordinator_task(state: dict) -> str:
     return (
         f"Coordinate the code review for issue #{state.get('issue_number')}. "
+        "Use github_get_issue to read the issue body and requirements. "
         "Merge all sub-reviewer findings. Deduplicate, filter, and make a final decision."
     )
 

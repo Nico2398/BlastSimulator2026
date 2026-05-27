@@ -81,7 +81,7 @@ def _build_context(state: dict) -> str:
         "",
         "TASK: Produce a structured implementation plan.",
         "",
-        "1. Read the issue body below to understand requirements.",
+        "1. Use github_get_issue to read the issue body.",
         "2. Inspect the codebase with read_file / grep / list_dir.",
         "3. Identify which files need to be created or modified.",
         "4. List acceptance criteria from the issue.",
@@ -117,13 +117,13 @@ def _build_context(state: dict) -> str:
             f"\nCall `get_skill_context('{state['skill']}')` to load the domain spec. "
             "Incorporate ALL rules from that spec into the plan."
         )
-    lines.append("\n## Issue Body\n" + state.get("issue_body", ""))
+    lines.append(f"\nCall `github_get_issue({state.get('issue_number', 0)})` to read the issue body.")
     return "\n".join(lines)
 
 
 def _build_task_prompt(state: dict) -> str:
     return (
         f"Create an implementation plan for issue #{state.get('issue_number')}. "
-        "Read the issue body and inspect the codebase. "
+        "Use github_get_issue to read the issue body, then inspect the codebase. "
         "Produce a structured plan with files, acceptance criteria, and edge cases."
     )

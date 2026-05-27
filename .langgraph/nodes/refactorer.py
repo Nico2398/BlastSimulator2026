@@ -50,8 +50,6 @@ def _build_context(state: dict) -> str:
     ]
     if state.get("code_review_report"):
         lines.append("\n## Code Review Findings\n" + state["code_review_report"])
-    if state.get("issue_body"):
-        lines.append("\n## Issue Body\n" + state["issue_body"])
     if state.get("changed_files"):
         file_list = "\n".join(f"  - {f}" for f in state["changed_files"])
         lines.append(f"\n## Changed Files\n{file_list}")
