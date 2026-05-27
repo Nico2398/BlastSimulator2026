@@ -46,7 +46,6 @@ def integration_test_writer(state: dict) -> dict:
     return {
         "messages": messages,
         "integration_test_writer_ok": ok,
-        "current_role": "integration-test-writer",
     }
 
 

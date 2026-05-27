@@ -47,7 +47,6 @@ def scenario_test_writer(state: dict) -> dict:
     return {
         "messages": messages,
         "scenario_test_writer_ok": ok,
-        "current_role": "scenario-test-writer",
     }
 
 

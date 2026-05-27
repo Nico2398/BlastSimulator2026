@@ -48,7 +48,6 @@ def unit_test_writer(state: dict) -> dict:
     return {
         "messages": messages,
         "unit_test_writer_ok": ok,
-        "current_role": "unit-test-writer",
     }
 
 
