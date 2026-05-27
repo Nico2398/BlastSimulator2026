@@ -21,6 +21,7 @@ if str(_HERE) not in sys.path:
 import git as gitpy
 
 from tools.git_tools import (
+    git_commit,
     git_force_checkout_branch,
     git_get_head_sha,
     git_get_conflict_files,
@@ -56,9 +57,13 @@ def merge_branches(state: dict) -> dict:
             ],
         }
 
+    # Auto-commit any uncommitted changes before switching.
+    commit_msg = git_commit(f"chore: auto-commit before switching to {full_branch}")
+    messages = state.get("messages", []) + ([{"role": "assistant", "content": commit_msg}] if "nothing" not in commit_msg else [])
+
     # Switch to full_branch (create from skeleton if new).
     checkout_msg = git_force_checkout_branch(full_branch, from_ref=skeleton_sha)
-    messages = state.get("messages", []) + [
+    messages = messages + [
         {"role": "assistant", "content": checkout_msg},
     ]
 

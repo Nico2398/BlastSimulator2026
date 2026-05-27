@@ -17,7 +17,7 @@ _HERE = Path(__file__).parent.parent
 if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
-from tools.git_tools import git_force_checkout_branch, git_get_head_sha, git_push
+from tools.git_tools import git_commit, git_force_checkout_branch, git_get_head_sha, git_push
 
 
 def switch_to_test_branch(state: dict) -> dict:
@@ -26,10 +26,12 @@ def switch_to_test_branch(state: dict) -> dict:
     test_branch = state.get("test_branch", f"langgraph/tests-{issue_number}")
     skeleton_sha = state.get("skeleton_commit_sha", "")
 
+    commit_msg = git_commit(f"chore: auto-commit before switching to {test_branch}")
+    messages = state.get("messages", []) + ([{"role": "assistant", "content": commit_msg}] if "nothing" not in commit_msg else [])
     checkout_msg = git_force_checkout_branch(test_branch, from_ref=skeleton_sha or None)
     ok = not checkout_msg.startswith("error")
 
-    messages = state.get("messages", []) + [
+    messages = messages + [
         {"role": "assistant", "content": checkout_msg},
     ]
 
@@ -52,10 +54,12 @@ def switch_to_impl_branch(state: dict) -> dict:
     impl_branch = state.get("impl_branch", f"langgraph/impl-{issue_number}")
     skeleton_sha = state.get("skeleton_commit_sha", "")
 
+    commit_msg = git_commit(f"chore: auto-commit before switching to {impl_branch}")
+    messages = state.get("messages", []) + ([{"role": "assistant", "content": commit_msg}] if "nothing" not in commit_msg else [])
     checkout_msg = git_force_checkout_branch(impl_branch, from_ref=skeleton_sha or None)
     ok = not checkout_msg.startswith("error")
 
-    messages = state.get("messages", []) + [
+    messages = messages + [
         {"role": "assistant", "content": checkout_msg},
     ]
 
