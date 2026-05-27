@@ -1,6 +1,6 @@
 """test_runner node — non-agentic: run the test suite and report pass/fail.
 
-Runs after cherry_pick so both tests and implementation code are present on
+Runs after merge_branches so both tests and implementation code are present on
 test_branch. No LLM is involved — pure deterministic pass/fail.
 
 On failure: test output is saved to state as `test_output` so the fixer node

@@ -27,7 +27,9 @@ _TRUNCATE = 600
 
 # Deterministic nodes — no LLM, we print their full return dict directly.
 _NON_AGENTIC = frozenset({
-    "orchestrate", "skeleton_writer", "cherry_pick",
+    "orchestrate", "skeleton_writer",
+    "setup_branches", "switch_to_test_branch", "switch_to_impl_branch",
+    "merge_branches",
     "test_runner", "qualimetry", "open_pr", "handle_interrupt",
 })
 
@@ -72,11 +74,27 @@ def _log_non_agentic(node: str, output: dict) -> None:
         if sha:
             log.info("  skeleton_commit_sha : %s", sha)
 
-    elif node == "cherry_pick":
-        ok = output.get("cherry_pick_ok", False)
-        log.info("  cherry_pick_ok : %s", "✅" if ok else "❌")
-        for path in (output.get("cherry_pick_conflicts") or []):
-            log.info("  conflict : %s", path)
+    elif node == "setup_branches":
+        ok = output.get("setup_branches_ok", False)
+        log.info("  setup_branches_ok : %s", "✅" if ok else "❌")
+        log.info("  skeleton_branch   : %s", output.get("skeleton_branch", ""))
+        log.info("  full_branch       : %s", output.get("full_branch", ""))
+
+    elif node == "switch_to_test_branch":
+        ok = output.get("switch_to_test_ok", False)
+        log.info("  switch_to_test_ok : %s", "✅" if ok else "❌")
+        log.info("  branch            : %s", output.get("branch_name", ""))
+
+    elif node == "switch_to_impl_branch":
+        ok = output.get("switch_to_impl_ok", False)
+        log.info("  switch_to_impl_ok : %s", "✅" if ok else "❌")
+        log.info("  branch            : %s", output.get("branch_name", ""))
+
+    elif node == "merge_branches":
+        ok = output.get("merge_ok", False)
+        log.info("  merge_ok       : %s", "✅" if ok else "❌")
+        for path in (output.get("merge_conflicts") or []):
+            log.info("  conflict       : %s", path)
 
     elif node == "test_runner":
         ok = output.get("test_runner_ok", False)

@@ -7,3 +7,4 @@ __pycache__/
 uv.lock
 diffs/
 .langgraph_api/
+traces.json

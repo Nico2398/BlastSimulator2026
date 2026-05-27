@@ -21,7 +21,6 @@ from nodes._base import (
 from tools.git_tools import (
     git_force_checkout_branch,
     git_commit,
-    git_push,
     git_get_head_sha,
 )
 
@@ -29,19 +28,17 @@ from tools.git_tools import (
 def implementer(state: dict) -> dict:
     """Implement the feature or fix. Read-only mode when pipeline=investigate.
 
-    Isolation strategy:
-    - Creates `impl_branch` forked from `skeleton_commit_sha` so the agent
-      never sees test commits.
-    - After the agent finishes, auto-commits any uncommitted changes.
-    - Records `impl_commit_sha` for the downstream cherry_pick node.
+    Already on impl_branch (switched by switch_to_impl_branch).
+    After the agent finishes, auto-commits any uncommitted changes.
+    Records `impl_commit_sha` for the downstream merge_branches node.
     """
     investigate = state.get("pipeline") == "investigate"
     tools = READ_ONLY_TOOLS if investigate else CODING_TOOLS
 
+    # Ensure we're on impl_branch (retry paths may arrive from other branches).
     if not investigate:
         impl_branch = state.get("impl_branch", "")
         skeleton_sha = state.get("skeleton_commit_sha", "")
-        # Create (or overwrite) impl_branch from skeleton_commit_sha (before test commits).
         checkout_msg = git_force_checkout_branch(impl_branch, from_ref=skeleton_sha or None)
     else:
         checkout_msg = ""
@@ -56,18 +53,13 @@ def implementer(state: dict) -> dict:
     impl_commit_sha = ""
     if not investigate:
         issue_number = state.get("issue_number", 0)
-        # Auto-commit any uncommitted work the agent left behind.
         commit_result = git_commit(
             f"feat(impl): implementation for #{issue_number}"
         )
-        # After git_commit, HEAD has either advanced (new commit) or stayed
-        # at the same SHA (nothing to commit). Either way, record the current HEAD.
         impl_commit_sha = git_get_head_sha()
-        push_result = git_push(impl_branch)
         messages = messages + [
             {"role": "assistant", "content": checkout_msg},
             {"role": "assistant", "content": commit_result},
-            {"role": "assistant", "content": push_result},
         ]
 
     retry_count = state.get("retry_count", 0)
@@ -124,8 +116,8 @@ def _retry_feedback(state: dict) -> list[str]:
         feedback.append("\n## Code Review Feedback\n" + state["code_review_report"])
     if state.get("validator_report"):
         feedback.append("\n## Validator Feedback\n" + state["validator_report"])
-    if state.get("cherry_pick_conflicts"):
-        conflict_list = "\n".join(f"- {path}" for path in state["cherry_pick_conflicts"])
-        feedback.append("\n## Cherry-pick Conflicts Still Open\n" + conflict_list)
+    if state.get("merge_conflicts"):
+        conflict_list = "\n".join(f"- {path}" for path in state["merge_conflicts"])
+        feedback.append("\n## Merge Conflicts Still Open\n" + conflict_list)
 
     return feedback

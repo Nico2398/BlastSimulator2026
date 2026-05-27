@@ -44,10 +44,10 @@ def fixer(state: dict) -> dict:
     messages = result["messages"]
 
     issue_number = state.get("issue_number", 0)
-    test_branch = state.get("test_branch", state.get("branch_name", ""))
+    current_branch = state.get("branch_name", state.get("full_branch", ""))
 
     commit_result = git_commit(f"fix(impl): fix failing tests for #{issue_number}")
-    push_result = git_push(test_branch)
+    push_result = git_push(current_branch)
     messages = messages + [
         {"role": "assistant", "content": commit_result},
         {"role": "assistant", "content": push_result},
