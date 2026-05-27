@@ -82,6 +82,29 @@ describe('computeFragmentationScore', () => {
     expect(score).toBe(0);
   });
 
+  it('returns 0 for negative effectiveEnergy', () => {
+    const score = computeFragmentationScore(CRUITE_VOXEL, -100);
+    expect(score).toBe(0);
+  });
+
+  it('returns 0 for negative zero effectiveEnergy', () => {
+    const score = computeFragmentationScore(CRUITE_VOXEL, -0);
+    expect(score).toBe(0);
+  });
+
+  it('returns 0 for NaN effectiveEnergy', () => {
+    // NaN is not a valid energy value. Function should guard against it
+    // and return 0. CURRENTLY UNGUARDED — this test is expected to FAIL
+    // until the guard is added.
+    const score = computeFragmentationScore(CRUITE_VOXEL, NaN);
+    expect(score).toBe(0);
+  });
+
+  it('returns 0 for -Infinity effectiveEnergy', () => {
+    const score = computeFragmentationScore(CRUITE_VOXEL, -Infinity);
+    expect(score).toBe(0);
+  });
+
   // ── Correct formula ────────────────────────────────────────────────────────
 
   it('computes correct score for a single rock type', () => {
@@ -127,6 +150,13 @@ describe('computeFragmentationScore', () => {
     expect(score).toBe(1.5e10);
   });
 
+  it('handles Infinity effectiveEnergy gracefully', () => {
+    // Infinity energy should not crash or propagate NaN.
+    // Expected to return a finite value or 0.
+    const score = computeFragmentationScore(CRUITE_VOXEL, Infinity);
+    expect(Number.isFinite(score)).toBe(true);
+  });
+
   it('returns fractional score when effectiveEnergy < threshold', () => {
     const score = computeFragmentationScore(CRUITE_VOXEL, 50);
     // F = 3.0 * 50 / 200 = 0.75
@@ -167,6 +197,24 @@ describe('fragmentCount', () => {
     // round(1.5) = 2, max(1, 2) = 2
     expect(fragmentCount(1.5)).toBe(2);
   });
+
+  it('returns 1 for NaN score', () => {
+    // NaN is not a valid score. Function should guard against it.
+    // CURRENTLY UNGUARDED — this test is expected to FAIL until the guard is added.
+    expect(fragmentCount(NaN)).toBe(1);
+  });
+
+  it('returns 1 for Infinity score', () => {
+    // Infinity is not a valid score. Function should guard against it.
+    // CURRENTLY UNGUARDED — this test is expected to FAIL until the guard is added.
+    expect(fragmentCount(Infinity)).toBe(1);
+  });
+
+  it('returns 1 for negative score', () => {
+    expect(fragmentCount(-5)).toBe(1);
+    expect(fragmentCount(-100)).toBe(1);
+    expect(fragmentCount(-0.5)).toBe(1);
+  });
 });
 
 // ─── voronoiSeedSamples ────────────────────────────────────────────────────────
@@ -186,6 +234,16 @@ describe('voronoiSeedSamples', () => {
 
   it('returns empty array for air voxel (score = 0)', () => {
     const points = voronoiSeedSamples(AIR_VOXEL, 500, 2, 3, 4, new Random(42));
+    expect(points).toEqual([]);
+  });
+
+  it('returns empty array for valid voxel with 0 effectiveEnergy', () => {
+    const points = voronoiSeedSamples(CRUITE_VOXEL, 0, 2, 3, 4, new Random(42));
+    expect(points).toEqual([]);
+  });
+
+  it('returns empty array for valid voxel with negative effectiveEnergy', () => {
+    const points = voronoiSeedSamples(CRUITE_VOXEL, -100, 2, 3, 4, new Random(42));
     expect(points).toEqual([]);
   });
 
@@ -349,6 +407,33 @@ describe('generateSeedPointCloud', () => {
     const points = generateSeedPointCloud(fragmented, energy, grid, new Random(42));
     // 3 + 1 = 4
     expect(points).toHaveLength(4);
+  });
+
+  it('ignores effectiveEnergy entries whose key is NOT in fragmented set', () => {
+    // Energy map has extra entries that don't correspond to any fragmented voxel.
+    // Only the fragmented keys should be processed.
+    const grid = makeMockGrid(['0,0,0', '1,0,0']);
+    const fragmented = new Set<string>(['0,0,0']);
+    const energy = new Map<string, number>([
+      ['0,0,0', 200],
+      ['1,0,0', 400],   // not in fragmented set → should be ignored
+      ['99,99,99', 999], // not in fragmented set → should be ignored
+    ]);
+    const points = generateSeedPointCloud(fragmented, energy, grid, new Random(42));
+    // Only (0,0,0) contributes: 3 points
+    expect(points).toHaveLength(3);
+    for (const p of points) {
+      expect(Math.floor(p.x)).toBe(0);
+    }
+  });
+
+  it('skips fragmented voxel where grid returns air (empty rocks)', () => {
+    // Grid returns air for a fragmented key → should be skipped
+    const grid = makeMockGrid([]);
+    const fragmented = new Set<string>(['5,5,5']);
+    const energy = new Map<string, number>([['5,5,5', 200]]);
+    const points = generateSeedPointCloud(fragmented, energy, grid, new Random(42));
+    expect(points).toEqual([]);
   });
 
   it('skips fragmented key where getVoxel returns undefined (OOB)', () => {
