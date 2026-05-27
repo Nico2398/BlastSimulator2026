@@ -34,7 +34,6 @@ def scenario_test_writer(state: dict) -> dict:
     ok = extract_ok(result, allow_expected_failures=True)
     messages = result["messages"]
 
-    retry_count = state.get("retry_count", 0)
     if ok:
         issue_number = state.get("issue_number", 0)
         test_branch = state.get("test_branch", state.get("branch_name", ""))
@@ -44,13 +43,10 @@ def scenario_test_writer(state: dict) -> dict:
             {"role": "assistant", "content": commit_result},
             {"role": "assistant", "content": push_result},
         ]
-    else:
-        retry_count += 1
 
     return {
         "messages": messages,
         "scenario_test_writer_ok": ok,
-        "retry_count": retry_count,
         "current_role": "scenario-test-writer",
     }
 
