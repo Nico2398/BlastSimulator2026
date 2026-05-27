@@ -86,10 +86,10 @@ async def run(issue_number: int, comment_body: str) -> None:
     config = {
         "configurable": {
             "thread_id": str(issue_number),
-            # MAX_RETRIES=7 × ~5 nodes per cycle + ~15 initial nodes = ~50 minimum.
-            # Set 150 to give ample headroom for all retry paths.
-            "recursion_limit": 150,
         },
+        # MAX_RETRIES=7 × ~5 nodes per cycle + ~15 initial nodes = ~50 minimum.
+        # Set 200 to give ample headroom for all retry paths.
+        "recursion_limit": 200,
     }
     initial_state: dict = {
         "issue_number": issue_number,
