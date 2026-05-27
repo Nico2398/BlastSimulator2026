@@ -95,10 +95,14 @@ from routing import (
 # ---------------------------------------------------------------------------
 
 
-class AgentState(TypedDict):
-    # Inputs
+class InputState(TypedDict):
+    """Only these fields are visible for input in LangGraph Studio."""
     issue_number: int
     comment_body: str
+
+
+class AgentState(InputState):
+    """Full pipeline state — all fields beyond InputState are internal."""
 
     # Set by orchestrate
     issue_title: str
@@ -203,7 +207,7 @@ def _interrupt_node(state: AgentState) -> dict:
 
 def build_graph():
     """Build and compile the BlastSimulator2026 LangGraph pipeline."""
-    builder = StateGraph(AgentState)
+    builder = StateGraph(AgentState, input=InputState)
 
     for name, fn in [
         ("orchestrate", orchestrate),
