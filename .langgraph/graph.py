@@ -8,7 +8,8 @@ Pipeline paths:
   fix-bug            orchestrate → skeleton_writer → unit-tests → implementer
                      → cherry_pick → test_runner → [fixer] → qualimetry
                      → code_review → validator → open_pr
-  review-pr          orchestrate → reviewer → END
+  review-pr          orchestrate → review_fan_out → [security ‖ quality ‖ i18n ‖ duplication]
+                     → review_fan_in (coordinator) → reviewer → END
   visual-change      same as implement-feature + visual_tester before open_pr
   investigate        orchestrate → implementer (read-only) → END
 
@@ -16,10 +17,15 @@ Test writing uses fan-out parallelism: unit/integration/scenario tests run
 concurrently when not skipped. A fan-in node merges results before implementer.
 
 Quality gates (in order after cherry_pick):
-  test_runner   non-agentic: runs Vitest, fails → fixer
-  fixer         agentic: fixes impl from error output only (unbiased); loops back to test_runner
-  qualimetry    non-agentic: jscpd duplication check; fails → implementer
-  code_review   agentic: architecture / convention audit; fails → implementer
+  test_runner         non-agentic: runs Vitest, fails → fixer
+  fixer               agentic: fixes impl from error output only (unbiased); loops back to test_runner
+  qualimetry          non-agentic: jscpd syntactic duplication check; fails → implementer
+  review_fan_out      dispatches parallel sub-reviewers based on risk tier
+  security_reviewer   agentic: exploitable vulnerabilities (full tier only)
+  quality_reviewer    agentic: architecture, conventions, naming intent, TypeScript strictness
+  i18n_reviewer       agentic: hardcoded strings, locale mismatches (lite + full tiers)
+  duplication_reviewer agentic: semantic duplication, non-atomic functions, generic code placement
+  review_fan_in       agentic coordinator: merges all sub-reviewer findings → code_review_ok
 
 See routing.py for all conditional-edge functions.
 """
@@ -60,7 +66,7 @@ from nodes.conflict_resolver import conflict_resolver
 from nodes.test_runner import test_runner
 from nodes.fixer import fixer
 from nodes.code_review import code_review
-from nodes.review_fan_out import review_fan_out, route_from_review_fan_out, security_reviewer, quality_reviewer, i18n_reviewer
+from nodes.review_fan_out import review_fan_out, route_from_review_fan_out, security_reviewer, quality_reviewer, i18n_reviewer, duplication_reviewer
 from nodes.review_fan_in import review_fan_in
 from nodes.open_pr import open_pr
 from routing import (
@@ -150,6 +156,8 @@ class AgentState(TypedDict):
     quality_review_report: str
     i18n_review_ok: bool
     i18n_review_report: str
+    duplication_review_ok: bool
+    duplication_review_report: str
     refactorer_ok: bool
     validator_ok: bool
     validator_report: str
@@ -217,6 +225,7 @@ def build_graph():
         ("security_reviewer", security_reviewer),
         ("quality_reviewer", quality_reviewer),
         ("i18n_reviewer", i18n_reviewer),
+        ("duplication_reviewer", duplication_reviewer),
         ("review_fan_in", review_fan_in),
         ("refactorer", refactorer),
         ("validator", validator),
@@ -232,7 +241,7 @@ def build_graph():
     builder.add_conditional_edges("orchestrate", route_from_orchestrate, {
         "planner": "planner",
         "implementer": "implementer",
-        "reviewer": "reviewer",
+        "review_fan_out": "review_fan_out",
     })
     builder.add_conditional_edges("planner", route_from_planner, {
         "skeleton_writer": "skeleton_writer",
@@ -294,17 +303,19 @@ def build_graph():
         "implementer": "implementer",
         "handle_interrupt": "handle_interrupt",
     })
-    # Review fan-out: dispatches to specialized sub-reviewers in parallel.
-    builder.add_conditional_edges("review_fan_out", route_from_review_fan_out, ["security_reviewer", "quality_reviewer", "i18n_reviewer"])
+    # Fan-out: dispatches to specialized sub-reviewers in parallel.
+    builder.add_conditional_edges("review_fan_out", route_from_review_fan_out, ["security_reviewer", "quality_reviewer", "i18n_reviewer", "duplication_reviewer"])
     # Each sub-reviewer routes to review_fan_in on completion.
     builder.add_edge("security_reviewer", "review_fan_in")
     builder.add_edge("quality_reviewer", "review_fan_in")
     builder.add_edge("i18n_reviewer", "review_fan_in")
-    # Review fan-in: coordinator merges findings, routes to refactorer or retry.
+    builder.add_edge("duplication_reviewer", "review_fan_in")
+    # Review fan-in: coordinator merges findings, routes to refactorer, retry, or reviewer.
     builder.add_conditional_edges("review_fan_in", route_from_review_fan_in, {
         "refactorer": "refactorer",
         "validator": "validator",
         "implementer": "implementer",
+        "reviewer": "reviewer",
         "handle_interrupt": "handle_interrupt",
     })
     builder.add_conditional_edges("code_review", route_from_code_review, {

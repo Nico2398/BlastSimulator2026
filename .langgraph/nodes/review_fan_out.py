@@ -1,13 +1,15 @@
 """review_fan_out — dispatch specialized sub-reviewers in parallel.
 
-Replaces the single code_review node with a fan-out of domain-specific
-reviewers (security, quality, i18n). Each runs as a separate agent call.
-The review_fan_in node merges their findings.
+Used in two pipeline paths:
+  - Development pipeline (implement-feature, fix-bug, visual-change): runs after qualimetry,
+    before refactorer. Fan-in (coordinator) routes to refactorer or implementer.
+  - Review-PR pipeline: runs immediately after orchestrate (user-triggered review request).
+    Fan-in (coordinator) routes to reviewer for runtime validation.
 
 Risk tier controls which reviewers run:
   trivial — quality only (1 reviewer)
-  lite    — quality + i18n (2 reviewers)
-  full    — security + quality + i18n (3 reviewers)
+  lite    — quality + i18n + duplication (3 reviewers)
+  full    — security + quality + i18n + duplication (4 reviewers)
 """
 
 from __future__ import annotations
@@ -52,12 +54,14 @@ def _select_reviewers(risk_tier: str) -> list[tuple[str, callable]]:
         return [
             ("quality_reviewer", quality_reviewer),
             ("i18n_reviewer", i18n_reviewer),
+            ("duplication_reviewer", duplication_reviewer),
         ]
     # full
     return [
         ("security_reviewer", security_reviewer),
         ("quality_reviewer", quality_reviewer),
         ("i18n_reviewer", i18n_reviewer),
+        ("duplication_reviewer", duplication_reviewer),
     ]
 
 
@@ -154,4 +158,46 @@ def i18n_reviewer(state: dict) -> dict:
         "messages": messages,
         "i18n_review_ok": ok,
         "i18n_review_report": content,
+    }
+
+
+def duplication_reviewer(state: dict) -> dict:
+    """Semantic duplication sub-reviewer.
+
+    Inspects the diff for semantic duplication, non-atomic functions, and
+    generic code placed in domain-specific modules — complementing the
+    non-agentic jscpd check that only detects syntactic clones.
+
+    Args:
+        state: Pipeline state dict. Reads issue_number, diff_dir, changed_files,
+               skill, issue_body, and plan.
+
+    Returns:
+        Partial state dict with keys:
+          - messages: agent message history
+          - duplication_review_ok: True when no [critical] duplication found
+          - duplication_review_report: full text of the agent's findings
+    """
+    llm = build_llm()
+    agent = build_react_agent(
+        "duplication-reviewer",
+        READ_ONLY_TOOLS,
+        llm,
+        extra_context=_build_shared_context(state),
+    )
+    task = (
+        f"Duplication review for issue #{state.get('issue_number')}. "
+        "Read SUMMARY.md in the diff directory, then read each changed file. "
+        "Check for semantic duplication against the existing codebase, non-atomic functions, "
+        "and generic code placed in domain-specific modules."
+    )
+    result = invoke_agent(agent, build_fresh_messages(task))
+    ok = extract_ok(result)
+    messages = result["messages"]
+    content = extract_message_content(messages[-1]) if messages else ""
+
+    return {
+        "messages": messages,
+        "duplication_review_ok": ok,
+        "duplication_review_report": content,
     }

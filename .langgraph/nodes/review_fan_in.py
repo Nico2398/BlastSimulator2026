@@ -97,6 +97,8 @@ def _build_coordinator_context(state: dict) -> str:
         lines.append("\n## Quality Review Report\n" + state["quality_review_report"])
     if state.get("i18n_review_report"):
         lines.append("\n## i18n Review Report\n" + state["i18n_review_report"])
+    if state.get("duplication_review_report"):
+        lines.append("\n## Duplication Review Report\n" + state["duplication_review_report"])
 
     return "\n".join(lines)
 

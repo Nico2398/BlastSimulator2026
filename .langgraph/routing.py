@@ -20,10 +20,12 @@ MAX_RETRIES = 7
 
 def route_from_orchestrate(state: dict) -> str:
     pipeline = state.get("pipeline", "implement-feature")
-    if pipeline == "review-pr":
-        return "reviewer"
     if pipeline == "investigate":
         return "implementer"
+    if pipeline == "review-pr":
+        # Fan-out sub-reviewers first (static analysis + duplication), then
+        # the coordinator merges findings, then reviewer does runtime validation.
+        return "review_fan_out"
     # All coding pipelines go through planner first.
     return "planner"
 
@@ -132,8 +134,13 @@ def route_from_code_review(state: dict) -> str:
 def route_from_review_fan_in(state: dict) -> str:
     """Route after review coordinator merges sub-reviewer findings.
 
-    Same logic as route_from_code_review — the coordinator sets code_review_ok.
+    For review-pr pipeline: hand off to reviewer for runtime validation
+    (runs tests, posts review comment) regardless of pass/fail.
+    For coding pipelines: same logic as route_from_code_review — the
+    coordinator sets code_review_ok.
     """
+    if state.get("pipeline") == "review-pr":
+        return "reviewer"
     if state.get("code_review_ok", False):
         return _route_after_code_review(state)
     return "handle_interrupt" if state.get("retry_count", 0) >= MAX_RETRIES else "implementer"
