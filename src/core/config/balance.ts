@@ -147,6 +147,8 @@ export const BLAST_ENERGY_EPSILON = 4.0;
 export const MAX_PROPAGATION_ITERATIONS = 500;
 /** Energy must reach this multiple of a voxel's threshold to fragment it. */
 export const FRAGMENTATION_MULTIPLIER = 1.0;
+/** Scale factor for fragmentation score: F(v) = FRAGMENTATION_SCORE_SCALE * (effectiveEnergy[v] / T(v)). */
+export const FRAGMENTATION_SCORE_SCALE = 3.0;
 
 // ─── Game Loop ──────────────────────────────────────────────────────────────────
 
