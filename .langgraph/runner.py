@@ -134,7 +134,34 @@ async def run(issue_number: int, comment_body: str) -> None:
     log.info("Starting pipeline for issue #%d", issue_number)
     log.info("Comment: %r", comment_body)
 
-    await stream_pipeline(graph, initial_state, config)
+    interrupted = await stream_pipeline(graph, initial_state, config)
+
+    if interrupted:
+        from routing import MAX_RETRIES
+        from tools.github_write import github_post_comment, github_add_label, github_remove_label
+        log.warning(
+            "Pipeline paused: max retries (%d) reached during pipeline execution. Posting pause comment and updating labels.",
+            MAX_RETRIES,
+        )
+        results = [
+            (
+                "post comment",
+                github_post_comment(
+                    issue_number,
+                    f"⚠️ **Pipeline paused** — max retries ({MAX_RETRIES}) reached during pipeline execution.\n\n"
+                    "The autonomous agent reached the retry limit before completing the workflow. "
+                    "Review the CI log output above, add clarification or guidance to this issue, then re-trigger the pipeline.",
+                ),
+            ),
+            ("remove label", github_remove_label(issue_number, "in-progress")),
+            ("add label", github_add_label(issue_number, "blocked")),
+        ]
+        for action, result in results:
+            if result.startswith("error:"):
+                log.warning("GitHub %s warning: %s", action, result)
+            else:
+                log.info("GitHub %s: %s", action, result)
+        sys.exit(1)
 
     log.info("Pipeline complete.")
 
