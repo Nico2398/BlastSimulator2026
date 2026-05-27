@@ -15,8 +15,11 @@ import type { Vec3 } from '../core/math/Vec3.js';
 /**
  * Compute F(v) = FRAGMENTATION_SCORE_SCALE * (effectiveEnergy[v] / T(v)).
  * Returns 0 for air voxels (empty composition or density ≤ 0) and when threshold ≤ 0.
+ * Returns 0 for NaN or Infinity effectiveEnergy.
  */
 export function computeFragmentationScore(voxel: VoxelData, effectiveEnergy: number): number {
+  // Guard non-finite energy (NaN, Infinity, -Infinity)
+  if (!Number.isFinite(effectiveEnergy)) return 0;
   // Air voxel — no rock
   if (voxel.composition.rocks.length === 0) return 0;
   // Zero or negative density — effectively air
@@ -31,8 +34,11 @@ export function computeFragmentationScore(voxel: VoxelData, effectiveEnergy: num
 
 /**
  * Number of Voronoi seeds per voxel: max(1, round(F(v))).
+ * Returns 1 for NaN or Infinity score.
  */
 export function fragmentCount(score: number): number {
+  // Guard non-finite score (NaN, Infinity, -Infinity)
+  if (!Number.isFinite(score)) return 1;
   return Math.max(1, Math.round(score));
 }
 
