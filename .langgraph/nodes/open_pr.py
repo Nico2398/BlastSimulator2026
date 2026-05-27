@@ -26,7 +26,7 @@ from tools.pygithub_tools import create_pr, add_label, remove_label, enable_auto
 def open_pr(state: dict) -> dict:
     """Create a PR for the completed work and update issue labels."""
     issue_number = state.get("issue_number", 0)
-    branch = state.get("test_branch", state.get("branch_name", ""))
+    branch = state.get("full_branch") or state.get("test_branch") or state.get("branch_name", "")
     issue_title = state.get("issue_title", f"Issue #{issue_number}")
     pipeline = state.get("pipeline", "implement-feature")
 

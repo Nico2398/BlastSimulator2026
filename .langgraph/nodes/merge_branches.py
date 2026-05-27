@@ -21,7 +21,7 @@ if str(_HERE) not in sys.path:
 import git as gitpy
 
 from tools.git_tools import (
-    git_checkout_existing,
+    git_force_checkout_branch,
     git_get_head_sha,
     git_get_conflict_files,
     git_push,
@@ -56,8 +56,8 @@ def merge_branches(state: dict) -> dict:
             ],
         }
 
-    # Switch to full_branch.
-    checkout_msg = git_checkout_existing(full_branch)
+    # Switch to full_branch (create from skeleton if new).
+    checkout_msg = git_force_checkout_branch(full_branch, from_ref=skeleton_sha)
     messages = state.get("messages", []) + [
         {"role": "assistant", "content": checkout_msg},
     ]
