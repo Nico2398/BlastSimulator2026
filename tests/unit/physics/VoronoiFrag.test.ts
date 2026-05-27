@@ -48,14 +48,14 @@ const MIXED_VOXEL: VoxelData = {
 // ─── computeFragmentationScore ─────────────────────────────────────────────────
 
 describe('computeFragmentationScore', () => {
-  // ── Air / zero-threshold guard ─────────────────────────────────────────────
+  // ── Guard: air / no rocks / density ≤ 0 / non-finite / threshold ≤ 0 ──────
 
   it('returns 0 for an air voxel (empty composition)', () => {
     const score = computeFragmentationScore(AIR_VOXEL, 500);
     expect(score).toBe(0);
   });
 
-  it('returns 0 for an air voxel (density ≤ 0)', () => {
+  it('returns 0 for a voxel with density ≤ 0', () => {
     const denseAir: VoxelData = {
       composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
       density: 0,
@@ -63,6 +63,19 @@ describe('computeFragmentationScore', () => {
       fractureModifier: 1.0,
     };
     const score = computeFragmentationScore(denseAir, 500);
+    expect(score).toBe(0);
+  });
+
+  it('returns 0 for an ore-only voxel (empty rock composition, density > 0)', () => {
+    // Ore-only voxels have no rock composition to fragment.
+    // computeFragmentationScore checks rocks.length === 0 before checking density.
+    const oreOnly: VoxelData = {
+      composition: { rocks: [] },
+      density: 1.0,
+      oreDensities: { blingite: 0.5 },
+      fractureModifier: 1.0,
+    };
+    const score = computeFragmentationScore(oreOnly, 500);
     expect(score).toBe(0);
   });
 
@@ -93,15 +106,18 @@ describe('computeFragmentationScore', () => {
   });
 
   it('returns 0 for NaN effectiveEnergy', () => {
-    // NaN is not a valid energy value. Function should guard against it
-    // and return 0. CURRENTLY UNGUARDED — this test is expected to FAIL
-    // until the guard is added.
     const score = computeFragmentationScore(CRUITE_VOXEL, NaN);
     expect(score).toBe(0);
   });
 
   it('returns 0 for -Infinity effectiveEnergy', () => {
     const score = computeFragmentationScore(CRUITE_VOXEL, -Infinity);
+    expect(score).toBe(0);
+  });
+
+  it('handles Infinity effectiveEnergy gracefully', () => {
+    // Infinity is not finite — should return 0.
+    const score = computeFragmentationScore(CRUITE_VOXEL, Infinity);
     expect(score).toBe(0);
   });
 
@@ -138,10 +154,10 @@ describe('computeFragmentationScore', () => {
     expect(FRAGMENTATION_SCORE_SCALE).toBe(3.0);
   });
 
-  it('does not mutate the input voxel object', () => {
-    const snapshot = JSON.parse(JSON.stringify(CRUITE_VOXEL));
-    computeFragmentationScore(CRUITE_VOXEL, 400);
-    expect(CRUITE_VOXEL).toEqual(snapshot);
+  it('returns fractional score when effectiveEnergy < threshold', () => {
+    const score = computeFragmentationScore(CRUITE_VOXEL, 50);
+    // F = 3.0 * 50 / 200 = 0.75
+    expect(score).toBeCloseTo(0.75, 10);
   });
 
   it('handles very large effectiveEnergy without overflow issues', () => {
@@ -150,17 +166,12 @@ describe('computeFragmentationScore', () => {
     expect(score).toBe(1.5e10);
   });
 
-  it('handles Infinity effectiveEnergy gracefully', () => {
-    // Infinity energy should not crash or propagate NaN.
-    // Expected to return a finite value or 0.
-    const score = computeFragmentationScore(CRUITE_VOXEL, Infinity);
-    expect(Number.isFinite(score)).toBe(true);
-  });
+  // ── Immutability ───────────────────────────────────────────────────────────
 
-  it('returns fractional score when effectiveEnergy < threshold', () => {
-    const score = computeFragmentationScore(CRUITE_VOXEL, 50);
-    // F = 3.0 * 50 / 200 = 0.75
-    expect(score).toBeCloseTo(0.75, 10);
+  it('does not mutate the input voxel object', () => {
+    const snapshot = JSON.parse(JSON.stringify(CRUITE_VOXEL));
+    computeFragmentationScore(CRUITE_VOXEL, 400);
+    expect(CRUITE_VOXEL).toEqual(snapshot);
   });
 });
 
@@ -199,15 +210,15 @@ describe('fragmentCount', () => {
   });
 
   it('returns 1 for NaN score', () => {
-    // NaN is not a valid score. Function should guard against it.
-    // CURRENTLY UNGUARDED — this test is expected to FAIL until the guard is added.
     expect(fragmentCount(NaN)).toBe(1);
   });
 
   it('returns 1 for Infinity score', () => {
-    // Infinity is not a valid score. Function should guard against it.
-    // CURRENTLY UNGUARDED — this test is expected to FAIL until the guard is added.
     expect(fragmentCount(Infinity)).toBe(1);
+  });
+
+  it('returns 1 for -Infinity score', () => {
+    expect(fragmentCount(-Infinity)).toBe(1);
   });
 
   it('returns 1 for negative score', () => {
@@ -232,8 +243,22 @@ describe('voronoiSeedSamples', () => {
     }
   }
 
+  // ── Guard: air / zero-energy / non-finite ──────────────────────────────────
+
   it('returns empty array for air voxel (score = 0)', () => {
     const points = voronoiSeedSamples(AIR_VOXEL, 500, 2, 3, 4, new Random(42));
+    expect(points).toEqual([]);
+  });
+
+  it('returns empty array for density=0 voxel with rock composition', () => {
+    // Voxel has rock composition but density=0 → treated as air.
+    const denseAir: VoxelData = {
+      composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
+      density: 0,
+      oreDensities: {},
+      fractureModifier: 1.0,
+    };
+    const points = voronoiSeedSamples(denseAir, 500, 0, 0, 0, new Random(42));
     expect(points).toEqual([]);
   });
 
@@ -246,6 +271,24 @@ describe('voronoiSeedSamples', () => {
     const points = voronoiSeedSamples(CRUITE_VOXEL, -100, 2, 3, 4, new Random(42));
     expect(points).toEqual([]);
   });
+
+  it('returns empty array for NaN effectiveEnergy', () => {
+    // NaN is non-finite → computeFragmentationScore returns 0 → empty array.
+    const points = voronoiSeedSamples(CRUITE_VOXEL, NaN, 2, 3, 4, new Random(42));
+    expect(points).toEqual([]);
+  });
+
+  it('returns empty array for Infinity effectiveEnergy', () => {
+    const points = voronoiSeedSamples(CRUITE_VOXEL, Infinity, 2, 3, 4, new Random(42));
+    expect(points).toEqual([]);
+  });
+
+  it('returns empty array for -Infinity effectiveEnergy', () => {
+    const points = voronoiSeedSamples(CRUITE_VOXEL, -Infinity, 2, 3, 4, new Random(42));
+    expect(points).toEqual([]);
+  });
+
+  // ── Correct count ─────────────────────────────────────────────────────────
 
   it('returns correct number of samples for cruite with effectiveEnergy = threshold', () => {
     // T(cruite) = 200, energy = 200 → F = 3.0 * 200/200 = 3.0 → count = round(3.0) = 3
@@ -264,6 +307,8 @@ describe('voronoiSeedSamples', () => {
     const points = voronoiSeedSamples(CRUITE_VOXEL, 10, 0, 0, 0, new Random(42));
     expect(points).toHaveLength(1);
   });
+
+  // ── Spatial correctness ────────────────────────────────────────────────────
 
   it('all points lie within [x, x+1) × [y, y+1) × [z, z+1)', () => {
     const points = voronoiSeedSamples(CRUITE_VOXEL, 400, 10, 20, 30, new Random(99));
@@ -290,6 +335,14 @@ describe('voronoiSeedSamples', () => {
     }
   });
 
+  it('handles negative voxel coordinates correctly', () => {
+    // Voxel at negative coordinates should produce points in that range
+    const points = voronoiSeedSamples(CRUITE_VOXEL, 400, -5, -3, -1, new Random(42));
+    assertPointsInCube(points, -5, -3, -1);
+  });
+
+  // ── Determinism ────────────────────────────────────────────────────────────
+
   it('deterministic with same seed', () => {
     const seed = 12345;
     const a = voronoiSeedSamples(CRUITE_VOXEL, 400, 7, 8, 9, new Random(seed));
@@ -310,11 +363,7 @@ describe('voronoiSeedSamples', () => {
     expect(allMatch).toBe(false);
   });
 
-  it('handles negative voxel coordinates correctly', () => {
-    // Voxel at negative coordinates should produce points in that range
-    const points = voronoiSeedSamples(CRUITE_VOXEL, 400, -5, -3, -1, new Random(42));
-    assertPointsInCube(points, -5, -3, -1);
-  });
+  // ── Immutability ───────────────────────────────────────────────────────────
 
   it('does not mutate the input voxel', () => {
     const snapshot = JSON.parse(JSON.stringify(CRUITE_VOXEL));
@@ -340,6 +389,8 @@ describe('generateSeedPointCloud', () => {
     };
   }
 
+  // ── Empty / trivial cases ──────────────────────────────────────────────────
+
   it('returns empty array for empty fragmented set', () => {
     const grid = makeMockGrid([]);
     const points = generateSeedPointCloud(
@@ -350,6 +401,8 @@ describe('generateSeedPointCloud', () => {
     );
     expect(points).toEqual([]);
   });
+
+  // ── Single / multiple voxels ───────────────────────────────────────────────
 
   it('returns correct total points for a single fragmented voxel', () => {
     // Voxel (5,5,5), cruite, energy=200 → F=3.0 → count=3
@@ -398,6 +451,8 @@ describe('generateSeedPointCloud', () => {
     expect(points).toHaveLength(10);
   });
 
+  // ── Missing / extra energy entries ─────────────────────────────────────────
+
   it('skips fragmented keys missing from effectiveEnergy map (treats energy as 0)', () => {
     // (0,0,0): has energy → 3 points
     // (1,0,0): missing from energy map → score 0 → fragmentCount(0) = 1 point
@@ -427,6 +482,67 @@ describe('generateSeedPointCloud', () => {
     }
   });
 
+  // ── Malformed / OOB / air keys ─────────────────────────────────────────────
+
+  it('skips malformed key (no commas in fragmented set)', () => {
+    const grid = makeMockGrid(['0,0,0']);
+    const fragmented = new Set<string>(['0,0,0', 'bad-key']);
+    const energy = new Map<string, number>([['0,0,0', 200]]);
+    const points = generateSeedPointCloud(fragmented, energy, grid, new Random(42));
+    // Only (0,0,0) contributes: 3 points
+    expect(points).toHaveLength(3);
+  });
+
+  it('skips malformed key (only 2 coordinate parts)', () => {
+    const grid = makeMockGrid(['0,0,0']);
+    const fragmented = new Set<string>(['0,0,0', '1,2']);
+    const energy = new Map<string, number>([['0,0,0', 200]]);
+    const points = generateSeedPointCloud(fragmented, energy, grid, new Random(42));
+    expect(points).toHaveLength(3);
+  });
+
+  it('skips malformed key (empty string)', () => {
+    const grid = makeMockGrid(['0,0,0']);
+    const fragmented = new Set<string>(['0,0,0', '']);
+    const energy = new Map<string, number>([['0,0,0', 200]]);
+    const points = generateSeedPointCloud(fragmented, energy, grid, new Random(42));
+    expect(points).toHaveLength(3);
+  });
+
+  it('skips malformed key (non-integer float coordinates — OOB lookup)', () => {
+    // "1.5,2.5,3.5" has 3 parts, all finite → grid.getVoxel(1.5, 2.5, 3.5)
+    // returns undefined (or air for integer key "1.5,2.5,3.5") → skipped.
+    const grid = makeMockGrid(['0,0,0']);
+    const fragmented = new Set<string>(['0,0,0', '1.5,2.5,3.5']);
+    const energy = new Map<string, number>([['0,0,0', 200]]);
+    const points = generateSeedPointCloud(fragmented, energy, grid, new Random(42));
+    expect(points).toHaveLength(3);
+  });
+
+  it('skips key with NaN coordinate component', () => {
+    const grid = makeMockGrid(['0,0,0']);
+    const fragmented = new Set<string>(['0,0,0', 'NaN,0,0']);
+    const energy = new Map<string, number>([['0,0,0', 200]]);
+    const points = generateSeedPointCloud(fragmented, energy, grid, new Random(42));
+    expect(points).toHaveLength(3);
+  });
+
+  it('skips key with Infinity coordinate component', () => {
+    const grid = makeMockGrid(['0,0,0']);
+    const fragmented = new Set<string>(['0,0,0', 'Infinity,0,0']);
+    const energy = new Map<string, number>([['0,0,0', 200]]);
+    const points = generateSeedPointCloud(fragmented, energy, grid, new Random(42));
+    expect(points).toHaveLength(3);
+  });
+
+  it('skips key with -Infinity coordinate component', () => {
+    const grid = makeMockGrid(['0,0,0']);
+    const fragmented = new Set<string>(['0,0,0', '-Infinity,0,0']);
+    const energy = new Map<string, number>([['0,0,0', 200]]);
+    const points = generateSeedPointCloud(fragmented, energy, grid, new Random(42));
+    expect(points).toHaveLength(3);
+  });
+
   it('skips fragmented voxel where grid returns air (empty rocks)', () => {
     // Grid returns air for a fragmented key → should be skipped
     const grid = makeMockGrid([]);
@@ -447,6 +563,8 @@ describe('generateSeedPointCloud', () => {
     const points = generateSeedPointCloud(fragmented, energy, grid, new Random(42));
     expect(points).toEqual([]);
   });
+
+  // ── Determinism ────────────────────────────────────────────────────────────
 
   it('deterministic with same seed', () => {
     const grid = makeMockGrid(['0,0,0', '1,1,1']);
@@ -481,6 +599,8 @@ describe('generateSeedPointCloud', () => {
     }
   });
 
+  // ── Large set / performance ────────────────────────────────────────────────
+
   it('handles large fragmented set without crashing', () => {
     // 100 voxels each with 3 points = 300 total points
     const voxelKeys: string[] = [];
@@ -496,6 +616,8 @@ describe('generateSeedPointCloud', () => {
     const points = generateSeedPointCloud(fragmented, energy, grid, new Random(42));
     expect(points).toHaveLength(300);
   });
+
+  // ── Immutability ───────────────────────────────────────────────────────────
 
   it('does not mutate input fragmentedVoxels set', () => {
     const grid = makeMockGrid(['0,0,0']);
