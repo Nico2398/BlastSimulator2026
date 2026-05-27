@@ -8,3 +8,4 @@ uv.lock
 diffs/
 .langgraph_api/
 traces.json
+logs/
