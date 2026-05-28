@@ -148,6 +148,16 @@ export const MAX_PROPAGATION_ITERATIONS = 500;
 /** Energy must reach this multiple of a voxel's threshold to fragment it. */
 export const FRAGMENTATION_MULTIPLIER = 1.0;
 
+/** Scale factor for fragmentation score: F(v) = FRAGMENTATION_SCORE_SCALE * (effectiveEnergy / threshold)
+ *  3.0 means a voxel at threshold (ratio=1.0) produces 3 fragments on average.
+ *  Real blasting: Kuz-Ram model predicts fragment sizes; this is a gameplay-simplified scale. */
+export const FRAGMENTATION_SCORE_SCALE = 3.0;
+
+/** Maximum total Voronoi seed points before culling lowest-score voxels.
+ *  Performance guard to prevent O(n log n) Delaunay from exploding.
+ *  Culling logic is in task 5.9 (Bowyer-Watson implementation). */
+export const MAX_VORONOI_POINTS = 2000;
+
 // ─── Game Loop ──────────────────────────────────────────────────────────────────
 
 /** Duration of one game tick in real milliseconds at 1× speed. 1 tick = 1 game-hour. */
