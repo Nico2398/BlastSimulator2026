@@ -140,8 +140,8 @@ describe('VoronoiFrag — computeFragmentCount', () => {
     expect(computeFragmentCount(FRAGMENTATION_SCORE_SCALE)).toBe(3);
   });
 
-  it('returns large integer for large scores', () => {
-    expect(computeFragmentCount(50.2)).toBe(50);
+  it('caps fragment count at MAX_FRAGMENTS_PER_VOXEL for large scores', () => {
+    expect(computeFragmentCount(50.2)).toBe(20);
   });
 });
 

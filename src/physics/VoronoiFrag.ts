@@ -6,8 +6,8 @@ import type { Vec3 } from '../core/math/Vec3.js';
 import { vec3 } from '../core/math/Vec3.js';
 import type { VoxelGrid } from '../core/world/VoxelGrid.js';
 import { Random } from '../core/math/Random.js';
-import { computeThreshold } from '../core/mining/BlastCalc.js';
-import { FRAGMENTATION_SCORE_SCALE } from '../core/config/balance.js';
+import { computeThreshold, parseKey } from '../core/mining/BlastCalc.js';
+import { FRAGMENTATION_SCORE_SCALE, MAX_FRAGMENTS_PER_VOXEL } from '../core/config/balance.js';
 
 /**
  * Compute the fragmentation score for a single voxel given its effective energy
@@ -40,7 +40,7 @@ export function computeFragmentationScore(
 export function computeFragmentCount(score: number): number {
   if (score <= 0) return 1;
   if (!Number.isFinite(score)) return 1;
-  return Math.max(1, Math.round(score));
+  return Math.min(MAX_FRAGMENTS_PER_VOXEL, Math.max(1, Math.round(score)));
 }
 
 /**
@@ -65,13 +65,9 @@ export function sampleVoronoiSeeds(
   const points: Vec3[] = [];
 
   for (const key of fragmentedVoxels) {
-    const parts = key.split(',');
-    if (parts.length !== 3) continue;
-
-    const x = Number(parts[0]);
-    const y = Number(parts[1]);
-    const z = Number(parts[2]);
-    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) continue;
+    const coords = parseKey(key);
+    if (!coords) continue;
+    const [x, y, z] = coords;
 
     if (!grid.isInBounds(x, y, z)) continue;
 
