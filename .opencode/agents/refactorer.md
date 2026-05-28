@@ -1,4 +1,5 @@
 ---
+model: opencode/deepseek-v4-flash-free
 description: TDD Refactor phase: cleans up implementation for clarity, maintainability, convention compliance. No behavior change. All tests must still pass after refactoring. 
 mode: subagent
 ---

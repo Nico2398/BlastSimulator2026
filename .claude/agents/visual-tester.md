@@ -4,6 +4,13 @@ description: Visual testing: Puppeteer scenario tests, screenshots, state dumps.
 allowed-tools: Read Search Execute
 user-invocable: false
 disable-model-invocation: true
+hooks:
+  PreToolUse:
+    - matcher: "Bash"
+      hooks:
+        - type: command
+          shell: powershell
+          command: ".claude/hooks/block-git-gh.ps1"
 ---
 # Visual Tester — Screenshot & Scenario Verification
 

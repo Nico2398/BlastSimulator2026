@@ -1,4 +1,5 @@
 ---
+model: opencode/deepseek-v4-flash-free
 description: Independent bug-fix specialist: fixes failing tests from error output and stack traces only — never reads test source. Non-biased fix. 
 mode: subagent
 ---

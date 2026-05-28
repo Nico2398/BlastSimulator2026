@@ -1,4 +1,5 @@
 ---
+model: opencode/deepseek-v4-flash-free
 description: TDD Red phase: writes failing tests before implementation. Unit tests, integration tests, scenario definitions. 
 mode: subagent
 ---

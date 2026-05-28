@@ -1,4 +1,5 @@
 ---
+model: opencode/deepseek-v4-flash-free
 description: Visual testing: Puppeteer scenario tests, screenshots, state dumps. Use when change affects rendering, UI, or visual presentation. 
 mode: subagent
 ---

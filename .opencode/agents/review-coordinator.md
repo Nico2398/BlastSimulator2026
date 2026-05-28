@@ -1,4 +1,5 @@
 ---
+model: opencode/deepseek-v4-flash-free
 description: Merges findings from specialized sub-reviewers. Deduplicates, re-categorizes, drops false positives, makes final pass/fail decision. Read-only. 
 mode: subagent
 ---
