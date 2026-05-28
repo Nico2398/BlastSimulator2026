@@ -3,8 +3,11 @@
 // Task 5.8: computeFragmentationScore and Voronoi seed sampling
 
 import type { Vec3 } from '../core/math/Vec3.js';
+import { vec3 } from '../core/math/Vec3.js';
 import type { VoxelGrid } from '../core/world/VoxelGrid.js';
 import { Random } from '../core/math/Random.js';
+import { computeThreshold } from '../core/mining/BlastCalc.js';
+import { FRAGMENTATION_SCORE_SCALE } from '../core/config/balance.js';
 
 /**
  * Compute the fragmentation score for a single voxel given its effective energy
@@ -17,11 +20,13 @@ import { Random } from '../core/math/Random.js';
  * @returns The fragmentation score (≥ 0). Higher = more fragments.
  */
 export function computeFragmentationScore(
-  _effectiveEnergy: number,
-  _threshold: number,
+  effectiveEnergy: number,
+  threshold: number,
 ): number {
-  // TODO: implement
-  return 0;
+  if (threshold <= 0) return 0;
+  if (effectiveEnergy <= 0) return 0;
+  if (!Number.isFinite(effectiveEnergy) || !Number.isFinite(threshold)) return 0;
+  return FRAGMENTATION_SCORE_SCALE * (effectiveEnergy / threshold);
 }
 
 /**
@@ -32,9 +37,10 @@ export function computeFragmentationScore(
  * @param score - The fragmentation score (from computeFragmentationScore).
  * @returns The number of fragments this voxel produces (at least 1).
  */
-export function computeFragmentCount(_score: number): number {
-  // TODO: implement
-  return 1;
+export function computeFragmentCount(score: number): number {
+  if (score <= 0) return 1;
+  if (!Number.isFinite(score)) return 1;
+  return Math.max(1, Math.round(score));
 }
 
 /**
@@ -51,11 +57,39 @@ export function computeFragmentCount(_score: number): number {
  * @returns Array of Vec3 seed points (fragment centroids) for Voronoi tessellation.
  */
 export function sampleVoronoiSeeds(
-  _fragmentedVoxels: Set<string>,
-  _effectiveEnergy: Map<string, number>,
-  _grid: VoxelGrid,
-  _rng: Random,
+  fragmentedVoxels: Set<string>,
+  effectiveEnergy: Map<string, number>,
+  grid: VoxelGrid,
+  rng: Random,
 ): Vec3[] {
-  // TODO: implement
-  return [];
+  const points: Vec3[] = [];
+
+  for (const key of fragmentedVoxels) {
+    const parts = key.split(',');
+    if (parts.length !== 3) continue;
+
+    const x = Number(parts[0]);
+    const y = Number(parts[1]);
+    const z = Number(parts[2]);
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) continue;
+
+    if (!grid.isInBounds(x, y, z)) continue;
+
+    const voxel = grid.getVoxel(x, y, z);
+    if (!voxel) continue;
+
+    const energy = effectiveEnergy.get(key) ?? 0;
+    const threshold = computeThreshold(voxel);
+    const score = computeFragmentationScore(energy, threshold);
+    const count = computeFragmentCount(score);
+
+    for (let i = 0; i < count; i++) {
+      const px = rng.nextFloat(x, x + 1);
+      const py = rng.nextFloat(y, y + 1);
+      const pz = rng.nextFloat(z, z + 1);
+      points.push(vec3(px, py, pz));
+    }
+  }
+
+  return points;
 }
