@@ -137,7 +137,7 @@ If the pipeline reaches the PR creation step, `gh` must be authenticated with a 
    - GitHub menu path: **Profile photo → Settings → Developer settings → Personal access tokens** (choose **Tokens (classic)** or **Fine-grained tokens**).
    - Classic PAT: `repo` + `workflow`
    - Fine-grained PAT (alternative): repository access with **Contents: Read/Write**, **Pull requests: Read/Write**, **Issues: Read/Write**, **Metadata: Read**
-2. Export token for local agent runs:
+2. Export token for local agent runs (still required for many non-interactive agent/tool invocations, even if `gh auth login` was already done):
 
    ```bash
    export GH_TOKEN="<your_token>"
