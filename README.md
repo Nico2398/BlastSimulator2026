@@ -126,3 +126,41 @@ scripts/
   nodes/              Per-step node implementations
   tools/              Shared tool implementations
 ```
+
+---
+
+## Agentic pipeline setup (GitHub CLI + token)
+
+If the pipeline reaches the PR creation step, `gh` must be authenticated with a token that can write branches and PR metadata.
+
+1. Create a GitHub token:
+   - Classic PAT: `repo` + `workflow`
+   - Fine-grained PAT (alternative): repository access with **Contents: Read/Write**, **Pull requests: Read/Write**, **Issues: Read/Write**, **Metadata: Read**
+2. Export token for local agent runs:
+
+   ```bash
+   export GH_TOKEN="<your_token>"
+   export GITHUB_TOKEN="$GH_TOKEN"
+   ```
+
+3. Authenticate GitHub CLI:
+
+   ```bash
+   gh auth login --with-token <<< "$GH_TOKEN"
+   gh auth status
+   ```
+
+4. Quick permission sanity check:
+
+   ```bash
+   gh issue view 1
+   gh pr list --limit 5
+   ```
+
+If these commands fail with permission/auth errors, the agent will not be able to open or update PRs.
+
+### Comment trigger migration
+
+> **Status: TO BE ADDED**
+>
+> Planned trigger path: `@opencode` comment invocation (intended replacement for older `@langgraph` / `@open-swe` comment triggers).
