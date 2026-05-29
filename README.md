@@ -143,12 +143,16 @@ If the pipeline reaches the PR creation step, `gh` must be authenticated with a 
    export GITHUB_TOKEN="$GH_TOKEN"
    ```
 
+   For one-time local setup, add these exports to your shell profile (for example `~/.bashrc` / `~/.zshrc`) so they are available in future sessions.
+
 3. Authenticate GitHub CLI:
 
    ```bash
    gh auth login --with-token <<< "$GH_TOKEN"
    gh auth status
    ```
+
+   `gh auth login` is typically one-time per machine/user (repeat only if token changes or auth state is reset).
 
 4. Quick permission sanity check:
 
