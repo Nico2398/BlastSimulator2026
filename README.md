@@ -163,21 +163,26 @@ If the pipeline reaches the PR creation step, `gh` must be authenticated with a 
    # Hostname is "nico.github.com" in this case
    ```
 
-4. Authenticate GitHub CLI:
+4. Authenticate GitHub CLI (for permanent credential storage):
 
-   Use the hostname from step 3 (default is `github.com`):
+   If `GH_TOKEN` is set, `gh` uses the env var and skips credential storage — you'll see a warning like *"The value of the GH_TOKEN environment variable is being used for authentication. To have GitHub CLI store credentials instead, first clear the value from the environment."* To store credentials permanently (no env var needed), clear it first:
+
    ```bash
-   gh auth login --hostname <hostname> --with-token <<< "$GH_TOKEN"
+   unset GH_TOKEN
+   unset GITHUB_TOKEN
+   gh auth login --hostname <hostname> --with-token <<< "<your_token>"
    gh auth status
    ```
 
    ```powershell
-   # Windows PowerShell
-   $env:GH_TOKEN | gh auth login --hostname <hostname> --with-token
+   # Windows PowerShell — must unset to avoid env-var override
+   $env:GH_TOKEN = $null
+   $env:GITHUB_TOKEN = $null
+   "<your_token>" | gh auth login --hostname <hostname> --with-token
    gh auth status
    ```
 
-   `gh auth login` is typically one-time per machine/user (repeat only if token changes or auth state is reset).
+   After permanent login succeeds, you can delete `GH_TOKEN`/`GITHUB_TOKEN` from your shell profile or keep them set — they won't interfere unless `gh` finds them at login time. Once stored, `gh` works across new terminals without any env vars.
 
 5. Quick permission sanity check:
 
