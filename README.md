@@ -59,6 +59,11 @@ bash scripts/visual-test.sh --name "scene" --commands "new_game seed:1"
 # Screenshots saved to screenshots/
 ```
 
+```powershell
+# Windows PowerShell (requires Git Bash or WSL):
+bash scripts/visual-test.sh --name "scene" --commands "new_game seed:1"
+```
+
 ---
 
 ## Build for itch.io
@@ -144,14 +149,26 @@ If the pipeline reaches the PR creation step, `gh` must be authenticated with a 
    export GITHUB_TOKEN="$GH_TOKEN"
    ```
 
+   ```powershell
+   # Windows PowerShell
+   $env:GH_TOKEN="<your_token>"
+   $env:GITHUB_TOKEN="$env:GH_TOKEN"
+   ```
+
    This is still needed for many non-interactive agent/tool invocations that read `GH_TOKEN`/`GITHUB_TOKEN` directly, even if `gh auth login` was already done.
 
-   For one-time local setup, add these exports to your shell profile (for example `~/.bashrc` / `~/.zshrc`) so they are available in future sessions.
+   For one-time local setup, add these exports to your shell profile (`~/.bashrc` / `~/.zshrc` on Linux/macOS, or `$PROFILE` in Windows PowerShell).
 
 3. Authenticate GitHub CLI:
 
    ```bash
    gh auth login --with-token <<< "$GH_TOKEN"
+   gh auth status
+   ```
+
+   ```powershell
+   # Windows PowerShell
+   $env:GH_TOKEN | gh auth login --with-token
    gh auth status
    ```
 
