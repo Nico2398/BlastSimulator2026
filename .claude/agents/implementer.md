@@ -4,6 +4,13 @@ description: TDD Green phase: minimum code to make failing tests pass. Correctne
 allowed-tools: Read Edit Search Execute
 user-invocable: false
 disable-model-invocation: true
+hooks:
+  PreToolUse:
+    - matcher: "Bash"
+      hooks:
+        - type: command
+          shell: powershell
+          command: ".claude/hooks/block-git-gh.ps1"
 ---
 # Implementer — TDD Green Phase
 

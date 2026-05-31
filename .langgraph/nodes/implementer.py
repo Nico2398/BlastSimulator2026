@@ -93,14 +93,13 @@ def _build_context(state: dict) -> str:
     lines.extend(_retry_feedback(state))
     if state.get("plan"):
         lines.append("\n## Implementation Plan\n" + state["plan"])
-    lines.append("\n## Issue Body\n" + state.get("issue_body", ""))
     return "\n".join(lines)
 
 
 def _build_task_prompt(state: dict) -> str:
     return (
         f"Implement issue #{state.get('issue_number')}. "
-        "Use the system context and repository files. "
+        "Use github_get_issue to read the issue body and requirements. "
         "Do not rely on prior graph message history."
     )
 

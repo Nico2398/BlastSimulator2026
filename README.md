@@ -126,3 +126,46 @@ scripts/
   nodes/              Per-step node implementations
   tools/              Shared tool implementations
 ```
+
+---
+
+## Agentic pipeline setup (GitHub CLI + token)
+
+If the pipeline reaches the PR creation step, `gh` must be authenticated with a token that can write branches and PR metadata.
+
+1. Create a GitHub token on your GitHub instance:
+   - GitHub menu path: **Profile photo → Settings → Developer settings → Personal access tokens** (choose **Tokens (classic)** or **Fine-grained tokens**).
+   - Classic PAT: `repo`, `read:org`, `gist`
+   - Fine-grained PAT (alternative): repository access with **Contents: Read/Write**, **Pull requests: Read/Write**, **Issues: Read/Write**, **Metadata: Read**
+2. Authenticate GitHub CLI (permanent credential storage):
+
+   If `GITHUB_TOKEN` is set in your terminal, `gh` uses it instead of storing credentials. Clear it first:
+
+   ```bash
+   unset GITHUB_TOKEN
+   gh auth login --with-token <<< "<your_token>"
+   gh auth status
+   ```
+
+   ```powershell
+   $env:GITHUB_TOKEN = $null
+   "<your_token>" | gh auth login --with-token
+   gh auth status
+   ```
+
+   This stores credentials in your system keychain. After this, `gh` works in new terminals without any env vars.
+
+3. Quick permission sanity check:
+
+   ```bash
+   gh issue view 1
+   gh pr list --limit 5
+   ```
+
+If these commands fail with permission/auth errors, the agent will not be able to open or update PRs.
+
+### Comment trigger migration
+
+> **Status: TO BE ADDED**
+>
+> Planned trigger path: `@opencode` comment invocation (intended replacement for older `@langgraph` / `@open-swe` comment triggers).

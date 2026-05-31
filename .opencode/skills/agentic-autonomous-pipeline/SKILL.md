@@ -2,7 +2,7 @@
 name: agentic-autonomous-pipeline
 description: >
   Agentic autonomous TDD development pipeline. Generic for any AI coding solution:
-  GitHub Copilot, Claude Code, OpenCode, and LangGraph.
+  GitHub Copilot, Claude Code, OpenCode, LangGraph.
   Use when setting up, debugging, or modifying the autonomous pipeline system.
 ---
 
@@ -60,20 +60,20 @@ Critical to unbiased implementation: test code and implementation code must neve
 
 ```
 main
- └─ langgraph/tests-<N>   (test branch — skeleton → tests → final code)
-      └─ langgraph/impl-<N>  (impl branch — forked from skeleton commit)
+ └─ pipeline/tests-<N>   (test branch — skeleton → tests → final code)
+      └─ pipeline/impl-<N>  (impl branch — forked from skeleton commit)
            └─ implementer works here, never sees tests
               ↓
          cherry-pick → lands on test branch
 ```
 
-1. **Skeleton branch:** create `langgraph/tests-<N>` from `main`, write empty stubs, record `skeleton_commit_sha`
-2. **Fork impl branch:** create `langgraph/impl-<N>` from that skeleton commit
-3. **Write tests** on `langgraph/tests-<N>` (test branch)
-4. **Implement** on `langgraph/impl-<N>` (impl branch) — agent never sees test commits
-5. **Cherry-pick** the implementation commit onto `langgraph/tests-<N>`
+1. **Skeleton branch:** create `pipeline/tests-<N>` from `main`, write empty stubs, record `skeleton_commit_sha`
+2. **Fork impl branch:** create `pipeline/impl-<N>` from that skeleton commit
+3. **Write tests** on `pipeline/tests-<N>` (test branch)
+4. **Implement** on `pipeline/impl-<N>` (impl branch) — agent never sees test commits
+5. **Cherry-pick** the implementation commit onto `pipeline/tests-<N>`
 6. **Resolve conflicts** if cherry-pick fails
-7. **All subsequent quality gates** run on `langgraph/tests-<N>`
+7. **All subsequent quality gates** run on `pipeline/tests-<N>`
 
 ### Cherry-Pick + Conflict Resolution
 
@@ -96,7 +96,7 @@ After the code lands on the test branch, these gates run in sequence:
 
 ### PR Creation
 
-Create a pull request from `langgraph/tests-<N>` to `main` with:
+Create a pull request from `pipeline/tests-<N>` to `main` with:
 - Title prefixed by pipeline type (`feat:`, `fix:`, `docs:`)
 - Body includes `Closes #<issue_number>` and validation checklist
 - Labels updated: `in-progress` removed, `in-review` added

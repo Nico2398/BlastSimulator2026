@@ -67,13 +67,12 @@ def _build_context(state: dict) -> str:
     lines.append(skill_hint(state.get("skill", "")))
     if state.get("plan"):
         lines.append("\n## Implementation Plan\n" + state["plan"])
-    lines.append("\n## Issue Body\n" + state.get("issue_body", ""))
     return "\n".join(lines)
 
 
 def _build_task_prompt(state: dict) -> str:
     return (
         f"Write failing integration tests for issue #{state.get('issue_number')}. "
-        "Read the issue body from the system context. "
+        "Use github_get_issue to read the issue body and requirements. "
         "Use read_file and grep to inspect existing tests before writing new ones."
     )

@@ -4,6 +4,13 @@ description: Validation specialist: runs full test suite, type checking, build. 
 allowed-tools: Read Search Execute
 user-invocable: false
 disable-model-invocation: true
+hooks:
+  PreToolUse:
+    - matcher: "Bash"
+      hooks:
+        - type: command
+          shell: powershell
+          command: ".claude/hooks/block-git-gh.ps1"
 ---
 # Validator — Full Suite Verification
 

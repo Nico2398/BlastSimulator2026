@@ -61,7 +61,8 @@ def _build_context(state: dict) -> str:
         f"Pipeline: {state.get('pipeline', '')}",
         "SCOPE: Full scenario tests — simulate complete game flows (level win/lose/events).",
         "Add or extend scenario definitions in scripts/scenario-defs/ if applicable.",
-        "Reference existing scenarios: blast-basic, level1-win-efficient, level1-lose-bankruptcy.",
+        "Reference existing scenarios: blast-basic, level1-win-efficient, level1-win-conservative,",
+        "  level1-lose-bankruptcy, level1-lose-arrest, level1-lose-ecology, level1-lose-revolt",
         "Tests must fail before any implementation is written.",
         "Read existing scenario files before writing to avoid duplication.",
         "Do NOT commit — the graph commits after you finish.",
@@ -69,13 +70,12 @@ def _build_context(state: dict) -> str:
     lines.append(skill_hint(state.get("skill", "")))
     if state.get("plan"):
         lines.append("\n## Implementation Plan\n" + state["plan"])
-    lines.append("\n## Issue Body\n" + state.get("issue_body", ""))
     return "\n".join(lines)
 
 
 def _build_task_prompt(state: dict) -> str:
     return (
         f"Write failing scenario tests for issue #{state.get('issue_number')}. "
-        "Read the issue body from the system context. "
+        "Use github_get_issue to read the issue body and requirements. "
         "Use read_file and list_dir to inspect existing scenarios before writing new ones."
     )

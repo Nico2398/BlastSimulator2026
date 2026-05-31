@@ -4,6 +4,13 @@ description: PR audit gate. Audits PR for architecture, i18n, style, correctness
 allowed-tools: Read Edit Search Execute
 user-invocable: false
 disable-model-invocation: true
+hooks:
+  PreToolUse:
+    - matcher: "Bash"
+      hooks:
+        - type: command
+          shell: powershell
+          command: ".claude/hooks/block-git-gh.ps1"
 ---
 # Reviewer — PR Audit + Merge Gate
 

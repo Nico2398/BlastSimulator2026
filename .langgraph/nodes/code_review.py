@@ -105,8 +105,6 @@ def _build_context(state: dict) -> str:
             f"\nCall `get_skill_context('{state['skill']}')` to load the domain spec. "
             "Verify the implementation follows ALL rules in that spec."
         )
-    if state.get("issue_body"):
-        lines.append("\n## Issue Body\n" + state["issue_body"])
     if state.get("plan"):
         lines.append("\n## Implementation Plan\n" + state["plan"])
     if state.get("changed_files"):
@@ -120,6 +118,7 @@ def _build_context(state: dict) -> str:
 def _build_task_prompt(state: dict) -> str:
     return (
         f"Review the implementation for issue #{state.get('issue_number')}. "
+        "Use github_get_issue to read the issue body and acceptance criteria. "
         "Read implementation files in src/ using your tools before making a judgment."
     )
 

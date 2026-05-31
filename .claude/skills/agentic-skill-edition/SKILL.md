@@ -1,28 +1,56 @@
 ---
 name: agentic-skill-edition
 description: >
-  Create and edit SKILL.md files across all agent standards (Copilot, Claude Code,
-  OpenCode, LangGraph). Follows skill best practices: concise, single-subject,
-  no overlap, DRY. Use when writing new skill, refactoring existing skill,
-  or auditing skill quality.
+  Create and edit agentic context files (SKILL.md, agent definitions, slash command prompts)
+  across all agent standards (Copilot, Claude Code, OpenCode, LangGraph). Enforces same-wording
+  duplication rule: body content must be identical across solutions, only frontmatter differs.
+  Use when writing or editing skills, agents, or prompts in any solution directory.
 ---
 
-# Agentic Skill Edition
+# Agentic Context File Edition
 
-Create or edit skills duplicated across all agent standard directories.
+Create or edit agentic context files duplicated across all agent standard directories.
 
 ## Multi-Agent Duplication
+
+**All agentic context files — skills, agent definitions, and slash command prompts — must be duplicated with identical body content across all agent directories. Only the frontmatter header differs between solutions.**
+
+### Skills
 
 Skills duplicated identically across all agent directories:
 
 | Agent | Directory |
-|-------|-----------|
+|-------|----------|
 | Copilot | `.github/skills/` |
 | Claude Code | `.claude/skills/` |
 | OpenCode | `.opencode/skills/` |
 | LangGraph | `.langgraph/` (reads `.github/`) |
 
 **Rule:** All copies same wording. Never update one directory only. LangGraph reads `.github/` — no separate copy.
+
+### Agent Definitions
+
+Agent definitions duplicated identically across all agent directories:
+
+| Agent | Directory | File format |
+|-------|-----------|-------------|
+| Copilot | `.github/agents/` | `<name>.agent.md` |
+| Claude Code | `.claude/agents/` | `<name>.md` |
+| OpenCode | `.opencode/agents/` | `<name>.md` |
+
+**Rule:** Body content (everything after frontmatter) must be word-for-word identical. Only frontmatter differs (solution-specific fields like `model:`, `mode:`, `allowed-tools:`, `tools:`, `name:`). OpenCode agents are the reference — sync Claude Code and Copilot to match.
+
+### Slash Command Prompts
+
+Slash command prompts duplicated across all command directories:
+
+| Agent | Directory | File format |
+|-------|-----------|-------------|
+| Copilot | `.github/prompts/` | `<name>.prompt.md` |
+| Claude Code | `.claude/commands/` | `<name>.md` |
+| OpenCode | `.opencode/commands/` | `<name>.md` |
+
+**Rule:** Same body content. Frontmatter fields differ per solution (`argument-hint`, `disable-model-invocation`, `context` are Claude Code-only; `tools` is Copilot-only; input syntax differs: `${input:var:hint}` for Copilot vs `$ARGUMENTS` for Claude Code/OpenCode).
 
 ## Principles (Embedded in This Skill)
 

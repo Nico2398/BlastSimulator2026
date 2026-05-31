@@ -4,6 +4,13 @@ description: TDD Refactor phase: cleans up implementation for clarity, maintaina
 allowed-tools: Read Edit Search Execute
 user-invocable: false
 disable-model-invocation: true
+hooks:
+  PreToolUse:
+    - matcher: "Bash"
+      hooks:
+        - type: command
+          shell: powershell
+          command: ".claude/hooks/block-git-gh.ps1"
 ---
 # Refactorer — TDD Refactor Phase
 

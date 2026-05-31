@@ -44,8 +44,6 @@ def _build_context(state: dict) -> str:
         "All three steps must pass: TypeScript type check, Vitest tests, Vite build.",
         "Report ✅ VALIDATION PASSED or ❌ VALIDATION FAILED with exact errors.",
     ]
-    if state.get("validator_report"):
-        lines.append("\n## Previous Validation Output\n" + state["validator_report"])
     return "\n".join(lines)
 
 

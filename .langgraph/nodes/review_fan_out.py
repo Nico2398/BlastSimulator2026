@@ -76,8 +76,6 @@ def _build_shared_context(state: dict) -> str:
         f"Pipeline: {state.get('pipeline', '')}",
     ]
     lines.append(skill_hint(state.get("skill", "")))
-    if state.get("issue_body"):
-        lines.append("\n## Issue Body\n" + state["issue_body"])
     if state.get("plan"):
         lines.append("\n## Implementation Plan\n" + state["plan"])
     if state.get("changed_files"):

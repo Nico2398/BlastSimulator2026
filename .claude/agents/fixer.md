@@ -4,6 +4,13 @@ description: Independent bug-fix specialist: fixes failing tests from error outp
 allowed-tools: Read Edit Search Execute
 user-invocable: false
 disable-model-invocation: true
+hooks:
+  PreToolUse:
+    - matcher: "Bash"
+      hooks:
+        - type: command
+          shell: powershell
+          command: ".claude/hooks/block-git-gh.ps1"
 ---
 # Fixer — Independent Test-Failure Fix
 
