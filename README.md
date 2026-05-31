@@ -59,11 +59,6 @@ bash scripts/visual-test.sh --name "scene" --commands "new_game seed:1"
 # Screenshots saved to screenshots/
 ```
 
-```powershell
-# Windows PowerShell (requires Git Bash or WSL):
-bash scripts/visual-test.sh --name "scene" --commands "new_game seed:1"
-```
-
 ---
 
 ## Build for itch.io
