@@ -133,9 +133,9 @@ scripts/
 
 If the pipeline reaches the PR creation step, `gh` must be authenticated with a token that can write branches and PR metadata.
 
-1. Create a GitHub token:
+1. Create a GitHub token on your GitHub instance:
    - GitHub menu path: **Profile photo → Settings → Developer settings → Personal access tokens** (choose **Tokens (classic)** or **Fine-grained tokens**).
-   - Classic PAT: `repo` + `workflow`
+   - Classic PAT: `repo`, `read:org`, `gist`
    - Fine-grained PAT (alternative): repository access with **Contents: Read/Write**, **Pull requests: Read/Write**, **Issues: Read/Write**, **Metadata: Read**
 2. Export token for local agent runs:
 
@@ -154,22 +154,32 @@ If the pipeline reaches the PR creation step, `gh` must be authenticated with a 
 
    For one-time local setup, add these exports to your shell profile (`~/.bashrc` / `~/.zshrc` on Linux/macOS, or `$PROFILE` in Windows PowerShell).
 
-3. Authenticate GitHub CLI:
+3. Determine your GitHub hostname:
 
+   Check your git remote to find the correct hostname:
    ```bash
-   gh auth login --with-token <<< "$GH_TOKEN"
+   git remote -v
+   # Example: origin  git@nico.github.com:Nico2398/BlastSimulator2026.git
+   # Hostname is "nico.github.com" in this case
+   ```
+
+4. Authenticate GitHub CLI:
+
+   Use the hostname from step 3 (default is `github.com`):
+   ```bash
+   gh auth login --hostname <hostname> --with-token <<< "$GH_TOKEN"
    gh auth status
    ```
 
    ```powershell
    # Windows PowerShell
-   $env:GH_TOKEN | gh auth login --with-token
+   $env:GH_TOKEN | gh auth login --hostname <hostname> --with-token
    gh auth status
    ```
 
    `gh auth login` is typically one-time per machine/user (repeat only if token changes or auth state is reset).
 
-4. Quick permission sanity check:
+5. Quick permission sanity check:
 
    ```bash
    gh issue view 1
