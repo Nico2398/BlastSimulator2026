@@ -44,8 +44,8 @@ Steps are sequential unless marked parallel. Failure loops shown separately belo
       @quality-reviewer     → architecture, conventions, TypeScript strictness
       @i18n-reviewer        → hardcoded strings, locale mismatches
       @duplication-reviewer → semantic duplication, non-atomic functions
-12. @review-coordinator → Merge all sub-reviewer findings → pass/fail
-                          if fail → @implementer (big loop)
+12. [merge-findings]  → Orchestrator merges all sub-reviewer findings → pass/fail
+                        if fail → @implementer (big loop)
 13. @refactorer        → Clean up conventions, no behavior change
                          then re-run [test-runner] to verify no regression
 14. @validator         → Full validation: typecheck → tests → build
@@ -64,7 +64,7 @@ Every agent failure loops back — either to `@implementer` (outer loop) or self
 | @planner | @planner (self-retry) |
 | [test-runner] | @fixer → [test-runner] (tight loop) |
 | [qualimetry] | @implementer |
-| @review-coordinator | @implementer |
+| [merge-findings] | @implementer |
 | @refactorer | @implementer |
 | @validator | @implementer |
 | @visual-tester | @implementer |
@@ -88,7 +88,7 @@ When looping back to `@implementer`, the full downstream chain reruns: `implemen
  9. [test-runner]      → run tests; fail → @fixer loop
 10. [qualimetry]       → jscpd check; fail → @implementer
 11. Code review (parallel): @quality-reviewer + @security-reviewer + @i18n-reviewer + @duplication-reviewer
-12. @review-coordinator → pass/fail; fail → @implementer
+12. [merge-findings]  → Orchestrator merges findings → pass/fail; fail → @implementer
 13. @validator         → typecheck → tests → build; fail → @implementer
 14. [open-pr]          → create PR + auto-merge
 ```
@@ -99,7 +99,7 @@ Note: `@refactorer` is skipped for fix-bug.
 
 ```
 1. Code review (parallel): @quality-reviewer + @security-reviewer + @i18n-reviewer + @duplication-reviewer
-2. @review-coordinator → Merge sub-reviewer findings
+2. [merge-findings]  → Orchestrator merges sub-reviewer findings
 3. @reviewer           → Runtime validation: run tests, fix any critical items, post review outcome
 ```
 
@@ -138,8 +138,9 @@ main
 1. **Delegate to specialists** — Use `@agent-name` syntax to invoke sub-agents
 2. **Enforce branch isolation** — See above. Never let @implementer see tests.
 3. **Handle non-agentic steps** — Branch switches, test runs, jscpd, PR creation.
-4. **Enforce sequence** — Never skip phases. Tests before implementation.
-5. **Report status** — After each agent completes, summarize what was done and current branch.
+4. **Merge code review findings** — After parallel reviewers complete, merge their findings into a single pass/fail decision (deduplicate, re-categorize, drop false positives, check issue alignment). No separate coordinator agent needed.
+5. **Enforce sequence** — Never skip phases. Tests before implementation.
+6. **Report status** — After each agent completes, summarize what was done and current branch.
 
 ## Non-Agentic Steps You Must Handle
 
@@ -151,6 +152,7 @@ main
 | merge-branches | merge test + impl → `pipeline/full-<N>`; detect conflicts |
 | test-runner | `npx vitest run` — capture output, route to @fixer on fail |
 | qualimetry | `npx jscpd src/ tests/` — route to @implementer on fail |
+| merge-findings | Deduplicate and merge all 4 reviewer reports → pass/fail |
 | After refactorer | Re-run `npx vitest run` (skip qualimetry + code-review) |
 | open-pr | `gh pr create` + `gh pr merge --auto --squash` — follow PR title/body/label standards in `agentic-autonomous-pipeline` skill |
 | Before completing | Summarize changes, files modified, test status |
