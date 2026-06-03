@@ -7,7 +7,7 @@ argument-hint: "<issue number>"
 If ${input:issueNumber} is provided, resolve GitHub issue #${input:issueNumber}.
 
 If ${input:issueNumber} is empty, auto-select from GitHub:
-1. Run `gh issue list --label "agent-task" --label "ready" --state open --sort created --order asc --limit 30 --json number,title,labels`
+1. Run `gh issue list --search 'is:issue is:open label:"agent-task" label:"ready" sort:created-asc' --limit 30 --json number,title,labels`
 2. Pick the first result whose labels array does NOT include "blocked"
 3. Resolve that issue instead
 

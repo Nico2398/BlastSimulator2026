@@ -48,20 +48,20 @@ Critical to unbiased implementation: test code and implementation code must neve
 
 ```
 main
- └─ pipeline/tests-<N>   (test branch — skeleton → tests → final code)
-      └─ pipeline/impl-<N>  (impl branch — forked from skeleton commit)
+ └─ pipeline/tests-<issue-number>   (test branch — skeleton → tests → final code)
+      └─ pipeline/impl-<issue-number>  (impl branch — forked from skeleton commit)
            └─ implementer works here, never sees tests
               ↓
          cherry-pick → lands on test branch
 ```
 
-1. **Skeleton branch:** create `pipeline/tests-<N>` from `main`, write empty stubs, record `skeleton_commit_sha`
-2. **Fork impl branch:** create `pipeline/impl-<N>` from that skeleton commit
-3. **Write tests** on `pipeline/tests-<N>` (test branch)
-4. **Implement** on `pipeline/impl-<N>` (impl branch) — agent never sees test commits
-5. **Cherry-pick** the implementation commit onto `pipeline/tests-<N>`
+1. **Skeleton branch:** create `pipeline/tests-<issue-number>` from `main`, write empty stubs, record `skeleton_commit_sha`
+2. **Fork impl branch:** create `pipeline/impl-<issue-number>` from that skeleton commit
+3. **Write tests** on `pipeline/tests-<issue-number>` (test branch)
+4. **Implement** on `pipeline/impl-<issue-number>` (impl branch) — agent never sees test commits
+5. **Cherry-pick** the implementation commit onto `pipeline/tests-<issue-number>`
 6. **Resolve conflicts** if cherry-pick fails
-7. **All subsequent quality gates** run on `pipeline/tests-<N>`
+7. **All subsequent quality gates** run on `pipeline/tests-<issue-number>`
 
 ### Cherry-Pick + Conflict Resolution
 
@@ -84,7 +84,7 @@ After the code lands on the test branch, these gates run in sequence:
 
 ### PR Creation
 
-Create a pull request from `pipeline/tests-<N>` to `main` with:
+Create a pull request from `pipeline/tests-<issue-number>` to `main` with:
 - Title prefixed by pipeline type (`feat:`, `fix:`, `docs:`)
 - Body includes `Closes #<issue_number>` and validation checklist
 - Labels updated: `in-progress` removed, `in-review` added
