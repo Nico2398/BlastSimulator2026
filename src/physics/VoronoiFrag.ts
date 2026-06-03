@@ -7,7 +7,7 @@ import { vec3, add, sub, scale, dot, cross, clamp, equals, distance } from '../c
 import type { VoxelGrid } from '../core/world/VoxelGrid.js';
 import { Random } from '../core/math/Random.js';
 import { computeThreshold, parseKey } from '../core/mining/BlastCalc.js';
-import { FRAGMENTATION_SCORE_SCALE, MAX_FRAGMENTS_PER_VOXEL, MAX_VORONOI_POINTS } from '../core/config/balance.js';
+import { FRAGMENTATION_SCORE_SCALE, MAX_FRAGMENTS_PER_VOXEL } from '../core/config/balance.js';
 
 /**
  * Compute the fragmentation score for a single voxel given its effective energy
@@ -164,11 +164,10 @@ export function cullLowestScoreVoxels(
   grid: VoxelGrid,
   maxPoints: number,
 ): Set<string> {
-  void MAX_VORONOI_POINTS;
   if (fragmentedVoxels.size === 0) return new Set();
 
   // Compute score and estimated fragment count for each voxel
-  const scores = new Map<string, number>();
+  const voxelInfo = new Map<string, { score: number; count: number }>();
   let totalEstimated = 0;
 
   for (const key of fragmentedVoxels) {
@@ -177,13 +176,13 @@ export function cullLowestScoreVoxels(
     const [x, y, z] = coords;
 
     if (!grid.isInBounds(x, y, z)) {
-      scores.set(key, 0);
+      voxelInfo.set(key, { score: 0, count: 0 });
       continue;
     }
 
     const voxel = grid.getVoxel(x, y, z);
     if (!voxel) {
-      scores.set(key, 0);
+      voxelInfo.set(key, { score: 0, count: 0 });
       continue;
     }
 
@@ -191,7 +190,7 @@ export function cullLowestScoreVoxels(
     const threshold = computeThreshold(voxel);
     const score = computeFragmentationScore(energy, threshold);
     const count = computeFragmentCount(score);
-    scores.set(key, score);
+    voxelInfo.set(key, { score, count });
     totalEstimated += count;
   }
 
@@ -201,8 +200,8 @@ export function cullLowestScoreVoxels(
   }
 
   // Sort keys by score ascending (lowest first)
-  const sortedKeys = [...scores.entries()]
-    .sort((a, b) => a[1] - b[1])
+  const sortedKeys = [...voxelInfo.entries()]
+    .sort((a, b) => a[1].score - b[1].score)
     .map(([key]) => key);
 
   // Remove lowest-score voxels until total estimated points ≤ maxPoints
@@ -213,28 +212,11 @@ export function cullLowestScoreVoxels(
     if (currentTotal <= maxPoints) break;
     if (!result.has(key)) continue;
 
-    const coords = parseKey(key);
-    if (!coords) continue;
-    const [x, y, z] = coords;
-
-    if (!grid.isInBounds(x, y, z)) {
-      result.delete(key);
-      continue;
-    }
-
-    const voxel = grid.getVoxel(x, y, z);
-    if (!voxel) {
-      result.delete(key);
-      continue;
-    }
-
-    const energy = effectiveEnergy.get(key) ?? 0;
-    const threshold = computeThreshold(voxel);
-    const score = computeFragmentationScore(energy, threshold);
-    const count = computeFragmentCount(score);
+    const info = voxelInfo.get(key);
+    if (!info) continue;
 
     result.delete(key);
-    currentTotal -= count;
+    currentTotal -= info.count;
   }
 
   return result;
