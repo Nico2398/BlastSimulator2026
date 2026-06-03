@@ -390,7 +390,7 @@ export function computeBlastEntityDamage(
 // Helpers
 // --------------------------------------------------------
 
-function parseKey(key: string): [number, number, number] | null {
+export function parseKey(key: string): [number, number, number] | null {
   const parts = key.split(',');
   if (parts.length !== 3) return null;
   const x = parseInt(parts[0]!, 10), y = parseInt(parts[1]!, 10), z = parseInt(parts[2]!, 10);
