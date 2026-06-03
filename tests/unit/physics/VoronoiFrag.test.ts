@@ -920,12 +920,14 @@ describe('VoronoiFrag — generateFragments', () => {
     expect(result).toHaveLength(4);
   });
 
-  it('all returned cells have isValid=true', () => {
+  it('marks cells with fewer than 4 vertices as invalid', () => {
+    // With only 1 tetrahedron, each seed has exactly 1 incident circumcenter.
+    // Since isValid requires ≥4 vertices, all 4 cells should be isValid=false.
     const result = generateFragments(points, tetrahedra, bounds);
-
     expect(result).toHaveLength(4);
     for (const cell of result) {
-      expect(cell.isValid).toBe(true);
+      expect(cell.vertices.length).toBe(1);
+      expect(cell.isValid).toBe(false);
     }
   });
 

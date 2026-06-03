@@ -485,14 +485,6 @@ export function clipVoronoiCell(cell: VoronoiCell, bounds: BoundingBox): Voronoi
  */
 export function generateFragments(points: Vec3[], tetrahedra: Tetrahedron[], bounds: BoundingBox): VoronoiCell[] {
   const cells = computeVoronoiCells(tetrahedra, points.length);
-  const result: VoronoiCell[] = [];
 
-  for (const cell of cells) {
-    const clipped = clipVoronoiCell(cell, bounds);
-    if (clipped.isValid) {
-      result.push(clipped);
-    }
-  }
-
-  return result;
+  return cells.map(cell => clipVoronoiCell(cell, bounds));
 }
