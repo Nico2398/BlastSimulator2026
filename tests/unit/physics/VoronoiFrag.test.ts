@@ -7,12 +7,27 @@ import {
   computeFragmentationScore,
   computeFragmentCount,
   sampleVoronoiSeeds,
+  computeBoundingBox,
+  cullLowestScoreVoxels,
+  computeCircumcenter,
+  bowyerWatsonDelaunay,
+  computeVoronoiCells,
+  clipVoronoiCell,
+  generateFragments,
+  type Tetrahedron,
+  type VoronoiCell,
+  type BoundingBox,
 } from '../../../src/physics/VoronoiFrag.js';
 import { VoxelGrid, type VoxelData } from '../../../src/core/world/VoxelGrid.js';
-import { FRAGMENTATION_SCORE_SCALE } from '../../../src/core/config/balance.js';
+import {
+  FRAGMENTATION_SCORE_SCALE,
+  MAX_VORONOI_POINTS,
+  MAX_FRAGMENTS_PER_VOXEL,
+} from '../../../src/core/config/balance.js';
 import { Random } from '../../../src/core/math/Random.js';
-import { vec3 } from '../../../src/core/math/Vec3.js';
+import { vec3, clamp, equals, distance, add, sub, scale, dot, cross } from '../../../src/core/math/Vec3.js';
 import { getRock } from '../../../src/core/world/RockCatalog.js';
+import { computeThreshold, parseKey } from '../../../src/core/mining/BlastCalc.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Group 1: computeFragmentationScore
@@ -489,6 +504,446 @@ describe('VoronoiFrag — sampleVoronoiSeeds', () => {
     for (let i = 3; i < 6; i++) {
       expect(seeds[i]!.x).toBeGreaterThanOrEqual(1);
       expect(seeds[i]!.x).toBeLessThan(2);
+    }
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Group 4: computeBoundingBox
+// Stub always returns { minX:0, minY:0, minZ:0, maxX:0, maxY:0, maxZ:0 }
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('VoronoiFrag — computeBoundingBox', () => {
+  it('empty set returns all zeros', () => {
+    const result = computeBoundingBox(new Set());
+
+    expect(result.minX).toBe(0);
+    expect(result.minY).toBe(0);
+    expect(result.minZ).toBe(0);
+    expect(result.maxX).toBe(0);
+    expect(result.maxY).toBe(0);
+    expect(result.maxZ).toBe(0);
+  });
+
+  it('single voxel returns correct bounds', () => {
+    const result = computeBoundingBox(new Set(['5,10,20']));
+
+    expect(result.minX).toBe(5);
+    expect(result.maxX).toBe(5);
+    expect(result.minY).toBe(10);
+    expect(result.maxY).toBe(10);
+    expect(result.minZ).toBe(20);
+    expect(result.maxZ).toBe(20);
+  });
+
+  it('multiple voxels returns correct bounds', () => {
+    const result = computeBoundingBox(new Set(['0,0,0', '10,20,30']));
+
+    expect(result.minX).toBe(0);
+    expect(result.minY).toBe(0);
+    expect(result.minZ).toBe(0);
+    expect(result.maxX).toBe(10);
+    expect(result.maxY).toBe(20);
+    expect(result.maxZ).toBe(30);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Group 5: cullLowestScoreVoxels
+// Stub returns empty set — tests should FAIL for non-empty inputs
+// Each voxel uses pure cruite (threshold = 200)
+//   score = 3.0 * (energy / 200)
+//   count = max(1, round(score))
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('VoronoiFrag — cullLowestScoreVoxels', () => {
+  it('under limit returns original set', () => {
+    // 3 voxels × 3 points each (energy=200) = 9 total, maxPoints = 2000 → no culling
+    const grid = new VoxelGrid(5, 5, 5);
+    for (let x = 0; x < 3; x++) {
+      grid.setVoxel(x, 0, 0, {
+        composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
+        density: 1.0,
+        oreDensities: {},
+        fractureModifier: 1.0,
+      });
+    }
+
+    const fragmented = new Set<string>(['0,0,0', '1,0,0', '2,0,0']);
+    const energy = new Map<string, number>([
+      ['0,0,0', 200],
+      ['1,0,0', 200],
+      ['2,0,0', 200],
+    ]);
+
+    const result = cullLowestScoreVoxels(fragmented, energy, grid, MAX_VORONOI_POINTS);
+
+    // Should keep all 3 voxels since 9 points ≤ 2000
+    expect(result).toEqual(fragmented);
+  });
+
+  it('over limit culls lowest score voxels', () => {
+    // 5 voxels with increasing energy:
+    //   (0,0,0): energy=200 → score=3.0 → count=3
+    //   (1,0,0): energy=400 → score=6.0 → count=6
+    //   (2,0,0): energy=600 → score=9.0 → count=9
+    //   (3,0,0): energy=800 → score=12.0 → count=12
+    //   (4,0,0): energy=1000 → score=15.0 → count=15
+    // Total = 45, maxPoints = 20 → cull lowest until ≤ 20
+    //   Remove (0,0,0) -3pt → 42 > 20
+    //   Remove (1,0,0) -6pt → 36 > 20
+    //   Remove (2,0,0) -9pt → 27 > 20
+    //   Remove (3,0,0) -12pt → 15 ≤ 20 ✓
+    // Expected: only (4,0,0) with 15 points remains
+    const grid = new VoxelGrid(5, 5, 5);
+    for (let x = 0; x < 5; x++) {
+      grid.setVoxel(x, 0, 0, {
+        composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
+        density: 1.0,
+        oreDensities: {},
+        fractureModifier: 1.0,
+      });
+    }
+
+    const fragmented = new Set<string>(['0,0,0', '1,0,0', '2,0,0', '3,0,0', '4,0,0']);
+    const energy = new Map<string, number>([
+      ['0,0,0', 200],
+      ['1,0,0', 400],
+      ['2,0,0', 600],
+      ['3,0,0', 800],
+      ['4,0,0', 1000],
+    ]);
+
+    const result = cullLowestScoreVoxels(fragmented, energy, grid, 20);
+
+    // Only the highest-scoring voxel (4,0,0) should remain
+    expect(result).toEqual(new Set(['4,0,0']));
+  });
+
+  it('empty set returns empty', () => {
+    const grid = new VoxelGrid(5, 5, 5);
+    const result = cullLowestScoreVoxels(new Set(), new Map(), grid, 100);
+    expect(result).toEqual(new Set());
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Group 6: computeCircumcenter
+// Stub returns vec3(0, 0, 0) — tests should FAIL
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('VoronoiFrag — computeCircumcenter', () => {
+  it('regular tetrahedron (unit)', () => {
+    // Unit tetrahedron: A(0,0,0), B(1,0,0), C(0,1,0), D(0,0,1)
+    // Circumcenter should be at (0.5, 0.5, 0.5)
+    const a = vec3(0, 0, 0);
+    const b = vec3(1, 0, 0);
+    const c = vec3(0, 1, 0);
+    const d = vec3(0, 0, 1);
+
+    const result = computeCircumcenter(a, b, c, d);
+
+    expect(result.x).toBe(0.5);
+    expect(result.y).toBe(0.5);
+    expect(result.z).toBe(0.5);
+  });
+
+  it('regular tetrahedron (scaled)', () => {
+    // Scaled tetrahedron: A(0,0,0), B(2,0,0), C(0,2,0), D(0,0,2)
+    // Circumcenter should be at (1, 1, 1)
+    const a = vec3(0, 0, 0);
+    const b = vec3(2, 0, 0);
+    const c = vec3(0, 2, 0);
+    const d = vec3(0, 0, 2);
+
+    const result = computeCircumcenter(a, b, c, d);
+
+    expect(result.x).toBe(1);
+    expect(result.y).toBe(1);
+    expect(result.z).toBe(1);
+  });
+
+  it('degenerate/coplanar points returns fallback centroid', () => {
+    // Four points on the z=0 plane → degenerate (coplanar)
+    // Fallback should return the centroid: (0.5, 0.5, 0)
+    const a = vec3(0, 0, 0);
+    const b = vec3(1, 0, 0);
+    const c = vec3(0, 1, 0);
+    const d = vec3(1, 1, 0);
+
+    const result = computeCircumcenter(a, b, c, d);
+
+    expect(result.x).toBe(0.5);
+    expect(result.y).toBe(0.5);
+    expect(result.z).toBe(0);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Group 7: bowyerWatsonDelaunay
+// Stub returns [] — tests should FAIL
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('VoronoiFrag — bowyerWatsonDelaunay', () => {
+  it('less than 4 points returns empty array', () => {
+    const threePoints = [vec3(0, 0, 0), vec3(1, 0, 0), vec3(0, 1, 0)];
+    const result = bowyerWatsonDelaunay(threePoints);
+
+    expect(result).toEqual([]);
+  });
+
+  it('exactly 4 non-degenerate points returns 1 tetrahedron', () => {
+    const points = [
+      vec3(0, 0, 0),
+      vec3(1, 0, 0),
+      vec3(0, 1, 0),
+      vec3(0, 0, 1),
+    ];
+
+    const result = bowyerWatsonDelaunay(points);
+
+    expect(result).toHaveLength(1);
+  });
+
+  it('vertex indices reference original array order', () => {
+    const points = [
+      vec3(0, 0, 0),
+      vec3(1, 0, 0),
+      vec3(0, 1, 0),
+      vec3(0, 0, 1),
+    ];
+
+    const result = bowyerWatsonDelaunay(points);
+
+    expect(result).toHaveLength(1);
+    const tet = result[0]!;
+    // The four vertex indices of the single tetrahedron should be 0, 1, 2, 3
+    const indices = [tet.a, tet.b, tet.c, tet.d].sort();
+    expect(indices).toEqual([0, 1, 2, 3]);
+  });
+
+  it('each tetrahedron has a valid circumcenter Vec3', () => {
+    const points = [
+      vec3(0, 0, 0),
+      vec3(1, 0, 0),
+      vec3(0, 1, 0),
+      vec3(0, 0, 1),
+    ];
+
+    const result = bowyerWatsonDelaunay(points);
+
+    expect(result).toHaveLength(1);
+    const tet = result[0]!;
+    // circumcenter should be a valid Vec3 with numeric components
+    expect(typeof tet.circumcenter.x).toBe('number');
+    expect(typeof tet.circumcenter.y).toBe('number');
+    expect(typeof tet.circumcenter.z).toBe('number');
+    // For this regular tetrahedron, circumcenter = (0.5, 0.5, 0.5)
+    expect(tet.circumcenter.x).toBe(0.5);
+    expect(tet.circumcenter.y).toBe(0.5);
+    expect(tet.circumcenter.z).toBe(0.5);
+  });
+
+  it('returns empty for 0, 1, 2, and 3 points', () => {
+    expect(bowyerWatsonDelaunay([])).toEqual([]);
+    expect(bowyerWatsonDelaunay([vec3(0, 0, 0)])).toEqual([]);
+    expect(bowyerWatsonDelaunay([vec3(0, 0, 0), vec3(1, 0, 0)])).toEqual([]);
+    expect(bowyerWatsonDelaunay([vec3(0, 0, 0), vec3(1, 0, 0), vec3(0, 1, 0)])).toEqual([]);
+  });
+
+  it('no vertex index is >= original point count', () => {
+    const points = [
+      vec3(0, 0, 0),
+      vec3(1, 0, 0),
+      vec3(0, 1, 0),
+      vec3(0, 0, 1),
+    ];
+
+    const result = bowyerWatsonDelaunay(points);
+
+    for (const tet of result) {
+      expect(tet.a).toBeLessThan(points.length);
+      expect(tet.b).toBeLessThan(points.length);
+      expect(tet.c).toBeLessThan(points.length);
+      expect(tet.d).toBeLessThan(points.length);
+    }
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Group 8: computeVoronoiCells
+// Stub returns [] — tests should FAIL
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('VoronoiFrag — computeVoronoiCells', () => {
+  const singleTet: Tetrahedron = {
+    a: 0, b: 1, c: 2, d: 3,
+    circumcenter: vec3(0.5, 0.5, 0.5),
+  };
+
+  it('correct number of cells from single tetrahedron', () => {
+    const result = computeVoronoiCells([singleTet], 4);
+
+    // 4 points → 4 Voronoi cells (one per seed)
+    expect(result).toHaveLength(4);
+  });
+
+  it('each cell has a valid seedIndex in range 0..pointCount-1', () => {
+    const result = computeVoronoiCells([singleTet], 4);
+
+    expect(result).toHaveLength(4);
+    const indices = result.map(c => c.seedIndex).sort();
+    expect(indices).toEqual([0, 1, 2, 3]);
+  });
+
+  it('cells from single tetrahedron have exactly 1 vertex each', () => {
+    const result = computeVoronoiCells([singleTet], 4);
+
+    // Each Voronoi cell from a single tet gets the tet's circumcenter as its sole vertex
+    for (const cell of result) {
+      expect(cell.vertices).toHaveLength(1);
+    }
+  });
+
+  it('handles empty tetrahedra array', () => {
+    const result = computeVoronoiCells([], 4);
+
+    // With no tetrahedra, all cells should be invalid with empty vertices
+    expect(result).toHaveLength(4);
+    for (const cell of result) {
+      expect(cell.vertices).toEqual([]);
+      expect(cell.isValid).toBe(false);
+    }
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Group 9: clipVoronoiCell
+// Stub returns { seedIndex:0, vertices:[], isValid:false } — tests should FAIL
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('VoronoiFrag — clipVoronoiCell', () => {
+  const bounds: BoundingBox = { minX: 0, minY: 0, minZ: 0, maxX: 10, maxY: 10, maxZ: 10 };
+
+  it('vertices inside bounds remain unchanged', () => {
+    const cell: VoronoiCell = {
+      seedIndex: 0,
+      vertices: [vec3(2, 3, 4), vec3(5, 6, 7)],
+      isValid: true,
+    };
+
+    const result = clipVoronoiCell(cell, bounds);
+
+    // Both vertices are inside bounds → should pass through unchanged
+    expect(result.vertices).toHaveLength(2);
+    expect(result.vertices[0]!.x).toBe(2);
+    expect(result.vertices[0]!.y).toBe(3);
+    expect(result.vertices[0]!.z).toBe(4);
+    expect(result.vertices[1]!.x).toBe(5);
+    expect(result.vertices[1]!.y).toBe(6);
+    expect(result.vertices[1]!.z).toBe(7);
+  });
+
+  it('vertices outside bounds get clamped', () => {
+    const cell: VoronoiCell = {
+      seedIndex: 0,
+      vertices: [vec3(15, 20, 25)],
+      isValid: true,
+    };
+
+    const result = clipVoronoiCell(cell, bounds);
+
+    // Vertex at (15,20,25) should be clamped to (10,10,10)
+    expect(result.vertices).toHaveLength(1);
+    expect(result.vertices[0]!.x).toBe(10);
+    expect(result.vertices[0]!.y).toBe(10);
+    expect(result.vertices[0]!.z).toBe(10);
+  });
+
+  it('empty vertices stays empty and invalid', () => {
+    const cell: VoronoiCell = {
+      seedIndex: 0,
+      vertices: [],
+      isValid: false,
+    };
+
+    const result = clipVoronoiCell(cell, bounds);
+
+    expect(result.vertices).toEqual([]);
+    expect(result.isValid).toBe(false);
+  });
+
+  it('keeps isValid=true when 4 or more vertices remain after clipping', () => {
+    // 4 vertices all inside bounds → all pass through → isValid stays true
+    const cell: VoronoiCell = {
+      seedIndex: 0,
+      vertices: [
+        vec3(1, 1, 1),
+        vec3(1, 1, 9),
+        vec3(1, 9, 1),
+        vec3(1, 9, 9),
+      ],
+      isValid: true,
+    };
+
+    const result = clipVoronoiCell(cell, bounds);
+
+    expect(result.vertices).toHaveLength(4);
+    expect(result.isValid).toBe(true);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Group 10: generateFragments (end-to-end)
+// Stub returns [] — tests should FAIL
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('VoronoiFrag — generateFragments', () => {
+  const points = [
+    vec3(0, 0, 0),
+    vec3(1, 0, 0),
+    vec3(0, 1, 0),
+    vec3(0, 0, 1),
+  ];
+
+  const tetrahedra: Tetrahedron[] = [{
+    a: 0, b: 1, c: 2, d: 3,
+    circumcenter: vec3(0.5, 0.5, 0.5),
+  }];
+
+  const bounds: BoundingBox = { minX: 0, minY: 0, minZ: 0, maxX: 1, maxY: 1, maxZ: 1 };
+
+  it('returns array of VoronoiCell matching point count', () => {
+    const result = generateFragments(points, tetrahedra, bounds);
+
+    // 4 seed points → 4 Voronoi cells
+    expect(result).toHaveLength(4);
+  });
+
+  it('marks cells with fewer than 4 vertices as invalid', () => {
+    // With only 1 tetrahedron, each seed has exactly 1 incident circumcenter.
+    // Since isValid requires ≥4 vertices, all 4 cells should be isValid=false.
+    const result = generateFragments(points, tetrahedra, bounds);
+    expect(result).toHaveLength(4);
+    for (const cell of result) {
+      expect(cell.vertices.length).toBe(1);
+      expect(cell.isValid).toBe(false);
+    }
+  });
+
+  it('all vertices are within the bounding box', () => {
+    const result = generateFragments(points, tetrahedra, bounds);
+
+    expect(result).toHaveLength(4);
+    for (const cell of result) {
+      for (const v of cell.vertices) {
+        expect(v.x).toBeGreaterThanOrEqual(0);
+        expect(v.x).toBeLessThanOrEqual(1);
+        expect(v.y).toBeGreaterThanOrEqual(0);
+        expect(v.y).toBeLessThanOrEqual(1);
+        expect(v.z).toBeGreaterThanOrEqual(0);
+        expect(v.z).toBeLessThanOrEqual(1);
+      }
     }
   });
 });
