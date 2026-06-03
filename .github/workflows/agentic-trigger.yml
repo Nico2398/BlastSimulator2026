@@ -86,8 +86,7 @@ jobs:
                 workflow_id: 'opencode-runner.yml',
                 ref: 'main',
                 inputs: {
-                  issue_number: String(issue.number),
-                  comment_body: 'manual trigger'
+                  issue_number: String(issue.number)
                 }
               });
               console.log(`Agent pipeline dispatched for issue #${issue.number}.`);

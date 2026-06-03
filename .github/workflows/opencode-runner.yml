@@ -9,6 +9,8 @@ on:
         type: string
   issue_comment:
     types: [created]
+  pull_request_review_comment:
+    types: [created]
 
 permissions:
   id-token: write
@@ -21,7 +23,8 @@ jobs:
     if: >
       github.event_name == 'workflow_dispatch' ||
       contains(github.event.comment.body, '/opencode') ||
-      contains(github.event.comment.body, '/oc')
+      contains(github.event.comment.body, '/oc') ||
+      contains(github.event.comment.body, '@opencode')
     runs-on: ubuntu-latest
     steps:
       - name: Acknowledge request
@@ -62,5 +65,6 @@ jobs:
         with:
           model: deepseek:deepseek-v4-flash
           use_github_token: true
+          mentions: /opencode,/oc,@opencode
           prompt: |
-            Run /resolve-issue ${{ inputs.issue_number }}
+            ${{ github.event_name == 'workflow_dispatch' && inputs.issue_number && format('Resolve GitHub issue #{0}. Follow the TDD pipeline: plan, write tests, implement, review, refactor, validate, and open a PR with Closes #{0}.', inputs.issue_number) || '' }}
