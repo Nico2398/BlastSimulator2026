@@ -83,11 +83,10 @@ jobs:
               // Dispatch the agent pipeline workflow
               await github.rest.actions.createWorkflowDispatch({
                 owner, repo,
-                workflow_id: 'langgraph-agent.yml',
+                workflow_id: 'opencode-runner.yml',
                 ref: 'main',
                 inputs: {
-                  issue_number: String(issue.number),
-                  comment_body: 'manual trigger'
+                  issue_number: String(issue.number)
                 }
               });
               console.log(`Agent pipeline dispatched for issue #${issue.number}.`);

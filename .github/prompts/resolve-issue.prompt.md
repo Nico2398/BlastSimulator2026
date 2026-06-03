@@ -4,6 +4,11 @@ description: Resolve a GitHub issue end-to-end through the TDD pipeline.
 argument-hint: "<issue number>"
 ---
 
-If no issue number was provided, stop and ask: "Please provide a GitHub issue number."
+If ${input:issueNumber} is provided, resolve GitHub issue #${input:issueNumber}.
 
-Resolve GitHub issue #${input:issueNumber:e.g. 125}.
+If ${input:issueNumber} is empty, auto-select from GitHub:
+1. Run `gh issue list --label "agent-task" --label "ready" --state open --sort created --order asc --limit 30 --json number,title,labels`
+2. Pick the first result whose labels array does NOT include "blocked"
+3. Resolve that issue instead
+
+If no eligible issue found, stop and report "No unblocked agent-task+ready issues available."

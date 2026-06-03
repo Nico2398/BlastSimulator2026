@@ -121,10 +121,7 @@ scripts/
   agents/             Agent role definitions
   skills/             Domain-specific skill specs
 
-.langgraph/           LangGraph typed-state pipeline
-  graph.py            StateGraph definition
-  nodes/              Per-step node implementations
-  tools/              Shared tool implementations
+.github/workflows/    GitHub Actions workflows (CI + OpenCode pipeline)
 ```
 
 ---
@@ -166,6 +163,6 @@ If these commands fail with permission/auth errors, the agent will not be able t
 
 ### Comment trigger migration
 
-> **Status: TO BE ADDED**
+> **Status: ACTIVE**
 >
-> Planned trigger path: `@opencode` comment invocation (intended replacement for older `@langgraph` / `@open-swe` comment triggers).
+> Trigger path: `/opencode` or `/oc` comment invocation on issues and PRs triggers the OpenCode pipeline via `.github/workflows/opencode-runner.yml`.
