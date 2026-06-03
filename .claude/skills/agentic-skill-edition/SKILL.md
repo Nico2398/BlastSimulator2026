@@ -2,7 +2,7 @@
 name: agentic-skill-edition
 description: >
   Create and edit agentic context files (SKILL.md, agent definitions, slash command prompts)
-  across all agent standards (Copilot, Claude Code, OpenCode, LangGraph). Enforces same-wording
+  across all agent standards (Copilot, Claude Code, OpenCode). Enforces same-wording
   duplication rule: body content must be identical across solutions, only frontmatter differs.
   Use when writing or editing skills, agents, or prompts in any solution directory.
 ---
@@ -24,9 +24,8 @@ Skills duplicated identically across all agent directories:
 | Copilot | `.github/skills/` |
 | Claude Code | `.claude/skills/` |
 | OpenCode | `.opencode/skills/` |
-| LangGraph | `.langgraph/` (reads `.github/`) |
 
-**Rule:** All copies same wording. Never update one directory only. LangGraph reads `.github/` — no separate copy.
+**Rule:** All copies same wording. Never update one directory only.
 
 ### Agent Definitions
 

@@ -1,4 +1,4 @@
-name: "Pipeline: assign next issue to LangGraph"
+name: "Pipeline: assign next issue to OpenCode"
 
 on:
   pull_request:
@@ -14,7 +14,7 @@ jobs:
     if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     steps:
-      - name: Close done issue + assign next ready issue to LangGraph
+      - name: Close done issue + assign next ready issue to OpenCode
         uses: actions/github-script@v7
         env:
           AGENTIC_AUTO_ASSIGN_ENABLED: ${{ vars.AGENTIC_AUTO_ASSIGN_ENABLED }}
@@ -138,7 +138,7 @@ jobs:
                   }
                 }
 
-                console.log(`Assigning #${issue.number} to LangGraph pipeline.`);
+                console.log(`Assigning #${issue.number} to OpenCode pipeline.`);
                 await github.rest.issues.removeLabel({
                   owner, repo,
                   issue_number: issue.number,
@@ -158,14 +158,13 @@ jobs:
 
                 await github.rest.actions.createWorkflowDispatch({
                   owner, repo,
-                  workflow_id: 'langgraph-agent.yml',
+                  workflow_id: 'opencode-runner.yml',
                   ref: 'main',
                    inputs: {
-                     issue_number: String(issue.number),
-                     comment_body: `auto-assigned from merged PR #${context.payload.pull_request.number}`
+                     issue_number: String(issue.number)
                    }
                 });
-                console.log(`LangGraph pipeline dispatched for issue #${issue.number}.`);
+                console.log(`OpenCode pipeline dispatched for issue #${issue.number}.`);
 
                 return;
               }
