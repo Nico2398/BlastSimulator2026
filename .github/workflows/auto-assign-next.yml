@@ -35,7 +35,8 @@ jobs:
 
             const n = issueNum ? parseInt(issueNum) : null;
             if (n) {
-              console.log(`Updating labels for issue #${n} (closed by native GitHub auto-close).`);
+              console.log(`Closing issue #${n} (referenced in merged PR body).`);
+              await github.rest.issues.update({ owner, repo, issue_number: n, state: 'closed' });
               await github.rest.issues.addLabels({ owner, repo, issue_number: n, labels: ['done'] }).catch(() => {});
               await github.rest.issues.removeLabel({ owner, repo, issue_number: n, name: 'in-progress' }).catch(() => {});
             }
