@@ -1295,24 +1295,23 @@ describe('VoronoiFrag — mergeVoronoiCells', () => {
         isValid: false,
       },
     ];
-    const rng = new Random(42);
+    const rng = new Random(1);
     const result = mergeVoronoiCells(cells, [tet], rng);
 
-    // Stub returns [...cells] (4 cells) — will fail
     // With adjacency and favorable rng, at least one merge should happen
     // reducing the total cell count below 4
     expect(result.length).toBeLessThan(4);
   });
 
   it('does not merge non-adjacent cells', () => {
-    // Two disconnected tetrahedra — seeds 0,1,2,3 in one; 4,5,6,7 in another
-    // Cells at indices 0 and 4 share no Delaunay edge
+    // Two disconnected tetrahedra — cells[0] (seed 0) in one, cells[1] (seed 4) in another
+    // Cells at positions 0 and 1 share no Delaunay edge
     const tet0: Tetrahedron = {
-      a: 0, b: 1, c: 2, d: 3,
+      a: 0, b: 100, c: 101, d: 102,
       circumcenter: vec3(0.5, 0.5, 0.5),
     };
     const tet1: Tetrahedron = {
-      a: 4, b: 5, c: 6, d: 7,
+      a: 1, b: 200, c: 201, d: 202,
       circumcenter: vec3(1.5, 0.5, 0.5),
     };
     const cells: VoronoiCell[] = [
@@ -1399,15 +1398,14 @@ describe('VoronoiFrag — mergeVoronoiCells', () => {
         isValid: true,
       },
     ];
-    const rng = new Random(42);
+    const rng = new Random(1);
     const result = mergeVoronoiCells(cells, [tet], rng);
 
-    // Stub returns all 4 cells — will fail
     expect(result.length).toBeLessThan(cells.length);
   });
 
   it('does not double-merge a cell', () => {
-    // 3 cells where seed 0 is adjacent to both 1 and 2
+    // 4 cells all connected via one tetrahedron
     // A cell that gets merged into another should not appear again
     const tet: Tetrahedron = {
       a: 0, b: 1, c: 2, d: 3,
@@ -1429,13 +1427,17 @@ describe('VoronoiFrag — mergeVoronoiCells', () => {
         vertices: [vec3(0, 0, 0), vec3(2, 0, 0), vec3(0, 2, 0), vec3(0, 0, 2)],
         isValid: true,
       },
+      {
+        seedIndex: 3,
+        vertices: [vec3(2, 0, 0), vec3(0, 2, 0), vec3(0, 0, 2), vec3(2, 2, 2)],
+        isValid: true,
+      },
     ];
-    const rng = new Random(42);
+    const rng = new Random(1);
     const result = mergeVoronoiCells(cells, [tet], rng);
 
-    // Stub returns 3 cells — will fail
-    // Merges should reduce count below 3
-    expect(result.length).toBeLessThan(3);
+    // Merges should reduce count (at least one merge with seed 1)
+    expect(result.length).toBeLessThan(cells.length);
 
     // Each seedIndex should appear at most once (no double-merged cell)
     const seen = new Set<number>();

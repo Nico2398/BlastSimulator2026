@@ -492,6 +492,8 @@ export function buildAdjacencyMap(tetrahedra: Tetrahedron[], pointCount: number)
   }
   for (const tet of tetrahedra) {
     const { a, b, c, d } = tet;
+    // Skip tetrahedra referencing out-of-range indices (e.g., super-tetrahedron vertices or test data with indices beyond cell count)
+    if (a >= pointCount || b >= pointCount || c >= pointCount || d >= pointCount) continue;
     // All 6 unordered pairs
     adj.get(a)!.add(b); adj.get(b)!.add(a);
     adj.get(a)!.add(c); adj.get(c)!.add(a);
@@ -531,116 +533,74 @@ export function convexHull3D(points: Vec3[]): Vec3[] {
     return [p0, p1, p2];
   }
 
-  // ── Find 4 non-coplanar extreme points ────────────────────────────────────
-  let maxX = 0, minX = 0, maxY = 0, minZ = 0;
+  // ── Find 4 non-coplanar points for initial tetrahedron ────────────────────
+  // Strategy: find the widest spread along X, then point farthest from line,
+  // then point farthest from the plane of those 3.
+
+  // Step 1: two farthest points along X axis
+  let minX = 0, maxX = 0;
   for (let i = 1; i < n; i++) {
-    const pi = points[i]!;
-    if (pi.x > points[maxX]!.x) maxX = i;
-    if (pi.x < points[minX]!.x) minX = i;
-    if (pi.y > points[maxY]!.y) maxY = i;
-    if (pi.z < points[minZ]!.z) minZ = i;
+    if (points[i]!.x < points[minX]!.x) minX = i;
+    if (points[i]!.x > points[maxX]!.x) maxX = i;
   }
+  let i0 = minX;
+  let i1 = maxX;
 
-  // Collect unique extreme indices (up to 4)
-  const tetIndices: number[] = [];
-  const seen = new Set<number>();
-  for (const idx of [maxX, minX, maxY, minZ]) {
-    if (!seen.has(idx)) {
-      seen.add(idx);
-      tetIndices.push(idx);
+  // Step 2: find point farthest from the line (i0,i1)
+  let i2 = -1;
+  let maxDist2 = -1;
+  const dir = sub(points[i1]!, points[i0]!);
+  const dirLen2 = dot(dir, dir);
+  for (let i = 0; i < n; i++) {
+    if (i === i0 || i === i1) continue;
+    // Distance from point to line = |cross(p-p0, dir)| / |dir|
+    const v = sub(points[i]!, points[i0]!);
+    const cr = cross(v, dir);
+    const dist2 = dot(cr, cr) / (dirLen2 || 1);
+    if (dist2 > maxDist2) {
+      maxDist2 = dist2;
+      i2 = i;
     }
   }
 
-  // If fewer than 4 distinct extreme points, add more candidates
-  if (tetIndices.length < 4) {
-    for (let i = 0; i < n && tetIndices.length < 4; i++) {
-      if (!seen.has(i)) {
-        seen.add(i);
-        tetIndices.push(i);
-      }
-    }
-  }
-
-  // Ensure first 3 are non-collinear
-  let i0 = tetIndices[0]!;
-  let i1 = tetIndices[1]!;
-  let i2 = tetIndices[2]!;
-  const p0 = points[i0]!;
-  const p1 = points[i1]!;
-  const p2 = points[i2]!;
-  let cr = cross(sub(p1, p0), sub(p2, p0));
-  if (Math.sqrt(dot(cr, cr)) < eps) {
-    // First 3 are collinear — scan for a non-collinear 3rd point
-    let foundNonCollinear = false;
-    for (let idx = 3; idx < tetIndices.length; idx++) {
-      const ti = tetIndices[idx]!;
-      const test = cross(sub(points[ti]!, p0), sub(p2, p0));
-      if (Math.sqrt(dot(test, test)) > eps) {
-        // Swap tetIndices[2] with tetIndices[idx]
-        tetIndices[2] = ti;
-        tetIndices[idx] = i2;
-        i2 = ti;
-        cr = test;
-        foundNonCollinear = true;
-        break;
-      }
-    }
-    if (!foundNonCollinear) {
-      // All points are effectively collinear — return unique points
-      const unique = new Map<string, Vec3>();
-      for (const p of points) {
-        const k = `${p.x},${p.y},${p.z}`;
-        if (!unique.has(k)) unique.set(k, p);
-      }
-      return [...unique.values()];
-    }
-  }
-
-  // Find a 4th non-coplanar point
-  let found4th = false;
-  if (tetIndices.length >= 4) {
-    const i3 = tetIndices[3]!;
-    const vol = Math.abs(dot(sub(points[i3]!, p0), cr));
-    if (vol > eps) {
-      found4th = true;
-    } else {
-      tetIndices.pop();
-    }
-  }
-
-  if (!found4th) {
-    // Search remaining points for a non-coplanar 4th vertex
-    for (let i = 0; i < n; i++) {
-      if (seen.has(i)) continue;
-      const vol = Math.abs(dot(sub(points[i]!, p0), cr));
-      if (vol > eps) {
-        tetIndices.push(i);
-        found4th = true;
-        break;
-      }
-    }
-  }
-
-  if (!found4th) {
-    // All points are coplanar — return unique vertices
+  // If all points collinear
+  if (i2 < 0 || Math.sqrt(maxDist2) < eps) {
     const unique = new Map<string, Vec3>();
-    for (const p of points) {
-      const k = `${p.x},${p.y},${p.z}`;
-      if (!unique.has(k)) unique.set(k, p);
-    }
+    for (const p of points) { const k = `${p.x},${p.y},${p.z}`; if (!unique.has(k)) unique.set(k, p); }
     return [...unique.values()];
   }
 
-  // ── We now have 4 non-coplanar points ─────────────────────────────────────
-  const ia = tetIndices[0]!;
-  const ib = tetIndices[1]!;
-  const ic = tetIndices[2]!;
-  const id = tetIndices[3]!;
+  // Step 3: find point farthest from the plane of (i0,i1,i2)
+  const p0 = points[i0]!, p1 = points[i1]!, p2 = points[i2]!;
+  const planeNormal = cross(sub(p1, p0), sub(p2, p0));
+  let i3 = -1;
+  let maxVol = -1;
+  for (let i = 0; i < n; i++) {
+    if (i === i0 || i === i1 || i === i2) continue;
+    const vol = Math.abs(dot(sub(points[i]!, p0), planeNormal));
+    if (vol > maxVol) {
+      maxVol = vol;
+      i3 = i;
+    }
+  }
 
-  // Centroid of all points (used as interior reference for normal orientation)
-  let cx = 0, cy = 0, cz = 0;
-  for (const p of points) { cx += p.x; cy += p.y; cz += p.z; }
-  const globalCentroid = vec3(cx / n, cy / n, cz / n);
+  // If all points are coplanar
+  if (i3 < 0 || maxVol < eps) {
+    const unique = new Map<string, Vec3>();
+    for (const p of points) { const k = `${p.x},${p.y},${p.z}`; if (!unique.has(k)) unique.set(k, p); }
+    return [...unique.values()];
+  }
+
+  // We now have 4 non-coplanar points: i0, i1, i2, i3
+  const ia = i0, ib = i1, ic = i2, id = i3;
+
+  // Centroid of initial tetrahedron (used as interior reference for normal orientation)
+  // Using tetrahedron centroid guarantees the reference point is inside the hull.
+  const tetCentroid = vec3(
+    (points[ia]!.x + points[ib]!.x + points[ic]!.x + points[id]!.x) / 4,
+    (points[ia]!.y + points[ib]!.y + points[ic]!.y + points[id]!.y) / 4,
+    (points[ia]!.z + points[ib]!.z + points[ic]!.z + points[id]!.z) / 4,
+  );
 
   // Face representation
   interface Face {
@@ -666,7 +626,7 @@ export function convexHull3D(points: Vec3[]): Vec3[] {
       (pa.z + pb.z + pc.z) / 3,
     );
     // Outward normal points away from the centroid
-    if (dot(n, sub(faceCenter, globalCentroid)) < 0) {
+    if (dot(n, sub(faceCenter, tetCentroid)) < 0) {
       faces.push({ a, b, c, normal: scale(n, -1) });
     } else {
       faces.push({ a, b, c, normal: n });
@@ -680,7 +640,7 @@ export function convexHull3D(points: Vec3[]): Vec3[] {
   addFace(ib, ic, id);
 
   // Track which points are already inserted
-  const inserted = new Set<number>(tetIndices);
+  const inserted = new Set<number>([ia, ib, ic, id]);
 
   // ── Incremental insertion of remaining points ──────────────────────────────
   for (let i = 0; i < n; i++) {
@@ -741,7 +701,7 @@ export function convexHull3D(points: Vec3[]): Vec3[] {
         (pa.z + pb.z + p.z) / 3,
       );
       let normal = n;
-      if (dot(normal, sub(faceCenter, globalCentroid)) < 0) {
+      if (dot(normal, sub(faceCenter, tetCentroid)) < 0) {
         normal = scale(normal, -1);
       }
       faces.push({ a, b, c: i, normal });
