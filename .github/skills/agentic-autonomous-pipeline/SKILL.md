@@ -95,4 +95,4 @@ This operation is always non-agentic (no LLM involved).
 
 Default: **enable GitHub native auto-merge** on every PR — via `gh pr merge --auto --squash`.
 
-Only skip auto-merge when the pipeline has explicitly flagged that human input is needed (artistic direction, critical architecture design decision). In that case, post a PR comment with the reason from the pipeline state instead. This is always non-agentic (no LLM involved).
+Skip auto-merge when the issue requires human input or the orchestrator judges the pipeline hit significant churn (repeated failure loops, heavy review findings, multiple implementer do-overs). Post a PR comment with the reason.

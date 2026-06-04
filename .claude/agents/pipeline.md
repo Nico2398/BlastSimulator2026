@@ -189,11 +189,17 @@ After creating the PR and before finishing, run:
 gh pr merge --auto --squash <pr-url>
 ```
 
-This is the **default**. Only skip it if the issue explicitly requires human artistic input or a critical software design decision. In that case, run instead:
+This is the **default**. Skip auto-merge when:
+1. The issue requires human input (artistic direction, critical design decision).
+2. You judge the pipeline hit significant churn (repeated failure loops, heavy review findings, multiple implementer do-overs) — you lived through it, use your judgment.
+
+When skipping, run:
 
 ```
 gh pr comment <pr-url> --body "Auto-merge paused — human input needed: <reason>"
 ```
+
+Include churn details in the reason so the reviewer understands the risk.
 
 ## Output Format
 
