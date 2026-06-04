@@ -67,4 +67,4 @@ jobs:
           use_github_token: true
           mentions: /opencode,/oc,@opencode
           prompt: |
-            ${{ github.event_name == 'workflow_dispatch' && inputs.issue_number && format('Resolve GitHub issue #{0}. Follow the TDD pipeline: plan, write tests, implement, review, refactor, validate, and open a PR with Closes #{0}.', inputs.issue_number) || '' }}
+            ${{ github.event_name == 'workflow_dispatch' && inputs.issue_number && format('Resolve GitHub issue #{0}. Follow the TDD pipeline: plan, write tests, implement, review, refactor, validate, and open a PR with Closes #{0}.', inputs.issue_number) || 'A user mentioned you in a comment. Read the PR/issue context and answer their question directly. If they ask a question, answer it using @ask. If they request a task, use the pipeline.' }}
