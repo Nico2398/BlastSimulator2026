@@ -164,6 +164,11 @@ export const MAX_VORONOI_POINTS = 2000;
  *  Real blasting produces non-convex fragments; merging simulates this naturally. */
 export const MERGE_PROBABILITY = 0.35;
 
+/** Distance (in metres) to deflate collision mesh vertices inward toward centroid.
+ *  Creates a small gap between visual and collision meshes to prevent physics catching
+ *  on visual edges. 0.05 m = 5 cm for 1 m voxels. */
+export const COLLISION_DEFLATE_AMOUNT = 0.05;
+
 // ─── Game Loop ──────────────────────────────────────────────────────────────────
 
 /** Duration of one game tick in real milliseconds at 1× speed. 1 tick = 1 game-hour. */
