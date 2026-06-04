@@ -18,12 +18,20 @@ First, classify the task:
 | Visual/rendering change | Full pipeline + visual-tester at end |
 | PR review | reviewer only |
 | Question/analysis | ask |
+| Imperative command | executor |
 
 ## Ask Pipeline
 
 ```
 1. @ask        → Answer question directly (read-only analysis)
 2. [post]     → (non-agentic) post @ask's answer as PR/issue comment via `gh pr comment` or `gh issue comment`
+```
+
+## Executor Pipeline
+
+```
+1. @executor   → Execute imperative command via `gh` or shell
+2. [post]     → (non-agentic) post result as PR/issue comment via `gh pr comment` or `gh issue comment`
 ```
 
 ## Full Pipeline (implement-feature / visual-change)
