@@ -492,8 +492,9 @@ export function buildAdjacencyMap(tetrahedra: Tetrahedron[], pointCount: number)
   }
   for (const tet of tetrahedra) {
     const { a, b, c, d } = tet;
-    // Skip tetrahedra referencing out-of-range indices (e.g., super-tetrahedron vertices or test data with indices beyond cell count)
+    // Skip tetrahedra referencing out-of-range or negative indices
     if (a >= pointCount || b >= pointCount || c >= pointCount || d >= pointCount) continue;
+    if (a < 0 || b < 0 || c < 0 || d < 0) continue;
     // All 6 unordered pairs
     adj.get(a)!.add(b); adj.get(b)!.add(a);
     adj.get(a)!.add(c); adj.get(c)!.add(a);
@@ -514,6 +515,13 @@ export function buildAdjacencyMap(tetrahedra: Tetrahedron[], pointCount: number)
 export function convexHull3D(points: Vec3[]): Vec3[] {
   const n = points.length;
   const eps = 1e-10;
+
+  // ── Input validation — reject NaN/Infinity ─────────────────────────────────
+  for (const p of points) {
+    if (!Number.isFinite(p.x) || !Number.isFinite(p.y) || !Number.isFinite(p.z)) {
+      return [];
+    }
+  }
 
   // ── Base cases ─────────────────────────────────────────────────────────────
   if (n === 0) return [];
@@ -745,10 +753,12 @@ export function mergeTwoCells(cellA: VoronoiCell, cellB: VoronoiCell): VoronoiCe
  * @returns A new array of Voronoi cells after merging.
  */
 export function mergeVoronoiCells(cells: VoronoiCell[], tetrahedra: Tetrahedron[], rng: Random): VoronoiCell[] {
-  const adj = buildAdjacencyMap(tetrahedra, cells.length);
-  const merged = new Array<boolean>(cells.length).fill(false);
+  // Clone input array to avoid mutating the caller's data
+  const working = [...cells];
+  const adj = buildAdjacencyMap(tetrahedra, working.length);
+  const merged = new Array<boolean>(working.length).fill(false);
 
-  for (let i = 0; i < cells.length; i++) {
+  for (let i = 0; i < working.length; i++) {
     if (merged[i]) continue;
     if (!rng.chance(MERGE_PROBABILITY)) continue;
 
@@ -762,9 +772,9 @@ export function mergeVoronoiCells(cells: VoronoiCell[], tetrahedra: Tetrahedron[
     const j = available[idx]!;
 
     // Merge cell i with cell j, storing result at index i
-    cells[i] = mergeTwoCells(cells[i]!, cells[j]!);
+    working[i] = mergeTwoCells(working[i]!, working[j]!);
     merged[j] = true;
   }
 
-  return cells.filter((_, idx) => !merged[idx]);
+  return working.filter((_, idx) => !merged[idx]);
 }
