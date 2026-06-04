@@ -7,7 +7,7 @@ import { vec3, add, sub, scale, dot, cross, clamp, equals, distance } from '../c
 import type { VoxelGrid } from '../core/world/VoxelGrid.js';
 import { Random } from '../core/math/Random.js';
 import { computeThreshold, parseKey } from '../core/mining/BlastCalc.js';
-import { FRAGMENTATION_SCORE_SCALE, MAX_FRAGMENTS_PER_VOXEL } from '../core/config/balance.js';
+import { FRAGMENTATION_SCORE_SCALE, MAX_FRAGMENTS_PER_VOXEL, MERGE_PROBABILITY } from '../core/config/balance.js';
 
 /**
  * Compute the fragmentation score for a single voxel given its effective energy
@@ -469,4 +469,64 @@ export function generateFragments(points: Vec3[], tetrahedra: Tetrahedron[], bou
   const cells = computeVoronoiCells(tetrahedra, points.length);
 
   return cells.map(cell => clipVoronoiCell(cell, bounds));
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Task 5.10 — Voronoi merging pass
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Builds the adjacency graph from Delaunay tetrahedra.
+ *
+ * For each pair of seed point indices that share a Delaunay edge (i.e., appear
+ * together in the same tetrahedron), an entry is recorded in the adjacency map.
+ *
+ * @param tetrahedra - Array of Delaunay tetrahedra.
+ * @param pointCount - Number of seed points.
+ * @returns Map where each key is a seed index and the value is a set of neighbor indices.
+ */
+export function buildAdjacencyMap(_tetrahedra: Tetrahedron[], _pointCount: number): Map<number, Set<number>> {
+  // TODO: implement
+  return new Map();
+}
+
+/**
+ * Computes the 3D convex hull of a set of points.
+ *
+ * @param points - Array of 3D points.
+ * @returns Array of hull vertices (in no guaranteed order).
+ */
+export function convexHull3D(_points: Vec3[]): Vec3[] {
+  // TODO: implement
+  return [];
+}
+
+/**
+ * Merges two adjacent Voronoi cells by computing the convex hull of their
+ * combined vertex sets.
+ *
+ * @param cellA - First Voronoi cell.
+ * @param cellB - Second Voronoi cell (adjacent to cellA).
+ * @returns A new merged Voronoi cell.
+ */
+export function mergeTwoCells(cellA: VoronoiCell, _cellB: VoronoiCell): VoronoiCell {
+  // TODO: implement
+  return { seedIndex: cellA.seedIndex, vertices: [], isValid: false };
+}
+
+/**
+ * Main Voronoi cell merging pass.
+ *
+ * For each cell, with probability `MERGE_PROBABILITY`, merge it with a randomly
+ * chosen adjacent neighbor. Merged cells replace both originals in the output array.
+ *
+ * @param cells - Array of Voronoi cells to merge.
+ * @param tetrahedra - Array of Delaunay tetrahedra (used to build adjacency).
+ * @param rng - Seeded random number generator for deterministic merging.
+ * @returns A new array of Voronoi cells after merging.
+ */
+export function mergeVoronoiCells(cells: VoronoiCell[], _tetrahedra: Tetrahedron[], _rng: Random): VoronoiCell[] {
+  // TODO: implement
+  void MERGE_PROBABILITY;
+  return [...cells];
 }

@@ -158,6 +158,12 @@ export const FRAGMENTATION_SCORE_SCALE = 3.0;
  *  Culling logic is in task 5.9 (Bowyer-Watson implementation). */
 export const MAX_VORONOI_POINTS = 2000;
 
+/** Probability (0–1) that a Voronoi cell merges with a face-adjacent neighbour
+ *  during the merging pass (task 5.10). 0.35 means ~35% of cells attempt to merge.
+ *  The merged shape is the convex hull of both cells' vertices.
+ *  Real blasting produces non-convex fragments; merging simulates this naturally. */
+export const MERGE_PROBABILITY = 0.35;
+
 // ─── Game Loop ──────────────────────────────────────────────────────────────────
 
 /** Duration of one game tick in real milliseconds at 1× speed. 1 tick = 1 game-hour. */
