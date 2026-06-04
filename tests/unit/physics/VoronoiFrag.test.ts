@@ -14,6 +14,10 @@ import {
   computeVoronoiCells,
   clipVoronoiCell,
   generateFragments,
+  buildAdjacencyMap,
+  convexHull3D,
+  mergeTwoCells,
+  mergeVoronoiCells,
   type Tetrahedron,
   type VoronoiCell,
   type BoundingBox,
@@ -23,6 +27,7 @@ import {
   FRAGMENTATION_SCORE_SCALE,
   MAX_VORONOI_POINTS,
   MAX_FRAGMENTS_PER_VOXEL,
+  MERGE_PROBABILITY,
 } from '../../../src/core/config/balance.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { vec3, clamp, equals, distance, add, sub, scale, dot, cross } from '../../../src/core/math/Vec3.js';
@@ -944,6 +949,499 @@ describe('VoronoiFrag — generateFragments', () => {
         expect(v.z).toBeGreaterThanOrEqual(0);
         expect(v.z).toBeLessThanOrEqual(1);
       }
+    }
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Group 11: buildAdjacencyMap (Task 5.10 — Voronoi merging pass)
+// Stub returns empty Map — tests should FAIL
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('VoronoiFrag — buildAdjacencyMap', () => {
+  it('returns map with all empty sets for empty tetrahedra array', () => {
+    const result = buildAdjacencyMap([], 4);
+
+    // Stub returns empty Map — will fail
+    expect(result.size).toBe(4);
+    for (let i = 0; i < 4; i++) {
+      expect(result.has(i)).toBe(true);
+      expect(result.get(i)).toEqual(new Set());
+    }
+  });
+
+  it('builds adjacency from single tetrahedron', () => {
+    const tet: Tetrahedron = { a: 0, b: 1, c: 2, d: 3, circumcenter: vec3(0.5, 0.5, 0.5) };
+    const result = buildAdjacencyMap([tet], 4);
+
+    // Stub returns empty Map — will fail
+    expect(result.size).toBe(4);
+    expect(result.get(0)).toEqual(new Set([1, 2, 3]));
+    expect(result.get(1)).toEqual(new Set([0, 2, 3]));
+    expect(result.get(2)).toEqual(new Set([0, 1, 3]));
+    expect(result.get(3)).toEqual(new Set([0, 1, 2]));
+  });
+
+  it('builds adjacency from two disconnected tetrahedra', () => {
+    const tet0: Tetrahedron = { a: 0, b: 1, c: 2, d: 3, circumcenter: vec3(0.5, 0.5, 0.5) };
+    const tet1: Tetrahedron = { a: 4, b: 5, c: 6, d: 7, circumcenter: vec3(0.5, 0.5, 0.5) };
+    const result = buildAdjacencyMap([tet0, tet1], 8);
+
+    // Stub returns empty Map — will fail
+    expect(result.size).toBe(8);
+    expect(result.get(0)).toEqual(new Set([1, 2, 3]));
+    expect(result.get(4)).toEqual(new Set([5, 6, 7]));
+    // No cross-edges between groups 0-3 and 4-7
+    for (let i = 0; i < 4; i++) {
+      for (let j = 4; j < 8; j++) {
+        expect(result.get(i)!.has(j)).toBe(false);
+      }
+    }
+  });
+
+  it('builds adjacency from two connected tetrahedra', () => {
+    const tet0: Tetrahedron = { a: 0, b: 1, c: 2, d: 3, circumcenter: vec3(0.5, 0.5, 0.5) };
+    const tet1: Tetrahedron = { a: 0, b: 1, c: 4, d: 5, circumcenter: vec3(0.5, 0.5, 0.5) };
+    const result = buildAdjacencyMap([tet0, tet1], 6);
+
+    // Stub returns empty Map — will fail
+    expect(result.size).toBe(6);
+    expect(result.get(0)!.has(4)).toBe(true);
+    expect(result.get(0)!.has(5)).toBe(true);
+  });
+
+  it('handles repeated edges without duplicates', () => {
+    const tet0: Tetrahedron = { a: 0, b: 1, c: 2, d: 3, circumcenter: vec3(0.5, 0.5, 0.5) };
+    const tet1: Tetrahedron = { a: 0, b: 1, c: 2, d: 4, circumcenter: vec3(0.5, 0.5, 0.5) };
+    const result = buildAdjacencyMap([tet0, tet1], 5);
+
+    // Stub returns empty Map — will fail
+    expect(result.size).toBe(5);
+
+    // Edge (0,1) appears in both tetrahedra but should only appear once in the set
+    const adj0 = result.get(0)!;
+    let count = 0;
+    for (const v of adj0) {
+      if (v === 1) count++;
+    }
+    expect(count).toBe(1);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Group 12: convexHull3D (Task 5.10 — Voronoi merging pass)
+// Stub returns [] — tests should FAIL for non-empty inputs
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('VoronoiFrag — convexHull3D', () => {
+  it('returns empty array for empty input', () => {
+    const result = convexHull3D([]);
+    expect(result).toEqual([]);
+  });
+
+  it('returns single point unchanged', () => {
+    const pt = vec3(1, 2, 3);
+    const result = convexHull3D([pt]);
+
+    // Stub returns [] — will fail
+    expect(result).toHaveLength(1);
+    expect(result[0]!.x).toBe(1);
+    expect(result[0]!.y).toBe(2);
+    expect(result[0]!.z).toBe(3);
+  });
+
+  it('returns both points for 2 points', () => {
+    const a = vec3(0, 0, 0);
+    const b = vec3(1, 0, 0);
+    const result = convexHull3D([a, b]);
+
+    // Stub returns [] — will fail
+    expect(result).toHaveLength(2);
+    // Both original points should be in the hull (order not important)
+    expect(result).toContainEqual(a);
+    expect(result).toContainEqual(b);
+  });
+
+  it('returns all 3 non-collinear points', () => {
+    const a = vec3(0, 0, 0);
+    const b = vec3(1, 0, 0);
+    const c = vec3(0, 1, 0);
+    const result = convexHull3D([a, b, c]);
+
+    // Stub returns [] — will fail
+    expect(result).toHaveLength(3);
+    expect(result).toContainEqual(a);
+    expect(result).toContainEqual(b);
+    expect(result).toContainEqual(c);
+  });
+
+  it('returns hull of regular tetrahedron', () => {
+    const a = vec3(0, 0, 0);
+    const b = vec3(1, 0, 0);
+    const c = vec3(0, 1, 0);
+    const d = vec3(0, 0, 1);
+    const result = convexHull3D([a, b, c, d]);
+
+    // Stub returns [] — will fail
+    expect(result).toHaveLength(4);
+    expect(result).toContainEqual(a);
+    expect(result).toContainEqual(b);
+    expect(result).toContainEqual(c);
+    expect(result).toContainEqual(d);
+  });
+
+  it('returns hull of octahedron', () => {
+    // Regular octahedron: (±1,0,0), (0,±1,0), (0,0,±1)
+    const vertices = [
+      vec3(1, 0, 0),
+      vec3(-1, 0, 0),
+      vec3(0, 1, 0),
+      vec3(0, -1, 0),
+      vec3(0, 0, 1),
+      vec3(0, 0, -1),
+    ];
+    const result = convexHull3D(vertices);
+
+    // Stub returns [] — will fail
+    expect(result).toHaveLength(6);
+    for (const v of vertices) {
+      expect(result).toContainEqual(v);
+    }
+  });
+
+  it('excludes interior points from hull', () => {
+    // Box corners: all (±1, ±1, ±1) — 8 points
+    // Center: (0,0,0) — interior, should not be in hull
+    const corners = [
+      vec3(-1, -1, -1), vec3(-1, -1, 1), vec3(-1, 1, -1), vec3(-1, 1, 1),
+      vec3(1, -1, -1), vec3(1, -1, 1), vec3(1, 1, -1), vec3(1, 1, 1),
+    ];
+    const center = vec3(0, 0, 0);
+    const points = [...corners, center];
+    const result = convexHull3D(points);
+
+    // Stub returns [] — will fail
+    expect(result).toHaveLength(8);
+    // Center should NOT be in hull
+    expect(result).not.toContainEqual(center);
+    // All 8 corners should be in hull
+    for (const c of corners) {
+      expect(result).toContainEqual(c);
+    }
+  });
+
+  it('handles collinear points by returning endpoints', () => {
+    const a = vec3(0, 0, 0);
+    const b = vec3(1, 1, 1);
+    const c = vec3(2, 2, 2);
+    const result = convexHull3D([a, b, c]);
+
+    // Stub returns [] — will fail
+    // Hull should only contain the two endpoints
+    expect(result).toHaveLength(2);
+    expect(result).toContainEqual(a);
+    expect(result).toContainEqual(c);
+    // The midpoint should be excluded
+    expect(result).not.toContainEqual(b);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Group 13: mergeTwoCells (Task 5.10 — Voronoi merging pass)
+// Stub returns { vertices: [], isValid: false } — tests should FAIL
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('VoronoiFrag — mergeTwoCells', () => {
+  it('merges two adjacent cells by convex hull', () => {
+    // Two adjacent tetrahedra sharing the face (1,0,0)-(0,1,0)-(0,0,1)
+    const cellA: VoronoiCell = {
+      seedIndex: 0,
+      vertices: [vec3(0, 0, 0), vec3(1, 0, 0), vec3(0, 1, 0), vec3(0, 0, 1)],
+      isValid: true,
+    };
+    const cellB: VoronoiCell = {
+      seedIndex: 1,
+      vertices: [vec3(1, 0, 0), vec3(0, 1, 0), vec3(0, 0, 1), vec3(1, 1, 1)],
+      isValid: true,
+    };
+    const result = mergeTwoCells(cellA, cellB);
+
+    // Stub returns { vertices: [], isValid: false } — will fail
+    expect(result.vertices.length).toBeGreaterThanOrEqual(4);
+    // All unique corners from both cells should be present
+    expect(result.vertices).toContainEqual(vec3(0, 0, 0));
+    expect(result.vertices).toContainEqual(vec3(1, 1, 1));
+  });
+
+  it('preserves seedIndex from cellA', () => {
+    const cellA: VoronoiCell = {
+      seedIndex: 5,
+      vertices: [vec3(0, 0, 0)],
+      isValid: true,
+    };
+    const cellB: VoronoiCell = {
+      seedIndex: 99,
+      vertices: [vec3(1, 0, 0)],
+      isValid: true,
+    };
+    const result = mergeTwoCells(cellA, cellB);
+
+    expect(result.seedIndex).toBe(5);
+    // Also verify hull produced at least 2 distinct points
+    // Stub returns vertices: [] — will fail
+    expect(result.vertices.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('returns isValid true when merged hull has >= 4 vertices', () => {
+    const cellA: VoronoiCell = {
+      seedIndex: 0,
+      vertices: [vec3(0, 0, 0), vec3(1, 0, 0), vec3(0, 1, 0), vec3(0, 0, 1)],
+      isValid: true,
+    };
+    const cellB: VoronoiCell = {
+      seedIndex: 1,
+      vertices: [vec3(1, 0, 0), vec3(0, 1, 0), vec3(0, 0, 1), vec3(1, 1, 1)],
+      isValid: true,
+    };
+    const result = mergeTwoCells(cellA, cellB);
+
+    // Stub returns isValid: false — will fail
+    expect(result.isValid).toBe(true);
+    expect(result.vertices.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('returns isValid false when merged hull has < 4 vertices', () => {
+    const cellA: VoronoiCell = {
+      seedIndex: 0,
+      vertices: [vec3(0, 0, 0)],
+      isValid: true,
+    };
+    const cellB: VoronoiCell = {
+      seedIndex: 1,
+      vertices: [vec3(0.1, 0, 0)],
+      isValid: true,
+    };
+    const result = mergeTwoCells(cellA, cellB);
+
+    // Stub returns vertices: [] — will fail (expects length 2)
+    expect(result.vertices.length).toBe(2);
+    expect(result.isValid).toBe(false);
+  });
+
+  it('handles invalid cells gracefully', () => {
+    // cellA has isValid=false with only 2 vertices
+    const cellA: VoronoiCell = {
+      seedIndex: 0,
+      vertices: [vec3(0, 0, 0), vec3(1, 0, 0)],
+      isValid: false,
+    };
+    const cellB: VoronoiCell = {
+      seedIndex: 1,
+      vertices: [vec3(0, 0, 0), vec3(1, 0, 0), vec3(0, 1, 0), vec3(0, 0, 1)],
+      isValid: true,
+    };
+    const result = mergeTwoCells(cellA, cellB);
+
+    // Stub returns vertices: [] — will fail
+    // Combined hull should have 4+ vertices despite cellA being invalid
+    expect(result.vertices.length).toBeGreaterThanOrEqual(4);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Group 14: mergeVoronoiCells (Task 5.10 — Voronoi merging pass)
+// Stub returns [...cells] unchanged — merging tests should FAIL
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('VoronoiFrag — mergeVoronoiCells', () => {
+  it('returns same cells when adjacency is empty', () => {
+    const cells: VoronoiCell[] = [
+      { seedIndex: 0, vertices: [vec3(0, 0, 0)], isValid: false },
+      { seedIndex: 1, vertices: [vec3(1, 0, 0)], isValid: false },
+    ];
+    const result = mergeVoronoiCells(cells, [], new Random(42));
+
+    expect(result).toHaveLength(2);
+    expect(result[0].seedIndex).toBe(0);
+    expect(result[1].seedIndex).toBe(1);
+  });
+
+  it('merges at least one pair when cells are adjacent and rng is favorable', () => {
+    // Single tetrahedron connecting seeds 0 and 1 (plus 2,3 as filler)
+    // With 2 adjacent cells, seed 42 should trigger chance(0.35)
+    const tet: Tetrahedron = {
+      a: 0, b: 1, c: 2, d: 3,
+      circumcenter: vec3(0.5, 0.5, 0.5),
+    };
+    const cells: VoronoiCell[] = [
+      {
+        seedIndex: 0,
+        vertices: [vec3(0, 0, 0), vec3(1, 0, 0), vec3(0, 1, 0), vec3(0, 0, 1)],
+        isValid: true,
+      },
+      {
+        seedIndex: 1,
+        vertices: [vec3(1, 0, 0), vec3(0, 1, 0), vec3(0, 0, 1), vec3(1, 1, 1)],
+        isValid: true,
+      },
+      {
+        seedIndex: 2,
+        vertices: [vec3(0, 0, 0)],
+        isValid: false,
+      },
+      {
+        seedIndex: 3,
+        vertices: [vec3(0, 0, 0)],
+        isValid: false,
+      },
+    ];
+    const rng = new Random(42);
+    const result = mergeVoronoiCells(cells, [tet], rng);
+
+    // Stub returns [...cells] (4 cells) — will fail
+    // With adjacency and favorable rng, at least one merge should happen
+    // reducing the total cell count below 4
+    expect(result.length).toBeLessThan(4);
+  });
+
+  it('does not merge non-adjacent cells', () => {
+    // Two disconnected tetrahedra — seeds 0,1,2,3 in one; 4,5,6,7 in another
+    // Cells at indices 0 and 4 share no Delaunay edge
+    const tet0: Tetrahedron = {
+      a: 0, b: 1, c: 2, d: 3,
+      circumcenter: vec3(0.5, 0.5, 0.5),
+    };
+    const tet1: Tetrahedron = {
+      a: 4, b: 5, c: 6, d: 7,
+      circumcenter: vec3(1.5, 0.5, 0.5),
+    };
+    const cells: VoronoiCell[] = [
+      { seedIndex: 0, vertices: [vec3(0, 0, 0)], isValid: false },
+      { seedIndex: 4, vertices: [vec3(1, 0, 0)], isValid: false },
+    ];
+    const rng = new Random(42);
+    const result = mergeVoronoiCells(cells, [tet0, tet1], rng);
+
+    // Non-adjacent cells should remain separate
+    expect(result).toHaveLength(2);
+    // Each seedIndex should appear exactly once
+    const seen = new Set<number>();
+    for (const cell of result) {
+      expect(seen.has(cell.seedIndex)).toBe(false);
+      seen.add(cell.seedIndex);
+    }
+  });
+
+  it('produces deterministic results with same seed', () => {
+    const tet: Tetrahedron = {
+      a: 0, b: 1, c: 2, d: 3,
+      circumcenter: vec3(0.5, 0.5, 0.5),
+    };
+    const cells: VoronoiCell[] = [
+      {
+        seedIndex: 0,
+        vertices: [vec3(0, 0, 0), vec3(1, 0, 0), vec3(0, 1, 0), vec3(0, 0, 1)],
+        isValid: true,
+      },
+      {
+        seedIndex: 1,
+        vertices: [vec3(1, 0, 0), vec3(0, 1, 0), vec3(0, 0, 1), vec3(1, 1, 1)],
+        isValid: true,
+      },
+    ];
+
+    const resultA = mergeVoronoiCells(cells, [tet], new Random(42));
+    const resultB = mergeVoronoiCells(cells, [tet], new Random(42));
+
+    // Same seed → same result
+    expect(resultA).toEqual(resultB);
+  });
+
+  it('handles single cell gracefully', () => {
+    const cells: VoronoiCell[] = [
+      {
+        seedIndex: 0,
+        vertices: [vec3(0, 0, 0), vec3(1, 0, 0), vec3(0, 1, 0), vec3(0, 0, 1)],
+        isValid: true,
+      },
+    ];
+    const result = mergeVoronoiCells(cells, [], new Random(42));
+
+    expect(result).toHaveLength(1);
+    expect(result[0].seedIndex).toBe(0);
+  });
+
+  it('reduces cell count when merges happen', () => {
+    // 4 cells all connected via one tetrahedron
+    const tet: Tetrahedron = {
+      a: 0, b: 1, c: 2, d: 3,
+      circumcenter: vec3(0.5, 0.5, 0.5),
+    };
+    const cells: VoronoiCell[] = [
+      {
+        seedIndex: 0,
+        vertices: [vec3(0, 0, 0), vec3(1, 0, 0), vec3(0, 1, 0), vec3(0, 0, 1)],
+        isValid: true,
+      },
+      {
+        seedIndex: 1,
+        vertices: [vec3(1, 0, 0), vec3(0, 1, 0), vec3(0, 0, 1), vec3(1, 1, 1)],
+        isValid: true,
+      },
+      {
+        seedIndex: 2,
+        vertices: [vec3(0, 0, 0), vec3(2, 0, 0), vec3(0, 2, 0), vec3(0, 0, 2)],
+        isValid: true,
+      },
+      {
+        seedIndex: 3,
+        vertices: [vec3(2, 0, 0), vec3(0, 2, 0), vec3(0, 0, 2), vec3(2, 2, 2)],
+        isValid: true,
+      },
+    ];
+    const rng = new Random(42);
+    const result = mergeVoronoiCells(cells, [tet], rng);
+
+    // Stub returns all 4 cells — will fail
+    expect(result.length).toBeLessThan(cells.length);
+  });
+
+  it('does not double-merge a cell', () => {
+    // 3 cells where seed 0 is adjacent to both 1 and 2
+    // A cell that gets merged into another should not appear again
+    const tet: Tetrahedron = {
+      a: 0, b: 1, c: 2, d: 3,
+      circumcenter: vec3(0.5, 0.5, 0.5),
+    };
+    const cells: VoronoiCell[] = [
+      {
+        seedIndex: 0,
+        vertices: [vec3(0, 0, 0), vec3(1, 0, 0), vec3(0, 1, 0), vec3(0, 0, 1)],
+        isValid: true,
+      },
+      {
+        seedIndex: 1,
+        vertices: [vec3(1, 0, 0), vec3(0, 1, 0), vec3(0, 0, 1), vec3(1, 1, 1)],
+        isValid: true,
+      },
+      {
+        seedIndex: 2,
+        vertices: [vec3(0, 0, 0), vec3(2, 0, 0), vec3(0, 2, 0), vec3(0, 0, 2)],
+        isValid: true,
+      },
+    ];
+    const rng = new Random(42);
+    const result = mergeVoronoiCells(cells, [tet], rng);
+
+    // Stub returns 3 cells — will fail
+    // Merges should reduce count below 3
+    expect(result.length).toBeLessThan(3);
+
+    // Each seedIndex should appear at most once (no double-merged cell)
+    const seen = new Set<number>();
+    for (const cell of result) {
+      expect(seen.has(cell.seedIndex)).toBe(false);
+      seen.add(cell.seedIndex);
     }
   });
 });
