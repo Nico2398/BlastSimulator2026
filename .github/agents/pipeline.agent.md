@@ -19,7 +19,14 @@ First, classify the task:
 | Bug fix | Shorter fix-bug pipeline |
 | Visual/rendering change | Full pipeline + visual-tester at end |
 | PR review | reviewer only |
-| Question/analysis | implementer (read-only) |
+| Question/analysis | ask |
+
+## Ask Pipeline
+
+```
+1. @ask        → Answer question directly (read-only analysis)
+2. [post]     → (non-agentic) post @ask's answer as PR/issue comment via `gh pr comment` or `gh issue comment`
+```
 
 ## Full Pipeline (implement-feature / visual-change)
 
