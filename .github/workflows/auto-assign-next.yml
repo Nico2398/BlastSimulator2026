@@ -3,6 +3,16 @@ name: "Pipeline: assign next issue to OpenCode"
 on:
   pull_request:
     types: [closed]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: 'Issue number to close and chain from'
+        required: true
+        type: string
+      pr_number:
+        description: 'PR number that was merged (defaults to issue_number context)'
+        required: false
+        type: string
 
 permissions:
   issues: write
@@ -11,7 +21,9 @@ permissions:
 
 jobs:
   chain-next-task:
-    if: github.event.pull_request.merged == true
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     steps:
       - name: Close done issue + assign next ready issue to OpenCode
@@ -19,26 +31,54 @@ jobs:
         env:
           AGENTIC_AUTO_ASSIGN_ENABLED: ${{ vars.AGENTIC_AUTO_ASSIGN_ENABLED }}
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION || secrets.GITHUB_TOKEN }}
           script: |
             const owner = context.repo.owner;
             const repo = context.repo.repo;
-            const prBody = context.payload.pull_request.body || '';
 
-            // --- 1. Find and close the completed issue ---
-            const closesMatch = prBody.match(/[Cc]loses?\s+#(\d+)/);
-            const issueNum = closesMatch?.[1];
+            // --- 0. Determine the issue number from the best available source ---
+            let n = null;
+            let issueSource = 'none';
 
-            if (!issueNum) {
-              console.log('No explicit close directive found in PR body. Skipping issue close.');
+            // Source A: workflow_dispatch input (most reliable)
+            if (context.eventName === 'workflow_dispatch') {
+              const inputIssue = context.payload.inputs?.issue_number;
+              if (inputIssue) {
+                n = parseInt(inputIssue);
+                issueSource = 'workflow_dispatch input';
+              }
             }
 
-            const n = issueNum ? parseInt(issueNum) : null;
+            // Source B: "Closes #N" or "closes #N" in PR body
+            if (!n && context.payload.pull_request) {
+              const prBody = context.payload.pull_request.body || '';
+              const closesMatch = prBody.match(/[Cc]loses?\s+#(\d+)/);
+              if (closesMatch) {
+                n = parseInt(closesMatch[1]);
+                issueSource = 'PR body "Closes #N"';
+              }
+            }
+
+            // Source C: branch name pipeline/tests-<issue_number> or pipeline/impl-<issue_number>
+            if (!n && context.payload.pull_request) {
+              const headRef = context.payload.pull_request.head.ref || '';
+              const branchMatch = headRef.match(/pipeline\/(?:tests|impl)-(\d+)/);
+              if (branchMatch) {
+                n = parseInt(branchMatch[1]);
+                issueSource = `branch name (${headRef})`;
+              }
+            }
+
+            console.log(`Issue number: ${n} (source: ${issueSource})`);
+
+            // --- 1. Find and close the completed issue ---
             if (n) {
-              console.log(`Closing issue #${n} (referenced in merged PR body).`);
+              console.log(`Closing issue #${n}.`);
               await github.rest.issues.update({ owner, repo, issue_number: n, state: 'closed' });
               await github.rest.issues.addLabels({ owner, repo, issue_number: n, labels: ['done'] }).catch(() => {});
               await github.rest.issues.removeLabel({ owner, repo, issue_number: n, name: 'in-progress' }).catch(() => {});
+            } else {
+              console.log('Could not determine issue number from any source. Skipping issue close.');
             }
 
             // --- 2. Update backlog.json to mark the closed task as done ---
@@ -48,10 +88,10 @@ jobs:
             const backlogIdMatch = closedIssueBody?.match(/^backlog-id:\s*(\S+)/m);
             if (backlogIdMatch) {
               const backlogId = backlogIdMatch[1];
-              const prNumber = context.payload.pull_request.number;
+              const prNumber = context.payload.pull_request?.number ?? context.payload.inputs?.pr_number ?? n;
               try {
                 const { data: fileData } = await github.rest.repos.getContent({
-                  owner, repo, path: '.github/skills/backlog/backlog.json'
+                  owner, repo, path: '.github/skills/agentic-backlog/backlog.json'
                 });
                 const raw = Buffer.from(fileData.content, 'base64').toString('utf8');
                 const tasks = JSON.parse(raw);
@@ -62,7 +102,7 @@ jobs:
                   const updated = JSON.stringify(tasks, null, 2) + '\n';
                   await github.rest.repos.createOrUpdateFileContents({
                     owner, repo,
-                    path: '.github/skills/backlog/backlog.json',
+                    path: '.github/skills/agentic-backlog/backlog.json',
                     message: `chore: mark backlog task ${backlogId} as done [skip ci]`,
                     content: Buffer.from(updated).toString('base64'),
                     sha: fileData.sha,
@@ -82,8 +122,11 @@ jobs:
             }
 
             // --- Auto-assign next issue (only when enabled + bot PR) ---
+            const rawEnv = process.env.AGENTIC_AUTO_ASSIGN_ENABLED ?? '(unset)';
             const autoAssignEnabled = (process.env.AGENTIC_AUTO_ASSIGN_ENABLED || 'false') === 'true';
-            const isBot = context.payload.pull_request.user.type === 'Bot';
+            const isBot = context.payload.pull_request?.user?.type === 'Bot';
+
+            console.log(`Auto-assign config: rawEnv="${rawEnv}", enabled=${autoAssignEnabled}, isBot=${isBot}`);
 
             if (autoAssignEnabled && isBot) {
               // --- 2.5 Check for stalled in-progress issues ---
@@ -154,16 +197,16 @@ jobs:
                 await github.rest.issues.createComment({
                   owner, repo,
                   issue_number: issue.number,
-                  body: `⚙️ Auto-assigned from merged PR #${context.payload.pull_request.number}`
+                  body: `⚙️ Auto-assigned from merged PR #${context.payload.pull_request?.number ?? '?'}`
                 });
 
                 await github.rest.actions.createWorkflowDispatch({
                   owner, repo,
                   workflow_id: 'opencode-runner.yml',
                   ref: 'main',
-                   inputs: {
-                     issue_number: String(issue.number)
-                   }
+                  inputs: {
+                    issue_number: String(issue.number)
+                  }
                 });
                 console.log(`OpenCode pipeline dispatched for issue #${issue.number}.`);
 
@@ -176,6 +219,7 @@ jobs:
                 console.log('Auto-assign is disabled (AGENTIC_AUTO_ASSIGN_ENABLED is not set to "true").');
               }
               if (!isBot) {
-                console.log(`PR author is ${context.payload.pull_request.user.type}, not Bot — skipping auto-assign.`);
+                const userType = context.payload.pull_request?.user?.type ?? 'unknown';
+                console.log(`PR author is ${userType}, not Bot — skipping auto-assign.`);
               }
             }
