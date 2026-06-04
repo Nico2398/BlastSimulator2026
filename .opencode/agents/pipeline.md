@@ -32,27 +32,28 @@ Steps are sequential unless marked parallel. Failure loops shown separately belo
  6. @test-writer            → Write failing tests on tests branch (unit + integration + scenario)
  7. [switch-to-impl]        → (non-agentic) switch to pipeline/impl-<issue-number>
  8. @implementer            → Minimum code to pass on impl branch (never sees test commits)
- 9. [cherry-pick]           → (non-agentic) cherry-pick impl commit onto tests branch
+ 9. [setup-feature-branch]  → (non-agentic) create pipeline/feature-<issue-number> from pipeline/tests-<issue-number> HEAD
+10. [cherry-pick]           → (non-agentic) cherry-pick impl commit onto feature branch
                              if conflicts → @conflict-resolver → retry cherry-pick
-10. [switch-to-test]        → (non-agentic) switch to pipeline/tests-<issue-number>
-11. [test-runner]           → (non-agentic) run full test suite on tests branch
+11. [switch-to-feature]     → (non-agentic) switch to pipeline/feature-<issue-number>
+12. [test-runner]           → (non-agentic) run full test suite on feature branch
                              if fail → @fixer → re-run test-runner (tight loop, max 7 retries)
-12. [qualimetry]            → (non-agentic) jscpd syntactic duplication check
+13. [qualimetry]            → (non-agentic) jscpd syntactic duplication check
                              if fail → @implementer (big loop)
-13. Code review (parallel):
+14. Code review (parallel):
       @security-reviewer    → exploitable vulnerabilities
       @quality-reviewer     → architecture, conventions, TypeScript strictness
       @i18n-reviewer        → hardcoded strings, locale mismatches
       @duplication-reviewer → semantic duplication, non-atomic functions
-14. [merge-findings]  → Orchestrator merges all sub-reviewer findings → pass/fail
+15. [merge-findings]  → Orchestrator merges all sub-reviewer findings → pass/fail
                         if fail → @implementer (big loop)
-15. @refactorer        → Clean up conventions, no behavior change
+16. @refactorer        → Clean up conventions, no behavior change
                          then re-run [test-runner] to verify no regression
-16. @validator         → Full validation: typecheck → tests → build
+17. @validator         → Full validation: typecheck → tests → build
                         if fail → @implementer (big loop)
-17. @visual-tester     → Screenshot verification (visual-change ONLY)
+18. @visual-tester     → Screenshot verification (visual-change ONLY)
                         if fail → @implementer (big loop)
-18. [open-pr]          → (non-agentic) create PR from tests branch to main + auto-merge
+19. [open-pr]          → (non-agentic) create PR from feature branch to main + auto-merge
 ```
 
 ### Failure loops (all pipelines)
@@ -70,7 +71,7 @@ Every agent failure loops back — either to `@implementer` (outer loop) or self
 | @visual-tester | @implementer |
 | Any node × 7 | Human escalation (interrupt) |
 
-When looping back to `@implementer`, the full downstream chain reruns: `implementer → cherry-pick → test-runner → qualimetry → code-review → refactorer → test-runner → validator → [visual-tester]`.
+When looping back to `@implementer`, the full downstream chain reruns: `implementer → setup-feature-branch → cherry-pick → switch-to-feature → test-runner → qualimetry → code-review → refactorer → test-runner → validator → [visual-tester]`.
 
 **Exception:** after `@refactorer` succeeds, the re-run of `[test-runner]` routes directly to `@validator` — qualimetry and code review are NOT repeated.
 
@@ -85,14 +86,15 @@ When looping back to `@implementer`, the full downstream chain reruns: `implemen
  6. @test-writer            → Write test that captures the bug
  7. [switch-to-impl]        → (non-agentic) switch to impl branch
  8. @implementer            → Fix the bug
- 9. [cherry-pick]           → (non-agentic) cherry-pick impl commit onto tests branch; conflicts → @conflict-resolver
-10. [switch-to-test]        → (non-agentic) switch to tests branch
-11. [test-runner]           → run tests; fail → @fixer loop
-12. [qualimetry]            → jscpd check; fail → @implementer
-13. Code review (parallel): @quality-reviewer + @security-reviewer + @i18n-reviewer + @duplication-reviewer
-14. [merge-findings]  → Orchestrator merges findings → pass/fail; fail → @implementer
-15. @validator         → typecheck → tests → build; fail → @implementer
-16. [open-pr]          → create PR from tests branch to main + auto-merge
+ 9. [setup-feature-branch]  → (non-agentic) create pipeline/feature-<issue-number> from pipeline/tests-<issue-number> HEAD
+10. [cherry-pick]           → (non-agentic) cherry-pick impl commit onto feature branch; conflicts → @conflict-resolver
+11. [switch-to-feature]     → (non-agentic) switch to pipeline/feature-<issue-number>
+12. [test-runner]           → run tests on feature branch; fail → @fixer loop
+13. [qualimetry]            → jscpd check; fail → @implementer
+14. Code review (parallel): @quality-reviewer + @security-reviewer + @i18n-reviewer + @duplication-reviewer
+15. [merge-findings]  → Orchestrator merges findings → pass/fail; fail → @implementer
+16. @validator         → typecheck → tests → build; fail → @implementer
+17. [open-pr]          → create PR from feature branch to main + auto-merge
 ```
 
 Note: `@refactorer` is skipped for fix-bug.
@@ -107,13 +109,15 @@ Note: `@refactorer` is skipped for fix-bug.
 
 ## Branch Isolation (Critical)
 
-The entire point of the 2-branch strategy is to prevent the implementer from seeing tests, ensuring unbiased TDD. You must enforce this strictly.
+The entire point of the 3-branch strategy is to prevent the implementer from seeing tests, ensuring unbiased TDD. You must enforce this strictly.
 
 ```
 main
  └─ pipeline/tests-<issue-number>   (stubs + tests — skeleton_commit_sha recorded here)
-      └─ pipeline/impl-<issue-number>  (forked from skeleton commit — implementer here)
-           ↓ cherry-pick impl commit onto tests branch → all quality gates run here
+ │    └─ pipeline/impl-<issue-number>  (forked from skeleton commit — implementer here)
+ │
+ └─ pipeline/feature-<issue-number> (deliverable — created from tests branch HEAD)
+                                     ↓ cherry-pick impl → quality gates + PR → main
 ```
 
 ### What each agent is allowed to see
@@ -123,15 +127,15 @@ main
 | @skeleton-writer | tests_branch | No tests exist yet |
 | @test-writer | tests_branch | Yes — writes them |
 | @implementer | impl_branch | **NO — branch enforces this** (test files never committed to impl_branch) |
-| @fixer | tests_branch | **Yes — both** (after cherry-pick, tests branch has impl + tests) |
-| @refactorer, @validator, reviewers | tests_branch | Yes (after cherry-pick) |
+| @fixer | feature_branch | **Yes — both** (after cherry-pick, feature branch has tests + impl) |
+| @refactorer, @validator, reviewers | feature_branch | Yes (after cherry-pick) |
 
 ### Enforcement rules for you (the orchestrator)
 
 - **Before invoking @implementer:** switch to `impl_branch` (`git checkout pipeline/impl-<issue-number>`). Confirm with `git branch` output before proceeding.
   - The branch itself enforces blindness — test files were never committed to `impl_branch`. No manual filtering needed.
   - Still: do **not** verbally describe test names, test logic, or expected assertions in the prompt. Pass only: plan, stub signatures, issue description.
-- **Before invoking @fixer:** switch to `tests_branch`. @fixer sees both implementation and test source (after cherry-pick) — this is intentional. It must judge which side is wrong (broken impl vs. incorrect test).
+- **Before invoking @fixer:** switch to `feature_branch`. @fixer sees both implementation and test source (after cherry-pick) — this is intentional. It must judge which side is wrong (broken impl vs. incorrect test).
 - If you accidentally switch to the wrong branch, stop, switch to the correct branch, and restart that agent step.
 
 ## Your Responsibilities
@@ -149,14 +153,16 @@ main
 |------|--------|
 | setup-test-branch | `git checkout -b pipeline/tests-<issue-number> main` |
 | setup-impl-branch | `git checkout -b pipeline/impl-<issue-number> <skeleton_commit_sha>` |
+| setup-feature-branch | `git checkout -b pipeline/feature-<issue-number> pipeline/tests-<issue-number>` |
 | switch-to-test | `git checkout pipeline/tests-<issue-number>` |
 | switch-to-impl | `git checkout pipeline/impl-<issue-number>` |
-| cherry-pick | `git cherry-pick <impl_commit_sha>` (on tests branch); detect conflicts |
+| switch-to-feature | `git checkout pipeline/feature-<issue-number>` |
+| cherry-pick | `git cherry-pick <impl_commit_sha>` (on feature branch); detect conflicts |
 | test-runner | `npx vitest run` — capture output, route to @fixer on fail |
 | qualimetry | `npx jscpd src/ tests/` — route to @implementer on fail |
 | merge-findings | Deduplicate and merge all 4 reviewer reports → pass/fail |
 | After refactorer | Re-run `npx vitest run` (skip qualimetry + code-review) |
-| open-pr | `gh pr create --base main --head pipeline/tests-<issue-number>` + `gh pr merge --auto --squash` — follow PR title/body/label standards in `agentic-autonomous-pipeline` skill |
+| open-pr | `gh pr create --base main --head pipeline/feature-<issue-number>` + `gh pr merge --auto --squash` — follow PR title/body/label standards in `agentic-autonomous-pipeline` skill |
 | Before completing | Summarize changes, files modified, test status |
 
 ## Key References
@@ -183,11 +189,17 @@ After creating the PR and before finishing, run:
 gh pr merge --auto --squash <pr-url>
 ```
 
-This is the **default**. Only skip it if the issue explicitly requires human artistic input or a critical software design decision. In that case, run instead:
+This is the **default**. Skip auto-merge when:
+1. The issue requires human input (artistic direction, critical design decision).
+2. You judge the pipeline hit significant churn (repeated failure loops, heavy review findings, multiple implementer do-overs) — you lived through it, use your judgment.
+
+When skipping, run:
 
 ```
 gh pr comment <pr-url> --body "Auto-merge paused — human input needed: <reason>"
 ```
+
+Include churn details in the reason so the reviewer understands the risk.
 
 ## Output Format
 
