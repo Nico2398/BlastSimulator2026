@@ -6,6 +6,13 @@ import type { Vec3 } from '../core/math/Vec3.js';
 import type { VoxelRockComposition } from '../core/world/VoxelGrid.js';
 import type { VoronoiCell, Tetrahedron } from './VoronoiFrag.js';
 
+import { vec3, ZERO, sub, normalize, distance } from '../core/math/Vec3.js';
+import { convexHull3D, buildAdjacencyMap } from './VoronoiFrag.js';
+import { computeThreshold, parseKey } from '../core/mining/BlastCalc.js';
+import { computeFragmentationScore, computeFragmentCount } from './VoronoiFrag.js';
+import { COLLISION_DEFLATE_AMOUNT, MERGE_PROBABILITY } from '../core/config/balance.js';
+import { getRock } from '../core/world/RockCatalog.js';
+
 // ─── Types ──────────────────────────────────────────────────────────────────────
 
 /** Ore composition for a single voxel or fragment. */
@@ -64,7 +71,48 @@ export function sampleSeedsWithMapping(
   _grid: any,
   _rng: any,
 ): { seeds: Vec3[]; seedToVoxelMap: Map<number, SeedVoxelInfo> } {
-  throw new Error('Not implemented');
+  const seeds: Vec3[] = [];
+  const seedToVoxelMap = new Map<number, SeedVoxelInfo>();
+  let seedIndex = 0;
+
+  // Sort keys for determinism
+  const sortedKeys = [..._fragmentedVoxels].sort();
+
+  for (const key of sortedKeys) {
+    const coords = parseKey(key);
+    if (!coords) continue;
+
+    const [x, y, z] = coords;
+
+    if (!_grid.isInBounds(x, y, z)) continue;
+
+    const voxel = _grid.getVoxel(x, y, z);
+    if (!voxel) continue;
+
+    const energy = _effectiveEnergy.get(key) ?? 0;
+    const threshold = computeThreshold(voxel);
+    const score = computeFragmentationScore(energy, threshold);
+    const count = computeFragmentCount(score);
+    const overflow = _generatedOverflow.get(key) ?? 0;
+
+    for (let i = 0; i < count; i++) {
+      const px = _rng.nextFloat(x, x + 1);
+      const py = _rng.nextFloat(y, y + 1);
+      const pz = _rng.nextFloat(z, z + 1);
+      seeds.push(vec3(px, py, pz));
+      seedToVoxelMap.set(seedIndex, {
+        x,
+        y,
+        z,
+        fragmentCount: count,
+        effectiveEnergy: energy,
+        generatedOverflow: overflow,
+      });
+      seedIndex++;
+    }
+  }
+
+  return { seeds, seedToVoxelMap };
 }
 
 /**
@@ -74,7 +122,15 @@ export function sampleSeedsWithMapping(
  * @returns The centroid as a Vec3.
  */
 export function computeCentroid(_vertices: Vec3[]): Vec3 {
-  throw new Error('Not implemented');
+  if (_vertices.length === 0) return ZERO;
+  let sx = 0, sy = 0, sz = 0;
+  for (const v of _vertices) {
+    sx += v.x;
+    sy += v.y;
+    sz += v.z;
+  }
+  const n = _vertices.length;
+  return vec3(sx / n, sy / n, sz / n);
 }
 
 /**
@@ -90,7 +146,24 @@ export function computeCentroid(_vertices: Vec3[]): Vec3 {
  * @returns A new array of deflated Vec3 points.
  */
 export function deflateVertices(_vertices: Vec3[], _centroid: Vec3, _amount: number): Vec3[] {
-  throw new Error('Not implemented');
+  if (_vertices.length === 0) return [];
+  const result: Vec3[] = [];
+  for (const v of _vertices) {
+    const dist = distance(v, _centroid);
+    if (dist === 0) {
+      result.push(v);
+      continue;
+    }
+    // Direction from vertex toward centroid
+    const dir = normalize(sub(_centroid, v));
+    const effectiveAmount = Math.min(_amount, dist);
+    result.push(vec3(
+      v.x + dir.x * effectiveAmount,
+      v.y + dir.y * effectiveAmount,
+      v.z + dir.z * effectiveAmount,
+    ));
+  }
+  return result;
 }
 
 /**
@@ -100,7 +173,14 @@ export function deflateVertices(_vertices: Vec3[], _centroid: Vec3, _amount: num
  * @returns A Float32Array of interleaved coordinates.
  */
 export function flattenVec3Array(_vertices: Vec3[]): Float32Array {
-  throw new Error('Not implemented');
+  const result = new Float32Array(_vertices.length * 3);
+  for (let i = 0; i < _vertices.length; i++) {
+    const v = _vertices[i]!;
+    result[i * 3] = v.x;
+    result[i * 3 + 1] = v.y;
+    result[i * 3 + 2] = v.z;
+  }
+  return result;
 }
 
 /**
@@ -110,7 +190,11 @@ export function flattenVec3Array(_vertices: Vec3[]): Float32Array {
  * @returns A VoxelOreComposition with an array of ore entries.
  */
 export function convertOreDensities(_oreDensities: Record<string, number>): VoxelOreComposition {
-  throw new Error('Not implemented');
+  const entries = Object.entries(_oreDensities)
+    .filter(([_, density]) => density > 0)
+    .map(([oreId, density]) => ({ oreId, density }))
+    .sort((a, b) => a.oreId.localeCompare(b.oreId));
+  return { ores: entries };
 }
 
 /**
@@ -129,7 +213,34 @@ export function computeAverageRockComposition(
   _seedToVoxelMap: Map<number, SeedVoxelInfo>,
   _grid: any,
 ): VoxelRockComposition {
-  throw new Error('Not implemented');
+  // Accumulate weighted coefficients per rockId
+  const weightedSum = new Map<string, number>();
+  const totalWeight = new Map<string, number>();
+
+  for (const seedIdx of _seedIndices) {
+    const info = _seedToVoxelMap.get(seedIdx);
+    if (!info) continue;
+
+    const voxel = _grid.getVoxel(info.x, info.y, info.z);
+    if (!voxel) continue;
+
+    const weight = 1 / info.fragmentCount;
+
+    for (const rock of voxel.composition.rocks) {
+      weightedSum.set(rock.rockId, (weightedSum.get(rock.rockId) ?? 0) + rock.coefficient * weight);
+      totalWeight.set(rock.rockId, (totalWeight.get(rock.rockId) ?? 0) + weight);
+    }
+  }
+
+  if (weightedSum.size === 0) return { rocks: [] };
+
+  const rocks = [...weightedSum.entries()]
+    .map(([rockId, sum]) => ({
+      rockId,
+      coefficient: sum / (totalWeight.get(rockId) ?? 1),
+    }));
+
+  return { rocks };
 }
 
 /**
@@ -148,7 +259,35 @@ export function computeAverageOreComposition(
   _seedToVoxelMap: Map<number, SeedVoxelInfo>,
   _grid: any,
 ): VoxelOreComposition {
-  throw new Error('Not implemented');
+  // Accumulate weighted densities per oreId
+  const weightedSum = new Map<string, number>();
+  const totalWeight = new Map<string, number>();
+
+  for (const seedIdx of _seedIndices) {
+    const info = _seedToVoxelMap.get(seedIdx);
+    if (!info) continue;
+
+    const voxel = _grid.getVoxel(info.x, info.y, info.z);
+    if (!voxel) continue;
+
+    const weight = 1 / info.fragmentCount;
+
+    for (const [oreId, density] of Object.entries(voxel.oreDensities as Record<string, number>)) {
+      weightedSum.set(oreId, (weightedSum.get(oreId) ?? 0) + density * weight);
+      totalWeight.set(oreId, (totalWeight.get(oreId) ?? 0) + weight);
+    }
+  }
+
+  if (weightedSum.size === 0) return { ores: [] };
+
+  const ores = [...weightedSum.entries()]
+    .map(([oreId, sum]) => ({
+      oreId,
+      density: sum / (totalWeight.get(oreId) ?? 1),
+    }))
+    .sort((a, b) => a.oreId.localeCompare(b.oreId));
+
+  return { ores };
 }
 
 /**
@@ -168,7 +307,42 @@ export function mergeVoronoiCellsWithGrouping(
   _tetrahedra: Tetrahedron[],
   _rng: any,
 ): { mergedCells: VoronoiCell[]; seedGroupings: number[][] } {
-  throw new Error('Not implemented');
+  // Clone input cells to avoid mutating caller's data
+  const working = _cells.map(c => ({ ...c, vertices: [...c.vertices] }));
+  const seedGroupings: number[][] = _cells.map(c => [c.seedIndex]);
+
+  const adjacencyMap = buildAdjacencyMap(_tetrahedra, working.length);
+  const isMerged = new Array<boolean>(working.length).fill(false);
+
+  for (let i = 0; i < working.length; i++) {
+    if (isMerged[i]) continue;
+    if (!_rng.chance(MERGE_PROBABILITY)) continue;
+
+    const neighbors = adjacencyMap.get(i);
+    if (!neighbors || neighbors.size === 0) continue;
+
+    // Filter to only include not-yet-merged neighbors
+    const available = [...neighbors].filter(j => !isMerged[j]);
+    if (available.length === 0) continue;
+
+    // Pick a random available neighbor
+    const pickIdx = _rng.nextInt(0, available.length - 1);
+    const neighborIdx = available[pickIdx]!;
+
+    // Merge cell i with neighbor: compute convex hull of combined vertices
+    const combined = [...working[i]!.vertices, ...working[neighborIdx]!.vertices];
+    const hull = convexHull3D(combined);
+    working[i] = { seedIndex: working[i]!.seedIndex, vertices: hull, isValid: hull.length >= 4 };
+
+    // Merge seed groupings
+    seedGroupings[i] = seedGroupings[i]!.concat(seedGroupings[neighborIdx]!);
+    isMerged[neighborIdx] = true;
+  }
+
+  return {
+    mergedCells: working.filter((_, idx) => !isMerged[idx]),
+    seedGroupings: seedGroupings.filter((_, idx) => !isMerged[idx]),
+  };
 }
 
 /**
@@ -184,7 +358,29 @@ export function computeVolumeM3(
   _seedIndices: number[],
   _seedToVoxelMap: Map<number, SeedVoxelInfo>,
 ): number {
-  throw new Error('Not implemented');
+  let volume = 0;
+
+  // Use a map to avoid double-counting seeds from the same source voxel
+  const voxelContributions = new Map<string, { seeds: number; fragmentCount: number }>();
+
+  for (const seedIdx of _seedIndices) {
+    const info = _seedToVoxelMap.get(seedIdx);
+    if (!info) continue;
+
+    const key = `${info.x},${info.y},${info.z}`;
+    const entry = voxelContributions.get(key);
+    if (entry) {
+      entry.seeds++;
+    } else {
+      voxelContributions.set(key, { seeds: 1, fragmentCount: info.fragmentCount });
+    }
+  }
+
+  for (const { seeds, fragmentCount } of voxelContributions.values()) {
+    volume += (seeds / fragmentCount) * 1.0;
+  }
+
+  return volume;
 }
 
 /**
@@ -212,5 +408,80 @@ export function generateRockFragments(
   _rng: any,
   _nextId?: number,
 ): RockFragment[] {
-  throw new Error('Not implemented');
+  const fragments: RockFragment[] = [];
+  let nextId = _nextId ?? 1;
+
+  for (let i = 0; i < _cells.length; i++) {
+    const cell = _cells[i]!;
+
+    // Skip invalid cells
+    if (!cell.isValid) continue;
+
+    const seedIndices = _seedGroupings[i]!;
+
+    // Skip empty seed groupings
+    if (seedIndices.length === 0) continue;
+
+    // Compute convex hull of cell vertices
+    const hull = convexHull3D(cell.vertices);
+
+    // Skip degenerate hulls (need at least 4 vertices for a 3D shape)
+    if (hull.length < 4) continue;
+
+    // Compute centroid
+    const centroid = computeCentroid(hull);
+
+    // Graphic vertices (convex hull)
+    const graphicVertices = flattenVec3Array(hull);
+
+    // Collision vertices (deflated inward)
+    const deflated = deflateVertices(hull, centroid, COLLISION_DEFLATE_AMOUNT);
+    const collisionVertices = flattenVec3Array(deflated);
+
+    // Volume
+    const volumeM3 = computeVolumeM3(seedIndices, _seedToVoxelMap);
+
+    // Composition
+    const composition = computeAverageRockComposition(seedIndices, _seedToVoxelMap, _grid);
+    const oreComposition = computeAverageOreComposition(seedIndices, _seedToVoxelMap, _grid);
+
+    // Mass: volume * rock density
+    let totalDensity = 0;
+    for (const rock of composition.rocks) {
+      const rockDef = getRock(rock.rockId);
+      if (rockDef) totalDensity += rock.coefficient * rockDef.density;
+    }
+    const massKg = volumeM3 * totalDensity;
+
+    // Overflow energy: sum of generated overflow from all unique source voxels
+    const overflowVoxels = new Set<string>();
+    for (const seedIdx of seedIndices) {
+      const info = _seedToVoxelMap.get(seedIdx);
+      if (!info) continue;
+      overflowVoxels.add(`${info.x},${info.y},${info.z}`);
+    }
+    let overflowEnergy = 0;
+    for (const voxelKey of overflowVoxels) {
+      overflowEnergy += _generatedOverflow.get(voxelKey) ?? 0;
+    }
+
+    fragments.push({
+      id: nextId++,
+      cx: centroid.x,
+      cy: centroid.y,
+      cz: centroid.z,
+      graphicVertices,
+      collisionVertices,
+      composition,
+      oreComposition,
+      volumeM3,
+      massKg,
+      overflowEnergy,
+      velocity: ZERO,
+      simulationTier: 'collapse',
+      state: 'settling',
+    });
+  }
+
+  return fragments;
 }
