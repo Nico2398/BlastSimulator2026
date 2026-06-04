@@ -47,28 +47,29 @@ Critical to unbiased implementation: test code and implementation code must neve
 
 ```
 main
- └─ pipeline/tests-<issue-number>   (test branch — skeleton → tests → final code)
-      └─ pipeline/impl-<issue-number>  (impl branch — forked from skeleton commit)
-           └─ implementer works here, never sees tests
-              ↓
-         cherry-pick → lands on test branch
+ └─ pipeline/tests-<issue-number>   (test branch — skeleton → tests)
+ │    └─ pipeline/impl-<issue-number>  (impl branch — forked from skeleton commit)
+ │
+ └─ pipeline/feature-<issue-number> (deliverable branch — created from tests branch HEAD)
+                                     ↓ cherry-pick impl → quality gates + PR → main
 ```
 
 1. **Skeleton branch:** create `pipeline/tests-<issue-number>` from `main`, write empty stubs, record `skeleton_commit_sha`
 2. **Fork impl branch:** create `pipeline/impl-<issue-number>` from that skeleton commit
 3. **Write tests** on `pipeline/tests-<issue-number>` (test branch)
 4. **Implement** on `pipeline/impl-<issue-number>` (impl branch) — agent never sees test commits
-5. **Cherry-pick** the implementation commit onto `pipeline/tests-<issue-number>`
-6. **Resolve conflicts** if cherry-pick fails
-7. **All subsequent quality gates** run on `pipeline/tests-<issue-number>`
+5. **Create feature branch:** create `pipeline/feature-<issue-number>` from `pipeline/tests-<issue-number>` HEAD
+6. **Cherry-pick** the implementation commit onto `pipeline/feature-<issue-number>`
+7. **Resolve conflicts** if cherry-pick fails
+8. **All subsequent quality gates** run on `pipeline/feature-<issue-number>`
 
 ### Cherry-Pick + Conflict Resolution
 
-The implementation commit is cherry-picked from the impl branch onto the test branch. If conflicts arise, a conflict resolver agent reads the conflicted files, merges both sides, removes conflict markers, and stages the resolved files. On resolution failure, the implementer re-runs.
+The implementation commit is cherry-picked from the impl branch onto the feature branch. If conflicts arise, a conflict resolver agent reads the conflicted files, merges both sides, removes conflict markers, and stages the resolved files. On resolution failure, the implementer re-runs.
 
 ### Quality Gates (after cherry-pick)
 
-After the code lands on the test branch, these gates run in sequence:
+After the code lands on the feature branch, these gates run in sequence:
 1. **Test runner** (non-agentic) — run test suite, pass → continue, fail → fixer loop
 2. **Duplication check** (non-agentic) — jscpd syntactic clone detection, fail → back to implementer
 3. **Code review fan-out** (agentic, parallel) — specialized sub-reviewers by risk tier:
@@ -83,7 +84,7 @@ After the code lands on the test branch, these gates run in sequence:
 
 ### PR Creation
 
-Create a pull request from `pipeline/tests-<issue-number>` to `main` with:
+Create a pull request from `pipeline/feature-<issue-number>` to `main` with:
 - Title prefixed by pipeline type (`feat:`, `fix:`, `docs:`)
 - Body includes `Closes #<issue_number>` and validation checklist
 - Labels updated: `in-progress` removed, `in-review` added
