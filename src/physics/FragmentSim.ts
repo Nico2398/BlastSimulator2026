@@ -291,3 +291,18 @@ export function generateRockFragments(
 
   return fragments;
 }
+
+/**
+ * Run Tier A physics simulation on all fragments with simulationTier === 'projected'.
+ * Implements PHYSICS_FRAGMENT_CAP:
+ *   - First N get full Cannon-es rigid-body simulation with terrain collision.
+ *   - Remaining use kinematic parabolic fallback (analytical trajectory).
+ * All processed fragments end with state='static' and updated (cx,cy,cz).
+ * Fragments with simulationTier !== 'projected' are returned unchanged.
+ */
+export function simulateProjectedFragments(
+  _fragments: RockFragment[],
+  _grid: VoxelGrid,
+): RockFragment[] {
+  throw new Error('Not implemented');
+}

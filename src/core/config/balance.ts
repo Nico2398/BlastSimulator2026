@@ -384,3 +384,11 @@ export const SURVEY_DURATION_TICKS = {
 
 /** Assumed bulk density of ore-bearing rock used for mass calculations (kg/m³). */
 export const ORE_DENSITY_KG_M3 = 2500;
+
+// ─── Physics ────────────────────────────────────────────────────────────────────
+
+/** Maximum fragments that get full Cannon-es rigid-body simulation. Rest use parabolic fallback. */
+export const PHYSICS_FRAGMENT_CAP = 50;
+
+/** Gravitational acceleration (m/s²). Negative = downward. */
+export const GRAVITY = -9.81;
