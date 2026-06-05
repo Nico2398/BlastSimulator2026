@@ -66,7 +66,7 @@ Check existing skills before writing. If new skill overlaps, extend existing ski
 Information lives in one place. Reference other files instead of copying. Keep SKILL.md under 500 lines. Split content into separate files (progressive disclosure).
 
 ### Affirmative Instructions
-State what the agent does, not what it does not do. Write "The agent includes `READY TO MERGE` in the PR body." not "The agent does not call `gh pr merge --auto`." Positive phrasing reduces cognitive load and clarifies expected behavior.
+State what the agent does, not what it does not do. Positive phrasing reduces cognitive load and clarifies expected behavior.
 
 ## Structure
 
@@ -141,6 +141,7 @@ Provide input/output pairs for quality-sensitive skills.
 - Vague skill names (`helper`, `utils`, `tools`)
 - Offering too many approaches
 - Deeply nested references (beyond one level)
+- Negative phrasing: state what to do, not what not to do
 
 ## Checklist
 
@@ -153,3 +154,4 @@ Provide input/output pairs for quality-sensitive skills.
 - [ ] Under 500 lines
 - [ ] Forward slashes only
 - [ ] Concise: every token earns its place
+- [ ] Affirmative phrasing: describes what agent does, not what it avoids
