@@ -93,6 +93,6 @@ This operation is always non-agentic (no LLM involved).
 
 ### Auto-Merge
 
-The agent does **not** call `gh pr merge --auto` directly. Instead, the PR body includes `READY TO MERGE`. The `auto-assign-next.yml` workflow (triggered on `pull_request: [opened, synchronize]`) detects this and enables GitHub native auto-merge via a PAT token. This ensures the merge is attributed to the PAT, so the downstream `pull_request: [closed]` event triggers `auto-assign-next.yml` to close the issue and dispatch the next task.
+The agent includes `READY TO MERGE` in the PR body. The `auto-assign-next.yml` workflow (triggered on `pull_request: [opened, synchronize]`) detects this and enables GitHub native auto-merge via a PAT token. The merge is attributed to the PAT, so the downstream `pull_request: [closed]` event triggers `auto-assign-next.yml` to close the issue and dispatch the next task.
 
 Skip `READY TO MERGE` when the issue requires human input or the orchestrator judges the pipeline hit significant churn (repeated failure loops, heavy review findings, multiple implementer do-overs). Post a PR comment with the reason.
