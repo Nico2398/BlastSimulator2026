@@ -2,24 +2,35 @@ name: "Pipeline: assign next issue to OpenCode"
 
 on:
   pull_request:
-    types: [closed]
+    types: [opened, synchronize, closed]
 
 permissions:
   issues: write
   contents: write
+  pull-requests: write
   actions: write
 
 jobs:
   chain-next-task:
-    if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     steps:
+      - name: Enable auto-merge for bot PRs with READY TO MERGE
+        if: >
+          github.event.action != 'closed' &&
+          contains(github.event.pull_request.body, 'READY TO MERGE') &&
+          github.event.pull_request.user.type == 'Bot'
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
+        run: |
+          gh pr merge --auto --squash "${{ github.event.pull_request.html_url }}"
+
       - name: Close done issue + assign next ready issue to OpenCode
+        if: github.event.pull_request.merged == true
         uses: actions/github-script@v7
         env:
           AGENTIC_AUTO_ASSIGN_ENABLED: ${{ vars.AGENTIC_AUTO_ASSIGN_ENABLED }}
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
           script: |
             const owner = context.repo.owner;
             const repo = context.repo.repo;
@@ -51,7 +62,7 @@ jobs:
               const prNumber = context.payload.pull_request.number;
               try {
                 const { data: fileData } = await github.rest.repos.getContent({
-                  owner, repo, path: '.github/skills/backlog/backlog.json'
+                  owner, repo, path: '.github/skills/agentic-backlog/backlog.json'
                 });
                 const raw = Buffer.from(fileData.content, 'base64').toString('utf8');
                 const tasks = JSON.parse(raw);
@@ -62,7 +73,7 @@ jobs:
                   const updated = JSON.stringify(tasks, null, 2) + '\n';
                   await github.rest.repos.createOrUpdateFileContents({
                     owner, repo,
-                    path: '.github/skills/backlog/backlog.json',
+                    path: '.github/skills/agentic-backlog/backlog.json',
                     message: `chore: mark backlog task ${backlogId} as done [skip ci]`,
                     content: Buffer.from(updated).toString('base64'),
                     sha: fileData.sha,

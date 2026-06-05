@@ -86,13 +86,13 @@ After the code lands on the feature branch, these gates run in sequence:
 
 Create a pull request from `pipeline/feature-<issue-number>` to `main` with:
 - Title prefixed by pipeline type (`feat:`, `fix:`, `docs:`)
-- Body includes `Closes #<issue_number>` and validation checklist
+- Body includes `Closes #<issue_number>`, validation checklist, and `READY TO MERGE` on its own line
 - Labels updated: `in-progress` removed, `in-review` added
 
 This operation is always non-agentic (no LLM involved).
 
 ### Auto-Merge
 
-Default: **enable GitHub native auto-merge** on every PR — via `gh pr merge --auto --squash`.
+The agent does **not** call `gh pr merge --auto` directly. Instead, the PR body includes `READY TO MERGE`. The `auto-assign-next.yml` workflow (triggered on `pull_request: [opened, synchronize]`) detects this and enables GitHub native auto-merge via a PAT token. This ensures the merge is attributed to the PAT, so the downstream `pull_request: [closed]` event triggers `auto-assign-next.yml` to close the issue and dispatch the next task.
 
-Skip auto-merge when the issue requires human input or the orchestrator judges the pipeline hit significant churn (repeated failure loops, heavy review findings, multiple implementer do-overs). Post a PR comment with the reason.
+Skip `READY TO MERGE` when the issue requires human input or the orchestrator judges the pipeline hit significant churn (repeated failure loops, heavy review findings, multiple implementer do-overs). Post a PR comment with the reason.

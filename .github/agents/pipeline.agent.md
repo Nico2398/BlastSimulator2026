@@ -70,7 +70,8 @@ Steps are sequential unless marked parallel. Failure loops shown separately belo
                         if fail → @implementer (big loop)
 18. @visual-tester     → Screenshot verification (visual-change ONLY)
                         if fail → @implementer (big loop)
-19. [open-pr]          → (non-agentic) create PR from feature branch to main + auto-merge
+19. [open-pr]          → (non-agentic) create PR from feature branch to main + READY TO MERGE
+
 ```
 
 ### Failure loops (all pipelines)
@@ -111,7 +112,7 @@ When looping back to `@implementer`, the full downstream chain reruns: `implemen
 14. Code review (parallel): @quality-reviewer + @security-reviewer + @i18n-reviewer + @duplication-reviewer
 15. [merge-findings]  → Orchestrator merges findings → pass/fail; fail → @implementer
 16. @validator         → typecheck → tests → build; fail → @implementer
-17. [open-pr]          → create PR from feature branch to main + auto-merge
+17. [open-pr]          → create PR from feature branch to main + READY TO MERGE
 ```
 
 Note: `@refactorer` is skipped for fix-bug.
@@ -179,7 +180,7 @@ main
 | qualimetry | `npx jscpd src/ tests/` — route to @implementer on fail |
 | merge-findings | Deduplicate and merge all 4 reviewer reports → pass/fail |
 | After refactorer | Re-run `npx vitest run` (skip qualimetry + code-review) |
-| open-pr | `gh pr create --base main --head pipeline/feature-<issue-number>` + `gh pr merge --auto --squash` — follow PR title/body/label standards in `agentic-autonomous-pipeline` skill |
+| open-pr | `gh pr create --base main --head pipeline/feature-<issue-number> --body "Closes #<issue-number>\n\nREADY TO MERGE"` — include validation checklist per `agentic-autonomous-pipeline` skill |
 | Before completing | Summarize changes, files modified, test status |
 
 ## Key References
@@ -198,22 +199,18 @@ main
   - **@implementer specifically:** do not verbally describe tests — only plan + stub signatures + expected behavior. Branch isolation handles the rest.
   - **@fixer specifically:** pass both the test runner error output AND full context (it needs both sides to decide what to fix)
 
-## Auto-Merge
+## READY TO MERGE
 
-After creating the PR and before finishing, run:
+After creating the PR, the body must include `READY TO MERGE` on its own line. The `auto-assign-next.yml` workflow detects this and enables GitHub native auto-merge via a PAT token, ensuring downstream CI events trigger correctly.
 
-```
-gh pr merge --auto --squash <pr-url>
-```
-
-This is the **default**. Skip auto-merge when:
+This is the **default**. Skip `READY TO MERGE` when:
 1. The issue requires human input (artistic direction, critical design decision).
 2. You judge the pipeline hit significant churn (repeated failure loops, heavy review findings, multiple implementer do-overs) — you lived through it, use your judgment.
 
-When skipping, run:
+When skipping, post a comment explaining why:
 
 ```
-gh pr comment <pr-url> --body "Auto-merge paused — human input needed: <reason>"
+gh pr comment <pr-url> --body "READY TO MERGE skipped — human input needed: <reason>"
 ```
 
 Include churn details in the reason so the reviewer understands the risk.
