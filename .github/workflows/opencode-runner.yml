@@ -22,9 +22,15 @@ jobs:
   run:
     if: >
       github.event_name == 'workflow_dispatch' ||
-      contains(github.event.comment.body, '/opencode') ||
-      contains(github.event.comment.body, '/oc') ||
-      contains(github.event.comment.body, '@opencode')
+      (
+        github.event.comment.user.type != 'Bot' &&
+        (
+          startsWith(github.event.comment.body, '@opencode ') ||
+          contains(github.event.comment.body, ' @opencode ') ||
+          endsWith(github.event.comment.body, ' @opencode') ||
+          github.event.comment.body == '@opencode'
+        )
+      )
     runs-on: ubuntu-latest
     steps:
       - name: Acknowledge request
@@ -65,6 +71,6 @@ jobs:
         with:
           model: opencode/deepseek-v4-flash-free
           use_github_token: true
-          mentions: /opencode,/oc,@opencode
+          mentions: '@opencode'
           prompt: |
             ${{ github.event_name == 'workflow_dispatch' && inputs.issue_number && format('Resolve GitHub issue #{0}. Follow the TDD pipeline: plan, write tests, implement, review, refactor, validate, and open a PR with Closes #{0}.', inputs.issue_number) || 'A user mentioned you in a comment. Read the PR/issue context and answer their question directly. If they ask a question, answer it using @ask. If they request a task, use the pipeline.' }}
