@@ -65,6 +65,9 @@ Check existing skills before writing. If new skill overlaps, extend existing ski
 ### DRY
 Information lives in one place. Reference other files instead of copying. Keep SKILL.md under 500 lines. Split content into separate files (progressive disclosure).
 
+### Affirmative Instructions
+State what the agent does, not what it does not do. Write "The agent includes `READY TO MERGE` in the PR body." not "The agent does not call `gh pr merge --auto`." Positive phrasing reduces cognitive load and clarifies expected behavior.
+
 ## Structure
 
 ### YAML Frontmatter
