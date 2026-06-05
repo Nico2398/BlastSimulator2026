@@ -3,7 +3,7 @@ name: agentic-skill-edition
 description: >
   Create and edit agentic context files (SKILL.md, agent definitions, slash command prompts)
   across all agent standards (Copilot, Claude Code, OpenCode). Enforces same-wording
-  duplication rule: body content must be identical across solutions, only frontmatter differs.
+  duplication rule and affirmative phrasing (state what agent does, not what it avoids).
   Use when writing or editing skills, agents, or prompts in any solution directory.
 ---
 
