@@ -169,6 +169,15 @@ export const MERGE_PROBABILITY = 0.35;
  *  on visual edges. 0.05 m = 5 cm for 1 m voxels. */
 export const COLLISION_DEFLATE_AMOUNT = 0.05;
 
+// ─── Fragment Velocity Simulation ────────────────────────────────────────────────
+
+/** Decay rate for surface proximity effect based on distance to air voxel. */
+export const SURFACE_PROXIMITY_DECAY = 0.5;
+/** Maximum velocity (m/s) for fragments classified as 'projected'. */
+export const MAX_PROJECTION_VELOCITY = 80;
+/** Velocity threshold (m/s) below which fragment is classified 'collapse'. */
+export const PROJECTION_VELOCITY_THRESHOLD = 2.0;
+
 // ─── Game Loop ──────────────────────────────────────────────────────────────────
 
 /** Duration of one game tick in real milliseconds at 1× speed. 1 tick = 1 game-hour. */
