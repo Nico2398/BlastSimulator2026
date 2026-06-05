@@ -65,6 +65,12 @@ Check existing skills before writing. If new skill overlaps, extend existing ski
 ### DRY
 Information lives in one place. Reference other files instead of copying. Keep SKILL.md under 500 lines. Split content into separate files (progressive disclosure).
 
+### Affirmative Instructions
+State what the agent does, not what it does not do. Positive phrasing reduces cognitive load and clarifies expected behavior.
+
+### Examples
+Use only when the instruction is not self-sufficient. Keep examples generic — domain-specific references become meaningless outside the original context.
+
 ## Structure
 
 ### YAML Frontmatter
@@ -138,6 +144,7 @@ Provide input/output pairs for quality-sensitive skills.
 - Vague skill names (`helper`, `utils`, `tools`)
 - Offering too many approaches
 - Deeply nested references (beyond one level)
+- Negative phrasing: state what to do, not what not to do
 
 ## Checklist
 
@@ -150,3 +157,4 @@ Provide input/output pairs for quality-sensitive skills.
 - [ ] Under 500 lines
 - [ ] Forward slashes only
 - [ ] Concise: every token earns its place
+- [ ] Affirmative phrasing: describes what agent does, not what it avoids
