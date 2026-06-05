@@ -22,7 +22,7 @@ import {
 import { type VoronoiCell, type Tetrahedron } from '../../../src/physics/VoronoiFrag.js';
 import { vec3, ZERO } from '../../../src/core/math/Vec3.js';
 import { Random } from '../../../src/core/math/Random.js';
-import { VoxelGrid, type VoxelRockComposition } from '../../../src/core/world/VoxelGrid.js';
+import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { getRock } from '../../../src/core/world/RockCatalog.js';
 import { COLLISION_DEFLATE_AMOUNT } from '../../../src/core/config/balance.js';
 import {
@@ -34,11 +34,7 @@ import {
   assignFragmentVelocity,
 } from '../../../src/physics/FragmentSimVelocity.js';
 import { length } from '../../../src/core/math/Vec3.js';
-import {
-  SURFACE_PROXIMITY_DECAY,
-  MAX_PROJECTION_VELOCITY,
-  PROJECTION_VELOCITY_THRESHOLD,
-} from '../../../src/core/config/balance.js';
+import { MAX_PROJECTION_VELOCITY } from '../../../src/core/config/balance.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Helpers

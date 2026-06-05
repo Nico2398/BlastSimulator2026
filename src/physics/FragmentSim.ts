@@ -7,12 +7,8 @@ import type { VoxelGrid, VoxelRockComposition } from '../core/world/VoxelGrid.js
 import type { Random } from '../core/math/Random.js';
 import { convexHull3D, buildAdjacencyMap, computeFragmentationScore, computeFragmentCount, type VoronoiCell, type Tetrahedron } from './VoronoiFrag.js';
 import { computeThreshold, parseKey } from '../core/mining/BlastCalc.js';
-import { COLLISION_DEFLATE_AMOUNT, MERGE_PROBABILITY, SURFACE_PROXIMITY_DECAY, MAX_PROJECTION_VELOCITY, PROJECTION_VELOCITY_THRESHOLD } from '../core/config/balance.js';
+import { COLLISION_DEFLATE_AMOUNT, MERGE_PROBABILITY } from '../core/config/balance.js';
 import { assignFragmentVelocity } from './FragmentSimVelocity.js';
-// TODO: balance constants used by implementer in FragmentSimVelocity — placeholder suppresses unused-warning
-void SURFACE_PROXIMITY_DECAY;
-void MAX_PROJECTION_VELOCITY;
-void PROJECTION_VELOCITY_THRESHOLD;
 import { getRock } from '../core/world/RockCatalog.js';
 
 import {
