@@ -8,26 +8,12 @@
 
 import type { FragmentData } from '../core/mining/BlastExecution.js';
 import type { PhysicsWorld, PhysicsBodyId } from './PhysicsWorld.js';
-
-// ── Config ──
-
-/**
- * Max simulation steps before forcing a stop (prevents infinite loop for unstable sims).
- * At 1/60s per step: 600 steps = 10 seconds of game physics.
- */
-const MAX_SIM_STEPS = 600;
-
-/** Step size in seconds. */
-const STEP_DT = 1 / 60;
-
-/**
- * Speed threshold below which a fragment is considered "settled" (m/s).
- * Real settling: <0.1 m/s is practically stopped.
- */
-const SETTLE_SPEED = 0.1;
-
-/** Fraction of fragments that must be settled before we stop simulation. */
-const SETTLE_FRACTION = 0.95;
+import {
+  PHYSICS_STEP_DT,
+  PHYSICS_MAX_STEPS,
+  PHYSICS_SETTLE_SPEED,
+  PHYSICS_SETTLE_FRACTION,
+} from '../core/config/balance.js';
 
 // ── Types ──
 
@@ -68,7 +54,7 @@ export class FragmentBody {
   }
 
   /**
-   * Add physics bodies for each fragment.
+   * Add physics bodies for blast fragments (FragmentData type).
    * Fragment volume → box half-extent (cube root of volume / 2).
    * Fragment mass and initial velocity are from BlastCalc output.
    */
@@ -91,6 +77,24 @@ export class FragmentBody {
   }
 
   /**
+   * Add physics bodies for rock fragments (RockFragment type from FragmentSim).
+   * Accepts fragments with { id, volume, mass, position (cx,cy,cz), velocity } shape.
+   */
+  addRockFragments(fragments: Array<{ id: number; volumeM3: number; massKg: number; cx: number; cy: number; cz: number; velocity: { x: number; y: number; z: number } }>): void {
+    for (const f of fragments) {
+      const halfExtent = Math.max(0.1, Math.cbrt(f.volumeM3) / 2);
+      const handle = this.world.addBody(
+        'box',
+        [halfExtent, halfExtent, halfExtent],
+        f.massKg,
+        { x: f.cx, y: f.cy, z: f.cz },
+        { x: f.velocity.x, y: f.velocity.y, z: f.velocity.z },
+      );
+      this.handles.set(f.id, handle);
+    }
+  }
+
+  /**
    * Run the simulation until fragments settle or max steps reached.
    * Tracks impact speed — the peak speed observed during simulation.
    * Peak speed approximates the speed at first terrain contact, which is
@@ -108,8 +112,8 @@ export class FragmentBody {
     }
 
     let steps = 0;
-    while (steps < MAX_SIM_STEPS) {
-      this.world.step(STEP_DT);
+    while (steps < PHYSICS_MAX_STEPS) {
+      this.world.step(PHYSICS_STEP_DT);
       steps++;
 
       // Check if enough fragments have settled; record peak speeds
@@ -120,11 +124,11 @@ export class FragmentBody {
         if (speed > (peakSpeeds.get(fragmentId) ?? 0)) {
           peakSpeeds.set(fragmentId, speed);
         }
-        if (speed < SETTLE_SPEED) {
+        if (speed < PHYSICS_SETTLE_SPEED) {
           settledCount++;
         }
       }
-      if (settledCount >= Math.ceil(total * SETTLE_FRACTION)) break;
+      if (settledCount >= Math.ceil(total * PHYSICS_SETTLE_FRACTION)) break;
     }
 
     // Store peak speeds as impact speeds
@@ -147,7 +151,7 @@ export class FragmentBody {
       results.push({
         fragmentId,
         finalPosition: pos,
-        settled: this.world.getBodySpeed(handle) < SETTLE_SPEED,
+        settled: this.world.getBodySpeed(handle) < PHYSICS_SETTLE_SPEED,
         impactSpeed: this.impactSpeeds.get(fragmentId) ?? 0,
       });
     }

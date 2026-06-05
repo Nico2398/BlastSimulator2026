@@ -7,9 +7,7 @@ import type { VoxelGrid, VoxelRockComposition } from '../core/world/VoxelGrid.js
 import type { Random } from '../core/math/Random.js';
 import { convexHull3D, buildAdjacencyMap, computeFragmentationScore, computeFragmentCount, type VoronoiCell, type Tetrahedron } from './VoronoiFrag.js';
 import { computeThreshold, parseKey } from '../core/mining/BlastCalc.js';
-import { COLLISION_DEFLATE_AMOUNT, MERGE_PROBABILITY, PHYSICS_FRAGMENT_CAP, GRAVITY } from '../core/config/balance.js';
-import { PhysicsWorld } from './PhysicsWorld.js';
-import { TerrainBody, findSurfaceY } from './TerrainBody.js';
+import { COLLISION_DEFLATE_AMOUNT, MERGE_PROBABILITY } from '../core/config/balance.js';
 import { assignFragmentVelocity } from './FragmentSimVelocity.js';
 import { getRock } from '../core/world/RockCatalog.js';
 
@@ -45,6 +43,8 @@ export {
   classifySimulationTier,
   assignFragmentVelocity,
 } from './FragmentSimVelocity.js';
+
+export { simulateProjectedFragments } from './FragmentSimPhysics.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────────
 
@@ -292,162 +292,4 @@ export function generateRockFragments(
   }
 
   return fragments;
-}
-
-/**
- * Run Tier A physics simulation on all fragments with simulationTier === 'projected'.
- * Implements PHYSICS_FRAGMENT_CAP:
- *   - First N get full Cannon-es rigid-body simulation with terrain collision.
- *   - Remaining use kinematic parabolic fallback (analytical trajectory).
- * All processed fragments end with state='static' and updated (cx,cy,cz).
- * Fragments with simulationTier !== 'projected' are returned unchanged.
- */
-export function simulateProjectedFragments(
-  _fragments: RockFragment[],
-  _grid: VoxelGrid,
-): RockFragment[] {
-  if (_fragments.length === 0) return _fragments;
-
-  // Separate projected from collapse fragments
-  const projected: RockFragment[] = [];
-  const collapse: RockFragment[] = [];
-
-  for (const frag of _fragments) {
-    if (frag.simulationTier === 'projected') {
-      projected.push(frag);
-    } else {
-      collapse.push(frag);
-    }
-  }
-
-  // Split projected at PHYSICS_FRAGMENT_CAP
-  const rigidFragments = projected.slice(0, PHYSICS_FRAGMENT_CAP);
-  const fallbackFragments = projected.slice(PHYSICS_FRAGMENT_CAP);
-
-  // Simulate
-  simulateRigidBodies(rigidFragments, _grid);
-  simulateParabolicFallback(fallbackFragments, _grid);
-
-  // Set state = 'static' on all projected fragments
-  for (const frag of projected) {
-    frag.state = 'static';
-  }
-
-  return _fragments;
-}
-
-// ─── Private Helpers ───────────────────────────────────────────────────────────
-
-/**
- * Run full Cannon-es rigid-body simulation for the given fragments.
- * Creates a PhysicsWorld, adds terrain and fragment bodies, steps until settled,
- * then reads final positions back into fragment (cx, cy, cz).
- * Fragments with massKg <= 0 or NaN positions are skipped.
- */
-function simulateRigidBodies(fragments: RockFragment[], grid: VoxelGrid): void {
-  if (fragments.length === 0) return;
-
-  const world = new PhysicsWorld();
-  world.init();
-
-  const terrain = new TerrainBody(world);
-  terrain.build(grid);
-
-  // Track fragment-handle associations
-  const tracked: Array<{ frag: RockFragment; handleId: number }> = [];
-
-  for (const frag of fragments) {
-    // Skip invalid fragments: mass <= 0 or NaN/Infinity positions
-    if (frag.massKg <= 0) continue;
-    if (!Number.isFinite(frag.cx) || !Number.isFinite(frag.cy) || !Number.isFinite(frag.cz)) continue;
-
-    const halfExtent = Math.max(0.1, Math.cbrt(frag.volumeM3) / 2);
-    const handle = world.addBody(
-      'box',
-      [halfExtent, halfExtent, halfExtent],
-      frag.massKg,
-      { x: frag.cx, y: frag.cy, z: frag.cz },
-      { x: frag.velocity.x, y: frag.velocity.y, z: frag.velocity.z },
-    );
-    tracked.push({ frag, handleId: handle.id });
-  }
-
-  // Step until settled or max steps reached
-  const dt = 1 / 60;
-  const maxSteps = 600;
-
-  for (let step = 0; step < maxSteps; step++) {
-    world.step(dt);
-
-    // Check if >= 95% have speed < 0.1
-    let settledCount = 0;
-    for (const { handleId } of tracked) {
-      if (world.getBodySpeed({ id: handleId }) < 0.1) settledCount++;
-    }
-    if (tracked.length > 0 && settledCount / tracked.length >= 0.95) break;
-  }
-
-  // Read final positions back into fragments
-  for (const { frag, handleId } of tracked) {
-    const pos = world.getBodyPosition({ id: handleId });
-    if (pos) {
-      frag.cx = pos.x;
-      frag.cy = pos.y;
-      frag.cz = pos.z;
-    }
-  }
-
-  terrain.dispose();
-  world.clear();
-}
-
-/**
- * Kinematic parabolic fallback for fragments beyond PHYSICS_FRAGMENT_CAP.
- * Uses semi-implicit Euler integration with findSurfaceY for ground detection.
- */
-function simulateParabolicFallback(fragments: RockFragment[], grid: VoxelGrid): void {
-  if (fragments.length === 0) return;
-
-  const dt = 1 / 60;
-  const maxSteps = 600;
-
-  for (const frag of fragments) {
-    // Skip invalid fragments: mass <= 0 or NaN/Infinity positions
-    if (frag.massKg <= 0) continue;
-    if (!Number.isFinite(frag.cx) || !Number.isFinite(frag.cy) || !Number.isFinite(frag.cz)) continue;
-
-    let x = frag.cx;
-    let y = frag.cy;
-    let z = frag.cz;
-    let vx = frag.velocity.x;
-    let vy = frag.velocity.y;
-    let vz = frag.velocity.z;
-
-    let settled = false;
-
-    for (let step = 0; step < maxSteps; step++) {
-      // Semi-implicit Euler integration
-      x += vx * dt;
-      vy += GRAVITY * dt;
-      y += vy * dt;
-      z += vz * dt;
-
-      // Ground detection via findSurfaceY
-      const terrainY = findSurfaceY(grid, Math.floor(x), Math.floor(z));
-      if (terrainY >= 0 && y <= terrainY + 1.0) {
-        frag.cx = x;
-        frag.cy = terrainY + 1.0;
-        frag.cz = z;
-        settled = true;
-        break;
-      }
-    }
-
-    // If never settled, use last computed position
-    if (!settled) {
-      frag.cx = x;
-      frag.cy = y;
-      frag.cz = z;
-    }
-  }
 }
