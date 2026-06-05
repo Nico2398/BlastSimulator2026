@@ -8,6 +8,7 @@ import type { Random } from '../core/math/Random.js';
 import { convexHull3D, buildAdjacencyMap, computeFragmentationScore, computeFragmentCount, type VoronoiCell, type Tetrahedron } from './VoronoiFrag.js';
 import { computeThreshold, parseKey } from '../core/mining/BlastCalc.js';
 import { COLLISION_DEFLATE_AMOUNT, MERGE_PROBABILITY } from '../core/config/balance.js';
+import { assignFragmentVelocity } from './FragmentSimVelocity.js';
 import { getRock } from '../core/world/RockCatalog.js';
 
 import {
@@ -33,6 +34,15 @@ export {
   computeAverageOreComposition,
   computeVolumeM3,
 } from './FragmentSimUtils.js';
+
+export {
+  computeEnergyGradientDirection,
+  distanceToNearestAirVoxel,
+  computeSurfaceProximityFactor,
+  computeVelocityMagnitude,
+  classifySimulationTier,
+  assignFragmentVelocity,
+} from './FragmentSimVelocity.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────────
 
@@ -197,6 +207,7 @@ export function generateRockFragments(
   _seedToVoxelMap: Map<number, SeedVoxelInfo>,
   _seedGroupings: number[][],
   _grid: VoxelGrid,
+  _effectiveEnergy: Map<string, number>,
   _generatedOverflow: Map<string, number>,
   _rng: Random,
   _nextId?: number,
@@ -258,7 +269,7 @@ export function generateRockFragments(
       overflowEnergy += _generatedOverflow.get(voxelKey) ?? 0;
     }
 
-    fragments.push({
+    const fragment: RockFragment = {
       id: nextId++,
       cx: centroid.x,
       cy: centroid.y,
@@ -273,7 +284,9 @@ export function generateRockFragments(
       velocity: ZERO,
       simulationTier: 'collapse',
       state: 'settling',
-    });
+    };
+    assignFragmentVelocity(fragment, _effectiveEnergy, _grid);
+    fragments.push(fragment);
   }
 
   return fragments;

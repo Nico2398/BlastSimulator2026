@@ -22,9 +22,19 @@ import {
 import { type VoronoiCell, type Tetrahedron } from '../../../src/physics/VoronoiFrag.js';
 import { vec3, ZERO } from '../../../src/core/math/Vec3.js';
 import { Random } from '../../../src/core/math/Random.js';
-import { VoxelGrid, type VoxelRockComposition } from '../../../src/core/world/VoxelGrid.js';
+import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { getRock } from '../../../src/core/world/RockCatalog.js';
 import { COLLISION_DEFLATE_AMOUNT } from '../../../src/core/config/balance.js';
+import {
+  computeEnergyGradientDirection,
+  distanceToNearestAirVoxel,
+  computeSurfaceProximityFactor,
+  computeVelocityMagnitude,
+  classifySimulationTier,
+  assignFragmentVelocity,
+} from '../../../src/physics/FragmentSimVelocity.js';
+import { length } from '../../../src/core/math/Vec3.js';
+import { MAX_PROJECTION_VELOCITY } from '../../../src/core/config/balance.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Helpers
@@ -1119,7 +1129,7 @@ describe('FragmentSim — generateRockFragments', () => {
     const seedToVoxelMap = new Map<number, SeedVoxelInfo>();
     const generatedOverflow = new Map<string, number>();
     const rng = new Random(42);
-    const result = generateRockFragments([], seedToVoxelMap, [], baseGrid(), generatedOverflow, rng);
+    const result = generateRockFragments([], seedToVoxelMap, [], baseGrid(), new Map<string, number>(), generatedOverflow, rng);
     expect(result).toEqual([]);
   });
 
@@ -1135,7 +1145,7 @@ describe('FragmentSim — generateRockFragments', () => {
     const generatedOverflow = new Map<string, number>([['0,0,0', 50]]);
     const rng = new Random(42);
 
-    const result = generateRockFragments(cells, seedToVoxelMap, seedGroupings, grid, generatedOverflow, rng);
+    const result = generateRockFragments(cells, seedToVoxelMap, seedGroupings, grid, new Map<string, number>(), generatedOverflow, rng);
     expect(result).toHaveLength(1);
     expect(result[0]!.id).toBe(1);
   });
@@ -1152,7 +1162,7 @@ describe('FragmentSim — generateRockFragments', () => {
     const generatedOverflow = new Map<string, number>();
     const rng = new Random(42);
 
-    const result = generateRockFragments(cells, seedToVoxelMap, seedGroupings, grid, generatedOverflow, rng, 100);
+    const result = generateRockFragments(cells, seedToVoxelMap, seedGroupings, grid, new Map<string, number>(), generatedOverflow, rng, 100);
     expect(result).toHaveLength(1);
     expect(result[0]!.id).toBe(100);
   });
@@ -1169,7 +1179,7 @@ describe('FragmentSim — generateRockFragments', () => {
     const generatedOverflow = new Map<string, number>();
     const rng = new Random(42);
 
-    const result = generateRockFragments(cells, seedToVoxelMap, seedGroupings, grid, generatedOverflow, rng);
+    const result = generateRockFragments(cells, seedToVoxelMap, seedGroupings, grid, new Map<string, number>(), generatedOverflow, rng);
 
     expect(result).toHaveLength(1);
     const frag = result[0]!;
@@ -1191,7 +1201,7 @@ describe('FragmentSim — generateRockFragments', () => {
     const generatedOverflow = new Map<string, number>();
     const rng = new Random(42);
 
-    const result = generateRockFragments(cells, seedToVoxelMap, seedGroupings, grid, generatedOverflow, rng);
+    const result = generateRockFragments(cells, seedToVoxelMap, seedGroupings, grid, new Map<string, number>(), generatedOverflow, rng);
 
     expect(result).toHaveLength(1);
     const frag = result[0]!;
@@ -1215,7 +1225,7 @@ describe('FragmentSim — generateRockFragments', () => {
     const generatedOverflow = new Map<string, number>();
     const rng = new Random(42);
 
-    const result = generateRockFragments(cells, seedToVoxelMap, seedGroupings, grid, generatedOverflow, rng);
+    const result = generateRockFragments(cells, seedToVoxelMap, seedGroupings, grid, new Map<string, number>(), generatedOverflow, rng);
 
     expect(result).toHaveLength(1);
     const frag = result[0]!;
@@ -1248,7 +1258,7 @@ describe('FragmentSim — generateRockFragments', () => {
     const generatedOverflow = new Map<string, number>();
     const rng = new Random(42);
 
-    const result = generateRockFragments(cells, seedToVoxelMap, seedGroupings, grid, generatedOverflow, rng);
+    const result = generateRockFragments(cells, seedToVoxelMap, seedGroupings, grid, new Map<string, number>(), generatedOverflow, rng);
     expect(result).toEqual([]);
   });
 
@@ -1268,7 +1278,7 @@ describe('FragmentSim — generateRockFragments', () => {
     const generatedOverflow = new Map<string, number>();
     const rng = new Random(42);
 
-    const result = generateRockFragments(cells, seedToVoxelMap, seedGroupings, grid, generatedOverflow, rng);
+    const result = generateRockFragments(cells, seedToVoxelMap, seedGroupings, grid, new Map<string, number>(), generatedOverflow, rng);
     expect(result).toEqual([]);
   });
 
@@ -1284,7 +1294,7 @@ describe('FragmentSim — generateRockFragments', () => {
     const generatedOverflow = new Map<string, number>();
     const rng = new Random(42);
 
-    const result = generateRockFragments(cells, seedToVoxelMap, seedGroupings, grid, generatedOverflow, rng);
+    const result = generateRockFragments(cells, seedToVoxelMap, seedGroupings, grid, new Map<string, number>(), generatedOverflow, rng);
 
     expect(result).toHaveLength(1);
     expect(result[0]!.volumeM3).toBeGreaterThan(0);
@@ -1303,7 +1313,7 @@ describe('FragmentSim — generateRockFragments', () => {
     const generatedOverflow = new Map<string, number>();
     const rng = new Random(42);
 
-    const result = generateRockFragments(cells, seedToVoxelMap, seedGroupings, grid, generatedOverflow, rng);
+    const result = generateRockFragments(cells, seedToVoxelMap, seedGroupings, grid, new Map<string, number>(), generatedOverflow, rng);
 
     expect(result).toHaveLength(1);
     const frag = result[0]!;
@@ -1326,7 +1336,7 @@ describe('FragmentSim — generateRockFragments', () => {
     const generatedOverflow = new Map<string, number>([['0,0,0', 75]]);
     const rng = new Random(42);
 
-    const result = generateRockFragments(cells, seedToVoxelMap, seedGroupings, grid, generatedOverflow, rng);
+    const result = generateRockFragments(cells, seedToVoxelMap, seedGroupings, grid, new Map<string, number>(), generatedOverflow, rng);
 
     expect(result).toHaveLength(1);
     expect(result[0]!.overflowEnergy).toBeGreaterThan(0);
@@ -1344,32 +1354,34 @@ describe('FragmentSim — generateRockFragments', () => {
     const generatedOverflow = new Map<string, number>();
     const rng = new Random(42);
 
-    const result = generateRockFragments(cells, seedToVoxelMap, seedGroupings, grid, generatedOverflow, rng);
+    const result = generateRockFragments(cells, seedToVoxelMap, seedGroupings, grid, new Map<string, number>(), generatedOverflow, rng);
 
     expect(result).toHaveLength(1);
     expect(result[0]!.overflowEnergy).toBe(0);
   });
 
-  it('sets default velocity=ZERO, simulationTier=collapse, state=settling', () => {
+  it('computes velocity from effectiveEnergy and overflowEnergy — non-zero when gradient exists', () => {
     const grid = baseGrid();
     const cells: VoronoiCell[] = [
       { seedIndex: 0, vertices: cellVertices1, isValid: true },
     ];
     const seedToVoxelMap = new Map<number, SeedVoxelInfo>([
-      [0, { x: 0, y: 0, z: 0, fragmentCount: 3, effectiveEnergy: 200, generatedOverflow: 0 }],
+      [0, { x: 0, y: 0, z: 0, fragmentCount: 3, effectiveEnergy: 10000, generatedOverflow: 10000 }],
     ]);
     const seedGroupings = [[0]];
-    const generatedOverflow = new Map<string, number>();
+    // Centroid of tetrahedron is (0.25, 0.25, 0.25). Finite diff with δ=1 samples at
+    // x+1=1.25→key "1,0,0" and x-1=-0.75→key "-1,0,0". Use "1,0,0" so gradient is non-zero.
+    const effectiveEnergy = new Map<string, number>([['1,0,0', 1000]]);
+    const generatedOverflow = new Map<string, number>([['0,0,0', 10000]]);
     const rng = new Random(42);
 
-    const result = generateRockFragments(cells, seedToVoxelMap, seedGroupings, grid, generatedOverflow, rng);
+    const result = generateRockFragments(cells, seedToVoxelMap, seedGroupings, grid, effectiveEnergy, generatedOverflow, rng);
 
     expect(result).toHaveLength(1);
     const frag = result[0]!;
-    expect(frag.velocity.x).toBe(0);
-    expect(frag.velocity.y).toBe(0);
-    expect(frag.velocity.z).toBe(0);
-    expect(frag.simulationTier).toBe('collapse');
+    // With high energy and shallow depth (grid is small, so surface is near), velocity should be non-zero
+    expect(length(frag.velocity)).toBeGreaterThan(0);
+    expect(frag.simulationTier).toBe('projected');
     expect(frag.state).toBe('settling');
   });
 
@@ -1385,7 +1397,7 @@ describe('FragmentSim — generateRockFragments', () => {
     const generatedOverflow = new Map<string, number>();
     const rng = new Random(42);
 
-    const result = generateRockFragments(cells, seedToVoxelMap, seedGroupings, grid, generatedOverflow, rng);
+    const result = generateRockFragments(cells, seedToVoxelMap, seedGroupings, grid, new Map<string, number>(), generatedOverflow, rng);
 
     expect(result).toHaveLength(1);
     const frag = result[0]!;
@@ -1406,7 +1418,7 @@ describe('FragmentSim — generateRockFragments', () => {
     const generatedOverflow = new Map<string, number>();
     const rng = new Random(42);
 
-    const result = generateRockFragments(cells, seedToVoxelMap, seedGroupings, grid, generatedOverflow, rng);
+    const result = generateRockFragments(cells, seedToVoxelMap, seedGroupings, grid, new Map<string, number>(), generatedOverflow, rng);
 
     expect(result).toHaveLength(1);
     const frag = result[0]!;
@@ -1426,8 +1438,8 @@ describe('FragmentSim — generateRockFragments', () => {
     const seedGroupings = [[0]];
     const generatedOverflow = new Map<string, number>();
 
-    const resultA = generateRockFragments(cells, seedToVoxelMap, seedGroupings, grid, generatedOverflow, new Random(42));
-    const resultB = generateRockFragments(cells, seedToVoxelMap, seedGroupings, grid, generatedOverflow, new Random(42));
+    const resultA = generateRockFragments(cells, seedToVoxelMap, seedGroupings, grid, new Map<string, number>(), generatedOverflow, new Random(42));
+    const resultB = generateRockFragments(cells, seedToVoxelMap, seedGroupings, grid, new Map<string, number>(), generatedOverflow, new Random(42));
 
     expect(resultA).toHaveLength(1);
     expect(resultB).toHaveLength(1);
@@ -1466,7 +1478,7 @@ describe('FragmentSim — generateRockFragments', () => {
     const generatedOverflow = new Map<string, number>();
     const rng = new Random(42);
 
-    const result = generateRockFragments(cells, seedToVoxelMap, seedGroupings, grid, generatedOverflow, rng, 10);
+    const result = generateRockFragments(cells, seedToVoxelMap, seedGroupings, grid, new Map<string, number>(), generatedOverflow, rng, 10);
 
     expect(result).toHaveLength(2);
     expect(result[0]!.id).toBe(10);
@@ -1496,7 +1508,7 @@ describe('FragmentSim — generateRockFragments', () => {
     const generatedOverflow = new Map<string, number>([['0,0,0', 30]]);
     const rng = new Random(42);
 
-    const result = generateRockFragments(cells, seedToVoxelMap, seedGroupings, grid, generatedOverflow, rng);
+    const result = generateRockFragments(cells, seedToVoxelMap, seedGroupings, grid, new Map<string, number>(), generatedOverflow, rng);
 
     expect(result).toHaveLength(1);
     const frag = result[0]!;
@@ -1504,5 +1516,410 @@ describe('FragmentSim — generateRockFragments', () => {
     expect(frag.volumeM3).toBeCloseTo(1.0, 5);
     // overflowEnergy should reflect all seeds contributing
     expect(frag.overflowEnergy).toBeGreaterThan(0);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Group 11: FragmentSimVelocity — computeEnergyGradientDirection
+// Computes gradient of effective energy field around a point.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('FragmentSimVelocity — computeEnergyGradientDirection', () => {
+  it('returns ZERO for empty effectiveEnergy map', () => {
+    const grid = new VoxelGrid(10, 10, 10);
+    const result = computeEnergyGradientDirection(new Map(), vec3(0, 0, 0), grid);
+    expect(result.x).toBe(0);
+    expect(result.y).toBe(0);
+    expect(result.z).toBe(0);
+  });
+
+  it('returns direction away from single high-energy voxel at (1,0,0)', () => {
+    const grid = new VoxelGrid(10, 10, 10);
+    const energy = new Map<string, number>([['1,0,0', 100]]);
+    // Point at origin — finite diff samples at x+1=1→"1,0,0" and x-1=-1→"-1,0,0"
+    // E(1,0,0)=100, E(-1,0,0)=0 → dE/dx=50 → gradient=(50,0,0) → negated=(-1,0,0)
+    const result = computeEnergyGradientDirection(energy, vec3(0, 0, 0), grid);
+    // Direction away from high energy (negative gradient) should point negative x
+    expect(result.x).toBeLessThan(0);
+    expect(result.y).toBeCloseTo(0, 10);
+    expect(result.z).toBeCloseTo(0, 10);
+  });
+
+  it('returns ZERO for uniform energy field', () => {
+    const grid = new VoxelGrid(10, 10, 10);
+    const energy = new Map<string, number>([
+      ['0,0,0', 100],
+      ['2,0,0', 100],
+    ]);
+    const result = computeEnergyGradientDirection(energy, vec3(1, 0, 0), grid);
+    // Uniform energy → no gradient → ZERO
+    expect(result.x).toBe(0);
+    expect(result.y).toBe(0);
+    expect(result.z).toBe(0);
+  });
+
+  it('computes gradient pointing away from higher energy region', () => {
+    const grid = new VoxelGrid(10, 10, 10);
+    // Higher energy at x=2 than at x=0
+    const energy = new Map<string, number>([
+      ['0,0,0', 50],
+      ['2,0,0', 150],
+    ]);
+    const result = computeEnergyGradientDirection(energy, vec3(1, 0, 0), grid);
+    // dE/dx ≈ (150-50)/2 = 50, so gradient points +x, negated gradient = -x direction
+    expect(result.x).toBeLessThan(0);
+    expect(result.y).toBeCloseTo(0, 10);
+    expect(result.z).toBeCloseTo(0, 10);
+  });
+
+  it('handles out-of-bounds point gracefully', () => {
+    const grid = new VoxelGrid(10, 10, 10);
+    const energy = new Map<string, number>();
+    // Point outside grid should not crash
+    const result = computeEnergyGradientDirection(energy, vec3(-5, -5, -5), grid);
+    expect(result).toBeDefined();
+  });
+
+  it('returns unit-length direction for non-zero gradient', () => {
+    const grid = new VoxelGrid(10, 10, 10);
+    const energy = new Map<string, number>([['5,0,0', 200]]);
+    const result = computeEnergyGradientDirection(energy, vec3(3, 0, 0), grid);
+    // Direction should be normalized
+    const mag = Math.sqrt(result.x * result.x + result.y * result.y + result.z * result.z);
+    if (mag > 0) {
+      expect(mag).toBeCloseTo(1.0, 5);
+    }
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Group 12: FragmentSimVelocity — distanceToNearestAirVoxel
+// Finds the distance from a point to the nearest air voxel.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('FragmentSimVelocity — distanceToNearestAirVoxel', () => {
+  it('returns 0 when point is inside an air voxel', () => {
+    // Default grid has no voxels set → all are air
+    const grid = new VoxelGrid(10, 10, 10);
+    const result = distanceToNearestAirVoxel(vec3(0.5, 0.5, 0.5), grid);
+    expect(result).toBe(0);
+  });
+
+  it('returns positive distance when surrounded by solid rock', () => {
+    const grid = new VoxelGrid(10, 10, 10);
+    // Fill the area with solid rock
+    for (let x = 3; x <= 7; x++) {
+      for (let y = 3; y <= 7; y++) {
+        for (let z = 3; z <= 7; z++) {
+          grid.setVoxel(x, y, z, {
+            composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
+            density: 1.0,
+            oreDensities: {},
+            fractureModifier: 1.0,
+          });
+        }
+      }
+    }
+    // Point at center of solid block (5.5, 5.5, 5.5) — nearest air is at boundary of the filled area
+    const result = distanceToNearestAirVoxel(vec3(5.5, 5.5, 5.5), grid, 10);
+    // Should be > 0 (distance to first air voxel outside the block)
+    expect(result).toBeGreaterThan(0);
+  });
+
+  it('returns sentinel when no air found within maxRadius', () => {
+    const grid = new VoxelGrid(30, 30, 30);
+    // Fill a central region with rock so air is far away
+    for (let x = 10; x < 20; x++) {
+      for (let y = 10; y < 20; y++) {
+        for (let z = 10; z < 20; z++) {
+          grid.setVoxel(x, y, z, {
+            composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
+            density: 1.0,
+            oreDensities: {},
+            fractureModifier: 1.0,
+          });
+        }
+      }
+    }
+    const result = distanceToNearestAirVoxel(vec3(15, 15, 15), grid, 4);
+    // Nearest air is at the boundary of the rock block (x=9 or x=20), distance > 8, so sentinel = 4*2
+    expect(result).toBe(8);
+  });
+
+  it('treats out-of-bounds voxels as air', () => {
+    const grid = new VoxelGrid(3, 3, 3);
+    // Fill grid with rock
+    for (let x = 0; x < 3; x++) {
+      for (let y = 0; y < 3; y++) {
+        for (let z = 0; z < 3; z++) {
+          grid.setVoxel(x, y, z, {
+            composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
+            density: 1.0,
+            oreDensities: {},
+            fractureModifier: 1.0,
+          });
+        }
+      }
+    }
+    // Point near boundary — out-of-bounds should count as air
+    const result = distanceToNearestAirVoxel(vec3(2.9, 1.5, 1.5), grid, 5);
+    expect(result).toBeGreaterThan(0);
+  });
+
+  it('detects adjacent air voxel with correct distance', () => {
+    const grid = new VoxelGrid(10, 10, 10);
+    // Solid rock at (5,5,5), all other voxels are air
+    grid.setVoxel(5, 5, 5, {
+      composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
+      density: 1.0,
+      oreDensities: {},
+      fractureModifier: 1.0,
+    });
+    // Point inside the solid voxel — BFS iteration order finds (4,4,4) first at r=1
+    const result = distanceToNearestAirVoxel(vec3(5.5, 5.5, 5.5), grid, 5);
+    // Distance from (5.5,5.5,5.5) to center of (4,4,4) = (4.5,4.5,4.5) = sqrt(3)
+    const expected = Math.sqrt(3);
+    expect(result).toBeCloseTo(expected, 5);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Group 13: FragmentSimVelocity — computeSurfaceProximityFactor
+// Surface proximity factor based on distance to air: exp(-d / SURFACE_PROXIMITY_DECAY).
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('FragmentSimVelocity — computeSurfaceProximityFactor', () => {
+  it('returns 1.0 for distToAir = 0', () => {
+    expect(computeSurfaceProximityFactor(0)).toBe(1.0);
+  });
+
+  it('returns exp(-0.5) ≈ 0.6065 for distToAir = 1.0', () => {
+    expect(computeSurfaceProximityFactor(1.0)).toBeCloseTo(Math.exp(-0.5), 10);
+  });
+
+  it('returns exp(-1.0) ≈ 0.3679 for distToAir = 2.0', () => {
+    expect(computeSurfaceProximityFactor(2.0)).toBeCloseTo(Math.exp(-1.0), 10);
+  });
+
+  it('returns very small value for distToAir = 10', () => {
+    expect(computeSurfaceProximityFactor(10)).toBeCloseTo(Math.exp(-5), 10);
+  });
+
+  it('returns correct value for distToAir = 0.5', () => {
+    expect(computeSurfaceProximityFactor(0.5)).toBeCloseTo(Math.exp(-0.25), 10);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Group 14: FragmentSimVelocity — computeVelocityMagnitude
+// Velocity magnitude from overflow energy, mass, and surface proximity factor.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('FragmentSimVelocity — computeVelocityMagnitude', () => {
+  it('computes correct magnitude for overflowEnergy=10000, mass=100, factor=1.0', () => {
+    const result = computeVelocityMagnitude(10000, 100, 1.0);
+    // sqrt(2 * 10000 / 100) = sqrt(200) ≈ 14.142
+    expect(result).toBeCloseTo(Math.sqrt(200), 10);
+  });
+
+  it('scales by surfaceProximityFactor', () => {
+    const result = computeVelocityMagnitude(10000, 100, 0.5);
+    // sqrt(200) * 0.5 ≈ 7.071
+    expect(result).toBeCloseTo(Math.sqrt(200) * 0.5, 10);
+  });
+
+  it('returns 0 when overflowEnergy is 0', () => {
+    expect(computeVelocityMagnitude(0, 100, 1.0)).toBe(0);
+  });
+
+  it('returns 0 when massKg is 0 (guard against division by zero)', () => {
+    expect(computeVelocityMagnitude(10000, 0, 1.0)).toBe(0);
+  });
+
+  it('clamps to MAX_PROJECTION_VELOCITY (80) when very high energy', () => {
+    // sqrt(2 * 1000000 / 1) = sqrt(2000000) ≈ 1414, clamped to 80
+    const result = computeVelocityMagnitude(1000000, 1, 1.0);
+    expect(result).toBe(MAX_PROJECTION_VELOCITY);
+  });
+
+  it('clamps very high energy/mass ratio to MAX_PROJECTION_VELOCITY', () => {
+    const result = computeVelocityMagnitude(100, 0.001, 1.0);
+    expect(result).toBe(MAX_PROJECTION_VELOCITY);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Group 15: FragmentSimVelocity — classifySimulationTier
+// Classifies fragment into 'collapse' or 'projected' based on velocity threshold.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('FragmentSimVelocity — classifySimulationTier', () => {
+  it('returns projected for vMag=5.0 (> threshold)', () => {
+    expect(classifySimulationTier(5.0)).toBe('projected');
+  });
+
+  it('returns collapse for vMag=1.0 (< threshold)', () => {
+    expect(classifySimulationTier(1.0)).toBe('collapse');
+  });
+
+  it('returns collapse for vMag=2.0 (exactly threshold, strict >)', () => {
+    expect(classifySimulationTier(2.0)).toBe('collapse');
+  });
+
+  it('returns collapse for vMag=0', () => {
+    expect(classifySimulationTier(0)).toBe('collapse');
+  });
+
+  it('returns projected for very high vMag=200', () => {
+    expect(classifySimulationTier(200)).toBe('projected');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Group 16: FragmentSimVelocity — assignFragmentVelocity
+// End-to-end velocity assignment: combines gradient, distance, proximity, and tier.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('FragmentSimVelocity — assignFragmentVelocity', () => {
+  it('assigns non-zero velocity and projected tier when fragment has high overflow and near surface', () => {
+    const grid = new VoxelGrid(10, 10, 10);
+    // Set rock at (5,5,5) with air all around
+    grid.setVoxel(5, 5, 5, {
+      composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
+      density: 1.0,
+      oreDensities: {},
+      fractureModifier: 1.0,
+    });
+
+    const fragment: RockFragment = {
+      id: 1, cx: 5.5, cy: 5.5, cz: 5.5,
+      graphicVertices: new Float32Array(),
+      collisionVertices: new Float32Array(),
+      composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
+      oreComposition: { ores: [] },
+      volumeM3: 1.0,
+      massKg: 100,
+      overflowEnergy: 100000,
+      velocity: ZERO,
+      simulationTier: 'collapse',
+      state: 'settling',
+    };
+
+    // Centroid at (5.5, 5.5, 5.5). Finite diff with δ=1 samples at x+1=6.5→"6,5,5" and
+    // x-1=4.5→"4,5,5". Use "4,5,5" in the map so gradient is non-zero (points +x).
+    const effectiveEnergy = new Map<string, number>([['4,5,5', 1000]]);
+
+    assignFragmentVelocity(fragment, effectiveEnergy, grid);
+
+    // Should have non-zero velocity and projected tier
+    const vMag = length(fragment.velocity);
+    expect(vMag).toBeGreaterThan(0);
+    expect(fragment.simulationTier).toBe('projected');
+    expect(fragment.state).toBe('settling'); // unchanged
+  });
+
+  it('assigns zero velocity and collapse tier when overflowEnergy is 0', () => {
+    const grid = new VoxelGrid(10, 10, 10);
+    grid.setVoxel(5, 5, 5, {
+      composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
+      density: 1.0,
+      oreDensities: {},
+      fractureModifier: 1.0,
+    });
+
+    const fragment: RockFragment = {
+      id: 1, cx: 5.5, cy: 5.5, cz: 5.5,
+      graphicVertices: new Float32Array(),
+      collisionVertices: new Float32Array(),
+      composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
+      oreComposition: { ores: [] },
+      volumeM3: 1.0,
+      massKg: 100,
+      overflowEnergy: 0,
+      velocity: ZERO,
+      simulationTier: 'projected',
+      state: 'settling',
+    };
+
+    assignFragmentVelocity(fragment, new Map<string, number>(), grid);
+
+    expect(fragment.velocity.x).toBe(0);
+    expect(fragment.velocity.y).toBe(0);
+    expect(fragment.velocity.z).toBe(0);
+    expect(fragment.simulationTier).toBe('collapse');
+  });
+
+  it('assigns collapse tier for deep fragment with no nearby air', () => {
+    const grid = new VoxelGrid(10, 10, 10);
+    // Fill entire grid with rock → no air
+    for (let x = 0; x < 10; x++) {
+      for (let y = 0; y < 10; y++) {
+        for (let z = 0; z < 10; z++) {
+          grid.setVoxel(x, y, z, {
+            composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
+            density: 1.0,
+            oreDensities: {},
+            fractureModifier: 1.0,
+          });
+        }
+      }
+    }
+
+    const fragment: RockFragment = {
+      id: 1, cx: 5.5, cy: 5.5, cz: 5.5,
+      graphicVertices: new Float32Array(),
+      collisionVertices: new Float32Array(),
+      composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
+      oreComposition: { ores: [] },
+      volumeM3: 1.0,
+      massKg: 100,
+      overflowEnergy: 5000,
+      velocity: ZERO,
+      simulationTier: 'projected',
+      state: 'settling',
+    };
+
+    assignFragmentVelocity(fragment, new Map<string, number>(), grid);
+
+    // Deep fragment → surfaceProximityFactor ≈ 0 → velocity ≈ 0
+    expect(fragment.simulationTier).toBe('collapse');
+  });
+
+  it('assigns upward velocity when energy gradient points upward', () => {
+    const grid = new VoxelGrid(10, 10, 10);
+    // Rock at (5,5,5) with air above
+    grid.setVoxel(5, 5, 5, {
+      composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
+      density: 1.0,
+      oreDensities: {},
+      fractureModifier: 1.0,
+    });
+
+    const fragment: RockFragment = {
+      id: 1, cx: 5.5, cy: 5.5, cz: 5.5,
+      graphicVertices: new Float32Array(),
+      collisionVertices: new Float32Array(),
+      composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
+      oreComposition: { ores: [] },
+      volumeM3: 1.0,
+      massKg: 100,
+      overflowEnergy: 50000,
+      velocity: ZERO,
+      simulationTier: 'collapse',
+      state: 'settling',
+    };
+
+    // Centroid at (5.5, 5.5, 5.5). Finite diff with δ=1 samples at y+1=6.5→"5,6,5" and
+    // y-1=4.5→"5,4,5". Higher energy at "5,4,5" (below) than "5,6,5" (above) → gradient upward.
+    const effectiveEnergy = new Map<string, number>([
+      ['5,4,5', 100000],
+      ['5,6,5', 10000],
+    ]);
+
+    assignFragmentVelocity(fragment, effectiveEnergy, grid);
+
+    // Energy is higher at lower y → gradient direction = away from high energy = upward (positive y)
+    expect(fragment.velocity.y).toBeGreaterThan(0);
+    expect(fragment.simulationTier).toBe('projected');
   });
 });
