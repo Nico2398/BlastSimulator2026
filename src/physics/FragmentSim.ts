@@ -44,6 +44,8 @@ export {
   assignFragmentVelocity,
 } from './FragmentSimVelocity.js';
 
+export { simulateProjectedFragments } from './FragmentSimPhysics.js';
+
 // ─── Types ──────────────────────────────────────────────────────────────────────
 
 /** Full RockFragment schema. */

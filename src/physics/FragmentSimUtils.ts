@@ -198,6 +198,15 @@ export function computeAverageOreComposition(
 }
 
 /**
+ * Check if a RockFragment has valid mass and position for physics simulation.
+ */
+export function isFragmentValidForPhysics(frag: { massKg: number; cx: number; cy: number; cz: number }): boolean {
+  if (frag.massKg <= 0) return false;
+  if (!Number.isFinite(frag.cx) || !Number.isFinite(frag.cy) || !Number.isFinite(frag.cz)) return false;
+  return true;
+}
+
+/**
  * Compute the total volume (m³) of a fragment from its constituent voxels.
  *
  * The volume is the sum of the voxel volumes (CELL_SIZE³ each) weighted by density.

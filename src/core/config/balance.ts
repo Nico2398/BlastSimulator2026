@@ -384,3 +384,22 @@ export const SURVEY_DURATION_TICKS = {
 
 /** Assumed bulk density of ore-bearing rock used for mass calculations (kg/m³). */
 export const ORE_DENSITY_KG_M3 = 2500;
+
+// ─── Physics ────────────────────────────────────────────────────────────────────
+
+/** Maximum fragments that get full Cannon-es rigid-body simulation. Rest use parabolic fallback. */
+export const PHYSICS_FRAGMENT_CAP = 50;
+
+/** Gravitational acceleration (m/s²). Negative = downward. */
+export const GRAVITY = -9.81;
+
+/** Physics timestep in seconds per step. */
+export const PHYSICS_STEP_DT = 1 / 60;
+/** Maximum physics simulation steps before forced stop. */
+export const PHYSICS_MAX_STEPS = 600;
+/** Speed threshold (m/s) below which a body is considered settled. */
+export const PHYSICS_SETTLE_SPEED = 0.1;
+/** Fraction of bodies that must be settled before sim stops early. */
+export const PHYSICS_SETTLE_FRACTION = 0.95;
+/** Vertical offset above terrain surface for fragment landing position (metres). */
+export const PHYSICS_TERRAIN_CLEARANCE = 1.0;

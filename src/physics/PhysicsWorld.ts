@@ -4,11 +4,9 @@
 // Architecture: src/physics/ depends on src/core/ but never the reverse.
 
 import * as CANNON from 'cannon-es';
+import { GRAVITY } from '../core/config/balance.js';
 
 // ── Config ──
-
-/** Gravity (m/s²). Real Earth gravity = 9.81. */
-const GRAVITY = -9.81;
 
 /** Physics substeps per step call — more = more accurate but slower. */
 const SUBSTEPS = 3;
