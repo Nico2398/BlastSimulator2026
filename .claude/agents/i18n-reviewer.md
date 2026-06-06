@@ -1,10 +1,18 @@
 ---
 name: i18n-reviewer
-description: Internationalization reviewer. Flags hardcoded user-facing strings, missing translation keys, en.json/fr.json mismatches. Read-only. 
+description:  Internationalization reviewer. Flags hardcoded user-facing strings, missing translation keys, en.json/fr.json mismatches. Read-only.
 allowed-tools: Read Search
 user-invocable: false
 disable-model-invocation: true
+hooks:
+  PreToolUse:
+    - matcher: Bash
+      hooks:
+        - type: command
+          shell: powershell
+          command: .claude/hooks/block-git-gh.ps1
 ---
+
 # i18n Reviewer
 
 Position: parallel sub-reviewer in code_review fan-out. Read-only.

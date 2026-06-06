@@ -49,6 +49,9 @@ handles that) — focus on **semantic and structural** duplication.
 - Identical or near-identical function bodies in the same file.
 - Repeated `switch`/`if-else` chains dispatching on the same discriminant.
 
+### Semantic Coherence
+- Delegated to `@semantic-reviewer`. If semantic-reviewer fails, do not override.
+
 ## What NOT to Flag
 
 - Syntactic clones already caught by jscpd (qualimetry step).

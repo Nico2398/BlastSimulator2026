@@ -1,17 +1,18 @@
 ---
 name: visual-tester
-description: Visual testing: Puppeteer scenario tests, screenshots, state dumps. Use when change affects rendering, UI, or visual presentation. 
-allowed-tools: Read Search Execute
+description:  Visual testing: Puppeteer scenario tests, screenshots, state dumps. Use when change affects rendering, UI, or visual presentation.
+allowed-tools: Read Edit Search Execute
 user-invocable: false
 disable-model-invocation: true
 hooks:
   PreToolUse:
-    - matcher: "Bash"
+    - matcher: Bash
       hooks:
         - type: command
           shell: powershell
-          command: ".claude/hooks/block-git-gh.ps1"
+          command: .claude/hooks/block-git-gh.ps1
 ---
+
 # Visual Tester — Screenshot & Scenario Verification
 
 Position: 5/5 (Visual Test). Prev: @validator.

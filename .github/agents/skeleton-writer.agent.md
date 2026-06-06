@@ -11,12 +11,14 @@ Write **empty stubs only**. No implementation logic. No tests. Establish the sha
 
 ## Process
 
+0. `git branch --show-current` → verify branch is `pipeline/tests-<issue-number>`. If mismatch, print `## WRONG BRANCH: on <actual>, expected pipeline/tests-<N>` and return FAIL.
 1. Read planner output — `## Plan` section, files to create/modify, acceptance criteria.
 2. For each new file: create with empty exports (interfaces, types, function stubs returning `undefined`/`null`/empty).
 3. For each modified file: add new function/method/type signatures only — do not alter existing logic.
 4. `npx tsc --noEmit` → verify stubs are type-valid.
 5. Commit: `git add -A && git commit -m "skeleton: <feature-name> stubs"`.
-6. Output `skeleton_commit_sha` (result of `git rev-parse HEAD`).
+6. `git log --oneline -1` → confirm committed.
+7. Output `skeleton_commit_sha` (result of `git rev-parse HEAD`).
 
 ## What to Create
 

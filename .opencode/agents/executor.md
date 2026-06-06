@@ -2,6 +2,18 @@
 model: opencode/deepseek-v4-flash-free
 description: Executes simple imperative commands (create issue, comment, tag, etc.) using gh and shell.
 mode: subagent
+permission:
+  bash:
+    "*": "allow"
+    "git add *": "deny"
+    "git commit *": "deny"
+    "git push *": "deny"
+    "git checkout *": "deny"
+    "git merge *": "deny"
+    "git rebase *": "deny"
+    "git cherry-pick *": "deny"
+    "gh pr create *": "deny"
+    "gh pr merge *": "deny"
 ---
 
 # Executor — Imperative Command Runner

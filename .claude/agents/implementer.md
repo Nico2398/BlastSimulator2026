@@ -1,17 +1,11 @@
 ---
 name: implementer
-description: TDD Green phase: minimum code to make failing tests pass. Correctness over elegance. Respects architecture + conventions. 
+description:  TDD Green phase: minimum code to make failing tests pass. Correctness over elegance. Respects architecture + conventions.
 allowed-tools: Read Edit Search Execute
 user-invocable: false
 disable-model-invocation: true
-hooks:
-  PreToolUse:
-    - matcher: "Bash"
-      hooks:
-        - type: command
-          shell: powershell
-          command: ".claude/hooks/block-git-gh.ps1"
 ---
+
 # Implementer — TDD Green Phase
 
 Position: 2/5 (Green). Prev: @test-writer. Next: @refactorer.
@@ -20,12 +14,15 @@ Write **minimum code** to pass failing tests.
 
 ## Process
 
+0. `git branch --show-current` → verify branch is `pipeline/impl-<issue-number>`. If mismatch, print `## WRONG BRANCH: on <actual>, expected pipeline/impl-<N>` and return FAIL.
 1. Read failing tests → understand expected behavior
 2. Identify source files needing changes
 3. Write minimum code → all failing tests pass
 4. `npx vitest run` → verify
 5. `npx tsc --noEmit` → verify type safety
-6. Hand off to refactorer
+6. Commit: `git add -A && git commit -m "implement: <feature> (#<issue>)"`
+7. `git log --oneline -1` → confirm committed
+8. Hand off to refactorer
 
 ## Console Command Pattern
 

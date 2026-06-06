@@ -1,10 +1,18 @@
 ---
 name: review-coordinator
-description: DEPRECATED — Orchestrator now handles merging reviewer findings directly. Kept for reference only. 
+description:  DEPRECATED — Orchestrator now handles merging reviewer findings directly. This agent definition kept for reference only.
 allowed-tools: Read Search
 user-invocable: false
 disable-model-invocation: true
+hooks:
+  PreToolUse:
+    - matcher: Bash
+      hooks:
+        - type: command
+          shell: powershell
+          command: .claude/hooks/block-git-gh.ps1
 ---
+
 # Review Coordinator (DEPRECATED)
 
 This role has been absorbed by the **pipeline orchestrator**. A dedicated coordinator agent is unnecessary because the orchestrator already holds all sub-reviewer outputs in context after fan-out. Merging them inline removes an extra LLM call and avoids re-transmitting findings.

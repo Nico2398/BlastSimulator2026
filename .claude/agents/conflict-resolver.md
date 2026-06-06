@@ -1,17 +1,11 @@
 ---
 name: conflict-resolver
-description: Resolves git cherry-pick merge conflicts. Reads conflicted files, merges both sides, removes conflict markers, stages resolved files. 
+description:  Resolves git cherry-pick merge conflicts. Reads conflicted files, merges both sides, removes conflict markers, stages resolved files.
 allowed-tools: Read Edit Search Execute
 user-invocable: false
 disable-model-invocation: true
-hooks:
-  PreToolUse:
-    - matcher: "Bash"
-      hooks:
-        - type: command
-          shell: powershell
-          command: ".claude/hooks/block-git-gh.ps1"
 ---
+
 # Conflict Resolver
 
 Resolve git cherry-pick merge conflicts. Clean, minimal edits.

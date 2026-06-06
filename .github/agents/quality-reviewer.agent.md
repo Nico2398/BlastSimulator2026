@@ -53,6 +53,7 @@ Adjust review depth based on `risk_tier` from context:
 ### Additional Checks (also have dedicated sub-reviewers)
 - **i18n** — user-visible strings via `t('key')`. No hardcoded text in logic/UI.
 - **Issue alignment** — every acceptance criterion from the issue is implemented.
+- **Semantic coherence** — delegated to `@semantic-reviewer`. If semantic-reviewer fails, do not override.
 
 ## What NOT to Flag
 

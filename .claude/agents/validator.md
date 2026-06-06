@@ -1,17 +1,18 @@
 ---
 name: validator
-description: Validation specialist: runs full test suite, type checking, build. Detects regressions, type errors, build failures. Reports pass/fail with actionable diagnostics. 
-allowed-tools: Read Search Execute
+description:  Validation specialist: runs full test suite, type checking, build. Detects regressions, type errors, build failures. Reports pass/fail with actionable diagnostics.
+allowed-tools: Read Edit Search Execute
 user-invocable: false
 disable-model-invocation: true
 hooks:
   PreToolUse:
-    - matcher: "Bash"
+    - matcher: Bash
       hooks:
         - type: command
           shell: powershell
-          command: ".claude/hooks/block-git-gh.ps1"
+          command: .claude/hooks/block-git-gh.ps1
 ---
+
 # Validator — Full Suite Verification
 
 Position: 4/5 (Validate). Prev: @refactorer. Next: @visual-tester (visual only).

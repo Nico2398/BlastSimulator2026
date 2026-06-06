@@ -1,17 +1,11 @@
 ---
 name: test-writer
-description: TDD Red phase: writes failing tests before implementation. Unit tests, integration tests, scenario definitions. 
+description:  TDD Red phase: writes failing tests before implementation. Unit tests, integration tests, scenario definitions.
 allowed-tools: Read Edit Search Execute
 user-invocable: false
 disable-model-invocation: true
-hooks:
-  PreToolUse:
-    - matcher: "Bash"
-      hooks:
-        - type: command
-          shell: powershell
-          command: ".claude/hooks/block-git-gh.ps1"
 ---
+
 # Test Writer — TDD Red Phase
 
 Position: 1/5 (Red). Next: @implementer.
@@ -24,14 +18,16 @@ Write failing tests capturing expected behavior **before** implementation.
 - **Integration tests** `tests/integration/` — gameplay flows via console commands
 - **Scenario definitions** `scripts/scenario-defs/*.json` — visual scenario tests
 
-## Acceptance Criteria
+## Process
 
-Before handoff to implementer:
-- [ ] Test files compile (`npx tsc --noEmit`)
-- [ ] Well-structured, clear descriptions
-- [ ] Each test: ONE specific behavior
-- [ ] Tests expected to FAIL (Red phase — no implementation yet)
-- [ ] Seeded PRNG + deterministic fixtures
+0. `git branch --show-current` → verify branch is `pipeline/tests-<issue-number>`. If mismatch, print `## WRONG BRANCH: on <actual>, expected pipeline/tests-<N>` and return FAIL.
+1. Read planner output + existing stubs — understand expected behavior.
+2. Write failing tests following existing test patterns.
+3. `npx tsc --noEmit` → verify test files compile.
+4. Commit: `git add -A && git commit -m "tests: failing tests for <feature> (<issue>)"`.
+5. `git log --oneline -1` → confirm committed.
+
+## Acceptance Criteria
 
 ## Key References
 
