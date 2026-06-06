@@ -44,7 +44,7 @@ export {
   assignFragmentVelocity,
 } from './FragmentSimVelocity.js';
 
-export { simulateProjectedFragments } from './FragmentSimPhysics.js';
+export { simulateProjectedFragments, simulateCollapseFragments } from './FragmentSimPhysics.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────────
 
