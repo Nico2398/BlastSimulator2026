@@ -33,33 +33,6 @@ jobs:
       )
     runs-on: ubuntu-latest
     steps:
-      - name: Acknowledge request
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const isDispatch = context.eventName === 'workflow_dispatch';
-            const issueNumber = isDispatch
-              ? context.payload.inputs?.issue_number
-              : (context.payload.issue?.number ?? context.payload.pull_request?.number);
-            const body = isDispatch
-              ? '👀 OpenCode pipeline picking this up…'
-              : null;
-            if (!isDispatch) {
-              await github.rest.reactions.createForIssueComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: context.payload.comment.id,
-                content: 'eyes'
-              });
-            } else if (issueNumber) {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: parseInt(issueNumber),
-                body
-              });
-            }
-
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
@@ -67,10 +40,8 @@ jobs:
       - uses: anomalyco/opencode/github@latest
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
         with:
           model: opencode/deepseek-v4-flash-free
-          use_github_token: true
           mentions: '@opencode'
           prompt: |
             ${{ github.event_name == 'workflow_dispatch' && inputs.issue_number && format('Resolve GitHub issue #{0}. Follow the TDD pipeline: plan, write tests, implement, review, refactor, validate, and open a PR with Closes #{0}.', inputs.issue_number) || 'A user mentioned you in a comment. Read the PR/issue context and answer their question directly. If they ask a question, answer it using @ask. If they request a task, use the pipeline.' }}

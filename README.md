@@ -17,6 +17,7 @@
 | Testing | Vitest | latest | Unit + integration tests, Node.js native |
 | Visual testing | Puppeteer | latest | Headless Chrome screenshot capture |
 | Console mode | Node.js + tsx | latest | CLI gameplay for testing without a browser |
+| CI agent | [opencode-agent](https://github.com/apps/opencode-agent) | latest | Autonomous PR creation and code review via GitHub App |
 
 ---
 
