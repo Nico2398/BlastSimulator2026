@@ -1,22 +1,10 @@
 {
   "$schema": "https://opencode.ai/config.json",
+  "model": "opencode/deepseek-v4-flash-free",
   "default_agent": "pipeline",
   "permission": {
     "bash": {
       "*": "allow"
-    }
-  },
-  "agent": {
-    "pipeline": {
-      "mode": "primary",
-      "description": "Orchestrates the TDD development pipeline. Invokes specialist agents in the correct sequence.",
-      "permission": {
-        "bash": {
-          "*": "allow",
-          "git *": "allow",
-          "gh *": "allow"
-        }
-      }
     }
   },
   "instructions": ["AGENTS.md"]
