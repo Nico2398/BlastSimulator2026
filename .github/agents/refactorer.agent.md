@@ -54,6 +54,7 @@ Clean up code — clarity, maintainability, conventions. No behavior change.
 
 ## Process
 
+0. `git branch --show-current` → verify branch is `pipeline/feature-<issue-number>`. If mismatch, print `## WRONG BRANCH: on <actual>, expected pipeline/feature-<N>` and return FAIL.
 1. `git diff main...HEAD` — full diff of changed files
 2. **Diff Review** — per file:
    - Stale comments ("not yet implemented", "placeholder", "will be added later")
@@ -65,7 +66,9 @@ Clean up code — clarity, maintainability, conventions. No behavior change.
 3. Apply structural refactoring
 4. `npx vitest run` — all tests pass
 5. `npx tsc --noEmit` — no type errors
-6. Hand off to validator
+6. Commit: `git add -A && git commit -m "refactor: <description> (<issue>)"`
+7. `git log --oneline -1` → confirm committed
+8. Hand off to validator
 
 ## Key References
 

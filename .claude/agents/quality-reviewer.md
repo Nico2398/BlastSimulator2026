@@ -1,10 +1,18 @@
 ---
 name: quality-reviewer
-description: Code quality reviewer. Flags architecture violations, naming issues, dead code, file size limits, TypeScript strictness, config hardcoding. Read-only. 
+description:  Code quality reviewer. Flags architecture violations, naming issues, dead code, file size limits, TypeScript strictness, config hardcoding. Read-only.
 allowed-tools: Read Search
 user-invocable: false
 disable-model-invocation: true
+hooks:
+  PreToolUse:
+    - matcher: Bash
+      hooks:
+        - type: command
+          shell: powershell
+          command: .claude/hooks/block-git-gh.ps1
 ---
+
 # Quality Reviewer
 
 Position: parallel sub-reviewer in code_review fan-out OR inline quality gate. Read-only.
@@ -50,6 +58,7 @@ Adjust review depth based on `risk_tier` from context:
 ### Additional Checks (also have dedicated sub-reviewers)
 - **i18n** — user-visible strings via `t('key')`. No hardcoded text in logic/UI.
 - **Issue alignment** — every acceptance criterion from the issue is implemented.
+- **Semantic coherence** — delegated to `@semantic-reviewer`. If semantic-reviewer fails, do not override.
 
 ## What NOT to Flag
 

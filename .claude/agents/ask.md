@@ -1,9 +1,16 @@
 ---
 name: ask
-description: Answers questions about the codebase — algorithmic analysis, design rationale, performance, architecture, conventions. Read-only, no code changes.
+description:  Answers questions about the codebase — algorithmic analysis, design rationale, performance, architecture, conventions. Read-only, no code changes.
 allowed-tools: Read Search
 user-invocable: false
 disable-model-invocation: true
+hooks:
+  PreToolUse:
+    - matcher: Bash
+      hooks:
+        - type: command
+          shell: powershell
+          command: .claude/hooks/block-git-gh.ps1
 ---
 # Q&A — Codebase Analysis
 

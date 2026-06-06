@@ -1,17 +1,18 @@
 ---
 name: reviewer
-description: PR audit gate. Audits PR for architecture, i18n, style, correctness. Runs full test suite. Reports pass/fail. 
+description:  PR audit gate. Audits PR for architecture, i18n, style, correctness. Runs full test suite. Reports pass/fail.
 allowed-tools: Read Edit Search Execute
 user-invocable: false
 disable-model-invocation: true
 hooks:
   PreToolUse:
-    - matcher: "Bash"
+    - matcher: Bash
       hooks:
         - type: command
           shell: powershell
-          command: ".claude/hooks/block-git-gh.ps1"
+          command: .claude/hooks/block-git-gh.ps1
 ---
+
 # Reviewer — PR Audit + Merge Gate
 
 Position: after TDD pipeline or on code review request.

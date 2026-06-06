@@ -14,11 +14,10 @@ jobs:
   chain-next-task:
     runs-on: ubuntu-latest
     steps:
-      - name: Enable auto-merge for bot PRs with READY TO MERGE
+      - name: Enable auto-merge for PRs with READY TO MERGE
         if: >
           github.event.action != 'closed' &&
-          contains(github.event.pull_request.body, 'READY TO MERGE') &&
-          github.event.pull_request.user.type == 'Bot'
+          contains(github.event.pull_request.body, 'READY TO MERGE')
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
         run: |
@@ -92,11 +91,10 @@ jobs:
               console.log('No backlog-id in issue body — skipping backlog update.');
             }
 
-            // --- Auto-assign next issue (only when enabled + bot PR) ---
+            // --- Auto-assign next issue (only when enabled) ---
             const autoAssignEnabled = (process.env.AGENTIC_AUTO_ASSIGN_ENABLED || 'false') === 'true';
-            const isBot = context.payload.pull_request.user.type === 'Bot';
 
-            if (autoAssignEnabled && isBot) {
+            if (autoAssignEnabled) {
               // --- 2.5 Check for stalled in-progress issues ---
               const { data: inProgress } = await github.rest.issues.listForRepo({
                 owner, repo,
@@ -186,7 +184,5 @@ jobs:
               if (!autoAssignEnabled) {
                 console.log('Auto-assign is disabled (AGENTIC_AUTO_ASSIGN_ENABLED is not set to "true").');
               }
-              if (!isBot) {
-                console.log(`PR author is ${context.payload.pull_request.user.type}, not Bot — skipping auto-assign.`);
-              }
+              console.log(`PR author is ${context.payload.pull_request.user.type} — auto-assign enabled.`);
             }

@@ -19,17 +19,19 @@ Fix implementation code to make test suite pass.
 1. **Do NOT open or read any test files** — work from error output only.
 2. Identify failing source files from stack traces + error messages.
 3. Write targeted fix — change only what error indicates.
-4. Do NOT commit — graph commits after you finish.
 
 ## Process
 
+0. `git branch --show-current` → verify branch is `pipeline/feature-<issue-number>`. If mismatch, print `## WRONG BRANCH: on <actual>, expected pipeline/feature-<N>` and return FAIL.
 1. Read test failure output in system context.
 2. Identify responsible source file(s) + function(s).
 3. Read those source files with `read_file`.
 4. Apply minimal fix.
 5. Verify with `npx tsc --noEmit` (type check only).
 6. Run `npx vitest run <failing-test-file>` on the specific file from the stack trace. If tests still fail, read the new output and iterate. Only stop when the targeted file passes or you are genuinely stuck with no path forward.
-7. Report what you changed.
+7. Commit: `git add -A && git commit -m "fix: <description of fix> (<issue>)"`
+8. `git log --oneline -1` → confirm committed
+9. Report what you changed.
 
 ## Key References
 

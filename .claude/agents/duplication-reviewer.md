@@ -1,10 +1,18 @@
 ---
 name: duplication-reviewer
-description: Agentic code duplication reviewer. Detects semantic duplication, non-atomic functions, generic code misplaced in specific modules, and cross-codebase logic similarities. Read-only.
+description:  Agentic code duplication reviewer. Detects semantic duplication, non-atomic functions, generic code misplaced in specific modules, and cross-codebase logic similarities. Read-only.
 allowed-tools: Read Search
 user-invocable: false
 disable-model-invocation: true
+hooks:
+  PreToolUse:
+    - matcher: Bash
+      hooks:
+        - type: command
+          shell: powershell
+          command: .claude/hooks/block-git-gh.ps1
 ---
+
 # Duplication Reviewer
 
 Position: parallel sub-reviewer in code_review fan-out. Read-only.
@@ -45,6 +53,9 @@ handles that) — focus on **semantic and structural** duplication.
 - The same conditional expression or guard clause repeated in multiple functions in the diff.
 - Identical or near-identical function bodies in the same file.
 - Repeated `switch`/`if-else` chains dispatching on the same discriminant.
+
+### Semantic Coherence
+- Delegated to `@semantic-reviewer`. If semantic-reviewer fails, do not override.
 
 ## What NOT to Flag
 
