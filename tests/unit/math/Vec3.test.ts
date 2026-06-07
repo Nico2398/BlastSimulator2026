@@ -72,7 +72,7 @@ describe('Vec3 — squaredDistance', () => {
     const a = vec3(2, 3, 4);
     const b = vec3(5, 7, 9);
     const expected = distance(a, b) ** 2;
-    expect(squaredDistance(a, b)).toBe(expected);
+    expect(squaredDistance(a, b)).toBeCloseTo(expected, 10);
   });
 
   it('squaredDistance is symmetric', () => {
