@@ -19,6 +19,7 @@ import {
   type RockFragment,
   type SeedVoxelInfo,
   simulateProjectedFragments,
+  simulateCollapseFragments,
 } from '../../../src/physics/FragmentSim.js';
 import { type VoronoiCell, type Tetrahedron } from '../../../src/physics/VoronoiFrag.js';
 import { vec3, ZERO } from '../../../src/core/math/Vec3.js';
@@ -35,7 +36,7 @@ import {
   assignFragmentVelocity,
 } from '../../../src/physics/FragmentSimVelocity.js';
 import { length } from '../../../src/core/math/Vec3.js';
-import { MAX_PROJECTION_VELOCITY, PHYSICS_FRAGMENT_CAP } from '../../../src/core/config/balance.js';
+import { MAX_PROJECTION_VELOCITY, PHYSICS_FRAGMENT_CAP, PHYSICS_TERRAIN_CLEARANCE } from '../../../src/core/config/balance.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Helpers
@@ -2089,6 +2090,236 @@ describe('FragmentSimPhysics — simulateProjectedFragments', () => {
     };
     const input = [frag];
     const result = simulateProjectedFragments(input, grid);
+    expect(result).toBe(input);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Group 18: FragmentSimPhysics — simulateCollapseFragments
+// Tier B gravity-drop simulation: straight-down, column stack, immediate static.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('FragmentSimPhysics — simulateCollapseFragments', () => {
+  it('returns empty array for empty input', () => {
+    const grid = new VoxelGrid(10, 10, 10);
+    const result = simulateCollapseFragments([], grid);
+    expect(result).toEqual([]);
+  });
+
+  it('returns projected fragments unchanged (state and tier preserved)', () => {
+    const grid = new VoxelGrid(10, 10, 10);
+    const frag: RockFragment = {
+      id: 1, cx: 0, cy: 0, cz: 0,
+      graphicVertices: new Float32Array(),
+      collisionVertices: new Float32Array(),
+      composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
+      oreComposition: { ores: [] },
+      volumeM3: 1.0, massKg: 100,
+      overflowEnergy: 0,
+      velocity: ZERO,
+      simulationTier: 'projected',
+      state: 'flying',
+    };
+    const result = simulateCollapseFragments([frag], grid);
+    expect(result).toHaveLength(1);
+    expect(result[0]!.state).toBe('flying');
+    expect(result[0]!.simulationTier).toBe('projected');
+  });
+
+  it('sets collapse fragment to static with terrain present', () => {
+    const grid = new VoxelGrid(10, 10, 10);
+    // Flat terrain at y=0
+    for (let x = 0; x < 10; x++) {
+      for (let z = 0; z < 10; z++) {
+        grid.setVoxel(x, 0, z, {
+          composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
+          density: 1.0, oreDensities: {}, fractureModifier: 1.0,
+        });
+      }
+    }
+    const frag: RockFragment = {
+      id: 1, cx: 5, cy: 10, cz: 5,
+      graphicVertices: new Float32Array(),
+      collisionVertices: new Float32Array(),
+      composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
+      oreComposition: { ores: [] },
+      volumeM3: 1.0, massKg: 100,
+      overflowEnergy: 0,
+      velocity: ZERO,
+      simulationTier: 'collapse',
+      state: 'settling',
+    };
+    const result = simulateCollapseFragments([frag], grid);
+    expect(result).toHaveLength(1);
+    expect(result[0]!.state).toBe('static');
+    // Should land at surface y=0 + clearance = 1.0
+    expect(result[0]!.cy).toBeCloseTo(PHYSICS_TERRAIN_CLEARANCE, 5);
+  });
+
+  it('drops collapse fragment straight down (no horizontal movement)', () => {
+    const grid = new VoxelGrid(10, 10, 10);
+    for (let x = 0; x < 10; x++) {
+      for (let z = 0; z < 10; z++) {
+        grid.setVoxel(x, 0, z, {
+          composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
+          density: 1.0, oreDensities: {}, fractureModifier: 1.0,
+        });
+      }
+    }
+    const frag: RockFragment = {
+      id: 1, cx: 3, cy: 20, cz: 7,
+      graphicVertices: new Float32Array(),
+      collisionVertices: new Float32Array(),
+      composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
+      oreComposition: { ores: [] },
+      volumeM3: 1.0, massKg: 100,
+      overflowEnergy: 0,
+      velocity: ZERO,
+      simulationTier: 'collapse',
+      state: 'settling',
+    };
+    const result = simulateCollapseFragments([frag], grid);
+    // cx and cz must remain unchanged
+    expect(result[0]!.cx).toBe(3);
+    expect(result[0]!.cz).toBe(7);
+    // cy should be at surface + clearance
+    expect(result[0]!.cy).toBeCloseTo(PHYSICS_TERRAIN_CLEARANCE, 5);
+    expect(result[0]!.state).toBe('static');
+  });
+
+  it('handles zero-mass collapse fragment (state=static, position unchanged)', () => {
+    const grid = new VoxelGrid(10, 10, 10);
+    const frag: RockFragment = {
+      id: 1, cx: 5, cy: 5, cz: 5,
+      graphicVertices: new Float32Array(),
+      collisionVertices: new Float32Array(),
+      composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
+      oreComposition: { ores: [] },
+      volumeM3: 1.0, massKg: 0,
+      overflowEnergy: 0,
+      velocity: ZERO,
+      simulationTier: 'collapse',
+      state: 'settling',
+    };
+    const result = simulateCollapseFragments([frag], grid);
+    expect(result).toHaveLength(1);
+    expect(result[0]!.state).toBe('static');
+    expect(result[0]!.cx).toBe(5);
+    expect(result[0]!.cy).toBe(5);
+    expect(result[0]!.cz).toBe(5);
+  });
+
+  it('handles fragment already below terrain surface', () => {
+    const grid = new VoxelGrid(10, 10, 10);
+    // Terrain at y=5
+    for (let x = 0; x < 10; x++) {
+      for (let z = 0; z < 10; z++) {
+        grid.setVoxel(x, 5, z, {
+          composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
+          density: 1.0, oreDensities: {}, fractureModifier: 1.0,
+        });
+      }
+    }
+    // Fragment at y=2, which is below terrain surface y=5
+    const frag: RockFragment = {
+      id: 1, cx: 5, cy: 2, cz: 5,
+      graphicVertices: new Float32Array(),
+      collisionVertices: new Float32Array(),
+      composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
+      oreComposition: { ores: [] },
+      volumeM3: 1.0, massKg: 100,
+      overflowEnergy: 0,
+      velocity: ZERO,
+      simulationTier: 'collapse',
+      state: 'settling',
+    };
+    const result = simulateCollapseFragments([frag], grid);
+    expect(result).toHaveLength(1);
+    expect(result[0]!.state).toBe('static');
+    // Should be placed at surface y=5 + clearance = 6.0
+    expect(result[0]!.cy).toBeCloseTo(5 + PHYSICS_TERRAIN_CLEARANCE, 5);
+  });
+
+  it('handles fragment over empty column (no terrain — falls through world)', () => {
+    const grid = new VoxelGrid(10, 10, 10);
+    // No terrain at all — all columns empty
+    const frag: RockFragment = {
+      id: 1, cx: 5, cy: 100, cz: 5,
+      graphicVertices: new Float32Array(),
+      collisionVertices: new Float32Array(),
+      composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
+      oreComposition: { ores: [] },
+      volumeM3: 1.0, massKg: 100,
+      overflowEnergy: 0,
+      velocity: ZERO,
+      simulationTier: 'collapse',
+      state: 'settling',
+    };
+    const result = simulateCollapseFragments([frag], grid);
+    expect(result).toHaveLength(1);
+    expect(result[0]!.state).toBe('static');
+    // Should have fallen for MAX_STEPS with gravity but never hit terrain
+    expect(result[0]!.cy).toBeLessThan(0); // Fell below world
+    expect(Number.isFinite(result[0]!.cy)).toBe(true);
+  });
+
+  it('preserves projected fragment state when mixed with collapse', () => {
+    const grid = new VoxelGrid(10, 10, 10);
+    for (let x = 0; x < 10; x++) {
+      for (let z = 0; z < 10; z++) {
+        grid.setVoxel(x, 0, z, {
+          composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
+          density: 1.0, oreDensities: {}, fractureModifier: 1.0,
+        });
+      }
+    }
+    const projected: RockFragment = {
+      id: 1, cx: 5, cy: 5, cz: 5,
+      graphicVertices: new Float32Array(),
+      collisionVertices: new Float32Array(),
+      composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
+      oreComposition: { ores: [] },
+      volumeM3: 1.0, massKg: 100,
+      overflowEnergy: 0, velocity: ZERO,
+      simulationTier: 'projected',
+      state: 'flying',
+    };
+    const collapse: RockFragment = {
+      id: 2, cx: 5, cy: 10, cz: 5,
+      graphicVertices: new Float32Array(),
+      collisionVertices: new Float32Array(),
+      composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
+      oreComposition: { ores: [] },
+      volumeM3: 1.0, massKg: 100,
+      overflowEnergy: 0, velocity: ZERO,
+      simulationTier: 'collapse',
+      state: 'settling',
+    };
+    const result = simulateCollapseFragments([projected, collapse], grid);
+    expect(result).toHaveLength(2);
+    const projectedResult = result.find(f => f.id === 1)!;
+    expect(projectedResult.state).toBe('flying');
+    expect(projectedResult.simulationTier).toBe('projected');
+    const collapseResult = result.find(f => f.id === 2)!;
+    expect(collapseResult.state).toBe('static');
+    expect(collapseResult.simulationTier).toBe('collapse');
+  });
+
+  it('mutates input array in place (returns same reference)', () => {
+    const grid = new VoxelGrid(10, 10, 10);
+    const frag: RockFragment = {
+      id: 1, cx: 5, cy: 5, cz: 5,
+      graphicVertices: new Float32Array(),
+      collisionVertices: new Float32Array(),
+      composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
+      oreComposition: { ores: [] },
+      volumeM3: 1.0, massKg: 100,
+      overflowEnergy: 0, velocity: ZERO,
+      simulationTier: 'collapse',
+      state: 'settling',
+    };
+    const input = [frag];
+    const result = simulateCollapseFragments(input, grid);
     expect(result).toBe(input);
   });
 });

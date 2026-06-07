@@ -135,3 +135,62 @@ function simulateParabolicFallback(fragments: RockFragment[], grid: VoxelGrid): 
     }
   }
 }
+
+// ─── Tier B: Collapse Fragments ───────────────────────────────────────────
+
+/**
+ * Run Tier B collapse simulation on all fragments with simulationTier === 'collapse'.
+ * Straight-down gravity drop via semi-implicit Euler integration:
+ *   vy += GRAVITY * dt  each step
+ *   y   += vy * dt      each step
+ * Terrain detection via findSurfaceY().
+ * Once settled on terrain → state = 'static' (no Cannon-es involvement).
+ * Collapse fragments have no cap — all processed, CPU-free (pure arithmetic).
+ * Non-collapse fragments are returned unchanged.
+ */
+export function simulateCollapseFragments(
+  _fragments: RockFragment[],
+  _grid: VoxelGrid,
+): RockFragment[] {
+  if (_fragments.length === 0) return _fragments;
+
+  // Only process 'collapse' fragments
+  const collapseFrags = _fragments.filter(f => f.simulationTier === 'collapse');
+
+  for (const frag of collapseFrags) {
+    if (!isFragmentValidForPhysics(frag)) {
+      // Skip simulation but still mark as static
+      frag.state = 'static';
+      continue;
+    }
+
+    let y = frag.cy;
+    let vy = frag.velocity.y;
+    let settled = false;
+
+    // Collapse fragments have no horizontal motion, so look up terrain column once
+    const terrainY = findSurfaceY(_grid, Math.floor(frag.cx), Math.floor(frag.cz));
+
+    // Semi-implicit Euler integration, vertical only
+    for (let step = 0; step < PHYSICS_MAX_STEPS; step++) {
+      vy += GRAVITY * PHYSICS_STEP_DT;
+      y += vy * PHYSICS_STEP_DT;
+
+      // Ground detection — terrain height is computed once (no horizontal movement)
+      if (terrainY >= 0 && y <= terrainY + PHYSICS_TERRAIN_CLEARANCE) {
+        frag.cy = terrainY + PHYSICS_TERRAIN_CLEARANCE;
+        settled = true;
+        break;
+      }
+    }
+
+    if (!settled) {
+      // Never reached ground within step limit — use last computed y
+      frag.cy = y;
+    }
+
+    frag.state = 'static';
+  }
+
+  return _fragments;
+}
