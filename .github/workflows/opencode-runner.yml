@@ -40,6 +40,7 @@ jobs:
       - uses: anomalyco/opencode/github@latest
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          GH_TOKEN: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
         with:
           model: opencode/deepseek-v4-flash-free
           mentions: '@opencode'
