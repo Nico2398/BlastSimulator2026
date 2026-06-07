@@ -370,11 +370,20 @@ export function bowyerWatsonDelaunay(points: Vec3[]): Tetrahedron[] {
       }
     }
 
-    // Step 3: Remove bad tetrahedra (reverse order to maintain indices)
-    const sortedBad = [...badTetIndices].sort((a, b) => b - a);
-    for (const ti of sortedBad) {
-      tetrahedra.splice(ti, 1);
+    // Step 3: Remove bad tetrahedra using single-pass compaction
+    const keep = new Array<boolean>(tetrahedra.length);
+    keep.fill(true);
+    for (const ti of badTetIndices) {
+      keep[ti] = false;
     }
+    let writeIdx = 0;
+    for (let ti = 0; ti < tetrahedra.length; ti++) {
+      if (keep[ti]) {
+        tetrahedra[writeIdx] = tetrahedra[ti]!;
+        writeIdx++;
+      }
+    }
+    tetrahedra.length = writeIdx;
 
     // Step 4: Create new tetrahedra from boundary faces and point i
     for (const [v0, v1, v2] of boundaryFaces) {
