@@ -5,15 +5,6 @@ mode: primary
 permission:
   bash:
     "*": "allow"
-    "git add *": "deny"
-    "git commit *": "deny"
-    "git push *": "deny"
-    "git checkout *": "deny"
-    "git merge *": "deny"
-    "git rebase *": "deny"
-    "git cherry-pick *": "deny"
-    "gh pr create *": "deny"
-    "gh pr merge *": "deny"
 ---
 # Pipeline Orchestrator
 
