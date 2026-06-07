@@ -3,7 +3,7 @@
 // Every formula from BLAST_SYSTEM.md is implemented here.
 
 import type { Vec3 } from '../math/Vec3.js';
-import { vec3, sub, normalize, scale, length as vecLength } from '../math/Vec3.js';
+import { vec3, sub, normalize, scale, length as vecLength, squaredDistance } from '../math/Vec3.js';
 import type { DrillHole } from './DrillPlan.js';
 import type { HoleCharge } from './ChargePlan.js';
 import type { VoxelData, VoxelGrid } from '../world/VoxelGrid.js';
@@ -90,9 +90,9 @@ export function calculateEnergyField(
     const surfaceY = holeSurfaceYs?.[hole.id] ?? 0;
     const depth = holeDepths[hole.id] ?? hole.depth;
     const midPos = vec3(hole.x, surfaceY - depth / 2, hole.z);
-    total += energy.downward / (distSquared(point, midPos) + EPSILON);
+    total += energy.downward / (squaredDistance(point, midPos) + EPSILON);
     if (energy.upward > 0) {
-      total += energy.upward / (distSquared(point, vec3(hole.x, surfaceY, hole.z)) + EPSILON);
+      total += energy.upward / (squaredDistance(point, vec3(hole.x, surfaceY, hole.z)) + EPSILON);
     }
   }
   return total;
@@ -396,11 +396,6 @@ export function parseKey(key: string): [number, number, number] | null {
   const x = parseInt(parts[0]!, 10), y = parseInt(parts[1]!, 10), z = parseInt(parts[2]!, 10);
   if (Number.isNaN(x) || Number.isNaN(y) || Number.isNaN(z)) return null;
   return [x, y, z];
-}
-
-function distSquared(a: Vec3, b: Vec3): number {
-  const dx = a.x - b.x, dy = a.y - b.y, dz = a.z - b.z;
-  return dx * dx + dy * dy + dz * dz;
 }
 
 export { PROJECTION_SPEED_THRESHOLD };

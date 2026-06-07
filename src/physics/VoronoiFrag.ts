@@ -331,9 +331,9 @@ export function bowyerWatsonDelaunay(points: Vec3[]): Tetrahedron[] {
     const badTetIndices: number[] = [];
     for (let ti = 0; ti < tetrahedra.length; ti++) {
       const tet = tetrahedra[ti]!;
-      const distToCenter = squaredDistance(p, tet.circumcenter);
-      const radius = squaredDistance(allPoints[tet.a]!, tet.circumcenter);
-      if (distToCenter <= radius + eps) {
+      const distSqToCenter = squaredDistance(p, tet.circumcenter);
+      const radiusSq = squaredDistance(allPoints[tet.a]!, tet.circumcenter);
+      if (distSqToCenter <= radiusSq + eps) {
         badTetIndices.push(ti);
       }
     }
