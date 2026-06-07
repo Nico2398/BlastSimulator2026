@@ -1,6 +1,5 @@
 // BlastSimulator2026 — Unit tests: VoronoiFrag module
-// Task 5.8: computeFragmentationScore, computeFragmentCount, sampleVoronoiSeeds
-// All tests should FAIL (Red phase) — stubs currently return 0 / 1 / [].
+// Tasks 5.8–5.10: fragmentation scoring, Voronoi tessellation, and cell merging
 
 import { describe, it, expect } from 'vitest';
 import {
@@ -30,7 +29,7 @@ import {
   MERGE_PROBABILITY,
 } from '../../../src/core/config/balance.js';
 import { Random } from '../../../src/core/math/Random.js';
-import { vec3, clamp, equals, distance, add, sub, scale, dot, cross, type Vec3 } from '../../../src/core/math/Vec3.js';
+import { vec3, clamp, equals, add, sub, scale, dot, cross, type Vec3 } from '../../../src/core/math/Vec3.js';
 import { getRock } from '../../../src/core/world/RockCatalog.js';
 import { computeThreshold, parseKey } from '../../../src/core/mining/BlastCalc.js';
 
@@ -515,7 +514,6 @@ describe('VoronoiFrag — sampleVoronoiSeeds', () => {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Group 4: computeBoundingBox
-// Stub always returns { minX:0, minY:0, minZ:0, maxX:0, maxY:0, maxZ:0 }
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('VoronoiFrag — computeBoundingBox', () => {
@@ -555,7 +553,6 @@ describe('VoronoiFrag — computeBoundingBox', () => {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Group 5: cullLowestScoreVoxels
-// Stub returns empty set — tests should FAIL for non-empty inputs
 // Each voxel uses pure cruite (threshold = 200)
 //   score = 3.0 * (energy / 200)
 //   count = max(1, round(score))
@@ -634,7 +631,6 @@ describe('VoronoiFrag — cullLowestScoreVoxels', () => {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Group 6: computeCircumcenter
-// Stub returns vec3(0, 0, 0) — tests should FAIL
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('VoronoiFrag — computeCircumcenter', () => {
@@ -686,7 +682,6 @@ describe('VoronoiFrag — computeCircumcenter', () => {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Group 7: bowyerWatsonDelaunay
-// Stub returns [] — tests should FAIL
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('VoronoiFrag — bowyerWatsonDelaunay', () => {
@@ -777,8 +772,8 @@ describe('VoronoiFrag — bowyerWatsonDelaunay', () => {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Group 7b: bowyerWatsonDelaunay — optimization verification
-// Tests with moderately sized point sets to verify optimizations don't break
-// correctness. All should FAIL while bowyerWatsonDelaunay stub returns [].
+// Tests with moderately sized point sets to verify optimizations (squared-distance
+// circumsphere test, single-pass compaction) don't break correctness.
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('bowyerWatsonDelaunay — optimization verification', () => {
@@ -904,7 +899,6 @@ describe('bowyerWatsonDelaunay — optimization verification', () => {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Group 8: computeVoronoiCells
-// Stub returns [] — tests should FAIL
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('VoronoiFrag — computeVoronoiCells', () => {
@@ -951,7 +945,6 @@ describe('VoronoiFrag — computeVoronoiCells', () => {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Group 9: clipVoronoiCell
-// Stub returns { seedIndex:0, vertices:[], isValid:false } — tests should FAIL
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('VoronoiFrag — clipVoronoiCell', () => {
@@ -1027,7 +1020,6 @@ describe('VoronoiFrag — clipVoronoiCell', () => {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Group 10: generateFragments (end-to-end)
-// Stub returns [] — tests should FAIL
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('VoronoiFrag — generateFragments', () => {
@@ -1082,14 +1074,12 @@ describe('VoronoiFrag — generateFragments', () => {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Group 11: buildAdjacencyMap (Task 5.10 — Voronoi merging pass)
-// Stub returns empty Map — tests should FAIL
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('VoronoiFrag — buildAdjacencyMap', () => {
   it('returns map with all empty sets for empty tetrahedra array', () => {
     const result = buildAdjacencyMap([], 4);
 
-    // Stub returns empty Map — will fail
     expect(result.size).toBe(4);
     for (let i = 0; i < 4; i++) {
       expect(result.has(i)).toBe(true);
@@ -1101,7 +1091,6 @@ describe('VoronoiFrag — buildAdjacencyMap', () => {
     const tet: Tetrahedron = { a: 0, b: 1, c: 2, d: 3, circumcenter: vec3(0.5, 0.5, 0.5) };
     const result = buildAdjacencyMap([tet], 4);
 
-    // Stub returns empty Map — will fail
     expect(result.size).toBe(4);
     expect(result.get(0)).toEqual(new Set([1, 2, 3]));
     expect(result.get(1)).toEqual(new Set([0, 2, 3]));
@@ -1114,7 +1103,6 @@ describe('VoronoiFrag — buildAdjacencyMap', () => {
     const tet1: Tetrahedron = { a: 4, b: 5, c: 6, d: 7, circumcenter: vec3(0.5, 0.5, 0.5) };
     const result = buildAdjacencyMap([tet0, tet1], 8);
 
-    // Stub returns empty Map — will fail
     expect(result.size).toBe(8);
     expect(result.get(0)).toEqual(new Set([1, 2, 3]));
     expect(result.get(4)).toEqual(new Set([5, 6, 7]));
@@ -1131,7 +1119,6 @@ describe('VoronoiFrag — buildAdjacencyMap', () => {
     const tet1: Tetrahedron = { a: 0, b: 1, c: 4, d: 5, circumcenter: vec3(0.5, 0.5, 0.5) };
     const result = buildAdjacencyMap([tet0, tet1], 6);
 
-    // Stub returns empty Map — will fail
     expect(result.size).toBe(6);
     expect(result.get(0)!.has(4)).toBe(true);
     expect(result.get(0)!.has(5)).toBe(true);
@@ -1142,7 +1129,6 @@ describe('VoronoiFrag — buildAdjacencyMap', () => {
     const tet1: Tetrahedron = { a: 0, b: 1, c: 2, d: 4, circumcenter: vec3(0.5, 0.5, 0.5) };
     const result = buildAdjacencyMap([tet0, tet1], 5);
 
-    // Stub returns empty Map — will fail
     expect(result.size).toBe(5);
 
     // Edge (0,1) appears in both tetrahedra but should only appear once in the set
@@ -1157,7 +1143,6 @@ describe('VoronoiFrag — buildAdjacencyMap', () => {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Group 12: convexHull3D (Task 5.10 — Voronoi merging pass)
-// Stub returns [] — tests should FAIL for non-empty inputs
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('VoronoiFrag — convexHull3D', () => {
@@ -1170,7 +1155,6 @@ describe('VoronoiFrag — convexHull3D', () => {
     const pt = vec3(1, 2, 3);
     const result = convexHull3D([pt]);
 
-    // Stub returns [] — will fail
     expect(result).toHaveLength(1);
     expect(result[0]!.x).toBe(1);
     expect(result[0]!.y).toBe(2);
@@ -1182,7 +1166,6 @@ describe('VoronoiFrag — convexHull3D', () => {
     const b = vec3(1, 0, 0);
     const result = convexHull3D([a, b]);
 
-    // Stub returns [] — will fail
     expect(result).toHaveLength(2);
     // Both original points should be in the hull (order not important)
     expect(result).toContainEqual(a);
@@ -1195,7 +1178,6 @@ describe('VoronoiFrag — convexHull3D', () => {
     const c = vec3(0, 1, 0);
     const result = convexHull3D([a, b, c]);
 
-    // Stub returns [] — will fail
     expect(result).toHaveLength(3);
     expect(result).toContainEqual(a);
     expect(result).toContainEqual(b);
@@ -1209,7 +1191,6 @@ describe('VoronoiFrag — convexHull3D', () => {
     const d = vec3(0, 0, 1);
     const result = convexHull3D([a, b, c, d]);
 
-    // Stub returns [] — will fail
     expect(result).toHaveLength(4);
     expect(result).toContainEqual(a);
     expect(result).toContainEqual(b);
@@ -1229,7 +1210,6 @@ describe('VoronoiFrag — convexHull3D', () => {
     ];
     const result = convexHull3D(vertices);
 
-    // Stub returns [] — will fail
     expect(result).toHaveLength(6);
     for (const v of vertices) {
       expect(result).toContainEqual(v);
@@ -1247,7 +1227,6 @@ describe('VoronoiFrag — convexHull3D', () => {
     const points = [...corners, center];
     const result = convexHull3D(points);
 
-    // Stub returns [] — will fail
     expect(result).toHaveLength(8);
     // Center should NOT be in hull
     expect(result).not.toContainEqual(center);
@@ -1263,7 +1242,6 @@ describe('VoronoiFrag — convexHull3D', () => {
     const c = vec3(2, 2, 2);
     const result = convexHull3D([a, b, c]);
 
-    // Stub returns [] — will fail
     // Hull should only contain the two endpoints
     expect(result).toHaveLength(2);
     expect(result).toContainEqual(a);
@@ -1275,7 +1253,6 @@ describe('VoronoiFrag — convexHull3D', () => {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Group 13: mergeTwoCells (Task 5.10 — Voronoi merging pass)
-// Stub returns { vertices: [], isValid: false } — tests should FAIL
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('VoronoiFrag — mergeTwoCells', () => {
@@ -1293,7 +1270,6 @@ describe('VoronoiFrag — mergeTwoCells', () => {
     };
     const result = mergeTwoCells(cellA, cellB);
 
-    // Stub returns { vertices: [], isValid: false } — will fail
     expect(result.vertices.length).toBeGreaterThanOrEqual(4);
     // All unique corners from both cells should be present
     expect(result.vertices).toContainEqual(vec3(0, 0, 0));
@@ -1315,7 +1291,6 @@ describe('VoronoiFrag — mergeTwoCells', () => {
 
     expect(result.seedIndex).toBe(5);
     // Also verify hull produced at least 2 distinct points
-    // Stub returns vertices: [] — will fail
     expect(result.vertices.length).toBeGreaterThanOrEqual(2);
   });
 
@@ -1332,7 +1307,6 @@ describe('VoronoiFrag — mergeTwoCells', () => {
     };
     const result = mergeTwoCells(cellA, cellB);
 
-    // Stub returns isValid: false — will fail
     expect(result.isValid).toBe(true);
     expect(result.vertices.length).toBeGreaterThanOrEqual(4);
   });
@@ -1350,7 +1324,6 @@ describe('VoronoiFrag — mergeTwoCells', () => {
     };
     const result = mergeTwoCells(cellA, cellB);
 
-    // Stub returns vertices: [] — will fail (expects length 2)
     expect(result.vertices.length).toBe(2);
     expect(result.isValid).toBe(false);
   });
@@ -1369,7 +1342,6 @@ describe('VoronoiFrag — mergeTwoCells', () => {
     };
     const result = mergeTwoCells(cellA, cellB);
 
-    // Stub returns vertices: [] — will fail
     // Combined hull should have 4+ vertices despite cellA being invalid
     expect(result.vertices.length).toBeGreaterThanOrEqual(4);
   });
@@ -1377,7 +1349,6 @@ describe('VoronoiFrag — mergeTwoCells', () => {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Group 14: mergeVoronoiCells (Task 5.10 — Voronoi merging pass)
-// Stub returns [...cells] unchanged — merging tests should FAIL
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('VoronoiFrag — mergeVoronoiCells', () => {
