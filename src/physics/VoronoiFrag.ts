@@ -3,7 +3,7 @@
 // Task 5.8: computeFragmentationScore and Voronoi seed sampling
 
 import type { Vec3 } from '../core/math/Vec3.js';
-import { vec3, add, sub, scale, dot, cross, clamp, equals, distance } from '../core/math/Vec3.js';
+import { vec3, add, sub, scale, dot, cross, clamp, equals, squaredDistance } from '../core/math/Vec3.js';
 import type { VoxelGrid } from '../core/world/VoxelGrid.js';
 import { Random } from '../core/math/Random.js';
 import { computeThreshold, parseKey } from '../core/mining/BlastCalc.js';
@@ -331,8 +331,8 @@ export function bowyerWatsonDelaunay(points: Vec3[]): Tetrahedron[] {
     const badTetIndices: number[] = [];
     for (let ti = 0; ti < tetrahedra.length; ti++) {
       const tet = tetrahedra[ti]!;
-      const distToCenter = distance(p, tet.circumcenter);
-      const radius = distance(allPoints[tet.a]!, tet.circumcenter);
+      const distToCenter = squaredDistance(p, tet.circumcenter);
+      const radius = squaredDistance(allPoints[tet.a]!, tet.circumcenter);
       if (distToCenter <= radius + eps) {
         badTetIndices.push(ti);
       }
