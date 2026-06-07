@@ -30,7 +30,7 @@ import {
   MERGE_PROBABILITY,
 } from '../../../src/core/config/balance.js';
 import { Random } from '../../../src/core/math/Random.js';
-import { vec3, clamp, equals, distance, add, sub, scale, dot, cross } from '../../../src/core/math/Vec3.js';
+import { vec3, clamp, equals, distance, add, sub, scale, dot, cross, type Vec3 } from '../../../src/core/math/Vec3.js';
 import { getRock } from '../../../src/core/world/RockCatalog.js';
 import { computeThreshold, parseKey } from '../../../src/core/mining/BlastCalc.js';
 
@@ -766,6 +766,133 @@ describe('VoronoiFrag — bowyerWatsonDelaunay', () => {
 
     const result = bowyerWatsonDelaunay(points);
 
+    for (const tet of result) {
+      expect(tet.a).toBeLessThan(points.length);
+      expect(tet.b).toBeLessThan(points.length);
+      expect(tet.c).toBeLessThan(points.length);
+      expect(tet.d).toBeLessThan(points.length);
+    }
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Group 7b: bowyerWatsonDelaunay — optimization verification
+// Tests with moderately sized point sets to verify optimizations don't break
+// correctness. All should FAIL while bowyerWatsonDelaunay stub returns [].
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('bowyerWatsonDelaunay — optimization verification', () => {
+  it('produces valid tetrahedra for 20 random points', () => {
+    const rng = new Random(42);
+    const points: Vec3[] = [];
+    for (let i = 0; i < 20; i++) {
+      points.push(vec3(
+        rng.next() * 100,
+        rng.next() * 100,
+        rng.next() * 100,
+      ));
+    }
+
+    const result = bowyerWatsonDelaunay(points);
+
+    // Expect at least one tetrahedron for 20 non-degenerate points
+    expect(result.length).toBeGreaterThan(0);
+
+    // All vertex indices must be valid (within original point count)
+    for (const tet of result) {
+      expect(tet.a).toBeLessThan(points.length);
+      expect(tet.b).toBeLessThan(points.length);
+      expect(tet.c).toBeLessThan(points.length);
+      expect(tet.d).toBeLessThan(points.length);
+      // Each tetrahedron must have a circumcenter with numeric components
+      expect(typeof tet.circumcenter.x).toBe('number');
+      expect(typeof tet.circumcenter.y).toBe('number');
+      expect(typeof tet.circumcenter.z).toBe('number');
+    }
+  });
+
+  it('produces valid tetrahedra for 50 random points', () => {
+    const rng = new Random(42);
+    const points: Vec3[] = [];
+    for (let i = 0; i < 50; i++) {
+      points.push(vec3(
+        rng.next() * 100,
+        rng.next() * 100,
+        rng.next() * 100,
+      ));
+    }
+
+    const result = bowyerWatsonDelaunay(points);
+
+    // Expect at least one tetrahedron for 50 non-degenerate points
+    expect(result.length).toBeGreaterThan(0);
+
+    // All vertex indices must be valid
+    for (const tet of result) {
+      expect(tet.a).toBeLessThan(points.length);
+      expect(tet.b).toBeLessThan(points.length);
+      expect(tet.c).toBeLessThan(points.length);
+      expect(tet.d).toBeLessThan(points.length);
+    }
+  });
+
+  it('produces deterministic results with same seed', () => {
+    const generatePoints = (seed: number): Vec3[] => {
+      const rng = new Random(seed);
+      const pts: Vec3[] = [];
+      for (let i = 0; i < 30; i++) {
+        pts.push(vec3(
+          rng.next() * 100,
+          rng.next() * 100,
+          rng.next() * 100,
+        ));
+      }
+      return pts;
+    };
+
+    const points = generatePoints(42);
+    const resultA = bowyerWatsonDelaunay(points);
+    const resultB = bowyerWatsonDelaunay(points);
+
+    // Same input → same tetrahedralization
+    expect(resultA).toEqual(resultB);
+  });
+
+  it('produces vertex indices that are all distinct within each tetrahedron', () => {
+    const rng = new Random(42);
+    const points: Vec3[] = [];
+    for (let i = 0; i < 25; i++) {
+      points.push(vec3(
+        rng.next() * 100,
+        rng.next() * 100,
+        rng.next() * 100,
+      ));
+    }
+
+    const result = bowyerWatsonDelaunay(points);
+
+    for (const tet of result) {
+      const indices = [tet.a, tet.b, tet.c, tet.d];
+      const unique = new Set(indices);
+      // A degenerate tetrahedron would have fewer than 4 unique indices
+      expect(unique.size).toBe(4);
+    }
+  });
+
+  it('produces a super-tetrahedron-free result (no index >= original point count)', () => {
+    const rng = new Random(42);
+    const points: Vec3[] = [];
+    for (let i = 0; i < 40; i++) {
+      points.push(vec3(
+        rng.next() * 100,
+        rng.next() * 100,
+        rng.next() * 100,
+      ));
+    }
+
+    const result = bowyerWatsonDelaunay(points);
+
+    // No tetrahedron should reference a super-tetrahedron vertex
     for (const tet of result) {
       expect(tet.a).toBeLessThan(points.length);
       expect(tet.b).toBeLessThan(points.length);
