@@ -9,9 +9,6 @@ import type { BlastRegion } from '../mining/BlastExecution.js';
 import { isBuildingFootprintCell } from '../entities/BuildingPlacement.js';
 import { NAV_BENCH_HEIGHT } from '../config/balance.js';
 
-// Suppress unused-import warning during stub phase; used by computeBenchLevel in implementation.
-void NAV_BENCH_HEIGHT;
-
 /** Cardinal offsets for 4-directional neighbor checks. */
 const CARDINAL_OFFSETS: readonly [number, number][] = [[0, -1], [0, 1], [-1, 0], [1, 0]];
 
@@ -58,21 +55,26 @@ export class NavGrid {
 
   /**
    * Compute the maximum surface Y across all columns in the voxel grid.
-   * Stub — returns 0.
+   * Returns -1 if the entire grid is void/empty.
    */
   static computeMaxSurfaceY(voxelGrid: VoxelGrid): number {
-    void voxelGrid;
-    return 0; // STUB
+    let maxY = -1;
+    for (let z = 0; z < voxelGrid.sizeZ; z++) {
+      for (let x = 0; x < voxelGrid.sizeX; x++) {
+        const surfaceY = NavGrid.computeSurfaceY(voxelGrid, x, z);
+        if (surfaceY > maxY) maxY = surfaceY;
+      }
+    }
+    return maxY;
   }
 
   /**
    * Compute the bench level for a cell given its surface Y and the max surface Y.
-   * Stub — returns 0.
+   * Returns 0 if surfaceY < 0 (void cell).
    */
   static computeBenchLevel(maxSurfaceY: number, surfaceY: number): number {
-    void maxSurfaceY;
-    void surfaceY;
-    return 0; // STUB
+    if (surfaceY < 0) return 0;
+    return Math.floor((maxSurfaceY - surfaceY) / NAV_BENCH_HEIGHT);
   }
 
   /**
@@ -94,7 +96,7 @@ export class NavGrid {
       for (let x = 0; x < width; x++) {
         const surfaceY = NavGrid.computeSurfaceY(voxelGrid, x, z);
         const cellType = NavGrid.classifyCellType(x, z, voxelGrid, buildings, drillHoles, surfaceY);
-        const benchLevel = 0; // STUB: will use NavGrid.computeBenchLevel(maxSurfaceY, surfaceY)
+        const benchLevel = NavGrid.computeBenchLevel(maxSurfaceY, surfaceY);
         row.push(NavGrid.makeCell(cellType, benchLevel));
       }
       cells.push(row);
@@ -132,7 +134,7 @@ export class NavGrid {
       for (let x = minX; x <= maxX; x++) {
         const surfaceY = NavGrid.computeSurfaceY(voxelGrid, x, z);
         const cellType = NavGrid.classifyCellType(x, z, voxelGrid, buildings, drillHoles, surfaceY);
-        navGrid.cells[z]![x] = NavGrid.makeCell(cellType, 0);
+        navGrid.cells[z]![x] = NavGrid.makeCell(cellType, NavGrid.computeBenchLevel(navGrid.maxSurfaceY, surfaceY));
       }
     }
   }

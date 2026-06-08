@@ -187,35 +187,167 @@ function directLineWalk(
 }
 
 // ---------------------------------------------------------------------------
-// Multi-level routing stubs
+// Multi-level routing
 // ---------------------------------------------------------------------------
 
 export function getBenchLevel(grid: NavGrid, x: number, z: number): number {
-  void grid;
-  void x;
-  void z;
-  return 0; // STUB
+  const cx = clampCoord(x, grid.width);
+  const cz = clampCoord(z, grid.height);
+  return grid.cells[cz]![cx]!.benchLevel;
 }
 
 export function findRampConnections(grid: NavGrid): RampConnection[] {
-  void grid;
-  return []; // STUB
+  const connections: RampConnection[] = [];
+
+  for (let z = 0; z < grid.height; z++) {
+    for (let x = 0; x < grid.width; x++) {
+      const cell = grid.cells[z]![x]!;
+      if (cell.type !== 'ramp') continue;
+
+      // Collect distinct bench levels among walkable neighbours
+      const levelToNeighbor = new Map<number, { x: number; z: number }>();
+
+      for (const [dx, dz] of NEIGHBOUR_OFFSETS) {
+        const nx = x + dx;
+        const nz = z + dz;
+        if (nx < 0 || nx >= grid.width || nz < 0 || nz >= grid.height) continue;
+        const neighbor = grid.cells[nz]![nx]!;
+        if (neighbor.type === 'blocked' || neighbor.type === 'void') continue;
+
+        const level = neighbor.benchLevel;
+        // Keep first neighbor per level for determinism
+        if (!levelToNeighbor.has(level)) {
+          levelToNeighbor.set(level, { x: nx, z: nz });
+        }
+      }
+
+      if (levelToNeighbor.size >= 2) {
+        const levels = Array.from(levelToNeighbor.keys());
+        const upperLevel = Math.max(...levels);
+        const lowerLevel = Math.min(...levels);
+        const upperPos = levelToNeighbor.get(upperLevel)!;
+        const lowerPos = levelToNeighbor.get(lowerLevel)!;
+
+        connections.push({
+          rampX: x,
+          rampZ: z,
+          upperLevel,
+          lowerLevel,
+          upperX: upperPos.x,
+          upperZ: upperPos.z,
+          lowerX: lowerPos.x,
+          lowerZ: lowerPos.z,
+        });
+      }
+    }
+  }
+
+  return connections;
 }
 
 function findMultiLevelPath(grid: NavGrid, request: PathRequest): PathResult {
-  void grid;
-  void request;
-  void stepCost; // reference to prevent unused-function warning during stub phase
-  return { found: false, waypoints: [], totalCost: 0 }; // STUB
+  const sx = clampCoord(request.fromX, grid.width);
+  const sz = clampCoord(request.fromZ, grid.height);
+  const gx = clampCoord(request.toX, grid.width);
+  const gz = clampCoord(request.toZ, grid.height);
+  const { avoidVehicles, agentId } = request;
+
+  const startLevel = getBenchLevel(grid, sx, sz);
+  const goalLevel = getBenchLevel(grid, gx, gz);
+
+  // If same level, delegate to normal pathfinding
+  if (startLevel === goalLevel) {
+    return findPath(grid, request);
+  }
+
+  const ramps = findRampConnections(grid);
+
+  // Filter ramps connecting startLevel ↔ goalLevel
+  const candidateRamps = ramps.filter(r =>
+    (r.upperLevel === startLevel && r.lowerLevel === goalLevel) ||
+    (r.upperLevel === goalLevel && r.lowerLevel === startLevel),
+  );
+
+  if (candidateRamps.length === 0) {
+    return { found: false, waypoints: [], totalCost: 0 };
+  }
+
+  let bestResult: PathResult | null = null;
+
+  for (const ramp of candidateRamps) {
+    // Determine entrance (on start level) and exit (on goal level)
+    let entrance: { x: number; z: number };
+    let exit: { x: number; z: number };
+
+    if (ramp.upperLevel === startLevel) {
+      entrance = { x: ramp.upperX, z: ramp.upperZ };
+      exit = { x: ramp.lowerX, z: ramp.lowerZ };
+    } else {
+      entrance = { x: ramp.lowerX, z: ramp.lowerZ };
+      exit = { x: ramp.upperX, z: ramp.upperZ };
+    }
+
+    // A* from start → entrance
+    const route1 = findPath(grid, {
+      agentId,
+      fromX: sx,
+      fromZ: sz,
+      toX: entrance.x,
+      toZ: entrance.z,
+      avoidVehicles,
+    });
+    if (!route1.found) continue;
+
+    // A* from exit → goal
+    const route2 = findPath(grid, {
+      agentId,
+      fromX: exit.x,
+      fromZ: exit.z,
+      toX: gx,
+      toZ: gz,
+      avoidVehicles,
+    });
+    if (!route2.found) continue;
+
+    // Cost: route1 + entrance→ramp + ramp→exit + route2
+    const entranceToRampCost = stepCost(grid, entrance.x, entrance.z, ramp.rampX, ramp.rampZ);
+    const rampToExitCost = stepCost(grid, ramp.rampX, ramp.rampZ, exit.x, exit.z);
+    const totalCost = route1.totalCost + entranceToRampCost + rampToExitCost + route2.totalCost;
+
+    // Build waypoints
+    const waypoints: Array<{ x: number; z: number }> = [...route1.waypoints];
+
+    // Add ramp cell if not a duplicate of last waypoint from route1
+    const lastR1 = route1.waypoints[route1.waypoints.length - 1];
+    if (!lastR1 || lastR1.x !== ramp.rampX || lastR1.z !== ramp.rampZ) {
+      waypoints.push({ x: ramp.rampX, z: ramp.rampZ });
+    }
+
+    // Append route2 waypoints, skipping duplicate first
+    for (const wp of route2.waypoints) {
+      const lastWp = waypoints[waypoints.length - 1];
+      if (!lastWp || lastWp.x !== wp.x || lastWp.z !== wp.z) {
+        waypoints.push(wp);
+      }
+    }
+
+    if (bestResult === null || totalCost < bestResult.totalCost) {
+      bestResult = { found: true, waypoints, totalCost };
+    }
+  }
+
+  return bestResult ?? { found: false, waypoints: [], totalCost: 0 };
 }
 
 function stepCost(grid: NavGrid, ax: number, az: number, bx: number, bz: number): number {
-  void grid;
-  void ax;
-  void az;
-  void bx;
-  void bz;
-  return 0; // STUB
+  const dx = Math.abs(bx - ax);
+  const dz = Math.abs(bz - az);
+  if (dx > 1 || dz > 1) return Infinity;
+  const cx = clampCoord(bx, grid.width);
+  const cz = clampCoord(bz, grid.height);
+  const cell = grid.cells[cz]![cx]!;
+  if (dx !== 0 && dz !== 0) return cell.moveCost * Math.SQRT2;
+  return cell.moveCost;
 }
 
 // ---------------------------------------------------------------------------
