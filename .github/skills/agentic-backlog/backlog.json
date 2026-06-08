@@ -1028,11 +1028,11 @@
       "src/core/voxels/NavGrid.ts"
     ],
     "testFile": "tests/unit/voxels/NavGrid.test.ts",
-    "status": "pending",
+    "status": "done",
     "blockedBy": [
       "5.6"
     ],
-    "closedInPR": null
+    "closedInPR": 228
   },
   {
     "id": "5.20",
