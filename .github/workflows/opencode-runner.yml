@@ -38,6 +38,8 @@ jobs:
           persist-credentials: false
 
       - name: Setup git auth for push operations
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
         run: gh auth setup-git
 
       - uses: anomalyco/opencode/github@latest
