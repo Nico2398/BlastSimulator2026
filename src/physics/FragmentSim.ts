@@ -33,6 +33,9 @@ export {
   computeAverageRockComposition,
   computeAverageOreComposition,
   computeVolumeM3,
+} from './FragmentSimUtils.js';
+
+export {
   AABB,
   SupportGraph,
   computeFragmentAABB,
@@ -41,7 +44,7 @@ export {
   verticalGap,
   buildSupportGraph,
   getDirectlySupported,
-} from './FragmentSimUtils.js';
+} from './FragmentSupportGraph.js';
 
 export {
   computeEnergyGradientDirection,
