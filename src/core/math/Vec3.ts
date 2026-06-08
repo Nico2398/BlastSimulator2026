@@ -46,6 +46,14 @@ export function distance(a: Vec3, b: Vec3): number {
   return length(sub(a, b));
 }
 
+/** Squared Euclidean distance between two points (avoids sqrt). */
+export function squaredDistance(a: Vec3, b: Vec3): number {
+  const dx = a.x - b.x;
+  const dy = a.y - b.y;
+  const dz = a.z - b.z;
+  return dx * dx + dy * dy + dz * dz;
+}
+
 export function normalize(v: Vec3): Vec3 {
   const len = length(v);
   if (len === 0) return ZERO;
