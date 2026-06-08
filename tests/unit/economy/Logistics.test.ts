@@ -88,8 +88,8 @@ describe('Fragment logistics', () => {
     pickupFragment(state, 1, 'truck-01');
     const collectedOre: Record<string, number> = {};
     deliverToDepot(state, 1, collectedOre);
-    // 100 kg * 0.3 dirtite density = 30 kg dirtite
-    expect(collectedOre.dirtite).toBeCloseTo(30);
+    // fragment volume = 100/2.5 = 40, ore mass = 40 * 0.3 * 2500 = 30000 kg
+    expect(collectedOre.dirtite).toBeCloseTo(30000);
   });
 
   it('deliverToDepot accumulates multiple fragments into collectedOre', () => {
@@ -100,8 +100,8 @@ describe('Fragment logistics', () => {
     const collectedOre: Record<string, number> = {};
     deliverToDepot(state, 1, collectedOre);
     deliverToDepot(state, 2, collectedOre);
-    // Fragment 1: 100 * 0.3 = 30, Fragment 2: 200 * 0.3 = 60, total = 90
-    expect(collectedOre.dirtite).toBeCloseTo(90);
+    // Fragment 1: 40*0.3*2500 = 30000, Fragment 2: 80*0.3*2500 = 60000, total = 90000
+    expect(collectedOre.dirtite).toBeCloseTo(90000);
   });
 
   it('deliverToDepot adds to existing ore type in collectedOre', () => {
@@ -110,7 +110,8 @@ describe('Fragment logistics', () => {
     pickupFragment(state, 1, 'truck-01');
     const collectedOre: Record<string, number> = { existingOre: 50 };
     deliverToDepot(state, 1, collectedOre);
-    expect(collectedOre.dirtite).toBeCloseTo(30);
+    // fragment volume = 40, ore mass = 40 * 0.3 * 2500 = 30000 kg
+    expect(collectedOre.dirtite).toBeCloseTo(30000);
     expect(collectedOre.existingOre).toBe(50);
   });
 
