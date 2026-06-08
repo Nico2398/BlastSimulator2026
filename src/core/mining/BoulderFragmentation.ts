@@ -37,6 +37,11 @@ export function isOversized(volume: number): boolean {
   return volume > OVERSIZED_FRAGMENT_THRESHOLD;
 }
 
+/** Checks whether a fragment's volume exceeds the oversized threshold. Delegates to {@link isOversized}. */
+export function isFragmentOversized(volumeM3: number): boolean {
+  return isOversized(volumeM3);
+}
+
 /**
  * Split an oversized boulder into N equal sub-fragments where every piece
  * has volume < OVERSIZED_FRAGMENT_THRESHOLD.

@@ -15,6 +15,7 @@ import {
   PROJECTION_SPEED_THRESHOLD,
   fragmentBoulder,
   isOversized,
+  isFragmentOversized,
   OVERSIZED_FRAGMENT_THRESHOLD,
   resetBoulderFragIds,
   computeThreshold,
@@ -1194,5 +1195,31 @@ describe('BlastCalc — identifyFragmentedVoxels', () => {
 
     expect(identifyFragmentedVoxels(gridBelow, resultBelow).has('0,0,0')).toBe(false);
     expect(identifyFragmentedVoxels(gridAt, resultAt).has('0,0,0')).toBe(true);
+  });
+});
+
+// ── 5.17: isFragmentOversized ──
+
+describe('BlastCalc — isFragmentOversized', () => {
+  it('returns true for volume strictly above the threshold', () => {
+    expect(isFragmentOversized(OVERSIZED_FRAGMENT_THRESHOLD + 0.001)).toBe(true);
+    expect(isFragmentOversized(1.0)).toBe(true);
+    expect(isFragmentOversized(10.0)).toBe(true);
+  });
+
+  it('returns false for volume at or below the threshold', () => {
+    expect(isFragmentOversized(OVERSIZED_FRAGMENT_THRESHOLD)).toBe(false);
+    expect(isFragmentOversized(OVERSIZED_FRAGMENT_THRESHOLD - 0.001)).toBe(false);
+    expect(isFragmentOversized(0.0)).toBe(false);
+  });
+
+  it('returns false for negative volume (graceful handling)', () => {
+    expect(isFragmentOversized(-1)).toBe(false);
+  });
+
+  it('is consistent with isOversized behavior for same volume values', () => {
+    expect(isFragmentOversized(0.3)).toBe(isOversized(0.3));
+    expect(isFragmentOversized(0.5)).toBe(isOversized(0.5));
+    expect(isFragmentOversized(0.7)).toBe(isOversized(0.7));
   });
 });
