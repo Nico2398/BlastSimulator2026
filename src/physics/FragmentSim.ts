@@ -36,6 +36,17 @@ export {
 } from './FragmentSimUtils.js';
 
 export {
+  AABB,
+  SupportGraph,
+  computeFragmentAABB,
+  computeXZOverlap,
+  horizontalOverlap,
+  verticalGap,
+  buildSupportGraph,
+  getDirectlySupported,
+} from './FragmentSupportGraph.js';
+
+export {
   computeEnergyGradientDirection,
   distanceToNearestAirVoxel,
   computeSurfaceProximityFactor,
@@ -44,7 +55,7 @@ export {
   assignFragmentVelocity,
 } from './FragmentSimVelocity.js';
 
-export { simulateProjectedFragments, simulateCollapseFragments, updateFragmentSleepStates } from './FragmentSimPhysics.js';
+export { simulateProjectedFragments, simulateCollapseFragments, updateFragmentSleepStates, collapseSupportedFragments, removeFragmentWithCollapse } from './FragmentSimPhysics.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────────
 

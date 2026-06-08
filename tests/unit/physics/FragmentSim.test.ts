@@ -38,6 +38,27 @@ import {
 } from '../../../src/physics/FragmentSimVelocity.js';
 import { length } from '../../../src/core/math/Vec3.js';
 import { MAX_PROJECTION_VELOCITY, PHYSICS_FRAGMENT_CAP, PHYSICS_TERRAIN_CLEARANCE, SLEEP_VELOCITY_THRESHOLD, SLEEP_TICKS_REQUIRED } from '../../../src/core/config/balance.js';
+import {
+  type AABB,
+  type SupportGraph,
+  computeFragmentAABB,
+  computeXZOverlap,
+  horizontalOverlap,
+  verticalGap,
+  buildSupportGraph,
+  getDirectlySupported,
+} from '../../../src/physics/FragmentSimUtils.js';
+import {
+  collapseSupportedFragments,
+  removeFragmentWithCollapse,
+} from '../../../src/physics/FragmentSimPhysics.js';
+import {
+  FRAGMENT_HORIZONTAL_OVERLAP_TOLERANCE,
+  FRAGMENT_SUPPORT_VERTICAL_GAP,
+  GRAVITY,
+  PHYSICS_MAX_STEPS,
+  PHYSICS_STEP_DT,
+} from '../../../src/core/config/balance.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Helpers
@@ -2444,5 +2465,424 @@ describe('FragmentSimPhysics — updateFragmentSleepStates', () => {
     const input = [frag];
     const result = updateFragmentSleepStates(input);
     expect(result).toBe(input);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Group 20: FragmentSimUtils — Support Graph
+// Fragment AABB computation, XZ overlap detection, vertical gap, support graph
+// building and querying for fragment stacking and collapse mechanics.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function makeAABB(minX: number, maxX: number, minY: number, maxY: number, minZ: number, maxZ: number): AABB {
+  return { minX, maxX, minY, maxY, minZ, maxZ };
+}
+
+function makeFragment(overrides: Partial<RockFragment> = {}): RockFragment {
+  return {
+    id: 1,
+    cx: 0, cy: 0, cz: 0,
+    graphicVertices: new Float32Array(),
+    collisionVertices: new Float32Array(),
+    composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
+    oreComposition: { ores: [] },
+    volumeM3: 1.0,
+    massKg: 100,
+    overflowEnergy: 0,
+    velocity: ZERO,
+    simulationTier: 'collapse',
+    state: 'settling',
+    sleepTicks: 0,
+    ...overrides,
+  };
+}
+
+describe('FragmentSimUtils — Support Graph', () => {
+  it('computeFragmentAABB returns correct bounds from graphicVertices', () => {
+    const frag = makeFragment({
+      graphicVertices: new Float32Array([
+        0, 0, 0,
+        1, 0, 0,
+        0, 1, 0,
+        0, 0, 1,
+      ]),
+    });
+    const aabb = computeFragmentAABB(frag);
+    expect(aabb.minX).toBe(0);
+    expect(aabb.maxX).toBe(1);
+    expect(aabb.minY).toBe(0);
+    expect(aabb.maxY).toBe(1);
+    expect(aabb.minZ).toBe(0);
+    expect(aabb.maxZ).toBe(1);
+  });
+
+  it('computeFragmentAABB handles single vertex', () => {
+    const frag = makeFragment({
+      graphicVertices: new Float32Array([5, 5, 5]),
+    });
+    const aabb = computeFragmentAABB(frag);
+    expect(aabb.minX).toBe(5);
+    expect(aabb.maxX).toBe(5);
+    expect(aabb.minY).toBe(5);
+    expect(aabb.maxY).toBe(5);
+    expect(aabb.minZ).toBe(5);
+    expect(aabb.maxZ).toBe(5);
+  });
+
+  it('computeXZOverlap computes correct intersection', () => {
+    const a = makeAABB(0, 2, 0, 1, 0, 2);
+    const b = makeAABB(1, 3, 0, 1, 1, 3);
+    const result = computeXZOverlap(a, b);
+    expect(result.overlapX).toBe(1);
+    expect(result.overlapZ).toBe(1);
+    expect(result.overlapArea).toBe(1);
+    expect(result.minArea).toBe(4);
+  });
+
+  it('computeXZOverlap returns zero for non-overlapping AABBs', () => {
+    const a = makeAABB(0, 1, 0, 1, 0, 1);
+    const b = makeAABB(2, 3, 0, 1, 2, 3);
+    const result = computeXZOverlap(a, b);
+    expect(result.overlapArea).toBe(0);
+    expect(result.minArea).toBe(1);
+  });
+
+  it('horizontalOverlap returns true when overlap >= tolerance', () => {
+    expect(horizontalOverlap(3, 5, 0.5)).toBe(true);
+  });
+
+  it('horizontalOverlap returns false when overlap < tolerance', () => {
+    expect(horizontalOverlap(1, 5, 0.5)).toBe(false);
+  });
+
+  it('horizontalOverlap returns true when overlapArea equals minArea (full overlap)', () => {
+    expect(horizontalOverlap(9, 9, 0.5)).toBe(true);
+  });
+
+  it('verticalGap returns correct gap between two stacked fragments', () => {
+    const below = makeFragment({ id: 1, cy: 0.5 });
+    const above = makeFragment({ id: 2, cy: 1.5 });
+    const belowAabb = makeAABB(0, 1, 0, 1, 0, 1);
+    const aboveAabb = makeAABB(0, 1, 1, 2, 0, 1);
+    const gap = verticalGap(above, below, aboveAabb, belowAabb);
+    // gap = above_minY - below_maxY = 1.0 - 1.0 = 0
+    expect(gap).toBe(0);
+  });
+
+  it('verticalGap returns negative when fragments overlap vertically', () => {
+    const below = makeFragment({ id: 1, cy: 1.5 });
+    const above = makeFragment({ id: 2, cy: 3.5 });
+    const belowAabb = makeAABB(0, 1, 0, 3, 0, 1);
+    const aboveAabb = makeAABB(0, 1, 2, 5, 0, 1);
+    const gap = verticalGap(above, below, aboveAabb, belowAabb);
+    // gap = 2 - 3 = -1
+    expect(gap).toBe(-1);
+  });
+
+  it('buildSupportGraph returns empty graph for empty fragment list', () => {
+    const result = buildSupportGraph([], FRAGMENT_HORIZONTAL_OVERLAP_TOLERANCE, FRAGMENT_SUPPORT_VERTICAL_GAP);
+    expect(result.supporting.size).toBe(0);
+    expect(result.supportedBy.size).toBe(0);
+  });
+
+  it('buildSupportGraph returns empty graph for single fragment', () => {
+    const frag = makeFragment({ id: 1 });
+    const result = buildSupportGraph([frag], FRAGMENT_HORIZONTAL_OVERLAP_TOLERANCE, FRAGMENT_SUPPORT_VERTICAL_GAP);
+    expect(result.supporting.size).toBe(0);
+    expect(result.supportedBy.size).toBe(0);
+  });
+
+  it('buildSupportGraph correctly links a stack of 3', () => {
+    // Three fragments stacked vertically with identical XZ overlap
+    const frag1 = makeFragment({
+      id: 1, cy: 1, state: 'static',
+      graphicVertices: new Float32Array([
+        0, 0, 0,  2, 0, 0,  2, 2, 0,  0, 2, 0,
+        0, 0, 2,  2, 0, 2,  2, 2, 2,  0, 2, 2,
+      ]),
+    });
+    const frag2 = makeFragment({
+      id: 2, cy: 3, state: 'static',
+      graphicVertices: new Float32Array([
+        0, 2, 0,  2, 2, 0,  2, 4, 0,  0, 4, 0,
+        0, 2, 2,  2, 2, 2,  2, 4, 2,  0, 4, 2,
+      ]),
+    });
+    const frag3 = makeFragment({
+      id: 3, cy: 5, state: 'static',
+      graphicVertices: new Float32Array([
+        0, 4, 0,  2, 4, 0,  2, 6, 0,  0, 6, 0,
+        0, 4, 2,  2, 4, 2,  2, 6, 2,  0, 6, 2,
+      ]),
+    });
+
+    const result = buildSupportGraph(
+      [frag1, frag2, frag3],
+      FRAGMENT_HORIZONTAL_OVERLAP_TOLERANCE,
+      FRAGMENT_SUPPORT_VERTICAL_GAP,
+    );
+
+    // frag1 supports frag2, frag2 supports frag3
+    expect(result.supporting.get(1)).toContain(2);
+    expect(result.supporting.get(2)).toContain(3);
+    expect(result.supportedBy.get(2)).toContain(1);
+    expect(result.supportedBy.get(3)).toContain(2);
+  });
+
+  it('buildSupportGraph does not link fragments horizontally separate', () => {
+    const frag1 = makeFragment({
+      id: 1, cy: 1, state: 'static',
+      graphicVertices: new Float32Array([
+        0, 0, 0,  1, 0, 0,  1, 1, 0,  0, 1, 0,
+        0, 0, 1,  1, 0, 1,  1, 1, 1,  0, 1, 1,
+      ]),
+    });
+    const frag2 = makeFragment({
+      id: 2, cy: 3, state: 'static',
+      graphicVertices: new Float32Array([
+        5, 0, 5,  6, 0, 5,  6, 1, 5,  5, 1, 5,
+        5, 0, 6,  6, 0, 6,  6, 1, 6,  5, 1, 6,
+      ]),
+    });
+    const result = buildSupportGraph([frag1, frag2], FRAGMENT_HORIZONTAL_OVERLAP_TOLERANCE, FRAGMENT_SUPPORT_VERTICAL_GAP);
+    // No XZ overlap → no edges
+    expect(result.supporting.get(1)).toBeUndefined();
+    expect(result.supportedBy.get(2)).toBeUndefined();
+  });
+
+  it('buildSupportGraph does not link fragments with vertical gap > maxGap', () => {
+    const frag1 = makeFragment({
+      id: 1, cy: 1, state: 'static',
+      graphicVertices: new Float32Array([
+        0, 0, 0,  2, 0, 0,  2, 1, 0,  0, 1, 0,
+        0, 0, 2,  2, 0, 2,  2, 1, 2,  0, 1, 2,
+      ]),
+    });
+    const frag2 = makeFragment({
+      id: 2, cy: 10, state: 'static',
+      graphicVertices: new Float32Array([
+        0, 9, 0,  2, 9, 0,  2, 10, 0,  0, 10, 0,
+        0, 9, 2,  2, 9, 2,  2, 10, 2,  0, 10, 2,
+      ]),
+    });
+    const result = buildSupportGraph([frag1, frag2], FRAGMENT_HORIZONTAL_OVERLAP_TOLERANCE, FRAGMENT_SUPPORT_VERTICAL_GAP);
+    // Vertical gap = 9 - 1 = 8 > 0.1 → no edge
+    expect(result.supporting.get(1)).toBeUndefined();
+    expect(result.supportedBy.get(2)).toBeUndefined();
+  });
+
+  it('buildSupportGraph links two supporters to one fragment', () => {
+    // Two fragments below (side by side) supporting one wide fragment above
+    // frag1: unit box from (0,0,0) to (1,1,1) → centroid y = 0.5
+    // frag2: unit box from (1,0,0) to (2,1,1) → centroid y = 0.5
+    // frag3: 2×1×1 box from (0,1,0) to (2,2,1) sitting on top of both → centroid y = 1.5
+    const frag1 = makeFragment({
+      id: 1, cy: 0.5, state: 'static',
+      graphicVertices: new Float32Array([
+        0, 0, 0,  1, 0, 0,  1, 1, 0,  0, 1, 0,
+        0, 0, 1,  1, 0, 1,  1, 1, 1,  0, 1, 1,
+      ]),
+    });
+    const frag2 = makeFragment({
+      id: 2, cy: 0.5, state: 'static',
+      graphicVertices: new Float32Array([
+        1, 0, 0,  2, 0, 0,  2, 1, 0,  1, 1, 0,
+        1, 0, 1,  2, 0, 1,  2, 1, 1,  1, 1, 1,
+      ]),
+    });
+    const frag3 = makeFragment({
+      id: 3, cy: 1.5, state: 'static',
+      graphicVertices: new Float32Array([
+        0, 1, 0,  2, 1, 0,  2, 2, 0,  0, 2, 0,
+        0, 1, 1,  2, 1, 1,  2, 2, 1,  0, 2, 1,
+      ]),
+    });
+
+    const result = buildSupportGraph(
+      [frag1, frag2, frag3],
+      FRAGMENT_HORIZONTAL_OVERLAP_TOLERANCE,
+      FRAGMENT_SUPPORT_VERTICAL_GAP,
+    );
+
+    // frag3 overlaps both frag1 (x[0,1]) and frag2 (x[1,2]) in XZ
+    expect(result.supporting.get(1)).toContain(3);
+    expect(result.supporting.get(2)).toContain(3);
+    expect(result.supportedBy.get(3)).toContain(1);
+    expect(result.supportedBy.get(3)).toContain(2);
+  });
+
+  it('getDirectlySupported returns fragments directly above the given fragment', () => {
+    const graph: SupportGraph = {
+      supporting: new Map([[1, [2, 3]]]),
+      supportedBy: new Map([[2, [1]], [3, [1]]]),
+    };
+    const result = getDirectlySupported(graph, 1);
+    expect(result).toEqual([2, 3]);
+  });
+
+  it('getDirectlySupported returns empty array for unknown ID', () => {
+    const graph: SupportGraph = {
+      supporting: new Map([[1, [2]]]),
+      supportedBy: new Map([[2, [1]]]),
+    };
+    const result = getDirectlySupported(graph, 99);
+    expect(result).toEqual([]);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Group 21: FragmentSimPhysics — Stack Collapse
+// Collapse detection and simulation: removing a fragment causes dependent
+// fragments above it to fall (Tier B gravity drop).
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function setupTerrainGrid(): VoxelGrid {
+  const grid = new VoxelGrid(10, 10, 10);
+  // Flat terrain at y=0
+  for (let x = 0; x < 10; x++) {
+    for (let z = 0; z < 10; z++) {
+      grid.setVoxel(x, 0, z, {
+        composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
+        density: 1.0,
+        oreDensities: {},
+        fractureModifier: 1.0,
+      });
+    }
+  }
+  return grid;
+}
+
+/** Generate 8 interleaved vertices for an axis-aligned box. */
+function makeBoxVertices(aabb: AABB): Float32Array {
+  const { minX, maxX, minY, maxY, minZ, maxZ } = aabb;
+  return new Float32Array([
+    minX, minY, minZ,  maxX, minY, minZ,  maxX, maxY, minZ,  minX, maxY, minZ,
+    minX, minY, maxZ,  maxX, minY, maxZ,  maxX, maxY, maxZ,  minX, maxY, maxZ,
+  ]);
+}
+
+function makeStackFragment(id: number, cy: number, aabb: AABB, overrides: Partial<RockFragment> = {}): RockFragment {
+  const verts = makeBoxVertices(aabb);
+  return {
+    id,
+    cx: (aabb.minX + aabb.maxX) / 2,
+    cy,
+    cz: (aabb.minZ + aabb.maxZ) / 2,
+    graphicVertices: verts,
+    collisionVertices: verts,
+    composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
+    oreComposition: { ores: [] },
+    volumeM3: 1.0,
+    massKg: 100,
+    overflowEnergy: 0,
+    velocity: ZERO,
+    simulationTier: 'collapse',
+    state: 'settling',
+    sleepTicks: 0,
+    ...overrides,
+  };
+}
+
+describe('FragmentSimPhysics — Stack Collapse', () => {
+  it('collapseSupportedFragments with empty input returns unchanged', () => {
+    const grid = setupTerrainGrid();
+    const graph: SupportGraph = { supporting: new Map(), supportedBy: new Map() };
+    const result = collapseSupportedFragments([], [], graph, grid, FRAGMENT_HORIZONTAL_OVERLAP_TOLERANCE, FRAGMENT_SUPPORT_VERTICAL_GAP);
+    expect(result.updatedFragments).toHaveLength(0);
+    expect(result.updatedGraph.supporting.size).toBe(0);
+    expect(result.updatedGraph.supportedBy.size).toBe(0);
+  });
+
+  it('collapseSupportedFragments with no dependents removes the fragment', () => {
+    const grid = setupTerrainGrid();
+    const frag = makeStackFragment(1, 1, makeAABB(0, 2, 0, 2, 0, 2));
+    const graph: SupportGraph = { supporting: new Map(), supportedBy: new Map() };
+    const result = collapseSupportedFragments([1], [frag], graph, grid, FRAGMENT_HORIZONTAL_OVERLAP_TOLERANCE, FRAGMENT_SUPPORT_VERTICAL_GAP);
+    // Fragment has no dependents, so it's simply removed
+    expect(result.updatedFragments).toHaveLength(0);
+  });
+
+  it('collapseSupportedFragments drops single dependent onto terrain', () => {
+    const grid = setupTerrainGrid();
+    const fragA = makeStackFragment(1, 1, makeAABB(0, 2, 0, 2, 0, 2));
+    const fragB = makeStackFragment(2, 3, makeAABB(0, 2, 2, 4, 0, 2));
+    // Manually build support graph where A supports B
+    const graph: SupportGraph = {
+      supporting: new Map([[1, [2]]]),
+      supportedBy: new Map([[2, [1]]]),
+    };
+    const result = collapseSupportedFragments(
+      [1], [fragA, fragB], graph, grid,
+      FRAGMENT_HORIZONTAL_OVERLAP_TOLERANCE,
+      FRAGMENT_SUPPORT_VERTICAL_GAP,
+    );
+    // A is removed, B should drop to terrain level
+    expect(result.updatedFragments).toHaveLength(1);
+    expect(result.updatedFragments[0]!.id).toBe(2);
+    // cy = terrainY(0) + clearance + halfHeight(1) = 2.0
+    expect(result.updatedFragments[0]!.cy).toBeCloseTo(PHYSICS_TERRAIN_CLEARANCE + 1, 5);
+  });
+
+  it('collapseSupportedFragments cascades through chain', () => {
+    const grid = setupTerrainGrid();
+    const fragA = makeStackFragment(1, 1, makeAABB(0, 2, 0, 2, 0, 2));
+    const fragB = makeStackFragment(2, 3, makeAABB(0, 2, 2, 4, 0, 2));
+    const fragC = makeStackFragment(3, 5, makeAABB(0, 2, 4, 6, 0, 2));
+    const fragD = makeStackFragment(4, 7, makeAABB(0, 2, 6, 8, 0, 2));
+    // Chain: A→B→C→D
+    const graph: SupportGraph = {
+      supporting: new Map([[1, [2]], [2, [3]], [3, [4]]]),
+      supportedBy: new Map([[2, [1]], [3, [2]], [4, [3]]]),
+    };
+    const result = collapseSupportedFragments(
+      [1], [fragA, fragB, fragC, fragD], graph, grid,
+      FRAGMENT_HORIZONTAL_OVERLAP_TOLERANCE,
+      FRAGMENT_SUPPORT_VERTICAL_GAP,
+    );
+    // A removed, B/C/D remain collapsed onto each other
+    expect(result.updatedFragments).toHaveLength(3);
+    const b = result.updatedFragments.find(f => f.id === 2)!;
+    const c = result.updatedFragments.find(f => f.id === 3)!;
+    const d = result.updatedFragments.find(f => f.id === 4)!;
+    // B lands on terrain: cy = terrainY(0) + clearance + halfHeight(1) = 2.0
+    expect(b.cy).toBeCloseTo(PHYSICS_TERRAIN_CLEARANCE + 1, 5);
+    // C stacks on B: B.topY(3.0) + C.halfHeight(1) + STACK_EPSILON(0.001) = 4.001
+    expect(c.cy).toBeCloseTo(4.001, 5);
+    // D stacks on C: C.topY(5.001) + D.halfHeight(1) + STACK_EPSILON(0.001) = 6.002
+    expect(d.cy).toBeCloseTo(6.002, 5);
+  });
+
+  it('removeFragmentWithCollapse removes the fragment from array', () => {
+    const grid = setupTerrainGrid();
+    const frag = makeStackFragment(1, 1, makeAABB(0, 2, 0, 2, 0, 2));
+    const graph: SupportGraph = { supporting: new Map(), supportedBy: new Map() };
+    const result = removeFragmentWithCollapse(
+      1, [frag], graph, grid,
+      FRAGMENT_HORIZONTAL_OVERLAP_TOLERANCE,
+      FRAGMENT_SUPPORT_VERTICAL_GAP,
+    );
+    expect(result.remainingFragments).toHaveLength(0);
+  });
+
+  it('removeFragmentWithCollapse updates support graph after collapse', () => {
+    const grid = setupTerrainGrid();
+    const fragA = makeStackFragment(1, 1, makeAABB(0, 2, 0, 2, 0, 2));
+    const fragB = makeStackFragment(2, 3, makeAABB(0, 2, 2, 4, 0, 2));
+    const graph: SupportGraph = {
+      supporting: new Map([[1, [2]]]),
+      supportedBy: new Map([[2, [1]]]),
+    };
+    const result = removeFragmentWithCollapse(
+      1, [fragA, fragB], graph, grid,
+      FRAGMENT_HORIZONTAL_OVERLAP_TOLERANCE,
+      FRAGMENT_SUPPORT_VERTICAL_GAP,
+    );
+    // A removed, B drops to terrain alone — no support edges remain
+    // cy = terrainY(0) + clearance + halfHeight(1) = 2.0
+    expect(result.remainingFragments).toHaveLength(1);
+    expect(result.remainingFragments[0]!.id).toBe(2);
+    expect(result.remainingFragments[0]!.cy).toBeCloseTo(PHYSICS_TERRAIN_CLEARANCE + 1, 5);
+    expect(result.updatedGraph.supporting.size).toBe(0);
+    expect(result.updatedGraph.supportedBy.size).toBe(0);
   });
 });

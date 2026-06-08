@@ -198,6 +198,9 @@ export function simulateCollapseFragments(
   return _fragments;
 }
 
+// Re-export collapse support graph functions from the new module
+export { collapseSupportedFragments, removeFragmentWithCollapse } from './FragmentSimCollapse.js';
+
 // ─── Sleep Detection ─────────────────────────────────────────────────────────
 
 /**
