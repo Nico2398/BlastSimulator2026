@@ -28,6 +28,11 @@ export interface PathResult {
   totalCost: number;
 }
 
+/**
+ * Describes a ramp cell connecting two different bench levels in the NavGrid.
+ * Each ramp has an upper-level neighbor and a lower-level neighbor that agents
+ * can path through to transition between levels.
+ */
 export interface RampConnection {
   rampX: number;
   rampZ: number;
@@ -245,6 +250,40 @@ export function findRampConnections(grid: NavGrid): RampConnection[] {
   return connections;
 }
 
+// Filter ramp connections that directly connect the given start and goal levels (in either direction).
+function filterRampsForLevels(ramps: RampConnection[], startLevel: number, goalLevel: number): RampConnection[] {
+  return ramps.filter(r =>
+    (r.upperLevel === startLevel && r.lowerLevel === goalLevel) ||
+    (r.upperLevel === goalLevel && r.lowerLevel === startLevel),
+  );
+}
+
+// Concatenate two A* route waypoints via a ramp cell, removing duplicate cells
+// at the join points so the path is contiguous.
+function concatPaths(
+  route1: PathResult,
+  rampCell: { x: number; z: number },
+  route2: PathResult,
+): Array<{ x: number; z: number }> {
+  const waypoints: Array<{ x: number; z: number }> = [...route1.waypoints];
+
+  // Add ramp cell if not a duplicate of last waypoint from route1
+  const lastR1 = route1.waypoints[route1.waypoints.length - 1];
+  if (!lastR1 || lastR1.x !== rampCell.x || lastR1.z !== rampCell.z) {
+    waypoints.push({ x: rampCell.x, z: rampCell.z });
+  }
+
+  // Append route2 waypoints, skipping duplicate first
+  for (const wp of route2.waypoints) {
+    const lastWp = waypoints[waypoints.length - 1];
+    if (!lastWp || lastWp.x !== wp.x || lastWp.z !== wp.z) {
+      waypoints.push(wp);
+    }
+  }
+
+  return waypoints;
+}
+
 function findMultiLevelPath(grid: NavGrid, request: PathRequest): PathResult {
   const sx = clampCoord(request.fromX, grid.width);
   const sz = clampCoord(request.fromZ, grid.height);
@@ -263,10 +302,7 @@ function findMultiLevelPath(grid: NavGrid, request: PathRequest): PathResult {
   const ramps = findRampConnections(grid);
 
   // Filter ramps connecting startLevel ↔ goalLevel
-  const candidateRamps = ramps.filter(r =>
-    (r.upperLevel === startLevel && r.lowerLevel === goalLevel) ||
-    (r.upperLevel === goalLevel && r.lowerLevel === startLevel),
-  );
+  const candidateRamps = filterRampsForLevels(ramps, startLevel, goalLevel);
 
   if (candidateRamps.length === 0) {
     return { found: false, waypoints: [], totalCost: 0 };
@@ -314,22 +350,8 @@ function findMultiLevelPath(grid: NavGrid, request: PathRequest): PathResult {
     const rampToExitCost = getStepCost(grid, ramp.rampX, ramp.rampZ, exit.x, exit.z);
     const totalCost = route1.totalCost + entranceToRampCost + rampToExitCost + route2.totalCost;
 
-    // Build waypoints
-    const waypoints: Array<{ x: number; z: number }> = [...route1.waypoints];
-
-    // Add ramp cell if not a duplicate of last waypoint from route1
-    const lastR1 = route1.waypoints[route1.waypoints.length - 1];
-    if (!lastR1 || lastR1.x !== ramp.rampX || lastR1.z !== ramp.rampZ) {
-      waypoints.push({ x: ramp.rampX, z: ramp.rampZ });
-    }
-
-    // Append route2 waypoints, skipping duplicate first
-    for (const wp of route2.waypoints) {
-      const lastWp = waypoints[waypoints.length - 1];
-      if (!lastWp || lastWp.x !== wp.x || lastWp.z !== wp.z) {
-        waypoints.push(wp);
-      }
-    }
+    // Concatenate route1 → ramp → route2 waypoints with deduplication
+    const waypoints = concatPaths(route1, { x: ramp.rampX, z: ramp.rampZ }, route2);
 
     if (bestResult === null || totalCost < bestResult.totalCost) {
       bestResult = { found: true, waypoints, totalCost };
@@ -339,6 +361,7 @@ function findMultiLevelPath(grid: NavGrid, request: PathRequest): PathResult {
   return bestResult ?? { found: false, waypoints: [], totalCost: 0 };
 }
 
+// Cost of a single step from a to b (must be neighbours, otherwise Infinity).
 function getStepCost(grid: NavGrid, ax: number, az: number, bx: number, bz: number): number {
   const dx = Math.abs(bx - ax);
   const dz = Math.abs(bz - az);

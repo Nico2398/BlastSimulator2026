@@ -21,7 +21,6 @@ export interface GameEventMap {
   'revolt:warning': { ticksRemaining: number };
   'revolt:triggered': Record<string, never>;
   'employee:levelup': { employeeId: number; category: SkillCategory; oldLevel: number; newLevel: number };
-  'pathfinding:no_ramp_available': { agentId: number; fromX: number; fromZ: number; toX: number; toZ: number; fromLevel: number; toLevel: number };
 }
 
 type EventHandler<T> = (data: T) => void;
