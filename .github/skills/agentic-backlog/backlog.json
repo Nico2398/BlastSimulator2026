@@ -1123,11 +1123,11 @@
       "src/core/nav/Pathfinding.ts"
     ],
     "testFile": "tests/unit/nav/Pathfinding.test.ts",
-    "status": "pending",
+    "status": "done",
     "blockedBy": [
       "6.1"
     ],
-    "closedInPR": null
+    "closedInPR": 268
   },
   {
     "id": "6.5",
