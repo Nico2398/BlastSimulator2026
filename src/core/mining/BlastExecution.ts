@@ -71,6 +71,13 @@ export interface SecondaryBlastEvent {
   explosivesKg: number;
 }
 
+export interface BlastRegion {
+  minX: number;
+  maxX: number;
+  minZ: number;
+  maxZ: number;
+}
+
 export interface BlastResult {
   fragments: FragmentData[];
   fragmentCount: number;
@@ -84,6 +91,7 @@ export interface BlastResult {
   rating: BlastRating;
   crackedVoxels: number;
   clearedVoxels: number;
+  clearedRegion: BlastRegion;
   destroyedBuildings: DestroyedBuildingInfo[];
   secondaryBlastEvents: SecondaryBlastEvent[];
 }
@@ -319,6 +327,7 @@ export function executeBlast(
     rating,
     crackedVoxels,
     clearedVoxels,
+    clearedRegion: { minX: 0, maxX: 0, minZ: 0, maxZ: 0 },
     destroyedBuildings,
     secondaryBlastEvents,
   };
