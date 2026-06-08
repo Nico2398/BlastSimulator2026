@@ -208,11 +208,24 @@ export function simulateCollapseFragments(
  * @param tickCount - Number of ticks to advance (default 1).
  * @returns The same array reference for chaining.
  */
-export function updateFragmentSleepStates(fragments: RockFragment[], tickCount: number = 1): RockFragment[] {
-  // TODO: implement sleep detection
-  void length;
-  void SLEEP_VELOCITY_THRESHOLD;
-  void SLEEP_TICKS_REQUIRED;
-  void tickCount;
-  return fragments;
+export function updateFragmentSleepStates(
+  _fragments: RockFragment[],
+  _tickCount: number = 1,
+): RockFragment[] {
+  for (const frag of _fragments) {
+    if (frag.state === 'static') continue;
+
+    const speed = length(frag.velocity);
+
+    if (speed < SLEEP_VELOCITY_THRESHOLD) {
+      frag.sleepTicks += _tickCount;
+      if (frag.sleepTicks >= SLEEP_TICKS_REQUIRED) {
+        frag.state = 'static';
+      }
+    } else {
+      frag.sleepTicks = 0;
+    }
+  }
+
+  return _fragments;
 }
