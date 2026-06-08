@@ -103,8 +103,8 @@ export class NavGrid {
   }
 
   /**
-   * Classify a single NavGrid cell based on column solidity, drill holes, and buildings.
-   * Priority order (highest to lowest): void > drill_hole > blocked > walkable.
+   * Classify a single NavGrid cell based on column solidity, drill holes, buildings, and ramps.
+   * Priority order (highest to lowest): void > drill_hole > blocked > ramp > walkable.
    */
   private static classifyCellType(
     x: number,
@@ -117,6 +117,14 @@ export class NavGrid {
     if (surfaceY === -1) return 'void';
     if (drillHoles.some(h => Math.floor(h.x) === x && Math.floor(h.z) === z)) return 'drill_hole';
     if (buildings.some(b => isBuildingFootprintCell(b, x, z))) return 'blocked';
+    // Ramp detection: cardinal neighbor with surface height delta > 1 voxel
+    const neighbors: [number, number][] = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+    for (const [dx, dz] of neighbors) {
+      const neighborSurfaceY = NavGrid.computeSurfaceY(voxelGrid, x + dx, z + dz);
+      if (neighborSurfaceY !== -1 && Math.abs(surfaceY - neighborSurfaceY) > 1) {
+        return 'ramp';
+      }
+    }
     return 'walkable';
   }
 
