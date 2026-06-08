@@ -28,6 +28,17 @@ export interface PathResult {
   totalCost: number;
 }
 
+export interface RampConnection {
+  rampX: number;
+  rampZ: number;
+  upperLevel: number;
+  lowerLevel: number;
+  upperX: number;
+  upperZ: number;
+  lowerX: number;
+  lowerZ: number;
+}
+
 /** 8-directional neighbour offsets as [dx, dz] pairs. */
 const NEIGHBOUR_OFFSETS: readonly [number, number][] = [
   [0, -1], [0, 1], [-1, 0], [1, 0],   // cardinal
@@ -176,6 +187,38 @@ function directLineWalk(
 }
 
 // ---------------------------------------------------------------------------
+// Multi-level routing stubs
+// ---------------------------------------------------------------------------
+
+export function getBenchLevel(grid: NavGrid, x: number, z: number): number {
+  void grid;
+  void x;
+  void z;
+  return 0; // STUB
+}
+
+export function findRampConnections(grid: NavGrid): RampConnection[] {
+  void grid;
+  return []; // STUB
+}
+
+function findMultiLevelPath(grid: NavGrid, request: PathRequest): PathResult {
+  void grid;
+  void request;
+  void stepCost; // reference to prevent unused-function warning during stub phase
+  return { found: false, waypoints: [], totalCost: 0 }; // STUB
+}
+
+function stepCost(grid: NavGrid, ax: number, az: number, bx: number, bz: number): number {
+  void grid;
+  void ax;
+  void az;
+  void bx;
+  void bz;
+  return 0; // STUB
+}
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
@@ -211,6 +254,11 @@ export function findPath(grid: NavGrid, request: PathRequest): PathResult {
   // 4. Trivial case: start == goal (both passable)
   if (sx === gx && sz === gz) {
     return { found: true, waypoints: [{ x: sx, z: sz }], totalCost: 0 };
+  }
+
+  // 4b. Multi-level check: delegate to multi-level routing when levels differ
+  if (getBenchLevel(grid, sx, sz) !== getBenchLevel(grid, gx, gz)) {
+    return findMultiLevelPath(grid, request);
   }
 
   // 5. A* main loop

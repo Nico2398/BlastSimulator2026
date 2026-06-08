@@ -210,6 +210,9 @@ export const BLAST_REMESH_RADIUS_CHUNKS = 2;
 /** Maximum nodes A* may explore before falling back to direct-line search. */
 export const PATHFINDING_NODE_BUDGET_CAP = 500;
 
+/** Height of one bench level in voxels. Affects benchLevel computation in NavGrid. */
+export const NAV_BENCH_HEIGHT = 5;
+
 // ─── Buildings ─────────────────────────────────────────────────────────────────
 
 /** Productivity well-being multiplier from Living Quarters by tier (and absent). */
