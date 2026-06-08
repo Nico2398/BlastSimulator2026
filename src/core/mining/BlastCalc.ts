@@ -399,4 +399,4 @@ export function parseKey(key: string): [number, number, number] | null {
 }
 
 export { PROJECTION_SPEED_THRESHOLD };
-export { isOversized, fragmentBoulder, resetBoulderFragIds, OVERSIZED_FRAGMENT_THRESHOLD, type Boulder, type FragmentBoulderResult } from './BoulderFragmentation.js';
+export { isOversized, isFragmentOversized, fragmentBoulder, resetBoulderFragIds, OVERSIZED_FRAGMENT_THRESHOLD, type Boulder, type FragmentBoulderResult } from './BoulderFragmentation.js';

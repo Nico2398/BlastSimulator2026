@@ -70,6 +70,7 @@ export interface RockFragment {
   composition: VoxelRockComposition;
   oreComposition: VoxelOreComposition;
   volumeM3: number;
+  oversized: boolean;
   massKg: number;
   overflowEnergy: number;
   velocity: Vec3;
@@ -293,6 +294,7 @@ export function generateRockFragments(
       composition,
       oreComposition,
       volumeM3,
+      oversized: false,
       massKg,
       overflowEnergy,
       velocity: ZERO,
