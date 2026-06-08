@@ -2,6 +2,7 @@
 // Tracks fragments through lifecycle: on_ground → in_transit → stored/sold/disposed.
 
 import type { FragmentData } from '../mining/BlastExecution.js';
+import { accumulateOreMass } from '../mining/BlastOreReport.js';
 
 // ── Fragment states ──
 
@@ -67,7 +68,11 @@ export function pickupFragment(
 }
 
 /** Deliver a fragment to the storage depot. */
-export function deliverToDepot(state: LogisticsState, fragmentId: number): boolean {
+export function deliverToDepot(
+  state: LogisticsState,
+  fragmentId: number,
+  collectedOre?: Record<string, number>,
+): boolean {
   const tracked = state.fragments.find(
     f => f.fragment.id === fragmentId && f.state === 'in_transit',
   );
@@ -76,6 +81,12 @@ export function deliverToDepot(state: LogisticsState, fragmentId: number): boole
   tracked.state = 'stored';
   tracked.vehicleId = null;
   state.storedMassKg += tracked.fragment.mass;
+
+  // Accumulate ore mass into collectedOre when provided
+  if (collectedOre) {
+    accumulateOreMass(collectedOre, tracked.fragment.volume, tracked.fragment.oreDensities);
+  }
+
   return true;
 }
 

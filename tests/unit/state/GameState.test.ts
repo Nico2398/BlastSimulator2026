@@ -287,6 +287,13 @@ describe('claimPendingAction (task 3.8)', () => {
 // Task 4.4 — surveyResults and nextSurveyId fields in GameState
 // =============================================================================
 
+describe('createGame — collectedOre (task 5.18)', () => {
+  it('initialises collectedOre as an empty object', () => {
+    const state = createGame({ seed: 42 });
+    expect(state.collectedOre).toEqual({});
+  });
+});
+
 describe('createGame — surveyResults and nextSurveyId (task 4.4)', () => {
   it('initialises surveyResults as an empty array', () => {
     const state = createGame({ seed: 42 });
