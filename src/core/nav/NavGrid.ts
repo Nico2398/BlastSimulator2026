@@ -32,8 +32,12 @@ export class NavGrid {
    * Find the highest solid voxel Y in column (x, z).
    * Returns the Y coordinate of the voxel (not y+1).
    * Returns -1 if the column is entirely void (no solid voxel with density >= 0.5).
+   * Out-of-bounds (x, z) coordinates are clamped to the grid limits.
    */
   static computeSurfaceY(voxelGrid: VoxelGrid, x: number, z: number): number {
+    // Guard against degenerate grids with zero dimensions
+    if (voxelGrid.sizeX <= 0 || voxelGrid.sizeZ <= 0) return -1;
+
     const cx = Math.max(0, Math.min(voxelGrid.sizeX - 1, Math.floor(x)));
     const cz = Math.max(0, Math.min(voxelGrid.sizeZ - 1, Math.floor(z)));
     for (let y = voxelGrid.sizeY - 1; y >= 0; y--) {
@@ -59,20 +63,7 @@ export class NavGrid {
     for (let z = 0; z < height; z++) {
       const row: NavCell[] = [];
       for (let x = 0; x < width; x++) {
-        const surfaceY = NavGrid.computeSurfaceY(voxelGrid, x, z);
-        let type: NavCellType;
-
-        if (surfaceY === -1) {
-          type = 'void';
-        } else if (drillHoles.some(h => Math.floor(h.x) === x && Math.floor(h.z) === z)) {
-          type = 'drill_hole';
-        } else if (buildings.some(b => isBuildingFootprintCell(b, x, z))) {
-          type = 'blocked';
-        } else {
-          type = 'walkable';
-        }
-
-        row.push(NavGrid.makeCell(type));
+        row.push(NavGrid.makeCell(NavGrid.classifyCellType(x, z, voxelGrid, buildings, drillHoles)));
       }
       cells.push(row);
     }
@@ -91,31 +82,42 @@ export class NavGrid {
     drillHoles: DrillHole[],
     region: BlastRegion,
   ): void {
+    // Detect empty sentinel region (e.g. {minX:0, maxX:-1, minZ:0, maxZ:-1})
+    // before clamping, since clamping would collapse min/max to the same value
+    // and fail the min > max check.
+    if (region.minX > region.maxX || region.minZ > region.maxZ) return;
+
     const minX = Math.max(0, Math.min(navGrid.width - 1, region.minX));
     const maxX = Math.max(0, Math.min(navGrid.width - 1, region.maxX));
     const minZ = Math.max(0, Math.min(navGrid.height - 1, region.minZ));
     const maxZ = Math.max(0, Math.min(navGrid.height - 1, region.maxZ));
 
+    // Defensive check for regions entirely outside grid bounds after clamping
     if (minX > maxX || minZ > maxZ) return;
 
     for (let z = minZ; z <= maxZ; z++) {
       for (let x = minX; x <= maxX; x++) {
-        const surfaceY = NavGrid.computeSurfaceY(voxelGrid, x, z);
-        let type: NavCellType;
-
-        if (surfaceY === -1) {
-          type = 'void';
-        } else if (drillHoles.some(h => Math.floor(h.x) === x && Math.floor(h.z) === z)) {
-          type = 'drill_hole';
-        } else if (buildings.some(b => isBuildingFootprintCell(b, x, z))) {
-          type = 'blocked';
-        } else {
-          type = 'walkable';
-        }
-
-        navGrid.cells[z]![x] = NavGrid.makeCell(type);
+        navGrid.cells[z]![x] = NavGrid.makeCell(NavGrid.classifyCellType(x, z, voxelGrid, buildings, drillHoles));
       }
     }
+  }
+
+  /**
+   * Classify a single NavGrid cell based on column solidity, drill holes, and buildings.
+   * Priority order (highest to lowest): void > drill_hole > blocked > walkable.
+   */
+  private static classifyCellType(
+    x: number,
+    z: number,
+    voxelGrid: VoxelGrid,
+    buildings: Building[],
+    drillHoles: DrillHole[],
+  ): NavCellType {
+    const surfaceY = NavGrid.computeSurfaceY(voxelGrid, x, z);
+    if (surfaceY === -1) return 'void';
+    if (drillHoles.some(h => Math.floor(h.x) === x && Math.floor(h.z) === z)) return 'drill_hole';
+    if (buildings.some(b => isBuildingFootprintCell(b, x, z))) return 'blocked';
+    return 'walkable';
   }
 
   /**

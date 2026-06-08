@@ -334,7 +334,7 @@ describe('NavGrid.patchNavGrid — region isolation', () => {
     expect(nav.cells[5]![5]!.type).toBe(beforeOutside);
   });
 
-  it('preserves all cell fields when updating a region', () => {
+  it('creates cells with all expected fields after region update', () => {
     const grid = makeSolidGrid(8, 10, 8, 4);
     const holes: DrillHole[] = [
       { id: 'H1', x: 1, z: 1, depth: 5, diameter: 0.15 },
@@ -378,6 +378,19 @@ describe('NavGrid.patchNavGrid — boundary conditions', () => {
     const snapshot = cellTypeMap(nav);
 
     const region: BlastRegion = { minX: 0, maxX: 0, minZ: 5, maxZ: 2 };
+    NavGrid.patchNavGrid(nav, grid, [], [], region);
+
+    const after = cellTypeMap(nav);
+    expect(after).toEqual(snapshot);
+  });
+
+  it('is a no-op for the sentinel empty region (minX=0, maxX=-1, minZ=0, maxZ=-1)', () => {
+    const grid = makeSolidGrid(5, 10, 5, 3);
+    const nav = NavGrid.buildNavGrid(grid, [], []);
+    const snapshot = cellTypeMap(nav);
+
+    // This sentinel value is what executeBlast returns when no voxels are cleared
+    const region: BlastRegion = { minX: 0, maxX: -1, minZ: 0, maxZ: -1 };
     NavGrid.patchNavGrid(nav, grid, [], [], region);
 
     const after = cellTypeMap(nav);
