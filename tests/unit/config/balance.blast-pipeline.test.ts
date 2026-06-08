@@ -139,8 +139,6 @@ describe('Step 4 — Projection & Physics Settle (5.20)', () => {
   });
 
   it('PHYSICS_FRAGMENT_CAP is 200 — maximum fragments with full Cannon-es rigid-body simulation', () => {
-    // INTENTIONAL FAILURE (Red Phase): Current value is 50, design spec requires 200.
-    // The implementer must update balance.ts to set PHYSICS_FRAGMENT_CAP = 200.
     expect(PHYSICS_FRAGMENT_CAP).toBe(200);
   });
 
