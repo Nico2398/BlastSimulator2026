@@ -408,3 +408,8 @@ export const PHYSICS_SETTLE_SPEED = 0.1;
 export const PHYSICS_SETTLE_FRACTION = 0.95;
 /** Vertical offset above terrain surface for fragment landing position (metres). */
 export const PHYSICS_TERRAIN_CLEARANCE = 1.0;
+
+/** Minimum horizontal overlap ratio (0–1) for a fragment to be considered "supported by" another. */
+export const FRAGMENT_HORIZONTAL_OVERLAP_TOLERANCE = 0.5;
+/** Maximum vertical gap (metres) between two fragments' AABB extents for stacking. */
+export const FRAGMENT_SUPPORT_VERTICAL_GAP = 0.1;

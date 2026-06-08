@@ -12,6 +12,21 @@ export interface VoxelOreComposition {
   ores: Array<{ oreId: string; density: number }>;
 }
 
+/** Axis-aligned bounding box derived from fragment vertices. */
+export interface AABB {
+  minX: number; maxX: number;
+  minY: number; maxY: number;
+  minZ: number; maxZ: number;
+}
+
+/** Bi-directional support graph for fragment stacking. */
+export interface SupportGraph {
+  /** fragmentId → IDs of fragments directly above that it supports */
+  supporting: Map<number, number[]>;
+  /** fragmentId → IDs of fragments directly below that support it */
+  supportedBy: Map<number, number[]>;
+}
+
 /** Tracks which voxel a seed index came from. */
 export interface SeedVoxelInfo {
   x: number;
@@ -242,4 +257,105 @@ export function computeVolumeM3(
   }
 
   return volume;
+}
+
+// ─── Fragment Support Graph & Stack-Collapse ─────────────────────────────────────
+
+/**
+ * Compute the axis-aligned bounding box (AABB) from a fragment's graphic vertices.
+ *
+ * Iterates over the interleaved Float32Array (every 3 floats = one vertex)
+ * and tracks the min/max for each axis.
+ *
+ * @param frag - Fragment object containing a `graphicVertices` Float32Array.
+ * @returns A new AABB with the computed extents.
+ */
+export function computeFragmentAABB(_frag: { graphicVertices: Float32Array }): AABB {
+  // TODO: implement
+  return { minX: 0, maxX: 0, minY: 0, maxY: 0, minZ: 0, maxZ: 0 };
+}
+
+/**
+ * Compute the XZ overlap between two axis-aligned bounding boxes.
+ *
+ * Returns the overlap extents on X and Z axes, the product (overlapArea),
+ * and the minimum of the two boxes' XZ areas (minArea).
+ *
+ * @param aabbA - First AABB.
+ * @param aabbB - Second AABB.
+ * @returns Overlap metrics.
+ */
+export function computeXZOverlap(_aabbA: AABB, _aabbB: AABB): { overlapX: number; overlapZ: number; overlapArea: number; minArea: number } {
+  // TODO: implement
+  return { overlapX: 0, overlapZ: 0, overlapArea: 0, minArea: 0 };
+}
+
+/**
+ * Test whether the horizontal overlap ratio meets the given tolerance.
+ *
+ * Returns true when overlapArea / minArea >= tolerance.
+ *
+ * @param overlapArea - Overlapping area on the XZ plane.
+ * @param minArea - Minimum of the two boxes' XZ areas.
+ * @param tolerance - Ratio threshold (0–1).
+ * @returns True if the overlap ratio meets or exceeds the tolerance.
+ */
+export function horizontalOverlap(_overlapArea: number, _minArea: number, _tolerance: number): boolean {
+  // TODO: implement
+  return false;
+}
+
+/**
+ * Compute the vertical gap between the bottom of the upper fragment's AABB
+ * and the top of the lower fragment's AABB.
+ *
+ * Positive values indicate a gap; zero or negative values indicate interpenetration.
+ *
+ * @param above - Fragment above with a `cy` centroid coordinate.
+ * @param below - Fragment below with a `cy` centroid coordinate.
+ * @param aboveAabb - AABB of the upper fragment.
+ * @param belowAabb - AABB of the lower fragment.
+ * @returns The vertical gap in metres.
+ */
+export function verticalGap(
+  _above: { cy: number },
+  _below: { cy: number },
+  _aboveAabb: AABB,
+  _belowAabb: AABB,
+): number {
+  // TODO: implement
+  return 0;
+}
+
+/**
+ * Build a bi-directional support graph from an array of fragments.
+ *
+ * For every pair of fragments where one is vertically above the other,
+ * checks horizontal overlap ratio and vertical gap. If both meet the
+ * provided tolerances, a support relationship is recorded.
+ *
+ * @param fragments - Array of fragments with at least `id` and `state`.
+ * @param horizontalTolerance - Minimum horizontal overlap ratio (0–1).
+ * @param maxVerticalGap - Maximum allowed vertical gap (metres).
+ * @returns A bi-directional SupportGraph.
+ */
+export function buildSupportGraph(
+  _fragments: Array<{ id: number; state: string }>,
+  _horizontalTolerance: number,
+  _maxVerticalGap: number,
+): SupportGraph {
+  // TODO: implement
+  return { supporting: new Map(), supportedBy: new Map() };
+}
+
+/**
+ * Get the IDs of fragments directly supported by (i.e. resting on top of) the given fragment.
+ *
+ * @param graph - The support graph.
+ * @param fragmentId - ID of the fragment to query.
+ * @returns Array of fragment IDs directly above the given fragment.
+ */
+export function getDirectlySupported(_graph: SupportGraph, _fragmentId: number): number[] {
+  // TODO: implement
+  return [];
 }

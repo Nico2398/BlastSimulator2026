@@ -18,6 +18,7 @@ import {
   SLEEP_TICKS_REQUIRED,
 } from '../core/config/balance.js';
 import { isFragmentValidForPhysics } from './FragmentSimUtils.js';
+import type { SupportGraph } from './FragmentSimUtils.js';
 
 /**
  * Run Tier A physics simulation on all fragments with simulationTier === 'projected'.
@@ -196,6 +197,63 @@ export function simulateCollapseFragments(
   }
 
   return _fragments;
+}
+
+// ─── Fragment Support Graph & Stack-Collapse ─────────────────────────────────────
+
+/**
+ * Collapse all fragments supported by (resting on top of) the given fragment IDs.
+ *
+ * Given a set of fragment IDs being removed/picked up, computes the set of
+ * fragments that are directly or transitively supported by them, then marks
+ * those fragments for collapse (Tier B simulation). Returns the updated
+ * fragment array and a rebuilt support graph.
+ *
+ * @param fragmentIds - IDs of fragments being removed.
+ * @param fragments - Current array of all fragments.
+ * @param graph - Current support graph.
+ * @param grid - The voxel grid (for terrain collision during collapse).
+ * @param horizontalTolerance - Minimum horizontal overlap ratio (0–1).
+ * @param maxVerticalGap - Maximum allowed vertical gap (metres).
+ * @returns Updated fragments and graph after collapse.
+ */
+export function collapseSupportedFragments(
+  _fragmentIds: number[],
+  fragments: RockFragment[],
+  _graph: SupportGraph,
+  _grid: VoxelGrid,
+  _horizontalTolerance: number,
+  _maxVerticalGap: number,
+): { updatedFragments: RockFragment[]; updatedGraph: SupportGraph } {
+  // TODO: implement
+  return { updatedFragments: [...fragments], updatedGraph: { supporting: new Map(), supportedBy: new Map() } };
+}
+
+/**
+ * Remove a single fragment and collapse any fragments that were depending on it.
+ *
+ * Removes the specified fragment from the array, identifies all fragments
+ * that were directly or transitively supported by it, marks them for collapse,
+ * and returns the remaining fragments together with an updated support graph.
+ *
+ * @param fragmentId - ID of the fragment to remove.
+ * @param fragments - Current array of all fragments.
+ * @param graph - Current support graph.
+ * @param grid - The voxel grid (for terrain collision during collapse).
+ * @param horizontalTolerance - Minimum horizontal overlap ratio (0–1).
+ * @param maxVerticalGap - Maximum allowed vertical gap (metres).
+ * @returns Remaining fragments and updated graph after removal and collapse.
+ */
+export function removeFragmentWithCollapse(
+  _fragmentId: number,
+  fragments: RockFragment[],
+  _graph: SupportGraph,
+  _grid: VoxelGrid,
+  _horizontalTolerance: number,
+  _maxVerticalGap: number,
+): { remainingFragments: RockFragment[]; updatedGraph: SupportGraph } {
+  // TODO: implement
+  return { remainingFragments: [...fragments], updatedGraph: { supporting: new Map(), supportedBy: new Map() } };
 }
 
 // ─── Sleep Detection ─────────────────────────────────────────────────────────
