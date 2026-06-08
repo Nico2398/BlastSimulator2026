@@ -2673,25 +2673,28 @@ describe('FragmentSimUtils — Support Graph', () => {
 
   it('buildSupportGraph links two supporters to one fragment', () => {
     // Two fragments below (side by side) supporting one wide fragment above
+    // frag1: unit box from (0,0,0) to (1,1,1) → centroid y = 0.5
+    // frag2: unit box from (1,0,0) to (2,1,1) → centroid y = 0.5
+    // frag3: 2×1×1 box from (0,1,0) to (2,2,1) sitting on top of both → centroid y = 1.5
     const frag1 = makeFragment({
-      id: 1, cy: 1, state: 'static',
+      id: 1, cy: 0.5, state: 'static',
       graphicVertices: new Float32Array([
         0, 0, 0,  1, 0, 0,  1, 1, 0,  0, 1, 0,
         0, 0, 1,  1, 0, 1,  1, 1, 1,  0, 1, 1,
       ]),
     });
     const frag2 = makeFragment({
-      id: 2, cy: 1, state: 'static',
+      id: 2, cy: 0.5, state: 'static',
       graphicVertices: new Float32Array([
         1, 0, 0,  2, 0, 0,  2, 1, 0,  1, 1, 0,
         1, 0, 1,  2, 0, 1,  2, 1, 1,  1, 1, 1,
       ]),
     });
     const frag3 = makeFragment({
-      id: 3, cy: 3, state: 'static',
+      id: 3, cy: 1.5, state: 'static',
       graphicVertices: new Float32Array([
-        0, 2, 0,  2, 2, 0,  2, 3, 0,  0, 3, 0,
-        0, 2, 1,  2, 2, 1,  2, 3, 1,  0, 3, 1,
+        0, 1, 0,  2, 1, 0,  2, 2, 0,  0, 2, 0,
+        0, 1, 1,  2, 1, 1,  2, 2, 1,  0, 2, 1,
       ]),
     });
 
@@ -2749,14 +2752,24 @@ function setupTerrainGrid(): VoxelGrid {
   return grid;
 }
 
+/** Generate 8 interleaved vertices for an axis-aligned box. */
+function makeBoxVertices(aabb: AABB): Float32Array {
+  const { minX, maxX, minY, maxY, minZ, maxZ } = aabb;
+  return new Float32Array([
+    minX, minY, minZ,  maxX, minY, minZ,  maxX, maxY, minZ,  minX, maxY, minZ,
+    minX, minY, maxZ,  maxX, minY, maxZ,  maxX, maxY, maxZ,  minX, maxY, maxZ,
+  ]);
+}
+
 function makeStackFragment(id: number, cy: number, aabb: AABB, overrides: Partial<RockFragment> = {}): RockFragment {
+  const verts = makeBoxVertices(aabb);
   return {
     id,
     cx: (aabb.minX + aabb.maxX) / 2,
     cy,
     cz: (aabb.minZ + aabb.maxZ) / 2,
-    graphicVertices: new Float32Array(),
-    collisionVertices: new Float32Array(),
+    graphicVertices: verts,
+    collisionVertices: verts,
     composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
     oreComposition: { ores: [] },
     volumeM3: 1.0,
@@ -2806,7 +2819,8 @@ describe('FragmentSimPhysics — Stack Collapse', () => {
     // A is removed, B should drop to terrain level
     expect(result.updatedFragments).toHaveLength(1);
     expect(result.updatedFragments[0]!.id).toBe(2);
-    expect(result.updatedFragments[0]!.cy).toBeCloseTo(PHYSICS_TERRAIN_CLEARANCE, 5);
+    // cy = terrainY(0) + clearance + halfHeight(1) = 2.0
+    expect(result.updatedFragments[0]!.cy).toBeCloseTo(PHYSICS_TERRAIN_CLEARANCE + 1, 5);
   });
 
   it('collapseSupportedFragments cascades through chain', () => {
@@ -2830,9 +2844,10 @@ describe('FragmentSimPhysics — Stack Collapse', () => {
     const b = result.updatedFragments.find(f => f.id === 2)!;
     const c = result.updatedFragments.find(f => f.id === 3)!;
     const d = result.updatedFragments.find(f => f.id === 4)!;
-    expect(b.cy).toBeCloseTo(PHYSICS_TERRAIN_CLEARANCE, 5);
-    expect(c.cy).toBeGreaterThan(b.cy);
-    expect(d.cy).toBeGreaterThan(c.cy);
+    // B lands on terrain: cy = terrainY(0) + clearance + halfHeight(1) = 2.0
+    expect(b.cy).toBeCloseTo(PHYSICS_TERRAIN_CLEARANCE + 1, 5);
+    expect(c.cy).toBeGreaterThan(b.cy);   // C stacks on B → cy > b.cy
+    expect(d.cy).toBeGreaterThan(c.cy);   // D stacks on C → cy > c.cy
   });
 
   it('removeFragmentWithCollapse removes the fragment from array', () => {
@@ -2861,9 +2876,10 @@ describe('FragmentSimPhysics — Stack Collapse', () => {
       FRAGMENT_SUPPORT_VERTICAL_GAP,
     );
     // A removed, B drops to terrain alone — no support edges remain
+    // cy = terrainY(0) + clearance + halfHeight(1) = 2.0
     expect(result.remainingFragments).toHaveLength(1);
     expect(result.remainingFragments[0]!.id).toBe(2);
-    expect(result.remainingFragments[0]!.cy).toBeCloseTo(PHYSICS_TERRAIN_CLEARANCE, 5);
+    expect(result.remainingFragments[0]!.cy).toBeCloseTo(PHYSICS_TERRAIN_CLEARANCE + 1, 5);
     expect(result.updatedGraph.supporting.size).toBe(0);
     expect(result.updatedGraph.supportedBy.size).toBe(0);
   });
