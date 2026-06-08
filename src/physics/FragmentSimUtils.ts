@@ -271,8 +271,32 @@ export function computeVolumeM3(
  * @returns A new AABB with the computed extents.
  */
 export function computeFragmentAABB(_frag: { graphicVertices: Float32Array }): AABB {
-  // TODO: implement
-  return { minX: 0, maxX: 0, minY: 0, maxY: 0, minZ: 0, maxZ: 0 };
+  const verts = _frag.graphicVertices;
+  if (verts.length === 0) {
+    return { minX: 0, maxX: 0, minY: 0, maxY: 0, minZ: 0, maxZ: 0 };
+  }
+  let minX = Infinity, maxX = -Infinity;
+  let minY = Infinity, maxY = -Infinity;
+  let minZ = Infinity, maxZ = -Infinity;
+  for (let i = 0; i < verts.length; i += 3) {
+    const x = verts[i]!;
+    const y = verts[i + 1]!;
+    const z = verts[i + 2]!;
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+    if (z < minZ) minZ = z;
+    if (z > maxZ) maxZ = z;
+  }
+  // Handle degenerate case where all vertices have same coordinate on an axis
+  if (!Number.isFinite(minX)) minX = 0;
+  if (!Number.isFinite(maxX)) maxX = 0;
+  if (!Number.isFinite(minY)) minY = 0;
+  if (!Number.isFinite(maxY)) maxY = 0;
+  if (!Number.isFinite(minZ)) minZ = 0;
+  if (!Number.isFinite(maxZ)) maxZ = 0;
+  return { minX, maxX, minY, maxY, minZ, maxZ };
 }
 
 /**
@@ -286,8 +310,13 @@ export function computeFragmentAABB(_frag: { graphicVertices: Float32Array }): A
  * @returns Overlap metrics.
  */
 export function computeXZOverlap(_aabbA: AABB, _aabbB: AABB): { overlapX: number; overlapZ: number; overlapArea: number; minArea: number } {
-  // TODO: implement
-  return { overlapX: 0, overlapZ: 0, overlapArea: 0, minArea: 0 };
+  const overlapX = Math.max(0, Math.min(_aabbA.maxX, _aabbB.maxX) - Math.max(_aabbA.minX, _aabbB.minX));
+  const overlapZ = Math.max(0, Math.min(_aabbA.maxZ, _aabbB.maxZ) - Math.max(_aabbA.minZ, _aabbB.minZ));
+  const overlapArea = overlapX * overlapZ;
+  const areaA = (_aabbA.maxX - _aabbA.minX) * (_aabbA.maxZ - _aabbA.minZ);
+  const areaB = (_aabbB.maxX - _aabbB.minX) * (_aabbB.maxZ - _aabbB.minZ);
+  const minArea = Math.min(areaA, areaB);
+  return { overlapX, overlapZ, overlapArea, minArea };
 }
 
 /**
@@ -301,8 +330,10 @@ export function computeXZOverlap(_aabbA: AABB, _aabbB: AABB): { overlapX: number
  * @returns True if the overlap ratio meets or exceeds the tolerance.
  */
 export function horizontalOverlap(_overlapArea: number, _minArea: number, _tolerance: number): boolean {
-  // TODO: implement
-  return false;
+  if (_minArea === 0) {
+    return _overlapArea === 0;
+  }
+  return _overlapArea / _minArea >= _tolerance;
 }
 
 /**
@@ -323,8 +354,11 @@ export function verticalGap(
   _aboveAabb: AABB,
   _belowAabb: AABB,
 ): number {
-  // TODO: implement
-  return 0;
+  const aboveHalfHeight = (_aboveAabb.maxY - _aboveAabb.minY) / 2;
+  const belowHalfHeight = (_belowAabb.maxY - _belowAabb.minY) / 2;
+  const aboveMinY = _above.cy - aboveHalfHeight;
+  const belowMaxY = _below.cy + belowHalfHeight;
+  return aboveMinY - belowMaxY;
 }
 
 /**
@@ -340,12 +374,47 @@ export function verticalGap(
  * @returns A bi-directional SupportGraph.
  */
 export function buildSupportGraph(
-  _fragments: Array<{ id: number; state: string }>,
+  _fragments: Array<{ id: number; state: string; cx: number; cy: number; cz: number; graphicVertices: Float32Array }>,
   _horizontalTolerance: number,
   _maxVerticalGap: number,
 ): SupportGraph {
-  // TODO: implement
-  return { supporting: new Map(), supportedBy: new Map() };
+  const supporting = new Map<number, number[]>();
+  const supportedBy = new Map<number, number[]>();
+
+  const staticFrags = _fragments.filter(f => f.state === 'static');
+
+  for (let i = 0; i < staticFrags.length; i++) {
+    const a = staticFrags[i]!;
+    for (let j = i + 1; j < staticFrags.length; j++) {
+      const b = staticFrags[j]!;
+
+      // Ensure a is below b (a.cy < b.cy)
+      const below = a.cy <= b.cy ? a : b;
+      const above = a.cy <= b.cy ? b : a;
+
+      const aabbBelow = computeFragmentAABB(below);
+      const aabbAbove = computeFragmentAABB(above);
+
+      const { overlapArea, minArea } = computeXZOverlap(aabbBelow, aabbAbove);
+
+      if (!horizontalOverlap(overlapArea, minArea, _horizontalTolerance)) continue;
+
+      const gap = verticalGap(above, below, aabbAbove, aabbBelow);
+
+      if (gap >= 0 && gap <= _maxVerticalGap) {
+        // below supports above
+        const belowList = supporting.get(below.id) ?? [];
+        belowList.push(above.id);
+        supporting.set(below.id, belowList);
+
+        const aboveList = supportedBy.get(above.id) ?? [];
+        aboveList.push(below.id);
+        supportedBy.set(above.id, aboveList);
+      }
+    }
+  }
+
+  return { supporting, supportedBy };
 }
 
 /**
@@ -356,6 +425,5 @@ export function buildSupportGraph(
  * @returns Array of fragment IDs directly above the given fragment.
  */
 export function getDirectlySupported(_graph: SupportGraph, _fragmentId: number): number[] {
-  // TODO: implement
-  return [];
+  return _graph.supporting.get(_fragmentId) ?? [];
 }

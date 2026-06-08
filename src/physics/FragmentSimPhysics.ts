@@ -18,6 +18,12 @@ import {
   SLEEP_TICKS_REQUIRED,
 } from '../core/config/balance.js';
 import { isFragmentValidForPhysics } from './FragmentSimUtils.js';
+import {
+  buildSupportGraph,
+  computeFragmentAABB,
+  computeXZOverlap,
+  horizontalOverlap,
+} from './FragmentSimUtils.js';
 import type { SupportGraph } from './FragmentSimUtils.js';
 
 /**
@@ -225,8 +231,105 @@ export function collapseSupportedFragments(
   _horizontalTolerance: number,
   _maxVerticalGap: number,
 ): { updatedFragments: RockFragment[]; updatedGraph: SupportGraph } {
-  // TODO: implement
-  return { updatedFragments: [...fragments], updatedGraph: { supporting: new Map(), supportedBy: new Map() } };
+  const removedIds = new Set(_fragmentIds);
+
+  // BFS to find all transitively supported fragments
+  const affectedIds = new Set<number>(_fragmentIds);
+  const queue = [..._fragmentIds];
+  while (queue.length > 0) {
+    const id = queue.shift()!;
+    const supported = _graph.supporting.get(id) ?? [];
+    for (const supportedId of supported) {
+      if (!affectedIds.has(supportedId)) {
+        affectedIds.add(supportedId);
+        queue.push(supportedId);
+      }
+    }
+  }
+
+  // Build quick lookup map
+  const fragMap = new Map<number, RockFragment>();
+  for (const frag of fragments) {
+    fragMap.set(frag.id, frag);
+  }
+
+  // Get the dropping fragments (affected but NOT removed)
+  const droppingIds = [...affectedIds].filter(id => !removedIds.has(id));
+  // Sort by cy ascending (lowest first) for stable settling
+  const sortedDropping = droppingIds
+    .map(id => fragMap.get(id)!)
+    .filter(f => f !== undefined)
+    .sort((a, b) => a.cy - b.cy);
+
+  const STACK_EPSILON = 0.001;
+  const otherFragments = fragments.filter(f => !removedIds.has(f.id));
+
+  // Perform gravity drop for each dropping fragment
+  for (const frag of sortedDropping) {
+    if (!isFragmentValidForPhysics(frag)) {
+      frag.state = 'static';
+      continue;
+    }
+
+    const fragAabb = computeFragmentAABB(frag);
+    const halfHeight = (fragAabb.maxY - fragAabb.minY) / 2;
+
+    let y = frag.cy;
+    let vy = frag.velocity.y;
+    let settled = false;
+
+    for (let step = 0; step < PHYSICS_MAX_STEPS; step++) {
+      // Semi-implicit Euler integration (vertical only)
+      vy += GRAVITY * PHYSICS_STEP_DT;
+      y += vy * PHYSICS_STEP_DT;
+
+      const bottomY = y - halfHeight;
+
+      // a) Check terrain
+      const terrainY = findSurfaceY(_grid, Math.floor(frag.cx), Math.floor(frag.cz));
+      if (terrainY >= 0 && bottomY <= terrainY + PHYSICS_TERRAIN_CLEARANCE) {
+        frag.cy = terrainY + PHYSICS_TERRAIN_CLEARANCE + halfHeight;
+        settled = true;
+        break;
+      }
+
+      // b) Check other fragments below
+      for (const other of otherFragments) {
+        if (other.id === frag.id) continue;
+        if (removedIds.has(other.id)) continue;
+        if (other.state !== 'static') continue;
+        // Only consider fragments that are below the dropping one
+        if (other.cy >= frag.cy) continue;
+
+        const otherAabb = computeFragmentAABB(other);
+        const { overlapArea, minArea } = computeXZOverlap(fragAabb, otherAabb);
+        if (!horizontalOverlap(overlapArea, minArea, _horizontalTolerance)) continue;
+
+        const otherHalfHeight = (otherAabb.maxY - otherAabb.minY) / 2;
+        const otherTopY = other.cy + otherHalfHeight;
+
+        if (bottomY <= otherTopY + STACK_EPSILON) {
+          // Land on this fragment's top
+          frag.cy = otherTopY + halfHeight + STACK_EPSILON;
+          settled = true;
+          break;
+        }
+      }
+
+      if (settled) break;
+    }
+
+    if (!settled) {
+      frag.cy = y;
+    }
+
+    frag.state = 'static';
+  }
+
+  // Rebuild support graph from the updated other fragments (including those that just settled)
+  const updatedGraph = buildSupportGraph(otherFragments as unknown as Array<{ id: number; state: string; cx: number; cy: number; cz: number; graphicVertices: Float32Array }>, _horizontalTolerance, _maxVerticalGap);
+
+  return { updatedFragments: otherFragments, updatedGraph };
 }
 
 /**
@@ -252,8 +355,18 @@ export function removeFragmentWithCollapse(
   _horizontalTolerance: number,
   _maxVerticalGap: number,
 ): { remainingFragments: RockFragment[]; updatedGraph: SupportGraph } {
-  // TODO: implement
-  return { remainingFragments: [...fragments], updatedGraph: { supporting: new Map(), supportedBy: new Map() } };
+  const result = collapseSupportedFragments(
+    [_fragmentId],
+    fragments,
+    _graph,
+    _grid,
+    _horizontalTolerance,
+    _maxVerticalGap,
+  );
+  return {
+    remainingFragments: result.updatedFragments,
+    updatedGraph: result.updatedGraph,
+  };
 }
 
 // ─── Sleep Detection ─────────────────────────────────────────────────────────
