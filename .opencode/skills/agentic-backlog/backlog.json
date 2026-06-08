@@ -1137,7 +1137,7 @@
       "src/core/nav/Pathfinding.ts"
     ],
     "testFile": "tests/unit/nav/Pathfinding.test.ts",
-    "status": "pending",
+    "status": "in-progress",
     "blockedBy": [
       "6.4"
     ],
