@@ -1095,11 +1095,11 @@
       "src/core/nav/NavGrid.ts"
     ],
     "testFile": "tests/unit/nav/NavGrid.test.ts",
-    "status": "pending",
+    "status": "done",
     "blockedBy": [
       "6.1"
     ],
-    "closedInPR": null
+    "closedInPR": 266
   },
   {
     "id": "6.3",
