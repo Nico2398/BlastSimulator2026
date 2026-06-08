@@ -348,6 +348,17 @@ export function previewCommand(
   return { success: false, output: 'Usage: preview energy|fragments|projections|vibrations' };
 }
 
+// ── Blast preview command ──
+
+export function blastPreviewCommand(
+  _ctx: MiningContext,
+  _args: string[],
+  _named: Record<string, string>,
+): CommandResult {
+  // TODO: implement blast preview
+  return { success: true, output: '' };
+}
+
 // ── Buy software ──
 
 export function buySoftwareCommand(
