@@ -55,10 +55,34 @@ function fragmentColumnEstimateKg(
   if (!survey) return 0;
   const colEstimates = survey.estimates[colKey];
   if (!colEstimates) return 0;
-  return Object.values(colEstimates).reduce(
-    (sum, density) => (density > 0 ? sum + fragment.volume * density * ORE_DENSITY_KG_M3 : sum),
-    0,
-  );
+  const colAcc: Record<string, number> = {};
+  accumulateOreMass(colAcc, fragment.volume, colEstimates);
+  return Object.values(colAcc).reduce((sum, v) => sum + v, 0);
+}
+
+// ── Shared helper (exported for cross-module reuse) ────────────────────────────
+
+/**
+ * Accumulate ore mass (kg) into `acc` keyed by ore type ID.
+ *
+ * Uses the standard formula: **mass = volume × oreDensity × ORE_DENSITY_KG_M3**
+ * and skips entries where density ≤ 0.
+ *
+ * @param acc       Mutable accumulator record (mutated in-place).
+ * @param volume    Fragment volume in m³.
+ * @param oreDensities  Map of ore type ID → density fraction (0–1).
+ */
+export function accumulateOreMass(
+  acc: Record<string, number>,
+  volume: number,
+  oreDensities: Record<string, number>,
+): void {
+  for (const [oreId, density] of Object.entries(oreDensities)) {
+    if (density > 0) {
+      const kg = volume * density * ORE_DENSITY_KG_M3;
+      acc[oreId] = (acc[oreId] ?? 0) + kg;
+    }
+  }
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -83,11 +107,7 @@ export function computeBlastOreReport(
 
   for (const fragment of fragments) {
     // Accumulate actual ore mass per ore type
-    for (const [oreId, density] of Object.entries(fragment.oreDensities)) {
-      if (density > 0) {
-        oreYields[oreId] = (oreYields[oreId] ?? 0) + fragment.volume * density * ORE_DENSITY_KG_M3;
-      }
-    }
+    accumulateOreMass(oreYields, fragment.volume, fragment.oreDensities);
 
     // Accumulate survey-estimated ore mass for this fragment's column
     if (surveys.length > 0) {

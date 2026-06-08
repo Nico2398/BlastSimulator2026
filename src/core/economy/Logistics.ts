@@ -2,7 +2,7 @@
 // Tracks fragments through lifecycle: on_ground → in_transit → stored/sold/disposed.
 
 import type { FragmentData } from '../mining/BlastExecution.js';
-import { ORE_DENSITY_KG_M3 } from '../config/balance.js';
+import { accumulateOreMass } from '../mining/BlastOreReport.js';
 
 // ── Fragment states ──
 
@@ -84,12 +84,7 @@ export function deliverToDepot(
 
   // Accumulate ore mass into collectedOre when provided
   if (collectedOre) {
-    for (const [oreId, density] of Object.entries(tracked.fragment.oreDensities)) {
-      if (density > 0) {
-        const kg = tracked.fragment.volume * density * ORE_DENSITY_KG_M3;
-        collectedOre[oreId] = (collectedOre[oreId] ?? 0) + kg;
-      }
-    }
+    accumulateOreMass(collectedOre, tracked.fragment.volume, tracked.fragment.oreDensities);
   }
 
   return true;
