@@ -1541,6 +1541,69 @@ describe('FragmentSim — generateRockFragments', () => {
     // overflowEnergy should reflect all seeds contributing
     expect(frag.overflowEnergy).toBeGreaterThan(0);
   });
+
+  // ── 5.17: Oversized flag ──
+
+  it('sets oversized=true when volumeM3 > 0.5', () => {
+    const grid = baseGrid();
+    const cells: VoronoiCell[] = [
+      { seedIndex: 0, vertices: cellVertices1, isValid: true },
+    ];
+    // Two seeds with fragmentCount=2 → volume = 2/2 = 1.0 > 0.5
+    const seedToVoxelMap = new Map<number, SeedVoxelInfo>([
+      [0, { x: 0, y: 0, z: 0, fragmentCount: 2, effectiveEnergy: 200, generatedOverflow: 0 }],
+      [1, { x: 0, y: 0, z: 0, fragmentCount: 2, effectiveEnergy: 200, generatedOverflow: 0 }],
+    ]);
+    const seedGroupings = [[0, 1]];
+    const generatedOverflow = new Map<string, number>();
+    const rng = new Random(42);
+
+    const result = generateRockFragments(cells, seedToVoxelMap, seedGroupings, grid, new Map<string, number>(), generatedOverflow, rng);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]!.volumeM3).toBeGreaterThan(0.5);
+    expect(result[0]!.oversized).toBe(true);
+  });
+
+  it('sets oversized=false when volumeM3 <= 0.5', () => {
+    const grid = baseGrid();
+    const cells: VoronoiCell[] = [
+      { seedIndex: 0, vertices: cellVertices1, isValid: true },
+    ];
+    // One seed with fragmentCount=3 → volume = 1/3 ≈ 0.333 < 0.5
+    const seedToVoxelMap = new Map<number, SeedVoxelInfo>([
+      [0, { x: 0, y: 0, z: 0, fragmentCount: 3, effectiveEnergy: 200, generatedOverflow: 0 }],
+    ]);
+    const seedGroupings = [[0]];
+    const generatedOverflow = new Map<string, number>();
+    const rng = new Random(42);
+
+    const result = generateRockFragments(cells, seedToVoxelMap, seedGroupings, grid, new Map<string, number>(), generatedOverflow, rng);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]!.volumeM3).toBeLessThanOrEqual(0.5);
+    expect(result[0]!.oversized).toBe(false);
+  });
+
+  it('sets oversized=false at the boundary (volumeM3 === 0.5)', () => {
+    const grid = baseGrid();
+    const cells: VoronoiCell[] = [
+      { seedIndex: 0, vertices: cellVertices1, isValid: true },
+    ];
+    // One seed with fragmentCount=2 → volume = 1/2 = 0.5
+    const seedToVoxelMap = new Map<number, SeedVoxelInfo>([
+      [0, { x: 0, y: 0, z: 0, fragmentCount: 2, effectiveEnergy: 200, generatedOverflow: 0 }],
+    ]);
+    const seedGroupings = [[0]];
+    const generatedOverflow = new Map<string, number>();
+    const rng = new Random(42);
+
+    const result = generateRockFragments(cells, seedToVoxelMap, seedGroupings, grid, new Map<string, number>(), generatedOverflow, rng);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]!.volumeM3).toBeCloseTo(0.5);
+    expect(result[0]!.oversized).toBe(false);
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1822,6 +1885,7 @@ describe('FragmentSimVelocity — assignFragmentVelocity', () => {
       composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
       oreComposition: { ores: [] },
       volumeM3: 1.0,
+      oversized: true,
       massKg: 100,
       overflowEnergy: 100000,
       velocity: ZERO,
@@ -1858,6 +1922,7 @@ describe('FragmentSimVelocity — assignFragmentVelocity', () => {
       composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
       oreComposition: { ores: [] },
       volumeM3: 1.0,
+      oversized: true,
       massKg: 100,
       overflowEnergy: 0,
       velocity: ZERO,
@@ -1896,6 +1961,7 @@ describe('FragmentSimVelocity — assignFragmentVelocity', () => {
       composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
       oreComposition: { ores: [] },
       volumeM3: 1.0,
+      oversized: true,
       massKg: 100,
       overflowEnergy: 5000,
       velocity: ZERO,
@@ -1926,6 +1992,7 @@ describe('FragmentSimVelocity — assignFragmentVelocity', () => {
       composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
       oreComposition: { ores: [] },
       volumeM3: 1.0,
+      oversized: true,
       massKg: 100,
       overflowEnergy: 50000,
       velocity: ZERO,
@@ -1969,7 +2036,7 @@ describe('FragmentSimPhysics — simulateProjectedFragments', () => {
       collisionVertices: new Float32Array(),
       composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
       oreComposition: { ores: [] },
-      volumeM3: 1.0, massKg: 100,
+      volumeM3: 1.0, oversized: true, massKg: 100,
       overflowEnergy: 0,
       velocity: ZERO,
       simulationTier: 'collapse',
@@ -1998,7 +2065,7 @@ describe('FragmentSimPhysics — simulateProjectedFragments', () => {
       collisionVertices: new Float32Array(),
       composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
       oreComposition: { ores: [] },
-      volumeM3: 1.0, massKg: 100,
+      volumeM3: 1.0, oversized: true, massKg: 100,
       overflowEnergy: 0,
       velocity: ZERO,
       simulationTier: 'projected',
@@ -2017,7 +2084,7 @@ describe('FragmentSimPhysics — simulateProjectedFragments', () => {
       collisionVertices: new Float32Array(),
       composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
       oreComposition: { ores: [] },
-      volumeM3: 1.0, massKg: 0,
+      volumeM3: 1.0, oversized: true, massKg: 0,
       overflowEnergy: 0,
       velocity: ZERO,
       simulationTier: 'projected',
@@ -2043,7 +2110,7 @@ describe('FragmentSimPhysics — simulateProjectedFragments', () => {
         collisionVertices: new Float32Array(),
         composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
         oreComposition: { ores: [] },
-        volumeM3: 1.0, massKg: 100,
+        volumeM3: 1.0, oversized: true, massKg: 100,
         overflowEnergy: 0,
         velocity: ZERO,
         simulationTier: 'projected',
@@ -2073,7 +2140,7 @@ describe('FragmentSimPhysics — simulateProjectedFragments', () => {
       collisionVertices: new Float32Array(),
       composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
       oreComposition: { ores: [] },
-      volumeM3: 1.0, massKg: 100,
+      volumeM3: 1.0, oversized: true, massKg: 100,
       overflowEnergy: 0, velocity: ZERO,
       simulationTier: 'projected',
       state: 'flying',
@@ -2084,7 +2151,7 @@ describe('FragmentSimPhysics — simulateProjectedFragments', () => {
       collisionVertices: new Float32Array(),
       composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
       oreComposition: { ores: [] },
-      volumeM3: 1.0, massKg: 100,
+      volumeM3: 1.0, oversized: true, massKg: 100,
       overflowEnergy: 0, velocity: ZERO,
       simulationTier: 'collapse',
       state: 'settling',
@@ -2105,7 +2172,7 @@ describe('FragmentSimPhysics — simulateProjectedFragments', () => {
       collisionVertices: new Float32Array(),
       composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
       oreComposition: { ores: [] },
-      volumeM3: 1.0, massKg: 100,
+      volumeM3: 1.0, oversized: true, massKg: 100,
       overflowEnergy: 0, velocity: ZERO,
       simulationTier: 'projected',
       state: 'flying',
@@ -2136,7 +2203,7 @@ describe('FragmentSimPhysics — simulateCollapseFragments', () => {
       collisionVertices: new Float32Array(),
       composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
       oreComposition: { ores: [] },
-      volumeM3: 1.0, massKg: 100,
+      volumeM3: 1.0, oversized: true, massKg: 100,
       overflowEnergy: 0,
       velocity: ZERO,
       simulationTier: 'projected',
@@ -2165,7 +2232,7 @@ describe('FragmentSimPhysics — simulateCollapseFragments', () => {
       collisionVertices: new Float32Array(),
       composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
       oreComposition: { ores: [] },
-      volumeM3: 1.0, massKg: 100,
+      volumeM3: 1.0, oversized: true, massKg: 100,
       overflowEnergy: 0,
       velocity: ZERO,
       simulationTier: 'collapse',
@@ -2194,7 +2261,7 @@ describe('FragmentSimPhysics — simulateCollapseFragments', () => {
       collisionVertices: new Float32Array(),
       composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
       oreComposition: { ores: [] },
-      volumeM3: 1.0, massKg: 100,
+      volumeM3: 1.0, oversized: true, massKg: 100,
       overflowEnergy: 0,
       velocity: ZERO,
       simulationTier: 'collapse',
@@ -2217,7 +2284,7 @@ describe('FragmentSimPhysics — simulateCollapseFragments', () => {
       collisionVertices: new Float32Array(),
       composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
       oreComposition: { ores: [] },
-      volumeM3: 1.0, massKg: 0,
+      volumeM3: 1.0, oversized: true, massKg: 0,
       overflowEnergy: 0,
       velocity: ZERO,
       simulationTier: 'collapse',
@@ -2249,7 +2316,7 @@ describe('FragmentSimPhysics — simulateCollapseFragments', () => {
       collisionVertices: new Float32Array(),
       composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
       oreComposition: { ores: [] },
-      volumeM3: 1.0, massKg: 100,
+      volumeM3: 1.0, oversized: true, massKg: 100,
       overflowEnergy: 0,
       velocity: ZERO,
       simulationTier: 'collapse',
@@ -2271,7 +2338,7 @@ describe('FragmentSimPhysics — simulateCollapseFragments', () => {
       collisionVertices: new Float32Array(),
       composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
       oreComposition: { ores: [] },
-      volumeM3: 1.0, massKg: 100,
+      volumeM3: 1.0, oversized: true, massKg: 100,
       overflowEnergy: 0,
       velocity: ZERO,
       simulationTier: 'collapse',
@@ -2301,7 +2368,7 @@ describe('FragmentSimPhysics — simulateCollapseFragments', () => {
       collisionVertices: new Float32Array(),
       composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
       oreComposition: { ores: [] },
-      volumeM3: 1.0, massKg: 100,
+      volumeM3: 1.0, oversized: true, massKg: 100,
       overflowEnergy: 0, velocity: ZERO,
       simulationTier: 'projected',
       state: 'flying',
@@ -2312,7 +2379,7 @@ describe('FragmentSimPhysics — simulateCollapseFragments', () => {
       collisionVertices: new Float32Array(),
       composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
       oreComposition: { ores: [] },
-      volumeM3: 1.0, massKg: 100,
+      volumeM3: 1.0, oversized: true, massKg: 100,
       overflowEnergy: 0, velocity: ZERO,
       simulationTier: 'collapse',
       state: 'settling',
@@ -2335,7 +2402,7 @@ describe('FragmentSimPhysics — simulateCollapseFragments', () => {
       collisionVertices: new Float32Array(),
       composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
       oreComposition: { ores: [] },
-      volumeM3: 1.0, massKg: 100,
+      volumeM3: 1.0, oversized: true, massKg: 100,
       overflowEnergy: 0, velocity: ZERO,
       simulationTier: 'collapse',
       state: 'settling',
@@ -2359,7 +2426,7 @@ describe('FragmentSimPhysics — updateFragmentSleepStates', () => {
       collisionVertices: new Float32Array(),
       composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
       oreComposition: { ores: [] },
-      volumeM3: 1.0, massKg: 100,
+      volumeM3: 1.0, oversized: true, massKg: 100,
       overflowEnergy: 0,
       velocity: ZERO,
       simulationTier: 'projected',
@@ -2487,6 +2554,7 @@ function makeFragment(overrides: Partial<RockFragment> = {}): RockFragment {
     composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
     oreComposition: { ores: [] },
     volumeM3: 1.0,
+    oversized: true,
     massKg: 100,
     overflowEnergy: 0,
     velocity: ZERO,
@@ -2773,6 +2841,7 @@ function makeStackFragment(id: number, cy: number, aabb: AABB, overrides: Partia
     composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
     oreComposition: { ores: [] },
     volumeM3: 1.0,
+    oversized: true,
     massKg: 100,
     overflowEnergy: 0,
     velocity: ZERO,
