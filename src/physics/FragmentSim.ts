@@ -6,7 +6,7 @@ import { vec3, ZERO, type Vec3 } from '../core/math/Vec3.js';
 import type { VoxelGrid, VoxelRockComposition } from '../core/world/VoxelGrid.js';
 import type { Random } from '../core/math/Random.js';
 import { convexHull3D, buildAdjacencyMap, computeFragmentationScore, computeFragmentCount, type VoronoiCell, type Tetrahedron } from './VoronoiFrag.js';
-import { computeThreshold, parseKey } from '../core/mining/BlastCalc.js';
+import { computeThreshold, isFragmentOversized, parseKey } from '../core/mining/BlastCalc.js';
 import { COLLISION_DEFLATE_AMOUNT, MERGE_PROBABILITY } from '../core/config/balance.js';
 import { assignFragmentVelocity } from './FragmentSimVelocity.js';
 import { getRock } from '../core/world/RockCatalog.js';
@@ -294,7 +294,7 @@ export function generateRockFragments(
       composition,
       oreComposition,
       volumeM3,
-      oversized: false,
+      oversized: isFragmentOversized(volumeM3),
       massKg,
       overflowEnergy,
       velocity: ZERO,
