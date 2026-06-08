@@ -971,11 +971,11 @@
       "src/physics/FragmentSim.ts"
     ],
     "testFile": "tests/unit/physics/FragmentSim.test.ts",
-    "status": "pending",
+    "status": "done",
     "blockedBy": [
       "5.13"
     ],
-    "closedInPR": null
+    "closedInPR": 219
   },
   {
     "id": "5.16",
