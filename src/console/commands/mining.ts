@@ -348,6 +348,83 @@ export function previewCommand(
   return { success: false, output: 'Usage: preview energy|fragments|projections|vibrations' };
 }
 
+/**
+ * Show a comprehensive blast preview covering energy, fragmentation,
+ * projections, and vibrations — each unlocked by the corresponding
+ * software tier.  Sections with insufficient tier display a lock message.
+ */
+export function blastPreviewCommand(
+  ctx: MiningContext,
+  _args: string[],
+  _named: Record<string, string>,
+): CommandResult {
+  const err = requireGame(ctx);
+  if (err) return { success: false, output: err };
+
+  if (ctx.state!.drillHoles.length === 0) {
+    return { success: false, output: 'No drill plan. Create one with drill_plan grid or drill_plan add.' };
+  }
+
+  const plan = assembleBlastPlan(ctx.state!.drillHoles, ctx.state!.chargesByHole, ctx.state!.sequenceDelays);
+  const errors = validateBlastPlan(plan);
+  if (errors.length > 0) {
+    return { success: false, output: `Invalid plan:\n${errors.map(e => `  ${e.holeId}: ${e.issue}`).join('\n')}` };
+  }
+
+  const energyPreview = previewEnergy(plan, ctx.grid!, ctx.softwareTier);
+  const fragmentPreview = previewFragments(plan, ctx.grid!, ctx.softwareTier);
+  const projectionPreview = previewProjections(plan, ctx.grid!, ctx.softwareTier);
+  const vibrationPreview = previewVibrations(plan, [], ctx.softwareTier);
+
+  const lines: string[] = ['=== BLAST PREVIEW ==='];
+
+  lines.push('');
+  if (energyPreview) {
+    lines.push('--- Energy Map ---');
+    lines.push(`  Affected voxels: ${energyPreview.energyMap.size}`);
+    lines.push(`  Min energy: ${energyPreview.minEnergy.toFixed(1)}`);
+    lines.push(`  Max energy: ${energyPreview.maxEnergy.toFixed(1)}`);
+  } else {
+    lines.push('--- Energy Map --- [Requires software tier 1]');
+  }
+
+  lines.push('');
+  if (fragmentPreview) {
+    lines.push('--- Fragmentation ---');
+    lines.push(`  Fractured: ${fragmentPreview.fracturedCount}`);
+    lines.push(`  Cracked: ${fragmentPreview.crackedCount}`);
+    lines.push(`  Unaffected: ${fragmentPreview.unaffectedCount}`);
+    lines.push(`  Average fragment size: ${fragmentPreview.avgFragmentSize.toFixed(3)} m³`);
+  } else {
+    lines.push('--- Fragmentation --- [Requires software tier 2]');
+  }
+
+  lines.push('');
+  if (projectionPreview) {
+    const fractured = fragmentPreview?.fracturedCount ?? 0;
+    const cracked = fragmentPreview?.crackedCount ?? 0;
+    // Fragments that are fractured/cracked but NOT projected outward collapse in place
+    const collapseCount = (fractured + cracked) - projectionPreview.projectionZoneCount;
+    lines.push('--- Projections ---');
+    lines.push(`  Projection zone voxels: ${projectionPreview.projectionZoneCount}`);
+    lines.push(`  Projected fragments: ${projectionPreview.projectionZoneCount}`);
+    lines.push(`  Collapse fragments: ${collapseCount}`);
+  } else {
+    lines.push('--- Projections --- [Requires software tier 3]');
+  }
+
+  lines.push('');
+  if (vibrationPreview) {
+    lines.push('--- Vibrations ---');
+    lines.push(`  Max vibration: ${vibrationPreview.maxVibration.toFixed(4)}`);
+    lines.push(`  Affected villages: ${vibrationPreview.villages.length}`);
+  } else {
+    lines.push('--- Vibrations --- [Requires software tier 4]');
+  }
+
+  return { success: true, output: lines.join('\n') };
+}
+
 // ── Buy software ──
 
 export function buySoftwareCommand(
