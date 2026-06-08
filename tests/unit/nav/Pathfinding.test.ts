@@ -13,7 +13,7 @@
 //   Group 9 — Waypoint validity: contiguous, includes goal, no dup start
 
 import { describe, it, expect } from 'vitest';
-import { findPath, type PathRequest } from '../../../src/core/nav/Pathfinding.js';
+import { findPath, octileHeuristic, type PathRequest } from '../../../src/core/nav/Pathfinding.js';
 import { NavGrid, type NavCell, type NavCellType } from '../../../src/core/nav/NavGrid.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -57,13 +57,6 @@ function isValidStep(a: { x: number; z: number }, b: { x: number; z: number }): 
   const dx = Math.abs(b.x - a.x);
   const dz = Math.abs(b.z - a.z);
   return dx <= 1 && dz <= 1 && (dx + dz > 0);
-}
-
-/** Build the octile heuristic value between two cells. */
-function octileHeuristic(ax: number, az: number, bx: number, bz: number): number {
-  const dx = Math.abs(ax - bx);
-  const dz = Math.abs(az - bz);
-  return Math.max(dx, dz) + (Math.SQRT2 - 1) * Math.min(dx, dz);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -198,9 +191,8 @@ describe('findPath — cell type costs', () => {
     const grid = makeFlatGrid(10, 1, 'drill_hole');
     const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 9, toZ: 0, avoidVehicles: false });
     expect(result.found).toBe(true);
-    // Cost per step should be 5.0 (not 1.0)
-    expect(result.totalCost).toBeGreaterThan(20);
-    expect(result.totalCost).toBeLessThanOrEqual(9 * 5.0);
+    // Deterministic: 9 cardinal steps × 5.0 = 45.0
+    expect(result.totalCost).toBe(45.0);
   });
 
   it('computes totalCost correctly for a path through ramp cells (cost 1.8 per step)', () => {
@@ -209,8 +201,8 @@ describe('findPath — cell type costs', () => {
     const grid = makeFlatGrid(10, 1, 'ramp');
     const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 9, toZ: 0, avoidVehicles: false });
     expect(result.found).toBe(true);
-    expect(result.totalCost).toBeGreaterThan(9);
-    expect(result.totalCost).toBeLessThanOrEqual(9 * 1.8 + 0.01);
+    // Deterministic: 9 cardinal steps × 1.8 = 16.2
+    expect(result.totalCost).toBeCloseTo(16.2, 4);
   });
 
   it('prefers a walkable path over a drill_hole path when both exist (lower cost)', () => {
@@ -248,10 +240,6 @@ describe('findPath — vehicle avoidance', () => {
     expect(result.found).toBe(true);
     // Path should avoid the vehicleOccupied cell
     for (const wp of result.waypoints) {
-      if (wp.x === 5 && wp.z === 1) {
-        // If we're at (5,1), it must be a non-occupied cell pass-through
-        // But since we set it to occupied, this would be wrong
-      }
       expect(!(wp.x === 5 && wp.z === 1)).toBe(true); // Should not visit (5,1)
     }
   });
@@ -393,13 +381,12 @@ describe('findPath — budget fallback (500 node cap)', () => {
     expect(result.found).toBe(true);
   });
 
-  it('returns found:true when budget is exceeded but the direct line is clear', () => {
+  it('budget-exceeded path waypoints form a valid start-to-goal path', () => {
     // 600×1, all walkable. A* exceeds budget (600 cells > 500).
-    // Direct line is unobstructed → found: true
+    // Direct line is unobstructed → waypoints should span the full route.
     const grid = makeFlatGrid(600, 1, 'walkable');
     const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 599, toZ: 0, avoidVehicles: false });
     expect(result.found).toBe(true);
-    // Waypoints should still form a valid start-to-goal path
     expect(result.waypoints.length).toBeGreaterThanOrEqual(2);
     expect(result.waypoints[0]!.x).toBe(0);
     expect(result.waypoints[0]!.z).toBe(0);
@@ -424,7 +411,7 @@ describe('findPath — budget fallback (500 node cap)', () => {
     const grid = makeFlatGrid(600, 1, 'walkable');
     const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 599, toZ: 0, avoidVehicles: false });
     expect(result.found).toBe(true);
-    expect(result.totalCost).toBeGreaterThan(0);
+    expect(result.totalCost).toBe(599);
   });
 });
 

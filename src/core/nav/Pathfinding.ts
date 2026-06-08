@@ -28,7 +28,7 @@ export interface PathResult {
 }
 
 /** Maximum number of nodes A* may explore before falling back to direct-line search. */
-const MAX_EXPLORED_NODES = 500;
+const NODE_BUDGET_CAP = 500;
 
 /** 8-directional neighbour offsets as [dx, dz] pairs. */
 const NEIGHBOUR_OFFSETS: readonly [number, number][] = [
@@ -104,7 +104,7 @@ function isImpassable(cell: NavCell, avoidVehicles: boolean): boolean {
 }
 
 /** Octile distance heuristic. */
-function octileHeuristic(ax: number, az: number, bx: number, bz: number): number {
+export function octileHeuristic(ax: number, az: number, bx: number, bz: number): number {
   const dx = Math.abs(ax - bx);
   const dz = Math.abs(az - bz);
   return Math.max(dx, dz) + (Math.SQRT2 - 1) * Math.min(dx, dz);
@@ -125,9 +125,8 @@ function clampCoord(value: number, max: number): number {
 // ---------------------------------------------------------------------------
 
 /**
- * Walk a straight line from (x0,z0) to (x1,z1) using a simple DDA approach.
- * Returns waypoints for every cell along the line (inclusive) if the entire
- * line is passable, or null if any cell is impassable.
+ * Walk a straight line from (x0,z0) to (x1,z1) using a DDA approach.
+ * Returns waypoints for every cell along the line if all are passable, else null.
  */
 function directLineWalk(
   grid: NavGrid,
@@ -183,12 +182,7 @@ function directLineWalk(
 // ---------------------------------------------------------------------------
 
 /**
- * Find the shortest path from (fromX, fromZ) to (toX, toZ) on the given NavGrid.
- * Uses A* with 8-directional movement and octile heuristic.
- *
- * @param grid   - The navigation grid to pathfind across.
- * @param request - The pathfinding request parameters.
- * @returns A PathResult indicating whether a path was found and the resulting waypoints.
+ * Find the shortest path on a NavGrid using A* with 8-directional movement and octile heuristic.
  */
 export function findPath(grid: NavGrid, request: PathRequest): PathResult {
   // 0. Validate grid dimensions
@@ -239,7 +233,7 @@ export function findPath(grid: NavGrid, request: PathRequest): PathResult {
   const hStart = octileHeuristic(sx, sz, gx, gz);
   openHeap.push({ key: hStart, x: sx, z: sz });
 
-  while (openHeap.size > 0 && exploredCount < MAX_EXPLORED_NODES) {
+  while (openHeap.size > 0 && exploredCount < NODE_BUDGET_CAP) {
     const current = openHeap.pop()!;
     const { x: cx, z: cz } = current;
     const currentKey = cellKey(cx, cz);
@@ -252,7 +246,7 @@ export function findPath(grid: NavGrid, request: PathRequest): PathResult {
 
     // Goal reached?
     if (cx === gx && cz === gz) {
-      return reconstructPath(cameFrom, cx, cz, gScore, gx, gz);
+      return reconstructPath(cameFrom, cx, cz, gScore);
     }
 
     // Explore neighbours
@@ -284,7 +278,7 @@ export function findPath(grid: NavGrid, request: PathRequest): PathResult {
   }
 
   // Budget exceeded or open set empty — try direct-line fallback
-  if (exploredCount >= MAX_EXPLORED_NODES) {
+  if (exploredCount >= NODE_BUDGET_CAP) {
     console.warn('pathfinding budget exceeded for agent', agentId);
   }
 
@@ -294,16 +288,12 @@ export function findPath(grid: NavGrid, request: PathRequest): PathResult {
   return { found: false, waypoints: [], totalCost: 0 };
 }
 
-/**
- * Reconstruct the path from the cameFrom map by walking backwards from goal to start.
- */
+/** Reconstruct path by walking cameFrom map backwards from goal to start. */
 function reconstructPath(
   cameFrom: Map<string, { x: number; z: number }>,
   goalX: number,
   goalZ: number,
   gScore: Map<string, number>,
-  _startX: number,
-  _startZ: number,
 ): PathResult {
   const waypoints: { x: number; z: number }[] = [];
   let cx = goalX;
