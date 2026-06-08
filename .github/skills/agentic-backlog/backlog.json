@@ -1069,11 +1069,11 @@
       "src/console/commands/mining.ts"
     ],
     "testFile": null,
-    "status": "pending",
+    "status": "done",
     "blockedBy": [
       "5.5"
     ],
-    "closedInPR": null
+    "closedInPR": 265
   },
   {
     "id": "6.1",
