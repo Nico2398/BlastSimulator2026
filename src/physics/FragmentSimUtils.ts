@@ -3,7 +3,7 @@
 
 import type { Vec3 } from '../core/math/Vec3.js';
 import { vec3, ZERO, sub, normalize, distance } from '../core/math/Vec3.js';
-import { VoxelGrid, type VoxelRockComposition } from '../core/world/VoxelGrid.js';
+import { VoxelGrid, type VoxelRockComposition, type VoxelData } from '../core/world/VoxelGrid.js';
 
 // Re-export types from FragmentSupportGraph for backward compatibility
 export type { AABB, SupportGraph } from './FragmentSupportGraph.js';
@@ -118,6 +118,50 @@ export function flattenVec3Array(_vertices: Vec3[]): Float32Array {
 }
 
 /**
+ * Internal helper: iterate over seed indices, look up voxels, and accumulate
+ * weighted averages across arbitrary per-voxel keyed values.
+ *
+ * Each voxel's contribution is weighted by 1/fragmentCount to share credit
+ * across fragments born from the same voxel.
+ *
+ * @param seedIndices - Array of seed indices belonging to the same fragment.
+ * @param seedToVoxelMap - Map of seed index → source voxel info.
+ * @param grid - The voxel grid to read from.
+ * @param extractValues - Callback that returns key/value pairs from a voxel.
+ * @returns Map of key → normalized weighted average.
+ */
+function computeWeightedAverage(
+  seedIndices: number[],
+  seedToVoxelMap: Map<number, SeedVoxelInfo>,
+  grid: VoxelGrid,
+  extractValues: (voxel: VoxelData) => Array<{ key: string; value: number }>,
+): Map<string, number> {
+  const weightedSum = new Map<string, number>();
+  const totalWeight = new Map<string, number>();
+
+  for (const seedIdx of seedIndices) {
+    const info = seedToVoxelMap.get(seedIdx);
+    if (!info) continue;
+
+    const voxel = grid.getVoxel(info.x, info.y, info.z);
+    if (!voxel) continue;
+
+    const weight = 1 / info.fragmentCount;
+
+    for (const { key, value } of extractValues(voxel)) {
+      weightedSum.set(key, (weightedSum.get(key) ?? 0) + value * weight);
+      totalWeight.set(key, (totalWeight.get(key) ?? 0) + weight);
+    }
+  }
+
+  const result = new Map<string, number>();
+  for (const [key, sum] of weightedSum) {
+    result.set(key, sum / (totalWeight.get(key) ?? 1));
+  }
+  return result;
+}
+
+/**
  * Compute the average rock composition across voxels mapped to a set of seed indices.
  *
  * Averages the rock coefficients across all source voxels, weighting each voxel
@@ -133,33 +177,15 @@ export function computeAverageRockComposition(
   _seedToVoxelMap: Map<number, SeedVoxelInfo>,
   _grid: VoxelGrid,
 ): VoxelRockComposition {
-  const weightedSum = new Map<string, number>();
-  const totalWeight = new Map<string, number>();
+  const averaged = computeWeightedAverage(
+    _seedIndices, _seedToVoxelMap, _grid,
+    (voxel) => voxel.composition.rocks.map(r => ({ key: r.rockId, value: r.coefficient })),
+  );
+  if (averaged.size === 0) return { rocks: [] };
 
-  for (const seedIdx of _seedIndices) {
-    const info = _seedToVoxelMap.get(seedIdx);
-    if (!info) continue;
-
-    const voxel = _grid.getVoxel(info.x, info.y, info.z);
-    if (!voxel) continue;
-
-    const weight = 1 / info.fragmentCount;
-
-    for (const rock of voxel.composition.rocks) {
-      weightedSum.set(rock.rockId, (weightedSum.get(rock.rockId) ?? 0) + rock.coefficient * weight);
-      totalWeight.set(rock.rockId, (totalWeight.get(rock.rockId) ?? 0) + weight);
-    }
-  }
-
-  if (weightedSum.size === 0) return { rocks: [] };
-
-  const rocks = [...weightedSum.entries()]
-    .map(([rockId, sum]) => ({
-      rockId,
-      coefficient: sum / (totalWeight.get(rockId) ?? 1),
-    }));
-
-  return { rocks };
+  return {
+    rocks: [...averaged.entries()].map(([rockId, coefficient]) => ({ rockId, coefficient })),
+  };
 }
 
 /**
@@ -178,34 +204,17 @@ export function computeAverageOreComposition(
   _seedToVoxelMap: Map<number, SeedVoxelInfo>,
   _grid: VoxelGrid,
 ): VoxelOreComposition {
-  const weightedSum = new Map<string, number>();
-  const totalWeight = new Map<string, number>();
+  const averaged = computeWeightedAverage(
+    _seedIndices, _seedToVoxelMap, _grid,
+    (voxel) => Object.entries(voxel.oreDensities).map(([oreId, density]) => ({ key: oreId, value: density })),
+  );
+  if (averaged.size === 0) return { ores: [] };
 
-  for (const seedIdx of _seedIndices) {
-    const info = _seedToVoxelMap.get(seedIdx);
-    if (!info) continue;
-
-    const voxel = _grid.getVoxel(info.x, info.y, info.z);
-    if (!voxel) continue;
-
-    const weight = 1 / info.fragmentCount;
-
-    for (const [oreId, density] of Object.entries(voxel.oreDensities)) {
-      weightedSum.set(oreId, (weightedSum.get(oreId) ?? 0) + density * weight);
-      totalWeight.set(oreId, (totalWeight.get(oreId) ?? 0) + weight);
-    }
-  }
-
-  if (weightedSum.size === 0) return { ores: [] };
-
-  const ores = [...weightedSum.entries()]
-    .map(([oreId, sum]) => ({
-      oreId,
-      density: sum / (totalWeight.get(oreId) ?? 1),
-    }))
-    .sort((a, b) => a.oreId.localeCompare(b.oreId));
-
-  return { ores };
+  return {
+    ores: [...averaged.entries()]
+      .map(([oreId, density]) => ({ oreId, density }))
+      .sort((a, b) => a.oreId.localeCompare(b.oreId)),
+  };
 }
 
 /**

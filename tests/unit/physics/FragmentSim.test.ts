@@ -2555,7 +2555,7 @@ describe('FragmentSimUtils — Support Graph', () => {
     expect(horizontalOverlap(1, 5, 0.5)).toBe(false);
   });
 
-  it('horizontalOverlap returns true for identical AABBs (full overlap)', () => {
+  it('horizontalOverlap returns true when overlapArea equals minArea (full overlap)', () => {
     expect(horizontalOverlap(9, 9, 0.5)).toBe(true);
   });
 
@@ -2846,8 +2846,10 @@ describe('FragmentSimPhysics — Stack Collapse', () => {
     const d = result.updatedFragments.find(f => f.id === 4)!;
     // B lands on terrain: cy = terrainY(0) + clearance + halfHeight(1) = 2.0
     expect(b.cy).toBeCloseTo(PHYSICS_TERRAIN_CLEARANCE + 1, 5);
-    expect(c.cy).toBeGreaterThan(b.cy);   // C stacks on B → cy > b.cy
-    expect(d.cy).toBeGreaterThan(c.cy);   // D stacks on C → cy > c.cy
+    // C stacks on B: B.topY(3.0) + C.halfHeight(1) + STACK_EPSILON(0.001) = 4.001
+    expect(c.cy).toBeCloseTo(4.001, 5);
+    // D stacks on C: C.topY(5.001) + D.halfHeight(1) + STACK_EPSILON(0.001) = 6.002
+    expect(d.cy).toBeCloseTo(6.002, 5);
   });
 
   it('removeFragmentWithCollapse removes the fragment from array', () => {
