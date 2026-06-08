@@ -46,7 +46,7 @@ import type { SitePolicy } from '../entities/SitePolicy.js';
 import { createSitePolicy } from '../entities/SitePolicy.js';
 
 /** Save format version — increment when GameState shape changes. */
-export const SAVE_VERSION = 4;
+export const SAVE_VERSION = 5;
 
 export interface GameConfig {
   seed: number;
@@ -143,6 +143,8 @@ export interface GameState {
   contracts: ContractState;
   /** Fragment logistics state. */
   logistics: LogisticsState;
+  /** Accumulated ore collected from fragments, keyed by ore type ID, value in kg. */
+  collectedOre: Record<string, number>;
 
   /** Building state. */
   buildings: BuildingState;
@@ -227,6 +229,7 @@ export function createGame(config: GameConfig): GameState {
     finances: createFinanceState(config.startingCash ?? STARTING_CASH),
     contracts: createContractState(),
     logistics: createLogisticsState(),
+    collectedOre: {},
     buildings: createBuildingState(),
     vehicles: createVehicleState(),
     employees: createEmployeeState(),

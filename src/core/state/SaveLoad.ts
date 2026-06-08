@@ -93,5 +93,10 @@ export function deserialize(json: string): GameState {
     eventsRaw['firedEventIds'] = [];
   }
 
+  // v4 → v5: collectedOre field added
+  if (typeof obj['collectedOre'] !== 'object' || obj['collectedOre'] === null) {
+    (obj as Record<string, unknown>)['collectedOre'] = {};
+  }
+
   return obj as unknown as GameState;
 }
