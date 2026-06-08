@@ -37,6 +37,9 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Setup git auth for push operations
+        run: gh auth setup-git
+
       - uses: anomalyco/opencode/github@latest
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
