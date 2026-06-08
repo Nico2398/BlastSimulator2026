@@ -1000,11 +1000,11 @@
       "src/core/mining/BlastCalc.ts"
     ],
     "testFile": "tests/unit/mining/BlastCalc.test.ts",
-    "status": "pending",
+    "status": "done",
     "blockedBy": [
       "5.11"
     ],
-    "closedInPR": null
+    "closedInPR": 221
   },
   {
     "id": "5.18",
