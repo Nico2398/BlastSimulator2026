@@ -310,8 +310,8 @@ function findMultiLevelPath(grid: NavGrid, request: PathRequest): PathResult {
     if (!route2.found) continue;
 
     // Cost: route1 + entrance→ramp + ramp→exit + route2
-    const entranceToRampCost = stepCost(grid, entrance.x, entrance.z, ramp.rampX, ramp.rampZ);
-    const rampToExitCost = stepCost(grid, ramp.rampX, ramp.rampZ, exit.x, exit.z);
+    const entranceToRampCost = getStepCost(grid, entrance.x, entrance.z, ramp.rampX, ramp.rampZ);
+    const rampToExitCost = getStepCost(grid, ramp.rampX, ramp.rampZ, exit.x, exit.z);
     const totalCost = route1.totalCost + entranceToRampCost + rampToExitCost + route2.totalCost;
 
     // Build waypoints
@@ -339,7 +339,7 @@ function findMultiLevelPath(grid: NavGrid, request: PathRequest): PathResult {
   return bestResult ?? { found: false, waypoints: [], totalCost: 0 };
 }
 
-function stepCost(grid: NavGrid, ax: number, az: number, bx: number, bz: number): number {
+function getStepCost(grid: NavGrid, ax: number, az: number, bx: number, bz: number): number {
   const dx = Math.abs(bx - ax);
   const dz = Math.abs(bz - az);
   if (dx > 1 || dz > 1) return Infinity;
