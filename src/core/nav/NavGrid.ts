@@ -76,6 +76,7 @@ export class NavGrid {
 
   /**
    * Patch a rectangular region of the NavGrid in place.
+   * The `navGrid` argument is mutated directly — no new NavGrid is created.
    * Only cells within the clamped region are recomputed; cells outside are untouched.
    */
   static patchNavGrid(
@@ -90,10 +91,10 @@ export class NavGrid {
     // and fail the min > max check.
     if (region.minX > region.maxX || region.minZ > region.maxZ) return;
 
-    const minX = Math.max(0, Math.min(navGrid.width - 1, region.minX));
-    const maxX = Math.max(0, Math.min(navGrid.width - 1, region.maxX));
-    const minZ = Math.max(0, Math.min(navGrid.height - 1, region.minZ));
-    const maxZ = Math.max(0, Math.min(navGrid.height - 1, region.maxZ));
+    const minX = Math.max(0, Math.min(navGrid.width - 1, Math.floor(region.minX)));
+    const maxX = Math.max(0, Math.min(navGrid.width - 1, Math.floor(region.maxX)));
+    const minZ = Math.max(0, Math.min(navGrid.height - 1, Math.floor(region.minZ)));
+    const maxZ = Math.max(0, Math.min(navGrid.height - 1, Math.floor(region.maxZ)));
 
     // Defensive check for regions entirely outside grid bounds after clamping
     if (minX > maxX || minZ > maxZ) return;
@@ -145,6 +146,11 @@ export class NavGrid {
       case 'drill_hole': moveCost = 5.0; break;
       case 'blocked':
       case 'void': moveCost = Infinity; break;
+      default: {
+        const _exhaustive: never = type;
+        void _exhaustive;
+        moveCost = Infinity;
+      }
     }
     return { type, moveCost, benchLevel: 0, vehicleOccupied: false };
   }

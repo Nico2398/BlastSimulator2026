@@ -527,8 +527,8 @@ describe('NavGrid.patchNavGrid — region isolation', () => {
     // Now drill_hole should change to void (rock removed)
     expect(nav.cells[1]![1]!.type).toBe('void');
     // vehicleOccupied and benchLevel should still be present
-    expect(typeof nav.cells[1]![1]!.vehicleOccupied).toBe('boolean');
-    expect(typeof nav.cells[1]![1]!.benchLevel).toBe('number');
+    expect(nav.cells[1]![1]!.vehicleOccupied).toBe(false);
+    expect(nav.cells[1]![1]!.benchLevel).toBe(0);
   });
 });
 
@@ -738,6 +738,26 @@ describe('NavGrid.patchNavGrid — drill hole changes', () => {
 
     expect(nav.cells[2]![2]!.type).toBe('void');
     expect(nav.cells[2]![2]!.moveCost).toBe(Infinity);
+  });
+
+  it('gives drill_hole priority over blocked when both overlap in a patched region', () => {
+    const grid = makeSolidGrid(10, 10, 10, 4);
+    const buildings: Building[] = [
+      { id: 1, type: 'management_office', tier: 1, x: 2, z: 2, hp: 80, active: true },
+    ];
+    const holes: DrillHole[] = [
+      { id: 'H1', x: 2, z: 2, depth: 5, diameter: 0.15 },
+    ];
+    const nav = NavGrid.buildNavGrid(grid, [], []);
+    // Initially (2,2) is walkable
+    expect(nav.cells[2]![2]!.type).toBe('walkable');
+
+    // Patch with both building and drill hole — drill_hole should win
+    const region: BlastRegion = { minX: 2, maxX: 3, minZ: 2, maxZ: 3 };
+    NavGrid.patchNavGrid(nav, grid, buildings, holes, region);
+
+    expect(nav.cells[2]![2]!.type).toBe('drill_hole');
+    expect(nav.cells[2]![2]!.moveCost).toBe(5.0);
   });
 });
 
