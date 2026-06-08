@@ -8,6 +8,9 @@ import type { DrillHole } from '../mining/DrillPlan.js';
 import type { BlastRegion } from '../mining/BlastExecution.js';
 import { isBuildingFootprintCell } from '../entities/BuildingPlacement.js';
 
+/** Cardinal offsets for 4-directional neighbor checks. */
+const CARDINAL_OFFSETS: readonly [number, number][] = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+
 export type NavCellType = 'walkable' | 'blocked' | 'drill_hole' | 'ramp' | 'void';
 
 export interface NavCell {
@@ -103,8 +106,12 @@ export class NavGrid {
   }
 
   /**
-   * Classify a single NavGrid cell based on column solidity, drill holes, and buildings.
-   * Priority order (highest to lowest): void > drill_hole > blocked > walkable.
+   * Classify a single NavGrid cell based on column solidity, drill holes, buildings, and ramps.
+   * Priority order (highest to lowest): void > drill_hole > blocked > ramp > walkable.
+   *
+   * Ramp detection: if any cardinal neighbor's surface Y differs from this cell's
+   * surface Y by more than 1 voxel, the cell is classified as a ramp. This allows
+   * pathfinding to handle elevation changes (e.g. stepped terrain or ramp transitions).
    */
   private static classifyCellType(
     x: number,
@@ -117,6 +124,13 @@ export class NavGrid {
     if (surfaceY === -1) return 'void';
     if (drillHoles.some(h => Math.floor(h.x) === x && Math.floor(h.z) === z)) return 'drill_hole';
     if (buildings.some(b => isBuildingFootprintCell(b, x, z))) return 'blocked';
+    // Ramp detection: cardinal neighbor with surface height delta > 1 voxel
+    for (const [dx, dz] of CARDINAL_OFFSETS) {
+      const neighborSurfaceY = NavGrid.computeSurfaceY(voxelGrid, x + dx, z + dz);
+      if (neighborSurfaceY !== -1 && Math.abs(surfaceY - neighborSurfaceY) > 1) {
+        return 'ramp';
+      }
+    }
     return 'walkable';
   }
 

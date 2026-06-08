@@ -291,6 +291,180 @@ describe('NavGrid.buildNavGrid — cell type priority', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// Group 2b: buildNavGrid — ramp detection
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('NavGrid.buildNavGrid — ramp detection', () => {
+  it('flat terrain produces no ramp cells', () => {
+    // 5×5 grid all solid at Y=4 → all cells surfaceY=4 → all neighbors same → no ramp
+    const grid = makeSolidGrid(5, 10, 5, 4);
+    const nav = NavGrid.buildNavGrid(grid, [], []);
+    const types = cellTypeMap(nav);
+    for (let z = 0; z < 5; z++) {
+      for (let x = 0; x < 5; x++) {
+        expect(types.get(`${x},${z}`)).not.toBe('ramp');
+      }
+    }
+  });
+
+  it('ramp detected when neighbor surface Y differs by > 1', () => {
+    // 3×3 grid, center column (1,1) solidY=4, neighbor (1,2) solidY=2
+    // Diff = |4-2| = 2 (> 1) → center should be ramp
+    const grid = new VoxelGrid(3, 10, 3);
+    // Fill center column solid to Y=4
+    for (let y = 0; y <= 4; y++) grid.setVoxel(1, y, 1, solidVoxel());
+    // Fill south neighbor column solid to Y=2 (lower)
+    for (let y = 0; y <= 2; y++) grid.setVoxel(1, y, 2, solidVoxel());
+    // Fill remaining columns solid to Y=4 to avoid void neighbors
+    for (let z = 0; z < 3; z++) {
+      for (let x = 0; x < 3; x++) {
+        if ((x === 1 && z === 1) || (x === 1 && z === 2)) continue;
+        for (let y = 0; y <= 4; y++) grid.setVoxel(x, y, z, solidVoxel());
+      }
+    }
+    const nav = NavGrid.buildNavGrid(grid, [], []);
+    expect(nav.cells[1]![1]!.type).toBe('ramp');
+  });
+
+  it('ramp NOT triggered when neighbor diff = 1', () => {
+    // 3×3 grid, center solidY=4, neighbor solidY=3 → diff=1 (not > 1) → walkable
+    const grid = new VoxelGrid(3, 10, 3);
+    for (let y = 0; y <= 4; y++) grid.setVoxel(1, y, 1, solidVoxel());
+    for (let y = 0; y <= 3; y++) grid.setVoxel(1, y, 2, solidVoxel());
+    for (let z = 0; z < 3; z++) {
+      for (let x = 0; x < 3; x++) {
+        if ((x === 1 && z === 1) || (x === 1 && z === 2)) continue;
+        for (let y = 0; y <= 4; y++) grid.setVoxel(x, y, z, solidVoxel());
+      }
+    }
+    const nav = NavGrid.buildNavGrid(grid, [], []);
+    expect(nav.cells[1]![1]!.type).toBe('walkable');
+  });
+
+  it('ramp cell has moveCost 1.8', () => {
+    // 3×3 grid with height diff > 1 → ramp cell should have moveCost 1.8
+    const grid = new VoxelGrid(3, 10, 3);
+    for (let y = 0; y <= 4; y++) grid.setVoxel(1, y, 1, solidVoxel());
+    for (let y = 0; y <= 2; y++) grid.setVoxel(1, y, 2, solidVoxel());
+    for (let z = 0; z < 3; z++) {
+      for (let x = 0; x < 3; x++) {
+        if ((x === 1 && z === 1) || (x === 1 && z === 2)) continue;
+        for (let y = 0; y <= 4; y++) grid.setVoxel(x, y, z, solidVoxel());
+      }
+    }
+    const nav = NavGrid.buildNavGrid(grid, [], []);
+    expect(nav.cells[1]![1]!.moveCost).toBe(1.8);
+  });
+
+  it('ramp detected with height diff on each cardinal direction', () => {
+    // North: center (2,2) solidY=4, north neighbor (2,1) solidY=2
+    const gridNorth = new VoxelGrid(5, 10, 5);
+    for (let z = 0; z < 5; z++)
+      for (let x = 0; x < 5; x++)
+        for (let y = 0; y <= 4; y++) gridNorth.setVoxel(x, y, z, solidVoxel());
+    // Lower north neighbor column
+    for (let y = 0; y <= 4; y++) gridNorth.clearVoxel(2, y, 1);
+    for (let y = 0; y <= 2; y++) gridNorth.setVoxel(2, y, 1, solidVoxel());
+    const navNorth = NavGrid.buildNavGrid(gridNorth, [], []);
+    expect(navNorth.cells[1]![2]!.type).toBe('ramp');
+
+    // South: center (2,2) solidY=4, south neighbor (2,3) solidY=2
+    const gridSouth = new VoxelGrid(5, 10, 5);
+    for (let z = 0; z < 5; z++)
+      for (let x = 0; x < 5; x++)
+        for (let y = 0; y <= 4; y++) gridSouth.setVoxel(x, y, z, solidVoxel());
+    for (let y = 0; y <= 4; y++) gridSouth.clearVoxel(2, y, 3);
+    for (let y = 0; y <= 2; y++) gridSouth.setVoxel(2, y, 3, solidVoxel());
+    const navSouth = NavGrid.buildNavGrid(gridSouth, [], []);
+    expect(navSouth.cells[3]![2]!.type).toBe('ramp');
+
+    // West: center (2,2) solidY=4, west neighbor (1,2) solidY=2
+    const gridWest = new VoxelGrid(5, 10, 5);
+    for (let z = 0; z < 5; z++)
+      for (let x = 0; x < 5; x++)
+        for (let y = 0; y <= 4; y++) gridWest.setVoxel(x, y, z, solidVoxel());
+    for (let y = 0; y <= 4; y++) gridWest.clearVoxel(1, y, 2);
+    for (let y = 0; y <= 2; y++) gridWest.setVoxel(1, y, 2, solidVoxel());
+    const navWest = NavGrid.buildNavGrid(gridWest, [], []);
+    expect(navWest.cells[2]![1]!.type).toBe('ramp');
+
+    // East: center (2,2) solidY=4, east neighbor (3,2) solidY=2
+    const gridEast = new VoxelGrid(5, 10, 5);
+    for (let z = 0; z < 5; z++)
+      for (let x = 0; x < 5; x++)
+        for (let y = 0; y <= 4; y++) gridEast.setVoxel(x, y, z, solidVoxel());
+    for (let y = 0; y <= 4; y++) gridEast.clearVoxel(3, y, 2);
+    for (let y = 0; y <= 2; y++) gridEast.setVoxel(3, y, 2, solidVoxel());
+    const navEast = NavGrid.buildNavGrid(gridEast, [], []);
+    expect(navEast.cells[2]![3]!.type).toBe('ramp');
+  });
+
+  it('ramp does NOT override void', () => {
+    // Cell (1,1) is void (all air), adjacent to height-diff column
+    // void has higher priority than ramp
+    const grid = new VoxelGrid(3, 10, 3);
+    // Fill all columns solid to Y=4 first
+    for (let z = 0; z < 3; z++)
+      for (let x = 0; x < 3; x++)
+        for (let y = 0; y <= 4; y++) grid.setVoxel(x, y, z, solidVoxel());
+    // Clear column (1,1) to make it void
+    for (let y = 0; y <= 4; y++) grid.clearVoxel(1, y, 1);
+    // Lower column (1,2) to create height diff adjacent to void column
+    for (let y = 0; y <= 4; y++) grid.clearVoxel(1, y, 2);
+    for (let y = 0; y <= 2; y++) grid.setVoxel(1, y, 2, solidVoxel());
+    const nav = NavGrid.buildNavGrid(grid, [], []);
+    // (1,1) is void → should not become ramp due to adjacent height diff
+    expect(nav.cells[1]![1]!.type).toBe('void');
+    expect(nav.cells[1]![1]!.moveCost).toBe(Infinity);
+  });
+
+  it('ramp does NOT override drill_hole', () => {
+    // Cell with both a drill hole and adjacent height diff → drill_hole wins
+    const grid = new VoxelGrid(3, 10, 3);
+    for (let z = 0; z < 3; z++)
+      for (let x = 0; x < 3; x++)
+        for (let y = 0; y <= 4; y++) grid.setVoxel(x, y, z, solidVoxel());
+    // Lower column (1,2) to create height diff with (1,1)
+    for (let y = 0; y <= 4; y++) grid.clearVoxel(1, y, 2);
+    for (let y = 0; y <= 2; y++) grid.setVoxel(1, y, 2, solidVoxel());
+    const holes: DrillHole[] = [
+      { id: 'H1', x: 1, z: 1, depth: 5, diameter: 0.15 },
+    ];
+    const nav = NavGrid.buildNavGrid(grid, [], holes);
+    expect(nav.cells[1]![1]!.type).toBe('drill_hole');
+    expect(nav.cells[1]![1]!.moveCost).toBe(5.0);
+  });
+
+  it('ramp does NOT override blocked', () => {
+    // Cell under a building footprint with adjacent height diff → blocked wins
+    const grid = new VoxelGrid(5, 10, 5);
+    for (let z = 0; z < 5; z++)
+      for (let x = 0; x < 5; x++)
+        for (let y = 0; y <= 4; y++) grid.setVoxel(x, y, z, solidVoxel());
+    // Lower column (2,1) to create height diff with (2,2)
+    for (let y = 0; y <= 4; y++) grid.clearVoxel(2, y, 1);
+    for (let y = 0; y <= 2; y++) grid.setVoxel(2, y, 1, solidVoxel());
+    const buildings: Building[] = [
+      { id: 1, type: 'management_office', tier: 1, x: 2, z: 2, hp: 80, active: true },
+    ];
+    const nav = NavGrid.buildNavGrid(grid, buildings, []);
+    // (2,2) is in building footprint AND adjacent to height diff → blocked wins over ramp
+    expect(nav.cells[2]![2]!.type).toBe('blocked');
+    expect(nav.cells[2]![2]!.moveCost).toBe(Infinity);
+  });
+
+  it('edge cell on flat terrain is walkable, not ramp', () => {
+    // 1-wide column strip: edge cells have out-of-bounds neighbors
+    // Clamping should not create false ramps on flat terrain
+    const grid = makeSolidGrid(1, 10, 5, 4);
+    const nav = NavGrid.buildNavGrid(grid, [], []);
+    for (let z = 0; z < 5; z++) {
+      expect(nav.cells[z]![0]!.type).toBe('walkable');
+    }
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // Group 3: patchNavGrid — dirty-region update
 // ═══════════════════════════════════════════════════════════════════════════════
 
