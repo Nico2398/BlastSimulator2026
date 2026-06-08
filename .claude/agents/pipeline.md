@@ -215,7 +215,7 @@ main
 | qualimetry | `npx jscpd src/ tests/` — route to @implementer on fail |
 | merge-findings | Deduplicate and merge all 5 reviewer outputs → pass/fail |
 | After refactorer | Re-run `npx vitest run` (skip qualimetry + code-review) |
-| open-pr | `gh pr create --base main --head pipeline/feature-<issue-number> --body "Closes #<issue-number>\n\nREADY TO MERGE"` — include validation checklist per `agentic-autonomous-pipeline` skill |
+| open-pr | `gh pr create --base main --head pipeline/feature-<issue-number> --body "Closes #<issue-number>\n\n<N> new tests — all passing\n\nREADY TO MERGE"` — include validation checklist per `agentic-autonomous-pipeline` skill |
 | Before completing | Summarize changes, files modified, test status |
 
 ## Key References
