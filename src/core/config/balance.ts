@@ -178,6 +178,11 @@ export const MAX_PROJECTION_VELOCITY = 80;
 /** Velocity threshold (m/s) below which fragment is classified 'collapse'. */
 export const PROJECTION_VELOCITY_THRESHOLD = 2.0;
 
+/** Velocity threshold (m/s) below which a fragment is considered stationary for sleep detection. */
+export const SLEEP_VELOCITY_THRESHOLD = 0.1;
+/** Number of consecutive ticks a fragment must be below sleep velocity to become 'static'. */
+export const SLEEP_TICKS_REQUIRED = 15;
+
 // ─── Game Loop ──────────────────────────────────────────────────────────────────
 
 /** Duration of one game tick in real milliseconds at 1× speed. 1 tick = 1 game-hour. */

@@ -2,6 +2,7 @@
 // Extracted from FragmentSim.ts to keep that file under 300 lines.
 // Part of Chapter 5 (Blast Full Pipeline)
 
+import { length } from '../core/math/Vec3.js';
 import { PhysicsWorld } from './PhysicsWorld.js';
 import { TerrainBody, findSurfaceY } from './TerrainBody.js';
 import { FragmentBody } from './FragmentBody.js';
@@ -13,6 +14,8 @@ import {
   PHYSICS_MAX_STEPS,
   PHYSICS_TERRAIN_CLEARANCE,
   GRAVITY,
+  SLEEP_VELOCITY_THRESHOLD,
+  SLEEP_TICKS_REQUIRED,
 } from '../core/config/balance.js';
 import { isFragmentValidForPhysics } from './FragmentSimUtils.js';
 
@@ -190,6 +193,49 @@ export function simulateCollapseFragments(
     }
 
     frag.state = 'static';
+  }
+
+  return _fragments;
+}
+
+// ─── Sleep Detection ─────────────────────────────────────────────────────────
+
+/**
+ * Increment sleepTicks on stationary fragments and transition to 'static' state
+ * when sleepTicks reaches SLEEP_TICKS_REQUIRED.
+ *
+ * For each fragment that is not already 'static':
+ *   - If its speed is below SLEEP_VELOCITY_THRESHOLD, sleepTicks advances by tickCount.
+ *   - Otherwise, sleepTicks resets to 0.
+ * Transitions to 'static' when sleepTicks >= SLEEP_TICKS_REQUIRED.
+ *
+ * @param fragments - Array of fragments to evaluate (mutated in place).
+ * @param tickCount - Number of ticks to advance (must be a finite positive number;
+ *                    invalid values (NaN, Infinity, <=0) default to 1).
+ * @returns The same array reference for chaining.
+ */
+export function updateFragmentSleepStates(
+  _fragments: RockFragment[],
+  _tickCount: number = 1,
+): RockFragment[] {
+  // Guard: ensure tickCount is a valid positive finite number
+  if (!Number.isFinite(_tickCount) || _tickCount <= 0) {
+    _tickCount = 1;
+  }
+
+  for (const fragment of _fragments) {
+    if (fragment.state === 'static') continue;
+
+    const speed = length(fragment.velocity);
+
+    if (speed < SLEEP_VELOCITY_THRESHOLD) {
+      fragment.sleepTicks += _tickCount;
+      if (fragment.sleepTicks >= SLEEP_TICKS_REQUIRED) {
+        fragment.state = 'static';
+      }
+    } else {
+      fragment.sleepTicks = 0;
+    }
   }
 
   return _fragments;

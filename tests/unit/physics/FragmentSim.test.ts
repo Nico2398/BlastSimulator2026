@@ -20,6 +20,7 @@ import {
   type SeedVoxelInfo,
   simulateProjectedFragments,
   simulateCollapseFragments,
+  updateFragmentSleepStates,
 } from '../../../src/physics/FragmentSim.js';
 import { type VoronoiCell, type Tetrahedron } from '../../../src/physics/VoronoiFrag.js';
 import { vec3, ZERO } from '../../../src/core/math/Vec3.js';
@@ -36,7 +37,7 @@ import {
   assignFragmentVelocity,
 } from '../../../src/physics/FragmentSimVelocity.js';
 import { length } from '../../../src/core/math/Vec3.js';
-import { MAX_PROJECTION_VELOCITY, PHYSICS_FRAGMENT_CAP, PHYSICS_TERRAIN_CLEARANCE } from '../../../src/core/config/balance.js';
+import { MAX_PROJECTION_VELOCITY, PHYSICS_FRAGMENT_CAP, PHYSICS_TERRAIN_CLEARANCE, SLEEP_VELOCITY_THRESHOLD, SLEEP_TICKS_REQUIRED } from '../../../src/core/config/balance.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Helpers
@@ -2320,6 +2321,128 @@ describe('FragmentSimPhysics — simulateCollapseFragments', () => {
     };
     const input = [frag];
     const result = simulateCollapseFragments(input, grid);
+    expect(result).toBe(input);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Group 19: FragmentSimPhysics — updateFragmentSleepStates
+// Aggressive sleep detection: stationary for SLEEP_TICKS_REQUIRED ticks → 'static'.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('FragmentSimPhysics — updateFragmentSleepStates', () => {
+  function makeFrag(overrides: Partial<RockFragment> = {}): RockFragment {
+    return {
+      id: 1, cx: 0, cy: 0, cz: 0,
+      graphicVertices: new Float32Array(),
+      collisionVertices: new Float32Array(),
+      composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
+      oreComposition: { ores: [] },
+      volumeM3: 1.0, massKg: 100,
+      overflowEnergy: 0,
+      velocity: ZERO,
+      simulationTier: 'projected',
+      state: 'flying',
+      sleepTicks: 0,
+      ...overrides,
+    };
+  }
+
+  it('handles empty fragment array', () => {
+    const result = updateFragmentSleepStates([]);
+    expect(result).toEqual([]);
+  });
+
+  it('does not change state on first call with zero velocity (sleepTicks < SLEEP_TICKS_REQUIRED)', () => {
+    const frag = makeFrag({ state: 'flying', velocity: ZERO, sleepTicks: 0 });
+    const result = updateFragmentSleepStates([frag]);
+    expect(result[0]!.state).toBe('flying');
+    expect(result[0]!.sleepTicks).toBe(1);
+  });
+
+  it('changes state to static after SLEEP_TICKS_REQUIRED calls when velocity is zero', () => {
+    const frag = makeFrag({ state: 'flying', velocity: ZERO, sleepTicks: SLEEP_TICKS_REQUIRED - 1 });
+    const result = updateFragmentSleepStates([frag]);
+    expect(result[0]!.state).toBe('static');
+    expect(result[0]!.sleepTicks).toBe(SLEEP_TICKS_REQUIRED);
+  });
+
+  it('changes state to static when velocity is below SLEEP_VELOCITY_THRESHOLD after enough ticks', () => {
+    const frag = makeFrag({
+      state: 'flying',
+      velocity: { x: 0.03, y: 0.04, z: 0 }, // magnitude = 0.05 < 0.1
+      sleepTicks: SLEEP_TICKS_REQUIRED - 1,
+    });
+    const result = updateFragmentSleepStates([frag]);
+    expect(result[0]!.state).toBe('static');
+  });
+
+  it('resets sleepTicks when velocity goes above threshold', () => {
+    const frag = makeFrag({
+      state: 'flying',
+      velocity: ZERO,
+      sleepTicks: 10,
+    });
+    // First call: accumulate to 11
+    const result1 = updateFragmentSleepStates([frag]);
+    expect(result1[0]!.sleepTicks).toBe(11);
+    // Now set velocity above threshold
+    result1[0]!.velocity = { x: 1, y: 0, z: 0 };
+    const result2 = updateFragmentSleepStates(result1);
+    expect(result2[0]!.sleepTicks).toBe(0);
+    expect(result2[0]!.state).toBe('flying');
+  });
+
+  it('does not affect fragments already static', () => {
+    const frag = makeFrag({ state: 'static', velocity: ZERO, sleepTicks: 99 });
+    const result = updateFragmentSleepStates([frag]);
+    expect(result[0]!.state).toBe('static');
+    expect(result[0]!.sleepTicks).toBe(99);
+  });
+
+  it('does not change state when velocity is above threshold', () => {
+    const frag = makeFrag({
+      state: 'flying',
+      velocity: { x: 1, y: 0, z: 0 }, // magnitude = 1 >= 0.1
+      sleepTicks: 0,
+    });
+    const result = updateFragmentSleepStates([frag]);
+    expect(result[0]!.state).toBe('flying');
+    expect(result[0]!.sleepTicks).toBe(0);
+  });
+
+  it('handles tickCount > 1', () => {
+    const frag = makeFrag({ state: 'flying', velocity: ZERO, sleepTicks: 0 });
+    const result = updateFragmentSleepStates([frag], 5);
+    // sleepTicks advances by 5 in one call
+    expect(result[0]!.sleepTicks).toBe(5);
+    expect(result[0]!.state).toBe('flying'); // still below SLEEP_TICKS_REQUIRED
+  });
+
+  it('tracks sleepTicks independently per fragment', () => {
+    const stationary = makeFrag({
+      id: 1,
+      state: 'flying',
+      velocity: ZERO,
+      sleepTicks: 0,
+    });
+    const moving = makeFrag({
+      id: 2,
+      state: 'flying',
+      velocity: { x: 1, y: 0, z: 0 },
+      sleepTicks: 0,
+    });
+    const result = updateFragmentSleepStates([stationary, moving]);
+    const stat = result.find(f => f.id === 1)!;
+    const mov = result.find(f => f.id === 2)!;
+    expect(stat.sleepTicks).toBeGreaterThan(0);
+    expect(mov.sleepTicks).toBe(0);
+  });
+
+  it('returns the same array reference (mutates in place)', () => {
+    const frag = makeFrag({ state: 'flying', velocity: ZERO, sleepTicks: 0 });
+    const input = [frag];
+    const result = updateFragmentSleepStates(input);
     expect(result).toBe(input);
   });
 });
