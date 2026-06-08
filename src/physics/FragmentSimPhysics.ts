@@ -2,6 +2,7 @@
 // Extracted from FragmentSim.ts to keep that file under 300 lines.
 // Part of Chapter 5 (Blast Full Pipeline)
 
+import { length } from '../core/math/Vec3.js';
 import { PhysicsWorld } from './PhysicsWorld.js';
 import { TerrainBody, findSurfaceY } from './TerrainBody.js';
 import { FragmentBody } from './FragmentBody.js';
@@ -13,6 +14,8 @@ import {
   PHYSICS_MAX_STEPS,
   PHYSICS_TERRAIN_CLEARANCE,
   GRAVITY,
+  SLEEP_VELOCITY_THRESHOLD,
+  SLEEP_TICKS_REQUIRED,
 } from '../core/config/balance.js';
 import { isFragmentValidForPhysics } from './FragmentSimUtils.js';
 
@@ -193,4 +196,21 @@ export function simulateCollapseFragments(
   }
 
   return _fragments;
+}
+
+// ─── Sleep Detection ─────────────────────────────────────────────────────────
+
+/**
+ * Increment sleepTicks on stationary fragments and transition to 'static' state
+ * when SLEEP_TICKS_REQUIRED consecutive ticks below SLEEP_VELOCITY_THRESHOLD.
+ *
+ * @param fragments - Array of fragments to evaluate.
+ * @returns The same array reference for chaining.
+ */
+export function updateFragmentSleepStates(fragments: RockFragment[]): RockFragment[] {
+  // TODO: implement sleep detection
+  void length;
+  void SLEEP_VELOCITY_THRESHOLD;
+  void SLEEP_TICKS_REQUIRED;
+  return fragments;
 }

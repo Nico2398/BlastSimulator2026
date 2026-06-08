@@ -44,7 +44,7 @@ export {
   assignFragmentVelocity,
 } from './FragmentSimVelocity.js';
 
-export { simulateProjectedFragments, simulateCollapseFragments } from './FragmentSimPhysics.js';
+export { simulateProjectedFragments, simulateCollapseFragments, updateFragmentSleepStates } from './FragmentSimPhysics.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────────
 
@@ -64,6 +64,7 @@ export interface RockFragment {
   velocity: Vec3;
   simulationTier: 'projected' | 'collapse';
   state: 'flying' | 'settling' | 'static';
+  sleepTicks: number;
 }
 
 // ─── Core Functions ─────────────────────────────────────────────────────────────
@@ -286,6 +287,7 @@ export function generateRockFragments(
       velocity: ZERO,
       simulationTier: 'collapse',
       state: 'settling',
+      sleepTicks: 0,
     };
     assignFragmentVelocity(fragment, _effectiveEnergy, _grid);
     fragments.push(fragment);
