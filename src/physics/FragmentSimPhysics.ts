@@ -205,12 +205,14 @@ export function simulateCollapseFragments(
  * when SLEEP_TICKS_REQUIRED consecutive ticks below SLEEP_VELOCITY_THRESHOLD.
  *
  * @param fragments - Array of fragments to evaluate.
+ * @param tickCount - Number of ticks to advance (default 1).
  * @returns The same array reference for chaining.
  */
-export function updateFragmentSleepStates(fragments: RockFragment[]): RockFragment[] {
+export function updateFragmentSleepStates(fragments: RockFragment[], tickCount: number = 1): RockFragment[] {
   // TODO: implement sleep detection
   void length;
   void SLEEP_VELOCITY_THRESHOLD;
   void SLEEP_TICKS_REQUIRED;
+  void tickCount;
   return fragments;
 }
