@@ -348,8 +348,11 @@ export function previewCommand(
   return { success: false, output: 'Usage: preview energy|fragments|projections|vibrations' };
 }
 
-// ── Blast preview command ──
-
+/**
+ * Show a comprehensive blast preview covering energy, fragmentation,
+ * projections, and vibrations — each unlocked by the corresponding
+ * software tier.  Sections with insufficient tier display a lock message.
+ */
 export function blastPreviewCommand(
   ctx: MiningContext,
   _args: string[],
@@ -375,7 +378,6 @@ export function blastPreviewCommand(
 
   const lines: string[] = ['=== BLAST PREVIEW ==='];
 
-  // ── Energy Map section ──
   lines.push('');
   if (energyPreview) {
     lines.push('--- Energy Map ---');
@@ -386,7 +388,6 @@ export function blastPreviewCommand(
     lines.push('--- Energy Map --- [Requires software tier 1]');
   }
 
-  // ── Fragmentation section ──
   lines.push('');
   if (fragmentPreview) {
     lines.push('--- Fragmentation ---');
@@ -398,11 +399,11 @@ export function blastPreviewCommand(
     lines.push('--- Fragmentation --- [Requires software tier 2]');
   }
 
-  // ── Projections section ──
   lines.push('');
   if (projectionPreview) {
     const fractured = fragmentPreview?.fracturedCount ?? 0;
     const cracked = fragmentPreview?.crackedCount ?? 0;
+    // Fragments that are fractured/cracked but NOT projected outward collapse in place
     const collapseCount = (fractured + cracked) - projectionPreview.projectionZoneCount;
     lines.push('--- Projections ---');
     lines.push(`  Projection zone voxels: ${projectionPreview.projectionZoneCount}`);
@@ -412,7 +413,6 @@ export function blastPreviewCommand(
     lines.push('--- Projections --- [Requires software tier 3]');
   }
 
-  // ── Vibrations section ──
   lines.push('');
   if (vibrationPreview) {
     lines.push('--- Vibrations ---');
