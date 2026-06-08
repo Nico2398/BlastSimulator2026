@@ -135,6 +135,17 @@ describe('buy_software tier validation', () => {
 // ── blast_preview ─────────────────────────────────────────────────────────────
 
 describe('blast_preview', () => {
+  /**
+   * Helper: create a mining context with a single-hole plan already set up
+   * (1 hole, 1 charge, 1 sequence delay). Optionally sets software tier.
+   */
+  function makePlan(ctx: MiningContext, tier?: number): void {
+    if (tier !== undefined) ctx.softwareTier = tier;
+    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+    chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
+    sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
+  }
+
   // ── guard: no game loaded ───────────────────────────────────────────────────
 
   it('returns success:false with "No game loaded" when ctx.state is null', () => {
@@ -173,9 +184,7 @@ describe('blast_preview', () => {
 
   it('tier 0 — complete plan, all sections require higher software tier', () => {
     const ctx = makeMiningContext();
-    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
-    chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
-    sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
+    makePlan(ctx);
 
     const result = blastPreviewCommand(ctx, [], {});
     expect(result.success).toBe(true);
@@ -187,10 +196,7 @@ describe('blast_preview', () => {
 
   it('tier 1 — energy section shows data, fragmentation+projections+vibrations require higher tier', () => {
     const ctx = makeMiningContext();
-    ctx.softwareTier = 1;
-    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
-    chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
-    sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
+    makePlan(ctx, 1);
 
     const result = blastPreviewCommand(ctx, [], {});
     expect(result.success).toBe(true);
@@ -206,10 +212,7 @@ describe('blast_preview', () => {
 
   it('tier 2 — energy + fragmentation show data, projections+vibrations require higher tier', () => {
     const ctx = makeMiningContext();
-    ctx.softwareTier = 2;
-    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
-    chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
-    sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
+    makePlan(ctx, 2);
 
     const result = blastPreviewCommand(ctx, [], {});
     expect(result.success).toBe(true);
@@ -228,10 +231,7 @@ describe('blast_preview', () => {
 
   it('tier 3 — energy + fragmentation + projections show data, vibrations require higher tier', () => {
     const ctx = makeMiningContext();
-    ctx.softwareTier = 3;
-    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
-    chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
-    sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
+    makePlan(ctx, 3);
 
     const result = blastPreviewCommand(ctx, [], {});
     expect(result.success).toBe(true);
@@ -249,10 +249,7 @@ describe('blast_preview', () => {
 
   it('tier 4 — all sections show data', () => {
     const ctx = makeMiningContext();
-    ctx.softwareTier = 4;
-    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
-    chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
-    sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
+    makePlan(ctx, 4);
 
     const result = blastPreviewCommand(ctx, [], {});
     expect(result.success).toBe(true);

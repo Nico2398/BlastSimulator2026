@@ -16,6 +16,7 @@ import {
   blastCommand,
   blastPlanCommand,
   previewCommand,
+  blastPreviewCommand,
   buySoftwareCommand,
   buildRampCommand,
   weatherCommand,
@@ -104,6 +105,9 @@ export function createRunner(): RunnerWithContext {
   );
   runner.register('preview', 'Preview blast (energy|fragments|projections|vibrations)', (args, named) =>
     previewCommand(ctx, args, named),
+  );
+  runner.register('blast_preview', 'Comprehensive blast preview (energy, fragments, projections, vibrations)', (args, named) =>
+    blastPreviewCommand(ctx, args, named),
   );
   runner.register('buy_software', 'Buy software upgrade', (args, named) =>
     buySoftwareCommand(ctx, args, named),
