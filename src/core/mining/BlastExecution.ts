@@ -71,6 +71,13 @@ export interface SecondaryBlastEvent {
   explosivesKg: number;
 }
 
+export interface BlastRegion {
+  minX: number;
+  maxX: number;
+  minZ: number;
+  maxZ: number;
+}
+
 export interface BlastResult {
   fragments: FragmentData[];
   fragmentCount: number;
@@ -84,6 +91,7 @@ export interface BlastResult {
   rating: BlastRating;
   crackedVoxels: number;
   clearedVoxels: number;
+  clearedRegion: BlastRegion;
   destroyedBuildings: DestroyedBuildingInfo[];
   secondaryBlastEvents: SecondaryBlastEvent[];
 }
@@ -215,6 +223,19 @@ export function executeBlast(
     }
   }
 
+  // 4b. Compute cleared region AABB from toClear for navmesh dirty-region update
+  const clearedRegion: BlastRegion = toClear.length === 0
+    ? { minX: 0, maxX: -1, minZ: 0, maxZ: -1 }
+    : toClear.reduce(
+        (acc, { x, z }) => ({
+          minX: Math.min(acc.minX, x),
+          maxX: Math.max(acc.maxX, x),
+          minZ: Math.min(acc.minZ, z),
+          maxZ: Math.max(acc.maxZ, z),
+        }),
+        { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity },
+      );
+
   // 5. Subtract fractured voxels from terrain
   for (const { x, y, z } of toClear) {
     grid.clearVoxel(x, y, z);
@@ -319,6 +340,7 @@ export function executeBlast(
     rating,
     crackedVoxels,
     clearedVoxels,
+    clearedRegion,
     destroyedBuildings,
     secondaryBlastEvents,
   };
