@@ -3,6 +3,7 @@
 
 import { NavGrid } from './NavGrid.js';
 import type { NavCell } from './NavGrid.js';
+import { PATHFINDING_NODE_BUDGET_CAP } from '../config/balance.js';
 
 /**
  * Describes a pathfinding request from one grid cell to another.
@@ -26,9 +27,6 @@ export interface PathResult {
   waypoints: Array<{ x: number; z: number }>;
   totalCost: number;
 }
-
-/** Maximum number of nodes A* may explore before falling back to direct-line search. */
-const NODE_BUDGET_CAP = 500;
 
 /** 8-directional neighbour offsets as [dx, dz] pairs. */
 const NEIGHBOUR_OFFSETS: readonly [number, number][] = [
@@ -155,8 +153,8 @@ function directLineWalk(
     const cz = Math.round(z0 + dz * t);
 
     // Clamp to grid bounds
-    const clampedX = Math.max(0, Math.min(grid.width - 1, cx));
-    const clampedZ = Math.max(0, Math.min(grid.height - 1, cz));
+    const clampedX = clampCoord(cx, grid.width);
+    const clampedZ = clampCoord(cz, grid.height);
 
     const cell = grid.cells[clampedZ]![clampedX]!;
     if (isImpassable(cell, avoidVehicles)) return null;
@@ -196,7 +194,7 @@ export function findPath(grid: NavGrid, request: PathRequest): PathResult {
   const gx = clampCoord(request.toX, grid.width);
   const gz = clampCoord(request.toZ, grid.height);
 
-  const { avoidVehicles, agentId } = request;
+  const { avoidVehicles } = request;
 
   // 2. Start impassable check (must precede start==goal check)
   const startCell = grid.cells[sz]![sx]!;
@@ -233,7 +231,7 @@ export function findPath(grid: NavGrid, request: PathRequest): PathResult {
   const hStart = octileHeuristic(sx, sz, gx, gz);
   openHeap.push({ key: hStart, x: sx, z: sz });
 
-  while (openHeap.size > 0 && exploredCount < NODE_BUDGET_CAP) {
+  while (openHeap.size > 0 && exploredCount < PATHFINDING_NODE_BUDGET_CAP) {
     const current = openHeap.pop()!;
     const { x: cx, z: cz } = current;
     const currentKey = cellKey(cx, cz);
@@ -278,10 +276,6 @@ export function findPath(grid: NavGrid, request: PathRequest): PathResult {
   }
 
   // Budget exceeded or open set empty — try direct-line fallback
-  if (exploredCount >= NODE_BUDGET_CAP) {
-    console.warn('pathfinding budget exceeded for agent', agentId);
-  }
-
   const fallback = directLineWalk(grid, sx, sz, gx, gz, avoidVehicles);
   if (fallback !== null) return fallback;
 
