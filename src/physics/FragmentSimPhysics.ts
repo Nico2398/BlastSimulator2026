@@ -202,28 +202,39 @@ export function simulateCollapseFragments(
 
 /**
  * Increment sleepTicks on stationary fragments and transition to 'static' state
- * when SLEEP_TICKS_REQUIRED consecutive ticks below SLEEP_VELOCITY_THRESHOLD.
+ * when sleepTicks reaches SLEEP_TICKS_REQUIRED.
  *
- * @param fragments - Array of fragments to evaluate.
- * @param tickCount - Number of ticks to advance (default 1).
+ * For each fragment that is not already 'static':
+ *   - If its speed is below SLEEP_VELOCITY_THRESHOLD, sleepTicks advances by tickCount.
+ *   - Otherwise, sleepTicks resets to 0.
+ * Transitions to 'static' when sleepTicks >= SLEEP_TICKS_REQUIRED.
+ *
+ * @param fragments - Array of fragments to evaluate (mutated in place).
+ * @param tickCount - Number of ticks to advance (must be a finite positive number;
+ *                    invalid values (NaN, Infinity, <=0) default to 1).
  * @returns The same array reference for chaining.
  */
 export function updateFragmentSleepStates(
   _fragments: RockFragment[],
   _tickCount: number = 1,
 ): RockFragment[] {
-  for (const frag of _fragments) {
-    if (frag.state === 'static') continue;
+  // Guard: ensure tickCount is a valid positive finite number
+  if (!Number.isFinite(_tickCount) || _tickCount <= 0) {
+    _tickCount = 1;
+  }
 
-    const speed = length(frag.velocity);
+  for (const fragment of _fragments) {
+    if (fragment.state === 'static') continue;
+
+    const speed = length(fragment.velocity);
 
     if (speed < SLEEP_VELOCITY_THRESHOLD) {
-      frag.sleepTicks += _tickCount;
-      if (frag.sleepTicks >= SLEEP_TICKS_REQUIRED) {
-        frag.state = 'static';
+      fragment.sleepTicks += _tickCount;
+      if (fragment.sleepTicks >= SLEEP_TICKS_REQUIRED) {
+        fragment.state = 'static';
       }
     } else {
-      frag.sleepTicks = 0;
+      fragment.sleepTicks = 0;
     }
   }
 
