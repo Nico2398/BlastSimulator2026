@@ -5,6 +5,7 @@ import type { MiningContext } from '../../../src/console/commands/mining.js';
 import {
   blastCommand,
   blastPlanCommand,
+  blastPreviewCommand,
   buySoftwareCommand,
   chargeCommand,
   drillPlanCommand,
@@ -128,6 +129,144 @@ describe('buy_software tier validation', () => {
     const result = buySoftwareCommand(ctx, [], { tier: '0' });
     expect(result.success).toBe(false);
     expect(result.output).toContain('Already at tier');
+  });
+});
+
+// ── blast_preview ─────────────────────────────────────────────────────────────
+
+describe('blast_preview', () => {
+  // ── guard: no game loaded ───────────────────────────────────────────────────
+
+  it('returns success:false with "No game loaded" when ctx.state is null', () => {
+    const ctx: MiningContext = {
+      state: null,
+      grid: null,
+      softwareTier: 0,
+      tubingState: createTubingState(),
+      emitter: new EventEmitter(),
+    };
+    const result = blastPreviewCommand(ctx, [], {});
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('No game loaded');
+  });
+
+  // ── guard: no drill plan ────────────────────────────────────────────────────
+
+  it('returns success:false with "No drill plan" when drillHoles is empty', () => {
+    const ctx = makeMiningContext();
+    const result = blastPreviewCommand(ctx, [], {});
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('No drill plan');
+  });
+
+  // ── guard: incomplete plan ──────────────────────────────────────────────────
+
+  it('returns success:false with validation error when holes exist but charges are missing', () => {
+    const ctx = makeMiningContext();
+    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+    const result = blastPreviewCommand(ctx, [], {});
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('Missing charge');
+  });
+
+  // ── software tier 0 — all locked ────────────────────────────────────────────
+
+  it('tier 0 — complete plan, all sections require higher software tier', () => {
+    const ctx = makeMiningContext();
+    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+    chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
+    sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
+
+    const result = blastPreviewCommand(ctx, [], {});
+    expect(result.success).toBe(true);
+    const matches = result.output.match(/Requires software tier/g);
+    expect(matches).toHaveLength(4);
+  });
+
+  // ── software tier 1 — energy unlocked ───────────────────────────────────────
+
+  it('tier 1 — energy section shows data, fragmentation+projections+vibrations require higher tier', () => {
+    const ctx = makeMiningContext();
+    ctx.softwareTier = 1;
+    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+    chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
+    sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
+
+    const result = blastPreviewCommand(ctx, [], {});
+    expect(result.success).toBe(true);
+    expect(result.output).toContain('Affected voxels');
+    expect(result.output).toContain('Min energy');
+    expect(result.output).toContain('Max energy');
+    // Remaining 3 sections still locked
+    const matches = result.output.match(/Requires software tier/g);
+    expect(matches).toHaveLength(3);
+  });
+
+  // ── software tier 2 — energy + frag unlocked ────────────────────────────────
+
+  it('tier 2 — energy + fragmentation show data, projections+vibrations require higher tier', () => {
+    const ctx = makeMiningContext();
+    ctx.softwareTier = 2;
+    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+    chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
+    sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
+
+    const result = blastPreviewCommand(ctx, [], {});
+    expect(result.success).toBe(true);
+    expect(result.output).toContain('Affected voxels');
+    expect(result.output).toContain('Min energy');
+    expect(result.output).toContain('Max energy');
+    expect(result.output).toContain('Fractured');
+    expect(result.output).toContain('Cracked');
+    expect(result.output).toContain('Average fragment size');
+    // Remaining 2 sections still locked
+    const matches = result.output.match(/Requires software tier/g);
+    expect(matches).toHaveLength(2);
+  });
+
+  // ── software tier 3 — energy + frag + projections unlocked ─────────────────
+
+  it('tier 3 — energy + fragmentation + projections show data, vibrations require higher tier', () => {
+    const ctx = makeMiningContext();
+    ctx.softwareTier = 3;
+    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+    chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
+    sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
+
+    const result = blastPreviewCommand(ctx, [], {});
+    expect(result.success).toBe(true);
+    expect(result.output).toContain('Affected voxels');
+    expect(result.output).toContain('Fractured');
+    expect(result.output).toContain('Projection zone voxels');
+    expect(result.output).toContain('Projected fragments');
+    expect(result.output).toContain('Collapse fragments');
+    // Remaining 1 section still locked
+    const matches = result.output.match(/Requires software tier/g);
+    expect(matches).toHaveLength(1);
+  });
+
+  // ── software tier 4 — all unlocked ─────────────────────────────────────────
+
+  it('tier 4 — all sections show data', () => {
+    const ctx = makeMiningContext();
+    ctx.softwareTier = 4;
+    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+    chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
+    sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
+
+    const result = blastPreviewCommand(ctx, [], {});
+    expect(result.success).toBe(true);
+    expect(result.output).toContain('Energy Map');
+    expect(result.output).toContain('Fragmentation');
+    expect(result.output).toContain('Projections');
+    expect(result.output).toContain('Vibrations');
+    expect(result.output).toContain('Affected voxels');
+    expect(result.output).toContain('Fractured');
+    expect(result.output).toContain('Projection zone voxels');
+    expect(result.output).toContain('Max vibration');
+    expect(result.output).toContain('Affected villages');
+    // All unlocked — no "Requires software tier" messages
+    expect(result.output).not.toMatch(/Requires software tier/);
   });
 });
 
