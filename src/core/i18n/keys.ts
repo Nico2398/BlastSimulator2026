@@ -10,6 +10,7 @@ export const I18nKeys = {
   blast: {
     fragments: 'blast.fragments',
     noCasualties: 'blast.no_casualties',
+    oversizedAlert: 'blast.oversized_alert',
     projections: 'blast.projections',
   },
 } as const;
