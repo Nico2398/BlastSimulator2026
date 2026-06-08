@@ -689,7 +689,7 @@
       "src/core/mining/SurveyCalc.ts"
     ],
     "testFile": "tests/unit/mining/SurveyCalc.test.ts",
-    "status": "in-progress",
+    "status": "pending",
     "blockedBy": [
       "4.1"
     ],
@@ -1000,7 +1000,7 @@
       "src/core/mining/BlastCalc.ts"
     ],
     "testFile": "tests/unit/mining/BlastCalc.test.ts",
-    "status": "pending",
+    "status": "done",
     "blockedBy": [
       "5.11"
     ],
@@ -1014,7 +1014,7 @@
       "src/core/GameState.ts"
     ],
     "testFile": "tests/unit/GameState.test.ts",
-    "status": "pending",
+    "status": "in-progress",
     "blockedBy": [
       "5.17"
     ],
