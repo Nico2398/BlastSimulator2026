@@ -262,3 +262,86 @@ describe('ore report event keys — en and fr translations differ', () => {
     expect(en, 'en and fr translations for event.absurdium_jackpot.desc must differ').not.toBe(fr);
   });
 });
+
+// ── Blast damage event keys (event.blast_damage.*) ─────────────────────────
+
+const BLAST_DAMAGE_EVENT_KEYS = [
+  'event.blast_damage.title',
+  'event.blast_damage.desc',
+  'event.blast_damage.opt0',
+  'event.blast_damage.opt1',
+  'event.blast_damage.opt2',
+] as const;
+
+describe('blast damage event keys resolve in both locales', () => {
+  for (const locale of LOCALES) {
+    it(`locale ${locale}: all event.blast_damage.* keys resolve`, () => {
+      setLocale(locale);
+      for (const key of BLAST_DAMAGE_EVENT_KEYS) {
+        const result = t(key);
+        expect(result, `key "${key}" must resolve in ${locale}`).not.toBe(key);
+        expect(result.length, `key "${key}" must be non-empty in ${locale}`).toBeGreaterThan(0);
+      }
+    });
+  }
+});
+
+describe('blast damage event keys — en and fr translations differ', () => {
+  it('event.blast_damage.title is translated differently in en vs fr', () => {
+    setLocale('en');
+    const en = t('event.blast_damage.title');
+    setLocale('fr');
+    const fr = t('event.blast_damage.title');
+    expect(en, 'event.blast_damage.title must resolve in en').not.toBe('event.blast_damage.title');
+    expect(fr, 'event.blast_damage.title must resolve in fr').not.toBe('event.blast_damage.title');
+    expect(en, 'en and fr translations for event.blast_damage.title must differ').not.toBe(fr);
+  });
+
+  it('event.blast_damage.opt0 is translated differently in en vs fr', () => {
+    setLocale('en');
+    const en = t('event.blast_damage.opt0');
+    setLocale('fr');
+    const fr = t('event.blast_damage.opt0');
+    expect(en, 'event.blast_damage.opt0 must resolve in en').not.toBe('event.blast_damage.opt0');
+    expect(fr, 'event.blast_damage.opt0 must resolve in fr').not.toBe('event.blast_damage.opt0');
+    expect(en, 'en and fr translations for event.blast_damage.opt0 must differ').not.toBe(fr);
+  });
+});
+
+// ── Oversized fragment alert (blast.oversized_alert) ───────────────────────
+
+describe('blast.oversized_alert key resolves in both locales', () => {
+  for (const locale of LOCALES) {
+    it(`locale ${locale}: blast.oversized_alert resolves`, () => {
+      setLocale(locale);
+      const key = 'blast.oversized_alert';
+      const result = t(key);
+      expect(result, `key "${key}" must resolve in ${locale}`).not.toBe(key);
+      expect(result.length, `key "${key}" must be non-empty in ${locale}`).toBeGreaterThan(0);
+    });
+  }
+});
+
+describe('blast.oversized_alert — en and fr translations differ', () => {
+  it('blast.oversized_alert is translated differently in en vs fr', () => {
+    setLocale('en');
+    const en = t('blast.oversized_alert');
+    setLocale('fr');
+    const fr = t('blast.oversized_alert');
+    expect(en, 'blast.oversized_alert must resolve in en').not.toBe('blast.oversized_alert');
+    expect(fr, 'blast.oversized_alert must resolve in fr').not.toBe('blast.oversized_alert');
+    expect(en, 'en and fr translations for blast.oversized_alert must differ').not.toBe(fr);
+  });
+});
+
+describe('blast.oversized_alert — {count} interpolation', () => {
+  for (const locale of LOCALES) {
+    it(`locale ${locale}: blast.oversized_alert interpolates {count}`, () => {
+      setLocale(locale);
+      const key = 'blast.oversized_alert';
+      const result = t(key, { count: 3 });
+      expect(result, `key "${key}" must resolve in ${locale}`).not.toBe(key);
+      expect(result, `interpolated string "${result}" must contain the count value`).toContain('3');
+    });
+  }
+});
