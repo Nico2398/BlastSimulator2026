@@ -72,6 +72,58 @@ describe('Fragment logistics', () => {
     expect(state.storedMassKg).toBe(0);
   });
 
+  it('deliverToDepot without collectedOre works as before', () => {
+    const state = createLogisticsState();
+    addBlastFragments(state, [makeFragment(1, 100)]);
+    pickupFragment(state, 1, 'truck-01');
+    const result = deliverToDepot(state, 1);
+    expect(result).toBe(true);
+    const counts = getFragmentCounts(state);
+    expect(counts.stored).toBe(1);
+  });
+
+  it('deliverToDepot with collectedOre accumulates ore mass correctly', () => {
+    const state = createLogisticsState();
+    addBlastFragments(state, [makeFragment(1, 100)]);
+    pickupFragment(state, 1, 'truck-01');
+    const collectedOre: Record<string, number> = {};
+    deliverToDepot(state, 1, collectedOre);
+    // 100 kg * 0.3 dirtite density = 30 kg dirtite
+    expect(collectedOre.dirtite).toBeCloseTo(30);
+  });
+
+  it('deliverToDepot accumulates multiple fragments into collectedOre', () => {
+    const state = createLogisticsState();
+    addBlastFragments(state, [makeFragment(1, 100), makeFragment(2, 200)]);
+    pickupFragment(state, 1, 'truck-01');
+    pickupFragment(state, 2, 'truck-01');
+    const collectedOre: Record<string, number> = {};
+    deliverToDepot(state, 1, collectedOre);
+    deliverToDepot(state, 2, collectedOre);
+    // Fragment 1: 100 * 0.3 = 30, Fragment 2: 200 * 0.3 = 60, total = 90
+    expect(collectedOre.dirtite).toBeCloseTo(90);
+  });
+
+  it('deliverToDepot adds to existing ore type in collectedOre', () => {
+    const state = createLogisticsState();
+    addBlastFragments(state, [makeFragment(1, 100)]);
+    pickupFragment(state, 1, 'truck-01');
+    const collectedOre: Record<string, number> = { existingOre: 50 };
+    deliverToDepot(state, 1, collectedOre);
+    expect(collectedOre.dirtite).toBeCloseTo(30);
+    expect(collectedOre.existingOre).toBe(50);
+  });
+
+  it('deliverToDepot returns false for missing fragment even with collectedOre', () => {
+    const state = createLogisticsState();
+    addBlastFragments(state, [makeFragment(1, 100)]);
+    pickupFragment(state, 1, 'truck-01');
+    const collectedOre: Record<string, number> = {};
+    const result = deliverToDepot(state, 999, collectedOre);
+    expect(result).toBe(false);
+    expect(collectedOre).toEqual({});
+  });
+
   it('no available storage → cannot pick up more fragments', () => {
     const state = createLogisticsState(150); // Only 150kg capacity
     addBlastFragments(state, [makeFragment(1, 100), makeFragment(2, 100)]);
