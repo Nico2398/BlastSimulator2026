@@ -527,8 +527,8 @@ describe('NavGrid.patchNavGrid — region isolation', () => {
     // Now drill_hole should change to void (rock removed)
     expect(nav.cells[1]![1]!.type).toBe('void');
     // vehicleOccupied and benchLevel should still be present
-    expect(typeof nav.cells[1]![1]!.vehicleOccupied).toBe('boolean');
-    expect(typeof nav.cells[1]![1]!.benchLevel).toBe('number');
+    expect(nav.cells[1]![1]!.vehicleOccupied).toBe(false);
+    expect(nav.cells[1]![1]!.benchLevel).toBe(0);
   });
 });
 
@@ -638,7 +638,264 @@ describe('NavGrid.patchNavGrid — boundary conditions', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Group 4: BlastResult clearedRegion
+// Group 3c: patchNavGrid — additional scenarios (building, drill hole, multi-cell,
+//           full-grid equivalence, ramp formation, building demolition)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('NavGrid.patchNavGrid — building footprint changes', () => {
+  it('marks cells as blocked when a building is placed within the patch region', () => {
+    const grid = makeSolidGrid(10, 10, 10, 4);
+    const nav = NavGrid.buildNavGrid(grid, [], []);
+    // All cells start as walkable
+    expect(nav.cells[3]![3]!.type).toBe('walkable');
+
+    // Add a building at (3,3) — management_office t1 has 2×2 footprint
+    const buildings: Building[] = [
+      { id: 1, type: 'management_office', tier: 1, x: 3, z: 3, hp: 80, active: true },
+    ];
+
+    // Patch region covering the entire building footprint
+    const region: BlastRegion = { minX: 3, maxX: 4, minZ: 3, maxZ: 4 };
+    NavGrid.patchNavGrid(nav, grid, buildings, [], region);
+
+    // All cells in the building footprint should be blocked
+    for (const [dx, dz] of [[0, 0], [1, 0], [0, 1], [1, 1]] as const) {
+      const cx = 3 + dx;
+      const cz = 3 + dz;
+      expect(nav.cells[cz]![cx]!.type).toBe('blocked');
+      expect(nav.cells[cz]![cx]!.moveCost).toBe(Infinity);
+    }
+  });
+
+  it('leaves non-footprint cells walkable when building is placed', () => {
+    const grid = makeSolidGrid(10, 10, 10, 4);
+    const nav = NavGrid.buildNavGrid(grid, [], []);
+    // Building at (0,0) covers (0,0)-(1,1)
+    const buildings: Building[] = [
+      { id: 1, type: 'management_office', tier: 1, x: 0, z: 0, hp: 80, active: true },
+    ];
+    const region: BlastRegion = { minX: 0, maxX: 3, minZ: 0, maxZ: 3 };
+    NavGrid.patchNavGrid(nav, grid, buildings, [], region);
+
+    // Cell (3,3) is outside the building footprint → walkable
+    expect(nav.cells[3]![3]!.type).toBe('walkable');
+    expect(nav.cells[3]![3]!.moveCost).toBe(1.0);
+  });
+
+  it('reverts blocked cells after building is removed from the array', () => {
+    const grid = makeSolidGrid(10, 10, 10, 4);
+    // Build with building present
+    const buildings: Building[] = [
+      { id: 1, type: 'management_office', tier: 1, x: 2, z: 2, hp: 80, active: true },
+    ];
+    const nav = NavGrid.buildNavGrid(grid, buildings, []);
+    expect(nav.cells[2]![2]!.type).toBe('blocked');
+
+    // Now "demolish" by passing empty buildings array and patching the region
+    const region: BlastRegion = { minX: 2, maxX: 3, minZ: 2, maxZ: 3 };
+    NavGrid.patchNavGrid(nav, grid, [], [], region);
+
+    // Cells should revert to walkable (voxels are still solid)
+    for (const [dx, dz] of [[0, 0], [1, 0], [0, 1], [1, 1]] as const) {
+      const cx = 2 + dx;
+      const cz = 2 + dz;
+      expect(nav.cells[cz]![cx]!.type).toBe('walkable');
+    }
+  });
+});
+
+describe('NavGrid.patchNavGrid — drill hole changes', () => {
+  it('marks cell as drill_hole when a drill hole is added within the patch region', () => {
+    const grid = makeSolidGrid(10, 10, 10, 4);
+    const nav = NavGrid.buildNavGrid(grid, [], []);
+    expect(nav.cells[5]![5]!.type).toBe('walkable');
+
+    // Add a drill hole at (5,5)
+    const holes: DrillHole[] = [
+      { id: 'H1', x: 5, z: 5, depth: 5, diameter: 0.15 },
+    ];
+    const region: BlastRegion = { minX: 5, maxX: 5, minZ: 5, maxZ: 5 };
+    NavGrid.patchNavGrid(nav, grid, [], holes, region);
+
+    expect(nav.cells[5]![5]!.type).toBe('drill_hole');
+    expect(nav.cells[5]![5]!.moveCost).toBe(5.0);
+  });
+
+  it('makes cell void when drill hole column rock is cleared and holes are still passed', () => {
+    const grid = makeSolidGrid(10, 10, 10, 4);
+    const holes: DrillHole[] = [
+      { id: 'H1', x: 2, z: 2, depth: 5, diameter: 0.15 },
+    ];
+    const nav = NavGrid.buildNavGrid(grid, [], holes);
+    expect(nav.cells[2]![2]!.type).toBe('drill_hole');
+
+    // Clear the rock in the drill hole column so surface becomes void
+    for (let y = 0; y <= 4; y++) grid.clearVoxel(2, y, 2);
+
+    const region: BlastRegion = { minX: 2, maxX: 2, minZ: 2, maxZ: 2 };
+    // Still pass holes — but void should take priority over drill_hole
+    NavGrid.patchNavGrid(nav, grid, [], holes, region);
+
+    expect(nav.cells[2]![2]!.type).toBe('void');
+    expect(nav.cells[2]![2]!.moveCost).toBe(Infinity);
+  });
+
+  it('gives drill_hole priority over blocked when both overlap in a patched region', () => {
+    const grid = makeSolidGrid(10, 10, 10, 4);
+    const buildings: Building[] = [
+      { id: 1, type: 'management_office', tier: 1, x: 2, z: 2, hp: 80, active: true },
+    ];
+    const holes: DrillHole[] = [
+      { id: 'H1', x: 2, z: 2, depth: 5, diameter: 0.15 },
+    ];
+    const nav = NavGrid.buildNavGrid(grid, [], []);
+    // Initially (2,2) is walkable
+    expect(nav.cells[2]![2]!.type).toBe('walkable');
+
+    // Patch with both building and drill hole — drill_hole should win
+    const region: BlastRegion = { minX: 2, maxX: 3, minZ: 2, maxZ: 3 };
+    NavGrid.patchNavGrid(nav, grid, buildings, holes, region);
+
+    expect(nav.cells[2]![2]!.type).toBe('drill_hole');
+    expect(nav.cells[2]![2]!.moveCost).toBe(5.0);
+  });
+});
+
+describe('NavGrid.patchNavGrid — multi-cell rectangular region', () => {
+  it('updates every cell in a 3×3 rectangular region', () => {
+    const grid = makeSolidGrid(10, 10, 10, 4);
+    const nav = NavGrid.buildNavGrid(grid, [], []);
+    // All cells are walkable initially
+
+    // Clear voxels in a contiguous 3×3 area (cells become void)
+    for (let z = 3; z <= 5; z++) {
+      for (let x = 3; x <= 5; x++) {
+        for (let y = 0; y <= 4; y++) grid.clearVoxel(x, y, z);
+      }
+    }
+
+    const region: BlastRegion = { minX: 3, maxX: 5, minZ: 3, maxZ: 5 };
+    NavGrid.patchNavGrid(nav, grid, [], [], region);
+
+    // Inside: all void
+    for (let z = 3; z <= 5; z++) {
+      for (let x = 3; x <= 5; x++) {
+        expect(nav.cells[z]![x]!.type).toBe('void');
+        expect(nav.cells[z]![x]!.moveCost).toBe(Infinity);
+      }
+    }
+    // Outside: remains walkable
+    expect(nav.cells[2]![2]!.type).toBe('walkable');
+    expect(nav.cells[6]![6]!.type).toBe('walkable');
+  });
+
+  it('updates exactly 9 cells in a 3×3 region, no more, no fewer', () => {
+    const grid = makeSolidGrid(10, 10, 10, 4);
+    const nav = NavGrid.buildNavGrid(grid, [], []);
+
+    // Record initial state
+    const beforeMap = cellTypeMap(nav);
+
+    // Clear only column (0,0)
+    for (let y = 0; y <= 4; y++) grid.clearVoxel(0, y, 0);
+
+    // Patch a 3×3 region
+    const region: BlastRegion = { minX: 0, maxX: 2, minZ: 0, maxZ: 2 };
+    NavGrid.patchNavGrid(nav, grid, [], [], region);
+
+    // Only (0,0) should have changed (from walkable to void)
+    // The other 8 cells (0,1), (0,2), (1,0), (1,1), (1,2), (2,0), (2,1), (2,2)
+    // should remain walkable since their voxels are unchanged
+    expect(nav.cells[0]![0]!.type).toBe('void');
+    for (let z = 0; z <= 2; z++) {
+      for (let x = 0; x <= 2; x++) {
+        if (x === 0 && z === 0) continue;
+        expect(nav.cells[z]![x]!.type).toBe('walkable');
+      }
+    }
+    // Also verify outside cells weren't touched
+    expect(nav.cells[5]![5]!.type).toBe(beforeMap.get('5,5'));
+  });
+});
+
+describe('NavGrid.patchNavGrid — full-grid equivalence', () => {
+  it('produces the same result as buildNavGrid when patching the full grid', () => {
+    const grid = makeSolidGrid(15, 10, 15, 4);
+    const buildings: Building[] = [
+      { id: 1, type: 'management_office', tier: 1, x: 5, z: 5, hp: 80, active: true },
+    ];
+    const holes: DrillHole[] = [
+      { id: 'H1', x: 10, z: 10, depth: 5, diameter: 0.15 },
+    ];
+
+    // Build fresh
+    const fresh = NavGrid.buildNavGrid(grid, buildings, holes);
+
+    // Patch the entire grid
+    const patched = NavGrid.buildNavGrid(grid, [], []); // start clean
+    const fullRegion: BlastRegion = { minX: 0, maxX: 14, minZ: 0, maxZ: 14 };
+    NavGrid.patchNavGrid(patched, grid, buildings, holes, fullRegion);
+
+    // Both should be identical
+    for (let z = 0; z < 15; z++) {
+      for (let x = 0; x < 15; x++) {
+        expect(patched.cells[z]![x]!.type).toBe(fresh.cells[z]![x]!.type);
+        expect(patched.cells[z]![x]!.moveCost).toBe(fresh.cells[z]![x]!.moveCost);
+      }
+    }
+  });
+});
+
+describe('NavGrid.patchNavGrid — ramp formation within patch', () => {
+  it('detects ramp when terrain height changes within the patched region', () => {
+    const grid = new VoxelGrid(5, 10, 5);
+    // Fill all columns solid to Y=4
+    for (let z = 0; z < 5; z++)
+      for (let x = 0; x < 5; x++)
+        for (let y = 0; y <= 4; y++) grid.setVoxel(x, y, z, solidVoxel());
+
+    const nav = NavGrid.buildNavGrid(grid, [], []);
+    // Flat terrain → no ramps initially
+    expect(nav.cells[2]![2]!.type).toBe('walkable');
+
+    // Lower column (2,3) to Y=2, creating height diff with (2,2)
+    for (let y = 0; y <= 4; y++) grid.clearVoxel(2, y, 3);
+    for (let y = 0; y <= 2; y++) grid.setVoxel(2, y, 3, solidVoxel());
+
+    // Patch region covering (2,2) and its neighbors
+    const region: BlastRegion = { minX: 1, maxX: 3, minZ: 1, maxZ: 3 };
+    NavGrid.patchNavGrid(nav, grid, [], [], region);
+
+    // (2,2) should now be ramp because neighbor (2,3) has height diff > 1
+    expect(nav.cells[2]![2]!.type).toBe('ramp');
+    expect(nav.cells[2]![2]!.moveCost).toBe(1.8);
+  });
+
+  it('ramp detection in patch respects higher-priority classifications', () => {
+    const grid = new VoxelGrid(5, 10, 5);
+    for (let z = 0; z < 5; z++)
+      for (let x = 0; x < 5; x++)
+        for (let y = 0; y <= 4; y++) grid.setVoxel(x, y, z, solidVoxel());
+
+    const nav = NavGrid.buildNavGrid(grid, [], []);
+
+    // Lower column (2,3) to create height diff with (2,2)
+    for (let y = 0; y <= 4; y++) grid.clearVoxel(2, y, 3);
+    for (let y = 0; y <= 2; y++) grid.setVoxel(2, y, 3, solidVoxel());
+
+    // Also place a building covering (2,2)
+    const buildings: Building[] = [
+      { id: 1, type: 'management_office', tier: 1, x: 2, z: 2, hp: 80, active: true },
+    ];
+
+    const region: BlastRegion = { minX: 1, maxX: 3, minZ: 1, maxZ: 3 };
+    NavGrid.patchNavGrid(nav, grid, buildings, [], region);
+
+    // (2,2) is both adjacent to ramp AND under building footprint
+    // → blocked should win over ramp (blocked > ramp priority)
+    expect(nav.cells[2]![2]!.type).toBe('blocked');
+  });
+});
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('executeBlast — clearedRegion', () => {
