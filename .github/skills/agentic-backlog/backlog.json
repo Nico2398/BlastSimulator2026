@@ -1055,11 +1055,11 @@
       "src/core/i18n/locales/fr.json"
     ],
     "testFile": "tests/unit/i18n/i18n.test.ts",
-    "status": "pending",
+    "status": "done",
     "blockedBy": [
       "5.7"
     ],
-    "closedInPR": null
+    "closedInPR": 264
   },
   {
     "id": "5.22",
