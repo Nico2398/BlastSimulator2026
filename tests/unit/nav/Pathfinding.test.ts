@@ -149,15 +149,17 @@ describe('findPath — obstacle avoidance', () => {
     expect(result.found).toBe(false);
   });
 
-  it('returns found: false when no path exists (goal surrounded by blocked cells)', () => {
-    // 5×5 grid, goal at (4,4) surrounded by blocked cells
+  it('finds a diagonal path past blocked cells near the goal', () => {
+    // 5×5 grid, goal at (4,4), cells (3,4) and (4,3) are blocked.
+    // With 8-directional movement the goal is reachable diagonally from (3,3).
     const grid = makeFlatGrid(5, 5, 'walkable');
-    setCell(grid, 4, 4, 'walkable'); // goal is walkable but surrounded
+    setCell(grid, 4, 4, 'walkable'); // goal is walkable
     setCell(grid, 3, 4, 'blocked');
     setCell(grid, 4, 3, 'blocked');
-    // (5,4) and (4,5) are out of bounds, so goal is unreachable
     const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 4, toZ: 4, avoidVehicles: false });
-    expect(result.found).toBe(false);
+    expect(result.found).toBe(true);
+    // Optimal diagonal path: (0,0)→(1,1)→(2,2)→(3,3)→(4,4) = 4 diagonal steps × √2
+    expect(result.totalCost).toBeCloseTo(4 * Math.SQRT2, 4);
   });
 
   it('routes around a wall of blocked cells forming a corridor', () => {
@@ -570,8 +572,8 @@ describe('findPath — complex scenarios', () => {
     // Path must pass through (1,1) which is drill_hole
     const passesDrill = result.waypoints.some(wp => wp.x === 1 && wp.z === 1);
     expect(passesDrill).toBe(true);
-    // Cost reflects drill_hole: 2 cells × 5.0 = 10.0
-    expect(result.totalCost).toBeCloseTo(10.0, 4);
+    // Cost: entering drill_hole (5.0) + entering walkable goal (1.0) = 6.0
+    expect(result.totalCost).toBeCloseTo(6.0, 4);
   });
 
   it('handles a winding path through a maze-like grid', () => {

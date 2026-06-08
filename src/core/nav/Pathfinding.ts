@@ -191,6 +191,11 @@ function directLineWalk(
  * @returns A PathResult indicating whether a path was found and the resulting waypoints.
  */
 export function findPath(grid: NavGrid, request: PathRequest): PathResult {
+  // 0. Validate grid dimensions
+  if (grid.width <= 0 || grid.height <= 0) {
+    return { found: false, waypoints: [], totalCost: 0 };
+  }
+
   // 1. Clamp start and goal to grid bounds
   const sx = clampCoord(request.fromX, grid.width);
   const sz = clampCoord(request.fromZ, grid.height);
@@ -199,21 +204,21 @@ export function findPath(grid: NavGrid, request: PathRequest): PathResult {
 
   const { avoidVehicles, agentId } = request;
 
-  // 2. Trivial case: start == goal
-  if (sx === gx && sz === gz) {
-    return { found: true, waypoints: [{ x: sx, z: sz }], totalCost: 0 };
-  }
-
-  // 3. Start impassable check
+  // 2. Start impassable check (must precede start==goal check)
   const startCell = grid.cells[sz]![sx]!;
   if (isImpassable(startCell, avoidVehicles)) {
     return { found: false, waypoints: [], totalCost: 0 };
   }
 
-  // 4. Goal impassable check
+  // 3. Goal impassable check
   const goalCell = grid.cells[gz]![gx]!;
   if (isImpassable(goalCell, avoidVehicles)) {
     return { found: false, waypoints: [], totalCost: 0 };
+  }
+
+  // 4. Trivial case: start == goal (both passable)
+  if (sx === gx && sz === gz) {
+    return { found: true, waypoints: [{ x: sx, z: sz }], totalCost: 0 };
   }
 
   // 5. A* main loop
