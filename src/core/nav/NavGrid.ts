@@ -7,6 +7,7 @@ import type { Building } from '../entities/Building.js';
 import type { DrillHole } from '../mining/DrillPlan.js';
 import type { BlastRegion } from '../mining/BlastExecution.js';
 import { isBuildingFootprintCell } from '../entities/BuildingPlacement.js';
+import { NAV_BENCH_HEIGHT } from '../config/balance.js';
 
 /** Cardinal offsets for 4-directional neighbor checks. */
 const CARDINAL_OFFSETS: readonly [number, number][] = [[0, -1], [0, 1], [-1, 0], [1, 0]];
@@ -23,11 +24,13 @@ export interface NavCell {
 export class NavGrid {
   readonly width: number;
   readonly height: number;
+  readonly maxSurfaceY: number;
   readonly cells: NavCell[][];
 
-  constructor(width: number, height: number, cells: NavCell[][]) {
+  constructor(width: number, height: number, cells: NavCell[][], maxSurfaceY: number = 0) {
     this.width = width;
     this.height = height;
+    this.maxSurfaceY = maxSurfaceY;
     this.cells = cells;
   }
 
@@ -51,6 +54,30 @@ export class NavGrid {
   }
 
   /**
+   * Compute the maximum surface Y across all columns in the voxel grid.
+   * Returns -1 if the entire grid is void/empty.
+   */
+  static computeMaxSurfaceY(voxelGrid: VoxelGrid): number {
+    let maxY = -1;
+    for (let z = 0; z < voxelGrid.sizeZ; z++) {
+      for (let x = 0; x < voxelGrid.sizeX; x++) {
+        const surfaceY = NavGrid.computeSurfaceY(voxelGrid, x, z);
+        if (surfaceY > maxY) maxY = surfaceY;
+      }
+    }
+    return maxY;
+  }
+
+  /**
+   * Compute the bench level for a cell given its surface Y and the max surface Y.
+   * Returns 0 if surfaceY < 0 (void cell).
+   */
+  static computeBenchLevel(maxSurfaceY: number, surfaceY: number): number {
+    if (surfaceY < 0) return 0;
+    return Math.floor((maxSurfaceY - surfaceY) / NAV_BENCH_HEIGHT);
+  }
+
+  /**
    * Build a full NavGrid from the voxel grid, buildings, and drill holes.
    * Each cell is classified as walkable, blocked, drill_hole, ramp, or void.
    */
@@ -62,16 +89,20 @@ export class NavGrid {
     const width = voxelGrid.sizeX;
     const height = voxelGrid.sizeZ;
     const cells: NavCell[][] = [];
+    const maxSurfaceY = NavGrid.computeMaxSurfaceY(voxelGrid);
 
     for (let z = 0; z < height; z++) {
       const row: NavCell[] = [];
       for (let x = 0; x < width; x++) {
-        row.push(NavGrid.makeCell(NavGrid.classifyCellType(x, z, voxelGrid, buildings, drillHoles)));
+        const surfaceY = NavGrid.computeSurfaceY(voxelGrid, x, z);
+        const cellType = NavGrid.classifyCellType(x, z, voxelGrid, buildings, drillHoles, surfaceY);
+        const benchLevel = NavGrid.computeBenchLevel(maxSurfaceY, surfaceY);
+        row.push(NavGrid.makeCell(cellType, benchLevel));
       }
       cells.push(row);
     }
 
-    return new NavGrid(width, height, cells);
+    return new NavGrid(width, height, cells, maxSurfaceY);
   }
 
   /**
@@ -101,7 +132,9 @@ export class NavGrid {
 
     for (let z = minZ; z <= maxZ; z++) {
       for (let x = minX; x <= maxX; x++) {
-        navGrid.cells[z]![x] = NavGrid.makeCell(NavGrid.classifyCellType(x, z, voxelGrid, buildings, drillHoles));
+        const surfaceY = NavGrid.computeSurfaceY(voxelGrid, x, z);
+        const cellType = NavGrid.classifyCellType(x, z, voxelGrid, buildings, drillHoles, surfaceY);
+        navGrid.cells[z]![x] = NavGrid.makeCell(cellType, NavGrid.computeBenchLevel(navGrid.maxSurfaceY, surfaceY));
       }
     }
   }
@@ -120,8 +153,9 @@ export class NavGrid {
     voxelGrid: VoxelGrid,
     buildings: Building[],
     drillHoles: DrillHole[],
+    surfaceY: number = NavGrid.computeSurfaceY(voxelGrid, x, z),
   ): NavCellType {
-    const surfaceY = NavGrid.computeSurfaceY(voxelGrid, x, z);
+    // surfaceY is now passed in; fallback to computeSurfaceY if not provided
     if (surfaceY === -1) return 'void';
     if (drillHoles.some(h => Math.floor(h.x) === x && Math.floor(h.z) === z)) return 'drill_hole';
     if (buildings.some(b => isBuildingFootprintCell(b, x, z))) return 'blocked';
@@ -138,7 +172,7 @@ export class NavGrid {
   /**
    * Create a NavCell with the given type and appropriate move cost.
    */
-  private static makeCell(type: NavCellType): NavCell {
+  private static makeCell(type: NavCellType, benchLevel: number = 0): NavCell {
     let moveCost: number;
     switch (type) {
       case 'walkable': moveCost = 1.0; break;
@@ -152,6 +186,6 @@ export class NavGrid {
         moveCost = Infinity;
       }
     }
-    return { type, moveCost, benchLevel: 0, vehicleOccupied: false };
+    return { type, moveCost, benchLevel, vehicleOccupied: false };
   }
 }
