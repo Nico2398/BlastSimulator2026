@@ -189,7 +189,7 @@ main
 3. **Enforce commit discipline** — Always run `branch-sanity` before and `verify-commit` after every agent step. Never assume the agent committed — verify.
 4. **Handle non-agentic steps** — Branch switches, test runs, jscpd, PR creation.
 5. **Merge code review findings** — After parallel reviewers complete, merge their findings into a single pass/fail decision (deduplicate, re-categorize, drop false positives, check issue alignment). No separate coordinator agent needed.
-6. **Enforce sequence** — Never skip phases. Tests before implementation.
+6. **Enforce sequence** — Never skip phases. Tests before implementation. NEVER skip steps 2–20 even if branches or commits appear to exist from a prior run — they may be stale, on wrong branches, or missing tests. Always recreate from scratch: delete old pipeline branches for this issue, then run the full sequence.
 7. **Report status** — After each agent completes, summarize what was done, commit SHA, and current branch.
 
 ## Non-Agentic Steps You Must Handle
@@ -198,7 +198,7 @@ main
 |------|--------|
 | setup-test-branch | `git checkout -b pipeline/tests-<issue-number> main` |
 | setup-impl-branch | `git checkout -b pipeline/impl-<issue-number> <skeleton_commit_sha>` |
-| setup-feature-branch | `git checkout -b pipeline/feature-<issue-number> pipeline/tests-<issue-number>` |
+| setup-feature-branch | `git checkout -b pipeline/feature-<issue-number> pipeline/tests-<issue-number>` — MUST specify tests branch as BASE. If you omit the base, git creates from HEAD which is WRONG. |
 | switch-to-test | `git checkout pipeline/tests-<issue-number>` |
 | switch-to-impl | `git checkout pipeline/impl-<issue-number>` |
 | switch-to-feature | `git checkout pipeline/feature-<issue-number>` |
