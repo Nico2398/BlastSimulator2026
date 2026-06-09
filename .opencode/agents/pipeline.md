@@ -203,7 +203,7 @@ main
 | switch-to-impl | `git checkout pipeline/impl-<issue-number>` |
 | switch-to-feature | `git checkout pipeline/feature-<issue-number>` |
 | branch-sanity | `git branch --show-current` — verify on expected branch; if mismatch, stop and diagnose |
-| verify-commit | `git log --oneline -1` — if dirty tree or last commit mismatches agent, run `git add -A && git commit -m "chore: auto-commit <agent> work [skip ci]"` |
+| verify-commit | `git log --oneline -1` — if dirty tree or last commit mismatches agent, run `git add -A && git commit -m "chore: auto-commit <agent> work"` |
 | cherry-pick | `git cherry-pick <impl_commit_sha>` (on feature branch); detect conflicts |
 | test-runner | `npx vitest run` — capture output, route to @fixer on fail |
 | qualimetry | `npx jscpd src/ tests/` — route to @implementer on fail |
