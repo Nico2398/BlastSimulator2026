@@ -11,6 +11,7 @@ import { tickEventSystem, type FiredEvent } from '../events/EventSystem.js';
 import { detectTrafficJam } from '../events/EventEngine.js';
 import { checkCollapse, type NeedKey, type Employee } from '../entities/Employee.js';
 import { replenishNeed } from '../entities/EmployeeNeeds.js';
+import type { EventEmitter } from '../state/EventEmitter.js';
 
 // ── Config ──
 
@@ -289,7 +290,7 @@ export interface NeedInsertionResult {
  * Check all alive, non-injured employees for collapse thresholds.
  * On collapse, creates a rest PendingAction targeting nearest suitable building.
  */
-export function tickCollapse(state: GameState): CollapseResult {
+export function tickCollapse(state: GameState, _firedEvents?: FiredEvent[], _emitter?: EventEmitter): CollapseResult {
   const result: CollapseResult = { collapsed: [] };
 
   for (const emp of state.employees.employees) {
@@ -352,7 +353,7 @@ export function tickCollapse(state: GameState): CollapseResult {
  * Dead, injured, and collapsing employees are skipped.
  * Employees that already have a rest PendingAction in the queue are skipped.
  */
-export function autoInsertNeedTasks(state: GameState): NeedInsertionResult {
+export function autoInsertNeedTasks(state: GameState, _firedEvents?: FiredEvent[], _emitter?: EventEmitter): NeedInsertionResult {
   const result: NeedInsertionResult = { inserted: [], skipped: [] };
 
   for (const emp of state.employees.employees) {
@@ -508,6 +509,7 @@ export interface ShiftCycleResult {
 export function processShiftCycle(
   state: GameState,
   firedEvents: FiredEvent[],
+  _emitter?: EventEmitter,
 ): ShiftCycleResult {
   // Check for a bunkhouse (living_quarters tier >= 2)
   const hasBunkhouse = state.buildings.buildings.some(

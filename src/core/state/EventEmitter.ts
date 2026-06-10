@@ -21,6 +21,11 @@ export interface GameEventMap {
   'revolt:warning': { ticksRemaining: number };
   'revolt:triggered': Record<string, never>;
   'employee:levelup': { employeeId: number; category: SkillCategory; oldLevel: number; newLevel: number };
+
+  // Phase 8 — Employee need events
+  'employee:need_warning': { employeeId: number; needKey: string };
+  'employee:collapsed': { employeeId: number; needKey: string };
+  'employee:shift_change': { employeeId: number };
 }
 
 type EventHandler<T> = (data: T) => void;
