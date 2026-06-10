@@ -9,7 +9,7 @@ import type { Random } from '../math/Random.js';
 import type { EventContext } from '../events/EventPool.js';
 import { tickEventSystem, type FiredEvent } from '../events/EventSystem.js';
 import { detectTrafficJam } from '../events/EventEngine.js';
-import { checkCollapse, type NeedKey } from '../entities/Employee.js';
+import { checkCollapse, type NeedKey, type Employee } from '../entities/Employee.js';
 import { replenishNeed } from '../entities/EmployeeNeeds.js';
 
 // ── Config ──
@@ -496,6 +496,11 @@ export interface ShiftCycleResult {
  * Empties restTicksRemaining on completion and transitions employees
  * between working and resting states.
  *
+ * Each employee is processed in a single pass through three sequential phases:
+ *   1. Complete rests — decrement restTicksRemaining, replenish fatigue on completion
+ *   2. Increment ticksWorked — for active employees not currently resting
+ *   3. Force shift rest — when ticksWorked reaches the work-duration threshold
+ *
  * @param state - The game state (mutated in place)
  * @param firedEvents - Accumulator for events fired this tick
  * @returns Result summary of shift transitions
@@ -516,87 +521,128 @@ export function processShiftCycle(
   const restCompleted: number[] = [];
   const shiftRested: number[] = [];
 
-  // ── Phase 1: Complete rests ────────────────────────────────────────────
+  // Single pass per employee — phases are independent per-employee so
+  // merging from three loops to one produces identical behaviour.
   for (const emp of state.employees.employees) {
     if (!emp.alive || emp.injured) continue;
-    if (emp.restTicksRemaining === null) continue;
 
-    emp.restTicksRemaining -= 1;
+    // Phase 1: Decrement rest, replenish fatigue on completion
+    completeRestTick(state, emp, restCompleted);
 
-    if (emp.restTicksRemaining <= 0) {
-      // Find nearest active living_quarters for replenishment
-      const building = findNearestLivingQuarters(state, emp.x, emp.z);
-      if (building) {
-        const def = getBuildingDef(building.type, building.tier);
-        replenishNeed(emp, 'fatigue', building.tier, def.capacity);
-      } else {
-        // Fallback — no building found (shouldn't happen since we checked hasBunkhouse)
-        emp.fatigue = MAX_NEED_GAUGE;
-      }
+    // Phase 2: Count work ticks for active employees not resting
+    incrementWorkTick(state, emp);
 
-      deductRestCost(state, 'fatigue');
-
-      if (emp.collapsing) {
-        emp.collapsing = false;
-      }
-
-      emp.restTicksRemaining = null;
-      emp.activeActionId = null;
-      emp.ticksWorked = 0;
-      restCompleted.push(emp.id);
-    }
-  }
-
-  // ── Phase 2: Increment ticksWorked for active employees not resting ────
-  for (const emp of state.employees.employees) {
-    if (!emp.alive || emp.injured) continue;
-    if (emp.activeActionId === null) continue;
-    if (emp.restTicksRemaining !== null) continue;
-
-    // Skip if employee has a pending rest action (voluntary rest)
-    const hasRestAction = state.pendingActions.some(
-      a => a.type === 'rest' && a.targetEmployeeId === emp.id,
-    );
-    if (hasRestAction) continue;
-
-    emp.ticksWorked += 1;
-  }
-
-  // ── Phase 3: Force shift rest for employees who've worked enough ───────
-  for (const emp of state.employees.employees) {
-    if (!emp.alive || emp.injured) continue;
-    if (emp.restTicksRemaining !== null) continue;
-    if (emp.activeActionId === null) continue;
-    if (emp.ticksWorked < WORK_DURATION_TICKS) continue;
-
-    // Find nearest living_quarters for target coordinates
-    const building = findNearestLivingQuarters(state, emp.x, emp.z);
-    let targetX = emp.x;
-    let targetZ = emp.z;
-    let buildingId: number | undefined;
-
-    if (building) {
-      const def = getBuildingDef(building.type, building.tier);
-      const { sizeX, sizeZ } = getDefSize(def);
-      targetX = building.x + sizeX / 2;
-      targetZ = building.z + sizeZ / 2;
-      buildingId = building.id;
-    }
-
-    emp.restTicksRemaining = SHIFT_SLEEP_DURATION_TICKS;
-
-    const restAction = createRestPendingAction(state, {
-      targetX,
-      targetZ,
-      targetEmployeeId: emp.id,
-      payload: { needType: 'fatigue', triggeredBy: 'shift_cycle', buildingId },
-    });
-
-    state.pendingActions.push(restAction);
-    emp.activeActionId = restAction.id;
-    shiftRested.push(emp.id);
-    firedEvents.push({ eventId: 'employee_shift_change', firedAtTick: state.tickCount });
+    // Phase 3: Force shift rest when work quota is met
+    forceShiftRestIfNeeded(state, emp, firedEvents, shiftRested);
   }
 
   return { restCompleted, shiftRested, active: true };
+}
+
+/**
+ * Decrement restTicksRemaining for an employee who is currently resting.
+ * If rest is complete (reaches ≤ 0), replenish fatigue, clear state, and record completion.
+ */
+function completeRestTick(
+  state: GameState,
+  emp: Employee,
+  restCompleted: number[],
+): void {
+  if (emp.restTicksRemaining === null) return;
+
+  emp.restTicksRemaining -= 1;
+
+  if (emp.restTicksRemaining <= 0) {
+    // Find nearest active living_quarters for replenishment
+    const building = findNearestLivingQuarters(state, emp.x, emp.z);
+    if (building) {
+      const def = getBuildingDef(building.type, building.tier);
+      replenishNeed(emp, 'fatigue', building.tier, def.capacity);
+    } else {
+      // Fallback — no building found (shouldn't happen since we checked hasBunkhouse)
+      emp.fatigue = MAX_NEED_GAUGE;
+    }
+
+    deductRestCost(state, 'fatigue');
+
+    if (emp.collapsing) {
+      emp.collapsing = false;
+    }
+
+    emp.restTicksRemaining = null;
+    emp.activeActionId = null;
+    emp.ticksWorked = 0;
+    restCompleted.push(emp.id);
+  }
+}
+
+/**
+ * Increment ticksWorked for an active (non-idle) employee who is not currently resting
+ * and does not already have a pending rest action queued.
+ */
+function incrementWorkTick(
+  state: GameState,
+  emp: Employee,
+): void {
+  if (emp.activeActionId === null) return;
+  if (emp.restTicksRemaining !== null) return;
+
+  // Skip if employee already has a pending rest action (voluntary rest)
+  const hasRestAction = state.pendingActions.some(
+    a => a.type === 'rest' && a.targetEmployeeId === emp.id,
+  );
+  if (hasRestAction) return;
+
+  emp.ticksWorked += 1;
+}
+
+/**
+ * If an active employee has worked enough ticks, force a shift rest:
+ * find the nearest living_quarters, create a rest PendingAction, and set restTicksRemaining.
+ */
+function forceShiftRestIfNeeded(
+  state: GameState,
+  emp: Employee,
+  firedEvents: FiredEvent[],
+  shiftRested: number[],
+): void {
+  if (emp.restTicksRemaining !== null) return;
+  if (emp.activeActionId === null) return;
+  if (emp.ticksWorked < WORK_DURATION_TICKS) return;
+
+  // Find nearest living_quarters for target coordinates
+  const building = findNearestLivingQuarters(state, emp.x, emp.z);
+  let targetX = emp.x;
+  let targetZ = emp.z;
+  let buildingId: number | undefined;
+
+  if (building) {
+    const center = getBuildingCenter(building);
+    targetX = center.x;
+    targetZ = center.z;
+    buildingId = building.id;
+  }
+
+  emp.restTicksRemaining = SHIFT_SLEEP_DURATION_TICKS;
+
+  const restAction = createRestPendingAction(state, {
+    targetX,
+    targetZ,
+    targetEmployeeId: emp.id,
+    payload: { needType: 'fatigue', triggeredBy: 'shift_cycle', buildingId },
+  });
+
+  state.pendingActions.push(restAction);
+  emp.activeActionId = restAction.id;
+  shiftRested.push(emp.id);
+  firedEvents.push({ eventId: 'employee_shift_change', firedAtTick: state.tickCount });
+}
+
+/**
+ * Compute the centre position of a building based on its definition size.
+ */
+function getBuildingCenter(building: Building): { x: number; z: number } {
+  const def = getBuildingDef(building.type, building.tier);
+  const { sizeX, sizeZ } = getDefSize(def);
+  return { x: building.x + sizeX / 2, z: building.z + sizeZ / 2 };
 }
