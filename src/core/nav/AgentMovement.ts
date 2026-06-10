@@ -121,7 +121,24 @@ export function advanceAgent(state: AgentState): AdvanceResult {
  * @returns `true` if any remaining waypoint is blocked.
  */
 export function isPathBlocked(state: AgentState, grid: NavGrid, avoidVehicles: boolean): boolean {
-  // TODO: implement
+  if (state.waypoints.length === 0 || state.waypointIndex >= state.waypoints.length) {
+    return false;
+  }
+
+  for (let i = state.waypointIndex; i < state.waypoints.length; i++) {
+    const wp = state.waypoints[i]!;
+    const clampedX = Math.max(0, Math.min(grid.width - 1, Math.floor(wp.x)));
+    const clampedZ = Math.max(0, Math.min(grid.height - 1, Math.floor(wp.z)));
+    const cell = grid.cells[clampedZ]![clampedX]!;
+
+    if (cell.type === 'blocked' || cell.type === 'void') {
+      return true;
+    }
+    if (avoidVehicles && cell.vehicleOccupied) {
+      return true;
+    }
+  }
+
   return false;
 }
 
@@ -137,7 +154,21 @@ export function doesPathCrossRegion(
   state: AgentState,
   region: { minX: number; maxX: number; minZ: number; maxZ: number },
 ): boolean {
-  // TODO: implement
+  if (region.minX > region.maxX || region.minZ > region.maxZ) {
+    return false;
+  }
+
+  if (state.waypoints.length === 0 || state.waypointIndex >= state.waypoints.length) {
+    return false;
+  }
+
+  for (let i = state.waypointIndex; i < state.waypoints.length; i++) {
+    const wp = state.waypoints[i]!;
+    if (wp.x >= region.minX && wp.x <= region.maxX && wp.z >= region.minZ && wp.z <= region.maxZ) {
+      return true;
+    }
+  }
+
   return false;
 }
 
@@ -149,6 +180,13 @@ export function doesPathCrossRegion(
  * @returns A new `AgentState` with cleared waypoints ready for re-routing.
  */
 export function requestReRoute(state: AgentState): AgentState {
-  // TODO: implement
-  return state;
+  return {
+    x: state.x,
+    z: state.z,
+    waypoints: [],
+    waypointIndex: 0,
+    walkSpeed: state.walkSpeed,
+    destinationX: state.destinationX,
+    destinationZ: state.destinationZ,
+  };
 }
