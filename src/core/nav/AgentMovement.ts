@@ -133,10 +133,15 @@ export function advanceAgent(state: AgentState): AdvanceResult {
 }
 
 /**
- * Iterate over remaining waypoints and return true if any satisfy the predicate.
+ * Check whether any remaining waypoint in the agent's path satisfies a predicate.
+ * Iterates over waypoints from the current index to the end of the list.
  * Returns false if no waypoints remain or the path is already complete.
+ *
+ * @param state     - The agent's current navigation state.
+ * @param predicate - Function tested against each remaining waypoint.
+ * @returns `true` if any remaining waypoint satisfies the predicate.
  */
-function someRemainingWaypoint(
+function hasWaypointSatisfying(
   state: AgentState,
   predicate: (wp: { x: number; z: number }) => boolean,
 ): boolean {
@@ -160,7 +165,7 @@ function someRemainingWaypoint(
  * @returns `true` if any remaining waypoint is blocked.
  */
 export function isPathBlocked(state: AgentState, grid: NavGrid, avoidVehicles: boolean): boolean {
-  return someRemainingWaypoint(state, (wp) => {
+  return hasWaypointSatisfying(state, (wp) => {
     const clampedX = Math.max(0, Math.min(grid.width - 1, Math.floor(wp.x)));
     const clampedZ = Math.max(0, Math.min(grid.height - 1, Math.floor(wp.z)));
     const cell = grid.cells[clampedZ]![clampedX]!;
@@ -202,7 +207,7 @@ export function doesPathCrossRegion(
     return false;
   }
 
-  return someRemainingWaypoint(state, (wp) =>
+  return hasWaypointSatisfying(state, (wp) =>
     wp.x >= region.minX && wp.x <= region.maxX && wp.z >= region.minZ && wp.z <= region.maxZ,
   );
 }
