@@ -25,10 +25,11 @@ npx tsx .github/skills/backlog/backlog.ts next       # see what's next
 npx tsx .github/skills/backlog/backlog.ts start <id> # claim it
 ```
 
-**After the PR is merged:**
+**After the PR is merged (auto-assign workflow handles this):**
 ```bash
 npx tsx .github/skills/backlog/backlog.ts done <id> --pr <number>
 ```
+> **IMPORTANT:** The pipeline orchestrator MUST NOT run `done` during development. The `auto-assign-next.yml` workflow commits this change to `main` after PR merge. Running it early pollutes the feature branch with a `[skip ci]` commit, which prevents the auto-merge workflow from triggering.
 
 ---
 
@@ -82,6 +83,7 @@ Statuses: `"pending"` | `"in-progress"` | `"done"` | `"blocked"`
 
 1. **Only one task `in-progress` at a time** per agent session. `start` command enforces this.
 2. **Always call `done` after PR is merged.** Pass `--pr <number>` to record PR reference.
+   - **Pipeline orchestrator:** Do NOT run `done` during pipeline execution. The `auto-assign-next.yml` workflow commits this to `main` after the PR merges.
 3. **Prefer tasks with all `blockedBy` IDs resolved.** `next` command handles this automatically.
 4. **Never skip `start`.** Claiming task before coding prevents two agents on same item.
 5. Can't complete task → call `block <id>` + note reason in PR description.

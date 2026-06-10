@@ -244,6 +244,15 @@ gh pr comment <pr-url> --body "READY TO MERGE skipped — human input needed: <r
 
 Include churn details in the reason so the reviewer understands the risk.
 
+## Critical: NEVER use `[skip ci]` on PR branches
+
+The `auto-assign-next.yml` workflow (triggered on `pull_request: [synchronize]`) detects `READY TO MERGE` and enables auto-merge. **Any commit with `[skip ci]` on a PR branch prevents this workflow from triggering**, leaving the PR without auto-merge.
+
+Rules:
+- **NEVER** include `[skip ci]` in any commit message on `pipeline/feature-*` branches
+- The `verify-commit` auto-commit message must NOT contain `[skip ci]`
+- **NEVER** run the backlog `done` command during pipeline execution. The `auto-assign-next.yml` workflow handles backlog updates on `main` AFTER the PR is merged. Running it early pollutes the feature branch with a `[skip ci]` commit and breaks auto-merge.
+
 ## Output Format
 
 After each agent completes:
