@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, existsSync } from 'fs';
-import { resolve } from 'path';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
 
-const SCENARIO_DIR = resolve(__dirname, '../../scripts/scenario-defs');
+const currentDir = dirname(fileURLToPath(import.meta.url));
+const SCENARIO_DIR = resolve(currentDir, '../../scripts/scenario-defs');
 
 const SCENARIO_NAMES = [
   'level1-playthrough-win',
@@ -44,12 +46,12 @@ function loadScenario(name: string): ScenarioDef {
 // ──────────────────────────────────────────────
 describe('Scenario JSON files exist and parse', () => {
   for (const name of SCENARIO_NAMES) {
-    it(`${name}.json exists on disk`, () => {
+    it(`${name} — JSON file exists on disk`, () => {
       const filePath = resolve(SCENARIO_DIR, `${name}.json`);
       expect(existsSync(filePath)).toBe(true);
     });
 
-    it(`${name}.json parses as valid JSON`, () => {
+    it(`${name} — parses as valid JSON`, () => {
       const filePath = resolve(SCENARIO_DIR, `${name}.json`);
       const raw = readFileSync(filePath, 'utf-8');
       expect(() => JSON.parse(raw)).not.toThrow();
@@ -62,19 +64,19 @@ describe('Scenario JSON files exist and parse', () => {
 // ──────────────────────────────────────────────
 describe('Scenario has required top-level fields', () => {
   for (const name of SCENARIO_NAMES) {
-    it(`${name} has "name" field (string)`, () => {
+    it(`${name} — has "name" field (string)`, () => {
       const scenario = loadScenario(name);
       expect(scenario).toHaveProperty('name');
       expect(typeof scenario.name).toBe('string');
     });
 
-    it(`${name} has "description" field (string)`, () => {
+    it(`${name} — has "description" field (string)`, () => {
       const scenario = loadScenario(name);
       expect(scenario).toHaveProperty('description');
       expect(typeof scenario.description).toBe('string');
     });
 
-    it(`${name} has "steps" field (array)`, () => {
+    it(`${name} — has "steps" field (array)`, () => {
       const scenario = loadScenario(name);
       expect(scenario).toHaveProperty('steps');
       expect(Array.isArray(scenario.steps)).toBe(true);
@@ -87,7 +89,7 @@ describe('Scenario has required top-level fields', () => {
 // ──────────────────────────────────────────────
 describe('Scenario name matches filename', () => {
   for (const name of SCENARIO_NAMES) {
-    it(`${name}.json has name === "${name}"`, () => {
+    it(`${name} — JSON name field matches filename`, () => {
       const scenario = loadScenario(name);
       expect(scenario.name).toBe(name);
     });
@@ -99,7 +101,7 @@ describe('Scenario name matches filename', () => {
 // ──────────────────────────────────────────────
 describe('Scenario steps are non-empty', () => {
   for (const name of SCENARIO_NAMES) {
-    it(`${name} has non-empty steps array`, () => {
+    it(`${name} — has non-empty steps array`, () => {
       const scenario = loadScenario(name);
       expect(scenario.steps.length).toBeGreaterThan(0);
     });
@@ -111,7 +113,7 @@ describe('Scenario steps are non-empty', () => {
 // ──────────────────────────────────────────────
 describe('Scenario has sufficient steps for a playthrough', () => {
   for (const name of SCENARIO_NAMES) {
-    it(`${name} has at least 15 steps`, () => {
+    it(`${name} — has at least 15 steps`, () => {
       const scenario = loadScenario(name);
       expect(scenario.steps.length).toBeGreaterThanOrEqual(15);
     });
@@ -140,7 +142,7 @@ describe('All steps are strings', () => {
 // ──────────────────────────────────────────────
 describe('Scenario description is meaningful', () => {
   for (const name of SCENARIO_NAMES) {
-    it(`${name} description length > 20 characters`, () => {
+    it(`${name} — description length > 20 characters`, () => {
       const scenario = loadScenario(name);
       expect(scenario.description.length).toBeGreaterThan(20);
     });
