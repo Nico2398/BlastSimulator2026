@@ -1274,12 +1274,12 @@
       "src/core/entities/Employee.ts"
     ],
     "testFile": "tests/unit/entities/Employee.test.ts",
-    "status": "pending",
+    "status": "done",
     "blockedBy": [
       "7.1",
       "7.2"
     ],
-    "closedInPR": null
+    "closedInPR": 280
   },
   {
     "id": "7.4",
