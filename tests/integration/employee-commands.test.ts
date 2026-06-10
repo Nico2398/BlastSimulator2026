@@ -275,7 +275,7 @@ describe('Console — needs command', () => {
     expect(result.output).toContain('Employee Needs:');
     expect(result.output).toContain('hunger');
     expect(result.output).toContain('fatigue');
-    expect(result.output).toContain('breakNeed');
+    expect(result.output).toContain('break:');
   });
 
   it('shows needs for multiple employees', () => {
@@ -303,9 +303,9 @@ describe('Console — needs command', () => {
     const result = needsCommand(ctx, [], {});
 
     expect(result.success).toBe(true);
-    expect(result.output).toContain('hunger:42');
-    expect(result.output).toContain('fatigue:58');
-    expect(result.output).toContain('breakNeed:73');
+    expect(result.output).toContain('hunger: 42');
+    expect(result.output).toContain('fatigue: 58');
+    expect(result.output).toContain('break: 73');
   });
 
   it('handles no employees', () => {
