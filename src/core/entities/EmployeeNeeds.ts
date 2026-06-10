@@ -2,7 +2,7 @@
 // Tracks three need gauges: hunger, fatigue, and breakNeed (all 0–100).
 
 import { type Employee } from './Employee.js';
-import { NEED_DRAIN_RATES, NEED_THRESHOLDS, NEED_PRODUCTIVITY_MULTIPLIERS, NEED_MORALE_PENALTIES, NEED_WARNING_THRESHOLDS, NEED_COLLAPSE_THRESHOLDS } from '../config/balance.js';
+import { NEED_DRAIN_RATES, NEED_THRESHOLDS, NEED_PRODUCTIVITY_MULTIPLIERS, NEED_MORALE_PENALTIES, NEED_WARNING_THRESHOLDS, NEED_COLLAPSE_THRESHOLDS, MORALE_THRESHOLDS, NEED_MORALE_DRAIN_MULTIPLIERS } from '../config/balance.js';
 export { NEED_WARNING_THRESHOLDS, NEED_COLLAPSE_THRESHOLDS };
 
 /** The three need gauges tracked on every Employee. */
@@ -65,4 +65,30 @@ export function tickNeedMorale(employee: Employee): number {
  */
 export function replenishNeed(employee: Employee, need: NeedKey, amount: number): void {
   employee[need] = Math.max(0, Math.min(100, employee[need] + amount));
+}
+
+/**
+ * Internal helper. Returns a drain-rate multiplier based on employee morale.
+ * - morale > 70: ×0.85 (slower drain — happier workers take better care)
+ * - morale < 30: ×1.20 (faster drain — unhappy workers let themselves go)
+ * - otherwise:   ×1.00 (standard drain)
+ */
+function getMoraleDrainMultiplier(_morale: number): number {
+  // STUB — implement later
+  void MORALE_THRESHOLDS;
+  void NEED_MORALE_DRAIN_MULTIPLIERS;
+  throw new Error('Not implemented');
+}
+
+/**
+ * Drain all need gauges by one tick, adjusted by a morale-based multiplier.
+ *
+ * High morale (>70) slows drain (×0.85), low morale (<30) accelerates drain (×1.20).
+ * Call this each tick for each employee.
+ * All gauges are clamped to a minimum of 0.
+ */
+export function tickNeedGauges(_employee: Employee, _isWorking: boolean): void {
+  // STUB — implement later
+  void getMoraleDrainMultiplier;
+  throw new Error('Not implemented');
 }

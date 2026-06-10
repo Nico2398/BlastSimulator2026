@@ -333,6 +333,19 @@ export const NEED_MORALE_PENALTIES = {
   breakNeed: -2,
 } as const;
 
+/** Morale thresholds for drain-rate adjustment in tickNeedGauges. */
+export const MORALE_THRESHOLDS = {
+  high: 70,
+  low: 30,
+} as const;
+
+/** Drain-rate multipliers applied by morale range in tickNeedGauges. */
+export const NEED_MORALE_DRAIN_MULTIPLIERS = {
+  high: 0.85,   // morale > MORALE_THRESHOLDS.high
+  normal: 1.0,  // morale between low and high (inclusive)
+  low: 1.20,    // morale < MORALE_THRESHOLDS.low
+} as const;
+
 /**
  * Warning thresholds that trigger proactive rest routing.
  * @deprecated Use {@link NEED_WARNING_THRESHOLDS} instead — this constant has identical values
