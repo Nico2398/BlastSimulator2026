@@ -333,7 +333,11 @@ export const NEED_MORALE_PENALTIES = {
   breakNeed: -2,
 } as const;
 
-/** Warning thresholds that trigger proactive rest routing. */
+/**
+ * Warning thresholds that trigger proactive rest routing.
+ * @deprecated Use {@link NEED_WARNING_THRESHOLDS} instead — this constant has identical values
+ *             and is kept only for backward compatibility.
+ */
 export const NEED_RESTORATION_THRESHOLDS = {
   hunger:  35,
   fatigue: 25,

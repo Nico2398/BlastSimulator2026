@@ -173,7 +173,7 @@ describe('Need thresholds (7.2)', () => {
   });
 
   it('NEED_WARNING_THRESHOLDS has exactly 3 keys: hunger, fatigue, breakNeed', () => {
-    expect(Object.keys(NEED_WARNING_THRESHOLDS).length).toBe(3);
+    expect(Object.keys(NEED_WARNING_THRESHOLDS)).toEqual(['hunger', 'fatigue', 'breakNeed']);
   });
 
   it('NEED_WARNING_THRESHOLDS.hunger is 35 — triggers proactive routing when hunger falls below 35', () => {
@@ -199,7 +199,7 @@ describe('Need thresholds (7.2)', () => {
   });
 
   it('NEED_COLLAPSE_THRESHOLDS has exactly 3 keys: hunger, fatigue, breakNeed', () => {
-    expect(Object.keys(NEED_COLLAPSE_THRESHOLDS).length).toBe(3);
+    expect(Object.keys(NEED_COLLAPSE_THRESHOLDS)).toEqual(['hunger', 'fatigue', 'breakNeed']);
   });
 
   it('NEED_COLLAPSE_THRESHOLDS.hunger is 10 — employee collapses when hunger reaches 10', () => {
