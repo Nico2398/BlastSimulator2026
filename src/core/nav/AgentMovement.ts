@@ -39,6 +39,54 @@ export interface AdvanceResult {
  * @returns The updated position and path-progress information.
  */
 export function advanceAgent(state: AgentState): AdvanceResult {
-  // TODO: implement
-  return { x: state.x, z: state.z, waypointIndex: state.waypointIndex, pathComplete: true };
+  // Guard: no waypoints or already past the end → path complete
+  if (state.waypoints.length === 0 || state.waypointIndex >= state.waypoints.length) {
+    return { x: state.x, z: state.z, waypointIndex: state.waypointIndex, pathComplete: true };
+  }
+
+  // Clamp walk speed to non-negative
+  const speed = Math.max(0, state.walkSpeed);
+  let remaining = speed;
+
+  // If speed is zero, return current position with appropriate pathComplete
+  if (remaining === 0) {
+    return {
+      x: state.x,
+      z: state.z,
+      waypointIndex: state.waypointIndex,
+      pathComplete: state.waypointIndex >= state.waypoints.length,
+    };
+  }
+
+  // Work with local copies to avoid mutating the input
+  let x = state.x;
+  let z = state.z;
+  let waypointIndex = state.waypointIndex;
+
+  while (remaining > 0 && waypointIndex < state.waypoints.length) {
+    const target = state.waypoints[waypointIndex]!;
+    const dx = target.x - x;
+    const dz = target.z - z;
+    const dist = Math.sqrt(dx * dx + dz * dz);
+
+    if (dist <= remaining) {
+      // Snap to target
+      x = target.x;
+      z = target.z;
+      remaining -= dist;
+      waypointIndex++;
+    } else {
+      // Move fractionally toward target
+      x += (dx / dist) * remaining;
+      z += (dz / dist) * remaining;
+      remaining = 0;
+    }
+  }
+
+  return {
+    x,
+    z,
+    waypointIndex,
+    pathComplete: waypointIndex >= state.waypoints.length,
+  };
 }
