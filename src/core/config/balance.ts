@@ -434,6 +434,13 @@ export const BUILDING_REPLENISH_RATES = {
   breakNeed: { 1: 10, 2: 16, 3: 22 },
 } as const;
 
+/** Per-visit cost deducted from cash for each need gauge. Fatigue has no cost (0). */
+export const NEED_REST_COSTS = {
+  hunger: 50,
+  fatigue: 0,
+  breakNeed: 20,
+} as const;
+
 // ─── Shift / Rest Scheduling ────────────────────────────────────────────────
 
 /** Shift duration in ticks for each policy mode. 1 tick = 1 game-hour. */

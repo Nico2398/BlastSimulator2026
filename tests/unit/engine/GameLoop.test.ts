@@ -21,9 +21,12 @@ import {
   // ── 7.7: autoInsertNeedTasks ──
   autoInsertNeedTasks,
   type NeedInsertionResult,
+  // ── 7.8: deductRestCost ──
+  deductRestCost,
 } from '../../../src/core/engine/GameLoop.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { hireEmployee, assignSkill, checkCollapse } from '../../../src/core/entities/Employee.js';
+import type { NeedKey } from '../../../src/core/entities/Employee.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
 import type { EventContext } from '../../../src/core/events/EventPool.js';
 import { setupEvents } from '../../../src/core/events/index.js';
@@ -34,6 +37,7 @@ import {
   NEED_REST_BUILDING_TYPES,
   NEED_REST_SEARCH_RADIUS,
   NEED_WARNING_THRESHOLDS,
+  NEED_REST_COSTS,
 } from '../../../src/core/config/balance.js';
 
 function buildContext(state: GameState): EventContext {
@@ -1380,5 +1384,82 @@ describe('autoInsertNeedTasks (7.7)', () => {
 
     // nextPendingActionId must have been incremented (one rest action inserted)
     expect(state.nextPendingActionId).toBe(beforeId + 1);
+  });
+});
+
+// ─── 7.8: deductRestCost ──────────────────────────────────────────────────────
+
+const DEDUCT_SEED = 42;
+
+describe('deductRestCost', () => {
+  // ── Test 1: Positive: hunger visit deducts NEED_REST_COSTS.hunger from cash ──
+  it('deducts NEED_REST_COSTS.hunger from cash for hunger', () => {
+    const state = createGame({ seed: DEDUCT_SEED });
+    state.cash = 5000;
+
+    const deducted = deductRestCost(state, 'hunger');
+
+    expect(state.cash).toBe(4950);
+    expect(deducted).toBe(NEED_REST_COSTS.hunger);
+  });
+
+  // ── Test 2: Positive: breakNeed visit deducts NEED_REST_COSTS.breakNeed from cash ──
+  it('deducts NEED_REST_COSTS.breakNeed from cash for breakNeed', () => {
+    const state = createGame({ seed: DEDUCT_SEED });
+    state.cash = 5000;
+
+    const deducted = deductRestCost(state, 'breakNeed');
+
+    expect(state.cash).toBe(4980);
+    expect(deducted).toBe(NEED_REST_COSTS.breakNeed);
+  });
+
+  // ── Test 3: Boundary: fatigue visit deducts 0 from cash ──
+  it('deducts 0 from cash for fatigue (no cost)', () => {
+    const state = createGame({ seed: DEDUCT_SEED });
+    state.cash = 5000;
+
+    const deducted = deductRestCost(state, 'fatigue');
+
+    expect(state.cash).toBe(5000);
+    expect(deducted).toBe(0);
+  });
+
+  // ── Test 4: Boundary: cash never goes below 0 ──
+  it('does not let cash go below 0', () => {
+    const state = createGame({ seed: DEDUCT_SEED });
+    state.cash = 10;
+
+    const deducted = deductRestCost(state, 'hunger');
+
+    expect(state.cash).toBe(0);
+    expect(deducted).toBe(NEED_REST_COSTS.hunger);
+  });
+
+  // ── Test 5: Edge: multiple visits accumulate correctly ──
+  it('accumulates costs correctly across multiple visits', () => {
+    const state = createGame({ seed: DEDUCT_SEED });
+    state.cash = 500;
+
+    const deducted1 = deductRestCost(state, 'hunger');
+    const deducted2 = deductRestCost(state, 'hunger');
+    const deducted3 = deductRestCost(state, 'breakNeed');
+
+    const expectedCash = 500 - 2 * NEED_REST_COSTS.hunger - NEED_REST_COSTS.breakNeed;
+    expect(state.cash).toBe(expectedCash);
+    expect(deducted1).toBe(NEED_REST_COSTS.hunger);
+    expect(deducted2).toBe(NEED_REST_COSTS.hunger);
+    expect(deducted3).toBe(NEED_REST_COSTS.breakNeed);
+  });
+
+  // ── Test 6: Edge: cash at exactly 0 is unchanged ──
+  it('leaves cash at 0 when it is already 0', () => {
+    const state = createGame({ seed: DEDUCT_SEED });
+    state.cash = 0;
+
+    const deducted = deductRestCost(state, 'hunger');
+
+    expect(state.cash).toBe(0);
+    expect(deducted).toBe(NEED_REST_COSTS.hunger);
   });
 });
