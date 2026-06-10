@@ -9,10 +9,11 @@ import type { Random } from '../math/Random.js';
 import type { EventContext } from '../events/EventPool.js';
 import { tickEventSystem, type FiredEvent } from '../events/EventSystem.js';
 import { detectTrafficJam } from '../events/EventEngine.js';
+import { checkCollapse } from '../entities/Employee.js';
 
 // ── Config ──
 
-import { BASE_TICK_MS as _BASE_TICK_MS, VALID_SPEEDS as _VALID_SPEEDS, NEED_RESTORATION_THRESHOLDS } from '../config/balance.js';
+import { BASE_TICK_MS as _BASE_TICK_MS, VALID_SPEEDS as _VALID_SPEEDS, NEED_RESTORATION_THRESHOLDS, NEED_REST_DURATIONS, NEED_REST_BUILDING_TYPES, NEED_REST_SEARCH_RADIUS } from '../config/balance.js';
 
 /** Milliseconds per base tick at 1x speed. */
 export const BASE_TICK_MS = _BASE_TICK_MS;
@@ -275,6 +276,25 @@ export function tickNeedRestoration(state: GameState): NeedRestorationResult {
   }
 
   return result;
+}
+
+export interface CollapseResult {
+  /** Employee IDs that collapsed this tick. */
+  collapsed: number[];
+}
+
+/**
+ * Check all alive, non-injured employees for collapse thresholds.
+ * On collapse, creates a rest PendingAction targeting nearest suitable building.
+ */
+export function tickCollapse(_state: GameState): CollapseResult {
+  // STUB - will be implemented
+  void _state;
+  void NEED_REST_DURATIONS;
+  void NEED_REST_BUILDING_TYPES;
+  void NEED_REST_SEARCH_RADIUS;
+  void checkCollapse;
+  return { collapsed: [] };
 }
 
 function findNearestLivingQuarters(

@@ -2,7 +2,7 @@
 // Tracks three need gauges: hunger, fatigue, and breakNeed (all 0–100).
 
 import { type Employee } from './Employee.js';
-import { NEED_DRAIN_RATES, NEED_THRESHOLDS, NEED_PRODUCTIVITY_MULTIPLIERS, NEED_MORALE_PENALTIES, MORALE_THRESHOLDS, NEED_MORALE_DRAIN_MULTIPLIERS, NEED_MORALE_EFFECT_THRESHOLDS, NEED_MORALE_EFFECT_PENALTIES, NEED_WELL_RESTED_THRESHOLD, NEED_WELL_RESTED_BONUS, BUILDING_REPLENISH_RATES } from '../config/balance.js';
+import { NEED_DRAIN_RATES, NEED_THRESHOLDS, NEED_PRODUCTIVITY_MULTIPLIERS, NEED_MORALE_PENALTIES, MORALE_THRESHOLDS, NEED_MORALE_DRAIN_MULTIPLIERS, NEED_MORALE_EFFECT_THRESHOLDS, NEED_MORALE_EFFECT_PENALTIES, NEED_WELL_RESTED_THRESHOLD, NEED_WELL_RESTED_BONUS, BUILDING_REPLENISH_RATES, NEED_COLLAPSE_THRESHOLDS } from '../config/balance.js';
 
 /** The three need gauges tracked on every Employee. */
 export type NeedKey = 'hunger' | 'fatigue' | 'breakNeed';
@@ -137,6 +137,18 @@ function getMoraleDrainMultiplier(morale: number): number {
   if (morale > MORALE_THRESHOLDS.high) return NEED_MORALE_DRAIN_MULTIPLIERS.high;
   if (morale < MORALE_THRESHOLDS.low) return NEED_MORALE_DRAIN_MULTIPLIERS.low;
   return NEED_MORALE_DRAIN_MULTIPLIERS.normal;
+}
+
+/**
+ * Check whether an employee's need gauges have fallen to or below their
+ * collapse thresholds. Sets collapsing=true and clears activeActionId on collapse.
+ * @returns The NeedKey that caused the collapse, or null if no collapse.
+ */
+export function checkCollapse(_employee: Employee): NeedKey | null {
+  // STUB - will be implemented
+  void _employee;
+  void NEED_COLLAPSE_THRESHOLDS;
+  return null;
 }
 
 /**

@@ -84,6 +84,7 @@ export interface Employee {
   fatigue: number;   // 0-100
   breakNeed: number; // 0-100
   collapsing: boolean;
+  interruptedActionPayload: Record<string, unknown> | null;
 }
 
 // ── Employee state ──
@@ -131,6 +132,7 @@ export function hireEmployee(
     fatigue: 100,
     breakNeed: 100,
     collapsing: false,
+    interruptedActionPayload: null,
   };
   state.employees.push(employee);
   return { employee, hiringCost: HIRING_COSTS[role] };
@@ -195,7 +197,7 @@ export function calculateSalary(employee: Employee): number {
 
 /** Get effectiveness multiplier based on morale (0.5–1.2). */
 export function getEffectiveness(employee: Employee): number {
-  if (employee.injured || !employee.alive) return 0;
+  if (employee.injured || !employee.alive || employee.collapsing) return 0;
   // Linear scale: morale 0 → 0.5, morale 100 → 1.2
   return 0.5 + (employee.morale / 100) * 0.7;
 }
@@ -296,5 +298,5 @@ export function tickTraining(state: EmployeeState): void {
 export type { GainXpResult } from './EmployeeGainXp.js';
 export { gainXp } from './EmployeeGainXp.js';
 export type { NeedKey } from './EmployeeNeeds.js';
-export { tickNeeds, tickNeedGauges, getNeedMultiplier, tickNeedMorale, replenishNeed, needsMoraleEffect } from './EmployeeNeeds.js';
+export { tickNeeds, tickNeedGauges, getNeedMultiplier, tickNeedMorale, replenishNeed, needsMoraleEffect, checkCollapse } from './EmployeeNeeds.js';
 export { computeTaskDuration } from './EmployeeTaskDuration.js';
