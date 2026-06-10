@@ -2,8 +2,7 @@
 // Tracks three need gauges: hunger, fatigue, and breakNeed (all 0–100).
 
 import { type Employee } from './Employee.js';
-import { NEED_DRAIN_RATES, NEED_THRESHOLDS, NEED_PRODUCTIVITY_MULTIPLIERS, NEED_MORALE_PENALTIES, NEED_WARNING_THRESHOLDS, NEED_COLLAPSE_THRESHOLDS, MORALE_THRESHOLDS, NEED_MORALE_DRAIN_MULTIPLIERS } from '../config/balance.js';
-export { NEED_WARNING_THRESHOLDS, NEED_COLLAPSE_THRESHOLDS };
+import { NEED_DRAIN_RATES, NEED_THRESHOLDS, NEED_PRODUCTIVITY_MULTIPLIERS, NEED_MORALE_PENALTIES, MORALE_THRESHOLDS, NEED_MORALE_DRAIN_MULTIPLIERS } from '../config/balance.js';
 
 /** The three need gauges tracked on every Employee. */
 export type NeedKey = 'hunger' | 'fatigue' | 'breakNeed';
@@ -16,6 +15,9 @@ export type NeedKey = 'hunger' | 'fatigue' | 'breakNeed';
  * recover breakNeed automatically when not working.
  *
  * All gauges are clamped to a minimum of 0.
+ *
+ * @deprecated Superseded by {@link tickNeedGauges} which applies a morale-based
+ *             drain multiplier. This function lacks the morale adjustment.
  */
 export function tickNeeds(employee: Employee, isWorking: boolean): void {
   employee.hunger    = Math.max(0, employee.hunger    - (isWorking ? NEED_DRAIN_RATES.hunger.working    : NEED_DRAIN_RATES.hunger.idle));
