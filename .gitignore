@@ -19,7 +19,7 @@ dist/
 Thumbs.db
 
 # Test coverage
-coverage/
+/coverage/
 
 # Screenshots (generated, not source)
 screenshots/
