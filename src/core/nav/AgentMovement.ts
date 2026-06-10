@@ -1,6 +1,8 @@
 // BlastSimulator2026 — AgentMovement: per-tick agent position advancement along a path
 // Part of the navmesh system.
 
+import type { NavGrid } from './NavGrid.js';
+
 /**
  * The current navigation state of an agent walking along a path.
  * Tracks position, waypoint list, progress index, and base walk speed.
@@ -16,6 +18,10 @@ export interface AgentState {
   waypointIndex: number;
   /** Agent walking speed in grid cells per tick. */
   walkSpeed: number;
+  /** The ultimate destination x-coordinate. */
+  destinationX: number;
+  /** The ultimate destination z-coordinate. */
+  destinationZ: number;
 }
 
 /**
@@ -33,6 +39,15 @@ export interface AdvanceResult {
 }
 
 /**
+ * The result of checking whether an agent's current path is stale
+ * due to obstacles or changed regions.
+ */
+export interface StaleCheckResult {
+  isStale: boolean;
+  reason?: 'BLOCKED_WAYPOINT' | 'CROSSES_UPDATED_REGION';
+}
+
+/**
  * Advance an agent toward the next waypoint for a single tick.
  *
  * @param state - The agent's current navigation state.
@@ -42,6 +57,11 @@ export function advanceAgent(state: AgentState): AdvanceResult {
   // Guard: NaN/infinite coordinates → bail out as path complete (defense-in-depth)
   if (!Number.isFinite(state.x) || !Number.isFinite(state.z)) {
     return { x: state.x, z: state.z, waypointIndex: state.waypointIndex, isPathComplete: true };
+  }
+
+  // Guard: NaN walkSpeed → treat as 0 (no movement)
+  if (!Number.isFinite(state.walkSpeed)) {
+    return { x: state.x, z: state.z, waypointIndex: state.waypointIndex, isPathComplete: false };
   }
 
   // Guard: no waypoints or already past the end → path complete
@@ -93,5 +113,99 @@ export function advanceAgent(state: AgentState): AdvanceResult {
     z,
     waypointIndex,
     isPathComplete: waypointIndex >= state.waypoints.length,
+  };
+}
+
+/**
+ * Iterate over remaining waypoints and return true if any satisfy the predicate.
+ * Returns false if no waypoints remain or the path is already complete.
+ */
+function someRemainingWaypoint(
+  state: AgentState,
+  predicate: (wp: { x: number; z: number }) => boolean,
+): boolean {
+  if (state.waypoints.length === 0 || state.waypointIndex >= state.waypoints.length) {
+    return false;
+  }
+  for (let i = state.waypointIndex; i < state.waypoints.length; i++) {
+    const wp = state.waypoints[i]!;
+    if (predicate(wp)) return true;
+  }
+  return false;
+}
+
+/**
+ * Check whether the next waypoint or any subsequent waypoint is blocked
+ * by an obstacle (vehicle or terrain change) on the NavGrid.
+ *
+ * @param state - The agent's current navigation state.
+ * @param grid  - The navigation grid to check against.
+ * @param avoidVehicles - Whether to treat vehicle-occupied cells as blocked.
+ * @returns `true` if any remaining waypoint is blocked.
+ */
+export function isPathBlocked(state: AgentState, grid: NavGrid, avoidVehicles: boolean): boolean {
+  return someRemainingWaypoint(state, (wp) => {
+    const clampedX = Math.max(0, Math.min(grid.width - 1, Math.floor(wp.x)));
+    const clampedZ = Math.max(0, Math.min(grid.height - 1, Math.floor(wp.z)));
+    const cell = grid.cells[clampedZ]![clampedX]!;
+
+    if (cell.type === 'blocked' || cell.type === 'void') {
+      return true;
+    }
+    if (avoidVehicles && cell.vehicleOccupied) {
+      return true;
+    }
+    return false;
+  });
+}
+
+/**
+ * Check whether any remaining waypoint in the agent's path falls within
+ * the specified axis-aligned region (point-in-AABB test).
+ *
+ * If waypoints are dense (adjacent cells), this approximates segment
+ * intersection. For sparse waypoints, a segment may cross the region
+ * without any waypoint inside it — callers should ensure waypoint density
+ * or use a separate segment-intersection test if needed.
+ *
+ * @param state  - The agent's current navigation state.
+ * @param region - The axis-aligned bounding box to test against.
+ * @returns `true` if any remaining waypoint lies inside the region.
+ */
+export function doesPathCrossRegion(
+  state: AgentState,
+  region: { minX: number; maxX: number; minZ: number; maxZ: number },
+): boolean {
+  // Guard: NaN/infinite region bounds → conservative (assume crossing)
+  if (!Number.isFinite(region.minX) || !Number.isFinite(region.maxX) ||
+      !Number.isFinite(region.minZ) || !Number.isFinite(region.maxZ)) {
+    return true;
+  }
+
+  if (region.minX > region.maxX || region.minZ > region.maxZ) {
+    return false;
+  }
+
+  return someRemainingWaypoint(state, (wp) =>
+    wp.x >= region.minX && wp.x <= region.maxX && wp.z >= region.minZ && wp.z <= region.maxZ,
+  );
+}
+
+/**
+ * Request a re-route by clearing the current waypoint list and resetting
+ * the agent's state so a new path can be computed.
+ *
+ * @param state - The agent's current navigation state.
+ * @returns A new `AgentState` with cleared waypoints ready for re-routing.
+ */
+export function requestReRoute(state: AgentState): AgentState {
+  return {
+    x: state.x,
+    z: state.z,
+    waypoints: [],
+    waypointIndex: 0,
+    walkSpeed: state.walkSpeed,
+    destinationX: state.destinationX,
+    destinationZ: state.destinationZ,
   };
 }
