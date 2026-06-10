@@ -85,6 +85,10 @@ export interface Employee {
   breakNeed: number; // 0-100
   collapsing: boolean;
   interruptedActionPayload: Record<string, unknown> | null;
+  /** Number of ticks the employee has worked in the current shift. */
+  ticksWorked: number;
+  /** Ticks of rest remaining when employee is in bunkhouse rest mode, or null if not resting. */
+  restTicksRemaining: number | null;
 }
 
 // ── Employee state ──
@@ -133,6 +137,8 @@ export function hireEmployee(
     breakNeed: 100,
     collapsing: false,
     interruptedActionPayload: null,
+    ticksWorked: 0,
+    restTicksRemaining: null,
   };
   state.employees.push(employee);
   return { employee, hiringCost: HIRING_COSTS[role] };

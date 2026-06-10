@@ -23,12 +23,16 @@ import {
   type NeedInsertionResult,
   // ── 7.8: deductRestCost ──
   deductRestCost,
+  // ── 7.9: shift cycle ──
+  processShiftCycle,
+  type ShiftCycleResult,
 } from '../../../src/core/engine/GameLoop.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { hireEmployee, assignSkill, checkCollapse } from '../../../src/core/entities/Employee.js';
 import type { NeedKey } from '../../../src/core/entities/Employee.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
 import type { EventContext } from '../../../src/core/events/EventPool.js';
+import type { FiredEvent } from '../../../src/core/events/EventSystem.js';
 import { setupEvents } from '../../../src/core/events/index.js';
 import { clearEvents, registerEvents } from '../../../src/core/events/EventPool.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
@@ -38,6 +42,8 @@ import {
   NEED_REST_SEARCH_RADIUS,
   NEED_WARNING_THRESHOLDS,
   NEED_REST_COSTS,
+  WORK_DURATION_TICKS,
+  SHIFT_SLEEP_DURATION_TICKS,
 } from '../../../src/core/config/balance.js';
 
 function buildContext(state: GameState): EventContext {
@@ -1461,5 +1467,291 @@ describe('deductRestCost', () => {
 
     expect(state.cash).toBe(0);
     expect(deducted).toBe(NEED_REST_COSTS.hunger);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Task 7.9 — processShiftCycle: Bunkhouse Tier 2+ shift scheduling
+//
+// Function under test:
+//   processShiftCycle(state, firedEvents) → ShiftCycleResult
+//
+// When a Tier 2+ living_quarters building exists, an 8-tick shift cycle
+// activates: employees work WORK_DURATION_TICKS (6) ticks then enter
+// SHIFT_SLEEP_DURATION_TICKS (8) ticks of forced rest. The cycle resets
+// upon rest completion. Dead/injured employees are skipped.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('processShiftCycle (7.9)', () => {
+  const SEED = 42;
+
+  // ── Test 1 ──────────────────────────────────────────────────────────────────
+  it('inactive when no living_quarters buildings exist', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.activeActionId = 10; // working
+
+    const firedEvents: FiredEvent[] = [];
+    const result = processShiftCycle(state, firedEvents);
+
+    expect(result.active).toBe(false);
+    expect(result.restCompleted).toEqual([]);
+    expect(result.shiftRested).toEqual([]);
+  });
+
+  // ── Test 2 ──────────────────────────────────────────────────────────────────
+  it('inactive when only tier 1 living_quarters exists', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    hireEmployee(state.employees, 'driller', rng);
+    placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, 1);
+
+    const firedEvents: FiredEvent[] = [];
+    const result = processShiftCycle(state, firedEvents);
+
+    expect(result.active).toBe(false);
+  });
+
+  // ── Test 3 ──────────────────────────────────────────────────────────────────
+  it('active when tier 2 living_quarters exists', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    hireEmployee(state.employees, 'driller', rng);
+    placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, 2);
+
+    const firedEvents: FiredEvent[] = [];
+    const result = processShiftCycle(state, firedEvents);
+
+    expect(result.active).toBe(true);
+  });
+
+  // ── Test 4 ──────────────────────────────────────────────────────────────────
+  it('active when tier 3 living_quarters exists', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    hireEmployee(state.employees, 'driller', rng);
+    placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, 3);
+
+    const firedEvents: FiredEvent[] = [];
+    const result = processShiftCycle(state, firedEvents);
+
+    expect(result.active).toBe(true);
+  });
+
+  // ── Test 5 ──────────────────────────────────────────────────────────────────
+  it('ticksWorked increments for working employees', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.activeActionId = 10;
+    employee.ticksWorked = 0;
+
+    placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, 2);
+
+    const firedEvents: FiredEvent[] = [];
+    processShiftCycle(state, firedEvents);
+
+    expect(employee.ticksWorked).toBe(1);
+  });
+
+  // ── Test 6 ──────────────────────────────────────────────────────────────────
+  it('ticksWorked NOT incremented for idle employees', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.activeActionId = null; // idle
+    employee.ticksWorked = 0;
+
+    placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, 2);
+
+    const firedEvents: FiredEvent[] = [];
+    const result = processShiftCycle(state, firedEvents);
+
+    // Active = true because T2 exists; ticksWorked must remain 0 for idle
+    expect(result.active).toBe(true);
+    expect(employee.ticksWorked).toBe(0);
+  });
+
+  // ── Test 7 ──────────────────────────────────────────────────────────────────
+  it('forced rest when ticksWorked reaches WORK_DURATION_TICKS (6)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const ORIGINAL_ACTION_ID = 100;
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.activeActionId = ORIGINAL_ACTION_ID;
+    employee.ticksWorked = WORK_DURATION_TICKS - 1; // 5 — next tick triggers shift rest
+
+    placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, 2);
+
+    const firedEvents: FiredEvent[] = [];
+    const result = processShiftCycle(state, firedEvents);
+
+    expect(result.shiftRested).toContain(employee.id);
+    expect(employee.restTicksRemaining).toBe(SHIFT_SLEEP_DURATION_TICKS);
+    // Employee should be claimed by a rest action (activeActionId changed)
+    expect(employee.activeActionId).not.toBe(ORIGINAL_ACTION_ID);
+    expect(employee.activeActionId).not.toBeNull();
+  });
+
+  // ── Test 8 ──────────────────────────────────────────────────────────────────
+  it('restTicksRemaining decrements each tick while resting', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.restTicksRemaining = 5;
+    employee.activeActionId = 200; // busy with rest
+
+    placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, 2);
+
+    const firedEvents: FiredEvent[] = [];
+    processShiftCycle(state, firedEvents);
+
+    expect(employee.restTicksRemaining).toBe(4);
+  });
+
+  // ── Test 9 ──────────────────────────────────────────────────────────────────
+  it('rest completes after SHIFT_SLEEP_DURATION_TICKS ticks', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.restTicksRemaining = 1; // one more tick → rest completes
+    employee.activeActionId = 300;  // in shift rest
+    employee.ticksWorked = 5;       // previous shift value
+    employee.fatigue = 20;          // fatigued before rest
+
+    placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, 2);
+
+    const firedEvents: FiredEvent[] = [];
+    const result = processShiftCycle(state, firedEvents);
+
+    expect(result.restCompleted).toContain(employee.id);
+    expect(employee.restTicksRemaining).toBeNull();
+    expect(employee.activeActionId).toBeNull(); // freed up after rest
+    expect(employee.ticksWorked).toBe(0);       // reset for next shift
+    // Fatigue should be restored (increased) upon rest completion
+    expect(employee.fatigue).toBeGreaterThan(20);
+  });
+
+  // ── Test 10 ─────────────────────────────────────────────────────────────────
+  it('employee_shift_change event fired when employee enters shift rest', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.activeActionId = 400;
+    employee.ticksWorked = WORK_DURATION_TICKS - 1; // 5 — triggers shift rest
+
+    placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, 2);
+
+    const firedEvents: FiredEvent[] = [];
+    processShiftCycle(state, firedEvents);
+
+    expect(firedEvents.length).toBeGreaterThanOrEqual(1);
+    expect(firedEvents[0]!.eventId).toBe('employee_shift_change');
+  });
+
+  // ── Test 11 ─────────────────────────────────────────────────────────────────
+  it('dead employees are skipped', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.alive = false;
+    employee.activeActionId = 500;
+    employee.ticksWorked = 3;
+
+    placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, 2);
+
+    const firedEvents: FiredEvent[] = [];
+    const result = processShiftCycle(state, firedEvents);
+
+    // Shift logic is active (T2 exists) but dead employee is skipped
+    expect(result.active).toBe(true);
+    expect(employee.ticksWorked).toBe(3); // unchanged
+    expect(employee.restTicksRemaining).toBeNull(); // not put to rest
+    expect(result.shiftRested).not.toContain(employee.id);
+  });
+
+  // ── Test 12 ─────────────────────────────────────────────────────────────────
+  it('injured employees are skipped', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.injured = true;
+    employee.activeActionId = 600;
+    employee.ticksWorked = 3;
+
+    placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, 2);
+
+    const firedEvents: FiredEvent[] = [];
+    const result = processShiftCycle(state, firedEvents);
+
+    expect(result.active).toBe(true);
+    expect(employee.ticksWorked).toBe(3); // unchanged
+    expect(employee.restTicksRemaining).toBeNull(); // not put to rest
+    expect(result.shiftRested).not.toContain(employee.id);
+  });
+
+  // ── Test 13 ─────────────────────────────────────────────────────────────────
+  it('employee with restTicksRemaining does NOT increment ticksWorked', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.restTicksRemaining = 4; // currently resting
+    employee.activeActionId = 700;
+    employee.ticksWorked = 3; // previous shift work count
+
+    placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, 2);
+
+    const firedEvents: FiredEvent[] = [];
+    const result = processShiftCycle(state, firedEvents);
+
+    // Active because T2 building exists
+    expect(result.active).toBe(true);
+    // ticksWorked must NOT be incremented for a resting employee
+    expect(employee.ticksWorked).toBe(3);
+    // restTicksRemaining should have decremented (not skipped entirely)
+    expect(employee.restTicksRemaining).toBe(3);
+  });
+
+  // ── Test 14 ─────────────────────────────────────────────────────────────────
+  it('multiple employees cycle independently', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee: emp1 } = hireEmployee(state.employees, 'driller', rng);
+    emp1.activeActionId = 800;
+    emp1.ticksWorked = WORK_DURATION_TICKS - 1; // 5 — will trigger shift rest
+
+    const { employee: emp2 } = hireEmployee(state.employees, 'blaster', rng);
+    emp2.activeActionId = 801;
+    emp2.ticksWorked = 2; // still working
+
+    placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, 2);
+
+    const firedEvents: FiredEvent[] = [];
+    const result = processShiftCycle(state, firedEvents);
+
+    // Only emp1 should transition to shift rest
+    expect(result.shiftRested).toContain(emp1.id);
+    expect(result.shiftRested).not.toContain(emp2.id);
+
+    // emp1's rest timer starts
+    expect(emp1.restTicksRemaining).toBe(SHIFT_SLEEP_DURATION_TICKS);
+
+    // emp2 continues working
+    expect(emp2.ticksWorked).toBe(3);
+    expect(emp2.restTicksRemaining).toBeNull();
   });
 });
