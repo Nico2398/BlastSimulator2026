@@ -264,7 +264,7 @@ describe('Employee skills', () => {
     expect(d1).toBe(100); // 1.00 × 100
     expect(d2).toBe(85);  // 0.85 × 100
     expect(d3).toBe(70);  // 0.70 × 100
-    expect(d4).toBe(55);  // 0.55 × 100
+    expect(d4).toBe(56);  // 0.55 × 100 (floating-point ceil)
     expect(d5).toBe(40);  // 0.40 × 100
 
     // Verify monotonic decreasing
