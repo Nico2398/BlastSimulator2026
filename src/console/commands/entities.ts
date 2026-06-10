@@ -323,3 +323,13 @@ export function zoneCommand(
       return { success: false, output: 'Usage: zone (clear|status)' };
   }
 }
+
+// ── needs command ──
+
+export function needsCommand(
+  _ctx: GameContext,
+  _args: string[],
+  _named: Record<string, string>,
+): CommandResult {
+  return { success: true, output: 'Employee Needs: TBD' };
+}
