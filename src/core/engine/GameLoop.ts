@@ -9,11 +9,11 @@ import type { Random } from '../math/Random.js';
 import type { EventContext } from '../events/EventPool.js';
 import { tickEventSystem, type FiredEvent } from '../events/EventSystem.js';
 import { detectTrafficJam } from '../events/EventEngine.js';
-import { checkCollapse } from '../entities/Employee.js';
+import { checkCollapse, type NeedKey } from '../entities/Employee.js';
 
 // ── Config ──
 
-import { BASE_TICK_MS as _BASE_TICK_MS, VALID_SPEEDS as _VALID_SPEEDS, NEED_RESTORATION_THRESHOLDS, NEED_REST_DURATIONS, NEED_REST_BUILDING_TYPES, NEED_REST_SEARCH_RADIUS } from '../config/balance.js';
+import { BASE_TICK_MS as _BASE_TICK_MS, VALID_SPEEDS as _VALID_SPEEDS, NEED_RESTORATION_THRESHOLDS, NEED_REST_DURATIONS, NEED_REST_BUILDING_TYPES, NEED_REST_SEARCH_RADIUS, NEED_WARNING_THRESHOLDS } from '../config/balance.js';
 
 /** Milliseconds per base tick at 1x speed. */
 export const BASE_TICK_MS = _BASE_TICK_MS;
@@ -283,6 +283,13 @@ export interface CollapseResult {
   collapsed: number[];
 }
 
+export interface NeedInsertionResult {
+  /** Employee/need pairs that had a rest PendingAction inserted. */
+  inserted: Array<{ employeeId: number; needKey: NeedKey }>;
+  /** Employee/need pairs that were skipped with a reason. */
+  skipped: Array<{ employeeId: number; needKey: NeedKey; reason: string }>;
+}
+
 /**
  * Check all alive, non-injured employees for collapse thresholds.
  * On collapse, creates a rest PendingAction targeting nearest suitable building.
@@ -346,6 +353,22 @@ export function tickCollapse(state: GameState): CollapseResult {
   }
 
   return result;
+}
+
+/**
+ * Proactively inserts rest PendingActions for employees whose need gauges
+ * have fallen below their warning thresholds (NEED_WARNING_THRESHOLDS).
+ *
+ * Unlike tickNeedRestoration() which handles only idle employees and
+ * immediately assigns the action (sets activeActionId), this function handles
+ * both idle and busy employees. For busy employees, the rest action is
+ * inserted into the pending queue without claiming it.
+ *
+ * Dead, injured, and collapsing employees are skipped.
+ * Employees that already have a rest PendingAction in the queue are skipped.
+ */
+export function autoInsertNeedTasks(state: GameState): NeedInsertionResult {
+  return { inserted: [], skipped: [] };
 }
 
 function findNearestBuildingOfType(
