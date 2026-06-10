@@ -1221,11 +1221,11 @@
       "src/core/engine/GameLoop.ts"
     ],
     "testFile": "tests/unit/engine/GameLoop.test.ts",
-    "status": "pending",
+    "status": "done",
     "blockedBy": [
       "6.3"
     ],
-    "closedInPR": null
+    "closedInPR": 275
   },
   {
     "id": "6.12",
