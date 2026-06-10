@@ -2,7 +2,7 @@
 // Tracks three need gauges: hunger, fatigue, and breakNeed (all 0–100).
 
 import { type Employee } from './Employee.js';
-import { NEED_DRAIN_RATES, NEED_THRESHOLDS, NEED_PRODUCTIVITY_MULTIPLIERS, NEED_MORALE_PENALTIES, MORALE_THRESHOLDS, NEED_MORALE_DRAIN_MULTIPLIERS } from '../config/balance.js';
+import { NEED_DRAIN_RATES, NEED_THRESHOLDS, NEED_PRODUCTIVITY_MULTIPLIERS, NEED_MORALE_PENALTIES, MORALE_THRESHOLDS, NEED_MORALE_DRAIN_MULTIPLIERS, NEED_MORALE_EFFECT_THRESHOLDS, NEED_MORALE_EFFECT_PENALTIES, NEED_WELL_RESTED_THRESHOLD, NEED_WELL_RESTED_BONUS } from '../config/balance.js';
 
 /** The three need gauges tracked on every Employee. */
 export type NeedKey = 'hunger' | 'fatigue' | 'breakNeed';
@@ -59,6 +59,23 @@ export function tickNeedMorale(employee: Employee): number {
   let delta = 0;
   if (employee.breakNeed < NEED_THRESHOLDS.breakNeed.low) delta += NEED_MORALE_PENALTIES.breakNeed;
   return delta;
+}
+
+/**
+ * Pure function. Computes the tick-level morale delta from ALL need gauges
+ * (hunger, fatigue, breakNeed).
+ *
+ * This function does NOT mutate employee.morale — it returns a delta that the
+ * caller must apply each tick.
+ */
+export function needsMoraleEffect(employee: Employee): number {
+  void employee;
+  void NEED_MORALE_EFFECT_THRESHOLDS;
+  void NEED_MORALE_EFFECT_PENALTIES;
+  void NEED_WELL_RESTED_THRESHOLD;
+  void NEED_WELL_RESTED_BONUS;
+  // TODO: implement per-gauge penalties + well-rested bonus
+  return 0;
 }
 
 /**

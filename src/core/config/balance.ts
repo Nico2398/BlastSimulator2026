@@ -347,6 +347,34 @@ export const NEED_MORALE_DRAIN_MULTIPLIERS = {
 } as const;
 
 /**
+ * Thresholds (gauge values) for the per-gauge morale effect in needsMoraleEffect().
+ */
+export const NEED_MORALE_EFFECT_THRESHOLDS = {
+  comfortable: 50,
+  uncomfortable: 30,
+  suffering: 15,
+} as const;
+
+/**
+ * Per-tick morale penalties applied per gauge in needsMoraleEffect().
+ */
+export const NEED_MORALE_EFFECT_PENALTIES = {
+  comfortable: 0,
+  uncomfortable: -0.5,
+  suffering: -1.5,
+  critical: -3.0,
+} as const;
+
+/**
+ * If ALL three gauges (hunger, fatigue, breakNeed) are simultaneously above this
+ * threshold, the employee receives a well-rested morale bonus per tick.
+ */
+export const NEED_WELL_RESTED_THRESHOLD = 80;
+
+/** The well-rested morale bonus applied per tick when all gauges are above the threshold. */
+export const NEED_WELL_RESTED_BONUS = 1;
+
+/**
  * Warning thresholds that trigger proactive rest routing.
  * @deprecated Use {@link NEED_WARNING_THRESHOLDS} instead — this constant has identical values
  *             and is kept only for backward compatibility.
