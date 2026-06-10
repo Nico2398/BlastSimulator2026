@@ -18,6 +18,9 @@ import {
   // ── 7.6: tickCollapse ──
   tickCollapse,
   type CollapseResult,
+  // ── 7.7: autoInsertNeedTasks ──
+  autoInsertNeedTasks,
+  type NeedInsertionResult,
 } from '../../../src/core/engine/GameLoop.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { hireEmployee, assignSkill, checkCollapse } from '../../../src/core/entities/Employee.js';
@@ -30,6 +33,7 @@ import {
   NEED_REST_DURATIONS,
   NEED_REST_BUILDING_TYPES,
   NEED_REST_SEARCH_RADIUS,
+  NEED_WARNING_THRESHOLDS,
 } from '../../../src/core/config/balance.js';
 
 function buildContext(state: GameState): EventContext {
@@ -936,4 +940,445 @@ describe('tickCollapse (7.6)', () => {
     expect(restAction!.payload.restDuration).toBe(NEED_REST_DURATIONS.fatigue);
   });
 
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Task 7.7 — autoInsertNeedTasks: proactive rest action insertion
+//
+// Function under test:
+//   autoInsertNeedTasks(state) → NeedInsertionResult
+//
+// Reads NEED_WARNING_THRESHOLDS (hunger<35, fatigue<25, breakNeed<30) and
+// conditionally inserts a rest PendingAction for each employee whose gauge
+// is below threshold. Busy employees are also serviced (inserted but not
+// claimed). Dead, injured, collapsing, and already-queued employees are
+// skipped. Nearest suitable building is targeted.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('autoInsertNeedTasks (7.7)', () => {
+  const SEED = 42;
+
+  // ── Test 1 ──────────────────────────────────────────────────────────────────
+  it('busy employee with hunger < 35 → rest action queued, activeActionId unchanged', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.x = 0;
+    employee.z = 0;
+    employee.hunger = 30;
+    employee.fatigue = 80;
+    employee.breakNeed = 80;
+    employee.activeActionId = 42; // already busy
+
+    const buildResult = placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100);
+    expect(buildResult.success).toBe(true);
+
+    const result = autoInsertNeedTasks(state);
+
+    // Must report insertion
+    expect(result.inserted).toHaveLength(1);
+    expect(result.inserted[0]!.employeeId).toBe(employee.id);
+    expect(result.inserted[0]!.needKey).toBe('hunger');
+
+    // activeActionId must remain unchanged
+    expect(employee.activeActionId).toBe(42);
+
+    // A rest PendingAction must exist for this employee
+    const restAction = state.pendingActions.find(
+      (a: PendingAction) => a.type === 'rest' && a.targetEmployeeId === employee.id,
+    );
+    expect(restAction).toBeDefined();
+
+    // Skipped must be empty
+    expect(result.skipped).toHaveLength(0);
+  });
+
+  // ── Test 2 ──────────────────────────────────────────────────────────────────
+  it('busy employee with fatigue < 25 → rest action queued', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.x = 0;
+    employee.z = 0;
+    employee.hunger = 80;
+    employee.fatigue = 20; // below threshold of 25
+    employee.breakNeed = 80;
+    employee.activeActionId = 42;
+
+    placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100);
+
+    const result = autoInsertNeedTasks(state);
+
+    expect(result.inserted).toHaveLength(1);
+    expect(result.inserted[0]!.employeeId).toBe(employee.id);
+    expect(result.inserted[0]!.needKey).toBe('fatigue');
+    expect(employee.activeActionId).toBe(42);
+
+    const restAction = state.pendingActions.find(
+      (a: PendingAction) => a.type === 'rest' && a.targetEmployeeId === employee.id,
+    );
+    expect(restAction).toBeDefined();
+    expect(result.skipped).toHaveLength(0);
+  });
+
+  // ── Test 3 ──────────────────────────────────────────────────────────────────
+  it('idle employee with breakNeed < 30 → rest action queued', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.x = 0;
+    employee.z = 0;
+    employee.hunger = 80;
+    employee.fatigue = 80;
+    employee.breakNeed = 25; // below threshold of 30
+    employee.activeActionId = null; // idle
+
+    placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100);
+
+    const result = autoInsertNeedTasks(state);
+
+    expect(result.inserted).toHaveLength(1);
+    expect(result.inserted[0]!.employeeId).toBe(employee.id);
+    expect(result.inserted[0]!.needKey).toBe('breakNeed');
+
+    const restAction = state.pendingActions.find(
+      (a: PendingAction) => a.type === 'rest' && a.targetEmployeeId === employee.id,
+    );
+    expect(restAction).toBeDefined();
+    expect(result.skipped).toHaveLength(0);
+  });
+
+  // ── Test 4 ──────────────────────────────────────────────────────────────────
+  it('all gauges above thresholds → no action created', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.hunger = 80;
+    employee.fatigue = 80;
+    employee.breakNeed = 80;
+
+    placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100);
+
+    const result = autoInsertNeedTasks(state);
+
+    expect(result.inserted).toHaveLength(0);
+    expect(result.skipped).toHaveLength(0);
+    expect(state.pendingActions).toHaveLength(0);
+  });
+
+  // ── Test 5 ──────────────────────────────────────────────────────────────────
+  it('dead employee → skipped', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.alive = false;
+    employee.hunger = 30;
+    employee.fatigue = 80;
+    employee.breakNeed = 80;
+
+    placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100);
+
+    const result = autoInsertNeedTasks(state);
+
+    expect(result.inserted).toHaveLength(0);
+    expect(result.skipped).toHaveLength(0);
+    expect(state.pendingActions).toHaveLength(0);
+  });
+
+  // ── Test 6 ──────────────────────────────────────────────────────────────────
+  it('injured employee → skipped', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.injured = true;
+    employee.hunger = 30;
+    employee.fatigue = 80;
+    employee.breakNeed = 80;
+
+    placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100);
+
+    const result = autoInsertNeedTasks(state);
+
+    expect(result.inserted).toHaveLength(0);
+    expect(result.skipped).toHaveLength(0);
+    expect(state.pendingActions).toHaveLength(0);
+  });
+
+  // ── Test 7 ──────────────────────────────────────────────────────────────────
+  it('collapsing employee → skipped', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.collapsing = true;
+    employee.hunger = 30;
+    employee.fatigue = 80;
+    employee.breakNeed = 80;
+
+    placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100);
+
+    const result = autoInsertNeedTasks(state);
+
+    expect(result.inserted).toHaveLength(0);
+    expect(result.skipped).toHaveLength(0);
+    expect(state.pendingActions).toHaveLength(0);
+  });
+
+  // ── Test 8 ──────────────────────────────────────────────────────────────────
+  it('employee with rest action already pending → skipped with reason', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.x = 0;
+    employee.z = 0;
+    employee.hunger = 30; // below threshold
+    employee.fatigue = 80;
+    employee.breakNeed = 80;
+    employee.activeActionId = null;
+
+    // Manually push a rest PendingAction targeting this employee
+    state.pendingActions.push({
+      id: state.nextPendingActionId++,
+      type: 'rest',
+      requiredSkill: null,
+      requiredVehicleRole: null,
+      targetX: 0,
+      targetZ: 0,
+      targetY: 0,
+      payload: {},
+      targetEmployeeId: employee.id,
+    });
+
+    placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100);
+
+    const result = autoInsertNeedTasks(state);
+
+    expect(result.inserted).toHaveLength(0);
+    expect(result.skipped).toHaveLength(1);
+    expect(result.skipped[0]!.employeeId).toBe(employee.id);
+    expect(result.skipped[0]!.needKey).toBe('hunger');
+    expect(result.skipped[0]!.reason).toBe('rest_action_already_queued');
+
+    // Only the pre-existing action remains
+    expect(state.pendingActions).toHaveLength(1);
+  });
+
+  // ── Test 9 ──────────────────────────────────────────────────────────────────
+  it('multiple gauges below warning → one rest action with all triggered needs', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.x = 0;
+    employee.z = 0;
+    employee.hunger = 30;    // below 35
+    employee.fatigue = 20;   // below 25
+    employee.breakNeed = 25; // below 30
+    employee.activeActionId = null;
+
+    placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100);
+
+    const result = autoInsertNeedTasks(state);
+
+    // All three need keys must appear in the inserted result
+    const needKeys = result.inserted.map(r => r.needKey);
+    expect(needKeys).toContain('hunger');
+    expect(needKeys).toContain('fatigue');
+    expect(needKeys).toContain('breakNeed');
+
+    // But only ONE rest action should exist in pendingActions
+    const restActions = state.pendingActions.filter(
+      (a: PendingAction) => a.type === 'rest' && a.targetEmployeeId === employee.id,
+    );
+    expect(restActions).toHaveLength(1);
+    expect(result.skipped).toHaveLength(0);
+  });
+
+  // ── Test 10 ─────────────────────────────────────────────────────────────────
+  it('rest action shape validation', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.x = 0;
+    employee.z = 0;
+    employee.hunger = 30; // below threshold
+    employee.fatigue = 80;
+    employee.breakNeed = 80;
+
+    const buildResult = placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100);
+    expect(buildResult.success).toBe(true);
+
+    autoInsertNeedTasks(state);
+
+    const restAction = state.pendingActions.find(
+      (a: PendingAction) => a.type === 'rest' && a.targetEmployeeId === employee.id,
+    );
+    expect(restAction).toBeDefined();
+    expect(restAction!.type).toBe('rest');
+    expect(restAction!.requiredSkill).toBeNull();
+    expect(restAction!.requiredVehicleRole).toBeNull();
+    expect(restAction!.targetEmployeeId).toBe(employee.id);
+    expect(restAction!.payload.buildingId).toBe(buildResult.building!.id);
+    expect(restAction!.payload.restDuration).toBeDefined();
+    expect(typeof restAction!.payload.restDuration).toBe('number');
+  });
+
+  // ── Test 11 ─────────────────────────────────────────────────────────────────
+  it('nearest building selected', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.x = 0;
+    employee.z = 0;
+    employee.hunger = 30;
+    employee.fatigue = 80;
+    employee.breakNeed = 80;
+
+    // Near building: (5, 5)
+    const nearResult = placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100);
+    expect(nearResult.success).toBe(true);
+
+    // Far building: (50, 50)
+    const farResult = placeBuilding(state.buildings, 'living_quarters', 50, 50, 100, 100);
+    expect(farResult.success).toBe(true);
+
+    autoInsertNeedTasks(state);
+
+    const restAction = state.pendingActions.find(
+      (a: PendingAction) => a.type === 'rest',
+    );
+    expect(restAction).toBeDefined();
+    // Must target the near building (5, 5), not the far one (50, 50)
+    expect(restAction!.targetX).toBe(nearResult.building!.x);
+    expect(restAction!.targetZ).toBe(nearResult.building!.z);
+  });
+
+  // ── Test 12 ─────────────────────────────────────────────────────────────────
+  it('no building → target is employee position', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.x = 7;
+    employee.z = 13;
+    employee.hunger = 30; // below threshold
+    employee.fatigue = 80;
+    employee.breakNeed = 80;
+
+    // No buildings placed
+
+    const result = autoInsertNeedTasks(state);
+
+    expect(result.inserted).toHaveLength(1);
+
+    const restAction = state.pendingActions.find(
+      (a: PendingAction) => a.type === 'rest' && a.targetEmployeeId === employee.id,
+    );
+    expect(restAction).toBeDefined();
+    expect(restAction!.targetX).toBe(7);
+    expect(restAction!.targetZ).toBe(13);
+    // payload.buildingId must be undefined
+    expect(restAction!.payload.buildingId).toBeUndefined();
+  });
+
+  // ── Test 13 ─────────────────────────────────────────────────────────────────
+  it('boundary: gauge exactly at threshold (e.g. hunger=35) → no action', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.hunger = NEED_WARNING_THRESHOLDS.hunger; // exactly 35
+    employee.fatigue = 80;
+    employee.breakNeed = 80;
+
+    placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100);
+
+    const result = autoInsertNeedTasks(state);
+
+    expect(result.inserted).toHaveLength(0);
+    expect(result.skipped).toHaveLength(0);
+    expect(state.pendingActions).toHaveLength(0);
+  });
+
+  // ── Test 14 ─────────────────────────────────────────────────────────────────
+  it('insertion and skip results populated correctly for mixed scenario', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    // Employee A: hungry
+    const { employee: empA } = hireEmployee(state.employees, 'driller', rng);
+    empA.x = 0;
+    empA.z = 0;
+    empA.hunger = 30;
+    empA.fatigue = 80;
+    empA.breakNeed = 80;
+    empA.activeActionId = null;
+
+    // Employee B: also hungry, but already has a rest action pending
+    const { employee: empB } = hireEmployee(state.employees, 'blaster', rng);
+    empB.x = 0;
+    empB.z = 0;
+    empB.hunger = 30;
+    empB.fatigue = 80;
+    empB.breakNeed = 80;
+    empB.activeActionId = null;
+
+    // Pre-insert a rest action for employee B
+    state.pendingActions.push({
+      id: state.nextPendingActionId++,
+      type: 'rest',
+      requiredSkill: null,
+      requiredVehicleRole: null,
+      targetX: 0,
+      targetZ: 0,
+      targetY: 0,
+      payload: {},
+      targetEmployeeId: empB.id,
+    });
+
+    placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100);
+
+    const result = autoInsertNeedTasks(state);
+
+    // Employee A must be inserted
+    expect(result.inserted).toHaveLength(1);
+    expect(result.inserted[0]!.employeeId).toBe(empA.id);
+    expect(result.inserted[0]!.needKey).toBe('hunger');
+
+    // Employee B must be skipped with reason
+    expect(result.skipped).toHaveLength(1);
+    expect(result.skipped[0]!.employeeId).toBe(empB.id);
+    expect(result.skipped[0]!.needKey).toBe('hunger');
+    expect(result.skipped[0]!.reason).toBe('rest_action_already_queued');
+  });
+
+  // ── Test 15 ─────────────────────────────────────────────────────────────────
+  it('nextPendingActionId incremented after insertion', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.x = 0;
+    employee.z = 0;
+    employee.hunger = 30;
+    employee.fatigue = 80;
+    employee.breakNeed = 80;
+
+    placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100);
+
+    const beforeId = state.nextPendingActionId;
+
+    autoInsertNeedTasks(state);
+
+    // nextPendingActionId must have been incremented (one rest action inserted)
+    expect(state.nextPendingActionId).toBe(beforeId + 1);
+  });
 });

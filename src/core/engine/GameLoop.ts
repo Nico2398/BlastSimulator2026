@@ -9,11 +9,11 @@ import type { Random } from '../math/Random.js';
 import type { EventContext } from '../events/EventPool.js';
 import { tickEventSystem, type FiredEvent } from '../events/EventSystem.js';
 import { detectTrafficJam } from '../events/EventEngine.js';
-import { checkCollapse } from '../entities/Employee.js';
+import { checkCollapse, type NeedKey } from '../entities/Employee.js';
 
 // ── Config ──
 
-import { BASE_TICK_MS as _BASE_TICK_MS, VALID_SPEEDS as _VALID_SPEEDS, NEED_RESTORATION_THRESHOLDS, NEED_REST_DURATIONS, NEED_REST_BUILDING_TYPES, NEED_REST_SEARCH_RADIUS } from '../config/balance.js';
+import { BASE_TICK_MS as _BASE_TICK_MS, VALID_SPEEDS as _VALID_SPEEDS, NEED_REST_DURATIONS, NEED_REST_BUILDING_TYPES, NEED_REST_SEARCH_RADIUS, NEED_WARNING_THRESHOLDS } from '../config/balance.js';
 
 /** Milliseconds per base tick at 1x speed. */
 export const BASE_TICK_MS = _BASE_TICK_MS;
@@ -246,8 +246,8 @@ export function tickNeedRestoration(state: GameState): NeedRestorationResult {
   for (const emp of state.employees.employees) {
     if (!emp.alive || emp.injured || emp.activeActionId !== null) continue;
     const needsRest =
-      emp.hunger  < NEED_RESTORATION_THRESHOLDS.hunger ||
-      emp.fatigue < NEED_RESTORATION_THRESHOLDS.fatigue;
+      emp.hunger  < NEED_WARNING_THRESHOLDS.hunger ||
+      emp.fatigue < NEED_WARNING_THRESHOLDS.fatigue;
 
     if (!needsRest) continue;
 
@@ -257,21 +257,15 @@ export function tickNeedRestoration(state: GameState): NeedRestorationResult {
       continue;
     }
 
-    const actionId = state.nextPendingActionId++;
-    const restAction: PendingAction = {
-      id: actionId,
-      type: 'rest',
-      requiredSkill: null,
-      requiredVehicleRole: null,
+    const restAction = createRestPendingAction(state, {
       targetX: building.x,
       targetZ: building.z,
-      targetY: 0,
-      payload: { buildingId: building.id },
       targetEmployeeId: emp.id,
-    };
+      payload: { buildingId: building.id },
+    });
 
     state.pendingActions.push(restAction);
-    emp.activeActionId = actionId;
+    emp.activeActionId = restAction.id;
     result.routed.push(emp.id);
   }
 
@@ -281,6 +275,13 @@ export function tickNeedRestoration(state: GameState): NeedRestorationResult {
 export interface CollapseResult {
   /** Employee IDs that collapsed this tick. */
   collapsed: number[];
+}
+
+export interface NeedInsertionResult {
+  /** Employee/need pairs that had a rest PendingAction inserted. */
+  inserted: Array<{ employeeId: number; needKey: NeedKey }>;
+  /** Employee/need pairs that were skipped with a reason. */
+  skipped: Array<{ employeeId: number; needKey: NeedKey; reason: string }>;
 }
 
 /**
@@ -324,28 +325,117 @@ export function tickCollapse(state: GameState): CollapseResult {
       restDuration *= 2;
     }
 
-    const actionId = state.nextPendingActionId++;
-    const restAction: PendingAction = {
-      id: actionId,
-      type: 'rest',
-      requiredSkill: null,
-      requiredVehicleRole: null,
+    const restAction = createRestPendingAction(state, {
       targetX,
       targetZ,
-      targetY: 0,
-      payload: {
-        buildingId,
-        collapsedNeed: collapsedGauge,
-        restDuration,
-      },
       targetEmployeeId: emp.id,
-    };
+      payload: { buildingId, collapsedNeed: collapsedGauge, restDuration },
+    });
 
     state.pendingActions.push(restAction);
-    emp.activeActionId = actionId;
+    emp.activeActionId = restAction.id;
   }
 
   return result;
+}
+
+/**
+ * Proactively inserts rest PendingActions for employees whose need gauges
+ * have fallen below their warning thresholds (NEED_WARNING_THRESHOLDS).
+ *
+ * Unlike tickNeedRestoration() which handles only idle employees and
+ * immediately assigns the action (sets activeActionId), this function handles
+ * both idle and busy employees. For busy employees, the rest action is
+ * inserted into the pending queue without claiming it.
+ *
+ * Dead, injured, and collapsing employees are skipped.
+ * Employees that already have a rest PendingAction in the queue are skipped.
+ */
+export function autoInsertNeedTasks(state: GameState): NeedInsertionResult {
+  const result: NeedInsertionResult = { inserted: [], skipped: [] };
+
+  for (const emp of state.employees.employees) {
+    // Skip dead, injured, or collapsing employees
+    if (!emp.alive || emp.injured || emp.collapsing) continue;
+
+    // Determine which gauges are below warning thresholds
+    const triggeredGauges: NeedKey[] = [];
+    const gauges: Array<{ key: NeedKey; value: number }> = [
+      { key: 'hunger', value: emp.hunger },
+      { key: 'fatigue', value: emp.fatigue },
+      { key: 'breakNeed', value: emp.breakNeed },
+    ];
+    for (const { key, value } of gauges) {
+      if (value < NEED_WARNING_THRESHOLDS[key]) {
+        triggeredGauges.push(key);
+      }
+    }
+
+    // If no gauges are below threshold, skip entirely
+    if (triggeredGauges.length === 0) continue;
+
+    // Check if employee already has a rest PendingAction queued
+    const hasRestAction = state.pendingActions.some(
+      action => action.targetEmployeeId === emp.id && action.type === 'rest',
+    );
+
+    if (hasRestAction) {
+      // Record all triggered gauges as skipped
+      for (const gauge of triggeredGauges) {
+        result.skipped.push({ employeeId: emp.id, needKey: gauge, reason: 'rest_action_already_queued' });
+      }
+      continue;
+    }
+
+    // Use the first triggered gauge as the primary one (array is non-empty due to check above)
+    const primaryGauge = triggeredGauges[0]!;
+    const buildingType = NEED_REST_BUILDING_TYPES[primaryGauge];
+    const building = findNearestBuildingOfType(state, buildingType, emp.x, emp.z);
+
+    const targetX = building?.x ?? emp.x;
+    const targetZ = building?.z ?? emp.z;
+
+    const restAction = createRestPendingAction(state, {
+      targetX,
+      targetZ,
+      targetEmployeeId: emp.id,
+      payload: {
+        buildingId: building?.id,
+        restDuration: NEED_REST_DURATIONS[primaryGauge],
+        triggeredBy: triggeredGauges,
+      },
+    });
+
+    state.pendingActions.push(restAction);
+
+    // Record each triggered gauge as inserted
+    for (const gauge of triggeredGauges) {
+      result.inserted.push({ employeeId: emp.id, needKey: gauge });
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Create a rest PendingAction with boilerplate fields pre-filled.
+ * Generates a new ID from state.nextPendingActionId.
+ */
+function createRestPendingAction(
+  state: GameState,
+  overrides: Pick<PendingAction, 'targetX' | 'targetZ' | 'targetEmployeeId' | 'payload'>,
+): PendingAction {
+  return {
+    id: state.nextPendingActionId++,
+    type: 'rest',
+    requiredSkill: null,
+    requiredVehicleRole: null,
+    targetX: overrides.targetX,
+    targetZ: overrides.targetZ,
+    targetY: 0,
+    payload: overrides.payload,
+    targetEmployeeId: overrides.targetEmployeeId,
+  };
 }
 
 function findNearestBuildingOfType(
