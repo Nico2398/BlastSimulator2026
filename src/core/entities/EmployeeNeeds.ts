@@ -73,11 +73,10 @@ export function replenishNeed(employee: Employee, need: NeedKey, amount: number)
  * - morale < 30: ×1.20 (faster drain — unhappy workers let themselves go)
  * - otherwise:   ×1.00 (standard drain)
  */
-function getMoraleDrainMultiplier(_morale: number): number {
-  // STUB — implement later
-  void MORALE_THRESHOLDS;
-  void NEED_MORALE_DRAIN_MULTIPLIERS;
-  throw new Error('Not implemented');
+function getMoraleDrainMultiplier(morale: number): number {
+  if (morale > MORALE_THRESHOLDS.high) return NEED_MORALE_DRAIN_MULTIPLIERS.high;
+  if (morale < MORALE_THRESHOLDS.low) return NEED_MORALE_DRAIN_MULTIPLIERS.low;
+  return NEED_MORALE_DRAIN_MULTIPLIERS.normal;
 }
 
 /**
@@ -87,8 +86,13 @@ function getMoraleDrainMultiplier(_morale: number): number {
  * Call this each tick for each employee.
  * All gauges are clamped to a minimum of 0.
  */
-export function tickNeedGauges(_employee: Employee, _isWorking: boolean): void {
-  // STUB — implement later
-  void getMoraleDrainMultiplier;
-  throw new Error('Not implemented');
+export function tickNeedGauges(employee: Employee, isWorking: boolean): void {
+  const multiplier = getMoraleDrainMultiplier(employee.morale);
+
+  const gauges: NeedKey[] = ['hunger', 'fatigue', 'breakNeed'];
+  for (const gauge of gauges) {
+    const baseRate = isWorking ? NEED_DRAIN_RATES[gauge].working : NEED_DRAIN_RATES[gauge].idle;
+    const actualDrain = baseRate * multiplier;
+    employee[gauge] = Math.max(0, employee[gauge] - actualDrain);
+  }
 }
