@@ -12,7 +12,6 @@ import {
   tickEventSystem,
   clearPendingEvent,
   queueFollowUp,
-  type EventSystemState,
 } from '../../src/core/events/EventSystem.js';
 import {
   detectTrafficJam,
@@ -20,10 +19,6 @@ import {
   detectOreReport,
 } from '../../src/core/events/EventEngine.js';
 import { Random } from '../../src/core/math/Random.js';
-import { createGame } from '../../src/core/state/GameState.js';
-import { createVehicleState, purchaseVehicle, type Vehicle } from '../../src/core/entities/Vehicle.js';
-import { createFinanceState } from '../../src/core/economy/Finance.js';
-import { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import { setupEvents } from '../../src/core/events/index.js';
 import { clearEvents } from '../../src/core/events/EventPool.js';
 
@@ -76,7 +71,7 @@ function makeEventCtx(overrides: Partial<{
 }
 
 /** Build a minimal waiting-vehicle fixture for traffic-jam tests. */
-let _nextVehicleId = 100;
+let _nextVehicleId: number;
 function makeWaitingVehicle(
   targetX: number,
   targetZ: number,

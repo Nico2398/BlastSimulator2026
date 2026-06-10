@@ -3,7 +3,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { type GameContext, newGameCommand } from '../../src/console/commands/world.js';
-import { financesCommand, contractCommand, fragmentsCommand } from '../../src/console/commands/economy.js';
+import { financesCommand, contractCommand } from '../../src/console/commands/economy.js';
 import { EventEmitter } from '../../src/core/state/EventEmitter.js';
 import {
   createFinanceState,
@@ -26,7 +26,6 @@ import {
 } from '../../src/core/economy/Contract.js';
 import { negotiateContract } from '../../src/core/economy/Negotiation.js';
 import { Random } from '../../src/core/math/Random.js';
-import { createLogisticsState } from '../../src/core/economy/Logistics.js';
 
 // ── Contract fixture helpers ─────────────────────────────────────────────────
 

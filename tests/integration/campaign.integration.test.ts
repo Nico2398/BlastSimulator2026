@@ -9,21 +9,12 @@ import {
   campaignCompleteCommand,
   statsCommand,
 } from '../../src/console/commands/campaign.js';
-import { tickCommand } from '../../src/console/commands/events.js';
-import {
-  drillPlanCommand,
-  chargeCommand,
-  sequenceCommand,
-  blastCommand,
-} from '../../src/console/commands/mining.js';
-import { employeeCommand, buildCommand } from '../../src/console/commands/entities.js';
 import { EventEmitter } from '../../src/core/state/EventEmitter.js';
 import {
   createCampaignState,
   recordProfit,
   startLevel,
   returnToWorldMap,
-  type CampaignState,
 } from '../../src/core/campaign/Campaign.js';
 import { getLevel, getAllLevels } from '../../src/core/campaign/Level.js';
 import {
@@ -31,12 +22,9 @@ import {
   snapshotStats,
   recordBlastResult,
   calculateStarRating,
-  type LevelStats,
-  type StarRating,
 } from '../../src/core/campaign/SuccessTracker.js';
 import { createGame } from '../../src/core/state/GameState.js';
-import { createFinanceState, addIncome, addExpense } from '../../src/core/economy/Finance.js';
-import { Random } from '../../src/core/math/Random.js';
+import { addIncome, addExpense } from '../../src/core/economy/Finance.js';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 

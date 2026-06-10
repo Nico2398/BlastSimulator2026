@@ -81,11 +81,10 @@ const VILLAGE_FAR: VillagePosition[] = [
   { id: 'testville', position: vec3(200, 0, 200) },
 ];
 
-beforeEach(() => resetHoleIds());
-
 // ── Blast enhanced ────────────────────────────────────────────────────────────
 
 describe('Blast enhanced', () => {
+  beforeEach(() => resetHoleIds());
   // ── 1. Multi-rock composition ─────────────────────────────────────────────
 
   it('multi-rock composition computes weighted threshold', () => {

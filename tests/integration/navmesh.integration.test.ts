@@ -212,7 +212,7 @@ describe('NavMesh and pathfinding', () => {
     expect(NavGrid.computeSurfaceY(empty, 1, 1)).toBe(-1);
   });
 
-  it('drill holes marked as blocked cells', () => {
+  it('drill holes marked as drill_hole cells', () => {
     const vg = new VoxelGrid(10, 10, 10);
     fillSolid(vg, 4);
 

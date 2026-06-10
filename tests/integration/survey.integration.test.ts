@@ -189,7 +189,7 @@ describe('Survey system', () => {
     expect(skillResult.success).toBe(true);
 
     // Survey at a valid position
-    const result = surveyCommand(ctx as never, ['core_sample'], { x: '16', z: '16' });
+    const result = surveyCommand(ctx as any, ['core_sample'], { x: '16', z: '16' });
     expect(result.success).toBe(true);
     expect(result.output).toContain('core_sample survey queued');
     expect(result.output).toContain('Action ID:');
@@ -212,12 +212,12 @@ describe('Survey system', () => {
 
   it('survey rejects out-of-bounds coordinates', () => {
     // Grid is 32x32x32, so (100, 100) is out of bounds
-    const result = surveyCommand(ctx as never, ['seismic'], { x: '100', z: '100' });
+    const result = surveyCommand(ctx as any, ['seismic'], { x: '100', z: '100' });
     expect(result.success).toBe(false);
     expect(result.output).toMatch(/out of bounds/i);
 
     // Negative coordinates should also be rejected
-    const negResult = surveyCommand(ctx as never, ['aerial'], { x: '-5', z: '16' });
+    const negResult = surveyCommand(ctx as any, ['aerial'], { x: '-5', z: '16' });
     expect(negResult.success).toBe(false);
     expect(negResult.output).toMatch(/out of bounds/i);
   });
@@ -233,7 +233,7 @@ describe('Survey system', () => {
     employeeCommand(ctx, ['assign_skill', String(empId)], { skill: 'geology', level: '1' });
 
     // Most expensive survey (seismic = $3000) — cash is 0
-    const result = surveyCommand(ctx as never, ['seismic'], { x: '16', z: '16' });
+    const result = surveyCommand(ctx as any, ['seismic'], { x: '16', z: '16' });
     expect(result.success).toBe(false);
     expect(result.output).toMatch(/insufficient funds/i);
     expect(result.output).toMatch(/3000/);
@@ -243,7 +243,7 @@ describe('Survey system', () => {
 
   it('survey without surveyor fails', () => {
     // No employees hired at all — no geology qualification exists
-    const result = surveyCommand(ctx as never, ['seismic'], { x: '16', z: '16' });
+    const result = surveyCommand(ctx as any, ['seismic'], { x: '16', z: '16' });
     expect(result.success).toBe(false);
     expect(result.output).toMatch(/no available surveyor/i);
   });
@@ -335,7 +335,7 @@ describe('Survey system', () => {
 
   // ── Additional: column with no ore → zero-density estimate omitted ────────
 
-  it('survey on a column with no ore produces zero-density estimates', () => {
+  it('survey on a column with no ore produces no estimates', () => {
     const grid = new VoxelGrid(30, 15, 30);
     // No ore placed anywhere — grid is all air/empty
 

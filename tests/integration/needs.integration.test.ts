@@ -5,23 +5,15 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { type GameContext, newGameCommand } from '../../src/console/commands/world.js';
 import { employeeCommand, needsCommand } from '../../src/console/commands/entities.js';
-import { setPolicyCommand } from '../../src/console/commands/policy.js';
 import { EventEmitter } from '../../src/core/state/EventEmitter.js';
-import {
-  createEmployeeState,
-  hireEmployee,
-} from '../../src/core/entities/Employee.js';
+
 import {
   tickNeedGauges,
   needsMoraleEffect,
   replenishNeed,
   checkCollapse,
   getNeedMultiplier,
-  type NeedKey,
 } from '../../src/core/entities/EmployeeNeeds.js';
-import { tickNeedRestoration, autoInsertNeedTasks } from '../../src/core/engine/GameLoop.js';
-import { createBuildingState, placeBuilding } from '../../src/core/entities/Building.js';
-import { Random } from '../../src/core/math/Random.js';
 import type { Employee } from '../../src/core/entities/Employee.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
