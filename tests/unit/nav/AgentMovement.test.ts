@@ -11,9 +11,11 @@
 //   Group 7 — Immutability (original AgentState not mutated)
 
 import { describe, it, expect } from 'vitest';
-import { advanceAgent } from '../../../src/core/nav/AgentMovement.js';
-import type { AdvanceResult, AgentState } from '../../../src/core/nav/AgentMovement.js';
+import { advanceAgent, isPathBlocked, doesPathCrossRegion, requestReRoute } from '../../../src/core/nav/AgentMovement.js';
+import type { AdvanceResult, AgentState, StaleCheckResult } from '../../../src/core/nav/AgentMovement.js';
 import { AGENT_WALK_SPEED } from '../../../src/core/config/balance.js';
+import { NavGrid } from '../../../src/core/nav/NavGrid.js';
+import type { NavCell } from '../../../src/core/nav/NavGrid.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Helper
@@ -26,8 +28,28 @@ function makeState(overrides?: Partial<AgentState>): AgentState {
     waypoints: [],
     waypointIndex: 0,
     walkSpeed: AGENT_WALK_SPEED,
+    destinationX: 0,
+    destinationZ: 0,
     ...overrides,
   };
+}
+
+/**
+ * Create a small NavGrid with known cell types for deterministic tests.
+ * Default is a 5×5 all-walkable grid unless overridden.
+ */
+function makeNavGrid(cells?: NavCell[][]): NavGrid {
+  if (cells) return new NavGrid(cells[0]!.length, cells.length, cells);
+  // Default: 5×5 walkable grid
+  const defaultCells: NavCell[][] = [];
+  for (let z = 0; z < 5; z++) {
+    const row: NavCell[] = [];
+    for (let x = 0; x < 5; x++) {
+      row.push({ type: 'walkable', moveCost: 1, benchLevel: 0, vehicleOccupied: false });
+    }
+    defaultCells.push(row);
+  }
+  return new NavGrid(5, 5, defaultCells);
 }
 
 /**
@@ -237,5 +259,360 @@ describe('advanceAgent — immutability', () => {
 
     // Returned object should be a different reference
     expect(result).not.toBe(original);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Group 8: isPathBlocked — stale-path detection via blocked waypoints
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('isPathBlocked — blocked waypoint detection', () => {
+  it('returns true when the next remaining waypoint is blocked', () => {
+    const grid = makeNavGrid([
+      [{ type: 'walkable', moveCost: 1, benchLevel: 0, vehicleOccupied: false }, { type: 'blocked', moveCost: Infinity, benchLevel: 0, vehicleOccupied: false }],
+      [{ type: 'walkable', moveCost: 1, benchLevel: 0, vehicleOccupied: false }, { type: 'walkable', moveCost: 1, benchLevel: 0, vehicleOccupied: false }],
+    ]);
+    const state = makeState({
+      x: 0, z: 0,
+      waypoints: [{ x: 1, z: 0 }],
+      waypointIndex: 0,
+      walkSpeed: 1,
+      destinationX: 1, destinationZ: 0,
+    });
+    expect(isPathBlocked(state, grid, false)).toBe(true);
+  });
+
+  it('returns true when a later remaining waypoint is blocked (not just the next one)', () => {
+    // Create a 3×1 grid: row 0 = [walkable, walkable, blocked]
+    const cells: NavCell[][] = [
+      [
+        { type: 'walkable', moveCost: 1, benchLevel: 0, vehicleOccupied: false },
+        { type: 'walkable', moveCost: 1, benchLevel: 0, vehicleOccupied: false },
+        { type: 'blocked', moveCost: Infinity, benchLevel: 0, vehicleOccupied: false },
+      ],
+    ];
+    const grid = makeNavGrid(cells);
+    const state = makeState({
+      x: 0, z: 0,
+      waypoints: [{ x: 0, z: 0 }, { x: 1, z: 0 }, { x: 2, z: 0 }],
+      waypointIndex: 0,
+      walkSpeed: 1,
+      destinationX: 2, destinationZ: 0,
+    });
+    expect(isPathBlocked(state, grid, false)).toBe(true);
+  });
+
+  it('returns true when avoidVehicles is true and a waypoint is vehicleOccupied', () => {
+    const grid = makeNavGrid([
+      [
+        { type: 'walkable', moveCost: 1, benchLevel: 0, vehicleOccupied: true },
+        { type: 'walkable', moveCost: 1, benchLevel: 0, vehicleOccupied: false },
+      ],
+      [
+        { type: 'walkable', moveCost: 1, benchLevel: 0, vehicleOccupied: false },
+        { type: 'walkable', moveCost: 1, benchLevel: 0, vehicleOccupied: false },
+      ],
+    ]);
+    const state = makeState({
+      x: 0, z: 0,
+      waypoints: [{ x: 0, z: 0 }],
+      waypointIndex: 0,
+      walkSpeed: 1,
+      destinationX: 0, destinationZ: 0,
+    });
+    expect(isPathBlocked(state, grid, true)).toBe(true);
+  });
+
+  it('returns false when avoidVehicles is false and a waypoint is vehicleOccupied', () => {
+    const grid = makeNavGrid([
+      [
+        { type: 'walkable', moveCost: 1, benchLevel: 0, vehicleOccupied: true },
+        { type: 'walkable', moveCost: 1, benchLevel: 0, vehicleOccupied: false },
+      ],
+      [
+        { type: 'walkable', moveCost: 1, benchLevel: 0, vehicleOccupied: false },
+        { type: 'walkable', moveCost: 1, benchLevel: 0, vehicleOccupied: false },
+      ],
+    ]);
+    const state = makeState({
+      x: 0, z: 0,
+      waypoints: [{ x: 0, z: 0 }],
+      waypointIndex: 0,
+      walkSpeed: 1,
+      destinationX: 0, destinationZ: 0,
+    });
+    expect(isPathBlocked(state, grid, false)).toBe(false);
+  });
+
+  it('returns false when all remaining waypoints are walkable', () => {
+    const grid = makeNavGrid(); // Default 5×5 all-walkable
+    const state = makeState({
+      x: 0, z: 0,
+      waypoints: [{ x: 2, z: 2 }, { x: 4, z: 4 }],
+      waypointIndex: 0,
+      walkSpeed: 1,
+      destinationX: 4, destinationZ: 4,
+    });
+    expect(isPathBlocked(state, grid, false)).toBe(false);
+  });
+
+  it('returns false when waypoints array is empty', () => {
+    const grid = makeNavGrid();
+    const state = makeState({
+      x: 0, z: 0,
+      waypoints: [],
+      waypointIndex: 0,
+      walkSpeed: 1,
+      destinationX: 0, destinationZ: 0,
+    });
+    expect(isPathBlocked(state, grid, false)).toBe(false);
+  });
+
+  it('returns false when waypointIndex is past the end of waypoints', () => {
+    const grid = makeNavGrid();
+    const state = makeState({
+      x: 0, z: 0,
+      waypoints: [{ x: 2, z: 0 }],
+      waypointIndex: 5,
+      walkSpeed: 1,
+      destinationX: 2, destinationZ: 0,
+    });
+    expect(isPathBlocked(state, grid, false)).toBe(false);
+  });
+
+  it('does not mutate the input AgentState', () => {
+    const grid = makeNavGrid([
+      [{ type: 'blocked', moveCost: Infinity, benchLevel: 0, vehicleOccupied: false }, { type: 'walkable', moveCost: 1, benchLevel: 0, vehicleOccupied: false }],
+      [{ type: 'walkable', moveCost: 1, benchLevel: 0, vehicleOccupied: false }, { type: 'walkable', moveCost: 1, benchLevel: 0, vehicleOccupied: false }],
+    ]);
+    const state = makeState({
+      x: 0, z: 0,
+      waypoints: [{ x: 0, z: 0 }],
+      waypointIndex: 0,
+      walkSpeed: 1,
+      destinationX: 0, destinationZ: 0,
+    });
+    const snapshot = { ...state, waypoints: [...state.waypoints] };
+
+    isPathBlocked(state, grid, false);
+
+    expect(state.x).toBe(snapshot.x);
+    expect(state.z).toBe(snapshot.z);
+    expect(state.waypointIndex).toBe(snapshot.waypointIndex);
+    expect(state.walkSpeed).toBe(snapshot.walkSpeed);
+    expect(state.destinationX).toBe(snapshot.destinationX);
+    expect(state.destinationZ).toBe(snapshot.destinationZ);
+    expect(state.waypoints.length).toBe(snapshot.waypoints.length);
+    expect(state.waypoints[0]!.x).toBe(snapshot.waypoints[0]!.x);
+    expect(state.waypoints[0]!.z).toBe(snapshot.waypoints[0]!.z);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Group 9: doesPathCrossRegion — stale-path detection via updated regions
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('doesPathCrossRegion — region intersection', () => {
+  const region = { minX: 1, maxX: 3, minZ: 1, maxZ: 3 };
+
+  it('returns true when a waypoint falls inside the region', () => {
+    const state = makeState({
+      x: 0, z: 0,
+      waypoints: [{ x: 2, z: 2 }],
+      waypointIndex: 0,
+      walkSpeed: 1,
+      destinationX: 2, destinationZ: 2,
+    });
+    expect(doesPathCrossRegion(state, region)).toBe(true);
+  });
+
+  it('returns true when a waypoint is exactly on a region boundary (inclusive)', () => {
+    const state = makeState({
+      x: 0, z: 0,
+      waypoints: [{ x: 1, z: 1 }],
+      waypointIndex: 0,
+      walkSpeed: 1,
+      destinationX: 1, destinationZ: 1,
+    });
+    expect(doesPathCrossRegion(state, region)).toBe(true);
+  });
+
+  it('returns false when no waypoint is inside the region', () => {
+    const state = makeState({
+      x: 0, z: 0,
+      waypoints: [{ x: 4, z: 4 }],
+      waypointIndex: 0,
+      walkSpeed: 1,
+      destinationX: 4, destinationZ: 4,
+    });
+    expect(doesPathCrossRegion(state, region)).toBe(false);
+  });
+
+  it('returns false when the region is empty (minX > maxX)', () => {
+    const emptyRegion = { minX: 5, maxX: 3, minZ: 1, maxZ: 3 };
+    const state = makeState({
+      x: 0, z: 0,
+      waypoints: [{ x: 2, z: 2 }],
+      waypointIndex: 0,
+      walkSpeed: 1,
+      destinationX: 2, destinationZ: 2,
+    });
+    expect(doesPathCrossRegion(state, emptyRegion)).toBe(false);
+  });
+
+  it('returns false when the region is empty (minZ > maxZ)', () => {
+    const emptyRegion = { minX: 1, maxX: 3, minZ: 5, maxZ: 3 };
+    const state = makeState({
+      x: 0, z: 0,
+      waypoints: [{ x: 2, z: 2 }],
+      waypointIndex: 0,
+      walkSpeed: 1,
+      destinationX: 2, destinationZ: 2,
+    });
+    expect(doesPathCrossRegion(state, emptyRegion)).toBe(false);
+  });
+
+  it('returns false when waypoints array is empty', () => {
+    const state = makeState({
+      x: 0, z: 0,
+      waypoints: [],
+      waypointIndex: 0,
+      walkSpeed: 1,
+      destinationX: 0, destinationZ: 0,
+    });
+    expect(doesPathCrossRegion(state, region)).toBe(false);
+  });
+
+  it('returns false when waypointIndex is past the end', () => {
+    const state = makeState({
+      x: 0, z: 0,
+      waypoints: [{ x: 2, z: 2 }],
+      waypointIndex: 5,
+      walkSpeed: 1,
+      destinationX: 2, destinationZ: 2,
+    });
+    expect(doesPathCrossRegion(state, region)).toBe(false);
+  });
+
+  it('does not mutate the input AgentState', () => {
+    const state = makeState({
+      x: 0, z: 0,
+      waypoints: [{ x: 2, z: 2 }],
+      waypointIndex: 0,
+      walkSpeed: 1,
+      destinationX: 2, destinationZ: 2,
+    });
+    const snapshot = { ...state, waypoints: [...state.waypoints] };
+
+    doesPathCrossRegion(state, region);
+
+    expect(state.x).toBe(snapshot.x);
+    expect(state.z).toBe(snapshot.z);
+    expect(state.waypointIndex).toBe(snapshot.waypointIndex);
+    expect(state.walkSpeed).toBe(snapshot.walkSpeed);
+    expect(state.destinationX).toBe(snapshot.destinationX);
+    expect(state.destinationZ).toBe(snapshot.destinationZ);
+    expect(state.waypoints.length).toBe(snapshot.waypoints.length);
+    expect(state.waypoints[0]!.x).toBe(snapshot.waypoints[0]!.x);
+    expect(state.waypoints[0]!.z).toBe(snapshot.waypoints[0]!.z);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Group 10: requestReRoute — clearing waypoints for re-routing
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('requestReRoute — clear waypoints for re-routing', () => {
+  it('returns a new AgentState with empty waypoints and waypointIndex 0', () => {
+    const state = makeState({
+      x: 10, z: 20,
+      waypoints: [{ x: 15, z: 25 }, { x: 30, z: 40 }],
+      waypointIndex: 1,
+      walkSpeed: 2,
+      destinationX: 30, destinationZ: 40,
+    });
+    const result = requestReRoute(state);
+    expect(result.waypoints).toEqual([]);
+    expect(result.waypointIndex).toBe(0);
+  });
+
+  it('preserves x, z, walkSpeed, destinationX, destinationZ', () => {
+    const state = makeState({
+      x: 10, z: 20,
+      waypoints: [{ x: 15, z: 25 }],
+      waypointIndex: 0,
+      walkSpeed: 3,
+      destinationX: 15, destinationZ: 25,
+    });
+    const result = requestReRoute(state);
+    expect(result.x).toBe(10);
+    expect(result.z).toBe(20);
+    expect(result.walkSpeed).toBe(3);
+    expect(result.destinationX).toBe(15);
+    expect(result.destinationZ).toBe(25);
+  });
+
+  it('does not mutate the input AgentState', () => {
+    const state = makeState({
+      x: 10, z: 20,
+      waypoints: [{ x: 15, z: 25 }],
+      waypointIndex: 0,
+      walkSpeed: 3,
+      destinationX: 15, destinationZ: 25,
+    });
+    const snapshot = { ...state, waypoints: [...state.waypoints] };
+
+    requestReRoute(state);
+
+    expect(state.x).toBe(snapshot.x);
+    expect(state.z).toBe(snapshot.z);
+    expect(state.waypointIndex).toBe(snapshot.waypointIndex);
+    expect(state.walkSpeed).toBe(snapshot.walkSpeed);
+    expect(state.destinationX).toBe(snapshot.destinationX);
+    expect(state.destinationZ).toBe(snapshot.destinationZ);
+    expect(state.waypoints.length).toBe(snapshot.waypoints.length);
+    expect(state.waypoints[0]!.x).toBe(snapshot.waypoints[0]!.x);
+    expect(state.waypoints[0]!.z).toBe(snapshot.waypoints[0]!.z);
+  });
+
+  it('works when destination equals current position', () => {
+    const state = makeState({
+      x: 5, z: 5,
+      waypoints: [{ x: 5, z: 5 }],
+      waypointIndex: 0,
+      walkSpeed: 1,
+      destinationX: 5, destinationZ: 5,
+    });
+    const result = requestReRoute(state);
+    expect(result.waypoints).toEqual([]);
+    expect(result.waypointIndex).toBe(0);
+    expect(result.x).toBe(5);
+    expect(result.z).toBe(5);
+    expect(result.destinationX).toBe(5);
+    expect(result.destinationZ).toBe(5);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Group 11: StaleCheckResult — type shape validation
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('StaleCheckResult — type shape', () => {
+  it('creates a stale result with BLOCKED_WAYPOINT reason', () => {
+    const result: StaleCheckResult = { isStale: true, reason: 'BLOCKED_WAYPOINT' };
+    expect(result.isStale).toBe(true);
+    expect(result.reason).toBe('BLOCKED_WAYPOINT');
+  });
+
+  it('creates a stale result with CROSSES_UPDATED_REGION reason', () => {
+    const result: StaleCheckResult = { isStale: true, reason: 'CROSSES_UPDATED_REGION' };
+    expect(result.isStale).toBe(true);
+    expect(result.reason).toBe('CROSSES_UPDATED_REGION');
+  });
+
+  it('creates a non-stale result with no reason', () => {
+    const result: StaleCheckResult = { isStale: false };
+    expect(result.isStale).toBe(false);
+    expect(result.reason).toBeUndefined();
   });
 });
