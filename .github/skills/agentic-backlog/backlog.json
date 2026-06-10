@@ -1262,9 +1262,9 @@
       "src/core/config/balance.ts"
     ],
     "testFile": null,
-    "status": "pending",
+    "status": "done",
     "blockedBy": [],
-    "closedInPR": null
+    "closedInPR": 279
   },
   {
     "id": "7.3",
