@@ -144,10 +144,18 @@ function getMoraleDrainMultiplier(morale: number): number {
  * collapse thresholds. Sets collapsing=true and clears activeActionId on collapse.
  * @returns The NeedKey that caused the collapse, or null if no collapse.
  */
-export function checkCollapse(_employee: Employee): NeedKey | null {
-  // STUB - will be implemented
-  void _employee;
-  void NEED_COLLAPSE_THRESHOLDS;
+export function checkCollapse(employee: Employee): NeedKey | null {
+  if (employee.collapsing) return null;
+
+  const gauges: NeedKey[] = ['hunger', 'fatigue', 'breakNeed'];
+  for (const gauge of gauges) {
+    if (employee[gauge] <= NEED_COLLAPSE_THRESHOLDS[gauge]) {
+      employee.collapsing = true;
+      employee.activeActionId = null;
+      return gauge;
+    }
+  }
+
   return null;
 }
 
