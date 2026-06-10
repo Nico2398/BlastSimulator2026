@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createGame, buildGameNavGrid } from '../../../src/core/state/GameState.js';
 import type { GameState, PendingAction, ActionType, GhostPreview } from '../../../src/core/state/GameState.js';
-import { NavGrid, type NavCellType } from '../../../src/core/nav/NavGrid.js';
+import { NavGrid } from '../../../src/core/nav/NavGrid.js';
 import { VoxelGrid, type VoxelData } from '../../../src/core/world/VoxelGrid.js';
 import type { Building } from '../../../src/core/entities/Building.js';
 import type { DrillHole } from '../../../src/core/mining/DrillPlan.js';
@@ -108,7 +108,8 @@ function makeAction(overrides: Partial<PendingAction> = {}): PendingAction {
 
 /**
  * Add a qualified employee to `state.employees` for the given skill.
- * Falls back to direct mutation if `assignSkill` is not yet implemented.
+ * Uses `assignSkill` for the canonical path; falls back to direct
+ * qualification assignment if a future refactor changes the API.
  */
 function addQualifiedEmployee(
   state: GameState,
@@ -120,7 +121,7 @@ function addQualifiedEmployee(
   try {
     assignSkill(state.employees, employee.id, skill, 1);
   } catch {
-    // assignSkill may not be implemented yet — set qualifications directly
+    // Defensive fallback — keep test working even if assignSkill signature changes
     (employee as Record<string, unknown>).qualifications = [
       { category: skill, proficiencyLevel: 1, xp: 0 },
     ];
