@@ -327,9 +327,19 @@ export function zoneCommand(
 // ── needs command ──
 
 export function needsCommand(
-  _ctx: GameContext,
+  ctx: GameContext,
   _args: string[],
   _named: Record<string, string>,
 ): CommandResult {
-  return { success: true, output: 'Employee Needs: TBD' };
+  const err = requireGame(ctx);
+  if (err) return err;
+  const state = ctx.state!;
+  if (state.employees.employees.length === 0) {
+    return { success: true, output: 'No employees.' };
+  }
+  const lines = ['Employee Needs:'];
+  for (const e of state.employees.employees) {
+    lines.push(`  [${e.id}] ${e.name.padEnd(20)} — hunger: ${e.hunger}  fatigue: ${e.fatigue}  break: ${e.breakNeed}`);
+  }
+  return { success: true, output: lines.join('\n') };
 }
