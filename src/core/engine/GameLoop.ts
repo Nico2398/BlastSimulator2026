@@ -10,10 +10,11 @@ import type { EventContext } from '../events/EventPool.js';
 import { tickEventSystem, type FiredEvent } from '../events/EventSystem.js';
 import { detectTrafficJam } from '../events/EventEngine.js';
 import { checkCollapse, type NeedKey } from '../entities/Employee.js';
+import { tickNeedGauges, needsMoraleEffect } from '../entities/EmployeeNeeds.js';
 
 // ── Config ──
 
-import { BASE_TICK_MS as _BASE_TICK_MS, VALID_SPEEDS as _VALID_SPEEDS, NEED_REST_DURATIONS, NEED_REST_BUILDING_TYPES, NEED_REST_SEARCH_RADIUS, NEED_WARNING_THRESHOLDS, NEED_REST_COSTS } from '../config/balance.js';
+import { BASE_TICK_MS as _BASE_TICK_MS, VALID_SPEEDS as _VALID_SPEEDS, NEED_REST_DURATIONS, NEED_REST_BUILDING_TYPES, NEED_REST_SEARCH_RADIUS, NEED_WARNING_THRESHOLDS, NEED_REST_COSTS, WORK_DURATION_TICKS, SHIFT_SLEEP_DURATION_TICKS } from '../config/balance.js';
 
 /** Milliseconds per base tick at 1x speed. */
 export const BASE_TICK_MS = _BASE_TICK_MS;
@@ -477,4 +478,36 @@ export function deductRestCost(state: GameState, needKey: NeedKey): number {
 
   state.cash = Math.max(0, state.cash - cost);
   return cost;
+}
+
+// ── Shift cycle (Bunkhouse Tier 2+) ──
+
+export interface ShiftCycleResult {
+  /** Employee IDs whose rest period completed this tick. */
+  restCompleted: number[];
+  /** Employee IDs that transitioned from shift-working to shift-resting this tick. */
+  shiftRested: number[];
+  /** Whether any employee shift logic was processed this tick. */
+  active: boolean;
+}
+
+/**
+ * Process the shift/rest cycle for employees with bunkhouse tier >= 2.
+ * Empties restTicksRemaining on completion and transitions employees
+ * between working and resting states.
+ *
+ * @param state - The game state (mutated in place)
+ * @param firedEvents - Accumulator for events fired this tick
+ * @returns Result summary of shift transitions
+ */
+export function processShiftCycle(
+  _state: GameState,
+  _firedEvents: FiredEvent[],
+): ShiftCycleResult {
+  void tickNeedGauges;
+  void needsMoraleEffect;
+  void WORK_DURATION_TICKS;
+  void SHIFT_SLEEP_DURATION_TICKS;
+  // TODO: implement shift cycle logic
+  return { restCompleted: [], shiftRested: [], active: false };
 }

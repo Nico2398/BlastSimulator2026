@@ -456,6 +456,12 @@ export const SITE_POLICY_DEFAULT_THRESHOLDS = {
   socialBreak: 20,
 } as const;
 
+/** Number of ticks an employee works before shift cycle rest is forced. */
+export const WORK_DURATION_TICKS = 6;
+
+/** Number of ticks an employee rests during a shift-cycle sleep when bunkhouse tier >= 2. */
+export const SHIFT_SLEEP_DURATION_TICKS = 8;
+
 // ─── Survey System ────────────────────────────────────────────────────────────
 
 /** Baseline noise std-dev applied to ore density estimates before skill adjustment. */
