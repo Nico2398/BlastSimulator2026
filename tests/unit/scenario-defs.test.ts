@@ -26,7 +26,7 @@ const KNOWN_COMMANDS = [
 ];
 
 /** Commands that inspect state — valid as a final playthrough step */
-const INSPECTION_COMMANDS = ['state', 'scores', 'finances', 'stats', 'inspect'];
+const INSPECTION_COMMANDS = ['campaign', 'state', 'scores', 'finances', 'stats', 'inspect'];
 
 interface ScenarioDef {
   name: string;
