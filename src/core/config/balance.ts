@@ -327,7 +327,7 @@ export const NEED_PRODUCTIVITY_MULTIPLIERS = {
 } as const;
 
 /**
- * Morale penalty (per tick) applied when a social or comfort gauge falls below its threshold.
+ * Morale penalty (per tick) applied when breakNeed falls below its low threshold.
  */
 export const NEED_MORALE_PENALTIES = {
   breakNeed: -2,

@@ -30,7 +30,7 @@ export function tickNeeds(employee: Employee, isWorking: boolean): void {
  *   - Fatigue < low      → ×0.75 | < critical → ×0.50
  *
  * Penalties are multiplicative: a hungry and exhausted worker suffers both.
- * Social and comfort do not affect productivity (they affect morale — see tickNeedMorale).
+ * breakNeed does not affect productivity (it affects morale — see tickNeedMorale).
  */
 export function getNeedMultiplier(employee: Employee): number {
   const hungerMult  = employee.hunger  < NEED_THRESHOLDS.hunger.critical  ? NEED_PRODUCTIVITY_MULTIPLIERS.hunger.critical
@@ -43,10 +43,14 @@ export function getNeedMultiplier(employee: Employee): number {
 }
 
 /**
- * Returns the morale delta (≤ 0) caused by unmet breakNeed.
+ * Pure function. Returns the morale delta (≤ 0) caused by unmet breakNeed.
  *
- * Call each tick and apply the returned value to employee.morale:
+ * This function does NOT mutate employee.morale — it returns a delta that the
+ * caller must apply to `employee.morale` each tick:
  *   - breakNeed < low → −2/tick
+ *
+ * Example:
+ *   employee.morale = Math.max(0, employee.morale + tickNeedMorale(employee));
  */
 export function tickNeedMorale(employee: Employee): number {
   let delta = 0;
@@ -59,5 +63,5 @@ export function tickNeedMorale(employee: Employee): number {
  * Use when the employee eats, rests, or takes a break.
  */
 export function replenishNeed(employee: Employee, need: NeedKey, amount: number): void {
-  employee[need] = Math.min(100, employee[need] + amount);
+  employee[need] = Math.max(0, Math.min(100, employee[need] + amount));
 }
