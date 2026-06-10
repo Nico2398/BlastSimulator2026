@@ -12,7 +12,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { advanceAgent } from '../../../src/core/nav/AgentMovement.js';
-import type { AgentState } from '../../../src/core/nav/AgentMovement.js';
+import type { AdvanceResult, AgentState } from '../../../src/core/nav/AgentMovement.js';
 import { AGENT_WALK_SPEED } from '../../../src/core/config/balance.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -30,6 +30,20 @@ function makeState(overrides?: Partial<AgentState>): AgentState {
   };
 }
 
+/**
+ * Assert that an AdvanceResult matches expected values.
+ * Uses toBeCloseTo for coordinates to handle floating-point comparisons.
+ */
+function expectResult(
+  result: AdvanceResult,
+  expected: { x?: number; z?: number; waypointIndex?: number; isPathComplete?: boolean },
+): void {
+  if (expected.x !== undefined) expect(result.x).toBeCloseTo(expected.x, 6);
+  if (expected.z !== undefined) expect(result.z).toBeCloseTo(expected.z, 6);
+  if (expected.waypointIndex !== undefined) expect(result.waypointIndex).toBe(expected.waypointIndex);
+  if (expected.isPathComplete !== undefined) expect(result.isPathComplete).toBe(expected.isPathComplete);
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // Group 1: Basic single-waypoint advancement
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -38,19 +52,13 @@ describe('advanceAgent — single waypoint', () => {
   it('reaches the target when walkSpeed >= distance', () => {
     const state = makeState({ x: 0, z: 0, waypoints: [{ x: 2, z: 0 }], waypointIndex: 0, walkSpeed: 2 });
     const result = advanceAgent(state);
-    expect(result.x).toBe(2);
-    expect(result.z).toBe(0);
-    expect(result.waypointIndex).toBe(1);
-    expect(result.pathComplete).toBe(true);
+    expectResult(result, { x: 2, z: 0, waypointIndex: 1, isPathComplete: true });
   });
 
   it('moves partially toward target when walkSpeed < distance', () => {
     const state = makeState({ x: 0, z: 0, waypoints: [{ x: 3, z: 0 }], waypointIndex: 0, walkSpeed: 1 });
     const result = advanceAgent(state);
-    expect(result.x).toBe(1);
-    expect(result.z).toBe(0);
-    expect(result.waypointIndex).toBe(0);
-    expect(result.pathComplete).toBe(false);
+    expectResult(result, { x: 1, z: 0, waypointIndex: 0, isPathComplete: false });
   });
 });
 
@@ -63,10 +71,7 @@ describe('advanceAgent — fractional walkSpeed', () => {
     const state = makeState({ x: 0, z: 0, waypoints: [{ x: 2, z: 0 }], waypointIndex: 0, walkSpeed: 0.5 });
     const result = advanceAgent(state);
     // Moves 0.5 units toward (2,0) from (0,0)
-    expect(result.x).toBeCloseTo(0.5, 6);
-    expect(result.z).toBe(0);
-    expect(result.waypointIndex).toBe(0);
-    expect(result.pathComplete).toBe(false);
+    expectResult(result, { x: 0.5, z: 0, waypointIndex: 0, isPathComplete: false });
   });
 });
 
@@ -85,11 +90,8 @@ describe('advanceAgent — multiple waypoints consumed in one tick', () => {
       walkSpeed: 3,
     });
     const result = advanceAgent(state);
-    expect(result.x).toBe(3);
-    expect(result.z).toBe(0);
-    expect(result.waypointIndex).toBe(3);
     // Still one waypoint remaining (at index 3, there are 4 waypoints total)
-    expect(result.pathComplete).toBe(false);
+    expectResult(result, { x: 3, z: 0, waypointIndex: 3, isPathComplete: false });
   });
 
   it('consumes all waypoints when walkSpeed is sufficient for the entire path', () => {
@@ -101,10 +103,7 @@ describe('advanceAgent — multiple waypoints consumed in one tick', () => {
       walkSpeed: 4,
     });
     const result = advanceAgent(state);
-    expect(result.x).toBe(4);
-    expect(result.z).toBe(0);
-    expect(result.waypointIndex).toBe(4);
-    expect(result.pathComplete).toBe(true);
+    expectResult(result, { x: 4, z: 0, waypointIndex: 4, isPathComplete: true });
   });
 });
 
@@ -122,10 +121,7 @@ describe('advanceAgent — path completion', () => {
       walkSpeed: 2,
     });
     const result = advanceAgent(state);
-    expect(result.x).toBe(2);
-    expect(result.z).toBe(0);
-    expect(result.waypointIndex).toBe(2);
-    expect(result.pathComplete).toBe(true);
+    expectResult(result, { x: 2, z: 0, waypointIndex: 2, isPathComplete: true });
   });
 
   it('completes immediately when already at the final waypoint', () => {
@@ -137,10 +133,7 @@ describe('advanceAgent — path completion', () => {
       walkSpeed: 1,
     });
     const result = advanceAgent(state);
-    expect(result.x).toBe(2);
-    expect(result.z).toBe(0);
-    expect(result.waypointIndex).toBe(1);
-    expect(result.pathComplete).toBe(true);
+    expectResult(result, { x: 2, z: 0, waypointIndex: 1, isPathComplete: true });
   });
 });
 
@@ -159,10 +152,7 @@ describe('advanceAgent — diagonal movement', () => {
       walkSpeed: 3,
     });
     const result = advanceAgent(state);
-    expect(result.x).toBe(2);
-    expect(result.z).toBe(2);
-    expect(result.waypointIndex).toBe(1);
-    expect(result.pathComplete).toBe(true);
+    expectResult(result, { x: 2, z: 2, waypointIndex: 1, isPathComplete: true });
   });
 });
 
@@ -171,16 +161,13 @@ describe('advanceAgent — diagonal movement', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('advanceAgent — edge cases', () => {
-  it('returns pathComplete=true when waypoints array is empty', () => {
+  it('returns isPathComplete=true when waypoints array is empty', () => {
     const state = makeState({ x: 5, z: 3, waypoints: [], waypointIndex: 0, walkSpeed: 2 });
     const result = advanceAgent(state);
-    expect(result.x).toBe(5);
-    expect(result.z).toBe(3);
-    expect(result.waypointIndex).toBe(0);
-    expect(result.pathComplete).toBe(true);
+    expectResult(result, { x: 5, z: 3, waypointIndex: 0, isPathComplete: true });
   });
 
-  it('returns pathComplete=true when waypointIndex is past the array length', () => {
+  it('returns isPathComplete=true when waypointIndex is past the array length', () => {
     const state = makeState({
       x: 5, z: 3,
       waypoints: [{ x: 1, z: 0 }, { x: 2, z: 0 }],
@@ -188,13 +175,10 @@ describe('advanceAgent — edge cases', () => {
       walkSpeed: 2,
     });
     const result = advanceAgent(state);
-    expect(result.x).toBe(5);
-    expect(result.z).toBe(3);
-    expect(result.waypointIndex).toBe(5);
-    expect(result.pathComplete).toBe(true);
+    expectResult(result, { x: 5, z: 3, waypointIndex: 5, isPathComplete: true });
   });
 
-  it('does not move and pathComplete is false when walkSpeed is 0 and waypoints exist', () => {
+  it('does not move and isPathComplete is false when walkSpeed is 0 and waypoints exist', () => {
     // walkSpeed=0 means no movement budget; waypoints remain unconsumed
     const state = makeState({
       x: 0, z: 0,
@@ -203,11 +187,8 @@ describe('advanceAgent — edge cases', () => {
       walkSpeed: 0,
     });
     const result = advanceAgent(state);
-    expect(result.x).toBe(0);
-    expect(result.z).toBe(0);
-    expect(result.waypointIndex).toBe(0);
-    // pathComplete should be false because we haven't reached the end
-    expect(result.pathComplete).toBe(false);
+    // isPathComplete should be false because we haven't reached the end
+    expectResult(result, { x: 0, z: 0, waypointIndex: 0, isPathComplete: false });
   });
 
   it('treats negative walkSpeed as 0 (no movement, no progress)', () => {
@@ -218,10 +199,7 @@ describe('advanceAgent — edge cases', () => {
       walkSpeed: -5,
     });
     const result = advanceAgent(state);
-    expect(result.x).toBe(0);
-    expect(result.z).toBe(0);
-    expect(result.waypointIndex).toBe(0);
-    expect(result.pathComplete).toBe(false);
+    expectResult(result, { x: 0, z: 0, waypointIndex: 0, isPathComplete: false });
   });
 });
 

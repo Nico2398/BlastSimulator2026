@@ -29,7 +29,7 @@ export interface AdvanceResult {
   /** Updated waypoint index (may have advanced past one or more waypoints). */
   waypointIndex: number;
   /** Whether the agent has reached the final waypoint this tick. */
-  pathComplete: boolean;
+  isPathComplete: boolean;
 }
 
 /**
@@ -39,22 +39,27 @@ export interface AdvanceResult {
  * @returns The updated position and path-progress information.
  */
 export function advanceAgent(state: AgentState): AdvanceResult {
+  // Guard: NaN/infinite coordinates → bail out as path complete (defense-in-depth)
+  if (!Number.isFinite(state.x) || !Number.isFinite(state.z)) {
+    return { x: state.x, z: state.z, waypointIndex: state.waypointIndex, isPathComplete: true };
+  }
+
   // Guard: no waypoints or already past the end → path complete
   if (state.waypoints.length === 0 || state.waypointIndex >= state.waypoints.length) {
-    return { x: state.x, z: state.z, waypointIndex: state.waypointIndex, pathComplete: true };
+    return { x: state.x, z: state.z, waypointIndex: state.waypointIndex, isPathComplete: true };
   }
 
   // Clamp walk speed to non-negative
   const speed = Math.max(0, state.walkSpeed);
   let remaining = speed;
 
-  // If speed is zero, return current position with appropriate pathComplete
+  // If speed is zero, return current position with appropriate isPathComplete
   if (remaining === 0) {
     return {
       x: state.x,
       z: state.z,
       waypointIndex: state.waypointIndex,
-      pathComplete: state.waypointIndex >= state.waypoints.length,
+      isPathComplete: state.waypointIndex >= state.waypoints.length,
     };
   }
 
@@ -87,6 +92,6 @@ export function advanceAgent(state: AgentState): AdvanceResult {
     x,
     z,
     waypointIndex,
-    pathComplete: waypointIndex >= state.waypoints.length,
+    isPathComplete: waypointIndex >= state.waypoints.length,
   };
 }
