@@ -2,7 +2,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { type GameContext, newGameCommand } from '../../src/console/commands/world.js';
-import { employeeCommand } from '../../src/console/commands/entities.js';
+import { employeeCommand, needsCommand } from '../../src/console/commands/entities.js';
 import { setPolicyCommand } from '../../src/console/commands/policy.js';
 import { EventEmitter } from '../../src/core/state/EventEmitter.js';
 
@@ -251,6 +251,73 @@ describe('Console — set_policy', () => {
   it('errors when no game is loaded', () => {
     const emptyCtx: GameContext = { state: null, grid: null, emitter: new EventEmitter() };
     const result = setPolicyCommand(emptyCtx, [], { mode: 'shift_8h' });
+
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('No game loaded');
+  });
+});
+
+// ── needs command ───────────────────────────────────────────────────────────
+
+describe('Console — needs command', () => {
+  let ctx: GameContext;
+
+  beforeEach(() => {
+    ctx = makeCtx();
+  });
+
+  it('shows needs for a single employee', () => {
+    hireOne(ctx);
+
+    const result = needsCommand(ctx, [], {});
+
+    expect(result.success).toBe(true);
+    expect(result.output).toContain('Employee Needs:');
+    expect(result.output).toContain('hunger');
+    expect(result.output).toContain('fatigue');
+    expect(result.output).toContain('breakNeed');
+  });
+
+  it('shows needs for multiple employees', () => {
+    hireOne(ctx, 'driller');
+    hireOne(ctx, 'blaster');
+    hireOne(ctx, 'surveyor');
+
+    const result = needsCommand(ctx, [], {});
+
+    expect(result.success).toBe(true);
+    // Each employee should produce a line with their gauge values
+    const lines = result.output.split('\n').filter(l => l.includes('hunger'));
+    expect(lines).toHaveLength(3);
+  });
+
+  it('displays correct gauge values', () => {
+    const empId = hireOne(ctx);
+    const emp = ctx.state!.employees.employees.find(e => e.id === empId)!;
+
+    // Set specific gauge values
+    emp.hunger = 42;
+    emp.fatigue = 58;
+    emp.breakNeed = 73;
+
+    const result = needsCommand(ctx, [], {});
+
+    expect(result.success).toBe(true);
+    expect(result.output).toContain('hunger:42');
+    expect(result.output).toContain('fatigue:58');
+    expect(result.output).toContain('breakNeed:73');
+  });
+
+  it('handles no employees', () => {
+    const result = needsCommand(ctx, [], {});
+
+    expect(result.success).toBe(true);
+    expect(result.output).toBe('No employees.');
+  });
+
+  it('handles no game loaded', () => {
+    const emptyCtx: GameContext = { state: null, grid: null, emitter: new EventEmitter() };
+    const result = needsCommand(emptyCtx, [], {});
 
     expect(result.success).toBe(false);
     expect(result.output).toContain('No game loaded');
