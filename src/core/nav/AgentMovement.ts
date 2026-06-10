@@ -1,6 +1,8 @@
 // BlastSimulator2026 — AgentMovement: per-tick agent position advancement along a path
 // Part of the navmesh system.
 
+import type { NavGrid } from './NavGrid.js';
+
 /**
  * The current navigation state of an agent walking along a path.
  * Tracks position, waypoint list, progress index, and base walk speed.
@@ -16,6 +18,10 @@ export interface AgentState {
   waypointIndex: number;
   /** Agent walking speed in grid cells per tick. */
   walkSpeed: number;
+  /** The ultimate destination x-coordinate. */
+  destinationX: number;
+  /** The ultimate destination z-coordinate. */
+  destinationZ: number;
 }
 
 /**
@@ -30,6 +36,15 @@ export interface AdvanceResult {
   waypointIndex: number;
   /** Whether the agent has reached the final waypoint this tick. */
   isPathComplete: boolean;
+}
+
+/**
+ * The result of checking whether an agent's current path is stale
+ * due to obstacles or changed regions.
+ */
+export interface StaleCheckResult {
+  isStale: boolean;
+  reason?: 'BLOCKED_WAYPOINT' | 'CROSSES_UPDATED_REGION';
 }
 
 /**
@@ -94,4 +109,46 @@ export function advanceAgent(state: AgentState): AdvanceResult {
     waypointIndex,
     isPathComplete: waypointIndex >= state.waypoints.length,
   };
+}
+
+/**
+ * Check whether the next waypoint or any subsequent waypoint is blocked
+ * by an obstacle (vehicle or terrain change) on the NavGrid.
+ *
+ * @param state - The agent's current navigation state.
+ * @param grid  - The navigation grid to check against.
+ * @param avoidVehicles - Whether to treat vehicle-occupied cells as blocked.
+ * @returns `true` if any remaining waypoint is blocked.
+ */
+export function isPathBlocked(state: AgentState, grid: NavGrid, avoidVehicles: boolean): boolean {
+  // TODO: implement
+  return false;
+}
+
+/**
+ * Check whether any segment of the agent's remaining path crosses
+ * a specified axis-aligned region (e.g., a recently updated blast area).
+ *
+ * @param state  - The agent's current navigation state.
+ * @param region - The axis-aligned bounding box to test against.
+ * @returns `true` if the remaining path intersects the region.
+ */
+export function doesPathCrossRegion(
+  state: AgentState,
+  region: { minX: number; maxX: number; minZ: number; maxZ: number },
+): boolean {
+  // TODO: implement
+  return false;
+}
+
+/**
+ * Request a re-route by clearing the current waypoint list and resetting
+ * the agent's state so a new path can be computed.
+ *
+ * @param state - The agent's current navigation state.
+ * @returns A new `AgentState` with cleared waypoints ready for re-routing.
+ */
+export function requestReRoute(state: AgentState): AgentState {
+  // TODO: implement
+  return state;
 }
