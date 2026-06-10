@@ -59,6 +59,11 @@ export function advanceAgent(state: AgentState): AdvanceResult {
     return { x: state.x, z: state.z, waypointIndex: state.waypointIndex, isPathComplete: true };
   }
 
+  // Guard: NaN walkSpeed → treat as 0 (no movement)
+  if (!Number.isFinite(state.walkSpeed)) {
+    return { x: state.x, z: state.z, waypointIndex: state.waypointIndex, isPathComplete: false };
+  }
+
   // Guard: no waypoints or already past the end → path complete
   if (state.waypoints.length === 0 || state.waypointIndex >= state.waypoints.length) {
     return { x: state.x, z: state.z, waypointIndex: state.waypointIndex, isPathComplete: true };
@@ -112,6 +117,24 @@ export function advanceAgent(state: AgentState): AdvanceResult {
 }
 
 /**
+ * Iterate over remaining waypoints and return true if any satisfy the predicate.
+ * Returns false if no waypoints remain or the path is already complete.
+ */
+function someRemainingWaypoint(
+  state: AgentState,
+  predicate: (wp: { x: number; z: number }) => boolean,
+): boolean {
+  if (state.waypoints.length === 0 || state.waypointIndex >= state.waypoints.length) {
+    return false;
+  }
+  for (let i = state.waypointIndex; i < state.waypoints.length; i++) {
+    const wp = state.waypoints[i]!;
+    if (predicate(wp)) return true;
+  }
+  return false;
+}
+
+/**
  * Check whether the next waypoint or any subsequent waypoint is blocked
  * by an obstacle (vehicle or terrain change) on the NavGrid.
  *
@@ -121,12 +144,7 @@ export function advanceAgent(state: AgentState): AdvanceResult {
  * @returns `true` if any remaining waypoint is blocked.
  */
 export function isPathBlocked(state: AgentState, grid: NavGrid, avoidVehicles: boolean): boolean {
-  if (state.waypoints.length === 0 || state.waypointIndex >= state.waypoints.length) {
-    return false;
-  }
-
-  for (let i = state.waypointIndex; i < state.waypoints.length; i++) {
-    const wp = state.waypoints[i]!;
+  return someRemainingWaypoint(state, (wp) => {
     const clampedX = Math.max(0, Math.min(grid.width - 1, Math.floor(wp.x)));
     const clampedZ = Math.max(0, Math.min(grid.height - 1, Math.floor(wp.z)));
     const cell = grid.cells[clampedZ]![clampedX]!;
@@ -137,39 +155,40 @@ export function isPathBlocked(state: AgentState, grid: NavGrid, avoidVehicles: b
     if (avoidVehicles && cell.vehicleOccupied) {
       return true;
     }
-  }
-
-  return false;
+    return false;
+  });
 }
 
 /**
- * Check whether any segment of the agent's remaining path crosses
- * a specified axis-aligned region (e.g., a recently updated blast area).
+ * Check whether any remaining waypoint in the agent's path falls within
+ * the specified axis-aligned region (point-in-AABB test).
+ *
+ * If waypoints are dense (adjacent cells), this approximates segment
+ * intersection. For sparse waypoints, a segment may cross the region
+ * without any waypoint inside it — callers should ensure waypoint density
+ * or use a separate segment-intersection test if needed.
  *
  * @param state  - The agent's current navigation state.
  * @param region - The axis-aligned bounding box to test against.
- * @returns `true` if the remaining path intersects the region.
+ * @returns `true` if any remaining waypoint lies inside the region.
  */
 export function doesPathCrossRegion(
   state: AgentState,
   region: { minX: number; maxX: number; minZ: number; maxZ: number },
 ): boolean {
+  // Guard: NaN/infinite region bounds → conservative (assume crossing)
+  if (!Number.isFinite(region.minX) || !Number.isFinite(region.maxX) ||
+      !Number.isFinite(region.minZ) || !Number.isFinite(region.maxZ)) {
+    return true;
+  }
+
   if (region.minX > region.maxX || region.minZ > region.maxZ) {
     return false;
   }
 
-  if (state.waypoints.length === 0 || state.waypointIndex >= state.waypoints.length) {
-    return false;
-  }
-
-  for (let i = state.waypointIndex; i < state.waypoints.length; i++) {
-    const wp = state.waypoints[i]!;
-    if (wp.x >= region.minX && wp.x <= region.maxX && wp.z >= region.minZ && wp.z <= region.maxZ) {
-      return true;
-    }
-  }
-
-  return false;
+  return someRemainingWaypoint(state, (wp) =>
+    wp.x >= region.minX && wp.x <= region.maxX && wp.z >= region.minZ && wp.z <= region.maxZ,
+  );
 }
 
 /**
