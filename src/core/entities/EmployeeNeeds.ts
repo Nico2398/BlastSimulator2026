@@ -2,7 +2,7 @@
 // Tracks three need gauges: hunger, fatigue, and breakNeed (all 0–100).
 
 import { type Employee } from './Employee.js';
-import { NEED_DRAIN_RATES, NEED_THRESHOLDS, NEED_PRODUCTIVITY_MULTIPLIERS, NEED_MORALE_PENALTIES, MORALE_THRESHOLDS, NEED_MORALE_DRAIN_MULTIPLIERS } from '../config/balance.js';
+import { NEED_DRAIN_RATES, NEED_THRESHOLDS, NEED_PRODUCTIVITY_MULTIPLIERS, NEED_MORALE_PENALTIES, MORALE_THRESHOLDS, NEED_MORALE_DRAIN_MULTIPLIERS, NEED_MORALE_EFFECT_THRESHOLDS, NEED_MORALE_EFFECT_PENALTIES, NEED_WELL_RESTED_THRESHOLD, NEED_WELL_RESTED_BONUS } from '../config/balance.js';
 
 /** The three need gauges tracked on every Employee. */
 export type NeedKey = 'hunger' | 'fatigue' | 'breakNeed';
@@ -54,10 +54,56 @@ export function getNeedMultiplier(employee: Employee): number {
  *
  * Example:
  *   employee.morale = Math.max(0, employee.morale + tickNeedMorale(employee));
+ *
+ * @deprecated Superseded by {@link needsMoraleEffect} which accounts for ALL
+ *             three need gauges (hunger, fatigue, breakNeed) instead of only breakNeed.
  */
 export function tickNeedMorale(employee: Employee): number {
   let delta = 0;
   if (employee.breakNeed < NEED_THRESHOLDS.breakNeed.low) delta += NEED_MORALE_PENALTIES.breakNeed;
+  return delta;
+}
+
+/**
+ * Pure function. Computes the tick-level morale delta from ALL need gauges
+ * (hunger, fatigue, breakNeed).
+ *
+ * Each gauge contributes 0 (≥50), −0.5 (30–49), −1.5 (15–29), or −3.0 (<15),
+ * yielding a per-tick range of −9.0 to +0.0 from penalties alone.
+ *
+ * If ALL three gauges are simultaneously above {@link NEED_WELL_RESTED_THRESHOLD}
+ * (currently 80), a well-rested bonus of +1 (NEED_WELL_RESTED_BONUS) is applied,
+ * bringing the total return range to **−9.0 to +1.0**.
+ *
+ * This function does NOT mutate employee.morale — it returns a delta that the
+ * caller must apply each tick.
+ *
+ * @returns The morale delta for this tick, ranging from −9.0 to +1.0.
+ */
+export function needsMoraleEffect(employee: Employee): number {
+  let delta = 0;
+
+  const gauges: NeedKey[] = ['hunger', 'fatigue', 'breakNeed'];
+  for (const gauge of gauges) {
+    const value = employee[gauge];
+    if (value >= NEED_MORALE_EFFECT_THRESHOLDS.comfortable) {
+      delta += NEED_MORALE_EFFECT_PENALTIES.comfortable;
+    } else if (value >= NEED_MORALE_EFFECT_THRESHOLDS.uncomfortable) {
+      delta += NEED_MORALE_EFFECT_PENALTIES.uncomfortable;
+    } else if (value >= NEED_MORALE_EFFECT_THRESHOLDS.suffering) {
+      delta += NEED_MORALE_EFFECT_PENALTIES.suffering;
+    } else {
+      delta += NEED_MORALE_EFFECT_PENALTIES.critical;
+    }
+  }
+
+  // Well-rested bonus: all three gauges strictly above threshold
+  if (employee.hunger > NEED_WELL_RESTED_THRESHOLD
+      && employee.fatigue > NEED_WELL_RESTED_THRESHOLD
+      && employee.breakNeed > NEED_WELL_RESTED_THRESHOLD) {
+    delta += NEED_WELL_RESTED_BONUS;
+  }
+
   return delta;
 }
 

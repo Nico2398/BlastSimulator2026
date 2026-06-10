@@ -296,5 +296,5 @@ export function tickTraining(state: EmployeeState): void {
 export type { GainXpResult } from './EmployeeGainXp.js';
 export { gainXp } from './EmployeeGainXp.js';
 export type { NeedKey } from './EmployeeNeeds.js';
-export { tickNeeds, tickNeedGauges, getNeedMultiplier, tickNeedMorale, replenishNeed } from './EmployeeNeeds.js';
+export { tickNeeds, tickNeedGauges, getNeedMultiplier, tickNeedMorale, replenishNeed, needsMoraleEffect } from './EmployeeNeeds.js';
 export { computeTaskDuration } from './EmployeeTaskDuration.js';
