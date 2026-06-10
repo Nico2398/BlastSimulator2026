@@ -18,11 +18,10 @@ const KNOWN_COMMANDS = [
   'employee', 'state', 'survey', 'tick', 'event',
   'drill_plan', 'charge', 'sequence', 'blast', 'contract',
   'build', 'vehicle', 'stats', 'inspect', 'zone',
-  'corrupt', 'mafia', 'buy_software', 'buy', 'weather',
+  'corrupt', 'mafia', 'buy_software', 'weather', 'buy',
   'fragments', 'preview', 'blast_preview', 'install_tubing',
   'build_ramp', 'set_policy', 'terrain_info', 'help',
-  'blast_plan', 'building', 'demolish', 'research', 'hire',
-  'assign', 'vehicle_buy',
+  'blast_plan',
 ];
 
 /** Commands that inspect state — valid as a final playthrough step */
@@ -149,20 +148,21 @@ describe('Scenario description is meaningful', () => {
 });
 
 // ──────────────────────────────────────────────
-// 8. All step first tokens are known commands
+// 8. No steps use unknown / unregistered commands
 // ──────────────────────────────────────────────
-describe('All steps use known console commands', () => {
+describe('No steps use unknown commands', () => {
   for (const name of SCENARIO_NAMES) {
-    it(`${name} — every step starts with a known command`, () => {
+    it(`${name} — no step references an unknown command`, () => {
       const scenario = loadScenario(name);
+      const unknownCommands: string[] = [];
       for (let i = 0; i < scenario.steps.length; i++) {
         const step = scenario.steps[i];
         const firstToken = step.trim().split(/\s+/)[0];
-        expect(
-          KNOWN_COMMANDS,
-          `step[${i}]: "${step}" — unknown command "${firstToken}"`,
-        ).toContain(firstToken);
+        if (!KNOWN_COMMANDS.includes(firstToken)) {
+          unknownCommands.push(`step[${i}]: "${step}"`);
+        }
       }
+      expect(unknownCommands).toEqual([]);
     });
   }
 });
@@ -184,23 +184,4 @@ describe('Last step is a state inspection command', () => {
   }
 });
 
-// ──────────────────────────────────────────────
-// 10. No steps use unknown / unregistered commands
-//     (complementary to test 8 — explicit negative check)
-// ──────────────────────────────────────────────
-describe('No steps use unknown commands', () => {
-  for (const name of SCENARIO_NAMES) {
-    it(`${name} — no step references an unknown command`, () => {
-      const scenario = loadScenario(name);
-      const unknownCommands: string[] = [];
-      for (let i = 0; i < scenario.steps.length; i++) {
-        const step = scenario.steps[i];
-        const firstToken = step.trim().split(/\s+/)[0];
-        if (!KNOWN_COMMANDS.includes(firstToken)) {
-          unknownCommands.push(`step[${i}]: "${step}"`);
-        }
-      }
-      expect(unknownCommands).toEqual([]);
-    });
-  }
-});
+
