@@ -1193,11 +1193,11 @@
       "src/core/nav/AgentMovement.ts"
     ],
     "testFile": "tests/unit/nav/AgentMovement.test.ts",
-    "status": "pending",
+    "status": "done",
     "blockedBy": [
       "6.8"
     ],
-    "closedInPR": null
+    "closedInPR": 273
   },
   {
     "id": "6.10",
