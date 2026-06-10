@@ -13,7 +13,7 @@ import { checkCollapse, type NeedKey } from '../entities/Employee.js';
 
 // ── Config ──
 
-import { BASE_TICK_MS as _BASE_TICK_MS, VALID_SPEEDS as _VALID_SPEEDS, NEED_RESTORATION_THRESHOLDS, NEED_REST_DURATIONS, NEED_REST_BUILDING_TYPES, NEED_REST_SEARCH_RADIUS, NEED_WARNING_THRESHOLDS } from '../config/balance.js';
+import { BASE_TICK_MS as _BASE_TICK_MS, VALID_SPEEDS as _VALID_SPEEDS, NEED_REST_DURATIONS, NEED_REST_BUILDING_TYPES, NEED_REST_SEARCH_RADIUS, NEED_WARNING_THRESHOLDS } from '../config/balance.js';
 
 /** Milliseconds per base tick at 1x speed. */
 export const BASE_TICK_MS = _BASE_TICK_MS;
@@ -246,8 +246,8 @@ export function tickNeedRestoration(state: GameState): NeedRestorationResult {
   for (const emp of state.employees.employees) {
     if (!emp.alive || emp.injured || emp.activeActionId !== null) continue;
     const needsRest =
-      emp.hunger  < NEED_RESTORATION_THRESHOLDS.hunger ||
-      emp.fatigue < NEED_RESTORATION_THRESHOLDS.fatigue;
+      emp.hunger  < NEED_WARNING_THRESHOLDS.hunger ||
+      emp.fatigue < NEED_WARNING_THRESHOLDS.fatigue;
 
     if (!needsRest) continue;
 
@@ -257,21 +257,15 @@ export function tickNeedRestoration(state: GameState): NeedRestorationResult {
       continue;
     }
 
-    const actionId = state.nextPendingActionId++;
-    const restAction: PendingAction = {
-      id: actionId,
-      type: 'rest',
-      requiredSkill: null,
-      requiredVehicleRole: null,
+    const restAction = createRestPendingAction(state, {
       targetX: building.x,
       targetZ: building.z,
-      targetY: 0,
-      payload: { buildingId: building.id },
       targetEmployeeId: emp.id,
-    };
+      payload: { buildingId: building.id },
+    });
 
     state.pendingActions.push(restAction);
-    emp.activeActionId = actionId;
+    emp.activeActionId = restAction.id;
     result.routed.push(emp.id);
   }
 
@@ -331,25 +325,15 @@ export function tickCollapse(state: GameState): CollapseResult {
       restDuration *= 2;
     }
 
-    const actionId = state.nextPendingActionId++;
-    const restAction: PendingAction = {
-      id: actionId,
-      type: 'rest',
-      requiredSkill: null,
-      requiredVehicleRole: null,
+    const restAction = createRestPendingAction(state, {
       targetX,
       targetZ,
-      targetY: 0,
-      payload: {
-        buildingId,
-        collapsedNeed: collapsedGauge,
-        restDuration,
-      },
       targetEmployeeId: emp.id,
-    };
+      payload: { buildingId, collapsedNeed: collapsedGauge, restDuration },
+    });
 
     state.pendingActions.push(restAction);
-    emp.activeActionId = actionId;
+    emp.activeActionId = restAction.id;
   }
 
   return result;
@@ -411,22 +395,16 @@ export function autoInsertNeedTasks(state: GameState): NeedInsertionResult {
     const targetX = building?.x ?? emp.x;
     const targetZ = building?.z ?? emp.z;
 
-    const actionId = state.nextPendingActionId++;
-    const restAction: PendingAction = {
-      id: actionId,
-      type: 'rest',
-      requiredSkill: null,
-      requiredVehicleRole: null,
+    const restAction = createRestPendingAction(state, {
       targetX,
       targetZ,
-      targetY: 0,
+      targetEmployeeId: emp.id,
       payload: {
         buildingId: building?.id,
         restDuration: NEED_REST_DURATIONS[primaryGauge],
         triggeredBy: triggeredGauges,
       },
-      targetEmployeeId: emp.id,
-    };
+    });
 
     state.pendingActions.push(restAction);
 
@@ -437,6 +415,27 @@ export function autoInsertNeedTasks(state: GameState): NeedInsertionResult {
   }
 
   return result;
+}
+
+/**
+ * Create a rest PendingAction with boilerplate fields pre-filled.
+ * Generates a new ID from state.nextPendingActionId.
+ */
+function createRestPendingAction(
+  state: GameState,
+  overrides: Pick<PendingAction, 'targetX' | 'targetZ' | 'targetEmployeeId' | 'payload'>,
+): PendingAction {
+  return {
+    id: state.nextPendingActionId++,
+    type: 'rest',
+    requiredSkill: null,
+    requiredVehicleRole: null,
+    targetX: overrides.targetX,
+    targetZ: overrides.targetZ,
+    targetY: 0,
+    payload: overrides.payload,
+    targetEmployeeId: overrides.targetEmployeeId,
+  };
 }
 
 function findNearestBuildingOfType(
