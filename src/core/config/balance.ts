@@ -210,6 +210,9 @@ export const BLAST_REMESH_RADIUS_CHUNKS = 2;
 /** Maximum nodes A* may explore before falling back to direct-line search. */
 export const PATHFINDING_NODE_BUDGET_CAP = 500;
 
+/** Employee agent walking speed in grid cells per tick (1 tick = 1 game-hour). */
+export const AGENT_WALK_SPEED = 2;
+
 /** Height of one bench level in voxels. Affects benchLevel computation in NavGrid. */
 export const NAV_BENCH_HEIGHT = 5;
 
