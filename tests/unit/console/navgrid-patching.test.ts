@@ -195,8 +195,9 @@ describe('NavGrid patching — building upgrade', () => {
     expect(nav.cells[1]![1]!.type).toBe('blocked');
 
     // New footprint cells (z=2 row from the 2×3 footprint) must be blocked
-    expect(nav.cells[0]![2]!.type).toBe('blocked');
-    expect(nav.cells[1]![2]!.type).toBe('blocked');
+    // NavGrid stores cells[z][x] → cells[dz+building.z][dx+building.x]
+    expect(nav.cells[2]![0]!.type).toBe('blocked');
+    expect(nav.cells[2]![1]!.type).toBe('blocked');
   });
 
   it('does not patch NavGrid when upgrade fails (already at max tier)', () => {
