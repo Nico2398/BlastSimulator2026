@@ -1207,11 +1207,11 @@
       "src/core/state/GameState.ts"
     ],
     "testFile": "tests/unit/state/GameState.test.ts",
-    "status": "pending",
+    "status": "done",
     "blockedBy": [
       "6.2"
     ],
-    "closedInPR": null
+    "closedInPR": 274
   },
   {
     "id": "6.11",
