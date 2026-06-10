@@ -434,6 +434,12 @@ export const BUILDING_REPLENISH_RATES = {
   breakNeed: { 1: 10, 2: 16, 3: 22 },
 } as const;
 
+/** Cost deducted from cash when an employee visits a building to restore hunger ($). */
+export const FOOD_COST_PER_VISIT = 50;
+
+/** Cost deducted from cash when an employee visits a building to restore breakNeed ($). */
+export const BREAK_COST_PER_VISIT = 20;
+
 // ─── Shift / Rest Scheduling ────────────────────────────────────────────────
 
 /** Shift duration in ticks for each policy mode. 1 tick = 1 game-hour. */
