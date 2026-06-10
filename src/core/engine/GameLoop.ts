@@ -300,6 +300,8 @@ export function tickCollapse(state: GameState, _firedEvents?: FiredEvent[], _emi
     if (!collapsedGauge) continue;
 
     result.collapsed.push(emp.id);
+    _firedEvents?.push({ eventId: 'employee_collapsed', firedAtTick: state.tickCount });
+    _emitter?.emit('employee:collapsed', { employeeId: emp.id, needKey: collapsedGauge });
 
     // Determine rest duration
     let restDuration = NEED_REST_DURATIONS[collapsedGauge];
@@ -385,6 +387,8 @@ export function autoInsertNeedTasks(state: GameState, _firedEvents?: FiredEvent[
       // Record all triggered gauges as skipped
       for (const gauge of triggeredGauges) {
         result.skipped.push({ employeeId: emp.id, needKey: gauge, reason: 'rest_action_already_queued' });
+        _firedEvents?.push({ eventId: 'need_warning', firedAtTick: state.tickCount });
+        _emitter?.emit('employee:need_warning', { employeeId: emp.id, needKey: gauge });
       }
       continue;
     }
@@ -535,7 +539,7 @@ export function processShiftCycle(
     incrementWorkTick(state, emp);
 
     // Phase 3: Force shift rest when work quota is met
-    forceShiftRestIfNeeded(state, emp, firedEvents, shiftRested);
+    forceShiftRestIfNeeded(state, emp, firedEvents, shiftRested, _emitter);
   }
 
   return { restCompleted, shiftRested, active: true };
@@ -607,6 +611,7 @@ function forceShiftRestIfNeeded(
   emp: Employee,
   firedEvents: FiredEvent[],
   shiftRested: number[],
+  emitter?: EventEmitter,
 ): void {
   if (emp.restTicksRemaining !== null) return;
   if (emp.activeActionId === null) return;
@@ -638,6 +643,7 @@ function forceShiftRestIfNeeded(
   emp.activeActionId = restAction.id;
   shiftRested.push(emp.id);
   firedEvents.push({ eventId: 'employee_shift_change', firedAtTick: state.tickCount });
+  emitter?.emit('employee:shift_change', { employeeId: emp.id });
 }
 
 /**
