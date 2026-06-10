@@ -469,6 +469,13 @@ function findNearestLivingQuarters(
  * Deduct the per-visit cost from cash for the given need gauge.
  * Returns the amount deducted (0 for fatigue, which has no cost).
  */
-export function deductRestCost(_state: GameState, _needKey: NeedKey): number {
-  return 0; // skeleton
+export function deductRestCost(state: GameState, needKey: NeedKey): number {
+  const cost = needKey === 'hunger'
+    ? FOOD_COST_PER_VISIT
+    : needKey === 'breakNeed'
+      ? BREAK_COST_PER_VISIT
+      : 0;
+
+  state.cash = Math.max(0, state.cash - cost);
+  return cost;
 }
