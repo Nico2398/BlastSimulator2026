@@ -1404,11 +1404,11 @@
       "src/console/commands/entities.ts"
     ],
     "testFile": null,
-    "status": "pending",
+    "status": "done",
     "blockedBy": [
       "7.3"
     ],
-    "closedInPR": null
+    "closedInPR": 289
   },
   {
     "id": "8.1",
