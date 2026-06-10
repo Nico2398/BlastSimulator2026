@@ -117,22 +117,27 @@ describe('NavMesh and pathfinding', () => {
     fillSolid(vg, 4);
 
     const nav = NavGrid.buildNavGrid(vg, [], []);
-    // Block the entire middle column (x=5) across all z-rows
-    for (let z = 0; z < nav.height; z++) {
+    // Block a wall segment in the middle: x=5, z=3..7 (5 cells).
+    // Passages remain at z=0..2 and z=8..9 so the path can go around.
+    for (let z = 3; z <= 7; z++) {
       nav.cells[z]![5] = {
         type: 'blocked', moveCost: Infinity, benchLevel: 0, vehicleOccupied: false,
       };
     }
 
+    // Start and goal on opposite sides of the wall, centred on the wall
     const result = findPath(nav, {
       agentId: 1, fromX: 0, fromZ: 5, toX: 9, toZ: 5, avoidVehicles: false,
     });
 
     expect(result.found).toBe(true);
-    // No waypoint should land on the blocked column
+    // No waypoint should land on a blocked cell
     for (const wp of result.waypoints) {
       expect(nav.cells[wp.z]![wp.x]!.type).not.toBe('blocked');
     }
+    // The path must detour (cannot stay on z=5 the whole way since (5,5) is blocked)
+    const hasDetour = result.waypoints.some(wp => wp.z !== 5);
+    expect(hasDetour).toBe(true);
   });
 
   it('patchNavGrid updates cells after terrain change', () => {
