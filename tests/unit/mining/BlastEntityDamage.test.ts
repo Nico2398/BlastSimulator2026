@@ -83,8 +83,8 @@ function makeEmployee(id: number, x: number, z: number, alive: boolean = true): 
     activeActionId: null,
     hunger: 80,
     fatigue: 80,
-    social: 80,
-    comfort: 80,
+    breakNeed: 80,
+    collapsing: false,
   };
 }
 
