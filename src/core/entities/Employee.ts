@@ -80,10 +80,10 @@ export interface Employee {
   trainingState: TrainingState | null;
   /** ID of the PendingAction currently claimed by this employee, or null if idle. */
   activeActionId: number | null;
-  hunger: number;  // 0-100
-  fatigue: number; // 0-100
-  social: number;  // 0-100
-  comfort: number; // 0-100
+  hunger: number;    // 0-100
+  fatigue: number;   // 0-100
+  breakNeed: number; // 0-100
+  collapsing: boolean;
 }
 
 // ── Employee state ──
@@ -129,8 +129,8 @@ export function hireEmployee(
     activeActionId: null,
     hunger: 100,
     fatigue: 100,
-    social: 100,
-    comfort: 100,
+    breakNeed: 100,
+    collapsing: false,
   };
   state.employees.push(employee);
   return { employee, hiringCost: HIRING_COSTS[role] };

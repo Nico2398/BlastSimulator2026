@@ -306,16 +306,14 @@ export const QUALIFICATION_SALARY_BONUS: Record<1 | 2 | 3 | 4 | 5, number> = {
 export const NEED_DRAIN_RATES = {
   hunger:  { working: 1,   idle: 0.5  },
   fatigue: { working: 2,   idle: 0.5  },
-  social:  { working: 1,   idle: 1    },
-  comfort: { working: 0.3, idle: 0.3  },
+  breakNeed: { working: 0.8, idle: 0 },
 } as const;
 
 /** Threshold values for productivity/morale effects. */
 export const NEED_THRESHOLDS = {
   hunger:  { low: 30, critical: 10 },
   fatigue: { low: 40, critical: 15 },
-  social:  { low: 20 },
-  comfort: { low: 30 },
+  breakNeed: { low: 30, critical: 15 },
 } as const;
 
 /**
@@ -332,14 +330,14 @@ export const NEED_PRODUCTIVITY_MULTIPLIERS = {
  * Morale penalty (per tick) applied when a social or comfort gauge falls below its threshold.
  */
 export const NEED_MORALE_PENALTIES = {
-  social:  -2,
-  comfort: -1,
+  breakNeed: -2,
 } as const;
 
 /** Warning thresholds that trigger proactive rest routing. */
 export const NEED_RESTORATION_THRESHOLDS = {
   hunger:  35,
   fatigue: 25,
+  breakNeed: 30,
 } as const;
 
 // ─── Shift / Rest Scheduling ────────────────────────────────────────────────
