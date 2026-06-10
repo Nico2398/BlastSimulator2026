@@ -20,6 +20,7 @@ import {
   getNeedMultiplier,
   tickNeedMorale,
   replenishNeed,
+  needsMoraleEffect,
   // ── 3.13: task-duration function ──
   computeTaskDuration,
   type SkillQualification,
@@ -36,6 +37,11 @@ import {
   NEED_PRODUCTIVITY_MULTIPLIERS,
   NEED_MORALE_PENALTIES,
   NEED_MORALE_DRAIN_MULTIPLIERS,
+  // ── 7.4: needsMoraleEffect balance constants ──
+  NEED_MORALE_EFFECT_THRESHOLDS,
+  NEED_MORALE_EFFECT_PENALTIES,
+  NEED_WELL_RESTED_THRESHOLD,
+  NEED_WELL_RESTED_BONUS,
   // ── 3.13: proficiency multipliers ──
   PROFICIENCY_MULTIPLIERS,
 } from '../../../src/core/config/balance.js';
@@ -836,6 +842,277 @@ describe('Employee — tickNeedGauges (7.3)', () => {
     expect(emp1.hunger).toBeCloseTo(100 - NEED_DRAIN_RATES.hunger.working * NEED_MORALE_DRAIN_MULTIPLIERS.low, 5);
     // morale=100: ×0.85
     expect(emp2.hunger).toBeCloseTo(100 - NEED_DRAIN_RATES.hunger.working * NEED_MORALE_DRAIN_MULTIPLIERS.high, 5);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Task 7.4 — needsMoraleEffect: morale delta from all three need gauges
+//
+// Function under test:
+//   needsMoraleEffect(employee) → number
+// Pure function returning the tick-level morale delta from hunger, fatigue,
+// and breakNeed gauges. Each gauge applies a tiered penalty:
+//   gauge >= 50:  0        (comfortable)
+//   gauge >= 30: -0.5      (uncomfortable)
+//   gauge >= 15: -1.5      (suffering)
+//   gauge <  15: -3.0      (critical)
+//
+// If all three gauges are > NEED_WELL_RESTED_THRESHOLD (80), a +1 bonus is
+// applied (well-rested bonus).
+// ─────────────────────────────────────────────────────────────────────────────
+describe('Employee — needsMoraleEffect (7.4)', () => {
+
+  // ── Test 1 ──────────────────────────────────────────────────────────────────
+  it('all gauges at 100 → returns +1 (well-rested bonus)', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    // All gauges default to 100
+    const result = needsMoraleEffect(employee);
+    // comfortable (0) + comfortable (0) + comfortable (0) + well-rested (+1) = +1
+    expect(result).toBe(1);
+  });
+
+  // ── Test 2 ──────────────────────────────────────────────────────────────────
+  it('all gauges at 100, well-rested bonus equals NEED_WELL_RESTED_BONUS', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    const result = needsMoraleEffect(employee);
+    expect(result).toBe(NEED_WELL_RESTED_BONUS);
+  });
+
+  // ── Test 3 ──────────────────────────────────────────────────────────────────
+  it('single gauge critical (hunger=10, others 100) → returns -3.0', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    employee.hunger = 10;
+    // hunger: critical (-3.0), fatigue: comfortable (0), breakNeed: comfortable (0)
+    const result = needsMoraleEffect(employee);
+    expect(result).toBeCloseTo(-3.0, 5);
+  });
+
+  // ── Test 4 ──────────────────────────────────────────────────────────────────
+  it('two critical gauges (fatigue=5, breakNeed=10, hunger=100) → returns -6.0', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    employee.fatigue = 5;
+    employee.breakNeed = 10;
+    // fatigue: critical (-3.0), breakNeed: critical (-3.0), hunger: comfortable (0)
+    const result = needsMoraleEffect(employee);
+    expect(result).toBeCloseTo(-6.0, 5);
+  });
+
+  // ── Test 5 ──────────────────────────────────────────────────────────────────
+  it('all three gauges critical (0, 0, 0) → returns -9.0', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    employee.hunger = 0;
+    employee.fatigue = 0;
+    employee.breakNeed = 0;
+    // critical (-3.0) × 3 = -9.0
+    const result = needsMoraleEffect(employee);
+    expect(result).toBeCloseTo(-9.0, 5);
+  });
+
+  // ── Test 6 ──────────────────────────────────────────────────────────────────
+  it('mixed gauges (hunger=40, fatigue=100, breakNeed=20) → returns -2.0', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    employee.hunger = 40;    // 40 >= 30 → uncomfortable (-0.5)
+    employee.fatigue = 100;  // 100 >= 50 → comfortable (0)
+    employee.breakNeed = 20; // 20 >= 15 → suffering (-1.5)
+    // -0.5 + 0 + -1.5 = -2.0
+    const result = needsMoraleEffect(employee);
+    expect(result).toBeCloseTo(-2.0, 5);
+  });
+
+  // ── Test 7 ──────────────────────────────────────────────────────────────────
+  it('borderline comfortable (50, 50, 50) → returns 0', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    employee.hunger = 50;
+    employee.fatigue = 50;
+    employee.breakNeed = 50;
+    // All comfortable (0) — no well-rested bonus (50 is not > 80)
+    const result = needsMoraleEffect(employee);
+    expect(result).toBe(0);
+  });
+
+  // ── Test 8 ──────────────────────────────────────────────────────────────────
+  it('borderline well-rested threshold (80, 80, 80) → returns 0', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    employee.hunger = 80;
+    employee.fatigue = 80;
+    employee.breakNeed = 80;
+    // All comfortable (0) — no well-rested bonus (80 is not > 80)
+    const result = needsMoraleEffect(employee);
+    expect(result).toBe(0);
+  });
+
+  // ── Test 9 ──────────────────────────────────────────────────────────────────
+  it('well-rested threshold crossed (81, 81, 81) → returns +1', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    employee.hunger = 81;
+    employee.fatigue = 81;
+    employee.breakNeed = 81;
+    // All comfortable (0) + well-rested (+1) = +1
+    const result = needsMoraleEffect(employee);
+    expect(result).toBe(1);
+  });
+
+  // ── Test 10 ─────────────────────────────────────────────────────────────────
+  it('one gauge just below well-rested (79, 100, 100) → returns 0', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    employee.hunger = 79;
+    employee.fatigue = 100;
+    employee.breakNeed = 100;
+    // All comfortable (0) — no bonus because 79 is not > 80
+    const result = needsMoraleEffect(employee);
+    expect(result).toBe(0);
+  });
+
+  // ── Test 11 ─────────────────────────────────────────────────────────────────
+  it('suffering threshold edge (15, 15, 15) → returns -4.5', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    employee.hunger = 15;
+    employee.fatigue = 15;
+    employee.breakNeed = 15;
+    // All suffering (-1.5 × 3) = -4.5
+    const result = needsMoraleEffect(employee);
+    expect(result).toBeCloseTo(-4.5, 5);
+  });
+
+  // ── Test 12 ─────────────────────────────────────────────────────────────────
+  it('below suffering / critical (14, 14, 14) → returns -9.0', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    employee.hunger = 14;
+    employee.fatigue = 14;
+    employee.breakNeed = 14;
+    // All critical (-3.0 × 3) = -9.0
+    const result = needsMoraleEffect(employee);
+    expect(result).toBeCloseTo(-9.0, 5);
+  });
+
+  // ── Test 13 ─────────────────────────────────────────────────────────────────
+  it('uncomfortable threshold edge (30, 30, 30) → returns -1.5', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    employee.hunger = 30;
+    employee.fatigue = 30;
+    employee.breakNeed = 30;
+    // All uncomfortable (-0.5 × 3) = -1.5
+    const result = needsMoraleEffect(employee);
+    expect(result).toBeCloseTo(-1.5, 5);
+  });
+
+  // ── Test 14 ─────────────────────────────────────────────────────────────────
+  it('below uncomfortable (29, 29, 29) → returns -4.5', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    employee.hunger = 29;
+    employee.fatigue = 29;
+    employee.breakNeed = 29;
+    // All suffering (-1.5 × 3) = -4.5
+    const result = needsMoraleEffect(employee);
+    expect(result).toBeCloseTo(-4.5, 5);
+  });
+
+  // ── Test 15 ─────────────────────────────────────────────────────────────────
+  it('pure function — does not mutate employee', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    employee.hunger = 10;
+    employee.fatigue = 20;
+    employee.breakNeed = 30;
+    employee.morale = 60;
+
+    const oldMorale = employee.morale;
+    const oldHunger = employee.hunger;
+    const oldFatigue = employee.fatigue;
+    const oldBreakNeed = employee.breakNeed;
+
+    needsMoraleEffect(employee); // call the pure function
+
+    // Verify nothing was mutated
+    expect(employee.morale).toBe(oldMorale);
+    expect(employee.hunger).toBe(oldHunger);
+    expect(employee.fatigue).toBe(oldFatigue);
+    expect(employee.breakNeed).toBe(oldBreakNeed);
+  });
+
+  // ── Test 16 ─────────────────────────────────────────────────────────────────
+  it('well-rested bonus does not mask critical gauge', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    employee.hunger = 85;    // comfortable (0)
+    employee.fatigue = 85;   // comfortable (0)
+    employee.breakNeed = 10; // critical (-3.0)
+    // Sum = -3.0, no bonus because breakNeed (10) is not > 80
+    const result = needsMoraleEffect(employee);
+    expect(result).toBeCloseTo(-3.0, 5);
+  });
+
+  // ── Test 17 ─────────────────────────────────────────────────────────────────
+  it('exactly at comfortable threshold (50, 50, 50) with no bonus → return exactly 0', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    employee.hunger = NEED_MORALE_EFFECT_THRESHOLDS.comfortable;
+    employee.fatigue = NEED_MORALE_EFFECT_THRESHOLDS.comfortable;
+    employee.breakNeed = NEED_MORALE_EFFECT_THRESHOLDS.comfortable;
+    // gauge=50 is the comfortable threshold; 50 >= 50 → comfortable (0)
+    const result = needsMoraleEffect(employee);
+    expect(NEED_MORALE_EFFECT_THRESHOLDS.comfortable).toBe(50);
+    expect(result).toBe(0);
+  });
+
+  // ── Test 18 ─────────────────────────────────────────────────────────────────
+  it('all three above well-rested threshold (82, 82, 82) → bonus positive', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    employee.hunger = 82;
+    employee.fatigue = 82;
+    employee.breakNeed = 82;
+    // All comfortable (0) + well-rested (+1) = +1
+    const result = needsMoraleEffect(employee);
+    expect(result).toBe(1);
+  });
+
+  // ── Test 19 ─────────────────────────────────────────────────────────────────
+  it('uses the correct constant values from balance.ts', () => {
+    // Verify penalty constants
+    expect(NEED_MORALE_EFFECT_PENALTIES.comfortable).toBe(0);
+    expect(NEED_MORALE_EFFECT_PENALTIES.uncomfortable).toBe(-0.5);
+    expect(NEED_MORALE_EFFECT_PENALTIES.suffering).toBe(-1.5);
+    expect(NEED_MORALE_EFFECT_PENALTIES.critical).toBe(-3.0);
+    // Verify well-rested bonus constant
+    expect(NEED_WELL_RESTED_BONUS).toBe(1);
+    // Verify threshold constants
+    expect(NEED_MORALE_EFFECT_THRESHOLDS.comfortable).toBe(50);
+    expect(NEED_MORALE_EFFECT_THRESHOLDS.uncomfortable).toBe(30);
+    expect(NEED_MORALE_EFFECT_THRESHOLDS.suffering).toBe(15);
+    expect(NEED_WELL_RESTED_THRESHOLD).toBe(80);
   });
 });
 
