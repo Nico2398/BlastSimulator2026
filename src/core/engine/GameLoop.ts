@@ -368,7 +368,75 @@ export function tickCollapse(state: GameState): CollapseResult {
  * Employees that already have a rest PendingAction in the queue are skipped.
  */
 export function autoInsertNeedTasks(state: GameState): NeedInsertionResult {
-  return { inserted: [], skipped: [] };
+  const result: NeedInsertionResult = { inserted: [], skipped: [] };
+
+  for (const emp of state.employees.employees) {
+    // Skip dead, injured, or collapsing employees
+    if (!emp.alive || emp.injured || emp.collapsing) continue;
+
+    // Determine which gauges are below warning thresholds
+    const triggeredGauges: NeedKey[] = [];
+    const gauges: Array<{ key: NeedKey; value: number }> = [
+      { key: 'hunger', value: emp.hunger },
+      { key: 'fatigue', value: emp.fatigue },
+      { key: 'breakNeed', value: emp.breakNeed },
+    ];
+    for (const { key, value } of gauges) {
+      if (value < NEED_WARNING_THRESHOLDS[key]) {
+        triggeredGauges.push(key);
+      }
+    }
+
+    // If no gauges are below threshold, skip entirely
+    if (triggeredGauges.length === 0) continue;
+
+    // Check if employee already has a rest PendingAction queued
+    const hasRestAction = state.pendingActions.some(
+      action => action.targetEmployeeId === emp.id && action.type === 'rest',
+    );
+
+    if (hasRestAction) {
+      // Record all triggered gauges as skipped
+      for (const gauge of triggeredGauges) {
+        result.skipped.push({ employeeId: emp.id, needKey: gauge, reason: 'rest_action_already_queued' });
+      }
+      continue;
+    }
+
+    // Use the first triggered gauge as the primary one (array is non-empty due to check above)
+    const primaryGauge = triggeredGauges[0]!;
+    const buildingType = NEED_REST_BUILDING_TYPES[primaryGauge];
+    const building = findNearestBuildingOfType(state, buildingType, emp.x, emp.z);
+
+    const targetX = building?.x ?? emp.x;
+    const targetZ = building?.z ?? emp.z;
+
+    const actionId = state.nextPendingActionId++;
+    const restAction: PendingAction = {
+      id: actionId,
+      type: 'rest',
+      requiredSkill: null,
+      requiredVehicleRole: null,
+      targetX,
+      targetZ,
+      targetY: 0,
+      payload: {
+        buildingId: building?.id,
+        restDuration: NEED_REST_DURATIONS[primaryGauge],
+        triggeredBy: triggeredGauges,
+      },
+      targetEmployeeId: emp.id,
+    };
+
+    state.pendingActions.push(restAction);
+
+    // Record each triggered gauge as inserted
+    for (const gauge of triggeredGauges) {
+      result.inserted.push({ employeeId: emp.id, needKey: gauge });
+    }
+  }
+
+  return result;
 }
 
 function findNearestBuildingOfType(
