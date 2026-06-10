@@ -11,9 +11,9 @@
 //   Group 7 — Immutability (original AgentState not mutated)
 
 import { describe, it, expect } from 'vitest';
-import { advanceAgent, isPathBlocked, doesPathCrossRegion, requestReRoute, recordStuckFailure, resetStuckState, isAgentStuck, getStuckState, STUCK_THRESHOLD, AGENT_STUCK_EVENT_ID } from '../../../src/core/nav/AgentMovement.js';
+import { advanceAgent, isPathBlocked, doesPathCrossRegion, requestReRoute, recordStuckFailure, resetStuckState, isAgentStuck, getStuckState, AGENT_STUCK_EVENT_ID } from '../../../src/core/nav/AgentMovement.js';
 import type { AdvanceResult, AgentState, StaleCheckResult, StuckResult } from '../../../src/core/nav/AgentMovement.js';
-import { AGENT_WALK_SPEED } from '../../../src/core/config/balance.js';
+import { AGENT_WALK_SPEED, STUCK_THRESHOLD } from '../../../src/core/config/balance.js';
 import { NavGrid } from '../../../src/core/nav/NavGrid.js';
 import type { NavCell } from '../../../src/core/nav/NavGrid.js';
 

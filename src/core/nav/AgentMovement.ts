@@ -2,9 +2,7 @@
 // Part of the navmesh system.
 
 import type { NavGrid } from './NavGrid.js';
-
-/** Number of consecutive failed re-route attempts before the agent transitions to stuck state. */
-export const STUCK_THRESHOLD = 3;
+import { STUCK_THRESHOLD } from '../config/balance.js';
 
 /** Event ID emitted when an agent becomes stuck. */
 export const AGENT_STUCK_EVENT_ID = 'agent_stuck';
@@ -238,7 +236,7 @@ export function requestReRoute(state: AgentState): AgentState {
  * @returns A new `AgentState` with updated stuck-tracker fields.
  */
 export function recordStuckFailure(state: AgentState): AgentState {
-  const base = (Number.isNaN(state.consecutiveFailures) || state.consecutiveFailures < 0)
+  const base = (typeof state.consecutiveFailures !== 'number' || !Number.isFinite(state.consecutiveFailures) || state.consecutiveFailures < 0)
     ? 0
     : state.consecutiveFailures;
   const newFailures = base + 1;
