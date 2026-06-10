@@ -1658,6 +1658,8 @@
   "course.geology": "Diplôme de Géologie",
   "course.management": "Diplôme de Gestion",
   "error.unqualified_task": "Aucun employé qualifié disponible pour cette tâche",
+  "nav.agent_stuck": "L'agent est bloqué et ne trouve pas de chemin",
+  "nav.no_ramp_available": "Aucune rampe disponible pour atteindre la destination",
   "need.comfort": "Confort",
   "need.fatigue": "Fatigue",
   "need.hunger": "Faim",

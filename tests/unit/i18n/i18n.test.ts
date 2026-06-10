@@ -345,3 +345,45 @@ describe('blast.oversized_alert — {count} interpolation', () => {
     });
   }
 });
+
+// ── Nav pathfinding event keys (nav.agent_stuck, nav.no_ramp_available) ──────
+
+const NAV_KEYS = [
+  'nav.agent_stuck',
+  'nav.no_ramp_available',
+] as const;
+
+describe('nav.* keys resolve in both locales', () => {
+  for (const locale of LOCALES) {
+    it(`locale ${locale}: all nav.* keys resolve`, () => {
+      setLocale(locale);
+      for (const key of NAV_KEYS) {
+        const result = t(key);
+        expect(result, `key "${key}" must resolve in ${locale}`).not.toBe(key);
+        expect(result.length, `key "${key}" must be non-empty in ${locale}`).toBeGreaterThan(0);
+      }
+    });
+  }
+});
+
+describe('nav.* keys — en and fr translations differ', () => {
+  it('nav.agent_stuck is translated differently in en vs fr', () => {
+    setLocale('en');
+    const en = t('nav.agent_stuck');
+    setLocale('fr');
+    const fr = t('nav.agent_stuck');
+    expect(en, 'nav.agent_stuck must resolve in en').not.toBe('nav.agent_stuck');
+    expect(fr, 'nav.agent_stuck must resolve in fr').not.toBe('nav.agent_stuck');
+    expect(en, 'en and fr translations for nav.agent_stuck must differ').not.toBe(fr);
+  });
+
+  it('nav.no_ramp_available is translated differently in en vs fr', () => {
+    setLocale('en');
+    const en = t('nav.no_ramp_available');
+    setLocale('fr');
+    const fr = t('nav.no_ramp_available');
+    expect(en, 'nav.no_ramp_available must resolve in en').not.toBe('nav.no_ramp_available');
+    expect(fr, 'nav.no_ramp_available must resolve in fr').not.toBe('nav.no_ramp_available');
+    expect(en, 'en and fr translations for nav.no_ramp_available must differ').not.toBe(fr);
+  });
+});

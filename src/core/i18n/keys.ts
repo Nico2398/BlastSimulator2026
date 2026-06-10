@@ -13,6 +13,10 @@ export const I18nKeys = {
     oversizedAlert: 'blast.oversized_alert',
     projections: 'blast.projections',
   },
+  nav: {
+    agentStuck: 'nav.agent_stuck',
+    noRampAvailable: 'nav.no_ramp_available',
+  },
 } as const;
 
 export type I18nKey = string;
