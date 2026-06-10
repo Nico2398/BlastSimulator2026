@@ -2,6 +2,10 @@
 // Part of the navmesh system.
 
 import type { NavGrid } from './NavGrid.js';
+import { STUCK_THRESHOLD } from '../config/balance.js';
+
+/** Event ID emitted when an agent becomes stuck. */
+export const AGENT_STUCK_EVENT_ID = 'agent_stuck';
 
 /**
  * The current navigation state of an agent walking along a path.
@@ -22,6 +26,10 @@ export interface AgentState {
   destinationX: number;
   /** The ultimate destination z-coordinate. */
   destinationZ: number;
+  /** Number of consecutive failed re-route attempts. */
+  consecutiveFailures: number;
+  /** True when consecutiveFailures >= STUCK_THRESHOLD. */
+  isStuck: boolean;
 }
 
 /**
@@ -45,6 +53,14 @@ export interface AdvanceResult {
 export interface StaleCheckResult {
   isStale: boolean;
   reason?: 'BLOCKED_WAYPOINT' | 'CROSSES_UPDATED_REGION';
+}
+
+/**
+ * Full stuck-state snapshot for an agent.
+ */
+export interface StuckResult {
+  consecutiveFailures: number;
+  isStuck: boolean;
 }
 
 /**
@@ -117,10 +133,15 @@ export function advanceAgent(state: AgentState): AdvanceResult {
 }
 
 /**
- * Iterate over remaining waypoints and return true if any satisfy the predicate.
+ * Check whether any remaining waypoint in the agent's path satisfies a predicate.
+ * Iterates over waypoints from the current index to the end of the list.
  * Returns false if no waypoints remain or the path is already complete.
+ *
+ * @param state     - The agent's current navigation state.
+ * @param predicate - Function tested against each remaining waypoint.
+ * @returns `true` if any remaining waypoint satisfies the predicate.
  */
-function someRemainingWaypoint(
+function hasWaypointSatisfying(
   state: AgentState,
   predicate: (wp: { x: number; z: number }) => boolean,
 ): boolean {
@@ -144,7 +165,7 @@ function someRemainingWaypoint(
  * @returns `true` if any remaining waypoint is blocked.
  */
 export function isPathBlocked(state: AgentState, grid: NavGrid, avoidVehicles: boolean): boolean {
-  return someRemainingWaypoint(state, (wp) => {
+  return hasWaypointSatisfying(state, (wp) => {
     const clampedX = Math.max(0, Math.min(grid.width - 1, Math.floor(wp.x)));
     const clampedZ = Math.max(0, Math.min(grid.height - 1, Math.floor(wp.z)));
     const cell = grid.cells[clampedZ]![clampedX]!;
@@ -186,7 +207,7 @@ export function doesPathCrossRegion(
     return false;
   }
 
-  return someRemainingWaypoint(state, (wp) =>
+  return hasWaypointSatisfying(state, (wp) =>
     wp.x >= region.minX && wp.x <= region.maxX && wp.z >= region.minZ && wp.z <= region.maxZ,
   );
 }
@@ -207,5 +228,63 @@ export function requestReRoute(state: AgentState): AgentState {
     walkSpeed: state.walkSpeed,
     destinationX: state.destinationX,
     destinationZ: state.destinationZ,
+    consecutiveFailures: state.consecutiveFailures,
+    isStuck: state.isStuck,
+  };
+}
+
+/**
+ * Record a failed re-route attempt for an agent.
+ * Increments consecutiveFailures and sets isStuck if threshold is reached.
+ *
+ * @param state - The agent's current navigation state.
+ * @returns A new `AgentState` with updated stuck-tracker fields.
+ */
+export function recordStuckFailure(state: AgentState): AgentState {
+  const base = (typeof state.consecutiveFailures !== 'number' || !Number.isFinite(state.consecutiveFailures) || state.consecutiveFailures < 0)
+    ? 0
+    : state.consecutiveFailures;
+  const newFailures = base + 1;
+  return {
+    ...state,
+    consecutiveFailures: newFailures,
+    isStuck: newFailures >= STUCK_THRESHOLD || state.isStuck,
+  };
+}
+
+/**
+ * Reset the stuck-tracker fields on an agent state.
+ *
+ * @param state - The agent's current navigation state.
+ * @returns A new `AgentState` with consecutiveFailures=0 and isStuck=false.
+ */
+export function resetStuckState(state: AgentState): AgentState {
+  return {
+    ...state,
+    consecutiveFailures: 0,
+    isStuck: false,
+  };
+}
+
+/**
+ * Check whether the agent is currently in a stuck state.
+ *
+ * @param state - The agent's current navigation state.
+ * @returns `true` if the agent is stuck.
+ */
+export function isAgentStuck(state: AgentState): boolean {
+  return !!state.isStuck;
+}
+
+/**
+ * Get the full stuck-state snapshot for an agent.
+ *
+ * @param state - The agent's current navigation state.
+ * @returns A `StuckResult` with consecutiveFailures and isStuck.
+ */
+export function getStuckState(state: AgentState): StuckResult {
+  return {
+    consecutiveFailures: state.consecutiveFailures,
+    isStuck: !!state.isStuck,
   };
 }
