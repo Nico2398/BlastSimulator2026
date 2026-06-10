@@ -11,10 +11,12 @@ import { resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 
 const PROJECT_ROOT = resolve(import.meta.dirname, '../../..');
+const EXEC_TIMEOUT = 120_000; // 120s for vitest --coverage subprocess
+const BEFOREALL_TIMEOUT = 130_000; // slightly above EXEC_TIMEOUT for beforeAll hook
 
 describe('npm run test:coverage execution (8.1)', () => {
   let coverageDir: string;
-  let coverageGenerated = false;
+  let coverageSucceeded = false;
 
   beforeAll(() => {
     coverageDir = mkdtempSync(resolve(tmpdir(), 'coverage-test-'));
@@ -30,33 +32,25 @@ describe('npm run test:coverage execution (8.1)', () => {
         '--exclude tests/unit/coverage/coverage-run.test.ts',
         {
           cwd: PROJECT_ROOT,
-          timeout: 120_000,
+          timeout: EXEC_TIMEOUT,
           encoding: 'utf-8',
           stdio: 'pipe',
         },
       );
-      coverageGenerated = true;
+      coverageSucceeded = true;
     } catch {
-      coverageGenerated = false;
+      coverageSucceeded = false;
     }
-  }, 130_000);
+  }, BEFOREALL_TIMEOUT);
 
   it('exits with code 0 when coverage runs on a tested subset', () => {
-    expect(coverageGenerated).toBe(true);
+    expect(coverageSucceeded).toBe(true);
   });
 
-  it('generates coverage/lcov.info file', () => {
-    const lcovPath = resolve(coverageDir, 'lcov.info');
-    expect(existsSync(lcovPath)).toBe(true);
-  });
-
-  it('generates coverage/index.html file', () => {
-    const htmlPath = resolve(coverageDir, 'index.html');
-    expect(existsSync(htmlPath)).toBe(true);
-  });
-
-  it('generates coverage/coverage-final.json file', () => {
-    const jsonPath = resolve(coverageDir, 'coverage-final.json');
-    expect(existsSync(jsonPath)).toBe(true);
-  });
+  it.each(['lcov.info', 'index.html', 'coverage-final.json'] as const)(
+    'generates coverage/%s',
+    (file) => {
+      expect(existsSync(resolve(coverageDir, file))).toBe(true);
+    },
+  );
 });

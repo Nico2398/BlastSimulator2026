@@ -6,6 +6,8 @@
 import { describe, it, expect } from 'vitest';
 import pkg from '../../../package.json' with { type: 'json' };
 
+const COVERAGE_FLAG = '--coverage';
+
 describe('coverage npm scripts (8.1)', () => {
   describe('test:coverage script', () => {
     it('exists in package.json scripts', () => {
@@ -14,7 +16,7 @@ describe('coverage npm scripts (8.1)', () => {
 
     it('contains the --coverage flag', () => {
       const script = pkg.scripts['test:coverage'];
-      expect(script).toContain('--coverage');
+      expect(script).toContain(COVERAGE_FLAG);
     });
 
     it('uses vitest run (not vitest watch)', () => {
@@ -30,7 +32,7 @@ describe('coverage npm scripts (8.1)', () => {
 
     it('contains the --coverage flag', () => {
       const script = pkg.scripts['validate'];
-      expect(script).toContain('--coverage');
+      expect(script).toContain(COVERAGE_FLAG);
     });
 
     it('includes tsc type-check', () => {

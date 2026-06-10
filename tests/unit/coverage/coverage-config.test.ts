@@ -45,20 +45,8 @@ describe('vitest coverage configuration (8.1)', () => {
       expect(Array.isArray(coverage?.reporter)).toBe(true);
     });
 
-    it('reporter includes text', () => {
-      expect(coverage?.reporter).toContain('text');
-    });
-
-    it('reporter includes json', () => {
-      expect(coverage?.reporter).toContain('json');
-    });
-
-    it('reporter includes html', () => {
-      expect(coverage?.reporter).toContain('html');
-    });
-
-    it('reporter includes lcov', () => {
-      expect(coverage?.reporter).toContain('lcov');
+    it.each(['text', 'json', 'html', 'lcov'] as const)('reporter includes %s', (reporter) => {
+      expect(coverage?.reporter).toContain(reporter);
     });
   });
 
@@ -67,24 +55,14 @@ describe('vitest coverage configuration (8.1)', () => {
       expect(coverage?.include).toContain('src/**');
     });
 
-    it('exclude excludes test files (**/*.test.ts)', () => {
-      expect(coverage?.exclude).toContain('src/**/*.test.ts');
-    });
-
-    it('exclude excludes spec files (**/*.spec.ts)', () => {
-      expect(coverage?.exclude).toContain('src/**/*.spec.ts');
-    });
-
-    it('exclude excludes declaration files (**/*.d.ts)', () => {
-      expect(coverage?.exclude).toContain('src/**/*.d.ts');
-    });
-
-    it('exclude excludes __tests__ directories', () => {
-      expect(coverage?.exclude).toContain('src/**/__tests__/**');
-    });
-
-    it('exclude excludes __mocks__ directories', () => {
-      expect(coverage?.exclude).toContain('src/**/__mocks__/**');
+    it.each([
+      ['test files (**/*.test.ts)', 'src/**/*.test.ts'],
+      ['spec files (**/*.spec.ts)', 'src/**/*.spec.ts'],
+      ['declaration files (**/*.d.ts)', 'src/**/*.d.ts'],
+      ['__tests__ directories', 'src/**/__tests__/**'],
+      ['__mocks__ directories', 'src/**/__mocks__/**'],
+    ] as const)('exclude excludes %s', (_, pattern) => {
+      expect(coverage?.exclude).toContain(pattern);
     });
   });
 
@@ -93,20 +71,11 @@ describe('vitest coverage configuration (8.1)', () => {
       expect(coverage?.thresholds.perFile).toBe(true);
     });
 
-    it('statements threshold is greater than 0', () => {
-      expect(coverage?.thresholds.statements).toBeGreaterThan(0);
-    });
-
-    it('branches threshold is greater than 0', () => {
-      expect(coverage?.thresholds.branches).toBeGreaterThan(0);
-    });
-
-    it('functions threshold is greater than 0', () => {
-      expect(coverage?.thresholds.functions).toBeGreaterThan(0);
-    });
-
-    it('lines threshold is greater than 0', () => {
-      expect(coverage?.thresholds.lines).toBeGreaterThan(0);
-    });
+    it.each(['statements', 'branches', 'functions', 'lines'] as const)(
+      '%s threshold is greater than 0',
+      (key) => {
+        expect(coverage?.thresholds[key]).toBeGreaterThan(0);
+      },
+    );
   });
 });
