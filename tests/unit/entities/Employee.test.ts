@@ -42,6 +42,8 @@ import {
   NEED_MORALE_EFFECT_PENALTIES,
   NEED_WELL_RESTED_THRESHOLD,
   NEED_WELL_RESTED_BONUS,
+  // ── 7.5: replenishNeed building replenish rates ──
+  BUILDING_REPLENISH_RATES,
   // ── 3.13: proficiency multipliers ──
   PROFICIENCY_MULTIPLIERS,
 } from '../../../src/core/config/balance.js';
@@ -498,7 +500,7 @@ describe('calculateSalary() (3.4)', () => {
 //   tickNeeds(employee, isWorking)        — drain all needs by the appropriate rate
 //   getNeedMultiplier(employee)           — returns productivity multiplier 0.0–1.0
 //   tickNeedMorale(employee)              — returns morale delta (≤ 0) from low breakNeed
-//   replenishNeed(employee, need, amount) — restore a gauge, capped at 100
+//   replenishNeed(employee, need, buildingTier, availableCapacity) → fills gauge at building tier rate, enforces capacity
 // New Employee fields: hunger, fatigue, breakNeed (all 0–100), collapsing (boolean)
 // New balance constants: NEED_DRAIN_RATES, NEED_THRESHOLDS
 // ─────────────────────────────────────────────────────────────────────────────
@@ -642,41 +644,6 @@ describe('Employee — need meters (7.1)', () => {
     expect(tickNeedMorale(employee)).toBe(0);
   });
 
-  // ── Test 14 ─────────────────────────────────────────────────────────────────
-  it('replenishNeed increases breakNeed by the given amount', () => {
-    const state = createEmployeeState();
-    const rng = new Random(1);
-    const { employee } = hireEmployee(state, 'driller', rng);
-    employee.breakNeed = 50;
-
-    replenishNeed(employee, 'breakNeed', 30);
-
-    expect(employee.breakNeed).toBe(80);
-  });
-
-  // ── Test 15 ─────────────────────────────────────────────────────────────────
-  it('replenishNeed caps breakNeed at 100 and never exceeds it', () => {
-    const state = createEmployeeState();
-    const rng = new Random(1);
-    const { employee } = hireEmployee(state, 'driller', rng);
-    employee.breakNeed = 80;
-
-    replenishNeed(employee, 'breakNeed', 50);
-
-    expect(employee.breakNeed).toBe(100);
-  });
-
-  // ── Test 16 ─────────────────────────────────────────────────────────────────
-  it('replenishNeed still works with hunger (non-breakNeed gauge)', () => {
-    const state = createEmployeeState();
-    const rng = new Random(1);
-    const { employee } = hireEmployee(state, 'driller', rng);
-    employee.hunger = 50;
-
-    replenishNeed(employee, 'hunger', 30);
-
-    expect(employee.hunger).toBe(80);
-  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1113,6 +1080,117 @@ describe('Employee — needsMoraleEffect (7.4)', () => {
     expect(NEED_MORALE_EFFECT_THRESHOLDS.uncomfortable).toBe(30);
     expect(NEED_MORALE_EFFECT_THRESHOLDS.suffering).toBe(15);
     expect(NEED_WELL_RESTED_THRESHOLD).toBe(80);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Task 7.5 — replenishNeed: fill gauge at building tier rate, enforce capacity
+//
+// Function under test:
+//   replenishNeed(employee, need, buildingTier, availableCapacity) → boolean
+// Uses BUILDING_REPLENISH_RATES to determine per-tick fill rate by tier.
+// Returns true if the replenishment was applied (capacity was > 0),
+// false if availableCapacity <= 0 (no capacity to consume).
+// Gauge is capped at 100.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('Employee — replenishNeed (7.5)', () => {
+
+  // ── Test 1 ──────────────────────────────────────────────────────────────────
+  it('replenishes hunger at tier-1 rate (+12), returns true', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    employee.hunger = 50;
+    const result = replenishNeed(employee, 'hunger', 1, 5);
+    expect(result).toBe(true);
+    expect(employee.hunger).toBe(62);
+  });
+
+  // ── Test 2 ──────────────────────────────────────────────────────────────────
+  it('replenishes fatigue at tier-2 rate (+14), returns true', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    employee.fatigue = 40;
+    const result = replenishNeed(employee, 'fatigue', 2, 3);
+    expect(result).toBe(true);
+    expect(employee.fatigue).toBe(54);
+  });
+
+  // ── Test 3 ──────────────────────────────────────────────────────────────────
+  it('replenishes breakNeed at tier-3 rate (+22), returns true', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    employee.breakNeed = 30;
+    const result = replenishNeed(employee, 'breakNeed', 3, 1);
+    expect(result).toBe(true);
+    expect(employee.breakNeed).toBe(52);
+  });
+
+  // ── Test 4 ──────────────────────────────────────────────────────────────────
+  it('availableCapacity = 0 → returns false, gauge unchanged', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    employee.hunger = 50;
+    const result = replenishNeed(employee, 'hunger', 1, 0);
+    expect(result).toBe(false);
+    expect(employee.hunger).toBe(50);
+  });
+
+  // ── Test 5 ──────────────────────────────────────────────────────────────────
+  it('availableCapacity < 0 → returns false, gauge unchanged', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    employee.fatigue = 60;
+    const result = replenishNeed(employee, 'fatigue', 2, -1);
+    expect(result).toBe(false);
+    expect(employee.fatigue).toBe(60);
+  });
+
+  // ── Test 6 ──────────────────────────────────────────────────────────────────
+  it('gauge near 100 + rate that would overflow → clamped to 100', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    employee.hunger = 95;
+    const result = replenishNeed(employee, 'hunger', 1, 5);
+    expect(result).toBe(true);
+    expect(employee.hunger).toBe(100);
+  });
+
+  // ── Test 7 ──────────────────────────────────────────────────────────────────
+  it('gauge already at 100 → returns true (capacity consumed), stays at 100', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    employee.hunger = 100;
+    const result = replenishNeed(employee, 'hunger', 1, 5);
+    expect(result).toBe(true);
+    expect(employee.hunger).toBe(100);
+  });
+
+  // ── Test 8 ──────────────────────────────────────────────────────────────────
+  it('all tiers produce distinct hunger rates: 12, 18, 25', () => {
+    expect(BUILDING_REPLENISH_RATES.hunger[1]).toBe(12);
+    expect(BUILDING_REPLENISH_RATES.hunger[2]).toBe(18);
+    expect(BUILDING_REPLENISH_RATES.hunger[3]).toBe(25);
+  });
+
+  // ── Test 9 ──────────────────────────────────────────────────────────────────
+  it('all tiers produce distinct fatigue rates: 8, 14, 20', () => {
+    expect(BUILDING_REPLENISH_RATES.fatigue[1]).toBe(8);
+    expect(BUILDING_REPLENISH_RATES.fatigue[2]).toBe(14);
+    expect(BUILDING_REPLENISH_RATES.fatigue[3]).toBe(20);
+  });
+
+  // ── Test 10 ─────────────────────────────────────────────────────────────────
+  it('all tiers produce distinct breakNeed rates: 10, 16, 22', () => {
+    expect(BUILDING_REPLENISH_RATES.breakNeed[1]).toBe(10);
+    expect(BUILDING_REPLENISH_RATES.breakNeed[2]).toBe(16);
+    expect(BUILDING_REPLENISH_RATES.breakNeed[3]).toBe(22);
   });
 });
 

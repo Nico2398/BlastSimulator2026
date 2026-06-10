@@ -399,6 +399,18 @@ export const NEED_COLLAPSE_THRESHOLDS = {
   breakNeed: 15,
 } as const;
 
+/**
+ * Per-tick replenishment rates for each need gauge by building tier.
+ * Keyed by need gauge (not building type) because the caller already knows
+ * which need to replenish; the building-to-need mapping is handled upstream.
+ * Tier 1 is the baseline; higher tiers improve replenishment rates.
+ */
+export const BUILDING_REPLENISH_RATES = {
+  hunger:   { 1: 12, 2: 18, 3: 25 },
+  fatigue:  { 1: 8,  2: 14, 3: 20 },
+  breakNeed: { 1: 10, 2: 16, 3: 22 },
+} as const;
+
 // ─── Shift / Rest Scheduling ────────────────────────────────────────────────
 
 /** Shift duration in ticks for each policy mode. 1 tick = 1 game-hour. */

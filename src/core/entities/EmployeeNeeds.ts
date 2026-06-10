@@ -2,7 +2,7 @@
 // Tracks three need gauges: hunger, fatigue, and breakNeed (all 0–100).
 
 import { type Employee } from './Employee.js';
-import { NEED_DRAIN_RATES, NEED_THRESHOLDS, NEED_PRODUCTIVITY_MULTIPLIERS, NEED_MORALE_PENALTIES, MORALE_THRESHOLDS, NEED_MORALE_DRAIN_MULTIPLIERS, NEED_MORALE_EFFECT_THRESHOLDS, NEED_MORALE_EFFECT_PENALTIES, NEED_WELL_RESTED_THRESHOLD, NEED_WELL_RESTED_BONUS } from '../config/balance.js';
+import { NEED_DRAIN_RATES, NEED_THRESHOLDS, NEED_PRODUCTIVITY_MULTIPLIERS, NEED_MORALE_PENALTIES, MORALE_THRESHOLDS, NEED_MORALE_DRAIN_MULTIPLIERS, NEED_MORALE_EFFECT_THRESHOLDS, NEED_MORALE_EFFECT_PENALTIES, NEED_WELL_RESTED_THRESHOLD, NEED_WELL_RESTED_BONUS, BUILDING_REPLENISH_RATES } from '../config/balance.js';
 
 /** The three need gauges tracked on every Employee. */
 export type NeedKey = 'hunger' | 'fatigue' | 'breakNeed';
@@ -108,11 +108,23 @@ export function needsMoraleEffect(employee: Employee): number {
 }
 
 /**
- * Restore a single need gauge by `amount`, capped at 100.
- * Use when the employee eats, rests, or takes a break.
+ * Restore a single need gauge using the replenishment rate for the given
+ * building tier, subject to available capacity.
+ *
+ * @returns `true` if capacity was available and replenishment was attempted;
+ *          `false` if capacity was insufficient.
  */
-export function replenishNeed(employee: Employee, need: NeedKey, amount: number): void {
-  employee[need] = Math.max(0, Math.min(100, employee[need] + amount));
+export function replenishNeed(
+  employee: Employee,
+  need: NeedKey,
+  buildingTier: 1 | 2 | 3,
+  availableCapacity: number,
+): boolean {
+  if (availableCapacity <= 0) return false;
+
+  const rate = BUILDING_REPLENISH_RATES[need][buildingTier];
+  employee[need] = Math.min(100, employee[need] + rate);
+  return true;
 }
 
 /**
