@@ -14,7 +14,7 @@ import { replenishNeed } from '../entities/EmployeeNeeds.js';
 
 // ── Config ──
 
-import { BASE_TICK_MS as _BASE_TICK_MS, VALID_SPEEDS as _VALID_SPEEDS, NEED_REST_DURATIONS, NEED_REST_BUILDING_TYPES, NEED_REST_SEARCH_RADIUS, NEED_WARNING_THRESHOLDS, NEED_REST_COSTS, WORK_DURATION_TICKS, SHIFT_SLEEP_DURATION_TICKS } from '../config/balance.js';
+import { BASE_TICK_MS as _BASE_TICK_MS, VALID_SPEEDS as _VALID_SPEEDS, MAX_NEED_GAUGE, NEED_REST_DURATIONS, NEED_REST_BUILDING_TYPES, NEED_REST_SEARCH_RADIUS, NEED_WARNING_THRESHOLDS, NEED_REST_COSTS, WORK_DURATION_TICKS, SHIFT_SLEEP_DURATION_TICKS } from '../config/balance.js';
 
 /** Milliseconds per base tick at 1x speed. */
 export const BASE_TICK_MS = _BASE_TICK_MS;
@@ -531,7 +531,7 @@ export function processShiftCycle(
         replenishNeed(emp, 'fatigue', building.tier, def.capacity);
       } else {
         // Fallback — no building found (shouldn't happen since we checked hasBunkhouse)
-        emp.fatigue = 100;
+        emp.fatigue = MAX_NEED_GAUGE;
       }
 
       deductRestCost(state, 'fatigue');
@@ -552,6 +552,12 @@ export function processShiftCycle(
     if (!emp.alive || emp.injured) continue;
     if (emp.activeActionId === null) continue;
     if (emp.restTicksRemaining !== null) continue;
+
+    // Skip if employee has a pending rest action (voluntary rest)
+    const hasRestAction = state.pendingActions.some(
+      a => a.type === 'rest' && a.targetEmployeeId === emp.id,
+    );
+    if (hasRestAction) continue;
 
     emp.ticksWorked += 1;
   }
@@ -586,6 +592,7 @@ export function processShiftCycle(
       payload: { needType: 'fatigue', triggeredBy: 'shift_cycle', buildingId },
     });
 
+    state.pendingActions.push(restAction);
     emp.activeActionId = restAction.id;
     shiftRested.push(emp.id);
     firedEvents.push({ eventId: 'employee_shift_change', firedAtTick: state.tickCount });

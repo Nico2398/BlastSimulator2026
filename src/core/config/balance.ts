@@ -441,6 +441,11 @@ export const NEED_REST_COSTS = {
   breakNeed: 20,
 } as const;
 
+// ─── General ───────────────────────────────────────────────────────────────────
+
+/** Maximum value for all need gauges (0–100 range). */
+export const MAX_NEED_GAUGE = 100;
+
 // ─── Shift / Rest Scheduling ────────────────────────────────────────────────
 
 /** Shift duration in ticks for each policy mode. 1 tick = 1 game-hour. */
