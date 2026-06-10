@@ -29,6 +29,7 @@ import type { FragmentData } from '../../core/mining/BlastExecution.js';
 import { runSurvey, SURVEY_METHODS, type SurveyMethod, computeBlastOreReport } from '../../core/mining/SurveyCalc.js';
 import { SURVEY_COSTS } from '../../core/config/balance.js';
 import { detectOreReport } from '../../core/events/EventEngine.js';
+import { NavGrid } from '../../core/nav/NavGrid.js';
 
 // ── Extended context for mining ──
 
@@ -245,6 +246,11 @@ export function blastCommand(
   state.drillHoles = [];
   state.chargesByHole = {};
   state.sequenceDelays = {};
+
+  // Patch NavGrid to reflect terrain changes from the blast
+  if (state.navGrid) {
+    NavGrid.patchNavGrid(state.navGrid, ctx.grid!, state.buildings.buildings, state.drillHoles, result.clearedRegion);
+  }
 
   return {
     success: true,
