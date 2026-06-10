@@ -1179,11 +1179,11 @@
       "src/core/nav/AgentMovement.ts"
     ],
     "testFile": "tests/unit/nav/AgentMovement.test.ts",
-    "status": "pending",
+    "status": "done",
     "blockedBy": [
       "6.7"
     ],
-    "closedInPR": null
+    "closedInPR": 272
   },
   {
     "id": "6.9",
