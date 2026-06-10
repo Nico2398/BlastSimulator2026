@@ -2,25 +2,28 @@
 // Verifies vitest --coverage works end-to-end: runs on a group of well-tested
 // files, then checks coverage report files are created.
 // Uses zero thresholds in subprocess to isolate from per-file gate config.
+// Uses separate temp output dir to conflict with parent coverage run.
 
 import { describe, it, expect, beforeAll } from 'vitest';
 import { execSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdtempSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { tmpdir } from 'node:os';
 
 const PROJECT_ROOT = resolve(import.meta.dirname, '../../..');
 
 describe('npm run test:coverage execution (8.1)', () => {
+  let coverageDir: string;
   let coverageGenerated = false;
 
   beforeAll(() => {
-    // Run coverage on a group of well-tested entity files.
-    // Zero thresholds in subprocess to avoid interfering with per-file gate.
+    coverageDir = mkdtempSync(resolve(tmpdir(), 'coverage-test-'));
     try {
       execSync(
         'npx vitest run --coverage ' +
         '--coverage.thresholds.statements=0 --coverage.thresholds.branches=0 ' +
         '--coverage.thresholds.functions=0 --coverage.thresholds.lines=0 ' +
+        `--coverage.reportsDirectory="${coverageDir}" ` +
         '--coverage.thresholds.perFile=false ' +
         'tests/unit/entities/Employee.test.ts tests/unit/entities/Building.test.ts ' +
         '--reporter=verbose ' +
@@ -43,17 +46,17 @@ describe('npm run test:coverage execution (8.1)', () => {
   });
 
   it('generates coverage/lcov.info file', () => {
-    const lcovPath = resolve(PROJECT_ROOT, 'coverage', 'lcov.info');
+    const lcovPath = resolve(coverageDir, 'lcov.info');
     expect(existsSync(lcovPath)).toBe(true);
   });
 
   it('generates coverage/index.html file', () => {
-    const htmlPath = resolve(PROJECT_ROOT, 'coverage', 'index.html');
+    const htmlPath = resolve(coverageDir, 'index.html');
     expect(existsSync(htmlPath)).toBe(true);
   });
 
   it('generates coverage/coverage-final.json file', () => {
-    const jsonPath = resolve(PROJECT_ROOT, 'coverage', 'coverage-final.json');
+    const jsonPath = resolve(coverageDir, 'coverage-final.json');
     expect(existsSync(jsonPath)).toBe(true);
   });
 });
