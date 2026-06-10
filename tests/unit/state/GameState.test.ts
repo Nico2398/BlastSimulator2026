@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createGame } from '../../../src/core/state/GameState.js';
+import { createGame, buildGameNavGrid } from '../../../src/core/state/GameState.js';
 import type { GameState, PendingAction, ActionType, GhostPreview } from '../../../src/core/state/GameState.js';
+import { NavGrid } from '../../../src/core/nav/NavGrid.js';
+import { VoxelGrid, type VoxelData } from '../../../src/core/world/VoxelGrid.js';
+import type { Building } from '../../../src/core/entities/Building.js';
+import type { DrillHole } from '../../../src/core/mining/DrillPlan.js';
 import { tick } from '../../../src/core/state/GameLoop.js';
 import { Random } from '../../../src/core/math/Random.js';
 import {
@@ -104,7 +108,8 @@ function makeAction(overrides: Partial<PendingAction> = {}): PendingAction {
 
 /**
  * Add a qualified employee to `state.employees` for the given skill.
- * Falls back to direct mutation if `assignSkill` is not yet implemented.
+ * Uses `assignSkill` for the canonical path; falls back to direct
+ * qualification assignment if a future refactor changes the API.
  */
 function addQualifiedEmployee(
   state: GameState,
@@ -116,7 +121,7 @@ function addQualifiedEmployee(
   try {
     assignSkill(state.employees, employee.id, skill, 1);
   } catch {
-    // assignSkill may not be implemented yet — set qualifications directly
+    // Defensive fallback — keep test working even if assignSkill signature changes
     (employee as Record<string, unknown>).qualifications = [
       { category: skill, proficiencyLevel: 1, xp: 0 },
     ];
@@ -303,5 +308,116 @@ describe('createGame — surveyResults and nextSurveyId (task 4.4)', () => {
   it('initialises nextSurveyId as 1', () => {
     const state = createGame({ seed: 42 });
     expect(state.nextSurveyId).toBe(1);
+  });
+});
+
+// =============================================================================
+// Task 6.10 — NavGrid integration into GameState
+// =============================================================================
+
+/** Create a solid voxel for filling a VoxelGrid. */
+function solidVoxel(): VoxelData {
+  return {
+    composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
+    density: 1.0,
+    oreDensities: {},
+    fractureModifier: 1.0,
+  };
+}
+
+describe('createGame — navGrid (task 6.10)', () => {
+  it('initialises navGrid as null', () => {
+    const state = createGame({ seed: 42 });
+    expect(state.navGrid).toBeNull();
+  });
+});
+
+describe('buildGameNavGrid (task 6.10)', () => {
+  it('builds NavGrid from valid VoxelGrid', () => {
+    const state = createGame({ seed: 42 });
+    const voxelGrid = new VoxelGrid(4, 4, 4);
+    // Fill every voxel with solid rock
+    for (let z = 0; z < 4; z++) {
+      for (let y = 0; y < 4; y++) {
+        for (let x = 0; x < 4; x++) {
+          voxelGrid.setVoxel(x, y, z, solidVoxel());
+        }
+      }
+    }
+    buildGameNavGrid(state, voxelGrid, [], []);
+    expect(state.navGrid).not.toBeNull();
+    expect(state.navGrid!.width).toBe(4);
+    expect(state.navGrid!.height).toBe(4);
+  });
+
+  it('handles degenerate VoxelGrid (sizeX=0)', () => {
+    const state = createGame({ seed: 42 });
+    const voxelGrid = new VoxelGrid(0, 5, 5);
+    expect(() => buildGameNavGrid(state, voxelGrid, [], [])).not.toThrow();
+    expect(state.navGrid).toBeNull();
+  });
+
+  it('handles degenerate VoxelGrid (sizeZ=0)', () => {
+    const state = createGame({ seed: 42 });
+    const voxelGrid = new VoxelGrid(5, 5, 0);
+    expect(() => buildGameNavGrid(state, voxelGrid, [], [])).not.toThrow();
+    expect(state.navGrid).toBeNull();
+  });
+
+  it('produces correct NavGrid dimensions matching voxel grid', () => {
+    const state = createGame({ seed: 42 });
+    const voxelGrid = new VoxelGrid(10, 5, 8);
+    // Fill every voxel with solid rock
+    for (let z = 0; z < 8; z++) {
+      for (let y = 0; y < 5; y++) {
+        for (let x = 0; x < 10; x++) {
+          voxelGrid.setVoxel(x, y, z, solidVoxel());
+        }
+      }
+    }
+    buildGameNavGrid(state, voxelGrid, [], []);
+    expect(state.navGrid).not.toBeNull();
+    expect(state.navGrid!.width).toBe(10);
+    expect(state.navGrid!.height).toBe(8);
+  });
+
+  it('with buildings and drill holes, NavGrid reflects them', () => {
+    const state = createGame({ seed: 42 });
+    const voxelGrid = new VoxelGrid(10, 5, 10);
+    // Fill every voxel with solid rock
+    for (let z = 0; z < 10; z++) {
+      for (let y = 0; y < 5; y++) {
+        for (let x = 0; x < 10; x++) {
+          voxelGrid.setVoxel(x, y, z, solidVoxel());
+        }
+      }
+    }
+    const building: Building = {
+      id: 1,
+      type: 'management_office',
+      tier: 1,
+      x: 2,
+      z: 2,
+      hp: 80,
+      active: true,
+    };
+    const drillHole: DrillHole = {
+      id: 'H1',
+      x: 5,
+      z: 5,
+      depth: 5,
+      diameter: 0.15,
+    };
+    buildGameNavGrid(state, voxelGrid, [building], [drillHole]);
+    expect(state.navGrid).not.toBeNull();
+    // management_office tier 1 has 2×2 footprint covering (2,2), (3,2), (2,3), (3,3)
+    expect(state.navGrid!.cells[2]![2]!.type).toBe('blocked');
+    expect(state.navGrid!.cells[2]![3]!.type).toBe('blocked');
+    expect(state.navGrid!.cells[3]![2]!.type).toBe('blocked');
+    expect(state.navGrid!.cells[3]![3]!.type).toBe('blocked');
+    // Drill hole at (5,5)
+    expect(state.navGrid!.cells[5]![5]!.type).toBe('drill_hole');
+    // Cell far from building or drill hole should be walkable
+    expect(state.navGrid!.cells[0]![0]!.type).toBe('walkable');
   });
 });

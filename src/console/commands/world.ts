@@ -1,7 +1,7 @@
 // BlastSimulator2026 — Console commands for world creation and inspection
 
 import type { CommandResult } from '../ConsoleRunner.js';
-import { createGame, type GameState } from '../../core/state/GameState.js';
+import { createGame, buildGameNavGrid, type GameState } from '../../core/state/GameState.js';
 import { getMinePreset, getAllMinePresets } from '../../core/world/MineType.js';
 import { generateTerrain } from '../../core/world/TerrainGen.js';
 import { getRock } from '../../core/world/RockCatalog.js';
@@ -38,6 +38,7 @@ export function newGameCommand(
   ctx.state = createGame({ seed, mineType });
   ctx.state.world = { sizeX: size, sizeY: size, sizeZ: size, gridReady: true };
   ctx.grid = generateTerrain({ sizeX: size, sizeY: size, sizeZ: size, seed, preset });
+  buildGameNavGrid(ctx.state, ctx.grid, ctx.state.buildings.buildings, ctx.state.drillHoles);
 
   return {
     success: true,

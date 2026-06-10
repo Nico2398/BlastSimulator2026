@@ -11,8 +11,10 @@ import type { ContractState } from '../economy/Contract.js';
 import { createContractState } from '../economy/Contract.js';
 import type { LogisticsState } from '../economy/Logistics.js';
 import { createLogisticsState } from '../economy/Logistics.js';
-import type { BuildingState } from '../entities/Building.js';
+import type { BuildingState, Building } from '../entities/Building.js';
 import { createBuildingState } from '../entities/Building.js';
+import { NavGrid } from '../nav/NavGrid.js';
+import type { VoxelGrid } from '../world/VoxelGrid.js';
 import type { VehicleState } from '../entities/Vehicle.js';
 import { createVehicleState } from '../entities/Vehicle.js';
 import type { EmployeeState, SkillCategory } from '../entities/Employee.js';
@@ -114,6 +116,9 @@ export interface GameState {
 
   /** World terrain — not serialized directly (too large), reconstructed from seed. */
   world: WorldState | null;
+
+  /** Navigation grid derived from the voxel surface, buildings, and drill holes. Null until built. */
+  navGrid: NavGrid | null;
 
   /** Set of surveyed column keys "x,z". */
   surveyedPositions: Set<string>;
@@ -218,6 +223,7 @@ export function createGame(config: GameConfig): GameState {
     isPaused: false,
     mineType: config.mineType ?? 'desert',
     world: null,
+    navGrid: null,
     surveyedPositions: new Set(),
     surveyResults: [],
     nextSurveyId: 1,
@@ -252,4 +258,19 @@ export function createGame(config: GameConfig): GameState {
     nextPendingActionId: 1,
     ghostPreviews: [],
   };
+}
+
+/**
+ * Build a NavGrid from the current world state and store it on the game state.
+ * Call this after terrain generation (VoxelGrid is ready) to make navigation available.
+ * If the voxel grid is degenerate (sizeX <= 0 or sizeZ <= 0), navGrid stays null.
+ */
+export function buildGameNavGrid(
+  state: GameState,
+  voxelGrid: VoxelGrid,
+  buildings: Building[],
+  drillHoles: DrillHole[],
+): void {
+  if (voxelGrid.sizeX <= 0 || voxelGrid.sizeZ <= 0) return;
+  state.navGrid = NavGrid.buildNavGrid(voxelGrid, buildings, drillHoles);
 }

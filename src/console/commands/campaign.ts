@@ -6,6 +6,7 @@ import { getAllLevels, getLevel } from '../../core/campaign/Level.js';
 import { getLevelProgress } from '../../core/campaign/Campaign.js';
 import { addIncome } from '../../core/economy/Finance.js';
 import { createGameForLevel } from '../../core/campaign/LevelTransition.js';
+import { buildGameNavGrid } from '../../core/state/GameState.js';
 import { generateTerrain } from '../../core/world/TerrainGen.js';
 import { getMinePreset } from '../../core/world/MineType.js';
 import { calculateStarRating } from '../../core/campaign/SuccessTracker.js';
@@ -109,6 +110,7 @@ export function campaignStartCommand(
     preset,
   });
   if (ctx.state.world) ctx.state.world.gridReady = true;
+  buildGameNavGrid(ctx.state, ctx.grid, ctx.state.buildings.buildings, ctx.state.drillHoles);
 
   return {
     success: true,
