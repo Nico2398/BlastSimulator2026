@@ -4,7 +4,7 @@
 
 import type { GameState, PendingAction } from '../state/GameState.js';
 import type { Vehicle } from '../entities/Vehicle.js';
-import type { Building } from '../entities/Building.js';
+import type { Building, BuildingType } from '../entities/Building.js';
 import type { Random } from '../math/Random.js';
 import type { EventContext } from '../events/EventPool.js';
 import { tickEventSystem, type FiredEvent } from '../events/EventSystem.js';
@@ -350,7 +350,7 @@ export function tickCollapse(state: GameState): CollapseResult {
 
 function findNearestBuildingOfType(
   state: GameState,
-  buildingType: string,
+  buildingType: BuildingType,
   empX: number,
   empZ: number,
 ): Building | null {
@@ -372,15 +372,5 @@ function findNearestLivingQuarters(
   empX: number,
   empZ: number,
 ): Building | null {
-  let nearest: Building | null = null;
-  let bestDistSq = Infinity;
-  for (const b of state.buildings.buildings) {
-    if (!b.active || b.type !== 'living_quarters') continue;
-    const distSq = (b.x - empX) ** 2 + (b.z - empZ) ** 2;
-    if (distSq < bestDistSq) {
-      bestDistSq = distSq;
-      nearest = b;
-    }
-  }
-  return nearest;
+  return findNearestBuildingOfType(state, 'living_quarters', empX, empZ);
 }

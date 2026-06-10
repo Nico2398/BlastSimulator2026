@@ -736,6 +736,8 @@ describe('tickCollapse (7.6)', () => {
       (a: PendingAction) => a.type === 'rest' && a.targetEmployeeId === employee.id,
     );
     expect(restAction).toBeDefined();
+    // The collapsed need must be 'hunger' (hunger=5 triggered the collapse)
+    expect(restAction!.payload.collapsedNeed).toBe('hunger');
   });
 
   // ── Test 2 ──────────────────────────────────────────────────────────────────
@@ -902,6 +904,36 @@ describe('tickCollapse (7.6)', () => {
     const result = tickCollapse(state);
 
     expect(result.collapsed).toEqual([employee.id]);
+  });
+
+  // ── Test 10 ─────────────────────────────────────────────────────────────────
+  it('fatigue-triggered collapse produces correct collapsedNeed and restDuration', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.hunger = 100;    // Above hunger threshold (10)
+    employee.fatigue = 3;     // Below fatigue threshold (5)
+    employee.breakNeed = 100;
+    employee.x = 0;
+    employee.z = 0;
+
+    // Place a living_quarters within search radius
+    placeBuilding(state.buildings, 'living_quarters', 10, 10, 100, 100);
+
+    const result = tickCollapse(state);
+
+    // Result must report this employee as collapsed
+    expect(result.collapsed).toHaveLength(1);
+    expect(result.collapsed[0]).toBe(employee.id);
+
+    // The rest action must have collapsedNeed: 'fatigue'
+    const restAction = state.pendingActions.find(
+      (a: PendingAction) => a.type === 'rest' && a.targetEmployeeId === employee.id,
+    );
+    expect(restAction).toBeDefined();
+    expect(restAction!.payload.collapsedNeed).toBe('fatigue');
+    expect(restAction!.payload.restDuration).toBe(NEED_REST_DURATIONS.fatigue);
   });
 
 });

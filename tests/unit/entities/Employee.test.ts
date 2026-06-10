@@ -1379,12 +1379,12 @@ describe('Employee — checkCollapse (7.6)', () => {
   });
 
   // ── Test 4 ──────────────────────────────────────────────────────────────────
-  it('gauge order honored: hunger(5) beats fatigue(50)', () => {
+  it('gauge order honored: hunger(5) beats fatigue(3)', () => {
     const state = createEmployeeState();
     const rng = new Random(1);
     const { employee } = hireEmployee(state, 'driller', rng);
-    employee.hunger = 5;
-    employee.fatigue = 50;
+    employee.hunger = 5;   // Below hunger threshold (10)
+    employee.fatigue = 3;  // Below fatigue threshold (5) — both gauges below threshold
     employee.breakNeed = 100;
 
     const result = checkCollapse(employee);
