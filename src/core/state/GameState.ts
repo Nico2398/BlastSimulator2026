@@ -271,7 +271,6 @@ export function buildGameNavGrid(
   buildings: Building[],
   drillHoles: DrillHole[],
 ): void {
-  // TODO: implement — guard against degenerate grids, then:
-  // if (voxelGrid.sizeX <= 0 || voxelGrid.sizeZ <= 0) return;
-  // state.navGrid = NavGrid.buildNavGrid(voxelGrid, buildings, drillHoles);
+  if (voxelGrid.sizeX <= 0 || voxelGrid.sizeZ <= 0) return;
+  state.navGrid = NavGrid.buildNavGrid(voxelGrid, buildings, drillHoles);
 }
