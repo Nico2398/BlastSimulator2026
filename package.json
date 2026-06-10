@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "console": "tsx src/console.ts",
-    "validate": "tsc --noEmit && vitest run --reporter=verbose && vite build",
+    "validate": "tsc --noEmit && vitest run --reporter=verbose --coverage && vite build",
+    "test:coverage": "vitest run --coverage",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:scenarios": "vitest run tests/unit/scenario-defs.test.ts"
@@ -22,6 +23,7 @@
   },
   "devDependencies": {
     "@types/three": "^0.165.0",
+    "@vitest/coverage-v8": "^1.6.1",
     "jscpd": "^4.2.4",
     "jsdom": "^29.0.0",
     "puppeteer": "^22.10.0",
