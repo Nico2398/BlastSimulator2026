@@ -611,7 +611,7 @@ function forceShiftRestIfNeeded(
   emp: Employee,
   firedEvents: FiredEvent[],
   shiftRested: number[],
-  emitter?: EventEmitter,
+  _emitter?: EventEmitter,
 ): void {
   if (emp.restTicksRemaining !== null) return;
   if (emp.activeActionId === null) return;
@@ -643,7 +643,7 @@ function forceShiftRestIfNeeded(
   emp.activeActionId = restAction.id;
   shiftRested.push(emp.id);
   firedEvents.push({ eventId: 'employee_shift_change', firedAtTick: state.tickCount });
-  emitter?.emit('employee:shift_change', { employeeId: emp.id });
+  _emitter?.emit('employee:shift_change', { employeeId: emp.id });
 }
 
 /**
