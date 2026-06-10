@@ -16,6 +16,7 @@ import {
   HIRING_COSTS,
   // ── 3.10: need-meter functions ──
   tickNeeds,
+  tickNeedGauges,
   getNeedMultiplier,
   tickNeedMorale,
   replenishNeed,
@@ -29,10 +30,12 @@ import {
   XP_THRESHOLDS,
   QUALIFICATION_SALARY_BONUS,
   // ── 3.10: need-meter balance constants ──
+  MORALE_THRESHOLDS,
   NEED_DRAIN_RATES,
   NEED_THRESHOLDS,
   NEED_PRODUCTIVITY_MULTIPLIERS,
   NEED_MORALE_PENALTIES,
+  NEED_MORALE_DRAIN_MULTIPLIERS,
   // ── 3.13: proficiency multipliers ──
   PROFICIENCY_MULTIPLIERS,
 } from '../../../src/core/config/balance.js';
@@ -667,6 +670,172 @@ describe('Employee — need meters (7.1)', () => {
     replenishNeed(employee, 'hunger', 30);
 
     expect(employee.hunger).toBe(80);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Task 7.3 — tickNeedGauges: morale-adjusted drain rates
+//
+// Function under test:
+//   tickNeedGauges(employee, isWorking)
+// Drain rates are multiplied by a morale-dependent factor:
+//   morale > 70 → NEED_MORALE_DRAIN_MULTIPLIERS.high (0.85)
+//   morale < 30 → NEED_MORALE_DRAIN_MULTIPLIERS.low  (1.20)
+//   otherwise   → NEED_MORALE_DRAIN_MULTIPLIERS.normal (1.00)
+// All gauges clamped to minimum 0.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('Employee — tickNeedGauges (7.3)', () => {
+
+  // ── Test 1 ──────────────────────────────────────────────────────────────────
+  it('high morale (>70) reduces drain rate when working', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    employee.morale = 80; // > 70 → high morale
+    const hungerBefore = employee.hunger;
+    const fatigueBefore = employee.fatigue;
+    const breakNeedBefore = employee.breakNeed;
+
+    tickNeedGauges(employee, true);
+
+    const expectedHunger = hungerBefore - NEED_DRAIN_RATES.hunger.working * NEED_MORALE_DRAIN_MULTIPLIERS.high;
+    const expectedFatigue = fatigueBefore - NEED_DRAIN_RATES.fatigue.working * NEED_MORALE_DRAIN_MULTIPLIERS.high;
+    const expectedBreakNeed = breakNeedBefore - NEED_DRAIN_RATES.breakNeed.working * NEED_MORALE_DRAIN_MULTIPLIERS.high;
+    expect(employee.hunger).toBeCloseTo(expectedHunger, 5);
+    expect(employee.fatigue).toBeCloseTo(expectedFatigue, 5);
+    expect(employee.breakNeed).toBeCloseTo(expectedBreakNeed, 5);
+  });
+
+  // ── Test 2 ──────────────────────────────────────────────────────────────────
+  it('low morale (<30) increases drain rate when working', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    employee.morale = 20; // < 30 → low morale
+
+    tickNeedGauges(employee, true);
+
+    expect(employee.hunger).toBeCloseTo(100 - NEED_DRAIN_RATES.hunger.working * NEED_MORALE_DRAIN_MULTIPLIERS.low, 5);
+    expect(employee.fatigue).toBeCloseTo(100 - NEED_DRAIN_RATES.fatigue.working * NEED_MORALE_DRAIN_MULTIPLIERS.low, 5);
+    expect(employee.breakNeed).toBeCloseTo(100 - NEED_DRAIN_RATES.breakNeed.working * NEED_MORALE_DRAIN_MULTIPLIERS.low, 5);
+  });
+
+  // ── Test 3 ──────────────────────────────────────────────────────────────────
+  it('normal morale (30-70) uses standard drain rate when working', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    employee.morale = 50; // normal range
+
+    tickNeedGauges(employee, true);
+
+    expect(employee.hunger).toBeCloseTo(100 - NEED_DRAIN_RATES.hunger.working * NEED_MORALE_DRAIN_MULTIPLIERS.normal, 5);
+    expect(employee.fatigue).toBeCloseTo(100 - NEED_DRAIN_RATES.fatigue.working * NEED_MORALE_DRAIN_MULTIPLIERS.normal, 5);
+    expect(employee.breakNeed).toBeCloseTo(100 - NEED_DRAIN_RATES.breakNeed.working * NEED_MORALE_DRAIN_MULTIPLIERS.normal, 5);
+  });
+
+  // ── Test 4 ──────────────────────────────────────────────────────────────────
+  it('boundary: morale = 70 uses normal multiplier (not high)', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    employee.morale = 70; // exactly at boundary — should be normal
+
+    tickNeedGauges(employee, true);
+
+    expect(employee.hunger).toBeCloseTo(100 - NEED_DRAIN_RATES.hunger.working * 1.0, 5);
+  });
+
+  // ── Test 5 ──────────────────────────────────────────────────────────────────
+  it('boundary: morale = 30 uses normal multiplier (not low)', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    employee.morale = 30; // exactly at boundary — should be normal
+
+    tickNeedGauges(employee, true);
+
+    expect(employee.hunger).toBeCloseTo(100 - NEED_DRAIN_RATES.hunger.working * 1.0, 5);
+  });
+
+  // ── Test 6 ──────────────────────────────────────────────────────────────────
+  it('high morale reduces drain rate when idle', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    employee.morale = 80;
+
+    tickNeedGauges(employee, false); // idle
+
+    expect(employee.hunger).toBeCloseTo(100 - NEED_DRAIN_RATES.hunger.idle * NEED_MORALE_DRAIN_MULTIPLIERS.high, 5);
+    expect(employee.fatigue).toBeCloseTo(100 - NEED_DRAIN_RATES.fatigue.idle * NEED_MORALE_DRAIN_MULTIPLIERS.high, 5);
+    // breakNeed idle rate is 0, so 0 * 0.85 = 0, stays at 100
+    expect(employee.breakNeed).toBe(100);
+  });
+
+  // ── Test 7 ──────────────────────────────────────────────────────────────────
+  it('low morale increases drain rate when idle', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    employee.morale = 20;
+
+    tickNeedGauges(employee, false); // idle
+
+    expect(employee.hunger).toBeCloseTo(100 - NEED_DRAIN_RATES.hunger.idle * NEED_MORALE_DRAIN_MULTIPLIERS.low, 5);
+    expect(employee.fatigue).toBeCloseTo(100 - NEED_DRAIN_RATES.fatigue.idle * NEED_MORALE_DRAIN_MULTIPLIERS.low, 5);
+    expect(employee.breakNeed).toBe(100); // idle rate 0 × 1.20 = 0
+  });
+
+  // ── Test 8 ──────────────────────────────────────────────────────────────────
+  it('gauges are clamped to 0 and never go negative', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    employee.hunger = 0;
+    employee.fatigue = 0;
+    employee.breakNeed = 0;
+    employee.morale = 20; // low morale — would drain faster
+
+    tickNeedGauges(employee, true);
+
+    expect(employee.hunger).toBe(0);
+    expect(employee.fatigue).toBe(0);
+    expect(employee.breakNeed).toBe(0);
+  });
+
+  // ── Test 9 ──────────────────────────────────────────────────────────────────
+  it('breakNeed does not drain when idle regardless of morale', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    employee.morale = 20; // low morale
+    employee.breakNeed = 100;
+
+    tickNeedGauges(employee, false); // idle
+
+    expect(employee.breakNeed).toBe(100); // idle rate = 0
+  });
+
+  // ── Test 10 ─────────────────────────────────────────────────────────────────
+  it('extreme morale values: 0 (low) and 100 (high) both apply correct multipliers', () => {
+    const state1 = createEmployeeState();
+    const rng1 = new Random(1);
+    const { employee: emp1 } = hireEmployee(state1, 'driller', rng1);
+    emp1.morale = 0;
+
+    const state2 = createEmployeeState();
+    const rng2 = new Random(1);
+    const { employee: emp2 } = hireEmployee(state2, 'driller', rng2);
+    emp2.morale = 100;
+
+    tickNeedGauges(emp1, true);
+    tickNeedGauges(emp2, true);
+
+    // morale=0: ×1.20
+    expect(emp1.hunger).toBeCloseTo(100 - NEED_DRAIN_RATES.hunger.working * NEED_MORALE_DRAIN_MULTIPLIERS.low, 5);
+    // morale=100: ×0.85
+    expect(emp2.hunger).toBeCloseTo(100 - NEED_DRAIN_RATES.hunger.working * NEED_MORALE_DRAIN_MULTIPLIERS.high, 5);
   });
 });
 
