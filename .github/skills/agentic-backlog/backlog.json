@@ -1289,11 +1289,11 @@
       "src/core/entities/Employee.ts"
     ],
     "testFile": "tests/unit/entities/Employee.test.ts",
-    "status": "pending",
+    "status": "done",
     "blockedBy": [
       "7.1"
     ],
-    "closedInPR": null
+    "closedInPR": 281
   },
   {
     "id": "7.5",
