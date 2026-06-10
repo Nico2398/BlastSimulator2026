@@ -340,6 +340,20 @@ export const NEED_RESTORATION_THRESHOLDS = {
   breakNeed: 30,
 } as const;
 
+/** Warning thresholds that trigger proactive need routing. */
+export const NEED_WARNING_THRESHOLDS = {
+  hunger:  0,
+  fatigue: 0,
+  breakNeed: 0,
+} as const;
+
+/** Collapse thresholds for each need gauge. */
+export const NEED_COLLAPSE_THRESHOLDS = {
+  hunger:  0,
+  fatigue: 0,
+  breakNeed: 0,
+} as const;
+
 // ─── Shift / Rest Scheduling ────────────────────────────────────────────────
 
 /** Shift duration in ticks for each policy mode. 1 tick = 1 game-hour. */
