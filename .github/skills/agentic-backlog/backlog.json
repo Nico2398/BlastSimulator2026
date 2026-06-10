@@ -1346,11 +1346,11 @@
       "src/core/engine/GameLoop.ts"
     ],
     "testFile": "tests/unit/engine/GameLoop.test.ts",
-    "status": "pending",
+    "status": "done",
     "blockedBy": [
       "7.5"
     ],
-    "closedInPR": null
+    "closedInPR": 285
   },
   {
     "id": "7.9",
