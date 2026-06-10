@@ -1418,9 +1418,9 @@
       "vitest.config.ts"
     ],
     "testFile": null,
-    "status": "pending",
+    "status": "done",
     "blockedBy": [],
-    "closedInPR": null
+    "closedInPR": 290
   },
   {
     "id": "8.2",
