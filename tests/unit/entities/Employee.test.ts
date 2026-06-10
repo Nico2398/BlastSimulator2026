@@ -483,31 +483,51 @@ describe('calculateSalary() (3.4)', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Task 3.10 — Need meters: Hunger, Fatigue, Social, Comfort
+// Task 7.1 — Need meters: Hunger, Fatigue, BreakNeed, Collapsing
 //
 // Functions under test:
-//   tickNeeds(employee, isWorking)  — drain all needs by the appropriate rate
-//   getNeedMultiplier(employee)     — returns productivity multiplier 0.0–1.0
-//   tickNeedMorale(employee)        — returns morale delta (≤ 0) from low needs
+//   tickNeeds(employee, isWorking)        — drain all needs by the appropriate rate
+//   getNeedMultiplier(employee)           — returns productivity multiplier 0.0–1.0
+//   tickNeedMorale(employee)              — returns morale delta (≤ 0) from low breakNeed
 //   replenishNeed(employee, need, amount) — restore a gauge, capped at 100
-// New Employee fields: hunger, fatigue, social, comfort (all 0–100)
+// New Employee fields: hunger, fatigue, breakNeed (all 0–100), collapsing (boolean)
 // New balance constants: NEED_DRAIN_RATES, NEED_THRESHOLDS
 // ─────────────────────────────────────────────────────────────────────────────
-describe('Employee — need meters (3.10)', () => {
+describe('Employee — need meters (7.1)', () => {
 
   // ── Test 1 ──────────────────────────────────────────────────────────────────
-  it('hireEmployee initialises hunger, fatigue, social, and comfort all to 100', () => {
+  it('hireEmployee initialises breakNeed to 100 and collapsing to false', () => {
     const state = createEmployeeState();
     const rng = new Random(1);
     const { employee } = hireEmployee(state, 'driller', rng);
 
-    expect(employee.hunger).toBe(100);
-    expect(employee.fatigue).toBe(100);
-    expect(employee.social).toBe(100);
-    expect(employee.comfort).toBe(100);
+    expect(employee.breakNeed).toBe(100);
+    expect(employee.collapsing).toBe(false);
   });
 
   // ── Test 2 ──────────────────────────────────────────────────────────────────
+  it('tickNeeds drains breakNeed at working rate (0.8) when isWorking is true', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+
+    tickNeeds(employee, true);
+
+    expect(employee.breakNeed).toBe(100 - NEED_DRAIN_RATES.breakNeed.working);
+  });
+
+  // ── Test 3 ──────────────────────────────────────────────────────────────────
+  it('tickNeeds does not drain breakNeed when isWorking is false', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+
+    tickNeeds(employee, false);
+
+    expect(employee.breakNeed).toBe(100);
+  });
+
+  // ── Test 4 ──────────────────────────────────────────────────────────────────
   it('tickNeeds drains hunger at NEED_DRAIN_RATES.hunger.working (1/tick) when isWorking is true', () => {
     const state = createEmployeeState();
     const rng = new Random(1);
@@ -518,7 +538,7 @@ describe('Employee — need meters (3.10)', () => {
     expect(employee.hunger).toBe(100 - NEED_DRAIN_RATES.hunger.working);
   });
 
-  // ── Test 3 ──────────────────────────────────────────────────────────────────
+  // ── Test 5 ──────────────────────────────────────────────────────────────────
   it('tickNeeds drains hunger at NEED_DRAIN_RATES.hunger.idle (0.5/tick) when isWorking is false', () => {
     const state = createEmployeeState();
     const rng = new Random(1);
@@ -529,7 +549,7 @@ describe('Employee — need meters (3.10)', () => {
     expect(employee.hunger).toBe(100 - NEED_DRAIN_RATES.hunger.idle);
   });
 
-  // ── Test 4 ──────────────────────────────────────────────────────────────────
+  // ── Test 6 ──────────────────────────────────────────────────────────────────
   it('tickNeeds drains fatigue at NEED_DRAIN_RATES.fatigue.working when isWorking is true', () => {
     const state = createEmployeeState();
     const rng = new Random(1);
@@ -540,47 +560,16 @@ describe('Employee — need meters (3.10)', () => {
     expect(employee.fatigue).toBe(100 - NEED_DRAIN_RATES.fatigue.working);
   });
 
-  // ── Test 5 ──────────────────────────────────────────────────────────────────
-  it('tickNeeds always drains social by NEED_DRAIN_RATES.social.idle regardless of isWorking', () => {
-    const state = createEmployeeState();
-    const rng = new Random(1);
-    const { employee } = hireEmployee(state, 'driller', rng);
-
-    // Isolation drain applies on every tick — isWorking: true is used here
-    tickNeeds(employee, true);
-
-    expect(employee.social).toBe(100 - NEED_DRAIN_RATES.social.idle);
-  });
-
-  // ── Test 6 ──────────────────────────────────────────────────────────────────
-  it('tickNeeds always drains comfort by NEED_DRAIN_RATES.comfort.idle regardless of isWorking', () => {
-    const state = createEmployeeState();
-    const rng = new Random(1);
-    const { employee } = hireEmployee(state, 'driller', rng);
-
-    tickNeeds(employee, true);
-
-    expect(employee.comfort).toBe(100 - NEED_DRAIN_RATES.comfort.idle);
-  });
-
   // ── Test 7 ──────────────────────────────────────────────────────────────────
-  it('tickNeeds never drains any need below 0 when needs are already at 0', () => {
+  it('tickNeeds never drains breakNeed below 0', () => {
     const state = createEmployeeState();
     const rng = new Random(1);
     const { employee } = hireEmployee(state, 'driller', rng);
-
-    // Force all needs to the floor
-    employee.hunger  = 0;
-    employee.fatigue = 0;
-    employee.social  = 0;
-    employee.comfort = 0;
+    employee.breakNeed = 0;
 
     tickNeeds(employee, true);
 
-    expect(employee.hunger).toBe(0);
-    expect(employee.fatigue).toBe(0);
-    expect(employee.social).toBe(0);
-    expect(employee.comfort).toBe(0);
+    expect(employee.breakNeed).toBe(0);
   });
 
   // ── Test 8 ──────────────────────────────────────────────────────────────────
@@ -604,16 +593,6 @@ describe('Employee — need meters (3.10)', () => {
   });
 
   // ── Test 10 ─────────────────────────────────────────────────────────────────
-  it('getNeedMultiplier returns hunger.critical multiplier when hunger is 5 (below NEED_THRESHOLDS.hunger.critical = 10)', () => {
-    const state = createEmployeeState();
-    const rng = new Random(1);
-    const { employee } = hireEmployee(state, 'driller', rng);
-    employee.hunger = 5; // 5 < 10 → critical-tier penalty
-
-    expect(getNeedMultiplier(employee)).toBe(NEED_PRODUCTIVITY_MULTIPLIERS.hunger.critical);
-  });
-
-  // ── Test 11 ─────────────────────────────────────────────────────────────────
   it('getNeedMultiplier returns fatigue.low multiplier when fatigue is 35 (below NEED_THRESHOLDS.fatigue.low = 40)', () => {
     const state = createEmployeeState();
     const rng = new Random(1);
@@ -623,93 +602,71 @@ describe('Employee — need meters (3.10)', () => {
     expect(getNeedMultiplier(employee)).toBe(NEED_PRODUCTIVITY_MULTIPLIERS.fatigue.low);
   });
 
-  // ── Test 12 ─────────────────────────────────────────────────────────────────
-  it('getNeedMultiplier returns fatigue.critical multiplier when fatigue is 10 (below NEED_THRESHOLDS.fatigue.critical = 15)', () => {
+  // ── Test 11 ─────────────────────────────────────────────────────────────────
+  it('tickNeedMorale returns 0 when breakNeed is above low threshold (30)', () => {
     const state = createEmployeeState();
     const rng = new Random(1);
     const { employee } = hireEmployee(state, 'driller', rng);
-    employee.fatigue = 10; // 10 < 15 → critical-tier penalty
-
-    expect(getNeedMultiplier(employee)).toBe(NEED_PRODUCTIVITY_MULTIPLIERS.fatigue.critical);
-  });
-
-  // ── Test 13 ─────────────────────────────────────────────────────────────────
-  it('getNeedMultiplier stacks hunger and fatigue penalties multiplicatively', () => {
-    const state = createEmployeeState();
-    const rng = new Random(1);
-    const { employee } = hireEmployee(state, 'driller', rng);
-    employee.hunger  = 25; // below 30 → hunger.low multiplier
-    employee.fatigue = 35; // below 40 → fatigue.low multiplier
-
-    expect(getNeedMultiplier(employee)).toBeCloseTo(
-      NEED_PRODUCTIVITY_MULTIPLIERS.hunger.low * NEED_PRODUCTIVITY_MULTIPLIERS.fatigue.low,
-      10,
-    );
-  });
-
-  // ── Test 14 ─────────────────────────────────────────────────────────────────
-  it('tickNeedMorale returns 0 when all needs are above their morale-penalty thresholds', () => {
-    const state = createEmployeeState();
-    const rng = new Random(1);
-    const { employee } = hireEmployee(state, 'driller', rng);
-    // All needs are 100 — well above both social < 20 and comfort < 30
+    employee.breakNeed = 35;
 
     expect(tickNeedMorale(employee)).toBe(0);
   });
 
-  // ── Test 15 ─────────────────────────────────────────────────────────────────
-  it('tickNeedMorale returns social penalty when social is 15 (below NEED_THRESHOLDS.social.low = 20)', () => {
+  // ── Test 12 ─────────────────────────────────────────────────────────────────
+  it('tickNeedMorale returns breakNeed penalty (-2) when breakNeed is below low threshold (30)', () => {
     const state = createEmployeeState();
     const rng = new Random(1);
     const { employee } = hireEmployee(state, 'driller', rng);
-    employee.social = 15; // 15 < 20 → social morale penalty
+    employee.breakNeed = 25;
 
-    expect(tickNeedMorale(employee)).toBe(NEED_MORALE_PENALTIES.social);
+    expect(tickNeedMorale(employee)).toBe(NEED_MORALE_PENALTIES.breakNeed);
+    expect(NEED_MORALE_PENALTIES.breakNeed).toBe(-2);
+  });
+
+  // ── Test 13 ─────────────────────────────────────────────────────────────────
+  it('tickNeedMorale returns 0 when breakNeed is exactly at low threshold (30)', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    employee.breakNeed = 30;
+
+    expect(tickNeedMorale(employee)).toBe(0);
+  });
+
+  // ── Test 14 ─────────────────────────────────────────────────────────────────
+  it('replenishNeed increases breakNeed by the given amount', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    employee.breakNeed = 50;
+
+    replenishNeed(employee, 'breakNeed', 30);
+
+    expect(employee.breakNeed).toBe(80);
+  });
+
+  // ── Test 15 ─────────────────────────────────────────────────────────────────
+  it('replenishNeed caps breakNeed at 100 and never exceeds it', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    employee.breakNeed = 80;
+
+    replenishNeed(employee, 'breakNeed', 50);
+
+    expect(employee.breakNeed).toBe(100);
   });
 
   // ── Test 16 ─────────────────────────────────────────────────────────────────
-  it('tickNeedMorale returns comfort penalty when comfort is 25 (below NEED_THRESHOLDS.comfort.low = 30)', () => {
-    const state = createEmployeeState();
-    const rng = new Random(1);
-    const { employee } = hireEmployee(state, 'driller', rng);
-    employee.comfort = 25; // 25 < 30 → comfort morale penalty
-
-    expect(tickNeedMorale(employee)).toBe(NEED_MORALE_PENALTIES.comfort);
-  });
-
-  // ── Test 17 ─────────────────────────────────────────────────────────────────
-  it('tickNeedMorale stacks both social and comfort penalties when both needs are low', () => {
-    const state = createEmployeeState();
-    const rng = new Random(1);
-    const { employee } = hireEmployee(state, 'driller', rng);
-    employee.social  = 15; // below 20 → social penalty
-    employee.comfort = 25; // below 30 → comfort penalty
-
-    expect(tickNeedMorale(employee)).toBe(NEED_MORALE_PENALTIES.social + NEED_MORALE_PENALTIES.comfort);
-  });
-
-  // ── Test 18 ─────────────────────────────────────────────────────────────────
-  it('replenishNeed increases the target need gauge by the given amount', () => {
+  it('replenishNeed still works with hunger (non-breakNeed gauge)', () => {
     const state = createEmployeeState();
     const rng = new Random(1);
     const { employee } = hireEmployee(state, 'driller', rng);
     employee.hunger = 50;
 
-    replenishNeed(employee, 'hunger' as NeedKey, 30);
+    replenishNeed(employee, 'hunger', 30);
 
     expect(employee.hunger).toBe(80);
-  });
-
-  // ── Test 19 ─────────────────────────────────────────────────────────────────
-  it('replenishNeed caps the need at 100 and never exceeds it', () => {
-    const state = createEmployeeState();
-    const rng = new Random(1);
-    const { employee } = hireEmployee(state, 'driller', rng);
-    employee.hunger = 80;
-
-    replenishNeed(employee, 'hunger' as NeedKey, 50); // 80 + 50 = 130, capped to 100
-
-    expect(employee.hunger).toBe(100);
   });
 });
 

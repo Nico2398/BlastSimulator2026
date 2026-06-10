@@ -23,7 +23,7 @@ const PROFICIENCY_LEVELS = [1, 2, 3, 4, 5] as const;
 
 const SHIFT_MODES: ShiftMode[] = ['shift_8h', 'shift_12h', 'continuous', 'custom'];
 
-const NEED_KEYS: NeedKey[] = ['hunger', 'fatigue', 'social', 'comfort'];
+const NEED_KEYS: NeedKey[] = ['hunger', 'fatigue', 'breakNeed'];
 
 const SKILL_KEYS = [
   'skill.blasting',
@@ -124,7 +124,7 @@ describe('policy name keys — en and fr translations differ', () => {
   });
 });
 
-// ── Need labels (need.hunger, need.fatigue, need.social, need.comfort) ────────
+// ── Need labels (need.hunger, need.fatigue, need.breakNeed) ───────────────────
 
 describe('need label keys resolve in both locales', () => {
   for (const locale of LOCALES) {
@@ -151,14 +151,14 @@ describe('need label keys — en and fr translations differ', () => {
     expect(en, 'en and fr translations for need.hunger must differ').not.toBe(fr);
   });
 
-  it('need.comfort is translated differently in en vs fr', () => {
+  it('need.breakNeed is translated differently in en vs fr', () => {
     setLocale('en');
-    const en = t('need.comfort');
+    const en = t('need.breakNeed');
     setLocale('fr');
-    const fr = t('need.comfort');
-    expect(en, 'need.comfort must resolve in en').not.toBe('need.comfort');
-    expect(fr, 'need.comfort must resolve in fr').not.toBe('need.comfort');
-    expect(en, 'en and fr translations for need.comfort must differ').not.toBe(fr);
+    const fr = t('need.breakNeed');
+    expect(en, 'need.breakNeed must resolve in en').not.toBe('need.breakNeed');
+    expect(fr, 'need.breakNeed must resolve in fr').not.toBe('need.breakNeed');
+    expect(en, 'en and fr translations for need.breakNeed must differ').not.toBe(fr);
   });
 });
 
