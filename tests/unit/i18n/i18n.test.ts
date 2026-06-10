@@ -1,12 +1,13 @@
-// BlastSimulator2026 — CH3.14 + CH4.9: i18n key resolution tests for proficiency
-// labels, policy names, need labels, skill keys, survey methods, and ore report
-// events.
+// BlastSimulator2026 — i18n key resolution tests.
 //
-// Verifies that every key in the proficiency.*, policy.*, need.*, skill.*,
-// survey.*, and event.(lucky_strike|barren_blast|legendary_vein|absurdium_jackpot).*
-// namespaces resolves (i.e. returns a non-empty string that is NOT the key
-// itself) in both 'en' and 'fr' locales, and that en/fr translations differ
-// for at least one representative key in each group.
+// Covers: proficiency labels, policy names, need labels, skill keys, survey
+// methods, ore report events, blast damage events, nav pathfinding messages,
+// need events (warning/collapsed/shift change), building.full, and
+// need.well_rested_bonus interpolation.
+//
+// Verifies that every key under test resolves (returns a non-empty string that
+// is NOT the key itself) in both 'en' and 'fr' locales, and that en/fr
+// translations differ for at least one representative key in each group.
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { t, setLocale } from '../../../src/core/i18n/I18n.js';
