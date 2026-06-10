@@ -4,13 +4,13 @@
 
 import type { GameState, PendingAction } from '../state/GameState.js';
 import type { Vehicle } from '../entities/Vehicle.js';
-import type { Building, BuildingType } from '../entities/Building.js';
+import { getBuildingDef, getDefSize, type Building, type BuildingType } from '../entities/Building.js';
 import type { Random } from '../math/Random.js';
 import type { EventContext } from '../events/EventPool.js';
 import { tickEventSystem, type FiredEvent } from '../events/EventSystem.js';
 import { detectTrafficJam } from '../events/EventEngine.js';
 import { checkCollapse, type NeedKey } from '../entities/Employee.js';
-import { tickNeedGauges, needsMoraleEffect } from '../entities/EmployeeNeeds.js';
+import { replenishNeed } from '../entities/EmployeeNeeds.js';
 
 // ── Config ──
 
@@ -501,13 +501,95 @@ export interface ShiftCycleResult {
  * @returns Result summary of shift transitions
  */
 export function processShiftCycle(
-  _state: GameState,
-  _firedEvents: FiredEvent[],
+  state: GameState,
+  firedEvents: FiredEvent[],
 ): ShiftCycleResult {
-  void tickNeedGauges;
-  void needsMoraleEffect;
-  void WORK_DURATION_TICKS;
-  void SHIFT_SLEEP_DURATION_TICKS;
-  // TODO: implement shift cycle logic
-  return { restCompleted: [], shiftRested: [], active: false };
+  // Check for a bunkhouse (living_quarters tier >= 2)
+  const hasBunkhouse = state.buildings.buildings.some(
+    b => b.type === 'living_quarters' && b.tier >= 2 && b.active,
+  );
+
+  if (!hasBunkhouse) {
+    return { restCompleted: [], shiftRested: [], active: false };
+  }
+
+  const restCompleted: number[] = [];
+  const shiftRested: number[] = [];
+
+  // ── Phase 1: Complete rests ────────────────────────────────────────────
+  for (const emp of state.employees.employees) {
+    if (!emp.alive || emp.injured) continue;
+    if (emp.restTicksRemaining === null) continue;
+
+    emp.restTicksRemaining -= 1;
+
+    if (emp.restTicksRemaining <= 0) {
+      // Find nearest active living_quarters for replenishment
+      const building = findNearestLivingQuarters(state, emp.x, emp.z);
+      if (building) {
+        const def = getBuildingDef(building.type, building.tier);
+        replenishNeed(emp, 'fatigue', building.tier, def.capacity);
+      } else {
+        // Fallback — no building found (shouldn't happen since we checked hasBunkhouse)
+        emp.fatigue = 100;
+      }
+
+      deductRestCost(state, 'fatigue');
+
+      if (emp.collapsing) {
+        emp.collapsing = false;
+      }
+
+      emp.restTicksRemaining = null;
+      emp.activeActionId = null;
+      emp.ticksWorked = 0;
+      restCompleted.push(emp.id);
+    }
+  }
+
+  // ── Phase 2: Increment ticksWorked for active employees not resting ────
+  for (const emp of state.employees.employees) {
+    if (!emp.alive || emp.injured) continue;
+    if (emp.activeActionId === null) continue;
+    if (emp.restTicksRemaining !== null) continue;
+
+    emp.ticksWorked += 1;
+  }
+
+  // ── Phase 3: Force shift rest for employees who've worked enough ───────
+  for (const emp of state.employees.employees) {
+    if (!emp.alive || emp.injured) continue;
+    if (emp.restTicksRemaining !== null) continue;
+    if (emp.activeActionId === null) continue;
+    if (emp.ticksWorked < WORK_DURATION_TICKS) continue;
+
+    // Find nearest living_quarters for target coordinates
+    const building = findNearestLivingQuarters(state, emp.x, emp.z);
+    let targetX = emp.x;
+    let targetZ = emp.z;
+    let buildingId: number | undefined;
+
+    if (building) {
+      const def = getBuildingDef(building.type, building.tier);
+      const { sizeX, sizeZ } = getDefSize(def);
+      targetX = building.x + sizeX / 2;
+      targetZ = building.z + sizeZ / 2;
+      buildingId = building.id;
+    }
+
+    emp.restTicksRemaining = SHIFT_SLEEP_DURATION_TICKS;
+
+    const restAction = createRestPendingAction(state, {
+      targetX,
+      targetZ,
+      targetEmployeeId: emp.id,
+      payload: { needType: 'fatigue', triggeredBy: 'shift_cycle', buildingId },
+    });
+
+    emp.activeActionId = restAction.id;
+    shiftRested.push(emp.id);
+    firedEvents.push({ eventId: 'employee_shift_change', firedAtTick: state.tickCount });
+  }
+
+  return { restCompleted, shiftRested, active: true };
 }
