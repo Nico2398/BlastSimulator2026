@@ -23,6 +23,8 @@ import {
   needsMoraleEffect,
   // ── 3.13: task-duration function ──
   computeTaskDuration,
+  // ── 7.6: checkCollapse ──
+  checkCollapse,
   type SkillQualification,
   type SkillCategory,
   type NeedKey,
@@ -1308,6 +1310,189 @@ describe('Employee — computeTaskDuration (3.13)', () => {
     // ceil(1 * 1.00 / (1.0 * 1.0 * 1.0)) = ceil(1.0) = 1
     const result = computeTaskDuration(1, 1, 1.0, 1.0, 1.0);
     expect(result).toBe(1);
+  });
+
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Task 7.6 — checkCollapse: interrupt task queue, prepend rest task
+//
+// Functions under test:
+//   checkCollapse(employee) → NeedKey | null
+//   getEffectiveness(employee) — returns 0 when collapsing (already wired)
+// New Employee fields: collapsing (boolean), interruptedActionPayload (maybe null)
+//
+// When a need gauge drops to or below its collapse threshold, the employee
+// should collapse: set collapsing=true, clear activeActionId, and return the
+// NeedKey that caused the collapse. Gauges are checked in order: hunger first,
+// then fatigue, then breakNeed. Already-collapsing employees are skipped.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('Employee — checkCollapse (7.6)', () => {
+
+  // ── Test 1 ──────────────────────────────────────────────────────────────────
+  it('hunger at threshold (≤10) triggers collapse returning "hunger"', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    employee.hunger = 10;
+    employee.fatigue = 100;
+    employee.breakNeed = 100;
+    employee.activeActionId = 42;
+
+    const result = checkCollapse(employee);
+
+    expect(result).toBe('hunger');
+    expect(employee.collapsing).toBe(true);
+    expect(employee.activeActionId).toBeNull();
+  });
+
+  // ── Test 2 ──────────────────────────────────────────────────────────────────
+  it('fatigue at threshold (≤5) triggers collapse returning "fatigue"', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    employee.hunger = 100;
+    employee.fatigue = 5;
+    employee.breakNeed = 100;
+    employee.activeActionId = 42;
+
+    const result = checkCollapse(employee);
+
+    expect(result).toBe('fatigue');
+    expect(employee.collapsing).toBe(true);
+  });
+
+  // ── Test 3 ──────────────────────────────────────────────────────────────────
+  it('breakNeed at threshold (≤15) triggers collapse returning "breakNeed"', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    employee.hunger = 100;
+    employee.fatigue = 100;
+    employee.breakNeed = 15;
+    employee.activeActionId = 42;
+
+    const result = checkCollapse(employee);
+
+    expect(result).toBe('breakNeed');
+    expect(employee.collapsing).toBe(true);
+  });
+
+  // ── Test 4 ──────────────────────────────────────────────────────────────────
+  it('gauge order honored: hunger(5) beats fatigue(3)', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    employee.hunger = 5;   // Below hunger threshold (10)
+    employee.fatigue = 3;  // Below fatigue threshold (5) — both gauges below threshold
+    employee.breakNeed = 100;
+
+    const result = checkCollapse(employee);
+
+    // Both hunger and fatigue are below thresholds, but hunger is checked first
+    expect(result).toBe('hunger');
+  });
+
+  // ── Test 5 ──────────────────────────────────────────────────────────────────
+  it('all gauges above thresholds → returns null', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    employee.hunger = 50;
+    employee.fatigue = 50;
+    employee.breakNeed = 50;
+
+    const result = checkCollapse(employee);
+
+    expect(result).toBeNull();
+    expect(employee.collapsing).toBe(false);
+  });
+
+  // ── Test 6 ──────────────────────────────────────────────────────────────────
+  it('already collapsing → returns null (no re-trigger)', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    employee.collapsing = true;
+    employee.hunger = 5;
+
+    const result = checkCollapse(employee);
+
+    expect(result).toBeNull();
+  });
+
+  // ── Test 7 ──────────────────────────────────────────────────────────────────
+  it('activeActionId cleared on collapse', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    employee.activeActionId = 42;
+    employee.hunger = 5;
+
+    checkCollapse(employee);
+
+    expect(employee.activeActionId).toBeNull();
+  });
+
+  // ── Test 8 ──────────────────────────────────────────────────────────────────
+  it('activeActionId NOT cleared when no collapse', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    employee.activeActionId = 42;
+    employee.hunger = 50;
+    employee.fatigue = 50;
+    employee.breakNeed = 50;
+
+    checkCollapse(employee);
+
+    expect(employee.activeActionId).toBe(42);
+  });
+
+  // ── Test 9 ──────────────────────────────────────────────────────────────────
+  it('getEffectiveness returns 0 when collapsing', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    employee.collapsing = true;
+
+    expect(getEffectiveness(employee)).toBe(0);
+  });
+
+  // ── Test 10 ─────────────────────────────────────────────────────────────────
+  it('interruptedActionPayload is null on new hire', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+
+    expect(employee.interruptedActionPayload).toBeDefined();
+    expect(employee.interruptedActionPayload).toBeNull();
+  });
+
+  // ── Test 11 ─────────────────────────────────────────────────────────────────
+  it('boundary: hunger=11 → no collapse, hunger=10 → collapse', () => {
+    const state1 = createEmployeeState();
+    const rng1 = new Random(1);
+    const { employee: emp1 } = hireEmployee(state1, 'driller', rng1);
+    emp1.hunger = 11;
+    emp1.fatigue = 100;
+    emp1.breakNeed = 100;
+
+    // hunger=11 is above the collapse threshold (10) → no collapse
+    expect(checkCollapse(emp1)).toBeNull();
+    expect(emp1.collapsing).toBe(false);
+
+    // hunger=10 is at the collapse threshold (10) → collapse
+    const state2 = createEmployeeState();
+    const rng2 = new Random(2);
+    const { employee: emp2 } = hireEmployee(state2, 'driller', rng2);
+    emp2.hunger = 10;
+    emp2.fatigue = 100;
+    emp2.breakNeed = 100;
+
+    const result = checkCollapse(emp2);
+    expect(result).toBe('hunger');
+    expect(emp2.collapsing).toBe(true);
   });
 
 });

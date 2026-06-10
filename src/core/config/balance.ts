@@ -2,6 +2,8 @@
 // All tunable game constants live here. Human can adjust these values during polish.
 // Real-world research notes are included for each value.
 
+import type { BuildingType } from '../entities/Building.js';
+
 // ─── Economy ──────────────────────────────────────────────────────────────────
 
 /** Starting cash for a new game ($). Real open-pit mines cost $10M+ to open; scaled down for gameplay. */
@@ -398,6 +400,27 @@ export const NEED_COLLAPSE_THRESHOLDS = {
   fatigue: 5,
   breakNeed: 15,
 } as const;
+
+/** Rest duration in ticks per need gauge when an employee collapses. */
+export const NEED_REST_DURATIONS = {
+  hunger: 2,
+  fatigue: 8,
+  breakNeed: 3,
+} as const;
+
+/**
+ * Building type that services each need gauge during collapse rest.
+ * All map to 'living_quarters' until dedicated canteen/bunkhouse/break_room
+ * building types are added (future Chapter 1 expansion).
+ */
+export const NEED_REST_BUILDING_TYPES = {
+  hunger: 'living_quarters',
+  fatigue: 'living_quarters',
+  breakNeed: 'living_quarters',
+} as const satisfies Record<string, BuildingType>;
+
+/** Max grid-cell distance to search for a suitable rest building. */
+export const NEED_REST_SEARCH_RADIUS = 20;
 
 /**
  * Per-tick replenishment rates for each need gauge by building tier.

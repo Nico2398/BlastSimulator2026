@@ -4,15 +4,16 @@
 
 import type { GameState, PendingAction } from '../state/GameState.js';
 import type { Vehicle } from '../entities/Vehicle.js';
-import type { Building } from '../entities/Building.js';
+import type { Building, BuildingType } from '../entities/Building.js';
 import type { Random } from '../math/Random.js';
 import type { EventContext } from '../events/EventPool.js';
 import { tickEventSystem, type FiredEvent } from '../events/EventSystem.js';
 import { detectTrafficJam } from '../events/EventEngine.js';
+import { checkCollapse } from '../entities/Employee.js';
 
 // ── Config ──
 
-import { BASE_TICK_MS as _BASE_TICK_MS, VALID_SPEEDS as _VALID_SPEEDS, NEED_RESTORATION_THRESHOLDS } from '../config/balance.js';
+import { BASE_TICK_MS as _BASE_TICK_MS, VALID_SPEEDS as _VALID_SPEEDS, NEED_RESTORATION_THRESHOLDS, NEED_REST_DURATIONS, NEED_REST_BUILDING_TYPES, NEED_REST_SEARCH_RADIUS } from '../config/balance.js';
 
 /** Milliseconds per base tick at 1x speed. */
 export const BASE_TICK_MS = _BASE_TICK_MS;
@@ -277,15 +278,86 @@ export function tickNeedRestoration(state: GameState): NeedRestorationResult {
   return result;
 }
 
-function findNearestLivingQuarters(
+export interface CollapseResult {
+  /** Employee IDs that collapsed this tick. */
+  collapsed: number[];
+}
+
+/**
+ * Check all alive, non-injured employees for collapse thresholds.
+ * On collapse, creates a rest PendingAction targeting nearest suitable building.
+ */
+export function tickCollapse(state: GameState): CollapseResult {
+  const result: CollapseResult = { collapsed: [] };
+
+  for (const emp of state.employees.employees) {
+    if (!emp.alive || emp.injured) continue;
+
+    const collapsedGauge = checkCollapse(emp);
+    if (!collapsedGauge) continue;
+
+    result.collapsed.push(emp.id);
+
+    // Determine rest duration
+    let restDuration = NEED_REST_DURATIONS[collapsedGauge];
+
+    // Find nearest suitable building
+    const buildingType = NEED_REST_BUILDING_TYPES[collapsedGauge];
+    const building = findNearestBuildingOfType(state, buildingType, emp.x, emp.z);
+
+    let targetX = emp.x;
+    let targetZ = emp.z;
+    let buildingId: number | undefined;
+
+    if (building) {
+      const distSq = (building.x - emp.x) ** 2 + (building.z - emp.z) ** 2;
+      if (distSq <= NEED_REST_SEARCH_RADIUS ** 2) {
+        targetX = building.x;
+        targetZ = building.z;
+        buildingId = building.id;
+      } else {
+        // Building exists but too far — double rest duration
+        restDuration *= 2;
+      }
+    } else {
+      // No building at all — double rest duration
+      restDuration *= 2;
+    }
+
+    const actionId = state.nextPendingActionId++;
+    const restAction: PendingAction = {
+      id: actionId,
+      type: 'rest',
+      requiredSkill: null,
+      requiredVehicleRole: null,
+      targetX,
+      targetZ,
+      targetY: 0,
+      payload: {
+        buildingId,
+        collapsedNeed: collapsedGauge,
+        restDuration,
+      },
+      targetEmployeeId: emp.id,
+    };
+
+    state.pendingActions.push(restAction);
+    emp.activeActionId = actionId;
+  }
+
+  return result;
+}
+
+function findNearestBuildingOfType(
   state: GameState,
+  buildingType: BuildingType,
   empX: number,
   empZ: number,
 ): Building | null {
   let nearest: Building | null = null;
   let bestDistSq = Infinity;
   for (const b of state.buildings.buildings) {
-    if (!b.active || b.type !== 'living_quarters') continue;
+    if (!b.active || b.type !== buildingType) continue;
     const distSq = (b.x - empX) ** 2 + (b.z - empZ) ** 2;
     if (distSq < bestDistSq) {
       bestDistSq = distSq;
@@ -293,4 +365,12 @@ function findNearestLivingQuarters(
     }
   }
   return nearest;
+}
+
+function findNearestLivingQuarters(
+  state: GameState,
+  empX: number,
+  empZ: number,
+): Building | null {
+  return findNearestBuildingOfType(state, 'living_quarters', empX, empZ);
 }

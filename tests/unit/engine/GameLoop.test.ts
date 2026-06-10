@@ -15,14 +15,22 @@ import {
   // tickNeedRestoration is imported here for Task 3.11 tests.
   // It does not exist yet — tests will fail (Red phase) until the implementation lands.
   tickNeedRestoration,
+  // ── 7.6: tickCollapse ──
+  tickCollapse,
+  type CollapseResult,
 } from '../../../src/core/engine/GameLoop.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
-import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
+import { hireEmployee, assignSkill, checkCollapse } from '../../../src/core/entities/Employee.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
 import type { EventContext } from '../../../src/core/events/EventPool.js';
 import { setupEvents } from '../../../src/core/events/index.js';
 import { clearEvents, registerEvents } from '../../../src/core/events/EventPool.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
+import {
+  NEED_REST_DURATIONS,
+  NEED_REST_BUILDING_TYPES,
+  NEED_REST_SEARCH_RADIUS,
+} from '../../../src/core/config/balance.js';
 
 function buildContext(state: GameState): EventContext {
   return {
@@ -684,4 +692,248 @@ describe('tickNeedRestoration (Task 3.11)', () => {
     expect(restAction!.targetZ).toBe(nearResult.building!.z);
     expect(restAction!.targetX).not.toBe(farResult.building!.x);
   });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Task 7.6 — tickCollapse: interrupt task queue, prepend rest task
+//
+// Function under test:
+//   tickCollapse(state) → CollapseResult
+//
+// When an employee's need gauge drops below its collapse threshold, a rest
+// PendingAction is created targeting the nearest suitable building. If no
+// building is within NEED_REST_SEARCH_RADIUS (20), the rest duration is
+// doubled and the action targets the employee's current position.
+// Already-collapsing, dead, and injured employees are skipped.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('tickCollapse (7.6)', () => {
+  const SEED = 42;
+
+  // ── Test 1 ──────────────────────────────────────────────────────────────────
+  it('collapsed employee gets rest PendingAction created', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.hunger = 5;
+    employee.fatigue = 100;
+    employee.breakNeed = 100;
+    employee.x = 0;
+    employee.z = 0;
+
+    // Place a living_quarters within search radius
+    const buildResult = placeBuilding(state.buildings, 'living_quarters', 10, 10, 100, 100);
+    expect(buildResult.success).toBe(true);
+
+    const result = tickCollapse(state);
+
+    // Result must report this employee as collapsed
+    expect(result.collapsed).toHaveLength(1);
+    expect(result.collapsed[0]).toBe(employee.id);
+
+    // A rest PendingAction must have been created for this employee
+    const restAction = state.pendingActions.find(
+      (a: PendingAction) => a.type === 'rest' && a.targetEmployeeId === employee.id,
+    );
+    expect(restAction).toBeDefined();
+    // The collapsed need must be 'hunger' (hunger=5 triggered the collapse)
+    expect(restAction!.payload.collapsedNeed).toBe('hunger');
+  });
+
+  // ── Test 2 ──────────────────────────────────────────────────────────────────
+  it('rest action targets the nearest living_quarters building', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.hunger = 5;
+    employee.fatigue = 100;
+    employee.breakNeed = 100;
+    employee.x = 0;
+    employee.z = 0;
+
+    // Two living_quarters: one near (5,5), one far (20,20)
+    const nearResult = placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100);
+    expect(nearResult.success).toBe(true);
+    const farResult = placeBuilding(state.buildings, 'living_quarters', 20, 20, 100, 100);
+    expect(farResult.success).toBe(true);
+
+    tickCollapse(state);
+
+    const restAction = state.pendingActions.find(
+      (a: PendingAction) => a.type === 'rest',
+    );
+    expect(restAction).toBeDefined();
+    // Must target the nearer building
+    expect(restAction!.targetX).toBe(nearResult.building!.x);
+    expect(restAction!.targetZ).toBe(nearResult.building!.z);
+    expect(restAction!.targetX).not.toBe(farResult.building!.x);
+  });
+
+  // ── Test 3 ──────────────────────────────────────────────────────────────────
+  it('no building within 20 cells → restDuration doubled in payload', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.hunger = 5;
+    employee.fatigue = 100;
+    employee.breakNeed = 100;
+    employee.x = 0;
+    employee.z = 0;
+
+    // Building at (50,50) is > 20 cells from (0,0)
+    placeBuilding(state.buildings, 'living_quarters', 50, 50, 100, 100);
+
+    tickCollapse(state);
+
+    const restAction = state.pendingActions.find(
+      (a: PendingAction) => a.type === 'rest',
+    );
+    expect(restAction).toBeDefined();
+    // restDuration must be doubled (base 2 × 2 = 4 for hunger)
+    expect(restAction!.payload.restDuration).toBe(NEED_REST_DURATIONS.hunger * 2);
+  });
+
+  // ── Test 4 ──────────────────────────────────────────────────────────────────
+  it('no building at all → rest duration doubled, target is employee position', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.hunger = 5;
+    employee.fatigue = 100;
+    employee.breakNeed = 100;
+    employee.x = 7;
+    employee.z = 13;
+
+    // No living_quarters placed anywhere
+
+    tickCollapse(state);
+
+    const restAction = state.pendingActions.find(
+      (a: PendingAction) => a.type === 'rest',
+    );
+    expect(restAction).toBeDefined();
+    // Target must be the employee's current position
+    expect(restAction!.targetX).toBe(7);
+    expect(restAction!.targetZ).toBe(13);
+    // restDuration must be doubled
+    expect(restAction!.payload.restDuration).toBe(NEED_REST_DURATIONS.hunger * 2);
+  });
+
+  // ── Test 5 ──────────────────────────────────────────────────────────────────
+  it('all gauges above thresholds → no action created', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.hunger = 50;
+    employee.fatigue = 50;
+    employee.breakNeed = 50;
+
+    placeBuilding(state.buildings, 'living_quarters', 10, 10, 100, 100);
+
+    const result = tickCollapse(state);
+
+    expect(result.collapsed).toHaveLength(0);
+    expect(state.pendingActions).toHaveLength(0);
+  });
+
+  // ── Test 6 ──────────────────────────────────────────────────────────────────
+  it('already collapsing → not re-processed', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.collapsing = true;
+    employee.hunger = 5;
+
+    placeBuilding(state.buildings, 'living_quarters', 10, 10, 100, 100);
+
+    const result = tickCollapse(state);
+
+    expect(result.collapsed).toHaveLength(0);
+    expect(state.pendingActions).toHaveLength(0);
+  });
+
+  // ── Test 7 ──────────────────────────────────────────────────────────────────
+  it('dead employee → skipped', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.alive = false;
+    employee.hunger = 5;
+
+    placeBuilding(state.buildings, 'living_quarters', 10, 10, 100, 100);
+
+    const result = tickCollapse(state);
+
+    expect(result.collapsed).toHaveLength(0);
+  });
+
+  // ── Test 8 ──────────────────────────────────────────────────────────────────
+  it('injured employee → skipped', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.injured = true;
+    employee.hunger = 5;
+
+    placeBuilding(state.buildings, 'living_quarters', 10, 10, 100, 100);
+
+    const result = tickCollapse(state);
+
+    expect(result.collapsed).toHaveLength(0);
+  });
+
+  // ── Test 9 ──────────────────────────────────────────────────────────────────
+  it('collapsed result contains employee IDs', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.hunger = 5;
+    employee.fatigue = 100;
+    employee.breakNeed = 100;
+
+    placeBuilding(state.buildings, 'living_quarters', 10, 10, 100, 100);
+
+    const result = tickCollapse(state);
+
+    expect(result.collapsed).toEqual([employee.id]);
+  });
+
+  // ── Test 10 ─────────────────────────────────────────────────────────────────
+  it('fatigue-triggered collapse produces correct collapsedNeed and restDuration', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.hunger = 100;    // Above hunger threshold (10)
+    employee.fatigue = 3;     // Below fatigue threshold (5)
+    employee.breakNeed = 100;
+    employee.x = 0;
+    employee.z = 0;
+
+    // Place a living_quarters within search radius
+    placeBuilding(state.buildings, 'living_quarters', 10, 10, 100, 100);
+
+    const result = tickCollapse(state);
+
+    // Result must report this employee as collapsed
+    expect(result.collapsed).toHaveLength(1);
+    expect(result.collapsed[0]).toBe(employee.id);
+
+    // The rest action must have collapsedNeed: 'fatigue'
+    const restAction = state.pendingActions.find(
+      (a: PendingAction) => a.type === 'rest' && a.targetEmployeeId === employee.id,
+    );
+    expect(restAction).toBeDefined();
+    expect(restAction!.payload.collapsedNeed).toBe('fatigue');
+    expect(restAction!.payload.restDuration).toBe(NEED_REST_DURATIONS.fatigue);
+  });
+
 });
