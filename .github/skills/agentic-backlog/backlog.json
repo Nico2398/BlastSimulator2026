@@ -1374,12 +1374,12 @@
       "src/core/events/EventSystem.ts"
     ],
     "testFile": "tests/unit/events/EventSystem.test.ts",
-    "status": "pending",
+    "status": "done",
     "blockedBy": [
       "7.6",
       "7.7"
     ],
-    "closedInPR": null
+    "closedInPR": 287
   },
   {
     "id": "7.11",
