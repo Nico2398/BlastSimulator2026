@@ -33,6 +33,7 @@ import type { NeedKey } from '../../../src/core/entities/Employee.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
 import type { EventContext } from '../../../src/core/events/EventPool.js';
 import type { FiredEvent } from '../../../src/core/events/EventSystem.js';
+import type { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { setupEvents } from '../../../src/core/events/index.js';
 import { clearEvents, registerEvents } from '../../../src/core/events/EventPool.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
@@ -950,6 +951,98 @@ describe('tickCollapse (7.6)', () => {
     expect(restAction!.payload.restDuration).toBe(NEED_REST_DURATIONS.fatigue);
   });
 
+  // ── Test 11 ─────────────────────────────────────────────────────────────────
+  it('adds employee_collapsed to firedEvents when employee collapses', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.hunger = 5;
+    employee.fatigue = 100;
+    employee.breakNeed = 100;
+    employee.x = 0;
+    employee.z = 0;
+
+    placeBuilding(state.buildings, 'living_quarters', 10, 10, 100, 100);
+
+    const firedEvents: FiredEvent[] = [];
+    tickCollapse(state, firedEvents);
+
+    expect(firedEvents).toHaveLength(1);
+    expect(firedEvents[0]!.eventId).toBe('employee_collapsed');
+    expect(firedEvents[0]!.firedAtTick).toBe(state.tickCount);
+  });
+
+  // ── Test 12 ─────────────────────────────────────────────────────────────────
+  it('emits employee:collapsed via emitter when employee collapses', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.hunger = 5;
+    employee.fatigue = 100;
+    employee.breakNeed = 100;
+    employee.x = 0;
+    employee.z = 0;
+
+    placeBuilding(state.buildings, 'living_quarters', 10, 10, 100, 100);
+
+    const events: string[] = [];
+    const mockEmitter = { emit: (event: string) => { events.push(event); } } as unknown as EventEmitter;
+    const firedEvents: FiredEvent[] = [];
+
+    tickCollapse(state, firedEvents, mockEmitter);
+
+    expect(events).toContain('employee:collapsed');
+  });
+
+  // ── Test 13 ─────────────────────────────────────────────────────────────────
+  it('does not emit employee_collapsed when employee is not collapsing', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.hunger = 50;
+    employee.fatigue = 50;
+    employee.breakNeed = 50;
+
+    placeBuilding(state.buildings, 'living_quarters', 10, 10, 100, 100);
+
+    const firedEvents: FiredEvent[] = [];
+    tickCollapse(state, firedEvents);
+
+    expect(firedEvents).toHaveLength(0);
+  });
+
+  // ── Test 14 ─────────────────────────────────────────────────────────────────
+  it('emits one employee_collapsed per collapsed employee', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee: emp1 } = hireEmployee(state.employees, 'driller', rng);
+    emp1.hunger = 5;
+    emp1.fatigue = 100;
+    emp1.breakNeed = 100;
+    emp1.x = 0;
+    emp1.z = 0;
+
+    const { employee: emp2 } = hireEmployee(state.employees, 'blaster', rng);
+    emp2.hunger = 5;
+    emp2.fatigue = 100;
+    emp2.breakNeed = 100;
+    emp2.x = 0;
+    emp2.z = 0;
+
+    placeBuilding(state.buildings, 'living_quarters', 10, 10, 100, 100);
+
+    const firedEvents: FiredEvent[] = [];
+    tickCollapse(state, firedEvents);
+
+    expect(firedEvents).toHaveLength(2);
+    expect(firedEvents[0]!.eventId).toBe('employee_collapsed');
+    expect(firedEvents[1]!.eventId).toBe('employee_collapsed');
+  });
+
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1391,6 +1484,118 @@ describe('autoInsertNeedTasks (7.7)', () => {
     // nextPendingActionId must have been incremented (one rest action inserted)
     expect(state.nextPendingActionId).toBe(beforeId + 1);
   });
+
+  // ── Test 16 ─────────────────────────────────────────────────────────────────
+  it('adds need_warning to firedEvents when rest action already queued', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.x = 0;
+    employee.z = 0;
+    employee.hunger = 30; // below threshold
+    employee.fatigue = 80;
+    employee.breakNeed = 80;
+    employee.activeActionId = null;
+
+    // Pre-insert a rest action for this employee
+    state.pendingActions.push({
+      id: state.nextPendingActionId++,
+      type: 'rest',
+      requiredSkill: null,
+      requiredVehicleRole: null,
+      targetX: 0,
+      targetZ: 0,
+      targetY: 0,
+      payload: {},
+      targetEmployeeId: employee.id,
+    });
+
+    placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100);
+
+    const firedEvents: FiredEvent[] = [];
+    autoInsertNeedTasks(state, firedEvents);
+
+    expect(firedEvents).toHaveLength(1);
+    expect(firedEvents[0]!.eventId).toBe('need_warning');
+    expect(firedEvents[0]!.firedAtTick).toBe(state.tickCount);
+  });
+
+  // ── Test 17 ─────────────────────────────────────────────────────────────────
+  it('emits employee:need_warning via emitter when insertion skipped', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.x = 0;
+    employee.z = 0;
+    employee.hunger = 30;
+    employee.fatigue = 80;
+    employee.breakNeed = 80;
+    employee.activeActionId = null;
+
+    // Pre-insert a rest action for this employee
+    state.pendingActions.push({
+      id: state.nextPendingActionId++,
+      type: 'rest',
+      requiredSkill: null,
+      requiredVehicleRole: null,
+      targetX: 0,
+      targetZ: 0,
+      targetY: 0,
+      payload: {},
+      targetEmployeeId: employee.id,
+    });
+
+    placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100);
+
+    const events: string[] = [];
+    const mockEmitter = { emit: (event: string) => { events.push(event); } } as unknown as EventEmitter;
+    const firedEvents: FiredEvent[] = [];
+
+    autoInsertNeedTasks(state, firedEvents, mockEmitter);
+
+    expect(events).toContain('employee:need_warning');
+  });
+
+  // ── Test 18 ─────────────────────────────────────────────────────────────────
+  it('does not emit need_warning when rest action is inserted', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.x = 0;
+    employee.z = 0;
+    employee.hunger = 30;
+    employee.fatigue = 80;
+    employee.breakNeed = 80;
+    employee.activeActionId = null;
+
+    placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100);
+
+    const firedEvents: FiredEvent[] = [];
+    autoInsertNeedTasks(state, firedEvents);
+
+    expect(firedEvents).toHaveLength(0);
+  });
+
+  // ── Test 19 ─────────────────────────────────────────────────────────────────
+  it('does not emit need_warning when gauges are above thresholds', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.hunger = 80;
+    employee.fatigue = 80;
+    employee.breakNeed = 80;
+
+    placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100);
+
+    const firedEvents: FiredEvent[] = [];
+    autoInsertNeedTasks(state, firedEvents);
+
+    expect(firedEvents).toHaveLength(0);
+  });
 });
 
 // ─── 7.8: deductRestCost ──────────────────────────────────────────────────────
@@ -1753,5 +1958,25 @@ describe('processShiftCycle (7.9)', () => {
     // emp2 continues working
     expect(emp2.ticksWorked).toBe(3);
     expect(emp2.restTicksRemaining).toBeNull();
+  });
+
+  // ── Test 15 ─────────────────────────────────────────────────────────────────
+  it('emits employee:shift_change via emitter when shift rest starts', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.activeActionId = 900;
+    employee.ticksWorked = WORK_DURATION_TICKS - 1; // triggers shift rest
+
+    placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, 2);
+
+    const events: string[] = [];
+    const mockEmitter = { emit: (event: string) => { events.push(event); } } as unknown as EventEmitter;
+    const firedEvents: FiredEvent[] = [];
+
+    processShiftCycle(state, firedEvents, mockEmitter);
+
+    expect(events).toContain('employee:shift_change');
   });
 });

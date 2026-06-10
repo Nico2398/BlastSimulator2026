@@ -11,6 +11,7 @@ import { tickEventSystem, type FiredEvent } from '../events/EventSystem.js';
 import { detectTrafficJam } from '../events/EventEngine.js';
 import { checkCollapse, type NeedKey, type Employee } from '../entities/Employee.js';
 import { replenishNeed } from '../entities/EmployeeNeeds.js';
+import type { EventEmitter } from '../state/EventEmitter.js';
 
 // ── Config ──
 
@@ -289,7 +290,7 @@ export interface NeedInsertionResult {
  * Check all alive, non-injured employees for collapse thresholds.
  * On collapse, creates a rest PendingAction targeting nearest suitable building.
  */
-export function tickCollapse(state: GameState): CollapseResult {
+export function tickCollapse(state: GameState, _firedEvents?: FiredEvent[], _emitter?: EventEmitter): CollapseResult {
   const result: CollapseResult = { collapsed: [] };
 
   for (const emp of state.employees.employees) {
@@ -299,6 +300,8 @@ export function tickCollapse(state: GameState): CollapseResult {
     if (!collapsedGauge) continue;
 
     result.collapsed.push(emp.id);
+    _firedEvents?.push({ eventId: 'employee_collapsed', firedAtTick: state.tickCount });
+    _emitter?.emit('employee:collapsed', { employeeId: emp.id, needKey: collapsedGauge });
 
     // Determine rest duration
     let restDuration = NEED_REST_DURATIONS[collapsedGauge];
@@ -352,7 +355,7 @@ export function tickCollapse(state: GameState): CollapseResult {
  * Dead, injured, and collapsing employees are skipped.
  * Employees that already have a rest PendingAction in the queue are skipped.
  */
-export function autoInsertNeedTasks(state: GameState): NeedInsertionResult {
+export function autoInsertNeedTasks(state: GameState, _firedEvents?: FiredEvent[], _emitter?: EventEmitter): NeedInsertionResult {
   const result: NeedInsertionResult = { inserted: [], skipped: [] };
 
   for (const emp of state.employees.employees) {
@@ -384,6 +387,8 @@ export function autoInsertNeedTasks(state: GameState): NeedInsertionResult {
       // Record all triggered gauges as skipped
       for (const gauge of triggeredGauges) {
         result.skipped.push({ employeeId: emp.id, needKey: gauge, reason: 'rest_action_already_queued' });
+        _firedEvents?.push({ eventId: 'need_warning', firedAtTick: state.tickCount });
+        _emitter?.emit('employee:need_warning', { employeeId: emp.id, needKey: gauge });
       }
       continue;
     }
@@ -508,6 +513,7 @@ export interface ShiftCycleResult {
 export function processShiftCycle(
   state: GameState,
   firedEvents: FiredEvent[],
+  _emitter?: EventEmitter,
 ): ShiftCycleResult {
   // Check for a bunkhouse (living_quarters tier >= 2)
   const hasBunkhouse = state.buildings.buildings.some(
@@ -533,7 +539,7 @@ export function processShiftCycle(
     incrementWorkTick(state, emp);
 
     // Phase 3: Force shift rest when work quota is met
-    forceShiftRestIfNeeded(state, emp, firedEvents, shiftRested);
+    forceShiftRestIfNeeded(state, emp, firedEvents, shiftRested, _emitter);
   }
 
   return { restCompleted, shiftRested, active: true };
@@ -605,6 +611,7 @@ function forceShiftRestIfNeeded(
   emp: Employee,
   firedEvents: FiredEvent[],
   shiftRested: number[],
+  _emitter?: EventEmitter,
 ): void {
   if (emp.restTicksRemaining !== null) return;
   if (emp.activeActionId === null) return;
@@ -636,6 +643,7 @@ function forceShiftRestIfNeeded(
   emp.activeActionId = restAction.id;
   shiftRested.push(emp.id);
   firedEvents.push({ eventId: 'employee_shift_change', firedAtTick: state.tickCount });
+  _emitter?.emit('employee:shift_change', { employeeId: emp.id });
 }
 
 /**
