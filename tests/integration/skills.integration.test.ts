@@ -78,7 +78,7 @@ describe('Employee skills', () => {
     expect(quals[0]!.proficiencyLevel).toBe(5);
   });
 
-  it('all 6 skill categories accepted', () => {
+  it('accepts all 6 skill categories', () => {
     const categories = [
       'driving.truck',
       'driving.excavator',
