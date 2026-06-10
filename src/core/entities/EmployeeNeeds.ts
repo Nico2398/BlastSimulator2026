@@ -4,9 +4,6 @@
 import { type Employee } from './Employee.js';
 import { NEED_DRAIN_RATES, NEED_THRESHOLDS, NEED_PRODUCTIVITY_MULTIPLIERS, NEED_MORALE_PENALTIES, MORALE_THRESHOLDS, NEED_MORALE_DRAIN_MULTIPLIERS, NEED_MORALE_EFFECT_THRESHOLDS, NEED_MORALE_EFFECT_PENALTIES, NEED_WELL_RESTED_THRESHOLD, NEED_WELL_RESTED_BONUS, BUILDING_REPLENISH_RATES } from '../config/balance.js';
 
-// Referenced for documentation; consumed during green-phase implementation.
-void BUILDING_REPLENISH_RATES;
-
 /** The three need gauges tracked on every Employee. */
 export type NeedKey = 'hunger' | 'fatigue' | 'breakNeed';
 
@@ -118,13 +115,16 @@ export function needsMoraleEffect(employee: Employee): number {
  *          `false` if capacity was insufficient.
  */
 export function replenishNeed(
-  _employee: Employee,
-  _need: NeedKey,
-  _buildingTier: 1 | 2 | 3,
-  _availableCapacity: number,
+  employee: Employee,
+  need: NeedKey,
+  buildingTier: 1 | 2 | 3,
+  availableCapacity: number,
 ): boolean {
-  // TODO: implement in green phase
-  return false;
+  if (availableCapacity <= 0) return false;
+
+  const rate = BUILDING_REPLENISH_RATES[need][buildingTier];
+  employee[need] = Math.min(100, employee[need] + rate);
+  return true;
 }
 
 /**
