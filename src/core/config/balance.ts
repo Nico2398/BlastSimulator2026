@@ -342,16 +342,16 @@ export const NEED_RESTORATION_THRESHOLDS = {
 
 /** Warning thresholds that trigger proactive need routing. */
 export const NEED_WARNING_THRESHOLDS = {
-  hunger:  0,
-  fatigue: 0,
-  breakNeed: 0,
+  hunger:  35,
+  fatigue: 25,
+  breakNeed: 30,
 } as const;
 
 /** Collapse thresholds for each need gauge. */
 export const NEED_COLLAPSE_THRESHOLDS = {
-  hunger:  0,
-  fatigue: 0,
-  breakNeed: 0,
+  hunger:  10,
+  fatigue: 5,
+  breakNeed: 15,
 } as const;
 
 // ─── Shift / Rest Scheduling ────────────────────────────────────────────────
