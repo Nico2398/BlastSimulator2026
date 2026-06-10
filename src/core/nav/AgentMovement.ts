@@ -3,6 +3,12 @@
 
 import type { NavGrid } from './NavGrid.js';
 
+/** Number of consecutive failed re-route attempts before the agent transitions to stuck state. */
+export const STUCK_THRESHOLD = 3;
+
+/** Event ID emitted when an agent becomes stuck. */
+export const AGENT_STUCK_EVENT_ID = 'agent_stuck';
+
 /**
  * The current navigation state of an agent walking along a path.
  * Tracks position, waypoint list, progress index, and base walk speed.
@@ -22,6 +28,10 @@ export interface AgentState {
   destinationX: number;
   /** The ultimate destination z-coordinate. */
   destinationZ: number;
+  /** Number of consecutive failed re-route attempts. */
+  consecutiveFailures: number;
+  /** True when consecutiveFailures >= STUCK_THRESHOLD. */
+  isStuck: boolean;
 }
 
 /**
@@ -45,6 +55,14 @@ export interface AdvanceResult {
 export interface StaleCheckResult {
   isStale: boolean;
   reason?: 'BLOCKED_WAYPOINT' | 'CROSSES_UPDATED_REGION';
+}
+
+/**
+ * Full stuck-state snapshot for an agent.
+ */
+export interface StuckResult {
+  consecutiveFailures: number;
+  isStuck: boolean;
 }
 
 /**
@@ -207,5 +225,63 @@ export function requestReRoute(state: AgentState): AgentState {
     walkSpeed: state.walkSpeed,
     destinationX: state.destinationX,
     destinationZ: state.destinationZ,
+    consecutiveFailures: state.consecutiveFailures,
+    isStuck: state.isStuck,
+  };
+}
+
+/**
+ * Record a failed re-route attempt for an agent.
+ * Increments consecutiveFailures and sets isStuck if threshold is reached.
+ *
+ * @param state - The agent's current navigation state.
+ * @returns A new `AgentState` with updated stuck-tracker fields.
+ */
+export function recordStuckFailure(state: AgentState): AgentState {
+  const base = (Number.isNaN(state.consecutiveFailures) || state.consecutiveFailures < 0)
+    ? 0
+    : state.consecutiveFailures;
+  const newFailures = base + 1;
+  return {
+    ...state,
+    consecutiveFailures: newFailures,
+    isStuck: newFailures >= STUCK_THRESHOLD || state.isStuck,
+  };
+}
+
+/**
+ * Reset the stuck-tracker fields on an agent state.
+ *
+ * @param state - The agent's current navigation state.
+ * @returns A new `AgentState` with consecutiveFailures=0 and isStuck=false.
+ */
+export function resetStuckState(state: AgentState): AgentState {
+  return {
+    ...state,
+    consecutiveFailures: 0,
+    isStuck: false,
+  };
+}
+
+/**
+ * Check whether the agent is currently in a stuck state.
+ *
+ * @param state - The agent's current navigation state.
+ * @returns `true` if the agent is stuck.
+ */
+export function isAgentStuck(state: AgentState): boolean {
+  return !!state.isStuck;
+}
+
+/**
+ * Get the full stuck-state snapshot for an agent.
+ *
+ * @param state - The agent's current navigation state.
+ * @returns A `StuckResult` with consecutiveFailures and isStuck.
+ */
+export function getStuckState(state: AgentState): StuckResult {
+  return {
+    consecutiveFailures: state.consecutiveFailures,
+    isStuck: !!state.isStuck,
   };
 }
