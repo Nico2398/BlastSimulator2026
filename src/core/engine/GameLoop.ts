@@ -13,7 +13,7 @@ import { checkCollapse, type NeedKey } from '../entities/Employee.js';
 
 // ── Config ──
 
-import { BASE_TICK_MS as _BASE_TICK_MS, VALID_SPEEDS as _VALID_SPEEDS, NEED_REST_DURATIONS, NEED_REST_BUILDING_TYPES, NEED_REST_SEARCH_RADIUS, NEED_WARNING_THRESHOLDS, FOOD_COST_PER_VISIT, BREAK_COST_PER_VISIT } from '../config/balance.js';
+import { BASE_TICK_MS as _BASE_TICK_MS, VALID_SPEEDS as _VALID_SPEEDS, NEED_REST_DURATIONS, NEED_REST_BUILDING_TYPES, NEED_REST_SEARCH_RADIUS, NEED_WARNING_THRESHOLDS, NEED_REST_COSTS } from '../config/balance.js';
 
 /** Milliseconds per base tick at 1x speed. */
 export const BASE_TICK_MS = _BASE_TICK_MS;
@@ -467,14 +467,13 @@ function findNearestLivingQuarters(
 
 /**
  * Deduct the per-visit cost from cash for the given need gauge.
- * Returns the amount deducted (0 for fatigue, which has no cost).
+ *
+ * @returns The per-visit cost constant (the amount that would be deducted ignoring
+ *          the cash floor of 0). When cash is insufficient, the actual deduction
+ *          is less than this value.
  */
 export function deductRestCost(state: GameState, needKey: NeedKey): number {
-  const cost = needKey === 'hunger'
-    ? FOOD_COST_PER_VISIT
-    : needKey === 'breakNeed'
-      ? BREAK_COST_PER_VISIT
-      : 0;
+  const cost = NEED_REST_COSTS[needKey];
 
   state.cash = Math.max(0, state.cash - cost);
   return cost;

@@ -37,8 +37,7 @@ import {
   NEED_REST_BUILDING_TYPES,
   NEED_REST_SEARCH_RADIUS,
   NEED_WARNING_THRESHOLDS,
-  FOOD_COST_PER_VISIT,
-  BREAK_COST_PER_VISIT,
+  NEED_REST_COSTS,
 } from '../../../src/core/config/balance.js';
 
 function buildContext(state: GameState): EventContext {
@@ -1393,26 +1392,26 @@ describe('autoInsertNeedTasks (7.7)', () => {
 const DEDUCT_SEED = 42;
 
 describe('deductRestCost', () => {
-  // ── Test 1: Positive: hunger visit deducts FOOD_COST_PER_VISIT from cash ──
-  it('deducts FOOD_COST_PER_VISIT from cash for hunger', () => {
+  // ── Test 1: Positive: hunger visit deducts NEED_REST_COSTS.hunger from cash ──
+  it('deducts NEED_REST_COSTS.hunger from cash for hunger', () => {
     const state = createGame({ seed: DEDUCT_SEED });
     state.cash = 5000;
 
     const deducted = deductRestCost(state, 'hunger');
 
     expect(state.cash).toBe(4950);
-    expect(deducted).toBe(FOOD_COST_PER_VISIT);
+    expect(deducted).toBe(NEED_REST_COSTS.hunger);
   });
 
-  // ── Test 2: Positive: breakNeed visit deducts BREAK_COST_PER_VISIT from cash ──
-  it('deducts BREAK_COST_PER_VISIT from cash for breakNeed', () => {
+  // ── Test 2: Positive: breakNeed visit deducts NEED_REST_COSTS.breakNeed from cash ──
+  it('deducts NEED_REST_COSTS.breakNeed from cash for breakNeed', () => {
     const state = createGame({ seed: DEDUCT_SEED });
     state.cash = 5000;
 
     const deducted = deductRestCost(state, 'breakNeed');
 
     expect(state.cash).toBe(4980);
-    expect(deducted).toBe(BREAK_COST_PER_VISIT);
+    expect(deducted).toBe(NEED_REST_COSTS.breakNeed);
   });
 
   // ── Test 3: Boundary: fatigue visit deducts 0 from cash ──
@@ -1434,7 +1433,7 @@ describe('deductRestCost', () => {
     const deducted = deductRestCost(state, 'hunger');
 
     expect(state.cash).toBe(0);
-    expect(deducted).toBe(FOOD_COST_PER_VISIT);
+    expect(deducted).toBe(NEED_REST_COSTS.hunger);
   });
 
   // ── Test 5: Edge: multiple visits accumulate correctly ──
@@ -1446,11 +1445,11 @@ describe('deductRestCost', () => {
     const deducted2 = deductRestCost(state, 'hunger');
     const deducted3 = deductRestCost(state, 'breakNeed');
 
-    const expectedCash = 500 - 2 * FOOD_COST_PER_VISIT - BREAK_COST_PER_VISIT;
+    const expectedCash = 500 - 2 * NEED_REST_COSTS.hunger - NEED_REST_COSTS.breakNeed;
     expect(state.cash).toBe(expectedCash);
-    expect(deducted1).toBe(FOOD_COST_PER_VISIT);
-    expect(deducted2).toBe(FOOD_COST_PER_VISIT);
-    expect(deducted3).toBe(BREAK_COST_PER_VISIT);
+    expect(deducted1).toBe(NEED_REST_COSTS.hunger);
+    expect(deducted2).toBe(NEED_REST_COSTS.hunger);
+    expect(deducted3).toBe(NEED_REST_COSTS.breakNeed);
   });
 
   // ── Test 6: Edge: cash at exactly 0 is unchanged ──
@@ -1461,6 +1460,6 @@ describe('deductRestCost', () => {
     const deducted = deductRestCost(state, 'hunger');
 
     expect(state.cash).toBe(0);
-    expect(deducted).toBe(FOOD_COST_PER_VISIT);
+    expect(deducted).toBe(NEED_REST_COSTS.hunger);
   });
 });

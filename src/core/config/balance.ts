@@ -434,11 +434,12 @@ export const BUILDING_REPLENISH_RATES = {
   breakNeed: { 1: 10, 2: 16, 3: 22 },
 } as const;
 
-/** Cost deducted from cash when an employee visits a building to restore hunger ($). */
-export const FOOD_COST_PER_VISIT = 50;
-
-/** Cost deducted from cash when an employee visits a building to restore breakNeed ($). */
-export const BREAK_COST_PER_VISIT = 20;
+/** Per-visit cost deducted from cash for each need gauge. Fatigue has no cost (0). */
+export const NEED_REST_COSTS = {
+  hunger: 50,
+  fatigue: 0,
+  breakNeed: 20,
+} as const;
 
 // ─── Shift / Rest Scheduling ────────────────────────────────────────────────
 
