@@ -11,8 +11,8 @@
 //   Group 7 — Immutability (original AgentState not mutated)
 
 import { describe, it, expect } from 'vitest';
-import { advanceAgent, isPathBlocked, doesPathCrossRegion, requestReRoute } from '../../../src/core/nav/AgentMovement.js';
-import type { AdvanceResult, AgentState, StaleCheckResult } from '../../../src/core/nav/AgentMovement.js';
+import { advanceAgent, isPathBlocked, doesPathCrossRegion, requestReRoute, recordStuckFailure, resetStuckState, isAgentStuck, getStuckState, STUCK_THRESHOLD, AGENT_STUCK_EVENT_ID } from '../../../src/core/nav/AgentMovement.js';
+import type { AdvanceResult, AgentState, StaleCheckResult, StuckResult } from '../../../src/core/nav/AgentMovement.js';
 import { AGENT_WALK_SPEED } from '../../../src/core/config/balance.js';
 import { NavGrid } from '../../../src/core/nav/NavGrid.js';
 import type { NavCell } from '../../../src/core/nav/NavGrid.js';
@@ -30,6 +30,8 @@ function makeState(overrides?: Partial<AgentState>): AgentState {
     walkSpeed: AGENT_WALK_SPEED,
     destinationX: 0,
     destinationZ: 0,
+    consecutiveFailures: 0,
+    isStuck: false,
     ...overrides,
   };
 }
@@ -614,5 +616,286 @@ describe('StaleCheckResult — type shape', () => {
     const result: StaleCheckResult = { isStale: false };
     expect(result.isStale).toBe(false);
     expect(result.reason).toBeUndefined();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Group 12: Stuck-state tracking
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ───────────────────────────────────────────────────────────────────────────────
+// Subgroup 12a: recordStuckFailure
+// ───────────────────────────────────────────────────────────────────────────────
+
+describe('recordStuckFailure — consecutive failure tracking', () => {
+  it('first failure increments from 0 to 1, does NOT set isStuck', () => {
+    const state = makeState({ consecutiveFailures: 0, isStuck: false });
+    const result = recordStuckFailure(state);
+    expect(result.consecutiveFailures).toBe(1);
+    expect(result.isStuck).toBe(false);
+  });
+
+  it('second failure increments from 1 to 2, does NOT set isStuck', () => {
+    const state = makeState({ consecutiveFailures: 1, isStuck: false });
+    const result = recordStuckFailure(state);
+    expect(result.consecutiveFailures).toBe(2);
+    expect(result.isStuck).toBe(false);
+  });
+
+  it('third failure increments from 2 to 3, sets isStuck=true (threshold reached)', () => {
+    const state = makeState({ consecutiveFailures: 2, isStuck: false });
+    const result = recordStuckFailure(state);
+    expect(result.consecutiveFailures).toBe(3);
+    expect(result.isStuck).toBe(true);
+  });
+
+  it('fourth failure increments from 3 to 4, isStuck remains true', () => {
+    const state = makeState({ consecutiveFailures: 3, isStuck: true });
+    const result = recordStuckFailure(state);
+    expect(result.consecutiveFailures).toBe(4);
+    expect(result.isStuck).toBe(true);
+  });
+
+  it('does NOT mutate the input AgentState (immutability)', () => {
+    const state = makeState({ consecutiveFailures: 1, isStuck: false });
+    const snapshot = { ...state, waypoints: [...state.waypoints] };
+
+    recordStuckFailure(state);
+
+    expect(state.consecutiveFailures).toBe(snapshot.consecutiveFailures);
+    expect(state.isStuck).toBe(snapshot.isStuck);
+    expect(state.x).toBe(snapshot.x);
+    expect(state.z).toBe(snapshot.z);
+    expect(state.waypointIndex).toBe(snapshot.waypointIndex);
+    expect(state.walkSpeed).toBe(snapshot.walkSpeed);
+    expect(state.destinationX).toBe(snapshot.destinationX);
+    expect(state.destinationZ).toBe(snapshot.destinationZ);
+  });
+
+  it('handles NaN consecutiveFailures gracefully (treats as 0 → returns 1, isStuck=false)', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const state = makeState({ consecutiveFailures: NaN as any, isStuck: false });
+    const result = recordStuckFailure(state);
+    expect(result.consecutiveFailures).toBe(1);
+    expect(result.isStuck).toBe(false);
+  });
+
+  it('handles negative consecutiveFailures gracefully (treats as 0 → returns 1, isStuck=false)', () => {
+    const state = makeState({ consecutiveFailures: -5, isStuck: false });
+    const result = recordStuckFailure(state);
+    expect(result.consecutiveFailures).toBe(1);
+    expect(result.isStuck).toBe(false);
+  });
+
+  it('handles extremely large consecutiveFailures (e.g., 999) — increments to 1000, isStuck stays true', () => {
+    const state = makeState({ consecutiveFailures: 999, isStuck: true });
+    const result = recordStuckFailure(state);
+    expect(result.consecutiveFailures).toBe(1000);
+    expect(result.isStuck).toBe(true);
+  });
+});
+
+// ───────────────────────────────────────────────────────────────────────────────
+// Subgroup 12b: resetStuckState
+// ───────────────────────────────────────────────────────────────────────────────
+
+describe('resetStuckState — clearing stuck state', () => {
+  it('sets consecutiveFailures=0 and isStuck=false when agent was stuck (3 failures)', () => {
+    const state = makeState({ consecutiveFailures: 3, isStuck: true });
+    const result = resetStuckState(state);
+    expect(result.consecutiveFailures).toBe(0);
+    expect(result.isStuck).toBe(false);
+  });
+
+  it('leaves at 0/false when already clear (idempotent)', () => {
+    const state = makeState({ consecutiveFailures: 0, isStuck: false });
+    const result = resetStuckState(state);
+    expect(result.consecutiveFailures).toBe(0);
+    expect(result.isStuck).toBe(false);
+  });
+
+  it('does NOT mutate the input AgentState', () => {
+    const state = makeState({
+      x: 5, z: 10,
+      waypoints: [{ x: 15, z: 20 }],
+      waypointIndex: 0,
+      walkSpeed: 2,
+      destinationX: 15, destinationZ: 20,
+      consecutiveFailures: 3,
+      isStuck: true,
+    });
+    const snapshot = { ...state, waypoints: [...state.waypoints] };
+
+    resetStuckState(state);
+
+    expect(state.consecutiveFailures).toBe(snapshot.consecutiveFailures);
+    expect(state.isStuck).toBe(snapshot.isStuck);
+    expect(state.x).toBe(snapshot.x);
+    expect(state.z).toBe(snapshot.z);
+    expect(state.waypointIndex).toBe(snapshot.waypointIndex);
+    expect(state.walkSpeed).toBe(snapshot.walkSpeed);
+    expect(state.destinationX).toBe(snapshot.destinationX);
+    expect(state.destinationZ).toBe(snapshot.destinationZ);
+    expect(state.waypoints.length).toBe(snapshot.waypoints.length);
+    expect(state.waypoints[0]!.x).toBe(snapshot.waypoints[0]!.x);
+    expect(state.waypoints[0]!.z).toBe(snapshot.waypoints[0]!.z);
+  });
+
+  it('preserves all other fields (x, z, waypoints, waypointIndex, walkSpeed, destinationX, destinationZ)', () => {
+    const state = makeState({
+      x: 7, z: 13,
+      waypoints: [{ x: 20, z: 30 }, { x: 40, z: 50 }],
+      waypointIndex: 1,
+      walkSpeed: 1.5,
+      destinationX: 40, destinationZ: 50,
+      consecutiveFailures: 2,
+      isStuck: false,
+    });
+    const result = resetStuckState(state);
+
+    expect(result.x).toBe(7);
+    expect(result.z).toBe(13);
+    expect(result.waypoints).toEqual([{ x: 20, z: 30 }, { x: 40, z: 50 }]);
+    expect(result.waypointIndex).toBe(1);
+    expect(result.walkSpeed).toBe(1.5);
+    expect(result.destinationX).toBe(40);
+    expect(result.destinationZ).toBe(50);
+  });
+});
+
+// ───────────────────────────────────────────────────────────────────────────────
+// Subgroup 12c: isAgentStuck
+// ───────────────────────────────────────────────────────────────────────────────
+
+describe('isAgentStuck — stuck status check', () => {
+  it('returns true when isStuck=true', () => {
+    const state = makeState({ isStuck: true });
+    expect(isAgentStuck(state)).toBe(true);
+  });
+
+  it('returns false when isStuck=false', () => {
+    const state = makeState({ isStuck: false });
+    expect(isAgentStuck(state)).toBe(false);
+  });
+
+  it('returns false for undefined isStuck (defensive)', () => {
+    // Cast a partial object to test defensive handling of undefined field
+    const partial = { x: 0, z: 0, waypoints: [], waypointIndex: 0, walkSpeed: 1, destinationX: 0, destinationZ: 0 } as AgentState;
+    expect(isAgentStuck(partial)).toBe(false);
+  });
+
+  it('returns false for null isStuck (defensive)', () => {
+    // Cast a partial object with null to test defensive handling
+    const partial = { x: 0, z: 0, waypoints: [], waypointIndex: 0, walkSpeed: 1, destinationX: 0, destinationZ: 0, isStuck: null } as unknown as AgentState;
+    expect(isAgentStuck(partial)).toBe(false);
+  });
+
+  it('is pure — does not mutate the input', () => {
+    const state = makeState({ isStuck: true });
+    const snapshot = { ...state, waypoints: [...state.waypoints] };
+
+    isAgentStuck(state);
+
+    expect(state.isStuck).toBe(snapshot.isStuck);
+    expect(state.consecutiveFailures).toBe(snapshot.consecutiveFailures);
+    expect(state.x).toBe(snapshot.x);
+    expect(state.z).toBe(snapshot.z);
+  });
+});
+
+// ───────────────────────────────────────────────────────────────────────────────
+// Subgroup 12d: getStuckState
+// ───────────────────────────────────────────────────────────────────────────────
+
+describe('getStuckState — stuck state snapshot', () => {
+  it('returns StuckResult matching input state', () => {
+    const state = makeState({ consecutiveFailures: 2, isStuck: false });
+    const result: StuckResult = getStuckState(state);
+    expect(result.consecutiveFailures).toBe(2);
+    expect(result.isStuck).toBe(false);
+  });
+
+  it('returns StuckResult with isStuck=true when agent is stuck', () => {
+    const state = makeState({ consecutiveFailures: 3, isStuck: true });
+    const result: StuckResult = getStuckState(state);
+    expect(result.consecutiveFailures).toBe(3);
+    expect(result.isStuck).toBe(true);
+  });
+
+  it('returns a new object (different reference from any state field)', () => {
+    const state = makeState({ consecutiveFailures: 1, isStuck: false });
+    const result = getStuckState(state);
+    // The result is a new object, not the same reference as state or any sub-field
+    expect(result).not.toBe(state);
+    // Verify it's a plain object with the correct shape
+    expect(typeof result).toBe('object');
+    expect(Object.keys(result)).toEqual(['consecutiveFailures', 'isStuck']);
+  });
+
+  it('is pure — does not mutate the input', () => {
+    const state = makeState({ consecutiveFailures: 3, isStuck: true });
+    const snapshot = { ...state, waypoints: [...state.waypoints] };
+
+    getStuckState(state);
+
+    expect(state.consecutiveFailures).toBe(snapshot.consecutiveFailures);
+    expect(state.isStuck).toBe(snapshot.isStuck);
+    expect(state.x).toBe(snapshot.x);
+    expect(state.z).toBe(snapshot.z);
+  });
+});
+
+// ───────────────────────────────────────────────────────────────────────────────
+// Subgroup 12e: Stuck-related constants and cross-function behavior
+// ───────────────────────────────────────────────────────────────────────────────
+
+describe('stuck-related constants and cross-function behavior', () => {
+  it('STUCK_THRESHOLD is exported and equals 3', () => {
+    expect(STUCK_THRESHOLD).toBe(3);
+  });
+
+  it('AGENT_STUCK_EVENT_ID is exported and equals "agent_stuck"', () => {
+    expect(AGENT_STUCK_EVENT_ID).toBe('agent_stuck');
+  });
+
+  it('requestReRoute preserves consecutiveFailures and isStuck', () => {
+    const state = makeState({
+      x: 10, z: 20,
+      waypoints: [{ x: 15, z: 25 }],
+      waypointIndex: 0,
+      walkSpeed: 3,
+      destinationX: 15, destinationZ: 25,
+      consecutiveFailures: 2,
+      isStuck: true,
+    });
+    const result = requestReRoute(state);
+
+    // Stuck fields are preserved
+    expect(result.consecutiveFailures).toBe(2);
+    expect(result.isStuck).toBe(true);
+
+    // Existing re-route behavior is still intact
+    expect(result.waypoints).toEqual([]);
+    expect(result.waypointIndex).toBe(0);
+    expect(result.x).toBe(10);
+    expect(result.z).toBe(20);
+    expect(result.walkSpeed).toBe(3);
+    expect(result.destinationX).toBe(15);
+    expect(result.destinationZ).toBe(25);
+  });
+
+  it('requestReRoute preserves consecutiveFailures=0 and isStuck=false when not stuck', () => {
+    const state = makeState({
+      x: 5, z: 5,
+      waypoints: [{ x: 10, z: 10 }],
+      waypointIndex: 0,
+      walkSpeed: 1,
+      destinationX: 10, destinationZ: 10,
+      consecutiveFailures: 0,
+      isStuck: false,
+    });
+    const result = requestReRoute(state);
+    expect(result.consecutiveFailures).toBe(0);
+    expect(result.isStuck).toBe(false);
   });
 });
