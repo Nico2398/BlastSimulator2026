@@ -3,7 +3,6 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     include: ['tests/**/*.test.ts'],
-    // TODO: implementer will fill in actual coverage thresholds
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html', 'lcov'],
@@ -17,10 +16,10 @@ export default defineConfig({
       ],
       thresholds: {
         perFile: true,
-        statements: 0,
-        branches: 0,
-        functions: 0,
-        lines: 0,
+        statements: 70,
+        branches: 55,
+        functions: 65,
+        lines: 70,
       },
     },
   },

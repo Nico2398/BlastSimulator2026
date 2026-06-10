@@ -23,6 +23,7 @@
   },
   "devDependencies": {
     "@types/three": "^0.165.0",
+    "@vitest/coverage-v8": "^1.6.1",
     "jscpd": "^4.2.4",
     "jsdom": "^29.0.0",
     "puppeteer": "^22.10.0",
