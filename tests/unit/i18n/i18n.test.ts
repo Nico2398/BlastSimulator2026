@@ -1,12 +1,13 @@
-// BlastSimulator2026 — CH3.14 + CH4.9: i18n key resolution tests for proficiency
-// labels, policy names, need labels, skill keys, survey methods, and ore report
-// events.
+// BlastSimulator2026 — i18n key resolution tests.
 //
-// Verifies that every key in the proficiency.*, policy.*, need.*, skill.*,
-// survey.*, and event.(lucky_strike|barren_blast|legendary_vein|absurdium_jackpot).*
-// namespaces resolves (i.e. returns a non-empty string that is NOT the key
-// itself) in both 'en' and 'fr' locales, and that en/fr translations differ
-// for at least one representative key in each group.
+// Covers: proficiency labels, policy names, need labels, skill keys, survey
+// methods, ore report events, blast damage events, nav pathfinding messages,
+// need events (warning/collapsed/shift change), building.full, and
+// need.well_rested_bonus interpolation.
+//
+// Verifies that every key under test resolves (returns a non-empty string that
+// is NOT the key itself) in both 'en' and 'fr' locales, and that en/fr
+// translations differ for at least one representative key in each group.
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { t, setLocale } from '../../../src/core/i18n/I18n.js';
@@ -386,4 +387,129 @@ describe('nav.* keys — en and fr translations differ', () => {
     expect(fr, 'nav.no_ramp_available must resolve in fr').not.toBe('nav.no_ramp_available');
     expect(en, 'en and fr translations for nav.no_ramp_available must differ').not.toBe(fr);
   });
+});
+
+// ── Need event keys (event.need_warning.*, event.employee_collapsed.*, event.employee_shift_change.*) ─
+
+const NEED_EVENT_KEYS = [
+  'event.need_warning.title',
+  'event.need_warning.hunger.desc',
+  'event.need_warning.fatigue.desc',
+  'event.need_warning.breakNeed.desc',
+  'event.employee_collapsed.title',
+  'event.employee_collapsed.hunger.desc',
+  'event.employee_collapsed.fatigue.desc',
+  'event.employee_collapsed.breakNeed.desc',
+  'event.employee_shift_change.title',
+  'event.employee_shift_change.desc',
+] as const;
+
+describe('need event keys resolve in both locales', () => {
+  for (const locale of LOCALES) {
+    it(`locale ${locale}: all event need keys resolve`, () => {
+      setLocale(locale);
+      for (const key of NEED_EVENT_KEYS) {
+        const result = t(key);
+        expect(result, `key "${key}" must resolve in ${locale}`).not.toBe(key);
+        expect(result.length, `key "${key}" must be non-empty in ${locale}`).toBeGreaterThan(0);
+      }
+    });
+  }
+});
+
+describe('need event keys — en and fr translations differ', () => {
+  it('event.need_warning.hunger.desc is translated differently in en vs fr', () => {
+    setLocale('en');
+    const en = t('event.need_warning.hunger.desc');
+    setLocale('fr');
+    const fr = t('event.need_warning.hunger.desc');
+    expect(en, 'event.need_warning.hunger.desc must resolve in en').not.toBe('event.need_warning.hunger.desc');
+    expect(fr, 'event.need_warning.hunger.desc must resolve in fr').not.toBe('event.need_warning.hunger.desc');
+    expect(en, 'en and fr translations for event.need_warning.hunger.desc must differ').not.toBe(fr);
+  });
+
+  it('event.employee_collapsed.fatigue.desc is translated differently in en vs fr', () => {
+    setLocale('en');
+    const en = t('event.employee_collapsed.fatigue.desc');
+    setLocale('fr');
+    const fr = t('event.employee_collapsed.fatigue.desc');
+    expect(en, 'event.employee_collapsed.fatigue.desc must resolve in en').not.toBe('event.employee_collapsed.fatigue.desc');
+    expect(fr, 'event.employee_collapsed.fatigue.desc must resolve in fr').not.toBe('event.employee_collapsed.fatigue.desc');
+    expect(en, 'en and fr translations for event.employee_collapsed.fatigue.desc must differ').not.toBe(fr);
+  });
+
+  it('event.employee_shift_change.title is translated differently in en vs fr', () => {
+    setLocale('en');
+    const en = t('event.employee_shift_change.title');
+    setLocale('fr');
+    const fr = t('event.employee_shift_change.title');
+    expect(en, 'event.employee_shift_change.title must resolve in en').not.toBe('event.employee_shift_change.title');
+    expect(fr, 'event.employee_shift_change.title must resolve in fr').not.toBe('event.employee_shift_change.title');
+    expect(en, 'en and fr translations for event.employee_shift_change.title must differ').not.toBe(fr);
+  });
+});
+
+// ── building.full key ──────────────────────────────────────────────────────────
+
+describe('building.full key resolves in both locales', () => {
+  for (const locale of LOCALES) {
+    it(`locale ${locale}: building.full resolves`, () => {
+      setLocale(locale);
+      const key = 'building.full';
+      const result = t(key);
+      expect(result, `key "${key}" must resolve in ${locale}`).not.toBe(key);
+      expect(result.length, `key "${key}" must be non-empty in ${locale}`).toBeGreaterThan(0);
+    });
+  }
+});
+
+describe('building.full — en and fr translations differ', () => {
+  it('building.full is translated differently in en vs fr', () => {
+    setLocale('en');
+    const en = t('building.full');
+    setLocale('fr');
+    const fr = t('building.full');
+    expect(en, 'building.full must resolve in en').not.toBe('building.full');
+    expect(fr, 'building.full must resolve in fr').not.toBe('building.full');
+    expect(en, 'en and fr translations for building.full must differ').not.toBe(fr);
+  });
+});
+
+// ── need.well_rested_bonus key ─────────────────────────────────────────────────
+
+describe('need.well_rested_bonus key resolves in both locales', () => {
+  for (const locale of LOCALES) {
+    it(`locale ${locale}: need.well_rested_bonus resolves`, () => {
+      setLocale(locale);
+      const key = 'need.well_rested_bonus';
+      const result = t(key);
+      expect(result, `key "${key}" must resolve in ${locale}`).not.toBe(key);
+      expect(result.length, `key "${key}" must be non-empty in ${locale}`).toBeGreaterThan(0);
+    });
+  }
+});
+
+describe('need.well_rested_bonus — en and fr translations differ', () => {
+  it('need.well_rested_bonus is translated differently in en vs fr', () => {
+    setLocale('en');
+    const en = t('need.well_rested_bonus');
+    setLocale('fr');
+    const fr = t('need.well_rested_bonus');
+    expect(en, 'need.well_rested_bonus must resolve in en').not.toBe('need.well_rested_bonus');
+    expect(fr, 'need.well_rested_bonus must resolve in fr').not.toBe('need.well_rested_bonus');
+    expect(en, 'en and fr translations for need.well_rested_bonus must differ').not.toBe(fr);
+  });
+});
+
+describe('need.well_rested_bonus — {amount} / {threshold} interpolation', () => {
+  for (const locale of LOCALES) {
+    it(`locale ${locale}: need.well_rested_bonus interpolates {amount} and {threshold}`, () => {
+      setLocale(locale);
+      const key = 'need.well_rested_bonus';
+      const result = t(key, { amount: 10, threshold: 5 });
+      expect(result, `key "${key}" must resolve in ${locale}`).not.toBe(key);
+      expect(result, `interpolated string "${result}" must contain the amount value`).toContain('10');
+      expect(result, `interpolated string "${result}" must contain the threshold value`).toContain('5');
+    });
+  }
 });

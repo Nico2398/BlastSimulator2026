@@ -17,6 +17,30 @@ export const I18nKeys = {
     agentStuck: 'nav.agent_stuck',
     noRampAvailable: 'nav.no_ramp_available',
   },
+  building: {
+    full: 'building.full',
+  },
+  need: {
+    wellRestedBonus: 'need.well_rested_bonus',
+  },
+  event: {
+    employeeCollapsed: {
+      title: 'event.employee_collapsed.title',
+      hungerDesc: 'event.employee_collapsed.hunger.desc',
+      fatigueDesc: 'event.employee_collapsed.fatigue.desc',
+      breakNeedDesc: 'event.employee_collapsed.breakNeed.desc',
+    },
+    employeeShiftChange: {
+      title: 'event.employee_shift_change.title',
+      desc: 'event.employee_shift_change.desc',
+    },
+    needWarning: {
+      title: 'event.need_warning.title',
+      hungerDesc: 'event.need_warning.hunger.desc',
+      fatigueDesc: 'event.need_warning.fatigue.desc',
+      breakNeedDesc: 'event.need_warning.breakNeed.desc',
+    },
+  },
 } as const;
 
 export type I18nKey = string;
