@@ -25,6 +25,8 @@ import { Random } from '../../core/math/Random.js';
 import { NavGrid } from '../../core/nav/NavGrid.js';
 import type { BlastRegion } from '../../core/mining/BlastExecution.js';
 import { defineZone, clearZone, isZoneClear, type ZoneBounds } from '../../core/entities/Zone.js';
+import type { GameState } from '../../core/state/GameState.js';
+import type { VoxelGrid } from '../../core/world/VoxelGrid.js';
 
 const VALID_SKILL_CATEGORIES: SkillCategory[] = [
   'driving.truck', 'driving.excavator', 'driving.drill_rig',
@@ -37,6 +39,16 @@ function requireGame(ctx: GameContext): CommandResult | null {
 }
 
 const GRID_SIZE = 64;
+
+function makeFootprintRegion(x: number, z: number, sizeX: number, sizeZ: number): BlastRegion {
+  return { minX: x, maxX: x + sizeX - 1, minZ: z, maxZ: z + sizeZ - 1 };
+}
+
+function patchNavGrid(state: GameState, grid: VoxelGrid, region: BlastRegion): void {
+  if (state.navGrid) {
+    NavGrid.patchNavGrid(state.navGrid, grid, state.buildings.buildings, state.drillHoles, region);
+  }
+}
 
 // ── build command ──
 
@@ -72,12 +84,9 @@ export function buildCommand(
       addExpense(state.finances, destroyDef.demolishCost, 'construction', `Demolish ${toDestroy.type} #${id}`, state.tickCount);
       destroyBuilding(state.buildings, id);
       // Patch NavGrid for removed building footprint
-      if (state.navGrid && ctx.grid) {
-        const region: BlastRegion = {
-          minX: toDestroy.x, maxX: toDestroy.x + getDefSize(destroyDef).sizeX - 1,
-          minZ: toDestroy.z, maxZ: toDestroy.z + getDefSize(destroyDef).sizeZ - 1,
-        };
-        NavGrid.patchNavGrid(state.navGrid, ctx.grid, state.buildings.buildings, state.drillHoles, region);
+      if (ctx.grid) {
+        const { sizeX, sizeZ } = getDefSize(destroyDef);
+        patchNavGrid(state, ctx.grid, makeFootprintRegion(toDestroy.x, toDestroy.z, sizeX, sizeZ));
       }
       return { success: true, output: `Building #${id} demolished. Cost: $${destroyDef.demolishCost}` };
     }
@@ -100,16 +109,10 @@ export function buildCommand(
       state.cash -= totalCost;
       addExpense(state.finances, totalCost, 'construction', `Upgrade ${upgradeType} to T${nextTier}`, state.tickCount);
       // Patch NavGrid covering both old and new footprint (size may change between tiers)
-      if (state.navGrid && ctx.grid) {
-        const oldSize = getDefSize(oldDef);
-        const newSize = getDefSize(newDef);
-        const maxX = Math.max(oldSize.sizeX, newSize.sizeX);
-        const maxZ = Math.max(oldSize.sizeZ, newSize.sizeZ);
-        const region: BlastRegion = {
-          minX: x, maxX: x + maxX - 1,
-          minZ: z, maxZ: z + maxZ - 1,
-        };
-        NavGrid.patchNavGrid(state.navGrid, ctx.grid, state.buildings.buildings, state.drillHoles, region);
+      if (ctx.grid) {
+        const maxX = Math.max(getDefSize(oldDef).sizeX, getDefSize(newDef).sizeX);
+        const maxZ = Math.max(getDefSize(oldDef).sizeZ, getDefSize(newDef).sizeZ);
+        patchNavGrid(state, ctx.grid, makeFootprintRegion(x, z, maxX, maxZ));
       }
       return {
         success: true,
@@ -133,17 +136,9 @@ export function buildCommand(
       state.cash -= result.cost!;
       addExpense(state.finances, result.cost!, 'construction', `Relocate building #${id}`, state.tickCount);
       // Patch NavGrid for old and new positions
-      if (state.navGrid && ctx.grid) {
-        const oldRegion: BlastRegion = {
-          minX: oldX, maxX: oldX + sizeX - 1,
-          minZ: oldZ, maxZ: oldZ + sizeZ - 1,
-        };
-        const newRegion: BlastRegion = {
-          minX: toCoords[0]!, maxX: toCoords[0]! + sizeX - 1,
-          minZ: toCoords[1]!, maxZ: toCoords[1]! + sizeZ - 1,
-        };
-        NavGrid.patchNavGrid(state.navGrid, ctx.grid, state.buildings.buildings, state.drillHoles, oldRegion);
-        NavGrid.patchNavGrid(state.navGrid, ctx.grid, state.buildings.buildings, state.drillHoles, newRegion);
+      if (ctx.grid) {
+        patchNavGrid(state, ctx.grid, makeFootprintRegion(oldX, oldZ, sizeX, sizeZ));
+        patchNavGrid(state, ctx.grid, makeFootprintRegion(toCoords[0]!, toCoords[1]!, sizeX, sizeZ));
       }
       return { success: true, output: `Building #${id} moved. Cost: $${result.cost}` };
     }
@@ -173,14 +168,9 @@ export function buildCommand(
       state.cash -= result.cost!;
       addExpense(state.finances, result.cost!, 'construction', `Build ${type} T${tier}`, state.tickCount);
       // Patch NavGrid for new building footprint
-      if (state.navGrid && ctx.grid) {
-        const placeDef = getBuildingDef(type, tier);
-        const { sizeX, sizeZ } = getDefSize(placeDef);
-        const region: BlastRegion = {
-          minX: atCoords[0]!, maxX: atCoords[0]! + sizeX - 1,
-          minZ: atCoords[1]!, maxZ: atCoords[1]! + sizeZ - 1,
-        };
-        NavGrid.patchNavGrid(state.navGrid, ctx.grid, state.buildings.buildings, state.drillHoles, region);
+      if (ctx.grid) {
+        const { sizeX, sizeZ } = getDefSize(getBuildingDef(type, tier));
+        patchNavGrid(state, ctx.grid, makeFootprintRegion(atCoords[0]!, atCoords[1]!, sizeX, sizeZ));
       }
       return { success: true, output: `Built ${type} T${tier} #${result.building!.id} at (${atCoords[0]},${atCoords[1]}). Cost: $${result.cost}` };
     }
