@@ -1590,11 +1590,11 @@
     "title": "Run all six level playthrough scenarios after final renderer integration; inspect screenshots per visual protocol",
     "files": [],
     "testFile": null,
-    "status": "pending",
+    "status": "done",
     "blockedBy": [
       "8.5",
       "8.6"
     ],
-    "closedInPR": null
+    "closedInPR": 277
   }
 ]
