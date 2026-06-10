@@ -11,6 +11,9 @@ import {
   EVENT_BASE_TIMERS, BANKRUPTCY_THRESHOLD, SCORE_DECAY_RATE, MAX_FRAGMENTS_PER_VOXEL,
   PROFICIENCY_MULTIPLIERS,
   XP_THRESHOLDS,
+  NEED_WARNING_THRESHOLDS,
+  NEED_COLLAPSE_THRESHOLDS,
+  NEED_RESTORATION_THRESHOLDS,
 } from '../../../src/core/config/balance.js';
 import type { EventContext } from '../../../src/core/events/EventPool.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
@@ -157,5 +160,63 @@ describe('Proficiency & XP balance (3.2)', () => {
     expect(thresholds[3]).toBeGreaterThan(thresholds[2] as number);
     expect(thresholds[4]).toBeGreaterThan(thresholds[3] as number);
     expect(thresholds[5]).toBeGreaterThan(thresholds[4] as number);
+  });
+});
+
+// ─── Task 7.2: Need warning & collapse thresholds ───────────────────────────
+
+describe('Need thresholds (7.2)', () => {
+  // ── NEED_WARNING_THRESHOLDS ──────────────────────────────────────────────
+
+  it('NEED_WARNING_THRESHOLDS is exported from balance.ts', () => {
+    expect(NEED_WARNING_THRESHOLDS).toBeDefined();
+  });
+
+  it('NEED_WARNING_THRESHOLDS has exactly 3 keys: hunger, fatigue, breakNeed', () => {
+    expect(Object.keys(NEED_WARNING_THRESHOLDS).length).toBe(3);
+  });
+
+  it('NEED_WARNING_THRESHOLDS.hunger is 35 — triggers proactive routing when hunger falls below 35', () => {
+    expect(NEED_WARNING_THRESHOLDS.hunger).toBe(35);
+  });
+
+  it('NEED_WARNING_THRESHOLDS.fatigue is 25 — triggers proactive routing when fatigue falls below 25', () => {
+    expect(NEED_WARNING_THRESHOLDS.fatigue).toBe(25);
+  });
+
+  it('NEED_WARNING_THRESHOLDS.breakNeed is 30 — triggers proactive routing when breakNeed falls below 30', () => {
+    expect(NEED_WARNING_THRESHOLDS.breakNeed).toBe(30);
+  });
+
+  it('NEED_WARNING_THRESHOLDS matches NEED_RESTORATION_THRESHOLDS (warning = restoration thresholds)', () => {
+    expect(NEED_WARNING_THRESHOLDS).toEqual(NEED_RESTORATION_THRESHOLDS);
+  });
+
+  // ── NEED_COLLAPSE_THRESHOLDS ────────────────────────────────────────────
+
+  it('NEED_COLLAPSE_THRESHOLDS is exported from balance.ts', () => {
+    expect(NEED_COLLAPSE_THRESHOLDS).toBeDefined();
+  });
+
+  it('NEED_COLLAPSE_THRESHOLDS has exactly 3 keys: hunger, fatigue, breakNeed', () => {
+    expect(Object.keys(NEED_COLLAPSE_THRESHOLDS).length).toBe(3);
+  });
+
+  it('NEED_COLLAPSE_THRESHOLDS.hunger is 10 — employee collapses when hunger reaches 10', () => {
+    expect(NEED_COLLAPSE_THRESHOLDS.hunger).toBe(10);
+  });
+
+  it('NEED_COLLAPSE_THRESHOLDS.fatigue is 5 — employee collapses when fatigue reaches 5', () => {
+    expect(NEED_COLLAPSE_THRESHOLDS.fatigue).toBe(5);
+  });
+
+  it('NEED_COLLAPSE_THRESHOLDS.breakNeed is 15 — employee collapses when breakNeed reaches 15', () => {
+    expect(NEED_COLLAPSE_THRESHOLDS.breakNeed).toBe(15);
+  });
+
+  it('collapse thresholds are strictly lower than warning thresholds (employees get warned before they collapse)', () => {
+    expect(NEED_COLLAPSE_THRESHOLDS.hunger).toBeLessThan(NEED_WARNING_THRESHOLDS.hunger);
+    expect(NEED_COLLAPSE_THRESHOLDS.fatigue).toBeLessThan(NEED_WARNING_THRESHOLDS.fatigue);
+    expect(NEED_COLLAPSE_THRESHOLDS.breakNeed).toBeLessThan(NEED_WARNING_THRESHOLDS.breakNeed);
   });
 });
