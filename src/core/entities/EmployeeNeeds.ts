@@ -111,7 +111,7 @@ export function needsMoraleEffect(employee: Employee): number {
  * Restore a single need gauge using the replenishment rate for the given
  * building tier, subject to available capacity.
  *
- * @returns `true` if the full intended replenishment was applied;
+ * @returns `true` if capacity was available and replenishment was attempted;
  *          `false` if capacity was insufficient.
  */
 export function replenishNeed(
