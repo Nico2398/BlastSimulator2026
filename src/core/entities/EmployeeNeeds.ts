@@ -69,13 +69,29 @@ export function tickNeedMorale(employee: Employee): number {
  * caller must apply each tick.
  */
 export function needsMoraleEffect(employee: Employee): number {
-  void employee;
-  void NEED_MORALE_EFFECT_THRESHOLDS;
-  void NEED_MORALE_EFFECT_PENALTIES;
-  void NEED_WELL_RESTED_THRESHOLD;
-  void NEED_WELL_RESTED_BONUS;
-  // TODO: implement per-gauge penalties + well-rested bonus
-  return 0;
+  let delta = 0;
+
+  for (const gauge of ['hunger', 'fatigue', 'breakNeed'] as const) {
+    const value = employee[gauge];
+    if (value >= NEED_MORALE_EFFECT_THRESHOLDS.comfortable) {
+      delta += NEED_MORALE_EFFECT_PENALTIES.comfortable;
+    } else if (value >= NEED_MORALE_EFFECT_THRESHOLDS.uncomfortable) {
+      delta += NEED_MORALE_EFFECT_PENALTIES.uncomfortable;
+    } else if (value >= NEED_MORALE_EFFECT_THRESHOLDS.suffering) {
+      delta += NEED_MORALE_EFFECT_PENALTIES.suffering;
+    } else {
+      delta += NEED_MORALE_EFFECT_PENALTIES.critical;
+    }
+  }
+
+  // Well-rested bonus: all three gauges strictly above threshold
+  if (employee.hunger > NEED_WELL_RESTED_THRESHOLD
+      && employee.fatigue > NEED_WELL_RESTED_THRESHOLD
+      && employee.breakNeed > NEED_WELL_RESTED_THRESHOLD) {
+    delta += NEED_WELL_RESTED_BONUS;
+  }
+
+  return delta;
 }
 
 /**
