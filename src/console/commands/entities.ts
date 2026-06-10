@@ -33,6 +33,8 @@ const VALID_SKILL_CATEGORIES: SkillCategory[] = [
   'blasting', 'management', 'geology',
 ];
 
+const NO_EMPLOYEES_MSG = 'No employees.';
+
 function requireGame(ctx: GameContext): CommandResult | null {
   if (!ctx.state) return { success: false, output: 'No game loaded. Use new_game first.' };
   return null;
@@ -193,7 +195,7 @@ export function employeeCommand(
   switch (sub) {
     case 'list': {
       if (state.employees.employees.length === 0) {
-        return { success: true, output: 'No employees.' };
+        return { success: true, output: NO_EMPLOYEES_MSG };
       }
       const lines = ['Employees:'];
       for (const e of state.employees.employees) {
@@ -254,6 +256,26 @@ export function employeeCommand(
     default:
       return { success: false, output: 'Usage: employee (list|hire|raise|fire|assign_skill)' };
   }
+}
+
+// ── needs command ──
+
+export function needsCommand(
+  ctx: GameContext,
+  _args: string[],
+  _named: Record<string, string>,
+): CommandResult {
+  const err = requireGame(ctx);
+  if (err) return err;
+  const state = ctx.state!;
+  if (state.employees.employees.length === 0) {
+    return { success: true, output: NO_EMPLOYEES_MSG };
+  }
+  const lines = ['Employee Needs:'];
+  for (const e of state.employees.employees) {
+    lines.push(`  [${e.id}] ${e.name.padEnd(20)} — hunger: ${e.hunger}  fatigue: ${e.fatigue}  break: ${e.breakNeed}`);
+  }
+  return { success: true, output: lines.join('\n') };
 }
 
 // ── scores command ──
@@ -323,3 +345,5 @@ export function zoneCommand(
       return { success: false, output: 'Usage: zone (clear|status)' };
   }
 }
+
+

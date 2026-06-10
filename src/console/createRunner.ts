@@ -34,6 +34,7 @@ import {
   employeeCommand,
   scoresCommand,
   zoneCommand,
+  needsCommand,
 } from './commands/entities.js';
 import { setPolicyCommand } from './commands/policy.js';
 import { vehicleCommand } from './commands/vehicle.js';
@@ -154,6 +155,9 @@ export function createRunner(): RunnerWithContext {
   );
   runner.register('zone', 'Safety zones (clear|status)', (args, named) =>
     zoneCommand(ctx, args, named),
+  );
+  runner.register('needs', 'Show all employees need gauges (hunger, fatigue, break)', (args, named) =>
+    needsCommand(ctx, args, named),
   );
   runner.register('set_policy', 'Set site policy (mode:shift_8h|shift_12h|continuous|custom [hunger:N] [fatigue:N] [social:N])', (args, named) =>
     setPolicyCommand(ctx, args, named),
