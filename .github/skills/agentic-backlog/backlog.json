@@ -1562,12 +1562,12 @@
       "package.json"
     ],
     "testFile": null,
-    "status": "pending",
+    "status": "done",
     "blockedBy": [
       "8.8",
       "8.1"
     ],
-    "closedInPR": null
+    "closedInPR": 299
   },
   {
     "id": "8.10",
