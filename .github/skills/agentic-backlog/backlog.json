@@ -1548,11 +1548,11 @@
       "package.json"
     ],
     "testFile": null,
-    "status": "pending",
+    "status": "done",
     "blockedBy": [
       "8.2"
     ],
-    "closedInPR": null
+    "closedInPR": 297
   },
   {
     "id": "8.9",
