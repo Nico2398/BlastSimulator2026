@@ -1522,9 +1522,9 @@
       "scripts/scenario-defs/level3-playthrough-ecology.json"
     ],
     "testFile": null,
-    "status": "pending",
+    "status": "done",
     "blockedBy": [],
-    "closedInPR": null
+    "closedInPR": 295
   },
   {
     "id": "8.7",
