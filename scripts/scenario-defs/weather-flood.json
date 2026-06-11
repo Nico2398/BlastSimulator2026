@@ -6,6 +6,7 @@
     "campaign start level:dusty_hollow",
     "time resume",
     "weather heavy_rain",
+    "tick 5",
     "scores",
     "drill_plan grid rows:2 cols:2 spacing:5 depth:8 start:15,15",
     "charge hole:* explosive:boomite amount:5 stemming:2",

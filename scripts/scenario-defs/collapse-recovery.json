@@ -6,6 +6,8 @@
     "campaign start level:dusty_hollow",
     "time resume",
     "employee hire role:driller",
+    "build bunkhouse at:5,5",
+    "employee list",
     "tick 50",
     "tick 50",
     "tick 50",
