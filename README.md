@@ -46,19 +46,51 @@ npm run console    # Start interactive REPL
 
 ---
 
-## Tests and Validation
+## Testing
 
-```bash
-npm run test       # Run unit + integration tests (Vitest)
-npm run validate   # Full validation: TypeScript check → tests → build
-```
+### Quick Start
 
-For visual regression testing (requires a running dev server):
+TODO: Brief overview
 
-```bash
-bash scripts/visual-test.sh --name "scene" --commands "new_game seed:1"
-# Screenshots saved to screenshots/
-```
+### npm Script Reference
+
+TODO: Table of all npm test scripts
+
+### Scripts Reference (`scripts/`)
+
+TODO: Table of all scripts in scripts/
+
+### Test Architecture — 4-Layer Pyramid
+
+TODO: Overview of 4 testing layers
+
+#### Layer 1: Unit Tests (`tests/unit/`)
+
+TODO: Unit test conventions
+
+#### Layer 2: Small Integration Tests (`tests/integration/`)
+
+TODO: Integration test conventions
+
+#### Layer 3: Full-Level Integration Tests (`tests/integration/full-level/`)
+
+TODO: Full-level test conventions
+
+#### Layer 4: Visual/Scenario Tests (Puppeteer-based)
+
+TODO: Visual test conventions
+
+### Per-Chapter Coverage Targets
+
+TODO: Coverage targets table
+
+### Performance Benchmarks
+
+TODO: Benchmarks table
+
+### Regression Test Policy
+
+TODO: Regression policy
 
 ---
 
