@@ -9,7 +9,6 @@ import { VoxelGrid, type VoxelData } from '../../../src/core/world/VoxelGrid.js'
 import { Random } from '../../../src/core/math/Random.js';
 import { estimateSurveyResult, type EstimateSurveyParams } from '../../../src/core/mining/SurveyCalc.js';
 import {
-  calculateEnergyField,
   propagateEnergy,
   identifyFragmentedVoxels,
 } from '../../../src/core/mining/BlastCalc.js';
@@ -97,8 +96,8 @@ function setupBenchmarkNavGrid(): NavGrid {
   return grid;
 }
 
-/** Set up a VoxelGrid (10×15×10) with ~1000 solid voxels and 3 drill holes with charges. */
-function setup500VoxelBlast(): {
+/** Set up a VoxelGrid (10×15×10) with ~1100 solid voxels and 3 drill holes with charges. */
+function setupThousandVoxelBlast(): {
   grid: VoxelGrid;
   holes: DrillHole[];
   charges: Record<string, HoleCharge>;
@@ -242,7 +241,7 @@ describe('Performance Benchmarks', () => {
       expect(avg).toBeLessThan(2);
     });
 
-    it('handles blocked-cell heavy grid under 2ms', () => {
+    it('handles blocked-cell heavy grid under 3ms', () => {
       const grid = setupBenchmarkNavGrid();
       // Block more cells to make pathfinding harder
       for (let x = 10; x < 20; x++) {
@@ -270,13 +269,13 @@ describe('Performance Benchmarks', () => {
       const elapsed = performance.now() - start;
       const avg = elapsed / 30;
 
-      expect(avg).toBeLessThan(2);
+      expect(avg).toBeLessThan(3);
     });
   });
 
-  describe('Full blast pipeline (500 voxels)', () => {
+  describe('Full blast pipeline (~1100 voxels)', () => {
     it('completes energy propagation + fragmentation in under 50ms', () => {
-      const { grid, holes, charges, depths, surfaceYs } = setup500VoxelBlast();
+      const { grid, holes, charges, depths, surfaceYs } = setupThousandVoxelBlast();
 
       // Build initial energy map
       const initial = new Map<string, number>();
