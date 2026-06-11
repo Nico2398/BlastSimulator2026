@@ -121,7 +121,7 @@ function clampScore(value: number): number {
 
 function applyDecay(value: number, rate: number): number {
   if (value > 50) return Math.max(50, value - rate);
-  if (value < 50) return Math.min(50, value + rate);
+  if (value > 0 && value < 50) return Math.min(50, value + rate);
   return value;
 }
 
