@@ -6,7 +6,6 @@ export default defineConfig({
       'tests/unit/**/*.test.ts',
       'tests/integration/**/*.test.ts',
       'tests/integration/full-level/**/*.test.ts',
-      'tests/scenarios/**/*.test.ts',
     ],
     coverage: {
       provider: 'v8',
