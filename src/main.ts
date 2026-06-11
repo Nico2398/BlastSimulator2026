@@ -153,6 +153,13 @@ window.__gameState = () => {
     employeeCount: s.employees.employees.length,
     levelEnded: s.levelEnded,
     levelEndReason: s.levelEndReason,
+    // ── Game-over detection fields ──
+    bankrupt: s.bankruptcy.bankrupt,
+    revolted: s.revolt.revolted,
+    ecologicalShutdown: s.ecological.shutdown,
+    arrested: s.arrest.arrested,
+    cash: s.cash,
+    profit: 0, // TODO: compute net profit from financial report
   };
 };
 
