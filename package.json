@@ -12,6 +12,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:scenarios": "vitest run tests/unit/scenario-defs.test.ts",
+    "test:playthrough": "vitest run tests/scenarios/level-playthroughs.test.ts --reporter=verbose",
     "test:integration": "vitest run tests/integration"
   },
   "dependencies": {
