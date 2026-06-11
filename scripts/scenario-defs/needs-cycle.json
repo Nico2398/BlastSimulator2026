@@ -1,0 +1,16 @@
+{
+  "name": "needs-cycle",
+  "description": "Chapter 7: Hire 3 workers, advance 20 ticks, and verify canteen auto-queue for hunger relief",
+  "steps": [
+    "new_game seed:42",
+    "campaign start level:dusty_hollow",
+    "time resume",
+    "employee hire role:driller",
+    "employee hire role:hauler",
+    "employee hire role:surveyor",
+    "build canteen at:5,5",
+    "tick 20",
+    "employee list",
+    "state full"
+  ]
+}

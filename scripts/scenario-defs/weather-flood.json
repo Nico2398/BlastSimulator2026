@@ -1,0 +1,18 @@
+{
+  "name": "weather-flood",
+  "description": "Set heavy rain weather, drill holes that flood, and verify water-sensitive explosive fails to detonate",
+  "steps": [
+    "new_game seed:42",
+    "campaign start level:dusty_hollow",
+    "time resume",
+    "weather heavy_rain",
+    "tick 5",
+    "scores",
+    "drill_plan grid rows:2 cols:2 spacing:5 depth:8 start:15,15",
+    "charge hole:* explosive:boomite amount:5 stemming:2",
+    "sequence auto delay_step:25",
+    "blast",
+    "fragments",
+    "state full"
+  ]
+}

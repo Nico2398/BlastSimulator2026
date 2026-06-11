@@ -1,0 +1,19 @@
+{
+  "name": "employee-training",
+  "description": "Chapter 3: Hire generalist employee, train drilling and geology skills, then complete a blast task",
+  "steps": [
+    "new_game seed:42",
+    "campaign start level:dusty_hollow",
+    "time resume",
+    "employee hire role:generalist",
+    "employee assign_skill 1 drilling 3",
+    "employee assign_skill 1 geology 2",
+    "employee list",
+    "drill_plan grid rows:2 cols:2 spacing:5 depth:8 start:15,15",
+    "charge hole:* explosive:boomite amount:5 stemming:2",
+    "sequence auto delay_step:25",
+    "blast",
+    "fragments",
+    "state full"
+  ]
+}

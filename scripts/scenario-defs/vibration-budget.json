@@ -1,0 +1,26 @@
+{
+  "name": "vibration-budget",
+  "description": "Exceed vibration budget 3 times with heavy charges and verify $5,000 fine is applied",
+  "steps": [
+    "new_game seed:42",
+    "campaign start level:dusty_hollow",
+    "time resume",
+    "scores",
+    "drill_plan grid rows:2 cols:2 spacing:4 depth:8 start:10,10",
+    "charge hole:* explosive:boomite amount:15 stemming:1",
+    "sequence auto delay_step:25",
+    "blast",
+    "finances",
+    "drill_plan grid rows:2 cols:2 spacing:4 depth:8 start:20,10",
+    "charge hole:* explosive:boomite amount:15 stemming:1",
+    "sequence auto delay_step:25",
+    "blast",
+    "finances",
+    "drill_plan grid rows:2 cols:2 spacing:4 depth:8 start:30,10",
+    "charge hole:* explosive:boomite amount:15 stemming:1",
+    "sequence auto delay_step:25",
+    "blast",
+    "finances",
+    "state full"
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "name": "multi-deck-blast",
+  "description": "Chapter 5: 3-deck charge configuration with varying depths for deep fracture and no surface projection",
+  "steps": [
+    "new_game seed:42",
+    "drill_plan grid rows:2 cols:2 spacing:6 depth:20 start:20,20",
+    "charge hole:1 explosive:boomite amount:6 stemming:6",
+    "charge hole:2 explosive:boomite amount:5 stemming:5",
+    "charge hole:3 explosive:boomite amount:4 stemming:4",
+    "charge hole:4 explosive:boomite amount:3 stemming:3",
+    "sequence auto delay_step:25",
+    "blast",
+    "fragments",
+    "inspect 20,20,0",
+    "state full"
+  ]
+}

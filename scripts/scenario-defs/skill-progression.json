@@ -1,0 +1,15 @@
+{
+  "name": "skill-progression",
+  "description": "Chapter 3: Hire driller, assign drilling skill, and verify Level 5 after 700 ticks of work",
+  "steps": [
+    "new_game seed:42",
+    "campaign start level:dusty_hollow",
+    "time resume",
+    "employee hire role:driller",
+    "employee assign_skill 1 drilling 1",
+    "employee list",
+    "tick 700",
+    "employee list",
+    "state full"
+  ]
+}

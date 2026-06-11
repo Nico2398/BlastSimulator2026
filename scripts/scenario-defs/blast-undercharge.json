@@ -1,0 +1,14 @@
+{
+  "name": "blast-undercharge",
+  "description": "Chapter 5: Charge at 30 percent optimal explosive amount to produce oversized fragments with zero projections",
+  "steps": [
+    "new_game seed:42",
+    "drill_plan grid rows:2 cols:2 spacing:5 depth:8 start:15,15",
+    "charge hole:* explosive:boomite amount:1 stemming:2",
+    "sequence auto delay_step:25",
+    "blast",
+    "fragments",
+    "inspect 15,15,0",
+    "state full"
+  ]
+}
