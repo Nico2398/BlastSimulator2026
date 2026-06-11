@@ -49,7 +49,6 @@ describe('Level 1 — Lose — Bankruptcy', () => {
 
     // Verify cash is below $5,000
     expect(ctx.state!.cash).toBeLessThan(5000);
-    const cashAtStart = ctx.state!.cash;
 
     // Tick 110 times (bankruptcy requires 100 ticks below threshold)
     tickWithEvents(ctx, 110);
@@ -59,33 +58,23 @@ describe('Level 1 — Lose — Bankruptcy', () => {
     // ticksBelowThreshold may have accumulated some ticks before we hit 100,
     // but should be >= 100 by now
     expect(ctx.state!.bankruptcy.ticksBelowThreshold).toBeGreaterThanOrEqual(100);
-
-    // The level should also be ended (the tick command sets levelEnded via updateBankruptcy,
-    // but that depends on the emitter. Since we can't easily subscribe to the emitter here,
-    // we check the state flag that updateBankruptcy sets.)
-    // Note: updateBankruptcy sets bankruptcy.bankrupt = true but does NOT set levelEnded
-    // directly -- that is handled by the game loop subscriber. So we only assert on bankrupt.
   });
 
   it('does not trigger bankruptcy when cash recovers above threshold', () => {
-    // Spend to just below threshold
-    employeeCommand(ctx, ['hire'], { role: 'driller' });
-    buildCommand(ctx as any, ['management_office'], { at: '5,5' });
+    // Force cash below $5,000 threshold directly
+    ctx.state!.cash = 1000;
 
-    // Check if we're below 5000
-    if (ctx.state!.cash >= 5000) {
-      // Spend more
-      buildCommand(ctx as any, ['living_quarters'], { at: '10,5' });
-    }
+    // Tick 30 times to accumulate some ticks below threshold
+    tickWithEvents(ctx, 30);
+    expect(ctx.state!.bankruptcy.ticksBelowThreshold).toBeGreaterThanOrEqual(30);
+    expect(ctx.state!.bankruptcy.bankrupt).toBe(false);
 
-    // If still above, skip this test scenario
-    if (ctx.state!.cash < 5000) {
-      // Give the state some cash back to simulate recovery
-      ctx.state!.cash = 10000;
-      tickWithEvents(ctx, 120);
-      // Bankruptcy counter should have been reset
-      expect(ctx.state!.bankruptcy.bankrupt).toBe(false);
-      expect(ctx.state!.bankruptcy.ticksBelowThreshold).toBe(0);
-    }
+    // Recover cash above threshold
+    ctx.state!.cash = 10000;
+    tickWithEvents(ctx, 5);
+
+    // Bankruptcy counter should have been reset
+    expect(ctx.state!.bankruptcy.bankrupt).toBe(false);
+    expect(ctx.state!.bankruptcy.ticksBelowThreshold).toBe(0);
   });
 });

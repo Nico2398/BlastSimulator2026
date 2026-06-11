@@ -2,10 +2,9 @@
 // Goal: Start level 1, let ecological score stay at 0 for a sustained period
 // to trigger an ecological shutdown.
 //
-// KNOWN BUG: ScoreManager.applyDecay pushes scores toward 50 at +0.05/tick.
-// This means ecology can NEVER stay at 0 for consecutive ticks naturally —
-// it gets pushed to 0.05 the next tick. We work around this by directly
-// resetting ecology to 0 after each tick.
+// NOTE: ScoreManager.applyDecay was historically pushing scores up from 0 toward 50.
+// This has been fixed (value > 0 guard) so scores at exactly 0 stay at 0 through
+// decay. With no buildings and no employees, ecology remains at 0 naturally.
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
@@ -30,13 +29,12 @@ describe('Level 1 — Lose — Ecological Disaster', () => {
     // Set ecology to 0 directly
     ctx.state!.scores.ecology = 0;
 
-    // KNOWN BUG WORKAROUND: ScoreManager.applyDecay pushes scores toward 50
-    // at +0.05/tick, so we reset ecology to 0 after each tick.
-    for (let i = 0; i < 250; i++) {
+    // Tick up to 200 ticks — ecology stays at 0 because:
+    // 1. No employees → avgMorale=50 → no score deltas
+    // 2. No buildings → buildingEffects.ecology=0
+    // 3. applyDecay(0, rate) → 0 (fix keeps 0 at 0)
+    for (let i = 0; i < 200; i++) {
       tickCommand(ctx, ['1'], {});
-      if (ctx.state!.scores.ecology >= 0 && ctx.state!.scores.ecology < 1) {
-        ctx.state!.scores.ecology = 0; // force back to 0
-      }
       // Handle any events that fire
       if (ctx.state!.events.pendingEvent) {
         ctx.state!.isPaused = false;

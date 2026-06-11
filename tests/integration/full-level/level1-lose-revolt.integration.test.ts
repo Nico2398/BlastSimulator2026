@@ -10,7 +10,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   makeCampaignCtx,
-  tickWithEvents,
 } from './helpers.js';
 import { tickCommand, eventCommand } from '../../../src/console/commands/events.js';
 

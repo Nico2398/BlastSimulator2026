@@ -9,9 +9,8 @@ import {
   performBlast,
   getStateSummary,
 } from './helpers.js';
-import { campaignCompleteCommand, campaignStatusCommand } from '../../../src/console/commands/campaign.js';
+import { campaignCompleteCommand } from '../../../src/console/commands/campaign.js';
 import { employeeCommand } from '../../../src/console/commands/entities.js';
-import { stateCommand } from '../../../src/console/commands/state.js';
 
 describe('Level 3 — Win', () => {
   let ctx: ReturnType<typeof makeCampaignCtxWithUnlock>;
