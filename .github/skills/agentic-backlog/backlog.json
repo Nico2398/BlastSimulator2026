@@ -1454,11 +1454,11 @@
       "tests/integration/campaign.integration.test.ts"
     ],
     "testFile": null,
-    "status": "in-progress",
+    "status": "done",
     "blockedBy": [
       "8.2"
     ],
-    "closedInPR": null
+    "closedInPR": 292
   },
   {
     "id": "8.4",
