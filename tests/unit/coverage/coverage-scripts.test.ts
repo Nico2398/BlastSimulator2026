@@ -30,9 +30,19 @@ describe('coverage npm scripts (8.1)', () => {
       expect(pkg.scripts).toHaveProperty('validate');
     });
 
-    it('contains the --coverage flag', () => {
+    it('includes npm run test:coverage (coverage gate)', () => {
       const script = pkg.scripts['validate'];
-      expect(script).toContain(COVERAGE_FLAG);
+      expect(script).toContain('npm run test:coverage');
+    });
+
+    it('includes npm run test:integration', () => {
+      const script = pkg.scripts['validate'];
+      expect(script).toContain('npm run test:integration');
+    });
+
+    it('includes npm run test:scenarios', () => {
+      const script = pkg.scripts['validate'];
+      expect(script).toContain('npm run test:scenarios');
     });
 
     it('includes tsc type-check', () => {
