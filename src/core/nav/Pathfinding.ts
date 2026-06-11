@@ -423,9 +423,15 @@ export function findPath(grid: NavGrid, request: PathRequest): PathResult {
     return findMultiLevelPath(grid, request);
   }
 
-  // 5. Fast path — try direct line before A* (handles unobstructed straight lines instantly)
+  // 5. Fast path — try direct line before A* only if it's clearly optimal.
+  //    Compare direct-line cost to heuristic lower bound (octile * minCost).
+  //    If directLine is more than 10% above heuristic, it's suboptimal — use A*.
   const directLine = directLineWalk(grid, sx, sz, gx, gz, avoidVehicles);
-  if (directLine !== null) return directLine;
+  if (directLine !== null) {
+    const minCost = 1.0; // walkable minimum
+    const heuristicLowerBound = octileHeuristic(sx, sz, gx, gz) * minCost;
+    if (directLine.totalCost <= heuristicLowerBound * 1.1) return directLine;
+  }
 
   // 6. A* main loop
 
