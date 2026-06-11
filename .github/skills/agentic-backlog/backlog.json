@@ -1505,9 +1505,9 @@
       "scripts/scenario-defs/weather-flood.json"
     ],
     "testFile": null,
-    "status": "pending",
+    "status": "done",
     "blockedBy": [],
-    "closedInPR": null
+    "closedInPR": 294
   },
   {
     "id": "8.6",
