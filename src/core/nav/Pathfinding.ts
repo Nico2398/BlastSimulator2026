@@ -51,6 +51,20 @@ const NEIGHBOUR_OFFSETS: readonly [number, number][] = [
 ];
 
 // ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+/** Minimum move cost for a walkable cell (used for heuristic lower bound). */
+const MIN_WALKABLE_COST = 1.0;
+
+/**
+ * Tolerance factor for the pre-A* direct-line check.
+ * If the direct-line path cost is within this factor of the heuristic lower
+ * bound, we consider it optimal enough to skip A* entirely.
+ */
+const DIRECT_LINE_TOLERANCE = 1.1;
+
+// ---------------------------------------------------------------------------
 // Internal binary min-heap (generic)
 // ---------------------------------------------------------------------------
 
@@ -124,9 +138,16 @@ export function octileHeuristic(ax: number, az: number, bx: number, bz: number):
   return Math.max(dx, dz) + (Math.SQRT2 - 1) * Math.min(dx, dz);
 }
 
-/** Build the key string for a coordinate pair. */
-function cellKey(x: number, z: number): string {
-  return `${x},${z}`;
+/** Encode a coordinate pair as a single numeric key. */
+const POS_MULT = 100000;
+function encodePos(x: number, z: number): number {
+  return x * POS_MULT + z;
+}
+function posX(pos: number): number {
+  return (pos / POS_MULT) | 0;
+}
+function posZ(pos: number): number {
+  return pos % POS_MULT;
 }
 
 /** Clamp a coordinate to the grid bounds. */
@@ -416,38 +437,47 @@ export function findPath(grid: NavGrid, request: PathRequest): PathResult {
     return findMultiLevelPath(grid, request);
   }
 
-  // 5. A* main loop
+  // 5. Fast path — try direct line before A* only if it's clearly optimal.
+  //    Compare direct-line cost to heuristic lower bound (octile * MIN_WALKABLE_COST).
+  //    If directLine is more than 10% above heuristic, it's suboptimal — use A*.
+  const directLine = directLineWalk(grid, sx, sz, gx, gz, avoidVehicles);
+  if (directLine !== null) {
+    const heuristicLowerBound = octileHeuristic(sx, sz, gx, gz) * MIN_WALKABLE_COST;
+    if (directLine.totalCost <= heuristicLowerBound * DIRECT_LINE_TOLERANCE) return directLine;
+  }
+
+  // 6. A* main loop
 
   interface AStarNode {
     key: number; // f = g + h, used by the min-heap
-    x: number;
-    z: number;
+    pos: number; // encoded position
+    g: number;   // gScore at push time (for stale check)
   }
 
   const openHeap = new MinHeap<AStarNode>();
-  const gScore = new Map<string, number>();
-  const cameFrom = new Map<string, { x: number; z: number }>();
+  const gScore = new Map<number, number>();
+  const cameFrom = new Map<number, number>();
   let exploredCount = 0;
 
-  const startKey = cellKey(sx, sz);
-  gScore.set(startKey, 0);
+  const startPos = encodePos(sx, sz);
+  gScore.set(startPos, 0);
   const hStart = octileHeuristic(sx, sz, gx, gz);
-  openHeap.push({ key: hStart, x: sx, z: sz });
+  openHeap.push({ key: hStart, pos: startPos, g: 0 });
 
   while (openHeap.size > 0 && exploredCount < PATHFINDING_NODE_BUDGET_CAP) {
     const current = openHeap.pop()!;
-    const { x: cx, z: cz } = current;
-    const currentKey = cellKey(cx, cz);
+    const cx = posX(current.pos);
+    const cz = posZ(current.pos);
 
-    // Skip stale entries (we don't update keys in-place)
-    const currentG = gScore.get(currentKey);
-    if (currentG === undefined) continue;
+    // Skip stale entries (re-expanded with outdated gScore)
+    const bestG = gScore.get(current.pos);
+    if (bestG === undefined || current.g !== bestG) continue;
 
     exploredCount++;
 
     // Goal reached?
     if (cx === gx && cz === gz) {
-      return reconstructPath(cameFrom, cx, cz, gScore);
+      return reconstructPath(cameFrom, gx, gz, gScore);
     }
 
     // Explore neighbours
@@ -464,16 +494,16 @@ export function findPath(grid: NavGrid, request: PathRequest): PathResult {
       // Move cost
       const isDiagonal = dx !== 0 && dz !== 0;
       const stepCost = isDiagonal ? neighborCell.moveCost * Math.SQRT2 : neighborCell.moveCost;
-      const tentativeG = currentG + stepCost;
+      const tentativeG = bestG + stepCost;
 
-      const neighborKey = cellKey(nx, nz);
-      const existingG = gScore.get(neighborKey);
+      const neighborPos = encodePos(nx, nz);
+      const existingG = gScore.get(neighborPos);
 
       if (existingG === undefined || tentativeG < existingG) {
-        gScore.set(neighborKey, tentativeG);
-        cameFrom.set(neighborKey, { x: cx, z: cz });
+        gScore.set(neighborPos, tentativeG);
+        cameFrom.set(neighborPos, current.pos);
         const h = octileHeuristic(nx, nz, gx, gz);
-        openHeap.push({ key: tentativeG + h, x: nx, z: nz });
+        openHeap.push({ key: tentativeG + h, pos: neighborPos, g: tentativeG });
       }
     }
   }
@@ -487,28 +517,25 @@ export function findPath(grid: NavGrid, request: PathRequest): PathResult {
 
 /** Reconstruct path by walking cameFrom map backwards from goal to start. */
 function reconstructPath(
-  cameFrom: Map<string, { x: number; z: number }>,
+  cameFrom: Map<number, number>,
   goalX: number,
   goalZ: number,
-  gScore: Map<string, number>,
+  gScore: Map<number, number>,
 ): PathResult {
   const waypoints: { x: number; z: number }[] = [];
-  let cx = goalX;
-  let cz = goalZ;
+  let currentPos = encodePos(goalX, goalZ);
 
   // Walk backwards
   while (true) {
-    waypoints.push({ x: cx, z: cz });
-    const key = cellKey(cx, cz);
-    const parent = cameFrom.get(key);
-    if (parent === undefined) break;
-    cx = parent.x;
-    cz = parent.z;
+    waypoints.push({ x: posX(currentPos), z: posZ(currentPos) });
+    const parentPos = cameFrom.get(currentPos);
+    if (parentPos === undefined) break;
+    currentPos = parentPos;
   }
 
   waypoints.reverse();
 
-  const totalCost = gScore.get(cellKey(goalX, goalZ)) ?? 0;
+  const totalCost = gScore.get(encodePos(goalX, goalZ)) ?? 0;
 
   return { found: true, waypoints, totalCost };
 }
