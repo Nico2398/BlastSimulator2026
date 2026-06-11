@@ -101,7 +101,7 @@ All four layers must pass before any PR is merged. `npm run validate` enforces t
 
 #### Layer 1: Unit Tests (`tests/unit/`)
 
-- **Location:** `tests/unit/` — mirrors `src/core/` directory structure
+- **Location:** `tests/unit/` — mirrors `src/` directory structure (e.g., `src/core/nav/Pathfinding.ts` → `tests/unit/nav/Pathfinding.test.ts`; `src/physics/` → `tests/unit/physics/`; etc.)
 - **Naming convention:** `{Module}.test.ts` at equivalent path (e.g., `src/core/nav/Pathfinding.ts` → `tests/unit/nav/Pathfinding.test.ts`)
 - **Runner:** Vitest, no DOM, no Three.js — pure Node.js
 - **Coverage requirements:**
@@ -126,7 +126,7 @@ All four layers must pass before any PR is merged. `npm run validate` enforces t
 - **Location:** `tests/integration/` — same Vitest runner, same project
 - **Scope:** Console command sequences exercising partial gameplay loops. No DOM, no Three.js. May import from `src/console/`.
 - **Requirements:** Minimum 8 scenarios per test suite (10 recommended)
-- **Available suites (21 total):**
+- **Available suites (16 total):**
   - `buildings.integration.test.ts` — placement, rejection, demolition, blast destruction, explosive warehouse, living quarters, research center, overcapacity, protected voxels
   - `vehicles.integration.test.ts` — purchase/qualification, traffic, damage/repair, blast destruction, driver re-entry, payload tracking
   - `skills.integration.test.ts` — qualification, training, XP, level-up, proficiency, salary, errors, ghost preview, duration
