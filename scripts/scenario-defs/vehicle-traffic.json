@@ -1,5 +1,21 @@
 {
   "name": "vehicle-traffic",
-  "description": "PLACEHOLDER",
-  "steps": []
+  "description": "Chapter 2: Add 4 haulers with drivers on narrow ramp and verify TrafficJamEvent triggers",
+  "steps": [
+    "new_game seed:42",
+    "campaign start level:dusty_hollow",
+    "time resume",
+    "employee hire role:driver",
+    "employee hire role:driver",
+    "employee hire role:driver",
+    "employee hire role:driver",
+    "vehicle buy hauler",
+    "vehicle buy hauler",
+    "vehicle buy hauler",
+    "vehicle buy hauler",
+    "vehicle list",
+    "tick 10",
+    "tick 10",
+    "state full"
+  ]
 }

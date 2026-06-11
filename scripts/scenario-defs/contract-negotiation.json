@@ -1,5 +1,20 @@
 {
   "name": "contract-negotiation",
-  "description": "PLACEHOLDER",
-  "steps": []
+  "description": "Negotiate contracts repeatedly to observe both improved and worsened pricing outcomes",
+  "steps": [
+    "new_game seed:42",
+    "campaign start level:dusty_hollow",
+    "time resume",
+    "contract list",
+    "contract accept 1",
+    "tick 10",
+    "contract deliver 1 amount:50",
+    "finances",
+    "contract list",
+    "contract accept 1",
+    "tick 10",
+    "contract deliver 1 amount:50",
+    "finances",
+    "state full"
+  ]
 }

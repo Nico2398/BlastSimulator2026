@@ -1,5 +1,15 @@
 {
   "name": "ramp-navigation",
-  "description": "PLACEHOLDER",
-  "steps": []
+  "description": "Chapter 6: Build ramp between two benches and verify agent can reach lower bench",
+  "steps": [
+    "new_game seed:42",
+    "build_ramp start:15,15 end:20,25",
+    "employee hire role:surveyor",
+    "employee list",
+    "tick 10",
+    "tick 10",
+    "tick 10",
+    "state full",
+    "inspect 20,20,0"
+  ]
 }

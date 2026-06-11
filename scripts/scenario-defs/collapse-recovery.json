@@ -1,5 +1,20 @@
 {
   "name": "collapse-recovery",
-  "description": "PLACEHOLDER",
-  "steps": []
+  "description": "Chapter 7: Drive employee fatigue to collapse, then verify rest restores them to resume original task",
+  "steps": [
+    "new_game seed:42",
+    "campaign start level:dusty_hollow",
+    "time resume",
+    "employee hire role:driller",
+    "tick 50",
+    "tick 50",
+    "tick 50",
+    "tick 50",
+    "tick 50",
+    "employee list",
+    "tick 50",
+    "tick 50",
+    "employee list",
+    "state full"
+  ]
 }
