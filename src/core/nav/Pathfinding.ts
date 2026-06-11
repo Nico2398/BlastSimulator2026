@@ -51,6 +51,20 @@ const NEIGHBOUR_OFFSETS: readonly [number, number][] = [
 ];
 
 // ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+/** Minimum move cost for a walkable cell (used for heuristic lower bound). */
+const MIN_WALKABLE_COST = 1.0;
+
+/**
+ * Tolerance factor for the pre-A* direct-line check.
+ * If the direct-line path cost is within this factor of the heuristic lower
+ * bound, we consider it optimal enough to skip A* entirely.
+ */
+const DIRECT_LINE_TOLERANCE = 1.1;
+
+// ---------------------------------------------------------------------------
 // Internal binary min-heap (generic)
 // ---------------------------------------------------------------------------
 
@@ -424,13 +438,12 @@ export function findPath(grid: NavGrid, request: PathRequest): PathResult {
   }
 
   // 5. Fast path — try direct line before A* only if it's clearly optimal.
-  //    Compare direct-line cost to heuristic lower bound (octile * minCost).
+  //    Compare direct-line cost to heuristic lower bound (octile * MIN_WALKABLE_COST).
   //    If directLine is more than 10% above heuristic, it's suboptimal — use A*.
   const directLine = directLineWalk(grid, sx, sz, gx, gz, avoidVehicles);
   if (directLine !== null) {
-    const minCost = 1.0; // walkable minimum
-    const heuristicLowerBound = octileHeuristic(sx, sz, gx, gz) * minCost;
-    if (directLine.totalCost <= heuristicLowerBound * 1.1) return directLine;
+    const heuristicLowerBound = octileHeuristic(sx, sz, gx, gz) * MIN_WALKABLE_COST;
+    if (directLine.totalCost <= heuristicLowerBound * DIRECT_LINE_TOLERANCE) return directLine;
   }
 
   // 6. A* main loop
