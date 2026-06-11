@@ -159,7 +159,7 @@ window.__gameState = () => {
     ecologicalShutdown: s.ecological.shutdown,
     arrested: s.arrest.arrested,
     cash: s.cash,
-    profit: 0, // TODO: compute net profit from financial report
+    profit: s.levelStats?.totalWealth ?? 0,
   };
 };
 
