@@ -1534,11 +1534,11 @@
       "tests/unit/benchmarks/benchmarks.test.ts"
     ],
     "testFile": "tests/unit/benchmarks/benchmarks.test.ts",
-    "status": "pending",
+    "status": "done",
     "blockedBy": [
       "8.2"
     ],
-    "closedInPR": null
+    "closedInPR": 296
   },
   {
     "id": "8.8",
