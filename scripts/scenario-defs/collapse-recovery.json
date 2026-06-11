@@ -8,14 +8,9 @@
     "employee hire role:driller",
     "build bunkhouse at:5,5",
     "employee list",
-    "tick 50",
-    "tick 50",
-    "tick 50",
-    "tick 50",
-    "tick 50",
+    "tick 250",
     "employee list",
-    "tick 50",
-    "tick 50",
+    "tick 100",
     "employee list",
     "state full"
   ]

@@ -8,13 +8,7 @@
     "employee hire role:driller",
     "employee assign_skill 1 drilling 1",
     "employee list",
-    "tick 100",
-    "tick 100",
-    "tick 100",
-    "tick 100",
-    "tick 100",
-    "tick 100",
-    "tick 100",
+    "tick 700",
     "employee list",
     "state full"
   ]

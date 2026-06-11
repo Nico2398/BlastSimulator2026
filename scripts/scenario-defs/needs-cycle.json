@@ -9,10 +9,7 @@
     "employee hire role:hauler",
     "employee hire role:surveyor",
     "build canteen at:5,5",
-    "tick 5",
-    "tick 5",
-    "tick 5",
-    "tick 5",
+    "tick 20",
     "employee list",
     "state full"
   ]

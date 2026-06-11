@@ -6,10 +6,8 @@
     "build_ramp start:15,15 end:20,25",
     "employee hire role:surveyor",
     "employee list",
-    "tick 10",
-    "tick 10",
-    "tick 10",
-    "state full",
-    "inspect 20,20,0"
+    "tick 30",
+    "inspect 20,20,0",
+    "state full"
   ]
 }

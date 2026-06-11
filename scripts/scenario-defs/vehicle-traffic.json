@@ -14,8 +14,7 @@
     "vehicle buy hauler",
     "vehicle buy hauler",
     "vehicle list",
-    "tick 10",
-    "tick 10",
+    "tick 20",
     "state full"
   ]
 }
