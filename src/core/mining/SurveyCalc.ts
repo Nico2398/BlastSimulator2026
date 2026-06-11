@@ -82,44 +82,49 @@ function getSurfaceY(grid: VoxelGrid, x: number, z: number): number {
 /**
  * Average a specific ore's density over the subset of `yLevels` that contain
  * solid voxels. Returns `undefined` if no solid voxels are found.
+ *
+ * Accepts an optional `start` / `end` range into `yLevels` to avoid slicing.
  */
 function averageSolidOreDensity(
   grid: VoxelGrid,
   x: number,
   z: number,
-  yLevels: number[],
+  yLevels: readonly number[],
   oreId: string,
+  start: number = 0,
+  end: number = yLevels.length,
 ): number | undefined {
-  const solidVals: number[] = [];
-  for (const y of yLevels) {
-    const v = grid.getVoxel(x, y, z);
-    if (v && v.density > 0) solidVals.push(v.oreDensities[oreId] ?? 0);
+  let sum = 0;
+  let count = 0;
+  for (let i = start; i < end; i++) {
+    const v = grid.getVoxel(x, yLevels[i]!, z);
+    if (v && v.density > 0) { sum += v.oreDensities[oreId] ?? 0; count++; }
   }
-  return solidVals.length > 0
-    ? solidVals.reduce((sum, val) => sum + val, 0) / solidVals.length
-    : undefined;
+  return count > 0 ? sum / count : undefined;
 }
 
 /**
  * Seismic density estimate: split `yLevels` into consecutive groups of
  * SURVEY_SEISMIC_GROUP_SIZE, average solid voxels within each group, then average
  * the group averages. Returns `undefined` if no solid voxels are found.
+ *
+ * Optimised to avoid intermediate array allocations — iterates indices directly
+ * instead of calling `yLevels.slice()` per group.
  */
 function computeSeismicOreDensity(
   grid: VoxelGrid,
   x: number,
   z: number,
-  yLevels: number[],
+  yLevels: readonly number[],
   oreId: string,
 ): number | undefined {
-  const groupAvgs: number[] = [];
+  let totalAvg = 0;
+  let groupCount = 0;
   for (let i = 0; i < yLevels.length; i += SURVEY_SEISMIC_GROUP_SIZE) {
-    const avg = averageSolidOreDensity(grid, x, z, yLevels.slice(i, i + SURVEY_SEISMIC_GROUP_SIZE), oreId);
-    if (avg !== undefined) groupAvgs.push(avg);
+    const avg = averageSolidOreDensity(grid, x, z, yLevels, oreId, i, Math.min(i + SURVEY_SEISMIC_GROUP_SIZE, yLevels.length));
+    if (avg !== undefined) { totalAvg += avg; groupCount++; }
   }
-  return groupAvgs.length > 0
-    ? groupAvgs.reduce((sum, val) => sum + val, 0) / groupAvgs.length
-    : undefined;
+  return groupCount > 0 ? totalAvg / groupCount : undefined;
 }
 
 /**
