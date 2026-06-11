@@ -8,12 +8,23 @@ import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { recordProfit } from '../../../src/core/campaign/Campaign.js';
 
 /**
- * Create a GameContext with a fresh campaign started for the given level.
- * Calls campaignStartCommand to initialise the level.
+ * Create a fresh GameContext with a new game of the default mine preset.
+ * Used as the base for all full-level test helpers.
  */
-export function makeCampaignCtx(levelId: string): GameContext {
+function createBaseContext(): GameContext {
   const ctx: GameContext = { state: null, grid: null, emitter: new EventEmitter() };
   newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32' });
+  return ctx;
+}
+
+/**
+ * Create a GameContext with a fresh campaign started for the given level.
+ * Calls campaignStartCommand to initialise the level.
+ * @param levelId The campaign level identifier (e.g. 'dusty_hollow').
+ * @returns A fully initialised GameContext ready for test commands.
+ */
+export function makeCampaignCtx(levelId: string): GameContext {
+  const ctx = createBaseContext();
   campaignStartCommand(ctx, [], { level: levelId });
   return ctx;
 }
@@ -22,10 +33,11 @@ export function makeCampaignCtx(levelId: string): GameContext {
  * Create a GameContext with all prior levels marked completed so the
  * target level is unlocked. Useful for levels 2 and 3 which require
  * earlier levels to be finished first.
+ * @param levelId The campaign level identifier to unlock and start.
+ * @returns A fully initialised GameContext with preceding levels completed.
  */
 export function makeCampaignCtxWithUnlock(levelId: string): GameContext {
-  const ctx: GameContext = { state: null, grid: null, emitter: new EventEmitter() };
-  newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32' });
+  const ctx = createBaseContext();
   if (levelId === 'grumpstone_ridge') {
     recordProfit(ctx.state!.campaign, 'dusty_hollow', 80000);
   } else if (levelId === 'treranium_depths') {
@@ -39,10 +51,12 @@ export function makeCampaignCtxWithUnlock(levelId: string): GameContext {
 /**
  * Advance the simulation by `n` ticks, running `tickCommand` each tick
  * and resolving any events that fire during the tick window.
+ * @param ctx The game context.
+ * @param n Number of ticks to advance.
  */
 export function tickWithEvents(ctx: GameContext, n: number): void {
   for (let i = 0; i < n; i++) {
-    const result = tickCommand(ctx, ['1'], {});
+    tickCommand(ctx, ['1'], {});
     if (ctx.state!.events.pendingEvent) {
       eventCommand(ctx, ['choose', '0'], {});
     }
@@ -54,7 +68,11 @@ export function tickWithEvents(ctx: GameContext, n: number): void {
 
 /**
  * Perform a standard blast cycle: drill grid, charge all, auto-sequence, blast.
- * Returns the blast command output text.
+ * Uses a 2×2 grid with 4m spacing, 8m depth, boomite explosive.
+ * @param ctx The game context (cast to MiningContext internally for command compatibility).
+ * @param originX X-coordinate of the drill grid origin.
+ * @param originZ Z-coordinate of the drill grid origin.
+ * @returns The blast command output text.
  */
 export function performBlast(ctx: GameContext, originX: number, originZ: number): string {
   drillPlanCommand(ctx as any, ['grid'], {
@@ -78,6 +96,8 @@ export function performBlast(ctx: GameContext, originX: number, originZ: number)
 /**
  * Return a summary object of the current game state (profit, balance,
  * scores, employee count, etc.) for use in test assertions.
+ * @param ctx The game context.
+ * @returns A plain object with key state properties for assertion.
  */
 export function getStateSummary(ctx: GameContext): Record<string, unknown> {
   return {

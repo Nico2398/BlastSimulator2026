@@ -7,8 +7,7 @@ import {
   makeCampaignCtx,
   tickWithEvents,
 } from './helpers.js';
-import { employeeCommand } from '../../../src/console/commands/entities.js';
-import { buildCommand } from '../../../src/console/commands/entities.js';
+import { buildCommand, employeeCommand } from '../../../src/console/commands/entities.js';
 
 describe('Level 1 — Lose — Bankruptcy', () => {
   let ctx: ReturnType<typeof makeCampaignCtx>;
@@ -43,9 +42,9 @@ describe('Level 1 — Lose — Bankruptcy', () => {
     // Build living_quarters ($10k) -> $2,000
     // That should be under $5k.
 
-    buildCommand(ctx as any, ['management_office'], { at: '5,5' });
-    buildCommand(ctx as any, ['research_center'], { at: '10,5' });
-    buildCommand(ctx as any, ['living_quarters'], { at: '15,5' });
+    buildCommand(ctx, ['management_office'], { at: '5,5' });
+    buildCommand(ctx, ['research_center'], { at: '10,5' });
+    buildCommand(ctx, ['living_quarters'], { at: '15,5' });
 
     // Verify cash is below $5,000
     expect(ctx.state!.cash).toBeLessThan(5000);
