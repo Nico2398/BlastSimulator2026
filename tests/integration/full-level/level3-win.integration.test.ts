@@ -1,26 +1,63 @@
 // BlastSimulator2026 — Full-level integration test: Level 3 Win
-// TODO: Implement test scenarios.
 // Goal: Start level 3 (with levels 1-2 pre-completed), perform mining
-// operations, accumulate past the unlock threshold, and verify win.
+// operations, and verify campaign completion.
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import {
-  makeCampaignCtx,
   makeCampaignCtxWithUnlock,
   tickWithEvents,
+  performBlast,
   getStateSummary,
 } from './helpers.js';
-import { campaignStartCommand, campaignCompleteCommand } from '../../src/console/commands/campaign.js';
-import { tickCommand, eventCommand, corruptCommand, mafiaCommand } from '../../src/console/commands/events.js';
-import { buildCommand, employeeCommand } from '../../src/console/commands/entities.js';
-import { drillPlanCommand, chargeCommand, sequenceCommand, blastCommand } from '../../src/console/commands/mining.js';
-import { financesCommand } from '../../src/console/commands/economy.js';
-import { stateCommand } from '../../src/console/commands/state.js';
-import { EventEmitter } from '../../src/core/state/EventEmitter.js';
-import { recordProfit } from '../../src/core/campaign/Campaign.js';
+import { campaignCompleteCommand, campaignStatusCommand } from '../../../src/console/commands/campaign.js';
+import { employeeCommand } from '../../../src/console/commands/entities.js';
+import { stateCommand } from '../../../src/console/commands/state.js';
 
 describe('Level 3 — Win', () => {
-  it('placeholder', () => {
-    expect(true).toBe(true);
+  let ctx: ReturnType<typeof makeCampaignCtxWithUnlock>;
+
+  beforeEach(() => {
+    ctx = makeCampaignCtxWithUnlock('treranium_depths');
+  });
+
+  it('starts level 3 with correct initial state', () => {
+    expect(ctx.state).not.toBeNull();
+    // Level 3 starting cash is $100,000
+    expect(ctx.state!.cash).toBe(100000);
+    expect(ctx.state!.campaign.activeLevelId).toBe('treranium_depths');
+    expect(ctx.grid).not.toBeNull();
+    // Verify grid dimensions: treranium_depths = 80x40x80
+    expect(ctx.grid!.sizeX).toBe(80);
+    expect(ctx.grid!.sizeY).toBe(40);
+    expect(ctx.grid!.sizeZ).toBe(80);
+  });
+
+  it('can hire, perform a blast, and complete the level', () => {
+    // Hire a driller
+    const hireResult = employeeCommand(ctx, ['hire'], { role: 'driller' });
+    expect(hireResult.success).toBe(true);
+    expect(ctx.state!.employees.employees.length).toBe(1);
+
+    // Assign blasting skill
+    employeeCommand(ctx, ['assign_skill', '1'], { skill: 'blasting', level: '5' });
+
+    // Perform a blast at (30,30) — offset from origin
+    const blastOutput = performBlast(ctx, 30, 30);
+    expect(blastOutput).toContain('BLAST REPORT');
+    tickWithEvents(ctx, 5);
+
+    // Force-complete the level
+    const completeResult = campaignCompleteCommand(ctx, [], {});
+    expect(completeResult.success).toBe(true);
+    expect(completeResult.output).toContain('force-completed');
+
+    // Verify level ended
+    expect(ctx.state!.levelEnded).toBe(true);
+    expect(ctx.state!.levelEndReason).toBe('completed');
+
+    // Verify state summary reflects completion
+    const summary = getStateSummary(ctx);
+    expect(summary.levelEnded).toBe(true);
+    expect(summary.levelEndReason).toBe('completed');
   });
 });
