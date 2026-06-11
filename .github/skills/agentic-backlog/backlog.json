@@ -1477,11 +1477,11 @@
       "tests/integration/full-level/level3-lose-ecology.integration.test.ts"
     ],
     "testFile": null,
-    "status": "pending",
+    "status": "done",
     "blockedBy": [
       "8.2"
     ],
-    "closedInPR": null
+    "closedInPR": 293
   },
   {
     "id": "8.5",
