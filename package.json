@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "console": "tsx src/console.ts",
-    "validate": "tsc --noEmit && vitest run --reporter=verbose --coverage && vite build",
+    "validate": "tsc --noEmit && npm run test:coverage && npm run test:integration && npm run test:scenarios && vite build",
     "test:coverage": "vitest run --coverage",
     "test": "vitest run",
     "test:watch": "vitest",
