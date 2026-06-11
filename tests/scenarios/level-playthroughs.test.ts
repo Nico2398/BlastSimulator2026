@@ -130,10 +130,97 @@ const OUTCOME_VALIDATORS: Record<string, OutcomeValidator> = {
   },
 };
 
+// ── Step runner helpers ──
+
+/**
+ * Runs a sequence of scenario commands on the page, capturing a screenshot
+ * after each step. Asserts every screenshot is created and non-trivial.
+ *
+ * @param page   - Puppeteer page connected to a running game
+ * @param steps  - Array of command strings to execute sequentially
+ * @param outDir - Directory where step screenshots will be saved
+ */
+async function runCommandsOnPage(
+  page: puppeteer.Page,
+  steps: string[],
+  outDir: string,
+): Promise<void> {
+  for (let i = 0; i < steps.length; i++) {
+    const command = steps[i];
+    const paddedIdx = String(i).padStart(2, '0');
+    const cmdSlug = command.split(/\s+/)[0].replace(/[^a-z0-9_-]/gi, '');
+
+    // Execute command via the game console bridge
+    try {
+      await page.evaluate((cmd: string) => {
+        if (typeof (window as any).__gameConsole === 'function') {
+          return (window as any).__gameConsole(cmd);
+        }
+        return 'ERROR: __gameConsole not available';
+      }, command);
+    } catch (cmdErr: unknown) {
+      // Capture the error but continue — don't abort mid-scenario
+      const errMsg = cmdErr instanceof Error ? cmdErr.message : String(cmdErr);
+      console.warn(`  ⚠️  Step ${i} command "${command}" failed: ${errMsg}`);
+    }
+
+    // Wait for command to settle
+    await new Promise(r => setTimeout(r, COMMAND_WAIT_MS));
+
+    // Force render frames so visual side-effects are captured
+    await page.evaluate(() => new Promise(r => requestAnimationFrame(() => {
+      requestAnimationFrame(() => r(undefined));
+    })));
+    await new Promise(r => setTimeout(r, RENDER_WAIT_MS));
+
+    // Take screenshot
+    const screenshotPath = resolve(outDir, `step-${paddedIdx}-${cmdSlug}.png`);
+    await page.screenshot({ path: screenshotPath, fullPage: false });
+
+    // Assert screenshot was created and is non-trivial
+    expect(existsSync(screenshotPath), `Screenshot missing after step ${i} (${command})`).toBe(true);
+    const stat = statSync(screenshotPath);
+    expect(stat.size, `Screenshot too small after step ${i} (${command})`).toBeGreaterThan(100);
+  }
+}
+
+/**
+ * Runs one extra game tick to trigger level-complete / game-over detection,
+ * then captures the final game state via `window.__gameState()`.
+ *
+ * @param page - Puppeteer page connected to a running game
+ * @returns The final game state extracted from the game
+ */
+async function captureFinalState(page: puppeteer.Page): Promise<FinalGameState> {
+  // Execute one tick to flush any pending level-end / game-over checks
+  await page.evaluate(() => (window as any).__gameConsole('tick 1'));
+  await new Promise(r => setTimeout(r, 1000));
+
+  const finalState = (await page.evaluate(() => {
+    if (typeof (window as any).__gameState === 'function') {
+      return (window as any).__gameState();
+    }
+    return null;
+  })) as FinalGameState | null;
+
+  if (!finalState) {
+    throw new Error('__gameState() returned null — game may not have initialized properly');
+  }
+
+  return finalState;
+}
+
 // ── Puppeteer scenario runner ──
 
 /**
  * Runs a single playthrough scenario in its own browser instance.
+ *
+ * 1. Launches a headless Chromium browser
+ * 2. Navigates to the dev server and waits for the game canvas
+ * 3. Dismisses the main menu
+ * 4. Executes each scenario step while capturing screenshots
+ * 5. Runs one extra tick to flush game-over detection
+ * 6. Captures and returns the final game state
  *
  * @param scenarioName - Name of the scenario (matches JSON filename without extension)
  * @returns The final game state after running all commands + extra tick
@@ -166,62 +253,11 @@ async function runScenario(scenarioName: string): Promise<FinalGameState> {
     });
     await new Promise(r => setTimeout(r, 300));
 
-    // Run each scenario step
-    for (let i = 0; i < scenario.steps.length; i++) {
-      const command = scenario.steps[i];
-      const paddedIdx = String(i).padStart(2, '0');
-      const cmdSlug = command.split(/\s+/)[0].replace(/[^a-z0-9_-]/gi, '');
+    // Run all scenario steps with screenshot capture
+    await runCommandsOnPage(page, scenario.steps, outDir);
 
-      // Execute command
-      try {
-        await page.evaluate((cmd: string) => {
-          if (typeof (window as any).__gameConsole === 'function') {
-            return (window as any).__gameConsole(cmd);
-          }
-          return 'ERROR: __gameConsole not available';
-        }, command);
-      } catch (cmdErr: unknown) {
-        // Capture the error but continue — don't abort mid-scenario
-        const errMsg = cmdErr instanceof Error ? cmdErr.message : String(cmdErr);
-        console.warn(`  ⚠️  Step ${i} command "${command}" failed: ${errMsg}`);
-      }
-
-      // Wait for command to settle
-      await new Promise(r => setTimeout(r, COMMAND_WAIT_MS));
-
-      // Force render frames
-      await page.evaluate(() => new Promise(r => requestAnimationFrame(() => {
-        requestAnimationFrame(() => r(undefined));
-      })));
-      await new Promise(r => setTimeout(r, RENDER_WAIT_MS));
-
-      // Take screenshot
-      const screenshotPath = resolve(outDir, `step-${paddedIdx}-${cmdSlug}.png`);
-      await page.screenshot({ path: screenshotPath, fullPage: false });
-
-      // Assert screenshot was created and is non-trivial
-      expect(existsSync(screenshotPath), `Screenshot missing after step ${i} (${command})`).toBe(true);
-      const stat = statSync(screenshotPath);
-      expect(stat.size, `Screenshot too small after step ${i} (${command})`).toBeGreaterThan(100);
-    }
-
-    // ── After all scenario steps: run one extra tick to trigger level-complete / game-over detection ──
-    await page.evaluate(() => (window as any).__gameConsole('tick 1'));
-    await new Promise(r => setTimeout(r, 1000));
-
-    // Capture final game state
-    const finalState = (await page.evaluate(() => {
-      if (typeof (window as any).__gameState === 'function') {
-        return (window as any).__gameState();
-      }
-      return null;
-    })) as FinalGameState | null;
-
-    if (!finalState) {
-      throw new Error('__gameState() returned null — game may not have initialized properly');
-    }
-
-    return finalState;
+    // Capture final game state after scenario steps + extra tick
+    return await captureFinalState(page);
   } finally {
     await browser.close();
   }
