@@ -84,6 +84,7 @@ export function tickEventSystem(
     if (!state.firedEventIds.includes(eventId)) {
       state.firedEventIds.push(eventId);
       state.pendingEvent = { eventId, firedAtTick: ctx.tickCount };
+      state.lastEventTick = ctx.tickCount;
       return state.pendingEvent;
     }
   }
@@ -100,6 +101,7 @@ export function tickEventSystem(
       if (event) {
         state.firedEventIds.push(event.id);
         state.pendingEvent = { eventId: event.id, firedAtTick: ctx.tickCount };
+        state.lastEventTick = ctx.tickCount;
         return state.pendingEvent;
       }
     }
