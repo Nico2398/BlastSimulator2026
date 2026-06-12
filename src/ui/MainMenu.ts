@@ -105,7 +105,7 @@ export class MainMenu {
 
     this.worldMapBox.appendChild(mapTitle);
 
-    const levels = getAllLevels();
+    const levels = getAllLevels().filter(l => l.difficultyTier > 0);
     for (const lvl of levels) {
       const prog = campaign?.levels[lvl.id];
       const unlocked = prog?.unlocked ?? (lvl.difficultyTier === 1);

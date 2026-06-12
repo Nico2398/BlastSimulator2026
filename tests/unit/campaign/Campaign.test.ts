@@ -12,29 +12,33 @@ import { createGame } from '../../../src/core/state/GameState.js';
 // LevelProgress is part of campaign state — no extra imports needed
 
 describe('Campaign state and progression (7.2)', () => {
-  it('new campaign has only level 1 unlocked', () => {
+  it('new campaign unlocks tutorial and first campaign level', () => {
     const campaign = createCampaignState();
     const levels = getAllLevels();
+    // tutorial_pit (index 0) is unlocked as the tutorial level
     expect(getLevelProgress(campaign, levels[0]!.id)?.unlocked).toBe(true);
-    expect(getLevelProgress(campaign, levels[1]!.id)?.unlocked).toBe(false);
+    // dusty_hollow (index 1, difficultyTier 1) is unlocked as the first visible campaign level
+    expect(getLevelProgress(campaign, levels[1]!.id)?.unlocked).toBe(true);
+    // grumpstone_ridge (index 2) stays locked
     expect(getLevelProgress(campaign, levels[2]!.id)?.unlocked).toBe(false);
   });
 
-  it('reaching profit threshold on level 1 unlocks level 2', () => {
+  it('completing dusty_hollow unlocks grumpstone_ridge', () => {
     const campaign = createCampaignState();
     const levels = getAllLevels();
-    const lvl1 = levels[0]!;
-    const lvl2 = levels[1]!;
+    const lvl1 = levels[1]!; // dusty_hollow — starts unlocked
+    const lvl2 = levels[2]!; // grumpstone_ridge — starts locked
 
+    expect(getLevelProgress(campaign, lvl1.id)?.unlocked).toBe(true);
     expect(getLevelProgress(campaign, lvl2.id)?.unlocked).toBe(false);
     recordProfit(campaign, lvl1.id, lvl1.unlockThreshold);
     expect(getLevelProgress(campaign, lvl2.id)?.unlocked).toBe(true);
   });
 
-  it('reaching profit threshold on level 2 unlocks level 3', () => {
+  it('completing grumpstone_ridge unlocks treranium_depths', () => {
     const campaign = createCampaignState();
     const levels = getAllLevels();
-    // Manually unlock and complete level 1 first
+    // Complete tutorial_pit then dusty_hollow to unlock grumpstone_ridge
     const lvl1 = levels[0]!;
     const lvl2 = levels[1]!;
     const lvl3 = levels[2]!;
@@ -46,7 +50,7 @@ describe('Campaign state and progression (7.2)', () => {
     expect(getLevelProgress(campaign, lvl3.id)?.unlocked).toBe(true);
   });
 
-  it('completing all 3 levels is tracked as campaign complete', () => {
+  it('completing all campaign levels is tracked as campaign complete', () => {
     const campaign = createCampaignState();
     const levels = getAllLevels();
 
@@ -59,10 +63,10 @@ describe('Campaign state and progression (7.2)', () => {
     expect(campaign.campaignComplete).toBe(true);
   });
 
-  it('player can start a new game on any unlocked level', () => {
+  it('player can start a game on tutorial level', () => {
     const campaign = createCampaignState();
     const levels = getAllLevels();
-    // Level 1 is unlocked
+    // tutorial_pit (index 0) is unlocked as the tutorial level
     expect(startLevel(campaign, levels[0]!.id)).toBe(true);
     expect(campaign.activeLevelId).toBe(levels[0]!.id);
   });
@@ -70,7 +74,7 @@ describe('Campaign state and progression (7.2)', () => {
   it('starting a locked level returns false', () => {
     const campaign = createCampaignState();
     const levels = getAllLevels();
-    expect(startLevel(campaign, levels[1]!.id)).toBe(false);
+    expect(startLevel(campaign, levels[2]!.id)).toBe(false);
     expect(campaign.activeLevelId).toBeNull();
   });
 
