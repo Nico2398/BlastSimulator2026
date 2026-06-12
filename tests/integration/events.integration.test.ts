@@ -25,6 +25,7 @@ import { clearEvents } from '../../src/core/events/EventPool.js';
 import { createRunner } from '../../src/console/createRunner.js';
 import { parseCommand } from '../../src/console/ConsoleRunner.js';
 import { makeCampaignCtx } from './full-level/helpers.js';
+import { MIN_EVENT_INTERVAL_TICKS, MIN_EVENT_INTERVAL_ACTIONS } from '../../src/core/config/balance.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -583,11 +584,11 @@ describe('Event system', () => {
       const unionTimer = ctx.state!.events.timers.find(t => t.category === 'union')!;
       unionTimer.remaining = 2;
 
-      // Accumulate the required 10 user actions for the cooldown check
-      for (let i = 0; i < 10; i++) {
+      // Accumulate the required user actions for the cooldown check
+      for (let i = 0; i < MIN_EVENT_INTERVAL_ACTIONS; i++) {
         incrementActionCount(ctx.state!.events);
       }
-      expect(ctx.state!.events.actionCountSinceEvent).toBe(10);
+      expect(ctx.state!.events.actionCountSinceEvent).toBe(MIN_EVENT_INTERVAL_ACTIONS);
 
       // ── Phase 1: Fire the first event ──
       const safetyLimit = ctx.state!.tickCount + 500;
@@ -596,8 +597,8 @@ describe('Event system', () => {
       }
       expect(ctx.state!.events.pendingEvent).not.toBeNull();
       const event1Tick = ctx.state!.events.pendingEvent!.firedAtTick;
-      // Cooldown requires at least 120 ticks since lastEventTick (0)
-      expect(event1Tick).toBeGreaterThanOrEqual(120);
+      // Cooldown requires at least MIN_EVENT_INTERVAL_TICKS since lastEventTick (0)
+      expect(event1Tick).toBeGreaterThanOrEqual(MIN_EVENT_INTERVAL_TICKS);
       // Action count must have been reset by the event firing
       expect(ctx.state!.events.actionCountSinceEvent).toBe(0);
 
@@ -613,10 +614,10 @@ describe('Event system', () => {
 
       // ── Phase 3: Second event with cooldown ──
       // Accumulate 10 actions again
-      for (let i = 0; i < 10; i++) {
+      for (let i = 0; i < MIN_EVENT_INTERVAL_ACTIONS; i++) {
         incrementActionCount(ctx.state!.events);
       }
-      expect(ctx.state!.events.actionCountSinceEvent).toBe(10);
+      expect(ctx.state!.events.actionCountSinceEvent).toBe(MIN_EVENT_INTERVAL_ACTIONS);
 
       // Tick until the next event fires
       const event2SafetyLimit = event1Tick + 500;
@@ -625,8 +626,8 @@ describe('Event system', () => {
       }
       expect(ctx.state!.events.pendingEvent).not.toBeNull();
       const event2Tick = ctx.state!.events.pendingEvent!.firedAtTick;
-      // At least 120 ticks must elapse between consecutive events
-      expect(event2Tick - event1Tick).toBeGreaterThanOrEqual(120);
+      // At least MIN_EVENT_INTERVAL_TICKS must elapse between consecutive events
+      expect(event2Tick - event1Tick).toBeGreaterThanOrEqual(MIN_EVENT_INTERVAL_TICKS);
       expect(ctx.state!.events.actionCountSinceEvent).toBe(0);
     });
   });
