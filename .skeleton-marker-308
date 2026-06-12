@@ -1,0 +1,2 @@
+Skeleton phase for #308 — wire incrementActionCount into __gameConsole bridge in main.ts
+No new stubs needed; incrementActionCount already exists at src/core/events/EventSystem.ts:135

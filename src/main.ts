@@ -13,7 +13,12 @@ import { AudioHooks } from './audio/AudioHooks.js';
 import { IndexedDBPersistence } from './persistence/IndexedDBPersistence.js';
 import { DownloadPersistence } from './persistence/DownloadPersistence.js';
 import { createRunner } from './console/createRunner.js';
+import { parseCommand } from './console/ConsoleRunner.js';
 import { BASE_TICK_MS } from './core/engine/GameLoop.js';
+import { incrementActionCount } from './core/events/EventSystem.js';
+
+/** Console commands that should not count as user actions for event cooldown gating. */
+const META_COMMANDS = ['tick', 'speed', 'pause', 'time'] as const;
 
 // --- 3D Scene ---
 const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
@@ -107,7 +112,12 @@ window.__gameConsole = (cmd: string) => {
   const result = runner.run(cmd);
   // Sync the renderer after every command so visual changes appear immediately
   gameRenderer.syncFromContext(ctx);
-  const cmdName = cmd.trim().split(/\s+/)[0] ?? '';
+  const cmdName = parseCommand(cmd).command;
+
+  // Increment action count for non-meta commands (event cooldown gating)
+  if (ctx.state && !META_COMMANDS.includes(cmdName as typeof META_COMMANDS[number])) {
+    incrementActionCount(ctx.state.events);
+  }
 
   // Trigger blast effects and terrain rebuild after a blast
   if (cmdName === 'blast' && result.success && ctx.state) {
