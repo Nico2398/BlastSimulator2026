@@ -23,6 +23,7 @@ import { Random } from '../../src/core/math/Random.js';
 import { setupEvents } from '../../src/core/events/index.js';
 import { clearEvents } from '../../src/core/events/EventPool.js';
 import { createRunner } from '../../src/console/createRunner.js';
+import { parseCommand } from '../../src/console/ConsoleRunner.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -471,6 +472,9 @@ describe('Event system', () => {
   // ── 11. Console bridge action count ──────────────────────────────────────────
 
   describe('console bridge action count', () => {
+    /** Console commands that should not count as user actions for event cooldown gating. */
+    const META_COMMANDS = ['tick', 'speed', 'pause', 'time'] as const;
+
     beforeEach(() => {
       clearEvents();
       setupEvents();
@@ -482,8 +486,8 @@ describe('Event system', () => {
      */
     function simulateBridge(runner: import('../../src/console/ConsoleRunner.js').ConsoleRunner, ctx: GameContext, cmd: string) {
       const result = runner.run(cmd);
-      const cmdName = cmd.trim().split(/\s+/)[0] ?? '';
-      if (ctx.state && !['tick', 'speed', 'pause', 'time'].includes(cmdName)) {
+      const cmdName = parseCommand(cmd).command;
+      if (ctx.state && !META_COMMANDS.includes(cmdName as typeof META_COMMANDS[number])) {
         incrementActionCount(ctx.state.events);
       }
       return result;
@@ -550,7 +554,7 @@ describe('Event system', () => {
       expect(() => {
         const result = runner.run('employee list');
         const cmdName = 'employee';
-        if (ctx.state && !['tick', 'speed', 'pause', 'time'].includes(cmdName)) {
+        if (ctx.state && !META_COMMANDS.includes(cmdName as typeof META_COMMANDS[number])) {
           incrementActionCount(ctx.state.events);
         }
       }).not.toThrow();
