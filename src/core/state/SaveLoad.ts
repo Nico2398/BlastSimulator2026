@@ -40,8 +40,6 @@ export function deserialize(json: string): GameState {
     );
   }
 
-  // Future: add migration logic for older versions here.
-
   // v2 → v3: waitingTicks added to Vehicle interface.
   // Older saves may have vehicles without this field — default to 0.
   if ((obj['version'] as number) < 3) {
@@ -87,10 +85,18 @@ export function deserialize(json: string): GameState {
     }
   }
 
-  // Ensure firedEventIds exists for saves created before it was added
+  // Ensure event system fields exist for saves created before they were added
   const eventsRaw = obj['events'] as Record<string, unknown> | undefined;
-  if (eventsRaw && !Array.isArray(eventsRaw['firedEventIds'])) {
-    eventsRaw['firedEventIds'] = [];
+  if (eventsRaw) {
+    if (!Array.isArray(eventsRaw['firedEventIds'])) {
+      eventsRaw['firedEventIds'] = [];
+    }
+    if (typeof eventsRaw['lastEventTick'] !== 'number') {
+      eventsRaw['lastEventTick'] = 0;
+    }
+    if (typeof eventsRaw['actionCountSinceEvent'] !== 'number') {
+      eventsRaw['actionCountSinceEvent'] = 0;
+    }
   }
 
   // v4 → v5: collectedOre field added

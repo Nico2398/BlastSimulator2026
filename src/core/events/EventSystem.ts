@@ -34,6 +34,10 @@ export interface EventSystemState {
   followUpQueue: string[];
   /** IDs of events that have already fired this level — each fires at most once. */
   firedEventIds: string[];
+  /** Tick count of the most recent event fire. Used to gate events by player activity. */
+  lastEventTick: number;
+  /** Number of player actions since the last event. Used for cooldown gating. */
+  actionCountSinceEvent: number;
 }
 
 export interface FiredEvent {
@@ -52,6 +56,8 @@ export function createEventSystemState(): EventSystemState {
     pendingEvent: null,
     followUpQueue: [],
     firedEventIds: [],
+    lastEventTick: 0,
+    actionCountSinceEvent: 0,
   };
 }
 
@@ -78,6 +84,7 @@ export function tickEventSystem(
     if (!state.firedEventIds.includes(eventId)) {
       state.firedEventIds.push(eventId);
       state.pendingEvent = { eventId, firedAtTick: ctx.tickCount };
+      state.lastEventTick = ctx.tickCount;
       return state.pendingEvent;
     }
   }
@@ -94,6 +101,7 @@ export function tickEventSystem(
       if (event) {
         state.firedEventIds.push(event.id);
         state.pendingEvent = { eventId: event.id, firedAtTick: ctx.tickCount };
+        state.lastEventTick = ctx.tickCount;
         return state.pendingEvent;
       }
     }
@@ -110,6 +118,11 @@ export function clearPendingEvent(state: EventSystemState): void {
 /** Queue a follow-up event. */
 export function queueFollowUp(state: EventSystemState, eventId: string): void {
   state.followUpQueue.push(eventId);
+}
+
+/** Increment the action count since the last event. Used for cooldown gating. */
+export function incrementActionCount(state: EventSystemState): void {
+  state.actionCountSinceEvent++;
 }
 
 // ── Selection ──

@@ -7,6 +7,7 @@ import {
   queueFollowUp,
   selectEvent,
   BASE_TIMER,
+  incrementActionCount,
 } from '../../../src/core/events/EventSystem.js';
 import {
   registerEvents,
@@ -205,5 +206,41 @@ describe('Event system engine', () => {
     const longInterval = unionTimer.remaining;
 
     expect(shortInterval).toBeLessThan(longInterval);
+  });
+
+  it('lastEventTick is 0 in fresh state', () => {
+    const state = createEventSystemState();
+    expect(state.lastEventTick).toBe(0);
+  });
+
+  it('actionCountSinceEvent is 0 in fresh state', () => {
+    const state = createEventSystemState();
+    expect(state.actionCountSinceEvent).toBe(0);
+  });
+
+  it('incrementActionCount increments by 1', () => {
+    const state = createEventSystemState();
+    expect(state.actionCountSinceEvent).toBe(0);
+    incrementActionCount(state);
+    expect(state.actionCountSinceEvent).toBe(1);
+  });
+
+  it('incrementActionCount increments from non-zero', () => {
+    const state = createEventSystemState();
+    state.actionCountSinceEvent = 5;
+    incrementActionCount(state);
+    expect(state.actionCountSinceEvent).toBe(6);
+  });
+
+  it('lastEventTick and actionCountSinceEvent survive JSON round-trip', () => {
+    const state = createEventSystemState();
+    state.lastEventTick = 42;
+    state.actionCountSinceEvent = 7;
+
+    const serialized = JSON.stringify(state);
+    const restored = JSON.parse(serialized) as typeof state;
+
+    expect(restored.lastEventTick).toBe(42);
+    expect(restored.actionCountSinceEvent).toBe(7);
   });
 });
