@@ -24,6 +24,7 @@ import { setupEvents } from '../../src/core/events/index.js';
 import { clearEvents } from '../../src/core/events/EventPool.js';
 import { createRunner } from '../../src/console/createRunner.js';
 import { parseCommand } from '../../src/console/ConsoleRunner.js';
+import { makeCampaignCtx } from './full-level/helpers.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -558,6 +559,75 @@ describe('Event system', () => {
           incrementActionCount(ctx.state.events);
         }
       }).not.toThrow();
+    });
+  });
+
+  // ── 12. Event cooldown cadence ──────────────────────────────────────────────
+
+  describe('event cooldown cadence', () => {
+    it('respects cooldown (120 ticks + 10 actions) in realistic tick+command sequence', () => {
+      // ── Phase 0: Setup campaign context ──
+      const ctx = makeCampaignCtx('dusty_hollow');
+
+      // Disable non-union timers so only union events can fire
+      for (const timer of ctx.state!.events.timers) {
+        if (timer.category !== 'union') {
+          timer.remaining = 99_999;
+        }
+      }
+
+      // Pre-warm tickCount to skip past the initial no-timer-activity zone
+      ctx.state!.tickCount = 110;
+
+      // Set union timer to expire in 2 ticks
+      const unionTimer = ctx.state!.events.timers.find(t => t.category === 'union')!;
+      unionTimer.remaining = 2;
+
+      // Accumulate the required 10 user actions for the cooldown check
+      for (let i = 0; i < 10; i++) {
+        incrementActionCount(ctx.state!.events);
+      }
+      expect(ctx.state!.events.actionCountSinceEvent).toBe(10);
+
+      // ── Phase 1: Fire the first event ──
+      const safetyLimit = ctx.state!.tickCount + 500;
+      while (!ctx.state!.events.pendingEvent && ctx.state!.tickCount < safetyLimit) {
+        tickCommand(ctx, ['5'], {});
+      }
+      expect(ctx.state!.events.pendingEvent).not.toBeNull();
+      const event1Tick = ctx.state!.events.pendingEvent!.firedAtTick;
+      // Cooldown requires at least 120 ticks since lastEventTick (0)
+      expect(event1Tick).toBeGreaterThanOrEqual(120);
+      // Action count must have been reset by the event firing
+      expect(ctx.state!.events.actionCountSinceEvent).toBe(0);
+
+      // Resolve first event so the game can advance again
+      const resolveResult = eventCommand(ctx, ['choose', '0'], {});
+      expect(resolveResult.success).toBe(true);
+      expect(ctx.state!.events.pendingEvent).toBeNull();
+
+      // ── Phase 2: Cooldown blocks immediate re-fire ──
+      tickCommand(ctx, ['1'], {});
+      expect(ctx.state!.events.pendingEvent).toBeNull();
+      expect(ctx.state!.events.lastEventTick).toBe(event1Tick);
+
+      // ── Phase 3: Second event with cooldown ──
+      // Accumulate 10 actions again
+      for (let i = 0; i < 10; i++) {
+        incrementActionCount(ctx.state!.events);
+      }
+      expect(ctx.state!.events.actionCountSinceEvent).toBe(10);
+
+      // Tick until the next event fires
+      const event2SafetyLimit = event1Tick + 500;
+      while (!ctx.state!.events.pendingEvent && ctx.state!.tickCount < event2SafetyLimit) {
+        tickCommand(ctx, ['5'], {});
+      }
+      expect(ctx.state!.events.pendingEvent).not.toBeNull();
+      const event2Tick = ctx.state!.events.pendingEvent!.firedAtTick;
+      // At least 120 ticks must elapse between consecutive events
+      expect(event2Tick - event1Tick).toBeGreaterThanOrEqual(120);
+      expect(ctx.state!.events.actionCountSinceEvent).toBe(0);
     });
   });
 });
