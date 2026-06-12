@@ -39,7 +39,7 @@ export function createCampaignState(): CampaignState {
     const lvl = all[i]!;
     levels[lvl.id] = {
       levelId: lvl.id,
-      unlocked: i === 0, // Only first level starts unlocked
+      unlocked: i === 0 || lvl.difficultyTier === 1,
       completed: false,
       cumulativeProfit: 0,
       bestSessionProfit: 0,
