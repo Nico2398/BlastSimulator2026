@@ -167,7 +167,7 @@ export function createRunner(): RunnerWithContext {
   runner.register('tick', 'Advance time by N ticks (default 1)', (args, named) =>
     tickCommand(ctx, args, named),
   );
-  runner.register('event', 'Event system (status|choose|timers|fire)', (args, named) =>
+  runner.register('event', 'Event system (status|choose|timers|fire <id>)', (args, named) =>
     eventCommand(ctx, args, named),
   );
   runner.register('corrupt', 'Corruption (target:judge cost:50000)', (args, named) =>
