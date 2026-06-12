@@ -6,10 +6,9 @@ import {
   clearPendingEvent,
   queueFollowUp,
   selectEvent,
-  BASE_TIMER,
   incrementActionCount,
-  MIN_EVENT_INTERVAL_ACTIONS,
 } from '../../../src/core/events/EventSystem.js';
+import { MIN_EVENT_INTERVAL_ACTIONS } from '../../../src/core/config/balance.js';
 import {
   registerEvents,
   clearEvents,

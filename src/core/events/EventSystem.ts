@@ -101,6 +101,7 @@ export function tickEventSystem(
       const minInterval = MIN_EVENT_INTERVAL_TICKS + rng.nextInt(0, MIN_EVENT_INTERVAL_RANDOM_RANGE);
       const ticksSinceLastEvent = ctx.tickCount - state.lastEventTick;
       if (ticksSinceLastEvent < minInterval || state.actionCountSinceEvent < MIN_EVENT_INTERVAL_ACTIONS) {
+        // Short retry delay (5 ticks) before re-checking cooldown — avoids tight loop
         timer.remaining = 5;
         continue;
       }
@@ -203,12 +204,8 @@ function getModulatedInterval(
       break;
   }
 
+  // Floor of 5 ticks ensures a minimum gap even with extreme score modulation
   return Math.max(5, Math.round(baseInterval * multiplier));
 }
 
-export {
-  BASE_TIMER,
-  MIN_EVENT_INTERVAL_TICKS,
-  MIN_EVENT_INTERVAL_RANDOM_RANGE,
-  MIN_EVENT_INTERVAL_ACTIONS,
-};
+
