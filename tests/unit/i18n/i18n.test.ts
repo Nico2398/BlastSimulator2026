@@ -513,3 +513,35 @@ describe('need.well_rested_bonus — {amount} / {threshold} interpolation', () =
     });
   }
 });
+
+// ── Level tutorial_pit keys ──────────────────────────────────────────────
+
+const LEVEL_TUTORIAL_PIT_KEYS = [
+  'level.tutorial_pit.name',
+  'level.tutorial_pit.desc',
+] as const;
+
+describe('level.tutorial_pit name & desc keys resolve in both locales', () => {
+  for (const locale of LOCALES) {
+    it(`locale ${locale}: level.tutorial_pit name and desc resolve`, () => {
+      setLocale(locale);
+      for (const key of LEVEL_TUTORIAL_PIT_KEYS) {
+        const result = t(key);
+        expect(result, `key "${key}" must resolve in ${locale}`).not.toBe(key);
+        expect(result.length, `key "${key}" must be non-empty in ${locale}`).toBeGreaterThan(0);
+      }
+    });
+  }
+});
+
+describe('level.tutorial_pit keys — en and fr translations differ', () => {
+  it('level.tutorial_pit.desc is translated differently in en vs fr', () => {
+    setLocale('en');
+    const en = t('level.tutorial_pit.desc');
+    setLocale('fr');
+    const fr = t('level.tutorial_pit.desc');
+    expect(en, 'level.tutorial_pit.desc must resolve in en').not.toBe('level.tutorial_pit.desc');
+    expect(fr, 'level.tutorial_pit.desc must resolve in fr').not.toBe('level.tutorial_pit.desc');
+    expect(en, 'en and fr translations for level.tutorial_pit.desc must differ').not.toBe(fr);
+  });
+});
