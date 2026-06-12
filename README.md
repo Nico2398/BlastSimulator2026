@@ -79,7 +79,6 @@ npm run validate      # Full PR gate — typecheck → tests → build
 | `scripts/screenshot.ts` | TypeScript | Puppeteer-based headless screenshot script. Launches Chrome, optionally runs console commands, saves PNG to `screenshots/`. | `npx tsx scripts/screenshot.ts --name "after-blast" --commands "survey 25,30; blast"` |
 | `scripts/scenario-test.ts` | TypeScript | Full scenario test runner. Loads a scenario JSON from `scripts/scenario-defs/`, runs each command step in headless Chrome, captures screenshot + full game state dump after every step. Output: `screenshots/scenario-{name}/` with per-step PNGs, JSON state files, and `report.json`. | `npx tsx scripts/scenario-test.ts --scenario blast-basic` |
 | `scripts/ui-diagnostic.ts` | TypeScript | Exhaustive UI button diagnostic. Opens game, clicks every interactive element across all panels. Output: `screenshots/ui-diagnostic/` with per-panel screenshots + `report.json`. | `npx tsx scripts/ui-diagnostic.ts` |
-| `scripts/backlog.ts` | TypeScript | Developer backlog CLI for tracking task progress (see agentic-backlog skill). Commands: `list`, `next`, `start`, `done`, `block`, `reset`, `stats`. | `npx tsx scripts/backlog.ts list` |
 | `scripts/check-tasks.sh` | Bash | Task consistency checker. Verifies completed tasks have expected source files, test files exist for core phases, i18n key parity, and no hardcoded strings. | `bash scripts/check-tasks.sh` |
 | `scripts/build-itch.sh` | Bash | Full itch.io deployment build: runs tests → TypeScript check → production build → creates `dist.zip`. | `bash scripts/build-itch.sh` |
 
@@ -302,7 +301,6 @@ tests/
       helpers.ts        Shared test utilities
 
 scripts/
-  backlog.ts            Developer backlog CLI
   build-itch.sh         Full itch.io deployment build
   check-tasks.sh        Task consistency checker
   screenshot.ts         Puppeteer-based screenshot script

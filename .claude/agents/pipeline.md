@@ -257,7 +257,6 @@ The `auto-assign-next.yml` workflow (triggered on `pull_request: [synchronize]`)
 Rules:
 - **NEVER** include `[skip ci]` in any commit message on `pipeline/feature-*` branches
 - The `verify-commit` auto-commit message must NOT contain `[skip ci]`
-- **NEVER** run the backlog `done` command during pipeline execution. The `auto-assign-next.yml` workflow handles backlog updates on `main` AFTER the PR is merged. Running it early pollutes the feature branch with a `[skip ci]` commit and breaks auto-merge.
 
 ## Output Format
 
