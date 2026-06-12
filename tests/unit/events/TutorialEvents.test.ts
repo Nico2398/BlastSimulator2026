@@ -122,4 +122,32 @@ describe('tutorial event definitions', () => {
     expect(con.scoreDelta?.safety).toBe(-5);
     expect(con.cashDelta).toBeUndefined();
   });
+
+  it('weightCoeff returns a constant 0.5 regardless of scores', () => {
+    const ev = getEventById('tutorial_synergy_consultant')!;
+    const highScores = { wellBeing: 100, safety: 100, ecology: 100, nuisance: 100 };
+    const lowScores = { wellBeing: 0, safety: 0, ecology: 0, nuisance: 0 };
+
+    expect(ev.weightCoeff(highScores)).toBe(0.5);
+    expect(ev.weightCoeff(lowScores)).toBe(0.5);
+  });
+
+  it('canFire returns true for any context', () => {
+    const ev = getEventById('tutorial_synergy_consultant')!;
+    // Tutorial events should always be fireable
+    const ctx = {
+      scores: { wellBeing: 50, safety: 50, ecology: 50, nuisance: 50 },
+      employeeCount: 0,
+      deathCount: 0,
+      corruptionLevel: 0,
+      hasBuilding: () => false,
+      hasDrillPlan: false,
+      tickCount: 0,
+      lawsuitCount: 0,
+      activeContractCount: 0,
+      weatherId: 'sunny',
+    };
+
+    expect(ev.canFire(ctx)).toBe(true);
+  });
 });
