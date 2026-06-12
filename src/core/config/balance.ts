@@ -107,6 +107,15 @@ export const EVENT_BASE_TIMERS = {
   lawsuit: 35,
 } as const;
 
+/** Minimum ticks that must elapse between consecutive events. */
+export const MIN_EVENT_INTERVAL_TICKS = 0;
+
+/** Random additional ticks added to the per-event cooldown. */
+export const MIN_EVENT_INTERVAL_RANDOM_RANGE = 0;
+
+/** Minimum number of user-initiated actions required between events. */
+export const MIN_EVENT_INTERVAL_ACTIONS = 0;
+
 // ─── Traffic ───────────────────────────────────────────────────────────────────
 
 /** Minimum number of vehicles waiting on the same target cell to trigger a traffic jam. */
