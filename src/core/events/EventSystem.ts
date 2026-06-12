@@ -85,6 +85,7 @@ export function tickEventSystem(
       state.firedEventIds.push(eventId);
       state.pendingEvent = { eventId, firedAtTick: ctx.tickCount };
       state.lastEventTick = ctx.tickCount;
+      state.actionCountSinceEvent = 0;
       return state.pendingEvent;
     }
   }
@@ -96,12 +97,21 @@ export function tickEventSystem(
       // Reset timer with score-modulated interval
       timer.remaining = getModulatedInterval(timer.category, ctx.scores, timer.baseInterval);
 
+      // Cooldown check — prevent events from firing too rapidly
+      const minInterval = MIN_EVENT_INTERVAL_TICKS + rng.nextInt(0, MIN_EVENT_INTERVAL_RANDOM_RANGE);
+      const ticksSinceLastEvent = ctx.tickCount - state.lastEventTick;
+      if (ticksSinceLastEvent < minInterval || state.actionCountSinceEvent < MIN_EVENT_INTERVAL_ACTIONS) {
+        timer.remaining = 5;
+        continue;
+      }
+
       // Try to fire an event from this category (already-fired events excluded)
       const event = selectEvent(timer.category, ctx, rng, state.firedEventIds);
       if (event) {
         state.firedEventIds.push(event.id);
         state.pendingEvent = { eventId: event.id, firedAtTick: ctx.tickCount };
         state.lastEventTick = ctx.tickCount;
+        state.actionCountSinceEvent = 0;
         return state.pendingEvent;
       }
     }
