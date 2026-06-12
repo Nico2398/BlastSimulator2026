@@ -6,9 +6,9 @@ import {
   clearPendingEvent,
   queueFollowUp,
   selectEvent,
-  BASE_TIMER,
   incrementActionCount,
 } from '../../../src/core/events/EventSystem.js';
+import { MIN_EVENT_INTERVAL_ACTIONS } from '../../../src/core/config/balance.js';
 import {
   registerEvents,
   clearEvents,
@@ -64,9 +64,10 @@ describe('Event system engine', () => {
     registerEvents([makeEvent('test1', 'union')]);
     const state = createEventSystemState();
     const unionTimer = state.timers.find(t => t.category === 'union')!;
+    state.actionCountSinceEvent = MIN_EVENT_INTERVAL_ACTIONS;
     unionTimer.remaining = 1; // Will fire next tick
 
-    const ctx = makeCtx();
+    const ctx = makeCtx({ tickCount: 200 });
     const fired = tickEventSystem(state, ctx, new Random(42));
     expect(fired).not.toBeNull();
     expect(fired!.eventId).toBe('test1');
@@ -131,14 +132,16 @@ describe('Event system engine', () => {
     const unionTimer = state.timers.find(t => t.category === 'union')!;
 
     // Fire the event once
+    state.actionCountSinceEvent = MIN_EVENT_INTERVAL_ACTIONS;
     unionTimer.remaining = 1;
-    const first = tickEventSystem(state, makeCtx(), new Random(42));
+    const first = tickEventSystem(state, makeCtx({ tickCount: 200 }), new Random(42));
     expect(first?.eventId).toBe('once_only');
     clearPendingEvent(state);
 
     // Attempt to fire again
+    state.actionCountSinceEvent = MIN_EVENT_INTERVAL_ACTIONS;
     unionTimer.remaining = 1;
-    const second = tickEventSystem(state, makeCtx(), new Random(42));
+    const second = tickEventSystem(state, makeCtx({ tickCount: 400 }), new Random(42));
     expect(second).toBeNull();
     expect(state.firedEventIds).toContain('once_only');
   });
@@ -190,17 +193,19 @@ describe('Event system engine', () => {
     registerEvents([makeEvent('test1', 'union')]);
     const state = createEventSystemState();
     const unionTimer = state.timers.find(t => t.category === 'union')!;
-    unionTimer.remaining = 1;
 
     // Low well-being → shorter interval
-    const lowCtx = makeCtx({ scores: { ...createScoreState(), wellBeing: 10 } });
+    state.actionCountSinceEvent = MIN_EVENT_INTERVAL_ACTIONS;
+    unionTimer.remaining = 1;
+    const lowCtx = makeCtx({ scores: { ...createScoreState(), wellBeing: 10 }, tickCount: 200 });
     tickEventSystem(state, lowCtx, new Random(42));
     clearPendingEvent(state);
     const shortInterval = unionTimer.remaining;
 
     // Reset and try with high well-being
+    state.actionCountSinceEvent = MIN_EVENT_INTERVAL_ACTIONS;
     unionTimer.remaining = 1;
-    const highCtx = makeCtx({ scores: { ...createScoreState(), wellBeing: 90 } });
+    const highCtx = makeCtx({ scores: { ...createScoreState(), wellBeing: 90 }, tickCount: 400 });
     tickEventSystem(state, highCtx, new Random(42));
     clearPendingEvent(state);
     const longInterval = unionTimer.remaining;
@@ -242,5 +247,114 @@ describe('Event system engine', () => {
 
     expect(restored.lastEventTick).toBe(42);
     expect(restored.actionCountSinceEvent).toBe(7);
+  });
+
+  // ── Cooldown gating tests ──
+
+  it('cooldown blocks event when tick interval not met', () => {
+    registerEvents([makeEvent('test1', 'union')]);
+    const state = createEventSystemState();
+    state.lastEventTick = 190;
+    state.actionCountSinceEvent = MIN_EVENT_INTERVAL_ACTIONS;
+    const unionTimer = state.timers.find(t => t.category === 'union')!;
+    unionTimer.remaining = 1;
+
+    const ctx = makeCtx({ tickCount: 200 });
+    const fired = tickEventSystem(state, ctx, new Random(42));
+    expect(fired).toBeNull();
+    expect(unionTimer.remaining).toBe(5);
+  });
+
+  it('cooldown blocks event when action count not met', () => {
+    registerEvents([makeEvent('test1', 'union')]);
+    const state = createEventSystemState();
+    state.lastEventTick = 0;
+    state.actionCountSinceEvent = 0;
+    const unionTimer = state.timers.find(t => t.category === 'union')!;
+    unionTimer.remaining = 1;
+
+    const ctx = makeCtx({ tickCount: 200 });
+    const fired = tickEventSystem(state, ctx, new Random(42));
+    expect(fired).toBeNull();
+    expect(unionTimer.remaining).toBe(5);
+  });
+
+  it('cooldown allows event when both conditions met', () => {
+    registerEvents([makeEvent('test1', 'union')]);
+    const state = createEventSystemState();
+    state.lastEventTick = 0;
+    state.actionCountSinceEvent = MIN_EVENT_INTERVAL_ACTIONS;
+    const unionTimer = state.timers.find(t => t.category === 'union')!;
+    unionTimer.remaining = 1;
+
+    const ctx = makeCtx({ tickCount: 200 });
+    const fired = tickEventSystem(state, ctx, new Random(42));
+    expect(fired).not.toBeNull();
+    expect(fired!.eventId).toBe('test1');
+  });
+
+  it('timer resets to 5 on cooldown failure, not to modulated interval', () => {
+    registerEvents([makeEvent('test1', 'union')]);
+    const state = createEventSystemState();
+    state.lastEventTick = 190;
+    state.actionCountSinceEvent = MIN_EVENT_INTERVAL_ACTIONS;
+    const unionTimer = state.timers.find(t => t.category === 'union')!;
+    unionTimer.remaining = 1;
+
+    const ctx = makeCtx({ tickCount: 200 });
+    tickEventSystem(state, ctx, new Random(42));
+    // Modulated interval for union at default scores (wellBeing: 50) would be ~25.
+    // On cooldown failure it must be exactly 5.
+    expect(unionTimer.remaining).toBe(5);
+  });
+
+  it('actionCountSinceEvent resets to 0 after event fires', () => {
+    registerEvents([makeEvent('test1', 'union')]);
+    const state = createEventSystemState();
+    state.actionCountSinceEvent = MIN_EVENT_INTERVAL_ACTIONS;
+    const unionTimer = state.timers.find(t => t.category === 'union')!;
+    unionTimer.remaining = 1;
+
+    const ctx = makeCtx({ tickCount: 200 });
+    tickEventSystem(state, ctx, new Random(42));
+    expect(state.actionCountSinceEvent).toBe(0);
+  });
+
+  it('lastEventTick updates after event fires through timer', () => {
+    registerEvents([makeEvent('test1', 'union')]);
+    const state = createEventSystemState();
+    state.actionCountSinceEvent = MIN_EVENT_INTERVAL_ACTIONS;
+    const unionTimer = state.timers.find(t => t.category === 'union')!;
+    unionTimer.remaining = 1;
+
+    const ctx = makeCtx({ tickCount: 200 });
+    tickEventSystem(state, ctx, new Random(42));
+    expect(state.lastEventTick).toBe(200);
+  });
+
+  it('actionCountSinceEvent resets to 0 after follow-up event fires', () => {
+    registerEvents([makeEvent('followup_ev', 'union')]);
+    const state = createEventSystemState();
+    state.actionCountSinceEvent = 5;
+    queueFollowUp(state, 'followup_ev');
+
+    const ctx = makeCtx({ tickCount: 200 });
+    const fired = tickEventSystem(state, ctx, new Random(42));
+    expect(fired).not.toBeNull();
+    expect(fired!.eventId).toBe('followup_ev');
+    expect(state.actionCountSinceEvent).toBe(0);
+  });
+
+  it('follow-up queue events bypass cooldown check', () => {
+    registerEvents([makeEvent('followup_ev', 'union')]);
+    const state = createEventSystemState();
+    state.lastEventTick = 190;
+    state.actionCountSinceEvent = 0;
+    queueFollowUp(state, 'followup_ev');
+
+    const ctx = makeCtx({ tickCount: 200 });
+    const fired = tickEventSystem(state, ctx, new Random(42));
+    expect(fired).not.toBeNull();
+    expect(fired!.eventId).toBe('followup_ev');
   });
 });

@@ -105,6 +105,9 @@ describe('GameLoop', () => {
   it('auto-pauses when event fires (requires decision)', () => {
     // Register a simple event that always fires
     setupEvents();
+    // Bypass cooldown gate so the event can fire on the first tick
+    state.events.lastEventTick = -200;
+    state.events.actionCountSinceEvent = 10;
     // Set timers to fire immediately by advancing close to trigger
     for (const timer of state.events.timers) {
       timer.remaining = 1;
