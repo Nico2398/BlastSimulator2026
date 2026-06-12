@@ -45,6 +45,13 @@ function makeEvent(id: string, category: 'union' | 'politics', weight: number = 
   };
 }
 
+/** Create a fresh event-system state and find the union timer. */
+function setupEventState() {
+  const state = createEventSystemState();
+  const timer = state.timers.find(t => t.category === 'union')!;
+  return { state, timer };
+}
+
 describe('Event system engine', () => {
   beforeEach(() => {
     clearEvents();
@@ -52,20 +59,18 @@ describe('Event system engine', () => {
 
   it('event timer counts down each tick', () => {
     registerEvents([makeEvent('test1', 'union')]);
-    const state = createEventSystemState();
-    const unionTimer = state.timers.find(t => t.category === 'union')!;
-    const initial = unionTimer.remaining;
+    const { state, timer } = setupEventState();
+    const initial = timer.remaining;
 
     tickEventSystem(state, makeCtx(), new Random(42));
-    expect(unionTimer.remaining).toBe(initial - 1);
+    expect(timer.remaining).toBe(initial - 1);
   });
 
   it('when timer reaches zero, an event is selected and fired', () => {
     registerEvents([makeEvent('test1', 'union')]);
-    const state = createEventSystemState();
-    const unionTimer = state.timers.find(t => t.category === 'union')!;
+    const { state, timer } = setupEventState();
     state.actionCountSinceEvent = MIN_EVENT_INTERVAL_ACTIONS;
-    unionTimer.remaining = 1; // Will fire next tick
+    timer.remaining = 1;
 
     const ctx = makeCtx({ tickCount: 200 });
     const fired = tickEventSystem(state, ctx, new Random(42));
@@ -253,39 +258,34 @@ describe('Event system engine', () => {
 
   it('cooldown blocks event when tick interval not met', () => {
     registerEvents([makeEvent('test1', 'union')]);
-    const state = createEventSystemState();
+    const { state, timer } = setupEventState();
     state.lastEventTick = 190;
     state.actionCountSinceEvent = MIN_EVENT_INTERVAL_ACTIONS;
-    const unionTimer = state.timers.find(t => t.category === 'union')!;
-    unionTimer.remaining = 1;
+    timer.remaining = 1;
 
     const ctx = makeCtx({ tickCount: 200 });
     const fired = tickEventSystem(state, ctx, new Random(42));
     expect(fired).toBeNull();
-    expect(unionTimer.remaining).toBe(5);
+    expect(timer.remaining).toBe(5);
   });
 
   it('cooldown blocks event when action count not met', () => {
     registerEvents([makeEvent('test1', 'union')]);
-    const state = createEventSystemState();
-    state.lastEventTick = 0;
+    const { state, timer } = setupEventState();
     state.actionCountSinceEvent = 0;
-    const unionTimer = state.timers.find(t => t.category === 'union')!;
-    unionTimer.remaining = 1;
+    timer.remaining = 1;
 
     const ctx = makeCtx({ tickCount: 200 });
     const fired = tickEventSystem(state, ctx, new Random(42));
     expect(fired).toBeNull();
-    expect(unionTimer.remaining).toBe(5);
+    expect(timer.remaining).toBe(5);
   });
 
   it('cooldown allows event when both conditions met', () => {
     registerEvents([makeEvent('test1', 'union')]);
-    const state = createEventSystemState();
-    state.lastEventTick = 0;
+    const { state, timer } = setupEventState();
     state.actionCountSinceEvent = MIN_EVENT_INTERVAL_ACTIONS;
-    const unionTimer = state.timers.find(t => t.category === 'union')!;
-    unionTimer.remaining = 1;
+    timer.remaining = 1;
 
     const ctx = makeCtx({ tickCount: 200 });
     const fired = tickEventSystem(state, ctx, new Random(42));
@@ -298,12 +298,9 @@ describe('Event system engine', () => {
 
     // Seed 7 → rng.nextInt(0,60) = 0 → minInterval = 120 + 0 = 120
     // tickCount=150, lastEventTick=0 → ticksSinceLastEvent=150 ≥ 120 → passes
-    const state1 = createEventSystemState();
-    state1.lastEventTick = 0;
+    const { state: state1, timer: timer1 } = setupEventState();
     state1.actionCountSinceEvent = MIN_EVENT_INTERVAL_ACTIONS;
-    const timer1 = state1.timers.find(t => t.category === 'union')!;
     timer1.remaining = 1;
-
     const ctx1 = makeCtx({ tickCount: 150 });
     const fired1 = tickEventSystem(state1, ctx1, new Random(7));
     expect(fired1).not.toBeNull();
@@ -311,12 +308,9 @@ describe('Event system engine', () => {
 
     // Seed 43 → rng.nextInt(0,60) = 60 → minInterval = 120 + 60 = 180
     // tickCount=150, lastEventTick=0 → ticksSinceLastEvent=150 < 180 → blocked
-    const state2 = createEventSystemState();
-    state2.lastEventTick = 0;
+    const { state: state2, timer: timer2 } = setupEventState();
     state2.actionCountSinceEvent = MIN_EVENT_INTERVAL_ACTIONS;
-    const timer2 = state2.timers.find(t => t.category === 'union')!;
     timer2.remaining = 1;
-
     const ctx2 = makeCtx({ tickCount: 150 });
     const fired2 = tickEventSystem(state2, ctx2, new Random(43));
     expect(fired2).toBeNull();
@@ -324,25 +318,23 @@ describe('Event system engine', () => {
 
   it('timer resets to 5 on cooldown failure, not to modulated interval', () => {
     registerEvents([makeEvent('test1', 'union')]);
-    const state = createEventSystemState();
+    const { state, timer } = setupEventState();
     state.lastEventTick = 190;
     state.actionCountSinceEvent = MIN_EVENT_INTERVAL_ACTIONS;
-    const unionTimer = state.timers.find(t => t.category === 'union')!;
-    unionTimer.remaining = 1;
+    timer.remaining = 1;
 
     const ctx = makeCtx({ tickCount: 200 });
     tickEventSystem(state, ctx, new Random(42));
     // Modulated interval for union at default scores (wellBeing: 50) would be ~25.
     // On cooldown failure it must be exactly 5.
-    expect(unionTimer.remaining).toBe(5);
+    expect(timer.remaining).toBe(5);
   });
 
   it('actionCountSinceEvent resets to 0 after event fires', () => {
     registerEvents([makeEvent('test1', 'union')]);
-    const state = createEventSystemState();
+    const { state, timer } = setupEventState();
     state.actionCountSinceEvent = MIN_EVENT_INTERVAL_ACTIONS;
-    const unionTimer = state.timers.find(t => t.category === 'union')!;
-    unionTimer.remaining = 1;
+    timer.remaining = 1;
 
     const ctx = makeCtx({ tickCount: 200 });
     tickEventSystem(state, ctx, new Random(42));
@@ -351,10 +343,9 @@ describe('Event system engine', () => {
 
   it('lastEventTick updates after event fires through timer', () => {
     registerEvents([makeEvent('test1', 'union')]);
-    const state = createEventSystemState();
+    const { state, timer } = setupEventState();
     state.actionCountSinceEvent = MIN_EVENT_INTERVAL_ACTIONS;
-    const unionTimer = state.timers.find(t => t.category === 'union')!;
-    unionTimer.remaining = 1;
+    timer.remaining = 1;
 
     const ctx = makeCtx({ tickCount: 200 });
     tickEventSystem(state, ctx, new Random(42));
