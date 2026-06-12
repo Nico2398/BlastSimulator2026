@@ -17,6 +17,7 @@ import { FOLLOWUP_EVENTS } from './FollowUpEvents.js';
 import { TRAFFIC_JAM_EVENTS } from './TrafficJamEvents.js';
 import { UNQUALIFIED_TASK_EVENTS } from './UnqualifiedTaskEvents.js';
 import { ORE_REPORT_EVENTS } from './OreReportEvents.js';
+import { TUTORIAL_EVENTS } from './TutorialEvents.js';
 
 export { clearEvents } from './EventPool.js';
 
@@ -36,4 +37,5 @@ export function setupEvents(): void {
   registerEvents(TRAFFIC_JAM_EVENTS);
   registerEvents(UNQUALIFIED_TASK_EVENTS);
   registerEvents(ORE_REPORT_EVENTS);
+  registerEvents(TUTORIAL_EVENTS);
 }
