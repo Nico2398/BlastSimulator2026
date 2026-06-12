@@ -1416,6 +1416,8 @@
   "weather.light_rain": "Pluie légère",
   "weather.storm": "Tempête",
   "weather.sunny": "Ensoleillé",
+  "level.tutorial_pit.name": "Fosse d'Apprentissage",
+  "level.tutorial_pit.desc": "Une petite carrière accueillante où vous apprendrez les bases. Suivez les conseils utiles et essayez de ne rien faire exploser... accidentellement.",
   "level.dusty_hollow.name": "La Combe Poussiéreuse",
   "level.dusty_hollow.desc": "Une carrière désertique où les ambitions sont aussi sèches que le paysage. Idéal pour les débutants qui préfèrent ne pas faire faillite immédiatement.",
   "level.grumpstone_ridge.name": "Le Crête Grognonne",

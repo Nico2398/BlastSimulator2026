@@ -1416,6 +1416,8 @@
   "weather.light_rain": "Light Rain",
   "weather.storm": "Storm",
   "weather.sunny": "Sunny",
+  "level.tutorial_pit.name": "Tutorial Pit",
+  "level.tutorial_pit.desc": "A small, friendly quarry where you'll learn the ropes. Follow the helpful hints and try not to blow anything up... accidentally.",
   "level.dusty_hollow.name": "Dusty Hollow",
   "level.dusty_hollow.desc": "A sun-baked desert quarry where ambitions are as dry as the landscape. Perfect for beginners who'd rather not immediately go bankrupt.",
   "level.grumpstone_ridge.name": "Grumpstone Ridge",
