@@ -241,6 +241,11 @@ export function eventCommand(
       return { success: true, output: lines.join('\n') };
     }
 
+    case 'fire': {
+      // TODO: implement in green phase
+      return { success: false, output: 'Not yet implemented' };
+    }
+
     default:
       return { success: false, output: 'Usage: event (status|choose|timers)' };
   }
