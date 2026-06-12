@@ -1,5 +1,6 @@
 // BlastSimulator2026 — Tutorial events
 // Events that guide the player through the first levels of the campaign.
+
 import { ev } from './EventBuilder.js';
 import type { EventDef } from './EventPool.js';
 
