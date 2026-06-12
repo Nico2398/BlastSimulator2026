@@ -293,6 +293,35 @@ describe('Event system engine', () => {
     expect(fired!.eventId).toBe('test1');
   });
 
+  it('random factor adds 0-60 extra ticks to event cooldown interval', () => {
+    registerEvents([makeEvent('test1', 'union')]);
+
+    // Seed 7 → rng.nextInt(0,60) = 0 → minInterval = 120 + 0 = 120
+    // tickCount=150, lastEventTick=0 → ticksSinceLastEvent=150 ≥ 120 → passes
+    const state1 = createEventSystemState();
+    state1.lastEventTick = 0;
+    state1.actionCountSinceEvent = MIN_EVENT_INTERVAL_ACTIONS;
+    const timer1 = state1.timers.find(t => t.category === 'union')!;
+    timer1.remaining = 1;
+
+    const ctx1 = makeCtx({ tickCount: 150 });
+    const fired1 = tickEventSystem(state1, ctx1, new Random(7));
+    expect(fired1).not.toBeNull();
+    expect(fired1!.eventId).toBe('test1');
+
+    // Seed 43 → rng.nextInt(0,60) = 60 → minInterval = 120 + 60 = 180
+    // tickCount=150, lastEventTick=0 → ticksSinceLastEvent=150 < 180 → blocked
+    const state2 = createEventSystemState();
+    state2.lastEventTick = 0;
+    state2.actionCountSinceEvent = MIN_EVENT_INTERVAL_ACTIONS;
+    const timer2 = state2.timers.find(t => t.category === 'union')!;
+    timer2.remaining = 1;
+
+    const ctx2 = makeCtx({ tickCount: 150 });
+    const fired2 = tickEventSystem(state2, ctx2, new Random(43));
+    expect(fired2).toBeNull();
+  });
+
   it('timer resets to 5 on cooldown failure, not to modulated interval', () => {
     registerEvents([makeEvent('test1', 'union')]);
     const state = createEventSystemState();
