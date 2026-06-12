@@ -53,6 +53,8 @@ describe('event fire subcommand', () => {
     expect(result.success).toBe(true);
     // Should contain the resolved event title
     expect(result.output).toContain(t(def!.titleKey));
+    // Should contain the event description
+    expect(result.output).toContain(t(def!.descKey));
     // Should contain the resolution hint
     expect(result.output).toContain('→ Use "event choose <index>" to decide.');
     // Should list option numbers for all options
