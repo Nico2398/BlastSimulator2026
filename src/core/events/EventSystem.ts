@@ -5,7 +5,7 @@ import type { Random } from '../math/Random.js';
 import type { ScoreState } from '../scores/ScoreManager.js';
 import type { EventDef, EventCategory, EventContext } from './EventPool.js';
 import { getEventsByCategory } from './EventPool.js';
-import { EVENT_BASE_TIMERS } from '../config/balance.js';
+import { EVENT_BASE_TIMERS, MIN_EVENT_INTERVAL_TICKS, MIN_EVENT_INTERVAL_RANDOM_RANGE, MIN_EVENT_INTERVAL_ACTIONS } from '../config/balance.js';
 
 // ── Config (imported from centralized balance) ──
 
@@ -196,4 +196,9 @@ function getModulatedInterval(
   return Math.max(5, Math.round(baseInterval * multiplier));
 }
 
-export { BASE_TIMER };
+export {
+  BASE_TIMER,
+  MIN_EVENT_INTERVAL_TICKS,
+  MIN_EVENT_INTERVAL_RANDOM_RANGE,
+  MIN_EVENT_INTERVAL_ACTIONS,
+};
