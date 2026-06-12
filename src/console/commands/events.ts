@@ -242,12 +242,34 @@ export function eventCommand(
     }
 
     case 'fire': {
-      // TODO: implement in green phase
-      return { success: false, output: 'Not yet implemented' };
+      const eventId = args[1];
+      if (!eventId) {
+        return { success: false, output: 'Usage: event fire <eventId>' };
+      }
+      const def = getEventById(eventId);
+      if (!def) {
+        return { success: false, output: `Event "${eventId}" not found in pool.` };
+      }
+      state.events.pendingEvent = { eventId: def.id, firedAtTick: state.tickCount };
+      if (!state.events.firedEventIds.includes(def.id)) {
+        state.events.firedEventIds.push(def.id);
+      }
+      state.events.lastEventTick = state.tickCount;
+      state.events.actionCountSinceEvent = 0;
+      state.isPaused = true;
+      const lines = [
+        `EVENT: ${t(def.titleKey)}`,
+        `  ${t(def.descKey)}`,
+      ];
+      for (let j = 0; j < def.options.length; j++) {
+        lines.push(`  [${j}] ${t(def.options[j]!.labelKey)}`);
+      }
+      lines.push('  → Use "event choose <index>" to decide.');
+      return { success: true, output: lines.join('\n') };
     }
 
     default:
-      return { success: false, output: 'Usage: event (status|choose|timers)' };
+      return { success: false, output: 'Usage: event (status|choose|timers|fire)' };
   }
 }
 
