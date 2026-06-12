@@ -545,3 +545,48 @@ describe('level.tutorial_pit keys — en and fr translations differ', () => {
     expect(en, 'en and fr translations for level.tutorial_pit.desc must differ').not.toBe(fr);
   });
 });
+
+// ── Tutorial synergy consultant event keys (event.tutorial_synergy_consultant.*) ─
+
+const TUTORIAL_SYNERGY_CONSULTANT_KEYS = [
+  'event.tutorial_synergy_consultant.title',
+  'event.tutorial_synergy_consultant.desc',
+  'event.tutorial_synergy_consultant.opt0',
+  'event.tutorial_synergy_consultant.opt1',
+  'event.tutorial_synergy_consultant.opt2',
+] as const;
+
+describe('tutorial_synergy_consultant event keys resolve in both locales', () => {
+  for (const locale of LOCALES) {
+    it(`locale ${locale}: all event.tutorial_synergy_consultant.* keys resolve`, () => {
+      setLocale(locale);
+      for (const key of TUTORIAL_SYNERGY_CONSULTANT_KEYS) {
+        const result = t(key);
+        expect(result, `key "${key}" must resolve in ${locale}`).not.toBe(key);
+        expect(result.length, `key "${key}" must be non-empty in ${locale}`).toBeGreaterThan(0);
+      }
+    });
+  }
+});
+
+describe('tutorial_synergy_consultant event keys — en and fr translations differ', () => {
+  it('event.tutorial_synergy_consultant.title is translated differently in en vs fr', () => {
+    setLocale('en');
+    const en = t('event.tutorial_synergy_consultant.title');
+    setLocale('fr');
+    const fr = t('event.tutorial_synergy_consultant.title');
+    expect(en, 'event.tutorial_synergy_consultant.title must resolve in en').not.toBe('event.tutorial_synergy_consultant.title');
+    expect(fr, 'event.tutorial_synergy_consultant.title must resolve in fr').not.toBe('event.tutorial_synergy_consultant.title');
+    expect(en, 'en and fr translations for event.tutorial_synergy_consultant.title must differ').not.toBe(fr);
+  });
+
+  it('event.tutorial_synergy_consultant.opt0 is translated differently in en vs fr', () => {
+    setLocale('en');
+    const en = t('event.tutorial_synergy_consultant.opt0');
+    setLocale('fr');
+    const fr = t('event.tutorial_synergy_consultant.opt0');
+    expect(en, 'event.tutorial_synergy_consultant.opt0 must resolve in en').not.toBe('event.tutorial_synergy_consultant.opt0');
+    expect(fr, 'event.tutorial_synergy_consultant.opt0 must resolve in fr').not.toBe('event.tutorial_synergy_consultant.opt0');
+    expect(en, 'en and fr translations for event.tutorial_synergy_consultant.opt0 must differ').not.toBe(fr);
+  });
+});
