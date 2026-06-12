@@ -40,7 +40,7 @@ export interface LevelDef {
    * making projection management more complex.
    */
   mixedRockHardness: boolean;
-  /** Difficulty tier: 1–3. Used for display and ordering. */
+  /** Difficulty tier: 0 (tutorial) – 3 (hardest). Used for display and ordering. */
   difficultyTier: number;
 }
 

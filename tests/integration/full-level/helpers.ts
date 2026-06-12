@@ -17,18 +17,7 @@ function createBaseContext(): GameContext {
   return ctx;
 }
 
-/**
- * Complete prior levels to unlock the given level.
- * tutorial_pit (tier 0, threshold 5000) is the only level unlocked by default.
- * dusty_hollow (tier 1, threshold 80000) becomes unlocked after completing tutorial_pit.
- * grumpstone_ridge (tier 2, threshold 250000) becomes unlocked after completing dusty_hollow.
- * treranium_depths (tier 3, threshold 800000) becomes unlocked after completing grumpstone_ridge.
- */
-function _unlockPriorLevels(campaign: { levels: Record<string, { unlocked: boolean; completed: boolean; cumulativeProfit: number; bestSessionProfit: number }> }): void {
-  // tutorial_pit is automatically unlocked at index 0 — no action needed
-}
-
-/** Complete tutorial_pit to unlock dusty_hollow. */
+/** Complete tutorial_pit (threshold 5000) to unlock dusty_hollow. */
 function _unlockDustyHollow(campaign: { levels: Record<string, { unlocked: boolean; completed: boolean; cumulativeProfit: number; bestSessionProfit: number }> }): void {
   recordProfit(campaign as any, 'tutorial_pit', 5000);
 }
