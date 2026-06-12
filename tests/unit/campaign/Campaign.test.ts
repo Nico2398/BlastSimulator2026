@@ -16,16 +16,17 @@ describe('Campaign state and progression (7.2)', () => {
     const campaign = createCampaignState();
     const levels = getAllLevels();
     expect(getLevelProgress(campaign, levels[0]!.id)?.unlocked).toBe(true);
-    expect(getLevelProgress(campaign, levels[1]!.id)?.unlocked).toBe(false);
+    expect(getLevelProgress(campaign, levels[1]!.id)?.unlocked).toBe(true);
     expect(getLevelProgress(campaign, levels[2]!.id)?.unlocked).toBe(false);
   });
 
   it('reaching profit threshold on level 1 unlocks level 2', () => {
     const campaign = createCampaignState();
     const levels = getAllLevels();
-    const lvl1 = levels[0]!;
-    const lvl2 = levels[1]!;
+    const lvl1 = levels[1]!; // dusty_hollow — starts unlocked
+    const lvl2 = levels[2]!; // grumpstone_ridge — starts locked
 
+    expect(getLevelProgress(campaign, lvl1.id)?.unlocked).toBe(true);
     expect(getLevelProgress(campaign, lvl2.id)?.unlocked).toBe(false);
     recordProfit(campaign, lvl1.id, lvl1.unlockThreshold);
     expect(getLevelProgress(campaign, lvl2.id)?.unlocked).toBe(true);
@@ -70,7 +71,7 @@ describe('Campaign state and progression (7.2)', () => {
   it('starting a locked level returns false', () => {
     const campaign = createCampaignState();
     const levels = getAllLevels();
-    expect(startLevel(campaign, levels[1]!.id)).toBe(false);
+    expect(startLevel(campaign, levels[2]!.id)).toBe(false);
     expect(campaign.activeLevelId).toBeNull();
   });
 

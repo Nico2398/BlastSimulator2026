@@ -91,9 +91,9 @@ describe('Level completion and transition (7.3)', () => {
 
   it('createGameForLevel returns null for a locked level', () => {
     const campaign = createCampaignState();
-    const level2 = getAllLevels()[1]!;
-    // Level 2 is locked at start
-    expect(createGameForLevel(campaign, level2.id)).toBeNull();
+    const level3 = getAllLevels()[2]!;
+    // Level 3 (grumpstone_ridge) is locked at start
+    expect(createGameForLevel(campaign, level3.id)).toBeNull();
   });
 
   it('continuing after completion allows further play (threshold check idempotent)', () => {

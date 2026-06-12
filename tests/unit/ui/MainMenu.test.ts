@@ -84,6 +84,27 @@ describe('MainMenu (12.8)', () => {
     menu.dispose();
   });
 
+  it('showWorldMap excludes tutorial_pit (difficultyTier 0) when campaign state provided', () => {
+    const menu = new MainMenu(container);
+    menu.show();
+    menu.showWorldMap(makeCampaign());
+    const text = container.textContent ?? '';
+    expect(text).not.toContain('Tutorial Pit');
+    expect(text).toContain('Dusty Hollow');
+    expect(text).toContain('Grumpstone Ridge');
+    menu.dispose();
+  });
+
+  it('showWorldMap excludes tutorial_pit with null campaign', () => {
+    const menu = new MainMenu(container);
+    menu.show();
+    menu.showWorldMap(null);
+    const text = container.textContent ?? '';
+    expect(text).not.toContain('Tutorial Pit');
+    expect(text).toContain('Dusty Hollow');
+    menu.dispose();
+  });
+
   it('showWorldMap shows stars for completed level', () => {
     const menu = new MainMenu(container);
     menu.show();
