@@ -17,35 +17,53 @@ function createBaseContext(): GameContext {
   return ctx;
 }
 
+/** Complete tutorial_pit (threshold 5000) to unlock dusty_hollow. */
+function _unlockDustyHollow(campaign: any): void {
+  recordProfit(campaign, 'tutorial_pit', 5000);
+}
+
+/** Complete dusty_hollow to unlock grumpstone_ridge. */
+function _unlockGrumpstoneRidge(campaign: any): void {
+  _unlockDustyHollow(campaign);
+  recordProfit(campaign, 'dusty_hollow', 80000);
+}
+
+/** Complete grumpstone_ridge to unlock treranium_depths. */
+function _unlockTreraniumDepths(campaign: any): void {
+  _unlockGrumpstoneRidge(campaign);
+  recordProfit(campaign, 'grumpstone_ridge', 250000);
+}
+
 /**
  * Create a GameContext with a fresh campaign started for the given level.
+ * Automatically completes any prior levels needed to unlock the target.
  * Calls campaignStartCommand to initialise the level.
  * @param levelId The campaign level identifier (e.g. 'dusty_hollow').
  * @returns A fully initialised GameContext ready for test commands.
  */
 export function makeCampaignCtx(levelId: string): GameContext {
   const ctx = createBaseContext();
+  if (levelId === 'dusty_hollow') {
+    _unlockDustyHollow(ctx.state!.campaign);
+  } else if (levelId === 'grumpstone_ridge') {
+    _unlockGrumpstoneRidge(ctx.state!.campaign);
+  } else if (levelId === 'treranium_depths') {
+    _unlockTreraniumDepths(ctx.state!.campaign);
+  }
+  // tutorial_pit is unlocked by default — no unlock needed
   campaignStartCommand(ctx, [], { level: levelId });
   return ctx;
 }
 
 /**
- * Create a GameContext with all prior levels marked completed so the
- * target level is unlocked. Useful for levels 2 and 3 which require
- * earlier levels to be finished first.
- * @param levelId The campaign level identifier to unlock and start.
+ * Create a GameContext with the given level started.
+ * Alias for makeCampaignCtx — retained for API compatibility.
+ * makeCampaignCtx now handles all prerequisite unlocking automatically.
+ * @param levelId The campaign level identifier to start.
  * @returns A fully initialised GameContext with preceding levels completed.
  */
 export function makeCampaignCtxWithUnlock(levelId: string): GameContext {
-  const ctx = createBaseContext();
-  if (levelId === 'grumpstone_ridge') {
-    recordProfit(ctx.state!.campaign, 'dusty_hollow', 80000);
-  } else if (levelId === 'treranium_depths') {
-    recordProfit(ctx.state!.campaign, 'dusty_hollow', 80000);
-    recordProfit(ctx.state!.campaign, 'grumpstone_ridge', 250000);
-  }
-  campaignStartCommand(ctx, [], { level: levelId });
-  return ctx;
+  return makeCampaignCtx(levelId);
 }
 
 /**

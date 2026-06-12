@@ -45,15 +45,19 @@ describe('Campaign', () => {
 
   // ── 1. Initial campaign state ─────────────────────────────────────────────
 
-  it('createCampaignState unlocks only level 1 by default', () => {
+  it('createCampaignState unlocks only tutorial_pit by default', () => {
     const campaign = createCampaignState();
 
-    // dusty_hollow (tier 1) should be unlocked
+    // tutorial_pit (tier 0) should be unlocked
+    expect(campaign.levels['tutorial_pit']).toBeDefined();
+    expect(campaign.levels['tutorial_pit']!.unlocked).toBe(true);
+    expect(campaign.levels['tutorial_pit']!.completed).toBe(false);
+    expect(campaign.levels['tutorial_pit']!.cumulativeProfit).toBe(0);
+    expect(campaign.levels['tutorial_pit']!.bestSessionProfit).toBe(0);
+
+    // dusty_hollow (tier 1) should be locked
     expect(campaign.levels['dusty_hollow']).toBeDefined();
-    expect(campaign.levels['dusty_hollow']!.unlocked).toBe(true);
-    expect(campaign.levels['dusty_hollow']!.completed).toBe(false);
-    expect(campaign.levels['dusty_hollow']!.cumulativeProfit).toBe(0);
-    expect(campaign.levels['dusty_hollow']!.bestSessionProfit).toBe(0);
+    expect(campaign.levels['dusty_hollow']!.unlocked).toBe(false);
 
     // grumpstone_ridge (tier 2) should be locked
     expect(campaign.levels['grumpstone_ridge']).toBeDefined();
@@ -95,36 +99,44 @@ describe('Campaign', () => {
     expect(level!.availableExplosives).toContain('krackle');
   });
 
-  // ── 3. getAllLevels returns all 3 ──────────────────────────────────────────
+  // ── 3. getAllLevels returns all 4 ──────────────────────────────────────────
 
-  it('getAllLevels returns all 3 levels in order', () => {
+  it('getAllLevels returns all 4 levels in order', () => {
     const all = getAllLevels();
 
-    expect(all).toHaveLength(3);
+    expect(all).toHaveLength(4);
 
     // Order must be by difficulty tier
-    expect(all[0]!.id).toBe('dusty_hollow');
-    expect(all[0]!.difficultyTier).toBe(1);
-    expect(all[0]!.startingCash).toBe(50000);
-    expect(all[0]!.unlockThreshold).toBe(80000);
+    expect(all[0]!.id).toBe('tutorial_pit');
+    expect(all[0]!.difficultyTier).toBe(0);
+    expect(all[0]!.startingCash).toBe(20000);
+    expect(all[0]!.unlockThreshold).toBe(5000);
 
-    expect(all[1]!.id).toBe('grumpstone_ridge');
-    expect(all[1]!.difficultyTier).toBe(2);
-    expect(all[1]!.startingCash).toBe(75000);
-    expect(all[1]!.unlockThreshold).toBe(250000);
+    expect(all[1]!.id).toBe('dusty_hollow');
+    expect(all[1]!.difficultyTier).toBe(1);
+    expect(all[1]!.startingCash).toBe(50000);
+    expect(all[1]!.unlockThreshold).toBe(80000);
 
-    expect(all[2]!.id).toBe('treranium_depths');
-    expect(all[2]!.difficultyTier).toBe(3);
-    expect(all[2]!.startingCash).toBe(100000);
-    expect(all[2]!.unlockThreshold).toBe(800000);
+    expect(all[2]!.id).toBe('grumpstone_ridge');
+    expect(all[2]!.difficultyTier).toBe(2);
+    expect(all[2]!.startingCash).toBe(75000);
+    expect(all[2]!.unlockThreshold).toBe(250000);
+
+    expect(all[3]!.id).toBe('treranium_depths');
+    expect(all[3]!.difficultyTier).toBe(3);
+    expect(all[3]!.startingCash).toBe(100000);
+    expect(all[3]!.unlockThreshold).toBe(800000);
 
     // Verify progressive difficulty
     expect(all[0]!.unlockThreshold).toBeLessThan(all[1]!.unlockThreshold);
     expect(all[1]!.unlockThreshold).toBeLessThan(all[2]!.unlockThreshold);
+    expect(all[2]!.unlockThreshold).toBeLessThan(all[3]!.unlockThreshold);
     expect(all[0]!.eventFreqMultiplier).toBeLessThan(all[1]!.eventFreqMultiplier!);
     expect(all[1]!.eventFreqMultiplier).toBeLessThan(all[2]!.eventFreqMultiplier!);
+    expect(all[2]!.eventFreqMultiplier).toBeLessThan(all[3]!.eventFreqMultiplier!);
     expect(all[0]!.contractPriceMultiplier).toBeGreaterThan(all[1]!.contractPriceMultiplier!);
     expect(all[1]!.contractPriceMultiplier).toBeGreaterThan(all[2]!.contractPriceMultiplier!);
+    expect(all[2]!.contractPriceMultiplier).toBeGreaterThan(all[3]!.contractPriceMultiplier!);
   });
 
   // ── 4. recordProfit completes level at threshold ───────────────────────────
@@ -150,24 +162,33 @@ describe('Campaign', () => {
   it('recordProfit unlocks next level on completion', () => {
     const campaign = createCampaignState();
 
-    // Initially only level 1 unlocked
+    // Initially only tutorial_pit unlocked
+    expect(campaign.levels['dusty_hollow']!.unlocked).toBe(false);
     expect(campaign.levels['grumpstone_ridge']!.unlocked).toBe(false);
     expect(campaign.levels['treranium_depths']!.unlocked).toBe(false);
 
-    // Complete level 1 at threshold
+    // Complete tutorial_pit at threshold
+    recordProfit(campaign, 'tutorial_pit', 5000);
+
+    // dusty_hollow should now be unlocked, deeper levels stay locked
+    expect(campaign.levels['dusty_hollow']!.unlocked).toBe(true);
+    expect(campaign.levels['grumpstone_ridge']!.unlocked).toBe(false);
+    expect(campaign.levels['treranium_depths']!.unlocked).toBe(false);
+
+    // Complete dusty_hollow
     recordProfit(campaign, 'dusty_hollow', 80000);
 
-    // Level 2 should now be unlocked, level 3 stays locked
+    // grumpstone_ridge should now be unlocked, treranium_depths stays locked
     expect(campaign.levels['grumpstone_ridge']!.unlocked).toBe(true);
     expect(campaign.levels['treranium_depths']!.unlocked).toBe(false);
 
-    // Complete level 2
+    // Complete grumpstone_ridge
     recordProfit(campaign, 'grumpstone_ridge', 250000);
 
-    // Level 3 should now be unlocked
+    // treranium_depths should now be unlocked
     expect(campaign.levels['treranium_depths']!.unlocked).toBe(true);
 
-    // Complete level 3
+    // Complete treranium_depths
     recordProfit(campaign, 'treranium_depths', 800000);
 
     // Campaign should be complete
@@ -206,17 +227,17 @@ describe('Campaign', () => {
   it('startLevel sets active level for unlocked levels', () => {
     const campaign = createCampaignState();
 
-    // Starting unlocked level 1 succeeds
-    const result = startLevel(campaign, 'dusty_hollow');
+    // Starting unlocked tutorial_pit succeeds
+    const result = startLevel(campaign, 'tutorial_pit');
     expect(result).toBe(true);
-    expect(campaign.activeLevelId).toBe('dusty_hollow');
+    expect(campaign.activeLevelId).toBe('tutorial_pit');
 
     // Return to map
     returnToWorldMap(campaign);
     expect(campaign.activeLevelId).toBeNull();
 
-    // Starting locked level 2 fails
-    const lockedResult = startLevel(campaign, 'grumpstone_ridge');
+    // Starting locked dusty_hollow fails
+    const lockedResult = startLevel(campaign, 'dusty_hollow');
     expect(lockedResult).toBe(false);
     expect(campaign.activeLevelId).toBeNull();
 
@@ -231,8 +252,8 @@ describe('Campaign', () => {
   it('returnToWorldMap clears active level', () => {
     const campaign = createCampaignState();
 
-    startLevel(campaign, 'dusty_hollow');
-    expect(campaign.activeLevelId).toBe('dusty_hollow');
+    startLevel(campaign, 'tutorial_pit');
+    expect(campaign.activeLevelId).toBe('tutorial_pit');
 
     returnToWorldMap(campaign);
     expect(campaign.activeLevelId).toBeNull();
@@ -312,36 +333,36 @@ describe('Campaign', () => {
   // ── 10. campaign start command loads a level ──────────────────────────────
 
   it('campaign start command loads a level correctly', () => {
-    // Starting level 1 (dusty_hollow) should succeed
-    const result = campaignStartCommand(ctx, [], { level: 'dusty_hollow' });
+    // Starting tutorial_pit should succeed
+    const result = campaignStartCommand(ctx, [], { level: 'tutorial_pit' });
 
     expect(result.success).toBe(true);
-    expect(result.output).toContain('dusty_hollow');
-    expect(result.output).toContain('40×20×40');
-    expect(result.output).toContain('$50,000');
+    expect(result.output).toContain('tutorial_pit');
+    expect(result.output).toContain('24×12×24');
+    expect(result.output).toContain('$20,000');
 
     // State should be set up
     expect(ctx.state).not.toBeNull();
-    expect(ctx.state!.cash).toBe(50000);
-    expect(ctx.state!.campaign.activeLevelId).toBe('dusty_hollow');
+    expect(ctx.state!.cash).toBe(20000);
+    expect(ctx.state!.campaign.activeLevelId).toBe('tutorial_pit');
     expect(ctx.state!.world).not.toBeNull();
     expect(ctx.state!.world!.gridReady).toBe(true);
-    expect(ctx.state!.world!.sizeX).toBe(40);
-    expect(ctx.state!.world!.sizeY).toBe(20);
-    expect(ctx.state!.world!.sizeZ).toBe(40);
+    expect(ctx.state!.world!.sizeX).toBe(24);
+    expect(ctx.state!.world!.sizeY).toBe(12);
+    expect(ctx.state!.world!.sizeZ).toBe(24);
 
     // Grid should be generated
     expect(ctx.grid).not.toBeNull();
-    expect(ctx.grid!.sizeX).toBe(40);
-    expect(ctx.grid!.sizeY).toBe(20);
-    expect(ctx.grid!.sizeZ).toBe(40);
+    expect(ctx.grid!.sizeX).toBe(24);
+    expect(ctx.grid!.sizeY).toBe(12);
+    expect(ctx.grid!.sizeZ).toBe(24);
   });
 
   // ── 11. Starting a locked level returns error ──────────────────────────────
 
   it('campaign start command rejects locked levels', () => {
-    // grumpstone_ridge is locked (only level 1 unlocked by default)
-    const result = campaignStartCommand(ctx, [], { level: 'grumpstone_ridge' });
+    // dusty_hollow is locked (only tutorial_pit unlocked by default)
+    const result = campaignStartCommand(ctx, [], { level: 'dusty_hollow' });
 
     expect(result.success).toBe(false);
     expect(result.output).toContain('locked');
@@ -357,26 +378,27 @@ describe('Campaign', () => {
     let status = campaignStatusCommand(ctx, [], {});
     expect(status.success).toBe(true);
     expect(status.output).toContain('Campaign Status');
+    expect(status.output).toContain('tutorial_pit');
     expect(status.output).toContain('dusty_hollow');
     expect(status.output).toContain('grumpstone_ridge');
     expect(status.output).toContain('treranium_depths');
     expect(status.output).toContain('(world map)');
 
     // Start a level and check status again
-    campaignStartCommand(ctx, [], { level: 'dusty_hollow' });
+    campaignStartCommand(ctx, [], { level: 'tutorial_pit' });
     status = campaignStatusCommand(ctx, [], {});
-    expect(status.output).toContain('dusty_hollow');
+    expect(status.output).toContain('tutorial_pit');
     expect(status.output).not.toContain('(world map)');
   });
 
   // ── 13. campaign complete command force-completes level ─────────────────────
 
   it('campaign complete command force-completes the active level', () => {
-    campaignStartCommand(ctx, [], { level: 'dusty_hollow' });
+    campaignStartCommand(ctx, [], { level: 'tutorial_pit' });
 
     const completeResult = campaignCompleteCommand(ctx, [], {});
     expect(completeResult.success).toBe(true);
-    expect(completeResult.output).toContain('dusty_hollow');
+    expect(completeResult.output).toContain('tutorial_pit');
     expect(completeResult.output).toContain('force-completed');
 
     // Level end flags should be set
@@ -384,13 +406,13 @@ describe('Campaign', () => {
     expect(ctx.state!.levelEndReason).toBe('completed');
 
     // Profit should have been recorded in finances
-    expect(ctx.state!.cash).toBeGreaterThanOrEqual(50000 + 80000);
+    expect(ctx.state!.cash).toBeGreaterThanOrEqual(20000 + 5000);
   });
 
   // ── 14. stats command output ───────────────────────────────────────────────
 
   it('stats command shows level statistics and star rating', () => {
-    campaignStartCommand(ctx, [], { level: 'dusty_hollow' });
+    campaignStartCommand(ctx, [], { level: 'tutorial_pit' });
 
     const result = statsCommand(ctx, [], {});
     expect(result.success).toBe(true);

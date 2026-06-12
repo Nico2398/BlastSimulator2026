@@ -1,6 +1,6 @@
 // BlastSimulator2026 — Level definition system
 // Each level represents a mine site with specific parameters and difficulty modifiers.
-// 3 levels with progressive difficulty — Human approved names, descriptions, and curve.
+// 4 levels with progressive difficulty — Human approved names, descriptions, and curve.
 
 // ── Types ──
 
@@ -40,13 +40,36 @@ export interface LevelDef {
    * making projection management more complex.
    */
   mixedRockHardness: boolean;
-  /** Difficulty tier: 1–3. Used for display and ordering. */
+  /** Difficulty tier: 0 (tutorial) – 3 (hardest). Used for display and ordering. */
   difficultyTier: number;
 }
 
 // ── Level catalog ──
 
 const LEVELS: readonly LevelDef[] = [
+  {
+    // ────────────────────────────────────────────────────────
+    // Level 0 — Tutorial Pit
+    // Tiny desert quarry. Very forgiving. Designed to teach core mechanics.
+    // No events. Bonus contracts. Player-proof score decay.
+    // ────────────────────────────────────────────────────────
+    id: 'tutorial_pit',
+    nameKey: 'level.tutorial_pit.name',
+    descKey: 'level.tutorial_pit.desc',
+    mineType: 'desert',
+    terrainSeed: 42,
+    gridX: 24,
+    gridY: 12,
+    gridZ: 24,
+    startingCash: 20000,
+    availableExplosives: ['pop_rock', 'boomite'],
+    unlockThreshold: 5000,
+    eventFreqMultiplier: 0,
+    contractPriceMultiplier: 1.5,
+    scoreDecayRate: 0.01,
+    mixedRockHardness: false,
+    difficultyTier: 0,
+  },
   {
     // ────────────────────────────────────────────────────────
     // Level 1 — Dusty Hollow
