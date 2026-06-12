@@ -95,4 +95,5 @@ Handle all technical decisions autonomously (architecture, algorithms, tests, ba
 - Approve if: all acceptance criteria pass, tests pass, code is clean
 - Request changes if: tests fail or code quality issues exist
   → Comment `@copilot <specific fix instruction>` so agent can iterate
+- **SOLID compliance** — single responsibility (one concern per class/function), open/closed (extendable without modifying existing), Liskov substitution (substitutable types), interface segregation (narrow interfaces), dependency inversion (depend on abstractions, not concretions).
 - Tag @Nico2398 if: architectural decisions needed, ambiguous requirements, or creative direction needed

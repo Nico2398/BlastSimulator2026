@@ -41,7 +41,7 @@ Use when creating GitHub issues that will be picked up by autonomous coding agen
 6. **Do NOT include** implementation hints, solution approaches, or code snippets in the issue body — the agent must derive these from the codebase.
 7. **Context section must explain the "why"** — what feature, what phase, what goal.
 8. **Single task per issue.** If a task touches multiple concerns, split it.
-9. **SOLID compliance.** Every issue must respect SOLID: single responsibility (one concern per issue), open/closed (extendable without modifying existing), Liskov substitution (substitutable types), interface segregation (narrow interfaces), dependency inversion (depend on abstractions, not concretions).
+9. **SMART compliance.** Every issue must be SMART: Specific (one clear goal), Measurable (verifiable outcome), Achievable (within agent's capabilities), Relevant (part of the larger feature), Time-bound (single atomic task, not open-ended).
 
 ## Checklist
 
@@ -51,4 +51,4 @@ Use when creating GitHub issues that will be picked up by autonomous coding agen
 - [ ] Test section names the test file and what to verify
 - [ ] Blocked by section references dependencies with issue numbers
 - [ ] Verification section has concrete, testable criteria
-- [ ] SOLID principles are respected (single responsibility, depends on abstractions)
+- [ ] SMART criteria are respected (specific, measurable, achievable, relevant, time-bound)

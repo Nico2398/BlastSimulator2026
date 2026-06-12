@@ -36,6 +36,7 @@ Adjust review depth based on `risk_tier` from context:
 - **File size** — code files >300 lines (data/i18n JSON exempt).
 - **Dead code** — unreachable branches, unused imports, commented-out code.
 - **Naming** — inconsistent identifiers vs conventions in `dev-coding-conventions` skill.
+- **SOLID principles** — violations of single responsibility (class/function does too much), dependency inversion (high-level depends on low-level details), or interface segregation (bloated interfaces) per `dev-coding-conventions` skill.
 
 ### Coding Conventions (Naming & Intent)
 - **Names translate intent** — a reader unfamiliar with the codebase must understand what a
