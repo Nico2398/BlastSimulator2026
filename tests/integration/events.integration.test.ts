@@ -17,7 +17,6 @@ import {
 import {
   detectTrafficJam,
   detectUnqualifiedTask,
-  detectOreReport,
 } from '../../src/core/events/EventEngine.js';
 import { Random } from '../../src/core/math/Random.js';
 import { setupEvents } from '../../src/core/events/index.js';
