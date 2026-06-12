@@ -94,7 +94,7 @@ export class SaveLoadUI {
     if (!this.backend) return;
     try {
       const data = serialize(state);
-      const summary = `$${state.cash.toLocaleString()} — Day ${Math.floor(state.tickCount / 24) + 1}`;
+      const summary = `$${state.cash.toLocaleString('en-US')} — Day ${Math.floor(state.tickCount / 24) + 1}`;
       await this.backend.save(AUTO_SAVE_SLOT, t('saveload.auto_name'), data, summary);
     } catch {
       // Silent auto-save failure
@@ -174,7 +174,7 @@ export class SaveLoadUI {
     if (!state) { this.setStatus(t('saveload.no_game')); return; }
     try {
       const data = serialize(state);
-      const summary = `$${state.cash.toLocaleString()} — Day ${Math.floor(state.tickCount / 24) + 1}`;
+      const summary = `$${state.cash.toLocaleString('en-US')} — Day ${Math.floor(state.tickCount / 24) + 1}`;
       const slotNum = slotId.replace('slot_', '');
       await this.backend.save(slotId, t('saveload.slot_name', { n: slotNum }), data, summary);
       this.setStatus(t('saveload.saved'));

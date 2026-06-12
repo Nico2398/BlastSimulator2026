@@ -28,8 +28,8 @@ export function campaignStatusCommand(
     const status = !prog.unlocked ? '🔒 Locked'
       : prog.completed ? '✅ Completed'
       : '▶ Unlocked';
-    const profit = prog.cumulativeProfit.toLocaleString();
-    const threshold = getLevel(lvl.id)?.unlockThreshold.toLocaleString() ?? '?';
+    const profit = prog.cumulativeProfit.toLocaleString('en-US');
+    const threshold = getLevel(lvl.id)?.unlockThreshold.toLocaleString('en-US') ?? '?';
     lines.push(`  [${lvl.difficultyTier}★] ${lvl.id} — ${status} | Profit: $${profit}/$${threshold}`);
   }
   if (campaign.campaignComplete) {
@@ -114,7 +114,7 @@ export function campaignStartCommand(
 
   return {
     success: true,
-    output: `Started level "${levelId}". Grid: ${level.gridX}×${level.gridY}×${level.gridZ}. Cash: $${level.startingCash.toLocaleString()}.`,
+    output: `Started level "${levelId}". Grid: ${level.gridX}×${level.gridY}×${level.gridZ}. Cash: $${level.startingCash.toLocaleString('en-US')}.`,
   };
 }
 
@@ -135,7 +135,7 @@ export function statsCommand(
   const ores = [...s.uniqueOresExtracted].join(', ') || 'none';
   const lines = [
     'Level Statistics:',
-    `  Total wealth:       $${s.totalWealth.toLocaleString()}`,
+    `  Total wealth:       $${s.totalWealth.toLocaleString('en-US')}`,
     `  Max depth:          ${s.maxDepthReached} voxels`,
     `  Volume blasted:     ${s.totalVolumeBlasted.toFixed(1)} m³`,
     `  Blasts performed:   ${s.blastsPerformed}`,

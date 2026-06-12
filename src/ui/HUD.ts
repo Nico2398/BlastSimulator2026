@@ -105,7 +105,7 @@ export class HUD {
   /** Update all HUD elements from current game state. */
   update(state: GameState, weather?: WeatherState): void {
     // Balance
-    this.balanceEl.textContent = `$${state.cash.toLocaleString()}`;
+    this.balanceEl.textContent = `$${state.cash.toLocaleString('en-US')}`;
 
     // Time — each tick is 1 in-game hour; 24 ticks = 1 day
     const day = Math.floor(state.tickCount / 24) + 1;

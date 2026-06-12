@@ -149,7 +149,7 @@ export class MainMenu {
         req.style.cssText = 'font-size:10px;color:#503820;margin-top:6px';
         const prevLevel = levels[levels.indexOf(lvl) - 1];
         req.textContent = prevLevel
-          ? t('menu.level_locked', { req: `$${lvl.unlockThreshold.toLocaleString()} on ${t(prevLevel.nameKey)}` })
+          ? t('menu.level_locked', { req: `$${lvl.unlockThreshold.toLocaleString('en-US')} on ${t(prevLevel.nameKey)}` })
           : '';
         card.appendChild(req);
       } else {
