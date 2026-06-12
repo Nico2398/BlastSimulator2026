@@ -14,6 +14,7 @@ import { IndexedDBPersistence } from './persistence/IndexedDBPersistence.js';
 import { DownloadPersistence } from './persistence/DownloadPersistence.js';
 import { createRunner } from './console/createRunner.js';
 import { BASE_TICK_MS } from './core/engine/GameLoop.js';
+import { incrementActionCount } from './core/events/EventSystem.js';
 
 // --- 3D Scene ---
 const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
@@ -108,6 +109,11 @@ window.__gameConsole = (cmd: string) => {
   // Sync the renderer after every command so visual changes appear immediately
   gameRenderer.syncFromContext(ctx);
   const cmdName = cmd.trim().split(/\s+/)[0] ?? '';
+
+  // Increment action count for non-meta commands (event cooldown gating)
+  if (ctx.state && !['tick', 'speed', 'pause', 'time'].includes(cmdName)) {
+    incrementActionCount(ctx.state.events);
+  }
 
   // Trigger blast effects and terrain rebuild after a blast
   if (cmdName === 'blast' && result.success && ctx.state) {
