@@ -8,7 +8,9 @@ import { processFrame } from '../../../src/core/engine/GameLoop.js';
 import { Random } from '../../../src/core/math/Random.js';
 import {
   STARTING_CASH, PAY_CYCLE_TICKS, BASE_TICK_MS,
-  EVENT_BASE_TIMERS, BANKRUPTCY_THRESHOLD, SCORE_DECAY_RATE, MAX_FRAGMENTS_PER_VOXEL,
+  EVENT_BASE_TIMERS, MIN_EVENT_INTERVAL_TICKS, MIN_EVENT_INTERVAL_RANDOM_RANGE,
+  MIN_EVENT_INTERVAL_ACTIONS,
+  BANKRUPTCY_THRESHOLD, SCORE_DECAY_RATE, MAX_FRAGMENTS_PER_VOXEL,
   PROFICIENCY_MULTIPLIERS,
   XP_THRESHOLDS,
   NEED_WARNING_THRESHOLDS,
@@ -84,6 +86,58 @@ describe('Balance config (12.1)', () => {
   it('fragment count per voxel is reasonable', () => {
     expect(MAX_FRAGMENTS_PER_VOXEL).toBeGreaterThan(0);
     expect(MAX_FRAGMENTS_PER_VOXEL).toBeLessThanOrEqual(50);
+  });
+});
+
+// ─── Task 3.3: Event cooldown constants ───────────────────────────────────────
+
+describe('Event cooldown (3.3)', () => {
+  // ── MIN_EVENT_INTERVAL_TICKS ─────────────────────────────────────────────
+
+  it('MIN_EVENT_INTERVAL_TICKS is exported from balance.ts', () => {
+    expect(MIN_EVENT_INTERVAL_TICKS).toBeDefined();
+  });
+
+  it('MIN_EVENT_INTERVAL_RANDOM_RANGE is exported from balance.ts', () => {
+    expect(MIN_EVENT_INTERVAL_RANDOM_RANGE).toBeDefined();
+  });
+
+  it('MIN_EVENT_INTERVAL_ACTIONS is exported from balance.ts', () => {
+    expect(MIN_EVENT_INTERVAL_ACTIONS).toBeDefined();
+  });
+
+  // ── Exact values ───────────────────────────────────────────────────────────
+
+  it('MIN_EVENT_INTERVAL_TICKS is 120 — at least 120 ticks (5 game-days) must elapse between consecutive events', () => {
+    expect(MIN_EVENT_INTERVAL_TICKS).toBe(120);
+  });
+
+  it('MIN_EVENT_INTERVAL_RANDOM_RANGE is 60 — adds up to 60 ticks of random variance to each cooldown', () => {
+    expect(MIN_EVENT_INTERVAL_RANDOM_RANGE).toBe(60);
+  });
+
+  it('MIN_EVENT_INTERVAL_ACTIONS is 10 — at least 10 player actions must occur between events', () => {
+    expect(MIN_EVENT_INTERVAL_ACTIONS).toBe(10);
+  });
+
+  // ── Invariants ─────────────────────────────────────────────────────────────
+
+  it('MIN_EVENT_INTERVAL_TICKS exceeds all EVENT_BASE_TIMERS — cooldown overrides individual category timers to prevent event back-to-back', () => {
+    for (const [cat, ticks] of Object.entries(EVENT_BASE_TIMERS)) {
+      expect(
+        MIN_EVENT_INTERVAL_TICKS,
+        `${cat} base timer (${ticks}) must be less than cooldown (${MIN_EVENT_INTERVAL_TICKS})`,
+      ).toBeGreaterThan(ticks as number);
+    }
+  });
+
+  it('MIN_EVENT_INTERVAL_RANDOM_RANGE is positive — randomness adds unpredictability', () => {
+    expect(MIN_EVENT_INTERVAL_RANDOM_RANGE).toBeGreaterThan(0);
+  });
+
+  it('MIN_EVENT_INTERVAL_ACTIONS is positive and under 100 — requires meaningful player engagement but not excessive grind', () => {
+    expect(MIN_EVENT_INTERVAL_ACTIONS).toBeGreaterThan(0);
+    expect(MIN_EVENT_INTERVAL_ACTIONS).toBeLessThan(100);
   });
 });
 
