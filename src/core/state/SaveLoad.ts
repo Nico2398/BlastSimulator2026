@@ -93,6 +93,16 @@ export function deserialize(json: string): GameState {
     eventsRaw['firedEventIds'] = [];
   }
 
+  // Ensure lastEventTick and actionCountSinceEvent exist for saves created before they were added
+  if (eventsRaw) {
+    if (typeof eventsRaw['lastEventTick'] !== 'number') {
+      eventsRaw['lastEventTick'] = 0;
+    }
+    if (typeof eventsRaw['actionCountSinceEvent'] !== 'number') {
+      eventsRaw['actionCountSinceEvent'] = 0;
+    }
+  }
+
   // v4 → v5: collectedOre field added
   if (typeof obj['collectedOre'] !== 'object' || obj['collectedOre'] === null) {
     (obj as Record<string, unknown>)['collectedOre'] = {};
