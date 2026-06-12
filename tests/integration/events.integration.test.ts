@@ -12,6 +12,7 @@ import {
   tickEventSystem,
   clearPendingEvent,
   queueFollowUp,
+  incrementActionCount,
 } from '../../src/core/events/EventSystem.js';
 import {
   detectTrafficJam,
@@ -21,6 +22,7 @@ import {
 import { Random } from '../../src/core/math/Random.js';
 import { setupEvents } from '../../src/core/events/index.js';
 import { clearEvents } from '../../src/core/events/EventPool.js';
+import { createRunner } from '../../src/console/createRunner.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -464,5 +466,94 @@ describe('Event system', () => {
 
     expect(result.success).toBe(false);
     expect(result.output).toContain('Usage:');
+  });
+
+  // ── 11. Console bridge action count ──────────────────────────────────────────
+
+  describe('console bridge action count', () => {
+    beforeEach(() => {
+      clearEvents();
+      setupEvents();
+    });
+
+    /**
+     * Simulate the post-processing that window.__gameConsole performs in main.ts:
+     * run the command, extract cmdName, guard on meta commands, call incrementActionCount.
+     */
+    function simulateBridge(runner: import('../../src/console/ConsoleRunner.js').ConsoleRunner, ctx: GameContext, cmd: string) {
+      const result = runner.run(cmd);
+      const cmdName = cmd.trim().split(/\s+/)[0] ?? '';
+      if (ctx.state && !['tick', 'speed', 'pause', 'time'].includes(cmdName)) {
+        incrementActionCount(ctx.state.events);
+      }
+      return result;
+    }
+
+    it('non-meta command increments actionCountSinceEvent via bridge', () => {
+      const { runner, ctx } = createRunner();
+      runner.run('new_game mine_type:desert seed:42 size:32');
+
+      expect(ctx.state!.events.actionCountSinceEvent).toBe(0);
+
+      simulateBridge(runner, ctx, 'employee hire role:blaster');
+
+      expect(ctx.state!.events.actionCountSinceEvent).toBe(1);
+    });
+
+    it('meta command tick does NOT increment actionCountSinceEvent', () => {
+      const { runner, ctx } = createRunner();
+      runner.run('new_game mine_type:desert seed:42 size:32');
+
+      simulateBridge(runner, ctx, 'tick 1');
+
+      expect(ctx.state!.events.actionCountSinceEvent).toBe(0);
+    });
+
+    it('meta command time does NOT increment actionCountSinceEvent', () => {
+      const { runner, ctx } = createRunner();
+      runner.run('new_game mine_type:desert seed:42 size:32');
+
+      simulateBridge(runner, ctx, 'time status');
+
+      expect(ctx.state!.events.actionCountSinceEvent).toBe(0);
+    });
+
+    it('multiple non-meta commands accumulate action count', () => {
+      const { runner, ctx } = createRunner();
+      runner.run('new_game mine_type:desert seed:42 size:32');
+
+      simulateBridge(runner, ctx, 'employee hire role:blaster');
+      simulateBridge(runner, ctx, 'employee hire role:driller');
+      simulateBridge(runner, ctx, 'finances');
+
+      expect(ctx.state!.events.actionCountSinceEvent).toBe(3);
+    });
+
+    it('mixed meta and non-meta — only non-meta increments', () => {
+      const { runner, ctx } = createRunner();
+      runner.run('new_game mine_type:desert seed:42 size:32');
+
+      simulateBridge(runner, ctx, 'tick 1');
+      simulateBridge(runner, ctx, 'employee hire role:blaster');
+      simulateBridge(runner, ctx, 'time status');
+      simulateBridge(runner, ctx, 'finances');
+
+      // 2 non-meta commands: employee, finances
+      expect(ctx.state!.events.actionCountSinceEvent).toBe(2);
+    });
+
+    it('no crash when ctx.state is null (no game initialized)', () => {
+      const { runner, ctx } = createRunner();
+      // ctx.state is null — no new_game called
+
+      // Should not throw
+      expect(() => {
+        const result = runner.run('employee list');
+        const cmdName = 'employee';
+        if (ctx.state && !['tick', 'speed', 'pause', 'time'].includes(cmdName)) {
+          incrementActionCount(ctx.state.events);
+        }
+      }).not.toThrow();
+    });
   });
 });
