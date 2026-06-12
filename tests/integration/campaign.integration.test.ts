@@ -99,7 +99,7 @@ describe('Campaign', () => {
     expect(level!.availableExplosives).toContain('krackle');
   });
 
-  // ── 3. getAllLevels returns all 3 ──────────────────────────────────────────
+  // ── 3. getAllLevels returns all 4 ──────────────────────────────────────────
 
   it('getAllLevels returns all 4 levels in order', () => {
     const all = getAllLevels();

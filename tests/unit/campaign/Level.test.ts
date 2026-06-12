@@ -52,18 +52,18 @@ describe('Level definition system (7.1)', () => {
     expect(levels[2]!.unlockThreshold).toBeLessThan(levels[3]!.unlockThreshold);
   });
 
-  it('level 3 includes all explosive types, level 1 only starter explosives', () => {
-    const level1 = getLevel('dusty_hollow')!;
-    const level3 = getLevel('treranium_depths')!;
+  it('treranium_depths includes all explosive types, dusty_hollow only starter explosives', () => {
+    const dustyHollow = getLevel('dusty_hollow')!;
+    const treraniumDepths = getLevel('treranium_depths')!;
 
-    // Level 1 should only have starter explosives
-    expect(level1.availableExplosives).not.toContain('dynatomics');
-    expect(level1.availableExplosives).not.toContain('obliviax');
+    // Dusty Hollow should only have starter explosives
+    expect(dustyHollow.availableExplosives).not.toContain('dynatomics');
+    expect(dustyHollow.availableExplosives).not.toContain('obliviax');
 
-    // Level 3 should have all explosives including endgame
-    expect(level3.availableExplosives).toContain('pop_rock');
-    expect(level3.availableExplosives).toContain('dynatomics');
-    expect(level3.availableExplosives.length).toBeGreaterThan(level1.availableExplosives.length);
+    // Treranium Depths should have all explosives including endgame
+    expect(treraniumDepths.availableExplosives).toContain('pop_rock');
+    expect(treraniumDepths.availableExplosives).toContain('dynatomics');
+    expect(treraniumDepths.availableExplosives.length).toBeGreaterThan(dustyHollow.availableExplosives.length);
   });
 
   it('level 3 has mixed rock hardness enabled', () => {
