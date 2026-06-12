@@ -13,7 +13,7 @@ import { EVENT_BASE_TIMERS, MIN_EVENT_INTERVAL_TICKS, MIN_EVENT_INTERVAL_RANDOM_
  * Categories that use the countdown-timer system.
  * 'traffic' and 'mining' are excluded because they are detected by EventEngine, not timers.
  */
-export type TimerCategory = Exclude<EventCategory, 'traffic' | 'mining'>;
+export type TimerCategory = Exclude<EventCategory, 'traffic' | 'mining' | 'tutorial'>;
 
 /** Base timer reset values per timer category (in ticks). */
 const BASE_TIMER: Record<TimerCategory, number> = { ...EVENT_BASE_TIMERS };

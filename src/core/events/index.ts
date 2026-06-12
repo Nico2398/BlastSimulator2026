@@ -17,10 +17,11 @@ import { FOLLOWUP_EVENTS } from './FollowUpEvents.js';
 import { TRAFFIC_JAM_EVENTS } from './TrafficJamEvents.js';
 import { UNQUALIFIED_TASK_EVENTS } from './UnqualifiedTaskEvents.js';
 import { ORE_REPORT_EVENTS } from './OreReportEvents.js';
+import { TUTORIAL_EVENTS } from './TutorialEvents.js';
 
 export { clearEvents } from './EventPool.js';
 
-/** Register all 260 events into the global pool. Call once at app init. */
+/** Register all event definitions into the global pool. Call once at app init. */
 export function setupEvents(): void {
   registerEvents(UNION_EVENTS_1);
   registerEvents(UNION_EVENTS_2);
@@ -36,4 +37,5 @@ export function setupEvents(): void {
   registerEvents(TRAFFIC_JAM_EVENTS);
   registerEvents(UNQUALIFIED_TASK_EVENTS);
   registerEvents(ORE_REPORT_EVENTS);
+  registerEvents(TUTORIAL_EVENTS);
 }
