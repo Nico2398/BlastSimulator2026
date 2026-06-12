@@ -3,7 +3,7 @@ name: gameplay-survey-system
 description: >
   Rock composition and survey system for BlastSimulator2026: 3 survey methods (seismic,
   core sample, aerial), estimation algorithm with Gaussian noise and skill scaling,
-  ore grade reporting post-blast, and atomic task breakdown. Use when implementing or
+  and ore grade reporting post-blast. Use when implementing or
   modifying surveys, ore discovery, voxel composition, or post-blast ore yield mechanics.
 ---
 
@@ -95,18 +95,3 @@ After a blast, `computeBlastOreReport()` calculates actual ore yield from destro
 - Surveyed voxels: color-coded ore density overlay, opacity = confidence
 - Seismic surveys disturb nearby buildings: −10 HP per survey if building within 5 cells
 
-## Atomic Task Breakdown
-
-| # | Task | File(s) |
-|---|------|---------|
-| 4.1 | Add `SurveyMethod`, `SurveyResult` interfaces | `src/core/mining/SurveyCalc.ts` (new) |
-| 4.2 | Implement `estimateSurveyResult()` — noise + skill scaling | `src/core/mining/SurveyCalc.ts` |
-| 4.3 | Implement `isSurveyStale()` — stale after 100 ticks | `src/core/mining/SurveyCalc.ts` |
-| 4.4 | Add `surveyResults: SurveyResult[]` and `nextSurveyId` to `GameState` | `src/core/GameState.ts` |
-| 4.5 | Add survey cost constants to `balance.ts` | `src/core/config/balance.ts` |
-| 4.6 | Implement `runSurvey()` — validate surveyor, deduct cost, enqueue task | `src/core/mining/SurveyCalc.ts` |
-| 4.7 | Implement `computeBlastOreReport()` — yield from destroyed voxels | `src/core/mining/SurveyCalc.ts` |
-| 4.8 | Wire ore report events to event system (Lucky Strike, Barren Blast, etc.) | `src/core/events/EventEngine.ts` |
-| 4.9 | Add i18n keys for survey methods and events (en + fr) | `src/core/i18n/locales/en.json`, `fr.json` |
-| 4.10 | Add `survey` console command (`survey seismic x:10 z:10`) | `src/console/commands/mining.ts` |
-| 4.11 | Render survey confidence overlay in terrain | `src/renderer/TerrainMesh.ts` |

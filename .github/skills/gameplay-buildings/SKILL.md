@@ -3,7 +3,7 @@ name: gameplay-buildings
 description: >
   Buildings system specification for BlastSimulator2026: 9 building types with 3 tiers each,
   placement rules, training buildings, living quarters, warehouses, Research Center,
-  destruction effects, and atomic task breakdown. Use when implementing or modifying buildings,
+  and destruction effects. Use when implementing or modifying buildings,
   construction, demolition, tier upgrades, or any building-gated action.
 ---
 
@@ -124,21 +124,3 @@ export interface BuildingDef {
 }
 ```
 
-## Atomic Task Breakdown
-
-| # | Task | File(s) |
-|---|------|---------|
-| 1.1 | Define `BuildingType` union with all 9 types | `src/core/entities/Building.ts` |
-| 1.2 | Define `BuildingTier`, footprint patterns, `BUILDING_DEFS` catalog | `src/core/entities/Building.ts` |
-| 1.3 | Implement `canPlaceBuilding()` — flat surface + overlap check | `src/core/entities/Building.ts` |
-| 1.4 | Protected-voxel check — block drill/blast under building | `src/core/mining/DrillPlan.ts` |
-| 1.5 | Building destruction on blast — check footprint vs blast AABB | `src/core/mining/BlastCalc.ts` |
-| 1.6 | Explosive Warehouse secondary blast on destruction | `src/core/mining/BlastCalc.ts` |
-| 1.7 | Research Center task queue — paid tasks unlock tiers | `src/core/entities/Building.ts` |
-| 1.8 | Training task — time cost + fee + skill grant | `src/core/entities/Building.ts`, `Employee.ts` |
-| 1.9 | Qualified-employee check — emit error on unqualified assignment | `src/core/engine/GameLoop.ts` |
-| 1.10 | Living Quarters well-being multiplier per tier | `src/core/entities/Building.ts`, `src/core/scores/` |
-| 1.11 | Freight Warehouse ore storage and contract sell interface | `src/core/entities/Building.ts` |
-| 1.12 | Add i18n keys for all 9 types, tier names, training courses (en + fr) | `src/core/i18n/locales/en.json`, `fr.json` |
-| 1.13 | Wire `build`, `demolish`, `research` console commands | `src/console/commands/entities.ts` |
-| 1.14 | Update building renderer — footprint shape and tier visuals | `src/renderer/BuildingMesh.ts` |
