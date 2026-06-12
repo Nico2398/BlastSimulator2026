@@ -45,7 +45,7 @@ describe('Campaign', () => {
 
   // ── 1. Initial campaign state ─────────────────────────────────────────────
 
-  it('createCampaignState unlocks only tutorial_pit by default', () => {
+  it('createCampaignState unlocks tutorial_pit and first visible level by default', () => {
     const campaign = createCampaignState();
 
     // tutorial_pit (tier 0) should be unlocked
@@ -162,7 +162,7 @@ describe('Campaign', () => {
   it('recordProfit unlocks next level on completion', () => {
     const campaign = createCampaignState();
 
-    // Initially tutorial_pit + dusty_hollow unlocked, deeper levels locked
+    // Initially tutorial_pit and dusty_hollow unlocked, deeper levels locked
     expect(campaign.levels['dusty_hollow']!.unlocked).toBe(true);
     expect(campaign.levels['grumpstone_ridge']!.unlocked).toBe(false);
     expect(campaign.levels['treranium_depths']!.unlocked).toBe(false);
@@ -367,7 +367,7 @@ describe('Campaign', () => {
   // ── 11. Starting a locked level returns error ──────────────────────────────
 
   it('campaign start command rejects locked levels', () => {
-    // grumpstone_ridge is locked (tutorial_pit + dusty_hollow unlocked by default)
+    // grumpstone_ridge is locked (only tutorial_pit and dusty_hollow unlocked by default)
     const result = campaignStartCommand(ctx, [], { level: 'grumpstone_ridge' });
 
     expect(result.success).toBe(false);
