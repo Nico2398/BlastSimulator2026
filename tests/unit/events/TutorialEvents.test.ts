@@ -81,3 +81,45 @@ describe('event fire subcommand', () => {
     expect(result.output).toContain('Usage');
   });
 });
+
+describe('tutorial event definitions', () => {
+  beforeEach(() => {
+    clearEvents();
+    setupEvents();
+  });
+
+  it('getEventById returns the tutorial_synergy_consultant event', () => {
+    const ev = getEventById('tutorial_synergy_consultant');
+    expect(ev).toBeDefined();
+    expect(ev!.category).toBe('tutorial');
+    expect(ev!.options.length).toBe(3);
+    expect(ev!.consequences.length).toBe(ev!.options.length);
+  });
+
+  it('option 0 — Hire consultant: cash cost and well-being boost', () => {
+    const ev = getEventById('tutorial_synergy_consultant')!;
+    const con = ev.consequences[0]!;
+
+    expect(con.cashDelta).toBe(-3000);
+    expect(con.scoreDelta?.wellBeing).toBe(15);
+    expect(con.corruptionDelta).toBeUndefined();
+  });
+
+  it('option 1 — Dismiss consultant: well-being and safety penalties, no cash change', () => {
+    const ev = getEventById('tutorial_synergy_consultant')!;
+    const con = ev.consequences[1]!;
+
+    expect(con.scoreDelta?.wellBeing).toBe(-10);
+    expect(con.scoreDelta?.safety).toBe(-5);
+    expect(con.cashDelta).toBeUndefined();
+  });
+
+  it('option 2 — Equity deal: well-being boost, safety penalty, no cash change', () => {
+    const ev = getEventById('tutorial_synergy_consultant')!;
+    const con = ev.consequences[2]!;
+
+    expect(con.scoreDelta?.wellBeing).toBe(5);
+    expect(con.scoreDelta?.safety).toBe(-5);
+    expect(con.cashDelta).toBeUndefined();
+  });
+});
