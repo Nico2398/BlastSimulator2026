@@ -146,4 +146,51 @@ describe('MainMenu (12.8)', () => {
     expect(cb).toHaveBeenCalledOnce();
     menu.dispose();
   });
+
+  it('renders tutorial button with correct text', () => {
+    const menu = new MainMenu(container);
+    menu.show();
+    const buttons = Array.from(container.querySelectorAll('button'));
+    const tutorialBtn = buttons.find(b => b.textContent?.includes('Tutorial'));
+    expect(tutorialBtn).not.toBeNull();
+    expect(tutorialBtn).not.toBeUndefined();
+    menu.dispose();
+  });
+
+  it('tutorial button has gold accent inline style', () => {
+    const menu = new MainMenu(container);
+    menu.show();
+    const buttons = Array.from(container.querySelectorAll('button'));
+    const tutorialBtn = buttons.find(b => b.textContent?.includes('Tutorial'))!;
+    expect(tutorialBtn.style.color).toBe('rgb(255, 224, 144)');
+    expect(tutorialBtn.style.borderColor).toContain('rgba');
+    expect(tutorialBtn.style.borderColor).toContain('255, 225, 144');
+    expect(tutorialBtn.style.background).toContain('rgba');
+    expect(tutorialBtn.style.background).toContain('255, 225, 144');
+    menu.dispose();
+  });
+
+  it('tutorial button calls onTutorial callback when clicked', () => {
+    const cb = vi.fn();
+    const menu = new MainMenu(container);
+    menu.setOnTutorial(cb);
+    menu.show();
+    const buttons = Array.from(container.querySelectorAll('button'));
+    const tutorialBtn = buttons.find(b => b.textContent?.includes('Tutorial'));
+    tutorialBtn?.click();
+    expect(cb).toHaveBeenCalledOnce();
+    menu.dispose();
+  });
+
+  it('tutorial button is ordered between New Campaign and Continue', () => {
+    const menu = new MainMenu(container);
+    menu.show();
+    const buttons = Array.from(container.querySelectorAll('button'));
+    const idxCampaign = buttons.findIndex(b => b.textContent?.includes('New Campaign'));
+    const idxTutorial = buttons.findIndex(b => b.textContent?.includes('Tutorial'));
+    const idxContinue = buttons.findIndex(b => b.textContent?.includes('Continue'));
+    expect(idxCampaign).toBeLessThan(idxTutorial);
+    expect(idxTutorial).toBeLessThan(idxContinue);
+    menu.dispose();
+  });
 });
