@@ -310,7 +310,8 @@ describe('TutorialOverlay (12.4)', () => {
   });
 
   describe('completion sequence', () => {
-    it('advancing through all steps finishes the tutorial', () => {
+    it('advancing through all steps finishes the tutorial after completion delay', () => {
+      vi.useFakeTimers();
       const tut = new TutorialOverlay(container);
       overlay = tut;
       const state = createMockState();
@@ -320,8 +321,126 @@ describe('TutorialOverlay (12.4)', () => {
       for (let i = 0; i < TOTAL_TUTORIAL_STEPS; i++) {
         tut.onCommandExecuted(state);
       }
+      // After the implementation change: finish() is delayed by 4s
+      // so isActive remains true until the timer fires.
+      // On current code: finish() is called immediately → isActive becomes false.
+      expect(tut.isActive).toBe(true);
+
+      vi.advanceTimersByTime(4000);
       expect(tut.isActive).toBe(false);
       expect(TutorialOverlay.isCompleted()).toBe(true);
+      vi.useRealTimers();
+    });
+
+    it('completion message shows Tutorial Complete! title and text', () => {
+      const tut = new TutorialOverlay(container) as any;
+      overlay = tut;
+      tut.start(createMockState());
+
+      // Directly set to congratulations step (index 22) and render
+      tut.stepIndex = 22;
+      tut.render();
+
+      const titleEl = container.querySelector('.bs-panel-title') as HTMLElement;
+      const textEl = container.querySelector('.bs-panel-text') as HTMLElement;
+      // After implementation: keys changed to tutorial.complete_title / tutorial.complete_text
+      // which translate to "Tutorial Complete!" and the completion text.
+      expect(titleEl.textContent).toBe('Tutorial Complete!');
+      expect(textEl.textContent).toBe("You've completed the tutorial. You're ready to run this mine!");
+    });
+
+    it('completion message is visible for at least 4 seconds before auto-dismiss', () => {
+      vi.useFakeTimers();
+      const tut = new TutorialOverlay(container);
+      overlay = tut;
+      const state = createMockState();
+      tut.start(state);
+
+      // Advance through all steps to trigger the congratulations guard
+      for (let i = 0; i < TOTAL_TUTORIAL_STEPS; i++) {
+        tut.onCommandExecuted(state);
+      }
+
+      // After change: 4s timer set, still active
+      expect(tut.isActive).toBe(true);
+
+      // Just before the 4s mark — still visible
+      vi.advanceTimersByTime(3500);
+      expect(tut.isActive).toBe(true);
+
+      // Past the 4s mark — timer fired and finished
+      vi.advanceTimersByTime(1000);
+      expect(tut.isActive).toBe(false);
+
+      vi.useRealTimers();
+    });
+
+    it('skip() immediately finishes even during completion message', () => {
+      vi.useFakeTimers();
+      const tut = new TutorialOverlay(container);
+      overlay = tut;
+      const state = createMockState();
+      tut.start(state);
+
+      // Advance through all steps to the congratulations step
+      for (let i = 0; i < TOTAL_TUTORIAL_STEPS; i++) {
+        tut.onCommandExecuted(state);
+      }
+
+      // After change: still active because of the 4s timer
+      expect(tut.isActive).toBe(true);
+
+      // skip() must finish immediately without advancing timers
+      tut.skip();
+      expect(tut.isActive).toBe(false);
+
+      vi.useRealTimers();
+    });
+
+    it('finish() is idempotent — calling skip() multiple times does not throw', () => {
+      vi.useFakeTimers();
+      const tut = new TutorialOverlay(container);
+      overlay = tut;
+      const state = createMockState();
+      tut.start(state);
+
+      // Advance through all steps
+      for (let i = 0; i < TOTAL_TUTORIAL_STEPS; i++) {
+        tut.onCommandExecuted(state);
+      }
+
+      tut.skip();
+      expect(tut.isActive).toBe(false);
+
+      // Second skip must not throw (isActive check in skip returns early)
+      expect(() => tut.skip()).not.toThrow();
+      expect(tut.isActive).toBe(false);
+
+      vi.useRealTimers();
+    });
+
+    it('isCompleted returns true only after tutorial fully completes', () => {
+      vi.useFakeTimers();
+      try { localStorage.removeItem('bs_tutorial_done'); } catch { /* ignore */ }
+      expect(TutorialOverlay.isCompleted()).toBe(false);
+
+      const tut = new TutorialOverlay(container);
+      overlay = tut;
+      const state = createMockState();
+      tut.start(state);
+
+      for (let i = 0; i < TOTAL_TUTORIAL_STEPS; i++) {
+        tut.onCommandExecuted(state);
+      }
+
+      // On current code: finish() called during the loop → isCompleted() already true (FAILS)
+      // After change: finish() delayed by 4s → isCompleted() still false (PASSES)
+      expect(TutorialOverlay.isCompleted()).toBe(false);
+
+      vi.advanceTimersByTime(4000);
+      expect(TutorialOverlay.isCompleted()).toBe(true);
+
+      vi.useRealTimers();
     });
   });
 });

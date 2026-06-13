@@ -9,6 +9,9 @@ import { TUTORIAL_STEPS, TOTAL_TUTORIAL_STEPS } from './tutorialSteps.js';
 /** How often (ms) to poll for step completion. */
 const POLL_INTERVAL_MS = 2000;
 
+/** How long (ms) to show the congratulations step before auto-dismiss. */
+const CONGRATULATIONS_DISPLAY_MS = 4000;
+
 /**
  * Modal tutorial overlay that guides new players through the first
  * campaign level step by step. The overlay is built entirely in the
@@ -142,6 +145,13 @@ export class TutorialOverlay {
    *  does not visibly advance. */
   private advanceOneStep(render: boolean): void {
     if (this.stepIndex >= TOTAL_TUTORIAL_STEPS - 1) {
+      if (render && this._active) {
+        this.clearPollTimer();
+        this.clearAutoAdvanceTimer();
+        this.render();
+        this.autoAdvanceTimer = setTimeout(() => this.finish(), CONGRATULATIONS_DISPLAY_MS);
+        return;
+      }
       this.finish();
       return;
     }
