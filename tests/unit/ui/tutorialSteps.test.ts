@@ -197,4 +197,13 @@ describe('tutorialSteps', () => {
     } as unknown as GameState);
     expect(snap19).toBeDefined();
   });
+
+  // ── 15 ───────────────────────────────────────────────────────────────────
+  it('step 22 uses tutorial.complete_title and tutorial.complete_text', () => {
+    const step22 = TUTORIAL_STEPS[22];
+    // After implementation: keys changed from tutorial.step23.title/tutorial.step23
+    // to tutorial.complete_title / tutorial.complete_text
+    expect(step22.titleKey).toBe('tutorial.complete_title');
+    expect(step22.textKey).toBe('tutorial.complete_text');
+  });
 });
