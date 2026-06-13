@@ -63,6 +63,12 @@ mainMenu.show();
 
 // --- Tutorial ---
 const tutorial = new TutorialOverlay(uiContainer);
+mainMenu.setOnTutorial(() => {
+  mainMenu.hide();
+  window.__gameConsole('new_game seed:42 size:24');
+  window.__gameConsole('campaign start level:tutorial_pit');
+  tutorial.start();
+});
 
 // --- Audio ---
 const audioMgr = new AudioManager();
