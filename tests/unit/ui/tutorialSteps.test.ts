@@ -83,4 +83,74 @@ describe('tutorialSteps', () => {
       }
     }
   });
+
+  // ── 11 ───────────────────────────────────────────────────────────────────
+  it('step IDs follow the issue-specified sequence', () => {
+    const expectedIds: string[] = [
+      'time-speed',
+      'hire-surveyor',
+      'survey',
+      'hire-driller',
+      'drill-plan',
+      'charge',
+      'sequence',
+      'blast',
+      'scores',
+      'event-fire-resolve',
+      'hire-manager',
+      'contract-accept',
+      'hire-driver',
+      'vehicle-buy-assign',
+      'build-storage',
+      'contract-deliver',
+      'finances',
+      'build-ramp',
+      'needs',
+      'set-policy',
+      'tick-advance',
+      'victory',
+      'congratulations',
+    ];
+    const actualIds = TUTORIAL_STEPS.map(s => s.id);
+    expect(actualIds).toEqual(expectedIds);
+  });
+
+  // ── 12 ───────────────────────────────────────────────────────────────────
+  it('steps 9, 17, 19 (1-indexed) have autoAdvanceMs set to 2000', () => {
+    // 0-indexed: 8 = scores, 16 = finances, 18 = needs
+    expect(TUTORIAL_STEPS[8].autoAdvanceMs).toBe(2000);
+    expect(TUTORIAL_STEPS[16].autoAdvanceMs).toBe(2000);
+    expect(TUTORIAL_STEPS[18].autoAdvanceMs).toBe(2000);
+  });
+
+  // ── 13 ───────────────────────────────────────────────────────────────────
+  it('steps 9, 17, 19 (1-indexed) have captureSnapshot that returns step-specific data', () => {
+    // Step 9 (scores) — captures scores + collectedOre
+    const step9 = TUTORIAL_STEPS[8];
+    expect(step9.captureSnapshot).toBeDefined();
+    const snap9 = step9.captureSnapshot!({
+      scores: { wellBeing: 75, safety: 80, ecology: 60, nuisance: 30 },
+      collectedOre: { iron: 500 },
+      cash: 25000,
+    } as GameState);
+    expect(snap9.scores).toBeDefined();
+    expect(snap9.collectedOre).toBeDefined();
+
+    // Step 17 (finances) — captures cash + contracts
+    const step17 = TUTORIAL_STEPS[16];
+    expect(step17.captureSnapshot).toBeDefined();
+    const snap17 = step17.captureSnapshot!({
+      cash: 100000,
+      contracts: { active: [{ id: 'c1' }] },
+    } as GameState);
+    expect(snap17.cash).toBe(100000);
+
+    // Step 19 (needs) — captures employee needs
+    const step19 = TUTORIAL_STEPS[18];
+    expect(step19.captureSnapshot).toBeDefined();
+    const snap19 = step19.captureSnapshot!({
+      employees: { employees: [{ needs: { hunger: 50, fatigue: 30, breakPressure: 20 } }] },
+    } as unknown as GameState);
+    expect(snap19).toBeDefined();
+  });
 });

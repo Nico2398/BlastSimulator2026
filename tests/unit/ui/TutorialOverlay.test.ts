@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { TutorialOverlay } from '../../../src/ui/TutorialOverlay.js';
+import { TUTORIAL_STEPS } from '../../../src/ui/tutorialSteps.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
 
 function createMockState(): GameState {
@@ -251,44 +252,88 @@ describe('TutorialOverlay (12.4)', () => {
   });
 
   // ── 21 ───────────────────────────────────────────────────────────────────
-  it('captureSnapshotForCurrentStep stores snapshot for the first step on start', () => {
-    // TODO: implement — verify that stepSnapshots[0] is set after start()
-    expect(true).toBe(true);
+  it('captureSnapshotForCurrentStep stores snapshot for step 0 with timeScale data', () => {
+    const tut = new TutorialOverlay(container) as any;
+    const state = createMockState();
+    state.timeScale = 2;
+    tut.start(state);
+    // Step 0 (time-speed) captureSnapshot should capture timeScale from game state
+    expect(tut.stepSnapshots[0]).toBeDefined();
+    expect(tut.stepSnapshots[0].timeScale).toBe(2);
   });
 
   // ── 22 ───────────────────────────────────────────────────────────────────
-  it('captureSnapshotForCurrentStep stores empty object when step has no captureSnapshot fn', () => {
-    // TODO: implement — verify snapshot is {} for steps without captureSnapshot
-    expect(true).toBe(true);
+  it('TUTORIAL_STEPS[0].captureSnapshot is defined and captures timeScale', () => {
+    const step0 = TUTORIAL_STEPS[0];
+    expect(step0.captureSnapshot).toBeDefined();
+    const state = { timeScale: 1 } as GameState;
+    const snap = step0.captureSnapshot!(state);
+    expect(snap.timeScale).toBeDefined();
+    expect(snap.timeScale).toBe(1);
   });
 
   // ── 23 ───────────────────────────────────────────────────────────────────
-  it('captureSnapshotForCurrentStep sets an autoAdvanceTimer when step has autoAdvanceMs', () => {
-    // TODO: implement — verify timer is set after start with auto-advance step
-    expect(true).toBe(true);
+  it('start() sets autoAdvanceTimer for step 0 (time-speed auto-advance)', () => {
+    const tut = new TutorialOverlay(container) as any;
+    const state = createMockState();
+    tut.start(state);
+    // Step 0 (time-speed) has autoAdvanceMs=2000, so timer should be set
+    expect(tut.autoAdvanceTimer).not.toBeNull();
   });
 
   // ── 24 ───────────────────────────────────────────────────────────────────
-  it('clearAutoAdvanceTimer clears the auto-advance timer', () => {
-    // TODO: implement — verify timer is null after clearAutoAdvanceTimer
-    expect(true).toBe(true);
+  it('skip() clears autoAdvanceTimer when timer is active', () => {
+    const tut = new TutorialOverlay(container) as any;
+    const state = createMockState();
+    tut.start(state);
+    // Step 0 is auto-advance, so timer should have been set
+    expect(tut.autoAdvanceTimer).not.toBeNull();
+    const timerBefore = tut.autoAdvanceTimer;
+    tut.skip();
+    // After skip, timer should be cleared
+    expect(tut.autoAdvanceTimer).toBeNull();
+    // The old timer should be distinct from the cleared state
+    expect(timerBefore).not.toBe(tut.autoAdvanceTimer);
   });
 
   // ── 25 ───────────────────────────────────────────────────────────────────
-  it('finish clears stepSnapshots and autoAdvanceTimer', () => {
-    // TODO: implement — verify cleanup on finish
-    expect(true).toBe(true);
+  it('finish() clears stepSnapshots and autoAdvanceTimer', () => {
+    const tut = new TutorialOverlay(container) as any;
+    const state = createMockState();
+    tut.start(state);
+    // After start, stepSnapshots should have at least one entry and timer should be set
+    expect(tut.stepSnapshots.length).toBeGreaterThanOrEqual(1);
+    expect(tut.autoAdvanceTimer).not.toBeNull();
+    tut.skip(); // calls finish() internally
+    expect(tut.stepSnapshots.length).toBe(0);
+    expect(tut.autoAdvanceTimer).toBeNull();
   });
 
   // ── 26 ───────────────────────────────────────────────────────────────────
-  it('auto-advance step hides next button and commands hint', () => {
-    // TODO: implement — verify render() hides nextBtn for autoAdvanceMs steps
-    expect(true).toBe(true);
+  it('render() hides next button for auto-advance step 0', () => {
+    const tut = new TutorialOverlay(container);
+    const state = createMockState();
+    tut.start(state);
+    const buttons = Array.from(container.querySelectorAll('button'));
+    const nextBtn = buttons.find(b => b.className.includes('bs-btn-primary'));
+    expect(nextBtn).toBeDefined();
+    // For auto-advance step (step 0 in new sequence), next button should be hidden
+    expect(nextBtn!.style.display).toBe('none');
   });
 
   // ── 27 ───────────────────────────────────────────────────────────────────
-  it('advanceToNextStep captures snapshot for the new step', () => {
-    // TODO: implement — verify snapshot is captured after advancing
-    expect(true).toBe(true);
+  it('advancing from step 0 captures snapshot for step 1 with meaningful data', () => {
+    const tut = new TutorialOverlay(container) as any;
+    const state = createMockState();
+    tut.start(state);
+    // Step 0 (welcome currently) isComplete returns true immediately
+    tut.onCommandExecuted(state);
+    // After advancing to step 1, its snapshot should be captured
+    expect(tut.stepSnapshots[1]).toBeDefined();
+    // Step 1 (hire-surveyor) should capture snapshot data about current employees
+    const snap1 = tut.stepSnapshots[1];
+    expect(typeof snap1).toBe('object');
+    // It should contain meaningful data, not just an empty object
+    expect(Object.keys(snap1).length).toBeGreaterThan(0);
   });
 });
