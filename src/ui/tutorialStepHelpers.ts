@@ -36,6 +36,28 @@ export function createHireStep(
 }
 
 /**
+ * Helper: create a hire step that also requires any pending tutorial event
+ * to be resolved first. Used for steps that follow event-fire-resolve where
+ * a synchronous isComplete check would fire before the event dialog is dismissed.
+ */
+export function createHireStepWithEventGuard(
+  id: string,
+  titleKey: string,
+  textKey: string,
+  role: EmployeeRole,
+): TutorialStep {
+  const base = createHireStep(id, titleKey, textKey, role);
+  const origIsComplete = base.isComplete;
+  return {
+    ...base,
+    isComplete: (state: GameState, snapshot: Record<string, unknown>) => {
+      // Must wait for any pending tutorial event to be resolved first
+      return state.events?.pendingEvent == null && origIsComplete(state, snapshot);
+    },
+  };
+}
+
+/**
  * Helper: create a step that completes when a numeric value has increased.
  * The `getValue` function is called at snapshot time and during the completion
  * check — when the current value exceeds the snapshot the step is complete.

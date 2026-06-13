@@ -3,6 +3,7 @@
 
 import { t } from '../core/i18n/I18n.js';
 import type { GameState } from '../core/state/GameState.js';
+import type { CommandResult } from '../console/ConsoleRunner.js';
 import { TUTORIAL_STEPS, TOTAL_TUTORIAL_STEPS } from './tutorialSteps.js';
 
 /** How often (ms) to poll for step completion. */
@@ -25,12 +26,13 @@ export class TutorialOverlay {
   private readonly skipBtn: HTMLElement;
   private readonly nextBtn: HTMLElement;
   private _active = false;
+  private _executingCommands = false;
   private stepIndex = 0;
   private gameState: GameState | null = null;
   private snapshots: Record<string, unknown> | null = null;
   private autoAdvanceTimer: ReturnType<typeof setTimeout> | null = null;
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
-  private gameConsole: ((cmd: string) => import('../console/ConsoleRunner.js').CommandResult) | null = null;
+  private gameConsole: ((cmd: string) => CommandResult) | null = null;
 
   constructor(container: HTMLElement) {
     this.overlay = document.createElement('div');
@@ -109,7 +111,7 @@ export class TutorialOverlay {
     return !!localStorage.getItem('bs_tutorial_done');
   }
 
-  setGameConsole(fn: (cmd: string) => import('../console/ConsoleRunner.js').CommandResult): void {
+  setGameConsole(fn: (cmd: string) => CommandResult): void {
     this.gameConsole = fn;
   }
 
@@ -121,6 +123,9 @@ export class TutorialOverlay {
 
   onCommandExecuted(state: GameState): void {
     if (!this._active) return;
+    // Guard against re-entrancy: command execution inside advanceOneStep
+    // ultimately calls back into onCommandExecuted via the console bridge.
+    if (this._executingCommands) return;
     this.gameState = state;
 
     const step = TUTORIAL_STEPS[this.stepIndex];
@@ -142,17 +147,22 @@ export class TutorialOverlay {
     this.clearPollTimer();
     this.stepIndex++;
 
-    // Execute commands for the new step
+    // Execute commands for the new step — guarded against re-entrancy
     const step = TUTORIAL_STEPS[this.stepIndex];
     if (step?.commands && step.commands.length > 0 && this.gameConsole) {
-      for (const cmd of step.commands) {
-        this.gameConsole(cmd);
-      }
-      // Auto-fire tutorial event for event-fire-resolve step
-      if (step.id === 'event-fire-resolve' && this.gameState) {
-        if (!this.gameState.events?.pendingEvent) {
-          this.gameConsole('event fire tutorial_synergy_consultant');
+      this._executingCommands = true;
+      try {
+        for (const cmd of step.commands) {
+          this.gameConsole(cmd);
         }
+        // Auto-fire tutorial event for event-fire-resolve step
+        if (step.id === 'event-fire-resolve' && this.gameState) {
+          if (!this.gameState.events?.pendingEvent) {
+            this.gameConsole('event fire tutorial_synergy_consultant');
+          }
+        }
+      } finally {
+        this._executingCommands = false;
       }
     }
 

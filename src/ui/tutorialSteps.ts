@@ -6,6 +6,7 @@ import type { ShiftMode } from '../core/entities/SitePolicy.js';
 import {
   createComparisonStep,
   createHireStep,
+  createHireStepWithEventGuard,
   createAutoAdvanceStep,
   countNavCellsByType,
   getEmployees,
@@ -72,33 +73,13 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     titleKey: 'tutorial.step10.title',
     textKey: 'tutorial.step10',
     commands: ['tick 3'],
-    captureSnapshot: (state: GameState) => ({
-      prevEventCount: (state.events?.firedEventIds ?? []).length,
-    }),
-    isComplete: (state: GameState, _snapshot: Record<string, unknown>) => {
+    isComplete: (state: GameState) => {
       return state.events?.pendingEvent != null;
     },
   },
 
   // ── Step 10: hire-manager ──
-  {
-    id: 'hire-manager',
-    titleKey: 'tutorial.step11.title',
-    textKey: 'tutorial.step11',
-    commands: ['hire employee'],
-    captureSnapshot: (state: GameState) => ({
-      prevEmployeeCount: getEmployees(state).length,
-    }),
-    isComplete: (state: GameState, snapshot: Record<string, unknown>) => {
-      const prev = snapshot.prevEmployeeCount as number;
-      const employees = getEmployees(state);
-      return (
-        state.events?.pendingEvent == null &&
-        employees.length > prev &&
-        employees.some(e => e.role === 'manager')
-      );
-    },
-  },
+  createHireStepWithEventGuard('hire-manager', 'tutorial.step11.title', 'tutorial.step11', 'manager'),
 
   // ── Step 11: contract-accept ──
   createComparisonStep('contract-accept', 'tutorial.step12.title', 'tutorial.step12', (s) => (s.contracts?.active ?? []).length, ['contracts']),
