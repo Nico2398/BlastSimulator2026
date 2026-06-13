@@ -30,6 +30,7 @@ export class TutorialOverlay {
   private snapshots: Record<string, unknown> | null = null;
   private autoAdvanceTimer: ReturnType<typeof setTimeout> | null = null;
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
+  private gameConsole: ((cmd: string) => import('../console/ConsoleRunner.js').CommandResult) | null = null;
 
   constructor(container: HTMLElement) {
     this.overlay = document.createElement('div');
@@ -108,6 +109,10 @@ export class TutorialOverlay {
     return !!localStorage.getItem('bs_tutorial_done');
   }
 
+  setGameConsole(fn: (cmd: string) => import('../console/ConsoleRunner.js').CommandResult): void {
+    this.gameConsole = fn;
+  }
+
   dispose(): void {
     this.clearPollTimer();
     this.clearAutoAdvanceTimer();
@@ -136,6 +141,21 @@ export class TutorialOverlay {
     }
     this.clearPollTimer();
     this.stepIndex++;
+
+    // Execute commands for the new step
+    const step = TUTORIAL_STEPS[this.stepIndex];
+    if (step?.commands && step.commands.length > 0 && this.gameConsole) {
+      for (const cmd of step.commands) {
+        this.gameConsole(cmd);
+      }
+      // Auto-fire tutorial event for event-fire-resolve step
+      if (step.id === 'event-fire-resolve' && this.gameState) {
+        if (!this.gameState.events?.pendingEvent) {
+          this.gameConsole('event fire tutorial_synergy_consultant');
+        }
+      }
+    }
+
     if (this.gameState) {
       this.captureSnapshotForCurrentStep();
     }
