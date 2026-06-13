@@ -16,7 +16,7 @@ export class TutorialOverlay {
   private readonly nextBtn: HTMLElement;
   private readonly commandsHint: HTMLElement;
   private gameState: GameState | null = null;
-  private active = false;
+  private _active = false;
   private stepIndex = 0;
 
   constructor(container: HTMLElement) {
@@ -45,26 +45,28 @@ export class TutorialOverlay {
     this.commandsHint.style.display = 'none';
     this.commandsHint.style.cssText = 'font-size:11px;color:#8a7040;margin-top:8px';
 
-    this.skipBtn = document.createElement('button');
-    this.skipBtn.className = 'bs-btn bs-btn-danger';
-    this.skipBtn.textContent = t('tutorial.skip');
-    this.skipBtn.addEventListener('click', () => this.skip());
-
-    this.nextBtn = document.createElement('button');
-    this.nextBtn.className = 'bs-btn bs-btn-primary';
-    this.nextBtn.textContent = t('tutorial.next');
-    this.nextBtn.addEventListener('click', () => this.advance());
+    this.skipBtn = this.createButton('tutorial.skip', 'bs-btn bs-btn-danger', () => this.skip());
+    this.nextBtn = this.createButton('tutorial.next', 'bs-btn bs-btn-primary', () => this.advanceToNextStep());
 
     this.box.append(this.titleEl, this.textEl, this.stepCounter, this.progressEl, this.commandsHint, this.skipBtn, this.nextBtn);
     this.overlay.appendChild(this.box);
     container.appendChild(this.overlay);
   }
 
+  /** Factory to create a button with i18n label, class name, and click handler. */
+  private createButton(i18nKey: string, className: string, handler: () => void): HTMLButtonElement {
+    const btn = document.createElement('button');
+    btn.className = className;
+    btn.textContent = t(i18nKey);
+    btn.addEventListener('click', handler);
+    return btn;
+  }
+
   /** Start tutorial from the beginning. */
   start(state?: GameState): void {
     this.gameState = state ?? null;
     this.stepIndex = 0;
-    this.active = true;
+    this._active = true;
     this.overlay.style.display = 'flex';
     if (this.gameState) {
       this.gameState.isPaused = true;
@@ -74,19 +76,13 @@ export class TutorialOverlay {
 
   /** Skip the tutorial and persist completion. */
   skip(): void {
-    if (!this.active) return;
-    this.active = false;
-    this.overlay.style.display = 'none';
-    if (this.gameState) {
-      this.gameState.isPaused = false;
-    }
-    localStorage.setItem('bs_tutorial_done', '1');
-    this.gameState = null;
+    if (!this._active) return;
+    this.finish();
   }
 
   /** Whether the tutorial is currently active. */
   get isActive(): boolean {
-    return this.active;
+    return this._active;
   }
 
   /** Returns true if tutorial was already completed (persisted in localStorage). */
@@ -105,27 +101,27 @@ export class TutorialOverlay {
 
   /** React to a command being executed — may advance tutorial steps. */
   onCommandExecuted(state: GameState): void {
-    if (!this.active) return;
+    if (!this._active) return;
     this.gameState = state;
     const step = TUTORIAL_STEPS[this.stepIndex];
     if (step && step.isComplete(state)) {
-      this.advance();
+      this.advanceToNextStep();
     }
   }
 
-  /** Advance to the next step or complete the tutorial. */
-  private advance(): void {
+  /** Advance to the next step or finish the tutorial. */
+  private advanceToNextStep(): void {
     if (this.stepIndex >= TOTAL_TUTORIAL_STEPS - 1) {
-      this.complete();
+      this.finish();
     } else {
       this.stepIndex++;
       this.render();
     }
   }
 
-  /** Mark the tutorial as complete. */
-  private complete(): void {
-    this.active = false;
+  /** Finish the tutorial: deactivate, hide overlay, unpause game, persist completion. */
+  private finish(): void {
+    this._active = false;
     if (this.gameState) {
       this.gameState.isPaused = false;
     }
