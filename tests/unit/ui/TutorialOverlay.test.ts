@@ -263,7 +263,7 @@ describe('TutorialOverlay (12.4)', () => {
     tut.start(state);
     // Step 0 (time-speed) captureSnapshot should capture timeScale from game state
     expect(tut.stepSnapshots[0]).toBeDefined();
-    expect(tut.stepSnapshots[0].timeScale).toBe(2);
+    expect(tut.stepSnapshots[0].prevTimeScale).toBe(2);
   });
 
   // ── 22 ───────────────────────────────────────────────────────────────────
@@ -272,17 +272,24 @@ describe('TutorialOverlay (12.4)', () => {
     expect(step0.captureSnapshot).toBeDefined();
     const state = { timeScale: 1 } as GameState;
     const snap = step0.captureSnapshot!(state);
-    expect(snap.timeScale).toBeDefined();
-    expect(snap.timeScale).toBe(1);
+    expect(snap.prevTimeScale).toBeDefined();
+    expect(snap.prevTimeScale).toBe(1);
   });
 
   // ── 23 ───────────────────────────────────────────────────────────────────
-  it('start() sets autoAdvanceTimer for step 0 (time-speed auto-advance)', () => {
+  it('start() sets autoAdvanceTimer only for steps with autoAdvanceMs', () => {
     const tut = new TutorialOverlay(container) as any;
     const state = createMockState();
     tut.start(state);
-    // Step 0 (time-speed) has autoAdvanceMs=2000, so timer should be set
+    // Step 0 (time-speed) does NOT have autoAdvanceMs, so timer should be null
+    expect(tut.autoAdvanceTimer).toBeNull();
+    // Switch to step 8 (scores) which has autoAdvanceMs=2000
+    tut.stepIndex = 8;
+    tut.captureSnapshotForCurrentStep();
     expect(tut.autoAdvanceTimer).not.toBeNull();
+    // Clean up the timer to avoid test pollution
+    clearTimeout(tut.autoAdvanceTimer);
+    tut.autoAdvanceTimer = null;
   });
 
   // ── 24 ───────────────────────────────────────────────────────────────────
@@ -290,7 +297,9 @@ describe('TutorialOverlay (12.4)', () => {
     const tut = new TutorialOverlay(container) as any;
     const state = createMockState();
     tut.start(state);
-    // Step 0 is auto-advance, so timer should have been set
+    // Step 0 does not auto-advance, so set up timer by switching to step 8 (scores)
+    tut.stepIndex = 8;
+    tut.captureSnapshotForCurrentStep();
     expect(tut.autoAdvanceTimer).not.toBeNull();
     const timerBefore = tut.autoAdvanceTimer;
     tut.skip();
@@ -305,8 +314,11 @@ describe('TutorialOverlay (12.4)', () => {
     const tut = new TutorialOverlay(container) as any;
     const state = createMockState();
     tut.start(state);
-    // After start, stepSnapshots should have at least one entry and timer should be set
+    // After start, stepSnapshots should have at least one entry
     expect(tut.stepSnapshots.length).toBeGreaterThanOrEqual(1);
+    // Step 0 does not auto-advance, so set up timer by switching to step 8 (scores)
+    tut.stepIndex = 8;
+    tut.captureSnapshotForCurrentStep();
     expect(tut.autoAdvanceTimer).not.toBeNull();
     tut.skip(); // calls finish() internally
     expect(tut.stepSnapshots.length).toBe(0);
@@ -314,15 +326,15 @@ describe('TutorialOverlay (12.4)', () => {
   });
 
   // ── 26 ───────────────────────────────────────────────────────────────────
-  it('render() hides next button for auto-advance step 0', () => {
+  it('render() shows next button for non-auto-advance step 0', () => {
     const tut = new TutorialOverlay(container);
     const state = createMockState();
     tut.start(state);
     const buttons = Array.from(container.querySelectorAll('button'));
     const nextBtn = buttons.find(b => b.className.includes('bs-btn-primary'));
     expect(nextBtn).toBeDefined();
-    // For auto-advance step (step 0 in new sequence), next button should be hidden
-    expect(nextBtn!.style.display).toBe('none');
+    // Step 0 (time-speed) does NOT have autoAdvanceMs, so next button should be visible
+    expect(nextBtn!.style.display).toBe('');
   });
 
   // ── 27 ───────────────────────────────────────────────────────────────────
@@ -330,7 +342,8 @@ describe('TutorialOverlay (12.4)', () => {
     const tut = new TutorialOverlay(container) as any;
     const state = createMockState();
     tut.start(state);
-    // Step 0 (welcome currently) isComplete returns true immediately
+    // Step 0 (time-speed) isComplete requires timeScale > prevTimeScale
+    state.timeScale = 2;
     tut.onCommandExecuted(state);
     // After advancing to step 1, its snapshot should be captured
     expect(tut.stepSnapshots[1]).toBeDefined();

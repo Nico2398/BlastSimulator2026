@@ -100,7 +100,10 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     titleKey: 'tutorial.step9.title',
     textKey: 'tutorial.step9',
     autoAdvanceMs: 2000,
-    captureSnapshot: () => ({}),
+    captureSnapshot: (state) => ({
+      scores: state.scores,
+      collectedOre: state.collectedOre,
+    }),
     isComplete: () => true,
   },
   // Step 9: event-fire-resolve — Respond to random events
@@ -186,7 +189,10 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     titleKey: 'tutorial.step17.title',
     textKey: 'tutorial.step17',
     autoAdvanceMs: 2000,
-    captureSnapshot: () => ({}),
+    captureSnapshot: (state) => ({
+      cash: state.cash,
+      contracts: state.contracts,
+    }),
     isComplete: () => true,
   },
   // Step 17: build-ramp — Build a ramp for bench access
@@ -208,7 +214,9 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     titleKey: 'tutorial.step19.title',
     textKey: 'tutorial.step19',
     autoAdvanceMs: 2000,
-    captureSnapshot: () => ({}),
+    captureSnapshot: (state) => ({
+      employees: state.employees,
+    }),
     isComplete: () => true,
   },
   // Step 19: set-policy — Customize site policy
