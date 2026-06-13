@@ -1,114 +1,151 @@
 // BlastSimulator2026 — Tutorial Overlay (12.4)
-// Step-by-step first-time player guidance. Uses event system for delivery.
-// Can be skipped at any time.
+// Step-by-step first-time player guidance.
 
 import { t } from '../core/i18n/I18n.js';
-
-import type { CommandResult } from '../console/ConsoleRunner.js';
-
-export type GameConsoleFn = (cmd: string) => CommandResult;
-
-const STEPS = [
-  'tutorial.step1',
-  'tutorial.step2',
-  'tutorial.step3',
-  'tutorial.step4',
-  'tutorial.done',
-] as const;
+import type { GameState } from '../core/state/GameState.js';
+import { TUTORIAL_STEPS, TOTAL_TUTORIAL_STEPS } from './tutorialSteps.js';
 
 export class TutorialOverlay {
   private readonly overlay: HTMLElement;
   private readonly box: HTMLElement;
+  private readonly titleEl: HTMLElement;
   private readonly textEl: HTMLElement;
   private readonly stepCounter: HTMLElement;
-  private step = 0;
-  private active = false;
+  private readonly progressEl: HTMLElement;
+  private readonly skipBtn: HTMLElement;
+  private readonly nextBtn: HTMLElement;
+  private readonly commandsHint: HTMLElement;
+  private gameState: GameState | null = null;
+  private _active = false;
+  private stepIndex = 0;
 
   constructor(container: HTMLElement) {
     this.overlay = document.createElement('div');
     this.overlay.className = 'bs-confirm-overlay';
-    this.overlay.style.cssText = 'display:none;pointer-events:none';
-    // Tutorial sits at bottom-center, doesn't block gameplay
-    this.overlay.style.alignItems = 'flex-end';
-    this.overlay.style.paddingBottom = '60px';
+    this.overlay.style.display = 'none';
+    this.overlay.style.position = 'fixed';
+    this.overlay.style.inset = '0';
+    this.overlay.style.zIndex = '600';
 
     this.box = document.createElement('div');
     this.box.className = 'bs-confirm-box';
-    this.box.style.cssText = 'max-width:380px;pointer-events:all;text-align:left';
+    this.box.style.pointerEvents = 'all';
 
-    const header = document.createElement('div');
-    header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:8px';
-
-    const title = document.createElement('div');
-    title.className = 'bs-panel-title';
-    title.style.margin = '0';
-    title.textContent = t('tutorial.title');
-
-    this.stepCounter = document.createElement('div');
-    this.stepCounter.style.cssText = 'font-size:10px;color:#806050';
-
-    header.append(title, this.stepCounter);
+    this.titleEl = document.createElement('div');
+    this.titleEl.className = 'bs-panel-title';
 
     this.textEl = document.createElement('p');
-    this.textEl.style.cssText = 'font-size:12px;color:#c0a070;margin:0 0 10px';
 
-    const btnRow = document.createElement('div');
-    btnRow.style.cssText = 'display:flex;gap:6px;justify-content:flex-end';
+    this.stepCounter = document.createElement('div');
 
-    const skipBtn = document.createElement('button');
-    skipBtn.className = 'bs-btn bs-btn-danger';
-    skipBtn.style.cssText = 'font-size:10px;padding:2px 8px';
-    skipBtn.textContent = t('tutorial.skip');
-    skipBtn.addEventListener('click', () => this.skip());
+    this.progressEl = document.createElement('div');
+    this.progressEl.style.cssText = 'height:4px;background:#f0b840;width:0%;transition:width 0.3s ease';
 
-    const nextBtn = document.createElement('button');
-    nextBtn.className = 'bs-btn bs-btn-primary';
-    nextBtn.style.cssText = 'font-size:10px;padding:2px 8px';
-    nextBtn.textContent = t('tutorial.next');
-    nextBtn.addEventListener('click', () => this.next());
+    this.commandsHint = document.createElement('div');
+    this.commandsHint.style.display = 'none';
+    this.commandsHint.style.cssText = 'font-size:11px;color:#8a7040;margin-top:8px';
 
-    btnRow.append(skipBtn, nextBtn);
-    this.box.append(header, this.textEl, btnRow);
+    this.skipBtn = this.createButton('tutorial.skip', 'bs-btn bs-btn-danger', () => this.skip());
+    this.nextBtn = this.createButton('tutorial.next', 'bs-btn bs-btn-primary', () => this.advanceToNextStep());
+
+    this.box.append(this.titleEl, this.textEl, this.stepCounter, this.progressEl, this.commandsHint, this.skipBtn, this.nextBtn);
     this.overlay.appendChild(this.box);
     container.appendChild(this.overlay);
   }
 
+  /** Factory to create a button with i18n label, class name, and click handler. */
+  private createButton(i18nKey: string, className: string, handler: () => void): HTMLButtonElement {
+    const btn = document.createElement('button');
+    btn.className = className;
+    btn.textContent = t(i18nKey);
+    btn.addEventListener('click', handler);
+    return btn;
+  }
+
   /** Start tutorial from the beginning. */
-  start(): void {
-    this.step = 0;
-    this.active = true;
+  start(state?: GameState): void {
+    this.gameState = state ?? null;
+    this.stepIndex = 0;
+    this._active = true;
     this.overlay.style.display = 'flex';
+    if (this.gameState) {
+      this.gameState.isPaused = true;
+    }
     this.render();
   }
 
+  /** Skip the tutorial and persist completion. */
   skip(): void {
-    this.active = false;
-    this.overlay.style.display = 'none';
-    localStorage.setItem('bs_tutorial_done', '1');
+    if (!this._active) return;
+    this.finish();
   }
 
-  get isActive(): boolean { return this.active; }
+  /** Whether the tutorial is currently active. */
+  get isActive(): boolean {
+    return this._active;
+  }
 
   /** Returns true if tutorial was already completed (persisted in localStorage). */
   static isCompleted(): boolean {
-    try { return !!localStorage.getItem('bs_tutorial_done'); } catch { return false; }
+    try {
+      return !!localStorage.getItem('bs_tutorial_done');
+    } catch {
+      return false;
+    }
   }
 
-  dispose(): void { this.overlay.remove(); }
+  /** Remove the overlay from the DOM. */
+  dispose(): void {
+    this.overlay.remove();
+  }
 
-  private next(): void {
-    this.step++;
-    if (this.step >= STEPS.length) {
-      this.skip(); // done
+  /** React to a command being executed — may advance tutorial steps. */
+  onCommandExecuted(state: GameState): void {
+    if (!this._active) return;
+    this.gameState = state;
+    const step = TUTORIAL_STEPS[this.stepIndex];
+    if (step && step.isComplete(state)) {
+      this.advanceToNextStep();
+    }
+  }
+
+  /** Advance to the next step or finish the tutorial. */
+  private advanceToNextStep(): void {
+    if (this.stepIndex >= TOTAL_TUTORIAL_STEPS - 1) {
+      this.finish();
     } else {
+      this.stepIndex++;
       this.render();
     }
   }
 
+  /** Finish the tutorial: deactivate, hide overlay, unpause game, persist completion. */
+  private finish(): void {
+    this._active = false;
+    if (this.gameState) {
+      this.gameState.isPaused = false;
+    }
+    this.overlay.style.display = 'none';
+    localStorage.setItem('bs_tutorial_done', '1');
+    this.gameState = null;
+  }
+
+  /** Render the current step. */
   private render(): void {
-    const key = STEPS[this.step];
-    if (!key) return;
-    this.textEl.textContent = t(key);
-    this.stepCounter.textContent = `${this.step + 1} / ${STEPS.length}`;
+    const step = TUTORIAL_STEPS[this.stepIndex];
+    if (!step) return;
+
+    this.titleEl.textContent = t(step.titleKey);
+    this.textEl.textContent = t(step.textKey);
+    this.stepCounter.textContent = `${this.stepIndex + 1} / ${TOTAL_TUTORIAL_STEPS}`;
+
+    if (step.commands && step.commands.length > 0) {
+      this.commandsHint.style.display = 'block';
+      this.commandsHint.textContent = step.commands.join(', ');
+    } else {
+      this.commandsHint.style.display = 'none';
+    }
+
+    this.progressEl.style.width = `${((this.stepIndex + 1) / TOTAL_TUTORIAL_STEPS) * 100}%`;
   }
 }
