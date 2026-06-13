@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { TutorialOverlay } from '../../../src/ui/TutorialOverlay.js';
+import { TUTORIAL_STEPS } from '../../../src/ui/tutorialSteps.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
 
 function createMockState(): GameState {
   return {
     isPaused: false,
+    timeScale: 1,
     time: 0,
     tickCount: 0,
     seed: 42,
@@ -121,11 +123,14 @@ describe('TutorialOverlay (12.4)', () => {
   });
 
   // ── 10 ───────────────────────────────────────────────────────────────────
-  it('dispose() removes overlay element from the DOM', () => {
+  it('dispose() removes overlay element from the container', () => {
     const tut = new TutorialOverlay(container);
     overlay = tut;
+    // Before dispose the overlay exists
+    expect(container.querySelector('.bs-confirm-overlay')).not.toBeNull();
     tut.dispose();
-    overlay = null; // prevent double-dispose
+    overlay = null;
+    // After dispose the container has no overlay
     expect(container.querySelector('.bs-confirm-overlay')).toBeNull();
   });
 
@@ -150,7 +155,9 @@ describe('TutorialOverlay (12.4)', () => {
     tut.start(state);
     const titleEl = container.querySelector('.bs-panel-title');
     const initialTitle = titleEl?.textContent ?? '';
-    // Simulate that the current step's isComplete condition is met
+    // Step 0 (time-speed): isComplete when timeScale > prevTimeScale
+    // Simulate the player increasing game speed
+    state.timeScale = 2;
     tut.onCommandExecuted(state);
     const newTitle = titleEl?.textContent ?? '';
     // The title should have changed to reflect the next step
@@ -163,11 +170,12 @@ describe('TutorialOverlay (12.4)', () => {
     overlay = tut;
     const state = createMockState();
     tut.start(state);
-    // Advance past welcome (step 0, isComplete: () => true) to survey step (step 1)
+    // Advance past step 0 (time-speed): isComplete when timeScale > prevTimeScale
+    state.timeScale = 2;
     tut.onCommandExecuted(state);
     const titleEl = container.querySelector('.bs-panel-title');
     const initialTitle = titleEl?.textContent ?? '';
-    // Step 1 (survey) requires surveyResults.length > 0, but mock has empty []
+    // Step 1 (hire-surveyor) requires an employee with role surveyor, but mock has empty []
     tut.onCommandExecuted(state);
     // Title should remain unchanged because the step is not yet complete
     expect(titleEl?.textContent).toBe(initialTitle);
@@ -239,14 +247,101 @@ describe('TutorialOverlay (12.4)', () => {
   });
 
   // ── 20 ───────────────────────────────────────────────────────────────────
-  it('dispose() removes all overlay elements from the container', () => {
+  it('captureSnapshotForCurrentStep stores snapshot for step 0 with timeScale data', () => {
+    const tut = new TutorialOverlay(container) as any;
+    const state = createMockState();
+    state.timeScale = 2;
+    tut.start(state);
+    // Step 0 (time-speed) captureSnapshot should capture timeScale from game state
+    expect(tut.stepSnapshots[0]).toBeDefined();
+    expect(tut.stepSnapshots[0].prevTimeScale).toBe(2);
+  });
+
+  // ── 21 ───────────────────────────────────────────────────────────────────
+  it('TUTORIAL_STEPS[0].captureSnapshot is defined and captures timeScale', () => {
+    const step0 = TUTORIAL_STEPS[0];
+    expect(step0.captureSnapshot).toBeDefined();
+    const state = { timeScale: 1 } as GameState;
+    const snap = step0.captureSnapshot!(state);
+    expect(snap.prevTimeScale).toBeDefined();
+    expect(snap.prevTimeScale).toBe(1);
+  });
+
+  // ── 22 ───────────────────────────────────────────────────────────────────
+  it('start() sets autoAdvanceTimer only for steps with autoAdvanceMs', () => {
+    const tut = new TutorialOverlay(container) as any;
+    const state = createMockState();
+    tut.start(state);
+    // Step 0 (time-speed) does NOT have autoAdvanceMs, so timer should be null
+    expect(tut.autoAdvanceTimer).toBeNull();
+    // Switch to step 8 (scores) which has autoAdvanceMs=2000
+    tut.stepIndex = 8;
+    tut.captureSnapshotForCurrentStep();
+    expect(tut.autoAdvanceTimer).not.toBeNull();
+    // Clean up the timer to avoid test pollution
+    clearTimeout(tut.autoAdvanceTimer);
+    tut.autoAdvanceTimer = null;
+  });
+
+  // ── 23 ───────────────────────────────────────────────────────────────────
+  it('skip() clears autoAdvanceTimer when timer is active', () => {
+    const tut = new TutorialOverlay(container) as any;
+    const state = createMockState();
+    tut.start(state);
+    // Step 0 does not auto-advance, so set up timer by switching to step 8 (scores)
+    tut.stepIndex = 8;
+    tut.captureSnapshotForCurrentStep();
+    expect(tut.autoAdvanceTimer).not.toBeNull();
+    const timerBefore = tut.autoAdvanceTimer;
+    tut.skip();
+    // After skip, timer should be cleared
+    expect(tut.autoAdvanceTimer).toBeNull();
+    // The old timer should be distinct from the cleared state
+    expect(timerBefore).not.toBe(tut.autoAdvanceTimer);
+  });
+
+  // ── 24 ───────────────────────────────────────────────────────────────────
+  it('finish() clears stepSnapshots and autoAdvanceTimer', () => {
+    const tut = new TutorialOverlay(container) as any;
+    const state = createMockState();
+    tut.start(state);
+    // After start, stepSnapshots should have at least one entry
+    expect(tut.stepSnapshots.length).toBeGreaterThanOrEqual(1);
+    // Step 0 does not auto-advance, so set up timer by switching to step 8 (scores)
+    tut.stepIndex = 8;
+    tut.captureSnapshotForCurrentStep();
+    expect(tut.autoAdvanceTimer).not.toBeNull();
+    tut.skip(); // calls finish() internally
+    expect(tut.stepSnapshots.length).toBe(0);
+    expect(tut.autoAdvanceTimer).toBeNull();
+  });
+
+  // ── 25 ───────────────────────────────────────────────────────────────────
+  it('render() shows next button for non-auto-advance step 0', () => {
     const tut = new TutorialOverlay(container);
-    overlay = tut;
-    // Before dispose the overlay exists
-    expect(container.querySelector('.bs-confirm-overlay')).not.toBeNull();
-    tut.dispose();
-    overlay = null;
-    // After dispose the container has no overlay
-    expect(container.querySelector('.bs-confirm-overlay')).toBeNull();
+    const state = createMockState();
+    tut.start(state);
+    const buttons = Array.from(container.querySelectorAll('button'));
+    const nextBtn = buttons.find(b => b.className.includes('bs-btn-primary'));
+    expect(nextBtn).toBeDefined();
+    // Step 0 (time-speed) does NOT have autoAdvanceMs, so next button should be visible
+    expect(nextBtn!.style.display).toBe('');
+  });
+
+  // ── 26 ───────────────────────────────────────────────────────────────────
+  it('advancing from step 0 captures snapshot for step 1 with meaningful data', () => {
+    const tut = new TutorialOverlay(container) as any;
+    const state = createMockState();
+    tut.start(state);
+    // Step 0 (time-speed) isComplete requires timeScale > prevTimeScale
+    state.timeScale = 2;
+    tut.onCommandExecuted(state);
+    // After advancing to step 1, its snapshot should be captured
+    expect(tut.stepSnapshots[1]).toBeDefined();
+    // Step 1 (hire-surveyor) should capture snapshot data about current employees
+    const snap1 = tut.stepSnapshots[1];
+    expect(typeof snap1).toBe('object');
+    // It should contain meaningful data, not just an empty object
+    expect(Object.keys(snap1).length).toBeGreaterThan(0);
   });
 });
