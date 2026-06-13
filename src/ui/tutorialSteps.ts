@@ -8,7 +8,9 @@ export interface TutorialStep {
   titleKey: string;
   textKey: string;
   commands?: string[];
-  isComplete: (state: GameState) => boolean;
+  autoAdvanceMs?: number;
+  captureSnapshot?: (state: GameState) => Record<string, unknown>;
+  isComplete: (state: GameState, snapshot: Record<string, unknown>) => boolean;
 }
 
 export const TUTORIAL_STEPS: TutorialStep[] = [

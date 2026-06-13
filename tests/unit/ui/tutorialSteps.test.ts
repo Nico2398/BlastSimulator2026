@@ -45,10 +45,42 @@ describe('tutorialSteps', () => {
   });
 
   // ── 7 ────────────────────────────────────────────────────────────────────
-  it('every step isComplete can be called with a minimal GameState without throwing', () => {
+  it('every step isComplete can be called with a minimal GameState and snapshot without throwing', () => {
+    const minimalState = { isPaused: false } as GameState;
+    const emptySnapshot: Record<string, unknown> = {};
+    for (const step of TUTORIAL_STEPS) {
+      expect(() => step.isComplete(minimalState, emptySnapshot)).not.toThrow();
+    }
+  });
+
+  // ── 8 ────────────────────────────────────────────────────────────────────
+  it('autoAdvanceMs is either undefined or a positive number for all steps', () => {
+    for (const step of TUTORIAL_STEPS) {
+      if (step.autoAdvanceMs != null) {
+        expect(typeof step.autoAdvanceMs).toBe('number');
+        expect(step.autoAdvanceMs).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  // ── 9 ────────────────────────────────────────────────────────────────────
+  it('captureSnapshot is either undefined or a function for all steps', () => {
+    for (const step of TUTORIAL_STEPS) {
+      if (step.captureSnapshot != null) {
+        expect(typeof step.captureSnapshot).toBe('function');
+      }
+    }
+  });
+
+  // ── 10 ───────────────────────────────────────────────────────────────────
+  it('captureSnapshot returns a Record when called with a GameState', () => {
     const minimalState = { isPaused: false } as GameState;
     for (const step of TUTORIAL_STEPS) {
-      expect(() => step.isComplete(minimalState)).not.toThrow();
+      if (step.captureSnapshot) {
+        const result = step.captureSnapshot(minimalState);
+        expect(result).toBeDefined();
+        expect(typeof result).toBe('object');
+      }
     }
   });
 });
