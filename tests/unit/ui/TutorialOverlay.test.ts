@@ -7,6 +7,7 @@ import type { GameState } from '../../../src/core/state/GameState.js';
 function createMockState(): GameState {
   return {
     isPaused: false,
+    timeScale: 1,
     time: 0,
     tickCount: 0,
     seed: 42,
@@ -151,7 +152,9 @@ describe('TutorialOverlay (12.4)', () => {
     tut.start(state);
     const titleEl = container.querySelector('.bs-panel-title');
     const initialTitle = titleEl?.textContent ?? '';
-    // Simulate that the current step's isComplete condition is met
+    // Step 0 (time-speed): isComplete when timeScale > prevTimeScale
+    // Simulate the player increasing game speed
+    state.timeScale = 2;
     tut.onCommandExecuted(state);
     const newTitle = titleEl?.textContent ?? '';
     // The title should have changed to reflect the next step
@@ -164,11 +167,12 @@ describe('TutorialOverlay (12.4)', () => {
     overlay = tut;
     const state = createMockState();
     tut.start(state);
-    // Advance past welcome (step 0, isComplete: () => true) to survey step (step 1)
+    // Advance past step 0 (time-speed): isComplete when timeScale > prevTimeScale
+    state.timeScale = 2;
     tut.onCommandExecuted(state);
     const titleEl = container.querySelector('.bs-panel-title');
     const initialTitle = titleEl?.textContent ?? '';
-    // Step 1 (survey) requires surveyResults.length > 0, but mock has empty []
+    // Step 1 (hire-surveyor) requires an employee with role surveyor, but mock has empty []
     tut.onCommandExecuted(state);
     // Title should remain unchanged because the step is not yet complete
     expect(titleEl?.textContent).toBe(initialTitle);
