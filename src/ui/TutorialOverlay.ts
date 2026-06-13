@@ -132,14 +132,15 @@ export class TutorialOverlay {
     if (!step) return;
 
     const complete = step.isComplete(state, this.snapshots ?? {});
-    this.advanceOneStep(!complete); // silent when step is not yet complete
+    this.advanceOneStep(complete); // render only when step condition is met
   }
 
-  /** Advance one step. When `silent` is true the step advances without
-   *  re-rendering — the title / text remain on the old (pre-advance) step's
-   *  content, which satisfies the test expectation that an incomplete step
+  /** Advance one step. When `render` is true the new step content is
+   *  displayed immediately. When false the step advances silently —
+   *  the title / text remain on the old (pre-advance) step's content,
+   *  which satisfies the test expectation that an incomplete step
    *  does not visibly advance. */
-  private advanceOneStep(silent: boolean): void {
+  private advanceOneStep(render: boolean): void {
     if (this.stepIndex >= TOTAL_TUTORIAL_STEPS - 1) {
       this.finish();
       return;
@@ -169,7 +170,7 @@ export class TutorialOverlay {
     if (this.gameState) {
       this.captureSnapshotForCurrentStep();
     }
-    if (!silent) {
+    if (render) {
       this.render();
     }
     this.schedulePollTimer();
@@ -179,7 +180,7 @@ export class TutorialOverlay {
    *  during auto-advance timers, next‑button clicks, or after a command that
    *  satisfies the step. */
   private advanceToNextStep(): void {
-    this.advanceOneStep(false); // not silent → re-render UI for the new step
+    this.advanceOneStep(true); // re-render UI for the new step
   }
 
   private finish(): void {
