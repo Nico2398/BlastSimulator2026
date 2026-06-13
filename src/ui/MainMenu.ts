@@ -12,6 +12,7 @@ export type OnResumeLevel = (levelId: string) => void;
 export type OnStartLevel = (levelId: string) => void;
 export type OnLoad = () => void;
 export type OnSettings = () => void;
+export type OnTutorial = () => void;
 
 export class MainMenu {
   private readonly overlay: HTMLElement;
@@ -21,6 +22,7 @@ export class MainMenu {
   private onStartLevel?: OnStartLevel;
   private onLoad?: OnLoad;
   private onSettings?: OnSettings;
+  private onTutorial?: OnTutorial;
 
   constructor(container: HTMLElement) {
     this.overlay = document.createElement('div');
@@ -59,11 +61,12 @@ export class MainMenu {
     ].join(';');
 
     const newBtn = this.makeMenuBtn(t('menu.new_campaign'), 'primary', () => this.onNewCampaign?.());
+    const tutorialBtn = this.makeMenuBtn(t('menu.tutorial'), 'gold', () => { this.onTutorial?.(); });
     const continueBtn = this.makeMenuBtn(t('menu.continue'), '', () => this.showWorldMap(null));
     const loadBtn = this.makeMenuBtn(t('menu.load'), '', () => this.onLoad?.());
     const settingsBtn = this.makeMenuBtn(t('menu.settings'), '', () => this.onSettings?.());
 
-    this.menuBox.append(newBtn, continueBtn, loadBtn, settingsBtn);
+    this.menuBox.append(newBtn, tutorialBtn, continueBtn, loadBtn, settingsBtn);
 
     // ── World map box (hidden initially) ──
     this.worldMapBox = document.createElement('div');
@@ -84,6 +87,7 @@ export class MainMenu {
   setOnStartLevel(fn: OnStartLevel): void { this.onStartLevel = fn; }
   setOnLoad(fn: OnLoad): void { this.onLoad = fn; }
   setOnSettings(fn: OnSettings): void { this.onSettings = fn; }
+  setOnTutorial(fn: OnTutorial): void { this.onTutorial = fn; }
 
   show(): void { this.overlay.style.display = 'flex'; }
   hide(): void { this.overlay.style.display = 'none'; }

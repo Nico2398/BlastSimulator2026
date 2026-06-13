@@ -1643,6 +1643,7 @@
   "tutorial.complete_text": "You've completed the tutorial. You're ready to run this mine!",
   "menu.title": "BlastSimulator 2026",
   "menu.new_campaign": "New Campaign",
+  "menu.tutorial": "Tutorial",
   "menu.continue": "Continue",
   "menu.load": "Load Game",
   "menu.settings": "Settings",
