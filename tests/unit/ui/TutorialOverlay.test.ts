@@ -123,11 +123,14 @@ describe('TutorialOverlay (12.4)', () => {
   });
 
   // ── 10 ───────────────────────────────────────────────────────────────────
-  it('dispose() removes overlay element from the DOM', () => {
+  it('dispose() removes overlay element from the container', () => {
     const tut = new TutorialOverlay(container);
     overlay = tut;
+    // Before dispose the overlay exists
+    expect(container.querySelector('.bs-confirm-overlay')).not.toBeNull();
     tut.dispose();
-    overlay = null; // prevent double-dispose
+    overlay = null;
+    // After dispose the container has no overlay
     expect(container.querySelector('.bs-confirm-overlay')).toBeNull();
   });
 
@@ -244,18 +247,6 @@ describe('TutorialOverlay (12.4)', () => {
   });
 
   // ── 20 ───────────────────────────────────────────────────────────────────
-  it('dispose() removes all overlay elements from the container', () => {
-    const tut = new TutorialOverlay(container);
-    overlay = tut;
-    // Before dispose the overlay exists
-    expect(container.querySelector('.bs-confirm-overlay')).not.toBeNull();
-    tut.dispose();
-    overlay = null;
-    // After dispose the container has no overlay
-    expect(container.querySelector('.bs-confirm-overlay')).toBeNull();
-  });
-
-  // ── 21 ───────────────────────────────────────────────────────────────────
   it('captureSnapshotForCurrentStep stores snapshot for step 0 with timeScale data', () => {
     const tut = new TutorialOverlay(container) as any;
     const state = createMockState();
@@ -266,7 +257,7 @@ describe('TutorialOverlay (12.4)', () => {
     expect(tut.stepSnapshots[0].prevTimeScale).toBe(2);
   });
 
-  // ── 22 ───────────────────────────────────────────────────────────────────
+  // ── 21 ───────────────────────────────────────────────────────────────────
   it('TUTORIAL_STEPS[0].captureSnapshot is defined and captures timeScale', () => {
     const step0 = TUTORIAL_STEPS[0];
     expect(step0.captureSnapshot).toBeDefined();
@@ -276,7 +267,7 @@ describe('TutorialOverlay (12.4)', () => {
     expect(snap.prevTimeScale).toBe(1);
   });
 
-  // ── 23 ───────────────────────────────────────────────────────────────────
+  // ── 22 ───────────────────────────────────────────────────────────────────
   it('start() sets autoAdvanceTimer only for steps with autoAdvanceMs', () => {
     const tut = new TutorialOverlay(container) as any;
     const state = createMockState();
@@ -292,7 +283,7 @@ describe('TutorialOverlay (12.4)', () => {
     tut.autoAdvanceTimer = null;
   });
 
-  // ── 24 ───────────────────────────────────────────────────────────────────
+  // ── 23 ───────────────────────────────────────────────────────────────────
   it('skip() clears autoAdvanceTimer when timer is active', () => {
     const tut = new TutorialOverlay(container) as any;
     const state = createMockState();
@@ -309,7 +300,7 @@ describe('TutorialOverlay (12.4)', () => {
     expect(timerBefore).not.toBe(tut.autoAdvanceTimer);
   });
 
-  // ── 25 ───────────────────────────────────────────────────────────────────
+  // ── 24 ───────────────────────────────────────────────────────────────────
   it('finish() clears stepSnapshots and autoAdvanceTimer', () => {
     const tut = new TutorialOverlay(container) as any;
     const state = createMockState();
@@ -325,7 +316,7 @@ describe('TutorialOverlay (12.4)', () => {
     expect(tut.autoAdvanceTimer).toBeNull();
   });
 
-  // ── 26 ───────────────────────────────────────────────────────────────────
+  // ── 25 ───────────────────────────────────────────────────────────────────
   it('render() shows next button for non-auto-advance step 0', () => {
     const tut = new TutorialOverlay(container);
     const state = createMockState();
@@ -337,7 +328,7 @@ describe('TutorialOverlay (12.4)', () => {
     expect(nextBtn!.style.display).toBe('');
   });
 
-  // ── 27 ───────────────────────────────────────────────────────────────────
+  // ── 26 ───────────────────────────────────────────────────────────────────
   it('advancing from step 0 captures snapshot for step 1 with meaningful data', () => {
     const tut = new TutorialOverlay(container) as any;
     const state = createMockState();

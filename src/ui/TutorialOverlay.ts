@@ -72,8 +72,6 @@ export class TutorialOverlay {
     this.overlay.style.display = 'flex';
     if (this.gameState) {
       this.gameState.isPaused = true;
-    }
-    if (this.gameState) {
       this.captureSnapshotForCurrentStep();
     }
     this.render();
