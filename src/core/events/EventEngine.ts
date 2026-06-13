@@ -26,6 +26,7 @@ export function detectTrafficJam(
   tickCount: number,
 ): FiredEvent | null {
   if (state.pendingEvent) return null;
+  if (state.eventFreqMultiplier === 0) return null;
 
   // Count qualifying vehicles (state=waiting, waitingTicks at threshold) per target cell.
   const waitingByTarget = new Map<string, number>();
@@ -59,6 +60,7 @@ export function detectUnqualifiedTask(
   tickCount: number,
 ): FiredEvent | null {
   if (state.pendingEvent) return null;
+  if (state.eventFreqMultiplier === 0) return null;
   if (unqualifiedActionIds.length === 0) return null;
 
   const event: FiredEvent = { eventId: 'unqualified_task_error', firedAtTick: tickCount };
@@ -82,6 +84,7 @@ export function detectOreReport(
   tickCount: number,
 ): FiredEvent | null {
   if (state.pendingEvent) return null;
+  if (state.eventFreqMultiplier === 0) return null;
 
   let eventId: string | null = null;
 

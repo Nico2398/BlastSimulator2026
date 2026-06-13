@@ -38,6 +38,8 @@ export interface EventSystemState {
   lastEventTick: number;
   /** Number of player actions since the last event. Used for cooldown gating. */
   actionCountSinceEvent: number;
+  /** Multiplier on event frequency (1 = normal, 0 = no events). When 0, all event firing is suppressed. */
+  eventFreqMultiplier: number;
 }
 
 export interface FiredEvent {
@@ -45,7 +47,7 @@ export interface FiredEvent {
   firedAtTick: number;
 }
 
-export function createEventSystemState(): EventSystemState {
+export function createEventSystemState(eventFreqMultiplier: number = 1): EventSystemState {
   const categories: TimerCategory[] = ['union', 'politics', 'weather', 'mafia', 'lawsuit'];
   return {
     timers: categories.map(cat => ({
@@ -58,6 +60,7 @@ export function createEventSystemState(): EventSystemState {
     firedEventIds: [],
     lastEventTick: 0,
     actionCountSinceEvent: 0,
+    eventFreqMultiplier,
   };
 }
 
@@ -75,6 +78,9 @@ export function tickEventSystem(
   ctx: EventContext,
   rng: Random,
 ): FiredEvent | null {
+  // When eventFreqMultiplier is 0, all timer-based events are suppressed
+  if (state.eventFreqMultiplier === 0) return null;
+
   // Don't fire new events while one is pending
   if (state.pendingEvent) return null;
 
