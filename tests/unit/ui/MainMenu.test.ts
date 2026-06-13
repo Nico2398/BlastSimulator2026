@@ -162,11 +162,11 @@ describe('MainMenu (12.8)', () => {
     menu.show();
     const buttons = Array.from(container.querySelectorAll('button'));
     const tutorialBtn = buttons.find(b => b.textContent?.includes('Tutorial'))!;
-    expect(tutorialBtn.style.color).toBe('#ffe090');
+    expect(tutorialBtn.style.color).toBe('rgb(255, 224, 144)');
     expect(tutorialBtn.style.borderColor).toContain('rgba');
-    expect(tutorialBtn.style.borderColor).toContain('255,225,144');
+    expect(tutorialBtn.style.borderColor).toContain('255, 225, 144');
     expect(tutorialBtn.style.background).toContain('rgba');
-    expect(tutorialBtn.style.background).toContain('255,225,144');
+    expect(tutorialBtn.style.background).toContain('255, 225, 144');
     menu.dispose();
   });
 
