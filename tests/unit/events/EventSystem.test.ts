@@ -377,4 +377,33 @@ describe('Event system engine', () => {
     expect(fired).not.toBeNull();
     expect(fired!.eventId).toBe('followup_ev');
   });
+
+  // ── eventFreqMultiplier = 0 suppression ──
+
+  it('tickEventSystem returns null when eventFreqMultiplier is 0', () => {
+    const state = createEventSystemState(0);
+    // Register an event that would normally fire
+    registerEvents([makeEvent('suppressed_test', 'union')]);
+    const unionTimer = state.timers.find(t => t.category === 'union')!;
+    state.actionCountSinceEvent = MIN_EVENT_INTERVAL_ACTIONS;
+    unionTimer.remaining = 1;
+
+    const ctx = makeCtx({ tickCount: 200 });
+    const fired = tickEventSystem(state, ctx, new Random(42));
+    expect(fired).toBeNull();
+    expect(state.pendingEvent).toBeNull();
+  });
+
+  it('tickEventSystem with eventFreqMultiplier=1 still fires events normally', () => {
+    registerEvents([makeEvent('normal_test', 'union')]);
+    const state = createEventSystemState(1); // default but explicit
+    const unionTimer = state.timers.find(t => t.category === 'union')!;
+    state.actionCountSinceEvent = MIN_EVENT_INTERVAL_ACTIONS;
+    unionTimer.remaining = 1;
+
+    const ctx = makeCtx({ tickCount: 200 });
+    const fired = tickEventSystem(state, ctx, new Random(42));
+    expect(fired).not.toBeNull();
+    expect(fired!.eventId).toBe('normal_test');
+  });
 });

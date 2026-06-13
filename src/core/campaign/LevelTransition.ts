@@ -86,6 +86,7 @@ export function createGameForLevel(
     seed: level.terrainSeed,
     mineType: level.mineType,
     startingCash: level.startingCash,
+    eventFreqMultiplier: level.eventFreqMultiplier,
   };
 
   const newState = createGame(config);

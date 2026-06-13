@@ -54,6 +54,7 @@ export interface GameConfig {
   seed: number;
   mineType?: string;
   startingCash?: number;
+  eventFreqMultiplier?: number;
 }
 
 /** The type of action a player has issued, waiting for an employee to execute. */
@@ -242,7 +243,7 @@ export function createGame(config: GameConfig): GameState {
     scores: createScoreState(),
     damage: createDamageState(),
     zone: createZoneState(),
-    events: createEventSystemState(),
+    events: createEventSystemState(config.eventFreqMultiplier ?? 1),
     corruption: createCorruptionState(),
     mafia: createMafiaState(),
     campaign: createCampaignState(),
