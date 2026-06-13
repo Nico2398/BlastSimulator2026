@@ -61,7 +61,7 @@ export class MainMenu {
     ].join(';');
 
     const newBtn = this.makeMenuBtn(t('menu.new_campaign'), 'primary', () => this.onNewCampaign?.());
-    const tutorialBtn = this.makeMenuBtn(t('menu.tutorial'), 'gold', () => { this.onTutorial?.(); });
+    const tutorialBtn = this.makeMenuBtn(t('menu.tutorial'), 'gold', () => this.onTutorial?.());
     const continueBtn = this.makeMenuBtn(t('menu.continue'), '', () => this.showWorldMap(null));
     const loadBtn = this.makeMenuBtn(t('menu.load'), '', () => this.onLoad?.());
     const settingsBtn = this.makeMenuBtn(t('menu.settings'), '', () => this.onSettings?.());
@@ -197,7 +197,7 @@ export class MainMenu {
 
   dispose(): void { this.overlay.remove(); }
 
-  private makeMenuBtn(label: string, variant: string, onClick: () => void): HTMLButtonElement {
+  private makeMenuBtn(label: string, variant: 'primary' | 'gold' | '', onClick: () => void): HTMLButtonElement {
     const btn = document.createElement('button');
     btn.className = `bs-btn${variant === 'primary' ? ' bs-btn-primary' : ''}`;
     btn.style.cssText = 'width:100%;padding:10px 16px;font-size:13px;font-weight:600;text-align:left;pointer-events:all';
