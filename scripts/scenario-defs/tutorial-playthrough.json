@@ -18,6 +18,7 @@
     "sequence auto delay_step:25",
     "blast",
     "scores",
+    "finances",
 
     "tick 3",
     "event fire tutorial_synergy_consultant",
@@ -26,6 +27,8 @@
     "employee hire role:manager",
     "employee assign_skill 3 skill:management level:3",
     "contract accept 1",
+    "contract deliver 1 amount:5000",
+    "finances",
 
     "employee hire role:driver",
     "employee assign_skill 4 skill:driving.truck level:3",
@@ -33,12 +36,25 @@
     "vehicle driver 1 4",
 
     "build storage_depot at:12,8",
-    "contract deliver 1 amount:500",
+    "contract accept 2",
+    "contract deliver 2 amount:5000",
     "finances",
 
     "build_ramp start:15,15 end:20,25",
     "needs",
     "set_policy mode:shift_8h",
+
+    "contract accept 3",
+    "contract deliver 3 amount:5000",
+    "finances",
+
+    "drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:8,8",
+    "charge hole:* explosive:boomite amount:4 stemming:2",
+    "sequence auto delay_step:20",
+    "blast",
+    "scores",
+    "finances",
+
     "tick 10",
     "campaign status"
   ]
