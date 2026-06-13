@@ -196,6 +196,20 @@ describe('EventEngine — detectTrafficJam (Task 2.8)', () => {
     const result = detectTrafficJam(vehicles, eventState, 100);
     expect(result).toBeNull();
   });
+
+  // ── eventFreqMultiplier = 0 suppression ──
+
+  it('returns null when eventFreqMultiplier is 0 even with qualifying vehicles', () => {
+    eventState = createEventSystemState(0);
+    const vehicles: Vehicle[] = [
+      makeWaitingVehicle(5, 5, 15),
+      makeWaitingVehicle(5, 5, 15),
+      makeWaitingVehicle(5, 5, 15),
+    ];
+    const result = detectTrafficJam(vehicles, eventState, 100);
+    expect(result).toBeNull();
+    expect(eventState.pendingEvent).toBeNull();
+  });
 });
 
 // ── traffic_jam EventDef registration ────────────────────────────────────────
@@ -373,6 +387,23 @@ describe('EventEngine — detectOreReport (Task 4.8)', () => {
     const result = detectOreReport(report, eventState, 800);
     expect(result).toBeNull();
     expect(eventState.pendingEvent!.eventId).toBe('union_strike');
+  });
+
+  // ── eventFreqMultiplier = 0 suppression ──
+
+  it('returns null when eventFreqMultiplier is 0 even with qualifying ore report', () => {
+    eventState = createEventSystemState(0);
+    const report = {
+      oreYields: { dirtite: 1300 },
+      totalYieldKg: 1300,
+      estimatedYieldKg: 1000,
+      yieldRatio: 1.3,
+      hasTreranium: false,
+      absurdiumFraction: 0,
+    };
+    const result = detectOreReport(report, eventState, 200);
+    expect(result).toBeNull();
+    expect(eventState.pendingEvent).toBeNull();
   });
 });
 

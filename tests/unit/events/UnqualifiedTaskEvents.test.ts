@@ -70,6 +70,15 @@ describe('EventEngine — detectUnqualifiedTask (Task 3.7)', () => {
     // The pre-existing pending event must not have been replaced
     expect(eventState.pendingEvent).toBe(existingPending);
   });
+
+  // ── eventFreqMultiplier = 0 suppression ──
+
+  it('returns null when eventFreqMultiplier is 0 even with unqualified actions', () => {
+    const state = createEventSystemState(0);
+    const result = detectUnqualifiedTask([42, 99], state, 100);
+    expect(result).toBeNull();
+    expect(state.pendingEvent).toBeNull();
+  });
 });
 
 // ── unqualified_task_error EventDef registration ──────────────────────────────
