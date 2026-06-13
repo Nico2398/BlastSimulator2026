@@ -9,6 +9,9 @@ import { setDelay, autoVPattern } from '../../core/mining/Sequence.js';
 import { assembleBlastPlan, validateBlastPlan } from '../../core/mining/BlastPlan.js';
 import { executeBlast } from '../../core/mining/BlastExecution.js';
 import { addIncome } from '../../core/economy/Finance.js';
+import { addBlastFragments } from '../../core/economy/Logistics.js';
+// TODO: implementer will wire addBlastFragments into blastCommand flow
+void addBlastFragments;
 import { recordVibration } from '../../core/scores/ScoreManager.js';
 import { recordBlastResult, snapshotStats } from '../../core/campaign/SuccessTracker.js';
 import {
