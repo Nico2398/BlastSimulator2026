@@ -164,4 +164,4 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   },
 ];
 
-export const TOTAL_TUTORIAL_STEPS = 23;
+export const TOTAL_TUTORIAL_STEPS = TUTORIAL_STEPS.length;
