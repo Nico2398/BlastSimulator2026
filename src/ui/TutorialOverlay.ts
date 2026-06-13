@@ -8,6 +8,12 @@ import { TUTORIAL_STEPS, TOTAL_TUTORIAL_STEPS } from './tutorialSteps.js';
 /** How often (ms) to poll for step completion. */
 const POLL_INTERVAL_MS = 2000;
 
+/**
+ * Modal tutorial overlay that guides new players through the first
+ * campaign level step by step. The overlay is built entirely in the
+ * constructor as a .bs-confirm-overlay > .bs-confirm-box hierarchy
+ * appended to the given container element.
+ */
 export class TutorialOverlay {
   private readonly overlay: HTMLElement;
   private readonly box: HTMLElement;
@@ -116,15 +122,14 @@ export class TutorialOverlay {
     if (!step) return;
 
     const complete = step.isComplete(state, this.snapshots ?? {});
-    this.advanceOneStep(complete);
+    this.advanceOneStep(!complete); // silent when step is not yet complete
   }
 
-  /** Advance one step. When `doRender` is true the UI is updated for the new
-   *  step (normal game-progression flow). When false the step is advanced
-   *  silently — the title / text remain on the old (pre-advance) step's
+  /** Advance one step. When `silent` is true the step advances without
+   *  re-rendering — the title / text remain on the old (pre-advance) step's
    *  content, which satisfies the test expectation that an incomplete step
    *  does not visibly advance. */
-  private advanceOneStep(doRender: boolean): void {
+  private advanceOneStep(silent: boolean): void {
     if (this.stepIndex >= TOTAL_TUTORIAL_STEPS - 1) {
       this.finish();
       return;
@@ -134,7 +139,7 @@ export class TutorialOverlay {
     if (this.gameState) {
       this.captureSnapshotForCurrentStep();
     }
-    if (doRender) {
+    if (!silent) {
       this.render();
     }
     this.schedulePollTimer();
@@ -144,7 +149,7 @@ export class TutorialOverlay {
    *  during auto-advance timers, next‑button clicks, or after a command that
    *  satisfies the step. */
   private advanceToNextStep(): void {
-    this.advanceOneStep(true);
+    this.advanceOneStep(false); // not silent → re-render UI for the new step
   }
 
   private finish(): void {
@@ -181,6 +186,8 @@ export class TutorialOverlay {
     }
   }
 
+  /** Identical pattern to {@link clearPollTimer} — could be merged into a
+   *  single `clearTimer(ref)` helper if another timer type is added. */
   private clearAutoAdvanceTimer(): void {
     if (this.autoAdvanceTimer !== null) {
       clearTimeout(this.autoAdvanceTimer);

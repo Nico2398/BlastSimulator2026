@@ -36,6 +36,39 @@ export function createHireStep(
 }
 
 /**
+ * Helper: create a step that completes when a numeric value has increased.
+ * The `getValue` function is called at snapshot time and during the completion
+ * check — when the current value exceeds the snapshot the step is complete.
+ *
+ * @param id         Unique step identifier.
+ * @param titleKey   i18n key for step title.
+ * @param textKey    i18n key for step text.
+ * @param getValue   Function returning the numeric value to compare.
+ * @param commands   Optional array of command hints shown to the player.
+ */
+export function createComparisonStep(
+  id: string,
+  titleKey: string,
+  textKey: string,
+  getValue: (state: GameState) => number,
+  commands?: string[],
+): TutorialStep {
+  return {
+    id,
+    titleKey,
+    textKey,
+    ...(commands ? { commands } : {}),
+    captureSnapshot: (state: GameState) => ({
+      prevValue: getValue(state),
+    }),
+    isComplete: (state: GameState, snapshot: Record<string, unknown>) => {
+      const prev = snapshot.prevValue as number;
+      return getValue(state) > prev;
+    },
+  };
+}
+
+/**
  * Helper: create a step that auto-advances after 2000ms.
  */
 export function createAutoAdvanceStep(

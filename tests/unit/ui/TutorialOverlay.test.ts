@@ -179,6 +179,7 @@ describe('TutorialOverlay (12.4)', () => {
   describe('auto-advance timer', () => {
     it('sets timer for steps with autoAdvanceMs, null for steps without', () => {
       vi.useFakeTimers();
+      // `as any` needed to access private autoAdvanceTimer for verification
       const tut = new TutorialOverlay(container) as any;
       overlay = tut;
       tut.start(createMockState());
@@ -188,6 +189,7 @@ describe('TutorialOverlay (12.4)', () => {
     });
 
     it('skip() clears pending auto-advance timer', () => {
+      // `as any` needed to access private autoAdvanceTimer for verification
       const tut = new TutorialOverlay(container) as any;
       overlay = tut;
       tut.start(createMockState());
@@ -232,6 +234,7 @@ describe('TutorialOverlay (12.4)', () => {
       expect(hintEl.style.display).toBe('none');
 
       // Advance to step 2 (survey) which has commands: ['survey seismic']
+      // `as any` needed to set private stepIndex and call private render()
       (tut as any).stepIndex = 2;
       (tut as any).render();
 
