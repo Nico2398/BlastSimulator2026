@@ -9,6 +9,11 @@ import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { setupEvents } from '../../../src/core/events/index.js';
 import { getEventById, clearEvents } from '../../../src/core/events/EventPool.js';
 import { t } from '../../../src/core/i18n/I18n.js';
+import { resolveEvent } from '../../../src/core/events/EventResolver.js';
+import { createScoreState } from '../../../src/core/scores/ScoreManager.js';
+import { createFinanceState } from '../../../src/core/economy/Finance.js';
+import { createEventSystemState } from '../../../src/core/events/EventSystem.js';
+import { Random } from '../../../src/core/math/Random.js';
 
 /** Build a fresh context with a real GameState (seed=42, desert biome). */
 function makeCtx(): GameContext {
@@ -80,6 +85,29 @@ describe('event fire subcommand', () => {
     expect(result.success).toBe(false);
     expect(result.output).toContain('Usage');
   });
+
+  it('event fire tutorial_synergy_consultant sets pendingEvent and shows tutorial details', () => {
+    // Arrange — look up the event definition to know what i18n keys to expect
+    const def = getEventById('tutorial_synergy_consultant');
+    expect(def).not.toBeNull();
+
+    // Act
+    const result = eventCommand(ctx, ['fire', 'tutorial_synergy_consultant'], {});
+
+    // Assert — pending event state
+    expect(result.success).toBe(true);
+    expect(ctx.state!.events.pendingEvent).not.toBeNull();
+    expect(ctx.state!.events.pendingEvent!.eventId).toBe('tutorial_synergy_consultant');
+    expect(ctx.state!.isPaused).toBe(true);
+    expect(ctx.state!.events.firedEventIds).toContain('tutorial_synergy_consultant');
+
+    // Assert — output contains tutorial details
+    expect(result.output).toContain(t(def!.titleKey));
+    expect(result.output).toContain(t(def!.descKey));
+    expect(result.output).toContain('[0]');
+    expect(result.output).toContain('[1]');
+    expect(result.output).toContain('[2]');
+  });
 });
 
 describe('tutorial event definitions', () => {
@@ -149,5 +177,42 @@ describe('tutorial event definitions', () => {
     };
 
     expect(ev.canFire(ctx)).toBe(true);
+  });
+});
+
+describe('tutorial event resolution', () => {
+  beforeEach(() => {
+    clearEvents();
+    setupEvents();
+  });
+
+  it.each([
+    [0, 'Hire consultant',  -3000, 97000, 65, 50, 50, 50],
+    [1, 'Dismiss consultant',    0, 100000, 40, 45, 50, 50],
+    [2, 'Equity deal',           0, 100000, 55, 45, 50, 50],
+  ] as const)('option %i — %s', (
+    optionIdx,
+    _name,
+    expectedCashChange,
+    expectedCash,
+    expectedWellBeing,
+    expectedSafety,
+    expectedEcology,
+    expectedNuisance,
+  ) => {
+    const eventSystem = createEventSystemState();
+    eventSystem.pendingEvent = { eventId: 'tutorial_synergy_consultant', firedAtTick: 10 };
+    const finances = createFinanceState(100000);
+    const scores = createScoreState();
+    const result = resolveEvent(eventSystem, finances, scores, optionIdx, 10, new Random(42));
+
+    expect(result).not.toBeNull();
+    expect(result!.cashChange).toBe(expectedCashChange);
+    expect(finances.cash).toBe(expectedCash);
+    expect(scores.wellBeing).toBe(expectedWellBeing);
+    expect(scores.safety).toBe(expectedSafety);
+    expect(scores.ecology).toBe(expectedEcology);
+    expect(scores.nuisance).toBe(expectedNuisance);
+    expect(eventSystem.pendingEvent).toBeNull();
   });
 });
