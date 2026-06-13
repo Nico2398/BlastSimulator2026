@@ -8,6 +8,7 @@ import {
   tickWithEvents,
   getStateSummary,
 } from './helpers.js';
+import { setupEvents } from '../../../src/core/events/index.js';
 import { campaignCompleteCommand } from '../../../src/console/commands/campaign.js';
 import { timeCommand, tickCommand, eventCommand } from '../../../src/console/commands/events.js';
 import { employeeCommand, buildCommand } from '../../../src/console/commands/entities.js';
@@ -21,6 +22,7 @@ describe('Tutorial Level — Full Walkthrough', () => {
   let ctx: ReturnType<typeof makeCampaignCtx>;
 
   beforeEach(() => {
+    setupEvents();
     ctx = makeCampaignCtx('tutorial_pit');
   });
 
