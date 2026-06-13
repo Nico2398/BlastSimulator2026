@@ -163,8 +163,11 @@ describe('TutorialOverlay (12.4)', () => {
     overlay = tut;
     const state = createMockState();
     tut.start(state);
+    // Advance past welcome (step 0, isComplete: () => true) to survey step (step 1)
+    tut.onCommandExecuted(state);
     const titleEl = container.querySelector('.bs-panel-title');
     const initialTitle = titleEl?.textContent ?? '';
+    // Step 1 (survey) requires surveyResults.length > 0, but mock has empty []
     tut.onCommandExecuted(state);
     // Title should remain unchanged because the step is not yet complete
     expect(titleEl?.textContent).toBe(initialTitle);
