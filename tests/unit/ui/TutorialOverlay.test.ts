@@ -224,7 +224,19 @@ describe('TutorialOverlay (12.4)', () => {
       const tut = new TutorialOverlay(container);
       overlay = tut;
       tut.start(createMockState());
-      expect(container.querySelector('.bs-tutorial-commands')).not.toBeNull();
+
+      const hintEl = container.querySelector('.bs-tutorial-commands') as HTMLElement;
+      expect(hintEl).not.toBeNull();
+
+      // Step 0 (time-speed) has no commands → hint is hidden
+      expect(hintEl.style.display).toBe('none');
+
+      // Advance to step 2 (survey) which has commands: ['survey seismic']
+      (tut as any).stepIndex = 2;
+      (tut as any).render();
+
+      expect(hintEl.style.display).not.toBe('none');
+      expect(hintEl.textContent).toBe('survey seismic');
     });
   });
 

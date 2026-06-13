@@ -156,7 +156,11 @@ export class TutorialOverlay {
       this.gameState.isPaused = false;
     }
     this.overlay.style.display = 'none';
-    localStorage.setItem('bs_tutorial_done', '1');
+    try {
+      localStorage.setItem('bs_tutorial_done', '1');
+    } catch {
+      // Silently ignore — localStorage may be unavailable in restricted browsing environments
+    }
     this.gameState = null;
   }
 
@@ -213,6 +217,7 @@ export class TutorialOverlay {
     this.titleEl.textContent = t(step.titleKey);
     this.textEl.textContent = t(step.textKey);
 
+    // TODO: use i18n t('tutorial.progress', { current, total }) once locale values have {current}/{total} placeholders
     this.stepCounter.textContent = `${this.stepIndex + 1} / ${TOTAL_TUTORIAL_STEPS}`;
 
     const progress = ((this.stepIndex + 1) / TOTAL_TUTORIAL_STEPS) * 100;
@@ -223,6 +228,7 @@ export class TutorialOverlay {
 
     if (step.commands && step.commands.length > 0) {
       this.commandsHint.style.display = '';
+      this.commandsHint.textContent = step.commands.join(', ');
     } else {
       this.commandsHint.style.display = 'none';
     }
