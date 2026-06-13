@@ -144,6 +144,7 @@ window.__gameConsole = (cmd: string) => {
 
   // Update UI after every command
   if (ctx.state) uiManager.update(ctx.state, ctx.weatherCycle?.current);
+  if (ctx.state) tutorial.onCommandExecuted(ctx.state);
   return result;
 };
 
@@ -214,6 +215,7 @@ window.__uiState = () => {
 };
 
 uiManager.setGameConsole(window.__gameConsole);
+tutorial.setGameConsole(window.__gameConsole);
 uiManager.setSpeedChangeHandler((speed) => {
   window.__gameConsole(`time speed ${speed}`);
 });

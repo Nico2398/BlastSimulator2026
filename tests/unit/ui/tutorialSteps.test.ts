@@ -123,6 +123,50 @@ describe('tutorialSteps', () => {
     expect(TUTORIAL_STEPS[18].autoAdvanceMs).toBe(2000);
   });
 
+  // ── 14 (event-fire-resolve) ──────────────────────────────────────────────
+  describe('step 9 (event-fire-resolve, index 9)', () => {
+    const step9 = TUTORIAL_STEPS[9];
+
+    it('has commands ["tick 3"]', () => {
+      expect(step9.commands).toEqual(['tick 3']);
+    });
+
+    it('isComplete returns true when pendingEvent is not null', () => {
+      const state = {
+        events: { pendingEvent: { eventId: 'test_evt', firedAtTick: 5 } },
+      } as unknown as GameState;
+      expect(step9.isComplete(state, {})).toBe(true);
+    });
+
+    it('isComplete returns false when pendingEvent is null', () => {
+      const state = { events: { pendingEvent: null } } as unknown as GameState;
+      expect(step9.isComplete(state, {})).toBe(false);
+    });
+  });
+
+  // ── 15 (hire-manager) ────────────────────────────────────────────────────
+  describe('step 10 (hire-manager, index 10)', () => {
+    const step10 = TUTORIAL_STEPS[10];
+
+    it('isComplete returns false when pendingEvent is not null even if manager hired', () => {
+      const state = {
+        events: { pendingEvent: { eventId: 'test_evt', firedAtTick: 5 } },
+        employees: { employees: [{ role: 'manager' }] },
+      } as unknown as GameState;
+      const snap = { prevEmployeeCount: 0 };
+      expect(step10.isComplete(state, snap)).toBe(false);
+    });
+
+    it('isComplete returns true when pendingEvent is null and manager hired', () => {
+      const state = {
+        events: { pendingEvent: null },
+        employees: { employees: [{ role: 'manager' }] },
+      } as unknown as GameState;
+      const snap = { prevEmployeeCount: 0 };
+      expect(step10.isComplete(state, snap)).toBe(true);
+    });
+  });
+
   // ── 13 ───────────────────────────────────────────────────────────────────
   it('steps 9, 17, 19 (1-indexed) have captureSnapshot that returns step-specific data', () => {
     // Step 9 (scores) — captures scores + collectedOre
