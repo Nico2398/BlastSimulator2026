@@ -255,6 +255,60 @@ describe('TutorialOverlay (12.4)', () => {
     });
   });
 
+  describe('setGameConsole', () => {
+    it('stores the function and does not throw', () => {
+      const tut = new TutorialOverlay(container);
+      overlay = tut;
+      const fn = vi.fn();
+      expect(() => tut.setGameConsole(fn)).not.toThrow();
+    });
+  });
+
+  describe('step 9 command execution and auto-fire', () => {
+    it('advancing to step 9 via advanceToNextStep executes tick 3 command', () => {
+      const tut = new TutorialOverlay(container) as any;
+      overlay = tut;
+      const state = createMockState();
+      const gameConsole = vi.fn();
+      tut.setGameConsole(gameConsole);
+      tut.start(state);
+
+      // Set to step 8 (scores) so advanceToNextStep goes to step 9 (event-fire-resolve)
+      tut.stepIndex = 8;
+      tut.advanceToNextStep();
+
+      expect(tut.stepIndex).toBe(9);
+      expect(gameConsole).toHaveBeenCalledWith('tick 3');
+    });
+
+    it('auto-fires tutorial_synergy_consultant when pendingEvent is null after step 9 commands', () => {
+      const tut = new TutorialOverlay(container) as any;
+      overlay = tut;
+      const state = createMockState();
+      const gameConsole = vi.fn();
+      tut.setGameConsole(gameConsole);
+      tut.start(state);
+
+      // createMockState does not include events → pendingEvent is undefined (== null)
+      tut.stepIndex = 8;
+      tut.advanceToNextStep();
+
+      expect(gameConsole).toHaveBeenCalledWith('event fire tutorial_synergy_consultant');
+    });
+
+    it('advanceOneStep handles null gameConsole without crashing', () => {
+      const tut = new TutorialOverlay(container) as any;
+      overlay = tut;
+      const state = createMockState();
+      tut.start(state);
+      // Do NOT call setGameConsole — gameConsole stays null
+
+      tut.stepIndex = 8;
+      expect(() => tut.advanceToNextStep()).not.toThrow();
+      expect(tut.stepIndex).toBe(9);
+    });
+  });
+
   describe('completion sequence', () => {
     it('advancing through all steps finishes the tutorial', () => {
       const tut = new TutorialOverlay(container);
