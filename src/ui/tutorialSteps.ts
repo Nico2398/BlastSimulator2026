@@ -202,10 +202,10 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     textKey: 'tutorial.step18',
     commands: ['build ramp'],
     captureSnapshot: (state) => ({
-      prevRampCount: (state.navGrid?.cells?.flat().filter(c => (c as any).type === 'ramp').length ?? 0),
+      prevRampCount: (state.navGrid?.cells?.flat()?.filter(c => (c as { type: string }).type === 'ramp').length ?? 0),
     }),
     isComplete: (state, snapshot) =>
-      (state.navGrid?.cells?.flat().filter(c => (c as any).type === 'ramp').length ?? 0) >
+      (state.navGrid?.cells?.flat()?.filter(c => (c as { type: string }).type === 'ramp').length ?? 0) >
         (snapshot.prevRampCount as number),
   },
   // Step 18: needs — Employee needs overview (auto-advance)
@@ -230,10 +230,12 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
       hungerThreshold: state.sitePolicy?.hungerRestThreshold ?? 80,
       fatigueThreshold: state.sitePolicy?.fatigueRestThreshold ?? 80,
     }),
-    isComplete: (state, snapshot) =>
-      state.sitePolicy?.shiftMode !== (snapshot as any).shiftMode ||
-      state.sitePolicy?.hungerRestThreshold !== (snapshot as any).hungerThreshold ||
-      state.sitePolicy?.fatigueRestThreshold !== (snapshot as any).fatigueThreshold,
+    isComplete: (state, snapshot) => {
+      const s = snapshot as { shiftMode?: string; hungerThreshold?: number; fatigueThreshold?: number };
+      return state.sitePolicy?.shiftMode !== s.shiftMode ||
+        state.sitePolicy?.hungerRestThreshold !== s.hungerThreshold ||
+        state.sitePolicy?.fatigueRestThreshold !== s.fatigueThreshold;
+    },
   },
   // Step 20: tick-advance — Let time pass
   {

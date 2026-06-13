@@ -44,8 +44,7 @@ export class TutorialOverlay {
     this.progressEl.style.cssText = 'height:4px;background:#f0b840;width:0%;transition:width 0.3s ease';
 
     this.commandsHint = document.createElement('div');
-    this.commandsHint.style.display = 'none';
-    this.commandsHint.style.cssText = 'font-size:11px;color:#8a7040;margin-top:8px';
+    this.commandsHint.style.cssText = 'display:none;font-size:11px;color:#8a7040;margin-top:8px';
 
     this.skipBtn = this.createButton('tutorial.skip', 'bs-btn bs-btn-danger', () => this.skip());
     this.nextBtn = this.createButton('tutorial.next', 'bs-btn bs-btn-primary', () => this.advanceToNextStep());
