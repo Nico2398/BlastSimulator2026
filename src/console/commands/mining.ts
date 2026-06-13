@@ -10,8 +10,7 @@ import { assembleBlastPlan, validateBlastPlan } from '../../core/mining/BlastPla
 import { executeBlast } from '../../core/mining/BlastExecution.js';
 import { addIncome } from '../../core/economy/Finance.js';
 import { addBlastFragments } from '../../core/economy/Logistics.js';
-// TODO: implementer will wire addBlastFragments into blastCommand flow
-void addBlastFragments;
+
 import { recordVibration } from '../../core/scores/ScoreManager.js';
 import { recordBlastResult, snapshotStats } from '../../core/campaign/SuccessTracker.js';
 import {
@@ -244,6 +243,14 @@ export function blastCommand(
   // Trigger one post-blast ore report event when conditions are met.
   const oreReport = computeBlastOreReport(result.fragments, state.surveyResults);
   detectOreReport(oreReport, state.events, state.tickCount);
+
+  // Track blast fragments in logistics for contract delivery.
+  addBlastFragments(state.logistics, result.fragments);
+
+  // Accumulate collected ore yields from the blast.
+  for (const [oreId, kg] of Object.entries(oreReport.oreYields)) {
+    state.collectedOre[oreId] = (state.collectedOre[oreId] ?? 0) + kg;
+  }
 
   // Clear drill plan after blast (holes are consumed)
   state.drillHoles = [];
