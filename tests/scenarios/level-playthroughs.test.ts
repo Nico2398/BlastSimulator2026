@@ -129,8 +129,8 @@ const OUTCOME_VALIDATORS: Record<string, OutcomeValidator> = {
     check: (s) => s.ecologicalShutdown === true || s.levelEndReason === 'ecological_shutdown',
   },
   'tutorial-playthrough': {
-    label: 'TODO — outcome validator',
-    check: () => false, // stub — will be replaced by test-writer
+    label: 'levelEndReason === "completed" and profit > 0',
+    check: (s: FinalGameState) => s.levelEndReason === 'completed' && (s.profit ?? 0) > 0,
   },
 };
 
@@ -377,5 +377,12 @@ describe('Level Playthrough Scenarios', () => {
   }, 180000);
 
   // ── Tutorial: Tutorial Pit — Win ──
-  it.todo('tutorial-playthrough — Full tutorial profitable playthrough reaching completion');
+  it('tutorial-playthrough — Full tutorial profitable playthrough reaching completion', async () => {
+    const finalState = await runScenario('tutorial-playthrough');
+    const validator = OUTCOME_VALIDATORS['tutorial-playthrough'];
+
+    console.log(`  Final state: levelEndReason=${finalState.levelEndReason}, profit=${finalState.profit}`);
+
+    expect(validator.check(finalState)).toBe(true);
+  }, 180000);
 });
