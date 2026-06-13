@@ -197,8 +197,8 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   // ── Step 22: congratulations ──
   {
     id: 'congratulations',
-    titleKey: 'tutorial.step23.title',
-    textKey: 'tutorial.step23',
+    titleKey: 'tutorial.complete_title',
+    textKey: 'tutorial.complete_text',
     isComplete: () => true,
   },
 ];

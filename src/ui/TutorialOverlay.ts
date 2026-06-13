@@ -142,6 +142,13 @@ export class TutorialOverlay {
    *  does not visibly advance. */
   private advanceOneStep(render: boolean): void {
     if (this.stepIndex >= TOTAL_TUTORIAL_STEPS - 1) {
+      if (render && this._active) {
+        this.clearPollTimer();
+        this.clearAutoAdvanceTimer();
+        this.render();
+        this.autoAdvanceTimer = setTimeout(() => this.finish(), 4000);
+        return;
+      }
       this.finish();
       return;
     }
