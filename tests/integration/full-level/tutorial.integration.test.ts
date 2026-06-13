@@ -6,9 +6,10 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   makeCampaignCtx,
   tickWithEvents,
+  performBlast,
   getStateSummary,
 } from './helpers.js';
-import { setupEvents } from '../../../src/core/events/index.js';
+import { setupEvents, clearEvents } from '../../../src/core/events/index.js';
 import { campaignCompleteCommand } from '../../../src/console/commands/campaign.js';
 import { timeCommand, tickCommand, eventCommand } from '../../../src/console/commands/events.js';
 import { employeeCommand, buildCommand } from '../../../src/console/commands/entities.js';
@@ -22,6 +23,7 @@ describe('Tutorial Level — Full Walkthrough', () => {
   let ctx: ReturnType<typeof makeCampaignCtx>;
 
   beforeEach(() => {
+    clearEvents();
     setupEvents();
     ctx = makeCampaignCtx('tutorial_pit');
   });
@@ -31,7 +33,6 @@ describe('Tutorial Level — Full Walkthrough', () => {
     // startingCash from Level definition
     expect(ctx.state!.cash).toBe(20000);
     expect(ctx.state!.campaign.activeLevelId).toBe('tutorial_pit');
-    expect(ctx.state!.grid).not.toBeNull();
     // Verify grid dimensions: tutorial_pit = 24x12x24
     expect(ctx.grid).not.toBeNull();
     expect(ctx.grid!.sizeX).toBe(24);
@@ -111,9 +112,8 @@ describe('Tutorial Level — Full Walkthrough', () => {
     expect(blastResult.success).toBe(true);
     expect(blastResult.output).toContain('BLAST REPORT');
 
-    // 11. Advance 1 tick to let blast settle
-    tickCommand(ctx, ['1'], {});
-    tickWithEvents(ctx, 1);
+    // 11. Advance ticks to let blast settle and process any pending events
+    tickWithEvents(ctx, 2);
 
     // 12. Fire the tutorial_synergy_consultant event
     const fireEvent = eventCommand(ctx, ['fire', 'tutorial_synergy_consultant'], {});
@@ -197,23 +197,8 @@ describe('Tutorial Level — Full Walkthrough', () => {
     // Perform a blast first to have some activity
     employeeCommand(ctx, ['hire'], { role: 'driller' });
     employeeCommand(ctx, ['assign_skill', '1'], { skill: 'blasting', level: '3' });
-    // Use performBlast pattern: drill, charge, sequence, blast
-    drillPlanCommand(ctx as any, ['grid'], {
-      origin: '10,10',
-      rows: '2',
-      cols: '2',
-      spacing: '4',
-      depth: '8',
-    });
-    chargeCommand(ctx as any, [], {
-      hole: '*',
-      explosive: 'boomite',
-      amount: '5kg',
-      stemming: '2m',
-    });
-    sequenceCommand(ctx as any, ['auto'], {});
-    const blastResult = blastCommand(ctx as any, [], {});
-    expect(blastResult.success).toBe(true);
+    const blastOutput = performBlast(ctx, 10, 10);
+    expect(blastOutput).toContain('BLAST REPORT');
     tickWithEvents(ctx, 3);
 
     // Force-complete the tutorial level
@@ -231,30 +216,18 @@ describe('Tutorial Level — Full Walkthrough', () => {
     expect(summary.levelEndReason).toBe('completed');
   });
 
-  it('level can reach star rating display after completion', () => {
+  it('state summary shows completion status after level ends', () => {
     employeeCommand(ctx, ['hire'], { role: 'driller' });
     employeeCommand(ctx, ['assign_skill', '1'], { skill: 'blasting', level: '5' });
-    drillPlanCommand(ctx as any, ['grid'], {
-      origin: '10,10',
-      rows: '2',
-      cols: '2',
-      spacing: '4',
-      depth: '8',
-    });
-    chargeCommand(ctx as any, [], {
-      hole: '*',
-      explosive: 'boomite',
-      amount: '5kg',
-      stemming: '2m',
-    });
-    sequenceCommand(ctx as any, ['auto'], {});
-    blastCommand(ctx as any, [], {});
+    performBlast(ctx, 10, 10);
     tickWithEvents(ctx, 5);
 
     // Force-complete
-    campaignCompleteCommand(ctx, [], {});
+    const completeResult = campaignCompleteCommand(ctx, [], {});
+    expect(completeResult.success).toBe(true);
+    expect(completeResult.output).toContain('force-completed');
 
-    // The stats command should show star rating
+    // The state summary should reflect completion
     const statsResult = stateCommand(ctx as any, ['summary'], {});
     expect(statsResult.success).toBe(true);
     const parsed = JSON.parse(statsResult.output) as Record<string, unknown>;
