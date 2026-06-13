@@ -186,63 +186,33 @@ describe('tutorial event resolution', () => {
     setupEvents();
   });
 
-  it('option 0 — Hire consultant: deducts $3000 and boosts well-being to 65', () => {
-    const def = getEventById('tutorial_synergy_consultant')!;
-    expect(def).toBeDefined();
-
+  it.each([
+    [0, 'Hire consultant',  -3000, 97000, 65, 50, 50, 50],
+    [1, 'Dismiss consultant',    0, 100000, 40, 45, 50, 50],
+    [2, 'Equity deal',           0, 100000, 55, 45, 50, 50],
+  ] as const)('option %i — %s', (
+    optionIdx,
+    _name,
+    expectedCashChange,
+    expectedCash,
+    expectedWellBeing,
+    expectedSafety,
+    expectedEcology,
+    expectedNuisance,
+  ) => {
     const eventSystem = createEventSystemState();
     eventSystem.pendingEvent = { eventId: 'tutorial_synergy_consultant', firedAtTick: 10 };
     const finances = createFinanceState(100000);
     const scores = createScoreState();
-    const result = resolveEvent(eventSystem, finances, scores, 0, 10, new Random(42));
+    const result = resolveEvent(eventSystem, finances, scores, optionIdx, 10, new Random(42));
 
     expect(result).not.toBeNull();
-    expect(result!.cashChange).toBe(-3000);
-    expect(finances.cash).toBe(97000);
-    expect(scores.wellBeing).toBe(65);
-    expect(scores.safety).toBe(50);
-    expect(scores.ecology).toBe(50);
-    expect(scores.nuisance).toBe(50);
-    expect(eventSystem.pendingEvent).toBeNull();
-  });
-
-  it('option 1 — Dismiss consultant: penalizes well-being to 40 and safety to 45', () => {
-    const def = getEventById('tutorial_synergy_consultant')!;
-    expect(def).toBeDefined();
-
-    const eventSystem = createEventSystemState();
-    eventSystem.pendingEvent = { eventId: 'tutorial_synergy_consultant', firedAtTick: 10 };
-    const finances = createFinanceState(100000);
-    const scores = createScoreState();
-    const result = resolveEvent(eventSystem, finances, scores, 1, 10, new Random(42));
-
-    expect(result).not.toBeNull();
-    expect(result!.cashChange).toBe(0);
-    expect(finances.cash).toBe(100000);
-    expect(scores.wellBeing).toBe(40);
-    expect(scores.safety).toBe(45);
-    expect(scores.ecology).toBe(50);
-    expect(scores.nuisance).toBe(50);
-    expect(eventSystem.pendingEvent).toBeNull();
-  });
-
-  it('option 2 — Equity deal: boosts well-being to 55, penalizes safety to 45', () => {
-    const def = getEventById('tutorial_synergy_consultant')!;
-    expect(def).toBeDefined();
-
-    const eventSystem = createEventSystemState();
-    eventSystem.pendingEvent = { eventId: 'tutorial_synergy_consultant', firedAtTick: 10 };
-    const finances = createFinanceState(100000);
-    const scores = createScoreState();
-    const result = resolveEvent(eventSystem, finances, scores, 2, 10, new Random(42));
-
-    expect(result).not.toBeNull();
-    expect(result!.cashChange).toBe(0);
-    expect(finances.cash).toBe(100000);
-    expect(scores.wellBeing).toBe(55);
-    expect(scores.safety).toBe(45);
-    expect(scores.ecology).toBe(50);
-    expect(scores.nuisance).toBe(50);
+    expect(result!.cashChange).toBe(expectedCashChange);
+    expect(finances.cash).toBe(expectedCash);
+    expect(scores.wellBeing).toBe(expectedWellBeing);
+    expect(scores.safety).toBe(expectedSafety);
+    expect(scores.ecology).toBe(expectedEcology);
+    expect(scores.nuisance).toBe(expectedNuisance);
     expect(eventSystem.pendingEvent).toBeNull();
   });
 });
