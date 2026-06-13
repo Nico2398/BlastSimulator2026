@@ -1,5 +1,45 @@
 {
   "name": "tutorial-playthrough",
-  "description": "",
-  "steps": []
+  "description": "Full tutorial playthrough at Tutorial Pit: hiring employees, seismic surveying, drill planning, blasting, contract management, building infrastructure, and completing the campaign introduction",
+  "steps": [
+    "new_game seed:42",
+    "campaign start level:tutorial_pit",
+    "time speed:2",
+
+    "employee hire role:surveyor",
+    "employee assign_skill 1 skill:geology level:3",
+    "survey seismic x:15 z:15",
+
+    "employee hire role:driller",
+    "employee assign_skill 2 skill:blasting level:3",
+
+    "drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:15,15",
+    "charge hole:* explosive:boomite amount:5 stemming:2",
+    "sequence auto delay_step:25",
+    "blast",
+    "scores",
+
+    "tick 3",
+    "event fire tutorial_synergy_consultant",
+    "event choose 0",
+
+    "employee hire role:manager",
+    "employee assign_skill 3 skill:management level:3",
+    "contract accept 1",
+
+    "employee hire role:driver",
+    "employee assign_skill 4 skill:driving.truck level:3",
+    "vehicle buy hauler",
+    "vehicle driver 1 4",
+
+    "build storage_depot at:12,8",
+    "contract deliver 1 amount:500",
+    "finances",
+
+    "build_ramp start:15,15 end:20,25",
+    "needs",
+    "set_policy mode:shift_8h",
+    "tick 10",
+    "campaign status"
+  ]
 }
