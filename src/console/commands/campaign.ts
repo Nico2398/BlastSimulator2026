@@ -10,6 +10,8 @@ import { buildGameNavGrid } from '../../core/state/GameState.js';
 import { generateTerrain } from '../../core/world/TerrainGen.js';
 import { getMinePreset } from '../../core/world/MineType.js';
 import { calculateStarRating } from '../../core/campaign/SuccessTracker.js';
+import { Random } from '../../core/math/Random.js';
+import { generateContracts } from '../../core/economy/Contract.js';
 // ── campaign status ──
 
 export function campaignStatusCommand(
@@ -111,6 +113,10 @@ export function campaignStartCommand(
   });
   if (ctx.state.world) ctx.state.world.gridReady = true;
   buildGameNavGrid(ctx.state, ctx.grid, ctx.state.buildings.buildings, ctx.state.drillHoles);
+
+  // Generate initial contracts so they're available immediately
+  const contractRng = new Random(ctx.state.seed + ctx.state.tickCount);
+  generateContracts(ctx.state.contracts, contractRng, ctx.state.tickCount);
 
   return {
     success: true,
