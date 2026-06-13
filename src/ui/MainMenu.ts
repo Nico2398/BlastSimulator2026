@@ -202,6 +202,11 @@ export class MainMenu {
     btn.className = `bs-btn${variant === 'primary' ? ' bs-btn-primary' : ''}`;
     btn.style.cssText = 'width:100%;padding:10px 16px;font-size:13px;font-weight:600;text-align:left;pointer-events:all';
     btn.textContent = label;
+    if (variant === 'gold') {
+      btn.style.color = '#ffe090';
+      btn.style.borderColor = 'rgba(255,225,144,0.4)';
+      btn.style.background = 'rgba(255,225,144,0.08)';
+    }
     btn.addEventListener('click', onClick);
     return btn;
   }
