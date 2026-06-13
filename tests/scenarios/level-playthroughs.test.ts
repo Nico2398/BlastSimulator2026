@@ -128,6 +128,10 @@ const OUTCOME_VALIDATORS: Record<string, OutcomeValidator> = {
     label: 'ecologicalShutdown === true OR levelEndReason === "ecological_shutdown"',
     check: (s) => s.ecologicalShutdown === true || s.levelEndReason === 'ecological_shutdown',
   },
+  'tutorial-playthrough': {
+    label: 'levelEndReason === "completed" and profit > 0',
+    check: (s: FinalGameState) => s.levelEndReason === 'completed' && (s.profit ?? 0) > 0,
+  },
 };
 
 // ── Step runner helpers ──
@@ -298,6 +302,7 @@ describe('Level Playthrough Scenarios', () => {
       'level2-playthrough-bankruptcy',
       'level3-playthrough-win',
       'level3-playthrough-ecology',
+      'tutorial-playthrough',
     ];
     for (const name of scenarioNames) {
       const filePath = resolve(SCENARIO_DIR, `${name}.json`);
@@ -367,6 +372,16 @@ describe('Level Playthrough Scenarios', () => {
     const validator = OUTCOME_VALIDATORS['level3-playthrough-ecology'];
 
     console.log(`  Final state: ecologicalShutdown=${finalState.ecologicalShutdown}, levelEndReason=${finalState.levelEndReason}`);
+
+    expect(validator.check(finalState)).toBe(true);
+  }, 180000);
+
+  // ── Tutorial: Tutorial Pit — Win ──
+  it('tutorial-playthrough — Full tutorial profitable playthrough reaching completion', async () => {
+    const finalState = await runScenario('tutorial-playthrough');
+    const validator = OUTCOME_VALIDATORS['tutorial-playthrough'];
+
+    console.log(`  Final state: levelEndReason=${finalState.levelEndReason}, profit=${finalState.profit}`);
 
     expect(validator.check(finalState)).toBe(true);
   }, 180000);
