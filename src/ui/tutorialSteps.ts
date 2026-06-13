@@ -2,6 +2,17 @@
 // Defines the TutorialStep interface and ordered step array.
 
 import type { GameState } from '../core/state/GameState.js';
+import type { ShiftMode } from '../core/entities/SitePolicy.js';
+import {
+  createComparisonStep,
+  createHireStep,
+  createAutoAdvanceStep,
+  countNavCellsByType,
+  getEmployees,
+  getVehicles,
+  countBuildingsOfType,
+  countVehiclesWithDriver,
+} from './tutorialStepHelpers.js';
 
 export interface TutorialStep {
   id: string;
@@ -9,238 +20,172 @@ export interface TutorialStep {
   textKey: string;
   commands?: string[];
   autoAdvanceMs?: number;
-  captureSnapshot?: (state: GameState) => Record<string, unknown>;
+  captureSnapshot?: ((state: GameState) => Record<string, unknown>) | undefined;
   isComplete: (state: GameState, snapshot: Record<string, unknown>) => boolean;
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/** Create a "hire employee" tutorial step for a specific role. */
-function createHireStep(
-  id: string,
-  titleKey: string,
-  textKey: string,
-  role: string,
-): TutorialStep {
-  return {
-    id,
-    titleKey,
-    textKey,
-    commands: ['hire employee'],
-    captureSnapshot: (state) => ({ prevEmployeeCount: state.employees?.employees?.length ?? 0 }),
-    isComplete: (state, snapshot) =>
-      (state.employees?.employees?.length ?? 0) > (snapshot.prevEmployeeCount as number) &&
-      (state.employees?.employees ?? []).some(e => e.role === role),
-  };
-}
-
-/** Create an auto-advance informational step (scores, finances, needs). */
-function createAutoAdvanceStep(
-  id: string,
-  titleKey: string,
-  textKey: string,
-  captureSnapshot: (state: GameState) => Record<string, unknown>,
-): TutorialStep {
-  return {
-    id,
-    titleKey,
-    textKey,
-    autoAdvanceMs: 2000,
-    captureSnapshot,
-    isComplete: () => true,
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Step definitions
-// ---------------------------------------------------------------------------
-
 export const TUTORIAL_STEPS: TutorialStep[] = [
-  // Step 0: time-speed — Increase game speed
+  // ── Step 0: time-speed ──
   {
     id: 'time-speed',
     titleKey: 'tutorial.step1.title',
     textKey: 'tutorial.step1',
-    captureSnapshot: (state) => ({ prevTimeScale: state.timeScale }),
-    isComplete: (state, snapshot) => state.timeScale > (snapshot.prevTimeScale as number),
+    captureSnapshot: (state: GameState) => ({
+      prevTimeScale: state.timeScale,
+    }),
+    isComplete: (state: GameState, snapshot: Record<string, unknown>) => {
+      const prev = snapshot.prevTimeScale as number;
+      return state.timeScale >= prev;
+    },
   },
-  // Step 1: hire-surveyor — Hire a surveyor employee
+
+  // ── Step 1: hire-surveyor ──
   createHireStep('hire-surveyor', 'tutorial.step2.title', 'tutorial.step2', 'surveyor'),
-  // Step 2: survey — Perform a seismic survey
-  {
-    id: 'survey',
-    titleKey: 'tutorial.step3.title',
-    textKey: 'tutorial.step3',
-    commands: ['survey seismic'],
-    captureSnapshot: (state) => ({ prevSurveyCount: state.surveyResults?.length ?? 0 }),
-    isComplete: (state, snapshot) =>
-      (state.surveyResults?.length ?? 0) > (snapshot.prevSurveyCount as number),
-  },
-  // Step 3: hire-driller — Hire a driller employee
+
+  // ── Step 2: survey ──
+  createComparisonStep('survey', 'tutorial.step3.title', 'tutorial.step3', (s) => (s.surveyResults ?? []).length, ['survey seismic']),
+
+  // ── Step 3: hire-driller ──
   createHireStep('hire-driller', 'tutorial.step4.title', 'tutorial.step4', 'driller'),
-  // Step 4: drill-plan — Place drill holes
-  {
-    id: 'drill-plan',
-    titleKey: 'tutorial.step5.title',
-    textKey: 'tutorial.step5',
-    commands: ['drill plan'],
-    captureSnapshot: (state) => ({ prevDrillCount: state.drillHoles?.length ?? 0 }),
-    isComplete: (state, snapshot) =>
-      (state.drillHoles?.length ?? 0) > (snapshot.prevDrillCount as number),
-  },
-  // Step 5: charge — Set explosive charges
-  {
-    id: 'charge',
-    titleKey: 'tutorial.step6.title',
-    textKey: 'tutorial.step6',
-    commands: ['blast plan'],
-    captureSnapshot: (state) => ({ prevChargeCount: Object.keys(state.chargesByHole ?? {}).length }),
-    isComplete: (state, snapshot) =>
-      Object.keys(state.chargesByHole ?? {}).length > (snapshot.prevChargeCount as number),
-  },
-  // Step 6: sequence — Configure detonation delays
-  {
-    id: 'sequence',
-    titleKey: 'tutorial.step7.title',
-    textKey: 'tutorial.step7',
-    commands: ['blast plan'],
-    captureSnapshot: (state) => ({ prevSeqCount: Object.keys(state.sequenceDelays ?? {}).length }),
-    isComplete: (state, snapshot) =>
-      Object.keys(state.sequenceDelays ?? {}).length > (snapshot.prevSeqCount as number),
-  },
-  // Step 7: blast — Execute the blast
-  {
-    id: 'blast',
-    titleKey: 'tutorial.step8.title',
-    textKey: 'tutorial.step8',
-    commands: ['blast execute'],
-    captureSnapshot: (state) => ({ prevOreCount: Object.keys(state.collectedOre ?? {}).length }),
-    isComplete: (state, snapshot) =>
-      Object.keys(state.collectedOre ?? {}).length > (snapshot.prevOreCount as number),
-  },
-  // Step 8: scores — Overview of scores (auto-advance)
-  createAutoAdvanceStep('scores', 'tutorial.step9.title', 'tutorial.step9', (state) => ({
-    scores: state.scores,
-    collectedOre: state.collectedOre,
+
+  // ── Step 4: drill-plan ──
+  createComparisonStep('drill-plan', 'tutorial.step5.title', 'tutorial.step5', (s) => (s.drillHoles ?? []).length, ['drill plan']),
+
+  // ── Step 5: charge ──
+  createComparisonStep('charge', 'tutorial.step6.title', 'tutorial.step6', (s) => Object.keys(s.chargesByHole ?? {}).length, ['blast plan']),
+
+  // ── Step 6: sequence ──
+  createComparisonStep('sequence', 'tutorial.step7.title', 'tutorial.step7', (s) => Object.keys(s.sequenceDelays ?? {}).length, ['blast plan']),
+
+  // ── Step 7: blast ──
+  createComparisonStep('blast', 'tutorial.step8.title', 'tutorial.step8', (s) => Object.keys(s.collectedOre ?? {}).length, ['blast execute']),
+
+  // ── Step 8: scores ──
+  createAutoAdvanceStep('scores', 'tutorial.step9.title', 'tutorial.step9', (state: GameState) => ({
+    scores: { ...(state.scores ?? {}) },
+    collectedOre: { ...(state.collectedOre ?? {}) },
   })),
-  // Step 9: event-fire-resolve — Respond to random events
-  {
-    id: 'event-fire-resolve',
-    titleKey: 'tutorial.step10.title',
-    textKey: 'tutorial.step10',
-    captureSnapshot: (state) => ({ prevFiredCount: state.events?.firedEventIds?.length ?? 0 }),
-    isComplete: (state, snapshot) =>
-      (state.events?.firedEventIds?.length ?? 0) > (snapshot.prevFiredCount as number),
-  },
-  // Step 10: hire-manager — Hire a manager
+
+  // ── Step 9: event-fire-resolve ──
+  createComparisonStep('event-fire-resolve', 'tutorial.step10.title', 'tutorial.step10', (s) => (s.events?.firedEventIds ?? []).length),
+
+  // ── Step 10: hire-manager ──
   createHireStep('hire-manager', 'tutorial.step11.title', 'tutorial.step11', 'manager'),
-  // Step 11: contract-accept — Accept a contract
-  {
-    id: 'contract-accept',
-    titleKey: 'tutorial.step12.title',
-    textKey: 'tutorial.step12',
-    commands: ['contracts'],
-    captureSnapshot: (state) => ({ prevContractCount: state.contracts?.active?.length ?? 0 }),
-    isComplete: (state, snapshot) =>
-      (state.contracts?.active?.length ?? 0) > (snapshot.prevContractCount as number),
-  },
-  // Step 12: hire-driver — Hire a driver
+
+  // ── Step 11: contract-accept ──
+  createComparisonStep('contract-accept', 'tutorial.step12.title', 'tutorial.step12', (s) => (s.contracts?.active ?? []).length, ['contracts']),
+
+  // ── Step 12: hire-driver ──
   createHireStep('hire-driver', 'tutorial.step13.title', 'tutorial.step13', 'driver'),
-  // Step 13: vehicle-buy-assign — Buy a vehicle and assign a driver
+
+  // ── Step 13: vehicle-buy-assign ──
   {
     id: 'vehicle-buy-assign',
     titleKey: 'tutorial.step14.title',
     textKey: 'tutorial.step14',
     commands: ['buy debris_hauler'],
-    captureSnapshot: (state) => ({ prevVehicleCount: state.vehicles?.vehicles?.length ?? 0 }),
-    isComplete: (state, snapshot) =>
-      (state.vehicles?.vehicles?.length ?? 0) > (snapshot.prevVehicleCount as number) &&
-      (state.vehicles?.vehicles ?? []).some(v => v.driverId != null),
-  },
-  // Step 14: build-storage — Build a freight warehouse
-  {
-    id: 'build-storage',
-    titleKey: 'tutorial.step15.title',
-    textKey: 'tutorial.step15',
-    commands: ['build freight_warehouse'],
-    captureSnapshot: (state) => ({
-      prevStorageCount: (state.buildings?.buildings ?? []).filter(b => b.type === 'freight_warehouse').length,
+    captureSnapshot: (state: GameState) => ({
+      prevVehicleCount: getVehicles(state).length,
     }),
-    isComplete: (state, snapshot) =>
-      (state.buildings?.buildings ?? []).filter(b => b.type === 'freight_warehouse').length >
-        (snapshot.prevStorageCount as number),
+    isComplete: (state: GameState, snapshot: Record<string, unknown>) => {
+      const prev = snapshot.prevVehicleCount as number;
+      return (
+        getVehicles(state).length > prev &&
+        countVehiclesWithDriver(state) > 0
+      );
+    },
   },
-  // Step 15: contract-deliver — Deliver ore to fulfill a contract
-  {
-    id: 'contract-deliver',
-    titleKey: 'tutorial.step16.title',
-    textKey: 'tutorial.step16',
-    commands: ['logistics'],
-    captureSnapshot: (state) => ({
-      prevDeliveredCount: state.contracts?.completedHistory?.length ?? 0,
-    }),
-    isComplete: (state, snapshot) =>
-      (state.contracts?.completedHistory?.length ?? 0) > (snapshot.prevDeliveredCount as number),
-  },
-  // Step 16: finances — Overview of finances (auto-advance)
-  createAutoAdvanceStep('finances', 'tutorial.step17.title', 'tutorial.step17', (state) => ({
+
+  // ── Step 14: build-storage ──
+  createComparisonStep('build-storage', 'tutorial.step15.title', 'tutorial.step15', (s) => countBuildingsOfType(s, 'freight_warehouse'), ['build freight_warehouse']),
+
+  // ── Step 15: contract-deliver ──
+  createComparisonStep('contract-deliver', 'tutorial.step16.title', 'tutorial.step16', (s) => (s.contracts?.completedHistory ?? []).length, ['logistics']),
+
+  // ── Step 16: finances ──
+  createAutoAdvanceStep('finances', 'tutorial.step17.title', 'tutorial.step17', (state: GameState) => ({
     cash: state.cash,
-    contracts: state.contracts,
+    contracts: { ...(state.contracts ?? {}) },
   })),
-  // Step 17: build-ramp — Build a ramp for bench access
+
+  // ── Step 17: build-ramp ──
   {
     id: 'build-ramp',
     titleKey: 'tutorial.step18.title',
     textKey: 'tutorial.step18',
     commands: ['build ramp'],
-    captureSnapshot: (state) => ({
-      prevRampCount: (state.navGrid?.cells?.flat()?.filter(c => (c as { type: string }).type === 'ramp').length ?? 0),
+    captureSnapshot: (state: GameState) => ({
+      prevRampCount: state.navGrid
+        ? countNavCellsByType(state.navGrid.cells, 'ramp')
+        : 0,
     }),
-    isComplete: (state, snapshot) =>
-      (state.navGrid?.cells?.flat()?.filter(c => (c as { type: string }).type === 'ramp').length ?? 0) >
-        (snapshot.prevRampCount as number),
+    isComplete: (state: GameState, snapshot: Record<string, unknown>) => {
+      const prev = snapshot.prevRampCount as number;
+      const current = state.navGrid
+        ? countNavCellsByType(state.navGrid.cells, 'ramp')
+        : 0;
+      return current > prev;
+    },
   },
-  // Step 18: needs — Employee needs overview (auto-advance)
-  createAutoAdvanceStep('needs', 'tutorial.step19.title', 'tutorial.step19', (state) => ({
-    employees: state.employees,
+
+  // ── Step 18: needs ──
+  createAutoAdvanceStep('needs', 'tutorial.step19.title', 'tutorial.step19', (state: GameState) => ({
+    employees: getEmployees(state).map(e => ({
+      id: (e as unknown as Record<string, unknown>).id as number ?? 0,
+      hunger: (e as unknown as Record<string, unknown>).hunger as number ?? 0,
+      fatigue: (e as unknown as Record<string, unknown>).fatigue as number ?? 0,
+      breakNeed: (e as unknown as Record<string, unknown>).breakNeed as number ?? 0,
+    })),
   })),
-  // Step 19: set-policy — Customize site policy
+
+  // ── Step 19: set-policy ──
   {
     id: 'set-policy',
     titleKey: 'tutorial.step20.title',
     textKey: 'tutorial.step20',
     commands: ['policy'],
-    captureSnapshot: (state) => ({
-      shiftMode: state.sitePolicy?.shiftMode ?? 'shift_8h',
-      hungerThreshold: state.sitePolicy?.hungerRestThreshold ?? 80,
-      fatigueThreshold: state.sitePolicy?.fatigueRestThreshold ?? 80,
+    captureSnapshot: (state: GameState) => ({
+      shiftMode: state.sitePolicy?.shiftMode,
+      hungerRestThreshold: state.sitePolicy?.hungerRestThreshold,
+      fatigueRestThreshold: state.sitePolicy?.fatigueRestThreshold,
     }),
-    isComplete: (state, snapshot) => {
-      const s = snapshot as { shiftMode?: string; hungerThreshold?: number; fatigueThreshold?: number };
-      return state.sitePolicy?.shiftMode !== s.shiftMode ||
-        state.sitePolicy?.hungerRestThreshold !== s.hungerThreshold ||
-        state.sitePolicy?.fatigueRestThreshold !== s.fatigueThreshold;
+    isComplete: (state: GameState, snapshot: Record<string, unknown>) => {
+      const snapShift = snapshot.shiftMode as ShiftMode | undefined;
+      const snapHunger = snapshot.hungerRestThreshold as number | undefined;
+      const snapFatigue = snapshot.fatigueRestThreshold as number | undefined;
+      const sp = state.sitePolicy;
+      if (!sp) return false;
+      return (
+        sp.shiftMode !== snapShift ||
+        sp.hungerRestThreshold !== snapHunger ||
+        sp.fatigueRestThreshold !== snapFatigue
+      );
     },
   },
-  // Step 20: tick-advance — Let time pass
+
+  // ── Step 20: tick-advance ──
   {
     id: 'tick-advance',
     titleKey: 'tutorial.step21.title',
     textKey: 'tutorial.step21',
-    captureSnapshot: (state) => ({ prevTick: state.tickCount ?? 0 }),
-    isComplete: (state, snapshot) =>
-      (state.tickCount ?? 0) > (snapshot.prevTick as number) + 5,
+    captureSnapshot: (state: GameState) => ({
+      prevTick: state.tickCount ?? 0,
+    }),
+    isComplete: (state: GameState, snapshot: Record<string, unknown>) => {
+      const prev = snapshot.prevTick as number;
+      return (state.tickCount ?? 0) > prev + 5;
+    },
   },
-  // Step 21: victory — Level complete
+
+  // ── Step 21: victory ──
   {
     id: 'victory',
     titleKey: 'tutorial.step22.title',
     textKey: 'tutorial.step22',
-    isComplete: (state) => state.levelEnded === true,
+    isComplete: (state: GameState) => state.levelEnded === true,
   },
-  // Step 22: congratulations — Tutorial done
+
+  // ── Step 22: congratulations ──
   {
     id: 'congratulations',
     titleKey: 'tutorial.step23.title',
