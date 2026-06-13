@@ -7,6 +7,7 @@ const currentDir = dirname(fileURLToPath(import.meta.url));
 const SCENARIO_DIR = resolve(currentDir, '../../scripts/scenario-defs');
 
 const PLAYTHROUGH_SCENARIO_NAMES = [
+  'tutorial-playthrough',
   'level1-playthrough-win',
   'level1-playthrough-revolt',
   'level2-playthrough-win',
@@ -46,7 +47,7 @@ const KNOWN_COMMANDS = [
   'corrupt', 'mafia', 'buy_software', 'weather', 'buy',
   'fragments', 'preview', 'blast_preview', 'install_tubing',
   'build_ramp', 'set_policy', 'terrain_info', 'help',
-  'blast_plan',
+  'blast_plan', 'needs',
 ];
 
 /** Commands that inspect state — valid as a final playthrough step */
