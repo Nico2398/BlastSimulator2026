@@ -42,7 +42,7 @@ describe('Tutorial contract availability (Issue #328)', () => {
   });
 
   it('contracts persist after ticking to tick 3 (simulating tutorial step 9)', () => {
-    // Arrange: generate contracts at tick 0 (same setup as test 2)
+    // Arrange: generate contracts at tick 0 (same setup as test 1)
     const state = createGame({ seed: 42, mineType: 'desert', startingCash: 20000 });
     const rng0 = new Random(42 + 0);
     generateContracts(state.contracts, rng0, 0);
