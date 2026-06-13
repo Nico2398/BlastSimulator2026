@@ -10,19 +10,26 @@ import {
   type EstimateSurveyParams,
 } from '../../../src/core/mining/SurveyCalc.js';
 import { Random } from '../../../src/core/math/Random.js';
+import type { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
+
+/**
+ * Build the tutorial terrain used by Issue #327 tests:
+ * desert preset, seed 42, dimensions 24×12×24.
+ */
+function makeTutorialTerrain(): VoxelGrid {
+  const preset = getMinePreset('desert');
+  return generateTerrain({
+    sizeX: 24,
+    sizeY: 12,
+    sizeZ: 24,
+    seed: 42,
+    preset,
+  });
+}
 
 describe('Tutorial survey verification (Issue #327)', () => {
   it('tutorial terrain (seed 42, desert, 24×12×24) has ore-bearing columns near (10,10)', () => {
-    const preset = getMinePreset('desert');
-    expect(preset).toBeDefined();
-
-    const terrain = generateTerrain({
-      sizeX: 24,
-      sizeY: 12,
-      sizeZ: 24,
-      seed: 42,
-      preset: preset!,
-    });
+    const terrain = makeTutorialTerrain();
 
     // Count how many columns within a 5×5 grid centred on (10,10) contain
     // at least one voxel with a non-empty oreDensities map.
@@ -43,16 +50,7 @@ describe('Tutorial survey verification (Issue #327)', () => {
   });
 
   it('seismic survey at (10,10) on tutorial terrain returns non-empty estimates', () => {
-    const preset = getMinePreset('desert');
-    expect(preset).toBeDefined();
-
-    const terrain = generateTerrain({
-      sizeX: 24,
-      sizeY: 12,
-      sizeZ: 24,
-      seed: 42,
-      preset: preset!,
-    });
+    const terrain = makeTutorialTerrain();
 
     const params: EstimateSurveyParams = {
       id: 1,
