@@ -25,7 +25,7 @@ describe('Tutorial flow', () => {
   // ── 1. new_game with tutorial params ──────────────────────────────────────
 
   it('new_game seed:42 size:24 creates game with correct params', () => {
-    const result = newGameCommand(ctx, [], { seed: '42', size: '24', mine_type: 'desert' });
+    const result = newGameCommand(ctx, [], { seed: '42', size: '24' });
 
     expect(result.success).toBe(true);
     expect(ctx.state).not.toBeNull();
@@ -44,7 +44,7 @@ describe('Tutorial flow', () => {
 
   it('followed by campaign start level:tutorial_pit sets up tutorial level', () => {
     // First set up the game environment
-    newGameCommand(ctx, [], { seed: '42', size: '24', mine_type: 'desert' });
+    newGameCommand(ctx, [], { seed: '42', size: '24' });
 
     // Then start the tutorial level
     const result = campaignStartCommand(ctx, [], { level: 'tutorial_pit' });
@@ -76,7 +76,7 @@ describe('Tutorial flow', () => {
     //   window.__gameConsole('campaign start level:tutorial_pit')
     //   tutorial.start()
 
-    newGameCommand(ctx, [], { seed: '42', size: '24', mine_type: 'desert' });
+    newGameCommand(ctx, [], { seed: '42', size: '24' });
     campaignStartCommand(ctx, [], { level: 'tutorial_pit' });
 
     // Verify game context is fully set up
