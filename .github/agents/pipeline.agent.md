@@ -25,6 +25,17 @@ First, classify the task:
 
 Only `@visual-tester` has vision (multimodal) capability. No other agent can analyze images or screenshots. Any task requiring visual inspection of render output must route through `@visual-tester`.
 
+## PR Status
+
+Set `pr_status` before step 29 (open-pr). Controls whether PR is created as draft or ready-to-merge.
+
+| Status | Behavior | When to use |
+|--------|----------|-------------|
+| `ready` (default) | PR created as normal, `READY TO MERGE` in body triggers auto-merge | Simple fixes, features with full coverage, no human-dependency |
+| `draft` | PR created with `--draft` flag, `READY TO MERGE` NOT included | Visual-change tasks needing human sign-off, pipeline hit retry loops, explicit request |
+
+The open-pr step passes `--draft` to `gh pr create` when `pr_status=draft`.
+
 ## Ask Pipeline
 
 ```
@@ -68,7 +79,8 @@ Use when the prompt mixes multiple task types (e.g. bug fix + visual change + fe
       [test-runner]             → re-run full suite
       @validator                → Full validation: typecheck → tests → build
       @visual-tester            → Screenshot verification (if any section is visual-change)
-      [open-pr]                 → Single PR from pipeline/feature-<N> to main
+      [open-pr]                 → Single PR from pipeline/feature-<N> to main.
+                                  Use `--draft` when pr_status=draft.
 ```
 
 ### Branch Strategy for Multi-Pipeline
@@ -127,15 +139,36 @@ Branch sanity checks and commit verifications run before/after each agent step t
 24. @refactorer          → Clean up conventions, no behavior change
                             then re-run [test-runner] to verify no regression
 25. [verify-commit]           → (non-agentic) confirm refactor commit exists; auto-commit if dirty
- 26. @validator           → Full validation: typecheck → tests → build
+26. @validator           → Full validation: typecheck → tests → build
                             if fail → @implementer (big loop)
- 27. [visual-feedback-loop] → Visual feedback loop (visual-change ONLY).
+27. [visual-feedback-loop] → Visual feedback loop (visual-change ONLY).
                             Tight loop on feature branch, no branch isolation.
                             See "Visual Feedback Loop" section below.
- 28. [verify-commit]           → (non-agentic) final commit check before PR
- 29. [open-pr]            → (non-agentic) create PR from feature branch to main + READY TO MERGE
+28. [verify-commit]           → (non-agentic) final commit check before PR
+29. [open-pr]            → (non-agentic) create PR from feature branch to main + READY TO MERGE.
+                            Use `--draft` when pr_status=draft.
 
 ```
+
+### Failure loops (all pipelines)
+
+Every agent failure loops back — either to `@implementer` (outer loop) or self-retries — capped at **7 retries** before human escalation.
+
+| Failure at | Loops back to |
+|------------|--------------|
+| @planner | @planner (self-retry) |
+| [test-runner] | @fixer → [test-runner] (tight loop) |
+| [qualimetry] | @implementer |
+| [merge-findings] | @implementer |
+| @semantic-reviewer | @implementer |
+| @refactorer | @implementer |
+| @validator | @implementer |
+| @visual-tester | @implementer |
+| Any node × 7 | Human escalation (interrupt) |
+
+When looping back to `@implementer`, the full downstream chain reruns: `implementer → setup-feature-branch → cherry-pick → switch-to-feature → test-runner → qualimetry → code-review → refactorer → test-runner → validator → [visual-tester]`.
+
+**Exception:** after `@refactorer` succeeds, the re-run of `[test-runner]` routes directly to `@validator` — qualimetry and code review are NOT repeated.
 
 ### Visual Feedback Loop
 
@@ -160,8 +193,6 @@ LOOP:
 - `@visual-tester` each iteration: re-run full scenario suite, report remaining failures
 - No qualimetry, code review, or refactorer inside the loop — those run once after loop exits
 - If loop makes no progress after 7 iterations → orchestrate escalation
-
-**Exception:** after `@refactorer` succeeds, the re-run of `[test-runner]` routes directly to `@validator` — qualimetry and code review are NOT repeated.
 
 ## Fix-Bug Pipeline (shorter)
 
@@ -191,7 +222,8 @@ LOOP:
 23. [merge-findings]     → Orchestrator merges findings → pass/fail; fail → @implementer
 24. @validator           → typecheck → tests → build; fail → @implementer
 25. [verify-commit]           → (non-agentic) final commit check
-26. [open-pr]            → create PR from feature branch to main + READY TO MERGE
+26. [open-pr]            → create PR from feature branch to main + READY TO MERGE.
+                            Use `--draft` when pr_status=draft.
 ```
 
 Note: `@refactorer` is skipped for fix-bug.
@@ -266,12 +298,14 @@ main
 | qualimetry | `npx jscpd src/ tests/` — route to @implementer on fail |
 | merge-findings | Deduplicate and merge all 5 reviewer outputs → pass/fail |
 | After refactorer | Re-run `npx vitest run` (skip qualimetry + code-review) |
-| open-pr | `gh pr create --base main --head pipeline/feature-<issue-number> --body "Closes #<issue-number>\n\n<N> new tests — all passing\n\nREADY TO MERGE"` — include validation checklist per `agentic-autonomous-pipeline` skill |
+| open-pr | `gh pr create --base main --head pipeline/feature-<issue-number> --body "Closes #<issue-number>\n\n<N> new tests — all passing\n\nREADY TO MERGE"` — include validation checklist per `agentic-autonomous-pipeline` skill. Add `--draft` when pr_status=draft (omit READY TO MERGE from body). |
 | Before completing | Summarize changes, files modified, test status |
 
 ## Key References
 
-- `agentic-autonomous-pipeline` skill — Full CI/CD workflow
+Skills listed below are **background reference only** — conceptual context, not procedure. The pipeline steps defined in this file are the sole source of truth for execution sequence.
+
+- `agentic-autonomous-pipeline` skill — CI/CD workflow reference (no competing step numbering)
 - `dev-architecture` skill — Module boundaries
 - `dev-testing-strategy` skill — Test conventions
 
