@@ -22,6 +22,9 @@ First, classify the task:
 | PR review | reviewer only |
 | Question/analysis | ask |
 | Imperative command | executor |
+| Complex/mixed prompt | Multi-Pipeline: decompose → sequential sections → single PR |
+
+Only `@visual-tester` has vision (multimodal) capability. No other agent can analyze images or screenshots. Any task requiring visual inspection of render output must route through `@visual-tester`.
 
 ## Ask Pipeline
 
@@ -36,6 +39,52 @@ First, classify the task:
 1. @executor   → Execute imperative command via `gh` or shell
 2. [post]     → (non-agentic) post result as PR/issue comment via `gh pr comment` or `gh issue comment`
 ```
+
+## Multi-Pipeline (complex / mixed prompts)
+
+Use when the prompt mixes multiple task types (e.g. bug fix + visual change + feature).
+
+```
+ 1. [decompose]           → (orchestrator) Split prompt into N sections.
+                            Each section = { id, title, task_type, description, acceptance_criteria }
+                            Task types: feature, fix-bug, visual-change
+                            Assign issue-number = single GitHub issue for all sections.
+ 2. [plan-all]            → (non-agentic, orchestrator) Create a TODO list with all sections.
+                            Share with user: "Plan: Section 1 (bug fix) → Section 2 (visual) → Section 3 (feature). Single PR."
+ 3. For each section K in [1..N]:
+      Same as Full Pipeline steps 1-16, EXCEPT:
+      - setup-feature-branch only runs for section 1 (creates pipeline/feature-<N>)
+      - Sections 2..N cherry-pick onto the EXISTING pipeline/feature-<N> branch
+      - [test-runner] runs after EACH section (catch regressions early)
+      - Skip qualimetry and code review until all sections are merged
+ 4. Section interlude (after cherry-pick to feature branch):
+      if conflicts → @conflict-resolver → retry cherry-pick
+      if test-runner fails → @fixer → re-run test-runner (tight loop, max 7 retries)
+ 5. After ALL sections merged:
+      [qualimetry]              → jscpd syntactic duplication check
+                                  if fail → @implementer → re-run section-specific pipeline for affected section
+      Code review (parallel): @security-reviewer + @quality-reviewer + @i18n-reviewer + @duplication-reviewer + @semantic-reviewer
+      [merge-findings]          → Orchestrator merges findings → pass/fail
+      @refactorer               → Clean up conventions, no behavior change
+      [test-runner]             → re-run full suite
+      @validator                → Full validation: typecheck → tests → build
+      @visual-tester            → Screenshot verification (if any section is visual-change)
+      [open-pr]                 → Single PR from pipeline/feature-<N> to main
+```
+
+### Branch Strategy for Multi-Pipeline
+
+```
+main
+ └─ pipeline/tests-<N>-section-1   (stubs + tests)
+ │    └─ pipeline/impl-<N>-section-1  (implementer)
+ └─ pipeline/tests-<N>-section-2   (stubs + tests)
+ │    └─ pipeline/impl-<N>-section-2  (implementer)
+ └─ pipeline/feature-<N>           (accumulated — ALL sections cherry-picked here)
+      └─ qualimetry → code review → refactorer → validator → [visual-tester] → PR to main
+```
+
+Each section preserves branch isolation (implementer never sees tests from other sections). Feature branch accumulates all changes. Single PR at the end.
 
 ## Full Pipeline (implement-feature / visual-change)
 

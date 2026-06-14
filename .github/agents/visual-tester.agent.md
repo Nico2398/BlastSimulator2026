@@ -41,6 +41,18 @@ PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium npx tsx scripts/scenario-test.ts --n
 bash scripts/visual-test.sh --name "terrain" --commands "new_game mine_type:desert seed:42"
 ```
 
+### Multi-Angle Screenshots
+Capture multiple camera angles per scenario step via `--shots`:
+```bash
+PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium npx tsx scripts/scenario-test.ts --name my-test \
+  --commands "new_game seed:42; drill_plan grid rows:2 cols:3 spacing:4 depth:6 start:15,15" \
+  --shots "overview:0:45;closeup:90:10;birdseye:0:80"
+```
+
+Format: `--shots "name:yaw:pitch;name:yaw:pitch"` (degrees).
+After each step, the runner orbits to each shot angle, captures `step-NN-cmd-{name}.png`, then resets.
+Inspect each angle for geometry, z-fighting, overlays, and effects.
+
 ## Output
 
 Per scenario step:

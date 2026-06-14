@@ -2,16 +2,23 @@
  * BlastSimulator2026 — Scenario Test Runner
  *
  * Runs a sequence of game commands in headless Chrome, capturing a screenshot
- * and game state dump after EVERY command. Produces a per-step report for
- * visual + logical verification.
+ * and game state dump after EVERY command. Supports multi-angle shots via --shots.
+ * Produces a per-step report for visual + logical verification.
  *
  * Usage:
  *   npx tsx scripts/scenario-test.ts --scenario blast-basic
  *   npx tsx scripts/scenario-test.ts --commands "new_game seed:42; drill_plan grid rows:2 cols:3 spacing:4 depth:6 start:15,15"
+ *   npx tsx scripts/scenario-test.ts --scenario blast-basic --shots "overview:0:45;closeup:90:10;birdseye:0:80"
+ *
+ * --shots format: name:yaw:pitch;name:yaw:pitch  (degrees)
+ *   Each shot is captured after every step, in addition to the default view.
+ *   Screenshots: step-NN-cmd.png (default) + step-NN-cmd-shotname.png (each shot)
  *
  * Output:  screenshots/scenario-{name}/
  *   step-00-new_game.png
  *   step-00-new_game.json      (game state + command output)
+ *   step-00-new_game-overview.png   (multi-angle shots)
+ *   step-00-new_game-closeup.png
  *   step-01-drill_plan.png
  *   step-01-drill_plan.json
  *   ...
@@ -33,6 +40,12 @@ interface ScenarioStep {
   description?: string;
 }
 
+interface ShotDef {
+  name: string;
+  yaw: number;
+  pitch: number;
+}
+
 interface StepResult {
   step: number;
   command: string;
@@ -43,10 +56,11 @@ interface StepResult {
   statePath: string;
 }
 
-function parseArgs(): { name: string; steps: ScenarioStep[] } {
+function parseArgs(): { name: string; steps: ScenarioStep[]; shots: ShotDef[] } {
   const args = process.argv.slice(2);
   let name = 'scenario';
   let steps: ScenarioStep[] = [];
+  let shots: ShotDef[] = [];
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--scenario' && args[i + 1]) {
@@ -67,13 +81,22 @@ function parseArgs(): { name: string; steps: ScenarioStep[] } {
     } else if (args[i] === '--name' && args[i + 1]) {
       name = args[i + 1];
       i++;
+    } else if (args[i] === '--shots' && args[i + 1]) {
+      const parts = args[i + 1].split(';').map(s => s.trim()).filter(Boolean);
+      for (const part of parts) {
+        const [shotName, yawStr, pitchStr] = part.split(':');
+        if (shotName && yawStr && pitchStr) {
+          shots.push({ name: shotName, yaw: parseFloat(yawStr), pitch: parseFloat(pitchStr) });
+        }
+      }
+      i++;
     }
   }
 
-  return { name, steps };
+  return { name, steps, shots };
 }
 
-async function runScenario(name: string, steps: ScenarioStep[]): Promise<StepResult[]> {
+async function runScenario(name: string, steps: ScenarioStep[], shots: ShotDef[]): Promise<StepResult[]> {
   const outDir = resolve(process.cwd(), `screenshots/scenario-${name}`);
   mkdirSync(outDir, { recursive: true });
 
@@ -154,7 +177,7 @@ async function runScenario(name: string, steps: ScenarioStep[]): Promise<StepRes
         return null;
       });
 
-      // Take screenshot
+      // Take default screenshot
       const screenshotPath = resolve(outDir, `step-${paddedIdx}-${cmdSlug}.png`);
       await page.screenshot({ path: screenshotPath, fullPage: false });
 
@@ -171,6 +194,32 @@ async function runScenario(name: string, steps: ScenarioStep[]): Promise<StepRes
 
       console.log(`  Screenshot: ${screenshotPath}`);
       console.log(`  State: ${statePath}`);
+
+      // Multi-angle shots (--shots parameter)
+      const shotPaths: string[] = [];
+      for (const shot of shots) {
+        await page.evaluate(
+          ({ y, p }: { y: number; p: number }) => {
+            (window as any).__cameraOrbit(y, p);
+          },
+          { y: shot.yaw, p: shot.pitch },
+        );
+        await new Promise(r => setTimeout(r, RENDER_WAIT_MS));
+        await page.evaluate(() => new Promise(r => requestAnimationFrame(() => {
+          requestAnimationFrame(() => r(undefined));
+        })));
+        await new Promise(r => setTimeout(r, RENDER_WAIT_MS));
+        const shotPath = resolve(outDir, `step-${paddedIdx}-${cmdSlug}-${shot.name}.png`);
+        await page.screenshot({ path: shotPath, fullPage: false });
+        shotPaths.push(shotPath);
+        console.log(`  Shot [${shot.name}]: ${shotPath}`);
+      }
+
+      // Reset camera after multi-angle shots
+      if (shots.length > 0) {
+        await page.evaluate(() => (window as any).__cameraReset());
+        await new Promise(r => setTimeout(r, RENDER_WAIT_MS));
+      }
 
       if (gameState) {
         const gs = gameState as any;
@@ -209,13 +258,17 @@ async function runScenario(name: string, steps: ScenarioStep[]): Promise<StepRes
 }
 
 // Main
-const { name, steps } = parseArgs();
+const { name, steps, shots } = parseArgs();
 if (steps.length === 0) {
   console.error('No steps defined. Use --scenario <name> or --commands "cmd1; cmd2; ..."');
   process.exit(1);
 }
 
-runScenario(name, steps)
+if (shots.length > 0) {
+  console.log(`Multi-angle shots: ${shots.map(s => `${s.name}(${s.yaw}°,${s.pitch}°)`).join(', ')}`);
+}
+
+runScenario(name, steps, shots)
   .then(() => {
     console.log('\nScenario complete.');
     process.exit(0);
