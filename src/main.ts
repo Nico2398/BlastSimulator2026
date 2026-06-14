@@ -111,6 +111,8 @@ declare global {
     __gameConsole: (cmd: string) => import('./console/ConsoleRunner.js').CommandResult;
     __gameState: () => Record<string, unknown> | null;
     __uiState: () => Record<string, unknown>;
+    __cameraOrbit: (yaw: number, pitch: number) => void;
+    __cameraReset: () => void;
   }
 }
 
@@ -212,6 +214,14 @@ window.__uiState = () => {
     });
   }
   return { panels: panelStates, blastPanelButtons: buttons };
+};
+
+// Camera control bridges (used by scenario-test.ts for multi-angle screenshots)
+window.__cameraOrbit = (yaw: number, pitch: number) => {
+  scene.cameraController.setOrbit(yaw, pitch);
+};
+window.__cameraReset = () => {
+  scene.cameraController.reset();
 };
 
 uiManager.setGameConsole(window.__gameConsole);
