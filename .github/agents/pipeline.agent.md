@@ -147,7 +147,7 @@ LOOP:
   a. @visual-tester   → Run scenario tests with --shots, inspect ALL screenshots.
                         Report ALL visual failures in one pass, ranked by severity.
                         If no failures → exit loop (continue to step 28).
-  b. @implementer     → Fix top reported visual issue only.
+  b. @implementer     → Fix ALL reported visual issues.
                         Runs on feature branch (branch-sanity: pipeline/feature-<N>).
                         Does NOT switch to impl branch — this is not TDD, it's visual iteration.
   c. [test-runner]    → Verify no test regression.
@@ -156,7 +156,7 @@ LOOP:
 ```
 
 **Key rules:**
-- `@implementer` during visual loop: fix ONE visual issue, commit, hand back to visual-tester
+- `@implementer` during visual loop: fix ALL reported visual issues, commit, hand back to visual-tester
 - `@visual-tester` each iteration: re-run full scenario suite, report remaining failures
 - No qualimetry, code review, or refactorer inside the loop — those run once after loop exits
 - If loop makes no progress after 7 iterations → orchestrate escalation

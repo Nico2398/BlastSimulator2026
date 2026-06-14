@@ -41,7 +41,7 @@ Write **minimum code** to pass failing tests.
 Use when invoked from the visual feedback loop (orchestrator confirms `pipeline/feature-<N>`).
 
 0. `git branch --show-current` → verify branch is `pipeline/feature-<issue-number>`. If mismatch, print `## WRONG BRANCH: on <actual>, expected pipeline/feature-<N>` and return FAIL.
-1. Read visual failure report from @visual-tester — fix **only the top ranked issue**.
+1. Read visual failure report from @visual-tester — fix **all reported visual issues**.
 2. Identify source files responsible for the visual issue (renderer, mesh, overlay, etc.).
 3. Apply minimal fix — change only what that one issue requires.
 4. `npx vitest run` → verify no test regression

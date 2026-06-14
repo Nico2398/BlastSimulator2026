@@ -133,7 +133,7 @@ Browser exposes:
 ```
 
 **Severity levels:** SEVERE (missing/corrupt geometry), MODERATE (wrong colors/overlays/effects), MINOR (state mismatch, cosmetic).
-In visual feedback loop: report all issues found. @implementer fixes the top one, then re-invoke.
+In visual feedback loop: report all issues found. @implementer fixes all of them, then re-invoke for another round.
 
 ## Key References
 
