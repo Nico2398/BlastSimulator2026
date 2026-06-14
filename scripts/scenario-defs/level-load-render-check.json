@@ -1,0 +1,14 @@
+{
+  "name": "level-load-render-check",
+  "description": "Verifies each level type renders correctly at load time — terrain, distant scenery, sky, HUD, minimap, toolbar. Captures 4 camera angles per step.",
+  "steps": [
+    "new_game seed:42 size:24",
+    "campaign start level:tutorial_pit",
+    "new_game seed:42",
+    "campaign start level:dusty_hollow",
+    "new_game seed:42",
+    "campaign start level:grumpstone_ridge",
+    "new_game seed:42",
+    "campaign start level:treranium_depths"
+  ]
+}
