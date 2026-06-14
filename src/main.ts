@@ -55,7 +55,10 @@ mainMenu.setOnNewCampaign(() => {
 mainMenu.setOnStartLevel((levelId) => {
   // Ensure a base GameState (with campaign) exists before starting a level.
   if (!ctx.state) window.__gameConsole('new_game');
-  window.__gameConsole(`campaign start level:${levelId}`);
+  const result = window.__gameConsole(`campaign start level:${levelId}`);
+  if (!result.success) {
+    uiManager.showNotification(result.output);
+  }
 });
 mainMenu.setOnLoad(() => { saveLoadUI.show(); });
 mainMenu.setOnSettings(() => { uiManager.showPanel('settings'); });

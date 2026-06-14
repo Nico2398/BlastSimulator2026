@@ -56,7 +56,9 @@ export class GameRenderer {
     if (!ctx.state || !ctx.grid) return;
 
     // New game (or first load) — rebuild everything
-    if (this.loadedSeed !== ctx.state.seed) {
+    // Also rebuild if the grid reference changed (handles same-seed new_game or
+    // campaign start where a new VoxelGrid was created with the same seed).
+    if (this.loadedSeed !== ctx.state.seed || ctx.grid !== this.lastGrid) {
       this.loadGame(ctx.state, ctx.grid);
       this.loadedSeed = ctx.state.seed;
     }

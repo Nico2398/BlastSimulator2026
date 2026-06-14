@@ -73,6 +73,9 @@ export class SkyboxWeather {
     this.sun = sun;
     this.ambient = ambient;
 
+    // Ensure scene background starts at the sunny sky colour (before first update)
+    scene.background = new THREE.Color(WEATHER_COLORS.sunny.skyLow);
+
     // Pre-allocate rain positions
     this.rainPositions = new Float32Array(RAIN_PARTICLE_COUNT * 3);
     this.initRainPositions();
