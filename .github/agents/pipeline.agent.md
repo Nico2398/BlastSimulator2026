@@ -21,6 +21,20 @@ First, classify the task:
 | PR review | reviewer only |
 | Question/analysis | ask |
 | Imperative command | executor |
+| Complex/mixed prompt | Multi-Pipeline: decompose → sequential sections → single PR |
+
+Only `@visual-tester` has vision (multimodal) capability. No other agent can analyze images or screenshots. Any task requiring visual inspection of render output must route through `@visual-tester`.
+
+## PR Status
+
+Set `pr_status` before step 29 (open-pr). Controls whether PR is created as draft or ready-to-merge.
+
+| Status | Behavior | When to use |
+|--------|----------|-------------|
+| `ready` (default) | PR created as normal, `READY TO MERGE` in body triggers auto-merge | Simple fixes, features with full coverage, no human-dependency |
+| `draft` | PR created with `--draft` flag, `READY TO MERGE` NOT included | Visual-change tasks needing human sign-off, pipeline hit retry loops, explicit request |
+
+The open-pr step passes `--draft` to `gh pr create` when `pr_status=draft`.
 
 ## Ask Pipeline
 
@@ -35,6 +49,53 @@ First, classify the task:
 1. @executor   → Execute imperative command via `gh` or shell
 2. [post]     → (non-agentic) post result as PR/issue comment via `gh pr comment` or `gh issue comment`
 ```
+
+## Multi-Pipeline (complex / mixed prompts)
+
+Use when the prompt mixes multiple task types (e.g. bug fix + visual change + feature).
+
+```
+ 1. [decompose]           → (orchestrator) Split prompt into N sections.
+                            Each section = { id, title, task_type, description, acceptance_criteria }
+                            Task types: feature, fix-bug, visual-change
+                            Assign issue-number = single GitHub issue for all sections.
+ 2. [plan-all]            → (non-agentic, orchestrator) Create a TODO list with all sections.
+                            Share with user: "Plan: Section 1 (bug fix) → Section 2 (visual) → Section 3 (feature). Single PR."
+ 3. For each section K in [1..N]:
+      Same as Full Pipeline steps 1-16, EXCEPT:
+      - setup-feature-branch only runs for section 1 (creates pipeline/feature-<N>)
+      - Sections 2..N cherry-pick onto the EXISTING pipeline/feature-<N> branch
+      - [test-runner] runs after EACH section (catch regressions early)
+      - Skip qualimetry and code review until all sections are merged
+ 4. Section interlude (after cherry-pick to feature branch):
+      if conflicts → @conflict-resolver → retry cherry-pick
+      if test-runner fails → @fixer → re-run test-runner (tight loop, max 7 retries)
+ 5. After ALL sections merged:
+      [qualimetry]              → jscpd syntactic duplication check
+                                  if fail → @implementer → re-run section-specific pipeline for affected section
+      Code review (parallel): @security-reviewer + @quality-reviewer + @i18n-reviewer + @duplication-reviewer + @semantic-reviewer
+      [merge-findings]          → Orchestrator merges findings → pass/fail
+      @refactorer               → Clean up conventions, no behavior change
+      [test-runner]             → re-run full suite
+      @validator                → Full validation: typecheck → tests → build
+      @visual-tester            → Screenshot verification (if any section is visual-change)
+      [open-pr]                 → Single PR from pipeline/feature-<N> to main.
+                                  Use `--draft` when pr_status=draft.
+```
+
+### Branch Strategy for Multi-Pipeline
+
+```
+main
+ └─ pipeline/tests-<N>-section-1   (stubs + tests)
+ │    └─ pipeline/impl-<N>-section-1  (implementer)
+ └─ pipeline/tests-<N>-section-2   (stubs + tests)
+ │    └─ pipeline/impl-<N>-section-2  (implementer)
+ └─ pipeline/feature-<N>           (accumulated — ALL sections cherry-picked here)
+      └─ qualimetry → code review → refactorer → validator → [visual-tester] → PR to main
+```
+
+Each section preserves branch isolation (implementer never sees tests from other sections). Feature branch accumulates all changes. Single PR at the end.
 
 ## Full Pipeline (implement-feature / visual-change)
 
@@ -80,10 +141,12 @@ Branch sanity checks and commit verifications run before/after each agent step t
 25. [verify-commit]           → (non-agentic) confirm refactor commit exists; auto-commit if dirty
 26. @validator           → Full validation: typecheck → tests → build
                             if fail → @implementer (big loop)
-27. @visual-tester       → Screenshot verification (visual-change ONLY)
-                            if fail → @implementer (big loop)
+27. [visual-feedback-loop] → Visual feedback loop (visual-change ONLY).
+                            Tight loop on feature branch, no branch isolation.
+                            See "Visual Feedback Loop" section below.
 28. [verify-commit]           → (non-agentic) final commit check before PR
-29. [open-pr]            → (non-agentic) create PR from feature branch to main + READY TO MERGE
+29. [open-pr]            → (non-agentic) create PR from feature branch to main + READY TO MERGE.
+                            Use `--draft` when pr_status=draft.
 
 ```
 
@@ -106,6 +169,30 @@ Every agent failure loops back — either to `@implementer` (outer loop) or self
 When looping back to `@implementer`, the full downstream chain reruns: `implementer → setup-feature-branch → cherry-pick → switch-to-feature → test-runner → qualimetry → code-review → refactorer → test-runner → validator → [visual-tester]`.
 
 **Exception:** after `@refactorer` succeeds, the re-run of `[test-runner]` routes directly to `@validator` — qualimetry and code review are NOT repeated.
+
+### Visual Feedback Loop
+
+Replaces a single @visual-tester invocation with an iterative loop for visual-change tasks.
+Runs on `pipeline/feature-<N>` (tests + impl already merged). No branch isolation — loop is visual feedback, independent from test steps.
+
+```
+LOOP:
+  a. @visual-tester   → Run scenario tests with --shots, inspect ALL screenshots.
+                        Report ALL visual failures in one pass, ranked by severity.
+                        If no failures → exit loop (continue to step 28).
+  b. @implementer     → Fix ALL reported visual issues.
+                        Runs on feature branch (branch-sanity: pipeline/feature-<N>).
+                        Does NOT switch to impl branch — this is not TDD, it's visual iteration.
+  c. [test-runner]    → Verify no test regression.
+                        if fail → @fixer → re-run [test-runner]
+  d. goto (a)         → Next iteration. No iteration cap.
+```
+
+**Key rules:**
+- `@implementer` during visual loop: fix ALL reported visual issues, commit, hand back to visual-tester
+- `@visual-tester` each iteration: re-run full scenario suite, report remaining failures
+- No qualimetry, code review, or refactorer inside the loop — those run once after loop exits
+- If loop makes no progress after 7 iterations → orchestrate escalation
 
 ## Fix-Bug Pipeline (shorter)
 
@@ -135,7 +222,8 @@ When looping back to `@implementer`, the full downstream chain reruns: `implemen
 23. [merge-findings]     → Orchestrator merges findings → pass/fail; fail → @implementer
 24. @validator           → typecheck → tests → build; fail → @implementer
 25. [verify-commit]           → (non-agentic) final commit check
-26. [open-pr]            → create PR from feature branch to main + READY TO MERGE
+26. [open-pr]            → create PR from feature branch to main + READY TO MERGE.
+                            Use `--draft` when pr_status=draft.
 ```
 
 Note: `@refactorer` is skipped for fix-bug.
@@ -167,7 +255,8 @@ main
 |-------|--------|----------------------|
 | @skeleton-writer | tests_branch | No tests exist yet |
 | @test-writer | tests_branch | Yes — writes them |
-| @implementer | impl_branch | **NO — branch enforces this** (test files never committed to impl_branch) |
+| @implementer (standard) | impl_branch | **NO — branch enforces this** (test files never committed to impl_branch) |
+| @implementer (visual loop) | feature_branch | **Yes** — visual feedback loop, not TDD |
 | @fixer | feature_branch | **Yes — both** (after cherry-pick, feature branch has tests + impl) |
 | @refactorer, @validator, reviewers | feature_branch | Yes (after cherry-pick) |
 
@@ -175,9 +264,10 @@ main
 
 - **Before invoking any agent:** run `branch-sanity` (`git branch --show-current`) to verify you're on the expected branch. If mismatch, diagnose and fix before proceeding.
 - **After any agent completes:** run `verify-commit` to ensure the agent's work was committed. If the working tree is dirty or the last commit doesn't match the agent, auto-commit.
-- **Before invoking @implementer:** switch to `impl_branch` (`git checkout pipeline/impl-<issue-number>`). Confirm with `git branch` output before proceeding.
+- **Before invoking @implementer (standard):** switch to `impl_branch` (`git checkout pipeline/impl-<issue-number>`). Confirm with `git branch` output before proceeding.
   - The branch itself enforces blindness — test files were never committed to `impl_branch`. No manual filtering needed.
   - Still: do **not** verbally describe test names, test logic, or expected assertions in the prompt. Pass only: plan, stub signatures, issue description.
+- **Before invoking @implementer (visual loop):** confirm on `feature_branch`. Visual loop bypasses branch isolation. Pass the visual failure report, not test names.
 - **Before invoking @fixer:** switch to `feature_branch`. @fixer sees both implementation and test source (after cherry-pick) — this is intentional. It must judge which side is wrong (broken impl vs. incorrect test).
 - If you accidentally switch to the wrong branch, stop, switch to the correct branch, and restart that agent step.
 
@@ -208,12 +298,14 @@ main
 | qualimetry | `npx jscpd src/ tests/` — route to @implementer on fail |
 | merge-findings | Deduplicate and merge all 5 reviewer outputs → pass/fail |
 | After refactorer | Re-run `npx vitest run` (skip qualimetry + code-review) |
-| open-pr | `gh pr create --base main --head pipeline/feature-<issue-number> --body "Closes #<issue-number>\n\n<N> new tests — all passing\n\nREADY TO MERGE"` — include validation checklist per `agentic-autonomous-pipeline` skill |
+| open-pr | `gh pr create --base main --head pipeline/feature-<issue-number> --body "Closes #<issue-number>\n\n<N> new tests — all passing\n\nREADY TO MERGE"` — include validation checklist per `agentic-autonomous-pipeline` skill. Add `--draft` when pr_status=draft (omit READY TO MERGE from body). |
 | Before completing | Summarize changes, files modified, test status |
 
 ## Key References
 
-- `agentic-autonomous-pipeline` skill — Full CI/CD workflow
+Skills listed below are **background reference only** — conceptual context, not procedure. The pipeline steps defined in this file are the sole source of truth for execution sequence.
+
+- `agentic-autonomous-pipeline` skill — CI/CD workflow reference (no competing step numbering)
 - `dev-architecture` skill — Module boundaries
 - `dev-testing-strategy` skill — Test conventions
 
@@ -224,8 +316,10 @@ main
 - **Always validate** — `npm run validate` must pass before declaring success
 - **Context to pass to each agent:**
   - All agents: issue description, plan, current branch, files modified so far
-  - **@implementer specifically:** do not verbally describe tests — only plan + stub signatures + expected behavior. Branch isolation handles the rest.
-  - **@fixer specifically:** pass both the test runner error output AND full context (it needs both sides to decide what to fix)
+  - **@implementer (standard):** do not verbally describe tests — only plan + stub signatures + expected behavior. Branch isolation handles the rest.
+  - **@implementer (visual loop):** pass the visual failure report from @visual-tester. No branch switching needed.
+  - **@fixer:** pass both the test runner error output AND full context (it needs both sides to decide what to fix)
+  - **@visual-tester:** pass scenario definition and expected visual outcome.
 
 ## READY TO MERGE
 

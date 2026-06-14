@@ -37,9 +37,7 @@ Write failing tests capturing expected behavior **before** implementation.
 2. Write failing tests following existing test patterns.
 3. `npx tsc --noEmit` → verify test files compile.
 4. Commit: `git add -A && git commit -m "tests: failing tests for <feature> (<issue>)"`.
-5. `git log --oneline -1` → confirm committed.
-
-## Acceptance Criteria
+ 5. `git log --oneline -1` → confirm committed.
 
 ## Key References
 

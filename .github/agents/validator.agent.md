@@ -70,20 +70,5 @@ Spot-check: `new_game seed:42` → `state summary` → `drill_plan` → `blast` 
 
 ## Key References
 
-- `dev-testing-strategy` — test pyramid, coverage goals
-- `dev-architecture` — build system, project structure
-```bash
-npx tsx src/console.ts
-```
-
-Key spot-check commands:
-- `new_game seed:42` → `state summary`
-- `drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:15,15`
-- `blast`
-- `finances`
-- `scores`
-
-## Key References
-
 - `dev-testing-strategy` — test pyramid, coverage goals, validation workflow
 - `dev-architecture` — build system, project structure
