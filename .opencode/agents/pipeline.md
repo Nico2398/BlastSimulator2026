@@ -128,34 +128,41 @@ Branch sanity checks and commit verifications run before/after each agent step t
 24. @refactorer          → Clean up conventions, no behavior change
                             then re-run [test-runner] to verify no regression
 25. [verify-commit]           → (non-agentic) confirm refactor commit exists; auto-commit if dirty
-26. @validator           → Full validation: typecheck → tests → build
+ 26. @validator           → Full validation: typecheck → tests → build
                             if fail → @implementer (big loop)
-27. @visual-tester       → Screenshot verification (visual-change ONLY)
-                            if fail → @implementer (big loop)
-28. [verify-commit]           → (non-agentic) final commit check before PR
-29. [open-pr]            → (non-agentic) create PR from feature branch to main + READY TO MERGE
+ 27. [visual-feedback-loop] → Visual feedback loop (visual-change ONLY).
+                            Tight loop on feature branch, no branch isolation.
+                            See "Visual Feedback Loop" section below.
+ 28. [verify-commit]           → (non-agentic) final commit check before PR
+ 29. [open-pr]            → (non-agentic) create PR from feature branch to main + READY TO MERGE
 
 ```
 
-### Failure loops (all pipelines)
+### Visual Feedback Loop
 
-Every agent failure loops back — either to `@implementer` (outer loop) or self-retries — capped at **7 retries** before human escalation.
+Replaces a single @visual-tester invocation with an iterative loop for visual-change tasks.
+Runs on `pipeline/feature-<N>` (tests + impl already merged). No branch isolation — loop is visual feedback, independent from test steps.
 
-| Failure at | Loops back to |
-|------------|--------------|
-| @planner | @planner (self-retry) |
-| [test-runner] | @fixer → [test-runner] (tight loop) |
-| [qualimetry] | @implementer |
-| [merge-findings] | @implementer |
-| @semantic-reviewer | @implementer |
-| @refactorer | @implementer |
-| @validator | @implementer |
-| @visual-tester | @implementer |
-| Any node × 7 | Human escalation (interrupt) |
+```
+LOOP:
+  a. @visual-tester   → Run scenario tests with --shots, inspect ALL screenshots.
+                        Report ALL visual failures in one pass, ranked by severity.
+                        If no failures → exit loop (continue to step 28).
+  b. @implementer     → Fix top reported visual issue only.
+                        Runs on feature branch (branch-sanity: pipeline/feature-<N>).
+                        Does NOT switch to impl branch — this is not TDD, it's visual iteration.
+  c. [test-runner]    → Verify no test regression.
+                        if fail → @fixer → re-run [test-runner]
+  d. goto (a)         → Next iteration. No iteration cap.
+```
 
-When looping back to `@implementer`, the full downstream chain reruns: `implementer → setup-feature-branch → cherry-pick → switch-to-feature → test-runner → qualimetry → code-review → refactorer → test-runner → validator → [visual-tester]`.
+**Key rules:**
+- `@implementer` during visual loop: fix ONE visual issue, commit, hand back to visual-tester
+- `@visual-tester` each iteration: re-run full scenario suite, report remaining failures
+- No qualimetry, code review, or refactorer inside the loop — those run once after loop exits
+- If loop makes no progress after 7 iterations → orchestrate escalation
 
-**Exception:** after `@refactorer` succeeds, the re-run of `[test-runner]` routes directly to `@validator` — qualimetry and code review are NOT repeated.
+## Fix-Bug Pipeline (shorter)
 
 ## Fix-Bug Pipeline (shorter)
 
@@ -217,7 +224,8 @@ main
 |-------|--------|----------------------|
 | @skeleton-writer | tests_branch | No tests exist yet |
 | @test-writer | tests_branch | Yes — writes them |
-| @implementer | impl_branch | **NO — branch enforces this** (test files never committed to impl_branch) |
+| @implementer (standard) | impl_branch | **NO — branch enforces this** (test files never committed to impl_branch) |
+| @implementer (visual loop) | feature_branch | **Yes** — visual feedback loop, not TDD |
 | @fixer | feature_branch | **Yes — both** (after cherry-pick, feature branch has tests + impl) |
 | @refactorer, @validator, reviewers | feature_branch | Yes (after cherry-pick) |
 
@@ -225,9 +233,10 @@ main
 
 - **Before invoking any agent:** run `branch-sanity` (`git branch --show-current`) to verify you're on the expected branch. If mismatch, diagnose and fix before proceeding.
 - **After any agent completes:** run `verify-commit` to ensure the agent's work was committed. If the working tree is dirty or the last commit doesn't match the agent, auto-commit.
-- **Before invoking @implementer:** switch to `impl_branch` (`git checkout pipeline/impl-<issue-number>`). Confirm with `git branch` output before proceeding.
+- **Before invoking @implementer (standard):** switch to `impl_branch` (`git checkout pipeline/impl-<issue-number>`). Confirm with `git branch` output before proceeding.
   - The branch itself enforces blindness — test files were never committed to `impl_branch`. No manual filtering needed.
   - Still: do **not** verbally describe test names, test logic, or expected assertions in the prompt. Pass only: plan, stub signatures, issue description.
+- **Before invoking @implementer (visual loop):** confirm on `feature_branch`. Visual loop bypasses branch isolation. Pass the visual failure report, not test names.
 - **Before invoking @fixer:** switch to `feature_branch`. @fixer sees both implementation and test source (after cherry-pick) — this is intentional. It must judge which side is wrong (broken impl vs. incorrect test).
 - If you accidentally switch to the wrong branch, stop, switch to the correct branch, and restart that agent step.
 

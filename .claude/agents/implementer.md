@@ -12,7 +12,7 @@ Position: 2/5 (Green). Prev: @test-writer. Next: @refactorer.
 
 Write **minimum code** to pass failing tests.
 
-## Process
+## Process (Standard TDD)
 
 0. `git branch --show-current` → verify branch is `pipeline/impl-<issue-number>`. If mismatch, print `## WRONG BRANCH: on <actual>, expected pipeline/impl-<N>` and return FAIL.
 1. Read failing tests → understand expected behavior
@@ -22,7 +22,21 @@ Write **minimum code** to pass failing tests.
 5. `npx tsc --noEmit` → verify type safety
 6. Commit: `git add -A && git commit -m "implement: <feature> (#<issue>)"`
 7. `git log --oneline -1` → confirm committed
-8. Hand off to refactorer
+ 8. Hand off to refactorer
+
+## Process (Visual Feedback Loop)
+
+Use when invoked from the visual feedback loop (orchestrator confirms `pipeline/feature-<N>`).
+
+0. `git branch --show-current` → verify branch is `pipeline/feature-<issue-number>`. If mismatch, print `## WRONG BRANCH: on <actual>, expected pipeline/feature-<N>` and return FAIL.
+1. Read visual failure report from @visual-tester — fix **only the top ranked issue**.
+2. Identify source files responsible for the visual issue (renderer, mesh, overlay, etc.).
+3. Apply minimal fix — change only what that one issue requires.
+4. `npx vitest run` → verify no test regression
+5. `npx tsc --noEmit` → verify type safety
+6. Commit: `git add -A && git commit -m "visual: fix <description> (<issue>)"`
+7. `git log --oneline -1` → confirm committed
+8. Hand back to orchestrator (next iteration of visual loop).
 
 ## Console Command Pattern
 

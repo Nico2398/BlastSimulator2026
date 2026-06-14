@@ -10,9 +10,18 @@ tools: ["read", "search", "execute"]
 
 # Visual Tester — Screenshot & Scenario Verification
 
-Position: 5/5 (Visual Test). Prev: @validator.
+Inspect game screenshots for rendering correctness using multimodal vision. **Only for rendering/UI/visual changes.**
 
-Run visual scenario tests, inspect screenshots, verify rendering. **Only for rendering/UI/visual changes.**
+## Invocation Contexts
+
+Two paths invoke this agent:
+
+| Context | When | Branch | Expected output |
+|---------|------|--------|----------------|
+| Standard verification | End of full pipeline, after @validator | `pipeline/feature-<N>` | Pass/fail with evidence |
+| Visual feedback loop | Iterative loop with @implementer | `pipeline/feature-<N>` | **All failures in one pass**, ranked by severity |
+
+In both contexts: run the full scenario suite, inspect every screenshot (including multi-angle shots), and report ALL visual failures found.
 
 ## Environment Setup
 
@@ -100,13 +109,31 @@ Browser exposes:
 - `window.__gameState()` — full serialized game state
 - `window.__uiState()` — panel visibility, button states
 
-## Completion Criteria
+## Report Format
 
-Never approve unless:
-- [ ] Screenshot confirms geometry visible + correct
-- [ ] State dumps confirm logical correctness
-- [ ] `npm run validate` passes
-- [ ] No visual regressions in before/after comparison
+### Pass
+```
+## VISUAL: PASS
+- Geometry present: all expected meshes visible
+- Visual quality: colors, z-fighting, overlays, effects correct
+- State coherence: visual matches state dumps
+- Screenshots: {paths}
+```
+
+### Fail
+```
+## VISUAL: FAIL
+- Total issues found: N
+- Issues ranked by severity:
+  1. [SEVERE] Missing geometry: building at (15,8) not rendered (step-03, shots: closeup, birdseye)
+  2. [MODERATE] Overlay: charge colors not visible on holes (step-02, overview shot)
+  3. [MINOR] State coherence: hole count in screenshot doesn't match state JSON (step-01)
+- Screenshots: {paths}
+- State dumps: {paths}
+```
+
+**Severity levels:** SEVERE (missing/corrupt geometry), MODERATE (wrong colors/overlays/effects), MINOR (state mismatch, cosmetic).
+In visual feedback loop: report all issues found. @implementer fixes the top one, then re-invoke.
 
 ## Key References
 
