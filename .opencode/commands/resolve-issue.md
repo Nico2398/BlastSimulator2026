@@ -1,6 +1,6 @@
 ---
 description: Resolve a GitHub issue end-to-end through the TDD pipeline.
-agent: pipeline
+agent: orchestrator
 ---
 
 If $ARGUMENTS is non-empty, resolve GitHub issue #$ARGUMENTS.

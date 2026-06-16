@@ -26,8 +26,7 @@ Two paths invoke this agent:
 
 | Context | When | Branch | Expected output |
 |---------|------|--------|----------------|
-| Standard verification | End of full pipeline, after @validator | `pipeline/feature-<N>` | Pass/fail with evidence |
-| Visual feedback loop | Iterative loop with @implementer | `pipeline/feature-<N>` | **All failures in one pass**, ranked by severity |
+| Visual feedback loop | After test-runner on feature branch, before qualimetry | `pipeline/feature-<N>` | **All failures in one pass**, ranked by severity |
 
 In both contexts: run the full scenario suite, inspect every screenshot (including multi-angle shots), and report ALL visual failures found.
 

@@ -18,7 +18,7 @@ permission:
 
 # Validator — Full Suite Verification
 
-Position: 4/5 (Validate). Prev: @refactorer. Next: @visual-tester (visual only).
+Position: after @refactorer. Part of `agentic-pipeline-finalization`.
 
 Run complete validation suite. Report results.
 
