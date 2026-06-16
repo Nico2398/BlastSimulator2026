@@ -8,11 +8,11 @@ description: >
 
 ## Review PR Pipeline
 
-```
-1. Code review (parallel): @quality-reviewer + @security-reviewer + @i18n-reviewer + @duplication-reviewer
-2. [merge-findings]  → Orchestrator merges sub-reviewer findings
-3. @reviewer           → Runtime validation: run tests, fix any critical items, post review outcome
-```
+ ```
+ 1. Code review (parallel): @security-reviewer + @quality-reviewer + @i18n-reviewer + @duplication-reviewer + @semantic-reviewer
+ 2. [merge-findings]  → Orchestrator merges sub-reviewer findings → pass/fail
+ 3. @reviewer           → Runtime validation: run tests, post review outcome (report only — no fixes)
+ ```
 
 ### Rules
 

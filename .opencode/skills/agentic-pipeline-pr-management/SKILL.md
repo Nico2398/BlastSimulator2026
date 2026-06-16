@@ -6,16 +6,22 @@ description: >
   before open-pr step.
 ---
 
-## PR Status
+## PR Status — Self-Evaluation
 
-Set `pr_status` before open-pr step. Controls whether PR is created as draft or ready-to-merge.
+Before open-pr step, evaluate: **is this PR ready to merge or should it be a draft?**
 
-| Status | Behavior | When to use |
-|--------|----------|-------------|
+Ask yourself:
+1. Does this change affect visuals or rendering? → draft (needs human sign-off)
+2. Did the pipeline hit retry loops or heavy review findings? → draft (needs human review)
+3. Does the issue explicitly request human input? → draft
+4. Is this a simple fix or feature with full test coverage, no visual changes, and clean pipeline run? → ready
+
+| Evaluation | Behavior | When |
+|------------|----------|------|
 | `ready` (default) | PR created as normal, `READY TO MERGE` in body triggers auto-merge | Simple fixes, features with full coverage, no human-dependency |
 | `draft` | PR created with `--draft` flag, `READY TO MERGE` NOT included | Visual-change tasks needing human sign-off, pipeline hit retry loops, explicit request |
 
-The open-pr step passes `--draft` to `gh pr create` when `pr_status=draft`.
+The open-pr step passes `--draft` to `gh pr create` when evaluation is `draft`.
 
 ## READY TO MERGE
 

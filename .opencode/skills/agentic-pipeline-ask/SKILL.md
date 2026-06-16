@@ -18,8 +18,8 @@ Simple read-only analysis pipeline. No code changes.
 ### Rules
 
 - `@ask` is read-only — no branch creation, no commits, no file writes
-- Post step uses the answer body verbatim as comment
-- When posting as comment, reference the original question
+- Post step prepends the original question as context for readers. Format: `"**Question:** <original>\n\n**Answer:** <answer body>"`
+- When posting as comment, reference the original question URL if available
 
 ### Non-Agentic Steps
 

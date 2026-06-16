@@ -26,6 +26,8 @@ description: >
 10. [git-verify]              → (non-agentic) confirm clean state: git status, branch, last commits
 ```
 
+**Retry counter:** resets at start of each full pipeline invocation. Nested pipeline skills each have their own counter.
+
 ### Failure loops
 
 | Failure at | Loops back to |
@@ -35,9 +37,9 @@ description: >
 | [qualimetry] | @implementer (big loop) |
 | finalization phase | See `agentic-pipeline-finalization` |
 | [git-verify] | Diagnose and fix — never proceed with dirty state |
-| Any × 7 | Human escalation |
+| Any × 7 | Human escalation: add PR/issue comment summarizing failure + history, then stop with `ESCALATED: human intervention required` |
 
-When looping back to `@implementer` from qualimetry: `implementer → TDD cycle (steps 3-14) → switch-to-feature → test-runner → qualimetry → finalization`. Visual loop is NOT re-run — it is a one-time gate before qualimetry.
+When looping back to `@implementer` from qualimetry: `@implementer on impl branch → cherry-pick → switch-to-feature → [test-runner] → qualimetry`. Do NOT re-run skeleton-writer or test-writer — branches and tests already exist. Visual loop is NOT re-run — it is a one-time gate before qualimetry.
 
 ### Visual Feedback Loop
 
@@ -60,15 +62,15 @@ LOOP:
 - `@implementer` during visual loop: fix ALL reported visual issues, commit, hand back to visual-tester
 - `@visual-tester` each iteration: re-run full scenario suite, report remaining failures
 - No qualimetry, code review, or refactorer inside the loop — those run once after loop exits
-- If loop makes no progress after 7 iterations → orchestrate escalation
+- If the SAME visual failure persists across 3 consecutive iterations → loop makes no progress → orchestrate escalation (7 total iteration cap before hard escalation)
 
 ### Non-Agentic Steps
 
 | Step | Action |
 |------|--------|
-| switch-to-feature | `git checkout pipeline/feature-<N>` |
+| switch-to-feature | `git checkout pipeline/feature-<N>` — verify branch exists first. If not → abort with TDD cycle failure |
 | branch-sanity | `git branch --show-current` |
-| verify-commit | `git log --oneline -1` — auto-commit if dirty |
+| verify-commit | `git log --oneline -1` — auto-commit if dirty, use message `"<agent-name>: <step-context> (#<N>)"` |
 | test-runner | `npx vitest run` — route to @fixer on fail |
-| qualimetry | `npx jscpd src/ tests/` — route to @implementer on fail |
+| qualimetry | `npx jscpd --gitOnly src/ tests/` (changed files only, skip pre-existing duplicates) — route to @implementer on fail |
 | git-verify | `git status --porcelain` (must be empty) → `git branch --show-current` → `git log --oneline -3` |

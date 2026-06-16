@@ -10,48 +10,57 @@ description: >
 
 Runs after qualimetry passes. Branch: `pipeline/feature-<N>`.
 
+**Parameters:**
+- `skip_refactorer` (default: `false`) — set to `true` for bug-fix pipelines to skip refactoring phase.
+
 ```
  1. Code review (parallel):
-       @security-reviewer      → exploitable vulnerabilities
-       @quality-reviewer       → architecture, conventions, TypeScript strictness
-       @i18n-reviewer          → hardcoded strings, locale mismatches
-       @duplication-reviewer   → semantic duplication, non-atomic functions
-       @semantic-reviewer      → test names match logic, function names match behavior
- 2. [merge-findings]     → Orchestrator merges all sub-reviewer findings → pass/fail
-                           if fail → @implementer (big loop)
- 3. @refactorer          → Clean up conventions, no behavior change
-                           then re-run [test-runner] to verify no regression
+        Delegate to `agentic-pipeline-review-pr` skill's code review step (all 5 reviewers:
+        @security-reviewer, @quality-reviewer, @i18n-reviewer, @duplication-reviewer, @semantic-reviewer).
+ 2. [merge-findings]     → Orchestrator merges all sub-reviewer findings → pass/fail.
+                            Pass/fail evaluated AFTER all 5 reviewers complete.
+                            if fail → @implementer (big loop)
+ 3. @refactorer          → If `skip_refactorer=true` → skip this step (jump to step 5).
+                            Otherwise: clean up conventions, no behavior change,
+                            then re-run [test-runner] to verify no regression.
+                            [test-runner] results:
+                              PASS → continue to step 5 (skip qualimetry + code review)
+                              FAIL → @implementer (big loop: TDD → qualimetry → finalization from start)
  4. [verify-commit]      → (non-agentic) confirm refactor commit exists; auto-commit if dirty
  5. @validator           → Full validation: typecheck → tests → build
-                           if fail → @implementer (big loop)
+                            if fail → @implementer (big loop)
  6. [verify-commit]      → (non-agentic) final commit check before PR
  7. [open-pr]            → (non-agentic) create PR from feature branch to main + READY TO MERGE.
-                           Use `--draft` when pr_status=draft.
+                            Before opening, evaluate: is the PR ready or draft?
+                            - `ready` (default): PR created as normal, READY TO MERGE in body
+                            - `draft`: `--draft` flag, omit READY TO MERGE
+                            Use draft when: visual changes need sign-off, pipeline hit retry loops,
+                            human input requested. See `agentic-pipeline-pr-management`.
  8. [git-verify]         → (non-agentic) confirm clean state: git status, branch, last commits
 ```
+
+**Retry counter:** resets at start of each finalization invocation.
 
 ### Failure loops
 
 | Failure at | Loops back to |
 |------------|--------------|
 | [merge-findings] | @implementer (big loop) |
-| @semantic-reviewer | @implementer (big loop) |
-| @refactorer | @implementer (big loop) |
+| @refactorer or [test-runner after refactorer] | @implementer (big loop) |
 | @validator | @implementer (big loop) |
 | [git-verify] | Diagnose and fix — never proceed with dirty state |
-| Any × 7 | Human escalation |
+| Any × 7 | Human escalation: add PR/issue comment summarizing failure + history, then stop with `ESCALATED: human intervention required` |
 
 When looping back to `@implementer` from any finalization step:
-`implementer → TDD cycle → qualimetry → finalization`
-
-**Exception:** after `@refactorer` succeeds, re-run of `[test-runner]` routes to `@validator` — qualimetry and code review are NOT repeated.
+`@implementer on impl branch → cherry-pick → switch-to-feature → qualimetry → finalization`
+Do NOT re-run skeleton-writer or test-writer — branches and tests already exist.
 
 ### Non-Agentic Steps
 
 | Step | Action |
 |------|--------|
-| merge-findings | Deduplicate and merge all 5 reviewer outputs → pass/fail |
-| After refactorer | Re-run `npx vitest run` (skip qualimetry + code-review) |
-| verify-commit | `git log --oneline -1` — auto-commit if dirty |
-| open-pr | `gh pr create --base main --head pipeline/feature-<N> --body "Closes #<N>\n\n<N> new tests — all passing\n\nREADY TO MERGE"` — add `--draft` when pr_status=draft (omit READY TO MERGE from body) |
+| merge-findings | Deduplicate and merge all 5 reviewer outputs → pass/fail (evaluate after ALL reviewers complete) |
+| After refactorer | `npx vitest run` — PASS → @validator, FAIL → @implementer (big loop) |
+| verify-commit | `git log --oneline -1` — auto-commit if dirty, use message `"<agent-name>: <step-context> (#<N>)"` |
+| open-pr | `gh pr create --base main --head pipeline/feature-<N> --title "<type>: Resolve #<N>" --body "Closes #<N>\n\n<test_count> tests — all passing\n\nREADY TO MERGE"`. Determine `<type>` from pipeline: `full → feat`, `fix-bug → fix`, `multi → feat`. Count test cases: `npx vitest list --reporter=json 2>$null | ConvertFrom-Json | ForEach-Object { $_.testModules } | Measure-Object`. For draft: add `--draft`, omit `READY TO MERGE` line. |
 | git-verify | `git status --porcelain` (must be empty) → `git branch --show-current` → `git log --oneline -3` |

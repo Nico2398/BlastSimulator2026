@@ -67,27 +67,27 @@ main
 
 The implementation commit is cherry-picked from the impl branch onto the feature branch. If conflicts arise, a conflict resolver agent reads the conflicted files, merges both sides, removes conflict markers, and stages the resolved files. On resolution failure, the implementer re-runs.
 
-### Quality Gates (after cherry-pick)
+ ### Quality Gates (after cherry-pick)
 
 After the code lands on the feature branch, these gates run in sequence:
 1. **Test runner** (non-agentic) — run test suite, pass → continue, fail → fixer loop
-2. **Duplication check** (non-agentic) — jscpd syntactic clone detection, fail → back to implementer
-3. **Code review fan-out** (agentic, parallel) — specialized sub-reviewers by risk tier:
-   - `security_reviewer` — exploitable vulnerabilities (full tier)
-   - `quality_reviewer` — architecture, naming intent, coding conventions, TypeScript strictness (all tiers)
-   - `i18n_reviewer` — hardcoded strings, locale mismatches (lite + full tiers)
-   - `duplication_reviewer` — semantic duplication, non-atomic functions, generic code placement (lite + full tiers)
-4. **Review coordinator** (agentic) — merges sub-reviewer findings, final pass/fail
-5. **Refactor** — clean up conventions, no behavior change
-6. **Validator** — full suite: TypeScript → tests → build
-7. **Visual verification** (visual changes only) — screenshot comparison
+2. **Visual feedback loop** (visual changes only) — iterative visual-test/implement cycle, runs before qualimetry. See `agentic-pipeline-full` skill.
+3. **Duplication check** (non-agentic) — `jscpd --gitOnly` changed-file clone detection, fail → back to implementer
+4. **Code review fan-out** (agentic, parallel) — specialized sub-reviewers by risk tier:
+   - `security_reviewer` — exploitable vulnerabilities
+   - `quality_reviewer` — architecture, naming intent, coding conventions, TypeScript strictness
+   - `i18n_reviewer` — hardcoded strings, locale mismatches
+   - `duplication_reviewer` — semantic duplication, non-atomic functions, generic code placement
+   - `semantic_reviewer` — test names match logic, function names match behavior
+5. **Merge findings** (orchestrator) — orchestrator merges sub-reviewer findings, final pass/fail
+6. **Refactor** — clean up conventions, no behavior change
+7. **Validator** — full suite: TypeScript → tests → build
 
 ### PR Creation
 
-Create a pull request from `pipeline/feature-<issue-number>` to `main` with:
-- Title prefixed by pipeline type (`feat:`, `fix:`, `docs:`)
-- Body includes `Closes #<issue_number>`, validation checklist, and `READY TO MERGE` on its own line
-- Labels updated: `in-progress` removed, `in-review` added
+Create a pull request from `pipeline/feature-<issue-number>` to `main`. Delegate to `agentic-pipeline-finalization` skill's `[open-pr]` step which handles title prefix, body format, draft/ready logic, and test count.
+
+Labels updated: `in-progress` removed, `in-review` added.
 
 This operation is always non-agentic (no LLM involved).
 

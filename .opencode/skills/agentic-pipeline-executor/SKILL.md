@@ -18,7 +18,14 @@ Simple command-execution pipeline. No code changes, no branch isolation.
 ### Rules
 
 - `@executor` runs commands directly — do not delegate to `@implementer` or other agents
-- For destructive commands (close, delete, force-push), confirm with user before executing
+- For destructive actions, prefer non-destructive alternatives:
+  | Destructive | Preferred alternative |
+  |-------------|----------------------|
+  | `git reset --hard` | `git revert <commit>` (reversible) |
+  | `git clean -fd` | `git stash` (preserves work) |
+  | `gh issue close` | `gh issue comment "Closing..." && gh issue close` (traceable) |
+  | `git branch -D` | `git branch -m <old> <backup>` (recoverable) |
+- When non-destructive alternative unavailable, confirm with invoker before executing. In non-interactive (GitHub Actions) mode, refuse with: "Destructive command blocked — requires human."
 - Post step includes command output (stdout/stderr)
 
 ### Non-Agentic Steps

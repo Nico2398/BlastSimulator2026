@@ -23,6 +23,7 @@ Use when creating GitHub issues that will be picked up by autonomous coding agen
 
 ## Blocked by
 - #N (backlog-id) — [what must be completed first]
+- If no dependencies, write: `None`
 
 ## Conventions
 - [Any specific patterns, imports, naming, or code style to follow]
