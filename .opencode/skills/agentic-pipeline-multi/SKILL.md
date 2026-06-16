@@ -14,21 +14,31 @@ Use when the prompt mixes multiple task types.
 ```
  1. [decompose]           → (orchestrator) Split prompt into N sections.
                             Each section = { id, title, task_type, description, acceptance_criteria }
+                            Supported task_types: feature, fix-bug, full, ask, executor, review-pr
                             Assign issue-number = single GitHub issue for all sections.
  2. [plan-all]            → (orchestrator) Create a TODO list with all sections.
                             Share with user: "Section 1 → Section 2 → ... → Section N. Single PR."
  3. For each section K in [1..N]:
-       TDD cycle via `agentic-pipeline-tdd` with label = <issue-number>-section-<K>.
-       EXCEPT:
-       - Section 1 creates pipeline/feature-<issue-number> (shared across all sections)
-       - Sections 2..N cherry-pick onto the EXISTING pipeline/feature-<issue-number>
-       - [test-runner] runs after EACH section (catch regressions early)
-       - If test-runner fails → @fixer → re-run test-runner (tight loop, max 7 retries)
-       - If cherry-pick conflicts → @conflict-resolver → retry cherry-pick
+        Route by task_type:
+        - Code-producing (feature, fix-bug, full) → `agentic-pipeline-tdd` with label = <issue-number>-section-<K>
+        - Ask  → `agentic-pipeline-ask`
+        - Executor → `agentic-pipeline-executor`
+        - Review-pr → `agentic-pipeline-review-pr`
+
+        For code-producing sections:
+        - Section 1 creates pipeline/feature-<issue-number> (shared across all sections)
+        - Sections 2..N cherry-pick onto the EXISTING pipeline/feature-<issue-number>
+        - [test-runner] runs after EACH code-producing section (catch regressions early)
+        - If test-runner fails → @fixer → re-run test-runner (tight loop, max 7 retries)
+        - If cherry-pick conflicts → @conflict-resolver → retry cherry-pick
+
+        For non-code sections:
+        - No branch creation, no cherry-pick, no test-runner
+        - Results captured and included in final PR description
  4. After ALL sections merged:
-       [qualimetry]              → jscpd syntactic duplication check
-                                   if fail → @implementer → re-run affected section's TDD
-       [finalization]            → Delegate to `agentic-pipeline-finalization` skill
+        [qualimetry]              → jscpd syntactic duplication check
+                                    if fail → @implementer → re-run affected section
+        [finalization]            → Delegate to `agentic-pipeline-finalization` skill
 ```
 
 ### Branch Strategy
