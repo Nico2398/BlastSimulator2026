@@ -173,3 +173,4 @@ Keep examples generic — domain-specific references lose meaning outside origin
 - [ ] No cross-file tight coupling (no step numbers, no "used by")
 - [ ] No user-input instructions
 - [ ] Correct file type for purpose
+- [ ] All 3 solution folders in sync (`.opencode`, `.claude`, `.github`) — same body content
