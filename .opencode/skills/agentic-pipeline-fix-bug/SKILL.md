@@ -20,9 +20,9 @@ description: >
    8. [finalization]            → Delegate to `agentic-pipeline-finalization` skill.
                                   Set `skip_refactorer=true` (bug fix — no refactoring phase).
                                   Runs code review → validator → open-pr.
-  9. @context-auditor          → Context audit
-                                  Validate context files against `agentic-context-edition` skill.
-                                  Report only — never modifies files.
+  9. @context-maintainer       → Context maintenance
+                                  Update context files to reflect project changes.
+                                  Do nothing if no project logic changed.
  10. [git-verify]              → (non-agentic) confirm clean state: git status, branch, last commits
 ```
 
@@ -35,7 +35,7 @@ description: >
 | @planner | @planner (self-retry) |
 | [qualimetry] | @implementer (big loop) |
 | finalization phase | See `agentic-pipeline-finalization` |
-| @context-auditor | Report findings, continue — never blocks pipeline |
+| @context-maintainer | Fix and commit, or do nothing — never blocks pipeline |
 | [git-verify] | Diagnose and fix — never proceed with dirty state |
 | Any × 7 | Human escalation: add PR/issue comment summarizing failure + history, then stop with `ESCALATED: human intervention required` |
 
