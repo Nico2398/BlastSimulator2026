@@ -22,10 +22,13 @@ description: >
  7. [visual-feedback-loop]    → Visual feedback loop (visual-change ONLY).
                                 Skip for backend-only features.
                                 Loop on failure — see "Visual Feedback Loop" below.
- 8. [qualimetry]              → jscpd syntactic duplication check
+  8. [qualimetry]              → jscpd syntactic duplication check
                                 if fail → @implementer (big loop)
- 9. [finalization]            → Delegate to `agentic-pipeline-finalization` skill
-10. [git-verify]              → confirm clean state: git status, branch, last commits
+  9. [finalization]            → Delegate to `agentic-pipeline-finalization` skill
+ 10. @maintainer               → Context maintainer check
+                                Validate context files against `context-edition` skill.
+                                Report only — never modifies files.
+ 11. [git-verify]              → confirm clean state: git status, branch, last commits
 ```
 
 **Retry counter:** resets at start of each full pipeline invocation. Nested pipeline skills each have their own counter.
@@ -38,6 +41,7 @@ description: >
 | [visual-feedback-loop] | See loop below — self-iterating |
 | [qualimetry] | @implementer (big loop) |
 | finalization phase | See `agentic-pipeline-finalization` |
+| @maintainer | Report findings, continue — never blocks pipeline |
 | [git-verify] | Diagnose and fix — never proceed with dirty state |
 | Any × 7 | Human escalation: add PR/issue comment summarizing failure + history, then stop with `ESCALATED: human intervention required` |
 

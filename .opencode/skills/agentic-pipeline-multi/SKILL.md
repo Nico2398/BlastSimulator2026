@@ -37,10 +37,13 @@ Use when the prompt mixes multiple task types.
          For non-code sections:
          - No branch creation, no cherry-pick, no test-runner
          - Results captured and included in final PR description
-  4. After ALL sections merged:
-         [qualimetry]              → jscpd syntactic duplication check
-                                     if fail → @implementer → re-run affected section
-         [finalization]            → Delegate to `agentic-pipeline-finalization` skill
+   4. After ALL sections merged:
+          [qualimetry]              → jscpd syntactic duplication check
+                                      if fail → @implementer → re-run affected section
+          [finalization]            → Delegate to `agentic-pipeline-finalization` skill
+          @maintainer               → Context maintainer check
+                                      Validate context files against `context-edition` skill.
+                                      Report only — never modifies files.
 ```
 
 ### Branch Strategy
