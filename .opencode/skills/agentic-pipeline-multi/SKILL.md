@@ -41,7 +41,7 @@ Use when the prompt mixes multiple task types.
           [qualimetry]              → jscpd syntactic duplication check
                                       if fail → @implementer → re-run affected section
           [finalization]            → Delegate to `agentic-pipeline-finalization` skill
-          @maintainer               → Context maintainer check
+          @context-auditor          → Context audit
                                       Validate context files against `agentic-context-edition` skill.
                                       Report only — never modifies files.
 ```

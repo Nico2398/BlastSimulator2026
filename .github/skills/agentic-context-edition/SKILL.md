@@ -77,7 +77,9 @@ Short skills enforce clean separation. A skill exceeding 500 lines likely mixes 
 
 Information lives in one place. Different context files refer to each other rather than duplicating content. This creates a single source of truth and prevents conflicting instructions across files.
 
-Example: two skills needing the same rule — put the rule in a dedicated reference file, both skills reference it.
+This applies to all content types: rules, requirements, specifications, validation criteria, checklists, and examples. If a concept is defined or specified in one file, other files reference it by name — they never restate its content.
+
+Example: two skills needing the same rule — put the rule in a dedicated reference file, both skills reference it. A validation agent checking context file quality references the `agentic-context-edition` skill rather than re-listing its requirements.
 
 ### No Tight Coupling
 
