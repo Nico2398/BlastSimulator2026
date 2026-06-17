@@ -16,11 +16,14 @@ description: >
  4. [branch-sanity]           → (non-agentic) verify on pipeline/feature-<N>
  5. [test-runner]             → run tests on feature branch; fail → @fixer loop
  6. [verify-commit]           → (non-agentic) confirm fix commit; auto-commit if dirty
- 7. [qualimetry]              → jscpd check; fail → @implementer (big loop)
-  8. [finalization]            → Delegate to `agentic-pipeline-finalization` skill.
-                                 Set `skip_refactorer=true` (bug fix — no refactoring phase).
-                                 Runs code review → validator → open-pr.
- 9. [git-verify]              → (non-agentic) confirm clean state: git status, branch, last commits
+  7. [qualimetry]              → jscpd check; fail → @implementer (big loop)
+   8. [finalization]            → Delegate to `agentic-pipeline-finalization` skill.
+                                  Set `skip_refactorer=true` (bug fix — no refactoring phase).
+                                  Runs code review → validator → open-pr.
+  9. @context-maintainer       → Context maintenance
+                                  Update context files to reflect project changes.
+                                  Do nothing if no project logic changed.
+ 10. [git-verify]              → (non-agentic) confirm clean state: git status, branch, last commits
 ```
 
 **Retry counter:** resets at start of each fix-bug pipeline invocation. Nested pipeline skills each have their own counter.
@@ -32,6 +35,7 @@ description: >
 | @planner | @planner (self-retry) |
 | [qualimetry] | @implementer (big loop) |
 | finalization phase | See `agentic-pipeline-finalization` |
+| @context-maintainer | Fix and commit, or do nothing — never blocks pipeline |
 | [git-verify] | Diagnose and fix — never proceed with dirty state |
 | Any × 7 | Human escalation: add PR/issue comment summarizing failure + history, then stop with `ESCALATED: human intervention required` |
 

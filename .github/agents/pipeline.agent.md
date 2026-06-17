@@ -79,6 +79,8 @@ Use when the prompt mixes multiple task types (e.g. bug fix + visual change + fe
       [test-runner]             → re-run full suite
       @validator                → Full validation: typecheck → tests → build
       @visual-tester            → Screenshot verification (if any section is visual-change)
+      @context-maintainer       → Update context files to reflect project changes.
+                                  Do nothing if no project logic changed.
       [open-pr]                 → Single PR from pipeline/feature-<N> to main.
                                   Use `--draft` when pr_status=draft.
 ```
@@ -144,8 +146,10 @@ Branch sanity checks and commit verifications run before/after each agent step t
 27. [visual-feedback-loop] → Visual feedback loop (visual-change ONLY).
                             Tight loop on feature branch, no branch isolation.
                             See "Visual Feedback Loop" section below.
-28. [verify-commit]           → (non-agentic) final commit check before PR
-29. [open-pr]            → (non-agentic) create PR from feature branch to main + READY TO MERGE.
+ 28. [verify-commit]           → (non-agentic) final commit check before PR
+ 29. @context-maintainer       → Update context files to reflect project changes.
+                                Do nothing if no project logic changed.
+ 30. [open-pr]            → (non-agentic) create PR from feature branch to main + READY TO MERGE.
                             Use `--draft` when pr_status=draft.
 
 ```
@@ -163,6 +167,7 @@ Every agent failure loops back — either to `@implementer` (outer loop) or self
 | @semantic-reviewer | @implementer |
 | @refactorer | @implementer |
 | @validator | @implementer |
+| @context-maintainer | Fix and commit, or do nothing — never blocks pipeline |
 | @visual-tester | @implementer |
 | Any node × 7 | Human escalation (interrupt) |
 
@@ -221,8 +226,10 @@ LOOP:
 22. Code review (parallel): @quality-reviewer + @security-reviewer + @i18n-reviewer + @duplication-reviewer + @semantic-reviewer
 23. [merge-findings]     → Orchestrator merges findings → pass/fail; fail → @implementer
 24. @validator           → typecheck → tests → build; fail → @implementer
-25. [verify-commit]           → (non-agentic) final commit check
-26. [open-pr]            → create PR from feature branch to main + READY TO MERGE.
+ 25. [verify-commit]           → (non-agentic) final commit check
+ 26. @context-maintainer       → Update context files to reflect project changes.
+                                Do nothing if no project logic changed.
+ 27. [open-pr]            → create PR from feature branch to main + READY TO MERGE.
                             Use `--draft` when pr_status=draft.
 ```
 
