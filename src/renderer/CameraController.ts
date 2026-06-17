@@ -39,6 +39,8 @@ export class CameraController {
 
   // Spherical coords relative to target
   private spherical: THREE.Spherical;
+  private defaultTarget: THREE.Vector3;
+  private defaultSpherical: THREE.Spherical;
 
   // Pan offset
   private panOffset: THREE.Vector3 = new THREE.Vector3();
@@ -67,6 +69,9 @@ export class CameraController {
     this.spherical.phi = THREE.MathUtils.clamp(this.spherical.phi, POLAR_MIN, POLAR_MAX);
     this.spherical.radius = THREE.MathUtils.clamp(this.spherical.radius, ZOOM_MIN, ZOOM_MAX);
 
+    this.defaultTarget = this.target.clone();
+    this.defaultSpherical = this.spherical.clone();
+
     this.attach();
     this.apply();
   }
@@ -86,6 +91,21 @@ export class CameraController {
     this.apply();
   }
   private _minHeight = -Infinity;
+
+  /** Set absolute yaw (degrees) and pitch (degrees above horizon). */
+  setOrbit(yawDeg: number, pitchDeg: number): void {
+    this.spherical.theta = THREE.MathUtils.degToRad(yawDeg);
+    const phi = THREE.MathUtils.degToRad(90 - pitchDeg);
+    this.spherical.phi = THREE.MathUtils.clamp(phi, POLAR_MIN, POLAR_MAX);
+    this.apply();
+  }
+
+  /** Reset camera to default position. */
+  reset(): void {
+    this.spherical.copy(this.defaultSpherical);
+    this.target.copy(this.defaultTarget);
+    this.apply();
+  }
 
   /** Detach all DOM listeners and release resources. */
   dispose(): void {

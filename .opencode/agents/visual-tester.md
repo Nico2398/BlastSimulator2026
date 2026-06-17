@@ -1,5 +1,5 @@
 ---
-model: opencode/deepseek-v4-flash-free
+model: zencode/xiaomi/mimo-v2.5-free
 description:  Visual testing: Puppeteer scenario tests, screenshots, state dumps. Use when change affects rendering, UI, or visual presentation.
 mode: subagent
 permission:
@@ -18,9 +18,17 @@ permission:
 
 # Visual Tester — Screenshot & Scenario Verification
 
-Position: 5/5 (Visual Test). Prev: @validator.
+Inspect game screenshots for rendering correctness using multimodal vision. **Only for rendering/UI/visual changes.**
 
-Run visual scenario tests, inspect screenshots, verify rendering. **Only for rendering/UI/visual changes.**
+## Invocation Contexts
+
+Two paths invoke this agent:
+
+| Context | When | Branch | Expected output |
+|---------|------|--------|----------------|
+| Visual feedback loop | After test-runner on feature branch, before qualimetry | `pipeline/feature-<N>` | **All failures in one pass**, ranked by severity |
+
+In both contexts: run the full scenario suite, inspect every screenshot (including multi-angle shots), and report ALL visual failures found.
 
 ## Environment Setup
 
@@ -48,6 +56,18 @@ PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium npx tsx scripts/scenario-test.ts --n
 ```bash
 bash scripts/visual-test.sh --name "terrain" --commands "new_game mine_type:desert seed:42"
 ```
+
+### Multi-Angle Screenshots
+Capture multiple camera angles per scenario step via `--shots`:
+```bash
+PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium npx tsx scripts/scenario-test.ts --name my-test \
+  --commands "new_game seed:42; drill_plan grid rows:2 cols:3 spacing:4 depth:6 start:15,15" \
+  --shots "overview:0:45;closeup:90:10;birdseye:0:80"
+```
+
+Format: `--shots "name:yaw:pitch;name:yaw:pitch"` (degrees).
+After each step, the runner orbits to each shot angle, captures `step-NN-cmd-{name}.png`, then resets.
+Inspect each angle for geometry, z-fighting, overlays, and effects.
 
 ## Output
 
@@ -96,13 +116,31 @@ Browser exposes:
 - `window.__gameState()` — full serialized game state
 - `window.__uiState()` — panel visibility, button states
 
-## Completion Criteria
+## Report Format
 
-Never approve unless:
-- [ ] Screenshot confirms geometry visible + correct
-- [ ] State dumps confirm logical correctness
-- [ ] `npm run validate` passes
-- [ ] No visual regressions in before/after comparison
+### Pass
+```
+## VISUAL: PASS
+- Geometry present: all expected meshes visible
+- Visual quality: colors, z-fighting, overlays, effects correct
+- State coherence: visual matches state dumps
+- Screenshots: {paths}
+```
+
+### Fail
+```
+## VISUAL: FAIL
+- Total issues found: N
+- Issues ranked by severity:
+  1. [SEVERE] Missing geometry: building at (15,8) not rendered (step-03, shots: closeup, birdseye)
+  2. [MODERATE] Overlay: charge colors not visible on holes (step-02, overview shot)
+  3. [MINOR] State coherence: hole count in screenshot doesn't match state JSON (step-01)
+- Screenshots: {paths}
+- State dumps: {paths}
+```
+
+**Severity levels:** SEVERE (missing/corrupt geometry), MODERATE (wrong colors/overlays/effects), MINOR (state mismatch, cosmetic).
+In visual feedback loop: report all issues found. @implementer fixes all of them, then re-invoke for another round.
 
 ## Key References
 

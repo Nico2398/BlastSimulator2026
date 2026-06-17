@@ -18,7 +18,7 @@ permission:
 
 # Validator — Full Suite Verification
 
-Position: 4/5 (Validate). Prev: @refactorer. Next: @visual-tester (visual only).
+Position: after @refactorer. Part of `agentic-pipeline-finalization`.
 
 Run complete validation suite. Report results.
 
@@ -74,21 +74,6 @@ For gameplay logic changes:
 npx tsx src/console.ts
 ```
 Spot-check: `new_game seed:42` → `state summary` → `drill_plan` → `blast` → `finances` → `scores`
-
-## Key References
-
-- `dev-testing-strategy` — test pyramid, coverage goals
-- `dev-architecture` — build system, project structure
-```bash
-npx tsx src/console.ts
-```
-
-Key spot-check commands:
-- `new_game seed:42` → `state summary`
-- `drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:15,15`
-- `blast`
-- `finances`
-- `scores`
 
 ## Key References
 
