@@ -23,20 +23,6 @@ The pipeline runs as an **Orchestrator Agent** (`pipeline` agent) invoked by the
 
 When triggered from GitHub Actions (`.github/workflows/opencode-runner.yml`), the opencode action runs the orchestrator non-interactively. The same pipeline also runs locally via `opencode run /resolve-issue`.
 
-## TDD Pipeline Steps
-
-The pipeline classifies each issue into a path, then runs the appropriate TDD sequence:
-
-| Path | Trigger | Description |
-|------|---------|-------------|
-| Full feature | feature, implement, add | Plan → Test (Red) → Implement (Green) → Quality gates → Code review → Refactor → Validate → PR |
-| Bug fix | bug, fix, broken, regression | Plan → Unit test → Implement → Quality gates → Code review → Validate → PR |
-| Visual change | rendering, UI, canvas | Full feature + visual verification before PR |
-| PR review | review, LGTM | Audit PR → pass/fail report |
-| Investigate | why, how, explain, analyze | Read-only exploration → END |
-
-Each TDD step follows the standard Red-Green-Refactor cycle. The specific agents and their granularity may evolve — the pipeline is defined by the sequence, not the agent count.
-
 ## Git & GitHub Operations (Fixed)
 
 Unlike agent granularity, the following git and GitHub operations are hard invariants of the pipeline and must be implemented by both execution models.
@@ -67,32 +53,11 @@ main
 
 The implementation commit is cherry-picked from the impl branch onto the feature branch. If conflicts arise, a conflict resolver agent reads the conflicted files, merges both sides, removes conflict markers, and stages the resolved files. On resolution failure, the implementer re-runs.
 
-### Quality Gates (after cherry-pick)
-
-After the code lands on the feature branch, these gates run in sequence:
-1. **Test runner** (non-agentic) — run test suite, pass → continue, fail → fixer loop
-2. **Duplication check** (non-agentic) — jscpd syntactic clone detection, fail → back to implementer
-3. **Code review fan-out** (agentic, parallel) — specialized sub-reviewers by risk tier:
-   - `security_reviewer` — exploitable vulnerabilities (full tier)
-   - `quality_reviewer` — architecture, naming intent, coding conventions, TypeScript strictness (all tiers)
-   - `i18n_reviewer` — hardcoded strings, locale mismatches (lite + full tiers)
-   - `duplication_reviewer` — semantic duplication, non-atomic functions, generic code placement (lite + full tiers)
-4. **Review coordinator** (agentic) — merges sub-reviewer findings, final pass/fail
-5. **Refactor** — clean up conventions, no behavior change
-6. **Validator** — full suite: TypeScript → tests → build
-7. **Visual verification** (visual changes only) — screenshot comparison
-
-### PR Creation
-
-Create a pull request from `pipeline/feature-<issue-number>` to `main` with:
-- Title prefixed by pipeline type (`feat:`, `fix:`, `docs:`)
-- Body includes `Closes #<issue_number>`, validation checklist, and `READY TO MERGE` on its own line
-- Labels updated: `in-progress` removed, `in-review` added
-
-This operation is always non-agentic (no LLM involved).
+For detailed pipeline steps (quality gates, code review, refactoring, validation, PR creation), see the individual pipeline skills:
+- `agentic-pipeline-full` — Full feature/visual-change pipeline
+- `agentic-pipeline-fix-bug` — Bug fix pipeline
+- `agentic-pipeline-finalization` — Final quality gates through PR
 
 ### Auto-Merge
 
-The agent includes `READY TO MERGE` in the PR body. The `auto-assign-next.yml` workflow (triggered on `pull_request: [opened, synchronize]`) detects this and enables GitHub native auto-merge via a PAT token. The merge is attributed to the PAT, so the downstream `pull_request: [closed]` event triggers `auto-assign-next.yml` to close the issue and dispatch the next task.
-
-Skip `READY TO MERGE` when the issue requires human input or the orchestrator judges the pipeline hit significant churn (repeated failure loops, heavy review findings, multiple implementer do-overs). Post a PR comment with the reason.
+The orchestrator includes `READY TO MERGE` in the PR body when PR status is `ready`. The `auto-assign-next.yml` workflow (triggered on `pull_request: [opened, synchronize]`) detects this and enables GitHub native auto-merge via a PAT token. See `agentic-pipeline-pr-management` for draft vs ready logic.

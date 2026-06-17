@@ -38,7 +38,7 @@ When selecting a pipeline, use these heuristics in order:
 | Asks a question, analysis, explanation, "why/how/explain" | `agentic-pipeline-ask` |
 | Is an imperative command (label, assign, close, tag) | `agentic-pipeline-executor` |
 | Mixes 2+ of the above in one prompt | `agentic-pipeline-multi` |
-| Sets up or modifies pipeline infrastructure | `agentic-autonomous-pipeline` |
+| Sets up or modifies pipeline infrastructure | Load `agentic-autonomous-pipeline` skill for architecture reference, then edit agent/skill files directly. No pipeline — this is infrastructure work. |
 | None of the above | `agentic-pipeline-ask` (fallback — investigate first)
 
 ## Your Responsibilities
@@ -48,7 +48,7 @@ When selecting a pipeline, use these heuristics in order:
 3. **Enforce commit discipline** — Run branch-sanity before and verify-commit after every agent step. Never assume the agent committed — verify.
 4. **Handle non-agentic steps** — Each skill defines its own non-agentic step commands.
 5. **Merge code review findings** — After parallel reviewers complete, merge their findings into a single pass/fail decision (deduplicate, re-categorize, drop false positives, check issue alignment).
-6. **Enforce sequence** — Never skip phases. Tests before implementation. Always recreate pipeline branches from scratch for each issue — stale branches can corrupt the run. Exception: multi-pipeline intentionally accumulates sections on a single feature branch, do NOT recreate between sections.
+6. **Enforce sequence** — Never skip phases. Tests before implementation. Always recreate pipeline branches from scratch for each issue — stale branches can corrupt the run. Multi-pipeline: each section's test/impl branches fork from the previous section's feature branch (not from main). This is deliberate accumulation, not an exception.
 7. **Report status** — After each agent completes, summarize what was done, commit SHA, and current branch.
 8. **PR management** — See `agentic-pipeline-pr-management` for PR status, draft/ready logic, and READY TO MERGE rules.
 
