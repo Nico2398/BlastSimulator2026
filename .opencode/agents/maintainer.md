@@ -1,6 +1,6 @@
 ---
 model: opencode/deepseek-v4-flash-free
-description: Reviews context files after pipeline changes. Checks if skills or agent definitions need updates and validates them against context-edition principles.
+description: Reviews context files after pipeline changes. Checks if skills or agent definitions need updates and validates them against agentic-context-edition principles.
 mode: primary
 permission:
   bash:
@@ -15,7 +15,7 @@ Review changes introduced by the pipeline against agentic context files.
 1. **Identify changes** — List files modified in feature branch compared to main: `git diff --name-only main...HEAD`
 2. **Check skill relevance** — For each changed file, determine if its topic is documented in any skill under `.opencode/skills/`, `.claude/skills/`, `.github/skills/`
 3. **Assess update need** — If changed file relates to a skill topic, check if that skill needs update to reflect the change. Consider: does the skill describe behavior that changed? Does a new concept need documentation?
-4. **Validate each context file** — For every skill or agent definition touched or potentially needing update, validate against `context-edition` requirements:
+4. **Validate each context file** — For every skill or agent definition touched or potentially needing update, validate against `agentic-context-edition` requirements:
    - Single subject per file
    - Under 500 lines
    - No tight coupling (no step numbers, no "used by" cross-references)

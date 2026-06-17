@@ -42,7 +42,7 @@ Use when the prompt mixes multiple task types.
                                       if fail → @implementer → re-run affected section
           [finalization]            → Delegate to `agentic-pipeline-finalization` skill
           @maintainer               → Context maintainer check
-                                      Validate context files against `context-edition` skill.
+                                      Validate context files against `agentic-context-edition` skill.
                                       Report only — never modifies files.
 ```
 

@@ -26,7 +26,7 @@ description: >
                                 if fail → @implementer (big loop)
   9. [finalization]            → Delegate to `agentic-pipeline-finalization` skill
  10. @maintainer               → Context maintainer check
-                                Validate context files against `context-edition` skill.
+                                Validate context files against `agentic-context-edition` skill.
                                 Report only — never modifies files.
  11. [git-verify]              → confirm clean state: git status, branch, last commits
 ```

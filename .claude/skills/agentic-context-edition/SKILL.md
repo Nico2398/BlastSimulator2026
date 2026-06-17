@@ -1,5 +1,5 @@
 ---
-name: context-edition
+name: agentic-context-edition
 description: >
   Create and edit agentic context files (skills, agent definitions, slash commands, data files)
   across all agent standards (Copilot, Claude Code, OpenCode). Covers file structure,

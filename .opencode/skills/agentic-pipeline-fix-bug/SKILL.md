@@ -21,7 +21,7 @@ description: >
                                   Set `skip_refactorer=true` (bug fix — no refactoring phase).
                                   Runs code review → validator → open-pr.
   9. @maintainer               → Context maintainer check
-                                  Validate context files against `context-edition` skill.
+                                  Validate context files against `agentic-context-edition` skill.
                                   Report only — never modifies files.
  10. [git-verify]              → (non-agentic) confirm clean state: git status, branch, last commits
 ```
