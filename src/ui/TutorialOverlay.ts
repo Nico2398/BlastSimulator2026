@@ -26,8 +26,7 @@ export class TutorialOverlay {
   private readonly stepCounter: HTMLElement;
   private readonly progressEl: HTMLElement;
   private readonly commandsHint: HTMLElement;
-  private readonly skipBtn: HTMLElement;
-  private readonly nextBtn: HTMLElement;
+  private highlightedEl: HTMLElement | null = null;
   private _active = false;
   private _executingCommands = false;
   private stepIndex = 0;
@@ -62,24 +61,12 @@ export class TutorialOverlay {
     this.commandsHint.className = 'bs-tutorial-commands';
     this.commandsHint.style.display = 'none';
 
-    this.skipBtn = document.createElement('button');
-    this.skipBtn.className = 'bs-btn bs-btn-danger bs-btn-skip';
-    this.skipBtn.textContent = t('tutorial.skip');
-    this.skipBtn.addEventListener('click', () => this.skip());
-
-    this.nextBtn = document.createElement('button');
-    this.nextBtn.className = 'bs-btn bs-btn-primary';
-    this.nextBtn.textContent = t('tutorial.next');
-    this.nextBtn.addEventListener('click', () => this.advanceToNextStep());
-
     this.box.append(
       this.titleEl,
       this.textEl,
       this.stepCounter,
       this.progressEl,
       this.commandsHint,
-      this.skipBtn,
-      this.nextBtn,
     );
     this.overlay.appendChild(this.box);
     container.appendChild(this.overlay);
@@ -119,8 +106,9 @@ export class TutorialOverlay {
   }
 
   dispose(): void {
-    this.clearPollTimer();
-    this.clearAutoAdvanceTimer();
+    this.clearHighlight();
+    this.clearTimer('pollTimer');
+    this.clearTimer('autoAdvanceTimer');
     this.overlay.remove();
   }
 
@@ -146,8 +134,8 @@ export class TutorialOverlay {
   private advanceOneStep(render: boolean): void {
     if (this.stepIndex >= TOTAL_TUTORIAL_STEPS - 1) {
       if (render && this._active) {
-        this.clearPollTimer();
-        this.clearAutoAdvanceTimer();
+        this.clearTimer('pollTimer');
+        this.clearTimer('autoAdvanceTimer');
         this.render();
         this.autoAdvanceTimer = setTimeout(() => this.finish(), CONGRATULATIONS_DISPLAY_MS);
         return;
@@ -155,7 +143,7 @@ export class TutorialOverlay {
       this.finish();
       return;
     }
-    this.clearPollTimer();
+    this.clearTimer('pollTimer');
     this.stepIndex++;
 
     // Execute commands for the new step — guarded against re-entrancy
@@ -194,8 +182,9 @@ export class TutorialOverlay {
   }
 
   private finish(): void {
-    this.clearPollTimer();
-    this.clearAutoAdvanceTimer();
+    this.clearHighlight();
+    this.clearTimer('pollTimer');
+    this.clearTimer('autoAdvanceTimer');
     this.snapshots = {};
     this._active = false;
     if (this.gameState) {
@@ -218,7 +207,7 @@ export class TutorialOverlay {
       this.snapshots = step.captureSnapshot(this.gameState);
     }
 
-    this.clearAutoAdvanceTimer();
+    this.clearTimer('autoAdvanceTimer');
 
     if (step.autoAdvanceMs !== undefined && step.autoAdvanceMs > 0) {
       this.autoAdvanceTimer = setTimeout(() => {
@@ -227,17 +216,8 @@ export class TutorialOverlay {
     }
   }
 
-  /** Identical pattern to {@link clearPollTimer} — could be merged into a
-   *  single `clearTimer(ref)` helper if another timer type is added. */
-  private clearAutoAdvanceTimer(): void {
-    if (this.autoAdvanceTimer !== null) {
-      clearTimeout(this.autoAdvanceTimer);
-      this.autoAdvanceTimer = null;
-    }
-  }
-
   private schedulePollTimer(): void {
-    this.clearPollTimer();
+    this.clearTimer('pollTimer');
     if (!this._active) return;
     this.pollTimer = setTimeout(() => {
       this.pollTimer = null;
@@ -251,10 +231,23 @@ export class TutorialOverlay {
     }, POLL_INTERVAL_MS);
   }
 
-  private clearPollTimer(): void {
-    if (this.pollTimer !== null) {
-      clearTimeout(this.pollTimer);
-      this.pollTimer = null;
+  private clearHighlight(): void {
+    if (this.highlightedEl) {
+      this.highlightedEl.classList.remove('bs-tutorial-highlight');
+      this.highlightedEl = null;
+    }
+  }
+
+  /** Unified helper — clears the referenced timeout and resets it to null. */
+  private clearTimer(timerName: 'autoAdvanceTimer' | 'pollTimer'): void {
+    const timer = timerName === 'autoAdvanceTimer' ? this.autoAdvanceTimer : this.pollTimer;
+    if (timer !== null) {
+      clearTimeout(timer);
+      if (timerName === 'autoAdvanceTimer') {
+        this.autoAdvanceTimer = null;
+      } else {
+        this.pollTimer = null;
+      }
     }
   }
 
@@ -267,12 +260,18 @@ export class TutorialOverlay {
 
     // TODO: use i18n t('tutorial.progress', { current, total }) once locale values have {current}/{total} placeholders
     this.stepCounter.textContent = `${this.stepIndex + 1} / ${TOTAL_TUTORIAL_STEPS}`;
+    this.clearHighlight();
 
     const progress = ((this.stepIndex + 1) / TOTAL_TUTORIAL_STEPS) * 100;
     this.progressEl.style.width = `${progress}%`;
 
-    const hasAutoAdvance = step.autoAdvanceMs !== undefined && step.autoAdvanceMs > 0;
-    this.nextBtn.style.display = hasAutoAdvance ? 'none' : '';
+    if (step.highlightTarget) {
+      const target = document.querySelector(step.highlightTarget) as HTMLElement | null;
+      if (target) {
+        target.classList.add('bs-tutorial-highlight');
+        this.highlightedEl = target;
+      }
+    }
 
     if (step.commands && step.commands.length > 0) {
       this.commandsHint.style.display = '';
