@@ -490,6 +490,10 @@ const CSS = `
   max-width: 380px;
   box-shadow: 0 4px 20px rgba(0,0,0,0.7);
 }
+
+/* ─── Tutorial highlight ─── */
+.bs-tutorial-highlight { }
+@keyframes bs-tutorial-pulse { }
 `;
 
 let injected = false;

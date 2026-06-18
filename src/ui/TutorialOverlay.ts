@@ -26,8 +26,7 @@ export class TutorialOverlay {
   private readonly stepCounter: HTMLElement;
   private readonly progressEl: HTMLElement;
   private readonly commandsHint: HTMLElement;
-  private readonly skipBtn: HTMLElement;
-  private readonly nextBtn: HTMLElement;
+  private highlightedEl: HTMLElement | null = null;
   private _active = false;
   private _executingCommands = false;
   private stepIndex = 0;
@@ -62,24 +61,12 @@ export class TutorialOverlay {
     this.commandsHint.className = 'bs-tutorial-commands';
     this.commandsHint.style.display = 'none';
 
-    this.skipBtn = document.createElement('button');
-    this.skipBtn.className = 'bs-btn bs-btn-danger bs-btn-skip';
-    this.skipBtn.textContent = t('tutorial.skip');
-    this.skipBtn.addEventListener('click', () => this.skip());
-
-    this.nextBtn = document.createElement('button');
-    this.nextBtn.className = 'bs-btn bs-btn-primary';
-    this.nextBtn.textContent = t('tutorial.next');
-    this.nextBtn.addEventListener('click', () => this.advanceToNextStep());
-
     this.box.append(
       this.titleEl,
       this.textEl,
       this.stepCounter,
       this.progressEl,
       this.commandsHint,
-      this.skipBtn,
-      this.nextBtn,
     );
     this.overlay.appendChild(this.box);
     container.appendChild(this.overlay);
@@ -119,6 +106,7 @@ export class TutorialOverlay {
   }
 
   dispose(): void {
+    this.clearHighlight();
     this.clearPollTimer();
     this.clearAutoAdvanceTimer();
     this.overlay.remove();
@@ -194,6 +182,7 @@ export class TutorialOverlay {
   }
 
   private finish(): void {
+    this.clearHighlight();
     this.clearPollTimer();
     this.clearAutoAdvanceTimer();
     this.snapshots = {};
@@ -258,6 +247,12 @@ export class TutorialOverlay {
     }
   }
 
+  private clearHighlight(): void {
+    if (this.highlightedEl) {
+      this.highlightedEl = null;
+    }
+  }
+
   private render(): void {
     const step = TUTORIAL_STEPS[this.stepIndex];
     if (!step) return;
@@ -267,12 +262,14 @@ export class TutorialOverlay {
 
     // TODO: use i18n t('tutorial.progress', { current, total }) once locale values have {current}/{total} placeholders
     this.stepCounter.textContent = `${this.stepIndex + 1} / ${TOTAL_TUTORIAL_STEPS}`;
+    this.clearHighlight();
 
     const progress = ((this.stepIndex + 1) / TOTAL_TUTORIAL_STEPS) * 100;
     this.progressEl.style.width = `${progress}%`;
 
-    const hasAutoAdvance = step.autoAdvanceMs !== undefined && step.autoAdvanceMs > 0;
-    this.nextBtn.style.display = hasAutoAdvance ? 'none' : '';
+    if (step.highlightTarget) {
+      // TODO: implement element highlighting
+    }
 
     if (step.commands && step.commands.length > 0) {
       this.commandsHint.style.display = '';

@@ -23,6 +23,7 @@ export interface TutorialStep {
   autoAdvanceMs?: number;
   captureSnapshot?: ((state: GameState) => Record<string, unknown>) | undefined;
   isComplete: (state: GameState, snapshot: Record<string, unknown>) => boolean;
+  highlightTarget?: string;
 }
 
 export const TUTORIAL_STEPS: TutorialStep[] = [
