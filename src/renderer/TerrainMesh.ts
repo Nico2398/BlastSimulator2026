@@ -84,7 +84,7 @@ export class TerrainMesh {
     this.material = new THREE.MeshPhongMaterial({
       vertexColors: true,
       shininess: 12,
-      side: THREE.FrontSide,
+      side: THREE.DoubleSide,
     });
   }
 

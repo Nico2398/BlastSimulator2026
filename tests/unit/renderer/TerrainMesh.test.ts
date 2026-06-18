@@ -145,6 +145,23 @@ describe('TerrainMesh', () => {
     expect(elapsed).toBeLessThan(200);
     tm.dispose();
   });
+
+  it('material uses DoubleSide so terrain is visible from below', () => {
+    const scene = makeScene();
+    const grid = new VoxelGrid(8, 8, 8);
+    // Fill bottom half solid, top half air — creates mesh
+    for (let x = 0; x < 8; x++)
+      for (let y = 0; y < 4; y++)
+        for (let z = 0; z < 8; z++)
+          grid.setVoxel(x, y, z, makeSolidVoxel());
+    const tm = new TerrainMesh(scene, grid);
+    tm.buildAll();
+    const mesh = scene.children.find(c => c instanceof THREE.Mesh) as THREE.Mesh;
+    expect(mesh).toBeDefined();
+    const mat = mesh.material as THREE.MeshPhongMaterial;
+    expect(mat.side).toBe(THREE.DoubleSide);
+    tm.dispose();
+  });
 });
 
 // ─── Survey Confidence Overlay ──────────────────────────────────────────────────
