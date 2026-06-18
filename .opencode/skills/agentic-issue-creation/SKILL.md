@@ -43,6 +43,7 @@ Use when creating GitHub issues that will be picked up by autonomous coding agen
 7. **Context section must explain the "why"** — what feature, what phase, what goal.
 8. **Single task per issue.** If a task touches multiple concerns, split it.
 9. **SMART compliance.** Every issue must be SMART: Specific (one clear goal), Measurable (verifiable outcome), Achievable (within agent's capabilities), Relevant (part of the larger feature), Time-bound (single atomic task, not open-ended).
+10. **Labels required.** Every issue must have `agent-task` and `ready` labels applied via `gh issue edit <number> --add-label "agent-task" --add-label "ready"` after creation.
 
 ## Checklist
 
@@ -53,4 +54,5 @@ Use when creating GitHub issues that will be picked up by autonomous coding agen
 - [ ] Blocked by section references dependencies with issue numbers
 - [ ] Verification section has concrete, testable criteria
 - [ ] SMART criteria are respected (specific, measurable, achievable, relevant, time-bound)
+- [ ] Labels `agent-task` and `ready` applied after creation
 
