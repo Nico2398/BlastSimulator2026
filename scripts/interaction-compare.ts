@@ -262,8 +262,7 @@ export function parseCompareArgs(): CompareOptions {
     process.exit(1);
   }
 
-  const result: CompareOptions = { baselineDir, targetDir, outputDir };
-  if (threshold !== undefined) result.threshold = threshold;
+  const result: CompareOptions = { baselineDir, targetDir, outputDir, threshold: threshold ?? 0.01 };
   return result;
 }
 
@@ -284,12 +283,10 @@ export async function compareDirectories(options: CompareOptions): Promise<Compa
 
   // Validate directories exist
   if (!existsSync(baselineDir)) {
-    console.error(`Baseline directory not found: ${baselineDir}`);
-    process.exit(1);
+    throw new Error(`Baseline directory not found: ${baselineDir}`);
   }
   if (!existsSync(targetDir)) {
-    console.error(`Target directory not found: ${targetDir}`);
-    process.exit(1);
+    throw new Error(`Target directory not found: ${targetDir}`);
   }
 
   mkdirSync(outputDir, { recursive: true });

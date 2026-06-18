@@ -347,8 +347,7 @@ export async function replayInteraction(options: ReplayOptions): Promise<void> {
   // Validate recording path
   const recordingPath = resolve(process.cwd(), options.recordingPath);
   if (!existsSync(recordingPath)) {
-    console.error(`Recording file not found: ${recordingPath}`);
-    process.exit(1);
+    throw new Error(`Recording file not found: ${recordingPath}`);
   }
 
   // Load and parse recording
@@ -357,18 +356,14 @@ export async function replayInteraction(options: ReplayOptions): Promise<void> {
   try {
     recording = JSON.parse(rawRecording) as InteractionRecording;
   } catch {
-    console.error(`Invalid recording JSON: ${recordingPath}`);
-    process.exit(1);
-    return;
+    throw new Error(`Invalid recording JSON: ${recordingPath}`);
   }
 
   // Validate format version
   if (recording.meta.formatVersion !== EXPECTED_FORMAT_VERSION) {
-    console.error(
+    throw new Error(
       `Unsupported recording format version: ${recording.meta.formatVersion}. Expected: ${EXPECTED_FORMAT_VERSION}`,
     );
-    process.exit(1);
-    return;
   }
 
   // Set up output directory
