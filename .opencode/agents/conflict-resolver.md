@@ -1,5 +1,5 @@
 ---
-model: opencode/deepseek-v4-flash-free
+model: opencode/mimo-v2.5-free
 description:  Resolves git cherry-pick merge conflicts. Reads conflicted files, merges both sides, removes conflict markers, stages resolved files.
 mode: subagent
 permission:

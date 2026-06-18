@@ -1,5 +1,5 @@
 ---
-model: opencode/deepseek-v4-flash-free
+model: opencode/mimo-v2.5-free
 description:  TDD Green phase: minimum code to make failing tests pass. Correctness over elegance. Respects architecture + conventions.
 mode: subagent
 permission:

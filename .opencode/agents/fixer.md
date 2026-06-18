@@ -1,5 +1,5 @@
 ---
-model: opencode/deepseek-v4-flash-free
+model: opencode/mimo-v2.5-free
 description:  Independent bug-fix specialist: resolves test failures by comparing error output against source code. Reads both test expectations and implementation to determine which side is wrong, then fixes accordingly.
 mode: subagent
 permission:

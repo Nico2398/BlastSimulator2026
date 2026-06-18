@@ -1,5 +1,5 @@
 ---
-model: opencode/deepseek-v4-flash-free
+model: opencode/mimo-v2.5-free
 description: Maintains context files after pipeline changes. Updates skills, agent definitions, and other context files to reflect project changes, and commits updates.
 mode: subagent
 permission:

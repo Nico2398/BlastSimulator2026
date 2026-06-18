@@ -1,5 +1,5 @@
 ---
-model: opencode/deepseek-v4-flash-free
+model: opencode/mimo-v2.5-free
 description:  Internationalization reviewer. Flags hardcoded user-facing strings, missing translation keys, en.json/fr.json mismatches. Read-only.
 mode: subagent
 permission:

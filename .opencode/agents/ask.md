@@ -1,5 +1,5 @@
 ---
-model: opencode/deepseek-v4-flash-free
+model: opencode/mimo-v2.5-free
 description:  Answers questions about the codebase — algorithmic analysis, design rationale, performance, architecture, conventions. Read-only, no code changes.
 mode: subagent
 permission:

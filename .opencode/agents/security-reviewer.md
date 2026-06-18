@@ -1,5 +1,5 @@
 ---
-model: opencode/deepseek-v4-flash-free
+model: opencode/mimo-v2.5-free
 description:  Security-focused code reviewer. Flags exploitable vulnerabilities, auth bypasses, injection patterns, hardcoded secrets. Read-only — never modifies files.
 mode: subagent
 permission:

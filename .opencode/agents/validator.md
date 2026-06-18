@@ -1,5 +1,5 @@
 ---
-model: opencode/deepseek-v4-flash-free
+model: opencode/mimo-v2.5-free
 description:  Validation specialist: runs full test suite, type checking, build. Detects regressions, type errors, build failures. Reports pass/fail with actionable diagnostics.
 mode: subagent
 permission:
