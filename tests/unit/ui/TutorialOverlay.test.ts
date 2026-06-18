@@ -52,8 +52,6 @@ describe('TutorialOverlay (12.4)', () => {
       expect(container.querySelector('.bs-panel-title')).not.toBeNull();
       expect(container.querySelector('.bs-panel-text')).not.toBeNull();
       expect(container.querySelector('.bs-tutorial-progress')).not.toBeNull();
-      expect(container.querySelector('.bs-btn-skip')).not.toBeNull();
-      expect(container.querySelector('.bs-btn-primary')).not.toBeNull();
     });
 
     it('isActive returns false before start()', () => {
@@ -212,14 +210,13 @@ describe('TutorialOverlay (12.4)', () => {
   });
 
   describe('next button and commands hint', () => {
-    it('shows next button for manual steps (no autoAdvanceMs) and hides for auto-advance steps', () => {
+    it('does NOT render skip or next buttons for any step', () => {
       const tut = new TutorialOverlay(container);
       overlay = tut;
       tut.start(createMockState());
 
-      const nextBtn = container.querySelector('.bs-btn-primary') as HTMLElement;
-      expect(nextBtn).not.toBeNull();
-      expect(nextBtn.style.display).not.toBe('none');
+      expect(container.querySelector('.bs-btn-skip')).toBeNull();
+      expect(container.querySelector('.bs-btn-primary')).toBeNull();
     });
 
     it('shows commands hint element when step has commands array', () => {
@@ -240,6 +237,109 @@ describe('TutorialOverlay (12.4)', () => {
 
       expect(hintEl.style.display).not.toBe('none');
       expect(hintEl.textContent).toBe('survey seismic');
+    });
+  });
+
+  describe('highlight system', () => {
+    it('clearHighlight safely handles null highlightedEl', () => {
+      const tut = new TutorialOverlay(container) as any;
+      overlay = tut;
+      expect(() => tut.clearHighlight()).not.toThrow();
+    });
+
+    it('render() applies highlight class to element matching highlightTarget', () => {
+      const tut = new TutorialOverlay(container) as any;
+      overlay = tut;
+      // Create a target element matching the highlight target for step 0
+      const target = document.createElement('div');
+      target.className = 'bs-speed-btn';
+      const hudTop = document.createElement('div');
+      hudTop.id = 'bs-hud-top';
+      hudTop.appendChild(target);
+      document.body.appendChild(hudTop);
+
+      tut.start(createMockState());
+      // Step 0 (time-speed) has highlightTarget '#bs-hud-top .bs-speed-btn'
+      expect(target.classList.contains('bs-tutorial-highlight')).toBe(true);
+      hudTop.remove();
+    });
+
+    it('highlight is cleared when advancing to next step', () => {
+      const tut = new TutorialOverlay(container) as any;
+      overlay = tut;
+      const target = document.createElement('div');
+      target.className = 'bs-speed-btn';
+      const hudTop = document.createElement('div');
+      hudTop.id = 'bs-hud-top';
+      hudTop.appendChild(target);
+      document.body.appendChild(hudTop);
+
+      tut.start(createMockState());
+      expect(target.classList.contains('bs-tutorial-highlight')).toBe(true);
+
+      // Advance by completing step 0 (time-speed: increase timeScale)
+      const state = createMockState();
+      state.timeScale = 2;
+      tut.onCommandExecuted(state);
+      // After advancing, highlight should be removed from old element
+      // (and new highlight may be applied if new step has target)
+      expect(target.classList.contains('bs-tutorial-highlight')).toBe(false);
+      hudTop.remove();
+    });
+
+    it('highlight is cleared on tutorial skip/finish', () => {
+      const tut = new TutorialOverlay(container) as any;
+      overlay = tut;
+      const target = document.createElement('div');
+      target.className = 'bs-speed-btn';
+      const hudTop = document.createElement('div');
+      hudTop.id = 'bs-hud-top';
+      hudTop.appendChild(target);
+      document.body.appendChild(hudTop);
+
+      tut.start(createMockState());
+      expect(target.classList.contains('bs-tutorial-highlight')).toBe(true);
+
+      tut.skip();
+      expect(target.classList.contains('bs-tutorial-highlight')).toBe(false);
+      hudTop.remove();
+    });
+
+    it('highlight is cleared on dispose', () => {
+      const tut = new TutorialOverlay(container) as any;
+      overlay = tut;
+      const target = document.createElement('div');
+      target.className = 'bs-speed-btn';
+      const hudTop = document.createElement('div');
+      hudTop.id = 'bs-hud-top';
+      hudTop.appendChild(target);
+      document.body.appendChild(hudTop);
+
+      tut.start(createMockState());
+      expect(target.classList.contains('bs-tutorial-highlight')).toBe(true);
+
+      tut.dispose();
+      overlay = null;
+      expect(target.classList.contains('bs-tutorial-highlight')).toBe(false);
+      hudTop.remove();
+    });
+
+    it('highlightTarget with undefined selector does not throw', () => {
+      // Step 22 (congratulations) has no highlightTarget
+      const tut = new TutorialOverlay(container) as any;
+      overlay = tut;
+      tut.stepIndex = 22;
+      expect(() => tut.render()).not.toThrow();
+    });
+
+    it('highlightTarget pointing to non-existent element does not throw', () => {
+      // Create a step whose highlightTarget won't be in DOM
+      (TUTORIAL_STEPS[0] as any).highlightTarget = '#non-existent-element';
+      const tut = new TutorialOverlay(container) as any;
+      overlay = tut;
+      expect(() => tut.render()).not.toThrow();
+      // Restore
+      delete (TUTORIAL_STEPS[0] as any).highlightTarget;
     });
   });
 

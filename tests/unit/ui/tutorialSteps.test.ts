@@ -206,4 +206,44 @@ describe('tutorialSteps', () => {
     expect(step22.titleKey).toBe('tutorial.complete_title');
     expect(step22.textKey).toBe('tutorial.complete_text');
   });
+
+  // ── 16 ───────────────────────────────────────────────────────────────────
+  it('every step has highlightTarget as either string or undefined', () => {
+    for (const step of TUTORIAL_STEPS) {
+      if (step.highlightTarget !== undefined) {
+        expect(typeof step.highlightTarget).toBe('string');
+        expect(step.highlightTarget.length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  // ── 17 ───────────────────────────────────────────────────────────────────
+  it('steps with meaningful UI target have a highlightTarget defined', () => {
+    // Steps that should definitely have highlight targets
+    const stepsWithTarget = new Set([
+      'time-speed', 'hire-surveyor', 'survey', 'hire-driller',
+      'drill-plan', 'charge', 'sequence', 'blast',
+      'scores', 'event-fire-resolve', 'hire-manager', 'contract-accept',
+      'hire-driver', 'vehicle-buy-assign', 'build-storage', 'contract-deliver',
+      'finances', 'build-ramp', 'needs', 'tick-advance',
+    ]);
+    for (const step of TUTORIAL_STEPS) {
+      if (stepsWithTarget.has(step.id)) {
+        expect(step.highlightTarget,
+          `Step "${step.id}" should have a highlightTarget`
+        ).toBeDefined();
+      }
+    }
+  });
+
+  // ── 18 ───────────────────────────────────────────────────────────────────
+  it('highlightTarget starts with # for CSS selector syntax', () => {
+    for (const step of TUTORIAL_STEPS) {
+      if (step.highlightTarget) {
+        expect(step.highlightTarget.startsWith('#'),
+          `Step "${step.id}" highlightTarget "${step.highlightTarget}" should start with #`
+        ).toBe(true);
+      }
+    }
+  });
 });
