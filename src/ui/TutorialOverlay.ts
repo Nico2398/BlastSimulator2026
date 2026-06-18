@@ -107,8 +107,8 @@ export class TutorialOverlay {
 
   dispose(): void {
     this.clearHighlight();
-    this.clearPollTimer();
-    this.clearAutoAdvanceTimer();
+    this.clearTimer('pollTimer');
+    this.clearTimer('autoAdvanceTimer');
     this.overlay.remove();
   }
 
@@ -134,8 +134,8 @@ export class TutorialOverlay {
   private advanceOneStep(render: boolean): void {
     if (this.stepIndex >= TOTAL_TUTORIAL_STEPS - 1) {
       if (render && this._active) {
-        this.clearPollTimer();
-        this.clearAutoAdvanceTimer();
+        this.clearTimer('pollTimer');
+        this.clearTimer('autoAdvanceTimer');
         this.render();
         this.autoAdvanceTimer = setTimeout(() => this.finish(), CONGRATULATIONS_DISPLAY_MS);
         return;
@@ -143,7 +143,7 @@ export class TutorialOverlay {
       this.finish();
       return;
     }
-    this.clearPollTimer();
+    this.clearTimer('pollTimer');
     this.stepIndex++;
 
     // Execute commands for the new step — guarded against re-entrancy
@@ -183,8 +183,8 @@ export class TutorialOverlay {
 
   private finish(): void {
     this.clearHighlight();
-    this.clearPollTimer();
-    this.clearAutoAdvanceTimer();
+    this.clearTimer('pollTimer');
+    this.clearTimer('autoAdvanceTimer');
     this.snapshots = {};
     this._active = false;
     if (this.gameState) {
@@ -207,7 +207,7 @@ export class TutorialOverlay {
       this.snapshots = step.captureSnapshot(this.gameState);
     }
 
-    this.clearAutoAdvanceTimer();
+    this.clearTimer('autoAdvanceTimer');
 
     if (step.autoAdvanceMs !== undefined && step.autoAdvanceMs > 0) {
       this.autoAdvanceTimer = setTimeout(() => {
@@ -216,17 +216,8 @@ export class TutorialOverlay {
     }
   }
 
-  /** Identical pattern to {@link clearPollTimer} — could be merged into a
-   *  single `clearTimer(ref)` helper if another timer type is added. */
-  private clearAutoAdvanceTimer(): void {
-    if (this.autoAdvanceTimer !== null) {
-      clearTimeout(this.autoAdvanceTimer);
-      this.autoAdvanceTimer = null;
-    }
-  }
-
   private schedulePollTimer(): void {
-    this.clearPollTimer();
+    this.clearTimer('pollTimer');
     if (!this._active) return;
     this.pollTimer = setTimeout(() => {
       this.pollTimer = null;
@@ -240,17 +231,23 @@ export class TutorialOverlay {
     }, POLL_INTERVAL_MS);
   }
 
-  private clearPollTimer(): void {
-    if (this.pollTimer !== null) {
-      clearTimeout(this.pollTimer);
-      this.pollTimer = null;
-    }
-  }
-
   private clearHighlight(): void {
     if (this.highlightedEl) {
       this.highlightedEl.classList.remove('bs-tutorial-highlight');
       this.highlightedEl = null;
+    }
+  }
+
+  /** Unified helper — clears the referenced timeout and resets it to null. */
+  private clearTimer(timerName: 'autoAdvanceTimer' | 'pollTimer'): void {
+    const timer = timerName === 'autoAdvanceTimer' ? this.autoAdvanceTimer : this.pollTimer;
+    if (timer !== null) {
+      clearTimeout(timer);
+      if (timerName === 'autoAdvanceTimer') {
+        this.autoAdvanceTimer = null;
+      } else {
+        this.pollTimer = null;
+      }
     }
   }
 
