@@ -77,7 +77,6 @@ interface StepResult {
 }
 
 function resolveChromePath(): string | undefined {
-  const { existsSync } = require('fs');
   const CANDIDATES = [
     ...(process.platform === 'win32'
       ? [

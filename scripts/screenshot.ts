@@ -23,7 +23,7 @@
  */
 
 import puppeteer from 'puppeteer';
-import { mkdirSync } from 'fs';
+import { mkdirSync, existsSync } from 'fs';
 import { resolve } from 'path';
 
 const SCREENSHOTS_DIR = resolve(process.cwd(), 'screenshots');
@@ -75,7 +75,6 @@ function parseArgs(): ScreenshotOptions {
 }
 
 function resolveChromePath(): string | undefined {
-    const { existsSync } = require('fs');
     const CANDIDATES = [
         ...(process.platform === 'win32'
             ? [
