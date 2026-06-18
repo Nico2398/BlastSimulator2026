@@ -10,6 +10,7 @@
  *   npx tsx scripts/screenshot.ts --commands "survey 25,30; blast"  # With commands
  *   npx tsx scripts/screenshot.ts --port 5174              # Custom dev server port
  *   npx tsx scripts/screenshot.ts --puppeteer-path "/path/to/chrome"  # Custom Chrome path
+ *   npx tsx scripts/screenshot.ts --viewport "1920x1080"  # Custom viewport size
  *
  * Screenshots are saved to: screenshots/{name}-{timestamp}.png
  *
@@ -26,7 +27,6 @@ import { mkdirSync } from 'fs';
 import { resolve } from 'path';
 
 const SCREENSHOTS_DIR = resolve(process.cwd(), 'screenshots');
-const VIEWPORT = { width: 1280, height: 720 };
 const INIT_WAIT_MS = 3000;
 const COMMAND_WAIT_MS = 500;
 
@@ -35,6 +35,7 @@ interface ScreenshotOptions {
     commands: string[];
     port: number;
     puppeteerPath?: string;
+    viewport: { width: number; height: number };
 }
 
 function parseArgs(): ScreenshotOptions {
@@ -43,6 +44,7 @@ function parseArgs(): ScreenshotOptions {
     let commands: string[] = [];
     let port = 5173;
     let puppeteerPath: string | undefined;
+    let viewport = { width: 1280, height: 720 };
 
     for (let i = 0; i < args.length; i++) {
         if (args[i] === '--name' && args[i + 1]) {
@@ -57,10 +59,19 @@ function parseArgs(): ScreenshotOptions {
         } else if (args[i] === '--puppeteer-path' && args[i + 1]) {
             puppeteerPath = args[i + 1];
             i++;
+        } else if (args[i] === '--viewport' && args[i + 1]) {
+            const parts = args[i + 1].split('x').map(v => parseInt(v, 10));
+            if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+                viewport = { width: parts[0], height: parts[1] };
+            } else {
+                console.error(`Invalid viewport format: ${args[i+1]}. Use WxH (e.g. 1920x1080)`);
+                process.exit(1);
+            }
+            i++;
         }
     }
 
-    return { name, commands, port, puppeteerPath };
+    return { name, commands, port, puppeteerPath, viewport };
 }
 
 function resolveChromePath(): string | undefined {
@@ -100,9 +111,9 @@ async function captureScreenshot(options: ScreenshotOptions): Promise<string> {
 
     try {
         const page = await browser.newPage();
-        await page.setViewport(VIEWPORT);
+        await page.setViewport(options.viewport);
 
-        console.log(`Navigating to ${devServerUrl}...`);
+        console.log(`Navigating to ${devServerUrl} (viewport: ${options.viewport.width}x${options.viewport.height})...`);
         await page.goto(devServerUrl, { waitUntil: 'networkidle0' });
 
         await page.waitForSelector('#game-canvas, canvas', { timeout: 10000 });
