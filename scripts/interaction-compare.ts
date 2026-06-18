@@ -54,7 +54,65 @@ function parseStepIndex(filename: string): number {
 }
 
 /**
+ * Recursively compares two arrays and returns field-level diffs.
+ *
+ * @param baseline - The baseline array.
+ * @param target - The target array to compare against.
+ * @param prefix - Current field path prefix (for nested indices).
+ * @returns Array of field-level diffs.
+ */
+function compareArrays(
+  baseline: unknown[],
+  target: unknown[],
+  prefix: string,
+): StateDiff[] {
+  const diffs: StateDiff[] = [];
+  const maxLen = Math.max(baseline.length, target.length);
+
+  for (let i = 0; i < maxLen; i++) {
+    const bVal = baseline[i];
+    const tVal = target[i];
+    if (bVal === undefined && tVal === undefined) continue;
+    const nestedDiffs = deepDiff(bVal, tVal, `${prefix}[${i}]`);
+    diffs.push(...nestedDiffs);
+  }
+
+  return diffs;
+}
+
+/**
+ * Recursively compares two plain objects and returns field-level diffs.
+ *
+ * @param baseline - The baseline object.
+ * @param target - The target object to compare against.
+ * @param prefix - Current field path prefix (for nested fields).
+ * @returns Array of field-level diffs.
+ */
+function compareObjects(
+  baseline: Record<string, unknown>,
+  target: Record<string, unknown>,
+  prefix: string,
+): StateDiff[] {
+  const diffs: StateDiff[] = [];
+  const allKeys = new Set([...Object.keys(baseline), ...Object.keys(target)]);
+
+  for (const key of allKeys) {
+    const bVal = baseline[key];
+    const tVal = target[key];
+
+    if (bVal === undefined && tVal === undefined) continue;
+
+    const fieldPath = prefix ? `${prefix}.${key}` : key;
+    const nestedDiffs = deepDiff(bVal, tVal, fieldPath);
+    diffs.push(...nestedDiffs);
+  }
+
+  return diffs;
+}
+
+/**
  * Deeply compares two JSON values and returns field-level diffs.
+ * Handles primitives, objects, arrays, and null/undefined values.
  *
  * @param baseline - The baseline value.
  * @param target - The target value to compare against.
@@ -68,7 +126,7 @@ function deepDiff(
 ): StateDiff[] {
   const diffs: StateDiff[] = [];
 
-  // Both are the same reference or value
+  // Both are the same reference or value (including both null/undefined)
   if (baseline === target) return diffs;
 
   // One is null/undefined and the other is not
@@ -95,39 +153,15 @@ function deepDiff(
 
   // Both are objects (including arrays)
   if (typeof baseline === 'object' && typeof target === 'object') {
-    const baselineObj = baseline as Record<string, unknown>;
-    const targetObj = target as Record<string, unknown>;
-
-    // If both are arrays
     if (Array.isArray(baseline) && Array.isArray(target)) {
-      const maxLen = Math.max(baseline.length, target.length);
-      for (let i = 0; i < maxLen; i++) {
-        const bVal = (baseline as unknown[])[i];
-        const tVal = (target as unknown[])[i];
-        if (bVal === undefined && tVal === undefined) continue;
-        if (bVal === undefined || tVal === undefined || bVal !== tVal) {
-          const nestedDiffs = deepDiff(bVal, tVal, `${prefix}[${i}]`);
-          diffs.push(...nestedDiffs);
-        }
-      }
-    } else {
-      // Both are plain objects
-      const allKeys = new Set([...Object.keys(baselineObj), ...Object.keys(targetObj)]);
-
-      for (const key of allKeys) {
-        const bVal = baselineObj[key];
-        const tVal = targetObj[key];
-
-        if (bVal === undefined && tVal === undefined) continue;
-
-        if (bVal === undefined || tVal === undefined || bVal !== tVal) {
-          const fieldPath = prefix ? `${prefix}.${key}` : key;
-          const nestedDiffs = deepDiff(bVal, tVal, fieldPath);
-          diffs.push(...nestedDiffs);
-        }
-      }
+      return compareArrays(baseline, target, prefix);
     }
-    return diffs;
+    // Both are plain objects
+    return compareObjects(
+      baseline as Record<string, unknown>,
+      target as Record<string, unknown>,
+      prefix,
+    );
   }
 
   // Primitive values that differ
@@ -217,6 +251,22 @@ function scanStepFiles(dir: string, extension: string): Map<number, string> {
   return result;
 }
 
+/**
+ * Determines pass/fail based on max pixel diff and state diffs.
+ *
+ * @param maxPixelDiffPercent - The maximum pixel diff percentage across all screenshots.
+ * @param stateDiffCount - Total number of state field diffs found.
+ * @param threshold - Pixel diff threshold (as a fraction, e.g. 0.01 for 1%).
+ * @returns True if all checks pass.
+ */
+function computePassFail(
+  maxPixelDiffPercent: number,
+  stateDiffCount: number,
+  threshold: number,
+): boolean {
+  return maxPixelDiffPercent <= threshold * 100 && stateDiffCount === 0;
+}
+
 // ── Functions ──
 
 /**
@@ -286,18 +336,18 @@ export async function compareDirectories(options: CompareOptions): Promise<Compa
   const baselineJsons = scanStepFiles(baselineDir, 'json');
   const targetJsons = scanStepFiles(targetDir, 'json');
 
-  // Collect all unique step indices
-  const allSteps = new Set<number>();
+  // Collect all unique step indices from both PNG and JSON files
+  const allStepIndices = new Set<number>();
   for (const idx of [...baselinePngs.keys(), ...targetPngs.keys(), ...baselineJsons.keys(), ...targetJsons.keys()]) {
-    allSteps.add(idx);
+    allStepIndices.add(idx);
   }
 
-  const sortedSteps = [...allSteps].sort((a, b) => a - b);
-  const totalSteps = Math.max(sortedSteps.length, 1);
+  const sortedStepIndices = [...allStepIndices].sort((a, b) => a - b);
+  const totalSteps = Math.max(sortedStepIndices.length, 1);
   const screenshotDiffs: ScreenshotDiff[] = [];
   const stateDiffs: StateDiff[] = [];
 
-  for (const stepIdx of sortedSteps) {
+  for (const stepIdx of sortedStepIndices) {
     // ── Compare Screenshots ──
     const baselinePngFile = baselinePngs.get(stepIdx);
     const targetPngFile = targetPngs.get(stepIdx);
@@ -359,7 +409,7 @@ export async function compareDirectories(options: CompareOptions): Promise<Compa
       if (stepStateDiffs.length > 0) {
         console.log(`  Step ${stepIdx} state diffs: ${stepStateDiffs.length}`);
         for (const d of stepStateDiffs) {
-          console.log(`    ${d.field}: ${JSON.stringify(d.baselineValue)} → ${JSON.stringify(d.targetValue)}`);
+          console.log(`    ${d.field}: ${JSON.stringify(d.baselineValue)} \u2192 ${JSON.stringify(d.targetValue)}`);
         }
       }
     }
@@ -370,7 +420,7 @@ export async function compareDirectories(options: CompareOptions): Promise<Compa
     (max, d) => Math.max(max, d.pixelDiffPercent),
     0,
   );
-  const pass = maxPixelDiff <= threshold * 100 && stateDiffs.length === 0;
+  const pass = computePassFail(maxPixelDiff, stateDiffs.length, threshold);
 
   // Count matched vs diverged
   const divergedScreenshots = screenshotDiffs.filter((d) => d.pixelDiffPercent > 0).length;

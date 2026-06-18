@@ -17,7 +17,7 @@
  * @module interaction-recorder
  */
 
-import type { InteractionRecording } from './interaction-types.js';
+import type { InteractionRecording, InteractionRecordEvent } from './interaction-types.js';
 import puppeteer from 'puppeteer';
 import { mkdirSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
@@ -70,6 +70,7 @@ export interface RecorderOptions {
  * Sanitizes a name string for safe use in file paths by replacing
  * non-alphanumeric characters (except dash and underscore) with underscores.
  * Prevents path traversal via crafted recording names.
+ *
  * @param name - The raw name to sanitize.
  * @returns Sanitized name safe for use in file paths.
  */
@@ -111,7 +112,7 @@ export function parseRecorderArgs(): RecorderOptions {
       if (parts.length === 2 && !isNaN(parts[0]!) && !isNaN(parts[1]!)) {
         viewport = { width: parts[0]!, height: parts[1]! };
       } else {
-        console.error(`Invalid viewport format: ${args[i]}. Use WxH (e.g. 1920x1080)`);
+        console.error(`ERROR: Invalid viewport format "${args[i]}". Expected format: WxH (e.g. 1920x1080)`);
         process.exit(1);
       }
     } else if (arg === '--puppeteer-path' && i + 1 < args.length) {
@@ -138,13 +139,13 @@ export function parseRecorderArgs(): RecorderOptions {
 }
 
 /**
- * Injects event listeners into the page that record all interactions
- * into `window.__recordingBuffer`. Each listener serializes the event
- * into the appropriate InteractionRecordEvent shape with a timestamp.
- * Mousemove and wheel are throttled to MOVE_THROTTLE_MS / WHEEL_THROTTLE_MS.
- * Pressing Escape sets `window.__recordingComplete = true`.
+ * Generates the JavaScript source code for in-page event listener injection.
+ * This string is evaluated via page.evaluate to attach listeners that record
+ * mouse, keyboard, scroll, wheel, and viewport events into
+ * `window.__recordingBuffer`. Mousemove and wheel are throttled.
+ * Pressing the Escape key sets `window.__recordingComplete = true`.
  *
- * This function is evaluated in-page via page.evaluate.
+ * @returns JavaScript source string for page injection.
  */
 function getEventListenersScript(): string {
   return `
@@ -160,7 +161,7 @@ function getEventListenersScript(): string {
       let lastMoveTime = 0;
       let lastWheelTime = 0;
 
-      function mouseEvent(type, e) {
+      function recordMouseEvent(type, e) {
         var button = 'left';
         if (e.button === 2) button = 'right';
         else if (e.button === 1) button = 'middle';
@@ -174,9 +175,9 @@ function getEventListenersScript(): string {
         });
       }
 
-      document.addEventListener('click', function(e) { mouseEvent('click', e); }, true);
-      document.addEventListener('mousedown', function(e) { mouseEvent('mousedown', e); }, true);
-      document.addEventListener('mouseup', function(e) { mouseEvent('mouseup', e); }, true);
+      document.addEventListener('click', function(e) { recordMouseEvent('click', e); }, true);
+      document.addEventListener('mousedown', function(e) { recordMouseEvent('mousedown', e); }, true);
+      document.addEventListener('mouseup', function(e) { recordMouseEvent('mouseup', e); }, true);
 
       document.addEventListener('mousemove', function(e) {
         var now = Date.now();

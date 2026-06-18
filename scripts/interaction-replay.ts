@@ -59,6 +59,13 @@ const MENU_DISMISS_MS = 300;
 /** The expected format version for recording files. */
 const EXPECTED_FORMAT_VERSION = 1;
 
+/** Maps our button names to Puppeteer MouseButton values. */
+const BUTTON_MAP: Record<string, 'left' | 'right' | 'middle'> = {
+  left: 'left',
+  right: 'right',
+  middle: 'middle',
+};
+
 // ── Options ──
 
 /**
@@ -149,7 +156,7 @@ export function parseReplayArgs(): ReplayOptions {
       if (parts.length === 2 && !isNaN(parts[0]!) && !isNaN(parts[1]!)) {
         viewport = { width: parts[0]!, height: parts[1]! };
       } else {
-        console.error(`Invalid viewport format: ${args[i]}. Use WxH (e.g. 1920x1080)`);
+        console.error(`ERROR: Invalid viewport format "${args[i]}". Expected format: WxH (e.g. 1920x1080)`);
         process.exit(1);
       }
     } else if (arg === '--puppeteer-path' && i + 1 < args.length) {
@@ -250,6 +257,7 @@ async function captureStep(
  * @param slug - Event slug for filename.
  * @param shots - Array of shot definitions.
  * @param outDir - Directory to save files in.
+ * @returns Array of captured shot file paths.
  */
 async function captureShots(
   page: puppeteer.Page,
@@ -297,6 +305,7 @@ async function captureShots(
  * @param frames - Number of frames to capture.
  * @param intervalMs - Interval between frames in ms.
  * @param outDir - Directory to save files in.
+ * @returns Array of captured frame file paths.
  */
 async function captureFrames(
   page: puppeteer.Page,
@@ -322,7 +331,182 @@ async function captureFrames(
   return paths;
 }
 
-// ── Main Replay Logic ──
+/**
+ * Replays a single interaction event on the given Puppeteer page.
+ * Handles all event types: click, mousedown, mouseup, mousemove,
+ * keypress, keydown, keyup, scroll, wheel, wait, assert, viewport.
+ *
+ * @param page - Puppeteer page object.
+ * @param event - The event to replay.
+ */
+export async function replayEvent(
+  page: puppeteer.Page,
+  event: InteractionRecordEvent,
+): Promise<void> {
+  const eventType = event.type;
+
+  switch (eventType) {
+    case 'click': {
+      const clickEvent = event as ClickEvent;
+      const btn = BUTTON_MAP[clickEvent.button] ?? 'left';
+      await page.mouse.click(clickEvent.x, clickEvent.y, { button: btn });
+      break;
+    }
+    case 'mousedown': {
+      const mouseDownEvent = event as ClickEvent;
+      const btn = BUTTON_MAP[mouseDownEvent.button] ?? 'left';
+      await page.mouse.down({ button: btn });
+      break;
+    }
+    case 'mouseup': {
+      const mouseUpEvent = event as ClickEvent;
+      const btn = BUTTON_MAP[mouseUpEvent.button] ?? 'left';
+      await page.mouse.up({ button: btn });
+      break;
+    }
+    case 'mousemove': {
+      const moveEvent = event as MouseMoveEvent;
+      await page.mouse.move(moveEvent.x, moveEvent.y);
+      break;
+    }
+    case 'keypress': {
+      const keyPressEvent = event as KeyEvent;
+      await page.keyboard.press(keyPressEvent.key);
+      break;
+    }
+    case 'keydown': {
+      const keyDownEvent = event as KeyEvent;
+      await page.keyboard.down(keyDownEvent.key);
+      break;
+    }
+    case 'keyup': {
+      const keyUpEvent = event as KeyEvent;
+      await page.keyboard.up(keyUpEvent.key);
+      break;
+    }
+    case 'scroll': {
+      const scrollEvent = event as ScrollEvent;
+      await page.evaluate(
+        (x: number, y: number) => window.scrollTo(x, y),
+        scrollEvent.x,
+        scrollEvent.y,
+      );
+      break;
+    }
+    case 'wheel': {
+      const wheelEvent = event as WheelEvent;
+      await page.evaluate(
+        (evt: { x: number; y: number; deltaX: number; deltaY: number; deltaZ: number }) => {
+          const wheelEvt = new WheelEvent('wheel', {
+            clientX: evt.x,
+            clientY: evt.y,
+            deltaX: evt.deltaX,
+            deltaY: evt.deltaY,
+            deltaZ: evt.deltaZ,
+            bubbles: true,
+            cancelable: true,
+          });
+          document.dispatchEvent(wheelEvt);
+        },
+        {
+          x: wheelEvent.x,
+          y: wheelEvent.y,
+          deltaX: wheelEvent.deltaX,
+          deltaY: wheelEvent.deltaY,
+          deltaZ: wheelEvent.deltaZ,
+        },
+      );
+      break;
+    }
+    case 'wait': {
+      const waitEvent = event as WaitEvent;
+      const durationMs = waitEvent.durationMs ?? 0;
+      await new Promise((r) => setTimeout(r, durationMs));
+      break;
+    }
+    case 'assert': {
+      const assertEvent = event as AssertEvent;
+      console.log(`  Assert: selector=${assertEvent.selector}, eval=${assertEvent.eval}`);
+
+      if (assertEvent.eval) {
+        // Validate eval string length to prevent abuse
+        if (assertEvent.eval.length > 200) {
+          console.warn(`  Warning: Assert eval string is unusually long (${assertEvent.eval.length} chars). This may be a security concern.`);
+        }
+
+        try {
+          const result = await page.evaluate((expr: string) => {
+            try {
+              // eslint-disable-next-line no-eval
+              return eval(expr);
+            } catch {
+              return { __error: `Eval failed: ${expr}` };
+            }
+          }, assertEvent.eval);
+          console.log(`  Assert eval result:`, result);
+
+          if (assertEvent.expectedValue !== undefined) {
+            const expected = assertEvent.expectedValue;
+            const passed = JSON.stringify(result) === JSON.stringify(expected);
+            if (!passed) {
+              console.warn(`  Assert FAILED: expected ${JSON.stringify(expected)}, got ${JSON.stringify(result)}`);
+            }
+          }
+        } catch (err: unknown) {
+          console.warn(`  Assert eval error:`, err);
+        }
+      }
+
+      if (assertEvent.gameStatePath) {
+        const stateVal = await page.evaluate((path: string) => {
+          const state = typeof (window as any).__gameState === 'function'
+            ? (window as any).__gameState()
+            : null;
+          if (!state) return null;
+          return path.split('.').reduce((obj: any, key: string) => obj?.[key], state);
+        }, assertEvent.gameStatePath);
+        console.log(`  Game state [${assertEvent.gameStatePath}]:`, stateVal);
+
+        if (assertEvent.expectedValue !== undefined) {
+          const passed = JSON.stringify(stateVal) === JSON.stringify(assertEvent.expectedValue);
+          if (!passed) {
+            console.warn(`  Assert FAILED: expected ${JSON.stringify(assertEvent.expectedValue)}, got ${JSON.stringify(stateVal)}`);
+          }
+        }
+      }
+
+      if (assertEvent.uiStatePath) {
+        const stateVal = await page.evaluate((path: string) => {
+          const uiState = typeof (window as any).__uiState === 'function'
+            ? (window as any).__uiState()
+            : null;
+          if (!uiState) return null;
+          return path.split('.').reduce((obj: any, key: string) => obj?.[key], uiState);
+        }, assertEvent.uiStatePath);
+        console.log(`  UI state [${assertEvent.uiStatePath}]:`, stateVal);
+
+        if (assertEvent.expectedValue !== undefined) {
+          const passed = JSON.stringify(stateVal) === JSON.stringify(assertEvent.expectedValue);
+          if (!passed) {
+            console.warn(`  Assert FAILED: expected ${JSON.stringify(assertEvent.expectedValue)}, got ${JSON.stringify(stateVal)}`);
+          }
+        }
+      }
+      break;
+    }
+    case 'viewport': {
+      const viewportEvent = event as ViewportEvent;
+      await page.setViewport({
+        width: viewportEvent.width,
+        height: viewportEvent.height,
+      });
+      break;
+    }
+    default:
+      console.warn(`Unknown event type: ${event.type}`);
+      break;
+  }
+}
 
 /**
  * Loads a recording from disk and replays every interaction event in
@@ -345,13 +529,13 @@ export async function replayInteraction(options: ReplayOptions): Promise<void> {
   try {
     recording = JSON.parse(rawRecording) as InteractionRecording;
   } catch {
-    throw new Error(`Invalid recording JSON: ${recordingPath}`);
+    throw new Error(`Invalid recording JSON file: ${recordingPath}. The file may be corrupted or not valid JSON.`);
   }
 
   // Validate format version
   if (recording.meta.formatVersion !== EXPECTED_FORMAT_VERSION) {
     throw new Error(
-      `Unsupported recording format version: ${recording.meta.formatVersion}. Expected: ${EXPECTED_FORMAT_VERSION}`,
+      `Unsupported recording format version: ${recording.meta.formatVersion}. Expected: ${EXPECTED_FORMAT_VERSION}. Record the interactions again with a compatible version.`,
     );
   }
 
@@ -437,184 +621,8 @@ export async function replayInteraction(options: ReplayOptions): Promise<void> {
 
       console.log(`Step ${i}: ${eventType}${label ? ` (${label})` : ''}`);
 
-      // Replay the event based on its type
-      switch (event.type) {
-        case 'click': {
-          const clickEvent = event as ClickEvent;
-          const buttonMap: Record<string, 'left' | 'right' | 'middle'> = {
-            left: 'left',
-            right: 'right',
-            middle: 'middle',
-          };
-          const btn = buttonMap[clickEvent.button] ?? 'left';
-          await page.mouse.click(clickEvent.x, clickEvent.y, { button: btn });
-          break;
-        }
-        case 'mousedown': {
-          const mouseDownEvent = event as ClickEvent;
-          const buttonMap: Record<string, 'left' | 'right' | 'middle'> = {
-            left: 'left',
-            right: 'right',
-            middle: 'middle',
-          };
-          const btn = buttonMap[mouseDownEvent.button] ?? 'left';
-          await page.mouse.down({ button: btn });
-          break;
-        }
-        case 'mouseup': {
-          const mouseUpEvent = event as ClickEvent;
-          const buttonMap: Record<string, 'left' | 'right' | 'middle'> = {
-            left: 'left',
-            right: 'right',
-            middle: 'middle',
-          };
-          const btn = buttonMap[mouseUpEvent.button] ?? 'left';
-          await page.mouse.up({ button: btn });
-          break;
-        }
-        case 'mousemove': {
-          const moveEvent = event as MouseMoveEvent;
-          await page.mouse.move(moveEvent.x, moveEvent.y);
-          break;
-        }
-        case 'keypress': {
-          const keyPressEvent = event as KeyEvent;
-          await page.keyboard.press(keyPressEvent.key);
-          break;
-        }
-        case 'keydown': {
-          const keyDownEvent = event as KeyEvent;
-          await page.keyboard.down(keyDownEvent.key);
-          break;
-        }
-        case 'keyup': {
-          const keyUpEvent = event as KeyEvent;
-          await page.keyboard.up(keyUpEvent.key);
-          break;
-        }
-        case 'scroll': {
-          const scrollEvent = event as ScrollEvent;
-          await page.evaluate(
-            (x: number, y: number) => window.scrollTo(x, y),
-            scrollEvent.x,
-            scrollEvent.y,
-          );
-          break;
-        }
-        case 'wheel': {
-          const wheelEvent = event as WheelEvent;
-          await page.evaluate(
-            (evt: { x: number; y: number; deltaX: number; deltaY: number; deltaZ: number }) => {
-              const wheelEvt = new WheelEvent('wheel', {
-                clientX: evt.x,
-                clientY: evt.y,
-                deltaX: evt.deltaX,
-                deltaY: evt.deltaY,
-                deltaZ: evt.deltaZ,
-                bubbles: true,
-                cancelable: true,
-              });
-              document.dispatchEvent(wheelEvt);
-            },
-            {
-              x: wheelEvent.x,
-              y: wheelEvent.y,
-              deltaX: wheelEvent.deltaX,
-              deltaY: wheelEvent.deltaY,
-              deltaZ: wheelEvent.deltaZ,
-            },
-          );
-          break;
-        }
-        case 'wait': {
-          const waitEvent = event as WaitEvent;
-          const durationMs = waitEvent.durationMs ?? 0;
-          await new Promise((r) => setTimeout(r, durationMs));
-          break;
-        }
-        case 'assert': {
-          const assertEvent = event as AssertEvent;
-          console.log(`  Assert: selector=${assertEvent.selector}, eval=${assertEvent.eval}`);
-
-          // Run assertion: evaluate a JS expression or check selector
-          if (assertEvent.eval) {
-            // Validate eval string length to prevent abuse
-            if (assertEvent.eval.length > 200) {
-              console.warn(`  Warning: Assert eval string is unusually long (${assertEvent.eval.length} chars). This may be a security concern.`);
-            }
-
-            try {
-              const result = await page.evaluate((expr: string) => {
-                try {
-                  // eslint-disable-next-line no-eval
-                  return eval(expr);
-                } catch {
-                  return { __error: `Eval failed: ${expr}` };
-                }
-              }, assertEvent.eval);
-              console.log(`  Assert eval result:`, result);
-
-              if (assertEvent.expectedValue !== undefined) {
-                const expected = assertEvent.expectedValue;
-                const passed = JSON.stringify(result) === JSON.stringify(expected);
-                if (!passed) {
-                  console.warn(`  Assert FAILED: expected ${JSON.stringify(expected)}, got ${JSON.stringify(result)}`);
-                }
-              }
-            } catch (err: unknown) {
-              console.warn(`  Assert eval error:`, err);
-            }
-          }
-
-          if (assertEvent.gameStatePath) {
-            const stateVal = await page.evaluate((path: string) => {
-              const state = typeof (window as any).__gameState === 'function'
-                ? (window as any).__gameState()
-                : null;
-              if (!state) return null;
-              return path.split('.').reduce((obj: any, key: string) => obj?.[key], state);
-            }, assertEvent.gameStatePath);
-            console.log(`  Game state [${assertEvent.gameStatePath}]:`, stateVal);
-
-            if (assertEvent.expectedValue !== undefined) {
-              const passed = JSON.stringify(stateVal) === JSON.stringify(assertEvent.expectedValue);
-              if (!passed) {
-                console.warn(`  Assert FAILED: expected ${JSON.stringify(assertEvent.expectedValue)}, got ${JSON.stringify(stateVal)}`);
-              }
-            }
-          }
-
-          if (assertEvent.uiStatePath) {
-            const stateVal = await page.evaluate((path: string) => {
-              const uiState = typeof (window as any).__uiState === 'function'
-                ? (window as any).__uiState()
-                : null;
-              if (!uiState) return null;
-              return path.split('.').reduce((obj: any, key: string) => obj?.[key], uiState);
-            }, assertEvent.uiStatePath);
-            console.log(`  UI state [${assertEvent.uiStatePath}]:`, stateVal);
-
-            if (assertEvent.expectedValue !== undefined) {
-              const passed = JSON.stringify(stateVal) === JSON.stringify(assertEvent.expectedValue);
-              if (!passed) {
-                console.warn(`  Assert FAILED: expected ${JSON.stringify(assertEvent.expectedValue)}, got ${JSON.stringify(stateVal)}`);
-              }
-            }
-          }
-          break;
-        }
-        case 'viewport': {
-          const viewportEvent = event as ViewportEvent;
-          await page.setViewport({
-            width: viewportEvent.width,
-            height: viewportEvent.height,
-          });
-          break;
-        }
-        default:
-          console.warn(`Unknown event type: ${event.type}`);
-          break;
-      }
+      // Delegate event execution to the reusable replay function
+      await replayEvent(page, event);
 
       // Build event slug for filenames
       const slug = label
