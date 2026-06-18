@@ -2,13 +2,11 @@
  * Tests for the interaction comparison module.
  *
  * Validates argument parsing and the compareDirectories() function.
- * Since compareDirectories() requires file system access it is tested
- * by verifying that the stub throws 'Not implemented'.
  *
  * @module tests/unit/interaction-compare
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   parseCompareArgs,
   compareDirectories,
@@ -17,102 +15,110 @@ import {
 // ── Argument Parsing ──
 
 describe('parseCompareArgs()', () => {
-  it('throws "Not implemented" when called (stub)', () => {
-    expect(() => parseCompareArgs()).toThrow('Not implemented');
+  const originalArgv = process.argv;
+  const originalExit = process.exit;
+
+  beforeEach(() => {
+    process.exit = vi.fn() as unknown as (code?: number) => never;
   });
 
-  it('parses --baseline and --target as required arguments when implemented', () => {
-    try {
-      const opts = parseCompareArgs();
-      expect(opts).toHaveProperty('baselineDir');
-      expect(opts).toHaveProperty('targetDir');
-      expect(typeof opts.baselineDir).toBe('string');
-      expect(typeof opts.targetDir).toBe('string');
-    } catch {
-      throw new Error('Not implemented');
-    }
+  afterEach(() => {
+    process.argv = originalArgv;
+    process.exit = originalExit;
   });
 
-  it('parses --output flag correctly when implemented', () => {
-    try {
-      const opts = parseCompareArgs();
-      expect(opts).toHaveProperty('outputDir');
-      expect(typeof opts.outputDir).toBe('string');
-    } catch {
-      throw new Error('Not implemented');
-    }
+  it('exits with code 1 when --baseline and --target are missing', () => {
+    process.argv = ['node', 'interaction-compare.ts'];
+    parseCompareArgs();
+    expect(process.exit).toHaveBeenCalledWith(1);
   });
 
-  it('parses --threshold flag correctly when implemented', () => {
-    try {
-      const opts = parseCompareArgs();
-      if (opts.threshold !== undefined) {
-        expect(typeof opts.threshold).toBe('number');
-        expect(opts.threshold).toBeGreaterThan(0);
-        expect(opts.threshold).toBeLessThan(1);
-      }
-    } catch {
-      throw new Error('Not implemented');
-    }
+  it('exits with code 1 when only --baseline is provided', () => {
+    process.argv = ['node', 'interaction-compare.ts', '--baseline', 'dir1'];
+    parseCompareArgs();
+    expect(process.exit).toHaveBeenCalledWith(1);
+  });
+
+  it('parses --baseline and --target correctly', () => {
+    process.argv = ['node', 'interaction-compare.ts', '--baseline', 'screenshots/v1', '--target', 'screenshots/v2'];
+    const opts = parseCompareArgs();
+    expect(opts.baselineDir).toBe('screenshots/v1');
+    expect(opts.targetDir).toBe('screenshots/v2');
+  });
+
+  it('parses --output flag correctly', () => {
+    process.argv = ['node', 'interaction-compare.ts', '--baseline', 'a', '--target', 'b', '--output', 'my-results'];
+    const opts = parseCompareArgs();
+    expect(opts.outputDir).toBe('my-results');
+  });
+
+  it('uses default output dir "compare-results" when --output is not specified', () => {
+    process.argv = ['node', 'interaction-compare.ts', '--baseline', 'a', '--target', 'b'];
+    const opts = parseCompareArgs();
+    expect(opts.outputDir).toBe('compare-results');
+  });
+
+  it('parses --threshold flag correctly', () => {
+    process.argv = ['node', 'interaction-compare.ts', '--baseline', 'a', '--target', 'b', '--threshold', '0.05'];
+    const opts = parseCompareArgs();
+    expect(opts.threshold).toBe(0.05);
   });
 
   it('uses default threshold of 0.01 when --threshold is not provided', () => {
-    try {
-      const opts = parseCompareArgs();
-      expect(opts.threshold).toBe(0.01);
-    } catch {
-      throw new Error('Not implemented');
-    }
+    process.argv = ['node', 'interaction-compare.ts', '--baseline', 'a', '--target', 'b'];
+    const opts = parseCompareArgs();
+    expect(opts.threshold).toBe(0.01);
+  });
+
+  it('returns CompareOptions with all required properties', () => {
+    process.argv = ['node', 'interaction-compare.ts', '--baseline', 'a', '--target', 'b'];
+    const opts = parseCompareArgs();
+    expect(opts).toHaveProperty('baselineDir');
+    expect(opts).toHaveProperty('targetDir');
+    expect(opts).toHaveProperty('outputDir');
+    expect(opts).toHaveProperty('threshold');
   });
 });
 
 // ── Comparison Function ──
 
 describe('compareDirectories()', () => {
-  it('throws "Not implemented" when called (stub)', async () => {
+  it('returns a promise', () => {
+    const resultPromise = compareDirectories({
+      baselineDir: 'screenshots/replay-v1',
+      targetDir: 'screenshots/replay-v2',
+      outputDir: 'compare-results',
+    });
+    expect(resultPromise).toBeInstanceOf(Promise);
+  });
+
+  it('rejects when baseline directory does not exist', async () => {
     await expect(
       compareDirectories({
-        baselineDir: 'screenshots/replay-v1',
+        baselineDir: 'screenshots/nonexistent',
         targetDir: 'screenshots/replay-v2',
-        outputDir: 'compare-results',
+        outputDir: 'compare-output',
       }),
-    ).rejects.toThrow('Not implemented');
+    ).rejects.toThrow();
   });
 
-  it('returns a CompareResult with correct structure when implemented', async () => {
-    const options = {
-      baselineDir: 'screenshots/baseline',
-      targetDir: 'screenshots/target',
-      outputDir: 'compare-output',
-      threshold: 0.05,
-    };
-
-    try {
-      const result = await compareDirectories(options);
-      expect(result).toHaveProperty('totalSteps');
-      expect(result).toHaveProperty('matchedSteps');
-      expect(result).toHaveProperty('divergedSteps');
-      expect(result).toHaveProperty('screenshotDiffs');
-      expect(result).toHaveProperty('stateDiffs');
-      expect(result).toHaveProperty('reportPath');
-      expect(result).toHaveProperty('pass');
-      expect(typeof result.pass).toBe('boolean');
-    } catch {
-      throw new Error('Not implemented');
-    }
+  it('rejects when target directory does not exist', async () => {
+    await expect(
+      compareDirectories({
+        baselineDir: 'src', // exists
+        targetDir: 'nonexistent-dir-xyz',
+        outputDir: 'compare-output',
+      }),
+    ).rejects.toThrow();
   });
 
-  it('threshold 0.01 is the default when not specified', async () => {
-    try {
-      const result = await compareDirectories({
-        baselineDir: 'a',
-        targetDir: 'b',
-        outputDir: 'out',
-      });
-      // threshold is optional so it may or may not be on the result
-      expect(result).toBeDefined();
-    } catch {
-      throw new Error('Not implemented');
-    }
+  it('accepts CompareOptions with custom threshold', () => {
+    const resultPromise = compareDirectories({
+      baselineDir: 'a',
+      targetDir: 'b',
+      outputDir: 'c',
+      threshold: 0.1,
+    });
+    expect(resultPromise).toBeInstanceOf(Promise);
   });
 });

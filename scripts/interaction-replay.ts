@@ -684,7 +684,10 @@ async function main(): Promise<void> {
 
 // ── CLI Entry ──
 
-main().catch((err: unknown) => {
-  console.error('Replay failed:', err);
-  process.exit(1);
-});
+// Only run main() when executed directly, not when imported by tests
+if (!process.env.VITEST) {
+  main().catch((err: unknown) => {
+    console.error('Replay failed:', err);
+    process.exit(1);
+  });
+}
