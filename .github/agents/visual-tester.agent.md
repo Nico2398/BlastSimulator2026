@@ -120,6 +120,15 @@ Per scenario step:
 - [ ] JSON state dump matches visual presentation
 - [ ] Command output matches expected state changes
 - [ ] UI state (button visibility, panel states) correct
+- [ ] Run `scripts/validate-state-schema.ts` on state dumps — no type errors
+
+### Accessibility
+- [ ] Run `scripts/a11y-check.ts` — all text elements meet WCAG AA contrast (4.5:1)
+- [ ] No zero-size or invisible buttons (caught by `scripts/ui-diagnostic.ts`)
+
+### Performance / Stability
+- [ ] No screenshots >5MB (caught by size monitor — may indicate render leak)
+- [ ] No step timeouts (caught by per-step timeout enforcement)
 
 ### Headless Chrome Limitations (NOT bugs)
 - Jagged edges (no MSAA in software rasterizer)
