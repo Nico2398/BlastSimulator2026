@@ -22,10 +22,13 @@ description: >
  7. [visual-feedback-loop]    → Visual feedback loop (visual-change ONLY).
                                 Skip for backend-only features.
                                 Loop on failure — see "Visual Feedback Loop" below.
- 8. [qualimetry]              → jscpd syntactic duplication check
+  8. [qualimetry]              → jscpd syntactic duplication check
                                 if fail → @implementer (big loop)
- 9. [finalization]            → Delegate to `agentic-pipeline-finalization` skill
-10. [git-verify]              → confirm clean state: git status, branch, last commits
+  9. [finalization]            → Delegate to `agentic-pipeline-finalization` skill
+ 10. @context-maintainer       → Context maintenance
+                                Update context files to reflect project changes.
+                                Do nothing if no project logic changed.
+ 11. [git-verify]              → confirm clean state: git status, branch, last commits
 ```
 
 **Retry counter:** resets at start of each full pipeline invocation. Nested pipeline skills each have their own counter.
@@ -38,6 +41,7 @@ description: >
 | [visual-feedback-loop] | See loop below — self-iterating |
 | [qualimetry] | @implementer (big loop) |
 | finalization phase | See `agentic-pipeline-finalization` |
+| @context-maintainer | Fix and commit, or do nothing — never blocks pipeline |
 | [git-verify] | Diagnose and fix — never proceed with dirty state |
 | Any × 7 | Human escalation: add PR/issue comment summarizing failure + history, then stop with `ESCALATED: human intervention required` |
 
@@ -51,7 +55,7 @@ Runs after test-runner passes on feature branch, before qualimetry. Visual-chang
 LOOP:
   a. @visual-tester   → Run scenario tests with --shots, inspect ALL screenshots.
                         Report ALL visual failures in one pass, ranked by severity.
-                        If no failures → exit loop (continue to step 8).
+                        If no failures → exit loop (continue to step 9).
   b. @implementer     → Fix ALL reported visual issues.
                         Runs on feature branch (branch-sanity: pipeline/feature-<N>).
                         Does NOT switch to impl branch — this is not TDD, it's visual iteration.
