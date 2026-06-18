@@ -30,18 +30,19 @@ npm run dev &
 sleep 5
 ```
 
-Puppeteer executable: `$env:PUPPETEER_EXECUTABLE_PATH` or `/usr/bin/chromium` (Linux CI).
+Puppeteer executable: `$env:PUPPETEER_EXECUTABLE_PATH` > auto-detect (Windows: `Program Files\Google\Chrome\chrome.exe`, Linux: `/usr/bin/chromium`).
+Dev server port: `--port` > `$env:VISUAL_TEST_PORT` > 5173 default.
 
 ## Running Scenario Tests
 
 ### Predefined
 ```bash
-PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium npx tsx scripts/scenario-test.ts --scenario blast-basic
+npx tsx scripts/scenario-test.ts --scenario blast-basic
 ```
 
 ### Custom
 ```bash
-PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium npx tsx scripts/scenario-test.ts --name my-test \
+npx tsx scripts/scenario-test.ts --name my-test \
   --commands "new_game seed:42; drill_plan grid rows:2 cols:3 spacing:4 depth:6 start:15,15; charge hole:* explosive:boomite amount:5 stemming:2; sequence auto; blast"
 ```
 
@@ -53,7 +54,7 @@ bash scripts/visual-test.sh --name "terrain" --commands "new_game mine_type:dese
 ### Multi-Angle Screenshots
 Capture multiple camera angles per scenario step via `--shots`:
 ```bash
-PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium npx tsx scripts/scenario-test.ts --name my-test \
+npx tsx scripts/scenario-test.ts --name my-test \
   --commands "new_game seed:42; drill_plan grid rows:2 cols:3 spacing:4 depth:6 start:15,15" \
   --shots "overview:0:45;closeup:90:10;birdseye:0:80"
 ```
@@ -62,11 +63,45 @@ Format: `--shots "name:yaw:pitch;name:yaw:pitch"` (degrees).
 After each step, the runner orbits to each shot angle, captures `step-NN-cmd-{name}.png`, then resets.
 Inspect each angle for geometry, z-fighting, overlays, and effects.
 
+### Animation Verification
+Capture multiple frames per step to verify animated effects (dust, screen shake, flash) via `--frames N --interval MS`:
+```bash
+npx tsx scripts/scenario-test.ts --scenario blast-basic --frames 3 --interval 100
+```
+
+### Custom Viewport
+Test at different resolutions for responsive rendering via `--viewport "WxH"`:
+```bash
+npx tsx scripts/scenario-test.ts --scenario blast-basic --viewport "1920x1080"
+```
+
+### Custom Port & Puppeteer Path
+```bash
+npx tsx scripts/scenario-test.ts --scenario blast-basic --port 5174 --puppeteer-path "/path/to/chrome"
+```
+Fallback chain: `--puppeteer-path` > `PUPPETEER_EXECUTABLE_PATH` env var > auto-detect (Windows/Linux).
+Port fallback: `--port` > `VISUAL_TEST_PORT` env var > 5173 default.
+
+### Per-Step Timeouts
+Scenario definitions support `timeout` (seconds) per step. Default 30s.
+
+### Screenshot Size Monitoring
+Screenshots >5MB trigger a warning — may indicate a render leak.
+
+## Additional Tools
+| Tool | Purpose | Usage |
+|------|---------|-------|
+| `scripts/a11y-check.ts` | WCAG color contrast analysis | `npx tsx scripts/a11y-check.ts` |
+| `scripts/validate-state-schema.ts` | State JSON schema validation | `npx tsx scripts/validate-state-schema.ts --dir screenshots/scenario-{name}` |
+| `scripts/ui-diagnostic.ts` | Exhaustive UI button diagnostics | `npx tsx scripts/ui-diagnostic.ts` |
+
 ## Output
 
 Per scenario step:
 - `screenshots/scenario-{name}/step-NN-cmd.png` — screenshot
+- `screenshots/scenario-{name}/step-NN-cmd-fN.png` — animation frames
 - `screenshots/scenario-{name}/step-NN-cmd.json` — game + UI state
+- `screenshots/scenario-{name}/step-NN-cmd-{shot}.png` — multi-angle shots
 - `screenshots/scenario-{name}/report.json` — summary
 
 ## What to Evaluate
@@ -85,6 +120,15 @@ Per scenario step:
 - [ ] JSON state dump matches visual presentation
 - [ ] Command output matches expected state changes
 - [ ] UI state (button visibility, panel states) correct
+- [ ] Run `scripts/validate-state-schema.ts` on state dumps — no type errors
+
+### Accessibility
+- [ ] Run `scripts/a11y-check.ts` — all text elements meet WCAG AA contrast (4.5:1)
+- [ ] No zero-size or invisible buttons (caught by `scripts/ui-diagnostic.ts`)
+
+### Performance / Stability
+- [ ] No screenshots >5MB (caught by size monitor — may indicate render leak)
+- [ ] No step timeouts (caught by per-step timeout enforcement)
 
 ### Headless Chrome Limitations (NOT bugs)
 - Jagged edges (no MSAA in software rasterizer)
