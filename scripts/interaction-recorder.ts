@@ -17,10 +17,11 @@
  * @module interaction-recorder
  */
 
-import type { InteractionRecording, InteractionRecordEvent } from './interaction-types.js';
+import type { InteractionRecording } from './interaction-types.js';
 import puppeteer from 'puppeteer';
-import { mkdirSync, writeFileSync, existsSync } from 'fs';
+import { mkdirSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
+import { resolveChromePath, LAUNCH_ARGS } from './shared/chrome.js';
 
 // ── Constants ──
 
@@ -63,81 +64,18 @@ export interface RecorderOptions {
   setupCommands?: string[];
 }
 
-// ── Helpers ──
-
-/**
- * Resolves the Chrome/Chromium executable path from well-known locations.
- * @returns The path if found, or undefined.
- */
-function resolveChromePath(): string | undefined {
-  const candidates = [
-    ...(process.platform === 'win32'
-      ? [
-          'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-          'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-          `${process.env.LOCALAPPDATA}\\Google\\Chrome\\Application\\chrome.exe`,
-          `${process.env.PROGRAMFILES}\\Google\\Chrome\\Application\\chrome.exe`,
-        ]
-      : [
-          '/usr/bin/chromium',
-          '/usr/bin/chromium-browser',
-          '/usr/bin/google-chrome',
-          '/root/.cache/ms-playwright/chromium-1194/chrome-linux/chrome',
-        ]),
-  ];
-  return candidates.find((p) => existsSync(p));
-}
-
-/**
- * Builds an InteractionRecordEvent from a DOM MouseEvent.
- * @param type - The event type discriminant.
- * @param e - The DOM mouse event.
- * @returns A serializable interaction event.
- */
-function mouseEventToRecord(
-  type: 'click' | 'mousedown' | 'mouseup',
-  e: MouseEvent,
-): InteractionRecordEvent {
-  return {
-    type,
-    timestamp: Date.now(),
-    x: e.clientX,
-    y: e.clientY,
-    button: e.button === 0 ? 'left' : e.button === 2 ? 'right' : 'middle',
-    modifiers: {
-      ctrl: e.ctrlKey || false,
-      shift: e.shiftKey || false,
-      alt: e.altKey || false,
-      meta: e.metaKey || false,
-    },
-  } as InteractionRecordEvent;
-}
-
-/**
- * Builds an InteractionRecordEvent from a DOM KeyboardEvent.
- * @param type - The event type discriminant.
- * @param e - The DOM keyboard event.
- * @returns A serializable interaction event.
- */
-function keyboardEventToRecord(
-  type: 'keypress' | 'keydown' | 'keyup',
-  e: KeyboardEvent,
-): InteractionRecordEvent {
-  return {
-    type,
-    timestamp: Date.now(),
-    key: e.key,
-    code: e.code,
-    modifiers: {
-      ctrl: e.ctrlKey || false,
-      shift: e.shiftKey || false,
-      alt: e.altKey || false,
-      meta: e.metaKey || false,
-    },
-  } as InteractionRecordEvent;
-}
-
 // ── Functions ──
+
+/**
+ * Sanitizes a name string for safe use in file paths by replacing
+ * non-alphanumeric characters (except dash and underscore) with underscores.
+ * Prevents path traversal via crafted recording names.
+ * @param name - The raw name to sanitize.
+ * @returns Sanitized name safe for use in file paths.
+ */
+export function sanitizeName(name: string): string {
+  return name.replace(/[^a-zA-Z0-9_-]/g, '_');
+}
 
 /**
  * Parses CLI arguments into a RecorderOptions object.
@@ -208,7 +146,7 @@ export function parseRecorderArgs(): RecorderOptions {
  *
  * This function is evaluated in-page via page.evaluate.
  */
-function injectEventListenersCode(): string {
+function getEventListenersScript(): string {
   return `
     (function() {
       if (window.__recordingBuffer) return; // already injected
@@ -324,7 +262,7 @@ export async function recordInteractions(options: RecorderOptions): Promise<Inte
   const browser = await puppeteer.launch({
     headless: true,
     executablePath,
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    args: LAUNCH_ARGS,
   });
 
   const startTime = Date.now();
@@ -363,7 +301,7 @@ export async function recordInteractions(options: RecorderOptions): Promise<Inte
     }
 
     // Inject event listeners
-    await page.evaluate(injectEventListenersCode());
+    await page.evaluate(getEventListenersScript());
     console.log('Event listeners injected. Recording... (press Escape to stop)');
 
     // Poll until recording is complete (Escape key pressed or timeout)
@@ -409,8 +347,9 @@ export async function recordInteractions(options: RecorderOptions): Promise<Inte
       events,
     };
 
-    // Save recording to file
-    const recordingPath = resolve(interactionsDir, `${options.name}.json`);
+    // Save recording to file (name sanitized to prevent path traversal)
+    const safeName = sanitizeName(options.name);
+    const recordingPath = resolve(interactionsDir, `${safeName}.json`);
     writeFileSync(recordingPath, JSON.stringify(recording, null, 2));
     console.log(`Recording saved: ${recordingPath}`);
     console.log(`Recorded ${events.length} events over ${durationMs}ms`);

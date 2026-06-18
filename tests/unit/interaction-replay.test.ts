@@ -8,6 +8,9 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { mkdirSync, writeFileSync, rmSync } from 'fs';
+import { resolve } from 'path';
+import os from 'os';
 import {
   parseReplayArgs,
   replayInteraction,
@@ -126,9 +129,35 @@ describe('parseReplayArgs()', () => {
 
 // ── Recording Format Validation ──
 
+/**
+ * Helper: creates a temporary recording JSON file, calls replayInteraction,
+ * and returns the error (or throws if replayInteraction succeeded).
+ */
+async function createTempRecordingAndReject(
+  recording: Record<string, unknown>,
+): Promise<Error> {
+  const tmpDir = resolve(os.tmpdir(), `int-replay-test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+  mkdirSync(tmpDir, { recursive: true });
+  const filePath = resolve(tmpDir, 'recording.json');
+  writeFileSync(filePath, JSON.stringify(recording));
+
+  try {
+    await replayInteraction({
+      recordingPath: filePath,
+      port: 5173,
+      viewport: { width: 1280, height: 720 },
+    });
+    throw new Error('Expected replayInteraction to throw');
+  } catch (err) {
+    return err as Error;
+  } finally {
+    try { rmSync(tmpDir, { recursive: true, force: true }); } catch { /* ignore cleanup errors */ }
+  }
+}
+
 describe('Recording format version validation', () => {
-  it('rejects recordings with mismatched formatVersion', () => {
-    const invalidRecording = {
+  it('rejects recordings with mismatched formatVersion', async () => {
+    const err = await createTempRecordingAndReject({
       name: 'bad-version',
       description: 'Wrong format version',
       meta: {
@@ -140,13 +169,16 @@ describe('Recording format version validation', () => {
       },
       setupCommands: [],
       events: [],
-    };
+    });
 
-    // The formatVersion should be 1 — a mismatch indicates an incompatible format
-    expect(invalidRecording.meta.formatVersion).not.toBe(1);
+    expect(err.message).toMatch(/Unsupported recording format version/);
+    expect(err.message).toContain('999');
   });
 
-  it('accepts recordings with formatVersion 1', () => {
+  it('accepts recordings with formatVersion 1 (data structure)', () => {
+    // Validates the data contract: formatVersion 1 is the expected value.
+    // Full integration testing of replayInteraction with version 1 requires
+    // a running dev server and Chrome, so we validate the structure here.
     const validRecording = {
       name: 'good-version',
       description: 'Correct format version',
@@ -164,8 +196,8 @@ describe('Recording format version validation', () => {
     expect(validRecording.meta.formatVersion).toBe(1);
   });
 
-  it('rejects recordings missing meta.formatVersion', () => {
-    const recording: Record<string, unknown> = {
+  it('rejects recordings missing meta.formatVersion', async () => {
+    const err = await createTempRecordingAndReject({
       name: 'no-version',
       description: 'Missing formatVersion',
       meta: {
@@ -177,9 +209,10 @@ describe('Recording format version validation', () => {
       },
       setupCommands: [],
       events: [],
-    };
+    });
 
-    expect(recording.meta).not.toHaveProperty('formatVersion');
+    expect(err.message).toMatch(/Unsupported recording format version/);
+    expect(err.message).toContain('undefined');
   });
 });
 

@@ -54,17 +54,6 @@ function parseStepIndex(filename: string): number {
 }
 
 /**
- * Extracts the event slug from a filename (everything after step-NN-).
- *
- * @param filename - The filename to extract the slug from.
- * @returns The event slug, or empty string.
- */
-function parseEventSlug(filename: string): string {
-  const match = filename.match(/^step-\d+-(.+)\.(png|json)$/);
-  return match?.[1] ?? '';
-}
-
-/**
  * Deeply compares two JSON values and returns field-level diffs.
  *
  * @param baseline - The baseline value.

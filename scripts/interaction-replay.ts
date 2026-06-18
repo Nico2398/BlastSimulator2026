@@ -25,10 +25,22 @@
  * @module interaction-replay
  */
 
-import type { InteractionRecording, InteractionRecordEvent } from './interaction-types.js';
+import type {
+  InteractionRecording,
+  InteractionRecordEvent,
+  ClickEvent,
+  MouseMoveEvent,
+  KeyEvent,
+  ScrollEvent,
+  WheelEvent,
+  WaitEvent,
+  AssertEvent,
+  ViewportEvent,
+} from './interaction-types.js';
 import puppeteer from 'puppeteer';
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'fs';
 import { resolve } from 'path';
+import { resolveChromePath, LAUNCH_ARGS } from './shared/chrome.js';
 
 // ── Constants ──
 
@@ -83,29 +95,6 @@ export interface ReplayOptions {
 }
 
 // ── Helpers ──
-
-/**
- * Resolves the Chrome/Chromium executable path from well-known locations.
- * @returns The path if found, or undefined.
- */
-function resolveChromePath(): string | undefined {
-  const candidates = [
-    ...(process.platform === 'win32'
-      ? [
-          'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-          'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-          `${process.env.LOCALAPPDATA}\\Google\\Chrome\\Application\\chrome.exe`,
-          `${process.env.PROGRAMFILES}\\Google\\Chrome\\Application\\chrome.exe`,
-        ]
-      : [
-          '/usr/bin/chromium',
-          '/usr/bin/chromium-browser',
-          '/usr/bin/google-chrome',
-          '/root/.cache/ms-playwright/chromium-1194/chrome-linux/chrome',
-        ]),
-  ];
-  return candidates.find((p) => existsSync(p));
-}
 
 /**
  * Parses the --shots argument into an array of ShotDef.
@@ -366,8 +355,9 @@ export async function replayInteraction(options: ReplayOptions): Promise<void> {
     );
   }
 
-  // Set up output directory
-  const defaultOutputDir = `screenshots/replay-${recording.name}`;
+  // Set up output directory (name sanitized to prevent path traversal)
+  const safeName = recording.name.replace(/[^a-zA-Z0-9_-]/g, '_');
+  const defaultOutputDir = `screenshots/replay-${safeName}`;
   const outDir = resolve(process.cwd(), options.outputDir ?? defaultOutputDir);
   mkdirSync(outDir, { recursive: true });
 
@@ -380,7 +370,7 @@ export async function replayInteraction(options: ReplayOptions): Promise<void> {
   const browser = await puppeteer.launch({
     headless: true,
     executablePath,
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    args: LAUNCH_ARGS,
   });
 
   const stepResults: Array<{
@@ -442,71 +432,80 @@ export async function replayInteraction(options: ReplayOptions): Promise<void> {
       lastTimestamp = event.timestamp;
 
       const eventType = event.type;
-      const label = (event as any).label;
-      const takeScreenshot = (event as any).screenshot !== false; // default true
+      const label = event.label;
+      const takeScreenshot = event.screenshot !== false; // default true
 
       console.log(`Step ${i}: ${eventType}${label ? ` (${label})` : ''}`);
 
       // Replay the event based on its type
       switch (event.type) {
         case 'click': {
+          const clickEvent = event as ClickEvent;
           const buttonMap: Record<string, 'left' | 'right' | 'middle'> = {
             left: 'left',
             right: 'right',
             middle: 'middle',
           };
-          const btn = buttonMap[(event as any).button] ?? 'left';
-          await page.mouse.click((event as any).x, (event as any).y, { button: btn });
+          const btn = buttonMap[clickEvent.button] ?? 'left';
+          await page.mouse.click(clickEvent.x, clickEvent.y, { button: btn });
           break;
         }
         case 'mousedown': {
+          const mouseDownEvent = event as ClickEvent;
           const buttonMap: Record<string, 'left' | 'right' | 'middle'> = {
             left: 'left',
             right: 'right',
             middle: 'middle',
           };
-          const btn = buttonMap[(event as any).button] ?? 'left';
+          const btn = buttonMap[mouseDownEvent.button] ?? 'left';
           await page.mouse.down({ button: btn });
           break;
         }
         case 'mouseup': {
+          const mouseUpEvent = event as ClickEvent;
           const buttonMap: Record<string, 'left' | 'right' | 'middle'> = {
             left: 'left',
             right: 'right',
             middle: 'middle',
           };
-          const btn = buttonMap[(event as any).button] ?? 'left';
+          const btn = buttonMap[mouseUpEvent.button] ?? 'left';
           await page.mouse.up({ button: btn });
           break;
         }
         case 'mousemove': {
-          await page.mouse.move((event as any).x, (event as any).y);
+          const moveEvent = event as MouseMoveEvent;
+          await page.mouse.move(moveEvent.x, moveEvent.y);
           break;
         }
         case 'keypress': {
-          await page.keyboard.press((event as any).key);
+          const keyPressEvent = event as KeyEvent;
+          await page.keyboard.press(keyPressEvent.key);
           break;
         }
         case 'keydown': {
-          await page.keyboard.down((event as any).key);
+          const keyDownEvent = event as KeyEvent;
+          await page.keyboard.down(keyDownEvent.key);
           break;
         }
         case 'keyup': {
-          await page.keyboard.up((event as any).key);
+          const keyUpEvent = event as KeyEvent;
+          await page.keyboard.up(keyUpEvent.key);
           break;
         }
         case 'scroll': {
+          const scrollEvent = event as ScrollEvent;
           await page.evaluate(
             (x: number, y: number) => window.scrollTo(x, y),
-            (event as any).x,
-            (event as any).y,
+            scrollEvent.x,
+            scrollEvent.y,
           );
           break;
         }
         case 'wheel': {
+          const wheelEvent = event as WheelEvent;
           await page.evaluate(
             (evt: { x: number; y: number; deltaX: number; deltaY: number; deltaZ: number }) => {
-              const wheelEvent = new WheelEvent('wheel', {
+              const wheelEvt = new WheelEvent('wheel', {
                 clientX: evt.x,
                 clientY: evt.y,
                 deltaX: evt.deltaX,
@@ -515,29 +514,35 @@ export async function replayInteraction(options: ReplayOptions): Promise<void> {
                 bubbles: true,
                 cancelable: true,
               });
-              document.dispatchEvent(wheelEvent);
+              document.dispatchEvent(wheelEvt);
             },
             {
-              x: (event as any).x,
-              y: (event as any).y,
-              deltaX: (event as any).deltaX,
-              deltaY: (event as any).deltaY,
-              deltaZ: (event as any).deltaZ,
+              x: wheelEvent.x,
+              y: wheelEvent.y,
+              deltaX: wheelEvent.deltaX,
+              deltaY: wheelEvent.deltaY,
+              deltaZ: wheelEvent.deltaZ,
             },
           );
           break;
         }
         case 'wait': {
-          const durationMs = (event as any).durationMs ?? 0;
+          const waitEvent = event as WaitEvent;
+          const durationMs = waitEvent.durationMs ?? 0;
           await new Promise((r) => setTimeout(r, durationMs));
           break;
         }
         case 'assert': {
-          const assertEvent = event as any;
+          const assertEvent = event as AssertEvent;
           console.log(`  Assert: selector=${assertEvent.selector}, eval=${assertEvent.eval}`);
 
           // Run assertion: evaluate a JS expression or check selector
           if (assertEvent.eval) {
+            // Validate eval string length to prevent abuse
+            if (assertEvent.eval.length > 200) {
+              console.warn(`  Warning: Assert eval string is unusually long (${assertEvent.eval.length} chars). This may be a security concern.`);
+            }
+
             try {
               const result = await page.evaluate((expr: string) => {
                 try {
@@ -599,14 +604,15 @@ export async function replayInteraction(options: ReplayOptions): Promise<void> {
           break;
         }
         case 'viewport': {
+          const viewportEvent = event as ViewportEvent;
           await page.setViewport({
-            width: (event as any).width,
-            height: (event as any).height,
+            width: viewportEvent.width,
+            height: viewportEvent.height,
           });
           break;
         }
         default:
-          console.warn(`Unknown event type: ${(event as any).type}`);
+          console.warn(`Unknown event type: ${event.type}`);
           break;
       }
 
