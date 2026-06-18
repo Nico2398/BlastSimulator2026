@@ -50,7 +50,7 @@ mainMenu.setOnNewCampaign(() => {
   // Show world map so the player can pick a level.
   // Tutorial overlay sits on top and doesn't block the map.
   mainMenu.showWorldMap(null);
-  if (!TutorialOverlay.isCompleted()) tutorial.start();
+  if (!TutorialOverlay.isCompleted()) tutorial.start(ctx.state ?? undefined);
 });
 mainMenu.setOnStartLevel((levelId) => {
   // Ensure a base GameState (with campaign) exists before starting a level.
@@ -67,7 +67,7 @@ mainMenu.setOnTutorial(() => {
   mainMenu.hide();
   window.__gameConsole('new_game seed:42 size:24');
   window.__gameConsole('campaign start level:tutorial_pit');
-  tutorial.start();
+  tutorial.start(ctx.state ?? undefined);
 });
 
 // --- Audio ---
