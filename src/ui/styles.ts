@@ -491,9 +491,19 @@ const CSS = `
   box-shadow: 0 4px 20px rgba(0,0,0,0.7);
 }
 
-/* ─── Tutorial highlight ─── */
-.bs-tutorial-highlight { }
-@keyframes bs-tutorial-pulse { }
+/* ─── Tutorial step highlight (bright blue pulsating glow) ─── */
+.bs-tutorial-highlight {
+  animation: bs-tutorial-pulse 1.5s ease-in-out infinite !important;
+  box-shadow: 0 0 12px 4px rgba(64, 156, 255, 0.8) !important;
+  border-color: #409cff !important;
+  outline: 2px solid rgba(64, 156, 255, 0.5) !important;
+  outline-offset: 2px !important;
+  transition: box-shadow 0.3s ease !important;
+}
+@keyframes bs-tutorial-pulse {
+  0%, 100% { box-shadow: 0 0 8px 2px rgba(64, 156, 255, 0.6); }
+  50% { box-shadow: 0 0 16px 6px rgba(64, 156, 255, 0.9); }
+}
 `;
 
 let injected = false;

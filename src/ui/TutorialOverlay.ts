@@ -249,6 +249,7 @@ export class TutorialOverlay {
 
   private clearHighlight(): void {
     if (this.highlightedEl) {
+      this.highlightedEl.classList.remove('bs-tutorial-highlight');
       this.highlightedEl = null;
     }
   }
@@ -268,7 +269,11 @@ export class TutorialOverlay {
     this.progressEl.style.width = `${progress}%`;
 
     if (step.highlightTarget) {
-      // TODO: implement element highlighting
+      const target = document.querySelector(step.highlightTarget) as HTMLElement | null;
+      if (target) {
+        target.classList.add('bs-tutorial-highlight');
+        this.highlightedEl = target;
+      }
     }
 
     if (step.commands && step.commands.length > 0) {

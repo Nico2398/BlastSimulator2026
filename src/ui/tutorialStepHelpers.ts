@@ -17,12 +17,12 @@ export function createHireStep(
   role: EmployeeRole,
   highlightTarget?: string,
 ): TutorialStep {
-  void highlightTarget;
   return {
     id,
     titleKey,
     textKey,
     commands: ['hire employee'],
+    ...(highlightTarget ? { highlightTarget } : {}),
     captureSnapshot: (state: GameState) => ({
       prevEmployeeCount: getEmployees(state).length,
     }),
@@ -49,8 +49,7 @@ export function createHireStepWithEventGuard(
   role: EmployeeRole,
   highlightTarget?: string,
 ): TutorialStep {
-  void highlightTarget;
-  const base = createHireStep(id, titleKey, textKey, role);
+  const base = createHireStep(id, titleKey, textKey, role, highlightTarget);
   const origIsComplete = base.isComplete;
   return {
     ...base,
@@ -80,12 +79,12 @@ export function createComparisonStep(
   commands?: string[],
   highlightTarget?: string,
 ): TutorialStep {
-  void highlightTarget;
   return {
     id,
     titleKey,
     textKey,
     ...(commands ? { commands } : {}),
+    ...(highlightTarget ? { highlightTarget } : {}),
     captureSnapshot: (state: GameState) => ({
       prevValue: getValue(state),
     }),
@@ -106,13 +105,13 @@ export function createAutoAdvanceStep(
   captureSnapshot?: (state: GameState) => Record<string, unknown>,
   highlightTarget?: string,
 ): TutorialStep {
-  void highlightTarget;
   return {
     id,
     titleKey,
     textKey,
     autoAdvanceMs: 2000,
     ...(captureSnapshot ? { captureSnapshot } : {}),
+    ...(highlightTarget ? { highlightTarget } : {}),
     isComplete: () => true,
   };
 }
