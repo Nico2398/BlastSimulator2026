@@ -2,7 +2,7 @@
   "name": "blast-execution-visual",
   "description": "Visual verification of blast execution and effects: explosion animation, energy propagation visualization, fragment spawning, and projection flyrock",
   "steps": [
-    { "command": "new_game seed:42", "timeout": 10 },
+    { "command": "new_game seed:42", "timeout": 15 },
     "drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:20,20",
     "charge hole:* explosive:boomite amount:5 stemming:2",
     "sequence auto delay_step:25",

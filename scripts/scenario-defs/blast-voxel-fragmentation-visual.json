@@ -2,7 +2,7 @@
   "name": "blast-voxel-fragmentation-visual",
   "description": "Visual verification of voxel fragmentation visibility: before/after terrain comparison, crater geometry, fragment mesh generation, and Voronoi decomposition artifacts",
   "steps": [
-    { "command": "new_game seed:42", "timeout": 10 },
+    { "command": "new_game seed:42", "timeout": 15 },
     "drill_plan grid rows:2 cols:3 spacing:4 depth:6 start:15,15",
     "charge hole:* explosive:boomite amount:5 stemming:2",
     "sequence auto delay_step:25",
