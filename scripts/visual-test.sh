@@ -3,20 +3,24 @@
 #
 # Usage:
 #   bash scripts/visual-test.sh --name "terrain" --commands "new_game mine_type:desert seed:42"
+#   bash scripts/visual-test.sh --name "blast" --commands "new_game seed:1; blast 3,5" --port 5174
 #
-# Kills any process on port 5173, starts the dev server in background,
-# waits for it to be ready, takes a screenshot, then cleans up on exit.
+# Environment variables:
+#   PUPPETEER_EXECUTABLE_PATH — path to Chrome/Chromium executable
+#   VISUAL_TEST_PORT — dev server port (default 5173)
 
 set -euo pipefail
 
 NAME="screenshot"
 COMMANDS=""
+PORT="${VISUAL_TEST_PORT:-5173}"
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --name)    NAME="$2";     shift 2 ;;
-    --commands) COMMANDS="$2"; shift 2 ;;
+    --name)      NAME="$2";      shift 2 ;;
+    --commands)  COMMANDS="$2";  shift 2 ;;
+    --port)      PORT="$2";      shift 2 ;;
     *) echo "Unknown arg: $1"; exit 1 ;;
   esac
 done
@@ -33,22 +37,22 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Kill any existing process on port 5173
-if lsof -ti :5173 &>/dev/null; then
-  echo "Killing existing process on port 5173..."
-  lsof -ti :5173 | xargs kill -9 2>/dev/null || true
+# Kill any existing process on the target port
+if lsof -ti :$PORT &>/dev/null; then
+  echo "Killing existing process on port $PORT..."
+  lsof -ti :$PORT | xargs kill -9 2>/dev/null || true
   sleep 1
 fi
 
 # Start dev server in background
-echo "Starting dev server..."
-npm run dev &>/tmp/blast-dev.log &
+echo "Starting dev server on port $PORT..."
+npm run dev -- --port "$PORT" &>/tmp/blast-dev.log &
 DEV_SERVER_PID=$!
 
 # Wait for server to be ready (up to 30 seconds)
-echo "Waiting for server on http://localhost:5173..."
+echo "Waiting for server on http://localhost:$PORT..."
 for i in $(seq 1 30); do
-  if curl -sf http://localhost:5173 &>/dev/null; then
+  if curl -sf "http://localhost:$PORT" &>/dev/null; then
     echo "Server ready."
     break
   fi
@@ -61,7 +65,7 @@ for i in $(seq 1 30); do
 done
 
 # Build screenshot command
-SCREENSHOT_ARGS=(--name "$NAME")
+SCREENSHOT_ARGS=(--name "$NAME" --port "$PORT")
 if [[ -n "$COMMANDS" ]]; then
   SCREENSHOT_ARGS+=(--commands "$COMMANDS")
 fi
