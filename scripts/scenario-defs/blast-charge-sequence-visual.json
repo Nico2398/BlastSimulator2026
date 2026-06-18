@@ -1,0 +1,22 @@
+{
+  "name": "blast-charge-sequence-visual",
+  "description": "Visual verification of charge loading UI and detonation sequence: explosive selection, amount, stemming, tubing, auto/manual sequencing, and delay patterns",
+  "steps": [
+    { "command": "new_game seed:42", "timeout": 10 },
+    "drill_plan grid rows:2 cols:3 spacing:4 depth:6 start:15,15",
+    "charge hole:* explosive:boomite amount:5 stemming:2",
+    "charge hole:1 explosive:boomite amount:8 stemming:3",
+    "sequence auto delay_step:25",
+    "sequence show",
+    "sequence set hole:1 delay:0",
+    "sequence set hole:2 delay:50",
+    "sequence show",
+    "state full",
+    "inspect 15,15,0"
+  ],
+  "shots": [
+    { "name": "overview", "yaw": 0, "pitch": 45 },
+    { "name": "closeup", "yaw": 90, "pitch": 10 },
+    { "name": "birdseye", "yaw": 0, "pitch": 80 }
+  ]
+}

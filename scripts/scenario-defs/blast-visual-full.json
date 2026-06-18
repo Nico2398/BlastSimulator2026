@@ -1,0 +1,40 @@
+{
+  "name": "blast-visual-full",
+  "description": "Comprehensive visual pipeline test covering all 7 blast system areas: drill plan, charge/sequence, software preview tiers, detonation execution, post-blast report, and voxel fragmentation with multi-angle screenshots at every stage",
+  "steps": [
+    { "command": "new_game seed:42", "timeout": 10 },
+    "drill_plan grid rows:3 cols:4 spacing:5 depth:8 start:20,20",
+    "drill_plan show",
+    "state full",
+    "charge hole:* explosive:boomite amount:5 stemming:2",
+    "charge hole:1 explosive:boomite amount:8 stemming:3",
+    "charge hole:2 explosive:boomite amount:3 stemming:1",
+    "sequence auto delay_step:25",
+    "sequence set hole:1 delay:0",
+    "sequence set hole:6 delay:100",
+    "sequence show",
+    "blast_preview",
+    "buy_software tier:1",
+    "preview energy",
+    "buy_software tier:2",
+    "preview fragments",
+    "buy_software tier:3",
+    "preview projections",
+    "buy_software tier:4",
+    "preview vibrations",
+    "blast_preview",
+    { "command": "blast", "timeout": 20 },
+    "fragments",
+    "inspect 20,20,0",
+    "finances",
+    "scores",
+    "stats",
+    "state full"
+  ],
+  "shots": [
+    { "name": "overview", "yaw": 0, "pitch": 45 },
+    { "name": "closeup", "yaw": 90, "pitch": 10 },
+    { "name": "birdseye", "yaw": 0, "pitch": 80 },
+    { "name": "angled", "yaw": 45, "pitch": 30 }
+  ]
+}
