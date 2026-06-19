@@ -7,9 +7,13 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { mkdirSync, writeFileSync, rmSync } from 'fs';
+import { resolve } from 'path';
+import os from 'os';
 import {
   parseCompareArgs,
   compareDirectories,
+  type CompareOptions,
 } from '../../scripts/interaction-compare.js';
 
 // ── Argument Parsing ──
@@ -83,20 +87,72 @@ describe('parseCompareArgs()', () => {
 // ── Comparison Function ──
 
 describe('compareDirectories()', () => {
-  it('returns a promise', () => {
-    const resultPromise = compareDirectories({
-      baselineDir: 'screenshots/replay-v1',
-      targetDir: 'screenshots/replay-v2',
-      outputDir: 'compare-results',
-    });
-    expect(resultPromise).toBeInstanceOf(Promise);
+  /**
+   * Creates a temporary directory with the given step files for testing.
+   */
+  function createTempStepDir(
+    prefix: string,
+    stepFiles: Array<{ step: number; type: string; data?: string }>,
+  ): string {
+    const tmpDir = resolve(os.tmpdir(), `int-cmp-test-${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+    mkdirSync(tmpDir, { recursive: true });
+    for (const sf of stepFiles) {
+      const padded = String(sf.step).padStart(2, '0');
+      if (sf.type === 'json') {
+        writeFileSync(
+          resolve(tmpDir, `step-${padded}-event.json`),
+          sf.data ?? JSON.stringify({}),
+        );
+      } else {
+        // Create a minimal valid PNG (just a small buffer so it's non-empty)
+        writeFileSync(
+          resolve(tmpDir, `step-${padded}-event.png`),
+          Buffer.from(sf.data ?? 'dummy-png-data'),
+        );
+      }
+    }
+    return tmpDir;
+  }
+
+  it('returns a promise and resolves with CompareResult structure', async () => {
+    const tmpBase = createTempStepDir('base', [
+      { step: 0, type: 'png' },
+      { step: 0, type: 'json' },
+    ]);
+    const tmpTarget = createTempStepDir('target', [
+      { step: 0, type: 'png' },
+      { step: 0, type: 'json' },
+    ]);
+    const tmpOut = resolve(os.tmpdir(), `int-cmp-out-${Date.now()}`);
+
+    try {
+      const result = await compareDirectories({
+        baselineDir: tmpBase,
+        targetDir: tmpTarget,
+        outputDir: tmpOut,
+      });
+      expect(result).toHaveProperty('totalSteps');
+      expect(result).toHaveProperty('matchedSteps');
+      expect(result).toHaveProperty('divergedSteps');
+      expect(result).toHaveProperty('screenshotDiffs');
+      expect(result).toHaveProperty('stateDiffs');
+      expect(result).toHaveProperty('reportPath');
+      expect(result).toHaveProperty('pass');
+      expect(typeof result.pass).toBe('boolean');
+      expect(Array.isArray(result.screenshotDiffs)).toBe(true);
+      expect(Array.isArray(result.stateDiffs)).toBe(true);
+    } finally {
+      try { rmSync(tmpBase, { recursive: true, force: true }); } catch { /* ignore */ }
+      try { rmSync(tmpTarget, { recursive: true, force: true }); } catch { /* ignore */ }
+      try { rmSync(tmpOut, { recursive: true, force: true }); } catch { /* ignore */ }
+    }
   });
 
   it('rejects when baseline directory does not exist', async () => {
     await expect(
       compareDirectories({
         baselineDir: 'screenshots/nonexistent',
-        targetDir: 'screenshots/replay-v2',
+        targetDir: 'src', // exists
         outputDir: 'compare-output',
       }),
     ).rejects.toThrow();
@@ -112,13 +168,29 @@ describe('compareDirectories()', () => {
     ).rejects.toThrow();
   });
 
-  it('accepts CompareOptions with custom threshold', () => {
-    const resultPromise = compareDirectories({
-      baselineDir: 'a',
-      targetDir: 'b',
-      outputDir: 'c',
-      threshold: 0.1,
-    });
-    expect(resultPromise).toBeInstanceOf(Promise);
+  it('accepts CompareOptions with custom threshold and resolves', async () => {
+    const tmpBase = createTempStepDir('threshold-base', [
+      { step: 0, type: 'json', data: JSON.stringify({ value: 1 }) },
+    ]);
+    const tmpTarget = createTempStepDir('threshold-target', [
+      { step: 0, type: 'json', data: JSON.stringify({ value: 2 }) },
+    ]);
+    const tmpOut = resolve(os.tmpdir(), `int-cmp-thresh-${Date.now()}`);
+
+    try {
+      const result = await compareDirectories({
+        baselineDir: tmpBase,
+        targetDir: tmpTarget,
+        outputDir: tmpOut,
+        threshold: 0.5,
+      });
+      expect(result).toHaveProperty('pass');
+      expect(result).toHaveProperty('stateDiffs');
+      expect(result.screenshotDiffs).toHaveLength(0);
+    } finally {
+      try { rmSync(tmpBase, { recursive: true, force: true }); } catch { /* ignore */ }
+      try { rmSync(tmpTarget, { recursive: true, force: true }); } catch { /* ignore */ }
+      try { rmSync(tmpOut, { recursive: true, force: true }); } catch { /* ignore */ }
+    }
   });
 });

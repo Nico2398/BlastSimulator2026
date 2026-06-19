@@ -125,10 +125,22 @@ describe('parseRecorderArgs()', () => {
 // ── Recording Function ──
 
 describe('recordInteractions()', () => {
+  /**
+   * Helper: calls recordInteractions and silences the promise rejection.
+   * Since recordInteractions() launches Puppeteer (requires Chrome + dev server),
+   * it will reject in CI. We catch the rejection to prevent unhandled promise
+   * errors while still verifying the return type.
+   */
+  function silentRecord(options: Record<string, unknown>): Promise<unknown> {
+    const promise = recordInteractions(options as Parameters<typeof recordInteractions>[0]);
+    promise.catch(() => { /* expected: no Chrome/dev-server in test env */ });
+    return promise;
+  }
+
   it('returns a promise that resolves to an InteractionRecording-like object', async () => {
     // Since recordInteractions() launches real Puppeteer and connects to a dev server,
     // we verify it has the correct function signature and returns a promise.
-    const resultPromise = recordInteractions({
+    const resultPromise = silentRecord({
       name: 'test',
       port: 5173,
       viewport: { width: 1280, height: 720 },
@@ -147,12 +159,12 @@ describe('recordInteractions()', () => {
       outputDir: 'my-recordings',
       setupCommands: ['new_game seed:42'],
     };
-    const resultPromise = recordInteractions(options);
+    const resultPromise = silentRecord(options);
     expect(resultPromise).toBeInstanceOf(Promise);
   });
 
   it('accepts minimal RecorderOptions', () => {
-    const resultPromise = recordInteractions({
+    const resultPromise = silentRecord({
       name: 'minimal-test',
       port: 5173,
       viewport: { width: 1280, height: 720 },

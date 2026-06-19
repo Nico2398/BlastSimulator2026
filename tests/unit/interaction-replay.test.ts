@@ -219,8 +219,20 @@ describe('Recording format version validation', () => {
 // ── Replay Function ──
 
 describe('replayInteraction()', () => {
+  /**
+   * Helper: calls replayInteraction and silences the promise rejection.
+   * Since replayInteraction() launches Puppeteer (requires Chrome + dev server),
+   * it will reject in CI. We catch the rejection to prevent unhandled promise
+   * errors while still verifying the return type.
+   */
+  function silentReplay(options: Record<string, unknown>): Promise<void> {
+    const promise = replayInteraction(options as Parameters<typeof replayInteraction>[0]);
+    promise.catch(() => { /* expected: no Chrome/dev-server in test env */ });
+    return promise;
+  }
+
   it('returns a promise', () => {
-    const resultPromise = replayInteraction({
+    const resultPromise = silentReplay({
       recordingPath: 'records/test.json',
       port: 5173,
       viewport: { width: 1280, height: 720 },
@@ -239,7 +251,7 @@ describe('replayInteraction()', () => {
   });
 
   it('accepts ReplayOptions with optional fields', () => {
-    const resultPromise = replayInteraction({
+    const resultPromise = silentReplay({
       recordingPath: 'records/test.json',
       port: 5174,
       viewport: { width: 1920, height: 1080 },
