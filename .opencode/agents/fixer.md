@@ -39,11 +39,11 @@ Arbiter between test expectation and implementation behavior. When a test fails,
    - If test expects impossible/improbable or contradicts spec → fix test
    - If implementation doesn't meet test → fix implementation
 6. Apply minimal fix to the correct side.
-5. Verify with `npx tsc --noEmit` (type check only).
-6. Run `npx vitest run <failing-test-file>` on the specific file from the stack trace. If tests still fail, read the new output and iterate. Only stop when the targeted file passes or you are genuinely stuck with no path forward.
-7. Commit: `git add -A && git commit -m "fix: <description of fix> (<issue>)"`
-8. `git log --oneline -1` → confirm committed
-9. Report what you changed.
+7. Verify with `npx tsc --noEmit` (type check only).
+8. Run `npx vitest run <failing-test-file>` on the specific file from the stack trace. If tests still fail, read the new output and iterate. Only stop when the targeted file passes or you are genuinely stuck with no path forward.
+9. Commit: `git add -A && git commit -m "fix: <description of fix> (<issue>)"`
+10. `git log --oneline -1` → confirm committed
+11. Report what you changed.
 
 ## Key References
 

@@ -72,11 +72,13 @@ LOOP:
 
 ### Non-Agentic Steps
 
+> Assumes `main` base branch. Override via `base_branch` parameter.
+
 | Step | Action |
 |------|--------|
 | switch-to-feature | `git checkout pipeline/feature-<N>` — verify branch exists first. If not → abort with TDD cycle failure |
 | branch-sanity | `git branch --show-current` |
 | verify-commit | `git log --oneline -1` — auto-commit if dirty, use message `"<agent-name>: <step-context> (#<N>)"` |
 | test-runner | `npx vitest run` — route to @fixer on fail |
-| qualimetry | `npx jscpd $(git diff --name-only origin/main -- src/ tests/)` (changed files only, skip pre-existing duplicates) — route to @implementer on fail |
+| qualimetry | Bash: `changed=$(git diff --name-only origin/main -- src/ tests/); if [ -n "$changed" ]; then npx jscpd $changed; fi` / PS: `$changed=git diff --name-only origin/main -- src/ tests/; if($changed){npx jscpd $changed}` (changed files only, skip pre-existing duplicates) — route to @implementer on fail |
 | git-verify | `git status --porcelain` (must be empty) → `git branch --show-current` → `git log --oneline -3` |
