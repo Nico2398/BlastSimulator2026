@@ -47,5 +47,5 @@ description: >
 | branch-sanity | `git branch --show-current` |
 | test-runner | `npx vitest run` — route to @fixer on fail |
 | verify-commit | `git log --oneline -1` — auto-commit if dirty, use message `"<agent-name>: <step-context> (#<N>)"` |
-| qualimetry | `npx jscpd --gitOnly src/ tests/` (changed files only) — route to @implementer on fail |
+| qualimetry | `npx jscpd $(git diff --name-only origin/main -- src/ tests/)` (changed files only) — route to @implementer on fail |
 | git-verify | `git status --porcelain` (must be empty) → `git branch --show-current` → `git log --oneline -3` |

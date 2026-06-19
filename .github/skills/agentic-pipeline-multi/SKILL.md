@@ -71,4 +71,4 @@ Each section preserves branch isolation. Feature branch accumulates all changes.
 | decompose | Manual — orchestrator splits prompt |
 | plan-all | Orchestrator creates TODO list |
 | test-runner | `npx vitest run` — route to @fixer on fail |
-| qualimetry | `npx jscpd --gitOnly src/ tests/` (changed files only) — route to @implementer on fail |
+| qualimetry | `npx jscpd $(git diff --name-only origin/main -- src/ tests/)` (changed files only) — route to @implementer on fail |
