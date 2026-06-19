@@ -13,6 +13,7 @@ One-command wrapper — starts server + captures screenshot:
 ```bash
 bash scripts/visual-test.sh --name "terrain" --commands "new_game mine_type:desert seed:42"
 ```
+PowerShell: `npx tsx scripts/screenshot.ts --name "terrain" --commands "new_game mine_type:desert seed:42"` (dev server must be running)
 
 Dev server already running:
 
@@ -69,10 +70,12 @@ Opens blast panel via Puppeteer click, tests all buttons, reports computed style
 ## Environment Notes
 
 - `PUPPETEER_EXECUTABLE_PATH` may vary. Agent sandbox: `/usr/bin/chromium`
-- Start dev server first: `npm run dev &`
+- Start dev server first:
+  - Bash: `npm run dev &`
+  - PowerShell: `Start-Process npm -ArgumentList "run dev"`
 
 ```bash
-PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium npx tsx scripts/scenario-test.ts --scenario blast-basic
+npx tsx scripts/scenario-test.ts --scenario blast-basic --puppeteer-path "/usr/bin/chromium"
 ```
 
 ## What to Evaluate

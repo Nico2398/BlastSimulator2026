@@ -71,6 +71,8 @@ Caller provides a `<label>` and optionally `<base_branch>` (default: `main`). Al
 
 ### Non-Agentic Steps
 
+> Assumes `main` base branch. Override via `base_branch` parameter.
+
 | Step | Action |
 |------|--------|
 | setup-test-branch | `git checkout -b pipeline/tests-<label> <base_branch>` (default: `main`) |
@@ -79,6 +81,6 @@ Caller provides a `<label>` and optionally `<base_branch>` (default: `main`). Al
 | switch-to-impl | `git checkout pipeline/impl-<label>` |
 | branch-sanity | `git branch --show-current` |
 | verify-commit | `git log --oneline -1` — auto-commit if dirty, use message `"<agent-name>: <step-context> (#<label>)"` |
-| verify-skeleton-sha | `git cat-file -t <skeleton_commit_sha> 2>$null`. If not a valid object → abort, retry @skeleton-writer |
+| verify-skeleton-sha | Bash: `git cat-file -t <skeleton_commit_sha> 2>/dev/null` / PS: `git cat-file -t <skeleton_commit_sha> 2>$null`. If not a valid object → abort, retry @skeleton-writer |
 | cherry-pick | `git cherry-pick pipeline/impl-<label>` — on feature branch; detect conflicts. If feature branch missing: `git checkout -b pipeline/feature-<label> pipeline/tests-<label>`, then cherry-pick |
 | git-verify | `git status --porcelain` (must be empty) → `git branch --show-current` → `git log --oneline -3` |

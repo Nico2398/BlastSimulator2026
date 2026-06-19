@@ -34,6 +34,7 @@ In both contexts: run the full scenario suite, inspect every screenshot (includi
 npm run dev &
 sleep 5
 ```
+PowerShell: `Start-Process npm -ArgumentList "run dev"; Start-Sleep -Seconds 5`
 
 Puppeteer executable: `$env:PUPPETEER_EXECUTABLE_PATH` > auto-detect (Windows: `Program Files\Google\Chrome\chrome.exe`, Linux: `/usr/bin/chromium`).
 Dev server port: `--port` > `$env:VISUAL_TEST_PORT` > 5173 default.
@@ -55,6 +56,7 @@ npx tsx scripts/scenario-test.ts --name my-test \
 ```bash
 bash scripts/visual-test.sh --name "terrain" --commands "new_game mine_type:desert seed:42"
 ```
+PowerShell: `npx tsx scripts/screenshot.ts --name "terrain" --commands "new_game mine_type:desert seed:42"` (dev server must be running)
 
 ### Multi-Angle Screenshots
 Capture multiple camera angles per scenario step via `--shots`:
@@ -149,8 +151,9 @@ Fixing visual issue:
 ## UI Button Diagnostics
 
 ```bash
-PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium npx tsx scripts/ui-diagnostic.ts
+npx tsx scripts/ui-diagnostic.ts
 ```
+Setting Puppeteer path: `--puppeteer-path "/path/to/chrome"` or `$env:PUPPETEER_EXECUTABLE_PATH`.
 
 ## State Extraction
 
