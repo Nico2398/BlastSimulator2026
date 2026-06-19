@@ -1,16 +1,18 @@
 /**
  * Tests for the interaction replay module.
  *
- * Validates argument parsing, constants, and the replayInteraction()
- * function.
+ * Validates argument parsing, constants, the replayInteraction()
+ * function structure, and recording format validation. Puppeteer is
+ * mocked so tests run without a real browser or dev server.
  *
  * @module tests/unit/interaction-replay
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, writeFileSync, rmSync } from 'fs';
+import { mkdirSync, writeFileSync, rmSync, existsSync, readFileSync } from 'fs';
 import { resolve } from 'path';
 import os from 'os';
+import puppeteer from 'puppeteer';
 import {
   parseReplayArgs,
   replayInteraction,
@@ -18,6 +20,73 @@ import {
   RENDER_WAIT_MS,
   MIN_INTER_EVENT_MS,
 } from '../../scripts/interaction-replay.js';
+
+vi.mock('puppeteer', () => ({
+  default: {
+    launch: vi.fn(),
+  },
+}));
+
+// ── Test Helpers ──
+
+/** Creates a mock Puppeteer Page object. */
+function createMockPage() {
+  return {
+    setViewport: vi.fn().mockResolvedValue(undefined),
+    goto: vi.fn().mockResolvedValue(undefined),
+    waitForSelector: vi.fn().mockResolvedValue(true),
+    evaluate: vi.fn().mockResolvedValue(undefined),
+    screenshot: vi.fn().mockResolvedValue(undefined),
+    close: vi.fn(),
+    on: vi.fn(),
+    mouse: { click: vi.fn(), down: vi.fn(), up: vi.fn(), move: vi.fn() },
+    keyboard: { press: vi.fn(), down: vi.fn(), up: vi.fn() },
+  };
+}
+
+/** Creates a mock Puppeteer Browser object wrapping the given page. */
+function createMockBrowser(mockPage: ReturnType<typeof createMockPage>) {
+  return {
+    newPage: vi.fn().mockResolvedValue(mockPage),
+    close: vi.fn(),
+  };
+}
+
+/** Creates a temporary directory. */
+function createTempDir(): string {
+  return resolve(
+    os.tmpdir(),
+    `int-replay-test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  );
+}
+
+/**
+ * Helper: creates a temporary recording JSON file, calls replayInteraction,
+ * and returns the error (or throws if replayInteraction succeeded).
+ * Does NOT mock puppeteer — the format validation happens before any
+ * puppeteer calls, so these tests work with the real module.
+ */
+async function createTempRecordingAndReject(
+  recording: Record<string, unknown>,
+): Promise<Error> {
+  const tmpDir = createTempDir();
+  mkdirSync(tmpDir, { recursive: true });
+  const filePath = resolve(tmpDir, 'recording.json');
+  writeFileSync(filePath, JSON.stringify(recording));
+
+  try {
+    await replayInteraction({
+      recordingPath: filePath,
+      port: 5173,
+      viewport: { width: 1280, height: 720 },
+    });
+    throw new Error('Expected replayInteraction to throw');
+  } catch (err) {
+    return err as Error;
+  } finally {
+    try { rmSync(tmpDir, { recursive: true, force: true }); } catch { /* ignore cleanup errors */ }
+  }
+}
 
 // ── Constants ──
 
@@ -129,32 +198,6 @@ describe('parseReplayArgs()', () => {
 
 // ── Recording Format Validation ──
 
-/**
- * Helper: creates a temporary recording JSON file, calls replayInteraction,
- * and returns the error (or throws if replayInteraction succeeded).
- */
-async function createTempRecordingAndReject(
-  recording: Record<string, unknown>,
-): Promise<Error> {
-  const tmpDir = resolve(os.tmpdir(), `int-replay-test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
-  mkdirSync(tmpDir, { recursive: true });
-  const filePath = resolve(tmpDir, 'recording.json');
-  writeFileSync(filePath, JSON.stringify(recording));
-
-  try {
-    await replayInteraction({
-      recordingPath: filePath,
-      port: 5173,
-      viewport: { width: 1280, height: 720 },
-    });
-    throw new Error('Expected replayInteraction to throw');
-  } catch (err) {
-    return err as Error;
-  } finally {
-    try { rmSync(tmpDir, { recursive: true, force: true }); } catch { /* ignore cleanup errors */ }
-  }
-}
-
 describe('Recording format version validation', () => {
   it('rejects recordings with mismatched formatVersion', async () => {
     const err = await createTempRecordingAndReject({
@@ -219,25 +262,8 @@ describe('Recording format version validation', () => {
 // ── Replay Function ──
 
 describe('replayInteraction()', () => {
-  /**
-   * Helper: calls replayInteraction and silences the promise rejection.
-   * Since replayInteraction() launches Puppeteer (requires Chrome + dev server),
-   * it will reject in CI. We catch the rejection to prevent unhandled promise
-   * errors while still verifying the return type.
-   */
-  function silentReplay(options: Record<string, unknown>): Promise<void> {
-    const promise = replayInteraction(options as Parameters<typeof replayInteraction>[0]);
-    promise.catch(() => { /* expected: no Chrome/dev-server in test env */ });
-    return promise;
-  }
-
-  it('returns a promise', () => {
-    const resultPromise = silentReplay({
-      recordingPath: 'records/test.json',
-      port: 5173,
-      viewport: { width: 1280, height: 720 },
-    });
-    expect(resultPromise).toBeInstanceOf(Promise);
+  beforeEach(() => {
+    vi.clearAllMocks();
   });
 
   it('rejects when recording file does not exist', async () => {
@@ -247,19 +273,209 @@ describe('replayInteraction()', () => {
         port: 5173,
         viewport: { width: 1280, height: 720 },
       }),
-    ).rejects.toThrow();
+    ).rejects.toThrow(/Recording file not found/);
   });
 
-  it('accepts ReplayOptions with optional fields', () => {
-    const resultPromise = silentReplay({
-      recordingPath: 'records/test.json',
-      port: 5174,
-      viewport: { width: 1920, height: 1080 },
-      puppeteerPath: '/custom/chrome',
-      shots: [{ name: 'overview', yaw: 0, pitch: 45 }],
-      frames: 3,
-      intervalMs: 100,
-    });
-    expect(resultPromise).toBeInstanceOf(Promise);
+  it('rejects when recording JSON is invalid', async () => {
+    const tmpDir = createTempDir();
+    mkdirSync(tmpDir, { recursive: true });
+    const filePath = resolve(tmpDir, 'corrupt.json');
+    writeFileSync(filePath, 'not valid json{{{');
+
+    try {
+      await expect(
+        replayInteraction({
+          recordingPath: filePath,
+          port: 5173,
+          viewport: { width: 1280, height: 720 },
+        }),
+      ).rejects.toThrow(/Invalid recording JSON/);
+    } finally {
+      try { rmSync(tmpDir, { recursive: true, force: true }); } catch { /* ignore cleanup errors */ }
+    }
+  });
+
+  it('launches puppeteer and replays a valid recording', async () => {
+    const tmpDir = createTempDir();
+    mkdirSync(tmpDir, { recursive: true });
+    const recordingPath = resolve(tmpDir, 'recording.json');
+    const mockEvents = [
+      { type: 'wait', timestamp: 0, durationMs: 10 },
+    ];
+    const recording = {
+      name: 'replay-test',
+      description: 'Test recording',
+      meta: {
+        viewport: { width: 1280, height: 720 },
+        createdAt: '2026-01-01T00:00:00.000Z',
+        durationMs: 100,
+        eventCount: 1,
+        formatVersion: 1,
+      },
+      setupCommands: [],
+      events: mockEvents,
+    };
+    writeFileSync(recordingPath, JSON.stringify(recording));
+
+    const mockPage = createMockPage();
+    const mockBrowser = createMockBrowser(mockPage);
+    (puppeteer as any).launch.mockResolvedValue(mockBrowser);
+
+    // Evaluate calls: menu dismiss, captureStep (rAF, gameState, uiState)
+    mockPage.evaluate
+      .mockResolvedValueOnce(undefined) // menu dismiss
+      .mockResolvedValueOnce(undefined) // captureStep double rAF
+      .mockResolvedValueOnce(null) // captureStep __gameState
+      .mockResolvedValueOnce(null); // captureStep __uiState
+
+    const outDir = resolve(tmpDir, 'output');
+
+    try {
+      await replayInteraction({
+        recordingPath,
+        port: 5173,
+        viewport: { width: 1280, height: 720 },
+        outputDir: outDir,
+      });
+
+      // Verify puppeteer was launched with correct args
+      expect(puppeteer.launch).toHaveBeenCalledTimes(1);
+      expect(puppeteer.launch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          headless: true,
+          args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        }),
+      );
+
+      // Verify browser interactions
+      expect(mockPage.goto).toHaveBeenCalledWith('http://localhost:5173', { waitUntil: 'networkidle0' });
+      expect(mockPage.setViewport).toHaveBeenCalledWith({ width: 1280, height: 720 });
+      expect(mockPage.waitForSelector).toHaveBeenCalledWith('#game-canvas, canvas', { timeout: 10000 });
+
+      // Verify screenshot was captured
+      expect(mockPage.screenshot).toHaveBeenCalledTimes(1);
+
+      // Verify report was written
+      const reportPath = resolve(outDir, 'report.json');
+      expect(existsSync(reportPath)).toBe(true);
+
+      const report = JSON.parse(readFileSync(reportPath, 'utf-8'));
+      expect(report).toHaveLength(1);
+      expect(report[0].eventType).toBe('wait');
+      expect(report[0].step).toBe(0);
+
+      // Verify browser was closed
+      expect(mockBrowser.close).toHaveBeenCalledTimes(1);
+    } finally {
+      try { rmSync(tmpDir, { recursive: true, force: true }); } catch { /* ignore cleanup errors */ }
+    }
+  });
+
+  it('accepts ReplayOptions with custom puppeteerPath', async () => {
+    const tmpDir = createTempDir();
+    mkdirSync(tmpDir, { recursive: true });
+    const recordingPath = resolve(tmpDir, 'recording.json');
+    const recording = {
+      name: 'path-test',
+      description: 'Test puppeteer path',
+      meta: {
+        viewport: { width: 1920, height: 1080 },
+        createdAt: '2026-01-01T00:00:00.000Z',
+        durationMs: 0,
+        eventCount: 0,
+        formatVersion: 1,
+      },
+      setupCommands: [],
+      events: [],
+    };
+    writeFileSync(recordingPath, JSON.stringify(recording));
+
+    const mockPage = createMockPage();
+    const mockBrowser = createMockBrowser(mockPage);
+    (puppeteer as any).launch.mockResolvedValue(mockBrowser);
+
+    // For an empty events list: menu dismiss only (no captureStep since no events)
+    mockPage.evaluate
+      .mockResolvedValueOnce(undefined); // menu dismiss
+
+    const outDir = resolve(tmpDir, 'output2');
+
+    try {
+      await replayInteraction({
+        recordingPath,
+        port: 5174,
+        viewport: { width: 1920, height: 1080 },
+        outputDir: outDir,
+        puppeteerPath: '/custom/chrome',
+        shots: [{ name: 'overview', yaw: 0, pitch: 45 }],
+        frames: 3,
+        intervalMs: 100,
+      });
+
+      // Custom puppeteerPath must be passed to launch
+      expect(puppeteer.launch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          executablePath: '/custom/chrome',
+        }),
+      );
+
+      // Report should be written even with 0 events
+      const reportPath = resolve(outDir, 'report.json');
+      expect(existsSync(reportPath)).toBe(true);
+    } finally {
+      try { rmSync(tmpDir, { recursive: true, force: true }); } catch { /* ignore cleanup errors */ }
+    }
+  });
+
+  it('executes setup commands from recording before replay', async () => {
+    const tmpDir = createTempDir();
+    mkdirSync(tmpDir, { recursive: true });
+    const recordingPath = resolve(tmpDir, 'recording.json');
+    const recording = {
+      name: 'setup-replay',
+      description: 'Test setup commands',
+      meta: {
+        viewport: { width: 1280, height: 720 },
+        createdAt: '2026-01-01T00:00:00.000Z',
+        durationMs: 0,
+        eventCount: 0,
+        formatVersion: 1,
+      },
+      setupCommands: ['new_game seed:42'],
+      events: [],
+    };
+    writeFileSync(recordingPath, JSON.stringify(recording));
+
+    const mockPage = createMockPage();
+    const mockBrowser = createMockBrowser(mockPage);
+    (puppeteer as any).launch.mockResolvedValue(mockBrowser);
+
+    // Evaluate calls: menu dismiss, setup command
+    mockPage.evaluate
+      .mockResolvedValueOnce(undefined) // menu dismiss
+      .mockResolvedValueOnce(undefined); // setup command
+
+    const outDir = resolve(tmpDir, 'output3');
+
+    try {
+      await replayInteraction({
+        recordingPath,
+        port: 5173,
+        viewport: { width: 1280, height: 720 },
+        outputDir: outDir,
+      });
+
+      // Verify setup command was evaluated
+      const evaluateCalls = mockPage.evaluate.mock.calls;
+      const setupCall = evaluateCalls.find(
+        ([, arg]) => typeof arg === 'string' && arg.includes('new_game'),
+      );
+      expect(setupCall).toBeDefined();
+
+      // Report should exist
+      expect(existsSync(resolve(outDir, 'report.json'))).toBe(true);
+    } finally {
+      try { rmSync(tmpDir, { recursive: true, force: true }); } catch { /* ignore cleanup errors */ }
+    }
   });
 });
