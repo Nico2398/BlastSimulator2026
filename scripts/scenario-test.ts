@@ -45,6 +45,7 @@
 import puppeteer from 'puppeteer';
 import { mkdirSync, writeFileSync, readFileSync, existsSync, statSync } from 'fs';
 import { resolve } from 'path';
+import { resolveChromePath } from './shared/chrome.js';
 
 const VIEWPORT = { width: 1280, height: 720 };
 const INIT_WAIT_MS = 3000;
@@ -74,25 +75,6 @@ interface StepResult {
   statePath: string;
   error?: string;
   warning?: string;
-}
-
-function resolveChromePath(): string | undefined {
-  const CANDIDATES = [
-    ...(process.platform === 'win32'
-      ? [
-          'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-          'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-          `${process.env.LOCALAPPDATA}\\Google\\Chrome\\Application\\chrome.exe`,
-          `${process.env.PROGRAMFILES}\\Google\\Chrome\\Application\\chrome.exe`,
-        ]
-      : [
-          '/usr/bin/chromium',
-          '/usr/bin/chromium-browser',
-          '/usr/bin/google-chrome',
-          '/root/.cache/ms-playwright/chromium-1194/chrome-linux/chrome',
-        ]),
-  ];
-  return CANDIDATES.find((p) => existsSync(p));
 }
 
 function parseViewsArg(raw: string): ShotDef[] {
