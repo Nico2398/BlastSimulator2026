@@ -1,0 +1,22 @@
+{
+  "name": "needs-cost-visual",
+  "description": "Visual check of need costs: after draining gauges and building living_quarters, advance ticks to trigger rest visits; verify finances output shows cash deductions for rest costs (canteen visit cost tier-dependent, break room $5/employee) and cash decreases accordingly",
+  "steps": [
+    { "command": "new_game seed:42", "timeout": 10 },
+    "employee hire role:driller",
+    "finances",
+    "tick 100",
+    "finances",
+    "build living_quarters at:10,10",
+    "tick 20",
+    "finances",
+    "tick 50",
+    "finances",
+    "state full"
+  ],
+  "shots": [
+    { "name": "overview", "yaw": 0, "pitch": 45 },
+    { "name": "finances-panel", "yaw": 90, "pitch": 10 },
+    { "name": "cost-details", "yaw": 45, "pitch": 30 }
+  ]
+}

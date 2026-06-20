@@ -1,0 +1,23 @@
+{
+  "name": "needs-proactive-queue-visual",
+  "description": "Visual check of proactive need queuing: drive fatigue to warning threshold (≤25) and hunger to warning threshold (≤35), then verify auto-inserted rest tasks appear in pending actions queue via state dump; also verify need_warning event fires when queue is full",
+  "steps": [
+    { "command": "new_game seed:42", "timeout": 10 },
+    "employee hire role:driller",
+    "build living_quarters at:10,10",
+    "needs",
+    "tick 80",
+    "needs",
+    "state full",
+    "tick 20",
+    "needs",
+    "state full",
+    "tick 30",
+    "needs",
+    "state full"
+  ],
+  "shots": [
+    { "name": "overview", "yaw": 0, "pitch": 45 },
+    { "name": "queue-state", "yaw": 90, "pitch": 10 }
+  ]
+}
