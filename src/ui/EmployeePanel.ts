@@ -3,9 +3,8 @@
 
 import { t } from '../core/i18n/I18n.js';
 import type { GameState } from '../core/state/GameState.js';
-import type { Employee, EmployeeRole, SkillQualification, TrainingState } from '../core/entities/Employee.js';
-import { XP_THRESHOLDS, QUALIFICATION_SALARY_BONUS, PROFICIENCY_MULTIPLIERS, BASE_SALARIES } from '../core/config/balance.js';
-import { computeTaskDuration } from '../core/entities/EmployeeTaskDuration.js';
+import type { Employee, EmployeeRole, TrainingState } from '../core/entities/Employee.js';
+import { XP_THRESHOLDS, QUALIFICATION_SALARY_BONUS, BASE_SALARIES } from '../core/config/balance.js';
 
 import type { CommandResult } from '../console/ConsoleRunner.js';
 
@@ -131,63 +130,172 @@ export class EmployeePanel {
 
   // ── Skill/detail display stubs (Phase 10.6.2) ──
 
-  private makeSkillStars(_level: number): string {
-    // TODO: implement
-    return '';
+  private makeSkillStars(level: number): string {
+    const filled = '★'.repeat(level);
+    const empty = '☆'.repeat(5 - level);
+    return filled + empty;
   }
 
   private makeSkillSection(e: Employee): HTMLElement {
     const el = document.createElement('div');
-    // TODO: implement — iterate e.qualifications
+
+    if (e.qualifications.length === 0) {
+      const msg = document.createElement('div');
+      msg.textContent = t('ui.employees.no_skills');
+      el.appendChild(msg);
+      return el;
+    }
+
     for (const q of e.qualifications) {
-      const _q: SkillQualification = q;
-      el.appendChild(document.createElement('span')); // placeholder
-      this.makeSkillStars(_q.proficiencyLevel);
-      this.makeXpBar(_q.xp, _q.proficiencyLevel);
+      const row = document.createElement('div');
+      row.className = 'bs-skill-row';
+
+      const catEl = document.createElement('span');
+      catEl.className = 'bs-skill-category';
+      catEl.textContent = q.category;
+
+      const starsEl = document.createElement('span');
+      starsEl.className = 'bs-skill-stars';
+      starsEl.textContent = this.makeSkillStars(q.proficiencyLevel);
+
+      const xpBar = this.makeXpBar(q.xp, q.proficiencyLevel);
+
+      row.append(catEl, starsEl, xpBar);
+      el.appendChild(row);
     }
     return el;
   }
 
-  private makeXpBar(_xp: number, _level: number): HTMLElement {
+  private makeXpBar(xp: number, level: number): HTMLElement {
     const el = document.createElement('div');
-    void XP_THRESHOLDS;
-    // TODO: implement — use XP_THRESHOLDS to compute fill width
+    el.className = 'bs-xp-bar-bg';
+
+    const fill = document.createElement('div');
+    fill.className = 'bs-xp-bar-fill';
+
+    const currentThreshold = XP_THRESHOLDS[level as keyof typeof XP_THRESHOLDS] ?? 0;
+    let pct = 100;
+    if (level < 5) {
+      const nextThreshold = XP_THRESHOLDS[(level + 1) as keyof typeof XP_THRESHOLDS] ?? currentThreshold;
+      const range = nextThreshold - currentThreshold;
+      if (range > 0) {
+        pct = Math.min(100, Math.round(((xp - currentThreshold) / range) * 100));
+      } else {
+        pct = 0;
+      }
+    }
+    fill.style.width = `${pct}%`;
+
+    el.appendChild(fill);
     return el;
   }
 
-  private makeNeedBar(_label: string, _value: number, _color: string): HTMLElement {
+  private makeNeedBar(label: string, value: number, color: string): HTMLElement {
     const el = document.createElement('div');
-    // TODO: implement
+    el.className = 'bs-need-row';
+
+    const labelEl = document.createElement('span');
+    labelEl.className = 'bs-need-label';
+    labelEl.textContent = label;
+
+    const barBg = document.createElement('div');
+    barBg.className = 'bs-need-bar-bg';
+
+    const barFill = document.createElement('div');
+    barFill.className = 'bs-need-bar-fill';
+    barFill.style.width = `${value}%`;
+    barFill.style.background = color;
+
+    const valueEl = document.createElement('span');
+    valueEl.textContent = String(value);
+
+    barBg.appendChild(barFill);
+    el.append(labelEl, barBg, valueEl);
     return el;
   }
 
-  private makeTaskQueue(_e: Employee, _state: GameState): HTMLElement {
+  private makeTaskQueue(e: Employee, state: GameState): HTMLElement {
     const el = document.createElement('div');
-    void computeTaskDuration;
-    // TODO: implement — use computeTaskDuration and e.trainingState to display queue
+    el.className = 'bs-task-queue';
+
+    // Current task section
+    const currentLabel = document.createElement('div');
+    currentLabel.style.cssText = 'font-size:9px;color:#7a7060;text-transform:uppercase;margin-bottom:2px';
+    currentLabel.textContent = t('ui.employees.active_task');
+    el.appendChild(currentLabel);
+
+    if (e.activeActionId !== null) {
+      const taskEl = document.createElement('div');
+      taskEl.className = 'bs-task-entry current';
+      const action = state.pendingActions.find(a => a.id === e.activeActionId);
+      taskEl.textContent = action ? `#${action.id} (${action.type})` : `#${e.activeActionId}`;
+      el.appendChild(taskEl);
+    } else {
+      const noTask = document.createElement('div');
+      noTask.className = 'bs-queue-empty';
+      noTask.textContent = t('ui.employees.no_task');
+      el.appendChild(noTask);
+    }
+
     return el;
   }
 
-  private makeSalaryBreakdown(_e: Employee): HTMLElement {
+  private makeSalaryBreakdown(e: Employee): HTMLElement {
     const el = document.createElement('div');
-    void BASE_SALARIES;
-    void QUALIFICATION_SALARY_BONUS;
-    void PROFICIENCY_MULTIPLIERS;
-    // TODO: implement — compute salary from base, bonus, and multipliers
+    el.className = 'bs-salary-breakdown';
+
+    const baseText = document.createElement('div');
+    baseText.textContent = `${t('ui.employees.base_salary')}: $${BASE_SALARIES[e.role]}`;
+    el.appendChild(baseText);
+
+    for (const q of e.qualifications) {
+      const bonus = QUALIFICATION_SALARY_BONUS[q.proficiencyLevel];
+      const bonusText = document.createElement('div');
+      bonusText.textContent = `${t('ui.employees.skill_bonus')} (${q.category}): +$${bonus}`;
+      el.appendChild(bonusText);
+    }
+
+    const totalBonus = e.qualifications.reduce((sum, q) => sum + QUALIFICATION_SALARY_BONUS[q.proficiencyLevel], 0);
+    const total = document.createElement('div');
+    total.className = 'bs-salary-total';
+    total.textContent = `${t('ui.employees.total_salary')}: $${BASE_SALARIES[e.role] + totalBonus}`;
+    el.appendChild(total);
+
     return el;
   }
 
-  private makeModifiersSection(_e: Employee): HTMLElement {
+  private makeModifiersSection(e: Employee): HTMLElement {
     const el = document.createElement('div');
-    // TODO: implement
+
+    if (e.morale >= 70) {
+      const tag = document.createElement('span');
+      tag.className = 'bs-modifier-tag';
+      tag.textContent = t('ui.employees.proficiency_5');
+      el.appendChild(tag);
+    }
+    if (e.collapsing) {
+      const tag = document.createElement('span');
+      tag.className = 'bs-modifier-tag';
+      tag.textContent = 'Collapsing';
+      el.appendChild(tag);
+    }
+    if (e.injured) {
+      const tag = document.createElement('span');
+      tag.className = 'bs-modifier-tag';
+      tag.textContent = 'Injured';
+      el.appendChild(tag);
+    }
+
     return el;
   }
 
   private makeTrainingBadge(e: Employee): HTMLElement | null {
     const ts: TrainingState | null = e.trainingState;
     if (ts) {
-      // TODO: implement — render training badge from ts
-      return document.createElement('span');
+      const badge = document.createElement('span');
+      badge.className = 'bs-training-badge';
+      badge.textContent = `${t('ui.employees.training')}: ${ts.skill} (${ts.ticksRemaining}t)`;
+      return badge;
     }
     return null;
   }
