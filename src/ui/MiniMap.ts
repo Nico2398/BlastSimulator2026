@@ -3,6 +3,7 @@
 
 import { t } from '../core/i18n/I18n.js';
 import type { GameState } from '../core/state/GameState.js';
+import type { NavGrid, NavCellType } from '../core/nav/NavGrid.js';
 
 const MAP_SIZE = 120; // px
 const LEGEND_HEIGHT = 16;
@@ -13,6 +14,7 @@ export class MiniMap {
   private readonly ctx2d: CanvasRenderingContext2D;
   private readonly title: HTMLElement;
   private _navGridVisible: boolean = false;
+  private _navGrid: NavGrid | null = null;
 
   constructor(container: HTMLElement) {
     this.el = document.createElement('div');
@@ -125,6 +127,11 @@ export class MiniMap {
       ctx.arc(h.x * scaleX, h.z * scaleZ, 2, 0, Math.PI * 2);
       ctx.fill();
     }
+
+    // Draw NavGrid overlay when visible
+    if (this._navGridVisible) {
+      this.drawNavGridOverlay(ctx, scaleX, scaleZ);
+    }
   }
 
   dispose(): void { this.el.remove(); }
@@ -133,7 +140,47 @@ export class MiniMap {
 
   setNavGridVisible(visible: boolean): void { this._navGridVisible = visible; }
 
-  drawNavGridOverlay(_ctx: CanvasRenderingContext2D, _scaleX: number, _scaleZ: number): void {
-    // TODO: implement
+  setNavGrid(navGrid: NavGrid | null): void { this._navGrid = navGrid; }
+
+  get navGrid(): NavGrid | null { return this._navGrid; }
+
+  /**
+   * Draw semi-transparent colored overlays on the minimap for each NavGrid cell type.
+   * - walkable: green tint
+   * - blocked: red tint
+   * - drill_hole: orange tint
+   * - ramp: yellow tint
+   * - void: dark tint
+   */
+  drawNavGridOverlay(ctx: CanvasRenderingContext2D, scaleX: number, scaleZ: number): void {
+    const navGrid = this._navGrid;
+    if (!navGrid) return;
+
+    const colorMap: Record<NavCellType, string> = {
+      walkable: 'rgba(0, 180, 0, 0.15)',
+      blocked: 'rgba(180, 0, 0, 0.3)',
+      drill_hole: 'rgba(180, 120, 0, 0.4)',
+      ramp: 'rgba(180, 180, 0, 0.3)',
+      void: 'rgba(0, 0, 0, 0.4)',
+    };
+
+    const cellW = Math.max(1, Math.floor(scaleX));
+    const cellH = Math.max(1, Math.floor(scaleZ));
+
+    for (let z = 0; z < navGrid.height; z++) {
+      for (let x = 0; x < navGrid.width; x++) {
+        const cell = navGrid.cells[z]?.[x];
+        if (!cell) continue;
+        const color = colorMap[cell.type];
+        if (!color) continue;
+        ctx.fillStyle = color;
+        ctx.fillRect(
+          Math.floor(x * scaleX),
+          Math.floor(z * scaleZ),
+          cellW,
+          cellH,
+        );
+      }
+    }
   }
 }

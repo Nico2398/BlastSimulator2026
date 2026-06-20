@@ -1,0 +1,19 @@
+{
+  "name": "nav-minimap-integration-visual",
+  "description": "Tests minimap integration with navgrid overlay showing cell types",
+  "steps": [
+    "new_game seed:42",
+    "drill_plan grid rows:2 cols:2 spacing:5 depth:6 start:5,5",
+    "build management_office at:2,2",
+    "build warehouse at:8,8",
+    "employee hire role:miner",
+    "employee list",
+    "tick 10"
+  ],
+  "shots": [
+    {"name": "overview", "yaw": 0, "pitch": 45},
+    {"name": "closeup", "yaw": 90, "pitch": 10},
+    {"name": "birdseye", "yaw": 0, "pitch": 80},
+    {"name": "angled", "yaw": 135, "pitch": 30}
+  ]
+}
