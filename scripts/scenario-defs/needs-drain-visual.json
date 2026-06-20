@@ -1,6 +1,6 @@
 {
   "name": "needs-drain-visual",
-  "description": "Visual check of need drain rates: after 80 ticks of work, fatigue should be notably lower than hunger (2/tick vs 1/tick) and breakNeed should be near zero (0.8/tick working), confirming different drain rates per gauge without building replenishment",
+  "description": "Visual check of need drain rates while idle: after 80 ticks, hunger drains at 0.5/tick and fatigue at 0.5/tick (same idle rate) while breakNeed does not drain when idle (0/tick); all three gauges should show different values compared to working rates",
   "steps": [
     { "command": "new_game seed:42", "timeout": 10 },
     "employee hire role:driller",

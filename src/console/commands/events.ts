@@ -16,7 +16,8 @@ import {
 } from '../../core/economy/Corruption.js';
 import { addExpense, addIncome } from '../../core/economy/Finance.js';
 import { processPayCycle, type Employee } from '../../core/entities/Employee.js';
-import { tickNeedGauges, tickNeedMorale } from '../../core/entities/EmployeeNeeds.js';
+import { tickNeedGauges, needsMoraleEffect } from '../../core/entities/EmployeeNeeds.js';
+import type { FiredEvent } from '../../core/events/EventSystem.js';
 import { tickCollapse, autoInsertNeedTasks, processShiftCycle } from '../../core/engine/GameLoop.js';
 import { checkDeadlines, generateContracts } from '../../core/economy/Contract.js';
 import { updateBankruptcy } from '../../core/campaign/Bankruptcy.js';
@@ -144,9 +145,9 @@ export function tickCommand(
       if (!emp.alive) continue;
       const isWorking = emp.activeActionId !== null;
       tickNeedGauges(emp, isWorking);
-      emp.morale = Math.max(0, Math.min(100, emp.morale + tickNeedMorale(emp)));
+      emp.morale = Math.max(0, Math.min(100, emp.morale + needsMoraleEffect(emp)));
     }
-    const firedEvents: Array<{ eventId: string; firedAtTick: number }> = [];
+    const firedEvents: FiredEvent[] = [];
     tickCollapse(state, firedEvents, emitter);
     autoInsertNeedTasks(state, firedEvents, emitter);
     processShiftCycle(state, firedEvents, emitter);
