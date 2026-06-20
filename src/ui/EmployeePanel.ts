@@ -185,7 +185,7 @@ export class EmployeePanel {
         pct = 0;
       }
     }
-    fill.style.width = `${pct}%`;
+    fill.style.width = `${Math.max(0, pct)}%`;
 
     el.appendChild(fill);
     return el;
@@ -235,7 +235,7 @@ export class EmployeePanel {
       const taskEl = document.createElement('div');
       taskEl.className = 'bs-task-entry current';
       const action = actions.find(a => a.id === e.activeActionId);
-      taskEl.textContent = action ? `#${action.id} (${action.type})` : `Active: #${e.activeActionId}`;
+      taskEl.textContent = action ? `#${action.id} (${action.type})` : t('ui.employees.active_fallback', { id: String(e.activeActionId) });
       el.appendChild(taskEl);
     } else {
       const noTask = document.createElement('div');
@@ -259,7 +259,7 @@ export class EmployeePanel {
     if (overflow > 0) {
       const overflowEl = document.createElement('div');
       overflowEl.className = 'bs-task-entry';
-      overflowEl.textContent = `+${overflow} more`;
+      overflowEl.textContent = t('ui.employees.overflow', { count: String(overflow) });
       el.appendChild(overflowEl);
     }
 
@@ -308,19 +308,19 @@ export class EmployeePanel {
     if (e.morale >= 70) {
       const tag = document.createElement('span');
       tag.className = 'bs-modifier-tag';
-      tag.textContent = t('ui.employees.proficiency_5');
+      tag.textContent = t('ui.employees.high_morale');
       el.appendChild(tag);
     }
     if (e.collapsing) {
       const tag = document.createElement('span');
       tag.className = 'bs-modifier-tag';
-      tag.textContent = 'Collapsing';
+      tag.textContent = t('ui.employees.collapsing');
       el.appendChild(tag);
     }
     if (e.injured) {
       const tag = document.createElement('span');
       tag.className = 'bs-modifier-tag';
-      tag.textContent = 'Injured';
+      tag.textContent = t('ui.employees.injured');
       el.appendChild(tag);
     }
 
