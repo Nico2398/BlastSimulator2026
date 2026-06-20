@@ -113,6 +113,7 @@ declare global {
     __uiState: () => Record<string, unknown>;
     __cameraOrbit: (yaw: number, pitch: number) => void;
     __cameraReset: () => void;
+    __startTutorial: () => void;
   }
 }
 
@@ -226,6 +227,13 @@ window.__cameraReset = () => {
 
 uiManager.setGameConsole(window.__gameConsole);
 tutorial.setGameConsole(window.__gameConsole);
+
+// Tutorial start bridge (Puppeteer) + console command (scenario tests)
+window.__startTutorial = () => tutorial.start(ctx.state ?? undefined);
+runner.register('tutorial_start', 'Start the tutorial overlay', () => {
+  window.__startTutorial();
+  return { success: true, output: 'Tutorial started' };
+});
 uiManager.setSpeedChangeHandler((speed) => {
   window.__gameConsole(`time speed ${speed}`);
 });

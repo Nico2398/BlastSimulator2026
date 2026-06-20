@@ -68,6 +68,7 @@ const VISUAL_SCENARIO_NAMES = [
   'save-load-visual',
   'i18n-display-visual',
   'main-menu-visual',
+  'tutorial-steps-visual',
 ] as const;
 
 const ALL_SCENARIO_NAMES = [
@@ -81,7 +82,7 @@ const KNOWN_COMMANDS = [
   'employee', 'state', 'survey', 'tick', 'event',
   'drill_plan', 'charge', 'sequence', 'blast', 'contract',
   'build', 'vehicle', 'stats', 'inspect', 'zone',
-  'corrupt', 'mafia', 'buy_software', 'weather', 'buy',
+  'tutorial_start', 'corrupt', 'mafia', 'buy_software', 'weather', 'buy',
   'fragments', 'preview', 'blast_preview', 'install_tubing',
   'build_ramp', 'set_policy', 'terrain_info', 'help',
   'blast_plan', 'needs',
