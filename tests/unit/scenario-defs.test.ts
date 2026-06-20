@@ -69,6 +69,16 @@ const VISUAL_SCENARIO_NAMES = [
   'i18n-display-visual',
   'main-menu-visual',
   'tutorial-steps-visual',
+  'building-menu-visual',
+  'building-placement-visual',
+  'building-tier-system-visual',
+  'building-training-visual',
+  'building-living-visual',
+  'building-warehouse-visual',
+  'building-research-visual',
+  'building-vehicle-depot-visual',
+  'building-ramp-visual',
+  'building-destruction-visual',
 ] as const;
 
 const ALL_SCENARIO_NAMES = [
