@@ -1,6 +1,25 @@
 {
   "name": "building-tier-system-visual",
-  "description": "TODO",
-  "shots": [],
-  "steps": []
+  "description": "Visual check of building tier upgrade system from T1 to T3 and demolition",
+  "steps": [
+    { "command": "new_game seed:42", "timeout": 10 },
+    "build living_quarters at:5,5 tier:1",
+    "build list",
+    "build upgrade 1",
+    "build list",
+    "build upgrade 2",
+    "build list",
+    "build management_office at:15,5 tier:1",
+    "build list",
+    "build destroy 3",
+    "build list",
+    "scores",
+    "state full"
+  ],
+  "shots": [
+    { "name": "overview", "yaw": 0, "pitch": 45 },
+    { "name": "tier-comparison", "yaw": 90, "pitch": 15 },
+    { "name": "closeup-t3", "yaw": 45, "pitch": 30 },
+    { "name": "birdseye", "yaw": 0, "pitch": 80 }
+  ]
 }

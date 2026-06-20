@@ -1,6 +1,19 @@
 {
   "name": "building-vehicle-depot-visual",
-  "description": "TODO",
-  "shots": [],
-  "steps": []
+  "description": "Visual check of vehicle depot building at all three tiers with fleet management",
+  "steps": [
+    { "command": "new_game seed:42", "timeout": 10 },
+    "build vehicle_depot at:5,5",
+    "build vehicle_depot at:15,5 tier:2",
+    "build vehicle_depot at:25,5 tier:3",
+    "build list",
+    "vehicle list",
+    "scores",
+    "state full"
+  ],
+  "shots": [
+    { "name": "overview", "yaw": 0, "pitch": 45 },
+    { "name": "depot-area", "yaw": 90, "pitch": 10 },
+    { "name": "closeup", "yaw": 45, "pitch": 30 }
+  ]
 }
