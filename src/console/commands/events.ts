@@ -16,6 +16,9 @@ import {
 } from '../../core/economy/Corruption.js';
 import { addExpense, addIncome } from '../../core/economy/Finance.js';
 import { processPayCycle } from '../../core/entities/Employee.js';
+import { tickNeedGauges, needsMoraleEffect } from '../../core/entities/EmployeeNeeds.js';
+import type { FiredEvent } from '../../core/events/EventSystem.js';
+import { tickCollapse, autoInsertNeedTasks, processShiftCycle } from '../../core/engine/GameLoop.js';
 import { checkDeadlines, generateContracts } from '../../core/economy/Contract.js';
 import { updateBankruptcy } from '../../core/campaign/Bankruptcy.js';
 import { updateEcology } from '../../core/campaign/EcologicalDisaster.js';
@@ -137,7 +140,23 @@ export function tickCommand(
     };
     updateScores(state.scores, scoreInputs);
 
-    // 8. Level stats snapshot + campaign profit check
+    // 8. Employee needs — drain gauges, update morale, check collapse
+    for (const emp of state.employees.employees) {
+      if (!emp.alive) continue;
+      const isWorking = emp.activeActionId !== null;
+      tickNeedGauges(emp, isWorking);
+      emp.morale = Math.max(0, Math.min(100, emp.morale + needsMoraleEffect(emp)));
+    }
+    const firedEvents: FiredEvent[] = [];
+    tickCollapse(state, firedEvents, emitter);
+    autoInsertNeedTasks(state, firedEvents, emitter);
+    processShiftCycle(state, firedEvents, emitter);
+    // Emit any needs-related events via console
+    for (const fe of firedEvents) {
+      lines.push(`[tick ${state.tickCount}] NEED: ${fe.eventId}`);
+    }
+
+    // 9. Level stats snapshot + campaign profit check
     snapshotStats(state.levelStats, state);
     const levelResult = checkLevelComplete(state, state.campaign, emitter);
     if (levelResult.triggered) {

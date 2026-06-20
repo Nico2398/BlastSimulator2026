@@ -1,0 +1,30 @@
+{
+  "name": "needs-collapse-visual",
+  "description": "Visual check of collapse state: drive fatigue below collapse threshold (≤5) without replenishment, verify employee flagged as collapsing in state dump, then build living_quarters and advance ticks to confirm rest recovery and task resumption",
+  "steps": [
+    { "command": "new_game seed:42", "timeout": 30 },
+    "employee hire role:driller",
+    "employee hire role:blaster",
+    "employee list",
+    "needs",
+    "tick 200",
+    "employee list",
+    "needs",
+    "tick 50",
+    "employee list",
+    "needs",
+    "build living_quarters at:15,15",
+    "tick 20",
+    "employee list",
+    "needs",
+    "tick 30",
+    "employee list",
+    "needs",
+    "state full"
+  ],
+  "shots": [
+    { "name": "overview", "yaw": 0, "pitch": 45 },
+    { "name": "collapse-state", "yaw": 90, "pitch": 10 },
+    { "name": "recovery", "yaw": 0, "pitch": 80 }
+  ]
+}

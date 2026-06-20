@@ -1,0 +1,22 @@
+{
+  "name": "needs-drain-visual",
+  "description": "Visual check of need drain rates while idle: after 80 ticks, hunger drains at 0.5/tick and fatigue at 0.5/tick (same idle rate) while breakNeed does not drain when idle (0/tick); all three gauges should show different values compared to working rates",
+  "steps": [
+    { "command": "new_game seed:42", "timeout": 10 },
+    "employee hire role:driller",
+    "needs",
+    "tick 10",
+    "needs",
+    "tick 20",
+    "needs",
+    "tick 50",
+    "needs",
+    "tick 80",
+    "needs",
+    "state full"
+  ],
+  "shots": [
+    { "name": "overview", "yaw": 0, "pitch": 45 },
+    { "name": "drain-comparison", "yaw": 90, "pitch": 10 }
+  ]
+}

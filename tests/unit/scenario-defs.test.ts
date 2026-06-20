@@ -42,6 +42,14 @@ const VISUAL_SCENARIO_NAMES = [
   'blast-report-visual',
   'blast-voxel-fragmentation-visual',
   'blast-visual-full',
+  'needs-gauges-visual',
+  'needs-drain-visual',
+  'needs-morale-visual',
+  'needs-collapse-visual',
+  'needs-replenishment-visual',
+  'needs-proactive-queue-visual',
+  'needs-cost-visual',
+  'needs-shift-cycle-visual',
 ] as const;
 
 const ALL_SCENARIO_NAMES = [

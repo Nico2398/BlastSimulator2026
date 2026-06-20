@@ -1,0 +1,26 @@
+{
+  "name": "needs-replenishment-visual",
+  "description": "Visual check of building replenishment rates: after gauges drain via 100 ticks of work, build living_quarters tier 1 and advance ticks to verify need replenishment (hunger +12/tick, fatigue +8/tick, breakNeed +10/tick) restores gauge values over time",
+  "steps": [
+    { "command": "new_game seed:42", "timeout": 30 },
+    "employee hire role:driller",
+    "needs",
+    "tick 100",
+    "needs",
+    "build living_quarters at:10,10",
+    "tick 10",
+    "needs",
+    "tick 20",
+    "needs",
+    "tick 30",
+    "needs",
+    "tick 50",
+    "needs",
+    "state full"
+  ],
+  "shots": [
+    { "name": "overview", "yaw": 0, "pitch": 45 },
+    { "name": "building-placement", "yaw": 90, "pitch": 10 },
+    { "name": "replenished-gauges", "yaw": 45, "pitch": 30 }
+  ]
+}
