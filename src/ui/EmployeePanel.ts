@@ -85,6 +85,7 @@ export class EmployeePanel {
   private makeEmployeeRow(e: Employee, state: GameState): HTMLElement {
     const row = document.createElement('div');
     row.className = 'bs-employee-row';
+    if (e.collapsing) row.classList.add('collapsing');
 
     const nameEl = document.createElement('div');
     nameEl.style.cssText = 'font-size:11px;color:#d0b090;font-weight:bold';
@@ -205,6 +206,9 @@ export class EmployeePanel {
     barFill.className = 'bs-need-bar-fill';
     barFill.style.width = `${value}%`;
     barFill.style.background = color;
+    if (value <= 15) barFill.classList.add('critical');
+    else if (value <= 35) barFill.classList.add('low');
+    else barFill.classList.add('normal');
 
     const valueEl = document.createElement('span');
     valueEl.textContent = String(value);
@@ -224,11 +228,14 @@ export class EmployeePanel {
     currentLabel.textContent = t('ui.employees.active_task');
     el.appendChild(currentLabel);
 
-    if (e.activeActionId !== null) {
+    const hasActive = e.activeActionId !== null;
+    const actions = state.pendingActions || [];
+
+    if (hasActive) {
       const taskEl = document.createElement('div');
       taskEl.className = 'bs-task-entry current';
-      const action = state.pendingActions.find(a => a.id === e.activeActionId);
-      taskEl.textContent = action ? `#${action.id} (${action.type})` : `#${e.activeActionId}`;
+      const action = actions.find(a => a.id === e.activeActionId);
+      taskEl.textContent = action ? `#${action.id} (${action.type})` : `Active: #${e.activeActionId}`;
       el.appendChild(taskEl);
     } else {
       const noTask = document.createElement('div');
@@ -237,12 +244,43 @@ export class EmployeePanel {
       el.appendChild(noTask);
     }
 
+    // Show pending actions (up to 5)
+    const displayActions = actions.slice(0, 5);
+    const overflow = actions.length > 5 ? actions.length - 5 : 0;
+
+    for (const a of displayActions) {
+      const entry = document.createElement('div');
+      entry.className = 'bs-task-entry';
+      if (a.id === e.activeActionId) entry.classList.add('current');
+      entry.textContent = `#${a.id} (${a.type})`;
+      el.appendChild(entry);
+    }
+
+    if (overflow > 0) {
+      const overflowEl = document.createElement('div');
+      overflowEl.className = 'bs-task-entry';
+      overflowEl.textContent = `+${overflow} more`;
+      el.appendChild(overflowEl);
+    }
+
+    if (actions.length === 0 && !hasActive) {
+      const emptyEl = document.createElement('div');
+      emptyEl.className = 'bs-queue-empty';
+      emptyEl.textContent = t('ui.employees.queue_empty');
+      el.appendChild(emptyEl);
+    }
+
     return el;
   }
 
   private makeSalaryBreakdown(e: Employee): HTMLElement {
     const el = document.createElement('div');
     el.className = 'bs-salary-breakdown';
+
+    const header = document.createElement('div');
+    header.style.cssText = 'font-size:9px;color:#7a7060;text-transform:uppercase;margin-bottom:2px';
+    header.textContent = t('ui.employees.salary_breakdown');
+    el.appendChild(header);
 
     const baseText = document.createElement('div');
     baseText.textContent = `${t('ui.employees.base_salary')}: $${BASE_SALARIES[e.role]}`;
