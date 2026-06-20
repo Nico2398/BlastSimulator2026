@@ -6,7 +6,7 @@
     "campaign start level:dusty_hollow",
     "time resume",
     "employee hire role:driller",
-    "employee assign_skill 1 drilling 1",
+    "employee assign_skill id:1 skill:driving.excavator level:1",
     "employee list",
     "tick 700",
     "employee list",
