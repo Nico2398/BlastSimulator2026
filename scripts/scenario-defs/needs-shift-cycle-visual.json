@@ -2,7 +2,7 @@
   "name": "needs-shift-cycle-visual",
   "description": "Visual check of shift cycle: build living_quarters tier 2+ to activate 8-tick shift cycle, set policy to shift_8h mode, then advance ticks to verify employees work 6 ticks then auto-enter 8-tick sleep rest; state dump should show restTicksRemaining during rest and ticksWorked reset on completion",
   "steps": [
-    { "command": "new_game seed:42", "timeout": 10 },
+    { "command": "new_game seed:42", "timeout": 30 },
     "employee hire role:driller",
     "build living_quarters at:10,10",
     "build upgrade 1",

@@ -2,7 +2,7 @@
   "name": "needs-morale-visual",
   "description": "Visual check of morale effects from need gauges: after 200+ ticks without rest, morale should decrease as gauges drain below thresholds; needs command and scores output verify need penalty calculation and well-rested bonus when all gauges above 80",
   "steps": [
-    { "command": "new_game seed:42", "timeout": 10 },
+    { "command": "new_game seed:42", "timeout": 30 },
     "employee hire role:driller",
     "employee list",
     "scores",
