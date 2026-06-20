@@ -57,6 +57,17 @@ const VISUAL_SCENARIO_NAMES = [
   'nav-dynamic-updates-visual',
   'nav-path-following-visual',
   'nav-minimap-integration-visual',
+  'core-loop-visual',
+  'economy-display-visual',
+  'contract-panel-visual',
+  'event-dialog-visual',
+  'scores-display-visual',
+  'time-management-visual',
+  'weather-display-visual',
+  'safety-projection-visual',
+  'save-load-visual',
+  'i18n-display-visual',
+  'main-menu-visual',
 ] as const;
 
 const ALL_SCENARIO_NAMES = [

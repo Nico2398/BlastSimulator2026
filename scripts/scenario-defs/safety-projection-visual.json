@@ -1,0 +1,29 @@
+{
+  "name": "safety-projection-visual",
+  "description": "Visual verification of safety and projection systems: safety zone evacuation before blast, blast projection trajectories based on overcharge/stemming/free face/sequence, buildings/vehicles in projection path, and post-blast damage assessment.",
+  "steps": [
+    { "command": "new_game seed:42", "timeout": 15 },
+    "campaign start level:dusty_hollow",
+    "time resume",
+    "zone status",
+    "zone clear x1:5 y1:5 x2:35 y2:35",
+    "zone status",
+    "build storage_depot at:35,25",
+    "drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:20,20",
+    "charge hole:* explosive:boomite amount:10 stemming:1",
+    "sequence auto delay_step:10",
+    "blast_preview",
+    "preview projections",
+    { "command": "blast", "timeout": 20, "frames": 6, "interval": 50 },
+    "fragments",
+    "build list",
+    "scores",
+    "state full"
+  ],
+  "shots": [
+    { "name": "overview", "yaw": 0, "pitch": 45 },
+    { "name": "zone-area", "yaw": 90, "pitch": 10 },
+    { "name": "projections", "yaw": 45, "pitch": 30 },
+    { "name": "post-blast", "yaw": 0, "pitch": 80 }
+  ]
+}
