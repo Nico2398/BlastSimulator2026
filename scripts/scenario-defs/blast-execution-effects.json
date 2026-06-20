@@ -1,0 +1,20 @@
+{
+  "name": "blast-execution-effects",
+  "description": "Visual verification of blast execution: explosion flash, dust cloud, fragment trajectories, settling animation",
+  "steps": [
+    { "command": "new_game seed:42", "timeout": 10 },
+    "drill_plan grid rows:3 cols:3 spacing:5 depth:6 start:15,15",
+    "charge hole:* explosive:boomite amount:5 stemming:2",
+    "sequence auto delay_step:25",
+    { "command": "blast", "timeout": 20 },
+    "fragments",
+    "inspect 15,15,0",
+    "state full"
+  ],
+  "shots": [
+    { "name": "overview", "yaw": 0, "pitch": 45 },
+    { "name": "closeup", "yaw": 90, "pitch": 10 },
+    { "name": "birdseye", "yaw": 0, "pitch": 80 },
+    { "name": "side", "yaw": 180, "pitch": 30 }
+  ]
+}

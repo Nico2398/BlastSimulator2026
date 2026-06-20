@@ -44,6 +44,8 @@ export interface MiningContext extends GameContext {
   lastBlastFragments?: { x: number; y: number; z: number }[];
   /** Full fragment data from last blast — used by renderer to spawn fragment meshes. */
   lastBlastFragmentData?: FragmentData[];
+  /** Drill holes from before the last blast — used by renderer for per-hole detonation timing. */
+  lastBlastHoles?: import('../../core/mining/DrillPlan.js').DrillHole[];
 }
 
 function requireGame(ctx: MiningContext): string | null {
@@ -251,6 +253,9 @@ export function blastCommand(
   for (const [oreId, kg] of Object.entries(oreReport.oreYields)) {
     state.collectedOre[oreId] = (state.collectedOre[oreId] ?? 0) + kg;
   }
+
+  // Store drill holes before clearing (needed by renderer for per-hole detonation timing)
+  ctx.lastBlastHoles = [...state.drillHoles];
 
   // Clear drill plan after blast (holes are consumed)
   state.drillHoles = [];

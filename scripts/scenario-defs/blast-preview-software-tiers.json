@@ -1,0 +1,23 @@
+{
+  "name": "blast-preview-software-tiers",
+  "description": "Visual verification of blast preview overlays at each software tier: energy heatmap, fragment distribution, projection arcs, vibration waves",
+  "steps": [
+    { "command": "new_game seed:42", "timeout": 10 },
+    "drill_plan grid rows:3 cols:3 spacing:5 depth:6 start:15,15",
+    "charge hole:* explosive:boomite amount:5 stemming:2",
+    "sequence auto delay_step:25",
+    "preview energy",
+    "buy_software tier:1",
+    "preview energy",
+    "buy_software tier:2",
+    "preview fragments",
+    "buy_software tier:3",
+    "preview projections",
+    "buy_software tier:4",
+    "preview vibrations"
+  ],
+  "shots": [
+    { "name": "overview", "yaw": 0, "pitch": 45 },
+    { "name": "birdseye", "yaw": 0, "pitch": 80 }
+  ]
+}

@@ -24,7 +24,7 @@ const CHARGE_COLORS: readonly number[] = [
 ];
 
 // Sequence label
-const LABEL_OFFSET = 1.8;     // Y above hole marker
+const LABEL_OFFSET = 2.5;     // Y above hole marker
 
 // Heatmap
 const HEATMAP_MAX_RADIUS = 8; // metres of energy influence
@@ -145,16 +145,17 @@ export class BlastPlanOverlay {
 
     // Charge fill inside shaft + surface indicator
     if (charge && charge.amountKg > 0) {
-      const lvl = Math.min(1, charge.amountKg / 200);
+      // Scale charge level against a realistic max (10kg) instead of 200kg
+      const lvl = Math.min(1, charge.amountKg / 10);
       const ci = Math.min(CHARGE_COLORS.length - 1, Math.floor(lvl * (CHARGE_COLORS.length - 1)) + 1);
       const fillH = depth * Math.min(0.9, lvl + 0.2);
       this.addXrayMesh(
         new THREE.CylinderGeometry(HOLE_RADIUS * 0.4, HOLE_RADIUS * 0.4, fillH, HOLE_SEGMENTS),
-        { color: CHARGE_COLORS[ci], transparent: true, opacity: 0.7 }, 13, x, base - depth + fillH / 2, z,
+        { color: CHARGE_COLORS[ci], transparent: true, opacity: 0.85 }, 13, x, base - depth + fillH / 2, z,
       );
       this.addXrayMesh(
         new THREE.CylinderGeometry(HOLE_RADIUS * 0.7, HOLE_RADIUS * 0.7, HOLE_HEIGHT * 0.9, HOLE_SEGMENTS),
-        { color: CHARGE_COLORS[ci], transparent: true, opacity: 0.6 }, 14, x, base + HOLE_HEIGHT / 2, z,
+        { color: CHARGE_COLORS[ci], transparent: true, opacity: 0.8 }, 14, x, base + HOLE_HEIGHT / 2, z,
       );
     }
 
@@ -262,7 +263,7 @@ export class BlastPlanOverlay {
     const level = Math.min(4, Math.floor(delayMs / 100));
     const colors = [0xffffff, 0x44ffff, 0xffff44, 0xff8844, 0xff4444];
     const color = colors[level]!;
-    const geo = new THREE.BoxGeometry(1.0, 0.5, 0.08);
+    const geo = new THREE.BoxGeometry(2.0, 1.0, 0.15);
     const mat = new THREE.MeshBasicMaterial({ color, depthTest: false });
     return new THREE.Mesh(geo, mat);
   }

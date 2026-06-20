@@ -1,0 +1,19 @@
+{
+  "name": "blast-detonation-sequence-ui",
+  "description": "Visual verification of detonation sequence UI: auto-sequence, delay labels, color coding",
+  "steps": [
+    { "command": "new_game seed:42", "timeout": 10 },
+    "drill_plan grid rows:3 cols:3 spacing:5 depth:6 start:15,15",
+    "charge hole:* explosive:boomite amount:5 stemming:2",
+    "sequence auto delay_step:50",
+    "sequence set hole:H1 delay:0",
+    "sequence set hole:H5 delay:200",
+    "sequence set hole:H9 delay:500",
+    "sequence show"
+  ],
+  "shots": [
+    { "name": "overview", "yaw": 0, "pitch": 45 },
+    { "name": "closeup", "yaw": 90, "pitch": 10 },
+    { "name": "birdseye", "yaw": 0, "pitch": 80 }
+  ]
+}

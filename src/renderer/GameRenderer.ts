@@ -150,6 +150,11 @@ export class GameRenderer {
   onBlast(ctx: MiningContext): void {
     if (!this.terrain || !this.lastGrid) return;
 
+    // Clear the blast plan overlay (holes are consumed by blast)
+    if (this.blastOverlay) {
+      this.blastOverlay.hide();
+    }
+
     // Localized terrain remesh: only rebuild chunks containing affected voxels.
     // Fragment positions tell us exactly which voxels were blasted.
     if (ctx.lastBlastFragments && ctx.lastBlastFragments.length > 0) {
@@ -175,8 +180,35 @@ export class GameRenderer {
       oz = ctx.lastBlastFragments.reduce((s, p) => s + p.z, 0) / ctx.lastBlastFragments.length;
     }
     const origin = new THREE.Vector3(ox, 0, oz);
+
+    // Build per-hole detonation list from sequence delays
+    const holes: import('./BlastEffects.js').HoleDetonation[] = [];
+    const sequenceDelays = ctx.state.sequenceDelays;
+
+    // If we have sequence delays, use them for per-hole timing
+    if (Object.keys(sequenceDelays).length > 0) {
+      for (const [holeId, delayMs] of Object.entries(sequenceDelays)) {
+        // Find hole position from last known drill holes
+        const holePos = ctx.lastBlastHoles?.find(h => h.id === holeId)
+          ?? ctx.state.drillHoles.find(h => h.id === holeId);
+        if (holePos) {
+          holes.push({
+            x: holePos.x,
+            y: this.getTerrainSurfaceY(holePos.x, holePos.z),
+            z: holePos.z,
+            delaySeconds: delayMs / 1000,
+          });
+        }
+      }
+    }
+
+    // Fallback: single explosion at centroid if no per-hole data
+    if (holes.length === 0) {
+      holes.push({ x: ox, y: 0, z: oz, delaySeconds: 0 });
+    }
+
     this.blastEffects.trigger({
-      holes: [{ x: ox, y: 0, z: oz, delaySeconds: 0 }],
+      holes,
       energyLevel: 0.6,
       origin,
     });
