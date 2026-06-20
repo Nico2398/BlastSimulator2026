@@ -15,7 +15,7 @@ import {
   type CorruptionTarget,
 } from '../../core/economy/Corruption.js';
 import { addExpense, addIncome } from '../../core/economy/Finance.js';
-import { processPayCycle, type Employee } from '../../core/entities/Employee.js';
+import { processPayCycle } from '../../core/entities/Employee.js';
 import { tickNeedGauges, needsMoraleEffect } from '../../core/entities/EmployeeNeeds.js';
 import type { FiredEvent } from '../../core/events/EventSystem.js';
 import { tickCollapse, autoInsertNeedTasks, processShiftCycle } from '../../core/engine/GameLoop.js';
