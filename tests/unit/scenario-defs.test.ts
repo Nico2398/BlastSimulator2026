@@ -68,6 +68,7 @@ const VISUAL_SCENARIO_NAMES = [
   'save-load-visual',
   'i18n-display-visual',
   'main-menu-visual',
+  'tutorial-steps-visual',
 ] as const;
 
 const ALL_SCENARIO_NAMES = [
