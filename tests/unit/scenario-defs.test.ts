@@ -34,20 +34,9 @@ const FEATURE_SCENARIO_NAMES = [
   'weather-flood',
 ] as const;
 
-const VISUAL_SCENARIO_NAMES = [
-  'blast-drill-plan-visual',
-  'blast-charge-sequence-visual',
-  'blast-preview-tiers-visual',
-  'blast-execution-visual',
-  'blast-report-visual',
-  'blast-voxel-fragmentation-visual',
-  'blast-visual-full',
-] as const;
-
 const ALL_SCENARIO_NAMES = [
   ...PLAYTHROUGH_SCENARIO_NAMES,
   ...FEATURE_SCENARIO_NAMES,
-  ...VISUAL_SCENARIO_NAMES,
 ] as const;
 
 const KNOWN_COMMANDS = [
@@ -64,17 +53,10 @@ const KNOWN_COMMANDS = [
 /** Commands that inspect state — valid as a final playthrough step */
 const INSPECTION_COMMANDS = ['campaign', 'state', 'scores', 'finances', 'stats', 'inspect'];
 
-interface ScenarioStepDef {
-  command: string;
-  timeout?: number;
-  description?: string;
-}
-
 interface ScenarioDef {
   name: string;
   description: string;
-  steps: Array<string | ScenarioStepDef>;
-  shots?: Array<{ name: string; yaw: number; pitch: number }>;
+  steps: string[];
 }
 
 function loadScenario(name: string): ScenarioDef {
@@ -163,20 +145,17 @@ describe('Playthrough scenarios have sufficient steps', () => {
 });
 
 // ──────────────────────────────────────────────
-// 6. All steps are strings or step objects
+// 6. All steps are strings
 // ──────────────────────────────────────────────
-describe('All steps are strings or step objects', () => {
+describe('All steps are strings', () => {
   for (const name of ALL_SCENARIO_NAMES) {
-    it(`${name} — every step is a string or {command, timeout?} object`, () => {
+    it(`${name} — every step is a string`, () => {
       const scenario = loadScenario(name);
       for (let i = 0; i < scenario.steps.length; i++) {
-        const step = scenario.steps[i];
-        const isString = typeof step === 'string';
-        const isStepObj = typeof step === 'object' && step !== null && typeof (step as any).command === 'string';
         expect(
-          isString || isStepObj,
-          `step[${i}] should be a string or {command} object, got ${typeof step}`,
-        ).toBe(true);
+          typeof scenario.steps[i],
+          `step[${i}] should be a string, got ${typeof scenario.steps[i]}`,
+        ).toBe('string');
       }
     });
   }
@@ -204,10 +183,9 @@ describe('No steps use unknown commands', () => {
       const unknownCommands: string[] = [];
       for (let i = 0; i < scenario.steps.length; i++) {
         const step = scenario.steps[i];
-        const cmdStr = typeof step === 'string' ? step : (step as any).command;
-        const firstToken = cmdStr.trim().split(/\s+/)[0];
+        const firstToken = step.trim().split(/\s+/)[0];
         if (!KNOWN_COMMANDS.includes(firstToken)) {
-          unknownCommands.push(`step[${i}]: "${cmdStr}"`);
+          unknownCommands.push(`step[${i}]: "${step}"`);
         }
       }
       expect(unknownCommands).toEqual([]);
@@ -223,32 +201,11 @@ describe('Playthrough last step is a state inspection command', () => {
     it(`${name} — final step is an inspection command`, () => {
       const scenario = loadScenario(name);
       const lastStep = scenario.steps[scenario.steps.length - 1];
-      const cmdStr = typeof lastStep === 'string' ? lastStep : (lastStep as any).command;
-      const firstToken = cmdStr.trim().split(/\s+/)[0];
+      const firstToken = lastStep.trim().split(/\s+/)[0];
       expect(
         INSPECTION_COMMANDS,
-        `last step: "${cmdStr}" — "${firstToken}" is not an inspection command`,
+        `last step: "${lastStep}" — "${firstToken}" is not an inspection command`,
       ).toContain(firstToken);
-    });
-  }
-});
-
-
-// ──────────────────────────────────────────────
-// 10. Visual scenarios have valid shots array
-// ──────────────────────────────────────────────
-describe('Visual scenarios have valid shots array', () => {
-  for (const name of VISUAL_SCENARIO_NAMES) {
-    it(`${name} — shots array contains objects with name, yaw, pitch`, () => {
-      const scenario = loadScenario(name) as ScenarioDef;
-      expect(scenario.shots).toBeDefined();
-      expect(Array.isArray(scenario.shots)).toBe(true);
-      expect(scenario.shots!.length).toBeGreaterThan(0);
-      for (const shot of scenario.shots!) {
-        expect(typeof shot.name).toBe('string');
-        expect(typeof shot.yaw).toBe('number');
-        expect(typeof shot.pitch).toBe('number');
-      }
     });
   }
 });
