@@ -59,7 +59,7 @@ export class EmployeePanel {
 
   update(state: GameState): void {
     const { employees } = state.employees;
-    this.listEl.innerHTML = '';
+    this.listEl.replaceChildren();
 
     if (employees.length === 0) {
       const msg = document.createElement('div');
@@ -129,7 +129,7 @@ export class EmployeePanel {
     return row;
   }
 
-  // ── Skill/detail display stubs (Phase 10.6.2) ──
+  // ── Skill/detail display ──
 
   private makeSkillStars(level: number): string {
     const filled = '★'.repeat(level);
@@ -229,7 +229,7 @@ export class EmployeePanel {
     el.appendChild(currentLabel);
 
     const hasActive = e.activeActionId !== null;
-    const actions = state.pendingActions || [];
+    const actions = state.pendingActions;
 
     if (hasActive) {
       const taskEl = document.createElement('div');
@@ -305,23 +305,18 @@ export class EmployeePanel {
   private makeModifiersSection(e: Employee): HTMLElement {
     const el = document.createElement('div');
 
-    if (e.morale >= 70) {
-      const tag = document.createElement('span');
-      tag.className = 'bs-modifier-tag';
-      tag.textContent = t('ui.employees.high_morale');
-      el.appendChild(tag);
-    }
-    if (e.collapsing) {
-      const tag = document.createElement('span');
-      tag.className = 'bs-modifier-tag';
-      tag.textContent = t('ui.employees.collapsing');
-      el.appendChild(tag);
-    }
-    if (e.injured) {
-      const tag = document.createElement('span');
-      tag.className = 'bs-modifier-tag';
-      tag.textContent = t('ui.employees.injured');
-      el.appendChild(tag);
+    const modifiers = [
+      { active: e.morale >= 70, text: t('ui.employees.high_morale') },
+      { active: e.collapsing, text: t('ui.employees.collapsing') },
+      { active: e.injured, text: t('ui.employees.injured') },
+    ];
+    for (const m of modifiers) {
+      if (m.active) {
+        const tag = document.createElement('span');
+        tag.className = 'bs-modifier-tag';
+        tag.textContent = m.text;
+        el.appendChild(tag);
+      }
     }
 
     return el;
