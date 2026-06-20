@@ -20,7 +20,7 @@ import {
   previewVibrations,
   purchaseSoftware,
 } from '../../core/mining/Software.js';
-import { buildRamp, type RampDirection } from '../../core/mining/Ramp.js';
+import { buildRamp, RAMP_WIDTH, type RampDirection } from '../../core/mining/Ramp.js';
 import {
   createWeatherCycle,
   forceAdvance,
@@ -81,6 +81,17 @@ export function drillPlanCommand(
     // Clear stale charges/sequences from previous plan
     ctx.state!.chargesByHole = {};
     ctx.state!.sequenceDelays = {};
+
+    // Patch NavGrid to reflect new drill hole cells
+    if (ctx.state!.navGrid && ctx.grid) {
+      const ox = Math.floor(origin[0] ?? 0);
+      const oz = Math.floor(origin[1] ?? 0);
+      const region = {
+        minX: ox, maxX: ox + Math.ceil(cols * spacing),
+        minZ: oz, maxZ: oz + Math.ceil(rows * spacing),
+      };
+      NavGrid.patchNavGrid(ctx.state!.navGrid, ctx.grid, ctx.state!.buildings.buildings, ctx.state!.drillHoles, region);
+    }
 
     return {
       success: true,
@@ -498,6 +509,26 @@ export function buildRampCommand(
 
   if (!result.success) return { success: false, output: result.message };
   ctx.state!.cash -= result.cost;
+
+  // Patch NavGrid to reflect ramp terrain changes
+  if (ctx.state!.navGrid && ctx.grid) {
+    const ox = Math.floor(origin[0] ?? 0);
+    const oz = Math.floor(origin[1] ?? 0);
+    // Compute affected region based on direction
+    let rampMinX = ox, rampMaxX = ox, rampMinZ = oz, rampMaxZ = oz;
+    if (direction === 'north' || direction === 'south') {
+      rampMinZ = Math.min(oz, direction === 'north' ? oz - length : oz);
+      rampMaxZ = Math.max(oz, direction === 'south' ? oz + length : oz);
+      rampMaxX = ox + RAMP_WIDTH;
+    } else {
+      rampMinX = Math.min(ox, direction === 'west' ? ox - length : ox);
+      rampMaxX = Math.max(ox, direction === 'east' ? ox + length : ox);
+      rampMaxZ = oz + RAMP_WIDTH;
+    }
+    const region = { minX: rampMinX, maxX: rampMaxX, minZ: rampMinZ, maxZ: rampMaxZ };
+    NavGrid.patchNavGrid(ctx.state!.navGrid, ctx.grid, ctx.state!.buildings.buildings, ctx.state!.drillHoles, region);
+  }
+
   return { success: true, output: result.message };
 }
 

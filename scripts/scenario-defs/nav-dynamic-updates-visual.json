@@ -1,0 +1,19 @@
+{
+  "name": "nav-dynamic-updates-visual",
+  "description": "Tests NavGrid updates after blast execution changes terrain",
+  "steps": [
+    "new_game seed:42",
+    "drill_plan grid rows:1 cols:1 spacing:1 depth:6 start:10,10",
+    "charge hole:H1 explosive:boomite amount:500kg stemming:2m",
+    "sequence auto",
+    "state full",
+    "blast",
+    "state full"
+  ],
+  "shots": [
+    {"name": "overview", "yaw": 0, "pitch": 45},
+    {"name": "closeup", "yaw": 90, "pitch": 10},
+    {"name": "birdseye", "yaw": 0, "pitch": 80},
+    {"name": "angled", "yaw": 135, "pitch": 30}
+  ]
+}

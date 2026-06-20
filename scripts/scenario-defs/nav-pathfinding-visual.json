@@ -1,0 +1,20 @@
+{
+  "name": "nav-pathfinding-visual",
+  "description": "Tests A pathfinding around obstacles with buildings as blockers",
+  "steps": [
+    "new_game seed:42",
+    "build management_office at:5,5",
+    "build management_office at:5,7",
+    "build management_office at:7,5",
+    "employee hire role:driller",
+    "employee list",
+    "tick 20",
+    "inspect 10,10,0"
+  ],
+  "shots": [
+    {"name": "overview", "yaw": 0, "pitch": 45},
+    {"name": "closeup", "yaw": 90, "pitch": 10},
+    {"name": "birdseye", "yaw": 0, "pitch": 80},
+    {"name": "angled", "yaw": 135, "pitch": 30}
+  ]
+}

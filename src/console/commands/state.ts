@@ -52,6 +52,22 @@ function serializeState(ctx: MiningContext): Record<string, unknown> {
     levelEnded: s.levelEnded,
     levelEndReason: s.levelEndReason,
     softwareTier: ctx.softwareTier,
+    navGrid: (() => {
+      const ng = s.navGrid;
+      if (!ng) return null;
+      const counts: Record<string, number> = { walkable: 0, blocked: 0, drill_hole: 0, ramp: 0, void: 0 };
+      for (const row of ng.cells) {
+        for (const cell of row) {
+          counts[cell.type]!++;
+        }
+      }
+      return {
+        width: ng.width,
+        height: ng.height,
+        maxSurfaceY: ng.maxSurfaceY,
+        cellTypeCounts: counts,
+      };
+    })(),
   };
 }
 
