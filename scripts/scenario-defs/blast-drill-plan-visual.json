@@ -1,0 +1,17 @@
+{
+  "name": "blast-drill-plan-visual",
+  "description": "Visual verification of drill plan UI: grid creation, hole markers, spacing parameters, and plan inspection across multiple camera angles",
+  "steps": [
+    { "command": "new_game seed:42", "timeout": 10 },
+    "drill_plan grid rows:3 cols:4 spacing:5 depth:8 start:20,20",
+    "drill_plan show",
+    "state full",
+    "inspect 20,20,0"
+  ],
+  "shots": [
+    { "name": "overview", "yaw": 0, "pitch": 45 },
+    { "name": "closeup", "yaw": 90, "pitch": 10 },
+    { "name": "birdseye", "yaw": 0, "pitch": 80 },
+    { "name": "angled", "yaw": 45, "pitch": 30 }
+  ]
+}
