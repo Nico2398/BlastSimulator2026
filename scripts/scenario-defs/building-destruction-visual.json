@@ -1,0 +1,24 @@
+{
+  "name": "building-destruction-visual",
+  "description": "Visual check of building destruction via blast: drill, charge, sequence, and detonate near warehouses",
+  "steps": [
+    { "command": "new_game seed:42", "timeout": 30 },
+    "build explosive_warehouse at:20,20",
+    "build freight_warehouse at:25,25",
+    "build list",
+    "drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:15,15",
+    "charge hole:* explosive:boomite amount:10 stemming:1",
+    "sequence auto delay_step:25",
+    { "command": "blast", "timeout": 20, "frames": 6, "interval": 50 },
+    "build list",
+    "fragments",
+    "scores",
+    "state full"
+  ],
+  "shots": [
+    { "name": "overview", "yaw": 0, "pitch": 45 },
+    { "name": "pre-blast", "yaw": 90, "pitch": 10 },
+    { "name": "post-blast", "yaw": 45, "pitch": 30 },
+    { "name": "destruction-closeup", "yaw": 0, "pitch": 80 }
+  ]
+}

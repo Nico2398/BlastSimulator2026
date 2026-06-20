@@ -1,0 +1,26 @@
+{
+  "name": "building-living-visual",
+  "description": "Visual check of living quarters tiers and employee needs display with hunger and fatigue gauges",
+  "steps": [
+    { "command": "new_game seed:42", "timeout": 10 },
+    "build living_quarters at:5,5 tier:1",
+    "build living_quarters at:12,5 tier:2",
+    "build living_quarters at:20,5 tier:3",
+    "build list",
+    "employee hire role:driller",
+    "employee hire role:blaster",
+    "employee hire role:driver",
+    "employee list",
+    "needs",
+    "tick 5",
+    "needs",
+    "scores",
+    "state full"
+  ],
+  "shots": [
+    { "name": "overview", "yaw": 0, "pitch": 45 },
+    { "name": "tier-comparison", "yaw": 90, "pitch": 15 },
+    { "name": "needs-display", "yaw": 45, "pitch": 30 },
+    { "name": "birdseye", "yaw": 0, "pitch": 80 }
+  ]
+}

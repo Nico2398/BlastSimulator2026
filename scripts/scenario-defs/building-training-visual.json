@@ -1,0 +1,22 @@
+{
+  "name": "building-training-visual",
+  "description": "Visual check of training buildings: driving center, blasting academy, management office, and geology lab",
+  "steps": [
+    { "command": "new_game seed:42", "timeout": 10 },
+    "build driving_center at:5,5",
+    "build blasting_academy at:10,5",
+    "build management_office at:15,5",
+    "build geology_lab at:20,5",
+    "build list",
+    "employee hire role:driller",
+    "employee hire role:blaster",
+    "employee list",
+    "tick 1",
+    "state full"
+  ],
+  "shots": [
+    { "name": "overview", "yaw": 0, "pitch": 45 },
+    { "name": "training-area", "yaw": 90, "pitch": 10 },
+    { "name": "closeup", "yaw": 45, "pitch": 30 }
+  ]
+}

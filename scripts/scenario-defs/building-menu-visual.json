@@ -1,0 +1,23 @@
+{
+  "name": "building-menu-visual",
+  "description": "Visual check of building selection menu: open build types, place multiple buildings, list placed buildings, inspect scores and state",
+  "steps": [
+    { "command": "new_game seed:42", "timeout": 30 },
+    "build types",
+    "build list",
+    "build living_quarters at:5,5",
+    "build management_office at:10,5",
+    "build driving_center at:15,5",
+    "build explosive_warehouse at:20,5",
+    "build freight_warehouse at:5,10",
+    "build vehicle_depot at:10,10",
+    "build list",
+    "scores",
+    "state full"
+  ],
+  "shots": [
+    { "name": "overview", "yaw": 0, "pitch": 45 },
+    { "name": "menu-panel", "yaw": 90, "pitch": 10 },
+    { "name": "birdseye", "yaw": 0, "pitch": 80 }
+  ]
+}
