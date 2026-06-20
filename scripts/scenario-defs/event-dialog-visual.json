@@ -1,0 +1,30 @@
+{
+  "name": "event-dialog-visual",
+  "description": "Visual verification of the event dialog system: event categories (Unions, Politics, Weather, Mafia, Lawsuits), dialog with title/description/options, consequence display, and state updates after resolution.",
+  "steps": [
+    { "command": "new_game seed:42", "timeout": 15 },
+    "campaign start level:dusty_hollow",
+    "time resume",
+    "event status",
+    "event fire union_safety_complaint",
+    "event choose 0",
+    "tick 8",
+    "event choose 0",
+    "event fire political_donor_visit",
+    "event choose 1",
+    "tick 8",
+    "event choose 0",
+    "event status",
+    "tick 8",
+    "event choose 0",
+    "scores",
+    "finances",
+    "state full"
+  ],
+  "shots": [
+    { "name": "overview", "yaw": 0, "pitch": 45 },
+    { "name": "event-dialog", "yaw": 90, "pitch": 10 },
+    { "name": "event-options", "yaw": 45, "pitch": 30 },
+    { "name": "after-resolution", "yaw": 0, "pitch": 80 }
+  ]
+}

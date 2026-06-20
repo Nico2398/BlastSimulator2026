@@ -1,0 +1,33 @@
+{
+  "name": "time-management-visual",
+  "description": "Visual verification of time management controls: speed buttons (1x, 2x, 4x, 8x), pause/resume toggle, current speed indicator in HUD, tick count display, and auto-pause behavior during events.",
+  "steps": [
+    { "command": "new_game seed:42", "timeout": 15 },
+    "campaign start level:dusty_hollow",
+    "time status",
+    "time pause",
+    "time status",
+    "time resume",
+    "time speed 2",
+    "time status",
+    "tick 5",
+    "event choose 0",
+    "time speed 4",
+    "time status",
+    "tick 5",
+    "event choose 0",
+    "time speed 8",
+    "time status",
+    "tick 5",
+    "event choose 0",
+    "time speed 1",
+    "time status",
+    "state full"
+  ],
+  "shots": [
+    { "name": "overview", "yaw": 0, "pitch": 45 },
+    { "name": "speed-controls", "yaw": 90, "pitch": 10 },
+    { "name": "paused-state", "yaw": 0, "pitch": 80 },
+    { "name": "high-speed", "yaw": 45, "pitch": 30 }
+  ]
+}

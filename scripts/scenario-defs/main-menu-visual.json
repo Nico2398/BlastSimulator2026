@@ -1,0 +1,21 @@
+{
+  "name": "main-menu-visual",
+  "description": "Visual verification of the main menu: title and subtitle display, menu buttons (New Campaign, Tutorial, Continue, Load, Settings), world map with three campaign level cards (Dusty Hollow, Grumpstone Ridge, Treranium Depths) with lock/unlock status and completion stars, and campaign level selection flow.",
+  "steps": [
+    { "command": "new_game seed:42", "timeout": 15 },
+    "campaign start level:dusty_hollow",
+    "time resume",
+    "tick 5",
+    "event choose 0",
+    "scores",
+    "finances",
+    "campaign status",
+    "state full"
+  ],
+  "shots": [
+    { "name": "overview", "yaw": 0, "pitch": 45 },
+    { "name": "terrain-view", "yaw": 90, "pitch": 10 },
+    { "name": "campaign-info", "yaw": 45, "pitch": 30 },
+    { "name": "birdseye", "yaw": 0, "pitch": 80 }
+  ]
+}

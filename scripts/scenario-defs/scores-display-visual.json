@@ -1,0 +1,29 @@
+{
+  "name": "scores-display-visual",
+  "description": "Visual verification of the four score bars in the HUD: Worker Well-being, Safety, Ecology, and Neighbor Nuisance scores (0-100). Verifies scores are visible, values update over time with decay, and the scores command reflects current state.",
+  "steps": [
+    { "command": "new_game seed:42", "timeout": 15 },
+    "campaign start level:dusty_hollow",
+    "time resume",
+    "scores",
+    "tick 10",
+    "event choose 0",
+    "scores",
+    "tick 20",
+    "event choose 0",
+    "scores",
+    "tick 30",
+    "event choose 0",
+    "scores",
+    "tick 50",
+    "event choose 0",
+    "scores",
+    "state full"
+  ],
+  "shots": [
+    { "name": "overview", "yaw": 0, "pitch": 45 },
+    { "name": "scores-panel", "yaw": 90, "pitch": 10 },
+    { "name": "after-decay", "yaw": 45, "pitch": 30 },
+    { "name": "birdseye", "yaw": 0, "pitch": 80 }
+  ]
+}

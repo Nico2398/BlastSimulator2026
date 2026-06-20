@@ -1,0 +1,34 @@
+{
+  "name": "core-loop-visual",
+  "description": "Visual verification of the full core gameplay loop: survey → drill plan → charge → sequence → blast → fragments → contract delivery. Multi-angle screenshots at each phase to confirm smooth transitions and visual feedback.",
+  "steps": [
+    { "command": "new_game seed:42 size:24", "timeout": 15 },
+    "campaign start level:dusty_hollow",
+    "time resume",
+    "employee hire role:surveyor",
+    "employee assign_skill 1 geology 3",
+    "survey seismic x:20 z:20",
+    "tick 5",
+    "event choose 0",
+    "survey show",
+    "drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:20,20",
+    "charge hole:* explosive:boomite amount:5 stemming:2",
+    "sequence auto delay_step:25",
+    "sequence show",
+    "blast_preview",
+    { "command": "blast", "timeout": 20, "frames": 6, "interval": 50 },
+    "fragments",
+    "contract list",
+    "contract accept 1",
+    "contract deliver 1 amount:500",
+    "finances",
+    "scores",
+    "state full"
+  ],
+  "shots": [
+    { "name": "overview", "yaw": 0, "pitch": 45 },
+    { "name": "ground-level", "yaw": 90, "pitch": 10 },
+    { "name": "drill-holes", "yaw": 45, "pitch": 30 },
+    { "name": "birdseye", "yaw": 0, "pitch": 80 }
+  ]
+}
