@@ -2,7 +2,7 @@
   "name": "building-research-visual",
   "description": "Visual check of research center building at all three tiers for technology advancement",
   "steps": [
-    { "command": "new_game seed:42", "timeout": 30 },
+    { "command": "new_game seed:42", "timeout": 10 },
     "build research_center at:5,5",
     "build research_center at:15,5 tier:2",
     "build research_center at:25,5 tier:3",

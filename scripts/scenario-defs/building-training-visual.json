@@ -11,7 +11,7 @@
     "employee hire role:driller",
     "employee hire role:blaster",
     "employee list",
-    { "command": "tick 1", "timeout": 10 },
+    "tick 1",
     "state full"
   ],
   "shots": [
