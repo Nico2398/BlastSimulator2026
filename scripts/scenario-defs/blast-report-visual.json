@@ -6,7 +6,7 @@
     "drill_plan grid rows:2 cols:2 spacing:5 depth:8 start:15,15",
     "charge hole:* explosive:boomite amount:5 stemming:2",
     "sequence auto delay_step:25",
-    { "command": "blast", "timeout": 15 },
+    { "command": "blast", "timeout": 15, "frames": 6, "interval": 50 },
     "fragments",
     "inspect 15,15,0",
     "finances",

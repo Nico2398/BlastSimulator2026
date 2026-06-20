@@ -23,7 +23,7 @@
     "buy_software tier:4",
     "preview vibrations",
     "blast_preview",
-    { "command": "blast", "timeout": 20 },
+    { "command": "blast", "timeout": 20, "frames": 6, "interval": 50 },
     "fragments",
     "inspect 20,20,0",
     "finances",

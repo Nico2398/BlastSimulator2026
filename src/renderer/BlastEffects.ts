@@ -14,10 +14,7 @@ import * as THREE from 'three';
 // ---------- Config ----------
 
 // Flash per hole
-// Duration is set long enough (1.5s) so that visual testing screenshots,
-// taken ~1.3s after the blast command, consistently capture the flash.
-// No testing-mode multiplier needed — native timing works for both play and test.
-const FLASH_DURATION = 1.5;        // seconds
+const FLASH_DURATION = 0.15;       // seconds — visible for ~2 frames at 60fps
 const FLASH_INTENSITY_BASE = 80;   // point light intensity at peak
 const FLASH_COLOR = 0xffdd88;      // warm orange-yellow
 
@@ -28,9 +25,7 @@ const DUST_LIFETIME = 3.0;         // seconds before fully faded
 const DUST_COLOR = 0xaa8855;       // sandy brown
 
 // Screen shake
-// Extended to match the longer flash duration — shake persists through the
-// visual capture window so screenshots register camera displacement.
-const SHAKE_DURATION_BASE = 2.0;   // seconds
+const SHAKE_DURATION_BASE = 0.5;   // seconds
 const SHAKE_AMP_BASE = 0.3;        // metres of camera offset at minimum energy
 const SHAKE_AMP_MAX = 2.5;         // maximum shake amplitude
 

@@ -68,6 +68,8 @@ interface ScenarioStepDef {
   command: string;
   timeout?: number;
   description?: string;
+  frames?: number;
+  interval?: number;
 }
 
 interface ScenarioDef {
@@ -167,7 +169,7 @@ describe('Playthrough scenarios have sufficient steps', () => {
 // ──────────────────────────────────────────────
 describe('All steps are strings or step objects', () => {
   for (const name of ALL_SCENARIO_NAMES) {
-    it(`${name} — every step is a string or {command, timeout?} object`, () => {
+    it(`${name} — every step is a string or step object with optional timeout/frames/interval fields`, () => {
       const scenario = loadScenario(name);
       for (let i = 0; i < scenario.steps.length; i++) {
         const step = scenario.steps[i];
@@ -183,7 +185,32 @@ describe('All steps are strings or step objects', () => {
 });
 
 // ──────────────────────────────────────────────
-// 7. Description is meaningful (>20 chars)
+// 7a. frames/interval fields are valid positive integers
+// ──────────────────────────────────────────────
+describe('Step frames/interval fields are valid', () => {
+  for (const name of ALL_SCENARIO_NAMES) {
+    it(`${name} — frames and interval are positive integers when present`, () => {
+      const scenario = loadScenario(name);
+      for (let i = 0; i < scenario.steps.length; i++) {
+        const step = scenario.steps[i];
+        if (typeof step === 'object' && step !== null) {
+          const s = step as ScenarioStepDef;
+          if (s.frames !== undefined) {
+            expect(Number.isInteger(s.frames), `step[${i}] frames must be integer`).toBe(true);
+            expect(s.frames, `step[${i}] frames must be > 0`).toBeGreaterThan(0);
+          }
+          if (s.interval !== undefined) {
+            expect(Number.isInteger(s.interval), `step[${i}] interval must be integer`).toBe(true);
+            expect(s.interval, `step[${i}] interval must be > 0`).toBeGreaterThan(0);
+          }
+        }
+      }
+    });
+  }
+});
+
+// ──────────────────────────────────────────────
+// 7b. Description is meaningful (>20 chars)
 // ──────────────────────────────────────────────
 describe('Scenario description is meaningful', () => {
   for (const name of ALL_SCENARIO_NAMES) {

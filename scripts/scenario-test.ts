@@ -56,6 +56,10 @@ interface ScenarioStep {
   command: string;
   description?: string;
   timeout?: number;
+  /** Per-step animation frame capture count (default: 1 = no additional frames). */
+  frames?: number;
+  /** Milliseconds between animation frames (default: 200). */
+  interval?: number;
 }
 
 interface ShotDef {
@@ -280,18 +284,20 @@ async function runScenario(
             const sizeWarn = checkScreenshotSize(screenshotPath);
             if (sizeWarn) console.warn(`  WARNING: ${sizeWarn}`);
 
-            // Animation frames
+            // Animation frames — step-level setting overrides CLI default
+            const stepFrames = step.frames ?? frames;
+            const stepInterval = step.interval ?? intervalMs;
             const framePaths: string[] = [];
-            if (frames > 1) {
-              for (let f = 0; f < frames; f++) {
-                await new Promise(r => setTimeout(r, intervalMs));
+            if (stepFrames > 1) {
+              for (let f = 0; f < stepFrames; f++) {
+                await new Promise(r => setTimeout(r, stepInterval));
                 await page.evaluate(() => new Promise(r => requestAnimationFrame(() => {
                   requestAnimationFrame(() => r(undefined));
                 })));
                 const framePath = resolve(outDir, `step-${paddedIdx}-${cmdSlug}-f${f}.png`);
                 await page.screenshot({ path: framePath, fullPage: false });
                 framePaths.push(framePath);
-                console.log(`  Frame ${f}: ${framePath}`);
+                console.log(`  Frame ${f}: ${framePath} (interval=${stepInterval}ms)`);
 
                 const fSizeWarn = checkScreenshotSize(framePath);
                 if (fSizeWarn) console.warn(`  WARNING: ${fSizeWarn}`);

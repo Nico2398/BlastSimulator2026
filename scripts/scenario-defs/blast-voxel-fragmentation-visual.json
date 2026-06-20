@@ -7,7 +7,7 @@
     "charge hole:* explosive:boomite amount:5 stemming:2",
     "sequence auto delay_step:25",
     "inspect 15,15,0",
-    { "command": "blast", "timeout": 20 },
+    { "command": "blast", "timeout": 20, "frames": 6, "interval": 50 },
     "inspect 15,15,0",
     "fragments",
     "state full"
