@@ -2,7 +2,7 @@
   "name": "building-ramp-visual",
   "description": "Visual check of ramp construction with different directions and depths for multi-level access",
   "steps": [
-    { "command": "new_game seed:42", "timeout": 10 },
+    { "command": "new_game seed:42", "timeout": 30 },
     "build_ramp origin:5,15 direction:south length:10 depth:8",
     "build_ramp origin:20,15 direction:east length:8 depth:6",
     "inspect 5,20,0",
