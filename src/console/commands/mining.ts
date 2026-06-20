@@ -20,7 +20,7 @@ import {
   previewVibrations,
   purchaseSoftware,
 } from '../../core/mining/Software.js';
-import { buildRamp, type RampDirection } from '../../core/mining/Ramp.js';
+import { buildRamp, RAMP_WIDTH, type RampDirection } from '../../core/mining/Ramp.js';
 import {
   createWeatherCycle,
   forceAdvance,
@@ -519,11 +519,11 @@ export function buildRampCommand(
     if (direction === 'north' || direction === 'south') {
       ramMinZ = Math.min(oz, direction === 'north' ? oz - length : oz);
       ramMaxZ = Math.max(oz, direction === 'south' ? oz + length : oz);
-      ramMaxX = ox + 4; // ramp width
+      ramMaxX = ox + RAMP_WIDTH;
     } else {
       ramMinX = Math.min(ox, direction === 'west' ? ox - length : ox);
       ramMaxX = Math.max(ox, direction === 'east' ? ox + length : ox);
-      ramMaxZ = oz + 4; // ramp width
+      ramMaxZ = oz + RAMP_WIDTH;
     }
     const region = { minX: ramMinX, maxX: ramMaxX, minZ: ramMinZ, maxZ: ramMaxZ };
     NavGrid.patchNavGrid(ctx.state!.navGrid, ctx.grid, ctx.state!.buildings.buildings, ctx.state!.drillHoles, region);

@@ -6,9 +6,8 @@ import { MiniMap } from '../../../src/ui/MiniMap.js';
  * MiniMap navGrid overlay tests.
  *
  * These tests exercise the navGridVisible getter, setNavGridVisible setter,
- * and the drawNavGridOverlay method on the MiniMap class. The overlay drawing
- * is currently a TODO stub — tests verify that the API surface exists and
- * the toggle state is correctly managed.
+ * setNavGrid, and the drawNavGridOverlay method on the MiniMap class.
+ * The overlay renders semi-transparent colored rectangles per cell type.
  */
 describe('MiniMap — navGrid overlay', () => {
   function createMiniMap(): MiniMap {
