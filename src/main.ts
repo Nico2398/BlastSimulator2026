@@ -227,12 +227,11 @@ window.__cameraReset = () => {
 
 uiManager.setGameConsole(window.__gameConsole);
 tutorial.setGameConsole(window.__gameConsole);
-// Expose tutorial start for scenario tests
-window.__startTutorial = () => tutorial.start(ctx.state ?? undefined);
 
-// Register tutorial_start console command for scenario tests
+// Tutorial start bridge (Puppeteer) + console command (scenario tests)
+window.__startTutorial = () => tutorial.start(ctx.state ?? undefined);
 runner.register('tutorial_start', 'Start the tutorial overlay', () => {
-  tutorial.start(ctx.state ?? undefined);
+  window.__startTutorial();
   return { success: true, output: 'Tutorial started' };
 });
 uiManager.setSpeedChangeHandler((speed) => {
