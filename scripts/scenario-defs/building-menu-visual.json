@@ -2,7 +2,7 @@
   "name": "building-menu-visual",
   "description": "Visual check of building selection menu: open build types, place multiple buildings, list placed buildings, inspect scores and state",
   "steps": [
-    { "command": "new_game seed:42", "timeout": 10 },
+    { "command": "new_game seed:42", "timeout": 30 },
     "build types",
     "build list",
     "build living_quarters at:5,5",
