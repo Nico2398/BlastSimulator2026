@@ -3,7 +3,9 @@
 
 import { t } from '../core/i18n/I18n.js';
 import type { GameState } from '../core/state/GameState.js';
-import type { Employee, EmployeeRole } from '../core/entities/Employee.js';
+import type { Employee, EmployeeRole, SkillQualification, TrainingState } from '../core/entities/Employee.js';
+import { XP_THRESHOLDS, QUALIFICATION_SALARY_BONUS, PROFICIENCY_MULTIPLIERS, BASE_SALARIES } from '../core/config/balance.js';
+import { computeTaskDuration } from '../core/entities/EmployeeTaskDuration.js';
 
 import type { CommandResult } from '../console/ConsoleRunner.js';
 
@@ -67,7 +69,7 @@ export class EmployeePanel {
       this.listEl.appendChild(msg);
     } else {
       for (const e of employees) {
-        if (e.alive) this.listEl.appendChild(this.makeEmployeeRow(e));
+        if (e.alive) this.listEl.appendChild(this.makeEmployeeRow(e, state));
       }
     }
 
@@ -81,7 +83,7 @@ export class EmployeePanel {
 
   dispose(): void { this.el.remove(); }
 
-  private makeEmployeeRow(e: Employee): HTMLElement {
+  private makeEmployeeRow(e: Employee, state: GameState): HTMLElement {
     const row = document.createElement('div');
     row.className = 'bs-employee-row';
 
@@ -114,12 +116,117 @@ export class EmployeePanel {
       if (!e.unionized) this.gameConsole?.(`employee fire id:${e.id}`);
     });
 
-    btnRow.append(raiseBtn, fireBtn);
+    const toggleEl = document.createElement('div');
+    toggleEl.className = 'bs-detail-toggle';
+    toggleEl.textContent = t('ui.employees.click_expand');
+    toggleEl.addEventListener('click', () => this.toggleDetail(row, e, state));
+
+    btnRow.append(raiseBtn, fireBtn, toggleEl);
     const col = document.createElement('div');
     col.style.cssText = 'flex:1;min-width:0';
     col.append(nameEl, details, btnRow);
     row.appendChild(col);
     return row;
+  }
+
+  // ── Skill/detail display stubs (Phase 10.6.2) ──
+
+  private makeSkillStars(_level: number): string {
+    // TODO: implement
+    return '';
+  }
+
+  private makeSkillSection(e: Employee): HTMLElement {
+    const el = document.createElement('div');
+    // TODO: implement — iterate e.qualifications
+    for (const q of e.qualifications) {
+      const _q: SkillQualification = q;
+      el.appendChild(document.createElement('span')); // placeholder
+      this.makeSkillStars(_q.proficiencyLevel);
+      this.makeXpBar(_q.xp, _q.proficiencyLevel);
+    }
+    return el;
+  }
+
+  private makeXpBar(_xp: number, _level: number): HTMLElement {
+    const el = document.createElement('div');
+    void XP_THRESHOLDS;
+    // TODO: implement — use XP_THRESHOLDS to compute fill width
+    return el;
+  }
+
+  private makeNeedBar(_label: string, _value: number, _color: string): HTMLElement {
+    const el = document.createElement('div');
+    // TODO: implement
+    return el;
+  }
+
+  private makeTaskQueue(_e: Employee, _state: GameState): HTMLElement {
+    const el = document.createElement('div');
+    void computeTaskDuration;
+    // TODO: implement — use computeTaskDuration and e.trainingState to display queue
+    return el;
+  }
+
+  private makeSalaryBreakdown(_e: Employee): HTMLElement {
+    const el = document.createElement('div');
+    void BASE_SALARIES;
+    void QUALIFICATION_SALARY_BONUS;
+    void PROFICIENCY_MULTIPLIERS;
+    // TODO: implement — compute salary from base, bonus, and multipliers
+    return el;
+  }
+
+  private makeModifiersSection(_e: Employee): HTMLElement {
+    const el = document.createElement('div');
+    // TODO: implement
+    return el;
+  }
+
+  private makeTrainingBadge(e: Employee): HTMLElement | null {
+    const ts: TrainingState | null = e.trainingState;
+    if (ts) {
+      // TODO: implement — render training badge from ts
+      return document.createElement('span');
+    }
+    return null;
+  }
+
+  private toggleDetail(row: HTMLElement, e: Employee, state: GameState): void {
+    const existing = row.querySelector('.bs-employee-detail');
+    if (existing) {
+      existing.remove();
+      return;
+    }
+
+    const detail = document.createElement('div');
+    detail.className = 'bs-employee-detail';
+
+    // Skills section
+    detail.appendChild(this.makeSkillSection(e));
+
+    // Need meters
+    const needRow = document.createElement('div');
+    needRow.style.cssText = 'margin-top:4px';
+    needRow.appendChild(this.makeNeedBar(t('ui.employees.hunger'), e.hunger, '#e09040'));
+    needRow.appendChild(this.makeNeedBar(t('ui.employees.fatigue'), e.fatigue, '#7090c0'));
+    needRow.appendChild(this.makeNeedBar(t('ui.employees.break'), e.breakNeed, '#90b070'));
+    detail.appendChild(needRow);
+
+    // Task queue
+    detail.appendChild(this.makeTaskQueue(e, state));
+
+    // Salary breakdown
+    detail.appendChild(this.makeSalaryBreakdown(e));
+
+    // Modifiers
+    detail.appendChild(this.makeModifiersSection(e));
+
+    // Training badge
+    const badge = this.makeTrainingBadge(e);
+    if (badge) detail.appendChild(badge);
+
+    row.appendChild(detail);
   }
 
   private buildHireSection(): void {

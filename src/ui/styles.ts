@@ -344,6 +344,28 @@ const CSS = `
 .bs-hp-bar-bg { background: rgba(255,255,255,0.1); border-radius: 2px; height: 4px; width: 60px; margin-top: 3px; }
 .bs-hp-bar-fill { height: 100%; background: #4caf50; border-radius: 2px; transition: width 0.3s; }
 
+/* ─── Employee skills detail (10.6.2) ─── */
+.bs-skill-row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; font-size: 10px; }
+.bs-skill-category { color: #d0b090; font-weight: 600; }
+.bs-skill-stars { color: #ffc840; font-size: 11px; }
+.bs-xp-bar-bg { background: rgba(255,255,255,0.1); border-radius: 2px; height: 4px; margin-top: 2px; }
+.bs-xp-bar-fill { height: 100%; background: linear-gradient(90deg, #4caf50, #8bc34a); border-radius: 2px; transition: width 0.3s; }
+.bs-need-bar-bg { background: rgba(255,255,255,0.08); border-radius: 2px; height: 5px; margin-top: 1px; }
+.bs-need-bar-fill { height: 100%; border-radius: 2px; transition: width 0.3s; }
+.bs-task-queue { margin-top: 6px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 4px; }
+.bs-task-entry { display: flex; align-items: center; gap: 4px; padding: 2px 0; font-size: 10px; color: #a09070; }
+.bs-task-entry.current { color: #d0c8b0; font-weight: 600; }
+.bs-task-time { margin-left: auto; color: #807060; font-size: 9px; }
+.bs-salary-breakdown { margin-top: 4px; font-size: 9px; color: #7a7060; }
+.bs-salary-total { color: #ffc840; font-weight: 600; font-size: 10px; }
+.bs-training-badge { background: rgba(100,150,255,0.2); border: 1px solid rgba(100,150,255,0.3); border-radius: 3px; padding: 1px 5px; font-size: 9px; color: #88bbff; display: inline-block; }
+.bs-modifier-tag { background: rgba(255,200,64,0.1); border-radius: 2px; padding: 1px 4px; font-size: 9px; color: #c8a848; display: inline-block; margin: 1px; }
+.bs-need-row { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; font-size: 10px; }
+.bs-need-label { width: 48px; color: #9a8868; font-size: 9px; }
+.bs-employee-detail { margin-top: 6px; padding: 6px 8px; background: rgba(255,255,255,0.04); border-radius: 4px; border: 1px solid rgba(255,255,255,0.06); }
+.bs-detail-toggle { cursor: pointer; font-size: 9px; color: #706050; margin-left: auto; user-select: none; }
+.bs-queue-empty { font-size: 10px; color: #605040; font-style: italic; padding: 2px 0; }
+
 /* ─── Section headers ─── */
 .bs-section-header {
   font-size: 10px;
