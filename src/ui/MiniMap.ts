@@ -12,6 +12,7 @@ export class MiniMap {
   private readonly canvas: HTMLCanvasElement;
   private readonly ctx2d: CanvasRenderingContext2D;
   private readonly title: HTMLElement;
+  private _navGridVisible: boolean = false;
 
   constructor(container: HTMLElement) {
     this.el = document.createElement('div');
@@ -127,4 +128,12 @@ export class MiniMap {
   }
 
   dispose(): void { this.el.remove(); }
+
+  get navGridVisible(): boolean { return this._navGridVisible; }
+
+  setNavGridVisible(visible: boolean): void { this._navGridVisible = visible; }
+
+  drawNavGridOverlay(_ctx: CanvasRenderingContext2D, _scaleX: number, _scaleZ: number): void {
+    // TODO: implement
+  }
 }
