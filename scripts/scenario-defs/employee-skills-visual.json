@@ -1,0 +1,27 @@
+{
+  "name": "employee-skills-visual",
+  "description": "Visual verification of employee skills UI: skill categories, proficiency stars, XP bars, task queue, salary breakdown, need gauges, training badges, and modifiers",
+  "steps": [
+    { "command": "new_game seed:42", "timeout": 10 },
+    "campaign start level:dusty_hollow",
+    "employee hire role:driller",
+    "employee hire role:blaster",
+    "employee hire role:driver",
+    "employee hire role:surveyor",
+    "employee hire role:manager",
+    "employee assign_skill id:1 skill:driving.excavator level:3",
+    "employee assign_skill id:1 skill:geology level:2",
+    "employee assign_skill id:2 skill:blasting level:4",
+    "employee assign_skill id:3 skill:driving.truck level:1",
+    "employee assign_skill id:4 skill:geology level:5",
+    "employee assign_skill id:5 skill:management level:2",
+    "employee list",
+    "tick 1",
+    "employee list",
+    "state full"
+  ],
+  "shots": [
+    { "name": "initial-overview", "yaw": 0, "pitch": 45 },
+    { "name": "employee-panel", "yaw": 90, "pitch": 10 }
+  ]
+}
