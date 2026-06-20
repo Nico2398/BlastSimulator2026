@@ -25,7 +25,7 @@ jobs:
             return /^READY TO MERGE$/m.test(body) ? 'true' : 'false'
 
       - name: Enable auto-merge
-        if: steps.check-ready.outputs.result == 'true'
+        if: steps.check-ready.outputs.result == 'true' && vars.AGENTIC_AUTO_MERGE_ENABLED == 'true'
         continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
