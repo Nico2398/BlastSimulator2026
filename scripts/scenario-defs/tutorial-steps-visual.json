@@ -1,0 +1,41 @@
+{
+  "name": "tutorial-steps-visual",
+  "description": "Step-by-step visual walkthrough of all 23 tutorial steps (0-22) with per-step screenshots for visual regression testing. Exercises the tutorial overlay from start through congratulations, capturing each step's UI state.",
+  "shots": [
+    { "name": "overview", "yaw": 0, "pitch": 45 },
+    { "name": "closeup", "yaw": 90, "pitch": 15 },
+    { "name": "birdseye", "yaw": 0, "pitch": 80 }
+  ],
+  "steps": [
+    { "command": "new_game seed:42", "timeout": 10, "description": "Setup: create game with seed 42" },
+    { "command": "campaign start level:tutorial_pit", "timeout": 10, "description": "Setup: start tutorial pit level" },
+
+    { "command": "tutorial_start", "timeout": 60, "description": "Step 0: Start tutorial overlay — time-speed guidance displayed" },
+
+    { "command": "time speed 2", "timeout": 10, "description": "Step 0 complete: change time speed → advances to step 1 (hire-surveyor)" },
+    { "command": "employee hire role:surveyor", "timeout": 10, "description": "Step 1 complete: hire surveyor → advances to step 2 (survey)" },
+    { "command": "survey seismic x:15 z:15", "timeout": 10, "description": "Step 2 complete: seismic survey → advances to step 3 (hire-driller)" },
+    { "command": "employee hire role:driller", "timeout": 10, "description": "Step 3 complete: hire driller → advances to step 4 (drill-plan)" },
+    { "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:15,15", "timeout": 10, "description": "Step 4 complete: drill plan grid → advances to step 5 (charge)" },
+    { "command": "charge hole:* explosive:boomite amount:5 stemming:2", "timeout": 10, "description": "Step 5 complete: set charges → advances to step 6 (sequence)" },
+    { "command": "sequence auto delay_step:25", "timeout": 10, "description": "Step 6 complete: auto-sequence → advances to step 7 (blast)" },
+    { "command": "blast", "timeout": 15, "description": "Step 7 complete: execute blast → advances to step 8 (scores)" },
+    { "command": "scores", "timeout": 10, "description": "Step 8 complete: view scores → auto-advances to step 9 (event-fire-resolve)" },
+    { "command": "tick 1", "timeout": 10, "description": "Step 9: trigger event-fire-resolve — tutorial fires event, pending event appears" },
+    { "command": "event choose 0", "timeout": 10, "description": "Resolve tutorial event → allows step 10 (hire-manager) to proceed" },
+    { "command": "employee hire role:manager", "timeout": 10, "description": "Step 10 complete: hire manager → advances to step 11 (contract-accept)" },
+    { "command": "contract accept 1", "timeout": 10, "description": "Step 11 complete: accept contract → advances to step 12 (hire-driver)" },
+    { "command": "employee hire role:driver", "timeout": 10, "description": "Step 12 complete: hire driver → advances to step 13 (vehicle-buy-assign)" },
+    { "command": "vehicle buy debris_hauler", "timeout": 10, "description": "Step 13: buy vehicle (tutorial auto-buys, also buy manually for driver assignment)" },
+    { "command": "vehicle driver 1 4", "timeout": 10, "description": "Step 13 complete: assign driver to vehicle → advances to step 14 (build-storage)" },
+    { "command": "build freight_warehouse at:12,8", "timeout": 10, "description": "Step 14 complete: build freight warehouse → advances to step 15 (contract-deliver)" },
+    { "command": "contract deliver 1 amount:5000", "timeout": 10, "description": "Step 15 complete: deliver to contract → advances to step 16 (finances)" },
+    { "command": "finances", "timeout": 10, "description": "Step 16 complete: view finances → auto-advances to step 17 (build-ramp)" },
+    { "command": "needs", "timeout": 10, "description": "Step 17: view needs → tutorial auto-builds ramp, advances to step 18 (needs)" },
+    { "command": "tick 3", "timeout": 10, "description": "Step 18: advance time — needs display shown, auto-advances to step 19 (set-policy)" },
+    { "command": "set_policy mode:shift_8h", "timeout": 10, "description": "Step 19 complete: change site policy → advances to step 20 (tick-advance)" },
+    { "command": "tick 10", "timeout": 15, "description": "Step 20 complete: advance time 10 ticks → advances to step 21 (victory)" },
+    { "command": "campaign complete", "timeout": 15, "description": "Step 21 complete: force-complete level → advances to step 22 (congratulations)" },
+    { "command": "tick 1", "timeout": 10, "description": "Step 22: congratulations displayed — tutorial auto-dismisses after display" }
+  ]
+}

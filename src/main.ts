@@ -227,7 +227,14 @@ window.__cameraReset = () => {
 
 uiManager.setGameConsole(window.__gameConsole);
 tutorial.setGameConsole(window.__gameConsole);
-// SKELETON: window.__startTutorial will be defined here by implementer
+// Expose tutorial start for scenario tests
+window.__startTutorial = () => tutorial.start(ctx.state ?? undefined);
+
+// Register tutorial_start console command for scenario tests
+runner.register('tutorial_start', 'Start the tutorial overlay', () => {
+  tutorial.start(ctx.state ?? undefined);
+  return { success: true, output: 'Tutorial started' };
+});
 uiManager.setSpeedChangeHandler((speed) => {
   window.__gameConsole(`time speed ${speed}`);
 });
