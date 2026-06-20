@@ -113,6 +113,7 @@ declare global {
     __uiState: () => Record<string, unknown>;
     __cameraOrbit: (yaw: number, pitch: number) => void;
     __cameraReset: () => void;
+    __startTutorial: () => void;
   }
 }
 
@@ -226,6 +227,7 @@ window.__cameraReset = () => {
 
 uiManager.setGameConsole(window.__gameConsole);
 tutorial.setGameConsole(window.__gameConsole);
+// SKELETON: window.__startTutorial will be defined here by implementer
 uiManager.setSpeedChangeHandler((speed) => {
   window.__gameConsole(`time speed ${speed}`);
 });
