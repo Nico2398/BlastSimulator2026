@@ -1,41 +1,67 @@
 {
   "name": "tutorial-steps-visual",
-  "description": "Step-by-step visual walkthrough of all 23 tutorial steps (0-22) with per-step screenshots for visual regression testing. Exercises the tutorial overlay from start through congratulations, capturing each step's UI state.",
+  "description": "Step-by-step visual walkthrough of all 23 tutorial steps (0-22) with per-step screenshots for visual regression testing. Exercises the tutorial overlay from start through congratulations, capturing each step's UI state, highlight targets, and progress indicator.",
   "shots": [
     { "name": "overview", "yaw": 0, "pitch": 45 },
     { "name": "closeup", "yaw": 90, "pitch": 15 },
     { "name": "birdseye", "yaw": 0, "pitch": 80 }
   ],
   "steps": [
-    { "command": "new_game seed:42", "timeout": 10, "description": "Setup: create game with seed 42" },
-    { "command": "campaign start level:tutorial_pit", "timeout": 10, "description": "Setup: start tutorial pit level" },
+    { "command": "new_game seed:42", "timeout": 15, "description": "Setup: create game with seed 42 (24x12x24 tutorial_pit)" },
+    { "command": "campaign start level:tutorial_pit", "timeout": 15, "description": "Setup: start tutorial pit level with $20,000 starting cash" },
 
-    { "command": "tutorial_start", "timeout": 60, "description": "Step 0: Start tutorial overlay — time-speed guidance displayed" },
+    { "command": "tutorial_start", "timeout": 30, "description": "Step 0: Start tutorial overlay — time-speed guidance displayed with highlight on #bs-hud-top .bs-speed-btn" },
 
-    { "command": "time speed 2", "timeout": 10, "description": "Step 0 complete: change time speed → advances to step 1 (hire-surveyor)" },
-    { "command": "employee hire role:surveyor", "timeout": 10, "description": "Step 1 complete: hire surveyor → advances to step 2 (survey)" },
-    { "command": "survey seismic x:15 z:15", "timeout": 10, "description": "Step 2 complete: seismic survey → advances to step 3 (hire-driller)" },
-    { "command": "employee hire role:driller", "timeout": 10, "description": "Step 3 complete: hire driller → advances to step 4 (drill-plan)" },
-    { "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:15,15", "timeout": 10, "description": "Step 4 complete: drill plan grid → advances to step 5 (charge)" },
-    { "command": "charge hole:* explosive:boomite amount:5 stemming:2", "timeout": 10, "description": "Step 5 complete: set charges → advances to step 6 (sequence)" },
-    { "command": "sequence auto delay_step:25", "timeout": 10, "description": "Step 6 complete: auto-sequence → advances to step 7 (blast)" },
-    { "command": "blast", "timeout": 15, "description": "Step 7 complete: execute blast → advances to step 8 (scores)" },
-    { "command": "scores", "timeout": 10, "description": "Step 8 complete: view scores → auto-advances to step 9 (event-fire-resolve)" },
-    { "command": "tick 1", "timeout": 10, "description": "Step 9: trigger event-fire-resolve — tutorial fires event, pending event appears" },
-    { "command": "event choose 0", "timeout": 10, "description": "Resolve tutorial event → allows step 10 (hire-manager) to proceed" },
-    { "command": "employee hire role:manager", "timeout": 10, "description": "Step 10 complete: hire manager → advances to step 11 (contract-accept)" },
-    { "command": "contract accept 1", "timeout": 10, "description": "Step 11 complete: accept contract → advances to step 12 (hire-driver)" },
-    { "command": "employee hire role:driver", "timeout": 10, "description": "Step 12 complete: hire driver → advances to step 13 (vehicle-buy-assign)" },
-    { "command": "vehicle buy debris_hauler", "timeout": 10, "description": "Step 13: buy vehicle (tutorial auto-buys, also buy manually for driver assignment)" },
-    { "command": "vehicle driver 1 4", "timeout": 10, "description": "Step 13 complete: assign driver to vehicle → advances to step 14 (build-storage)" },
-    { "command": "build freight_warehouse at:12,8", "timeout": 10, "description": "Step 14 complete: build freight warehouse → advances to step 15 (contract-deliver)" },
-    { "command": "contract deliver 1 amount:5000", "timeout": 10, "description": "Step 15 complete: deliver to contract → advances to step 16 (finances)" },
-    { "command": "finances", "timeout": 10, "description": "Step 16 complete: view finances → auto-advances to step 17 (build-ramp)" },
-    { "command": "needs", "timeout": 10, "description": "Step 17: view needs → tutorial auto-builds ramp, advances to step 18 (needs)" },
-    { "command": "tick 3", "timeout": 10, "description": "Step 18: advance time — needs display shown, auto-advances to step 19 (set-policy)" },
-    { "command": "set_policy mode:shift_8h", "timeout": 10, "description": "Step 19 complete: change site policy → advances to step 20 (tick-advance)" },
-    { "command": "tick 10", "timeout": 15, "description": "Step 20 complete: advance time 10 ticks → advances to step 21 (victory)" },
-    { "command": "campaign complete", "timeout": 15, "description": "Step 21 complete: force-complete level → advances to step 22 (congratulations)" },
-    { "command": "tick 1", "timeout": 10, "description": "Step 22: congratulations displayed — tutorial auto-dismisses after display" }
+    { "command": "time speed:2", "timeout": 15, "description": "Step 0 complete: increase time speed → overlay advances to step 1 (hire-surveyor)" },
+
+    { "command": "employee hire role:surveyor", "timeout": 15, "description": "Step 1 complete: hire surveyor employee → overlay advances to step 2 (survey)" },
+    { "command": "employee assign_skill 1 skill:geology level:3", "timeout": 15, "description": "Assign geology skill to surveyor for seismic survey" },
+
+    { "command": "survey seismic x:15 z:15", "timeout": 30, "description": "Step 2 complete: run seismic survey → overlay advances to step 3 (hire-driller)" },
+
+    { "command": "employee hire role:driller", "timeout": 15, "description": "Step 3 complete: hire driller → overlay advances to step 4 (drill-plan)" },
+    { "command": "employee assign_skill 2 skill:blasting level:3", "timeout": 15, "description": "Assign blasting skill to driller for drill plan" },
+
+    { "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:15,15", "timeout": 15, "description": "Step 4 complete: create drill plan → overlay advances to step 5 (charge)" },
+
+    { "command": "charge hole:* explosive:boomite amount:5 stemming:2", "timeout": 15, "description": "Step 5 complete: set charges on all holes → overlay advances to step 6 (sequence)" },
+
+    { "command": "sequence auto delay_step:25", "timeout": 15, "description": "Step 6 complete: auto-sequence delays → overlay advances to step 7 (blast)" },
+
+    { "command": "blast", "timeout": 30, "description": "Step 7 complete: execute blast → overlay advances to step 8 (scores). Screenshot captures blast crater + fragments" },
+
+    { "command": "scores", "timeout": 15, "description": "Step 8: view scores overlay → auto-advances after 2s to step 9 (event-fire-resolve). Screenshot captures scores display" },
+
+    { "command": "tick 1", "timeout": 30, "description": "Step 9: advance time to fire tutorial_synergy_consultant event. Overlay fires event, pending event dialog appears" },
+    { "command": "event choose 0", "timeout": 15, "description": "Resolve tutorial_synergy_consultant (hire consultant: -$3k, +15 well-being). Clears pending event guard" },
+
+    { "command": "employee hire role:manager", "timeout": 15, "description": "Step 10 complete: hire manager (event guard now clear) → overlay advances to step 11 (contract-accept)" },
+    { "command": "employee assign_skill 3 skill:management level:3", "timeout": 15, "description": "Assign management skill to manager" },
+
+    { "command": "contract accept 1", "timeout": 15, "description": "Step 11 complete: accept first contract → overlay advances to step 12 (hire-driver)" },
+
+    { "command": "employee hire role:driver", "timeout": 15, "description": "Step 12 complete: hire driver → overlay advances to step 13 (vehicle-buy-assign)" },
+    { "command": "employee assign_skill 4 skill:driving.truck level:3", "timeout": 15, "description": "Assign driving.truck skill to driver" },
+
+    { "command": "vehicle buy debris_hauler", "timeout": 15, "description": "Step 13: buy debris_hauler vehicle → overlay auto-executes buy debris_hauler" },
+    { "command": "vehicle driver 1 4", "timeout": 15, "description": "Step 13 complete: assign driver (ID 4) to vehicle (ID 1) → overlay advances to step 14 (build-storage)" },
+
+    { "command": "build freight_warehouse at:12,8", "timeout": 15, "description": "Step 14 complete: build freight warehouse → overlay advances to step 15 (contract-deliver)" },
+
+    { "command": "contract deliver 1 amount:5000", "timeout": 30, "description": "Step 15 complete: deliver first contract → overlay advances to step 16 (finances)" },
+
+    { "command": "finances", "timeout": 15, "description": "Step 16: view finances overlay → auto-advances after 2s to step 17 (build-ramp). Screenshot captures balance + contract earnings" },
+
+    { "command": "build_ramp start:10,15 end:10,25", "timeout": 15, "description": "Step 17 complete: build ramp on navGrid → overlay advances to step 18 (needs)" },
+
+    { "command": "needs", "timeout": 15, "description": "Step 18: view employee needs → auto-advances after 2s to step 19 (set-policy)" },
+
+    { "command": "set_policy mode:shift_8h", "timeout": 15, "description": "Step 19 complete: set shift policy → overlay advances to step 20 (tick-advance)" },
+
+    { "command": "tick 6", "timeout": 30, "description": "Step 20 complete: advance 6 ticks (tickCount > prev + 5) → overlay advances to step 21 (victory)" },
+
+    { "command": "campaign complete", "timeout": 15, "description": "Step 21 complete: force level completion (levelEnded=true) → overlay advances to step 22 (congratulations)" },
+
+    { "command": "tick 1", "timeout": 15, "description": "Step 22: congratulations displayed → overlay auto-dismisses after 4s. Final state: isPaused=false, bs_tutorial_done set" }
   ]
 }
