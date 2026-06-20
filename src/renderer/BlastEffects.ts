@@ -14,7 +14,7 @@ import * as THREE from 'three';
 // ---------- Config ----------
 
 // Flash per hole
-const FLASH_DURATION = 0.15;       // seconds
+const FLASH_DURATION = 0.15;       // seconds — visible for ~2 frames at 60fps
 const FLASH_INTENSITY_BASE = 80;   // point light intensity at peak
 const FLASH_COLOR = 0xffdd88;      // warm orange-yellow
 
