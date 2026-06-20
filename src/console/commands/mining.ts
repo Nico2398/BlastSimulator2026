@@ -515,17 +515,17 @@ export function buildRampCommand(
     const ox = Math.floor(origin[0] ?? 0);
     const oz = Math.floor(origin[1] ?? 0);
     // Compute affected region based on direction
-    let ramMinX = ox, ramMaxX = ox, ramMinZ = oz, ramMaxZ = oz;
+    let rampMinX = ox, rampMaxX = ox, rampMinZ = oz, rampMaxZ = oz;
     if (direction === 'north' || direction === 'south') {
-      ramMinZ = Math.min(oz, direction === 'north' ? oz - length : oz);
-      ramMaxZ = Math.max(oz, direction === 'south' ? oz + length : oz);
-      ramMaxX = ox + RAMP_WIDTH;
+      rampMinZ = Math.min(oz, direction === 'north' ? oz - length : oz);
+      rampMaxZ = Math.max(oz, direction === 'south' ? oz + length : oz);
+      rampMaxX = ox + RAMP_WIDTH;
     } else {
-      ramMinX = Math.min(ox, direction === 'west' ? ox - length : ox);
-      ramMaxX = Math.max(ox, direction === 'east' ? ox + length : ox);
-      ramMaxZ = oz + RAMP_WIDTH;
+      rampMinX = Math.min(ox, direction === 'west' ? ox - length : ox);
+      rampMaxX = Math.max(ox, direction === 'east' ? ox + length : ox);
+      rampMaxZ = oz + RAMP_WIDTH;
     }
-    const region = { minX: ramMinX, maxX: ramMaxX, minZ: ramMinZ, maxZ: ramMaxZ };
+    const region = { minX: rampMinX, maxX: rampMaxX, minZ: rampMinZ, maxZ: rampMaxZ };
     NavGrid.patchNavGrid(ctx.state!.navGrid, ctx.grid, ctx.state!.buildings.buildings, ctx.state!.drillHoles, region);
   }
 

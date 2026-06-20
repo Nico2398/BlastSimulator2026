@@ -8,6 +8,15 @@ import type { NavGrid, NavCellType } from '../core/nav/NavGrid.js';
 const MAP_SIZE = 120; // px
 const LEGEND_HEIGHT = 16;
 
+/** Semi-transparent color overlay per NavCellType — shared across frames to avoid re-allocation. */
+const NAV_GRID_COLOR_MAP: Record<NavCellType, string> = {
+  walkable: 'rgba(0, 180, 0, 0.15)',
+  blocked: 'rgba(180, 0, 0, 0.3)',
+  drill_hole: 'rgba(180, 120, 0, 0.4)',
+  ramp: 'rgba(180, 180, 0, 0.3)',
+  void: 'rgba(0, 0, 0, 0.4)',
+};
+
 export class MiniMap {
   private readonly el: HTMLElement;
   private readonly canvas: HTMLCanvasElement;
@@ -156,14 +165,6 @@ export class MiniMap {
     const navGrid = this._navGrid;
     if (!navGrid) return;
 
-    const colorMap: Record<NavCellType, string> = {
-      walkable: 'rgba(0, 180, 0, 0.15)',
-      blocked: 'rgba(180, 0, 0, 0.3)',
-      drill_hole: 'rgba(180, 120, 0, 0.4)',
-      ramp: 'rgba(180, 180, 0, 0.3)',
-      void: 'rgba(0, 0, 0, 0.4)',
-    };
-
     const cellW = Math.max(1, Math.floor(scaleX));
     const cellH = Math.max(1, Math.floor(scaleZ));
 
@@ -171,7 +172,7 @@ export class MiniMap {
       for (let x = 0; x < navGrid.width; x++) {
         const cell = navGrid.cells[z]?.[x];
         if (!cell) continue;
-        const color = colorMap[cell.type];
+        const color = NAV_GRID_COLOR_MAP[cell.type];
         if (!color) continue;
         ctx.fillStyle = color;
         ctx.fillRect(
