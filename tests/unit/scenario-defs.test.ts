@@ -50,6 +50,13 @@ const VISUAL_SCENARIO_NAMES = [
   'needs-proactive-queue-visual',
   'needs-cost-visual',
   'needs-shift-cycle-visual',
+  'nav-cell-types-visual',
+  'nav-move-costs-visual',
+  'nav-pathfinding-visual',
+  'nav-ramp-routing-visual',
+  'nav-dynamic-updates-visual',
+  'nav-path-following-visual',
+  'nav-minimap-integration-visual',
 ] as const;
 
 const ALL_SCENARIO_NAMES = [
