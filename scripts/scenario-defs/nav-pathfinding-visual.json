@@ -3,10 +3,10 @@
   "description": "Tests A pathfinding around obstacles with buildings as blockers",
   "steps": [
     "new_game seed:42",
-    "build warehouse at:5,5",
-    "build warehouse at:5,7",
-    "build warehouse at:7,5",
-    "employee hire role:miner",
+    "build management_office at:5,5",
+    "build management_office at:5,7",
+    "build management_office at:7,5",
+    "employee hire role:driller",
     "employee list",
     "tick 20",
     "inspect 10,10,0"

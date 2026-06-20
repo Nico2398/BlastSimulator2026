@@ -3,11 +3,11 @@
   "description": "Tests path following and stuck state with building obstacles",
   "steps": [
     "new_game seed:42",
-    "employee hire role:miner",
-    "employee hire role:miner",
+    "employee hire role:driller",
+    "employee hire role:driller",
     "employee list",
     "tick 10",
-    "build warehouse at:3,3",
+    "build management_office at:3,3",
     "state full",
     "tick 15"
   ],

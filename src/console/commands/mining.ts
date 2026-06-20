@@ -82,6 +82,17 @@ export function drillPlanCommand(
     ctx.state!.chargesByHole = {};
     ctx.state!.sequenceDelays = {};
 
+    // Patch NavGrid to reflect new drill hole cells
+    if (ctx.state!.navGrid && ctx.grid) {
+      const ox = Math.floor(origin[0] ?? 0);
+      const oz = Math.floor(origin[1] ?? 0);
+      const region = {
+        minX: ox, maxX: ox + Math.ceil(cols * spacing),
+        minZ: oz, maxZ: oz + Math.ceil(rows * spacing),
+      };
+      NavGrid.patchNavGrid(ctx.state!.navGrid, ctx.grid, ctx.state!.buildings.buildings, ctx.state!.drillHoles, region);
+    }
+
     return {
       success: true,
       output: `Drill plan: ${rows}×${cols} grid, ${ctx.state!.drillHoles.length} holes, spacing ${spacing}m, depth ${depth}m`,
@@ -498,6 +509,26 @@ export function buildRampCommand(
 
   if (!result.success) return { success: false, output: result.message };
   ctx.state!.cash -= result.cost;
+
+  // Patch NavGrid to reflect ramp terrain changes
+  if (ctx.state!.navGrid && ctx.grid) {
+    const ox = Math.floor(origin[0] ?? 0);
+    const oz = Math.floor(origin[1] ?? 0);
+    // Compute affected region based on direction
+    let ramMinX = ox, ramMaxX = ox, ramMinZ = oz, ramMaxZ = oz;
+    if (direction === 'north' || direction === 'south') {
+      ramMinZ = Math.min(oz, direction === 'north' ? oz - length : oz);
+      ramMaxZ = Math.max(oz, direction === 'south' ? oz + length : oz);
+      ramMaxX = ox + 4; // ramp width
+    } else {
+      ramMinX = Math.min(ox, direction === 'west' ? ox - length : ox);
+      ramMaxX = Math.max(ox, direction === 'east' ? ox + length : ox);
+      ramMaxZ = oz + 4; // ramp width
+    }
+    const region = { minX: ramMinX, maxX: ramMaxX, minZ: ramMinZ, maxZ: ramMaxZ };
+    NavGrid.patchNavGrid(ctx.state!.navGrid, ctx.grid, ctx.state!.buildings.buildings, ctx.state!.drillHoles, region);
+  }
+
   return { success: true, output: result.message };
 }
 

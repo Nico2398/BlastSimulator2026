@@ -5,7 +5,7 @@
     "new_game seed:42",
     "drill_plan grid rows:2 cols:2 spacing:5 depth:6 start:5,5",
     "build management_office at:2,2",
-    "build_ramp start:1,20 end:10,25",
+    "build_ramp origin:1,20 direction:south length:10 depth:8",
     "state full",
     "tick 10"
   ],

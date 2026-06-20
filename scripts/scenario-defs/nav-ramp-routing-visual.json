@@ -3,8 +3,8 @@
   "description": "Tests multi-level ramp routing with agents walking across levels",
   "steps": [
     "new_game seed:42",
-    "build_ramp start:5,15 end:12,25",
-    "employee hire role:miner",
+    "build_ramp origin:5,15 direction:south length:10 depth:8",
+    "employee hire role:driller",
     "employee list",
     "tick 30",
     "inspect 8,20,0",

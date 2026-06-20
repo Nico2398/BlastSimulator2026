@@ -4,8 +4,8 @@
   "steps": [
     "new_game seed:42",
     "drill_plan grid rows:1 cols:1 spacing:1 depth:6 start:10,10",
-    "charge DH1 anfo:500",
-    "sequence DH1 delay:0",
+    "charge hole:H1 explosive:boomite amount:500kg stemming:2m",
+    "sequence auto",
     "state full",
     "blast",
     "state full"
