@@ -1,0 +1,21 @@
+{
+  "name": "vehicle-roles-panel-visual",
+  "description": "Visual check: vehicle panel lists all 5 roles with tier names and purchase costs displayed",
+  "steps": [
+    { "command": "new_game seed:42", "timeout": 10 },
+    "campaign start level:dusty_hollow",
+    "vehicle list",
+    "vehicle buy debris_hauler",
+    "vehicle buy rock_digger",
+    "vehicle buy drill_rig",
+    "vehicle buy building_destroyer",
+    "vehicle buy rock_fragmenter",
+    "vehicle list",
+    "state full"
+  ],
+  "shots": [
+    { "name": "roles-overview", "yaw": 0, "pitch": 45 },
+    { "name": "roles-panel", "yaw": 90, "pitch": 10 },
+    { "name": "roles-fleet", "yaw": 45, "pitch": 30 }
+  ]
+}

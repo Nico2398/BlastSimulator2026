@@ -154,11 +154,12 @@ export class VehicleMesh {
     this.scene = scene;
   }
 
-  addVehicle(vehicle: Vehicle): void {
+  /** Add a vehicle mesh to the scene at its position, optionally on a terrain surface. */
+  addVehicle(vehicle: Vehicle, surfaceY: number = 0): void {
     const builder = VEHICLE_BUILDERS[vehicle.type];
     const group = builder();
     applyTierVariation(group, vehicle.tier);
-    group.position.set(vehicle.x, 0, vehicle.z);
+    group.position.set(vehicle.x, surfaceY, vehicle.z);
     this.scene.add(group);
     this.vehicles.set(vehicle.id, { group, vehicle });
   }
@@ -179,11 +180,11 @@ export class VehicleMesh {
     }
   }
 
-  /** Snap a vehicle directly to its position (no lerp — use after teleport). */
-  snapPosition(vehicleId: number, x: number, z: number): void {
+  /** Snap a vehicle directly to its world position (no lerp — use after teleport or initial placement). */
+  snapPosition(vehicleId: number, x: number, y: number, z: number): void {
     const entry = this.vehicles.get(vehicleId);
     if (entry) {
-      entry.group.position.set(x, 0, z);
+      entry.group.position.set(x, y, z);
     }
   }
 

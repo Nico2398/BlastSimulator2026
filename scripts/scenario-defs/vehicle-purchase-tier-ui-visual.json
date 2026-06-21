@@ -1,0 +1,18 @@
+{
+  "name": "vehicle-purchase-tier-ui-visual",
+  "description": "Visual check: vehicle purchase menu shows all roles with cost stats and purchase buttons for tier comparison",
+  "steps": [
+    { "command": "new_game seed:42", "timeout": 10 },
+    "campaign start level:dusty_hollow",
+    "vehicle list",
+    "vehicle buy debris_hauler",
+    "vehicle buy rock_digger",
+    "vehicle list",
+    "state full"
+  ],
+  "shots": [
+    { "name": "purchase-menu", "yaw": 0, "pitch": 45 },
+    { "name": "fleet-after-purchase", "yaw": 45, "pitch": 30 },
+    { "name": "panel-detail", "yaw": 90, "pitch": 10 }
+  ]
+}

@@ -66,6 +66,16 @@ export class GameRenderer {
     // Sync entities added since last call
     syncEntitySets(ctx.state, this.buildings, this.renderedBuildingIds, this.vehicles, this.renderedVehicleIds, this.characters, this.renderedEmployeeIds);
 
+    // Place vehicles at terrain surface height (not buried at y=0)
+    if (this.vehicles && this.lastGrid) {
+      for (const v of ctx.state.vehicles.vehicles) {
+        if (this.renderedVehicleIds.has(v.id)) {
+          const surfaceY = this.getTerrainSurfaceY(v.x, v.z);
+          this.vehicles.snapPosition(v.id, v.x, surfaceY, v.z);
+        }
+      }
+    }
+
     // Sync ghost previews for pending actions
     if (this.ghosts) {
       this.ghosts.sync(ctx.state.ghostPreviews);
@@ -243,7 +253,8 @@ export class GameRenderer {
     // Vehicles
     this.vehicles = new VehicleMesh(scene);
     for (const v of state.vehicles.vehicles) {
-      this.vehicles.addVehicle(v);
+      const surfaceY = this.getTerrainSurfaceY(v.x, v.z);
+      this.vehicles.addVehicle(v, surfaceY);
     }
 
     // Characters
