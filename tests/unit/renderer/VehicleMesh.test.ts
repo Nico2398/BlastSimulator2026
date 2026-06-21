@@ -65,7 +65,7 @@ describe('VehicleMesh', () => {
     const scene = new THREE.Scene();
     const vm = new VehicleMesh(scene);
     vm.addVehicle(makeVehicle(1, 'building_destroyer', 0, 0));
-    vm.snapPosition(1, 50, 75);
+    vm.snapPosition(1, 50, 0, 75);
     const group = scene.children[0] as THREE.Group;
     expect(group.position.x).toBeCloseTo(50);
     expect(group.position.z).toBeCloseTo(75);

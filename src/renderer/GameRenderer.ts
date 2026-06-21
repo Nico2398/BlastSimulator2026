@@ -71,7 +71,7 @@ export class GameRenderer {
       for (const v of ctx.state.vehicles.vehicles) {
         if (this.renderedVehicleIds.has(v.id)) {
           const surfaceY = this.getTerrainSurfaceY(v.x, v.z);
-          this.vehicles.snapPosition(v.id, v.x, v.z, surfaceY);
+          this.vehicles.snapPosition(v.id, v.x, surfaceY, v.z);
         }
       }
     }
