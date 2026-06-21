@@ -154,11 +154,11 @@ export class VehicleMesh {
     this.scene = scene;
   }
 
-  addVehicle(vehicle: Vehicle): void {
+  addVehicle(vehicle: Vehicle, surfaceY: number = 0): void {
     const builder = VEHICLE_BUILDERS[vehicle.type];
     const group = builder();
     applyTierVariation(group, vehicle.tier);
-    group.position.set(vehicle.x, 0, vehicle.z);
+    group.position.set(vehicle.x, surfaceY, vehicle.z);
     this.scene.add(group);
     this.vehicles.set(vehicle.id, { group, vehicle });
   }
@@ -180,10 +180,10 @@ export class VehicleMesh {
   }
 
   /** Snap a vehicle directly to its position (no lerp — use after teleport). */
-  snapPosition(vehicleId: number, x: number, z: number): void {
+  snapPosition(vehicleId: number, x: number, z: number, y: number = 0): void {
     const entry = this.vehicles.get(vehicleId);
     if (entry) {
-      entry.group.position.set(x, 0, z);
+      entry.group.position.set(x, y, z);
     }
   }
 
