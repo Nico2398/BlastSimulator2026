@@ -12,6 +12,7 @@ Runs after qualimetry passes. Branch: `pipeline/feature-<N>`.
 
 **Parameters:**
 - `skip_refactorer` (default: `false`) — set to `true` for bug-fix pipelines to skip refactoring phase.
+- `visual_incomplete` (default: `false`) — set to `true` when visual feedback loop could NOT complete inspection (VISION: BLOCKED). When `true`, the PR MUST be created as draft (--draft) WITHOUT `READY TO MERGE`.
 
 ```
 [ ] = orchestrator-executed command  |  @agent = AI agent invocation
@@ -31,8 +32,9 @@ Runs after qualimetry passes. Branch: `pipeline/feature-<N>`.
  5. @validator           → Full validation: typecheck → tests → build
                             if fail → @implementer (big loop)
  6. [verify-commit]      → final commit check before PR
- 7. [open-pr]            → create PR from feature branch to main + READY TO MERGE.
-                            Evaluate draft/ready per `agentic-pipeline-pr-management` skill.
+ 7. [open-pr]            → create PR from feature branch to main.
+                             Evaluate draft/ready per `agentic-pipeline-pr-management` skill.
+                             **If `visual_incomplete=true` → MUST use --draft, NO `READY TO MERGE`.**
  8. [git-verify]         → confirm clean state: git status, branch, last commits
 ```
 

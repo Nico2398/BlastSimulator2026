@@ -184,8 +184,18 @@ Browser exposes:
 - State dumps: {paths}
 ```
 
+### Blocked (cannot inspect)
+```
+## VISION: BLOCKED — visual inspection could not be completed
+- Reason: vision model unavailable / screenshots not generated / dev server not reachable
+- Screenshots captured: {count or N/A}
+- The orchestrator MUST halt the pipeline and escalate. Do NOT proceed to qualimetry or finalization.
+```
+
 **Severity levels:** SEVERE (missing/corrupt geometry), MODERATE (wrong colors/overlays/effects), MINOR (state mismatch, cosmetic).
 In visual feedback loop: report all issues found. @implementer fixes all of them, then re-invoke for another round.
+
+**If you cannot inspect screenshots** (vision model not available, images failed to load, dev server unreachable), you MUST report `## VISION: BLOCKED` instead of PASS or FAIL. Do NOT report PASS when screenshots were merely captured — you must visually inspect them.
 
 ## Key References
 

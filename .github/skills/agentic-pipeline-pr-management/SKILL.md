@@ -11,10 +11,11 @@ description: >
 Before open-pr step, evaluate: **is this PR ready to merge or should it be a draft?**
 
 Ask yourself:
-1. Did the visual feedback loop report persistent failures (3+ iterations without progress)? → draft (visuals need human review)
-2. Did the pipeline hit retry loops or heavy review findings? → draft (needs human review)
-3. Does the issue explicitly request human input? → draft
-4. Is this a simple fix or feature with full test coverage, no visual changes, and clean pipeline run? → ready
+1. Did the visual feedback loop report VISION: BLOCKED (could not inspect screenshots)? → **draft** (visual inspection incomplete, human review REQUIRED)
+2. Did the visual feedback loop report persistent failures (3+ iterations without progress)? → draft (visuals need human review)
+3. Did the pipeline hit retry loops or heavy review findings? → draft (needs human review)
+4. Does the issue explicitly request human input? → draft
+5. Is this a simple fix or feature with full test coverage, no visual changes, and clean pipeline run? → ready
 
 | Evaluation | Behavior | When |
 |------------|----------|------|
@@ -28,8 +29,9 @@ The open-pr step passes `--draft` to `gh pr create` when evaluation is `draft`.
 After creating the PR, the body must include `READY TO MERGE` on its own line. The `auto-assign-next.yml` workflow detects this and enables GitHub native auto-merge via a PAT token, ensuring downstream CI events trigger correctly.
 
 This is the **default**. Skip `READY TO MERGE` when:
-1. The issue requires human input (artistic direction, critical design decision).
-2. The pipeline hit significant churn (repeated failure loops, heavy review findings, multiple implementer do-overs).
+1. Visual feedback loop was incomplete (VISION: BLOCKED) — human must inspect screenshots first.
+2. The issue requires human input (artistic direction, critical design decision).
+3. The pipeline hit significant churn (repeated failure loops, heavy review findings, multiple implementer do-overs).
 
 When skipping, post a comment explaining why:
 
