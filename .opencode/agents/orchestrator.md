@@ -1,5 +1,6 @@
 ---
 model: opencode/mimo-v2.5-free
+reasoningEffort: high
 description:  Orchestrates the TDD development pipeline. Invokes specialist agents in the correct sequence. Does not write code directly — only delegates to sub-agents and manages workflow.
 mode: primary
 permission:
@@ -24,6 +25,8 @@ Classify the task and load the relevant skill for detailed steps.
 | Complex/mixed prompt | `agentic-pipeline-multi` |
 
 Only `@visual-tester` has vision (multimodal) capability. No other agent can analyze images or screenshots. Any task requiring visual inspection of render output must route through `@visual-tester`.
+
+**Visual feedback loop blocking rule:** If @visual-tester reports that visual inspection could NOT be completed (e.g., vision model unavailable, screenshots unreadable), the pipeline MUST halt. Do NOT proceed to qualimetry or finalization. Mark the visual feedback step as FAILED, add a comment to the issue explaining why, and escalate with `ESCALATED: visual inspection blocked — human review required`.
 
 ## Classification Heuristics
 
@@ -50,7 +53,7 @@ When selecting a pipeline, use these heuristics in order:
 5. **Merge code review findings** — After parallel reviewers complete, merge their findings into a single pass/fail decision (deduplicate, re-categorize, drop false positives, check issue alignment).
 6. **Enforce sequence** — Never skip phases. Tests before implementation. Always recreate pipeline branches from scratch for each issue — stale branches can corrupt the run. Multi-pipeline: each section's test/impl branches fork from the previous section's feature branch (not from main). This is deliberate accumulation, not an exception.
 7. **Report status** — After each agent completes, summarize what was done, commit SHA, and current branch.
-8. **PR management** — See `agentic-pipeline-pr-management` for PR status, draft/ready logic, and READY TO MERGE rules.
+8. **PR management** — See `agentic-pipeline-pr-management` for PR status, draft/ready logic, and READY TO MERGE rules. **CRITICAL:** If the visual feedback loop could not complete inspection (vision model unavailable or @visual-tester returned VISION: BLOCKED), the PR MUST be created as a draft (--draft) WITHOUT `READY TO MERGE`.
 
 ## Rules
 
