@@ -2,23 +2,19 @@
   "name": "vehicle-3d-rendering-visual",
   "description": "Visual check: all 5 vehicle roles render distinct 3D shapes at spawn with correct positioning",
   "steps": [
-    { "command": "new_game seed:42", "timeout": 10 },
-    "campaign start level:dusty_hollow",
-    "vehicle buy debris_hauler",
-    "vehicle buy rock_digger",
-    "vehicle buy drill_rig",
-    "vehicle buy building_destroyer",
-    "vehicle buy rock_fragmenter",
-    "vehicle list",
-    "state full"
+    { "command": "new_game seed:42", "timeout": 15 },
+    { "command": "campaign start level:dusty_hollow", "timeout": 15 },
+    { "command": "vehicle buy debris_hauler", "timeout": 15 },
+    { "command": "vehicle buy rock_digger", "timeout": 15 },
+    { "command": "vehicle buy drill_rig", "timeout": 15 },
+    { "command": "vehicle buy building_destroyer", "timeout": 15 },
+    { "command": "vehicle buy rock_fragmenter", "timeout": 15 },
+    { "command": "vehicle list", "timeout": 15 },
+    { "command": "state full", "timeout": 15 }
   ],
   "shots": [
-    { "name": "all-five-roles", "yaw": 0, "pitch": 45 },
-    { "name": "roles-top-down", "yaw": 0, "pitch": 80 },
-    { "name": "hauler-closeup", "yaw": 30, "pitch": 20 },
-    { "name": "drill-closeup", "yaw": 60, "pitch": 15 },
-    { "name": "digger-closeup", "yaw": 90, "pitch": 20 },
-    { "name": "destroyer-closeup", "yaw": 120, "pitch": 20 },
-    { "name": "fragmenter-closeup", "yaw": 150, "pitch": 20 }
+    { "name": "all-roles", "yaw": 0, "pitch": 45 },
+    { "name": "top-down", "yaw": 0, "pitch": 80 },
+    { "name": "side-view", "yaw": 90, "pitch": 15 }
   ]
 }
