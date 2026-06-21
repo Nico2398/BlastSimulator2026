@@ -1,0 +1,25 @@
+{
+  "name": "vehicle-traffic-routing-visual",
+  "description": "Visual check: multiple vehicles on shared navmesh cause congestion with waiting state and traffic jam alert",
+  "steps": [
+    { "command": "new_game seed:42", "timeout": 10 },
+    "campaign start level:dusty_hollow",
+    "employee hire role:driver",
+    "employee hire role:driver",
+    "employee hire role:driver",
+    "employee hire role:driver",
+    "vehicle buy debris_hauler",
+    "vehicle buy debris_hauler",
+    "vehicle buy debris_hauler",
+    "vehicle buy debris_hauler",
+    "vehicle list",
+    "tick 20",
+    "vehicle list",
+    "state full"
+  ],
+  "shots": [
+    { "name": "fleet-overview", "yaw": 0, "pitch": 45 },
+    { "name": "traffic-congestion", "yaw": 45, "pitch": 30 },
+    { "name": "congestion-closeup", "yaw": 90, "pitch": 10 }
+  ]
+}

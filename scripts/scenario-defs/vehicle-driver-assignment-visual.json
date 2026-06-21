@@ -1,0 +1,23 @@
+{
+  "name": "vehicle-driver-assignment-visual",
+  "description": "Visual check: assign qualified driver to vehicle, verify driver info, enforce one driver per vehicle",
+  "steps": [
+    { "command": "new_game seed:42", "timeout": 10 },
+    "campaign start level:dusty_hollow",
+    "vehicle buy debris_hauler",
+    "employee hire role:driver",
+    "employee assign_skill 1 skill:driving.truck level:1",
+    "vehicle list",
+    "vehicle driver 1 1",
+    "vehicle list",
+    "employee hire role:blaster",
+    "vehicle driver 1 2",
+    "vehicle list",
+    "state full"
+  ],
+  "shots": [
+    { "name": "before-assignment", "yaw": 0, "pitch": 45 },
+    { "name": "after-qualified", "yaw": 45, "pitch": 30 },
+    { "name": "after-unqualified", "yaw": 90, "pitch": 15 }
+  ]
+}

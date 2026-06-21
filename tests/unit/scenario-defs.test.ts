@@ -79,6 +79,13 @@ const VISUAL_SCENARIO_NAMES = [
   'building-vehicle-depot-visual',
   'building-ramp-visual',
   'building-destruction-visual',
+  'vehicle-3d-rendering-visual',
+  'vehicle-driver-assignment-visual',
+  'vehicle-purchase-tier-ui-visual',
+  'vehicle-purchase-visual',
+  'vehicle-roles-panel-visual',
+  'vehicle-task-states-visual',
+  'vehicle-traffic-routing-visual',
 ] as const;
 
 const ALL_SCENARIO_NAMES = [

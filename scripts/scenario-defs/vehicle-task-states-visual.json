@@ -1,0 +1,24 @@
+{
+  "name": "vehicle-task-states-visual",
+  "description": "Visual check: vehicle state transitions through idle moving working and waiting states",
+  "steps": [
+    { "command": "new_game seed:42", "timeout": 10 },
+    "campaign start level:dusty_hollow",
+    "vehicle buy debris_hauler",
+    "vehicle list",
+    "vehicle move 1 to:25,25",
+    "vehicle list",
+    "tick 5",
+    "vehicle list",
+    "vehicle assign 1 task:transport",
+    "vehicle list",
+    "tick 3",
+    "vehicle list",
+    "state full"
+  ],
+  "shots": [
+    { "name": "idle-state", "yaw": 0, "pitch": 45 },
+    { "name": "moving-state", "yaw": 45, "pitch": 30 },
+    { "name": "working-state", "yaw": 90, "pitch": 15 }
+  ]
+}
