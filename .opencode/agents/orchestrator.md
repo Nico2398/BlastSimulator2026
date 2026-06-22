@@ -24,8 +24,6 @@ Classify the task and load the relevant skill for detailed steps.
 | Imperative command | `agentic-pipeline-executor` |
 | Complex/mixed prompt | `agentic-pipeline-multi` |
 
-Only `@visual-tester` has vision (multimodal) capability. No other agent can analyze images or screenshots. Any task requiring visual inspection of render output must route through `@visual-tester`.
-
 **Visual feedback loop blocking rule:** If @visual-tester reports that visual inspection could NOT be completed (e.g., vision model unavailable, screenshots unreadable), the pipeline MUST halt. Do NOT proceed to qualimetry or finalization. Mark the visual feedback step as FAILED, add a comment to the issue explaining why, and escalate with `ESCALATED: visual inspection blocked — human review required`.
 
 ## Classification Heuristics
