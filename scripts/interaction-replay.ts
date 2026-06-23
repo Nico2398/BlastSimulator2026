@@ -36,6 +36,8 @@ import type {
   WaitEvent,
   AssertEvent,
   ViewportEvent,
+  TypeEvent,
+  WaitForSelectorEvent,
 } from './interaction-types.js';
 import puppeteer from 'puppeteer';
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'fs';
@@ -499,6 +501,18 @@ export async function replayEvent(
       await page.setViewport({
         width: viewportEvent.width,
         height: viewportEvent.height,
+      });
+      break;
+    }
+    case 'type': {
+      const typeEvent = event as TypeEvent;
+      await page.type(typeEvent.selector, typeEvent.text, { delay: typeEvent.delay });
+      break;
+    }
+    case 'waitForSelector': {
+      const waitForSelectorEvent = event as WaitForSelectorEvent;
+      await page.waitForSelector(waitForSelectorEvent.selector, {
+        timeout: waitForSelectorEvent.timeout ?? 10000,
       });
       break;
     }

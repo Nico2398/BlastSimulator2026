@@ -61,7 +61,30 @@ interface ScenarioStep {
   frames?: number;
   /** Milliseconds between animation frames (default: 200). */
   interval?: number;
+  /** Optional interaction actions to execute before/instead of the command. */
+  interaction?: InteractionStepAction[];
 }
+
+/**
+ * A single interaction action within a scenario step.
+ * Covers all supported Puppeteer interaction types.
+ */
+type InteractionStepAction =
+  | { type: 'click'; x: number; y: number; button?: 'left' | 'right' | 'middle' }
+  | { type: 'mousedown'; x: number; y: number; button?: 'left' | 'right' | 'middle' }
+  | { type: 'mouseup'; x: number; y: number; button?: 'left' | 'right' | 'middle' }
+  | { type: 'mousemove'; x: number; y: number }
+  | { type: 'keypress'; key: string }
+  | { type: 'keydown'; key: string }
+  | { type: 'keyup'; key: string }
+  | { type: 'scroll'; x: number; y: number }
+  | { type: 'wheel'; x: number; y: number; deltaX: number; deltaY: number; deltaZ: number }
+  | { type: 'wait'; durationMs: number }
+  | { type: 'waitForSelector'; selector: string; timeout?: number }
+  | { type: 'type'; selector: string; text: string; delay?: number }
+  | { type: 'assert'; selector?: string; property?: string; expectedValue?: unknown }
+  | { type: 'viewport'; width: number; height: number }
+  | { type: 'command'; command: string };
 
 interface ShotDef {
   name: string;
@@ -81,6 +104,23 @@ interface StepResult {
   warning?: string;
 }
 
+/**
+ * Executes an array of interaction actions on the given Puppeteer page.
+ * TODO: implement — skeleton stub for unified scenario test system (#400).
+ *
+ * @param page - Puppeteer page object.
+ * @param actions - Array of interaction actions to execute sequentially.
+ * @param timeout - Optional timeout in milliseconds for the entire sequence.
+ */
+export async function executeInteractionStep(
+  page: any,
+  actions: InteractionStepAction[],
+  timeout?: number,
+): Promise<void> {
+  // TODO: implement
+  throw new Error('executeInteractionStep: Not implemented');
+}
+
 function parseViewsArg(raw: string): ShotDef[] {
   return raw.split(';').map(s => s.trim()).filter(Boolean).map((part) => {
     const [shotName, yawStr, pitchStr] = part.split(':');
@@ -92,6 +132,7 @@ function parseArgs(): {
   name: string; steps: ScenarioStep[]; shots: ShotDef[];
   port: number; puppeteerPath?: string; frames: number; intervalMs: number;
   viewport: { width: number; height: number };
+  mode: string;
 } {
   const args = process.argv.slice(2);
   let name = 'scenario';
@@ -102,6 +143,7 @@ function parseArgs(): {
   let frames = 1;
   let intervalMs = 200;
   let viewport = { width: 1280, height: 720 };
+  let mode = 'standard'; // TODO: implement --mode parsing
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--scenario' && args[i + 1]) {
@@ -152,7 +194,7 @@ function parseArgs(): {
     }
   }
 
-  return { name, steps, shots, port, puppeteerPath, frames, intervalMs, viewport };
+  return { name, steps, shots, port, puppeteerPath, frames, intervalMs, viewport, mode };
 }
 
 function checkScreenshotSize(filepath: string): string | undefined {
@@ -392,7 +434,7 @@ async function runScenario(
 }
 
 // Main
-const { name, steps, shots, port, puppeteerPath, frames, intervalMs, viewport } = parseArgs();
+const { name, steps, shots, port, puppeteerPath, frames, intervalMs, viewport, mode } = parseArgs();
 if (steps.length === 0) {
   console.error('No steps defined. Use --scenario <name> or --commands "cmd1; cmd2; ..."');
   process.exit(1);
