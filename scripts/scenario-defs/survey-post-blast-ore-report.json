@@ -1,0 +1,60 @@
+{
+  "name": "survey-post-blast-ore-report",
+  "description": "Validates post-blast ore report: run a survey before blast, execute the blast, then verify the ore report shows actual ore extracted vs estimated. The report should include yield data per ore type and accuracy comparison.",
+  "steps": [
+    "new_game seed:42",
+    "campaign start level:dusty_hollow",
+    "time resume",
+
+    "employee hire role:surveyor",
+    "employee assign_skill 1 skill:geology level:5",
+    "employee list",
+
+    "state full",
+
+    "survey seismic x:20 z:20",
+    "survey show",
+    "state full",
+
+    "tick 8",
+    "event choose 0",
+    "tick 8",
+    "event choose 0",
+    "tick 8",
+    "event choose 0",
+    "tick 8",
+    "event choose 0",
+
+    "survey show",
+    "state full",
+
+    "survey core_sample x:20 z:20",
+    "survey show",
+    "state full",
+
+    "tick 8",
+    "event choose 0",
+    "tick 8",
+    "event choose 0",
+    "tick 8",
+    "event choose 0",
+    "tick 8",
+    "event choose 0",
+
+    "survey show",
+    "state full",
+
+    "drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:20,20",
+    "charge hole:* explosive:boomite amount:5 stemming:2",
+    "sequence auto delay_step:25",
+    "blast",
+    "state full",
+
+    "survey ore_report",
+    "state full"
+  ],
+  "shots": [
+    { "name": "pre-blast-survey", "yaw": 0, "pitch": 45 },
+    { "name": "post-blast-report", "yaw": 90, "pitch": 30 }
+  ]
+}
