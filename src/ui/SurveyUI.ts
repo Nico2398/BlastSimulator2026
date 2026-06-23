@@ -5,8 +5,30 @@ import { t } from '../core/i18n/I18n.js';
 import type { GameState } from '../core/state/GameState.js';
 
 import type { CommandResult } from '../console/ConsoleRunner.js';
+import type { SurveyMethod } from '../core/mining/SurveyCalc.js';
 
 export type GameConsoleFn = (cmd: string) => CommandResult;
+
+/** Configuration for a single method button in the selection panel. */
+export interface SurveyMethodButtonConfig {
+  /** The survey method this button triggers. */
+  method: SurveyMethod;
+  /** Display label for the button (i18n key). */
+  labelKey: string;
+  /** Estimated cost to display beside the button. */
+  estimatedCost: number;
+  /** Whether this method is currently selected. */
+  selected: boolean;
+}
+
+/** Result of the method selection panel interaction. */
+export interface SurveyMethodSelection {
+  /** The method the player selected. */
+  method: SurveyMethod;
+  /** Grid position where the survey should be placed. */
+  targetX: number;
+  targetZ: number;
+}
 
 export class SurveyUI {
   private readonly el: HTMLElement;
@@ -75,6 +97,35 @@ export class SurveyUI {
 
   update(_state: GameState): void {
     // Survey data is injected via showSurveyResult when user clicks terrain
+  }
+
+  /**
+   * Show the method selection panel with available survey methods.
+   * Each method button displays its name, cost, and accuracy hint.
+   */
+  showMethodSelection(methods: SurveyMethodButtonConfig[]): void {
+    // TODO: implement — render method selection buttons
+    void methods;
+  }
+
+  /** Hide the method selection panel without clearing state. */
+  hideMethodSelection(): void {
+    // TODO: implement — hide method selection buttons
+  }
+
+  /**
+   * Register a callback invoked when the player selects a survey method
+   * and confirms a target position.
+   */
+  onMethodSelected(callback: (selection: SurveyMethodSelection) => void): void {
+    // TODO: implement — wire button click handlers
+    void callback;
+  }
+
+  /** Get the currently selected survey method, or null if none. */
+  getSelectedMethod(): SurveyMethod | null {
+    // TODO: implement
+    return null;
   }
 
   dispose(): void { this.el.remove(); }
