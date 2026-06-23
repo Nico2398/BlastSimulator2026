@@ -1,0 +1,51 @@
+{
+  "name": "survey-seismic-side-effects",
+  "description": "Validates seismic survey side effects: run a seismic survey and verify that it triggers vibration, disturbs nearby employees, and potentially causes minor events. The overlay should show the seismic coverage radius. Requires the survey overlay to be wired into syncFromContext().",
+  "steps": [
+    "new_game seed:42",
+    "campaign start level:dusty_hollow",
+    "time resume",
+
+    "employee hire role:surveyor",
+    "employee assign_skill 1 skill:geology level:5",
+    "employee hire role:driver",
+    "employee assign_skill 2 skill:driving level:3",
+    "employee list",
+
+    "state full",
+
+    "survey seismic x:20 z:20",
+    "state full",
+
+    "tick 4",
+    "event choose 0",
+    "tick 4",
+    "event choose 0",
+    "tick 4",
+    "event choose 0",
+    "tick 4",
+    "event choose 0",
+
+    "survey show",
+    "state full",
+
+    "tick 8",
+    "event choose 0",
+    "tick 8",
+    "event choose 0",
+    "tick 8",
+    "event choose 0",
+    "tick 8",
+    "event choose 0",
+
+    "survey show",
+    "state full",
+
+    "stats",
+    "scores"
+  ],
+  "shots": [
+    { "name": "seismic-execution", "yaw": 0, "pitch": 45 },
+    { "name": "seismic-side-effects", "yaw": 90, "pitch": 30 }
+  ]
+}

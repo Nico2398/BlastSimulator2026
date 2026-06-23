@@ -1,0 +1,64 @@
+{
+  "name": "survey-ore-vein-visibility",
+  "description": "Validates ore vein visibility: run surveys at positions where ore is expected, then verify the overlay shows ore indicators. After a blast, check that ore vein markers are still visible or updated based on new terrain geometry. Requires the survey overlay to be wired into syncFromContext().",
+  "steps": [
+    "new_game seed:42",
+    "campaign start level:dusty_hollow",
+    "time resume",
+
+    "employee hire role:surveyor",
+    "employee assign_skill 1 skill:geology level:5",
+    "employee list",
+
+    "state full",
+
+    "survey seismic x:15 z:15",
+    "survey seismic x:25 z:15",
+    "survey seismic x:15 z:25",
+    "survey seismic x:25 z:25",
+
+    "survey show",
+    "state full",
+
+    "tick 8",
+    "event choose 0",
+    "tick 8",
+    "event choose 0",
+    "tick 8",
+    "event choose 0",
+    "tick 8",
+    "event choose 0",
+
+    "survey show",
+    "state full",
+
+    "survey core_sample x:20 z:20",
+    "survey show",
+    "state full",
+
+    "tick 8",
+    "event choose 0",
+    "tick 8",
+    "event choose 0",
+    "tick 8",
+    "event choose 0",
+    "tick 8",
+    "event choose 0",
+
+    "survey show",
+    "state full",
+
+    "drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:15,15",
+    "charge hole:* explosive:boomite amount:5 stemming:2",
+    "sequence auto delay_step:25",
+    "blast",
+    "state full",
+
+    "survey show",
+    "state full"
+  ],
+  "shots": [
+    { "name": "ore-veins-before-blast", "yaw": 0, "pitch": 45 },
+    { "name": "ore-veins-after-blast", "yaw": 90, "pitch": 30 }
+  ]
+}

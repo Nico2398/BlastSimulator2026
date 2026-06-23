@@ -1,0 +1,61 @@
+{
+  "name": "survey-method-selection",
+  "description": "Validates survey method selection UI: clicking through seismic, core_sample, and aerial methods highlights the selected method and updates the cost/accuracy display. Each method triggers the correct console command.",
+  "steps": [
+    "new_game seed:42",
+    "campaign start level:dusty_hollow",
+    "time resume",
+
+    "employee hire role:surveyor",
+    "employee assign_skill 1 skill:geology level:5",
+    "employee list",
+
+    "state full",
+
+    "survey mode",
+    "state full",
+
+    "survey seismic x:20 z:20",
+    "state full",
+
+    "tick 8",
+    "event choose 0",
+    "tick 8",
+    "event choose 0",
+    "tick 8",
+    "event choose 0",
+    "tick 8",
+    "event choose 0",
+
+    "survey core_sample x:25 z:25",
+    "state full",
+
+    "tick 8",
+    "event choose 0",
+    "tick 8",
+    "event choose 0",
+    "tick 8",
+    "event choose 0",
+    "tick 8",
+    "event choose 0",
+
+    "survey aerial x:30 z:30",
+    "state full",
+
+    "tick 8",
+    "event choose 0",
+    "tick 8",
+    "event choose 0",
+    "tick 8",
+    "event choose 0",
+    "tick 8",
+    "event choose 0",
+
+    "survey show",
+    "state full"
+  ],
+  "shots": [
+    { "name": "method-panel", "yaw": 0, "pitch": 45 },
+    { "name": "seismic-selected", "yaw": 90, "pitch": 30 }
+  ]
+}

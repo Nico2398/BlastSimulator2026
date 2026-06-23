@@ -1,0 +1,64 @@
+{
+  "name": "survey-stale-handling",
+  "description": "Validates stale survey handling: run a survey, wait for it to expire (tick past stale threshold), then verify the overlay shows stale markers in grey. Running a new survey at the same position should refresh the marker to fresh colour. Requires the survey overlay to be wired into syncFromContext().",
+  "steps": [
+    "new_game seed:42",
+    "campaign start level:dusty_hollow",
+    "time resume",
+
+    "employee hire role:surveyor",
+    "employee assign_skill 1 skill:geology level:5",
+    "employee list",
+
+    "state full",
+
+    "survey seismic x:20 z:20",
+    "survey show",
+    "state full",
+
+    "tick 10",
+    "event choose 0",
+    "tick 10",
+    "event choose 0",
+    "tick 10",
+    "event choose 0",
+    "tick 10",
+    "event choose 0",
+
+    "survey show",
+    "state full",
+
+    "tick 10",
+    "event choose 0",
+    "tick 10",
+    "event choose 0",
+    "tick 10",
+    "event choose 0",
+    "tick 10",
+    "event choose 0",
+
+    "survey show",
+    "state full",
+
+    "survey core_sample x:20 z:20",
+    "survey show",
+    "state full",
+
+    "tick 8",
+    "event choose 0",
+    "tick 8",
+    "event choose 0",
+    "tick 8",
+    "event choose 0",
+    "tick 8",
+    "event choose 0",
+
+    "survey show",
+    "state full"
+  ],
+  "shots": [
+    { "name": "fresh-survey", "yaw": 0, "pitch": 45 },
+    { "name": "stale-survey", "yaw": 90, "pitch": 30 },
+    { "name": "refreshed-survey", "yaw": 180, "pitch": 45 }
+  ]
+}
