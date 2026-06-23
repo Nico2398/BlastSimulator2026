@@ -106,14 +106,12 @@ interface StepResult {
 
 /**
  * Executes an array of interaction actions on the given Puppeteer page.
- * TODO: implement — skeleton stub for unified scenario test system (#400).
- *
  * @param page - Puppeteer page object.
  * @param actions - Array of interaction actions to execute sequentially.
  * @param timeout - Optional timeout in milliseconds for the entire sequence.
  */
 export async function executeInteractionStep(
-  page: any,
+  page: puppeteer.Page,
   actions: InteractionStepAction[],
   timeout?: number,
 ): Promise<void> {
@@ -296,6 +294,7 @@ async function runScenario(
   name: string, steps: ScenarioStep[], shots: ShotDef[],
   port: number, puppeteerPath: string | undefined, frames: number, intervalMs: number,
   viewport: { width: number; height: number },
+  mode: string,
 ): Promise<StepResult[]> {
   const outDir = resolve(process.cwd(), `screenshots/scenario-${name}`);
   mkdirSync(outDir, { recursive: true });
@@ -348,16 +347,25 @@ async function runScenario(
       try {
         await Promise.race([
           (async () => {
-            // Execute command and capture output
-            const commandOutput = await page.evaluate((cmd: string) => {
-              if (typeof (window as any).__gameConsole === 'function') {
-                const result = (window as any).__gameConsole(cmd);
-                return typeof result === 'object' ? (result.output ?? '') : String(result);
+            // Mode-based execution
+            let commandOutput = '';
+            if (mode === 'interaction') {
+              if (step.interaction && step.interaction.length > 0) {
+                await executeInteractionStep(page, step.interaction);
+              } else {
+                console.warn(`  Step ${i}: interaction mode but no interaction defined, skipping.`);
               }
-              return 'ERROR: __gameConsole not available';
-            }, step.command);
-
-            console.log(`  Output: ${commandOutput}`);
+            } else {
+              // Execute command and capture output
+              commandOutput = await page.evaluate((cmd: string) => {
+                if (typeof (window as any).__gameConsole === 'function') {
+                  const result = (window as any).__gameConsole(cmd);
+                  return typeof result === 'object' ? (result.output ?? '') : String(result);
+                }
+                return 'ERROR: __gameConsole not available';
+              }, step.command);
+              console.log(`  Output: ${commandOutput}`);
+            }
 
             // Wait for render to settle
             await new Promise(r => setTimeout(r, COMMAND_WAIT_MS));
@@ -533,7 +541,7 @@ if (frames > 1) {
   console.log(`Animation frames: ${frames} at ${intervalMs}ms interval`);
 }
 
-runScenario(name, steps, shots, port, puppeteerPath, frames, intervalMs, viewport)
+runScenario(name, steps, shots, port, puppeteerPath, frames, intervalMs, viewport, mode)
   .then(() => {
     console.log('\nScenario complete.');
     process.exit(0);
