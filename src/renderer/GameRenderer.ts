@@ -19,6 +19,8 @@ import { DistantScenery } from './DistantScenery.js';
 import { BlastPlanOverlay } from './BlastPlanOverlay.js';
 import { GhostMesh } from './GhostMesh.js';
 import { syncEntitySets } from './EntitySync.js';
+import type { SurveyConfidenceOverlayOptions, SurveyConfidencePoint } from './SurveyConfidenceOverlay.js';
+import { isSurveyStale } from '../core/mining/SurveyCalc.js';
 
 export class GameRenderer {
   private readonly sm: SceneManager;
@@ -85,6 +87,11 @@ export class GameRenderer {
     if (this.skybox && ctx.weatherCycle) {
       this.skybox.setWeather(ctx.weatherCycle.current);
     }
+
+    // Sync survey confidence overlay
+    this.syncSurveyOverlay(
+      this.buildSurveyOverlayOptions(ctx.state),
+    );
   }
 
   /** Per-frame update — call from the render loop. */
@@ -139,6 +146,69 @@ export class GameRenderer {
         return hd;
       }),
     });
+  }
+
+  /**
+   * Sync survey confidence overlay from the current game state.
+   * Call from syncFromContext() to keep the overlay visible during gameplay.
+   */
+  syncSurveyOverlay(options: SurveyConfidenceOverlayOptions | null): void {
+    if (!this.terrain) return;
+
+    const overlay = this.terrain.getSurveyOverlay();
+    if (options && options.points.length > 0) {
+      overlay.show(options);
+    } else {
+      overlay.hide();
+    }
+  }
+
+  /**
+   * Convert GameState.surveyResults into overlay options.
+   * Returns null when there are no survey results.
+   */
+  private buildSurveyOverlayOptions(
+    state: import('../core/state/GameState.js').GameState,
+  ): SurveyConfidenceOverlayOptions | null {
+    if (state.surveyResults.length === 0 || !this.lastGrid) return null;
+
+    const currentTick = state.tickCount;
+    const grid = this.lastGrid;
+    const points: SurveyConfidencePoint[] = [];
+
+    for (const survey of state.surveyResults) {
+      const fresh = !isSurveyStale(survey, currentTick);
+
+      for (const colKey of Object.keys(survey.estimates)) {
+        const parts = colKey.split(',').map(Number);
+        const x = parts[0]!;
+        const z = parts[1]!;
+
+        // Surface Y = topmost solid voxel + 1
+        let surfaceY = 0;
+        const clampedX = Math.max(0, Math.min(grid.sizeX - 1, Math.floor(x)));
+        const clampedZ = Math.max(0, Math.min(grid.sizeZ - 1, Math.floor(z)));
+        for (let y = grid.sizeY - 1; y >= 0; y--) {
+          const voxel = grid.getVoxel(clampedX, y, clampedZ);
+          if (voxel && voxel.density > 0) {
+            surfaceY = y + 1;
+            break;
+          }
+        }
+
+        points.push({
+          x,
+          z,
+          surfaceY,
+          confidence: survey.confidence,
+          fresh,
+        });
+      }
+    }
+
+    if (points.length === 0) return null;
+
+    return { points, opacity: 0.6 };
   }
 
   /** Find the highest solid-voxel Y at the given (x, z) column. Returns 0 if no grid. */
