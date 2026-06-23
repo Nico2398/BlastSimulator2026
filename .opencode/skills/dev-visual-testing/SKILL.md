@@ -25,6 +25,7 @@ Multiple commands separated by `;`. Screenshots saved to `screenshots/`.
 
 ## Scenario Testing (Per-Step Screenshots + State Dumps)
 
+### Command mode (default)
 ```bash
 # Inline commands
 npx tsx scripts/scenario-test.ts --name blast-test \
@@ -33,6 +34,13 @@ npx tsx scripts/scenario-test.ts --name blast-test \
 # Scenario definition file
 npx tsx scripts/scenario-test.ts --scenario blast-basic
 ```
+
+### Interaction mode
+```bash
+npx tsx scripts/scenario-test.ts --scenario my-interaction-test --mode interaction
+```
+
+Interaction mode executes Puppeteer actions (click, type, waitForSelector, scroll, etc.) defined in scenario step `interaction` arrays. Type definitions in `scripts/interaction-types.ts`. Steps without `interaction` fall back to command execution.
 
 **Output per step:**
 - `step-NN-command.png` — screenshot after command

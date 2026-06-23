@@ -102,7 +102,13 @@ Same Vitest runner. May import from `src/console/` (command layer). Must exercis
 
 ## Scenario Test Definitions
 
-JSON files in `scripts/scenario-defs/`. Runner captures screenshot + state JSON after every command.
+JSON files in `scripts/scenario-defs/`. Runner captures screenshot + state JSON after every step.
+
+**Dual-play modes** (`--mode command|interaction`):
+- **command** (default) — sends console commands via `__gameConsole()`.
+- **interaction** — executes Puppeteer interactions (click, type, waitForSelector, etc.) via `executeInteractionStep()`.
+
+Scenario steps can define an `interaction` array of `InteractionStepAction` objects for UI-level testing. Steps without `interaction` fall back to command execution. Type definitions in `scripts/interaction-types.ts`.
 
 ### Feature Scenarios (Ch.1–7 visual regression)
 
@@ -143,7 +149,11 @@ After any rendering change:
    ```bash
    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium npx tsx scripts/scenario-test.ts --scenario level1-playthrough-win
    ```
-3. Inspect every screenshot using the `view` tool
+3. For interaction-based scenarios, use `--mode interaction`:
+   ```bash
+   PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium npx tsx scripts/scenario-test.ts --scenario my-interaction-test --mode interaction
+   ```
+4. Inspect every screenshot using the `view` tool
 4. Verify against expected visual description per checkpoint
 5. If any checkpoint fails → fix rendering → re-run
 
