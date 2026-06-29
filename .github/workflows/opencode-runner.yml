@@ -54,6 +54,87 @@ jobs:
         shell: bash
         run: echo "$HOME/.opencode/bin" >> $GITHUB_PATH
 
+      - name: Build trigger context prompt
+        id: build-prompt
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const event = context.eventName;
+            let prompt = '';
+
+            if (event === 'workflow_dispatch') {
+              const issueNum = '${{ inputs.issue_number }}';
+              if (issueNum) {
+                const { data: issue } = await github.rest.issues.get({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: parseInt(issueNum)
+                });
+                prompt = [
+                  'You have been assigned to GitHub Issue #' + issueNum + '.',
+                  '',
+                  'The issue description is:',
+                  '--- BEGIN DESCRIPTION ---',
+                  issue.body || '(No description)',
+                  '--- END DESCRIPTION ---',
+                  '',
+                  'Read the full Issue #' + issueNum + ' thread for more context. You have access to tools to read issues from the GitHub repo.'
+                ].join('\n');
+              } else {
+                prompt = 'You have been triggered manually.';
+              }
+            } else if (event === 'issue_comment') {
+              const commentBody = context.payload.comment?.body || '';
+              const isPR = !!context.payload.issue?.pull_request;
+              const num = context.payload.issue?.number;
+              const entityBody = context.payload.issue?.body || '(No description)';
+              const type = isPR ? 'Pull Request' : 'Issue';
+              const threadType = isPR ? 'pull requests' : 'issues';
+
+              prompt = [
+                'You have been mentioned in a comment from ' + type + ' #' + num + '.',
+                '',
+                'The message that triggered this session was:',
+                '--- BEGIN TRIGGER MESSAGE ---',
+                commentBody,
+                '--- END TRIGGER MESSAGE ---',
+                '',
+                'The description of this ' + type.toLowerCase() + ' is:',
+                '--- BEGIN DESCRIPTION ---',
+                entityBody,
+                '--- END DESCRIPTION ---',
+                '',
+                'Read the full ' + type + ' #' + num + ' thread for more context. You have access to tools to read ' + threadType + ' from the GitHub repo.'
+              ].join('\n');
+            } else if (event === 'pull_request_review_comment') {
+              const num = context.payload.pull_request?.number;
+              const commentBody = context.payload.comment?.body || '';
+              const prBody = context.payload.pull_request?.body || '(No description)';
+
+              prompt = [
+                'You have been mentioned in a review comment from Pull Request #' + num + '.',
+                '',
+                'The message that triggered this session was:',
+                '--- BEGIN TRIGGER MESSAGE ---',
+                commentBody,
+                '--- END TRIGGER MESSAGE ---',
+                '',
+                'The pull request description is:',
+                '--- BEGIN DESCRIPTION ---',
+                prBody,
+                '--- END DESCRIPTION ---',
+                '',
+                'Read the full Pull Request #' + num + ' thread for more context. You have access to tools to read pull requests from the GitHub repo.'
+              ].join('\n');
+            } else {
+              prompt = 'A user triggered you. Read the context and respond appropriately.';
+            }
+
+            const delimiter = 'PROMPT_EOF_' + Date.now();
+            fs.appendFileSync(process.env.GITHUB_ENV, 'PROMPT<<' + delimiter + '\n' + prompt + '\n' + delimiter + '\n', 'utf8');
+
       - name: Run opencode
         id: opencode
         shell: bash
@@ -69,8 +150,6 @@ jobs:
           OPENCODE_PERMISSION: '{"external_directory":"allow","doom_loop":"deny"}'
           MODEL: opencode/mimo-v2.5-free
           MENTIONS: '@opencode'
-          PROMPT: |
-            ${{ github.event_name == 'workflow_dispatch' && inputs.issue_number && format('Resolve GitHub issue #{0}. Follow the TDD pipeline: plan, write tests, implement, review, refactor, validate, and open a PR with Closes #{0}.', inputs.issue_number) || 'A user mentioned you in a comment. Read the PR/issue context and answer their question directly. If they ask a question, answer it using @ask. If they request a task, use the pipeline.' }}
 
       - name: Export full session
         if: always()
