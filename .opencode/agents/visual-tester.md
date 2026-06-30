@@ -50,7 +50,14 @@ Dev server port: `--port` > `$env:VISUAL_TEST_PORT` > 5173 default.
 npx tsx scripts/scenario-test.ts --scenario blast-basic
 ```
 
-### Custom
+### Interaction mode
+```bash
+npx tsx scripts/scenario-test.ts --scenario my-interaction-test --mode interaction
+```
+
+Interaction mode executes Puppeteer actions (click, type, waitForSelector, scroll) from scenario step `interaction` arrays. Steps without `interaction` fall back to command execution. Type definitions in `scripts/interaction-types.ts`.
+
+### Custom (command mode)
 ```bash
 npx tsx scripts/scenario-test.ts --name my-test \
   --commands "new_game seed:42; drill_plan grid rows:2 cols:3 spacing:4 depth:6 start:15,15; charge hole:* explosive:boomite amount:5 stemming:2; sequence auto; blast"

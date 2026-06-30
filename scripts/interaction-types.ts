@@ -24,7 +24,9 @@ export type InteractionEventType =
   | 'wheel'
   | 'wait'
   | 'assert'
-  | 'viewport';
+  | 'viewport'
+  | 'type'
+  | 'waitForSelector';
 
 // ── Base Event ──
 
@@ -105,6 +107,24 @@ export interface ViewportEvent extends InteractionEventBase {
   height: number;
 }
 
+export interface TypeEvent extends InteractionEventBase {
+  type: 'type';
+  selector: string;
+  text: string;
+  delay?: number;
+}
+
+export interface WaitForSelectorEvent extends InteractionEventBase {
+  type: 'waitForSelector';
+  selector: string;
+  timeout?: number;
+}
+
+export interface CommandAction {
+  type: 'command';
+  command: string;
+}
+
 // ── Union of All Event Types ──
 
 export type InteractionRecordEvent =
@@ -115,7 +135,9 @@ export type InteractionRecordEvent =
   | WheelEvent
   | WaitEvent
   | AssertEvent
-  | ViewportEvent;
+  | ViewportEvent
+  | TypeEvent
+  | WaitForSelectorEvent;
 
 // ── Recording Container ──
 

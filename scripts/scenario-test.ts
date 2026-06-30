@@ -46,6 +46,7 @@ import puppeteer from 'puppeteer';
 import { mkdirSync, writeFileSync, readFileSync, existsSync, statSync } from 'fs';
 import { resolve } from 'path';
 import { resolveChromePath } from './shared/chrome.js';
+import { executeActionOnPage } from './shared/interaction-executor.js';
 
 const VIEWPORT = { width: 1280, height: 720 };
 const INIT_WAIT_MS = 3000;
@@ -61,7 +62,30 @@ interface ScenarioStep {
   frames?: number;
   /** Milliseconds between animation frames (default: 200). */
   interval?: number;
+  /** Optional interaction actions to execute before/instead of the command. */
+  interaction?: InteractionStepAction[];
 }
+
+/**
+ * A single interaction action within a scenario step.
+ * Covers all supported Puppeteer interaction types.
+ */
+type InteractionStepAction =
+  | { type: 'click'; x: number; y: number; button?: 'left' | 'right' | 'middle' }
+  | { type: 'mousedown'; x: number; y: number; button?: 'left' | 'right' | 'middle' }
+  | { type: 'mouseup'; x: number; y: number; button?: 'left' | 'right' | 'middle' }
+  | { type: 'mousemove'; x: number; y: number }
+  | { type: 'keypress'; key: string }
+  | { type: 'keydown'; key: string }
+  | { type: 'keyup'; key: string }
+  | { type: 'scroll'; x: number; y: number }
+  | { type: 'wheel'; x: number; y: number; deltaX: number; deltaY: number; deltaZ: number }
+  | { type: 'wait'; durationMs: number }
+  | { type: 'waitForSelector'; selector: string; timeout?: number }
+  | { type: 'type'; selector: string; text: string; delay?: number }
+  | { type: 'assert'; selector?: string; property?: string; expectedValue?: unknown }
+  | { type: 'viewport'; width: number; height: number }
+  | { type: 'command'; command: string };
 
 interface ShotDef {
   name: string;
@@ -81,6 +105,39 @@ interface StepResult {
   warning?: string;
 }
 
+/**
+ * Executes an array of interaction actions on the given Puppeteer page.
+ * @param page - Puppeteer page object.
+ * @param actions - Array of interaction actions to execute sequentially.
+ * @param timeout - Optional timeout in milliseconds for the entire sequence.
+ */
+export async function executeInteractionStep(
+  page: puppeteer.Page,
+  actions: InteractionStepAction[],
+  timeout?: number,
+): Promise<void> {
+  const execute = async () => {
+    for (const action of actions) {
+      try {
+        await executeActionOnPage(page, action as any);
+      } catch (err: any) {
+        console.error(`  Interaction action error (${action.type}): ${err.message ?? String(err)}`);
+      }
+    }
+  };
+
+  if (timeout !== undefined && timeout > 0) {
+    await Promise.race([
+      execute(),
+      new Promise<void>((_, reject) =>
+        setTimeout(() => reject(new Error(`executeInteractionStep timed out after ${timeout}ms`)), timeout),
+      ),
+    ]);
+  } else {
+    await execute();
+  }
+}
+
 function parseViewsArg(raw: string): ShotDef[] {
   return raw.split(';').map(s => s.trim()).filter(Boolean).map((part) => {
     const [shotName, yawStr, pitchStr] = part.split(':');
@@ -92,6 +149,7 @@ function parseArgs(): {
   name: string; steps: ScenarioStep[]; shots: ShotDef[];
   port: number; puppeteerPath?: string; frames: number; intervalMs: number;
   viewport: { width: number; height: number };
+  mode: string;
 } {
   const args = process.argv.slice(2);
   let name = 'scenario';
@@ -102,6 +160,7 @@ function parseArgs(): {
   let frames = 1;
   let intervalMs = 200;
   let viewport = { width: 1280, height: 720 };
+  let mode = 'command'; // default mode
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--scenario' && args[i + 1]) {
@@ -149,10 +208,18 @@ function parseArgs(): {
         process.exit(1);
       }
       i++;
+    } else if (args[i] === '--mode' && args[i + 1]) {
+      const modeArg = args[i + 1];
+      if (modeArg !== 'command' && modeArg !== 'interaction') {
+        console.error(`Invalid mode: "${modeArg}". Supported modes: command, interaction`);
+        process.exit(1);
+      }
+      mode = modeArg;
+      i++;
     }
   }
 
-  return { name, steps, shots, port, puppeteerPath, frames, intervalMs, viewport };
+  return { name, steps, shots, port, puppeteerPath, frames, intervalMs, viewport, mode };
 }
 
 function checkScreenshotSize(filepath: string): string | undefined {
@@ -170,6 +237,7 @@ async function runScenario(
   name: string, steps: ScenarioStep[], shots: ShotDef[],
   port: number, puppeteerPath: string | undefined, frames: number, intervalMs: number,
   viewport: { width: number; height: number },
+  mode: string,
 ): Promise<StepResult[]> {
   const outDir = resolve(process.cwd(), `screenshots/scenario-${name}`);
   mkdirSync(outDir, { recursive: true });
@@ -222,16 +290,25 @@ async function runScenario(
       try {
         await Promise.race([
           (async () => {
-            // Execute command and capture output
-            const commandOutput = await page.evaluate((cmd: string) => {
-              if (typeof (window as any).__gameConsole === 'function') {
-                const result = (window as any).__gameConsole(cmd);
-                return typeof result === 'object' ? (result.output ?? '') : String(result);
+            // Mode-based execution
+            let commandOutput = '';
+            if (mode === 'interaction') {
+              if (step.interaction && step.interaction.length > 0) {
+                await executeInteractionStep(page, step.interaction);
+              } else {
+                console.warn(`  Step ${i}: interaction mode but no interaction defined, skipping.`);
               }
-              return 'ERROR: __gameConsole not available';
-            }, step.command);
-
-            console.log(`  Output: ${commandOutput}`);
+            } else {
+              // Execute command and capture output
+              commandOutput = await page.evaluate((cmd: string) => {
+                if (typeof (window as any).__gameConsole === 'function') {
+                  const result = (window as any).__gameConsole(cmd);
+                  return typeof result === 'object' ? (result.output ?? '') : String(result);
+                }
+                return 'ERROR: __gameConsole not available';
+              }, step.command);
+              console.log(`  Output: ${commandOutput}`);
+            }
 
             // Wait for render to settle
             await new Promise(r => setTimeout(r, COMMAND_WAIT_MS));
@@ -392,7 +469,7 @@ async function runScenario(
 }
 
 // Main
-const { name, steps, shots, port, puppeteerPath, frames, intervalMs, viewport } = parseArgs();
+const { name, steps, shots, port, puppeteerPath, frames, intervalMs, viewport, mode } = parseArgs();
 if (steps.length === 0) {
   console.error('No steps defined. Use --scenario <name> or --commands "cmd1; cmd2; ..."');
   process.exit(1);
@@ -407,7 +484,7 @@ if (frames > 1) {
   console.log(`Animation frames: ${frames} at ${intervalMs}ms interval`);
 }
 
-runScenario(name, steps, shots, port, puppeteerPath, frames, intervalMs, viewport)
+runScenario(name, steps, shots, port, puppeteerPath, frames, intervalMs, viewport, mode)
   .then(() => {
     console.log('\nScenario complete.');
     process.exit(0);

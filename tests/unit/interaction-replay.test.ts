@@ -16,6 +16,7 @@ import puppeteer from 'puppeteer';
 import {
   parseReplayArgs,
   replayInteraction,
+  replayEvent,
   COMMAND_WAIT_MS,
   RENDER_WAIT_MS,
   MIN_INTER_EVENT_MS,
@@ -37,6 +38,7 @@ function createMockPage() {
     waitForSelector: vi.fn().mockResolvedValue(true),
     evaluate: vi.fn().mockResolvedValue(undefined),
     screenshot: vi.fn().mockResolvedValue(undefined),
+    type: vi.fn().mockResolvedValue(undefined),
     close: vi.fn(),
     on: vi.fn(),
     mouse: { click: vi.fn(), down: vi.fn(), up: vi.fn(), move: vi.fn() },
@@ -477,5 +479,71 @@ describe('replayInteraction()', () => {
     } finally {
       try { rmSync(tmpDir, { recursive: true, force: true }); } catch { /* ignore cleanup errors */ }
     }
+  });
+});
+
+// ── replayEvent() — type and waitForSelector ──
+
+describe('replayEvent() handles type event', () => {
+  it('calls page.type(selector, text, { delay })', async () => {
+    const mockPage = createMockPage();
+    const event = {
+      type: 'type' as const,
+      timestamp: 1000,
+      selector: '#search-input',
+      text: 'hello world',
+      delay: 50,
+    };
+
+    await replayEvent(mockPage as any, event);
+
+    expect(mockPage.type).toHaveBeenCalledTimes(1);
+    expect(mockPage.type).toHaveBeenCalledWith('#search-input', 'hello world', { delay: 50 });
+  });
+
+  it('handles type event without optional delay', async () => {
+    const mockPage = createMockPage();
+    const event = {
+      type: 'type' as const,
+      timestamp: 2000,
+      selector: '#name-field',
+      text: 'test',
+    };
+
+    await replayEvent(mockPage as any, event);
+
+    expect(mockPage.type).toHaveBeenCalledTimes(1);
+    expect(mockPage.type).toHaveBeenCalledWith('#name-field', 'test', { delay: undefined });
+  });
+});
+
+describe('replayEvent() handles waitForSelector event', () => {
+  it('calls page.waitForSelector(selector, { timeout })', async () => {
+    const mockPage = createMockPage();
+    const event = {
+      type: 'waitForSelector' as const,
+      timestamp: 1500,
+      selector: '.game-loaded',
+      timeout: 5000,
+    };
+
+    await replayEvent(mockPage as any, event);
+
+    expect(mockPage.waitForSelector).toHaveBeenCalledTimes(1);
+    expect(mockPage.waitForSelector).toHaveBeenCalledWith('.game-loaded', { timeout: 5000 });
+  });
+
+  it('handles waitForSelector event without optional timeout', async () => {
+    const mockPage = createMockPage();
+    const event = {
+      type: 'waitForSelector' as const,
+      timestamp: 2500,
+      selector: '#result',
+    };
+
+    await replayEvent(mockPage as any, event);
+
+    expect(mockPage.waitForSelector).toHaveBeenCalledTimes(1);
+    expect(mockPage.waitForSelector).toHaveBeenCalledWith('#result', { timeout: 10000 });
   });
 });

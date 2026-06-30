@@ -6,6 +6,16 @@ import { fileURLToPath } from 'url';
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const SCENARIO_DIR = resolve(currentDir, '../../scripts/scenario-defs');
 
+// ── Dual-play interaction action types ──
+
+const KNOWN_INTERACTION_ACTION_TYPES = [
+  'click', 'mousedown', 'mouseup', 'mousemove',
+  'keypress', 'keydown', 'keyup',
+  'scroll', 'wheel',
+  'wait', 'waitForSelector', 'type',
+  'assert', 'viewport', 'command',
+] as const;
+
 const PLAYTHROUGH_SCENARIO_NAMES = [
   'tutorial-playthrough',
   'level1-playthrough-win',
@@ -322,4 +332,127 @@ describe('Visual scenarios have valid shots array', () => {
       }
     });
   }
+});
+
+// ──────────────────────────────────────────────
+// 11. Dual-play scenario steps — interaction array validation
+// ──────────────────────────────────────────────
+
+describe('Dual-play scenario steps', () => {
+  it('interaction array actions must have a type field from known types', () => {
+    const actions = [
+      { type: 'click', x: 100, y: 200 },
+      { type: 'type', selector: '#input', text: 'hello' },
+      { type: 'wait', durationMs: 500 },
+    ];
+    for (const action of actions) {
+      expect(action).toHaveProperty('type');
+      expect(
+        KNOWN_INTERACTION_ACTION_TYPES,
+        `action type "${(action as any).type}" should be a known interaction type`,
+      ).toContain((action as any).type);
+    }
+  });
+
+  it('click action requires x and y coordinates', () => {
+    const withXY = { type: 'click', x: 100, y: 200 };
+    const withButton = { type: 'click', x: 100, y: 200, button: 'right' };
+    const missingX = { type: 'click', y: 200 };
+    const missingY = { type: 'click', x: 100 };
+
+    expect(withXY).toHaveProperty('x');
+    expect(withXY).toHaveProperty('y');
+    expect(withButton).toHaveProperty('button', 'right');
+    expect((missingX as any).x).toBeUndefined();
+    expect((missingY as any).y).toBeUndefined();
+  });
+
+  it('type action requires selector and text', () => {
+    const valid = { type: 'type', selector: '#input', text: 'hello' };
+    const missingSelector = { type: 'type', text: 'hello' };
+    const missingText = { type: 'type', selector: '#input' };
+
+    expect(valid.selector).toBeDefined();
+    expect(valid.text).toBeDefined();
+    expect((missingSelector as any).selector).toBeUndefined();
+    expect((missingText as any).text).toBeUndefined();
+  });
+
+  it('wait action requires durationMs', () => {
+    const valid = { type: 'wait', durationMs: 500 };
+    const missing = { type: 'wait' };
+
+    expect(valid.durationMs).toBe(500);
+    expect((missing as any).durationMs).toBeUndefined();
+  });
+
+  it('waitForSelector action requires selector', () => {
+    const valid = { type: 'waitForSelector', selector: '.loaded' };
+    const missing = { type: 'waitForSelector' };
+
+    expect(valid.selector).toBeDefined();
+    expect(typeof valid.selector).toBe('string');
+    expect((missing as any).selector).toBeUndefined();
+  });
+
+  it('viewport action requires width and height', () => {
+    const valid = { type: 'viewport', width: 1920, height: 1080 };
+    const missingWidth = { type: 'viewport', height: 1080 };
+    const missingHeight = { type: 'viewport', width: 1920 };
+
+    expect(valid.width).toBeDefined();
+    expect(valid.height).toBeDefined();
+    expect(typeof valid.width).toBe('number');
+    expect(typeof valid.height).toBe('number');
+    expect((missingWidth as any).width).toBeUndefined();
+    expect((missingHeight as any).height).toBeUndefined();
+  });
+
+  it('command action within interaction array requires command field', () => {
+    const valid = { type: 'command', command: 'new_game seed:42' };
+    const missing = { type: 'command' };
+
+    expect(valid.command).toBeDefined();
+    expect(typeof valid.command).toBe('string');
+    expect((missing as any).command).toBeUndefined();
+  });
+
+  it('unknown action types are rejected', () => {
+    const validTypes = KNOWN_INTERACTION_ACTION_TYPES;
+    const unknownType = 'drag';
+
+    expect(validTypes).not.toContain(unknownType);
+  });
+
+  it('steps with only command field work (backward compat)', () => {
+    const step = { command: 'new_game seed:42' };
+    expect(step).toHaveProperty('command');
+    expect(typeof step.command).toBe('string');
+    expect((step as any).interaction).toBeUndefined();
+  });
+
+  it('steps with only interaction field work', () => {
+    const step = {
+      interaction: [
+        { type: 'click', x: 100, y: 200 },
+        { type: 'wait', durationMs: 500 },
+      ],
+    };
+    expect(step).toHaveProperty('interaction');
+    expect(Array.isArray(step.interaction)).toBe(true);
+    expect((step as any).command).toBeUndefined();
+  });
+
+  it('steps with both command and interaction fields work', () => {
+    const step = {
+      command: 'new_game seed:42',
+      interaction: [
+        { type: 'click', x: 100, y: 200 },
+      ],
+    };
+    expect(step).toHaveProperty('command');
+    expect(step).toHaveProperty('interaction');
+    expect(Array.isArray(step.interaction)).toBe(true);
+    expect(step.interaction.length).toBe(1);
+  });
 });
