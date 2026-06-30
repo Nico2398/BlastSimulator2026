@@ -441,11 +441,16 @@ async function runScenario(
     }
 
     // Save report
+    // Truncate commandOutput to avoid JSON.stringify exceeding V8's max string length.
+    // Full output is preserved in per-step state JSON files.
+    const MAX_REPORT_OUTPUT = 2000;
     const reportPath = resolve(outDir, 'report.json');
     const report = results.map(r => ({
       step: r.step,
       command: r.command,
-      output: r.commandOutput,
+      output: r.commandOutput.length > MAX_REPORT_OUTPUT
+        ? r.commandOutput.slice(0, MAX_REPORT_OUTPUT) + `... [truncated, ${r.commandOutput.length} chars total]`
+        : r.commandOutput,
       error: r.error,
       warning: r.warning,
       holes: (r.gameState as any)?.holeCount ?? 0,
