@@ -2,26 +2,167 @@
   "name": "blast-preview-tiers-visual",
   "description": "Visual verification of blast preview overlays across 4 software tiers: tier 0 blind, tier 1 energy heatmap, tier 2 fragment distribution, tier 3 projection zones, tier 4 vibration propagation",
   "steps": [
-    { "command": "new_game seed:42", "timeout": 10 },
-    "drill_plan grid rows:2 cols:2 spacing:5 depth:8 start:15,15",
-    "charge hole:* explosive:boomite amount:5 stemming:2",
-    "sequence auto delay_step:25",
-    "blast_preview",
-    "preview energy",
-    "buy_software tier:1",
-    "preview energy",
-    "buy_software tier:2",
-    "preview fragments",
-    "buy_software tier:3",
-    "preview projections",
-    "buy_software tier:4",
-    "preview vibrations",
-    "blast_preview",
-    "state full"
+    {
+      "command": "new_game seed:42",
+      "timeout": 10,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ]
+    },
+    {
+      "command": "drill_plan grid rows:2 cols:2 spacing:5 depth:8 start:15,15",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:2 cols:2 spacing:5 depth:8 start:15,15"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:boomite amount:5 stemming:2"
+        }
+      ]
+    },
+    {
+      "command": "sequence auto delay_step:25",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sequence auto delay_step:25"
+        }
+      ]
+    },
+    {
+      "command": "blast_preview",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "blast_preview"
+        }
+      ]
+    },
+    {
+      "command": "preview energy",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "preview energy"
+        }
+      ]
+    },
+    {
+      "command": "buy_software tier:1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "buy_software tier:1"
+        }
+      ]
+    },
+    {
+      "command": "preview energy",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "preview energy"
+        }
+      ]
+    },
+    {
+      "command": "buy_software tier:2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "buy_software tier:2"
+        }
+      ]
+    },
+    {
+      "command": "preview fragments",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "preview fragments"
+        }
+      ]
+    },
+    {
+      "command": "buy_software tier:3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "buy_software tier:3"
+        }
+      ]
+    },
+    {
+      "command": "preview projections",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "preview projections"
+        }
+      ]
+    },
+    {
+      "command": "buy_software tier:4",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "buy_software tier:4"
+        }
+      ]
+    },
+    {
+      "command": "preview vibrations",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "preview vibrations"
+        }
+      ]
+    },
+    {
+      "command": "blast_preview",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "blast_preview"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    }
   ],
   "shots": [
-    { "name": "overview", "yaw": 0, "pitch": 45 },
-    { "name": "closeup", "yaw": 90, "pitch": 10 },
-    { "name": "birdseye", "yaw": 0, "pitch": 80 }
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45
+    },
+    {
+      "name": "closeup",
+      "yaw": 90,
+      "pitch": 10
+    },
+    {
+      "name": "birdseye",
+      "yaw": 0,
+      "pitch": 80
+    }
   ]
 }

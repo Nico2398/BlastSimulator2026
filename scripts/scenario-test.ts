@@ -47,6 +47,7 @@ import { mkdirSync, writeFileSync, readFileSync, existsSync, statSync } from 'fs
 import { resolve } from 'path';
 import { resolveChromePath } from './shared/chrome.js';
 import { executeActionOnPage } from './shared/interaction-executor.js';
+import type { InteractionStepAction } from './shared/scenario-types.js';
 
 const VIEWPORT = { width: 1280, height: 720 };
 const INIT_WAIT_MS = 3000;
@@ -65,27 +66,6 @@ interface ScenarioStep {
   /** Optional interaction actions to execute before/instead of the command. */
   interaction?: InteractionStepAction[];
 }
-
-/**
- * A single interaction action within a scenario step.
- * Covers all supported Puppeteer interaction types.
- */
-type InteractionStepAction =
-  | { type: 'click'; x: number; y: number; button?: 'left' | 'right' | 'middle' }
-  | { type: 'mousedown'; x: number; y: number; button?: 'left' | 'right' | 'middle' }
-  | { type: 'mouseup'; x: number; y: number; button?: 'left' | 'right' | 'middle' }
-  | { type: 'mousemove'; x: number; y: number }
-  | { type: 'keypress'; key: string }
-  | { type: 'keydown'; key: string }
-  | { type: 'keyup'; key: string }
-  | { type: 'scroll'; x: number; y: number }
-  | { type: 'wheel'; x: number; y: number; deltaX: number; deltaY: number; deltaZ: number }
-  | { type: 'wait'; durationMs: number }
-  | { type: 'waitForSelector'; selector: string; timeout?: number }
-  | { type: 'type'; selector: string; text: string; delay?: number }
-  | { type: 'assert'; selector?: string; property?: string; expectedValue?: unknown }
-  | { type: 'viewport'; width: number; height: number }
-  | { type: 'command'; command: string };
 
 interface ShotDef {
   name: string;
@@ -239,7 +219,7 @@ async function runScenario(
   viewport: { width: number; height: number },
   mode: string,
 ): Promise<StepResult[]> {
-  const outDir = resolve(process.cwd(), `screenshots/scenario-${name}`);
+  const outDir = resolve(process.cwd(), `screenshots/scenario-${name}-${mode}`);
   mkdirSync(outDir, { recursive: true });
 
   const devServerUrl = `http://localhost:${port}`;
@@ -295,6 +275,20 @@ async function runScenario(
             if (mode === 'interaction') {
               if (step.interaction && step.interaction.length > 0) {
                 await executeInteractionStep(page, step.interaction);
+                // Capture command output for any command-type actions in the interaction
+                const commandActions = step.interaction.filter(a => a.type === 'command');
+                if (commandActions.length > 0) {
+                  // Execute last command action to capture its output
+                  const lastCmd = commandActions[commandActions.length - 1];
+                  commandOutput = await page.evaluate((cmd: string) => {
+                    if (typeof (window as any).__gameConsole === 'function') {
+                      const result = (window as any).__gameConsole(cmd);
+                      return typeof result === 'object' ? (result.output ?? '') : String(result);
+                    }
+                    return 'ERROR: __gameConsole not available';
+                  }, lastCmd.command);
+                  console.log(`  Output: ${commandOutput}`);
+                }
               } else {
                 console.warn(`  Step ${i}: interaction mode but no interaction defined, skipping.`);
               }
@@ -447,11 +441,16 @@ async function runScenario(
     }
 
     // Save report
+    // Truncate commandOutput to avoid JSON.stringify exceeding V8's max string length.
+    // Full output is preserved in per-step state JSON files.
+    const MAX_REPORT_OUTPUT = 2000;
     const reportPath = resolve(outDir, 'report.json');
     const report = results.map(r => ({
       step: r.step,
       command: r.command,
-      output: r.commandOutput,
+      output: r.commandOutput.length > MAX_REPORT_OUTPUT
+        ? r.commandOutput.slice(0, MAX_REPORT_OUTPUT) + `... [truncated, ${r.commandOutput.length} chars total]`
+        : r.commandOutput,
       error: r.error,
       warning: r.warning,
       holes: (r.gameState as any)?.holeCount ?? 0,

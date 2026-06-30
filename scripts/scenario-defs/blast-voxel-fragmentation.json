@@ -2,21 +2,119 @@
   "name": "blast-voxel-fragmentation",
   "description": "Visual verification of voxel fragmentation: before/after terrain, crater formation, bench levels, isolated islands",
   "steps": [
-    { "command": "new_game seed:42", "timeout": 10 },
-    "state full",
-    "drill_plan grid rows:4 cols:4 spacing:4 depth:8 start:14,14",
-    "charge hole:* explosive:boomite amount:5 stemming:2",
-    "sequence auto delay_step:25",
-    { "command": "blast", "timeout": 20 },
-    "state full",
-    "inspect 14,14,0",
-    "inspect 14,14,1",
-    "inspect 14,14,2"
+    {
+      "command": "new_game seed:42",
+      "timeout": 10,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "drill_plan grid rows:4 cols:4 spacing:4 depth:8 start:14,14",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:4 cols:4 spacing:4 depth:8 start:14,14"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:boomite amount:5 stemming:2"
+        }
+      ]
+    },
+    {
+      "command": "sequence auto delay_step:25",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sequence auto delay_step:25"
+        }
+      ]
+    },
+    {
+      "command": "blast",
+      "timeout": 20,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "blast"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "inspect 14,14,0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "inspect 14,14,0"
+        }
+      ]
+    },
+    {
+      "command": "inspect 14,14,1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "inspect 14,14,1"
+        }
+      ]
+    },
+    {
+      "command": "inspect 14,14,2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "inspect 14,14,2"
+        }
+      ]
+    }
   ],
   "shots": [
-    { "name": "overview", "yaw": 0, "pitch": 45 },
-    { "name": "crater-top", "yaw": 0, "pitch": 80 },
-    { "name": "crater-side", "yaw": 90, "pitch": 10 },
-    { "name": "crater-diagonal", "yaw": 45, "pitch": 30 }
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45
+    },
+    {
+      "name": "crater-top",
+      "yaw": 0,
+      "pitch": 80
+    },
+    {
+      "name": "crater-side",
+      "yaw": 90,
+      "pitch": 10
+    },
+    {
+      "name": "crater-diagonal",
+      "yaw": 45,
+      "pitch": 30
+    }
   ]
 }

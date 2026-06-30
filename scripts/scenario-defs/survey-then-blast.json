@@ -2,51 +2,374 @@
   "name": "survey-then-blast",
   "description": "Seismic survey → confidence overlay → blast → ore report. Validates survey confidence overlay rendering before and after detonation. FAILS until GameRenderer wires getSurveyOverlay().show() in syncFromContext(), so the overlay never appears in screenshots.",
   "steps": [
-    "new_game seed:42",
-    "campaign start level:dusty_hollow",
-    "time resume",
-    "scores",
-    "finances",
-
-    "employee hire role:surveyor",
-    "employee assign_skill 1 geology 3",
-    "employee list",
-    "state full",
-
-    "survey seismic x:25 z:25",
-    "survey show",
-    "tick 10",
-    "event choose 0",
-    "tick 10",
-    "event choose 0",
-    "tick 10",
-    "event choose 0",
-    "tick 10",
-    "event choose 0",
-    "survey show",
-    "state full",
-
-    "survey core_sample x:25 z:25",
-    "survey show",
-    "tick 8",
-    "event choose 0",
-    "tick 8",
-    "event choose 0",
-    "tick 8",
-    "event choose 0",
-    "tick 8",
-    "event choose 0",
-    "survey show",
-    "state full",
-
-    "drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:25,25",
-    "charge hole:* explosive:boomite amount:5 stemming:2",
-    "sequence auto delay_step:25",
-    "blast",
-    "state full",
-
-    "finances",
-    "scores",
-    "stats"
+    {
+      "command": "new_game seed:42",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ]
+    },
+    {
+      "command": "campaign start level:dusty_hollow",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign start level:dusty_hollow"
+        }
+      ]
+    },
+    {
+      "command": "time resume",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time resume"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:surveyor",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:surveyor"
+        }
+      ]
+    },
+    {
+      "command": "employee assign_skill 1 geology 3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 1 geology 3"
+        }
+      ]
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "survey seismic x:25 z:25",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "survey seismic x:25 z:25"
+        }
+      ]
+    },
+    {
+      "command": "survey show",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "survey show"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "survey show",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "survey show"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "survey core_sample x:25 z:25",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "survey core_sample x:25 z:25"
+        }
+      ]
+    },
+    {
+      "command": "survey show",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "survey show"
+        }
+      ]
+    },
+    {
+      "command": "tick 8",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 8"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 8",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 8"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 8",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 8"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 8",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 8"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "survey show",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "survey show"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:25,25",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:25,25"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:boomite amount:5 stemming:2"
+        }
+      ]
+    },
+    {
+      "command": "sequence auto delay_step:25",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sequence auto delay_step:25"
+        }
+      ]
+    },
+    {
+      "command": "blast",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "blast"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "stats",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "stats"
+        }
+      ]
+    }
   ]
 }

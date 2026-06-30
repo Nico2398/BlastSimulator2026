@@ -2,18 +2,122 @@
   "name": "presplit-wall",
   "description": "Chapter 5: Presplit row plus production drill holes for zero back-break wall control",
   "steps": [
-    "new_game seed:42",
-    "drill_plan grid rows:1 cols:5 spacing:3 depth:10 start:10,20",
-    "drill_plan grid rows:3 cols:3 spacing:5 depth:12 start:20,20",
-    "charge hole:1 explosive:presplit amount:2 stemming:3",
-    "charge hole:2 explosive:presplit amount:2 stemming:3",
-    "charge hole:3 explosive:presplit amount:2 stemming:3",
-    "charge hole:4 explosive:presplit amount:2 stemming:3",
-    "charge hole:5 explosive:presplit amount:2 stemming:3",
-    "charge hole:* explosive:boomite amount:5 stemming:2",
-    "sequence auto delay_step:25",
-    "blast",
-    "fragments",
-    "state full"
+    {
+      "command": "new_game seed:42",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ]
+    },
+    {
+      "command": "drill_plan grid rows:1 cols:5 spacing:3 depth:10 start:10,20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:1 cols:5 spacing:3 depth:10 start:10,20"
+        }
+      ]
+    },
+    {
+      "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:12 start:20,20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:12 start:20,20"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:1 explosive:presplit amount:2 stemming:3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:1 explosive:presplit amount:2 stemming:3"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:2 explosive:presplit amount:2 stemming:3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:2 explosive:presplit amount:2 stemming:3"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:3 explosive:presplit amount:2 stemming:3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:3 explosive:presplit amount:2 stemming:3"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:4 explosive:presplit amount:2 stemming:3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:4 explosive:presplit amount:2 stemming:3"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:5 explosive:presplit amount:2 stemming:3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:5 explosive:presplit amount:2 stemming:3"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:boomite amount:5 stemming:2"
+        }
+      ]
+    },
+    {
+      "command": "sequence auto delay_step:25",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sequence auto delay_step:25"
+        }
+      ]
+    },
+    {
+      "command": "blast",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "blast"
+        }
+      ]
+    },
+    {
+      "command": "fragments",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "fragments"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    }
   ]
 }

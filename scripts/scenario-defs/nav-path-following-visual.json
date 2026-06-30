@@ -2,19 +2,99 @@
   "name": "nav-path-following-visual",
   "description": "Tests path following and stuck state with building obstacles",
   "steps": [
-    "new_game seed:42",
-    "employee hire role:driller",
-    "employee hire role:driller",
-    "employee list",
-    "tick 10",
-    "build management_office at:3,3",
-    "state full",
-    "tick 15"
+    {
+      "command": "new_game seed:42",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:driller"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:driller"
+        }
+      ]
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "build management_office at:3,3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build management_office at:3,3"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "tick 15",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 15"
+        }
+      ]
+    }
   ],
   "shots": [
-    {"name": "overview", "yaw": 0, "pitch": 45},
-    {"name": "closeup", "yaw": 90, "pitch": 10},
-    {"name": "birdseye", "yaw": 0, "pitch": 80},
-    {"name": "angled", "yaw": 135, "pitch": 30}
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45
+    },
+    {
+      "name": "closeup",
+      "yaw": 90,
+      "pitch": 10
+    },
+    {
+      "name": "birdseye",
+      "yaw": 0,
+      "pitch": 80
+    },
+    {
+      "name": "angled",
+      "yaw": 135,
+      "pitch": 30
+    }
   ]
 }

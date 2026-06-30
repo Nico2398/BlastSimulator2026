@@ -2,17 +2,86 @@
   "name": "building-research-visual",
   "description": "Visual check of research center building at all three tiers for technology advancement",
   "steps": [
-    { "command": "new_game seed:42", "timeout": 30 },
-    "build research_center at:5,5",
-    "build research_center at:15,5 tier:2",
-    "build research_center at:25,5 tier:3",
-    "build list",
-    "scores",
-    "state full"
+    {
+      "command": "new_game seed:42",
+      "timeout": 30,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ]
+    },
+    {
+      "command": "build research_center at:5,5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build research_center at:5,5"
+        }
+      ]
+    },
+    {
+      "command": "build research_center at:15,5 tier:2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build research_center at:15,5 tier:2"
+        }
+      ]
+    },
+    {
+      "command": "build research_center at:25,5 tier:3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build research_center at:25,5 tier:3"
+        }
+      ]
+    },
+    {
+      "command": "build list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build list"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    }
   ],
   "shots": [
-    { "name": "overview", "yaw": 0, "pitch": 45 },
-    { "name": "research-area", "yaw": 90, "pitch": 10 },
-    { "name": "closeup", "yaw": 45, "pitch": 30 }
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45
+    },
+    {
+      "name": "research-area",
+      "yaw": 90,
+      "pitch": 10
+    },
+    {
+      "name": "closeup",
+      "yaw": 45,
+      "pitch": 30
+    }
   ]
 }

@@ -2,22 +2,135 @@
   "name": "needs-proactive-queue-visual",
   "description": "Visual check of proactive need queuing: drive fatigue to warning threshold (≤25) and hunger to warning threshold (≤35), then verify auto-inserted rest tasks appear in pending actions queue via state dump; also verify need_warning event fires when queue is full",
   "steps": [
-    { "command": "new_game seed:42", "timeout": 30 },
-    "employee hire role:driller",
-    "build living_quarters at:10,10",
-    "needs",
-    "tick 80",
-    "needs",
-    "state full",
-    "tick 20",
-    "needs",
-    "state full",
-    "tick 30",
-    "needs",
-    "state full"
+    {
+      "command": "new_game seed:42",
+      "timeout": 30,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:driller"
+        }
+      ]
+    },
+    {
+      "command": "build living_quarters at:10,10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build living_quarters at:10,10"
+        }
+      ]
+    },
+    {
+      "command": "needs",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "needs"
+        }
+      ]
+    },
+    {
+      "command": "tick 80",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 80"
+        }
+      ]
+    },
+    {
+      "command": "needs",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "needs"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "tick 20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 20"
+        }
+      ]
+    },
+    {
+      "command": "needs",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "needs"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "tick 30",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 30"
+        }
+      ]
+    },
+    {
+      "command": "needs",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "needs"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    }
   ],
   "shots": [
-    { "name": "overview", "yaw": 0, "pitch": 45 },
-    { "name": "queue-state", "yaw": 90, "pitch": 10 }
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45
+    },
+    {
+      "name": "queue-state",
+      "yaw": 90,
+      "pitch": 10
+    }
   ]
 }

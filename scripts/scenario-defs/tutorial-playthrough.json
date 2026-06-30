@@ -2,60 +2,401 @@
   "name": "tutorial-playthrough",
   "description": "Full tutorial playthrough at Tutorial Pit: hiring employees, seismic surveying, drill planning, blasting, contract management, building infrastructure, and completing the campaign introduction",
   "steps": [
-    "new_game seed:42",
-    "campaign start level:tutorial_pit",
-    "time speed:2",
-
-    "employee hire role:surveyor",
-    "employee assign_skill 1 skill:geology level:3",
-    "survey seismic x:15 z:15",
-
-    "employee hire role:driller",
-    "employee assign_skill 2 skill:blasting level:3",
-
-    "drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:15,15",
-    "charge hole:* explosive:boomite amount:5 stemming:2",
-    "sequence auto delay_step:25",
-    "blast",
-    "scores",
-    "finances",
-
-    "tick 3",
-    "event fire tutorial_synergy_consultant",
-    "event choose 0",
-
-    "employee hire role:manager",
-    "employee assign_skill 3 skill:management level:3",
-    "contract accept 1",
-    "contract deliver 1 amount:5000",
-    "finances",
-
-    "employee hire role:driver",
-    "employee assign_skill 4 skill:driving.truck level:3",
-    "vehicle buy hauler",
-    "vehicle driver 1 4",
-
-    "build storage_depot at:12,8",
-    "contract accept 2",
-    "contract deliver 2 amount:5000",
-    "finances",
-
-    "build_ramp start:15,15 end:20,25",
-    "needs",
-    "set_policy mode:shift_8h",
-
-    "contract accept 3",
-    "contract deliver 3 amount:5000",
-    "finances",
-
-    "drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:8,8",
-    "charge hole:* explosive:boomite amount:4 stemming:2",
-    "sequence auto delay_step:20",
-    "blast",
-    "scores",
-    "finances",
-
-    "tick 10",
-    "campaign status"
+    {
+      "command": "new_game seed:42",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ]
+    },
+    {
+      "command": "campaign start level:tutorial_pit",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign start level:tutorial_pit"
+        }
+      ]
+    },
+    {
+      "command": "time speed:2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time speed:2"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:surveyor",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:surveyor"
+        }
+      ]
+    },
+    {
+      "command": "employee assign_skill 1 skill:geology level:3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 1 skill:geology level:3"
+        }
+      ]
+    },
+    {
+      "command": "survey seismic x:15 z:15",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "survey seismic x:15 z:15"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:driller"
+        }
+      ]
+    },
+    {
+      "command": "employee assign_skill 2 skill:blasting level:3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 2 skill:blasting level:3"
+        }
+      ]
+    },
+    {
+      "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:15,15",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:15,15"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:boomite amount:5 stemming:2"
+        }
+      ]
+    },
+    {
+      "command": "sequence auto delay_step:25",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sequence auto delay_step:25"
+        }
+      ]
+    },
+    {
+      "command": "blast",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "blast"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "tick 3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 3"
+        }
+      ]
+    },
+    {
+      "command": "event fire tutorial_synergy_consultant",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event fire tutorial_synergy_consultant"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:manager",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:manager"
+        }
+      ]
+    },
+    {
+      "command": "employee assign_skill 3 skill:management level:3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 3 skill:management level:3"
+        }
+      ]
+    },
+    {
+      "command": "contract accept 1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract accept 1"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver 1 amount:5000",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract deliver 1 amount:5000"
+        }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:driver"
+        }
+      ]
+    },
+    {
+      "command": "employee assign_skill 4 skill:driving.truck level:3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 4 skill:driving.truck level:3"
+        }
+      ]
+    },
+    {
+      "command": "vehicle buy hauler",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle buy hauler"
+        }
+      ]
+    },
+    {
+      "command": "vehicle driver 1 4",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 1 4"
+        }
+      ]
+    },
+    {
+      "command": "build storage_depot at:12,8",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build storage_depot at:12,8"
+        }
+      ]
+    },
+    {
+      "command": "contract accept 2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract accept 2"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver 2 amount:5000",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract deliver 2 amount:5000"
+        }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "build_ramp start:15,15 end:20,25",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build_ramp start:15,15 end:20,25"
+        }
+      ]
+    },
+    {
+      "command": "needs",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "needs"
+        }
+      ]
+    },
+    {
+      "command": "set_policy mode:shift_8h",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "set_policy mode:shift_8h"
+        }
+      ]
+    },
+    {
+      "command": "contract accept 3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract accept 3"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver 3 amount:5000",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract deliver 3 amount:5000"
+        }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:8,8",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:8,8"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:4 stemming:2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:boomite amount:4 stemming:2"
+        }
+      ]
+    },
+    {
+      "command": "sequence auto delay_step:20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sequence auto delay_step:20"
+        }
+      ]
+    },
+    {
+      "command": "blast",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "blast"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "campaign status",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign status"
+        }
+      ]
+    }
   ]
 }

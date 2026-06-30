@@ -2,30 +2,199 @@
   "name": "contract-panel-visual",
   "description": "Visual verification of the contract panel UI: available contracts list with material type, quantity, unit price, deadline and penalties; active contracts with progress; completed contract history; accept/reject/negotiate buttons.",
   "steps": [
-    { "command": "new_game seed:42", "timeout": 15 },
-    "campaign start level:dusty_hollow",
-    "time resume",
-    "contract list",
-    "contract accept 1",
-    "contract status",
-    "tick 10",
-    "event choose 0",
-    "tick 10",
-    "event choose 0",
-    "contract list",
-    "contract accept 2",
-    "contract status",
-    "tick 10",
-    "event choose 0",
-    "contract deliver 2 amount:300",
-    "contract status",
-    "finances",
-    "state full"
+    {
+      "command": "new_game seed:42",
+      "timeout": 15,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ]
+    },
+    {
+      "command": "campaign start level:dusty_hollow",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign start level:dusty_hollow"
+        }
+      ]
+    },
+    {
+      "command": "time resume",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time resume"
+        }
+      ]
+    },
+    {
+      "command": "contract list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract list"
+        }
+      ]
+    },
+    {
+      "command": "contract accept 1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract accept 1"
+        }
+      ]
+    },
+    {
+      "command": "contract status",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract status"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "contract list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract list"
+        }
+      ]
+    },
+    {
+      "command": "contract accept 2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract accept 2"
+        }
+      ]
+    },
+    {
+      "command": "contract status",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract status"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver 2 amount:300",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract deliver 2 amount:300"
+        }
+      ]
+    },
+    {
+      "command": "contract status",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract status"
+        }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    }
   ],
   "shots": [
-    { "name": "overview", "yaw": 0, "pitch": 45 },
-    { "name": "contracts-available", "yaw": 90, "pitch": 10 },
-    { "name": "active-contracts", "yaw": 45, "pitch": 30 },
-    { "name": "finances-impact", "yaw": 0, "pitch": 80 }
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45
+    },
+    {
+      "name": "contracts-available",
+      "yaw": 90,
+      "pitch": 10
+    },
+    {
+      "name": "active-contracts",
+      "yaw": 45,
+      "pitch": 30
+    },
+    {
+      "name": "finances-impact",
+      "yaw": 0,
+      "pitch": 80
+    }
   ]
 }

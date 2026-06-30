@@ -113,10 +113,10 @@ jobs:
           name: build-artifacts
           path: dist/
 
-  # TODO: Extend this to run ALL scenario tests with both modes in a future PR.
-  # For now, we only test blast-basic to validate the dual-play infrastructure.
+  # Runs every scenario in both command and interaction modes to verify dual-play parity.
+  # All scenarios are run sequentially in a single job to avoid the overhead of 198 parallel jobs.
   scenario-dual-play:
-    name: Scenario dual-play test (blast-basic)
+    name: "Scenario dual-play (command + interaction)"
     runs-on: ubuntu-latest
     needs:
       - typecheck
@@ -153,11 +153,32 @@ jobs:
           sleep 5
           curl -s http://localhost:5173 > /dev/null || (echo "Dev server failed to start" && exit 1)
 
-      - name: Run scenario test (command mode)
-        run: npx tsx scripts/scenario-test.ts --scenario blast-basic --mode command
-
-      - name: Run scenario test (interaction mode)
-        run: npx tsx scripts/scenario-test.ts --scenario blast-basic --mode interaction
+      - name: Run all scenarios in both modes
+        run: |
+          FAILED=0
+          SCENARIOS=$(ls scripts/scenario-defs/*.json | xargs -I{} basename {} .json | sort)
+          TOTAL=$(echo "$SCENARIOS" | wc -l)
+          INDEX=0
+          for SCENARIO in $SCENARIOS; do
+            INDEX=$((INDEX + 1))
+            for MODE in command interaction; do
+              echo ""
+              echo "========================================"
+              echo "[$INDEX/$TOTAL] Running: $SCENARIO ($MODE)"
+              echo "========================================"
+              if ! npx tsx scripts/scenario-test.ts --scenario "$SCENARIO" --mode "$MODE"; then
+                echo "FAILED: $SCENARIO ($MODE)"
+                FAILED=1
+              fi
+            done
+          done
+          echo ""
+          echo "========================================"
+          if [ "$FAILED" -ne 0 ]; then
+            echo "Some scenarios failed. Check logs above."
+            exit 1
+          fi
+          echo "All scenarios passed in both modes."
 
       - name: Stop dev server
         if: always()

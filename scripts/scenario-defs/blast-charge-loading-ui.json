@@ -2,17 +2,86 @@
   "name": "blast-charge-loading-ui",
   "description": "Visual verification of charge loading UI: per-hole charges, explosive types, amounts, charge-all, visual indicators",
   "steps": [
-    { "command": "new_game seed:42", "timeout": 10 },
-    "drill_plan grid rows:3 cols:3 spacing:5 depth:6 start:15,15",
-    "charge hole:H1 explosive:boomite amount:3 stemming:2",
-    "charge hole:H2 explosive:boomite amount:8 stemming:2",
-    "charge hole:H3 explosive:boomite amount:5 stemming:1",
-    "charge hole:* explosive:boomite amount:5 stemming:2",
-    "charge hole:H5 explosive:boomite amount:7 stemming:3"
+    {
+      "command": "new_game seed:42",
+      "timeout": 10,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ]
+    },
+    {
+      "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:6 start:15,15",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:6 start:15,15"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:H1 explosive:boomite amount:3 stemming:2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:H1 explosive:boomite amount:3 stemming:2"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:H2 explosive:boomite amount:8 stemming:2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:H2 explosive:boomite amount:8 stemming:2"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:H3 explosive:boomite amount:5 stemming:1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:H3 explosive:boomite amount:5 stemming:1"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:boomite amount:5 stemming:2"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:H5 explosive:boomite amount:7 stemming:3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:H5 explosive:boomite amount:7 stemming:3"
+        }
+      ]
+    }
   ],
   "shots": [
-    { "name": "overview", "yaw": 0, "pitch": 45 },
-    { "name": "closeup", "yaw": 90, "pitch": 10 },
-    { "name": "birdseye", "yaw": 0, "pitch": 80 }
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45
+    },
+    {
+      "name": "closeup",
+      "yaw": 90,
+      "pitch": 10
+    },
+    {
+      "name": "birdseye",
+      "yaw": 0,
+      "pitch": 80
+    }
   ]
 }

@@ -2,127 +2,977 @@
   "name": "level2-playthrough-win",
   "description": "Full Level 2 (Grumpstone Ridge) profitable playthrough: all survey methods, multiple blast cycles, contract management, and vehicle fleet to reach $250k profit",
   "steps": [
-    "new_game seed:2277",
-    "campaign start level:grumpstone_ridge",
-    "time resume",
-    "scores",
-    "finances",
-
-    "employee hire role:surveyor",
-    "employee hire role:surveyor",
-    "employee hire role:driller",
-    "employee hire role:driller",
-    "employee hire role:blaster",
-    "employee hire role:blaster",
-    "employee hire role:driver",
-    "employee assign_skill 1 geology 4",
-    "employee assign_skill 2 geology 3",
-    "employee list",
-    "state full",
-
-    "survey seismic x:20 z:20",
-    "survey core_sample x:20 z:20",
-    "survey aerial x:20 z:20",
-    "survey show",
-    "state full",
-
-    "tick 8",
-    "event choose 0",
-    "tick 8",
-    "event choose 0",
-    "tick 8",
-    "event choose 0",
-    "tick 8",
-    "event choose 0",
-    "survey show",
-    "state full",
-
-    "build office at:5,5",
-    "build storage_depot at:10,5",
-    "build canteen at:5,10",
-    "build list",
-    "state full",
-
-    "vehicle buy excavator",
-    "vehicle buy truck",
-    "vehicle buy drill_rig",
-    "vehicle list",
-    "finances",
-
-    "drill_plan grid rows:3 cols:4 spacing:5 depth:10 start:20,20",
-    "charge hole:* explosive:boomite amount:5 stemming:2",
-    "sequence auto delay_step:25",
-    "blast",
-    "state full",
-    "finances",
-    "scores",
-
-    "tick 6",
-    "event choose 0",
-    "tick 6",
-    "event choose 0",
-    "contract list",
-    "contract accept 1",
-    "contract deliver 1 amount:800",
-    "contract accept 2",
-    "contract deliver 2 amount:600",
-    "finances",
-
-    "drill_plan grid rows:4 cols:4 spacing:4 depth:12 start:25,15",
-    "charge hole:* explosive:krackle amount:5 stemming:3",
-    "sequence auto delay_step:20",
-    "blast",
-    "state full",
-    "finances",
-    "scores",
-
-    "tick 6",
-    "event choose 0",
-    "tick 6",
-    "event choose 0",
-    "contract list",
-    "contract accept 3",
-    "contract deliver 3 amount:1200",
-    "contract status",
-    "finances",
-
-    "drill_plan grid rows:4 cols:5 spacing:4 depth:12 start:15,25",
-    "charge hole:* explosive:boomite amount:6 stemming:3",
-    "sequence auto delay_step:20",
-    "blast",
-    "state full",
-
-    "tick 6",
-    "event choose 0",
-    "tick 6",
-    "event choose 0",
-    "contract list",
-    "contract accept 4",
-    "contract deliver 4 amount:1500",
-    "finances",
-    "scores",
-
-    "build medical_bay at:10,10",
-    "build break_room at:15,10",
-    "build list",
-    "state full",
-
-    "drill_plan grid rows:5 cols:4 spacing:5 depth:14 start:10,25",
-    "charge hole:* explosive:krackle amount:6 stemming:3",
-    "sequence auto delay_step:20",
-    "blast",
-    "state full",
-
-    "tick 6",
-    "event choose 0",
-    "tick 6",
-    "event choose 0",
-    "contract list",
-    "contract accept 5",
-    "contract deliver 5 amount:2000",
-    "finances",
-    "scores",
-    "stats",
-    "campaign status"
+    {
+      "command": "new_game seed:2277",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:2277"
+        }
+      ]
+    },
+    {
+      "command": "campaign start level:grumpstone_ridge",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign start level:grumpstone_ridge"
+        }
+      ]
+    },
+    {
+      "command": "time resume",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time resume"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:surveyor",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:surveyor"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:surveyor",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:surveyor"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:driller"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:driller"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:blaster"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:blaster"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:driver"
+        }
+      ]
+    },
+    {
+      "command": "employee assign_skill 1 geology 4",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 1 geology 4"
+        }
+      ]
+    },
+    {
+      "command": "employee assign_skill 2 geology 3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 2 geology 3"
+        }
+      ]
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "survey seismic x:20 z:20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "survey seismic x:20 z:20"
+        }
+      ]
+    },
+    {
+      "command": "survey core_sample x:20 z:20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "survey core_sample x:20 z:20"
+        }
+      ]
+    },
+    {
+      "command": "survey aerial x:20 z:20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "survey aerial x:20 z:20"
+        }
+      ]
+    },
+    {
+      "command": "survey show",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "survey show"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "tick 8",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 8"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 8",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 8"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 8",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 8"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 8",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 8"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "survey show",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "survey show"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "build office at:5,5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build office at:5,5"
+        }
+      ]
+    },
+    {
+      "command": "build storage_depot at:10,5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build storage_depot at:10,5"
+        }
+      ]
+    },
+    {
+      "command": "build canteen at:5,10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build canteen at:5,10"
+        }
+      ]
+    },
+    {
+      "command": "build list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build list"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "vehicle buy excavator",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle buy excavator"
+        }
+      ]
+    },
+    {
+      "command": "vehicle buy truck",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle buy truck"
+        }
+      ]
+    },
+    {
+      "command": "vehicle buy drill_rig",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle buy drill_rig"
+        }
+      ]
+    },
+    {
+      "command": "vehicle list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle list"
+        }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "drill_plan grid rows:3 cols:4 spacing:5 depth:10 start:20,20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:3 cols:4 spacing:5 depth:10 start:20,20"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:boomite amount:5 stemming:2"
+        }
+      ]
+    },
+    {
+      "command": "sequence auto delay_step:25",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sequence auto delay_step:25"
+        }
+      ]
+    },
+    {
+      "command": "blast",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "blast"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "contract list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract list"
+        }
+      ]
+    },
+    {
+      "command": "contract accept 1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract accept 1"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver 1 amount:800",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract deliver 1 amount:800"
+        }
+      ]
+    },
+    {
+      "command": "contract accept 2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract accept 2"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver 2 amount:600",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract deliver 2 amount:600"
+        }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "drill_plan grid rows:4 cols:4 spacing:4 depth:12 start:25,15",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:4 cols:4 spacing:4 depth:12 start:25,15"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:* explosive:krackle amount:5 stemming:3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:krackle amount:5 stemming:3"
+        }
+      ]
+    },
+    {
+      "command": "sequence auto delay_step:20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sequence auto delay_step:20"
+        }
+      ]
+    },
+    {
+      "command": "blast",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "blast"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "contract list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract list"
+        }
+      ]
+    },
+    {
+      "command": "contract accept 3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract accept 3"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver 3 amount:1200",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract deliver 3 amount:1200"
+        }
+      ]
+    },
+    {
+      "command": "contract status",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract status"
+        }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "drill_plan grid rows:4 cols:5 spacing:4 depth:12 start:15,25",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:4 cols:5 spacing:4 depth:12 start:15,25"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:6 stemming:3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:boomite amount:6 stemming:3"
+        }
+      ]
+    },
+    {
+      "command": "sequence auto delay_step:20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sequence auto delay_step:20"
+        }
+      ]
+    },
+    {
+      "command": "blast",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "blast"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "contract list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract list"
+        }
+      ]
+    },
+    {
+      "command": "contract accept 4",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract accept 4"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver 4 amount:1500",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract deliver 4 amount:1500"
+        }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "build medical_bay at:10,10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build medical_bay at:10,10"
+        }
+      ]
+    },
+    {
+      "command": "build break_room at:15,10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build break_room at:15,10"
+        }
+      ]
+    },
+    {
+      "command": "build list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build list"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "drill_plan grid rows:5 cols:4 spacing:5 depth:14 start:10,25",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:5 cols:4 spacing:5 depth:14 start:10,25"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:* explosive:krackle amount:6 stemming:3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:krackle amount:6 stemming:3"
+        }
+      ]
+    },
+    {
+      "command": "sequence auto delay_step:20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sequence auto delay_step:20"
+        }
+      ]
+    },
+    {
+      "command": "blast",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "blast"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "contract list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract list"
+        }
+      ]
+    },
+    {
+      "command": "contract accept 5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract accept 5"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver 5 amount:2000",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract deliver 5 amount:2000"
+        }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "stats",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "stats"
+        }
+      ]
+    },
+    {
+      "command": "campaign status",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign status"
+        }
+      ]
+    }
   ]
 }
