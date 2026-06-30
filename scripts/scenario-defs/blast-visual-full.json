@@ -2,39 +2,283 @@
   "name": "blast-visual-full",
   "description": "Comprehensive visual pipeline test covering all 7 blast system areas: drill plan, charge/sequence, software preview tiers, detonation execution, post-blast report, and voxel fragmentation with multi-angle screenshots at every stage",
   "steps": [
-    { "command": "new_game seed:42", "timeout": 15 },
-    "drill_plan grid rows:3 cols:4 spacing:5 depth:8 start:20,20",
-    "drill_plan show",
-    "state full",
-    "charge hole:* explosive:boomite amount:5 stemming:2",
-    "charge hole:H1 explosive:boomite amount:8 stemming:3",
-    "charge hole:H2 explosive:boomite amount:3 stemming:1",
-    "sequence auto delay_step:25",
-    "sequence set hole:H1 delay:0",
-    "sequence set hole:H6 delay:100",
-    "sequence show",
-    "blast_preview",
-    "buy_software tier:1",
-    "preview energy",
-    "buy_software tier:2",
-    "preview fragments",
-    "buy_software tier:3",
-    "preview projections",
-    "buy_software tier:4",
-    "preview vibrations",
-    "blast_preview",
-    { "command": "blast", "timeout": 20, "frames": 6, "interval": 50 },
-    "fragments",
-    "inspect 20,20,0",
-    "finances",
-    "scores",
-    "stats",
-    "state full"
+    {
+      "command": "new_game seed:42",
+      "timeout": 15,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ]
+    },
+    {
+      "command": "drill_plan grid rows:3 cols:4 spacing:5 depth:8 start:20,20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:3 cols:4 spacing:5 depth:8 start:20,20"
+        }
+      ]
+    },
+    {
+      "command": "drill_plan show",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan show"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:boomite amount:5 stemming:2"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:H1 explosive:boomite amount:8 stemming:3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:H1 explosive:boomite amount:8 stemming:3"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:H2 explosive:boomite amount:3 stemming:1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:H2 explosive:boomite amount:3 stemming:1"
+        }
+      ]
+    },
+    {
+      "command": "sequence auto delay_step:25",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sequence auto delay_step:25"
+        }
+      ]
+    },
+    {
+      "command": "sequence set hole:H1 delay:0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sequence set hole:H1 delay:0"
+        }
+      ]
+    },
+    {
+      "command": "sequence set hole:H6 delay:100",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sequence set hole:H6 delay:100"
+        }
+      ]
+    },
+    {
+      "command": "sequence show",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sequence show"
+        }
+      ]
+    },
+    {
+      "command": "blast_preview",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "blast_preview"
+        }
+      ]
+    },
+    {
+      "command": "buy_software tier:1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "buy_software tier:1"
+        }
+      ]
+    },
+    {
+      "command": "preview energy",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "preview energy"
+        }
+      ]
+    },
+    {
+      "command": "buy_software tier:2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "buy_software tier:2"
+        }
+      ]
+    },
+    {
+      "command": "preview fragments",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "preview fragments"
+        }
+      ]
+    },
+    {
+      "command": "buy_software tier:3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "buy_software tier:3"
+        }
+      ]
+    },
+    {
+      "command": "preview projections",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "preview projections"
+        }
+      ]
+    },
+    {
+      "command": "buy_software tier:4",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "buy_software tier:4"
+        }
+      ]
+    },
+    {
+      "command": "preview vibrations",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "preview vibrations"
+        }
+      ]
+    },
+    {
+      "command": "blast_preview",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "blast_preview"
+        }
+      ]
+    },
+    {
+      "command": "blast",
+      "timeout": 20,
+      "frames": 6,
+      "interval": 50,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "blast"
+        }
+      ]
+    },
+    {
+      "command": "fragments",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "fragments"
+        }
+      ]
+    },
+    {
+      "command": "inspect 20,20,0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "inspect 20,20,0"
+        }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "stats",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "stats"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    }
   ],
   "shots": [
-    { "name": "overview", "yaw": 0, "pitch": 45 },
-    { "name": "closeup", "yaw": 90, "pitch": 10 },
-    { "name": "birdseye", "yaw": 0, "pitch": 80 },
-    { "name": "angled", "yaw": 45, "pitch": 30 }
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45
+    },
+    {
+      "name": "closeup",
+      "yaw": 90,
+      "pitch": 10
+    },
+    {
+      "name": "birdseye",
+      "yaw": 0,
+      "pitch": 80
+    },
+    {
+      "name": "angled",
+      "yaw": 45,
+      "pitch": 30
+    }
   ]
 }

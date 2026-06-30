@@ -2,8 +2,8 @@
  * BlastSimulator2026 — Shared Interaction Executor
  *
  * Executes a single interaction action on a Puppeteer page.
- * Shared by scenario-test and interaction-replay modules to avoid
- * duplicating the switch-based dispatch logic.
+ * Shared by scenario-test module for executing interaction actions
+ * in dual-play mode (interaction execution path).
  *
  * @module shared/interaction-executor
  */

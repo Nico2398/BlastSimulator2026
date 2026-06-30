@@ -2,76 +2,518 @@
   "name": "survey-confidence-overlay",
   "description": "Dedicated scenario for survey confidence overlay: multiple survey methods at the same location showing confidence differences, stale/fresh rendering, and overlay lifecycle. The final screenshot must show colour-coded confidence markers (green = high, red/yellow = low, grey = stale). This scenario FAILS until GameRenderer wires getSurveyOverlay().show() into syncFromContext().",
   "steps": [
-    "new_game seed:42",
-    "campaign start level:dusty_hollow",
-    "time resume",
-    "scores",
-
-    "employee hire role:surveyor",
-    "employee hire role:surveyor",
-    "employee assign_skill 1 geology 5",
-    "employee assign_skill 2 geology 1",
-    "employee list",
-
-    "state full",
-
-    "survey core_sample x:20 z:20",
-    "survey seismic x:20 z:20",
-    "survey aerial x:20 z:20",
-    "survey show",
-    "state full",
-
-    "tick 8",
-    "event choose 0",
-    "state full",
-
-    "tick 8",
-    "event choose 0",
-    "state full",
-
-    "tick 8",
-    "event choose 0",
-    "state full",
-
-    "tick 8",
-    "event choose 0",
-    "state full",
-
-    "tick 8",
-    "event choose 0",
-    "state full",
-
-    "tick 8",
-    "event choose 0",
-    "survey show",
-    "state full",
-
-    "survey core_sample x:35 z:20",
-    "survey core_sample x:20 z:35",
-    "survey core_sample x:35 z:35",
-    "survey show",
-    "state full",
-
-    "tick 8",
-    "event choose 0",
-    "tick 8",
-    "event choose 0",
-    "state full",
-
-    "tick 8",
-    "event choose 0",
-    "tick 8",
-    "event choose 0",
-    "survey show",
-    "state full",
-
-    "inspect 20,5,20",
-    "inspect 35,5,20",
-    "inspect 20,5,35",
-    "inspect 35,5,35",
-
-    "finances",
-    "scores",
-    "stats"
+    {
+      "command": "new_game seed:42",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ]
+    },
+    {
+      "command": "campaign start level:dusty_hollow",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign start level:dusty_hollow"
+        }
+      ]
+    },
+    {
+      "command": "time resume",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time resume"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:surveyor",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:surveyor"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:surveyor",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:surveyor"
+        }
+      ]
+    },
+    {
+      "command": "employee assign_skill 1 geology 5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 1 geology 5"
+        }
+      ]
+    },
+    {
+      "command": "employee assign_skill 2 geology 1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 2 geology 1"
+        }
+      ]
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "survey core_sample x:20 z:20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "survey core_sample x:20 z:20"
+        }
+      ]
+    },
+    {
+      "command": "survey seismic x:20 z:20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "survey seismic x:20 z:20"
+        }
+      ]
+    },
+    {
+      "command": "survey aerial x:20 z:20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "survey aerial x:20 z:20"
+        }
+      ]
+    },
+    {
+      "command": "survey show",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "survey show"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "tick 8",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 8"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "tick 8",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 8"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "tick 8",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 8"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "tick 8",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 8"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "tick 8",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 8"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "tick 8",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 8"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "survey show",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "survey show"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "survey core_sample x:35 z:20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "survey core_sample x:35 z:20"
+        }
+      ]
+    },
+    {
+      "command": "survey core_sample x:20 z:35",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "survey core_sample x:20 z:35"
+        }
+      ]
+    },
+    {
+      "command": "survey core_sample x:35 z:35",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "survey core_sample x:35 z:35"
+        }
+      ]
+    },
+    {
+      "command": "survey show",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "survey show"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "tick 8",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 8"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 8",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 8"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "tick 8",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 8"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 8",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 8"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "survey show",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "survey show"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "inspect 20,5,20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "inspect 20,5,20"
+        }
+      ]
+    },
+    {
+      "command": "inspect 35,5,20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "inspect 35,5,20"
+        }
+      ]
+    },
+    {
+      "command": "inspect 20,5,35",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "inspect 20,5,35"
+        }
+      ]
+    },
+    {
+      "command": "inspect 35,5,35",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "inspect 35,5,35"
+        }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "stats",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "stats"
+        }
+      ]
+    }
   ]
 }

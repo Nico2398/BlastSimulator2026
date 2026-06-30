@@ -2,56 +2,401 @@
   "name": "survey-overlay-lifecycle",
   "description": "Survey confidence overlay lifecycle: fresh survey rendering → tick past stale threshold → new survey refreshes overlay → blast terrain remesh preserves overlay. FAILS until GameRenderer wires getSurveyOverlay().show() in syncFromContext().",
   "steps": [
-    "new_game seed:42",
-    "campaign start level:dusty_hollow",
-    "time resume",
-
-    "employee hire role:surveyor",
-    "employee hire role:surveyor",
-    "employee assign_skill 1 geology 5",
-    "employee assign_skill 2 geology 1",
-    "employee list",
-    "state full",
-
-    "survey seismic x:20 z:20",
-    "survey core_sample x:20 z:20",
-    "survey show",
-    "state full",
-
-    "tick 10",
-    "event choose 0",
-    "tick 10",
-    "event choose 0",
-    "tick 10",
-    "event choose 0",
-    "tick 10",
-    "event choose 0",
-    "survey show",
-    "state full",
-
-    "survey aerial x:20 z:20",
-    "survey show",
-    "state full",
-
-    "tick 10",
-    "event choose 0",
-    "tick 10",
-    "event choose 0",
-    "tick 10",
-    "event choose 0",
-    "tick 10",
-    "event choose 0",
-    "survey show",
-    "state full",
-
-    "drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:20,20",
-    "charge hole:* explosive:boomite amount:5 stemming:2",
-    "sequence auto delay_step:25",
-    "blast",
-    "state full",
-
-    "finances",
-    "scores",
-    "stats"
+    {
+      "command": "new_game seed:42",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ]
+    },
+    {
+      "command": "campaign start level:dusty_hollow",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign start level:dusty_hollow"
+        }
+      ]
+    },
+    {
+      "command": "time resume",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time resume"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:surveyor",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:surveyor"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:surveyor",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:surveyor"
+        }
+      ]
+    },
+    {
+      "command": "employee assign_skill 1 geology 5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 1 geology 5"
+        }
+      ]
+    },
+    {
+      "command": "employee assign_skill 2 geology 1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 2 geology 1"
+        }
+      ]
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "survey seismic x:20 z:20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "survey seismic x:20 z:20"
+        }
+      ]
+    },
+    {
+      "command": "survey core_sample x:20 z:20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "survey core_sample x:20 z:20"
+        }
+      ]
+    },
+    {
+      "command": "survey show",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "survey show"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "survey show",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "survey show"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "survey aerial x:20 z:20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "survey aerial x:20 z:20"
+        }
+      ]
+    },
+    {
+      "command": "survey show",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "survey show"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "survey show",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "survey show"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:20,20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:20,20"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:boomite amount:5 stemming:2"
+        }
+      ]
+    },
+    {
+      "command": "sequence auto delay_step:25",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sequence auto delay_step:25"
+        }
+      ]
+    },
+    {
+      "command": "blast",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "blast"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "stats",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "stats"
+        }
+      ]
+    }
   ]
 }

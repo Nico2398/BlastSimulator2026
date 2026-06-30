@@ -2,18 +2,95 @@
   "name": "building-warehouse-visual",
   "description": "Visual check of warehouse buildings: explosive and freight warehouses at multiple tiers",
   "steps": [
-    { "command": "new_game seed:42", "timeout": 10 },
-    "build explosive_warehouse at:5,5",
-    "build freight_warehouse at:10,5",
-    "build explosive_warehouse at:20,5 tier:2",
-    "build freight_warehouse at:25,5 tier:2",
-    "build list",
-    "fragments",
-    "state full"
+    {
+      "command": "new_game seed:42",
+      "timeout": 10,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ]
+    },
+    {
+      "command": "build explosive_warehouse at:5,5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build explosive_warehouse at:5,5"
+        }
+      ]
+    },
+    {
+      "command": "build freight_warehouse at:10,5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build freight_warehouse at:10,5"
+        }
+      ]
+    },
+    {
+      "command": "build explosive_warehouse at:20,5 tier:2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build explosive_warehouse at:20,5 tier:2"
+        }
+      ]
+    },
+    {
+      "command": "build freight_warehouse at:25,5 tier:2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build freight_warehouse at:25,5 tier:2"
+        }
+      ]
+    },
+    {
+      "command": "build list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build list"
+        }
+      ]
+    },
+    {
+      "command": "fragments",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "fragments"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    }
   ],
   "shots": [
-    { "name": "overview", "yaw": 0, "pitch": 45 },
-    { "name": "warehouse-area", "yaw": 90, "pitch": 10 },
-    { "name": "closeup", "yaw": 45, "pitch": 30 }
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45
+    },
+    {
+      "name": "warehouse-area",
+      "yaw": 90,
+      "pitch": 10
+    },
+    {
+      "name": "closeup",
+      "yaw": 45,
+      "pitch": 30
+    }
   ]
 }

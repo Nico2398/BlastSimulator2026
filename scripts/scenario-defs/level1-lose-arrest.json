@@ -2,51 +2,365 @@
   "name": "level1-lose-arrest",
   "description": "Level 1 losing scenario: heavy corruption and mafia use, triggering criminal arrest",
   "steps": [
-    "new_game seed:42",
-    "campaign start level:dusty_hollow",
-    "time resume",
-
-    "corrupt target:judge cost:5000",
-    "corrupt target:inspector cost:5000",
-    "corrupt target:union_leader cost:5000",
-    "corrupt target:politician cost:5000",
-    "corrupt target:witness cost:5000",
-
-    "corrupt target:judge cost:10000",
-    "corrupt target:inspector cost:10000",
-    "corrupt target:union_leader cost:10000",
-    "corrupt",
-    "finances",
-
-    "mafia status",
-    "employee hire role:driller",
-    "employee hire role:blaster",
-    "mafia smuggle",
-
-    "tick 10",
-    "event choose 0",
-    "tick 10",
-    "event choose 0",
-    "tick 10",
-    "event choose 0",
-    "mafia status",
-    "finances",
-
-    "corrupt target:judge cost:5000",
-    "corrupt target:politician cost:5000",
-
-    "tick 10",
-    "event choose 0",
-    "tick 10",
-    "event choose 0",
-    "tick 10",
-    "event choose 0",
-    "tick 10",
-    "event choose 0",
-    "mafia status",
-    "finances",
-    "scores",
-    "stats",
-    "campaign status"
+    {
+      "command": "new_game seed:42",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ]
+    },
+    {
+      "command": "campaign start level:dusty_hollow",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign start level:dusty_hollow"
+        }
+      ]
+    },
+    {
+      "command": "time resume",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time resume"
+        }
+      ]
+    },
+    {
+      "command": "corrupt target:judge cost:5000",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "corrupt target:judge cost:5000"
+        }
+      ]
+    },
+    {
+      "command": "corrupt target:inspector cost:5000",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "corrupt target:inspector cost:5000"
+        }
+      ]
+    },
+    {
+      "command": "corrupt target:union_leader cost:5000",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "corrupt target:union_leader cost:5000"
+        }
+      ]
+    },
+    {
+      "command": "corrupt target:politician cost:5000",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "corrupt target:politician cost:5000"
+        }
+      ]
+    },
+    {
+      "command": "corrupt target:witness cost:5000",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "corrupt target:witness cost:5000"
+        }
+      ]
+    },
+    {
+      "command": "corrupt target:judge cost:10000",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "corrupt target:judge cost:10000"
+        }
+      ]
+    },
+    {
+      "command": "corrupt target:inspector cost:10000",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "corrupt target:inspector cost:10000"
+        }
+      ]
+    },
+    {
+      "command": "corrupt target:union_leader cost:10000",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "corrupt target:union_leader cost:10000"
+        }
+      ]
+    },
+    {
+      "command": "corrupt",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "corrupt"
+        }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "mafia status",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "mafia status"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:driller"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:blaster"
+        }
+      ]
+    },
+    {
+      "command": "mafia smuggle",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "mafia smuggle"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "mafia status",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "mafia status"
+        }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "corrupt target:judge cost:5000",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "corrupt target:judge cost:5000"
+        }
+      ]
+    },
+    {
+      "command": "corrupt target:politician cost:5000",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "corrupt target:politician cost:5000"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "mafia status",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "mafia status"
+        }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "stats",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "stats"
+        }
+      ]
+    },
+    {
+      "command": "campaign status",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign status"
+        }
+      ]
+    }
   ]
 }

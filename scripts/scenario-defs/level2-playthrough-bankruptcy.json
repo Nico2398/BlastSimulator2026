@@ -2,87 +2,671 @@
   "name": "level2-playthrough-bankruptcy",
   "description": "Level 2 bankruptcy scenario: heavy overspending on buildings, vehicles, and employees with no profitable blasting to trigger financial collapse",
   "steps": [
-    "new_game seed:2277",
-    "campaign start level:grumpstone_ridge",
-    "time resume",
-    "scores",
-    "finances",
-
-    "build office at:5,5",
-    "build storage_depot at:10,5",
-    "build medical_bay at:5,10",
-    "build canteen at:10,10",
-    "build break_room at:15,5",
-    "build bunkhouse at:15,10",
-    "build management_office at:20,5",
-    "build list",
-    "finances",
-
-    "vehicle buy excavator",
-    "vehicle buy truck",
-    "vehicle buy drill_rig",
-    "vehicle buy bulldozer",
-    "vehicle buy hauler",
-    "vehicle list",
-    "finances",
-
-    "employee hire role:driller",
-    "employee hire role:driller",
-    "employee hire role:driller",
-    "employee hire role:blaster",
-    "employee hire role:blaster",
-    "employee hire role:driver",
-    "employee hire role:driver",
-    "employee hire role:surveyor",
-    "employee hire role:manager",
-    "employee hire role:manager",
-    "employee list",
-    "finances",
-    "state full",
-
-    "tick 10",
-    "event choose 0",
-    "tick 10",
-    "event choose 0",
-    "tick 10",
-    "event choose 0",
-    "finances",
-    "scores",
-
-    "tick 15",
-    "event choose 0",
-    "tick 15",
-    "event choose 0",
-    "tick 15",
-    "event choose 0",
-    "finances",
-    "scores",
-
-    "tick 15",
-    "event choose 0",
-    "tick 15",
-    "event choose 0",
-    "tick 15",
-    "event choose 0",
-    "finances",
-    "scores",
-
-    "tick 15",
-    "event choose 0",
-    "tick 15",
-    "event choose 0",
-    "tick 15",
-    "event choose 0",
-    "finances",
-    "scores",
-
-    "tick 10",
-    "event choose 0",
-    "tick 10",
-    "event choose 0",
-    "finances",
-    "scores",
-    "stats",
-    "campaign status"
+    {
+      "command": "new_game seed:2277",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:2277"
+        }
+      ]
+    },
+    {
+      "command": "campaign start level:grumpstone_ridge",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign start level:grumpstone_ridge"
+        }
+      ]
+    },
+    {
+      "command": "time resume",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time resume"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "build office at:5,5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build office at:5,5"
+        }
+      ]
+    },
+    {
+      "command": "build storage_depot at:10,5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build storage_depot at:10,5"
+        }
+      ]
+    },
+    {
+      "command": "build medical_bay at:5,10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build medical_bay at:5,10"
+        }
+      ]
+    },
+    {
+      "command": "build canteen at:10,10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build canteen at:10,10"
+        }
+      ]
+    },
+    {
+      "command": "build break_room at:15,5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build break_room at:15,5"
+        }
+      ]
+    },
+    {
+      "command": "build bunkhouse at:15,10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build bunkhouse at:15,10"
+        }
+      ]
+    },
+    {
+      "command": "build management_office at:20,5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build management_office at:20,5"
+        }
+      ]
+    },
+    {
+      "command": "build list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build list"
+        }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "vehicle buy excavator",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle buy excavator"
+        }
+      ]
+    },
+    {
+      "command": "vehicle buy truck",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle buy truck"
+        }
+      ]
+    },
+    {
+      "command": "vehicle buy drill_rig",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle buy drill_rig"
+        }
+      ]
+    },
+    {
+      "command": "vehicle buy bulldozer",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle buy bulldozer"
+        }
+      ]
+    },
+    {
+      "command": "vehicle buy hauler",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle buy hauler"
+        }
+      ]
+    },
+    {
+      "command": "vehicle list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle list"
+        }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:driller"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:driller"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:driller"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:blaster"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:blaster"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:driver"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:driver"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:surveyor",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:surveyor"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:manager",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:manager"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:manager",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:manager"
+        }
+      ]
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "tick 15",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 15"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 15",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 15"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 15",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 15"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "tick 15",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 15"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 15",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 15"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 15",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 15"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "tick 15",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 15"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 15",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 15"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 15",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 15"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "stats",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "stats"
+        }
+      ]
+    },
+    {
+      "command": "campaign status",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign status"
+        }
+      ]
+    }
   ]
 }

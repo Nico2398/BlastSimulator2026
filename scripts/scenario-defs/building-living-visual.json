@@ -2,25 +2,154 @@
   "name": "building-living-visual",
   "description": "Visual check of living quarters tiers and employee needs display with hunger and fatigue gauges",
   "steps": [
-    { "command": "new_game seed:42", "timeout": 10 },
-    "build living_quarters at:5,5 tier:1",
-    "build living_quarters at:12,5 tier:2",
-    "build living_quarters at:20,5 tier:3",
-    "build list",
-    "employee hire role:driller",
-    "employee hire role:blaster",
-    "employee hire role:driver",
-    "employee list",
-    "needs",
-    "tick 5",
-    "needs",
-    "scores",
-    "state full"
+    {
+      "command": "new_game seed:42",
+      "timeout": 10,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ]
+    },
+    {
+      "command": "build living_quarters at:5,5 tier:1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build living_quarters at:5,5 tier:1"
+        }
+      ]
+    },
+    {
+      "command": "build living_quarters at:12,5 tier:2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build living_quarters at:12,5 tier:2"
+        }
+      ]
+    },
+    {
+      "command": "build living_quarters at:20,5 tier:3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build living_quarters at:20,5 tier:3"
+        }
+      ]
+    },
+    {
+      "command": "build list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build list"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:driller"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:blaster"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:driver"
+        }
+      ]
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ]
+    },
+    {
+      "command": "needs",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "needs"
+        }
+      ]
+    },
+    {
+      "command": "tick 5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 5"
+        }
+      ]
+    },
+    {
+      "command": "needs",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "needs"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    }
   ],
   "shots": [
-    { "name": "overview", "yaw": 0, "pitch": 45 },
-    { "name": "tier-comparison", "yaw": 90, "pitch": 15 },
-    { "name": "needs-display", "yaw": 45, "pitch": 30 },
-    { "name": "birdseye", "yaw": 0, "pitch": 80 }
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45
+    },
+    {
+      "name": "tier-comparison",
+      "yaw": 90,
+      "pitch": 15
+    },
+    {
+      "name": "needs-display",
+      "yaw": 45,
+      "pitch": 30
+    },
+    {
+      "name": "birdseye",
+      "yaw": 0,
+      "pitch": 80
+    }
   ]
 }

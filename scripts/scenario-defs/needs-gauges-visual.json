@@ -2,25 +2,158 @@
   "name": "needs-gauges-visual",
   "description": "Visual check of need gauge display: hire 3 employees, advance ticks to drain gauges, then verify needs command shows decreasing hunger/fatigue/breakNeed values per employee with color-coding thresholds (green >50, yellow 30-50, red <30)",
   "steps": [
-    { "command": "new_game seed:42", "timeout": 10 },
-    "employee hire role:driller",
-    "employee hire role:blaster",
-    "employee hire role:driver",
-    "needs",
-    "employee list",
-    "tick 5",
-    "needs",
-    "tick 15",
-    "needs",
-    "tick 30",
-    "needs",
-    "tick 50",
-    "needs",
-    "state full"
+    {
+      "command": "new_game seed:42",
+      "timeout": 10,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:driller"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:blaster"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:driver"
+        }
+      ]
+    },
+    {
+      "command": "needs",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "needs"
+        }
+      ]
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ]
+    },
+    {
+      "command": "tick 5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 5"
+        }
+      ]
+    },
+    {
+      "command": "needs",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "needs"
+        }
+      ]
+    },
+    {
+      "command": "tick 15",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 15"
+        }
+      ]
+    },
+    {
+      "command": "needs",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "needs"
+        }
+      ]
+    },
+    {
+      "command": "tick 30",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 30"
+        }
+      ]
+    },
+    {
+      "command": "needs",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "needs"
+        }
+      ]
+    },
+    {
+      "command": "tick 50",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ]
+    },
+    {
+      "command": "needs",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "needs"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    }
   ],
   "shots": [
-    { "name": "overview", "yaw": 0, "pitch": 45 },
-    { "name": "needs-panel", "yaw": 90, "pitch": 10 },
-    { "name": "employee-status", "yaw": 45, "pitch": 30 }
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45
+    },
+    {
+      "name": "needs-panel",
+      "yaw": 90,
+      "pitch": 10
+    },
+    {
+      "name": "employee-status",
+      "yaw": 45,
+      "pitch": 30
+    }
   ]
 }

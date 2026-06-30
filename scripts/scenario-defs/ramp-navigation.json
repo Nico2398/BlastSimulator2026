@@ -2,12 +2,68 @@
   "name": "ramp-navigation",
   "description": "Chapter 6: Build ramp between two benches and verify agent can reach lower bench",
   "steps": [
-    "new_game seed:42",
-    "build_ramp start:15,15 end:20,25",
-    "employee hire role:surveyor",
-    "employee list",
-    "tick 30",
-    "inspect 20,20,0",
-    "state full"
+    {
+      "command": "new_game seed:42",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ]
+    },
+    {
+      "command": "build_ramp start:15,15 end:20,25",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build_ramp start:15,15 end:20,25"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:surveyor",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:surveyor"
+        }
+      ]
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ]
+    },
+    {
+      "command": "tick 30",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 30"
+        }
+      ]
+    },
+    {
+      "command": "inspect 20,20,0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "inspect 20,20,0"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    }
   ]
 }

@@ -2,33 +2,226 @@
   "name": "economy-display-visual",
   "description": "Visual verification of the economy display: cash balance in HUD top bar, income/expenses in financial summary, contract income reflection, building maintenance costs, employee salaries, and vehicle maintenance costs.",
   "steps": [
-    { "command": "new_game seed:42", "timeout": 15 },
-    "campaign start level:dusty_hollow",
-    "time resume",
-    "finances",
-    "scores",
-    "employee hire role:driller",
-    "employee hire role:blaster",
-    "employee hire role:driver",
-    "tick 10",
-    "event choose 0",
-    "finances",
-    "vehicle buy hauler",
-    "build storage_depot at:25,25",
-    "tick 10",
-    "event choose 0",
-    "finances",
-    "contract list",
-    "contract accept 1",
-    "tick 5",
-    "finances",
-    "scores",
-    "state full"
+    {
+      "command": "new_game seed:42",
+      "timeout": 15,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ]
+    },
+    {
+      "command": "campaign start level:dusty_hollow",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign start level:dusty_hollow"
+        }
+      ]
+    },
+    {
+      "command": "time resume",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time resume"
+        }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:driller"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:blaster"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:driver"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "vehicle buy hauler",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle buy hauler"
+        }
+      ]
+    },
+    {
+      "command": "build storage_depot at:25,25",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build storage_depot at:25,25"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "contract list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract list"
+        }
+      ]
+    },
+    {
+      "command": "contract accept 1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract accept 1"
+        }
+      ]
+    },
+    {
+      "command": "tick 5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 5"
+        }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    }
   ],
   "shots": [
-    { "name": "overview", "yaw": 0, "pitch": 45 },
-    { "name": "hud-closeup", "yaw": 90, "pitch": 10 },
-    { "name": "finances-panel", "yaw": 0, "pitch": 80 },
-    { "name": "contracts-view", "yaw": 45, "pitch": 30 }
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45
+    },
+    {
+      "name": "hud-closeup",
+      "yaw": 90,
+      "pitch": 10
+    },
+    {
+      "name": "finances-panel",
+      "yaw": 0,
+      "pitch": 80
+    },
+    {
+      "name": "contracts-view",
+      "yaw": 45,
+      "pitch": 30
+    }
   ]
 }

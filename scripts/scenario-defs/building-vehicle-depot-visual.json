@@ -2,18 +2,95 @@
   "name": "building-vehicle-depot-visual",
   "description": "Visual check of vehicle depot building at all three tiers with fleet management",
   "steps": [
-    { "command": "new_game seed:42", "timeout": 10 },
-    "build vehicle_depot at:5,5",
-    "build vehicle_depot at:15,5 tier:2",
-    "build vehicle_depot at:25,5 tier:3",
-    "build list",
-    "vehicle list",
-    "scores",
-    "state full"
+    {
+      "command": "new_game seed:42",
+      "timeout": 10,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ]
+    },
+    {
+      "command": "build vehicle_depot at:5,5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build vehicle_depot at:5,5"
+        }
+      ]
+    },
+    {
+      "command": "build vehicle_depot at:15,5 tier:2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build vehicle_depot at:15,5 tier:2"
+        }
+      ]
+    },
+    {
+      "command": "build vehicle_depot at:25,5 tier:3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build vehicle_depot at:25,5 tier:3"
+        }
+      ]
+    },
+    {
+      "command": "build list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build list"
+        }
+      ]
+    },
+    {
+      "command": "vehicle list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle list"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    }
   ],
   "shots": [
-    { "name": "overview", "yaw": 0, "pitch": 45 },
-    { "name": "depot-area", "yaw": 90, "pitch": 10 },
-    { "name": "closeup", "yaw": 45, "pitch": 30 }
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45
+    },
+    {
+      "name": "depot-area",
+      "yaw": 90,
+      "pitch": 10
+    },
+    {
+      "name": "closeup",
+      "yaw": 45,
+      "pitch": 30
+    }
   ]
 }

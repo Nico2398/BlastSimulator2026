@@ -2,125 +2,968 @@
   "name": "level3-playthrough-ecology",
   "description": "Level 3 ecological shutdown scenario: massive krackle and obliviax blasts with no mitigation, long tick cycles to trigger ecology collapse",
   "steps": [
-    "new_game seed:3666",
-    "campaign start level:treranium_depths",
-    "time resume",
-    "scores",
-    "finances",
-
-    "employee hire role:driller",
-    "employee hire role:driller",
-    "employee hire role:driller",
-    "employee hire role:blaster",
-    "employee hire role:blaster",
-    "employee hire role:blaster",
-    "employee hire role:driver",
-    "employee list",
-    "state full",
-
-    "tick 5",
-    "event choose 0",
-    "tick 5",
-    "event choose 0",
-    "scores",
-
-    "drill_plan grid rows:5 cols:4 spacing:3 depth:12 start:10,10",
-    "charge hole:* explosive:krackle amount:10 stemming:1",
-    "sequence auto delay_step:10",
-    "blast",
-    "state full",
-    "scores",
-
-    "drill_plan grid rows:4 cols:5 spacing:3 depth:12 start:25,10",
-    "charge hole:* explosive:krackle amount:10 stemming:1",
-    "sequence auto delay_step:10",
-    "blast",
-    "state full",
-    "scores",
-
-    "tick 8",
-    "event choose 0",
-    "tick 8",
-    "event choose 0",
-    "tick 8",
-    "event choose 0",
-    "scores",
-
-    "drill_plan grid rows:5 cols:5 spacing:3 depth:14 start:10,25",
-    "charge hole:* explosive:obliviax amount:8 stemming:1",
-    "sequence auto delay_step:10",
-    "blast",
-    "state full",
-    "scores",
-
-    "drill_plan grid rows:5 cols:5 spacing:3 depth:14 start:25,25",
-    "charge hole:* explosive:krackle amount:12 stemming:1",
-    "sequence auto delay_step:10",
-    "blast",
-    "state full",
-    "scores",
-
-    "tick 10",
-    "event choose 0",
-    "tick 10",
-    "event choose 0",
-    "tick 10",
-    "event choose 0",
-    "scores",
-
-    "drill_plan grid rows:6 cols:5 spacing:3 depth:16 start:15,15",
-    "charge hole:* explosive:obliviax amount:10 stemming:1",
-    "sequence auto delay_step:10",
-    "blast",
-    "state full",
-    "scores",
-
-    "tick 10",
-    "event choose 0",
-    "tick 10",
-    "event choose 0",
-    "tick 10",
-    "event choose 0",
-    "tick 10",
-    "event choose 0",
-    "scores",
-
-    "drill_plan grid rows:6 cols:6 spacing:3 depth:16 start:20,20",
-    "charge hole:* explosive:krackle amount:15 stemming:1",
-    "sequence auto delay_step:10",
-    "blast",
-    "state full",
-    "scores",
-
-    "tick 10",
-    "event choose 0",
-    "tick 10",
-    "event choose 0",
-    "tick 10",
-    "event choose 0",
-    "tick 10",
-    "event choose 0",
-    "tick 10",
-    "event choose 0",
-    "tick 10",
-    "event choose 0",
-    "scores",
-
-    "tick 10",
-    "event choose 0",
-    "tick 10",
-    "event choose 0",
-    "tick 10",
-    "event choose 0",
-    "tick 10",
-    "event choose 0",
-    "tick 10",
-    "event choose 0",
-    "tick 10",
-    "event choose 0",
-    "scores",
-    "finances",
-    "stats",
-    "campaign status"
+    {
+      "command": "new_game seed:3666",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:3666"
+        }
+      ]
+    },
+    {
+      "command": "campaign start level:treranium_depths",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign start level:treranium_depths"
+        }
+      ]
+    },
+    {
+      "command": "time resume",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time resume"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:driller"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:driller"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:driller"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:blaster"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:blaster"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:blaster"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:driver"
+        }
+      ]
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "tick 5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 5"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 5"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "drill_plan grid rows:5 cols:4 spacing:3 depth:12 start:10,10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:5 cols:4 spacing:3 depth:12 start:10,10"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:* explosive:krackle amount:10 stemming:1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:krackle amount:10 stemming:1"
+        }
+      ]
+    },
+    {
+      "command": "sequence auto delay_step:10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sequence auto delay_step:10"
+        }
+      ]
+    },
+    {
+      "command": "blast",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "blast"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "drill_plan grid rows:4 cols:5 spacing:3 depth:12 start:25,10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:4 cols:5 spacing:3 depth:12 start:25,10"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:* explosive:krackle amount:10 stemming:1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:krackle amount:10 stemming:1"
+        }
+      ]
+    },
+    {
+      "command": "sequence auto delay_step:10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sequence auto delay_step:10"
+        }
+      ]
+    },
+    {
+      "command": "blast",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "blast"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "tick 8",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 8"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 8",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 8"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 8",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 8"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:14 start:10,25",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:14 start:10,25"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:* explosive:obliviax amount:8 stemming:1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:obliviax amount:8 stemming:1"
+        }
+      ]
+    },
+    {
+      "command": "sequence auto delay_step:10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sequence auto delay_step:10"
+        }
+      ]
+    },
+    {
+      "command": "blast",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "blast"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:14 start:25,25",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:14 start:25,25"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:* explosive:krackle amount:12 stemming:1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:krackle amount:12 stemming:1"
+        }
+      ]
+    },
+    {
+      "command": "sequence auto delay_step:10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sequence auto delay_step:10"
+        }
+      ]
+    },
+    {
+      "command": "blast",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "blast"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "drill_plan grid rows:6 cols:5 spacing:3 depth:16 start:15,15",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:6 cols:5 spacing:3 depth:16 start:15,15"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:* explosive:obliviax amount:10 stemming:1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:obliviax amount:10 stemming:1"
+        }
+      ]
+    },
+    {
+      "command": "sequence auto delay_step:10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sequence auto delay_step:10"
+        }
+      ]
+    },
+    {
+      "command": "blast",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "blast"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "drill_plan grid rows:6 cols:6 spacing:3 depth:16 start:20,20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:6 cols:6 spacing:3 depth:16 start:20,20"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:* explosive:krackle amount:15 stemming:1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:krackle amount:15 stemming:1"
+        }
+      ]
+    },
+    {
+      "command": "sequence auto delay_step:10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sequence auto delay_step:10"
+        }
+      ]
+    },
+    {
+      "command": "blast",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "blast"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "stats",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "stats"
+        }
+      ]
+    },
+    {
+      "command": "campaign status",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign status"
+        }
+      ]
+    }
   ]
 }

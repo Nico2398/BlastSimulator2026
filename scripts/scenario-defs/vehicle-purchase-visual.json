@@ -2,19 +2,104 @@
   "name": "vehicle-purchase-visual",
   "description": "Visual check: purchase vehicle deducts cost from cash, mesh appears in scene, fleet shows idle state",
   "steps": [
-    { "command": "new_game seed:42", "timeout": 10 },
-    "campaign start level:dusty_hollow",
-    "scores",
-    "vehicle buy debris_hauler",
-    "scores",
-    "vehicle list",
-    "vehicle buy drill_rig",
-    "vehicle list",
-    "state full"
+    {
+      "command": "new_game seed:42",
+      "timeout": 10,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ]
+    },
+    {
+      "command": "campaign start level:dusty_hollow",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign start level:dusty_hollow"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "vehicle buy debris_hauler",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle buy debris_hauler"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "vehicle list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle list"
+        }
+      ]
+    },
+    {
+      "command": "vehicle buy drill_rig",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle buy drill_rig"
+        }
+      ]
+    },
+    {
+      "command": "vehicle list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle list"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    }
   ],
   "shots": [
-    { "name": "after-first-purchase", "yaw": 0, "pitch": 45 },
-    { "name": "after-second-purchase", "yaw": 45, "pitch": 30 },
-    { "name": "purchase-closeup", "yaw": 90, "pitch": 15 }
+    {
+      "name": "after-first-purchase",
+      "yaw": 0,
+      "pitch": 45
+    },
+    {
+      "name": "after-second-purchase",
+      "yaw": 45,
+      "pitch": 30
+    },
+    {
+      "name": "purchase-closeup",
+      "yaw": 90,
+      "pitch": 15
+    }
   ]
 }

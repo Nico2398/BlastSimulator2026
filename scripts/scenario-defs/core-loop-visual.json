@@ -2,33 +2,229 @@
   "name": "core-loop-visual",
   "description": "Visual verification of the full core gameplay loop: survey → drill plan → charge → sequence → blast → fragments → contract delivery. Multi-angle screenshots at each phase to confirm smooth transitions and visual feedback.",
   "steps": [
-    { "command": "new_game seed:42 size:24", "timeout": 15 },
-    "campaign start level:dusty_hollow",
-    "time resume",
-    "employee hire role:surveyor",
-    "employee assign_skill 1 geology 3",
-    "survey seismic x:20 z:20",
-    "tick 5",
-    "event choose 0",
-    "survey show",
-    "drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:20,20",
-    "charge hole:* explosive:boomite amount:5 stemming:2",
-    "sequence auto delay_step:25",
-    "sequence show",
-    "blast_preview",
-    { "command": "blast", "timeout": 20, "frames": 6, "interval": 50 },
-    "fragments",
-    "contract list",
-    "contract accept 1",
-    "contract deliver 1 amount:500",
-    "finances",
-    "scores",
-    "state full"
+    {
+      "command": "new_game seed:42 size:24",
+      "timeout": 15,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 size:24"
+        }
+      ]
+    },
+    {
+      "command": "campaign start level:dusty_hollow",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign start level:dusty_hollow"
+        }
+      ]
+    },
+    {
+      "command": "time resume",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time resume"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:surveyor",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:surveyor"
+        }
+      ]
+    },
+    {
+      "command": "employee assign_skill 1 geology 3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 1 geology 3"
+        }
+      ]
+    },
+    {
+      "command": "survey seismic x:20 z:20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "survey seismic x:20 z:20"
+        }
+      ]
+    },
+    {
+      "command": "tick 5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 5"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "survey show",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "survey show"
+        }
+      ]
+    },
+    {
+      "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:20,20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:20,20"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:boomite amount:5 stemming:2"
+        }
+      ]
+    },
+    {
+      "command": "sequence auto delay_step:25",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sequence auto delay_step:25"
+        }
+      ]
+    },
+    {
+      "command": "sequence show",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sequence show"
+        }
+      ]
+    },
+    {
+      "command": "blast_preview",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "blast_preview"
+        }
+      ]
+    },
+    {
+      "command": "blast",
+      "timeout": 20,
+      "frames": 6,
+      "interval": 50,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "blast"
+        }
+      ]
+    },
+    {
+      "command": "fragments",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "fragments"
+        }
+      ]
+    },
+    {
+      "command": "contract list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract list"
+        }
+      ]
+    },
+    {
+      "command": "contract accept 1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract accept 1"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver 1 amount:500",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract deliver 1 amount:500"
+        }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    }
   ],
   "shots": [
-    { "name": "overview", "yaw": 0, "pitch": 45 },
-    { "name": "ground-level", "yaw": 90, "pitch": 10 },
-    { "name": "drill-holes", "yaw": 45, "pitch": 30 },
-    { "name": "birdseye", "yaw": 0, "pitch": 80 }
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45
+    },
+    {
+      "name": "ground-level",
+      "yaw": 90,
+      "pitch": 10
+    },
+    {
+      "name": "drill-holes",
+      "yaw": 45,
+      "pitch": 30
+    },
+    {
+      "name": "birdseye",
+      "yaw": 0,
+      "pitch": 80
+    }
   ]
 }

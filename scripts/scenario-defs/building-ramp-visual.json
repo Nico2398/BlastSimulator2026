@@ -2,17 +2,82 @@
   "name": "building-ramp-visual",
   "description": "Visual check of ramp construction with different directions and depths for multi-level access",
   "steps": [
-    { "command": "new_game seed:42", "timeout": 30 },
-    "build_ramp origin:5,15 direction:south length:10 depth:8",
-    "build_ramp origin:20,15 direction:east length:8 depth:6",
-    "inspect 5,20,0",
-    "inspect 20,15,0",
-    "state full"
+    {
+      "command": "new_game seed:42",
+      "timeout": 30,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ]
+    },
+    {
+      "command": "build_ramp origin:5,15 direction:south length:10 depth:8",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build_ramp origin:5,15 direction:south length:10 depth:8"
+        }
+      ]
+    },
+    {
+      "command": "build_ramp origin:20,15 direction:east length:8 depth:6",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build_ramp origin:20,15 direction:east length:8 depth:6"
+        }
+      ]
+    },
+    {
+      "command": "inspect 5,20,0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "inspect 5,20,0"
+        }
+      ]
+    },
+    {
+      "command": "inspect 20,15,0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "inspect 20,15,0"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    }
   ],
   "shots": [
-    { "name": "overview", "yaw": 0, "pitch": 45 },
-    { "name": "ramp-closeup", "yaw": 90, "pitch": 10 },
-    { "name": "birdseye", "yaw": 0, "pitch": 80 },
-    { "name": "angled", "yaw": 135, "pitch": 30 }
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45
+    },
+    {
+      "name": "ramp-closeup",
+      "yaw": 90,
+      "pitch": 10
+    },
+    {
+      "name": "birdseye",
+      "yaw": 0,
+      "pitch": 80
+    },
+    {
+      "name": "angled",
+      "yaw": 135,
+      "pitch": 30
+    }
   ]
 }

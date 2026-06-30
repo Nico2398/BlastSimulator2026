@@ -456,3 +456,73 @@ describe('Dual-play scenario steps', () => {
     expect(step.interaction.length).toBe(1);
   });
 });
+
+// ──────────────────────────────────────────────
+// 12. Every scenario step has dual-play interaction array
+// ──────────────────────────────────────────────
+
+describe('Every scenario step has a dual-play interaction array', () => {
+  for (const name of ALL_SCENARIO_NAMES) {
+    it(`${name} — every step has an interaction array with at least one action`, () => {
+      const scenario = loadScenario(name);
+      for (let i = 0; i < scenario.steps.length; i++) {
+        const step = scenario.steps[i];
+        // Steps can be strings (backward compat) or objects
+        if (typeof step === 'string') {
+          // Plain string steps are valid (backward compat — no interaction needed)
+          continue;
+        }
+        const stepObj = step as any;
+        // Object steps must have an interaction array
+        expect(
+          stepObj.interaction,
+          `step[${i}] ("${stepObj.command ?? '(no command)'}") must have an interaction array`,
+        ).toBeDefined();
+        expect(
+          Array.isArray(stepObj.interaction),
+          `step[${i}] interaction must be an array`,
+        ).toBe(true);
+        expect(
+          stepObj.interaction.length,
+          `step[${i}] interaction array must have at least one action`,
+        ).toBeGreaterThan(0);
+      }
+    });
+
+    it(`${name} — interaction actions have valid types from known types`, () => {
+      const scenario = loadScenario(name);
+      for (let i = 0; i < scenario.steps.length; i++) {
+        const step = scenario.steps[i];
+        if (typeof step === 'string') continue;
+        const stepObj = step as any;
+        if (!stepObj.interaction) continue;
+        for (const action of stepObj.interaction) {
+          expect(
+            KNOWN_INTERACTION_ACTION_TYPES,
+            `step[${i}] interaction action type "${action.type}" should be a known type`,
+          ).toContain(action.type);
+        }
+      }
+    });
+
+    it(`${name} — command actions within interaction arrays have a command field`, () => {
+      const scenario = loadScenario(name);
+      for (let i = 0; i < scenario.steps.length; i++) {
+        const step = scenario.steps[i];
+        if (typeof step === 'string') continue;
+        const stepObj = step as any;
+        if (!stepObj.interaction) continue;
+        for (const action of stepObj.interaction) {
+          if (action.type === 'command') {
+            expect(
+              action.command,
+              `step[${i}] command action must have a command field`,
+            ).toBeDefined();
+            expect(typeof action.command).toBe('string');
+            expect(action.command.length).toBeGreaterThan(0);
+          }
+        }
+      }
+    });
+  }
+});
