@@ -114,118 +114,13 @@ jobs:
           path: dist/
 
   # Runs every scenario in both command and interaction modes to verify dual-play parity.
+  # All scenarios are run sequentially in a single job to avoid the overhead of 198 parallel jobs.
   scenario-dual-play:
-    name: "Scenario dual-play: ${{ matrix.scenario }} (${{ matrix.mode }})"
+    name: "Scenario dual-play (command + interaction)"
     runs-on: ubuntu-latest
     needs:
       - typecheck
       - test
-    strategy:
-      fail-fast: false
-      matrix:
-        scenario:
-          - blast-basic
-          - blast-charge-loading-ui
-          - blast-charge-sequence-visual
-          - blast-detonation-sequence-ui
-          - blast-drill-plan-ui
-          - blast-drill-plan-visual
-          - blast-execution-effects
-          - blast-execution-visual
-          - blast-overcharge
-          - blast-preview-software-tiers
-          - blast-preview-tiers-visual
-          - blast-report-metrics
-          - blast-report-visual
-          - blast-undercharge
-          - blast-visual-full
-          - blast-voxel-fragmentation
-          - blast-voxel-fragmentation-visual
-          - building-destruction-visual
-          - building-lifecycle
-          - building-living-visual
-          - building-menu-visual
-          - building-placement-visual
-          - building-ramp-visual
-          - building-research-visual
-          - building-tier-system-visual
-          - building-training-visual
-          - building-vehicle-depot-visual
-          - building-warehouse-visual
-          - collapse-recovery
-          - contract-negotiation
-          - contract-panel-visual
-          - core-loop-visual
-          - economy-display-visual
-          - employee-skills-visual
-          - employee-training
-          - event-dialog-visual
-          - i18n-display-visual
-          - level1-lose-arrest
-          - level1-lose-bankruptcy
-          - level1-lose-ecology
-          - level1-lose-revolt
-          - level1-playthrough-revolt
-          - level1-playthrough-win
-          - level1-win-conservative
-          - level1-win-efficient
-          - level2-playthrough-bankruptcy
-          - level2-playthrough-win
-          - level3-playthrough-ecology
-          - level3-playthrough-win
-          - main-menu-visual
-          - multi-deck-blast
-          - nav-cell-types-visual
-          - nav-dynamic-updates-visual
-          - nav-minimap-integration-visual
-          - nav-move-costs-visual
-          - nav-path-following-visual
-          - nav-pathfinding-visual
-          - nav-ramp-routing-visual
-          - needs-collapse-visual
-          - needs-cost-visual
-          - needs-cycle
-          - needs-drain-visual
-          - needs-gauges-visual
-          - needs-morale-visual
-          - needs-proactive-queue-visual
-          - needs-replenishment-visual
-          - needs-shift-cycle-visual
-          - presplit-wall
-          - ramp-navigation
-          - safety-projection-visual
-          - save-load-visual
-          - scores-display-visual
-          - skill-progression
-          - survey-confidence-display
-          - survey-confidence-overlay
-          - survey-execution
-          - survey-method-selection
-          - survey-ore-vein-visibility
-          - survey-overlay-lifecycle
-          - survey-post-blast-ore-report
-          - survey-result-visualization
-          - survey-seismic-side-effects
-          - survey-stale-handling
-          - survey-then-blast
-          - survey-then-blast-playthrough
-          - time-management-visual
-          - tutorial-playthrough
-          - tutorial-steps-visual
-          - vehicle-3d-rendering-visual
-          - vehicle-driver-assignment-visual
-          - vehicle-purchase-tier-ui-visual
-          - vehicle-purchase-visual
-          - vehicle-roles-panel-visual
-          - vehicle-task-states-visual
-          - vehicle-traffic
-          - vehicle-traffic-routing-visual
-          - vibration-budget
-          - weather-display-visual
-          - weather-flood
-        mode:
-          - command
-          - interaction
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -258,8 +153,32 @@ jobs:
           sleep 5
           curl -s http://localhost:5173 > /dev/null || (echo "Dev server failed to start" && exit 1)
 
-      - name: Run scenario test (${{ matrix.mode }} mode)
-        run: npx tsx scripts/scenario-test.ts --scenario ${{ matrix.scenario }} --mode ${{ matrix.mode }}
+      - name: Run all scenarios in both modes
+        run: |
+          FAILED=0
+          SCENARIOS=$(ls scripts/scenario-defs/*.json | xargs -I{} basename {} .json | sort)
+          TOTAL=$(echo "$SCENARIOS" | wc -l)
+          INDEX=0
+          for SCENARIO in $SCENARIOS; do
+            INDEX=$((INDEX + 1))
+            for MODE in command interaction; do
+              echo ""
+              echo "========================================"
+              echo "[$INDEX/$TOTAL] Running: $SCENARIO ($MODE)"
+              echo "========================================"
+              if ! npx tsx scripts/scenario-test.ts --scenario "$SCENARIO" --mode "$MODE"; then
+                echo "FAILED: $SCENARIO ($MODE)"
+                FAILED=1
+              fi
+            done
+          done
+          echo ""
+          echo "========================================"
+          if [ "$FAILED" -ne 0 ]; then
+            echo "Some scenarios failed. Check logs above."
+            exit 1
+          fi
+          echo "All scenarios passed in both modes."
 
       - name: Stop dev server
         if: always()
