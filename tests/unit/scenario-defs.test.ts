@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, existsSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import type { ScenarioDef } from '../../scripts/shared/scenario-types.js';
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const SCENARIO_DIR = resolve(currentDir, '../../scripts/scenario-defs');
@@ -24,6 +25,7 @@ const PLAYTHROUGH_SCENARIO_NAMES = [
   'level2-playthrough-bankruptcy',
   'level3-playthrough-win',
   'level3-playthrough-ecology',
+  'survey-then-blast-playthrough',
 ] as const;
 
 const FEATURE_SCENARIO_NAMES = [
@@ -42,6 +44,21 @@ const FEATURE_SCENARIO_NAMES = [
   'collapse-recovery',
   'contract-negotiation',
   'weather-flood',
+  'blast-basic',
+  'blast-charge-loading-ui',
+  'blast-detonation-sequence-ui',
+  'blast-drill-plan-ui',
+  'blast-execution-effects',
+  'blast-preview-software-tiers',
+  'blast-report-metrics',
+  'blast-voxel-fragmentation',
+  'employee-skills-visual',
+  'level1-lose-arrest',
+  'level1-lose-bankruptcy',
+  'level1-lose-ecology',
+  'level1-lose-revolt',
+  'level1-win-conservative',
+  'level1-win-efficient',
 ] as const;
 
 const VISUAL_SCENARIO_NAMES = [
@@ -96,6 +113,16 @@ const VISUAL_SCENARIO_NAMES = [
   'vehicle-roles-panel-visual',
   'vehicle-task-states-visual',
   'vehicle-traffic-routing-visual',
+  'survey-confidence-display',
+  'survey-confidence-overlay',
+  'survey-execution',
+  'survey-method-selection',
+  'survey-ore-vein-visibility',
+  'survey-overlay-lifecycle',
+  'survey-post-blast-ore-report',
+  'survey-result-visualization',
+  'survey-seismic-side-effects',
+  'survey-stale-handling',
 ] as const;
 
 const ALL_SCENARIO_NAMES = [
@@ -124,13 +151,6 @@ interface ScenarioStepDef {
   description?: string;
   frames?: number;
   interval?: number;
-}
-
-interface ScenarioDef {
-  name: string;
-  description: string;
-  steps: Array<string | ScenarioStepDef>;
-  shots?: Array<{ name: string; yaw: number; pitch: number }>;
 }
 
 function loadScenario(name: string): ScenarioDef {
@@ -467,11 +487,11 @@ describe('Every scenario step has a dual-play interaction array', () => {
       const scenario = loadScenario(name);
       for (let i = 0; i < scenario.steps.length; i++) {
         const step = scenario.steps[i];
-        // Steps can be strings (backward compat) or objects
-        if (typeof step === 'string') {
-          // Plain string steps are valid (backward compat — no interaction needed)
-          continue;
-        }
+        // All steps must be objects with interaction arrays — plain strings are not allowed
+        expect(
+          typeof step !== 'string',
+          `step[${i}] is a plain string "${step}". All steps must be objects with a dual-play interaction array.`,
+        ).toBe(true);
         const stepObj = step as any;
         // Object steps must have an interaction array
         expect(
@@ -493,7 +513,9 @@ describe('Every scenario step has a dual-play interaction array', () => {
       const scenario = loadScenario(name);
       for (let i = 0; i < scenario.steps.length; i++) {
         const step = scenario.steps[i];
-        if (typeof step === 'string') continue;
+        if (typeof step === 'string') {
+          throw new Error(`step[${i}] is a plain string — all steps must be objects with interaction arrays`);
+        }
         const stepObj = step as any;
         if (!stepObj.interaction) continue;
         for (const action of stepObj.interaction) {
@@ -509,7 +531,9 @@ describe('Every scenario step has a dual-play interaction array', () => {
       const scenario = loadScenario(name);
       for (let i = 0; i < scenario.steps.length; i++) {
         const step = scenario.steps[i];
-        if (typeof step === 'string') continue;
+        if (typeof step === 'string') {
+          throw new Error(`step[${i}] is a plain string — all steps must be objects with interaction arrays`);
+        }
         const stepObj = step as any;
         if (!stepObj.interaction) continue;
         for (const action of stepObj.interaction) {

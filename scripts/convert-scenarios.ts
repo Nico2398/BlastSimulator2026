@@ -17,28 +17,9 @@
 
 import { readFileSync, writeFileSync, readdirSync } from 'fs';
 import { resolve } from 'path';
+import type { ScenarioStepDef, ScenarioDef } from './shared/scenario-types.js';
 
 const SCENARIO_DIR = resolve(process.cwd(), 'scripts/scenario-defs');
-
-interface ScenarioStep {
-  command: string;
-  timeout?: number;
-  description?: string;
-  frames?: number;
-  interval?: number;
-  interaction?: InteractionStepAction[];
-}
-
-type InteractionStepAction =
-  | { type: 'command'; command: string }
-  | { type: 'wait'; durationMs: number };
-
-interface ScenarioDef {
-  name: string;
-  description: string;
-  steps: Array<string | ScenarioStep>;
-  shots?: Array<{ name: string; yaw: number; pitch: number }>;
-}
 
 /**
  * Converts a single step to dual-play format.
@@ -46,7 +27,7 @@ interface ScenarioDef {
  * - Object with command only → add interaction array
  * - Object already with interaction → skip (already converted)
  */
-function convertStep(step: string | ScenarioStep): ScenarioStep {
+function convertStep(step: string | ScenarioStepDef): ScenarioStepDef {
   // Plain string step
   if (typeof step === 'string') {
     return {
@@ -80,7 +61,7 @@ function convertScenario(scenario: ScenarioDef): ScenarioDef {
 /**
  * Checks if a step is already in dual-play format (has interaction array).
  */
-function isAlreadyConverted(step: string | ScenarioStep): boolean {
+function isAlreadyConverted(step: string | ScenarioStepDef): boolean {
   if (typeof step === 'string') return false;
   return Array.isArray(step.interaction) && step.interaction.length > 0;
 }
