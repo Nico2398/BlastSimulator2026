@@ -43,6 +43,7 @@ import puppeteer from 'puppeteer';
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'fs';
 import { resolve } from 'path';
 import { resolveChromePath, LAUNCH_ARGS } from './shared/chrome.js';
+import { executeActionOnPage } from './shared/interaction-executor.js';
 
 // ── Constants ──
 
@@ -345,181 +346,83 @@ export async function replayEvent(
   page: puppeteer.Page,
   event: InteractionRecordEvent,
 ): Promise<void> {
-  const eventType = event.type;
+  // For assert events, use the extended logic with eval, gameStatePath, uiStatePath
+  if (event.type === 'assert') {
+    const assertEvent = event as AssertEvent;
+    console.log(`  Assert: selector=${assertEvent.selector}, eval=${assertEvent.eval}`);
 
-  switch (eventType) {
-    case 'click': {
-      const clickEvent = event as ClickEvent;
-      const btn = BUTTON_MAP[clickEvent.button] ?? 'left';
-      await page.mouse.click(clickEvent.x, clickEvent.y, { button: btn });
-      break;
-    }
-    case 'mousedown': {
-      const mouseDownEvent = event as ClickEvent;
-      const btn = BUTTON_MAP[mouseDownEvent.button] ?? 'left';
-      await page.mouse.down({ button: btn });
-      break;
-    }
-    case 'mouseup': {
-      const mouseUpEvent = event as ClickEvent;
-      const btn = BUTTON_MAP[mouseUpEvent.button] ?? 'left';
-      await page.mouse.up({ button: btn });
-      break;
-    }
-    case 'mousemove': {
-      const moveEvent = event as MouseMoveEvent;
-      await page.mouse.move(moveEvent.x, moveEvent.y);
-      break;
-    }
-    case 'keypress': {
-      const keyPressEvent = event as KeyEvent;
-      await page.keyboard.press(keyPressEvent.key);
-      break;
-    }
-    case 'keydown': {
-      const keyDownEvent = event as KeyEvent;
-      await page.keyboard.down(keyDownEvent.key);
-      break;
-    }
-    case 'keyup': {
-      const keyUpEvent = event as KeyEvent;
-      await page.keyboard.up(keyUpEvent.key);
-      break;
-    }
-    case 'scroll': {
-      const scrollEvent = event as ScrollEvent;
-      await page.evaluate(
-        (x: number, y: number) => window.scrollTo(x, y),
-        scrollEvent.x,
-        scrollEvent.y,
-      );
-      break;
-    }
-    case 'wheel': {
-      const wheelEvent = event as WheelEvent;
-      await page.evaluate(
-        (evt: { x: number; y: number; deltaX: number; deltaY: number; deltaZ: number }) => {
-          const wheelEvt = new WheelEvent('wheel', {
-            clientX: evt.x,
-            clientY: evt.y,
-            deltaX: evt.deltaX,
-            deltaY: evt.deltaY,
-            deltaZ: evt.deltaZ,
-            bubbles: true,
-            cancelable: true,
-          });
-          document.dispatchEvent(wheelEvt);
-        },
-        {
-          x: wheelEvent.x,
-          y: wheelEvent.y,
-          deltaX: wheelEvent.deltaX,
-          deltaY: wheelEvent.deltaY,
-          deltaZ: wheelEvent.deltaZ,
-        },
-      );
-      break;
-    }
-    case 'wait': {
-      const waitEvent = event as WaitEvent;
-      const durationMs = waitEvent.durationMs ?? 0;
-      await new Promise((r) => setTimeout(r, durationMs));
-      break;
-    }
-    case 'assert': {
-      const assertEvent = event as AssertEvent;
-      console.log(`  Assert: selector=${assertEvent.selector}, eval=${assertEvent.eval}`);
-
-      if (assertEvent.eval) {
-        // Validate eval string length to prevent abuse
-        if (assertEvent.eval.length > 200) {
-          console.warn(`  Warning: Assert eval string is unusually long (${assertEvent.eval.length} chars). This may be a security concern.`);
-        }
-
-        try {
-          const result = await page.evaluate((expr: string) => {
-            try {
-              // eslint-disable-next-line no-eval
-              return eval(expr);
-            } catch {
-              return { __error: `Eval failed: ${expr}` };
-            }
-          }, assertEvent.eval);
-          console.log(`  Assert eval result:`, result);
-
-          if (assertEvent.expectedValue !== undefined) {
-            const expected = assertEvent.expectedValue;
-            const passed = JSON.stringify(result) === JSON.stringify(expected);
-            if (!passed) {
-              console.warn(`  Assert FAILED: expected ${JSON.stringify(expected)}, got ${JSON.stringify(result)}`);
-            }
-          }
-        } catch (err: unknown) {
-          console.warn(`  Assert eval error:`, err);
-        }
+    if (assertEvent.eval) {
+      // Validate eval string length to prevent abuse
+      if (assertEvent.eval.length > 200) {
+        console.warn(`  Warning: Assert eval string is unusually long (${assertEvent.eval.length} chars). This may be a security concern.`);
       }
 
-      if (assertEvent.gameStatePath) {
-        const stateVal = await page.evaluate((path: string) => {
-          const state = typeof (window as any).__gameState === 'function'
-            ? (window as any).__gameState()
-            : null;
-          if (!state) return null;
-          return path.split('.').reduce((obj: any, key: string) => obj?.[key], state);
-        }, assertEvent.gameStatePath);
-        console.log(`  Game state [${assertEvent.gameStatePath}]:`, stateVal);
+      try {
+        const result = await page.evaluate((expr: string) => {
+          try {
+            // eslint-disable-next-line no-eval
+            return eval(expr);
+          } catch {
+            return { __error: `Eval failed: ${expr}` };
+          }
+        }, assertEvent.eval);
+        console.log(`  Assert eval result:`, result);
 
         if (assertEvent.expectedValue !== undefined) {
-          const passed = JSON.stringify(stateVal) === JSON.stringify(assertEvent.expectedValue);
+          const expected = assertEvent.expectedValue;
+          const passed = JSON.stringify(result) === JSON.stringify(expected);
           if (!passed) {
-            console.warn(`  Assert FAILED: expected ${JSON.stringify(assertEvent.expectedValue)}, got ${JSON.stringify(stateVal)}`);
+            console.warn(`  Assert FAILED: expected ${JSON.stringify(expected)}, got ${JSON.stringify(result)}`);
           }
         }
+      } catch (err: unknown) {
+        console.warn(`  Assert eval error:`, err);
       }
+    }
 
-      if (assertEvent.uiStatePath) {
-        const stateVal = await page.evaluate((path: string) => {
-          const uiState = typeof (window as any).__uiState === 'function'
-            ? (window as any).__uiState()
-            : null;
-          if (!uiState) return null;
-          return path.split('.').reduce((obj: any, key: string) => obj?.[key], uiState);
-        }, assertEvent.uiStatePath);
-        console.log(`  UI state [${assertEvent.uiStatePath}]:`, stateVal);
+    if (assertEvent.gameStatePath) {
+      const stateVal = await page.evaluate((path: string) => {
+        const state = typeof (window as any).__gameState === 'function'
+          ? (window as any).__gameState()
+          : null;
+        if (!state) return null;
+        return path.split('.').reduce((obj: any, key: string) => obj?.[key], state);
+      }, assertEvent.gameStatePath);
+      console.log(`  Game state [${assertEvent.gameStatePath}]:`, stateVal);
 
-        if (assertEvent.expectedValue !== undefined) {
-          const passed = JSON.stringify(stateVal) === JSON.stringify(assertEvent.expectedValue);
-          if (!passed) {
-            console.warn(`  Assert FAILED: expected ${JSON.stringify(assertEvent.expectedValue)}, got ${JSON.stringify(stateVal)}`);
-          }
+      if (assertEvent.expectedValue !== undefined) {
+        const passed = JSON.stringify(stateVal) === JSON.stringify(assertEvent.expectedValue);
+        if (!passed) {
+          console.warn(`  Assert FAILED: expected ${JSON.stringify(assertEvent.expectedValue)}, got ${JSON.stringify(stateVal)}`);
         }
       }
-      break;
     }
-    case 'viewport': {
-      const viewportEvent = event as ViewportEvent;
-      await page.setViewport({
-        width: viewportEvent.width,
-        height: viewportEvent.height,
-      });
-      break;
+
+    if (assertEvent.uiStatePath) {
+      const stateVal = await page.evaluate((path: string) => {
+        const uiState = typeof (window as any).__uiState === 'function'
+          ? (window as any).__uiState()
+          : null;
+        if (!uiState) return null;
+        return path.split('.').reduce((obj: any, key: string) => obj?.[key], uiState);
+      }, assertEvent.uiStatePath);
+      console.log(`  UI state [${assertEvent.uiStatePath}]:`, stateVal);
+
+      if (assertEvent.expectedValue !== undefined) {
+        const passed = JSON.stringify(stateVal) === JSON.stringify(assertEvent.expectedValue);
+        if (!passed) {
+          console.warn(`  Assert FAILED: expected ${JSON.stringify(assertEvent.expectedValue)}, got ${JSON.stringify(stateVal)}`);
+        }
+      }
     }
-    case 'type': {
-      const typeEvent = event as TypeEvent;
-      await page.type(typeEvent.selector, typeEvent.text, { delay: typeEvent.delay });
-      break;
-    }
-    case 'waitForSelector': {
-      const waitForSelectorEvent = event as WaitForSelectorEvent;
-      await page.waitForSelector(waitForSelectorEvent.selector, {
-        timeout: waitForSelectorEvent.timeout ?? 10000,
-      });
-      break;
-    }
-    default:
-      console.warn(`Unknown event type: ${event.type}`);
-      break;
+
+    // Also run the basic assert check from the shared helper
+    await executeActionOnPage(page, event as any);
+    return;
   }
+
+  // For all other event types, use the shared helper
+  await executeActionOnPage(page, event as any);
 }
 
 /**

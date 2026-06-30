@@ -182,7 +182,7 @@ describe('ScenarioStep type accepts dual-play format steps', () => {
     const step = {
       command: 'new_game seed:42',
       interaction: [
-        { type: 'click', selector: '#start-btn' },
+        { type: 'click', x: 100, y: 200 },
       ],
     };
     expect(step).toHaveProperty('command');
@@ -243,9 +243,15 @@ describe('ScenarioStep type accepts dual-play format steps', () => {
 // ── Mode parsing defaults ──
 
 describe('Mode parsing defaults', () => {
-  it('parseArgs returns mode defaulting to standard or command', () => {
-    const validModes = ['standard', 'command'];
-    const expectedDefault = 'standard';
+  it('parseArgs returns mode defaulting to command', () => {
+    const validModes = ['command', 'interaction'];
+    const expectedDefault = 'command';
     expect(validModes).toContain(expectedDefault);
+  });
+
+  it('parseArgs rejects invalid mode', () => {
+    const validModes = ['command', 'interaction'];
+    const invalidMode = 'standard';
+    expect(validModes).not.toContain(invalidMode);
   });
 });

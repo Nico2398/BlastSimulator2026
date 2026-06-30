@@ -120,6 +120,11 @@ export interface WaitForSelectorEvent extends InteractionEventBase {
   timeout?: number;
 }
 
+export interface CommandAction {
+  type: 'command';
+  command: string;
+}
+
 // ── Union of All Event Types ──
 
 export type InteractionRecordEvent =

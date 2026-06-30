@@ -354,18 +354,17 @@ describe('Dual-play scenario steps', () => {
     }
   });
 
-  it('click action requires selector or (x and y)', () => {
-    const withSelector = { type: 'click', selector: '#btn' };
+  it('click action requires x and y coordinates', () => {
     const withXY = { type: 'click', x: 100, y: 200 };
-    const invalid = { type: 'click' };
+    const withButton = { type: 'click', x: 100, y: 200, button: 'right' };
+    const missingX = { type: 'click', y: 200 };
+    const missingY = { type: 'click', x: 100 };
 
-    expect(withSelector.selector).toBeDefined();
-    expect(typeof (withSelector as any).x).toBe('undefined');
     expect(withXY).toHaveProperty('x');
     expect(withXY).toHaveProperty('y');
-    expect((invalid as any).selector).toBeUndefined();
-    expect((invalid as any).x).toBeUndefined();
-    expect((invalid as any).y).toBeUndefined();
+    expect(withButton).toHaveProperty('button', 'right');
+    expect((missingX as any).x).toBeUndefined();
+    expect((missingY as any).y).toBeUndefined();
   });
 
   it('type action requires selector and text', () => {

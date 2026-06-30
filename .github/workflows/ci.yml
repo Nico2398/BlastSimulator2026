@@ -112,3 +112,53 @@ jobs:
         with:
           name: build-artifacts
           path: dist/
+
+  # TODO: Extend this to run ALL scenario tests with both modes in a future PR.
+  # For now, we only test blast-basic to validate the dual-play infrastructure.
+  scenario-dual-play:
+    name: Scenario dual-play test (blast-basic)
+    runs-on: ubuntu-latest
+    needs:
+      - typecheck
+      - test
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Cache npm dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Puppeteer Chrome
+        run: npx puppeteer browsers install chrome
+
+      - name: Build project
+        run: npm run build
+
+      - name: Start dev server
+        run: |
+          npx vite --port 5173 &
+          sleep 5
+          curl -s http://localhost:5173 > /dev/null || (echo "Dev server failed to start" && exit 1)
+
+      - name: Run scenario test (command mode)
+        run: npx tsx scripts/scenario-test.ts --scenario blast-basic --mode command
+
+      - name: Run scenario test (interaction mode)
+        run: npx tsx scripts/scenario-test.ts --scenario blast-basic --mode interaction
+
+      - name: Stop dev server
+        if: always()
+        run: kill $(lsof -t -i:5173) 2>/dev/null || true

@@ -46,6 +46,7 @@ import puppeteer from 'puppeteer';
 import { mkdirSync, writeFileSync, readFileSync, existsSync, statSync } from 'fs';
 import { resolve } from 'path';
 import { resolveChromePath } from './shared/chrome.js';
+import { executeActionOnPage } from './shared/interaction-executor.js';
 
 const VIEWPORT = { width: 1280, height: 720 };
 const INIT_WAIT_MS = 3000;
@@ -118,70 +119,7 @@ export async function executeInteractionStep(
   const execute = async () => {
     for (const action of actions) {
       try {
-        switch (action.type) {
-          case 'click': {
-            const btn = action.button ?? 'left';
-            await page.mouse.click(action.x, action.y, { button: btn });
-            break;
-          }
-          case 'mousedown': {
-            const btn = action.button ?? 'left';
-            await page.mouse.down({ button: btn });
-            break;
-          }
-          case 'mouseup': {
-            const btn = action.button ?? 'left';
-            await page.mouse.up({ button: btn });
-            break;
-          }
-          case 'mousemove':
-            await page.mouse.move(action.x, action.y);
-            break;
-          case 'keypress':
-            await page.keyboard.press(action.key);
-            break;
-          case 'keydown':
-            await page.keyboard.down(action.key);
-            break;
-          case 'keyup':
-            await page.keyboard.up(action.key);
-            break;
-          case 'scroll':
-            await page.evaluate(
-              ({ x, y }: { x: number; y: number }) => window.scrollTo(x, y),
-              { x: action.x, y: action.y },
-            );
-            break;
-          case 'wheel':
-            await page.mouse.wheel({ deltaX: action.deltaX, deltaY: action.deltaY });
-            break;
-          case 'wait':
-            await new Promise((r) => setTimeout(r, action.durationMs));
-            break;
-          case 'waitForSelector':
-            await page.waitForSelector(action.selector, { timeout: action.timeout ?? 10000 });
-            break;
-          case 'type':
-            await page.type(action.selector, action.text, { delay: action.delay });
-            break;
-          case 'assert':
-            console.log(`  Assert: selector=${action.selector}, property=${action.property}, expected=${action.expectedValue}`);
-            break;
-          case 'viewport':
-            await page.setViewport({ width: action.width, height: action.height });
-            break;
-          case 'command':
-            await page.evaluate((cmd: string) => {
-              if (typeof (window as any).__gameConsole === 'function') {
-                return (window as any).__gameConsole(cmd);
-              }
-              return undefined;
-            }, action.command);
-            break;
-          default:
-            console.warn(`  Unknown interaction action type: ${(action as any).type}`);
-            break;
-        }
+        await executeActionOnPage(page, action as any);
       } catch (err: any) {
         console.error(`  Interaction action error (${action.type}): ${err.message ?? String(err)}`);
       }
@@ -271,7 +209,12 @@ function parseArgs(): {
       }
       i++;
     } else if (args[i] === '--mode' && args[i + 1]) {
-      mode = args[i + 1];
+      const modeArg = args[i + 1];
+      if (modeArg !== 'command' && modeArg !== 'interaction') {
+        console.error(`Invalid mode: "${modeArg}". Supported modes: command, interaction`);
+        process.exit(1);
+      }
+      mode = modeArg;
       i++;
     }
   }
