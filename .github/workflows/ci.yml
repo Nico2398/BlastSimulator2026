@@ -126,17 +126,41 @@ jobs:
         scenario:
           - blast-basic
           - blast-charge-loading-ui
+          - blast-charge-sequence-visual
           - blast-detonation-sequence-ui
           - blast-drill-plan-ui
+          - blast-drill-plan-visual
           - blast-execution-effects
+          - blast-execution-visual
+          - blast-overcharge
           - blast-preview-software-tiers
+          - blast-preview-tiers-visual
           - blast-report-metrics
+          - blast-report-visual
+          - blast-undercharge
+          - blast-visual-full
           - blast-voxel-fragmentation
+          - blast-voxel-fragmentation-visual
+          - building-destruction-visual
           - building-lifecycle
+          - building-living-visual
+          - building-menu-visual
+          - building-placement-visual
+          - building-ramp-visual
+          - building-research-visual
+          - building-tier-system-visual
+          - building-training-visual
+          - building-vehicle-depot-visual
+          - building-warehouse-visual
           - collapse-recovery
           - contract-negotiation
+          - contract-panel-visual
+          - core-loop-visual
+          - economy-display-visual
           - employee-skills-visual
           - employee-training
+          - event-dialog-visual
+          - i18n-display-visual
           - level1-lose-arrest
           - level1-lose-bankruptcy
           - level1-lose-ecology
@@ -149,10 +173,29 @@ jobs:
           - level2-playthrough-win
           - level3-playthrough-ecology
           - level3-playthrough-win
+          - main-menu-visual
           - multi-deck-blast
+          - nav-cell-types-visual
+          - nav-dynamic-updates-visual
+          - nav-minimap-integration-visual
+          - nav-move-costs-visual
+          - nav-path-following-visual
+          - nav-pathfinding-visual
+          - nav-ramp-routing-visual
+          - needs-collapse-visual
+          - needs-cost-visual
           - needs-cycle
+          - needs-drain-visual
+          - needs-gauges-visual
+          - needs-morale-visual
+          - needs-proactive-queue-visual
+          - needs-replenishment-visual
+          - needs-shift-cycle-visual
           - presplit-wall
           - ramp-navigation
+          - safety-projection-visual
+          - save-load-visual
+          - scores-display-visual
           - skill-progression
           - survey-confidence-display
           - survey-confidence-overlay
@@ -166,9 +209,19 @@ jobs:
           - survey-stale-handling
           - survey-then-blast
           - survey-then-blast-playthrough
+          - time-management-visual
           - tutorial-playthrough
+          - tutorial-steps-visual
+          - vehicle-3d-rendering-visual
+          - vehicle-driver-assignment-visual
+          - vehicle-purchase-tier-ui-visual
+          - vehicle-purchase-visual
+          - vehicle-roles-panel-visual
+          - vehicle-task-states-visual
           - vehicle-traffic
+          - vehicle-traffic-routing-visual
           - vibration-budget
+          - weather-display-visual
           - weather-flood
         mode:
           - command

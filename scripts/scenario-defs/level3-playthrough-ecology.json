@@ -135,7 +135,8 @@
           "type": "command",
           "command": "tick 5"
         }
-      ]
+      ],
+      "timeout": 90
     },
     {
       "command": "event choose 0",
@@ -153,7 +154,8 @@
           "type": "command",
           "command": "tick 5"
         }
-      ]
+      ],
+      "timeout": 90
     },
     {
       "command": "event choose 0",
@@ -288,7 +290,8 @@
           "type": "command",
           "command": "tick 8"
         }
-      ]
+      ],
+      "timeout": 90
     },
     {
       "command": "event choose 0",
@@ -306,7 +309,8 @@
           "type": "command",
           "command": "tick 8"
         }
-      ]
+      ],
+      "timeout": 90
     },
     {
       "command": "event choose 0",
@@ -324,7 +328,8 @@
           "type": "command",
           "command": "tick 8"
         }
-      ]
+      ],
+      "timeout": 90
     },
     {
       "command": "event choose 0",
@@ -459,7 +464,8 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "timeout": 90
     },
     {
       "command": "event choose 0",
@@ -477,7 +483,8 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "timeout": 90
     },
     {
       "command": "event choose 0",
@@ -495,7 +502,8 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "timeout": 90
     },
     {
       "command": "event choose 0",
@@ -576,7 +584,8 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "timeout": 90
     },
     {
       "command": "event choose 0",
@@ -594,7 +603,8 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "timeout": 90
     },
     {
       "command": "event choose 0",
@@ -612,7 +622,8 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "timeout": 90
     },
     {
       "command": "event choose 0",
@@ -630,7 +641,8 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "timeout": 90
     },
     {
       "command": "event choose 0",
@@ -711,7 +723,8 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "timeout": 90
     },
     {
       "command": "event choose 0",
@@ -729,7 +742,8 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "timeout": 90
     },
     {
       "command": "event choose 0",
@@ -747,7 +761,8 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "timeout": 90
     },
     {
       "command": "event choose 0",
@@ -765,7 +780,8 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "timeout": 90
     },
     {
       "command": "event choose 0",
@@ -783,7 +799,8 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "timeout": 90
     },
     {
       "command": "event choose 0",
@@ -801,7 +818,8 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "timeout": 90
     },
     {
       "command": "event choose 0",
@@ -828,7 +846,8 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "timeout": 90
     },
     {
       "command": "event choose 0",
@@ -846,7 +865,8 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "timeout": 90
     },
     {
       "command": "event choose 0",
@@ -864,7 +884,8 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "timeout": 90
     },
     {
       "command": "event choose 0",
@@ -882,7 +903,8 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "timeout": 90
     },
     {
       "command": "event choose 0",
@@ -900,7 +922,8 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "timeout": 90
     },
     {
       "command": "event choose 0",
@@ -918,7 +941,8 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "timeout": 90
     },
     {
       "command": "event choose 0",
