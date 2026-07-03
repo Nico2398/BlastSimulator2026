@@ -147,13 +147,24 @@ jobs:
       - name: Build project
         run: npm run build
 
+      - name: Run all scenarios (command mode — batch, no browser)
+        run: |
+          if ! npx tsx scripts/run-all-scenarios.ts; then
+            echo ""
+            echo "========================================"
+            echo "Some command-mode scenarios failed. Check logs above."
+            echo "========================================"
+            exit 1
+          fi
+          echo "All scenarios passed in command mode."
+
       - name: Start dev server
         run: |
           npx vite --port 5173 &
           sleep 5
           curl -s http://localhost:5173 > /dev/null || (echo "Dev server failed to start" && exit 1)
 
-      - name: Run all scenarios in both modes
+      - name: Run all scenarios (interaction mode)
         run: |
           FAILED=0
           SCENARIOS=$(ls scripts/scenario-defs/*.json | xargs -I{} basename {} .json | sort)
@@ -161,24 +172,22 @@ jobs:
           INDEX=0
           for SCENARIO in $SCENARIOS; do
             INDEX=$((INDEX + 1))
-            for MODE in command interaction; do
-              echo ""
-              echo "========================================"
-              echo "[$INDEX/$TOTAL] Running: $SCENARIO ($MODE)"
-              echo "========================================"
-              if ! npx tsx scripts/scenario-test.ts --scenario "$SCENARIO" --mode "$MODE"; then
-                echo "FAILED: $SCENARIO ($MODE)"
-                FAILED=1
-              fi
-            done
+            echo ""
+            echo "========================================"
+            echo "[$INDEX/$TOTAL] Running: $SCENARIO (interaction)"
+            echo "========================================"
+            if ! npx tsx scripts/scenario-test.ts --scenario "$SCENARIO" --mode interaction; then
+              echo "FAILED: $SCENARIO (interaction)"
+              FAILED=1
+            fi
           done
           echo ""
           echo "========================================"
           if [ "$FAILED" -ne 0 ]; then
-            echo "Some scenarios failed. Check logs above."
+            echo "Some interaction-mode scenarios failed. Check logs above."
             exit 1
           fi
-          echo "All scenarios passed in both modes."
+          echo "All scenarios passed in interaction mode."
 
       - name: Stop dev server
         if: always()

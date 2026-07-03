@@ -62,6 +62,12 @@ export async function executeActionOnPage(
       await page.mouse.click(action.x!, action.y!, { button: btn });
       break;
     }
+    case 'clickSelector': {
+      const btn = BUTTON_MAP[action.button ?? 'left'] ?? 'left';
+      await page.waitForSelector(action.selector!, { timeout: action.timeout ?? 5000 });
+      await page.click(action.selector!, { button: btn });
+      break;
+    }
     case 'mousedown': {
       const btn = BUTTON_MAP[action.button ?? 'left'] ?? 'left';
       await page.mouse.down({ button: btn });

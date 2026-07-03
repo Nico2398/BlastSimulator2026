@@ -16,6 +16,7 @@
  */
 export type InteractionStepAction =
   | { type: 'click'; x: number; y: number; button?: 'left' | 'right' | 'middle' }
+  | { type: 'clickSelector'; selector: string; button?: 'left' | 'right' | 'middle' }
   | { type: 'mousedown'; x: number; y: number; button?: 'left' | 'right' | 'middle' }
   | { type: 'mouseup'; x: number; y: number; button?: 'left' | 'right' | 'middle' }
   | { type: 'mousemove'; x: number; y: number }
@@ -29,7 +30,8 @@ export type InteractionStepAction =
   | { type: 'type'; selector: string; text: string; delay?: number }
   | { type: 'assert'; selector?: string; property?: string; expectedValue?: unknown }
   | { type: 'viewport'; width: number; height: number }
-  | { type: 'command'; command: string };
+  | { type: 'command'; command: string }
+  | { type: 'screenshot' };
 
 /**
  * A scenario step — either a legacy string command or an object with
