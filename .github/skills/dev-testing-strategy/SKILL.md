@@ -181,6 +181,18 @@ Use `scripts/run-all-scenarios.ts` for batch runs (both modes supported via `--m
 | Survey estimation (radius 20) | < 5ms |
 | Full-level integration test (Level 1 win) | < 30s wall clock |
 
+## CI Launch Strategy
+
+CI has 3 tiers of scenario testing:
+
+| Tier | What | When | Time |
+|------|------|------|------|
+| **1 — Command** | All 99 scenarios in command mode (pure Node.js, no browser) | Every push, PR, schedule, manual | ~1 min |
+| **2 — Interaction** | All 99 scenarios in interaction mode (Puppeteer, real browser) | Push to main, schedule (weekly), workflow_dispatch, **or PR with `full-ci` label** | ~16 min |
+| **3 — Full** | Tiers 1 + 2 combined | Automatic on schedule/weekly; opt-in via `full-ci` label on PR | ~18 min |
+
+**Label convention:** Add `full-ci` to a PR when the change affects UI, rendering, or Puppeteer interaction behavior. Most PRs (docs, config, logic-only) skip interaction mode safely. The `full-ci` label on an issue MUST transfer to the opened PR.
+
 ## Regression Test Policy
 
 Any bug fix must include new unit or integration test that:

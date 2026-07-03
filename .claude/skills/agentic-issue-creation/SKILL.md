@@ -43,6 +43,8 @@ Use when creating GitHub issues that will be picked up by autonomous coding agen
 8. **Single task per issue.** If a task touches multiple concerns, split it.
 9. **SMART compliance.** Every issue must be SMART: Specific (one clear goal), Measurable (verifiable outcome), Achievable (within agent's capabilities), Relevant (part of the larger feature), Time-bound (single atomic task, not open-ended).
 10. **Labels required.** Every issue must have `agent-task` and `ready` labels applied via `gh issue edit <number> --add-label "agent-task" --add-label "ready"` after creation.
+11. **Assess interaction-mode risk.** Before creating an issue, ask: "Does this change affect the UI, rendering, or Puppeteer interaction? Or will command-mode scenarios be sufficient?" If the change might impact interaction tests, add the `full-ci` label to the issue.
+12. **Label transfer.** When a PR is opened from an issue with the `full-ci` label, the label MUST be transferred to the PR via `gh pr edit <number> --add-label "full-ci"`. This ensures the slow interaction-mode CI runs on risky changes.
 
 ## Checklist
 
@@ -54,4 +56,6 @@ Use when creating GitHub issues that will be picked up by autonomous coding agen
 - [ ] Verification section has concrete, testable criteria
 - [ ] SMART criteria are respected (specific, measurable, achievable, relevant, time-bound)
 - [ ] Labels `agent-task` and `ready` applied after creation
+- [ ] Assessed interaction-mode risk → `full-ci` label added if change affects UI/rendering/interaction
+- [ ] If issue has `full-ci`, PR must also get `full-ci` when opened
 
