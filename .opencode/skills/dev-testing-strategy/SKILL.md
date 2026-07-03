@@ -145,17 +145,20 @@ Scenario steps can define an `interaction` array of `InteractionStepAction` obje
 
 After any rendering change:
 1. `npm run dev &`
-2. Run relevant playthrough scenario:
+2. Run relevant playthrough scenario with screenshots:
    ```bash
-   PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium npx tsx scripts/scenario-test.ts --scenario level1-playthrough-win
+   npx tsx scripts/scenario-test.ts --scenario level1-playthrough-win --mode interaction --screenshots
    ```
-3. For interaction-based scenarios, use `--mode interaction`:
+3. For interaction-based scenarios:
    ```bash
-   PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium npx tsx scripts/scenario-test.ts --scenario my-interaction-test --mode interaction
+   npx tsx scripts/scenario-test.ts --scenario my-interaction-test --mode interaction --screenshots
    ```
-4. Inspect every screenshot using the `view` tool
-4. Verify against expected visual description per checkpoint
-5. If any checkpoint fails → fix rendering → re-run
+4. Inspect every screenshot in `screenshots/scenario-{name}-interaction/`
+5. Verify against expected visual description per checkpoint
+6. If any checkpoint fails → fix rendering → re-run
+
+Screenshots opt-in via `--screenshots`. CI runs without it (no screenshots, state-only validation).
+Use `scripts/run-all-scenarios.ts` for batch runs (both modes supported via `--mode`).
 
 **Mandatory check cadence:**
 | Trigger | Scenarios to run |

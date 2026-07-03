@@ -1,5 +1,5 @@
-/**
- * BlastSimulator2026 — Scenario Test Runner
+﻿/**
+ * BlastSimulator2026 ÔÇö Scenario Test Runner
  *
  * Runs a sequence of game commands in headless Chrome, capturing a screenshot
  * and game state dump after EVERY command. Supports multi-angle shots via --shots.
@@ -26,7 +26,7 @@
  * Screenshot size monitoring: warns if PNG > 5MB.
  *
  * Environment variables:
- *   PUPPETEER_EXECUTABLE_PATH — path to Chrome/Chromium executable
+ *   PUPPETEER_EXECUTABLE_PATH ÔÇö path to Chrome/Chromium executable
  *
  * Output:  screenshots/scenario-{name}/
  *   step-00-new_game.png
@@ -48,12 +48,17 @@ import { resolve } from 'path';
 import { resolveChromePath } from './shared/chrome.js';
 import { executeActionOnPage } from './shared/interaction-executor.js';
 import type { InteractionStepAction } from './shared/scenario-types.js';
+import { createGameEngine, runSteps } from './shared/command-runner.js';
 
 const VIEWPORT = { width: 1280, height: 720 };
-const INIT_WAIT_MS = 3000;
-const COMMAND_WAIT_MS = 800;
-const RENDER_WAIT_MS = 500;
+const INIT_WAIT_MS = 0;
 const MAX_SCREENSHOT_BYTES = 5 * 1024 * 1024;
+const SCREENSHOT_DIR = resolve(process.cwd(), 'screenshots');
+
+/** Wait for one render frame (requestAnimationFrame). Screenshots need the GPU to flush a frame. */
+async function waitOneFrame(page: puppeteer.Page): Promise<void> {
+  await page.evaluate(() => new Promise(r => requestAnimationFrame(r)));
+}
 
 interface ScenarioStep {
   command: string;
@@ -129,7 +134,7 @@ function parseArgs(): {
   name: string; steps: ScenarioStep[]; shots: ShotDef[];
   port: number; puppeteerPath?: string; frames: number; intervalMs: number;
   viewport: { width: number; height: number };
-  mode: string;
+  mode: string; screenshots: boolean;
 } {
   const args = process.argv.slice(2);
   let name = 'scenario';
@@ -141,6 +146,7 @@ function parseArgs(): {
   let intervalMs = 200;
   let viewport = { width: 1280, height: 720 };
   let mode = 'command'; // default mode
+  let screenshots = false;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--scenario' && args[i + 1]) {
@@ -196,10 +202,12 @@ function parseArgs(): {
       }
       mode = modeArg;
       i++;
+    } else if (args[i] === '--screenshots') {
+      screenshots = true;
     }
   }
 
-  return { name, steps, shots, port, puppeteerPath, frames, intervalMs, viewport, mode };
+  return { name, steps, shots, port, puppeteerPath, frames, intervalMs, viewport, mode, screenshots };
 }
 
 function checkScreenshotSize(filepath: string): string | undefined {
@@ -213,13 +221,14 @@ function checkScreenshotSize(filepath: string): string | undefined {
   return undefined;
 }
 
-async function runScenario(
+/** Run scenario in interaction mode (Puppeteer + Chrome). */
+async function runScenarioInteraction(
   name: string, steps: ScenarioStep[], shots: ShotDef[],
   port: number, puppeteerPath: string | undefined, frames: number, intervalMs: number,
   viewport: { width: number; height: number },
-  mode: string,
+  enableScreenshots: boolean,
 ): Promise<StepResult[]> {
-  const outDir = resolve(process.cwd(), `screenshots/scenario-${name}-${mode}`);
+  const outDir = resolve(SCREENSHOT_DIR, `scenario-${name}-interaction`);
   mkdirSync(outDir, { recursive: true });
 
   const devServerUrl = `http://localhost:${port}`;
@@ -251,7 +260,6 @@ async function runScenario(
       const menu = document.getElementById('bs-main-menu');
       if (menu) (menu as HTMLElement).style.display = 'none';
     });
-    await new Promise(r => setTimeout(r, 300));
 
     for (let i = 0; i < steps.length; i++) {
       const step = steps[i];
@@ -267,53 +275,52 @@ async function runScenario(
         setTimeout(() => { timedOut = true; reject(new Error(`Step ${i} timed out after ${stepTimeout}ms`)); }, stepTimeout)
       );
 
+      // Collect screenshot paths taken during this step (for screenshot action type)
+      const stepScreenshotPaths: string[] = [];
+      let takeScreenshotAtIndex = -1;
+
       try {
         await Promise.race([
           (async () => {
-            // Mode-based execution
             let commandOutput = '';
-            if (mode === 'interaction') {
-              if (step.interaction && step.interaction.length > 0) {
-                await executeInteractionStep(page, step.interaction);
-                // Capture command output for any command-type actions in the interaction
-                const commandActions = step.interaction.filter(a => a.type === 'command');
-                if (commandActions.length > 0) {
-                  // Execute last command action to capture its output
-                  const lastCmd = commandActions[commandActions.length - 1];
-                  commandOutput = await page.evaluate((cmd: string) => {
-                    if (typeof (window as any).__gameConsole === 'function') {
-                      const result = (window as any).__gameConsole(cmd);
-                      return typeof result === 'object' ? (result.output ?? '') : String(result);
-                    }
-                    return 'ERROR: __gameConsole not available';
-                  }, lastCmd.command);
-                  console.log(`  Output: ${commandOutput}`);
+            if (step.interaction && step.interaction.length > 0) {
+              // Execute interaction actions, capturing screenshot paths when screenshot action is encountered
+              let screenshotIndex = 0;
+              for (const action of step.interaction) {
+                if (action.type === 'screenshot' && enableScreenshots) {
+                  const ssPath = resolve(outDir, `step-${paddedIdx}-${cmdSlug}-ss${screenshotIndex}.png`);
+                  await page.screenshot({ path: ssPath, fullPage: false });
+                  stepScreenshotPaths.push(ssPath);
+                  console.log(`  Screenshot [${screenshotIndex}]: ${ssPath}`);
+                  screenshotIndex++;
+                } else if (action.type === 'screenshot') {
+                  // Screenshots disabled, skip
+                } else {
+                  await executeActionOnPage(page, action as any);
                 }
-              } else {
-                console.warn(`  Step ${i}: interaction mode but no interaction defined, skipping.`);
               }
-            } else {
-              // Execute command and capture output
-              commandOutput = await page.evaluate((cmd: string) => {
-                if (typeof (window as any).__gameConsole === 'function') {
-                  const result = (window as any).__gameConsole(cmd);
-                  return typeof result === 'object' ? (result.output ?? '') : String(result);
+
+              // Capture command output from game state (do NOT re-run command)
+              commandOutput = await page.evaluate(() => {
+                if (typeof (window as any).__gameState === 'function') {
+                  const state = (window as any).__gameState();
+                  if (state && state.lastCommandOutput) return String(state.lastCommandOutput);
                 }
-                return 'ERROR: __gameConsole not available';
-              }, step.command);
-              console.log(`  Output: ${commandOutput}`);
+                return '';
+              });
+            } else {
+              console.warn(`  Step ${i}: interaction mode but no interaction defined, skipping.`);
             }
 
-            // Wait for render to settle
-            await new Promise(r => setTimeout(r, COMMAND_WAIT_MS));
+            // Reset the real-time tick accumulator so the game loop
+            // (main.ts:271-286) doesn't fire ticks accumulated across steps.
+            await page.evaluate(() => {
+              if (typeof (window as any).__resetTickAccumulator === 'function') {
+                (window as any).__resetTickAccumulator();
+              }
+            });
 
-            // Force a render frame
-            await page.evaluate(() => new Promise(r => requestAnimationFrame(() => {
-              requestAnimationFrame(() => r(undefined));
-            })));
-            await new Promise(r => setTimeout(r, RENDER_WAIT_MS));
-
-            // Extract game state
+            // Extract game state (synchronous, no render needed)
             const gameState = await page.evaluate(() => {
               if (typeof (window as any).__gameState === 'function') {
                 return (window as any).__gameState();
@@ -329,24 +336,25 @@ async function runScenario(
               return null;
             });
 
-            // Take default screenshot
-            const screenshotPath = resolve(outDir, `step-${paddedIdx}-${cmdSlug}.png`);
-            await page.screenshot({ path: screenshotPath, fullPage: false });
+            // Screenshot (only with --screenshots flag)
+            let screenshotPath = '';
+            let sizeWarn: string | undefined;
+            if (enableScreenshots) {
+              await waitOneFrame(page);
+              screenshotPath = resolve(outDir, `step-${paddedIdx}-${cmdSlug}.png`);
+              await page.screenshot({ path: screenshotPath, fullPage: false });
+              sizeWarn = checkScreenshotSize(screenshotPath);
+              if (sizeWarn) console.warn(`  WARNING: ${sizeWarn}`);
+            }
 
-            // Screenshot size monitoring
-            const sizeWarn = checkScreenshotSize(screenshotPath);
-            if (sizeWarn) console.warn(`  WARNING: ${sizeWarn}`);
-
-            // Animation frames — step-level setting overrides CLI default
+            // Animation frames ÔÇö step-level setting overrides CLI default (only with --screenshots)
             const stepFrames = step.frames ?? frames;
             const stepInterval = step.interval ?? intervalMs;
             const framePaths: string[] = [];
-            if (stepFrames > 1) {
+            if (enableScreenshots && stepFrames > 1) {
               for (let f = 0; f < stepFrames; f++) {
                 await new Promise(r => setTimeout(r, stepInterval));
-                await page.evaluate(() => new Promise(r => requestAnimationFrame(() => {
-                  requestAnimationFrame(() => r(undefined));
-                })));
+                await waitOneFrame(page);
                 const framePath = resolve(outDir, `step-${paddedIdx}-${cmdSlug}-f${f}.png`);
                 await page.screenshot({ path: framePath, fullPage: false });
                 framePaths.push(framePath);
@@ -364,40 +372,39 @@ async function runScenario(
               commandOutput,
               gameState,
               uiState,
+              screenshots: stepScreenshotPaths.length > 0 ? stepScreenshotPaths : undefined,
             };
             const statePath = resolve(outDir, `step-${paddedIdx}-${cmdSlug}.json`);
             writeFileSync(statePath, JSON.stringify(stateData, null, 2));
 
-            console.log(`  Screenshot: ${screenshotPath}`);
+            if (screenshotPath) {
+              console.log(`  Screenshot: ${screenshotPath}`);
+            }
             console.log(`  State: ${statePath}`);
 
-            // Multi-angle shots (--shots or scenario-defined)
-            const shotPaths: string[] = [];
-            for (const shot of shots) {
-              await page.evaluate(
-                ({ y, p }: { y: number; p: number }) => {
-                  (window as any).__cameraOrbit(y, p);
-                },
-                { y: shot.yaw, p: shot.pitch },
-              );
-              await new Promise(r => setTimeout(r, RENDER_WAIT_MS));
-              await page.evaluate(() => new Promise(r => requestAnimationFrame(() => {
-                requestAnimationFrame(() => r(undefined));
-              })));
-              await new Promise(r => setTimeout(r, RENDER_WAIT_MS));
-              const shotPath = resolve(outDir, `step-${paddedIdx}-${cmdSlug}-${shot.name}.png`);
-              await page.screenshot({ path: shotPath, fullPage: false });
-              shotPaths.push(shotPath);
-              console.log(`  Shot [${shot.name}]: ${shotPath}`);
+            // Multi-angle shots (--shots or scenario-defined) ÔÇö only with --screenshots
+            if (enableScreenshots) {
+              for (const shot of shots) {
+                await page.evaluate(
+                  ({ y, p }: { y: number; p: number }) => {
+                    (window as any).__cameraOrbit(y, p);
+                  },
+                  { y: shot.yaw, p: shot.pitch },
+                );
+                await waitOneFrame(page);
+                const shotPath = resolve(outDir, `step-${paddedIdx}-${cmdSlug}-${shot.name}.png`);
+                await page.screenshot({ path: shotPath, fullPage: false });
+                console.log(`  Shot [${shot.name}]: ${shotPath}`);
 
-              const sSizeWarn = checkScreenshotSize(shotPath);
-              if (sSizeWarn) console.warn(`  WARNING: ${sSizeWarn}`);
-            }
+                const sSizeWarn = checkScreenshotSize(shotPath);
+                if (sSizeWarn) console.warn(`  WARNING: ${sSizeWarn}`);
+              }
 
-            // Reset camera after multi-angle shots
-            if (shots.length > 0) {
-              await page.evaluate(() => (window as any).__cameraReset());
-              await new Promise(r => setTimeout(r, RENDER_WAIT_MS));
+              // Reset camera after multi-angle shots
+              if (shots.length > 0) {
+                await page.evaluate(() => (window as any).__cameraReset());
+                await waitOneFrame(page);
+              }
             }
 
             if (gameState) {
@@ -467,28 +474,81 @@ async function runScenario(
   }
 }
 
+/** Run scenario in command mode (pure Node.js, no browser). */
+async function runScenarioCommand(
+  name: string, steps: ScenarioStep[],
+): Promise<StepResult[]> {
+  const engine = createGameEngine();
+  const outDir = resolve(SCREENSHOT_DIR, `scenario-${name}-command`);
+
+  console.log(`\n--- Scenario: ${name} ---`);
+  const results = runSteps(engine, steps, outDir);
+
+  // Print per-step summary to stdout (matching expected CI output format)
+  for (const r of results) {
+    const paddedIdx = String(r.step).padStart(2, '0');
+    const cmdSlug = r.command.split(/\s+/)[0].replace(/[^a-z0-9_-]/gi, '');
+    console.log(`  ${paddedIdx} ${r.command}`);
+    console.log(`    Output: ${r.commandOutput.substring(0, 120)}`);
+    if (r.gameState) {
+      console.log(`    Holes: ${r.gameState.holeCount}, Charged: ${r.gameState.chargedCount}, Sequenced: ${r.gameState.sequencedCount}`);
+    }
+    if (r.error) console.error(`    ERROR: ${r.error}`);
+    console.log(`    State: ${r.statePath}`);
+  }
+
+  return results.map(r => ({
+    step: r.step,
+    command: r.command,
+    commandOutput: r.commandOutput,
+    gameState: r.gameState as unknown as Record<string, unknown>,
+    uiState: null,
+    screenshotPath: '',
+    statePath: r.statePath,
+    error: r.error,
+  }));
+}
+
 // Main
-const { name, steps, shots, port, puppeteerPath, frames, intervalMs, viewport, mode } = parseArgs();
+const { name, steps, shots, port, puppeteerPath, frames, intervalMs, viewport, mode, screenshots } = parseArgs();
 if (steps.length === 0) {
   console.error('No steps defined. Use --scenario <name> or --commands "cmd1; cmd2; ..."');
   process.exit(1);
 }
 
-console.log(`Viewport: ${viewport.width}x${viewport.height}`);
-console.log(`Dev server port: ${port}`);
-if (shots.length > 0) {
-  console.log(`Multi-angle shots: ${shots.map(s => `${s.name}(${s.yaw}°,${s.pitch}°)`).join(', ')}`);
-}
-if (frames > 1) {
-  console.log(`Animation frames: ${frames} at ${intervalMs}ms interval`);
+console.log(`Mode: ${mode}`);
+if (mode === 'command') {
+  console.log('Engine: Node.js (pure logic, no browser)');
+} else {
+  console.log(`Viewport: ${viewport.width}x${viewport.height}`);
+  console.log(`Dev server port: ${port}`);
+  console.log(`Screenshots: ${screenshots ? 'enabled' : 'disabled (use --screenshots to enable)'}`);
+  if (shots.length > 0) {
+    console.log(`Multi-angle shots: ${shots.map(s => `${s.name}(${s.yaw}┬░,${s.pitch}┬░)`).join(', ')}`);
+  }
+  if (frames > 1) {
+    console.log(`Animation frames: ${frames} at ${intervalMs}ms interval`);
+  }
 }
 
-runScenario(name, steps, shots, port, puppeteerPath, frames, intervalMs, viewport, mode)
-  .then(() => {
-    console.log('\nScenario complete.');
-    process.exit(0);
-  })
-  .catch(err => {
-    console.error('Scenario failed:', err);
-    process.exit(1);
-  });
+if (mode === 'command') {
+  runScenarioCommand(name, steps)
+    .then(() => {
+      console.log('\nScenario complete.');
+      process.exit(0);
+    })
+    .catch(err => {
+      console.error('Scenario failed:', err);
+      process.exit(1);
+    });
+} else {
+  runScenarioInteraction(name, steps, shots, port, puppeteerPath, frames, intervalMs, viewport, screenshots)
+    .then(() => {
+      console.log('\nScenario complete.');
+      process.exit(0);
+    })
+    .catch(err => {
+      console.error('Scenario failed:', err);
+      process.exit(1);
+    });
+}

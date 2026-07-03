@@ -164,27 +164,13 @@ jobs:
           sleep 5
           curl -s http://localhost:5173 > /dev/null || (echo "Dev server failed to start" && exit 1)
 
-      - name: Run all scenarios (interaction mode)
+      - name: Run all scenarios (interaction mode — batch, shared browser)
         run: |
-          FAILED=0
-          SCENARIOS=$(ls scripts/scenario-defs/*.json | xargs -I{} basename {} .json | sort)
-          TOTAL=$(echo "$SCENARIOS" | wc -l)
-          INDEX=0
-          for SCENARIO in $SCENARIOS; do
-            INDEX=$((INDEX + 1))
+          if ! npx tsx scripts/run-all-scenarios.ts --mode interaction; then
             echo ""
             echo "========================================"
-            echo "[$INDEX/$TOTAL] Running: $SCENARIO (interaction)"
-            echo "========================================"
-            if ! npx tsx scripts/scenario-test.ts --scenario "$SCENARIO" --mode interaction; then
-              echo "FAILED: $SCENARIO (interaction)"
-              FAILED=1
-            fi
-          done
-          echo ""
-          echo "========================================"
-          if [ "$FAILED" -ne 0 ]; then
             echo "Some interaction-mode scenarios failed. Check logs above."
+            echo "========================================"
             exit 1
           fi
           echo "All scenarios passed in interaction mode."
