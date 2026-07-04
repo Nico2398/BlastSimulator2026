@@ -1,5 +1,5 @@
 ---
-model: opencode/mimo-v2.5-free
+model: opencode/deepseek-v4-flash-free
 description:  Semantic code reviewer. Verifies tests and implementation exist, that test descriptions match the logic under test, and that function names match their implementation behavior. Read-only.
 mode: subagent
 permission:

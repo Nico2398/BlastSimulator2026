@@ -1,5 +1,5 @@
 ---
-model: opencode/mimo-v2.5-free
+model: opencode/deepseek-v4-flash-free
 description: TDD Skeleton phase: create empty stubs, interfaces, and type exports from planner output. No logic, no tests. Establishes the API surface test-writer and implementer will build against.
 mode: subagent
 permission:

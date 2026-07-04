@@ -1,5 +1,5 @@
 ---
-model: opencode/mimo-v2.5-free
+model: opencode/deepseek-v4-flash-free
 description: Executes simple imperative commands (create issue, comment, tag, etc.) using gh and shell.
 mode: subagent
 permission:
