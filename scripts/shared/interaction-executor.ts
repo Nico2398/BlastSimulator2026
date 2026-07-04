@@ -9,32 +9,7 @@
  */
 
 import type puppeteer from 'puppeteer';
-
-/**
- * A minimal action type that covers all supported interaction types.
- * Both InteractionStepAction and InteractionRecordEvent are compatible
- * with this interface.
- */
-export interface InteractionAction {
-  type: string;
-  x?: number;
-  y?: number;
-  button?: string;
-  key?: string;
-  selector?: string;
-  text?: string;
-  delay?: number;
-  durationMs?: number;
-  deltaX?: number;
-  deltaY?: number;
-  width?: number;
-  height?: number;
-  command?: string;
-  timeout?: number;
-  property?: string;
-  expectedValue?: unknown;
-  [key: string]: unknown;
-}
+import type { InteractionStepAction } from './scenario-types.js';
 
 /** Maps button names to Puppeteer MouseButton values. */
 const BUTTON_MAP: Record<string, 'left' | 'right' | 'middle'> = {
@@ -54,18 +29,18 @@ const BUTTON_MAP: Record<string, 'left' | 'right' | 'middle'> = {
  */
 export async function executeActionOnPage(
   page: puppeteer.Page,
-  action: InteractionAction,
+  action: InteractionStepAction,
 ): Promise<void> {
   switch (action.type) {
     case 'click': {
       const btn = BUTTON_MAP[action.button ?? 'left'] ?? 'left';
-      await page.mouse.click(action.x!, action.y!, { button: btn });
+      await page.mouse.click(action.x, action.y, { button: btn });
       break;
     }
     case 'clickSelector': {
       const btn = BUTTON_MAP[action.button ?? 'left'] ?? 'left';
-      await page.waitForSelector(action.selector!, { timeout: action.timeout ?? 5000 });
-      await page.click(action.selector!, { button: btn });
+      await page.waitForSelector(action.selector, { timeout: action.timeout ?? 5000 });
+      await page.click(action.selector, { button: btn });
       break;
     }
     case 'mousedown': {
@@ -79,34 +54,34 @@ export async function executeActionOnPage(
       break;
     }
     case 'mousemove':
-      await page.mouse.move(action.x!, action.y!);
+      await page.mouse.move(action.x, action.y);
       break;
     case 'keypress':
-      await page.keyboard.press(action.key!);
+      await page.keyboard.press(action.key);
       break;
     case 'keydown':
-      await page.keyboard.down(action.key!);
+      await page.keyboard.down(action.key);
       break;
     case 'keyup':
-      await page.keyboard.up(action.key!);
+      await page.keyboard.up(action.key);
       break;
     case 'scroll':
       await page.evaluate(
         ({ x, y }: { x: number; y: number }) => window.scrollTo(x, y),
-        { x: action.x!, y: action.y! },
+        { x: action.x, y: action.y },
       );
       break;
     case 'wheel':
-      await page.mouse.wheel({ deltaX: action.deltaX!, deltaY: action.deltaY! });
+      await page.mouse.wheel({ deltaX: action.deltaX, deltaY: action.deltaY });
       break;
     case 'wait':
       await new Promise((r) => setTimeout(r, action.durationMs));
       break;
     case 'waitForSelector':
-      await page.waitForSelector(action.selector!, { timeout: action.timeout ?? 10000 });
+      await page.waitForSelector(action.selector, { timeout: action.timeout ?? 10000 });
       break;
     case 'type':
-      await page.type(action.selector!, action.text!, { delay: action.delay });
+      await page.type(action.selector, action.text, { delay: action.delay });
       break;
     case 'assert': {
       if (action.selector) {
@@ -127,7 +102,7 @@ export async function executeActionOnPage(
       break;
     }
     case 'viewport':
-      await page.setViewport({ width: action.width!, height: action.height! });
+      await page.setViewport({ width: action.width, height: action.height });
       break;
     case 'command':
       await page.evaluate((cmd: string) => {
@@ -135,10 +110,16 @@ export async function executeActionOnPage(
           return (window as any).__gameConsole(cmd);
         }
         return undefined;
-      }, action.command!);
+      }, action.command);
       break;
-    default:
-      console.warn(`  Unknown interaction action type: ${action.type}`);
+    case 'screenshot':
+      // Screenshot is handled by the caller, not here
       break;
+    default: {
+      // Exhaustiveness check
+      const _exhaustive: never = action;
+      console.warn(`  Unknown interaction action type: ${(_exhaustive as any).type}`);
+      break;
+    }
   }
 }

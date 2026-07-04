@@ -25,7 +25,7 @@ let executeInteractionStep: any;
 beforeEach(async () => {
   vi.resetModules();
   process.argv = ['node', 'scenario-test.ts', '--commands', 'help'];
-  const mod = await import('../../scripts/scenario-test.js');
+  const mod = await import('../../scripts/scenario-interaction-runner.js');
   executeInteractionStep = mod.executeInteractionStep;
 });
 

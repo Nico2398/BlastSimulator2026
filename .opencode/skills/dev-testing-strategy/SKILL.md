@@ -106,7 +106,7 @@ JSON files in `scripts/scenario-defs/`. Runner captures screenshot + state JSON 
 
 **Dual-play modes** (`--mode command|interaction`):
 - **command** (default) — sends console commands via `__gameConsole()`.
-- **interaction** — executes Puppeteer interactions (click, type, waitForSelector, etc.) via `executeInteractionStep()`.
+- **interaction** — executes Puppeteer interactions (click, type, waitForSelector, etc.) via `executeInteractionStep()` from `scenario-interaction-runner.ts`.
 
 Scenario steps can define an `interaction` array of `InteractionStepAction` objects for UI-level testing. Steps without `interaction` fall back to command execution. Type definitions in `scripts/shared/scenario-types.ts`.
 

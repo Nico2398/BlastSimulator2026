@@ -15,7 +15,7 @@
 import { readdirSync, mkdirSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
 import puppeteer from 'puppeteer';
-import { resolveChromePath } from './shared/chrome.js';
+import { resolveChromePath, LAUNCH_ARGS } from './shared/chrome.js';
 import { executeActionOnPage } from './shared/interaction-executor.js';
 import type { InteractionStepAction, ScenarioStepDef } from './shared/scenario-types.js';
 import {
@@ -28,9 +28,11 @@ import {
   formatCommandSlug,
   loadScenarioDef,
   parseScenarioSteps,
+  buildScenarioReport,
+  SCENARIO_DIR,
+  type ReportableStep,
 } from './shared/scenario-utils.js';
 
-const SCENARIO_DIR = resolve(import.meta.dirname, 'scenario-defs');
 const SCREENSHOT_DIR = resolve(import.meta.dirname, '..', 'screenshots');
 const DEV_SERVER_PORT = 5173;
 
@@ -76,7 +78,7 @@ async function runBatchInteraction(
   const browser = await puppeteer.launch({
     headless: true,
     executablePath,
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    args: LAUNCH_ARGS,
   });
 
   const results: ScenarioResult[] = [];
@@ -103,6 +105,7 @@ async function runBatchInteraction(
 
         let failed = false;
         let errorMsg = '';
+        const stepResults: ReportableStep[] = [];
 
         for (let s = 0; s < steps.length; s++) {
           const step = steps[s];
@@ -136,32 +139,49 @@ async function runBatchInteraction(
                   return null;
                 });
 
+                // Capture command output
+                const commandOutput = await page.evaluate(() => {
+                  if (typeof (window as any).__gameState === 'function') {
+                    const state = (window as any).__gameState();
+                    if (state && state.lastCommandOutput) return String(state.lastCommandOutput);
+                  }
+                  return '';
+                });
+
                 // Save state JSON
                 const stateData = {
                   step: s,
                   command: step.command,
-                  commandOutput: await page.evaluate(() => {
-                    if (typeof (window as any).__gameState === 'function') {
-                      const state = (window as any).__gameState();
-                      if (state && state.lastCommandOutput) return String(state.lastCommandOutput);
-                    }
-                    return '';
-                  }),
+                  commandOutput,
                   gameState,
                   uiState: null,
                 };
                 const statePath = resolve(outDir, `step-${paddedIdx}-${cmdSlug}.json`);
                 writeFileSync(statePath, JSON.stringify(stateData, null, 2));
+
+                // Accumulate for report
+                stepResults.push({
+                  step: s,
+                  command: step.command,
+                  commandOutput,
+                  gameState,
+                });
               })(),
               new Promise((_, reject) =>
                 setTimeout(() => reject(new Error(`Step ${s} timed out after ${stepTimeout}ms`)), stepTimeout)
               ),
             ]);
-          } catch (err: any) {
+          } catch (err: unknown) {
             failed = true;
-            errorMsg = err.message ?? String(err);
+            errorMsg = err instanceof Error ? err.message : String(err);
             break;
           }
+        }
+
+        // Generate report.json for batch interaction mode
+        if (stepResults.length > 0) {
+          const report = buildScenarioReport(stepResults);
+          writeFileSync(resolve(outDir, 'report.json'), JSON.stringify(report, null, 2));
         }
 
         await page.close();

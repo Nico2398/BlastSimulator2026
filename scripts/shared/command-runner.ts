@@ -7,7 +7,7 @@ import { resolve } from 'path';
 import { createRunner, serializeGameState, type SerializableGameState } from '../../src/console-api.js';
 import type { CommandResult } from '../../src/console/ConsoleRunner.js';
 import type { RunnerWithContext } from '../../src/console/createRunner.js';
-import type { ScenarioStepDef } from './scenario-types.js';
+import type { ScenarioStepDef, StepResult } from './scenario-types.js';
 import {
   formatStepIndex,
   formatCommandSlug,
@@ -15,17 +15,8 @@ import {
   type ReportableStep,
 } from './scenario-utils.js';
 
-// Re-export canonical ScenarioStep type from scenario-types.ts
-export type { ScenarioStepDef as ScenarioStep } from './scenario-types.js';
-
-export interface StepResult {
-  step: number;
-  command: string;
-  commandOutput: string;
-  gameState: SerializableGameState | null;
-  statePath: string;
-  error?: string;
-}
+// Re-export canonical types from scenario-types.ts
+export type { ScenarioStepDef as ScenarioStep, StepResult } from './scenario-types.js';
 
 export interface ScenarioResult {
   name: string;
@@ -89,7 +80,7 @@ export function runSteps(
   }
 
   // Save report using shared builder
-  const report = buildScenarioReport(results as unknown as ReportableStep[]);
+  const report = buildScenarioReport(results as ReportableStep[]);
   writeFileSync(resolve(outDir, 'report.json'), JSON.stringify(report, null, 2));
 
   return results;

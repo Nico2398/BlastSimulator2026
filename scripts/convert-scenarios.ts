@@ -18,8 +18,7 @@
 import { readFileSync, writeFileSync, readdirSync } from 'fs';
 import { resolve } from 'path';
 import type { ScenarioStepDef, ScenarioDef } from './shared/scenario-types.js';
-
-const SCENARIO_DIR = resolve(process.cwd(), 'scripts/scenario-defs');
+import { SCENARIO_DIR } from './shared/scenario-utils.js';
 
 /**
  * Converts a single step to dual-play format.

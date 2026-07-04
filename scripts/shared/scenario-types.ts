@@ -57,6 +57,22 @@ export interface ScenarioStepDef {
 export interface ScenarioDef {
   name: string;
   description: string;
-  steps: Array<string | ScenarioStepDef>;
+  steps: ScenarioStepDef[];
   shots?: Array<{ name: string; yaw: number; pitch: number }>;
+}
+
+/**
+ * Unified step result from running a scenario step.
+ * Used by both command-runner.ts and scenario-test.ts.
+ */
+export interface StepResult {
+  step: number;
+  command: string;
+  commandOutput: string;
+  gameState: Record<string, unknown> | null;
+  uiState?: Record<string, unknown> | null;
+  screenshotPath?: string;
+  statePath: string;
+  error?: string;
+  warning?: string;
 }

@@ -350,6 +350,10 @@ describe('Visual scenarios have valid shots array', () => {
 
 // ──────────────────────────────────────────────
 // 11. Dual-play scenario steps — interaction array validation (data-driven)
+// Note: Some tests (click, type, wait, waitForSelector, viewport, wheel) are
+// currently vacuously true because all 99 scenarios only use command-type actions.
+// These tests are forward-looking: they validate data when non-command action
+// types are added to scenarios in the future.
 // ──────────────────────────────────────────────
 
 describe('Dual-play scenario steps — data-driven validation', () => {
@@ -453,6 +457,23 @@ describe('Dual-play scenario steps — data-driven validation', () => {
       }
     });
 
+    it(`${name} — wheel actions have deltaX, deltaY, deltaZ`, () => {
+      const scenario = loadScenario(name);
+      for (let i = 0; i < scenario.steps.length; i++) {
+        const step = scenario.steps[i];
+        if (typeof step === 'string') continue;
+        const stepObj = step as ScenarioStepDef;
+        if (!stepObj.interaction) continue;
+        for (const action of stepObj.interaction) {
+          if (action.type === 'wheel') {
+            expect(typeof action.deltaX).toBe('number');
+            expect(typeof action.deltaY).toBe('number');
+            expect(typeof action.deltaZ).toBe('number');
+          }
+        }
+      }
+    });
+
     it(`${name} — command actions within interaction arrays have a command field`, () => {
       const scenario = loadScenario(name);
       for (let i = 0; i < scenario.steps.length; i++) {
@@ -519,62 +540,16 @@ describe('Every scenario step has a dual-play interaction array', () => {
       }
     });
 
-    it(`${name} — interaction actions have valid types from known types`, () => {
+    it(`${name} — interaction[0] is always a command-type action and matches step.command`, () => {
       const scenario = loadScenario(name);
       for (let i = 0; i < scenario.steps.length; i++) {
-        const step = scenario.steps[i];
-        if (typeof step === 'string') {
-          throw new Error(`step[${i}] is a plain string — all steps must be objects with interaction arrays`);
-        }
-        const stepObj = step as any;
-        if (!stepObj.interaction) continue;
-        for (const action of stepObj.interaction) {
-          expect(
-            KNOWN_INTERACTION_ACTION_TYPES,
-            `step[${i}] interaction action type "${action.type}" should be a known type`,
-          ).toContain(action.type);
-        }
-      }
-    });
-
-    it(`${name} — command actions within interaction arrays have a command field`, () => {
-      const scenario = loadScenario(name);
-      for (let i = 0; i < scenario.steps.length; i++) {
-        const step = scenario.steps[i];
-        if (typeof step === 'string') {
-          throw new Error(`step[${i}] is a plain string — all steps must be objects with interaction arrays`);
-        }
-        const stepObj = step as any;
-        if (!stepObj.interaction) continue;
-        for (const action of stepObj.interaction) {
-          if (action.type === 'command') {
-            expect(
-              action.command,
-              `step[${i}] command action must have a command field`,
-            ).toBeDefined();
-            expect(typeof action.command).toBe('string');
-            expect(action.command.length).toBeGreaterThan(0);
-          }
-        }
-      }
-    });
-
-    it(`${name} — step.command matches interaction[0].command for command-type actions`, () => {
-      const scenario = loadScenario(name);
-      for (let i = 0; i < scenario.steps.length; i++) {
-        const step = scenario.steps[i];
-        if (typeof step === 'string') {
-          throw new Error(`step[${i}] is a plain string — all steps must be objects with interaction arrays`);
-        }
-        const stepObj = step as ScenarioStepDef;
-        if (!stepObj.interaction) continue;
-        // Find the first command-type action in the interaction array
-        const cmdAction = stepObj.interaction.find(a => a.type === 'command');
-        if (cmdAction && cmdAction.type === 'command') {
-          expect(
-            cmdAction.command,
-            `step[${i}] first command action must match step.command`,
-          ).toBe(stepObj.command);
+        const step = scenario.steps[i] as ScenarioStepDef;
+        expect(step.interaction).toBeDefined();
+        expect(step.interaction!.length).toBeGreaterThan(0);
+        const firstAction = step.interaction![0];
+        expect(firstAction.type).toBe('command');
+        if (firstAction.type === 'command') {
+          expect(firstAction.command).toBe(step.command);
         }
       }
     });

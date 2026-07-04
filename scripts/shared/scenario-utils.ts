@@ -11,7 +11,7 @@ import { readFileSync, existsSync } from 'fs';
 import { resolve } from 'path';
 import type { ScenarioDef, ScenarioStepDef } from './scenario-types.js';
 
-const SCENARIO_DIR = resolve(import.meta.dirname ?? process.cwd(), '..', 'scenario-defs');
+export const SCENARIO_DIR = resolve(import.meta.dirname ?? process.cwd(), '..', 'scenario-defs');
 
 /**
  * Format a zero-padded step index (e.g., 0 → "00", 12 → "12").
@@ -93,11 +93,9 @@ export function loadScenarioDef(name: string, dir?: string): ScenarioDef {
 }
 
 /**
- * Parse scenario steps from a ScenarioDef, converting string steps
- * to ScenarioStepDef objects for uniform handling.
+ * Parse scenario steps from a ScenarioDef.
+ * Steps are already ScenarioStepDef[] after dual-play conversion.
  */
 export function parseScenarioSteps(def: ScenarioDef): ScenarioStepDef[] {
-  return def.steps.map(s =>
-    typeof s === 'string' ? { command: s } : s,
-  );
+  return def.steps;
 }
