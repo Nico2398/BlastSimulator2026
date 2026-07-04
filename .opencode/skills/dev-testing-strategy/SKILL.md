@@ -108,7 +108,7 @@ JSON files in `scripts/scenario-defs/`. Runner captures screenshot + state JSON 
 - **command** (default) — sends console commands via `__gameConsole()`.
 - **interaction** — executes Puppeteer interactions (click, type, waitForSelector, etc.) via `executeInteractionStep()`.
 
-Scenario steps can define an `interaction` array of `InteractionStepAction` objects for UI-level testing. Steps without `interaction` fall back to command execution. Type definitions in `scripts/interaction-types.ts`.
+Scenario steps can define an `interaction` array of `InteractionStepAction` objects for UI-level testing. Steps without `interaction` fall back to command execution. Type definitions in `scripts/shared/scenario-types.ts`.
 
 ### Feature Scenarios (Ch.1–7 visual regression)
 

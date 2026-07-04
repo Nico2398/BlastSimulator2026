@@ -43,12 +43,20 @@
  */
 
 import puppeteer from 'puppeteer';
-import { mkdirSync, writeFileSync, readFileSync, existsSync, statSync } from 'fs';
+import { mkdirSync, writeFileSync, statSync } from 'fs';
 import { resolve } from 'path';
 import { resolveChromePath } from './shared/chrome.js';
 import { executeActionOnPage } from './shared/interaction-executor.js';
-import type { InteractionStepAction } from './shared/scenario-types.js';
+import type { InteractionStepAction, ScenarioStepDef } from './shared/scenario-types.js';
 import { createGameEngine, runSteps } from './shared/command-runner.js';
+import {
+  formatStepIndex,
+  formatCommandSlug,
+  buildScenarioReport,
+  loadScenarioDef,
+  parseScenarioSteps,
+  type ReportableStep,
+} from './shared/scenario-utils.js';
 
 const VIEWPORT = { width: 1280, height: 720 };
 const INIT_WAIT_MS = 0;
@@ -60,17 +68,8 @@ async function waitOneFrame(page: puppeteer.Page): Promise<void> {
   await page.evaluate(() => new Promise(r => requestAnimationFrame(r)));
 }
 
-interface ScenarioStep {
-  command: string;
-  description?: string;
-  timeout?: number;
-  /** Per-step animation frame capture count (default: 1 = no additional frames). */
-  frames?: number;
-  /** Milliseconds between animation frames (default: 200). */
-  interval?: number;
-  /** Optional interaction actions to execute before/instead of the command. */
-  interaction?: InteractionStepAction[];
-}
+// Use canonical ScenarioStepDef from scenario-types.ts
+type ScenarioStep = ScenarioStepDef;
 
 interface ShotDef {
   name: string;
@@ -151,15 +150,14 @@ function parseArgs(): {
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--scenario' && args[i + 1]) {
       name = args[i + 1];
-      const defPath = resolve(process.cwd(), `scripts/scenario-defs/${name}.json`);
-      if (existsSync(defPath)) {
-        const def = JSON.parse(readFileSync(defPath, 'utf-8'));
-        steps = def.steps.map((s: any) => typeof s === 'string' ? { command: s } : s);
+      try {
+        const def = loadScenarioDef(name, resolve(process.cwd(), 'scripts/scenario-defs'));
+        steps = parseScenarioSteps(def);
         if (def.shots && Array.isArray(def.shots)) {
-          shots = def.shots.map((s: any) => ({ name: s.name, yaw: s.yaw, pitch: s.pitch }));
+          shots = def.shots.map(s => ({ name: s.name, yaw: s.yaw, pitch: s.pitch }));
         }
-      } else {
-        console.error(`Scenario file not found: ${defPath}`);
+      } catch (err) {
+        console.error(`Scenario file not found: ${err instanceof Error ? err.message : err}`);
         process.exit(1);
       }
       i++;
@@ -263,8 +261,8 @@ async function runScenarioInteraction(
 
     for (let i = 0; i < steps.length; i++) {
       const step = steps[i];
-      const paddedIdx = String(i).padStart(2, '0');
-      const cmdSlug = step.command.split(/\s+/)[0].replace(/[^a-z0-9_-]/gi, '');
+      const paddedIdx = formatStepIndex(i);
+      const cmdSlug = formatCommandSlug(step.command);
 
       console.log(`\n--- Step ${i}: ${step.command} ---`);
 
@@ -447,24 +445,9 @@ async function runScenarioInteraction(
       }
     }
 
-    // Save report
-    // Truncate commandOutput to avoid JSON.stringify exceeding V8's max string length.
-    // Full output is preserved in per-step state JSON files.
-    const MAX_REPORT_OUTPUT = 2000;
+    // Save report using shared builder
     const reportPath = resolve(outDir, 'report.json');
-    const report = results.map(r => ({
-      step: r.step,
-      command: r.command,
-      output: r.commandOutput.length > MAX_REPORT_OUTPUT
-        ? r.commandOutput.slice(0, MAX_REPORT_OUTPUT) + `... [truncated, ${r.commandOutput.length} chars total]`
-        : r.commandOutput,
-      error: r.error,
-      warning: r.warning,
-      holes: (r.gameState as any)?.holeCount ?? 0,
-      charged: (r.gameState as any)?.chargedCount ?? 0,
-      sequenced: (r.gameState as any)?.sequencedCount ?? 0,
-      screenshot: r.screenshotPath,
-    }));
+    const report = buildScenarioReport(results as unknown as ReportableStep[]);
     writeFileSync(reportPath, JSON.stringify(report, null, 2));
     console.log(`\nReport saved: ${reportPath}`);
 
@@ -486,8 +469,8 @@ async function runScenarioCommand(
 
   // Print per-step summary to stdout (matching expected CI output format)
   for (const r of results) {
-    const paddedIdx = String(r.step).padStart(2, '0');
-    const cmdSlug = r.command.split(/\s+/)[0].replace(/[^a-z0-9_-]/gi, '');
+    const paddedIdx = formatStepIndex(r.step);
+    const cmdSlug = formatCommandSlug(r.command);
     console.log(`  ${paddedIdx} ${r.command}`);
     console.log(`    Output: ${r.commandOutput.substring(0, 120)}`);
     if (r.gameState) {

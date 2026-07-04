@@ -7,12 +7,16 @@ import { resolve } from 'path';
 import { createRunner, serializeGameState, type SerializableGameState } from '../../src/console-api.js';
 import type { CommandResult } from '../../src/console/ConsoleRunner.js';
 import type { RunnerWithContext } from '../../src/console/createRunner.js';
+import type { ScenarioStepDef } from './scenario-types.js';
+import {
+  formatStepIndex,
+  formatCommandSlug,
+  buildScenarioReport,
+  type ReportableStep,
+} from './scenario-utils.js';
 
-export interface ScenarioStep {
-  command: string;
-  description?: string;
-  timeout?: number;
-}
+// Re-export canonical ScenarioStep type from scenario-types.ts
+export type { ScenarioStepDef as ScenarioStep } from './scenario-types.js';
 
 export interface StepResult {
   step: number;
@@ -37,7 +41,7 @@ export function createGameEngine(): RunnerWithContext {
 
 export function runSteps(
   engine: RunnerWithContext,
-  steps: ScenarioStep[],
+  steps: ScenarioStepDef[],
   outDir: string,
 ): StepResult[] {
   mkdirSync(outDir, { recursive: true });
@@ -46,8 +50,8 @@ export function runSteps(
 
   for (let i = 0; i < steps.length; i++) {
     const step = steps[i];
-    const paddedIdx = String(i).padStart(2, '0');
-    const cmdSlug = step.command.split(/\s+/)[0].replace(/[^a-z0-9_-]/gi, '');
+    const paddedIdx = formatStepIndex(i);
+    const cmdSlug = formatCommandSlug(step.command);
 
     try {
       const result = runner.run(step.command);
@@ -84,19 +88,8 @@ export function runSteps(
     }
   }
 
-  // Save report
-  const MAX_REPORT_OUTPUT = 2000;
-  const report = results.map(r => ({
-    step: r.step,
-    command: r.command,
-    output: r.commandOutput.length > MAX_REPORT_OUTPUT
-      ? r.commandOutput.slice(0, MAX_REPORT_OUTPUT) + `... [truncated, ${r.commandOutput.length} chars total]`
-      : r.commandOutput,
-    error: r.error,
-    holes: (r.gameState as any)?.holeCount ?? 0,
-    charged: (r.gameState as any)?.chargedCount ?? 0,
-    sequenced: (r.gameState as any)?.sequencedCount ?? 0,
-  }));
+  // Save report using shared builder
+  const report = buildScenarioReport(results as unknown as ReportableStep[]);
   writeFileSync(resolve(outDir, 'report.json'), JSON.stringify(report, null, 2));
 
   return results;
@@ -105,7 +98,7 @@ export function runSteps(
 export function runScenario(
   engine: RunnerWithContext,
   name: string,
-  steps: ScenarioStep[],
+  steps: ScenarioStepDef[],
   baseOutDir: string,
 ): ScenarioResult {
   const outDir = resolve(baseOutDir, `scenario-${name}-command`);
@@ -125,7 +118,7 @@ export function runScenario(
     } else {
       console.log(`[${name}] OK — ${steps.length} steps`);
     }
-    return { name, totalSteps: steps.length, failed: failedSteps.length > 0, error: errors.join('\n'), report: resolve(outDir, 'report.json') };
+    return { name, totalSteps: steps.length, failed: failedSteps.length > 0, error: errors.join('\n'), reportPath: resolve(outDir, 'report.json') };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error(`[${name}] FAILED — ${msg}`);

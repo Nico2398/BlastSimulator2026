@@ -55,7 +55,7 @@ npx tsx scripts/scenario-test.ts --scenario blast-basic
 npx tsx scripts/scenario-test.ts --scenario my-interaction-test --mode interaction
 ```
 
-Interaction mode executes Puppeteer actions (click, type, waitForSelector, scroll) from scenario step `interaction` arrays. Steps without `interaction` fall back to command execution. Type definitions in `scripts/interaction-types.ts`.
+Interaction mode executes Puppeteer actions (click, type, waitForSelector, scroll) from scenario step `interaction` arrays. Steps without `interaction` fall back to command execution. Type definitions in `scripts/shared/scenario-types.ts`.
 
 ### Custom (command mode)
 ```bash

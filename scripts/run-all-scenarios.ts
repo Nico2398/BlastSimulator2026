@@ -12,18 +12,23 @@
  * Interaction mode: shared Puppeteer browser, ~2-3min for all 99.
  */
 
-import { readFileSync, readdirSync, existsSync, mkdirSync, writeFileSync } from 'fs';
+import { readdirSync, mkdirSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
 import puppeteer from 'puppeteer';
 import { resolveChromePath } from './shared/chrome.js';
 import { executeActionOnPage } from './shared/interaction-executor.js';
-import type { InteractionStepAction } from './shared/scenario-types.js';
+import type { InteractionStepAction, ScenarioStepDef } from './shared/scenario-types.js';
 import {
   createGameEngine,
   runScenario,
-  type ScenarioStep,
   type ScenarioResult,
 } from './shared/command-runner.js';
+import {
+  formatStepIndex,
+  formatCommandSlug,
+  loadScenarioDef,
+  parseScenarioSteps,
+} from './shared/scenario-utils.js';
 
 const SCENARIO_DIR = resolve(import.meta.dirname, 'scenario-defs');
 const SCREENSHOT_DIR = resolve(import.meta.dirname, '..', 'screenshots');
@@ -50,16 +55,15 @@ function parseArgs(): { mode: string; scenarios: string[]; port: number } {
   return { mode, scenarios, port };
 }
 
-function loadScenarioDefs(name: string): { steps: ScenarioStep[]; shots?: { name: string; yaw: number; pitch: number }[] } {
-  const defPath = resolve(SCENARIO_DIR, `${name}.json`);
-  if (!existsSync(defPath)) {
-    throw new Error(`Scenario not found: ${defPath}`);
-  }
-  const def = JSON.parse(readFileSync(defPath, 'utf-8'));
-  return {
-    steps: def.steps.map((s: any) => typeof s === 'string' ? { command: s } : s),
-    shots: def.shots,
+function loadLocalScenarioDefs(name: string): { steps: ScenarioStepDef[]; shots?: { name: string; yaw: number; pitch: number }[] } {
+  const def = loadScenarioDef(name, SCENARIO_DIR);
+  const result: { steps: ScenarioStepDef[]; shots?: { name: string; yaw: number; pitch: number }[] } = {
+    steps: parseScenarioSteps(def),
   };
+  if (def.shots) {
+    result.shots = def.shots;
+  }
+  return result;
 }
 
 async function runBatchInteraction(
@@ -85,7 +89,7 @@ async function runBatchInteraction(
       mkdirSync(outDir, { recursive: true });
 
       try {
-        const { steps, shots: scenarioShots } = loadScenarioDefs(name);
+        const { steps, shots: scenarioShots } = loadLocalScenarioDefs(name);
         const page = await browser.newPage();
         await page.setViewport({ width: 1280, height: 720 });
 
@@ -102,8 +106,8 @@ async function runBatchInteraction(
 
         for (let s = 0; s < steps.length; s++) {
           const step = steps[s];
-          const paddedIdx = String(s).padStart(2, '0');
-          const cmdSlug = step.command.split(/\s+/)[0].replace(/[^a-z0-9_-]/gi, '');
+          const paddedIdx = formatStepIndex(s);
+          const cmdSlug = formatCommandSlug(step.command);
           const stepTimeout = (step.timeout ?? 60) * 1000;
 
           try {
@@ -210,7 +214,7 @@ async function main(): Promise<void> {
     for (let i = 0; i < names.length; i++) {
       const name = names[i];
       try {
-        const steps = loadScenarioDefs(name).steps;
+        const steps = loadLocalScenarioDefs(name).steps;
         const result = runScenario(engine, name, steps, SCREENSHOT_DIR);
         results.push(result);
       } catch (err: unknown) {
