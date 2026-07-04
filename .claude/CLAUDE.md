@@ -17,6 +17,14 @@ npm run test            # Tests only
 npx tsx src/console.ts  # Interactive gameplay testing
 ```
 
+## Skills-First
+
+Before any task, load related skill(s) for domain rules, procedures, and constraints.
+
+## Capability Boundaries
+
+When a task requires capabilities the model lacks, reject directly. Examples: model modality gap (e.g., asked to classify images but has no vision), environment restriction (e.g., asked to write to a path outside allowed directories).
+
 ## Communication Style
 
 Respond terse. All technical substance stay. Only fluff die.
