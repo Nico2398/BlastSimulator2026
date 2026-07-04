@@ -1,5 +1,6 @@
 ---
 model: opencode/deepseek-v4-flash-free
+reasoningEffort: max
 description:  Internationalization reviewer. Flags hardcoded user-facing strings, missing translation keys, en.json/fr.json mismatches. Read-only.
 mode: subagent
 permission:

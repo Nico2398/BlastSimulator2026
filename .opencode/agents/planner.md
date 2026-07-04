@@ -1,5 +1,6 @@
 ---
 model: opencode/deepseek-v4-flash-free
+reasoningEffort: max
 description:  Produces structured implementation plan from issue. Read-only — no code changes. Analyzes requirements, inspects codebase, outputs files to create/modify, acceptance criteria, edge cases.
 mode: subagent
 permission:

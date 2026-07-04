@@ -1,5 +1,6 @@
 ---
 model: opencode/deepseek-v4-flash-free
+reasoningEffort: max
 description:  Answers questions about the codebase — algorithmic analysis, design rationale, performance, architecture, conventions. Read-only, no code changes.
 mode: subagent
 permission:

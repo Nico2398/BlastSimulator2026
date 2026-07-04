@@ -1,5 +1,6 @@
 ---
 model: opencode/deepseek-v4-flash-free
+reasoningEffort: max
 description: Executes simple imperative commands (create issue, comment, tag, etc.) using gh and shell.
 mode: subagent
 permission:

@@ -1,5 +1,6 @@
 ---
 model: opencode/deepseek-v4-flash-free
+reasoningEffort: max
 description:  Code quality reviewer. Flags architecture violations, naming issues, dead code, file size limits, TypeScript strictness, config hardcoding. Read-only.
 mode: subagent
 permission:

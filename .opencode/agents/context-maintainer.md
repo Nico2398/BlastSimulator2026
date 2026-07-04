@@ -1,5 +1,6 @@
 ---
 model: opencode/deepseek-v4-flash-free
+reasoningEffort: max
 description: Maintains context files after pipeline changes. Updates skills, agent definitions, and other context files to reflect project changes, and commits updates.
 mode: subagent
 permission:

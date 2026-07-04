@@ -1,5 +1,6 @@
 ---
 model: opencode/deepseek-v4-flash-free
+reasoningEffort: max
 description:  Agentic code duplication reviewer. Detects semantic duplication, non-atomic functions, generic code misplaced in specific modules, and cross-codebase logic similarities. Read-only.
 mode: subagent
 permission:

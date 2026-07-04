@@ -1,5 +1,6 @@
 ---
 model: opencode/deepseek-v4-flash-free
+reasoningEffort: max
 description:  PR audit gate. Audits PR for architecture, i18n, style, correctness. Runs full test suite. Reports pass/fail.
 mode: subagent
 permission:

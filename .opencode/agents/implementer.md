@@ -1,5 +1,6 @@
 ---
 model: opencode/deepseek-v4-flash-free
+reasoningEffort: max
 description:  TDD Green phase: minimum code to make failing tests pass. Correctness over elegance. Respects architecture + conventions.
 mode: subagent
 permission:

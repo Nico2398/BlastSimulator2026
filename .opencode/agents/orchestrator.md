@@ -1,6 +1,6 @@
 ---
 model: opencode/deepseek-v4-flash-free
-reasoningEffort: high
+reasoningEffort: max
 description:  Orchestrates the TDD development pipeline. Invokes specialist agents in the correct sequence. Does not write code directly — only delegates to sub-agents and manages workflow.
 mode: primary
 permission:
