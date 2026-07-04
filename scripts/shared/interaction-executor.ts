@@ -87,15 +87,15 @@ export async function executeActionOnPage(
       if (action.selector) {
         const element = await page.$(action.selector);
         if (!element) {
-          console.warn(`  Assert FAILED: selector "${action.selector}" not found`);
+          throw new Error(`Assert FAILED: selector "${action.selector}" not found`);
         } else if (action.property && action.expectedValue !== undefined) {
           const actual = await element.evaluate(
-            (el: Element, prop: string) => (el as any)[prop],
+            (el: Element, prop: string) => (el as Record<string, unknown>)[prop],
             action.property,
           );
           const passed = JSON.stringify(actual) === JSON.stringify(action.expectedValue);
           if (!passed) {
-            console.warn(`  Assert FAILED: expected ${action.property}=${JSON.stringify(action.expectedValue)}, got ${JSON.stringify(actual)}`);
+            throw new Error(`Assert FAILED: expected ${action.property}=${JSON.stringify(action.expectedValue)}, got ${JSON.stringify(actual)}`);
           }
         }
       }

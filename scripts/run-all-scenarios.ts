@@ -14,10 +14,7 @@
 
 import { readdirSync, mkdirSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
-import puppeteer from 'puppeteer';
-import { resolveChromePath, LAUNCH_ARGS } from './shared/chrome.js';
-import { executeActionOnPage } from './shared/interaction-executor.js';
-import type { InteractionStepAction, ScenarioStepDef } from './shared/scenario-types.js';
+import type { ScenarioStepDef } from './shared/scenario-types.js';
 import {
   createGameEngine,
   runScenario,
@@ -27,13 +24,17 @@ import {
   formatStepIndex,
   formatCommandSlug,
   loadScenarioDef,
-  parseScenarioSteps,
   buildScenarioReport,
   SCENARIO_DIR,
   type ReportableStep,
 } from './shared/scenario-utils.js';
+import {
+  initBrowser,
+  executeInteractionActions,
+  DEFAULT_STEP_TIMEOUT,
+  SCREENSHOT_DIR,
+} from './shared/puppeteer-utils.js';
 
-const SCREENSHOT_DIR = resolve(import.meta.dirname, '..', 'screenshots');
 const DEV_SERVER_PORT = 5173;
 
 function parseArgs(): { mode: string; scenarios: string[]; port: number } {
@@ -57,29 +58,14 @@ function parseArgs(): { mode: string; scenarios: string[]; port: number } {
   return { mode, scenarios, port };
 }
 
-function loadLocalScenarioDefs(name: string): { steps: ScenarioStepDef[]; shots?: { name: string; yaw: number; pitch: number }[] } {
-  const def = loadScenarioDef(name, SCENARIO_DIR);
-  const result: { steps: ScenarioStepDef[]; shots?: { name: string; yaw: number; pitch: number }[] } = {
-    steps: parseScenarioSteps(def),
-  };
-  if (def.shots) {
-    result.shots = def.shots;
-  }
-  return result;
-}
-
 async function runBatchInteraction(
   names: string[],
   port: number,
 ): Promise<ScenarioResult[]> {
-  const executablePath = resolveChromePath();
   console.log('\nLaunching shared browser...');
 
-  const browser = await puppeteer.launch({
-    headless: true,
-    executablePath,
-    args: LAUNCH_ARGS,
-  });
+  const { browser, page: _sharedPage } = await initBrowser({ port });
+  // Note: We create a new page per scenario for isolation
 
   const results: ScenarioResult[] = [];
   const startTime = Date.now();
@@ -91,7 +77,8 @@ async function runBatchInteraction(
       mkdirSync(outDir, { recursive: true });
 
       try {
-        const { steps, shots: scenarioShots } = loadLocalScenarioDefs(name);
+        const def = loadScenarioDef(name, SCENARIO_DIR);
+        const steps: ScenarioStepDef[] = def.steps;
         const page = await browser.newPage();
         await page.setViewport({ width: 1280, height: 720 });
 
@@ -111,50 +98,22 @@ async function runBatchInteraction(
           const step = steps[s];
           const paddedIdx = formatStepIndex(s);
           const cmdSlug = formatCommandSlug(step.command);
-          const stepTimeout = (step.timeout ?? 60) * 1000;
+          const stepTimeout = (step.timeout ?? DEFAULT_STEP_TIMEOUT) * 1000;
 
           try {
             await Promise.race([
               (async () => {
-                // Execute interaction actions
-                if (step.interaction && step.interaction.length > 0) {
-                  for (const action of step.interaction) {
-                    if (action.type === 'screenshot') continue;
-                    await executeActionOnPage(page, action as InteractionStepAction);
-                  }
-                }
-
-                // Reset tick accumulator
-                await page.evaluate(() => {
-                  if (typeof (window as any).__resetTickAccumulator === 'function') {
-                    (window as any).__resetTickAccumulator();
-                  }
-                });
-
-                // Extract game state
-                const gameState = await page.evaluate(() => {
-                  if (typeof (window as any).__gameState === 'function') {
-                    return (window as any).__gameState();
-                  }
-                  return null;
-                });
-
-                // Capture command output
-                const commandOutput = await page.evaluate(() => {
-                  if (typeof (window as any).__gameState === 'function') {
-                    const state = (window as any).__gameState();
-                    if (state && state.lastCommandOutput) return String(state.lastCommandOutput);
-                  }
-                  return '';
-                });
+                const interactionResult = await executeInteractionActions(
+                  page, step, false, outDir, paddedIdx, cmdSlug,
+                );
 
                 // Save state JSON
                 const stateData = {
                   step: s,
                   command: step.command,
-                  commandOutput,
-                  gameState,
-                  uiState: null,
+                  commandOutput: interactionResult.commandOutput,
+                  gameState: interactionResult.gameState,
+                  uiState: interactionResult.uiState,
                 };
                 const statePath = resolve(outDir, `step-${paddedIdx}-${cmdSlug}.json`);
                 writeFileSync(statePath, JSON.stringify(stateData, null, 2));
@@ -163,8 +122,8 @@ async function runBatchInteraction(
                 stepResults.push({
                   step: s,
                   command: step.command,
-                  commandOutput,
-                  gameState,
+                  commandOutput: interactionResult.commandOutput,
+                  gameState: interactionResult.gameState,
                 });
               })(),
               new Promise((_, reject) =>
@@ -234,7 +193,7 @@ async function main(): Promise<void> {
     for (let i = 0; i < names.length; i++) {
       const name = names[i];
       try {
-        const steps = loadLocalScenarioDefs(name).steps;
+        const steps = loadScenarioDef(name, SCENARIO_DIR).steps;
         const result = runScenario(engine, name, steps, SCREENSHOT_DIR);
         results.push(result);
       } catch (err: unknown) {

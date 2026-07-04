@@ -16,7 +16,7 @@ import {
 } from './scenario-utils.js';
 
 // Re-export canonical types from scenario-types.ts
-export type { ScenarioStepDef as ScenarioStep, StepResult } from './scenario-types.js';
+export type { StepResult } from './scenario-types.js';
 
 export interface ScenarioResult {
   name: string;

@@ -91,11 +91,3 @@ export function loadScenarioDef(name: string, dir?: string): ScenarioDef {
   }
   return JSON.parse(readFileSync(defPath, 'utf-8')) as ScenarioDef;
 }
-
-/**
- * Parse scenario steps from a ScenarioDef.
- * Steps are already ScenarioStepDef[] after dual-play conversion.
- */
-export function parseScenarioSteps(def: ScenarioDef): ScenarioStepDef[] {
-  return def.steps;
-}

@@ -16,7 +16,7 @@
  */
 export type InteractionStepAction =
   | { type: 'click'; x: number; y: number; button?: 'left' | 'right' | 'middle' }
-  | { type: 'clickSelector'; selector: string; button?: 'left' | 'right' | 'middle' }
+  | { type: 'clickSelector'; selector: string; button?: 'left' | 'right' | 'middle'; timeout?: number }
   | { type: 'mousedown'; x: number; y: number; button?: 'left' | 'right' | 'middle' }
   | { type: 'mouseup'; x: number; y: number; button?: 'left' | 'right' | 'middle' }
   | { type: 'mousemove'; x: number; y: number }
@@ -24,7 +24,7 @@ export type InteractionStepAction =
   | { type: 'keydown'; key: string }
   | { type: 'keyup'; key: string }
   | { type: 'scroll'; x: number; y: number }
-  | { type: 'wheel'; x: number; y: number; deltaX: number; deltaY: number; deltaZ: number }
+  | { type: 'wheel'; deltaX: number; deltaY: number }
   | { type: 'wait'; durationMs: number }
   | { type: 'waitForSelector'; selector: string; timeout?: number }
   | { type: 'type'; selector: string; text: string; delay?: number }
@@ -32,12 +32,6 @@ export type InteractionStepAction =
   | { type: 'viewport'; width: number; height: number }
   | { type: 'command'; command: string }
   | { type: 'screenshot' };
-
-/**
- * A scenario step — either a legacy string command or an object with
- * command + optional interaction array for dual-play support.
- */
-export type ScenarioStep = string | ScenarioStepDef;
 
 /**
  * Object form of a scenario step with command and optional interaction array.
@@ -48,7 +42,7 @@ export interface ScenarioStepDef {
   description?: string;
   frames?: number;
   interval?: number;
-  interaction?: InteractionStepAction[];
+  interaction: InteractionStepAction[];
 }
 
 /**

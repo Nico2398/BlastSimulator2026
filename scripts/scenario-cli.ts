@@ -9,7 +9,7 @@
 
 import { resolve } from 'path';
 import type { ScenarioStepDef } from './shared/scenario-types.js';
-import { loadScenarioDef, parseScenarioSteps } from './shared/scenario-utils.js';
+import { loadScenarioDef } from './shared/scenario-utils.js';
 import type { ShotDef } from './scenario-interaction-runner.js';
 
 export interface ParsedArgs {
@@ -50,7 +50,7 @@ export function parseArgs(): ParsedArgs {
       name = args[i + 1];
       try {
         const def = loadScenarioDef(name, resolve(process.cwd(), 'scripts/scenario-defs'));
-        steps = parseScenarioSteps(def);
+        steps = def.steps;
         if (def.shots && Array.isArray(def.shots)) {
           shots = def.shots.map(s => ({ name: s.name, yaw: s.yaw, pitch: s.pitch }));
         }

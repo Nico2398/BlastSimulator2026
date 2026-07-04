@@ -7,28 +7,27 @@
 import puppeteer from 'puppeteer';
 import { mkdirSync, writeFileSync, statSync } from 'fs';
 import { resolve } from 'path';
-import { resolveChromePath, LAUNCH_ARGS } from './shared/chrome.js';
-import { executeActionOnPage } from './shared/interaction-executor.js';
-import type { InteractionStepAction, ScenarioStepDef, StepResult } from './shared/scenario-types.js';
+import { LAUNCH_ARGS } from './shared/chrome.js';
+import type { ScenarioStepDef, StepResult } from './shared/scenario-types.js';
 import {
   formatStepIndex,
   formatCommandSlug,
   buildScenarioReport,
   type ReportableStep,
 } from './shared/scenario-utils.js';
+import {
+  initBrowser,
+  executeInteractionActions,
+  waitOneFrame,
+  DEFAULT_STEP_TIMEOUT,
+} from './shared/puppeteer-utils.js';
 
-const INIT_WAIT_MS = 0;
 const MAX_SCREENSHOT_BYTES = 5 * 1024 * 1024;
 
 export interface ShotDef {
   name: string;
   yaw: number;
   pitch: number;
-}
-
-/** Wait for one render frame (requestAnimationFrame). Screenshots need the GPU to flush a frame. */
-async function waitOneFrame(page: puppeteer.Page): Promise<void> {
-  await page.evaluate(() => new Promise(r => requestAnimationFrame(r)));
 }
 
 function checkScreenshotSize(filepath: string): string | undefined {
@@ -42,35 +41,6 @@ function checkScreenshotSize(filepath: string): string | undefined {
   return undefined;
 }
 
-/** Executes an array of interaction actions on the given Puppeteer page. */
-export async function executeInteractionStep(
-  page: puppeteer.Page,
-  actions: InteractionStepAction[],
-  timeout?: number,
-): Promise<void> {
-  const execute = async () => {
-    for (const action of actions) {
-      try {
-        await executeActionOnPage(page, action);
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.error(`  Interaction action error (${action.type}): ${msg}`);
-      }
-    }
-  };
-
-  if (timeout !== undefined && timeout > 0) {
-    await Promise.race([
-      execute(),
-      new Promise<void>((_, reject) =>
-        setTimeout(() => reject(new Error(`executeInteractionStep timed out after ${timeout}ms`)), timeout),
-      ),
-    ]);
-  } else {
-    await execute();
-  }
-}
-
 /** Run scenario in interaction mode (Puppeteer + Chrome). */
 export async function runScenarioInteraction(
   name: string, steps: ScenarioStepDef[], shots: ShotDef[],
@@ -81,31 +51,18 @@ export async function runScenarioInteraction(
 ): Promise<StepResult[]> {
   const outDir = resolve(screenshotDir, `scenario-${name}-interaction`);
   mkdirSync(outDir, { recursive: true });
-  const devServerUrl = `http://localhost:${port}`;
-  const executablePath = puppeteerPath ?? process.env.PUPPETEER_EXECUTABLE_PATH ?? resolveChromePath();
-  const browser = await puppeteer.launch({ headless: true, executablePath, args: LAUNCH_ARGS });
   const results: StepResult[] = [];
 
-  try {
-    const page = await browser.newPage();
-    await page.setViewport(viewport);
-    console.log(`Navigating to ${devServerUrl}...`);
-    await page.goto(devServerUrl, { waitUntil: 'networkidle0' });
-    await page.waitForSelector('#game-canvas, canvas', { timeout: 10000 });
-    console.log('Game canvas detected. Waiting for initialization...');
-    await new Promise(r => setTimeout(r, INIT_WAIT_MS));
-    await page.evaluate(() => {
-      const menu = document.getElementById('bs-main-menu');
-      if (menu) (menu as HTMLElement).style.display = 'none';
-    });
+  const { browser, page } = await initBrowser({ port, puppeteerPath, viewport });
 
+  try {
     for (let i = 0; i < steps.length; i++) {
       const step = steps[i];
       const paddedIdx = formatStepIndex(i);
       const cmdSlug = formatCommandSlug(step.command);
       console.log(`\n--- Step ${i}: ${step.command} ---`);
       let timedOut = false;
-      const stepTimeout = (step.timeout ?? 30) * 1000;
+      const stepTimeout = (step.timeout ?? DEFAULT_STEP_TIMEOUT) * 1000;
       const timeoutPromise = new Promise<void>((_, reject) =>
         setTimeout(() => { timedOut = true; reject(new Error(`Step ${i} timed out after ${stepTimeout}ms`)); }, stepTimeout)
       );
@@ -114,50 +71,10 @@ export async function runScenarioInteraction(
       try {
         await Promise.race([
           (async () => {
-            let commandOutput = '';
-            if (step.interaction && step.interaction.length > 0) {
-              let screenshotIndex = 0;
-              for (const action of step.interaction) {
-                if (action.type === 'screenshot' && enableScreenshots) {
-                  const ssPath = resolve(outDir, `step-${paddedIdx}-${cmdSlug}-ss${screenshotIndex}.png`);
-                  await page.screenshot({ path: ssPath, fullPage: false });
-                  stepScreenshotPaths.push(ssPath);
-                  console.log(`  Screenshot [${screenshotIndex}]: ${ssPath}`);
-                  screenshotIndex++;
-                } else if (action.type !== 'screenshot') {
-                  await executeActionOnPage(page, action);
-                }
-              }
-              commandOutput = await page.evaluate(() => {
-                if (typeof (window as any).__gameState === 'function') {
-                  const state = (window as any).__gameState();
-                  if (state && state.lastCommandOutput) return String(state.lastCommandOutput);
-                }
-                return '';
-              });
-            } else {
-              console.warn(`  Step ${i}: interaction mode but no interaction defined, skipping.`);
-            }
-
-            await page.evaluate(() => {
-              if (typeof (window as any).__resetTickAccumulator === 'function') {
-                (window as any).__resetTickAccumulator();
-              }
-            });
-
-            const gameState = await page.evaluate(() => {
-              if (typeof (window as any).__gameState === 'function') {
-                return (window as any).__gameState();
-              }
-              return null;
-            });
-
-            const uiState = await page.evaluate(() => {
-              if (typeof (window as any).__uiState === 'function') {
-                return (window as any).__uiState();
-              }
-              return null;
-            });
+            const interactionResult = await executeInteractionActions(
+              page, step, enableScreenshots, outDir, paddedIdx, cmdSlug,
+            );
+            stepScreenshotPaths.push(...interactionResult.screenshotPaths);
 
             let screenshotPath = '';
             let sizeWarn: string | undefined;
@@ -183,7 +100,8 @@ export async function runScenarioInteraction(
               }
             }
 
-            const stateData = { step: i, command: step.command, commandOutput, gameState, uiState,
+            const stateData = { step: i, command: step.command, commandOutput: interactionResult.commandOutput,
+              gameState: interactionResult.gameState, uiState: interactionResult.uiState,
               screenshots: stepScreenshotPaths.length > 0 ? stepScreenshotPaths : undefined };
             const statePath = resolve(outDir, `step-${paddedIdx}-${cmdSlug}.json`);
             writeFileSync(statePath, JSON.stringify(stateData, null, 2));
@@ -208,13 +126,14 @@ export async function runScenarioInteraction(
               }
             }
 
-            if (gameState) {
-              const gs = gameState as any;
+            if (interactionResult.gameState) {
+              const gs = interactionResult.gameState as Record<string, unknown>;
               console.log(`  Holes: ${gs.holeCount ?? 0}, Charged: ${gs.chargedCount ?? 0}, Sequenced: ${gs.sequencedCount ?? 0}`);
             }
 
-            results.push({ step: i, command: step.command, commandOutput: commandOutput as string,
-              gameState: gameState as any, uiState: uiState as any, screenshotPath, statePath, warning: sizeWarn });
+            results.push({ step: i, command: step.command, commandOutput: interactionResult.commandOutput,
+              gameState: interactionResult.gameState, uiState: interactionResult.uiState,
+              screenshotPath, statePath, warning: sizeWarn });
           })(),
           timeoutPromise,
         ]);
