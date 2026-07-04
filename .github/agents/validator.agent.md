@@ -15,7 +15,7 @@ Position: 4/5 (Validate). Prev: @refactorer. Next: @visual-tester (visual only).
 
 Run complete validation suite. Report results.
 
-## Validation Steps (all must pass)
+## ▶ PROCEDURE — EXECUTE IN ORDER. ALL STEPS MUST PASS.
 
 ### Step 1: TypeScript
 ```bash

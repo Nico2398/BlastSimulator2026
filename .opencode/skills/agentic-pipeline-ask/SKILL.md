@@ -6,16 +6,14 @@ description: >
   as question or analysis.
 ---
 
-## Ask Pipeline
+## ▶ PROCEDURE — EXECUTE IN ORDER. DO NOT SKIP. DO NOT IMPROVISE.
 
-Simple read-only analysis pipeline. No code changes.
+Simple read-only analysis pipeline. No code changes. No exploration between steps.
 
-```
-[ ] = orchestrator-executed command  |  @agent = AI agent invocation
-
-1. @ask        → Answer question directly (read-only analysis)
-2. [post]      → post @ask's answer as PR/issue comment via `gh pr comment` or `gh issue comment`
-```
+| Step | Who | Action |
+|------|-----|--------|
+| 1 | @ask | Answer question directly (read-only analysis) |
+| 2 | [post] | Post answer as PR/issue comment via `gh pr comment` or `gh issue comment` |
 
 ### Rules
 

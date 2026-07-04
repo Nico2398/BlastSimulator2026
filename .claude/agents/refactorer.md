@@ -49,7 +49,7 @@ Clean up code — clarity, maintainability, conventions. No behavior change.
 - [ ] Physics/rendering: try/catch for unexpected errors
 - [ ] Game never crashes — errors show message + continue
 
-## Process
+## ▶ PROCEDURE — EXECUTE IN ORDER
 
 0. `git branch --show-current` → verify branch is `pipeline/feature-<issue-number>`. If mismatch, print `## WRONG BRANCH: on <actual>, expected pipeline/feature-<N>` and return FAIL.
 1. `git diff main...HEAD` — full diff of changed files

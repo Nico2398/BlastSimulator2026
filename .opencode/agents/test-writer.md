@@ -30,7 +30,7 @@ Write failing tests capturing expected behavior **before** implementation.
 - **Integration tests** `tests/integration/` — gameplay flows via console commands
 - **Scenario definitions** `scripts/scenario-defs/*.json` — visual scenario tests
 
-## Process
+## ▶ PROCEDURE — EXECUTE IN ORDER
 
 0. `git branch --show-current` → verify branch is `pipeline/tests-<issue-number>`. If mismatch, print `## WRONG BRANCH: on <actual>, expected pipeline/tests-<N>` and return FAIL.
 1. Read planner output + existing stubs — understand expected behavior.

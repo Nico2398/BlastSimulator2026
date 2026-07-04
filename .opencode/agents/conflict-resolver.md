@@ -22,7 +22,7 @@ permission:
 
 Resolve git cherry-pick merge conflicts. Clean, minimal edits.
 
-## Steps
+## ▶ PROCEDURE — EXECUTE IN ORDER
 1. Read each conflicted file. Identify `<<<<<<<`, `=======`, `>>>>>>>` markers.
 2. Merge both sides — keep all functional code, drop duplicate lines.
 3. Prefer incoming branch (impl) when logic conflicts — it's the newer code.

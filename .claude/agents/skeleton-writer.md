@@ -11,7 +11,7 @@ Position: 1/5 (Skeleton). Prev: @planner. Next: @test-writer + @implementer (par
 
 Write **empty stubs only**. No implementation logic. No tests. Establish the shared API surface that both test-writer and implementer will work against.
 
-## Process
+## ▶ PROCEDURE — EXECUTE IN ORDER
 
 0. `git branch --show-current` → verify branch is `pipeline/tests-<issue-number>`. If mismatch, print `## WRONG BRANCH: on <actual>, expected pipeline/tests-<N>` and return FAIL.
 1. Read planner output — `## Plan` section, files to create/modify, acceptance criteria.

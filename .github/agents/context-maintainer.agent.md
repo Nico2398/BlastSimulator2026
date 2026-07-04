@@ -9,7 +9,7 @@ tools: ["agent", "read", "search", "execute"]
 
 Update context files to reflect changes introduced by the pipeline.
 
-## Process
+## ▶ PROCEDURE — EXECUTE IN ORDER
 
 1. **Identify changes** — List files modified in feature branch compared to main: `git diff --name-only main...HEAD`
 2. **Check context file relevance** — For each changed file, determine if its topic is documented in any context file (skills, agent definitions, prompts)

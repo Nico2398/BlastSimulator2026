@@ -9,6 +9,14 @@ description: Create GitHub issues formatted for agentic pipeline consumption wit
 
 Use when creating GitHub issues that will be picked up by autonomous coding agents (pipeline orchestrator + sub-agents). Every issue must be self-contained — the agent has no prior context beyond what's in the issue body.
 
+## ▶ PROCEDURE — EXECUTE IN ORDER
+
+1. Fill every field in the Issue Body Template below
+2. Verify all Rules (1-10) are satisfied
+3. Run through the Checklist before posting
+4. Create the issue via `gh issue create` with the completed template
+5. Apply labels: `gh issue edit <number> --add-label "agent-task" --add-label "ready"`
+
 ## Issue Body Template
 
 ```markdown

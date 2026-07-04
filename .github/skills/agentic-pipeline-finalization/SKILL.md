@@ -6,7 +6,7 @@ description: >
   of full, fix-bug, and multi pipelines.
 ---
 
-## Finalization Procedure
+## ▶ PROCEDURE — EXECUTE IN ORDER. DO NOT SKIP. DO NOT IMPROVISE.
 
 Runs after qualimetry passes. Branch: `pipeline/feature-<N>`.
 

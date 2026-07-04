@@ -6,7 +6,7 @@ description: >
   and finalization (via `agentic-pipeline-finalization`).
 ---
 
-## Full Pipeline
+## ▶ PROCEDURE — EXECUTE IN ORDER. DO NOT SKIP. DO NOT IMPROVISE.
 
 ```
 [ ] = orchestrator-executed command  |  @agent = AI agent invocation

@@ -16,7 +16,7 @@ Fix implementation code to make test suite pass.
 
 Arbiter between test expectation and implementation behavior. When a test fails, one of the two is wrong. Read both sides, judge, fix the faulty side.
 
-## Process
+## ▶ PROCEDURE — EXECUTE IN ORDER
 
 0. `git branch --show-current` → verify branch is `pipeline/feature-<issue-number>`. If mismatch, print `## WRONG BRANCH: on <actual>, expected pipeline/feature-<N>` and return FAIL.
 1. Read test failure output in system context.

@@ -22,7 +22,7 @@ Position: after @refactorer. Part of `agentic-pipeline-finalization`.
 
 Run complete validation suite. Report results.
 
-## Validation Steps (all must pass)
+## ▶ PROCEDURE — EXECUTE IN ORDER. ALL STEPS MUST PASS.
 
 ### Step 1: TypeScript
 ```bash

@@ -64,7 +64,7 @@ Verify semantic coherence between tests and implementation. Every test case must
 - Style preferences not in `dev-coding-conventions`.
 - "Consider adding more tests" without concrete missing coverage.
 
-## Process
+## ▶ PROCEDURE — EXECUTE IN ORDER
 
 1. Read `git diff main...HEAD --stat` for file list.
 2. Read the test file(s) — focus on new/modified test blocks.

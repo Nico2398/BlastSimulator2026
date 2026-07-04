@@ -11,7 +11,7 @@ tools: ["read", "search"]
 
 Answer questions about the codebase directly. Read-only — no code changes.
 
-## Approach
+## ▶ PROCEDURE — EXECUTE IN ORDER
 
 1. Read relevant code — inspect files in question
 2. Analyze — algorithmic complexity, architecture, performance

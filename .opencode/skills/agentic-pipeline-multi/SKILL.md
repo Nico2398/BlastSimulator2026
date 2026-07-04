@@ -7,7 +7,7 @@ description: >
   via `agentic-pipeline-finalization`.
 ---
 
-## Multi-Pipeline
+## ▶ PROCEDURE — EXECUTE IN ORDER. DO NOT SKIP. DO NOT IMPROVISE.
 
 Use when the prompt mixes multiple task types.
 

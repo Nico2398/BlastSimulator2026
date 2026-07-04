@@ -6,7 +6,7 @@ description: >
   (refactorer skipped).
 ---
 
-## Fix-Bug Pipeline
+## ▶ PROCEDURE — EXECUTE IN ORDER. DO NOT SKIP. DO NOT IMPROVISE.
 
 ```
  1. @planner                  → Plan the fix

@@ -20,7 +20,7 @@ permission:
 
 Execute simple imperative commands directly via `gh` or shell.
 
-## Pipeline
+## ▶ PROCEDURE — EXECUTE IN ORDER
 
 ```
 1. [execute]  → run the command directly via `gh` or shell

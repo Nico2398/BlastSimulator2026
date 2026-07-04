@@ -32,6 +32,17 @@ Two paths invoke this agent:
 
 In both contexts: run the full scenario suite, inspect every screenshot (including multi-angle shots), and report ALL visual failures found.
 
+## ▶ PROCEDURE — EXECUTE IN ORDER
+
+1. Verify branch: `git branch --show-current` → must be `pipeline/feature-<N>`
+2. Start dev server if not running
+3. Run scenario tests (predefined or custom)
+4. Inspect EVERY screenshot using vision capability
+5. Run a11y-check.ts and validate-state-schema.ts
+6. Report: `## VISUAL: PASS`, `## VISUAL: FAIL`, or `## VISION: BLOCKED`
+
+**If vision capability is unavailable → MUST report VISION: BLOCKED. Never report PASS without visual inspection.**
+
 ## Environment Setup
 
 ```bash

@@ -14,7 +14,9 @@ Position: after TDD pipeline or on code review request.
 
 Audit PR. Fix issues. Report pass when all checks pass.
 
-## Step 1: Run Tests
+## ▶ PROCEDURE — EXECUTE IN ORDER. DO NOT SKIP. DO NOT IMPROVISE.
+
+### Step 1: Run Tests
 
 ```bash
 npm run validate

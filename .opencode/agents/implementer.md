@@ -24,7 +24,7 @@ Position: 2/5 (Green). Prev: @test-writer. Next: @refactorer.
 
 Write **minimum code** to pass failing tests.
 
-## Process (Standard TDD)
+## ▶ PROCEDURE — Standard TDD
 
 0. `git branch --show-current` → verify branch is `pipeline/impl-<issue-number>`. If mismatch, print `## WRONG BRANCH: on <actual>, expected pipeline/impl-<N>` and return FAIL.
 1. Read failing tests → understand expected behavior
@@ -36,7 +36,7 @@ Write **minimum code** to pass failing tests.
 7. `git log --oneline -1` → confirm committed
 8. Hand off to refactorer
 
-## Process (Visual Feedback Loop)
+## ▶ PROCEDURE — Visual Feedback Loop
 
 Use when invoked from the visual feedback loop (orchestrator confirms `pipeline/feature-<N>`).
 

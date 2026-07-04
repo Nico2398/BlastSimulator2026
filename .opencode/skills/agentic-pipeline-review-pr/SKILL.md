@@ -6,13 +6,13 @@ description: >
   Use when the orchestrator classifies a task as PR review.
 ---
 
-## Review PR Pipeline
+## ▶ PROCEDURE — EXECUTE IN ORDER. DO NOT SKIP. DO NOT IMPROVISE.
 
- ```
- 1. Code review (parallel): @security-reviewer + @quality-reviewer + @i18n-reviewer + @duplication-reviewer + @semantic-reviewer
- 2. [merge-findings]  → Orchestrator merges sub-reviewer findings → pass/fail
- 3. @reviewer           → Runtime validation: run tests, post review outcome (report only — no fixes)
- ```
+| Step | Who | Action |
+|------|-----|--------|
+| 1 | @security-reviewer + @quality-reviewer + @i18n-reviewer + @duplication-reviewer + @semantic-reviewer | Parallel code review |
+| 2 | [merge-findings] | Orchestrator merges sub-reviewer findings → pass/fail |
+| 3 | @reviewer | Runtime validation: run tests, post review outcome (report only — no fixes) |
 
 ### Rules
 

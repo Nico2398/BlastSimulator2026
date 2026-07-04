@@ -13,7 +13,7 @@ tools: ["read", "search"]
 
 Produce structured implementation plan from issue. Read-only — no code changes.
 
-## Steps
+## ▶ PROCEDURE — EXECUTE IN ORDER. DO NOT SKIP. DO NOT IMPROVISE.
 1. Read issue body. Understand requirements.
 2. Inspect codebase: `read_file`, `grep`, `list_dir`.
 3. Load skill spec if relevant: `get_skill_context('<skill>')`.

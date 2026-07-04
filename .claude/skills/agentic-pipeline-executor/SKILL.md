@@ -6,16 +6,14 @@ description: >
   a task as an imperative command (label, assign, close, etc.).
 ---
 
-## Executor Pipeline
+## ▶ PROCEDURE — EXECUTE IN ORDER. DO NOT SKIP. DO NOT IMPROVISE.
 
 Simple command-execution pipeline. No code changes, no branch isolation.
 
-```
-[ ] = orchestrator-executed command  |  @agent = AI agent invocation
-
-1. @executor   → Execute imperative command via `gh` or shell
-2. [post]      → post result as PR/issue comment via `gh pr comment` or `gh issue comment`
-```
+| Step | Who | Action |
+|------|-----|--------|
+| 1 | @executor | Execute imperative command via `gh` or shell |
+| 2 | [post] | Post result as PR/issue comment via `gh pr comment` or `gh issue comment` |
 
 ### Rules
 

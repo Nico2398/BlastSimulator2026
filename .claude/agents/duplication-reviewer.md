@@ -68,7 +68,7 @@ handles that) — focus on **semantic and structural** duplication.
 - Speculative "this could be reused someday" without a concrete existing consumer.
 - Any issue in unchanged files that this PR does not affect.
 
-## Process
+## ▶ PROCEDURE — EXECUTE IN ORDER
 
 1. Read `SUMMARY.md` in the diff directory to get the list of changed files.
 2. For each changed file: read the patch, then read the full source file.

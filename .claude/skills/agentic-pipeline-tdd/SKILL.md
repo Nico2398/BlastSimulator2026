@@ -6,7 +6,7 @@ description: >
   with implementer branch blindness. Branch naming uses a <label> parameter.
 ---
 
-## TDD Cycle
+## ▶ PROCEDURE — EXECUTE IN ORDER. DO NOT SKIP. DO NOT IMPROVISE.
 
 Branch isolation is critical. Implementer never sees test source.
 
