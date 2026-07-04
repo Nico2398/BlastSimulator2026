@@ -45,7 +45,7 @@ jobs:
             const prBody = context.payload.pull_request.body || '';
 
             // --- 1. Find and close the completed issue ---
-            const closesMatch = prBody.match(/[Cc]loses?\s+#(\d+)/);
+            const closesMatch = prBody.match(/(?:Closes?|Resolves|Fixes)\s+#(\d+)/i);
             const issueNum = closesMatch?.[1];
 
             if (!issueNum) {
