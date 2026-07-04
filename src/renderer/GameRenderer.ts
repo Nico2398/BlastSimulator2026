@@ -25,7 +25,7 @@ import { isSurveyStale } from '../core/mining/SurveyCalc.js';
 export class GameRenderer {
   private readonly sm: SceneManager;
 
-  private terrain: TerrainMesh | null = null;
+  public terrain: TerrainMesh | null = null;
   private buildings: BuildingMesh | null = null;
   private vehicles: VehicleMesh | null = null;
   private characters: CharacterMesh | null = null;
