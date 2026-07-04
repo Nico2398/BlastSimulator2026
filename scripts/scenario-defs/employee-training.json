@@ -2,18 +2,122 @@
   "name": "employee-training",
   "description": "Chapter 3: Hire generalist employee, train drilling and geology skills, then complete a blast task",
   "steps": [
-    "new_game seed:42",
-    "campaign start level:dusty_hollow",
-    "time resume",
-    "employee hire role:driller",
-    "employee assign_skill id:1 skill:driving.excavator level:3",
-    "employee assign_skill id:1 skill:geology level:2",
-    "employee list",
-    "drill_plan grid rows:2 cols:2 spacing:5 depth:8 start:15,15",
-    "charge hole:* explosive:boomite amount:5 stemming:2",
-    "sequence auto delay_step:25",
-    "blast",
-    "fragments",
-    "state full"
+    {
+      "command": "new_game seed:42",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ]
+    },
+    {
+      "command": "campaign start level:dusty_hollow",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign start level:dusty_hollow"
+        }
+      ]
+    },
+    {
+      "command": "time resume",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time resume"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:driller"
+        }
+      ]
+    },
+    {
+      "command": "employee assign_skill id:1 skill:driving.excavator level:3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill id:1 skill:driving.excavator level:3"
+        }
+      ]
+    },
+    {
+      "command": "employee assign_skill id:1 skill:geology level:2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill id:1 skill:geology level:2"
+        }
+      ]
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ]
+    },
+    {
+      "command": "drill_plan grid rows:2 cols:2 spacing:5 depth:8 start:15,15",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:2 cols:2 spacing:5 depth:8 start:15,15"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:boomite amount:5 stemming:2"
+        }
+      ]
+    },
+    {
+      "command": "sequence auto delay_step:25",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sequence auto delay_step:25"
+        }
+      ]
+    },
+    {
+      "command": "blast",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "blast"
+        }
+      ]
+    },
+    {
+      "command": "fragments",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "fragments"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    }
   ]
 }

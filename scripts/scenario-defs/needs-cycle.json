@@ -2,15 +2,95 @@
   "name": "needs-cycle",
   "description": "Chapter 7: Hire 3 workers, advance 20 ticks, and verify canteen auto-queue for hunger relief",
   "steps": [
-    "new_game seed:42",
-    "campaign start level:dusty_hollow",
-    "time resume",
-    "employee hire role:driller",
-    "employee hire role:hauler",
-    "employee hire role:surveyor",
-    "build canteen at:5,5",
-    "tick 20",
-    "employee list",
-    "state full"
+    {
+      "command": "new_game seed:42",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ]
+    },
+    {
+      "command": "campaign start level:dusty_hollow",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign start level:dusty_hollow"
+        }
+      ]
+    },
+    {
+      "command": "time resume",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time resume"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:driller"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:hauler",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:hauler"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:surveyor",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:surveyor"
+        }
+      ]
+    },
+    {
+      "command": "build canteen at:5,5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build canteen at:5,5"
+        }
+      ]
+    },
+    {
+      "command": "tick 20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 20"
+        }
+      ]
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    }
   ]
 }

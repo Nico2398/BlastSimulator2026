@@ -23,43 +23,44 @@ npx tsx scripts/screenshot.ts --name "after-blast" --commands "new_game seed:1; 
 
 Multiple commands separated by `;`. Screenshots saved to `screenshots/`.
 
-## Scenario Testing (Per-Step Screenshots + State Dumps)
+## Scenario Testing (State Dumps + Optional Screenshots)
 
-### Command mode (default)
+### Single scenario runner
 ```bash
+# Command mode (default, pure Node.js, no browser)
+npx tsx scripts/scenario-test.ts --scenario blast-basic
+
+# Interaction mode (Puppeteer with real UI clicks)
+npx tsx scripts/scenario-test.ts --scenario blast-basic --mode interaction
+
+# With screenshots for visual inspection
+npx tsx scripts/scenario-test.ts --scenario blast-basic --mode interaction --screenshots
+
 # Inline commands
 npx tsx scripts/scenario-test.ts --name blast-test \
   --commands "new_game seed:42; drill_plan grid rows:2 cols:3 spacing:4 depth:6 start:15,15; charge hole:* explosive:boomite amount:5 stemming:2; sequence auto; blast"
-
-# Scenario definition file
-npx tsx scripts/scenario-test.ts --scenario blast-basic
 ```
 
-### Interaction mode
+### Batch runner (CI)
 ```bash
-npx tsx scripts/scenario-test.ts --scenario my-interaction-test --mode interaction
+# All scenarios, command mode (fastest)
+npx tsx scripts/run-all-scenarios.ts
+
+# All scenarios, interaction mode (shared browser)
+npx tsx scripts/run-all-scenarios.ts --mode interaction
+
+# Filter by name
+npx tsx scripts/run-all-scenarios.ts blast-basic tutorial-playthrough
 ```
 
-Interaction mode executes Puppeteer actions (click, type, waitForSelector, scroll, etc.) defined in scenario step `interaction` arrays. Type definitions in `scripts/interaction-types.ts`. Steps without `interaction` fall back to command execution.
+Interaction actions (clickSelector, waitForSelector, type, etc.) defined in scenario step `interaction` arrays. Type definitions in `scripts/shared/scenario-types.ts`. Steps without `interaction` use command execution.
 
 **Output per step:**
-- `step-NN-command.png` — screenshot after command
-- `step-NN-command.json` — game state + UI state + command output
+- `step-NN-command.json` — game state + command output (always)
+- `step-NN-command.png` — screenshot (only with `--screenshots`)
 - `report.json` — summary of all steps
 
 Scenario definitions in `scripts/scenario-defs/*.json`.
-
-### Available Predefined Scenarios
-
-| Scenario | Description |
-|----------|-------------|
-| `blast-basic` | Full blast pipeline |
-| `level1-win-efficient` | Complete level 1 winning run |
-| `level1-win-conservative` | Conservative strategy win |
-| `level1-lose-bankruptcy` | Game over via bankruptcy |
-| `level1-lose-arrest` | Game over via criminal charges |
-| `level1-lose-ecology` | Game over via environmental collapse |
-| `level1-lose-revolt` | Game over via worker revolt |
 
 ### State Extraction Bridges
 
@@ -106,8 +107,8 @@ Headless Chrome has no GPU. Expect:
 ## Before/After Screenshots
 
 When fixing visual issue:
-1. `--name "before-fix-ISSUE"` before change
-2. `--name "after-fix-ISSUE"` after change
+1. `--scenario "before-fix-ISSUE" --screenshots` before change
+2. `--scenario "after-fix-ISSUE" --screenshots` after change
 3. Compare both → confirm no visual regression
 
 ## Completion Criteria

@@ -2,22 +2,131 @@
   "name": "vehicle-driver-assignment-visual",
   "description": "Visual check: assign qualified driver to vehicle, verify driver info, enforce one driver per vehicle",
   "steps": [
-    { "command": "new_game seed:42", "timeout": 10 },
-    "campaign start level:dusty_hollow",
-    "vehicle buy debris_hauler",
-    "employee hire role:driver",
-    "employee assign_skill 1 skill:driving.truck level:1",
-    "vehicle list",
-    "vehicle driver 1 1",
-    "vehicle list",
-    "employee hire role:blaster",
-    "vehicle driver 1 2",
-    "vehicle list",
-    "state full"
+    {
+      "command": "new_game seed:42",
+      "timeout": 10,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ]
+    },
+    {
+      "command": "campaign start level:dusty_hollow",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign start level:dusty_hollow"
+        }
+      ]
+    },
+    {
+      "command": "vehicle buy debris_hauler",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle buy debris_hauler"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:driver"
+        }
+      ]
+    },
+    {
+      "command": "employee assign_skill 1 skill:driving.truck level:1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 1 skill:driving.truck level:1"
+        }
+      ]
+    },
+    {
+      "command": "vehicle list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle list"
+        }
+      ]
+    },
+    {
+      "command": "vehicle driver 1 1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 1 1"
+        }
+      ]
+    },
+    {
+      "command": "vehicle list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle list"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:blaster"
+        }
+      ]
+    },
+    {
+      "command": "vehicle driver 1 2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 1 2"
+        }
+      ]
+    },
+    {
+      "command": "vehicle list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle list"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    }
   ],
   "shots": [
-    { "name": "before-assignment", "yaw": 0, "pitch": 45 },
-    { "name": "after-qualified", "yaw": 45, "pitch": 30 },
-    { "name": "after-unqualified", "yaw": 90, "pitch": 15 }
+    {
+      "name": "before-assignment",
+      "yaw": 0,
+      "pitch": 45
+    },
+    {
+      "name": "after-qualified",
+      "yaw": 45,
+      "pitch": 30
+    },
+    {
+      "name": "after-unqualified",
+      "yaw": 90,
+      "pitch": 15
+    }
   ]
 }

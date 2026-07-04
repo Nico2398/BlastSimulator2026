@@ -2,39 +2,14 @@
  * BlastSimulator2026 — Shared Interaction Executor
  *
  * Executes a single interaction action on a Puppeteer page.
- * Shared by scenario-test and interaction-replay modules to avoid
- * duplicating the switch-based dispatch logic.
+ * Shared by scenario-test module for executing interaction actions
+ * in dual-play mode (interaction execution path).
  *
  * @module shared/interaction-executor
  */
 
-import type puppeteer from 'puppeteer';
-
-/**
- * A minimal action type that covers all supported interaction types.
- * Both InteractionStepAction and InteractionRecordEvent are compatible
- * with this interface.
- */
-export interface InteractionAction {
-  type: string;
-  x?: number;
-  y?: number;
-  button?: string;
-  key?: string;
-  selector?: string;
-  text?: string;
-  delay?: number;
-  durationMs?: number;
-  deltaX?: number;
-  deltaY?: number;
-  width?: number;
-  height?: number;
-  command?: string;
-  timeout?: number;
-  property?: string;
-  expectedValue?: unknown;
-  [key: string]: unknown;
-}
+import type { Page, KeyInput } from 'puppeteer';
+import type { InteractionStepAction } from './scenario-types.js';
 
 /** Maps button names to Puppeteer MouseButton values. */
 const BUTTON_MAP: Record<string, 'left' | 'right' | 'middle'> = {
@@ -53,13 +28,19 @@ const BUTTON_MAP: Record<string, 'left' | 'right' | 'middle'> = {
  * @param action - The interaction action to execute.
  */
 export async function executeActionOnPage(
-  page: puppeteer.Page,
-  action: InteractionAction,
+  page: Page,
+  action: InteractionStepAction,
 ): Promise<void> {
   switch (action.type) {
     case 'click': {
       const btn = BUTTON_MAP[action.button ?? 'left'] ?? 'left';
-      await page.mouse.click(action.x!, action.y!, { button: btn });
+      await page.mouse.click(action.x, action.y, { button: btn });
+      break;
+    }
+    case 'clickSelector': {
+      const btn = BUTTON_MAP[action.button ?? 'left'] ?? 'left';
+      await page.waitForSelector(action.selector, { timeout: action.timeout ?? 5000 });
+      await page.click(action.selector, { button: btn });
       break;
     }
     case 'mousedown': {
@@ -73,55 +54,57 @@ export async function executeActionOnPage(
       break;
     }
     case 'mousemove':
-      await page.mouse.move(action.x!, action.y!);
+      await page.mouse.move(action.x, action.y);
       break;
     case 'keypress':
-      await page.keyboard.press(action.key!);
+      await page.keyboard.press(action.key as KeyInput);
       break;
     case 'keydown':
-      await page.keyboard.down(action.key!);
+      await page.keyboard.down(action.key as KeyInput);
       break;
     case 'keyup':
-      await page.keyboard.up(action.key!);
+      await page.keyboard.up(action.key as KeyInput);
       break;
     case 'scroll':
       await page.evaluate(
         ({ x, y }: { x: number; y: number }) => window.scrollTo(x, y),
-        { x: action.x!, y: action.y! },
+        { x: action.x, y: action.y },
       );
       break;
     case 'wheel':
-      await page.mouse.wheel({ deltaX: action.deltaX!, deltaY: action.deltaY! });
+      await page.mouse.wheel({ deltaX: action.deltaX, deltaY: action.deltaY });
       break;
     case 'wait':
       await new Promise((r) => setTimeout(r, action.durationMs));
       break;
     case 'waitForSelector':
-      await page.waitForSelector(action.selector!, { timeout: action.timeout ?? 10000 });
+      await page.waitForSelector(action.selector, { timeout: action.timeout ?? 10000 });
       break;
     case 'type':
-      await page.type(action.selector!, action.text!, { delay: action.delay });
+      await page.type(action.selector, action.text, {
+        ...(action.delay !== undefined ? { delay: action.delay } : {}),
+      });
       break;
     case 'assert': {
       if (action.selector) {
         const element = await page.$(action.selector);
         if (!element) {
-          console.warn(`  Assert FAILED: selector "${action.selector}" not found`);
+          throw new Error(`Assert FAILED: selector "${action.selector}" not found`);
         } else if (action.property && action.expectedValue !== undefined) {
           const actual = await element.evaluate(
-            (el: Element, prop: string) => (el as any)[prop],
+            (el: Element, prop: string) => (el as unknown as Record<string, unknown>)[prop],
             action.property,
           );
           const passed = JSON.stringify(actual) === JSON.stringify(action.expectedValue);
           if (!passed) {
-            console.warn(`  Assert FAILED: expected ${action.property}=${JSON.stringify(action.expectedValue)}, got ${JSON.stringify(actual)}`);
+            throw new Error(`Assert FAILED: expected ${action.property}=${JSON.stringify(action.expectedValue)}, got ${JSON.stringify(actual)}`);
           }
         }
       }
       break;
     }
     case 'viewport':
-      await page.setViewport({ width: action.width!, height: action.height! });
+      await page.setViewport({ width: action.width, height: action.height });
       break;
     case 'command':
       await page.evaluate((cmd: string) => {
@@ -129,10 +112,16 @@ export async function executeActionOnPage(
           return (window as any).__gameConsole(cmd);
         }
         return undefined;
-      }, action.command!);
+      }, action.command);
       break;
-    default:
-      console.warn(`  Unknown interaction action type: ${action.type}`);
+    case 'screenshot':
+      // Screenshot is handled by the caller, not here
       break;
+    default: {
+      // Exhaustiveness check
+      const _exhaustive: never = action;
+      console.warn(`  Unknown interaction action type: ${(_exhaustive as any).type}`);
+      break;
+    }
   }
 }

@@ -2,29 +2,190 @@
   "name": "event-dialog-visual",
   "description": "Visual verification of the event dialog system: event categories (Unions, Politics, Weather, Mafia, Lawsuits), dialog with title/description/options, consequence display, and state updates after resolution.",
   "steps": [
-    { "command": "new_game seed:42", "timeout": 15 },
-    "campaign start level:dusty_hollow",
-    "time resume",
-    "event status",
-    "event fire union_coffee_uprising",
-    "event choose 0",
-    "tick 8",
-    "event choose 0",
-    "event fire tutorial_synergy_consultant",
-    "event choose 1",
-    "tick 8",
-    "event choose 0",
-    "event status",
-    "tick 8",
-    "event choose 0",
-    "scores",
-    "finances",
-    "state full"
+    {
+      "command": "new_game seed:42",
+      "timeout": 15,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ]
+    },
+    {
+      "command": "campaign start level:dusty_hollow",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign start level:dusty_hollow"
+        }
+      ]
+    },
+    {
+      "command": "time resume",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time resume"
+        }
+      ]
+    },
+    {
+      "command": "event status",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event status"
+        }
+      ]
+    },
+    {
+      "command": "event fire union_coffee_uprising",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event fire union_coffee_uprising"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "tick 8",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 8"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "event fire tutorial_synergy_consultant",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event fire tutorial_synergy_consultant"
+        }
+      ]
+    },
+    {
+      "command": "event choose 1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 1"
+        }
+      ]
+    },
+    {
+      "command": "tick 8",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 8"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "event status",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event status"
+        }
+      ]
+    },
+    {
+      "command": "tick 8",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 8"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    }
   ],
   "shots": [
-    { "name": "overview", "yaw": 0, "pitch": 45 },
-    { "name": "event-dialog", "yaw": 90, "pitch": 10 },
-    { "name": "event-options", "yaw": 45, "pitch": 30 },
-    { "name": "after-resolution", "yaw": 0, "pitch": 80 }
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45
+    },
+    {
+      "name": "event-dialog",
+      "yaw": 90,
+      "pitch": 10
+    },
+    {
+      "name": "event-options",
+      "yaw": 45,
+      "pitch": 30
+    },
+    {
+      "name": "after-resolution",
+      "yaw": 0,
+      "pitch": 80
+    }
   ]
 }

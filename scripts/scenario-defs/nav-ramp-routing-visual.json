@@ -2,18 +2,90 @@
   "name": "nav-ramp-routing-visual",
   "description": "Tests multi-level ramp routing with agents walking across levels",
   "steps": [
-    "new_game seed:42",
-    "build_ramp origin:5,15 direction:south length:10 depth:8",
-    "employee hire role:driller",
-    "employee list",
-    "tick 30",
-    "inspect 8,20,0",
-    "state full"
+    {
+      "command": "new_game seed:42",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ]
+    },
+    {
+      "command": "build_ramp origin:5,15 direction:south length:10 depth:8",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build_ramp origin:5,15 direction:south length:10 depth:8"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:driller"
+        }
+      ]
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ]
+    },
+    {
+      "command": "tick 30",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 30"
+        }
+      ]
+    },
+    {
+      "command": "inspect 8,20,0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "inspect 8,20,0"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    }
   ],
   "shots": [
-    {"name": "overview", "yaw": 0, "pitch": 45},
-    {"name": "closeup", "yaw": 90, "pitch": 10},
-    {"name": "birdseye", "yaw": 0, "pitch": 80},
-    {"name": "angled", "yaw": 135, "pitch": 30}
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45
+    },
+    {
+      "name": "closeup",
+      "yaw": 90,
+      "pitch": 10
+    },
+    {
+      "name": "birdseye",
+      "yaw": 0,
+      "pitch": 80
+    },
+    {
+      "name": "angled",
+      "yaw": 135,
+      "pitch": 30
+    }
   ]
 }

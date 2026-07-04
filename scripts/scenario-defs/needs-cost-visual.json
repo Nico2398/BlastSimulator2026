@@ -2,21 +2,122 @@
   "name": "needs-cost-visual",
   "description": "Visual check of need costs: after draining gauges and building living_quarters, advance ticks to trigger rest visits; verify finances output shows cash deductions for rest costs (hunger rest costs $50, break need rest costs $20, fatigue rest is free) and cash decreases accordingly",
   "steps": [
-    { "command": "new_game seed:42", "timeout": 30 },
-    "employee hire role:driller",
-    "finances",
-    "tick 100",
-    "finances",
-    "build living_quarters at:10,10",
-    "tick 20",
-    "finances",
-    "tick 50",
-    "finances",
-    "state full"
+    {
+      "command": "new_game seed:42",
+      "timeout": 30,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:driller"
+        }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "tick 100",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 100"
+        }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "build living_quarters at:10,10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build living_quarters at:10,10"
+        }
+      ]
+    },
+    {
+      "command": "tick 20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 20"
+        }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "tick 50",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    }
   ],
   "shots": [
-    { "name": "overview", "yaw": 0, "pitch": 45 },
-    { "name": "finances-panel", "yaw": 90, "pitch": 10 },
-    { "name": "cost-details", "yaw": 45, "pitch": 30 }
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45
+    },
+    {
+      "name": "finances-panel",
+      "yaw": 90,
+      "pitch": 10
+    },
+    {
+      "name": "cost-details",
+      "yaw": 45,
+      "pitch": 30
+    }
   ]
 }

@@ -2,21 +2,122 @@
   "name": "blast-charge-sequence-visual",
   "description": "Visual verification of charge loading UI and detonation sequence: explosive selection, amount, stemming, tubing, auto/manual sequencing, and delay patterns",
   "steps": [
-    { "command": "new_game seed:42", "timeout": 10 },
-    "drill_plan grid rows:2 cols:3 spacing:4 depth:6 start:15,15",
-    "charge hole:* explosive:boomite amount:5 stemming:2",
-    "charge hole:H1 explosive:boomite amount:8 stemming:3",
-    "sequence auto delay_step:25",
-    "sequence show",
-    "sequence set hole:H1 delay:0",
-    "sequence set hole:H2 delay:50",
-    "sequence show",
-    "state full",
-    "inspect 15,15,0"
+    {
+      "command": "new_game seed:42",
+      "timeout": 10,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ]
+    },
+    {
+      "command": "drill_plan grid rows:2 cols:3 spacing:4 depth:6 start:15,15",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:2 cols:3 spacing:4 depth:6 start:15,15"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:boomite amount:5 stemming:2"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:H1 explosive:boomite amount:8 stemming:3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:H1 explosive:boomite amount:8 stemming:3"
+        }
+      ]
+    },
+    {
+      "command": "sequence auto delay_step:25",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sequence auto delay_step:25"
+        }
+      ]
+    },
+    {
+      "command": "sequence show",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sequence show"
+        }
+      ]
+    },
+    {
+      "command": "sequence set hole:H1 delay:0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sequence set hole:H1 delay:0"
+        }
+      ]
+    },
+    {
+      "command": "sequence set hole:H2 delay:50",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sequence set hole:H2 delay:50"
+        }
+      ]
+    },
+    {
+      "command": "sequence show",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sequence show"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "inspect 15,15,0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "inspect 15,15,0"
+        }
+      ]
+    }
   ],
   "shots": [
-    { "name": "overview", "yaw": 0, "pitch": 45 },
-    { "name": "closeup", "yaw": 90, "pitch": 10 },
-    { "name": "birdseye", "yaw": 0, "pitch": 80 }
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45
+    },
+    {
+      "name": "closeup",
+      "yaw": 90,
+      "pitch": 10
+    },
+    {
+      "name": "birdseye",
+      "yaw": 0,
+      "pitch": 80
+    }
   ]
 }

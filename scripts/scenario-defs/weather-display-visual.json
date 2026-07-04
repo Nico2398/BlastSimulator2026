@@ -2,30 +2,199 @@
   "name": "weather-display-visual",
   "description": "Visual verification of the weather system: weather cycle (sunny → cloudy → rain → heavy rain → storm → heat wave → cold snap), weather indicator icon in HUD, weather command output, and visual effects on terrain appearance.",
   "steps": [
-    { "command": "new_game seed:42", "timeout": 15 },
-    "campaign start level:dusty_hollow",
-    "time resume",
-    "weather",
-    "weather advance",
-    "weather",
-    "weather advance",
-    "weather",
-    "weather advance",
-    "weather",
-    "weather advance",
-    "weather",
-    "weather advance",
-    "weather",
-    "weather advance",
-    "weather",
-    "weather advance",
-    "weather",
-    "state full"
+    {
+      "command": "new_game seed:42",
+      "timeout": 15,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ]
+    },
+    {
+      "command": "campaign start level:dusty_hollow",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign start level:dusty_hollow"
+        }
+      ]
+    },
+    {
+      "command": "time resume",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time resume"
+        }
+      ]
+    },
+    {
+      "command": "weather",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "weather"
+        }
+      ]
+    },
+    {
+      "command": "weather advance",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "weather advance"
+        }
+      ]
+    },
+    {
+      "command": "weather",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "weather"
+        }
+      ]
+    },
+    {
+      "command": "weather advance",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "weather advance"
+        }
+      ]
+    },
+    {
+      "command": "weather",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "weather"
+        }
+      ]
+    },
+    {
+      "command": "weather advance",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "weather advance"
+        }
+      ]
+    },
+    {
+      "command": "weather",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "weather"
+        }
+      ]
+    },
+    {
+      "command": "weather advance",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "weather advance"
+        }
+      ]
+    },
+    {
+      "command": "weather",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "weather"
+        }
+      ]
+    },
+    {
+      "command": "weather advance",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "weather advance"
+        }
+      ]
+    },
+    {
+      "command": "weather",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "weather"
+        }
+      ]
+    },
+    {
+      "command": "weather advance",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "weather advance"
+        }
+      ]
+    },
+    {
+      "command": "weather",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "weather"
+        }
+      ]
+    },
+    {
+      "command": "weather advance",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "weather advance"
+        }
+      ]
+    },
+    {
+      "command": "weather",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "weather"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    }
   ],
   "shots": [
-    { "name": "overview", "yaw": 0, "pitch": 45 },
-    { "name": "weather-icon", "yaw": 90, "pitch": 10 },
-    { "name": "birdseye", "yaw": 0, "pitch": 80 },
-    { "name": "angled", "yaw": 45, "pitch": 30 }
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45
+    },
+    {
+      "name": "weather-icon",
+      "yaw": 90,
+      "pitch": 10
+    },
+    {
+      "name": "birdseye",
+      "yaw": 0,
+      "pitch": 80
+    },
+    {
+      "name": "angled",
+      "yaw": 45,
+      "pitch": 30
+    }
   ]
 }

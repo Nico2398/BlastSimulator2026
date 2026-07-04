@@ -2,23 +2,140 @@
   "name": "vehicle-task-states-visual",
   "description": "Visual check: vehicle state transitions through idle moving working and waiting states",
   "steps": [
-    { "command": "new_game seed:42", "timeout": 10 },
-    "campaign start level:dusty_hollow",
-    "vehicle buy debris_hauler",
-    "vehicle list",
-    "vehicle move 1 to:25,25",
-    "vehicle list",
-    "tick 5",
-    "vehicle list",
-    "vehicle assign 1 task:transport",
-    "vehicle list",
-    "tick 3",
-    "vehicle list",
-    "state full"
+    {
+      "command": "new_game seed:42",
+      "timeout": 10,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ]
+    },
+    {
+      "command": "campaign start level:dusty_hollow",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign start level:dusty_hollow"
+        }
+      ]
+    },
+    {
+      "command": "vehicle buy debris_hauler",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle buy debris_hauler"
+        }
+      ]
+    },
+    {
+      "command": "vehicle list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle list"
+        }
+      ]
+    },
+    {
+      "command": "vehicle move 1 to:25,25",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle move 1 to:25,25"
+        }
+      ]
+    },
+    {
+      "command": "vehicle list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle list"
+        }
+      ]
+    },
+    {
+      "command": "tick 5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 5"
+        }
+      ]
+    },
+    {
+      "command": "vehicle list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle list"
+        }
+      ]
+    },
+    {
+      "command": "vehicle assign 1 task:transport",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle assign 1 task:transport"
+        }
+      ]
+    },
+    {
+      "command": "vehicle list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle list"
+        }
+      ]
+    },
+    {
+      "command": "tick 3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 3"
+        }
+      ]
+    },
+    {
+      "command": "vehicle list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle list"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    }
   ],
   "shots": [
-    { "name": "idle-state", "yaw": 0, "pitch": 45 },
-    { "name": "moving-state", "yaw": 45, "pitch": 30 },
-    { "name": "working-state", "yaw": 90, "pitch": 15 }
+    {
+      "name": "idle-state",
+      "yaw": 0,
+      "pitch": 45
+    },
+    {
+      "name": "moving-state",
+      "yaw": 45,
+      "pitch": 30
+    },
+    {
+      "name": "working-state",
+      "yaw": 90,
+      "pitch": 15
+    }
   ]
 }

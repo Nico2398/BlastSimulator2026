@@ -22,7 +22,7 @@ interface SchemaField {
   description?: string;
 }
 
-type Schema = Record<string, SchemaField | Schema>;
+type Schema = Record<string, SchemaField | Record<string, SchemaField>>;
 
 interface ValidationError {
   path: string;
@@ -188,15 +188,18 @@ function parseArgs(): { path?: string; dir?: string } {
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--state' && args[i + 1]) {
-      path = resolve(process.cwd(), args[i + 1]);
+      path = resolve(process.cwd(), args[i + 1]!);
       i++;
     } else if (args[i] === '--dir' && args[i + 1]) {
-      dir = resolve(process.cwd(), args[i + 1]);
+      dir = resolve(process.cwd(), args[i + 1]!);
       i++;
     }
   }
 
-  return { path, dir };
+  return {
+    ...(path !== undefined ? { path } : {}),
+    ...(dir !== undefined ? { dir } : {}),
+  };
 }
 
 function main(): void {

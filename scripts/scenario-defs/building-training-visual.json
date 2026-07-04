@@ -2,21 +2,122 @@
   "name": "building-training-visual",
   "description": "Visual check of training buildings: driving center, blasting academy, management office, and geology lab",
   "steps": [
-    { "command": "new_game seed:42", "timeout": 10 },
-    "build driving_center at:5,5",
-    "build blasting_academy at:10,5",
-    "build management_office at:15,5",
-    "build geology_lab at:20,5",
-    "build list",
-    "employee hire role:driller",
-    "employee hire role:blaster",
-    "employee list",
-    "tick 1",
-    "state full"
+    {
+      "command": "new_game seed:42",
+      "timeout": 10,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ]
+    },
+    {
+      "command": "build driving_center at:5,5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build driving_center at:5,5"
+        }
+      ]
+    },
+    {
+      "command": "build blasting_academy at:10,5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build blasting_academy at:10,5"
+        }
+      ]
+    },
+    {
+      "command": "build management_office at:15,5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build management_office at:15,5"
+        }
+      ]
+    },
+    {
+      "command": "build geology_lab at:20,5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build geology_lab at:20,5"
+        }
+      ]
+    },
+    {
+      "command": "build list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build list"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:driller"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:blaster"
+        }
+      ]
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ]
+    },
+    {
+      "command": "tick 1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 1"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    }
   ],
   "shots": [
-    { "name": "overview", "yaw": 0, "pitch": 45 },
-    { "name": "training-area", "yaw": 90, "pitch": 10 },
-    { "name": "closeup", "yaw": 45, "pitch": 30 }
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45
+    },
+    {
+      "name": "training-area",
+      "yaw": 90,
+      "pitch": 10
+    },
+    {
+      "name": "closeup",
+      "yaw": 45,
+      "pitch": 30
+    }
   ]
 }

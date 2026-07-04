@@ -7,6 +7,10 @@ on:
   pull_request:
     branches:
       - main
+  schedule:
+    # Weekly full run (Monday 4am UTC) to catch regressions
+    - cron: '0 4 * * 1'
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -41,6 +45,9 @@ jobs:
 
       - name: Run TypeScript type check
         run: npx tsc --noEmit
+
+      - name: Run TypeScript type check on scripts/
+        run: npx tsc --noEmit --project scripts/tsconfig.json
 
   test:
     name: Unit & integration tests
@@ -113,11 +120,60 @@ jobs:
           name: build-artifacts
           path: dist/
 
-  # TODO: Extend this to run ALL scenario tests with both modes in a future PR.
-  # For now, we only test blast-basic to validate the dual-play infrastructure.
-  scenario-dual-play:
-    name: Scenario dual-play test (blast-basic)
+  # Runs all scenarios in command mode (fast, no browser).
+  # Always runs on every push/PR/schedule/manual trigger.
+  scenario-command:
+    name: "Scenarios (command mode)"
     runs-on: ubuntu-latest
+    needs:
+      - typecheck
+      - test
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Cache npm dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Run all scenarios (command mode — batch, no browser)
+        run: |
+          if ! npx tsx scripts/run-all-scenarios.ts; then
+            echo ""
+            echo "========================================"
+            echo "Some command-mode scenarios failed. Check logs above."
+            echo "========================================"
+            exit 1
+          fi
+          echo "All scenarios passed in command mode."
+
+  # Runs all scenarios in interaction mode (Puppeteer, slow).
+  # Runs only on:
+  #   - Push to main (catches regressions after merge)
+  #   - Schedule (weekly full scan)
+  #   - workflow_dispatch (manual trigger)
+  #   - PRs labeled "full-ci" (opts in for risky changes)
+  scenario-interaction:
+    name: "Scenarios (interaction mode)"
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name != 'pull_request' ||
+      contains(github.event.pull_request.labels.*.name, 'full-ci')
     needs:
       - typecheck
       - test
@@ -153,11 +209,16 @@ jobs:
           sleep 5
           curl -s http://localhost:5173 > /dev/null || (echo "Dev server failed to start" && exit 1)
 
-      - name: Run scenario test (command mode)
-        run: npx tsx scripts/scenario-test.ts --scenario blast-basic --mode command
-
-      - name: Run scenario test (interaction mode)
-        run: npx tsx scripts/scenario-test.ts --scenario blast-basic --mode interaction
+      - name: Run all scenarios (interaction mode — batch, shared browser)
+        run: |
+          if ! npx tsx scripts/run-all-scenarios.ts --mode interaction; then
+            echo ""
+            echo "========================================"
+            echo "Some interaction-mode scenarios failed. Check logs above."
+            echo "========================================"
+            exit 1
+          fi
+          echo "All scenarios passed in interaction mode."
 
       - name: Stop dev server
         if: always()

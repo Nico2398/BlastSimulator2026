@@ -2,14 +2,86 @@
   "name": "skill-progression",
   "description": "Chapter 3: Hire driller, assign drilling skill, and verify Level 5 after 700 ticks of work",
   "steps": [
-    "new_game seed:42",
-    "campaign start level:dusty_hollow",
-    "time resume",
-    "employee hire role:driller",
-    "employee assign_skill id:1 skill:driving.excavator level:1",
-    "employee list",
-    "tick 700",
-    "employee list",
-    "state full"
+    {
+      "command": "new_game seed:42",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ]
+    },
+    {
+      "command": "campaign start level:dusty_hollow",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign start level:dusty_hollow"
+        }
+      ]
+    },
+    {
+      "command": "time resume",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time resume"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:driller"
+        }
+      ]
+    },
+    {
+      "command": "employee assign_skill id:1 skill:driving.excavator level:1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill id:1 skill:driving.excavator level:1"
+        }
+      ]
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ]
+    },
+    {
+      "command": "tick 700",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 700"
+        }
+      ]
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    }
   ]
 }

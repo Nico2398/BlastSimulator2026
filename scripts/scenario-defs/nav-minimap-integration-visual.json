@@ -2,18 +2,90 @@
   "name": "nav-minimap-integration-visual",
   "description": "Tests minimap integration with navgrid overlay showing cell types",
   "steps": [
-    "new_game seed:42",
-    "drill_plan grid rows:2 cols:2 spacing:5 depth:6 start:5,5",
-    "build management_office at:2,2",
-    "build management_office at:8,8",
-    "employee hire role:driller",
-    "employee list",
-    "tick 10"
+    {
+      "command": "new_game seed:42",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ]
+    },
+    {
+      "command": "drill_plan grid rows:2 cols:2 spacing:5 depth:6 start:5,5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:2 cols:2 spacing:5 depth:6 start:5,5"
+        }
+      ]
+    },
+    {
+      "command": "build management_office at:2,2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build management_office at:2,2"
+        }
+      ]
+    },
+    {
+      "command": "build management_office at:8,8",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build management_office at:8,8"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:driller"
+        }
+      ]
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    }
   ],
   "shots": [
-    {"name": "overview", "yaw": 0, "pitch": 45},
-    {"name": "closeup", "yaw": 90, "pitch": 10},
-    {"name": "birdseye", "yaw": 0, "pitch": 80},
-    {"name": "angled", "yaw": 135, "pitch": 30}
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45
+    },
+    {
+      "name": "closeup",
+      "yaw": 90,
+      "pitch": 10
+    },
+    {
+      "name": "birdseye",
+      "yaw": 0,
+      "pitch": 80
+    },
+    {
+      "name": "angled",
+      "yaw": 135,
+      "pitch": 30
+    }
   ]
 }

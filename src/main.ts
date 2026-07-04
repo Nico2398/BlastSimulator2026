@@ -114,6 +114,7 @@ declare global {
     __cameraOrbit: (yaw: number, pitch: number) => void;
     __cameraReset: () => void;
     __startTutorial: () => void;
+    __resetTickAccumulator: () => void;
   }
 }
 
@@ -182,6 +183,8 @@ window.__gameState = () => {
     profit: s.levelStats?.totalWealth ?? 0,
   };
 };
+
+window.__resetTickAccumulator = () => { accumulatedGameMs = 0; };
 
 window.__uiState = () => {
   const panels = ['bs-blast-panel', 'bs-contract-panel', 'bs-build-panel',

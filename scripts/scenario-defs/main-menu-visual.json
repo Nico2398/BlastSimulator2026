@@ -2,20 +2,109 @@
   "name": "main-menu-visual",
   "description": "Visual verification of the main menu: title and subtitle display, menu buttons (New Campaign, Tutorial, Continue, Load, Settings), world map with three campaign level cards (Dusty Hollow, Grumpstone Ridge, Treranium Depths) with lock/unlock status and completion stars, and campaign level selection flow.",
   "steps": [
-    { "command": "new_game seed:42", "timeout": 15 },
-    "campaign start level:dusty_hollow",
-    "time resume",
-    "tick 5",
-    "event choose 0",
-    "scores",
-    "finances",
-    "campaign status",
-    "state full"
+    {
+      "command": "new_game seed:42",
+      "timeout": 15,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ]
+    },
+    {
+      "command": "campaign start level:dusty_hollow",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign start level:dusty_hollow"
+        }
+      ]
+    },
+    {
+      "command": "time resume",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time resume"
+        }
+      ]
+    },
+    {
+      "command": "tick 5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 5"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "campaign status",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign status"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    }
   ],
   "shots": [
-    { "name": "overview", "yaw": 0, "pitch": 45 },
-    { "name": "terrain-view", "yaw": 90, "pitch": 10 },
-    { "name": "campaign-info", "yaw": 45, "pitch": 30 },
-    { "name": "birdseye", "yaw": 0, "pitch": 80 }
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45
+    },
+    {
+      "name": "terrain-view",
+      "yaw": 90,
+      "pitch": 10
+    },
+    {
+      "name": "campaign-info",
+      "yaw": 45,
+      "pitch": 30
+    },
+    {
+      "name": "birdseye",
+      "yaw": 0,
+      "pitch": 80
+    }
   ]
 }

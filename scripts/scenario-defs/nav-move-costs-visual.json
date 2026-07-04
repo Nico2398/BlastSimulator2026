@@ -2,16 +2,72 @@
   "name": "nav-move-costs-visual",
   "description": "Tests move cost visualization showing different cell types with varying costs",
   "steps": [
-    "new_game seed:42",
-    "drill_plan grid rows:1 cols:3 spacing:4 depth:6 start:5,5",
-    "build management_office at:2,2",
-    "state full",
-    "tick 5"
+    {
+      "command": "new_game seed:42",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ]
+    },
+    {
+      "command": "drill_plan grid rows:1 cols:3 spacing:4 depth:6 start:5,5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:1 cols:3 spacing:4 depth:6 start:5,5"
+        }
+      ]
+    },
+    {
+      "command": "build management_office at:2,2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build management_office at:2,2"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "tick 5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 5"
+        }
+      ]
+    }
   ],
   "shots": [
-    {"name": "overview", "yaw": 0, "pitch": 45},
-    {"name": "closeup", "yaw": 90, "pitch": 10},
-    {"name": "birdseye", "yaw": 0, "pitch": 80},
-    {"name": "angled", "yaw": 135, "pitch": 30}
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45
+    },
+    {
+      "name": "closeup",
+      "yaw": 90,
+      "pitch": 10
+    },
+    {
+      "name": "birdseye",
+      "yaw": 0,
+      "pitch": 80
+    },
+    {
+      "name": "angled",
+      "yaw": 135,
+      "pitch": 30
+    }
   ]
 }

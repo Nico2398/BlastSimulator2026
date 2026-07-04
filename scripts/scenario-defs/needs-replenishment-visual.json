@@ -2,25 +2,158 @@
   "name": "needs-replenishment-visual",
   "description": "Visual check of building replenishment rates: after gauges drain via 100 ticks of work, build living_quarters tier 1 and advance ticks to verify need replenishment (hunger +12/tick, fatigue +8/tick, breakNeed +10/tick) restores gauge values over time",
   "steps": [
-    { "command": "new_game seed:42", "timeout": 30 },
-    "employee hire role:driller",
-    "needs",
-    "tick 100",
-    "needs",
-    "build living_quarters at:10,10",
-    "tick 10",
-    "needs",
-    "tick 20",
-    "needs",
-    "tick 30",
-    "needs",
-    "tick 50",
-    "needs",
-    "state full"
+    {
+      "command": "new_game seed:42",
+      "timeout": 30,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:driller"
+        }
+      ]
+    },
+    {
+      "command": "needs",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "needs"
+        }
+      ]
+    },
+    {
+      "command": "tick 100",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 100"
+        }
+      ]
+    },
+    {
+      "command": "needs",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "needs"
+        }
+      ]
+    },
+    {
+      "command": "build living_quarters at:10,10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build living_quarters at:10,10"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "needs",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "needs"
+        }
+      ]
+    },
+    {
+      "command": "tick 20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 20"
+        }
+      ]
+    },
+    {
+      "command": "needs",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "needs"
+        }
+      ]
+    },
+    {
+      "command": "tick 30",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 30"
+        }
+      ]
+    },
+    {
+      "command": "needs",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "needs"
+        }
+      ]
+    },
+    {
+      "command": "tick 50",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ]
+    },
+    {
+      "command": "needs",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "needs"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    }
   ],
   "shots": [
-    { "name": "overview", "yaw": 0, "pitch": 45 },
-    { "name": "building-placement", "yaw": 90, "pitch": 10 },
-    { "name": "replenished-gauges", "yaw": 45, "pitch": 30 }
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45
+    },
+    {
+      "name": "building-placement",
+      "yaw": 90,
+      "pitch": 10
+    },
+    {
+      "name": "replenished-gauges",
+      "yaw": 45,
+      "pitch": 30
+    }
   ]
 }

@@ -2,18 +2,19 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, existsSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import type { ScenarioDef, ScenarioStepDef } from '../../scripts/shared/scenario-types.js';
+import { loadScenarioDef, SCENARIO_DIR } from '../../scripts/shared/scenario-utils.js';
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
-const SCENARIO_DIR = resolve(currentDir, '../../scripts/scenario-defs');
 
 // ── Dual-play interaction action types ──
 
 const KNOWN_INTERACTION_ACTION_TYPES = [
-  'click', 'mousedown', 'mouseup', 'mousemove',
+  'click', 'clickSelector', 'mousedown', 'mouseup', 'mousemove',
   'keypress', 'keydown', 'keyup',
   'scroll', 'wheel',
   'wait', 'waitForSelector', 'type',
-  'assert', 'viewport', 'command',
+  'assert', 'viewport', 'command', 'screenshot',
 ] as const;
 
 const PLAYTHROUGH_SCENARIO_NAMES = [
@@ -24,6 +25,7 @@ const PLAYTHROUGH_SCENARIO_NAMES = [
   'level2-playthrough-bankruptcy',
   'level3-playthrough-win',
   'level3-playthrough-ecology',
+  'survey-then-blast-playthrough',
 ] as const;
 
 const FEATURE_SCENARIO_NAMES = [
@@ -42,6 +44,21 @@ const FEATURE_SCENARIO_NAMES = [
   'collapse-recovery',
   'contract-negotiation',
   'weather-flood',
+  'blast-basic',
+  'blast-charge-loading-ui',
+  'blast-detonation-sequence-ui',
+  'blast-drill-plan-ui',
+  'blast-execution-effects',
+  'blast-preview-software-tiers',
+  'blast-report-metrics',
+  'blast-voxel-fragmentation',
+  'employee-skills-visual',
+  'level1-lose-arrest',
+  'level1-lose-bankruptcy',
+  'level1-lose-ecology',
+  'level1-lose-revolt',
+  'level1-win-conservative',
+  'level1-win-efficient',
 ] as const;
 
 const VISUAL_SCENARIO_NAMES = [
@@ -96,6 +113,16 @@ const VISUAL_SCENARIO_NAMES = [
   'vehicle-roles-panel-visual',
   'vehicle-task-states-visual',
   'vehicle-traffic-routing-visual',
+  'survey-confidence-display',
+  'survey-confidence-overlay',
+  'survey-execution',
+  'survey-method-selection',
+  'survey-ore-vein-visibility',
+  'survey-overlay-lifecycle',
+  'survey-post-blast-ore-report',
+  'survey-result-visualization',
+  'survey-seismic-side-effects',
+  'survey-stale-handling',
 ] as const;
 
 const ALL_SCENARIO_NAMES = [
@@ -117,27 +144,6 @@ const KNOWN_COMMANDS = [
 
 /** Commands that inspect state — valid as a final playthrough step */
 const INSPECTION_COMMANDS = ['campaign', 'state', 'scores', 'finances', 'stats', 'inspect'];
-
-interface ScenarioStepDef {
-  command: string;
-  timeout?: number;
-  description?: string;
-  frames?: number;
-  interval?: number;
-}
-
-interface ScenarioDef {
-  name: string;
-  description: string;
-  steps: Array<string | ScenarioStepDef>;
-  shots?: Array<{ name: string; yaw: number; pitch: number }>;
-}
-
-function loadScenario(name: string): ScenarioDef {
-  const filePath = resolve(SCENARIO_DIR, `${name}.json`);
-  const raw = readFileSync(filePath, 'utf-8');
-  return JSON.parse(raw) as ScenarioDef;
-}
 
 // ──────────────────────────────────────────────
 // 1. File existence & valid JSON
@@ -163,19 +169,19 @@ describe('Scenario JSON files exist and parse', () => {
 describe('Scenario has required top-level fields', () => {
   for (const name of ALL_SCENARIO_NAMES) {
     it(`${name} — has "name" field (string)`, () => {
-      const scenario = loadScenario(name);
+      const scenario = loadScenarioDef(name, SCENARIO_DIR);
       expect(scenario).toHaveProperty('name');
       expect(typeof scenario.name).toBe('string');
     });
 
     it(`${name} — has "description" field (string)`, () => {
-      const scenario = loadScenario(name);
+      const scenario = loadScenarioDef(name, SCENARIO_DIR);
       expect(scenario).toHaveProperty('description');
       expect(typeof scenario.description).toBe('string');
     });
 
     it(`${name} — has "steps" field (array)`, () => {
-      const scenario = loadScenario(name);
+      const scenario = loadScenarioDef(name, SCENARIO_DIR);
       expect(scenario).toHaveProperty('steps');
       expect(Array.isArray(scenario.steps)).toBe(true);
     });
@@ -188,7 +194,7 @@ describe('Scenario has required top-level fields', () => {
 describe('Scenario name matches filename', () => {
   for (const name of ALL_SCENARIO_NAMES) {
     it(`${name} — JSON name field matches filename`, () => {
-      const scenario = loadScenario(name);
+      const scenario = loadScenarioDef(name, SCENARIO_DIR);
       expect(scenario.name).toBe(name);
     });
   }
@@ -200,7 +206,7 @@ describe('Scenario name matches filename', () => {
 describe('Scenario steps are non-empty', () => {
   for (const name of ALL_SCENARIO_NAMES) {
     it(`${name} — has non-empty steps array`, () => {
-      const scenario = loadScenario(name);
+      const scenario = loadScenarioDef(name, SCENARIO_DIR);
       expect(scenario.steps.length).toBeGreaterThan(0);
     });
   }
@@ -212,26 +218,28 @@ describe('Scenario steps are non-empty', () => {
 describe('Playthrough scenarios have sufficient steps', () => {
   for (const name of PLAYTHROUGH_SCENARIO_NAMES) {
     it(`${name} — has at least 15 steps`, () => {
-      const scenario = loadScenario(name);
+      const scenario = loadScenarioDef(name, SCENARIO_DIR);
       expect(scenario.steps.length).toBeGreaterThanOrEqual(15);
     });
   }
 });
 
 // ──────────────────────────────────────────────
-// 6. All steps are strings or step objects
+// 6. All steps are objects with command field (strings not allowed after dual-play conversion)
 // ──────────────────────────────────────────────
-describe('All steps are strings or step objects', () => {
+describe('All steps are objects with command field', () => {
   for (const name of ALL_SCENARIO_NAMES) {
-    it(`${name} — every step is a string or step object with optional timeout/frames/interval fields`, () => {
-      const scenario = loadScenario(name);
+    it(`${name} — every step is an object with a command field (no plain strings)`, () => {
+      const scenario = loadScenarioDef(name, SCENARIO_DIR);
       for (let i = 0; i < scenario.steps.length; i++) {
         const step = scenario.steps[i];
-        const isString = typeof step === 'string';
-        const isStepObj = typeof step === 'object' && step !== null && typeof (step as any).command === 'string';
+        expect(typeof step !== 'string',
+          `step[${i}] is a plain string "${step}". All steps must be objects with a command field.`,
+        ).toBe(true);
+        const isStepObj = typeof step === 'object' && step !== null && typeof (step as ScenarioStepDef).command === 'string';
         expect(
-          isString || isStepObj,
-          `step[${i}] should be a string or {command} object, got ${typeof step}`,
+          isStepObj,
+          `step[${i}] should be an object with a command field, got ${typeof step}`,
         ).toBe(true);
       }
     });
@@ -244,7 +252,7 @@ describe('All steps are strings or step objects', () => {
 describe('Step frames/interval fields are valid', () => {
   for (const name of ALL_SCENARIO_NAMES) {
     it(`${name} — frames and interval are positive integers when present`, () => {
-      const scenario = loadScenario(name);
+      const scenario = loadScenarioDef(name, SCENARIO_DIR);
       for (let i = 0; i < scenario.steps.length; i++) {
         const step = scenario.steps[i];
         if (typeof step === 'object' && step !== null) {
@@ -269,7 +277,7 @@ describe('Step frames/interval fields are valid', () => {
 describe('Scenario description is meaningful', () => {
   for (const name of ALL_SCENARIO_NAMES) {
     it(`${name} — description length > 20 characters`, () => {
-      const scenario = loadScenario(name);
+      const scenario = loadScenarioDef(name, SCENARIO_DIR);
       expect(scenario.description.length).toBeGreaterThan(20);
     });
   }
@@ -281,7 +289,7 @@ describe('Scenario description is meaningful', () => {
 describe('No steps use unknown commands', () => {
   for (const name of ALL_SCENARIO_NAMES) {
     it(`${name} — no step references an unknown command`, () => {
-      const scenario = loadScenario(name);
+      const scenario = loadScenarioDef(name, SCENARIO_DIR);
       const unknownCommands: string[] = [];
       for (let i = 0; i < scenario.steps.length; i++) {
         const step = scenario.steps[i];
@@ -302,7 +310,7 @@ describe('No steps use unknown commands', () => {
 describe('Playthrough last step is a state inspection command', () => {
   for (const name of PLAYTHROUGH_SCENARIO_NAMES) {
     it(`${name} — final step is an inspection command`, () => {
-      const scenario = loadScenario(name);
+      const scenario = loadScenarioDef(name, SCENARIO_DIR);
       const lastStep = scenario.steps[scenario.steps.length - 1];
       const cmdStr = typeof lastStep === 'string' ? lastStep : (lastStep as any).command;
       const firstToken = cmdStr.trim().split(/\s+/)[0];
@@ -321,7 +329,7 @@ describe('Playthrough last step is a state inspection command', () => {
 describe('Visual scenarios have valid shots array', () => {
   for (const name of VISUAL_SCENARIO_NAMES) {
     it(`${name} — shots array contains objects with name, yaw, pitch`, () => {
-      const scenario = loadScenario(name) as ScenarioDef;
+      const scenario = loadScenarioDef(name, SCENARIO_DIR) as ScenarioDef;
       expect(scenario.shots).toBeDefined();
       expect(Array.isArray(scenario.shots)).toBe(true);
       expect(scenario.shots!.length).toBeGreaterThan(0);
@@ -335,124 +343,192 @@ describe('Visual scenarios have valid shots array', () => {
 });
 
 // ──────────────────────────────────────────────
-// 11. Dual-play scenario steps — interaction array validation
+// 11. Dual-play scenario steps — interaction array validation (data-driven)
+// Note: Some tests (click, type, wait, waitForSelector, viewport, wheel) are
+// currently vacuously true because all 99 scenarios only use command-type actions.
+// These tests are forward-looking: they validate data when non-command action
+// types are added to scenarios in the future.
 // ──────────────────────────────────────────────
 
-describe('Dual-play scenario steps', () => {
-  it('interaction array actions must have a type field from known types', () => {
-    const actions = [
-      { type: 'click', x: 100, y: 200 },
-      { type: 'type', selector: '#input', text: 'hello' },
-      { type: 'wait', durationMs: 500 },
-    ];
-    for (const action of actions) {
-      expect(action).toHaveProperty('type');
-      expect(
-        KNOWN_INTERACTION_ACTION_TYPES,
-        `action type "${(action as any).type}" should be a known interaction type`,
-      ).toContain((action as any).type);
-    }
-  });
+describe('Dual-play scenario steps — data-driven validation', () => {
+  for (const name of ALL_SCENARIO_NAMES) {
+    it(`${name} — all interaction action types are in the known set`, () => {
+      const scenario = loadScenarioDef(name, SCENARIO_DIR);
+      for (let i = 0; i < scenario.steps.length; i++) {
+        const step = scenario.steps[i];
+        if (typeof step === 'string') {
+          throw new Error(`step[${i}] is a plain string — all steps must be objects with interaction arrays`);
+        }
+        const stepObj = step as ScenarioStepDef;
+        if (!stepObj.interaction) continue;
+        for (const action of stepObj.interaction) {
+          expect(
+            KNOWN_INTERACTION_ACTION_TYPES,
+            `step[${i}] action type "${action.type}" is not a known interaction type`,
+          ).toContain(action.type);
+        }
+      }
+    });
 
-  it('click action requires x and y coordinates', () => {
-    const withXY = { type: 'click', x: 100, y: 200 };
-    const withButton = { type: 'click', x: 100, y: 200, button: 'right' };
-    const missingX = { type: 'click', y: 200 };
-    const missingY = { type: 'click', x: 100 };
+    it(`${name} — click actions have x and y coordinates`, () => {
+      const scenario = loadScenarioDef(name, SCENARIO_DIR);
+      for (let i = 0; i < scenario.steps.length; i++) {
+        const step = scenario.steps[i];
+        if (typeof step === 'string') continue;
+        const stepObj = step as ScenarioStepDef;
+        if (!stepObj.interaction) continue;
+        for (const action of stepObj.interaction) {
+          if (action.type === 'click') {
+            expect(typeof action.x).toBe('number');
+            expect(typeof action.y).toBe('number');
+          }
+        }
+      }
+    });
 
-    expect(withXY).toHaveProperty('x');
-    expect(withXY).toHaveProperty('y');
-    expect(withButton).toHaveProperty('button', 'right');
-    expect((missingX as any).x).toBeUndefined();
-    expect((missingY as any).y).toBeUndefined();
-  });
+    it(`${name} — type actions have selector and text`, () => {
+      const scenario = loadScenarioDef(name, SCENARIO_DIR);
+      for (let i = 0; i < scenario.steps.length; i++) {
+        const step = scenario.steps[i];
+        if (typeof step === 'string') continue;
+        const stepObj = step as ScenarioStepDef;
+        if (!stepObj.interaction) continue;
+        for (const action of stepObj.interaction) {
+          if (action.type === 'type') {
+            expect(typeof action.selector).toBe('string');
+            expect(action.selector.length).toBeGreaterThan(0);
+            expect(typeof action.text).toBe('string');
+          }
+        }
+      }
+    });
 
-  it('type action requires selector and text', () => {
-    const valid = { type: 'type', selector: '#input', text: 'hello' };
-    const missingSelector = { type: 'type', text: 'hello' };
-    const missingText = { type: 'type', selector: '#input' };
+    it(`${name} — wait actions have durationMs`, () => {
+      const scenario = loadScenarioDef(name, SCENARIO_DIR);
+      for (let i = 0; i < scenario.steps.length; i++) {
+        const step = scenario.steps[i];
+        if (typeof step === 'string') continue;
+        const stepObj = step as ScenarioStepDef;
+        if (!stepObj.interaction) continue;
+        for (const action of stepObj.interaction) {
+          if (action.type === 'wait') {
+            expect(typeof action.durationMs).toBe('number');
+            expect(action.durationMs).toBeGreaterThan(0);
+          }
+        }
+      }
+    });
 
-    expect(valid.selector).toBeDefined();
-    expect(valid.text).toBeDefined();
-    expect((missingSelector as any).selector).toBeUndefined();
-    expect((missingText as any).text).toBeUndefined();
-  });
+    it(`${name} — waitForSelector actions have selector`, () => {
+      const scenario = loadScenarioDef(name, SCENARIO_DIR);
+      for (let i = 0; i < scenario.steps.length; i++) {
+        const step = scenario.steps[i];
+        if (typeof step === 'string') continue;
+        const stepObj = step as ScenarioStepDef;
+        if (!stepObj.interaction) continue;
+        for (const action of stepObj.interaction) {
+          if (action.type === 'waitForSelector') {
+            expect(typeof action.selector).toBe('string');
+            expect(action.selector.length).toBeGreaterThan(0);
+          }
+        }
+      }
+    });
 
-  it('wait action requires durationMs', () => {
-    const valid = { type: 'wait', durationMs: 500 };
-    const missing = { type: 'wait' };
+    it(`${name} — viewport actions have width and height`, () => {
+      const scenario = loadScenarioDef(name, SCENARIO_DIR);
+      for (let i = 0; i < scenario.steps.length; i++) {
+        const step = scenario.steps[i];
+        if (typeof step === 'string') continue;
+        const stepObj = step as ScenarioStepDef;
+        if (!stepObj.interaction) continue;
+        for (const action of stepObj.interaction) {
+          if (action.type === 'viewport') {
+            expect(typeof action.width).toBe('number');
+            expect(typeof action.height).toBe('number');
+          }
+        }
+      }
+    });
 
-    expect(valid.durationMs).toBe(500);
-    expect((missing as any).durationMs).toBeUndefined();
-  });
+    it(`${name} — wheel actions have deltaX and deltaY`, () => {
+      const scenario = loadScenarioDef(name, SCENARIO_DIR);
+      for (let i = 0; i < scenario.steps.length; i++) {
+        const step = scenario.steps[i];
+        if (typeof step === 'string') continue;
+        const stepObj = step as ScenarioStepDef;
+        if (!stepObj.interaction) continue;
+        for (const action of stepObj.interaction) {
+          if (action.type === 'wheel') {
+            expect(typeof action.deltaX).toBe('number');
+            expect(typeof action.deltaY).toBe('number');
+          }
+        }
+      }
+    });
 
-  it('waitForSelector action requires selector', () => {
-    const valid = { type: 'waitForSelector', selector: '.loaded' };
-    const missing = { type: 'waitForSelector' };
+    it(`${name} — command actions within interaction arrays have a command field`, () => {
+      const scenario = loadScenarioDef(name, SCENARIO_DIR);
+      for (let i = 0; i < scenario.steps.length; i++) {
+        const step = scenario.steps[i];
+        if (typeof step === 'string') continue;
+        const stepObj = step as ScenarioStepDef;
+        if (!stepObj.interaction) continue;
+        for (const action of stepObj.interaction) {
+          if (action.type === 'command') {
+            expect(typeof action.command).toBe('string');
+            expect(action.command.length).toBeGreaterThan(0);
+          }
+        }
+      }
+    });
+  }
+});
 
-    expect(valid.selector).toBeDefined();
-    expect(typeof valid.selector).toBe('string');
-    expect((missing as any).selector).toBeUndefined();
-  });
+// ──────────────────────────────────────────────
+// 12. Every scenario step has dual-play interaction array
+// ──────────────────────────────────────────────
 
-  it('viewport action requires width and height', () => {
-    const valid = { type: 'viewport', width: 1920, height: 1080 };
-    const missingWidth = { type: 'viewport', height: 1080 };
-    const missingHeight = { type: 'viewport', width: 1920 };
+describe('Every scenario step has a dual-play interaction array', () => {
+  for (const name of ALL_SCENARIO_NAMES) {
+    it(`${name} — every step has an interaction array with at least one action`, () => {
+      const scenario = loadScenarioDef(name, SCENARIO_DIR);
+      for (let i = 0; i < scenario.steps.length; i++) {
+        const step = scenario.steps[i];
+        // All steps must be objects with interaction arrays — plain strings are not allowed
+        expect(
+          typeof step !== 'string',
+          `step[${i}] is a plain string "${step}". All steps must be objects with a dual-play interaction array.`,
+        ).toBe(true);
+        const stepObj = step as any;
+        // Object steps must have an interaction array
+        expect(
+          stepObj.interaction,
+          `step[${i}] ("${stepObj.command ?? '(no command)'}") must have an interaction array`,
+        ).toBeDefined();
+        expect(
+          Array.isArray(stepObj.interaction),
+          `step[${i}] interaction must be an array`,
+        ).toBe(true);
+        expect(
+          stepObj.interaction.length,
+          `step[${i}] interaction array must have at least one action`,
+        ).toBeGreaterThan(0);
+      }
+    });
 
-    expect(valid.width).toBeDefined();
-    expect(valid.height).toBeDefined();
-    expect(typeof valid.width).toBe('number');
-    expect(typeof valid.height).toBe('number');
-    expect((missingWidth as any).width).toBeUndefined();
-    expect((missingHeight as any).height).toBeUndefined();
-  });
-
-  it('command action within interaction array requires command field', () => {
-    const valid = { type: 'command', command: 'new_game seed:42' };
-    const missing = { type: 'command' };
-
-    expect(valid.command).toBeDefined();
-    expect(typeof valid.command).toBe('string');
-    expect((missing as any).command).toBeUndefined();
-  });
-
-  it('unknown action types are rejected', () => {
-    const validTypes = KNOWN_INTERACTION_ACTION_TYPES;
-    const unknownType = 'drag';
-
-    expect(validTypes).not.toContain(unknownType);
-  });
-
-  it('steps with only command field work (backward compat)', () => {
-    const step = { command: 'new_game seed:42' };
-    expect(step).toHaveProperty('command');
-    expect(typeof step.command).toBe('string');
-    expect((step as any).interaction).toBeUndefined();
-  });
-
-  it('steps with only interaction field work', () => {
-    const step = {
-      interaction: [
-        { type: 'click', x: 100, y: 200 },
-        { type: 'wait', durationMs: 500 },
-      ],
-    };
-    expect(step).toHaveProperty('interaction');
-    expect(Array.isArray(step.interaction)).toBe(true);
-    expect((step as any).command).toBeUndefined();
-  });
-
-  it('steps with both command and interaction fields work', () => {
-    const step = {
-      command: 'new_game seed:42',
-      interaction: [
-        { type: 'click', x: 100, y: 200 },
-      ],
-    };
-    expect(step).toHaveProperty('command');
-    expect(step).toHaveProperty('interaction');
-    expect(Array.isArray(step.interaction)).toBe(true);
-    expect(step.interaction.length).toBe(1);
-  });
+    it(`${name} — interaction[0] is always a command-type action and matches step.command`, () => {
+      const scenario = loadScenarioDef(name, SCENARIO_DIR);
+      for (let i = 0; i < scenario.steps.length; i++) {
+        const step = scenario.steps[i] as ScenarioStepDef;
+        expect(step.interaction).toBeDefined();
+        expect(step.interaction!.length).toBeGreaterThan(0);
+        const firstAction = step.interaction![0];
+        expect(firstAction.type).toBe('command');
+        if (firstAction.type === 'command') {
+          expect(firstAction.command).toBe(step.command);
+        }
+      }
+    });
+  }
 });

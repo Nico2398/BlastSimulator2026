@@ -2,22 +2,127 @@
   "name": "i18n-display-visual",
   "description": "Visual verification of internationalization (i18n) system: English text displays correctly throughout UI including HUD, menus, contract panel, event dialogs, and score labels. All fictional names (rocks, explosives, buildings, vehicles) display without unresolved i18n keys.",
   "steps": [
-    { "command": "new_game seed:42", "timeout": 15 },
-    "campaign start level:dusty_hollow",
-    "time resume",
-    "scores",
-    "finances",
-    "contract list",
-    "time status",
-    "employee list",
-    "build list",
-    "inspect 15,15,0",
-    "state full"
+    {
+      "command": "new_game seed:42",
+      "timeout": 15,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ]
+    },
+    {
+      "command": "campaign start level:dusty_hollow",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign start level:dusty_hollow"
+        }
+      ]
+    },
+    {
+      "command": "time resume",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time resume"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "contract list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract list"
+        }
+      ]
+    },
+    {
+      "command": "time status",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time status"
+        }
+      ]
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ]
+    },
+    {
+      "command": "build list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build list"
+        }
+      ]
+    },
+    {
+      "command": "inspect 15,15,0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "inspect 15,15,0"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    }
   ],
   "shots": [
-    { "name": "overview", "yaw": 0, "pitch": 45 },
-    { "name": "hud-text", "yaw": 90, "pitch": 10 },
-    { "name": "panel-text", "yaw": 45, "pitch": 30 },
-    { "name": "birdseye", "yaw": 0, "pitch": 80 }
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45
+    },
+    {
+      "name": "hud-text",
+      "yaw": 90,
+      "pitch": 10
+    },
+    {
+      "name": "panel-text",
+      "yaw": 45,
+      "pitch": 30
+    },
+    {
+      "name": "birdseye",
+      "yaw": 0,
+      "pitch": 80
+    }
   ]
 }

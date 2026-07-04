@@ -2,19 +2,99 @@
   "name": "nav-pathfinding-visual",
   "description": "Tests A pathfinding around obstacles with buildings as blockers",
   "steps": [
-    "new_game seed:42",
-    "build management_office at:5,5",
-    "build management_office at:5,7",
-    "build management_office at:7,5",
-    "employee hire role:driller",
-    "employee list",
-    "tick 20",
-    "inspect 10,10,0"
+    {
+      "command": "new_game seed:42",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ]
+    },
+    {
+      "command": "build management_office at:5,5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build management_office at:5,5"
+        }
+      ]
+    },
+    {
+      "command": "build management_office at:5,7",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build management_office at:5,7"
+        }
+      ]
+    },
+    {
+      "command": "build management_office at:7,5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build management_office at:7,5"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:driller"
+        }
+      ]
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ]
+    },
+    {
+      "command": "tick 20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 20"
+        }
+      ]
+    },
+    {
+      "command": "inspect 10,10,0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "inspect 10,10,0"
+        }
+      ]
+    }
   ],
   "shots": [
-    {"name": "overview", "yaw": 0, "pitch": 45},
-    {"name": "closeup", "yaw": 90, "pitch": 10},
-    {"name": "birdseye", "yaw": 0, "pitch": 80},
-    {"name": "angled", "yaw": 135, "pitch": 30}
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45
+    },
+    {
+      "name": "closeup",
+      "yaw": 90,
+      "pitch": 10
+    },
+    {
+      "name": "birdseye",
+      "yaw": 0,
+      "pitch": 80
+    },
+    {
+      "name": "angled",
+      "yaw": 135,
+      "pitch": 30
+    }
   ]
 }

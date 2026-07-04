@@ -102,7 +102,13 @@ Same Vitest runner. May import from `src/console/` (command layer). Must exercis
 
 ## Scenario Test Definitions
 
-JSON files in `scripts/scenario-defs/`. Runner captures screenshot + state JSON after every command.
+JSON files in `scripts/scenario-defs/`. Runner captures screenshot + state JSON after every step.
+
+**Dual-play modes** (`--mode command|interaction`):
+- **command** (default) — sends console commands via `__gameConsole()`.
+- **interaction** — executes Puppeteer interactions (click, type, waitForSelector, etc.) via `executeInteractionStep()` from `scenario-interaction-runner.ts`.
+
+Scenario steps can define an `interaction` array of `InteractionStepAction` objects for UI-level testing. Steps without `interaction` fall back to command execution. Type definitions in `scripts/shared/scenario-types.ts`.
 
 ### Feature Scenarios (Ch.1–7 visual regression)
 
@@ -139,13 +145,20 @@ JSON files in `scripts/scenario-defs/`. Runner captures screenshot + state JSON 
 
 After any rendering change:
 1. `npm run dev &`
-2. Run relevant playthrough scenario:
+2. Run relevant playthrough scenario with screenshots:
    ```bash
-   PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium npx tsx scripts/scenario-test.ts --scenario level1-playthrough-win
+   npx tsx scripts/scenario-test.ts --scenario level1-playthrough-win --mode interaction --screenshots
    ```
-3. Inspect every screenshot using the `view` tool
-4. Verify against expected visual description per checkpoint
-5. If any checkpoint fails → fix rendering → re-run
+3. For interaction-based scenarios:
+   ```bash
+   npx tsx scripts/scenario-test.ts --scenario my-interaction-test --mode interaction --screenshots
+   ```
+4. Inspect every screenshot in `screenshots/scenario-{name}-interaction/`
+5. Verify against expected visual description per checkpoint
+6. If any checkpoint fails → fix rendering → re-run
+
+Screenshots opt-in via `--screenshots`. CI runs without it (no screenshots, state-only validation).
+Use `scripts/run-all-scenarios.ts` for batch runs (both modes supported via `--mode`).
 
 **Mandatory check cadence:**
 | Trigger | Scenarios to run |
@@ -167,6 +180,18 @@ After any rendering change:
 | Frame tick at 8× speed, 20 agents | < 16ms |
 | Survey estimation (radius 20) | < 5ms |
 | Full-level integration test (Level 1 win) | < 30s wall clock |
+
+## CI Launch Strategy
+
+CI has 3 tiers of scenario testing:
+
+| Tier | What | When | Time |
+|------|------|------|------|
+| **1 — Command** | All 99 scenarios in command mode (pure Node.js, no browser) | Every push, PR, schedule, manual | ~1 min |
+| **2 — Interaction** | All 99 scenarios in interaction mode (Puppeteer, real browser) | Push to main, schedule (weekly), workflow_dispatch, **or PR with `full-ci` label** | ~16 min |
+| **3 — Full** | Tiers 1 + 2 combined | Automatic on schedule/weekly; opt-in via `full-ci` label on PR | ~18 min |
+
+**Label convention:** Add `full-ci` to a PR when the change affects UI, rendering, or Puppeteer interaction behavior. Most PRs (docs, config, logic-only) skip interaction mode safely. The `full-ci` label on an issue MUST transfer to the opened PR.
 
 ## Regression Test Policy
 

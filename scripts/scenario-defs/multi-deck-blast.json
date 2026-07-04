@@ -2,16 +2,104 @@
   "name": "multi-deck-blast",
   "description": "Chapter 5: 3-deck charge configuration with varying depths for deep fracture and no surface projection",
   "steps": [
-    "new_game seed:42",
-    "drill_plan grid rows:2 cols:2 spacing:6 depth:20 start:20,20",
-    "charge hole:1 explosive:boomite amount:6 stemming:6",
-    "charge hole:2 explosive:boomite amount:5 stemming:5",
-    "charge hole:3 explosive:boomite amount:4 stemming:4",
-    "charge hole:4 explosive:boomite amount:3 stemming:3",
-    "sequence auto delay_step:25",
-    "blast",
-    "fragments",
-    "inspect 20,20,0",
-    "state full"
+    {
+      "command": "new_game seed:42",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ]
+    },
+    {
+      "command": "drill_plan grid rows:2 cols:2 spacing:6 depth:20 start:20,20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:2 cols:2 spacing:6 depth:20 start:20,20"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:1 explosive:boomite amount:6 stemming:6",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:1 explosive:boomite amount:6 stemming:6"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:2 explosive:boomite amount:5 stemming:5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:2 explosive:boomite amount:5 stemming:5"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:3 explosive:boomite amount:4 stemming:4",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:3 explosive:boomite amount:4 stemming:4"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:4 explosive:boomite amount:3 stemming:3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:4 explosive:boomite amount:3 stemming:3"
+        }
+      ]
+    },
+    {
+      "command": "sequence auto delay_step:25",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sequence auto delay_step:25"
+        }
+      ]
+    },
+    {
+      "command": "blast",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "blast"
+        }
+      ]
+    },
+    {
+      "command": "fragments",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "fragments"
+        }
+      ]
+    },
+    {
+      "command": "inspect 20,20,0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "inspect 20,20,0"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    }
   ]
 }

@@ -2,20 +2,120 @@
   "name": "blast-report-visual",
   "description": "Visual verification of post-blast report data: blast quality rating, fragment statistics, ore value extraction, vibration impact, and financial impact",
   "steps": [
-    { "command": "new_game seed:42", "timeout": 15 },
-    "drill_plan grid rows:2 cols:2 spacing:5 depth:8 start:15,15",
-    "charge hole:* explosive:boomite amount:5 stemming:2",
-    "sequence auto delay_step:25",
-    { "command": "blast", "timeout": 15, "frames": 6, "interval": 50 },
-    "fragments",
-    "inspect 15,15,0",
-    "finances",
-    "scores",
-    "state full",
-    "stats"
+    {
+      "command": "new_game seed:42",
+      "timeout": 15,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ]
+    },
+    {
+      "command": "drill_plan grid rows:2 cols:2 spacing:5 depth:8 start:15,15",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:2 cols:2 spacing:5 depth:8 start:15,15"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:boomite amount:5 stemming:2"
+        }
+      ]
+    },
+    {
+      "command": "sequence auto delay_step:25",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sequence auto delay_step:25"
+        }
+      ]
+    },
+    {
+      "command": "blast",
+      "timeout": 15,
+      "frames": 6,
+      "interval": 50,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "blast"
+        }
+      ]
+    },
+    {
+      "command": "fragments",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "fragments"
+        }
+      ]
+    },
+    {
+      "command": "inspect 15,15,0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "inspect 15,15,0"
+        }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "stats",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "stats"
+        }
+      ]
+    }
   ],
   "shots": [
-    { "name": "overview", "yaw": 0, "pitch": 45 },
-    { "name": "birdseye", "yaw": 0, "pitch": 80 }
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45
+    },
+    {
+      "name": "birdseye",
+      "yaw": 0,
+      "pitch": 80
+    }
   ]
 }

@@ -1,13 +1,14 @@
 /**
  * Tests for the scenario-test runner module.
  *
- * Validates that executeInteractionStep is exported, ScenarioStep type
+ * Validates that executeInteractionActions is exported, ScenarioStep type
  * accepts dual-play format steps, and mode parsing has correct defaults.
  *
  * @module tests/unit/scenario-test
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { InteractionStepAction } from '../../scripts/shared/scenario-types.js';
 
 // Mock process.exit to prevent the module from exiting during import
 const mockExit = vi.fn();
@@ -21,20 +22,25 @@ beforeEach(() => {
 });
 
 // Dynamic import after mocking to avoid top-level process.exit
-let executeInteractionStep: any;
+let executeInteractionActions: (page: any, step: { command: string; interaction: InteractionStepAction[] }, enableScreenshots: boolean, outDir: string, paddedIdx: string, cmdSlug: string) => Promise<any>;
 beforeEach(async () => {
   vi.resetModules();
   process.argv = ['node', 'scenario-test.ts', '--commands', 'help'];
-  const mod = await import('../../scripts/scenario-test.js');
-  executeInteractionStep = mod.executeInteractionStep;
+  const mod = await import('../../scripts/shared/puppeteer-utils.js');
+  executeInteractionActions = mod.executeInteractionActions;
 });
 
-// ── executeInteractionStep export ──
+/** Helper to wrap actions in a ScenarioStepDef-compatible object. */
+function makeStep(actions: InteractionStepAction[], command = 'test'): { command: string; interaction: InteractionStepAction[] } {
+  return { command, interaction: actions };
+}
 
-describe('executeInteractionStep', () => {
+// ── executeInteractionActions export ──
+
+describe('executeInteractionActions', () => {
   it('is exported and is a function', () => {
-    expect(executeInteractionStep).toBeDefined();
-    expect(typeof executeInteractionStep).toBe('function');
+    expect(executeInteractionActions).toBeDefined();
+    expect(typeof executeInteractionActions).toBe('function');
   });
 
   it('executes click actions on the page', async () => {
@@ -52,14 +58,12 @@ describe('executeInteractionStep', () => {
       },
       type: vi.fn().mockResolvedValue(undefined),
       waitForSelector: vi.fn().mockResolvedValue(undefined),
-      evaluate: vi.fn().mockResolvedValue(undefined),
+      evaluate: vi.fn().mockResolvedValue(null),
     };
 
-    const actions = [
-      { type: 'click' as const, x: 100, y: 200 },
-    ];
+    const step = makeStep([{ type: 'click', x: 100, y: 200 }]);
 
-    await executeInteractionStep(mockPage, actions);
+    await executeInteractionActions(mockPage, step, false, '/tmp', '00', 'test');
 
     expect(mockPage.mouse.click).toHaveBeenCalledTimes(1);
     expect(mockPage.mouse.click).toHaveBeenCalledWith(100, 200, { button: 'left' });
@@ -71,14 +75,12 @@ describe('executeInteractionStep', () => {
       keyboard: { press: vi.fn(), down: vi.fn(), up: vi.fn() },
       type: vi.fn().mockResolvedValue(undefined),
       waitForSelector: vi.fn().mockResolvedValue(undefined),
-      evaluate: vi.fn().mockResolvedValue(undefined),
+      evaluate: vi.fn().mockResolvedValue(null),
     };
 
-    const actions = [
-      { type: 'type' as const, selector: '#search', text: 'hello', delay: 50 },
-    ];
+    const step = makeStep([{ type: 'type', selector: '#search', text: 'hello', delay: 50 }]);
 
-    await executeInteractionStep(mockPage, actions);
+    await executeInteractionActions(mockPage, step, false, '/tmp', '00', 'test');
 
     expect(mockPage.type).toHaveBeenCalledTimes(1);
     expect(mockPage.type).toHaveBeenCalledWith('#search', 'hello', { delay: 50 });
@@ -90,14 +92,12 @@ describe('executeInteractionStep', () => {
       keyboard: { press: vi.fn(), down: vi.fn(), up: vi.fn() },
       type: vi.fn().mockResolvedValue(undefined),
       waitForSelector: vi.fn().mockResolvedValue(undefined),
-      evaluate: vi.fn().mockResolvedValue(undefined),
+      evaluate: vi.fn().mockResolvedValue(null),
     };
 
-    const actions = [
-      { type: 'waitForSelector' as const, selector: '.loaded', timeout: 5000 },
-    ];
+    const step = makeStep([{ type: 'waitForSelector', selector: '.loaded', timeout: 5000 }]);
 
-    await executeInteractionStep(mockPage, actions);
+    await executeInteractionActions(mockPage, step, false, '/tmp', '00', 'test');
 
     expect(mockPage.waitForSelector).toHaveBeenCalledTimes(1);
     expect(mockPage.waitForSelector).toHaveBeenCalledWith('.loaded', { timeout: 5000 });
@@ -109,15 +109,13 @@ describe('executeInteractionStep', () => {
       keyboard: { press: vi.fn(), down: vi.fn(), up: vi.fn() },
       type: vi.fn().mockResolvedValue(undefined),
       waitForSelector: vi.fn().mockResolvedValue(undefined),
-      evaluate: vi.fn().mockResolvedValue(undefined),
+      evaluate: vi.fn().mockResolvedValue(null),
     };
 
     const start = Date.now();
-    const actions = [
-      { type: 'wait' as const, durationMs: 100 },
-    ];
+    const step = makeStep([{ type: 'wait', durationMs: 100 }]);
 
-    await executeInteractionStep(mockPage, actions);
+    await executeInteractionActions(mockPage, step, false, '/tmp', '00', 'test');
 
     const elapsed = Date.now() - start;
     expect(elapsed).toBeGreaterThanOrEqual(80); // Allow some tolerance
@@ -129,16 +127,16 @@ describe('executeInteractionStep', () => {
       keyboard: { press: vi.fn().mockResolvedValue(undefined), down: vi.fn(), up: vi.fn() },
       type: vi.fn().mockResolvedValue(undefined),
       waitForSelector: vi.fn().mockResolvedValue(undefined),
-      evaluate: vi.fn().mockResolvedValue(undefined),
+      evaluate: vi.fn().mockResolvedValue(null),
     };
 
-    const actions = [
-      { type: 'click' as const, x: 10, y: 20 },
-      { type: 'type' as const, selector: '#input', text: 'test' },
-      { type: 'keypress' as const, key: 'Enter' },
-    ];
+    const step = makeStep([
+      { type: 'click', x: 10, y: 20 },
+      { type: 'type', selector: '#input', text: 'test' },
+      { type: 'keypress', key: 'Enter' },
+    ]);
 
-    await executeInteractionStep(mockPage, actions);
+    await executeInteractionActions(mockPage, step, false, '/tmp', '00', 'test');
 
     expect(mockPage.mouse.click).toHaveBeenCalledTimes(1);
     expect(mockPage.type).toHaveBeenCalledTimes(1);
@@ -147,8 +145,8 @@ describe('executeInteractionStep', () => {
 
   it('returns a Promise<void>', () => {
     const mockPage = {};
-    const actions: any[] = [];
-    const result = executeInteractionStep(mockPage, actions);
+    const step = makeStep([]);
+    const result = executeInteractionActions(mockPage, step, false, '/tmp', '00', 'test');
     expect(result).toBeInstanceOf(Promise);
     // Suppress unhandled rejection from stub
     result.catch(() => {});
@@ -219,7 +217,7 @@ describe('ScenarioStep type accepts dual-play format steps', () => {
     };
     expect(step.interaction).toHaveLength(1);
     expect(step.interaction[0]).toHaveProperty('type', 'command');
-    expect((step.interaction[0] as any).command).toBe('new_game seed:42');
+    expect((step.interaction[0] as { type: string; command: string }).command).toBe('new_game seed:42');
   });
 
   it('accepts step with optional fields (timeout, frames, interval, description)', () => {

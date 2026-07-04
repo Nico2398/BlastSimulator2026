@@ -2,27 +2,176 @@
   "name": "needs-morale-visual",
   "description": "Visual check of morale effects from need gauges: after 200+ ticks without rest, morale should decrease as gauges drain below thresholds; needs command and scores output verify need penalty calculation and well-rested bonus when all gauges above 80",
   "steps": [
-    { "command": "new_game seed:42", "timeout": 30 },
-    "employee hire role:driller",
-    "employee list",
-    "scores",
-    "tick 100",
-    "needs",
-    "employee list",
-    "scores",
-    "tick 150",
-    "needs",
-    "employee list",
-    "scores",
-    "tick 200",
-    "needs",
-    "employee list",
-    "scores",
-    "state full"
+    {
+      "command": "new_game seed:42",
+      "timeout": 30,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:driller"
+        }
+      ]
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "tick 100",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 100"
+        }
+      ]
+    },
+    {
+      "command": "needs",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "needs"
+        }
+      ]
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "tick 150",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 150"
+        }
+      ]
+    },
+    {
+      "command": "needs",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "needs"
+        }
+      ]
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "tick 200",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 200"
+        }
+      ]
+    },
+    {
+      "command": "needs",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "needs"
+        }
+      ]
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    }
   ],
   "shots": [
-    { "name": "overview", "yaw": 0, "pitch": 45 },
-    { "name": "morale-scroll", "yaw": 90, "pitch": 10 },
-    { "name": "scores-birdseye", "yaw": 0, "pitch": 80 }
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45
+    },
+    {
+      "name": "morale-scroll",
+      "yaw": 90,
+      "pitch": 10
+    },
+    {
+      "name": "scores-birdseye",
+      "yaw": 0,
+      "pitch": 80
+    }
   ]
 }

@@ -2,23 +2,139 @@
   "name": "building-destruction-visual",
   "description": "Visual check of building destruction via blast: drill, charge, sequence, and detonate near warehouses",
   "steps": [
-    { "command": "new_game seed:42", "timeout": 30 },
-    "build explosive_warehouse at:20,20",
-    "build freight_warehouse at:25,25",
-    "build list",
-    "drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:15,15",
-    "charge hole:* explosive:boomite amount:10 stemming:1",
-    "sequence auto delay_step:25",
-    { "command": "blast", "timeout": 20, "frames": 6, "interval": 50 },
-    "build list",
-    "fragments",
-    "scores",
-    "state full"
+    {
+      "command": "new_game seed:42",
+      "timeout": 30,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ]
+    },
+    {
+      "command": "build explosive_warehouse at:20,20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build explosive_warehouse at:20,20"
+        }
+      ]
+    },
+    {
+      "command": "build freight_warehouse at:25,25",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build freight_warehouse at:25,25"
+        }
+      ]
+    },
+    {
+      "command": "build list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build list"
+        }
+      ]
+    },
+    {
+      "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:15,15",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:15,15"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:10 stemming:1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:boomite amount:10 stemming:1"
+        }
+      ]
+    },
+    {
+      "command": "sequence auto delay_step:25",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sequence auto delay_step:25"
+        }
+      ]
+    },
+    {
+      "command": "blast",
+      "timeout": 20,
+      "frames": 6,
+      "interval": 50,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "blast"
+        }
+      ]
+    },
+    {
+      "command": "build list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build list"
+        }
+      ]
+    },
+    {
+      "command": "fragments",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "fragments"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    }
   ],
   "shots": [
-    { "name": "overview", "yaw": 0, "pitch": 45 },
-    { "name": "pre-blast", "yaw": 90, "pitch": 10 },
-    { "name": "post-blast", "yaw": 45, "pitch": 30 },
-    { "name": "destruction-closeup", "yaw": 0, "pitch": 80 }
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45
+    },
+    {
+      "name": "pre-blast",
+      "yaw": 90,
+      "pitch": 10
+    },
+    {
+      "name": "post-blast",
+      "yaw": 45,
+      "pitch": 30
+    },
+    {
+      "name": "destruction-closeup",
+      "yaw": 0,
+      "pitch": 80
+    }
   ]
 }

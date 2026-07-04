@@ -2,8 +2,8 @@
  * BlastSimulator2026 — Shared Chrome/Chromium utilities
  *
  * Common logic for resolving the Chrome/Chromium executable path and
- * recommended launch arguments, used by both interaction-recorder and
- * interaction-replay.
+ * recommended launch arguments, used by scenario-test and visual testing
+ * infrastructure.
  *
  * @module shared/chrome
  */

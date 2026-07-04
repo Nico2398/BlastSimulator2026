@@ -2,17 +2,86 @@
   "name": "vehicle-purchase-tier-ui-visual",
   "description": "Visual check: vehicle purchase menu shows all roles with cost stats and purchase buttons for tier comparison",
   "steps": [
-    { "command": "new_game seed:42", "timeout": 10 },
-    "campaign start level:dusty_hollow",
-    "vehicle list",
-    "vehicle buy debris_hauler",
-    "vehicle buy rock_digger",
-    "vehicle list",
-    "state full"
+    {
+      "command": "new_game seed:42",
+      "timeout": 10,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ]
+    },
+    {
+      "command": "campaign start level:dusty_hollow",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign start level:dusty_hollow"
+        }
+      ]
+    },
+    {
+      "command": "vehicle list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle list"
+        }
+      ]
+    },
+    {
+      "command": "vehicle buy debris_hauler",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle buy debris_hauler"
+        }
+      ]
+    },
+    {
+      "command": "vehicle buy rock_digger",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle buy rock_digger"
+        }
+      ]
+    },
+    {
+      "command": "vehicle list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle list"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    }
   ],
   "shots": [
-    { "name": "purchase-menu", "yaw": 0, "pitch": 45 },
-    { "name": "fleet-after-purchase", "yaw": 45, "pitch": 30 },
-    { "name": "panel-detail", "yaw": 90, "pitch": 10 }
+    {
+      "name": "purchase-menu",
+      "yaw": 0,
+      "pitch": 45
+    },
+    {
+      "name": "fleet-after-purchase",
+      "yaw": 45,
+      "pitch": 30
+    },
+    {
+      "name": "panel-detail",
+      "yaw": 90,
+      "pitch": 10
+    }
   ]
 }

@@ -2,22 +2,135 @@
   "name": "blast-preview-software-tiers",
   "description": "Visual verification of blast preview overlays at each software tier: energy heatmap, fragment distribution, projection arcs, vibration waves",
   "steps": [
-    { "command": "new_game seed:42", "timeout": 10 },
-    "drill_plan grid rows:3 cols:3 spacing:5 depth:6 start:15,15",
-    "charge hole:* explosive:boomite amount:5 stemming:2",
-    "sequence auto delay_step:25",
-    "preview energy",
-    "buy_software tier:1",
-    "preview energy",
-    "buy_software tier:2",
-    "preview fragments",
-    "buy_software tier:3",
-    "preview projections",
-    "buy_software tier:4",
-    "preview vibrations"
+    {
+      "command": "new_game seed:42",
+      "timeout": 10,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ]
+    },
+    {
+      "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:6 start:15,15",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:6 start:15,15"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:boomite amount:5 stemming:2"
+        }
+      ]
+    },
+    {
+      "command": "sequence auto delay_step:25",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sequence auto delay_step:25"
+        }
+      ]
+    },
+    {
+      "command": "preview energy",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "preview energy"
+        }
+      ]
+    },
+    {
+      "command": "buy_software tier:1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "buy_software tier:1"
+        }
+      ]
+    },
+    {
+      "command": "preview energy",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "preview energy"
+        }
+      ]
+    },
+    {
+      "command": "buy_software tier:2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "buy_software tier:2"
+        }
+      ]
+    },
+    {
+      "command": "preview fragments",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "preview fragments"
+        }
+      ]
+    },
+    {
+      "command": "buy_software tier:3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "buy_software tier:3"
+        }
+      ]
+    },
+    {
+      "command": "preview projections",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "preview projections"
+        }
+      ]
+    },
+    {
+      "command": "buy_software tier:4",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "buy_software tier:4"
+        }
+      ]
+    },
+    {
+      "command": "preview vibrations",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "preview vibrations"
+        }
+      ]
+    }
   ],
   "shots": [
-    { "name": "overview", "yaw": 0, "pitch": 45 },
-    { "name": "birdseye", "yaw": 0, "pitch": 80 }
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45
+    },
+    {
+      "name": "birdseye",
+      "yaw": 0,
+      "pitch": 80
+    }
   ]
 }

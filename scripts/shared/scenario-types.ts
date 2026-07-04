@@ -1,0 +1,72 @@
+/**
+ * BlastSimulator2026 — Shared Scenario Types
+ *
+ * Canonical type definitions for scenario steps, interaction actions,
+ * and scenario definitions. Used by:
+ *   - scripts/scenario-test.ts
+ *   - scripts/convert-scenarios.ts
+ *   - tests/unit/scenario-defs.test.ts
+ *
+ * @module shared/scenario-types
+ */
+
+/**
+ * A single interaction action within a scenario step.
+ * Covers all supported Puppeteer interaction types.
+ */
+export type InteractionStepAction =
+  | { type: 'click'; x: number; y: number; button?: 'left' | 'right' | 'middle' }
+  | { type: 'clickSelector'; selector: string; button?: 'left' | 'right' | 'middle'; timeout?: number }
+  | { type: 'mousedown'; x: number; y: number; button?: 'left' | 'right' | 'middle' }
+  | { type: 'mouseup'; x: number; y: number; button?: 'left' | 'right' | 'middle' }
+  | { type: 'mousemove'; x: number; y: number }
+  | { type: 'keypress'; key: string }
+  | { type: 'keydown'; key: string }
+  | { type: 'keyup'; key: string }
+  | { type: 'scroll'; x: number; y: number }
+  | { type: 'wheel'; deltaX: number; deltaY: number }
+  | { type: 'wait'; durationMs: number }
+  | { type: 'waitForSelector'; selector: string; timeout?: number }
+  | { type: 'type'; selector: string; text: string; delay?: number }
+  | { type: 'assert'; selector?: string; property?: string; expectedValue?: unknown }
+  | { type: 'viewport'; width: number; height: number }
+  | { type: 'command'; command: string }
+  | { type: 'screenshot' };
+
+/**
+ * Object form of a scenario step with command and optional interaction array.
+ */
+export interface ScenarioStepDef {
+  command: string;
+  timeout?: number;
+  description?: string;
+  frames?: number;
+  interval?: number;
+  interaction?: InteractionStepAction[];
+}
+
+/**
+ * Top-level scenario definition loaded from JSON files.
+ */
+export interface ScenarioDef {
+  name: string;
+  description: string;
+  steps: ScenarioStepDef[];
+  shots?: Array<{ name: string; yaw: number; pitch: number }>;
+}
+
+/**
+ * Unified step result from running a scenario step.
+ * Used by both command-runner.ts and scenario-test.ts.
+ */
+export interface StepResult {
+  step: number;
+  command: string;
+  commandOutput: string;
+  gameState: Record<string, unknown> | null;
+  uiState?: Record<string, unknown> | null;
+  screenshotPath?: string;
+  statePath: string;
+  error?: string;
+  warning?: string;
+}
