@@ -9,7 +9,7 @@
 
 import { readFileSync, existsSync } from 'fs';
 import { resolve } from 'path';
-import type { ScenarioDef, ScenarioStepDef } from './scenario-types.js';
+import type { ScenarioDef } from './scenario-types.js';
 
 export const SCENARIO_DIR = resolve(import.meta.dirname ?? process.cwd(), '..', 'scenario-defs');
 
@@ -25,7 +25,7 @@ export function formatStepIndex(i: number): string {
  * Takes the first token and strips non-alphanumeric characters.
  */
 export function formatCommandSlug(command: string): string {
-  return command.split(/\s+/)[0].replace(/[^a-z0-9_-]/gi, '');
+  return command.split(/\s+/)[0]!.replace(/[^a-z0-9_-]/gi, '');
 }
 
 /**
@@ -70,12 +70,12 @@ export function buildScenarioReport(results: ReportableStep[]): ReportEntry[] {
     output: r.commandOutput.length > MAX_REPORT_OUTPUT
       ? r.commandOutput.slice(0, MAX_REPORT_OUTPUT) + `... [truncated, ${r.commandOutput.length} chars total]`
       : r.commandOutput,
-    error: r.error,
-    warning: r.warning,
+    ...(r.error !== undefined ? { error: r.error } : {}),
+    ...(r.warning !== undefined ? { warning: r.warning } : {}),
     holes: r.gameState?.holeCount ?? 0,
     charged: r.gameState?.chargedCount ?? 0,
     sequenced: r.gameState?.sequencedCount ?? 0,
-    screenshot: r.screenshotPath,
+    ...(r.screenshotPath !== undefined ? { screenshot: r.screenshotPath } : {}),
   }));
 }
 

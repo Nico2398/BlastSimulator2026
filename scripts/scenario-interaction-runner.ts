@@ -4,10 +4,8 @@
  * Extracted from scenario-test.ts to meet the 300-line file limit.
  */
 
-import puppeteer from 'puppeteer';
 import { mkdirSync, writeFileSync, statSync } from 'fs';
 import { resolve } from 'path';
-import { LAUNCH_ARGS } from './shared/chrome.js';
 import type { ScenarioStepDef, StepResult } from './shared/scenario-types.js';
 import {
   formatStepIndex,
@@ -53,11 +51,15 @@ export async function runScenarioInteraction(
   mkdirSync(outDir, { recursive: true });
   const results: StepResult[] = [];
 
-  const { browser, page } = await initBrowser({ port, puppeteerPath, viewport });
+  const { browser, page } = await initBrowser({
+    port,
+    ...(puppeteerPath !== undefined ? { puppeteerPath } : {}),
+    viewport,
+  });
 
   try {
     for (let i = 0; i < steps.length; i++) {
-      const step = steps[i];
+      const step = steps[i]!;
       const paddedIdx = formatStepIndex(i);
       const cmdSlug = formatCommandSlug(step.command);
       console.log(`\n--- Step ${i}: ${step.command} ---`);
@@ -131,17 +133,32 @@ export async function runScenarioInteraction(
               console.log(`  Holes: ${gs.holeCount ?? 0}, Charged: ${gs.chargedCount ?? 0}, Sequenced: ${gs.sequencedCount ?? 0}`);
             }
 
-            results.push({ step: i, command: step.command, commandOutput: interactionResult.commandOutput,
-              gameState: interactionResult.gameState, uiState: interactionResult.uiState,
-              screenshotPath, statePath, warning: sizeWarn });
+            results.push({
+              step: i,
+              command: step.command,
+              commandOutput: interactionResult.commandOutput,
+              gameState: interactionResult.gameState,
+              uiState: interactionResult.uiState,
+              screenshotPath,
+              statePath,
+              ...(sizeWarn !== undefined ? { warning: sizeWarn } : {}),
+            });
           })(),
           timeoutPromise,
         ]);
       } catch (err: unknown) {
         const errorMsg = err instanceof Error ? err.message : String(err);
         console.error(`  ERROR: ${errorMsg}`);
-        results.push({ step: i, command: step.command, commandOutput: '', gameState: null,
-          uiState: null, screenshotPath: '', statePath: '', error: errorMsg });
+        results.push({
+          step: i,
+          command: step.command,
+          commandOutput: '',
+          gameState: null,
+          uiState: null,
+          screenshotPath: '',
+          statePath: '',
+          error: errorMsg,
+        });
         if (timedOut) {
           console.error('  Step timed out. Skipping remaining steps.');
           break;

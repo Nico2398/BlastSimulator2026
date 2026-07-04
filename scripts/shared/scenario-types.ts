@@ -42,7 +42,7 @@ export interface ScenarioStepDef {
   description?: string;
   frames?: number;
   interval?: number;
-  interaction: InteractionStepAction[];
+  interaction?: InteractionStepAction[];
 }
 
 /**

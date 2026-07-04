@@ -4,8 +4,7 @@
 
 import { mkdirSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
-import { createRunner, serializeGameState, type SerializableGameState } from '../../src/console-api.js';
-import type { CommandResult } from '../../src/console/ConsoleRunner.js';
+import { createRunner, serializeGameState } from '../../src/console-api.js';
 import type { RunnerWithContext } from '../../src/console/createRunner.js';
 import type { ScenarioStepDef, StepResult } from './scenario-types.js';
 import {
@@ -40,13 +39,13 @@ export function runSteps(
   const results: StepResult[] = [];
 
   for (let i = 0; i < steps.length; i++) {
-    const step = steps[i];
+    const step = steps[i]!;
     const paddedIdx = formatStepIndex(i);
     const cmdSlug = formatCommandSlug(step.command);
 
     try {
       const result = runner.run(step.command);
-      const gameState = serializeGameState(ctx);
+      const gameState = serializeGameState(ctx) as Record<string, unknown> | null;
 
       const stateData = {
         step: i,

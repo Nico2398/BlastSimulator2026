@@ -1,9 +1,10 @@
 {
   "extends": "../tsconfig.json",
   "compilerOptions": {
-    "rootDir": ".",
+    "rootDir": "..",
     "outDir": "../dist-scripts",
-    "noEmit": true
+    "noEmit": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"]
   },
   "include": ["./**/*.ts"],
   "exclude": ["node_modules", "../dist", "../tests"]

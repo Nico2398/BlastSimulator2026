@@ -9,10 +9,11 @@
  */
 
 import puppeteer from 'puppeteer';
+import type { Browser, Page, PuppeteerLaunchOptions } from 'puppeteer';
 import { resolve } from 'path';
 import { resolveChromePath, LAUNCH_ARGS } from './chrome.js';
 import { executeActionOnPage } from './interaction-executor.js';
-import type { InteractionStepAction, ScenarioStepDef } from './scenario-types.js';
+import type { ScenarioStepDef } from './scenario-types.js';
 
 /** Default timeout for scenario steps in seconds. */
 export const DEFAULT_STEP_TIMEOUT = 60;
@@ -33,8 +34,8 @@ export interface BrowserInitOptions {
  * Result from browser initialization.
  */
 export interface BrowserInitResult {
-  browser: puppeteer.Browser;
-  page: puppeteer.Page;
+  browser: Browser;
+  page: Page;
 }
 
 /**
@@ -49,11 +50,15 @@ export async function initBrowser(options: BrowserInitOptions): Promise<BrowserI
   const { port, puppeteerPath, viewport = { width: 1280, height: 720 } } = options;
   const executablePath = puppeteerPath ?? process.env.PUPPETEER_EXECUTABLE_PATH ?? resolveChromePath();
 
-  const browser = await puppeteer.launch({
+  const launchOptions: PuppeteerLaunchOptions = {
     headless: true,
-    executablePath,
     args: LAUNCH_ARGS,
-  });
+  };
+  if (executablePath) {
+    launchOptions.executablePath = executablePath;
+  }
+
+  const browser = await puppeteer.launch(launchOptions);
 
   const page = await browser.newPage();
   await page.setViewport(viewport);
@@ -96,7 +101,7 @@ export interface InteractionStepResult {
  * @returns Interaction step result with state and screenshots.
  */
 export async function executeInteractionActions(
-  page: puppeteer.Page,
+  page: Page,
   step: ScenarioStepDef,
   enableScreenshots: boolean,
   outDir: string,
@@ -165,6 +170,6 @@ export async function executeInteractionActions(
  *
  * @param page - Puppeteer page object.
  */
-export async function waitOneFrame(page: puppeteer.Page): Promise<void> {
+export async function waitOneFrame(page: Page): Promise<void> {
   await page.evaluate(() => new Promise(r => requestAnimationFrame(r)));
 }

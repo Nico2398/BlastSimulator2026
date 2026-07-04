@@ -20,7 +20,8 @@
  */
 
 import puppeteer from 'puppeteer';
-import { mkdirSync, writeFileSync, existsSync } from 'fs';
+import type { PuppeteerLaunchOptions } from 'puppeteer';
+import { mkdirSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
 
 interface TextElement {
@@ -64,18 +65,12 @@ function contrastRatio(hex1: string, hex2: string): number {
   return (lighter + 0.05) / (darker + 0.05);
 }
 
-function isLargeText(fontSize: string, fontWeight: string): boolean {
-  const size = parseFloat(fontSize);
-  const bold = fontWeight === 'bold' || parseInt(fontWeight) >= 700;
-  return size >= 18 || (size >= 14 && bold);
-}
-
 function rgbToHex(rgb: string): string | null {
   const match = rgb.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)/);
   if (!match) return null;
-  const r = parseInt(match[1]).toString(16).padStart(2, '0');
-  const g = parseInt(match[2]).toString(16).padStart(2, '0');
-  const b = parseInt(match[3]).toString(16).padStart(2, '0');
+  const r = parseInt(match[1]!).toString(16).padStart(2, '0');
+  const g = parseInt(match[2]!).toString(16).padStart(2, '0');
+  const b = parseInt(match[3]!).toString(16).padStart(2, '0');
   return `#${r}${g}${b}`;
 }
 
@@ -86,12 +81,13 @@ function parseArgs(): { port: number; viewport: { width: number; height: number 
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--port' && args[i + 1]) {
-      port = parseInt(args[i + 1], 10);
+      port = parseInt(args[i + 1]!, 10);
       i++;
     } else if (args[i] === '--viewport' && args[i + 1]) {
-      const parts = args[i + 1].split('x').map(v => parseInt(v, 10));
-      if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
-        viewport = { width: parts[0], height: parts[1] };
+      const viewportStr = args[i + 1]!;
+      const parts = viewportStr.split('x').map(v => parseInt(v, 10));
+      if (parts.length === 2 && !isNaN(parts[0]!) && !isNaN(parts[1]!)) {
+        viewport = { width: parts[0]!, height: parts[1]! };
       }
       i++;
     }
@@ -105,11 +101,15 @@ async function runA11yCheck(port: number, viewport: { width: number; height: num
 
   const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
 
-  const browser = await puppeteer.launch({
+  const launchOptions: PuppeteerLaunchOptions = {
     headless: true,
-    executablePath,
     args: ['--no-sandbox', '--disable-setuid-sandbox'],
-  });
+  };
+  if (executablePath) {
+    launchOptions.executablePath = executablePath;
+  }
+
+  const browser = await puppeteer.launch(launchOptions);
 
   try {
     const page = await browser.newPage();
@@ -175,7 +175,6 @@ async function runA11yCheck(port: number, viewport: { width: number; height: num
       if (!fgHex || !bgHex) continue;
 
       const ratio = contrastRatio(fgHex, bgHex);
-      const large = isLargeText(el.fontSize, el.fontWeight);
 
       const passAANormal = ratio >= 4.5;
       const passAALarge = ratio >= 3.0;

@@ -45,13 +45,13 @@ function parseArgs(): { mode: string; scenarios: string[]; port: number } {
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--mode' && args[i + 1]) {
-      mode = args[i + 1];
+      mode = args[i + 1]!;
       i++;
     } else if (args[i] === '--port' && args[i + 1]) {
-      port = parseInt(args[i + 1], 10);
+      port = parseInt(args[i + 1]!, 10);
       i++;
-    } else {
-      scenarios.push(args[i]);
+    } else if (args[i]) {
+      scenarios.push(args[i]!);
     }
   }
 
@@ -77,7 +77,7 @@ async function runBatchInteraction(
       mkdirSync(outDir, { recursive: true });
 
       try {
-        const def = loadScenarioDef(name, SCENARIO_DIR);
+        const def = loadScenarioDef(name!, SCENARIO_DIR);
         const steps: ScenarioStepDef[] = def.steps;
         const page = await browser.newPage();
         await page.setViewport({ width: 1280, height: 720 });
@@ -95,7 +95,7 @@ async function runBatchInteraction(
         const stepResults: ReportableStep[] = [];
 
         for (let s = 0; s < steps.length; s++) {
-          const step = steps[s];
+          const step = steps[s]!;
           const paddedIdx = formatStepIndex(s);
           const cmdSlug = formatCommandSlug(step.command);
           const stepTimeout = (step.timeout ?? DEFAULT_STEP_TIMEOUT) * 1000;
@@ -144,11 +144,16 @@ async function runBatchInteraction(
         }
 
         await page.close();
-        results.push({ name, totalSteps: steps.length, failed, error: failed ? errorMsg : undefined });
+        results.push({
+          name: name!,
+          totalSteps: steps.length,
+          failed,
+          ...(failed ? { error: errorMsg } : {}),
+        });
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         console.error(`\n[${name}] FAILED — ${msg}`);
-        results.push({ name, totalSteps: 0, failed: true, error: msg });
+        results.push({ name: name!, totalSteps: 0, failed: true, error: msg });
       }
 
       // Print progress
@@ -193,13 +198,13 @@ async function main(): Promise<void> {
     for (let i = 0; i < names.length; i++) {
       const name = names[i];
       try {
-        const steps = loadScenarioDef(name, SCENARIO_DIR).steps;
-        const result = runScenario(engine, name, steps, SCREENSHOT_DIR);
+        const steps = loadScenarioDef(name!, SCENARIO_DIR).steps;
+        const result = runScenario(engine, name!, steps, SCREENSHOT_DIR);
         results.push(result);
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         console.error(`\n[${name}] FAILED — ${msg}`);
-        results.push({ name, totalSteps: 0, failed: true, error: msg });
+        results.push({ name: name!, totalSteps: 0, failed: true, error: msg });
       }
 
       const passed = results.filter(r => !r.failed).length;

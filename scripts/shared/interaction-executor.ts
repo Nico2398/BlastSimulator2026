@@ -8,7 +8,7 @@
  * @module shared/interaction-executor
  */
 
-import type puppeteer from 'puppeteer';
+import type { Page, KeyInput } from 'puppeteer';
 import type { InteractionStepAction } from './scenario-types.js';
 
 /** Maps button names to Puppeteer MouseButton values. */
@@ -28,7 +28,7 @@ const BUTTON_MAP: Record<string, 'left' | 'right' | 'middle'> = {
  * @param action - The interaction action to execute.
  */
 export async function executeActionOnPage(
-  page: puppeteer.Page,
+  page: Page,
   action: InteractionStepAction,
 ): Promise<void> {
   switch (action.type) {
@@ -57,13 +57,13 @@ export async function executeActionOnPage(
       await page.mouse.move(action.x, action.y);
       break;
     case 'keypress':
-      await page.keyboard.press(action.key);
+      await page.keyboard.press(action.key as KeyInput);
       break;
     case 'keydown':
-      await page.keyboard.down(action.key);
+      await page.keyboard.down(action.key as KeyInput);
       break;
     case 'keyup':
-      await page.keyboard.up(action.key);
+      await page.keyboard.up(action.key as KeyInput);
       break;
     case 'scroll':
       await page.evaluate(
@@ -81,7 +81,9 @@ export async function executeActionOnPage(
       await page.waitForSelector(action.selector, { timeout: action.timeout ?? 10000 });
       break;
     case 'type':
-      await page.type(action.selector, action.text, { delay: action.delay });
+      await page.type(action.selector, action.text, {
+        ...(action.delay !== undefined ? { delay: action.delay } : {}),
+      });
       break;
     case 'assert': {
       if (action.selector) {
@@ -90,7 +92,7 @@ export async function executeActionOnPage(
           throw new Error(`Assert FAILED: selector "${action.selector}" not found`);
         } else if (action.property && action.expectedValue !== undefined) {
           const actual = await element.evaluate(
-            (el: Element, prop: string) => (el as Record<string, unknown>)[prop],
+            (el: Element, prop: string) => (el as unknown as Record<string, unknown>)[prop],
             action.property,
           );
           const passed = JSON.stringify(actual) === JSON.stringify(action.expectedValue);

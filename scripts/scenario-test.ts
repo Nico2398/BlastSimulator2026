@@ -47,10 +47,9 @@ import type { ScenarioStepDef, StepResult } from './shared/scenario-types.js';
 import { createGameEngine, runSteps } from './shared/command-runner.js';
 import {
   formatStepIndex,
-  formatCommandSlug,
 } from './shared/scenario-utils.js';
 import { parseArgs } from './scenario-cli.js';
-import { runScenarioInteraction, type ShotDef } from './scenario-interaction-runner.js';
+import { runScenarioInteraction } from './scenario-interaction-runner.js';
 
 const SCREENSHOT_DIR = resolve(process.cwd(), 'screenshots');
 
@@ -67,7 +66,6 @@ async function runScenarioCommand(
   // Print per-step summary to stdout (matching expected CI output format)
   for (const r of results) {
     const paddedIdx = formatStepIndex(r.step);
-    const cmdSlug = formatCommandSlug(r.command);
     console.log(`  ${paddedIdx} ${r.command}`);
     console.log(`    Output: ${r.commandOutput.substring(0, 120)}`);
     if (r.gameState) {
@@ -85,7 +83,7 @@ async function runScenarioCommand(
     uiState: null,
     screenshotPath: '',
     statePath: r.statePath,
-    error: r.error,
+    ...(r.error !== undefined ? { error: r.error } : {}),
   }));
 }
 

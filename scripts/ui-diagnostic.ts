@@ -8,7 +8,7 @@
  * Output: screenshots/ui-diagnostic/ with per-panel screenshots + summary.
  */
 
-import puppeteer, { type Page } from 'puppeteer';
+import puppeteer, { type Page, type PuppeteerLaunchOptions } from 'puppeteer';
 import { mkdirSync, writeFileSync, existsSync } from 'fs';
 import { resolve } from 'path';
 
@@ -122,7 +122,7 @@ async function auditPanelButtons(page: Page, panelId: string, panelName: string)
       display: btn.display,
       disabled: btn.disabled,
       clickable: !issue,
-      issue,
+      ...(issue !== undefined ? { issue } : {}),
     });
   }
 }
@@ -186,11 +186,15 @@ async function run() {
   ];
   const executablePath = CHROMIUM_PATHS.find(p => existsSync(p));
 
-  const browser = await puppeteer.launch({
+  const launchOptions: PuppeteerLaunchOptions = {
     headless: true,
-    executablePath,
     args: ['--no-sandbox', '--disable-setuid-sandbox'],
-  });
+  };
+  if (executablePath) {
+    launchOptions.executablePath = executablePath;
+  }
+
+  const browser = await puppeteer.launch(launchOptions);
 
   try {
     const page = await browser.newPage();
@@ -254,7 +258,7 @@ async function run() {
           display: btn.display,
           disabled: btn.disabled,
           clickable: !issue,
-          issue,
+          ...(issue !== undefined ? { issue } : {}),
         });
       }
     }
@@ -281,6 +285,7 @@ async function run() {
     });
     if (speedInfo) {
       const ok = speedInfo.changed && speedInfo.width > 0;
+      const speedIssue = ok ? undefined : (speedInfo.width === 0 ? 'zero-size' : 'text did not change after click');
       logResult({
         panel: 'hud',
         text: `Speed: ${speedInfo.text} → ${speedInfo.afterClick}`,
@@ -288,7 +293,7 @@ async function run() {
         pointerEvents: speedInfo.pointerEvents,
         display: 'inline-block', disabled: false,
         clickable: ok,
-        issue: ok ? undefined : (speedInfo.width === 0 ? 'zero-size' : 'text did not change after click'),
+        ...(speedIssue !== undefined ? { issue: speedIssue } : {}),
       });
     } else {
       logResult({
@@ -481,7 +486,7 @@ async function run() {
       return { visible: true, buttons: btns };
     });
 
-    if (eventDialogInfo.visible) {
+    if (eventDialogInfo.visible && eventDialogInfo.buttons) {
       console.log(`  Event dialog visible with ${eventDialogInfo.buttons.length} buttons`);
       await screenshot(page, 'event-dialog');
       for (const btn of eventDialogInfo.buttons) {
@@ -495,7 +500,7 @@ async function run() {
           pointerEvents: btn.pointerEvents,
           display: 'block', disabled: btn.disabled,
           clickable: !issue,
-          issue,
+          ...(issue !== undefined ? { issue } : {}),
         });
       }
     } else {
@@ -539,7 +544,7 @@ async function run() {
             pointerEvents: btn.pointerEvents,
             display: 'block', disabled: btn.disabled,
             clickable: !issue,
-            issue,
+            ...(issue !== undefined ? { issue } : {}),
           });
         }
 
@@ -616,7 +621,7 @@ async function run() {
         display: btn.display,
         disabled: btn.disabled,
         clickable: !issue,
-        issue,
+        ...(issue !== undefined ? { issue } : {}),
       });
     }
 

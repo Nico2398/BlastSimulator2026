@@ -23,6 +23,7 @@
  */
 
 import puppeteer from 'puppeteer';
+import type { PuppeteerLaunchOptions } from 'puppeteer';
 import { mkdirSync } from 'fs';
 import { resolve } from 'path';
 import { resolveChromePath } from './shared/chrome.js';
@@ -49,30 +50,37 @@ function parseArgs(): ScreenshotOptions {
 
     for (let i = 0; i < args.length; i++) {
         if (args[i] === '--name' && args[i + 1]) {
-            name = args[i + 1];
+            name = args[i + 1]!;
             i++;
         } else if (args[i] === '--commands' && args[i + 1]) {
-            commands = args[i + 1].split(';').map((c) => c.trim()).filter(Boolean);
+            commands = args[i + 1]!.split(';').map((c) => c.trim()).filter(Boolean);
             i++;
         } else if (args[i] === '--port' && args[i + 1]) {
-            port = parseInt(args[i + 1], 10);
+            port = parseInt(args[i + 1]!, 10);
             i++;
         } else if (args[i] === '--puppeteer-path' && args[i + 1]) {
             puppeteerPath = args[i + 1];
             i++;
         } else if (args[i] === '--viewport' && args[i + 1]) {
-            const parts = args[i + 1].split('x').map(v => parseInt(v, 10));
-            if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
-                viewport = { width: parts[0], height: parts[1] };
+            const viewportStr = args[i + 1]!;
+            const parts = viewportStr.split('x').map(v => parseInt(v, 10));
+            if (parts.length === 2 && !isNaN(parts[0]!) && !isNaN(parts[1]!)) {
+                viewport = { width: parts[0]!, height: parts[1]! };
             } else {
-                console.error(`Invalid viewport format: ${args[i+1]}. Use WxH (e.g. 1920x1080)`);
+                console.error(`Invalid viewport format: ${viewportStr}. Use WxH (e.g. 1920x1080)`);
                 process.exit(1);
             }
             i++;
         }
     }
 
-    return { name, commands, port, puppeteerPath, viewport };
+    return {
+        name,
+        commands,
+        port,
+        ...(puppeteerPath !== undefined ? { puppeteerPath } : {}),
+        viewport,
+    };
 }
 
 async function captureScreenshot(options: ScreenshotOptions): Promise<string> {
@@ -84,11 +92,15 @@ async function captureScreenshot(options: ScreenshotOptions): Promise<string> {
         ?? process.env.PUPPETEER_EXECUTABLE_PATH
         ?? resolveChromePath();
 
-    const browser = await puppeteer.launch({
+    const launchOptions: PuppeteerLaunchOptions = {
         headless: true,
-        executablePath,
         args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    });
+    };
+    if (executablePath) {
+        launchOptions.executablePath = executablePath;
+    }
+
+    const browser = await puppeteer.launch(launchOptions);
 
     try {
         const page = await browser.newPage();

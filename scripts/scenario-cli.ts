@@ -28,7 +28,10 @@ export interface ParsedArgs {
 function parseViewsArg(raw: string): ShotDef[] {
   return raw.split(';').map(s => s.trim()).filter(Boolean).map((part) => {
     const [shotName, yawStr, pitchStr] = part.split(':');
-    return { name: shotName, yaw: parseFloat(yawStr), pitch: parseFloat(pitchStr) };
+    const name = shotName ?? '';
+    const yaw = parseFloat(yawStr ?? '');
+    const pitch = parseFloat(pitchStr ?? '');
+    return { name, yaw, pitch };
   }).filter(s => s.name && !isNaN(s.yaw) && !isNaN(s.pitch));
 }
 
@@ -47,7 +50,7 @@ export function parseArgs(): ParsedArgs {
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--scenario' && args[i + 1]) {
-      name = args[i + 1];
+      name = args[i + 1]!;
       try {
         const def = loadScenarioDef(name, resolve(process.cwd(), 'scripts/scenario-defs'));
         steps = def.steps;
@@ -60,38 +63,39 @@ export function parseArgs(): ParsedArgs {
       }
       i++;
     } else if (args[i] === '--commands' && args[i + 1]) {
-      const commands = args[i + 1].split(';').map(c => c.trim()).filter(Boolean);
+      const commands = args[i + 1]!.split(';').map(c => c.trim()).filter(Boolean);
       steps = commands.map(cmd => ({ command: cmd }));
       i++;
     } else if (args[i] === '--name' && args[i + 1]) {
-      name = args[i + 1];
+      name = args[i + 1]!;
       i++;
     } else if (args[i] === '--shots' && args[i + 1]) {
-      shots = parseViewsArg(args[i + 1]);
+      shots = parseViewsArg(args[i + 1]!);
       i++;
     } else if (args[i] === '--port' && args[i + 1]) {
-      port = parseInt(args[i + 1], 10);
+      port = parseInt(args[i + 1]!, 10);
       i++;
     } else if (args[i] === '--puppeteer-path' && args[i + 1]) {
       puppeteerPath = args[i + 1];
       i++;
     } else if (args[i] === '--frames' && args[i + 1]) {
-      frames = parseInt(args[i + 1], 10);
+      frames = parseInt(args[i + 1]!, 10);
       i++;
     } else if (args[i] === '--interval' && args[i + 1]) {
-      intervalMs = parseInt(args[i + 1], 10);
+      intervalMs = parseInt(args[i + 1]!, 10);
       i++;
     } else if (args[i] === '--viewport' && args[i + 1]) {
-      const parts = args[i + 1].split('x').map(v => parseInt(v, 10));
-      if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
-        viewport = { width: parts[0], height: parts[1] };
+      const viewportStr = args[i + 1]!;
+      const parts = viewportStr.split('x').map(v => parseInt(v, 10));
+      if (parts.length === 2 && !isNaN(parts[0]!) && !isNaN(parts[1]!)) {
+        viewport = { width: parts[0]!, height: parts[1]! };
       } else {
-        console.error(`Invalid viewport format: ${args[i+1]}. Use WxH (e.g. 1920x1080)`);
+        console.error(`Invalid viewport format: ${viewportStr}. Use WxH (e.g. 1920x1080)`);
         process.exit(1);
       }
       i++;
     } else if (args[i] === '--mode' && args[i + 1]) {
-      const modeArg = args[i + 1];
+      const modeArg = args[i + 1]!;
       if (modeArg !== 'command' && modeArg !== 'interaction') {
         console.error(`Invalid mode: "${modeArg}". Supported modes: command, interaction`);
         process.exit(1);
@@ -103,5 +107,16 @@ export function parseArgs(): ParsedArgs {
     }
   }
 
-  return { name, steps, shots, port, puppeteerPath, frames, intervalMs, viewport, mode, screenshots };
+  return {
+    name,
+    steps,
+    shots,
+    port,
+    ...(puppeteerPath !== undefined ? { puppeteerPath } : {}),
+    frames,
+    intervalMs,
+    viewport,
+    mode,
+    screenshots,
+  };
 }
