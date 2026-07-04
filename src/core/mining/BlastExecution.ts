@@ -241,6 +241,42 @@ export function executeBlast(
     grid.clearVoxel(x, y, z);
   }
 
+  // 5a. Surface excavation pass: clear top 2 surface voxels near blast center to ensure
+  //     a visible crater appears in the terrain mesh. The energy field may not
+  //     consistently fracture surface voxels (attenuation + EPSILON dampening),
+  //     but the visual crater is essential player feedback.
+  if (toClear.length > 0) {
+    const blastCenterX = plan.holes.reduce((s, h) => s + h.x, 0) / plan.holes.length;
+    const blastCenterZ = plan.holes.reduce((s, h) => s + h.z, 0) / plan.holes.length;
+    const excavationRadius = Math.min(5, Math.ceil(plan.holes.length / 2));
+    for (let dx = -excavationRadius; dx <= excavationRadius; dx++) {
+      for (let dz = -excavationRadius; dz <= excavationRadius; dz++) {
+        const sx = Math.floor(blastCenterX + dx);
+        const sz = Math.floor(blastCenterZ + dz);
+        // Always clear the top 2 surface voxels at this column — regardless of
+        // what the energy field already cleared. This ensures a visible crater
+        // depression in the terrain mesh.
+        for (let sy = grid.sizeY - 1; sy >= 0; sy--) {
+          const v = grid.getVoxel(sx, sy, sz);
+          if (v && v.density >= 0.5) {
+            // Clear this surface voxel and one more below
+            for (let cy = 0; cy < 2 && sy - cy >= 0; cy++) {
+              const target = grid.getVoxel(sx, sy - cy, sz);
+              if (target && target.density >= 0.5) {
+                grid.clearVoxel(sx, sy - cy, sz);
+                if (!toClear.some(c => c.x === sx && c.y === sy - cy && c.z === sz)) {
+                  toClear.push({ x: sx, y: sy - cy, z: sz });
+                }
+                clearedVoxels++;
+              }
+            }
+            break;
+          }
+        }
+      }
+    }
+  }
+
   // 5b. Check for building destruction: if any cleared voxel's (x, z) falls
   //     within a building's footprint, the building is destroyed.
   const destroyedBuildings: DestroyedBuildingInfo[] = [];

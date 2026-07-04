@@ -71,7 +71,7 @@ function interpVertex(
 
 export class TerrainMesh {
   private readonly scene: THREE.Scene;
-  private readonly grid: VoxelGrid;
+  private grid: VoxelGrid;
   private mesh: THREE.Mesh | null = null;
   private readonly material: THREE.MeshPhongMaterial;
   private surveyOverlay: SurveyConfidenceOverlay | null = null;
@@ -86,6 +86,12 @@ export class TerrainMesh {
       shininess: 12,
       side: THREE.DoubleSide,
     });
+  }
+
+  /** Replace the underlying grid reference (e.g. after campaign start regenerates terrain). */
+  setGrid(grid: VoxelGrid): void {
+    console.log(`[TerrainMesh] setGrid: old=${this.grid.id} new=${grid.id}`);
+    this.grid = grid;
   }
 
   /** Build all chunks from scratch. Call once after grid is populated. */
@@ -108,6 +114,7 @@ export class TerrainMesh {
       }
     }
 
+    console.log(`[TerrainMesh] buildAll: grid=${this.grid.id} positions=${positions.length}`);
     if (positions.length === 0) return;
 
     const geometry = new THREE.BufferGeometry();

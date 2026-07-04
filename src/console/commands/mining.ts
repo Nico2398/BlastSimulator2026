@@ -497,13 +497,36 @@ export function buildRampCommand(
   const err = requireGame(ctx);
   if (err) return { success: false, output: err };
 
-  const origin = (named['origin'] ?? '0,0').split(',').map(Number);
-  const direction = (named['direction'] ?? 'south') as RampDirection;
-  const length = parseInt(named['length'] ?? '10', 10);
+  let originX: number;
+  let originZ: number;
+  let direction: RampDirection;
+  let length: number;
   const depth = parseInt(named['depth'] ?? '8', 10);
 
+  if (named['start'] && named['end']) {
+    const start = named['start'].split(',').map(Number);
+    const end = named['end'].split(',').map(Number);
+    originX = start[0] ?? 0;
+    originZ = start[1] ?? 0;
+    const dx = (end[0] ?? 0) - originX;
+    const dz = (end[1] ?? 0) - originZ;
+    if (Math.abs(dz) >= Math.abs(dx)) {
+      direction = dz >= 0 ? 'south' : 'north';
+      length = Math.abs(Math.round(dz));
+    } else {
+      direction = dx >= 0 ? 'east' : 'west';
+      length = Math.abs(Math.round(dx));
+    }
+  } else {
+    const origin = (named['origin'] ?? '0,0').split(',').map(Number);
+    originX = origin[0] ?? 0;
+    originZ = origin[1] ?? 0;
+    direction = (named['direction'] ?? 'south') as RampDirection;
+    length = parseInt(named['length'] ?? '10', 10);
+  }
+
   const result = buildRamp(ctx.grid!, {
-    originX: origin[0] ?? 0, originZ: origin[1] ?? 0,
+    originX, originZ,
     direction, length, targetDepth: depth,
   }, ctx.state!.cash);
 
@@ -512,9 +535,8 @@ export function buildRampCommand(
 
   // Patch NavGrid to reflect ramp terrain changes
   if (ctx.state!.navGrid && ctx.grid) {
-    const ox = Math.floor(origin[0] ?? 0);
-    const oz = Math.floor(origin[1] ?? 0);
-    // Compute affected region based on direction
+    const ox = Math.floor(originX);
+    const oz = Math.floor(originZ);
     let rampMinX = ox, rampMaxX = ox, rampMinZ = oz, rampMaxZ = oz;
     if (direction === 'north' || direction === 'south') {
       rampMinZ = Math.min(oz, direction === 'north' ? oz - length : oz);

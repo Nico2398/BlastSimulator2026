@@ -18,7 +18,8 @@ import { addExpense, addIncome } from '../../core/economy/Finance.js';
 import { processPayCycle } from '../../core/entities/Employee.js';
 import { tickNeedGauges, needsMoraleEffect } from '../../core/entities/EmployeeNeeds.js';
 import type { FiredEvent } from '../../core/events/EventSystem.js';
-import { tickCollapse, autoInsertNeedTasks, processShiftCycle } from '../../core/engine/GameLoop.js';
+import { tickCollapse, autoInsertNeedTasks, processShiftCycle, tickEmployees } from '../../core/engine/GameLoop.js';
+import { estimateSurveyResult, type SurveyMethod } from '../../core/mining/SurveyCalc.js';
 import { checkDeadlines, generateContracts } from '../../core/economy/Contract.js';
 import { updateBankruptcy } from '../../core/campaign/Bankruptcy.js';
 import { updateEcology } from '../../core/campaign/EcologicalDisaster.js';
@@ -155,6 +156,40 @@ export function tickCommand(
     for (const fe of firedEvents) {
       lines.push(`[tick ${state.tickCount}] NEED: ${fe.eventId}`);
     }
+
+    // 8b. Process survey pending actions — match surveyors and generate results.
+    //     Surveys complete instantly (duration system TBD); this ensures the
+    //     confidence overlay appears after queuing a survey + advancing time.
+    const surveyActions = state.pendingActions.filter(a => a.type === 'survey');
+    state.pendingActions = state.pendingActions.filter(a => a.type !== 'survey');
+    for (const action of surveyActions) {
+      // Find an idle qualified surveyor
+      const method = action.payload['method'] as SurveyMethod;
+      const surveyor = state.employees.employees.find(
+        emp => emp.alive && !emp.injured && emp.activeActionId === null &&
+               emp.qualifications.some(q => q.category === 'geology'),
+      );
+      if (surveyor && ctx.grid) {
+        const skillLevel = surveyor.qualifications.find(q => q.category === 'geology')?.proficiencyLevel ?? 1;
+        const surveyResult = estimateSurveyResult(ctx.grid, {
+          id: action.id,
+          method,
+          centerX: action.targetX,
+          centerZ: action.targetZ,
+          surveyorId: surveyor.id,
+          skillLevel,
+          completedTick: state.tickCount,
+        }, new Random(state.seed + state.tickCount + action.id));
+        state.surveyResults.push(surveyResult);
+        lines.push(`[tick ${state.tickCount}] ${method} survey complete at (${action.targetX}, ${action.targetZ}).`);
+      } else if (!surveyor) {
+        // No eligible surveyor available — keep the action in queue
+        state.pendingActions.push(action);
+      }
+    }
+
+    // 8c. Dispatch remaining pending actions to idle qualified employees
+    tickEmployees(state);
 
     // 9. Level stats snapshot + campaign profit check
     snapshotStats(state.levelStats, state);

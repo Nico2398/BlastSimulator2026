@@ -165,11 +165,17 @@ export async function executeInteractionActions(
 }
 
 /**
- * Wait for one render frame (requestAnimationFrame).
- * Screenshots need the GPU to flush a frame.
+ * Wait for render frames to flush.
+ * In headless Chrome, requestAnimationFrame may not fire on the expected
+ * schedule, so we wait for one rAF plus a fallback timeout to ensure
+ * the GPU has flushed.
  *
  * @param page - Puppeteer page object.
+ * @param frames - Number of animation frames to wait for (default 3).
  */
-export async function waitOneFrame(page: Page): Promise<void> {
+export async function waitOneFrame(page: Page, frames = 3): Promise<void> {
+  // Wait for one rAF frame (triggers render loop's next frame)
   await page.evaluate(() => new Promise(r => requestAnimationFrame(r)));
+  // Fallback delay: give GPU time to flush in headless Chrome
+  await new Promise(r => setTimeout(r, 50 * frames));
 }
