@@ -26,7 +26,7 @@ import puppeteer from 'puppeteer';
 import type { PuppeteerLaunchOptions } from 'puppeteer';
 import { mkdirSync } from 'fs';
 import { resolve } from 'path';
-import { resolveChromePath } from './shared/chrome.js';
+import { LAUNCH_ARGS, resolveChromePathOrThrow } from './shared/chrome.js';
 
 const SCREENSHOTS_DIR = resolve(process.cwd(), 'screenshots');
 const INIT_WAIT_MS = 3000;
@@ -88,17 +88,11 @@ async function captureScreenshot(options: ScreenshotOptions): Promise<string> {
 
     const devServerUrl = `http://localhost:${options.port}`;
 
-    const executablePath = options.puppeteerPath
-        ?? process.env.PUPPETEER_EXECUTABLE_PATH
-        ?? resolveChromePath();
-
     const launchOptions: PuppeteerLaunchOptions = {
         headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        args: LAUNCH_ARGS,
+        executablePath: options.puppeteerPath ?? resolveChromePathOrThrow(),
     };
-    if (executablePath) {
-        launchOptions.executablePath = executablePath;
-    }
 
     const browser = await puppeteer.launch(launchOptions);
 

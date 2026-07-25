@@ -8,12 +8,22 @@
     "build": "vite build",
     "console": "tsx src/console.ts",
     "validate": "tsc --noEmit && npm run test:coverage && npm run test:integration && npm run test:scenarios && vite build",
+    "typecheck": "tsc --noEmit && tsc --noEmit --project scripts/tsconfig.json",
     "test:coverage": "vitest run --coverage",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:scenarios": "vitest run tests/unit/scenario-defs.test.ts",
     "test:playthrough": "vitest run tests/scenarios/level-playthroughs.test.ts --reporter=verbose",
-    "test:integration": "vitest run tests/integration"
+    "test:integration": "vitest run tests/integration",
+    "verify:env": "tsx scripts/verify-env.ts",
+    "validate:context": "tsx scripts/validate-context.ts",
+    "scenario": "tsx scripts/scenario-test.ts",
+    "scenarios": "tsx scripts/run-all-scenarios.ts",
+    "scenarios:interaction": "tsx scripts/run-all-scenarios.ts --mode interaction",
+    "screenshot": "tsx scripts/screenshot.ts",
+    "a11y": "tsx scripts/a11y-check.ts",
+    "ui:diagnostic": "tsx scripts/ui-diagnostic.ts",
+    "validate:state": "tsx scripts/validate-state-schema.ts"
   },
   "dependencies": {
     "cannon-es": "^0.20.0",

@@ -53,9 +53,23 @@ npm run console    # Start interactive REPL
 Run `npm test` for fast local feedback during development. Run `npm run validate` as the full PR gate — it runs TypeScript type-checking, all tests with coverage, and a production build.
 
 ```bash
+npm run verify:env    # Which verification channels are usable right now
 npm test              # Quick feedback — unit + integration tests
 npm run validate      # Full PR gate — typecheck → tests → build
 ```
+
+### Verification Channels
+
+Four independent channels prove a change works, and each catches what the others miss. Verify through every channel a change touches — a green test suite proves the logic, not the picture.
+
+| Channel | Command | Proves |
+|---------|---------|--------|
+| `static` | `npm run typecheck` | Types line up across `src/` and `scripts/` |
+| `logic` | `npm run test` | Unit + integration behaviour matches expectations |
+| `scenario` | `npm run scenarios` | Full command sequences produce the expected game state |
+| `visual` | `npm run screenshot`, `npm run scenarios:interaction` | The game renders and the UI responds to real clicks |
+
+`npm run verify:env` reports each channel as READY or BLOCKED with the remedy, including the resolved Chrome/Chromium path used by the visual channel.
 
 ### npm Script Reference
 
@@ -66,7 +80,17 @@ npm run validate      # Full PR gate — typecheck → tests → build
 | `npm run test:coverage` | `vitest run --coverage` | Tests + per-file coverage report (v8 provider) | Check coverage before PR |
 | `npm run test:integration` | `vitest run tests/integration` | Integration tests only (small suites + full-level) | Validate cross-module behavior |
 | `npm run test:scenarios` | `vitest run tests/unit/scenario-defs.test.ts` | Validates all scenario JSON files parse correctly | Ensure scenario definitions are valid |
+| `npm run typecheck` | `tsc --noEmit` on `src/` and `scripts/` | TypeScript across both projects | Fastest check after an edit |
 | `npm run validate` | `tsc --noEmit && npm run test:coverage && npm run test:integration && npm run test:scenarios && vite build` | TypeScript type-check → tests with coverage → integration tests → scenario defs validation → production build | **Full PR gate** — must pass before merging |
+| `npm run verify:env` | `tsx scripts/verify-env.ts` | Reports each verification channel READY or BLOCKED, with remedies | Before relying on a channel |
+| `npm run validate:context` | `tsx scripts/validate-context.ts` | Agent/skill/rule frontmatter schemas, tool names, preloaded skills, hook paths, cross-runtime body sync | After editing anything under `.claude/`, `.github/`, `.opencode/` |
+| `npm run scenario` | `tsx scripts/scenario-test.ts` | Single scenario, command or interaction mode | Debug one scenario |
+| `npm run scenarios` | `tsx scripts/run-all-scenarios.ts` | All 99 scenarios, command mode, no browser | Gameplay/console/economy/campaign changes |
+| `npm run scenarios:interaction` | `tsx scripts/run-all-scenarios.ts --mode interaction` | All 99 scenarios through the real UI (Puppeteer) | UI/rendering changes |
+| `npm run screenshot` | `tsx scripts/screenshot.ts` | Captures a PNG after running console commands | Inspect what the game renders |
+| `npm run a11y` | `tsx scripts/a11y-check.ts` | WCAG AA contrast analysis of visible text | UI/color changes |
+| `npm run ui:diagnostic` | `tsx scripts/ui-diagnostic.ts` | Clicks every UI control, reports dead ones | UI/layout changes |
+| `npm run validate:state` | `tsx scripts/validate-state-schema.ts` | State JSON schema validation on scenario dumps | After scenario runs |
 | `npm run console` | `tsx src/console.ts` | Interactive CLI for manual gameplay testing | Exploratory testing without a browser |
 | `npm run build` | `vite build` | Production build to `dist/` | Deploy to itch.io |
 

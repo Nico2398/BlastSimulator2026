@@ -8,12 +8,13 @@ description: >
 
 ## Bug Fix / Feature Request Workflow
 
-1. **Understand** — reproduce in console mode if possible (`npx tsx src/console.ts`)
+1. **Understand** — reproduce in console mode if possible (`npm run console`)
 2. **Find modules** — core logic in `src/core/`, rendering in `src/renderer/`. Never cross layer boundaries.
 3. **Write/update tests** — failing test capturing bug or new behavior first
 4. **Implement** — minimum change to pass test; don't refactor unrelated code
 5. **Validate** — `npm run validate` must pass cleanly
-6. **Visual check** (if rendering touched) — capture + inspect screenshot
+6. **Scenario check** (gameplay, console, economy, campaign touched) — `npm run scenarios`
+7. **Visual check** (rendering or UI touched) — capture a screenshot, then open it with the Read tool and describe what is on screen. Details in `dev-visual-testing`.
 
 ## Code Style
 

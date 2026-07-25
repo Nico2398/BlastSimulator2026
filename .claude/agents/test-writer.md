@@ -1,9 +1,11 @@
 ---
 name: test-writer
-description:  TDD Red phase: writes failing tests before implementation. Unit tests, integration tests, scenario definitions.
-allowed-tools: Read Edit Search Execute
-user-invocable: false
-disable-model-invocation: true
+description: TDD Red phase: writes failing tests before implementation. Unit tests, integration tests, scenario definitions.
+tools: Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite
+skills:
+  - dev-testing-strategy
+  - dev-visual-testing
+  - dev-coding-conventions
 ---
 
 # Test Writer — TDD Red Phase

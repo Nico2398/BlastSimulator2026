@@ -1,9 +1,9 @@
 ---
 name: conflict-resolver
-description:  Resolves git cherry-pick merge conflicts. Reads conflicted files, merges both sides, removes conflict markers, stages resolved files.
-allowed-tools: Read Edit Search Execute
-user-invocable: false
-disable-model-invocation: true
+description: Resolves git cherry-pick merge conflicts. Reads conflicted files, merges both sides, removes conflict markers, stages resolved files.
+tools: Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite
+skills:
+  - dev-coding-conventions
 ---
 
 # Conflict Resolver

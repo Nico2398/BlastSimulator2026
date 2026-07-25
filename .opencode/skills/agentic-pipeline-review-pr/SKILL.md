@@ -16,7 +16,7 @@ description: >
 
 ### Rules
 
-- Reviewers run in parallel — orchestrator invokes all 4 simultaneously
+- Reviewers run in parallel — orchestrator invokes all simultaneously
 - @reviewer runs after findings are merged, sees the consolidated output
 - @reviewer runs full test suite to validate
 - @reviewer posts pass/fail outcome as PR comment
@@ -26,7 +26,7 @@ description: >
 
 | Step | Action |
 |------|--------|
-| merge-findings | Deduplicate and merge all 4 reviewer outputs → pass/fail |
+| merge-findings | Deduplicate and merge all reviewer outputs → pass/fail |
 
 ### Review Output Format
 

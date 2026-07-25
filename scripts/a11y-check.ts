@@ -23,6 +23,7 @@ import puppeteer from 'puppeteer';
 import type { PuppeteerLaunchOptions } from 'puppeteer';
 import { mkdirSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
+import { LAUNCH_ARGS, resolveChromePathOrThrow } from './shared/chrome.js';
 
 interface TextElement {
   tag: string;
@@ -99,15 +100,11 @@ function parseArgs(): { port: number; viewport: { width: number; height: number 
 async function runA11yCheck(port: number, viewport: { width: number; height: number }): Promise<A11yReport> {
   const devServerUrl = `http://localhost:${port}`;
 
-  const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
-
   const launchOptions: PuppeteerLaunchOptions = {
     headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    args: LAUNCH_ARGS,
+    executablePath: resolveChromePathOrThrow(),
   };
-  if (executablePath) {
-    launchOptions.executablePath = executablePath;
-  }
 
   const browser = await puppeteer.launch(launchOptions);
 

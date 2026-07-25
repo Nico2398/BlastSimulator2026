@@ -6,6 +6,30 @@ description: >
   verification. Use when working on rendering, UI, or any visual feature.
 ---
 
+## The Visual Channel
+
+Type checks and unit tests cannot see a black screen, a mesh at the wrong scale, or a button with zero height. This channel closes that gap by producing images and reading them.
+
+**Capturing is not verifying.** A screenshot proves nothing until it is opened with the Read tool and described. You have vision — use it. State JSON is a complement to an image, never a substitute for one.
+
+Confirm the channel is live before relying on it:
+
+```bash
+npm run verify:env
+```
+
+It prints the resolved browser path and whether the dev server is up, and names the remedy for whatever is missing.
+
+## Prerequisites
+
+Dev server on :5173 (override with `--port` or `VISUAL_TEST_PORT`):
+
+```bash
+npm run dev &
+```
+
+Browser resolution is automatic, in this order: `--puppeteer-path` > `PUPPETEER_EXECUTABLE_PATH` > Puppeteer's own cache > system Chrome/Chromium > Playwright-style caches including `PLAYWRIGHT_BROWSERS_PATH`. When nothing resolves, the error names the fix rather than failing opaquely.
+
 ## Taking Screenshots
 
 One-command wrapper — starts server + captures screenshot:
@@ -13,44 +37,45 @@ One-command wrapper — starts server + captures screenshot:
 ```bash
 bash scripts/visual-test.sh --name "terrain" --commands "new_game mine_type:desert seed:42"
 ```
-PowerShell: `npx tsx scripts/screenshot.ts --name "terrain" --commands "new_game mine_type:desert seed:42"` (dev server must be running)
 
 Dev server already running:
 
 ```bash
-npx tsx scripts/screenshot.ts --name "after-blast" --commands "new_game seed:1; blast 3,5"
+npm run screenshot -- --name "after-blast" --commands "new_game seed:1; blast 3,5"
 ```
 
 Multiple commands separated by `;`. Screenshots saved to `screenshots/`.
+
+Then open the PNG with the Read tool and describe what it shows.
 
 ## Scenario Testing (State Dumps + Optional Screenshots)
 
 ### Single scenario runner
 ```bash
 # Command mode (default, pure Node.js, no browser)
-npx tsx scripts/scenario-test.ts --scenario blast-basic
+npm run scenario -- --scenario blast-basic
 
 # Interaction mode (Puppeteer with real UI clicks)
-npx tsx scripts/scenario-test.ts --scenario blast-basic --mode interaction
+npm run scenario -- --scenario blast-basic --mode interaction
 
 # With screenshots for visual inspection
-npx tsx scripts/scenario-test.ts --scenario blast-basic --mode interaction --screenshots
+npm run scenario -- --scenario blast-basic --mode interaction --screenshots
 
 # Inline commands
-npx tsx scripts/scenario-test.ts --name blast-test \
+npm run scenario -- --name blast-test \
   --commands "new_game seed:42; drill_plan grid rows:2 cols:3 spacing:4 depth:6 start:15,15; charge hole:* explosive:boomite amount:5 stemming:2; sequence auto; blast"
 ```
 
 ### Batch runner (CI)
 ```bash
 # All scenarios, command mode (fastest)
-npx tsx scripts/run-all-scenarios.ts
+npm run scenarios
 
 # All scenarios, interaction mode (shared browser)
-npx tsx scripts/run-all-scenarios.ts --mode interaction
+npm run scenarios:interaction
 
 # Filter by name
-npx tsx scripts/run-all-scenarios.ts blast-basic tutorial-playthrough
+npm run scenarios -- blast-basic tutorial-playthrough
 ```
 
 Interaction actions (clickSelector, waitForSelector, type, etc.) defined in scenario step `interaction` arrays. Type definitions in `scripts/shared/scenario-types.ts`. Steps without `interaction` use command execution.
@@ -68,23 +93,22 @@ Browser entry point exposes:
 - `window.__gameState()` — serialized game state
 - `window.__uiState()` — panel visibility, button states, pointer-events
 
-### UI Button Diagnostics
+### Extra Capture Modes
+
+| Flag | Effect |
+|------|--------|
+| `--shots "name:yaw:pitch;..."` | Orbit to each camera angle per step → `step-NN-cmd-{name}.png` |
+| `--frames N --interval MS` | N frames per step, for animated effects → `step-NN-cmd-fN.png` |
+| `--viewport "WxH"` | Capture at a different resolution |
+| `--puppeteer-path PATH` | Explicit browser binary |
+| `--port N` | Dev server port |
+
+### Supporting Checks
 
 ```bash
-npx tsx scripts/ui-diagnostic.ts
-```
-
-Opens blast panel via Puppeteer click, tests all buttons, reports computed styles.
-
-## Environment Notes
-
-- `PUPPETEER_EXECUTABLE_PATH` may vary. Agent sandbox: `/usr/bin/chromium`
-- Start dev server first:
-  - Bash: `npm run dev &`
-  - PowerShell: `Start-Process npm -ArgumentList "run dev"`
-
-```bash
-npx tsx scripts/scenario-test.ts --scenario blast-basic --puppeteer-path "/usr/bin/chromium"
+npm run a11y             # WCAG AA contrast analysis of every visible text element
+npm run validate:state   # State JSON schema validation
+npm run ui:diagnostic    # Clicks every UI button, reports computed styles and dead controls
 ```
 
 ## What to Evaluate
@@ -107,13 +131,15 @@ Headless Chrome has no GPU. Expect:
 ## Before/After Screenshots
 
 When fixing visual issue:
-1. `--scenario "before-fix-ISSUE" --screenshots` before change
-2. `--scenario "after-fix-ISSUE" --screenshots` after change
-3. Compare both → confirm no visual regression
+1. `--name "before-fix-ISSUE" --screenshots` before change; open the PNGs, describe the defect
+2. `--name "after-fix-ISSUE" --screenshots` after change; open the PNGs, describe the result
+3. Compare the two descriptions → confirm the defect is gone and nothing else moved
 
 ## Completion Criteria
 
 Never mark rendering task complete unless:
-1. Screenshot confirms geometry visible + correct
+1. Screenshots were captured **and opened with the Read tool** — geometry visible and correct
 2. `npm run validate` passes
 3. State dumps confirm logical state matches expectations
+
+When images could not be produced at all, say the visual channel is unverified and give the `npm run verify:env` remedy. Never report a rendering change verified on the strength of the test suite alone.

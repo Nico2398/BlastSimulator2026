@@ -1,16 +1,15 @@
 ---
 name: semantic-reviewer
-description:  Semantic code reviewer. Verifies tests and implementation exist, that test descriptions match the logic under test, and that function names match their implementation behavior. Read-only.
-allowed-tools: Read Search
-user-invocable: false
-disable-model-invocation: true
+description: Semantic code reviewer. Verifies tests and implementation exist, that test descriptions match the logic under test, and that function names match their implementation behavior. Read-only.
+tools: Read, Grep, Glob, Bash, Skill, TodoWrite
+skills:
+  - dev-testing-strategy
 hooks:
   PreToolUse:
     - matcher: Bash
       hooks:
         - type: command
-          shell: powershell
-          command: .claude/hooks/block-git-gh.ps1
+          command: ${CLAUDE_PROJECT_DIR}/.claude/hooks/block-git-gh.sh
 ---
 # Semantic Reviewer
 

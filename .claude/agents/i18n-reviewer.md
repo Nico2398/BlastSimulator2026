@@ -1,16 +1,15 @@
 ---
 name: i18n-reviewer
-description:  Internationalization reviewer. Flags hardcoded user-facing strings, missing translation keys, en.json/fr.json mismatches. Read-only.
-allowed-tools: Read Search
-user-invocable: false
-disable-model-invocation: true
+description: Internationalization reviewer. Flags hardcoded user-facing strings, missing translation keys, en.json/fr.json mismatches. Read-only.
+tools: Read, Grep, Glob, Bash, Skill, TodoWrite
+skills:
+  - dev-coding-conventions
 hooks:
   PreToolUse:
     - matcher: Bash
       hooks:
         - type: command
-          shell: powershell
-          command: .claude/hooks/block-git-gh.ps1
+          command: ${CLAUDE_PROJECT_DIR}/.claude/hooks/block-git-gh.sh
 ---
 
 # i18n Reviewer

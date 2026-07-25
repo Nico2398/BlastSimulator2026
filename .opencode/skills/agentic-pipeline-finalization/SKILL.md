@@ -12,7 +12,7 @@ Runs after qualimetry passes. Branch: `pipeline/feature-<N>`.
 
 **Parameters:**
 - `skip_refactorer` (default: `false`) — set to `true` for bug-fix pipelines to skip refactoring phase.
-- `visual_incomplete` (default: `false`) — set to `true` when visual feedback loop could NOT complete inspection (VISION: BLOCKED). When `true`, the PR MUST be created as draft (--draft) WITHOUT `READY TO MERGE`.
+- `visual_incomplete` (default: `false`) — set to `true` when visual feedback loop could NOT complete inspection (VISUAL: BLOCKED). When `true`, the PR MUST be created as draft (--draft) WITHOUT `READY TO MERGE`.
 
 ```
 [ ] = orchestrator-executed command  |  @agent = AI agent invocation

@@ -1,9 +1,9 @@
 ---
 name: agentic-context-edition
 description: >
-  Create and edit agentic context files (skills, agent definitions, slash commands, data files)
-  across all agent standards (Copilot, Claude Code, OpenCode). Covers file structure,
-  duplication rules, progressive disclosure, and content hygiene.
+  Create and edit agentic context files (skills, agent definitions, path-scoped rules, slash commands,
+  data files) across all agent standards (Copilot, Claude Code, OpenCode). Covers file structure,
+  per-runtime frontmatter schemas, duplication rules, progressive disclosure, and content hygiene.
   Use when writing or editing any file under .opencode/, .claude/, or .github/ agent directories.
 ---
 
@@ -33,7 +33,7 @@ All context files — skills, agent definitions, and slash commands — duplicat
 | Claude Code | `.claude/agents/` | `<name>.md` |
 | OpenCode | `.opencode/agents/` | `<name>.md` |
 
-**Rule:** Body content word-for-word identical. Only frontmatter differs (model, mode, allowed-tools, tools, name). OpenCode agents are the reference — sync Claude Code and Copilot to match.
+**Rule:** Body content word-for-word identical. Frontmatter is per-runtime and never copied between directories.
 
 ### Slash Commands
 
@@ -44,6 +44,54 @@ All context files — skills, agent definitions, and slash commands — duplicat
 | OpenCode | `.opencode/commands/` | `<name>.md` |
 
 **Rule:** Same body content. Frontmatter fields differ per solution.
+
+### Path-Scoped Rules (Claude Code)
+
+`.claude/rules/*.md` holds hard invariants for one area of the tree. A `paths` frontmatter list makes a rule load only when files matching those globs are touched; a rule with no `paths` loads every session.
+
+Choose the layer by lifetime and scope:
+
+| Content | Goes in |
+|---------|---------|
+| Always-true project facts, verification gate | `.claude/CLAUDE.md` |
+| Invariants for one directory | `.claude/rules/` with `paths` |
+| Procedures and domain specs loaded on demand | `.claude/skills/` |
+| Role, tool budget, preloaded skills for one agent | `.claude/agents/` |
+
+Rules state the invariant and name the skill that details it. They never restate the skill.
+
+## Frontmatter Schemas Are Not Interchangeable
+
+An unrecognised frontmatter field raises no error — it is ignored. A tool restriction written with the wrong field name silently grants full access. Never copy one runtime's frontmatter into another's directory.
+
+### Claude Code agent (`.claude/agents/*.md`)
+
+`name`, `description`, `tools`, `disallowedTools`, `model`, `permissionMode`, `maxTurns`, `skills`, `mcpServers`, `hooks`, `memory`, `background`, `effort`, `isolation`, `color`, `initialPrompt`.
+
+- `tools` is an allowlist, comma-separated, using exact Claude Code tool names (`Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite, WebFetch`). `disallowedTools` is a denylist applied first.
+- `allowed-tools` is **not** an agent field. Using it leaves the agent with every tool.
+- `skills` preloads full skill content at startup — this is how a specialist gets its domain knowledge without spending turns discovering it.
+- Subagents cannot spawn subagents unless `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` is set in `.claude/settings.json`. An orchestrator that delegates depends on it.
+
+### Claude Code skill and command (`.claude/skills/*/SKILL.md`, `.claude/commands/*.md`)
+
+`name`, `description`, `when_to_use`, `argument-hint`, `arguments`, `disable-model-invocation`, `user-invocable`, `allowed-tools`, `disallowed-tools`, `model`, `effort`, `context`, `agent`, `background`, `hooks`, `paths`, `shell`.
+
+- Here `allowed-tools` **is** correct — it pre-approves tools for the invoking turn.
+- `disable-model-invocation: true` also blocks the skill from being preloaded into an agent's `skills` list.
+- Directory name sets the command; frontmatter `name` is the display label and must match the directory.
+
+### Claude Code rule (`.claude/rules/*.md`)
+
+`paths` only.
+
+## Verify a Context Change
+
+```bash
+npm run validate:context
+```
+
+Checks frontmatter fields against the schema for each file type, resolves tool names and preloaded skills, confirms hook commands exist and are executable, and diffs bodies across the three runtime directories. Run it after any context edit — these failures are invisible at runtime.
 
 ## Communication Standards
 
@@ -173,4 +221,6 @@ Keep examples generic — domain-specific references lose meaning outside origin
 - [ ] No cross-file tight coupling (no step numbers, no "used by")
 - [ ] No user-input instructions
 - [ ] Correct file type for purpose
+- [ ] Frontmatter fields belong to that runtime's schema
 - [ ] All 3 solution folders in sync (`.opencode`, `.claude`, `.github`) — same body content
+- [ ] `npm run validate:context` passes

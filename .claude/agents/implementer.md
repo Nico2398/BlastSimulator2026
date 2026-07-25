@@ -1,9 +1,10 @@
 ---
 name: implementer
-description:  TDD Green phase: minimum code to make failing tests pass. Correctness over elegance. Respects architecture + conventions.
-allowed-tools: Read Edit Search Execute
-user-invocable: false
-disable-model-invocation: true
+description: TDD Green phase: minimum code to make failing tests pass. Correctness over elegance. Respects architecture + conventions.
+tools: Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite
+skills:
+  - dev-architecture
+  - dev-coding-conventions
 ---
 
 # Implementer — TDD Green Phase
