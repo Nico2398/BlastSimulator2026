@@ -24,9 +24,14 @@ export const LAUNCH_ARGS: string[] = ['--no-sandbox', '--disable-setuid-sandbox'
  * `PLAYWRIGHT_BROWSERS_PATH` is set by pre-provisioned agent sandboxes
  * (Claude Code on the web installs Chromium at `/opt/pw-browsers`).
  */
+function explicitPlaywrightRoot(): string | undefined {
+  const root = process.env.PLAYWRIGHT_BROWSERS_PATH;
+  return root && root !== '0' ? root : undefined;
+}
+
+/** Conventional cache locations, searched only after system installs. */
 function playwrightRoots(): string[] {
   const roots = [
-    process.env.PLAYWRIGHT_BROWSERS_PATH,
     '/opt/pw-browsers',
     process.platform === 'win32'
       ? `${process.env.LOCALAPPDATA}\\ms-playwright`
@@ -87,9 +92,14 @@ function expandPlaywrightRoot(root: string): string[] {
  *
  * Resolution order:
  * 1. `PUPPETEER_EXECUTABLE_PATH` (explicit override)
- * 2. Puppeteer's own cached browser (via `puppeteer.executablePath()`)
- * 3. System-installed Chrome/Chromium paths
- * 4. Playwright-style browser caches, including `PLAYWRIGHT_BROWSERS_PATH`
+ * 2. `PLAYWRIGHT_BROWSERS_PATH` (explicit override)
+ * 3. Puppeteer's own cached browser (via `puppeteer.executablePath()`)
+ * 4. System-installed Chrome/Chromium paths
+ * 5. Conventional Playwright cache locations
+ *
+ * Both environment variables state operator intent, so they outrank anything
+ * auto-discovered. A CI runner with an incidental `/usr/bin/chromium` must not
+ * shadow the browser an agent sandbox provisioned via `PLAYWRIGHT_BROWSERS_PATH`.
  *
  * @returns The path if found, or undefined.
  */
@@ -133,9 +143,16 @@ export function resolveChromePath(): string | undefined {
             '/usr/bin/google-chrome-stable',
           ];
 
+  const explicitRoot = explicitPlaywrightRoot();
+  const explicitCandidates = explicitRoot ? expandPlaywrightRoot(explicitRoot) : [];
   const cacheCandidates = playwrightRoots().flatMap(expandPlaywrightRoot);
 
-  const candidates = [...dynamicCandidates, ...systemCandidates, ...cacheCandidates];
+  const candidates = [
+    ...explicitCandidates,
+    ...dynamicCandidates,
+    ...systemCandidates,
+    ...cacheCandidates,
+  ];
   return candidates.find((p) => existsSync(p));
 }
 

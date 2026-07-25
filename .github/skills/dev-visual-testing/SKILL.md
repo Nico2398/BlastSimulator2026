@@ -28,7 +28,7 @@ Dev server on :5173 (override with `--port` or `VISUAL_TEST_PORT`):
 npm run dev &
 ```
 
-Browser resolution is automatic, in this order: `--puppeteer-path` > `PUPPETEER_EXECUTABLE_PATH` > Puppeteer's own cache > system Chrome/Chromium > Playwright-style caches including `PLAYWRIGHT_BROWSERS_PATH`. When nothing resolves, the error names the fix rather than failing opaquely.
+Browser resolution is automatic, in this order: `--puppeteer-path` > `PUPPETEER_EXECUTABLE_PATH` > `PLAYWRIGHT_BROWSERS_PATH` > Puppeteer's own cache > system Chrome/Chromium > conventional Playwright caches. Both environment variables state operator intent, so they outrank anything auto-discovered — an incidental `/usr/bin/chromium` on a CI runner must not shadow a sandbox-provisioned browser. When nothing resolves, the error names the fix rather than failing opaquely.
 
 ## Taking Screenshots
 

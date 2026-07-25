@@ -48,7 +48,7 @@ In both contexts: run the full scenario suite, inspect every screenshot (includi
 npm run dev &
 ```
 
-Browser resolution is automatic: `--puppeteer-path` > `PUPPETEER_EXECUTABLE_PATH` > Puppeteer's cache > system Chrome/Chromium > Playwright cache (`PLAYWRIGHT_BROWSERS_PATH`). `npm run verify:env` prints the resolved path. When no browser exists, the failure message names the fix.
+Browser resolution is automatic: `--puppeteer-path` > `PUPPETEER_EXECUTABLE_PATH` > `PLAYWRIGHT_BROWSERS_PATH` > Puppeteer's cache > system Chrome/Chromium > conventional Playwright caches. `npm run verify:env` prints the resolved path. When no browser exists, the failure message names the fix.
 
 Dev server port: `--port` > `VISUAL_TEST_PORT` > 5173 default.
 
