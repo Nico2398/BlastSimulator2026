@@ -21,6 +21,8 @@ import { GhostMesh } from './GhostMesh.js';
 import { syncEntitySets } from './EntitySync.js';
 import type { SurveyConfidenceOverlayOptions, SurveyConfidencePoint } from './SurveyConfidenceOverlay.js';
 import { isSurveyStale } from '../core/mining/SurveyCalc.js';
+import { SOLID_VOXEL_DENSITY_THRESHOLD } from '../core/config/balance.js';
+import { isInZone } from '../core/entities/Zone.js';
 
 export class GameRenderer {
   private readonly sm: SceneManager;
@@ -48,6 +50,11 @@ export class GameRenderer {
 
   constructor(sceneManager: SceneManager) {
     this.sm = sceneManager;
+  }
+
+  /** ID of the currently-bound VoxelGrid, for diagnostics. Null if no grid is loaded. */
+  get lastGridId(): number | null {
+    return this.lastGrid?.id ?? null;
   }
 
   /**
@@ -101,6 +108,14 @@ export class GameRenderer {
     // Sync ghost previews for pending actions
     if (this.ghosts) {
       this.ghosts.sync(ctx.state.ghostPreviews);
+    }
+
+    // Blink employees still inside an active safety zone during clearing
+    if (this.characters) {
+      const zone = ctx.state.zone.activeZone;
+      for (const e of ctx.state.employees.employees) {
+        this.characters.setEvacuating(e.id, zone !== null && isInZone(e.x, e.z, zone));
+      }
     }
 
     // Sync weather
@@ -238,7 +253,7 @@ export class GameRenderer {
     const gz = Math.max(0, Math.min(this.lastGrid.sizeZ - 1, Math.floor(z)));
     for (let y = this.lastGrid.sizeY - 1; y >= 0; y--) {
       const v = this.lastGrid.getVoxel(gx, y, gz);
-      if (v && v.density >= 0.5) return y + 1;
+      if (v && v.density >= SOLID_VOXEL_DENSITY_THRESHOLD) return y + 1;
     }
     return 0;
   }

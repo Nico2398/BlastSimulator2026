@@ -67,6 +67,31 @@ describe('CharacterMesh', () => {
     cm.dispose();
   });
 
+  it('snapPosition sets the group position immediately, bypassing the lerp', () => {
+    const scene = new THREE.Scene();
+    const cm = new CharacterMesh(scene);
+    cm.addEmployee(makeEmployee(1, { x: 0, z: 0 }), 0);
+
+    cm.snapPosition(1, 10, 3, 20);
+
+    const group = scene.children[0] as THREE.Group;
+    expect(group.position.x).toBe(10);
+    expect(group.position.y).toBe(3);
+    expect(group.position.z).toBe(20);
+    cm.dispose();
+  });
+
+  it('snapPosition on an unknown id is a no-op', () => {
+    const scene = new THREE.Scene();
+    const cm = new CharacterMesh(scene);
+    cm.addEmployee(makeEmployee(1, { x: 0, z: 0 }), 0);
+
+    expect(() => cm.snapPosition(999, 10, 3, 20)).not.toThrow();
+    const group = scene.children[0] as THREE.Group;
+    expect(group.position.x).toBe(0);
+    cm.dispose();
+  });
+
   it('setEvacuating makes character blink after time update', () => {
     const scene = new THREE.Scene();
     const cm = new CharacterMesh(scene);
@@ -82,6 +107,26 @@ describe('CharacterMesh', () => {
       if (!group.visible) anyInvisible = true;
     }
     expect(anyInvisible).toBe(true);
+    cm.dispose();
+  });
+
+  it('setEvacuating(false) restores visibility immediately', () => {
+    const scene = new THREE.Scene();
+    const cm = new CharacterMesh(scene);
+    const emp = makeEmployee(1);
+    cm.addEmployee(emp);
+    cm.setEvacuating(1, true);
+    cm.setEvacuating(1, false);
+    const group = scene.children[0] as THREE.Group;
+    expect(group.visible).toBe(true);
+    cm.dispose();
+  });
+
+  it('setEvacuating on an unknown id is a no-op', () => {
+    const scene = new THREE.Scene();
+    const cm = new CharacterMesh(scene);
+    cm.addEmployee(makeEmployee(1));
+    expect(() => cm.setEvacuating(999, true)).not.toThrow();
     cm.dispose();
   });
 

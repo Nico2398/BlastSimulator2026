@@ -6,6 +6,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { type GameContext, newGameCommand } from '../../src/console/commands/world.js';
 import { employeeCommand } from '../../src/console/commands/entities.js';
 import { surveyCommand } from '../../src/console/commands/mining.js';
+import { tickCommand } from '../../src/console/commands/events.js';
 import { EventEmitter } from '../../src/core/state/EventEmitter.js';
 import {
   estimateSurveyResult,
@@ -206,6 +207,38 @@ describe('Survey system', () => {
     // A ghost preview should also be created
     expect(ctx.state!.ghostPreviews).toHaveLength(1);
     expect(ctx.state!.ghostPreviews[0]!.type).toBe('survey');
+  });
+
+  // ── 6b. Pending survey resolves into surveyResults when ticked ────────────
+
+  it('tickCommand resolves a pending survey action into state.surveyResults', () => {
+    const empId = hireEmployeeByRole(ctx, 'surveyor');
+    employeeCommand(ctx, ['assign_skill', String(empId)], { skill: 'geology', level: '3' });
+
+    surveyCommand(ctx as any, ['core_sample'], { x: '16', z: '16' });
+    expect(ctx.state!.pendingActions.filter(a => a.type === 'survey')).toHaveLength(1);
+    expect(ctx.state!.surveyResults).toHaveLength(0);
+
+    const result = tickCommand(ctx, ['1'], {});
+    expect(result.success).toBe(true);
+
+    // The pending survey action is consumed and a result is produced.
+    expect(ctx.state!.pendingActions.filter(a => a.type === 'survey')).toHaveLength(0);
+    expect(ctx.state!.surveyResults).toHaveLength(1);
+    expect(ctx.state!.surveyResults[0]!.method).toBe('core_sample');
+    expect(result.output).toContain('core_sample survey complete');
+  });
+
+  it('tickCommand leaves a pending survey queued when no qualified surveyor is available', () => {
+    // No employee hired — the survey action has no surveyor to complete it.
+    surveyCommand(ctx as any, ['core_sample'], { x: '16', z: '16' });
+    expect(ctx.state!.pendingActions.filter(a => a.type === 'survey')).toHaveLength(1);
+
+    tickCommand(ctx, ['1'], {});
+
+    // Action stays queued rather than being silently dropped.
+    expect(ctx.state!.pendingActions.filter(a => a.type === 'survey')).toHaveLength(1);
+    expect(ctx.state!.surveyResults).toHaveLength(0);
   });
 
   // ── 7. Out-of-bounds coordinates rejected ────────────────────────────────

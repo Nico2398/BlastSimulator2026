@@ -20,7 +20,7 @@ import type { CommandResult } from '../console/ConsoleRunner.js';
 
 export type GameConsoleFn = (cmd: string) => CommandResult;
 
-type PanelName = 'blast' | 'contracts' | 'build' | 'vehicles' | 'employees' | 'survey' | 'settings';
+export type PanelName = 'blast' | 'contracts' | 'build' | 'vehicles' | 'employees' | 'survey' | 'settings';
 
 export class UIManager {
   private readonly hud: HUD;

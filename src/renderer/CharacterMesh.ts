@@ -133,15 +133,6 @@ export class CharacterMesh {
     }
   }
 
-  /** Move a character directly to safe zone exit position during zone clear. */
-  evacuateTo(employeeId: number, x: number, z: number): void {
-    const entry = this.characters.get(employeeId);
-    if (entry) {
-      entry.employee.x = x;
-      entry.employee.z = z;
-    }
-  }
-
   removeEmployee(id: number): void {
     const entry = this.characters.get(id);
     if (entry) {

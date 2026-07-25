@@ -3,13 +3,14 @@
 // Shortcuts panel shown in Settings/Help.
 
 import { t } from '../core/i18n/I18n.js';
+import type { PanelName } from './UIManager.js';
 
 export type GameConsoleFn = (cmd: string) => string;
 
 export interface ShortcutCallbacks {
   togglePause: () => void;
   setSpeed: (n: number) => void;
-  togglePanel: (name: string) => void;
+  togglePanel: (name: PanelName) => void;
   quickSave: () => void;
   openSettings: () => void;
 }

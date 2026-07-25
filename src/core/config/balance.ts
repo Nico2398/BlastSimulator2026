@@ -150,6 +150,27 @@ export const PROJECTION_SPEED_THRESHOLD = 15;
 /** Epsilon for blast energy attenuation formula (prevents division by zero). */
 export const BLAST_ENERGY_EPSILON = 4.0;
 
+/** Density at/above which a voxel is considered solid ground (0–1 scale). */
+export const SOLID_VOXEL_DENSITY_THRESHOLD = 0.5;
+
+/** Maximum crater excavation radius (voxels) around the blast center. Guarantees a
+ *  visible crater in the terrain mesh even when the energy field doesn't consistently
+ *  fracture surface voxels (attenuation + epsilon dampening). */
+export const CRATER_EXCAVATION_MAX_RADIUS = 5;
+
+/** Number of surface voxels cleared per column during the crater excavation pass. */
+export const CRATER_EXCAVATION_DEPTH_VOXELS = 2;
+
+/** Fragment vertical offset (voxels) so blast fragments settle inside the crater
+ *  instead of appearing to float at the pre-blast surface level. Offset ranges from
+ *  MIN to MIN+SPREAD, hashed per-fragment across HASH_BUCKETS steps. */
+export const FRAGMENT_CRATER_YOFFSET_MIN = 0.2;
+export const FRAGMENT_CRATER_YOFFSET_SPREAD = 0.3;
+export const FRAGMENT_CRATER_YOFFSET_HASH_BUCKETS = 9;
+
+/** Minimum fragment render height (voxels) above the grid floor. */
+export const FRAGMENT_MIN_RENDER_Y = 0.05;
+
 /** Maximum iterations for the energy propagation overflow loop.
  *  Prevents infinite loops when energy is trapped with no dissipating neighbors.
  *  Real blasting energy dissipates in microseconds; this is a computational guard.

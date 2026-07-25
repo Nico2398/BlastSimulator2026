@@ -11,6 +11,12 @@
 import * as THREE from 'three';
 import type { FragmentData } from '../core/mining/BlastExecution.js';
 import { sampleRockColor } from './ProceduralTexture.js';
+import {
+  FRAGMENT_CRATER_YOFFSET_MIN,
+  FRAGMENT_CRATER_YOFFSET_SPREAD,
+  FRAGMENT_CRATER_YOFFSET_HASH_BUCKETS,
+  FRAGMENT_MIN_RENDER_Y,
+} from '../core/config/balance.js';
 
 // ---------- Config ----------
 
@@ -115,9 +121,10 @@ export class FragmentMesh {
       // Displace fragment downward so it sits inside the crater instead of
       // at the pre-blast surface level. Without this, fragments fill the crater
       // and make it appear as if no terrain deformation occurred.
-      // Offset = 0.2 + hash(fragId) * 0.3 — ranges 0.2 to 0.5 voxels down.
-      const yOffset = 0.2 + ((frag.id * 7 + 13) % 9) * 0.0333;
-      const fragY = Math.max(0.05, frag.position.y - yOffset);
+      const yOffset = FRAGMENT_CRATER_YOFFSET_MIN
+        + ((frag.id * 7 + 13) % FRAGMENT_CRATER_YOFFSET_HASH_BUCKETS)
+          * (FRAGMENT_CRATER_YOFFSET_SPREAD / FRAGMENT_CRATER_YOFFSET_HASH_BUCKETS);
+      const fragY = Math.max(FRAGMENT_MIN_RENDER_Y, frag.position.y - yOffset);
 
       // Build transform matrix
       FragmentMesh._pos.set(frag.position.x, fragY, frag.position.z);

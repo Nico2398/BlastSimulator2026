@@ -115,6 +115,7 @@ declare global {
     __cameraReset: () => void;
     __startTutorial: () => void;
     __resetTickAccumulator: () => void;
+    __debugGridInfo: () => Record<string, unknown>;
   }
 }
 
@@ -200,7 +201,7 @@ window.__gameState = () => {
     cash: s.cash,
     profit: s.levelStats?.totalWealth ?? 0,
     lastCommandOutput,
-    frameCount: (scene as any).frameCount ?? 0,
+    frameCount: scene.frameCount,
     ctxGridId: ctx.grid?.id ?? null,
     consoleLogs: consoleLogs.splice(0, 50),
     // Sample voxels at blast center to check if they're cleared
@@ -227,32 +228,18 @@ window.__gameState = () => {
       return sample;
     })() : null,
     // Terrain mesh bounding box from Three.js geometry
-    meshBounds: gameRenderer.terrain ? (() => {
-      const mesh = (gameRenderer.terrain as any).mesh;
-      if (!mesh || !mesh.geometry) return null;
-      mesh.geometry.computeBoundingBox();
-      const bb = mesh.geometry.boundingBox;
-      return {
-        minX: Math.round(bb.min.x * 100) / 100,
-        maxX: Math.round(bb.max.x * 100) / 100,
-        minY: Math.round(bb.min.y * 100) / 100,
-        maxY: Math.round(bb.max.y * 100) / 100,
-        minZ: Math.round(bb.min.z * 100) / 100,
-        maxZ: Math.round(bb.max.z * 100) / 100,
-        vertexCount: mesh.geometry.attributes.position.count,
-      };
-    })() : null,
+    meshBounds: gameRenderer.terrain?.getBounds() ?? null,
   };
 };
 
 window.__resetTickAccumulator = () => { accumulatedGameMs = 0; };
 
 // Debug: expose grid reference info for diagnostics
-(window as any).__debugGridInfo = () => {
+window.__debugGridInfo = () => {
   return {
     ctxGridId: ctx.grid?.id ?? null,
-    lastGridId: (gameRenderer as any).lastGrid?.id ?? null,
-    terrainGridId: (gameRenderer as any).terrain?.grid?.id ?? null,
+    lastGridId: gameRenderer.lastGridId,
+    terrainGridId: gameRenderer.terrain?.gridId ?? null,
   };
 };
 
@@ -329,7 +316,7 @@ saveLoadUI.setOnLoad((state) => {
 new KeyboardShortcuts({
   togglePause: () => window.__gameConsole('pause'),
   setSpeed: (n) => window.__gameConsole(`speed ${n}`),
-  togglePanel: (name) => uiManager.togglePanel(name as any),
+  togglePanel: (name) => uiManager.togglePanel(name),
   quickSave: () => { if (ctx.state) void saveLoadUI['autoSave'](ctx.state); },
   openSettings: () => uiManager.togglePanel('settings'),
 });

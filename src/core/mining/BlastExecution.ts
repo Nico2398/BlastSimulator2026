@@ -21,6 +21,11 @@ import { getRock } from '../world/RockCatalog.js';
 import { getOre } from '../world/OreCatalog.js';
 import { getDominantRockId, VoxelGrid, type VoxelData } from '../world/VoxelGrid.js';
 import { getBuildingDef, destroyBuilding, type BuildingState, type Building, type BuildingType } from '../entities/Building.js';
+import {
+  SOLID_VOXEL_DENSITY_THRESHOLD,
+  CRATER_EXCAVATION_MAX_RADIUS,
+  CRATER_EXCAVATION_DEPTH_VOXELS,
+} from '../config/balance.js';
 
 // ── Config ──
 
@@ -241,28 +246,27 @@ export function executeBlast(
     grid.clearVoxel(x, y, z);
   }
 
-  // 5a. Surface excavation pass: clear top 2 surface voxels near blast center to ensure
-  //     a visible crater appears in the terrain mesh. The energy field may not
-  //     consistently fracture surface voxels (attenuation + EPSILON dampening),
+  // 5a. Surface excavation pass: clear the top surface voxels near the blast center
+  //     to ensure a visible crater appears in the terrain mesh. The energy field may
+  //     not consistently fracture surface voxels (attenuation + EPSILON dampening),
   //     but the visual crater is essential player feedback.
   if (toClear.length > 0) {
-    const blastCenterX = plan.holes.reduce((s, h) => s + h.x, 0) / plan.holes.length;
-    const blastCenterZ = plan.holes.reduce((s, h) => s + h.z, 0) / plan.holes.length;
-    const excavationRadius = Math.min(5, Math.ceil(plan.holes.length / 2));
+    const { x: blastCenterX, z: blastCenterZ } = calculateBlastCenter(plan.holes);
+    const excavationRadius = Math.min(CRATER_EXCAVATION_MAX_RADIUS, Math.ceil(plan.holes.length / 2));
     for (let dx = -excavationRadius; dx <= excavationRadius; dx++) {
       for (let dz = -excavationRadius; dz <= excavationRadius; dz++) {
         const sx = Math.floor(blastCenterX + dx);
         const sz = Math.floor(blastCenterZ + dz);
-        // Always clear the top 2 surface voxels at this column — regardless of
-        // what the energy field already cleared. This ensures a visible crater
-        // depression in the terrain mesh.
+        // Always clear the top CRATER_EXCAVATION_DEPTH_VOXELS surface voxels at this
+        // column — regardless of what the energy field already cleared. This ensures
+        // a visible crater depression in the terrain mesh.
         for (let sy = grid.sizeY - 1; sy >= 0; sy--) {
           const v = grid.getVoxel(sx, sy, sz);
-          if (v && v.density >= 0.5) {
-            // Clear this surface voxel and one more below
-            for (let cy = 0; cy < 2 && sy - cy >= 0; cy++) {
+          if (v && v.density >= SOLID_VOXEL_DENSITY_THRESHOLD) {
+            // Clear this surface voxel and the voxels below, down to the configured depth
+            for (let cy = 0; cy < CRATER_EXCAVATION_DEPTH_VOXELS && sy - cy >= 0; cy++) {
               const target = grid.getVoxel(sx, sy - cy, sz);
-              if (target && target.density >= 0.5) {
+              if (target && target.density >= SOLID_VOXEL_DENSITY_THRESHOLD) {
                 grid.clearVoxel(sx, sy - cy, sz);
                 if (!toClear.some(c => c.x === sx && c.y === sy - cy && c.z === sz)) {
                   toClear.push({ x: sx, y: sy - cy, z: sz });
@@ -390,7 +394,7 @@ function getColumnSurfaceY(grid: VoxelGrid, x: number, z: number): number {
   const gz = Math.max(0, Math.min(grid.sizeZ - 1, Math.floor(z)));
   for (let y = grid.sizeY - 1; y >= 0; y--) {
     const v = grid.getVoxel(gx, y, gz);
-    if (v && v.density >= 0.5) return y + 1;
+    if (v && v.density >= SOLID_VOXEL_DENSITY_THRESHOLD) return y + 1;
   }
   return 0;
 }

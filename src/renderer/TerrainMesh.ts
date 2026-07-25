@@ -94,6 +94,31 @@ export class TerrainMesh {
     this.grid = grid;
   }
 
+  /** ID of the currently-bound VoxelGrid, for diagnostics. */
+  get gridId(): number {
+    return this.grid.id;
+  }
+
+  /** Bounding box and vertex count of the current mesh geometry, for diagnostics. Null if unbuilt. */
+  getBounds(): {
+    minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number;
+    vertexCount: number;
+  } | null {
+    if (!this.mesh) return null;
+    this.mesh.geometry.computeBoundingBox();
+    const bb = this.mesh.geometry.boundingBox;
+    if (!bb) return null;
+    return {
+      minX: Math.round(bb.min.x * 100) / 100,
+      maxX: Math.round(bb.max.x * 100) / 100,
+      minY: Math.round(bb.min.y * 100) / 100,
+      maxY: Math.round(bb.max.y * 100) / 100,
+      minZ: Math.round(bb.min.z * 100) / 100,
+      maxZ: Math.round(bb.max.z * 100) / 100,
+      vertexCount: this.mesh.geometry.attributes['position']!.count,
+    };
+  }
+
   /** Build all chunks from scratch. Call once after grid is populated. */
   buildAll(): void {
     // Remove any existing mesh
