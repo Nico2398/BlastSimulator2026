@@ -224,7 +224,7 @@ export class EmployeePanel {
 
     // Current task section
     const currentLabel = document.createElement('div');
-    currentLabel.style.cssText = 'font-size:9px;color:#7a7060;text-transform:uppercase;margin-bottom:2px';
+    currentLabel.style.cssText = 'font-size:9px;color:#857b6b;text-transform:uppercase;margin-bottom:2px';
     currentLabel.textContent = t('ui.employees.active_task');
     el.appendChild(currentLabel);
 
@@ -278,7 +278,7 @@ export class EmployeePanel {
     el.className = 'bs-salary-breakdown';
 
     const header = document.createElement('div');
-    header.style.cssText = 'font-size:9px;color:#7a7060;text-transform:uppercase;margin-bottom:2px';
+    header.style.cssText = 'font-size:9px;color:#857b6b;text-transform:uppercase;margin-bottom:2px';
     header.textContent = t('ui.employees.salary_breakdown');
     el.appendChild(header);
 

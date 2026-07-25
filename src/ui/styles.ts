@@ -263,7 +263,7 @@ const CSS = `
 
 /* ─── Contract UI ─── */
 .bs-contract-desc { font-weight: 600; color: #d0c8b0; margin-bottom: 2px; }
-.bs-contract-details { font-size: 10px; color: #7a7060; }
+.bs-contract-details { font-size: 10px; color: #857b6b; }
 .bs-contract-active .bs-contract-desc { color: #b0e098; }
 .bs-contract-row {
   border-bottom: 1px solid rgba(255,255,255,0.07);
@@ -356,7 +356,7 @@ const CSS = `
 .bs-task-entry { display: flex; align-items: center; gap: 4px; padding: 2px 0; font-size: 10px; color: #a09070; }
 .bs-task-entry.current { color: #d0c8b0; font-weight: 600; }
 .bs-task-time { margin-left: auto; color: #807060; font-size: 9px; }
-.bs-salary-breakdown { margin-top: 4px; font-size: 9px; color: #7a7060; }
+.bs-salary-breakdown { margin-top: 4px; font-size: 9px; color: #857b6b; }
 .bs-salary-total { color: #ffc840; font-weight: 600; font-size: 10px; }
 .bs-training-badge { background: rgba(100,150,255,0.2); border: 1px solid rgba(100,150,255,0.3); border-radius: 3px; padding: 1px 5px; font-size: 9px; color: #88bbff; display: inline-block; }
 .bs-modifier-tag { background: rgba(255,200,64,0.1); border-radius: 2px; padding: 1px 4px; font-size: 9px; color: #c8a848; display: inline-block; margin: 1px; }
@@ -369,7 +369,7 @@ const CSS = `
 /* ─── Section headers ─── */
 .bs-section-header {
   font-size: 10px;
-  color: #7a7060;
+  color: #857b6b;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   margin-bottom: 4px;
@@ -463,7 +463,7 @@ const CSS = `
 }
 .bs-tile-select-hint {
   font-size: 11px;
-  color: #7a7060;
+  color: #857b6b;
   line-height: 1.5;
 }
 .bs-tile-select-info {
