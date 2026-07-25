@@ -1,8 +1,9 @@
 ---
 name: agentic-autonomous-pipeline
 description: >
-  Agentic autonomous TDD development pipeline. Runs via OpenCode orchestrator (CLI or GitHub Actions).
-  Use when setting up, debugging, or modifying the autonomous pipeline system.
+  Agentic autonomous TDD development pipeline. Runs under Claude Code or OpenCode, from a CLI
+  session or GitHub Actions. Use when setting up, debugging, or modifying the autonomous
+  pipeline system.
 ---
 
 ## Overview
@@ -19,9 +20,23 @@ Files across all directories must stay synchronized with exactly the same wordin
 
 ## Execution Model
 
-The pipeline runs as an **Orchestrator Agent** (`pipeline` agent) invoked by the developer or by a GitHub Actions workflow. The orchestrator does NOT write code — it delegates to **hidden sub-agents** in the correct TDD sequence, passing context forward between steps.
+The pipeline runs as an **Orchestrator Agent** (`pipeline` agent) invoked by the developer or by a GitHub Actions workflow. The orchestrator does NOT write code — it delegates to sub-agents in the correct TDD sequence, passing context forward between steps.
 
-When triggered from GitHub Actions (`.github/workflows/opencode-runner.yml`), the opencode action runs the orchestrator non-interactively. The same pipeline also runs locally via `opencode run /resolve-issue`.
+| Runtime | Entry point | Delegation mechanism |
+|---------|-------------|---------------------|
+| Claude Code | `/resolve-issue <issue>` — forks into the `pipeline` agent | `Agent` tool, one sub-agent per pipeline step |
+| OpenCode | `opencode run /resolve-issue` | `task` tool |
+| GitHub Actions | `.github/workflows/opencode-runner.yml` | Runs the orchestrator non-interactively |
+
+### Claude Code prerequisites
+
+Delegation depends on configuration that is off by default:
+
+- **Nested spawning.** A subagent cannot spawn subagents unless `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` is set in `.claude/settings.json`. Without it the orchestrator does every step itself, collapsing branch isolation and the whole TDD guarantee.
+- **Tool budgets.** Each agent's `tools` / `disallowedTools` frontmatter is the enforcement layer. The orchestrator is denied `Edit` and `Write`; read-only reviewers get no write tools at all.
+- **Preloaded skills.** Each specialist declares its domain skills in `skills:` frontmatter, so it starts with the spec already in context.
+
+Verify all three with `npm run validate:context`.
 
 ## Git & GitHub Operations (Fixed)
 

@@ -1,16 +1,16 @@
 ---
 name: planner
-description:  Produces structured implementation plan from issue. Read-only — no code changes. Analyzes requirements, inspects codebase, outputs files to create/modify, acceptance criteria, edge cases.
-allowed-tools: Read Search
-user-invocable: false
-disable-model-invocation: true
+description: Produces structured implementation plan from issue. Read-only — no code changes. Analyzes requirements, inspects codebase, outputs files to create/modify, acceptance criteria, edge cases.
+tools: Read, Grep, Glob, Bash, Skill, TodoWrite
+skills:
+  - dev-architecture
+  - dev-testing-strategy
 hooks:
   PreToolUse:
     - matcher: Bash
       hooks:
         - type: command
-          shell: powershell
-          command: .claude/hooks/block-git-gh.ps1
+          command: ${CLAUDE_PROJECT_DIR}/.claude/hooks/block-git-gh.sh
 ---
 
 # Planner

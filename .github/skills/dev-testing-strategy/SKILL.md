@@ -16,17 +16,37 @@ No layer optional. **More tests always better** — do not limit test cases.
 3. **Full-level integration tests** — Complete runs from `new_game` to terminal outcome (win or each loss condition).
 4. **Visual scenario tests** — Full browser sessions (Puppeteer). Screenshots + JSON state dumps after every command.
 
-All four layers must pass before any PR is merged. `npm run validate` runs TS type-check + unit + integration tests + build.
+All four layers must pass before any PR is merged.
+
+## Verification Channels
+
+The four layers surface as four independent channels. Each catches what the others miss, so a change is verified through every channel it touches — not the cheapest one.
+
+| Channel | Command | Proves | Misses |
+|---------|---------|--------|--------|
+| `static` | `npm run typecheck` | Types line up across `src/` and `scripts/` | Anything about runtime behaviour |
+| `logic` | `npm run test` | Unit + integration behaviour matches expectations | Whether the game renders |
+| `scenario` | `npm run scenarios` | Full command sequences produce the expected game state | Whether the UI is reachable |
+| `visual` | `npm run scenarios:interaction`, `npm run screenshot` | The game renders and the UI responds to real clicks | Nothing a player sees — this is the last line |
+
+Two channels disagreeing means neither result stands. Investigate until they agree.
+
+`npm run verify:env` reports each channel as READY or BLOCKED with the remedy. Run it when a channel's usability is in doubt rather than assuming a failure is a code defect.
 
 ## Validation Commands
 
 ```bash
-npm run validate          # TypeScript → tests → build
-npm run test              # Unit + integration tests only
+npm run verify:env        # which channels are live
+npm run validate          # TypeScript → coverage → integration → scenario defs → build
+npm run typecheck         # TypeScript across src/ and scripts/
+npm run test              # Unit + integration tests
 npm run test:integration  # Integration tests only
-npm run test:scenarios    # Scenario tests only
-npx tsx src/console.ts    # Interactive gameplay testing (no browser)
+npm run test:scenarios    # Validates scenario definition files (not the scenario runner)
+npm run scenarios         # Runs all 99 scenarios, command mode
+npm run console           # Interactive gameplay testing (no browser)
 ```
+
+`npm run validate` covers static, logic, and the scenario *definition* check. It does not run the scenario runner or the visual channel — invoke `npm run scenarios` and the visual commands separately.
 
 ## Unit Test Conventions
 
@@ -147,18 +167,16 @@ After any rendering change:
 1. `npm run dev &`
 2. Run relevant playthrough scenario with screenshots:
    ```bash
-   npx tsx scripts/scenario-test.ts --scenario level1-playthrough-win --mode interaction --screenshots
+   npm run scenario -- --scenario level1-playthrough-win --mode interaction --screenshots
    ```
-3. For interaction-based scenarios:
-   ```bash
-   npx tsx scripts/scenario-test.ts --scenario my-interaction-test --mode interaction --screenshots
-   ```
-4. Inspect every screenshot in `screenshots/scenario-{name}-interaction/`
-5. Verify against expected visual description per checkpoint
-6. If any checkpoint fails → fix rendering → re-run
+3. **Open every screenshot** in `screenshots/scenario-{name}-interaction/` with the Read tool and describe what it shows
+4. Verify each description against the expected visual checkpoint
+5. If any checkpoint fails → fix rendering → re-run
 
 Screenshots opt-in via `--screenshots`. CI runs without it (no screenshots, state-only validation).
-Use `scripts/run-all-scenarios.ts` for batch runs (both modes supported via `--mode`).
+Use `npm run scenarios` / `npm run scenarios:interaction` for batch runs.
+
+Capturing a screenshot is not inspecting it. A rendering change stays unverified until an image has been read. Full procedure: `dev-visual-testing` skill.
 
 **Mandatory check cadence:**
 | Trigger | Scenarios to run |
@@ -198,19 +216,3 @@ CI has 3 tiers of scenario testing:
 Any bug fix must include new unit or integration test that:
 - Fails on the buggy code
 - Passes on the fix
-
-## Testing Infrastructure Atomic Tasks
-
-| # | Task | File(s) |
-|---|------|---------|
-| 1 | Add coverage reporter to `vitest.config.ts` (v8, per-file thresholds) | `vitest.config.ts` |
-| 2 | Create `tests/integration/` and `tests/integration/full-level/` | `vitest.config.ts`, `package.json` |
-| 3 | Add 10 small integration test suites (≥ 8 scenarios each) | `tests/integration/` |
-| 4 | Add 10 full-level integration tests | `tests/integration/full-level/` |
-| 5 | Add 15 feature scenario JSON files | `scripts/scenario-defs/` |
-| 6 | Add 6 full-level playthrough scenario JSON files | `scripts/scenario-defs/` |
-| 7 | Add performance benchmark suite | `tests/unit/benchmarks/` |
-| 8 | Add `npm run test:integration` and `npm run test:scenarios` scripts | `package.json` |
-| 9 | Update `npm run validate` to include integration tests and coverage gate | `package.json` |
-| 10 | Document test conventions in `README.md` under "Testing" section | `README.md` |
-| 11 | Run all 6 level playthrough scenarios after final renderer integration; inspect screenshots | Manual step |

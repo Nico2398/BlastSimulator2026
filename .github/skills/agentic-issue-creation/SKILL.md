@@ -31,6 +31,7 @@ Use when creating GitHub issues that will be picked up by autonomous coding agen
 
 ## Blocked by
 - #N (backlog-id) — [what must be completed first]
+- If no dependencies, write: `None`
 
 ## Conventions
 - [Any specific patterns, imports, naming, or code style to follow]
@@ -66,3 +67,4 @@ Use when creating GitHub issues that will be picked up by autonomous coding agen
 - [ ] Labels `agent-task` and `ready` applied after creation
 - [ ] Assessed interaction-mode risk → `full-ci` label added if change affects UI/rendering/interaction
 - [ ] If issue has `full-ci`, PR must also get `full-ci` when opened
+

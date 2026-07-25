@@ -14,7 +14,7 @@
  */
 
 import { readFileSync, readdirSync, existsSync, statSync } from 'fs';
-import { resolve } from 'path';
+import { basename, resolve } from 'path';
 
 interface SchemaField {
   type: 'string' | 'number' | 'boolean' | 'object' | 'array' | 'any';
@@ -45,25 +45,45 @@ interface ValidationResult {
   pass: boolean;
 }
 
-// Core game state schema — extend this as the game evolves
-const GAME_STATE_SCHEMA: Schema = {
-  gameTime: { type: 'number', description: 'Elapsed game ticks' },
-  money: { type: 'number', description: 'Current funds' },
-  score: { type: 'number', description: 'Level score' },
-  holeCount: { type: 'number', optional: true },
-  chargedCount: { type: 'number', optional: true },
-  sequencedCount: { type: 'number', optional: true },
-  employees: { type: 'number', optional: true },
-  vehicles: { type: 'number', optional: true },
-  morale: { type: 'number', optional: true },
-  corruption: { type: 'number', optional: true },
-  ecology: { type: 'number', optional: true },
-  safety: { type: 'number', optional: true },
-  level: { type: 'number', optional: true },
-  phase: { type: 'string', optional: true },
-  weather: { type: 'string', optional: true },
-  vibrationBudget: { type: 'number', optional: true },
-  warningCount: { type: 'number', optional: true },
+/**
+ * Game state schema — mirrors `SerializableGameState` in src/console-api.ts,
+ * which is what both `serializeGameState()` (command mode) and
+ * `window.__gameState()` (interaction mode) emit.
+ *
+ * Keep in lockstep with that interface. `tests/unit/console-api.test.ts`
+ * asserts the emitted field set, so a field added there without a matching
+ * entry here shows up as drift rather than passing silently.
+ */
+export const GAME_STATE_SCHEMA: Schema = {
+  seed: { type: 'number', description: 'PRNG seed the game was created with' },
+  time: { type: 'number', description: 'Elapsed game time' },
+  tickCount: { type: 'number', description: 'Simulation ticks elapsed' },
+  isPaused: { type: 'boolean' },
+  mineType: { type: 'string', description: 'Terrain preset identifier' },
+  drillHoles: { type: 'array' },
+  chargesByHole: { type: 'object' },
+  sequenceDelays: { type: 'object' },
+  finances: { type: 'object', description: 'Finance sub-state; cash mirrors the flat field' },
+  holeCount: { type: 'number' },
+  chargedCount: { type: 'number' },
+  sequencedCount: { type: 'number' },
+  buildingCount: { type: 'number' },
+  vehicleCount: { type: 'number' },
+  employeeCount: { type: 'number' },
+  levelEnded: { type: 'boolean' },
+  levelEndReason: { type: 'string', optional: true, description: 'null while the level runs' },
+  bankrupt: { type: 'boolean', description: 'Loss condition' },
+  revolted: { type: 'boolean', description: 'Loss condition' },
+  ecologicalShutdown: { type: 'boolean', description: 'Loss condition' },
+  arrested: { type: 'boolean', description: 'Loss condition' },
+  cash: { type: 'number' },
+  profit: { type: 'number', description: 'Total wealth accumulated this level' },
+};
+
+/** UI state schema — mirrors window.__uiState() in src/main.ts. */
+export const UI_STATE_SCHEMA: Schema = {
+  panels: { type: 'object', description: 'Per-panel visibility and pointer-events' },
+  blastPanelButtons: { type: 'array', description: 'Blast panel controls with computed styles' },
 };
 
 function validateValue(
@@ -163,6 +183,13 @@ function validateStateFile(filePath: string): ValidationResult {
     const unknownWarnings = checkUnknownFields('', state, GAME_STATE_SCHEMA);
     warnings.push(...unknownWarnings);
 
+    // Interaction-mode dumps carry UI state alongside game state
+    if (typeof data.uiState === 'object' && data.uiState !== null) {
+      const uiState = data.uiState as Record<string, unknown>;
+      validateObject('uiState', uiState, UI_STATE_SCHEMA, errors);
+      warnings.push(...checkUnknownFields('uiState', uiState, UI_STATE_SCHEMA));
+    }
+
   } catch (err: any) {
     errors.push({
       path: '',
@@ -179,6 +206,15 @@ function validateStateFile(filePath: string): ValidationResult {
     warnings,
     pass: errors.length === 0,
   };
+}
+
+/**
+ * Per-step state dumps only. `report.json` is a run summary with a different
+ * shape — validating it against the state schema reports every step index as
+ * an unknown field.
+ */
+function isStateDump(fileName: string): boolean {
+  return fileName.endsWith('.json') && fileName !== 'report.json';
 }
 
 function parseArgs(): { path?: string; dir?: string } {
@@ -212,7 +248,7 @@ function main(): void {
     if (existsSync(dir)) {
       const entries = readdirSync(dir);
       files.push(...entries
-        .filter(f => f.endsWith('.json'))
+        .filter(f => isStateDump(f))
         .map(f => resolve(dir, f))
         .filter(f => statSync(f).isFile())
       );
@@ -227,7 +263,7 @@ function main(): void {
         if (statSync(scenarioDir).isDirectory()) {
           const entries = readdirSync(scenarioDir);
           files.push(...entries
-            .filter(f => f.endsWith('.json') && f !== 'report.json')
+            .filter(f => isStateDump(f))
             .map(f => resolve(scenarioDir, f))
           );
         }
@@ -272,4 +308,7 @@ function main(): void {
   }
 }
 
-main();
+// Run only when invoked directly — importing the schema must not scan the disk.
+if (process.argv[1] && import.meta.url.endsWith(basename(process.argv[1]))) {
+  main();
+}

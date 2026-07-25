@@ -1,9 +1,10 @@
 ---
 name: skeleton-writer
 description: TDD Skeleton phase: create empty stubs, interfaces, and type exports from planner output. No logic, no tests. Establishes the API surface test-writer and implementer will build against.
-allowed-tools: Read Edit Search Execute
-user-invocable: false
-disable-model-invocation: true
+tools: Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite
+skills:
+  - dev-architecture
+  - dev-coding-conventions
 ---
 # Skeleton Writer — TDD Skeleton Phase
 

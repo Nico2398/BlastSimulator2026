@@ -1,16 +1,16 @@
 ---
 name: duplication-reviewer
-description:  Agentic code duplication reviewer. Detects semantic duplication, non-atomic functions, generic code misplaced in specific modules, and cross-codebase logic similarities. Read-only.
-allowed-tools: Read Search
-user-invocable: false
-disable-model-invocation: true
+description: Agentic code duplication reviewer. Detects semantic duplication, non-atomic functions, generic code misplaced in specific modules, and cross-codebase logic similarities. Read-only.
+tools: Read, Grep, Glob, Bash, Skill, TodoWrite
+skills:
+  - dev-architecture
+  - dev-coding-conventions
 hooks:
   PreToolUse:
     - matcher: Bash
       hooks:
         - type: command
-          shell: powershell
-          command: .claude/hooks/block-git-gh.ps1
+          command: ${CLAUDE_PROJECT_DIR}/.claude/hooks/block-git-gh.sh
 ---
 
 # Duplication Reviewer

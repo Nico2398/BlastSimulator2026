@@ -23,6 +23,7 @@ import puppeteer from 'puppeteer';
 import type { PuppeteerLaunchOptions } from 'puppeteer';
 import { mkdirSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
+import { LAUNCH_ARGS, resolveChromePathOrThrow } from './shared/chrome.js';
 
 interface TextElement {
   tag: string;
@@ -65,7 +66,13 @@ function contrastRatio(hex1: string, hex2: string): number {
   return (lighter + 0.05) / (darker + 0.05);
 }
 
+/**
+ * Normalise a colour to hex. The in-page pass already composites alpha and
+ * emits hex, so accept that form unchanged; the rgb() form remains supported
+ * for any caller that has not been through compositing.
+ */
 function rgbToHex(rgb: string): string | null {
+  if (/^#[0-9a-f]{6}$/i.test(rgb)) return rgb.toLowerCase();
   const match = rgb.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)/);
   if (!match) return null;
   const r = parseInt(match[1]!).toString(16).padStart(2, '0');
@@ -99,15 +106,11 @@ function parseArgs(): { port: number; viewport: { width: number; height: number 
 async function runA11yCheck(port: number, viewport: { width: number; height: number }): Promise<A11yReport> {
   const devServerUrl = `http://localhost:${port}`;
 
-  const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
-
   const launchOptions: PuppeteerLaunchOptions = {
     headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    args: LAUNCH_ARGS,
+    executablePath: resolveChromePathOrThrow(),
   };
-  if (executablePath) {
-    launchOptions.executablePath = executablePath;
-  }
 
   const browser = await puppeteer.launch(launchOptions);
 
@@ -125,42 +128,127 @@ async function runA11yCheck(port: number, viewport: { width: number; height: num
       const menu = document.getElementById('bs-main-menu');
       if (menu) (menu as HTMLElement).style.display = 'none';
     });
+
+    // Reveal every panel. Controls inside a closed panel measure zero-size and
+    // would be skipped, leaving most of the UI's text unchecked.
+    const panelsShown = await page.evaluate(() => {
+      const ids = ['bs-blast-panel', 'bs-contract-panel', 'bs-build-panel',
+        'bs-vehicle-panel', 'bs-employee-panel', 'bs-survey-panel'];
+      let shown = 0;
+      for (const id of ids) {
+        const el = document.getElementById(id);
+        if (el) {
+          (el as HTMLElement).style.display = 'block';
+          shown++;
+        }
+      }
+      return shown;
+    });
+    console.log(`Panels revealed for measurement: ${panelsShown}`);
     await new Promise(r => setTimeout(r, 500));
+
+    // esbuild (via tsx) rewrites named functions to `__name(fn, "fn")` to
+    // preserve Function.name. That helper is module-scoped in Node and does not
+    // travel with a serialized page.evaluate body, so any helper function
+    // declared below would throw "__name is not defined" in the browser.
+    // Installing an identity shim as a raw string keeps it out of esbuild's reach.
+    await page.evaluate('globalThis.__name = globalThis.__name || function (fn) { return fn; }');
 
     // Extract all visible text elements with computed styles
     const elements: TextElement[] = await page.evaluate(() => {
       const allElements = document.querySelectorAll('body *');
       const results: any[] = [];
 
+      // NOTE: function declarations, not arrow consts. esbuild (via tsx)
+      // annotates named function expressions with a `__name()` helper that does
+      // not exist in the page, and the evaluate call dies with
+      // "__name is not defined".
+
+      /** Parse any CSS color the browser computed into RGBA components. */
+      function parseRgba(css: string): [number, number, number, number] | null {
+        const m = css.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)$/);
+        if (!m) return null;
+        return [+m[1]!, +m[2]!, +m[3]!, m[4] === undefined ? 1 : +m[4]!];
+      }
+
+      /** Composite a translucent colour over an already-opaque backdrop. */
+      function composite(
+        fg: [number, number, number, number],
+        bg: [number, number, number],
+      ): [number, number, number] {
+        return [
+          Math.round(fg[0] * fg[3] + bg[0] * (1 - fg[3])),
+          Math.round(fg[1] * fg[3] + bg[1] * (1 - fg[3])),
+          Math.round(fg[2] * fg[3] + bg[2] * (1 - fg[3])),
+        ];
+      }
+
+      /**
+       * Effective background behind an element. An element's own
+       * background-color is frequently transparent or semi-transparent, so the
+       * ancestor chain has to be composited to find what the text actually sits
+       * on. Reading backgroundColor alone reports translucent white panels as
+       * solid #ffffff and invents contrast failures that are not on screen.
+       */
+      function effectiveBackground(start: Element): [number, number, number] {
+        const layers: [number, number, number, number][] = [];
+        let node: Element | null = start;
+
+        while (node) {
+          const parsed = parseRgba(window.getComputedStyle(node).backgroundColor);
+          if (parsed && parsed[3] > 0) {
+            layers.push(parsed);
+            if (parsed[3] === 1) break;
+          }
+          node = node.parentElement;
+        }
+
+        // Canvas-backed game: anything still unresolved sits on the page canvas.
+        let base: [number, number, number] = [255, 255, 255];
+        for (let i = layers.length - 1; i >= 0; i--) {
+          base = composite(layers[i]!, base);
+        }
+        return base;
+      }
+
+      function toHex(c: [number, number, number]): string {
+        return `#${c.map(v => v.toString(16).padStart(2, '0')).join('')}`;
+      }
+
       allElements.forEach(el => {
-        const text = (el as HTMLElement).innerText?.trim();
-        if (!text) return;
+        // Only elements holding their own text — innerText includes descendants,
+        // so containers would re-report their children's text with the
+        // container's colours.
+        const ownText = Array.from(el.childNodes)
+          .filter(n => n.nodeType === Node.TEXT_NODE)
+          .map(n => n.textContent ?? '')
+          .join('')
+          .trim();
+        if (!ownText) return;
 
         const style = window.getComputedStyle(el);
-        const display = style.display;
-        const visibility = style.visibility;
+        if (style.display === 'none' || style.visibility === 'hidden') return;
+        if (parseFloat(style.opacity) === 0) return;
 
-        if (display === 'none' || visibility === 'hidden') return;
-
-        const color = style.color;
-        const bg = style.backgroundColor;
-        const fontSize = style.fontSize;
-        const fontWeight = style.fontWeight;
-
-        if (!color || !bg) return;
-        if (color === 'rgba(0, 0, 0, 0)' || bg === 'rgba(0, 0, 0, 0)') return;
-
-        // Skip canvas and script elements
         const tag = el.tagName.toLowerCase();
         if (tag === 'canvas' || tag === 'script' || tag === 'style') return;
 
+        const rect = (el as HTMLElement).getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) return;
+
+        const fg = parseRgba(style.color);
+        if (!fg || fg[3] === 0) return;
+
+        const bg = effectiveBackground(el);
+
         results.push({
           tag,
-          text: text.substring(0, 100), // truncate long text
-          fontSize,
-          fontWeight,
-          foreground: color,
-          background: bg,
+          text: ownText.substring(0, 100),
+          fontSize: style.fontSize,
+          fontWeight: style.fontWeight,
+          // Text alpha composites against its own backdrop too.
+          foreground: toHex(fg[3] < 1 ? composite(fg, bg) : [fg[0], fg[1], fg[2]]),
+          background: toHex(bg),
         });
       });
 

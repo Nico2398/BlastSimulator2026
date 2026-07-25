@@ -22,7 +22,7 @@ description: >
  7. [visual-feedback-loop]    → Visual feedback loop (visual-change ONLY).
                                  Skip for backend-only features.
                                  Loop on failure — see "Visual Feedback Loop" below.
-                                 **CRITICAL:** If @visual-tester returns VISION: BLOCKED (cannot inspect),
+                                 **CRITICAL:** If @visual-tester returns VISUAL: BLOCKED (cannot inspect),
                                  halt pipeline immediately. Do NOT proceed to qualimetry. Escalate.
   8. [qualimetry]              → jscpd syntactic duplication check
                                 if fail → @implementer (big loop)
@@ -41,7 +41,7 @@ description: >
 |------------|--------------|
 | @planner | @planner (self-retry) |
 | [visual-feedback-loop] | See loop below — self-iterating |
-| [visual-feedback-loop] VISION: BLOCKED | **HALT** — escalate, do not proceed to qualimetry |
+| [visual-feedback-loop] VISUAL: BLOCKED | **HALT** — escalate, do not proceed to qualimetry |
 | [qualimetry] | @implementer (big loop) |
 | finalization phase | See `agentic-pipeline-finalization` |
 | @context-maintainer | Fix and commit, or do nothing — never blocks pipeline |
@@ -57,8 +57,8 @@ Runs after test-runner passes on feature branch, before qualimetry. Visual-chang
 ```
 LOOP:
   a. @visual-tester   → Run scenario tests with --shots, inspect ALL screenshots.
-                        Must return VISUAL: PASS, VISUAL: FAIL, or VISION: BLOCKED.
-                        If VISION: BLOCKED → halt pipeline immediately (escalate).
+                        Must return VISUAL: PASS, VISUAL: FAIL, or VISUAL: BLOCKED.
+                        If VISUAL: BLOCKED → halt pipeline immediately (escalate).
                         If no failures → exit loop (continue to step 9).
   b. @implementer     → Fix ALL reported visual issues.
                         Runs on feature branch (branch-sanity: pipeline/feature-<N>).
