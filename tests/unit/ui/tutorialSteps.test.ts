@@ -127,8 +127,8 @@ describe('tutorialSteps', () => {
   describe('step 9 (event-fire-resolve, index 9)', () => {
     const step9 = TUTORIAL_STEPS[9];
 
-    it('has commands ["tick 3"]', () => {
-      expect(step9.commands).toEqual(['tick 3']);
+    it('drives itself: autoCommands fast-forward and fire the scripted event', () => {
+      expect(step9.autoCommands).toEqual(['tick 3', 'event fire tutorial_synergy_consultant']);
     });
 
     it('isComplete returns true when pendingEvent is not null', () => {
@@ -245,5 +245,60 @@ describe('tutorialSteps', () => {
         ).toBe(true);
       }
     }
+  });
+
+  // ── 16 ───────────────────────────────────────────────────────────────────
+  it('step 0 (time-speed) only completes on a genuine speed increase', () => {
+    const step0 = TUTORIAL_STEPS[0]!;
+    const snap = step0.captureSnapshot!({ timeScale: 1 } as GameState);
+    // Same speed as when the step opened — the player has not acted yet.
+    expect(step0.isComplete({ timeScale: 1 } as GameState, snap)).toBe(false);
+    expect(step0.isComplete({ timeScale: 2 } as GameState, snap)).toBe(true);
+  });
+
+  // ── 17 ───────────────────────────────────────────────────────────────────
+  it('only the scripted event step carries autoCommands', () => {
+    for (const step of TUTORIAL_STEPS) {
+      if (step.id === 'event-fire-resolve') continue;
+      expect(step.autoCommands).toBeUndefined();
+    }
+  });
+
+  // ── 18 ───────────────────────────────────────────────────────────────────
+  it('every highlightTarget points at a control that stays on screen', () => {
+    // Panels are display:none until the player opens them, so a step may only
+    // highlight the always-present HUD, score panel or toolbar buttons.
+    const allowed = /^#bs-hud-top |^#bs-hud-scores$|^#bs-toolbar \[data-panel="[a-z]+"\]$/;
+    for (const step of TUTORIAL_STEPS) {
+      if (!step.highlightTarget) continue;
+      expect(step.highlightTarget).toMatch(allowed);
+    }
+  });
+
+  // ── 19 ───────────────────────────────────────────────────────────────────
+  describe('step 7 (blast, index 7)', () => {
+    const blastStep = TUTORIAL_STEPS[7]!;
+
+    it('completes on a barren blast, not only when ore is found', () => {
+      // A legitimate blast that turns up no ore still satisfied the objective:
+      // "execute the blast sequence". Keying on ore alone dead-ends the card.
+      const before = { levelStats: { blastsPerformed: 0 }, collectedOre: {} } as unknown as GameState;
+      const snap = blastStep.captureSnapshot!(before);
+      const after = { levelStats: { blastsPerformed: 1 }, collectedOre: {} } as unknown as GameState;
+      expect(blastStep.isComplete(after, snap)).toBe(true);
+    });
+
+    it('still completes when ore is collected outside a campaign level', () => {
+      const before = { collectedOre: {} } as unknown as GameState;
+      const snap = blastStep.captureSnapshot!(before);
+      const after = { collectedOre: { gravelite: 400 } } as unknown as GameState;
+      expect(blastStep.isComplete(after, snap)).toBe(true);
+    });
+
+    it('does not complete before the player blasts', () => {
+      const before = { levelStats: { blastsPerformed: 0 }, collectedOre: {} } as unknown as GameState;
+      const snap = blastStep.captureSnapshot!(before);
+      expect(blastStep.isComplete(before, snap)).toBe(false);
+    });
   });
 });

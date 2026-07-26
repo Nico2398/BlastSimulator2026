@@ -453,12 +453,15 @@ export function mafiaCommand(
 export function timeCommand(
   ctx: GameContext,
   args: string[],
-  _named: Record<string, string>,
+  named: Record<string, string>,
 ): CommandResult {
   const err = requireGame(ctx);
   if (err) return err;
   const state = ctx.state!;
-  const sub = args[0] ?? 'status';
+  // `time speed 2` and `time speed:2` are both accepted — the named form is the
+  // house style for every other command, and silently reporting status for it
+  // made scenarios look like they had changed the speed when they had not.
+  const sub = args[0] ?? (named['speed'] !== undefined ? 'speed' : 'status');
 
   switch (sub) {
     case 'status':
@@ -480,7 +483,7 @@ export function timeCommand(
       return { success: true, output: `Game resumed at ${state.timeScale}x speed.` };
 
     case 'speed': {
-      const speed = parseInt(args[1] ?? '', 10);
+      const speed = parseInt(args[1] ?? named['speed'] ?? '', 10);
       if (![1, 2, 4, 8].includes(speed)) {
         return { success: false, output: 'Valid speeds: 1, 2, 4, 8' };
       }

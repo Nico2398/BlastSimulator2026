@@ -78,6 +78,10 @@ export class GameRenderer {
       // TerrainMesh holds a grid reference — rebind it so it reads from the new grid
       this.terrain?.setGrid(ctx.grid);
       this.terrain?.buildAll();
+      // A campaign level can swap in a differently-sized grid while keeping the
+      // seed, so loadGame() never runs. Re-frame or the new site renders as a
+      // small off-centre patch of the previous site's view.
+      this.frameCameraOnGrid();
     }
 
     this.lastState = ctx.state;
@@ -345,7 +349,7 @@ export class GameRenderer {
   private loadGame(state: GameState, grid: VoxelGrid): void {
     this.clearAll();
 
-    const { scene, sun, ambient, cameraController } = this.sm;
+    const { scene, sun, ambient } = this.sm;
 
     // Terrain mesh (marching cubes)
     this.terrain = new TerrainMesh(scene, grid);
@@ -395,8 +399,21 @@ export class GameRenderer {
     // Ghost previews (initially empty)
     this.ghosts = new GhostMesh(scene);
 
-    // Point camera at terrain centre
-    cameraController.setTarget(grid.sizeX / 2, 0, grid.sizeZ / 2);
+    // Frame the whole site
+    this.frameCameraOnGrid();
+  }
+
+  /**
+   * Centre the camera on the loaded grid and pull back far enough to show all
+   * of it. Aimed at the surface rather than y=0 so the benches sit mid-frame.
+   */
+  private frameCameraOnGrid(): void {
+    const grid = this.lastGrid;
+    if (!grid) return;
+    const cx = grid.sizeX / 2;
+    const cz = grid.sizeZ / 2;
+    const span = Math.max(grid.sizeX, grid.sizeZ);
+    this.sm.cameraController.frameSite(cx, this.getTerrainSurfaceY(cx, cz), cz, span);
   }
 
   private clearAll(): void {

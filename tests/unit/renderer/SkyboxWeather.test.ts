@@ -58,8 +58,10 @@ describe('SkyboxWeather', () => {
 
   it('update reduces sun intensity for rainy weather', () => {
     const { sun, sw } = makeSetup();
-    sw.setWeather('heavy_rain');
+    // Sampled before setWeather: the first weather assignment snaps rather than
+    // lerping, so sampling after it would already be at the rainy target.
     const initialIntensity = sun.intensity;
+    sw.setWeather('heavy_rain');
     for (let i = 0; i < 120; i++) sw.update(0.016, 50, 50);
     expect(sun.intensity).toBeLessThan(initialIntensity);
     sw.dispose();

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
-import { HUD } from '../../../src/ui/HUD.js';
+import { HUD, formatBalance } from '../../../src/ui/HUD.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 
 function makeState() {
@@ -101,5 +101,41 @@ describe('HUD (10.1)', () => {
     const icon = container.querySelector('.bs-weather')?.textContent ?? '';
     expect(icon).toBe('⛈️');
     hud.dispose();
+  });
+
+  describe('balance formatting', () => {
+    it('prints whole dollars with thousands separators', () => {
+      expect(formatBalance(75000)).toBe('$75,000');
+    });
+
+    it('drops the float rounding tail instead of printing cents', () => {
+      // Cash is a float; toLocaleString would render this as "$-37,799.853".
+      expect(formatBalance(-37799.853)).toBe('-$37,800');
+    });
+
+    it('puts the minus sign in front of the currency symbol', () => {
+      expect(formatBalance(-1234)).toBe('-$1,234');
+    });
+
+    it('renders zero without a sign', () => {
+      expect(formatBalance(0)).toBe('$0');
+    });
+
+    it('colours a negative balance red in the HUD', () => {
+      const container = document.createElement('div');
+      document.body.appendChild(container);
+      const hud = new HUD(container);
+      const state = makeState();
+      state.cash = -500.4;
+      hud.update(state);
+      const el = container.querySelector('.bs-balance') as HTMLElement;
+      expect(el.textContent).toBe('-$500');
+      expect(el.style.color).not.toBe('');
+      const negative = el.style.color;
+      state.cash = 500;
+      hud.update(state);
+      expect(el.style.color).not.toBe(negative);
+      hud.dispose();
+    });
   });
 });

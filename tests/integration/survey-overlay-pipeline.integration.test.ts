@@ -23,6 +23,7 @@ function makeMockSceneManager() {
   const ambient = new THREE.AmbientLight();
   const cameraController = {
     setTarget: vi.fn(),
+    frameSite: vi.fn(),
     update: vi.fn(),
   };
   return {

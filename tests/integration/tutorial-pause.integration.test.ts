@@ -74,7 +74,7 @@ describe('Tutorial pause behaviour (#371)', () => {
     expect(() => tutorial.start(undefined)).not.toThrow();
 
     // The overlay should be visible even without a state
-    const oe = container.querySelector('.bs-confirm-overlay') as HTMLElement;
+    const oe = container.querySelector('.bs-tutorial-overlay') as HTMLElement;
     expect(oe.style.display).not.toBe('none');
   });
 

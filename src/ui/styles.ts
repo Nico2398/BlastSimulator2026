@@ -41,7 +41,9 @@ const CSS = `
   height: 44px;
   display: flex;
   align-items: center;
-  padding: 0 12px;
+  /* Right padding reserves the strip the fixed "Return to Map" button occupies,
+     so the event badge does not slide underneath it when it appears. */
+  padding: 0 215px 0 12px;
   gap: 14px;
   background: rgba(6,5,2,0.92);
   border-bottom: 1px solid rgba(200,160,60,0.2);
@@ -497,7 +499,8 @@ const CSS = `
 /* ─── Notification toast ─── */
 .bs-notification {
   position: fixed;
-  bottom: 20px;
+  /* Clears the tutorial coach mark, which docks along the bottom edge. */
+  bottom: 220px;
   left: 50%;
   transform: translateX(-50%);
   background: rgba(60,20,8,0.95);
@@ -511,6 +514,86 @@ const CSS = `
   text-align: center;
   max-width: 380px;
   box-shadow: 0 4px 20px rgba(0,0,0,0.7);
+}
+
+/* ─── Tutorial coach mark ───
+   Docked bottom-centre, never modal: the wrapper lets clicks through so the
+   player can actually use the control the step is pointing at, and it sits
+   below the event dialog (z 600) so the two never fight for the same pixels. */
+.bs-tutorial-overlay {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  display: flex;
+  justify-content: center;
+  padding: 0 150px 18px;
+  z-index: 500;
+  pointer-events: none;
+}
+.bs-tutorial-box {
+  background: rgba(14, 11, 6, 0.95);
+  border: 1px solid rgba(200, 160, 60, 0.55);
+  border-radius: 10px;
+  padding: 12px 16px 14px;
+  width: 100%;
+  max-width: 560px;
+  pointer-events: all;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.8);
+  font-family: 'Segoe UI', system-ui, Arial, sans-serif;
+  color: #e8e0d0;
+}
+.bs-tutorial-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.bs-tutorial-header .bs-panel-title { margin-bottom: 6px; flex: 1; }
+.bs-tutorial-box .bs-panel-text {
+  font-size: 13px;
+  line-height: 1.55;
+  color: #d8c8a8;
+  margin: 0 0 10px;
+}
+.bs-tutorial-progress {
+  font-size: 11px;
+  color: #9a8868;
+  white-space: nowrap;
+  letter-spacing: 0.04em;
+}
+.bs-tutorial-progress-track {
+  background: rgba(255,255,255,0.1);
+  border-radius: 3px;
+  height: 4px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+.bs-tutorial-progress-fill {
+  height: 100%;
+  background: #f0b840;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+.bs-tutorial-commands-label {
+  font-size: 9px;
+  color: #7a6b55;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 2px;
+}
+.bs-tutorial-commands {
+  font-family: ui-monospace, 'Consolas', monospace;
+  font-size: 11px;
+  color: #a89060;
+  background: rgba(255,255,255,0.05);
+  border-radius: 4px;
+  padding: 4px 8px;
+  margin-bottom: 10px;
+  word-break: break-word;
+}
+.bs-tutorial-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 /* ─── Tutorial step highlight (bright blue pulsating glow) ─── */

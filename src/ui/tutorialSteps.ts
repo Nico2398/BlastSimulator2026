@@ -13,16 +13,32 @@ import {
   getVehicles,
   countBuildingsOfType,
   countVehiclesWithDriver,
+  TOOLBAR_TARGET,
 } from './tutorialStepHelpers.js';
 
 export interface TutorialStep {
   id: string;
   titleKey: string;
   textKey: string;
+  /**
+   * Console commands equivalent to the step's objective, shown to the player as
+   * a hint. These are never executed by the tutorial — completing the step is
+   * the player's job.
+   */
   commands?: string[];
+  /**
+   * Commands the tutorial runs itself when the step opens. Reserved for scripted
+   * demonstrations (the event pop-up), not for doing the player's work.
+   */
+  autoCommands?: string[];
   autoAdvanceMs?: number;
   captureSnapshot?: ((state: GameState) => Record<string, unknown>) | undefined;
   isComplete: (state: GameState, snapshot: Record<string, unknown>) => boolean;
+  /**
+   * CSS selector for the control the player must use. It has to point at
+   * something that is on screen while the step is active — highlighting a
+   * closed panel glows nothing.
+   */
   highlightTarget?: string;
 }
 
@@ -38,30 +54,33 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     }),
     isComplete: (state: GameState, snapshot: Record<string, unknown>) => {
       const prev = snapshot.prevTimeScale as number;
-      return state.timeScale >= prev;
+      return state.timeScale > prev;
     },
   },
 
   // ── Step 1: hire-surveyor ──
-  createHireStep('hire-surveyor', 'tutorial.step2.title', 'tutorial.step2', 'surveyor', '#bs-employee-panel'),
+  createHireStep('hire-surveyor', 'tutorial.step2.title', 'tutorial.step2', 'surveyor'),
 
   // ── Step 2: survey ──
-  createComparisonStep('survey', 'tutorial.step3.title', 'tutorial.step3', (s) => (s.surveyResults ?? []).length, ['survey seismic'], '#bs-survey-panel'),
+  createComparisonStep('survey', 'tutorial.step3.title', 'tutorial.step3', (s) => (s.surveyResults ?? []).length, ['survey seismic x:12 z:12'], TOOLBAR_TARGET.survey),
 
   // ── Step 3: hire-driller ──
-  createHireStep('hire-driller', 'tutorial.step4.title', 'tutorial.step4', 'driller', '#bs-employee-panel'),
+  createHireStep('hire-driller', 'tutorial.step4.title', 'tutorial.step4', 'driller'),
 
   // ── Step 4: drill-plan ──
-  createComparisonStep('drill-plan', 'tutorial.step5.title', 'tutorial.step5', (s) => (s.drillHoles ?? []).length, ['drill plan'], '#bs-blast-panel'),
+  createComparisonStep('drill-plan', 'tutorial.step5.title', 'tutorial.step5', (s) => (s.drillHoles ?? []).length, ['drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:8,8'], TOOLBAR_TARGET.blast),
 
   // ── Step 5: charge ──
-  createComparisonStep('charge', 'tutorial.step6.title', 'tutorial.step6', (s) => Object.keys(s.chargesByHole ?? {}).length, ['blast plan'], '#bs-blast-panel'),
+  createComparisonStep('charge', 'tutorial.step6.title', 'tutorial.step6', (s) => Object.keys(s.chargesByHole ?? {}).length, ['charge hole:* explosive:boomite amount:5 stemming:2'], TOOLBAR_TARGET.blast),
 
   // ── Step 6: sequence ──
-  createComparisonStep('sequence', 'tutorial.step7.title', 'tutorial.step7', (s) => Object.keys(s.sequenceDelays ?? {}).length, ['blast plan'], '#bs-blast-panel'),
+  createComparisonStep('sequence', 'tutorial.step7.title', 'tutorial.step7', (s) => Object.keys(s.sequenceDelays ?? {}).length, ['sequence auto delay_step:25'], TOOLBAR_TARGET.blast),
 
   // ── Step 7: blast ──
-  createComparisonStep('blast', 'tutorial.step8.title', 'tutorial.step8', (s) => Object.keys(s.collectedOre ?? {}).length, ['blast execute'], '#bs-blast-panel'),
+  // Counts blasts fired as well as ore types collected. Keying only on ore
+  // dead-ends the tutorial when a legitimate blast comes up barren — the player
+  // did exactly what was asked and the card would never move on.
+  createComparisonStep('blast', 'tutorial.step8.title', 'tutorial.step8', (s) => (s.levelStats?.blastsPerformed ?? 0) + Object.keys(s.collectedOre ?? {}).length, ['blast'], TOOLBAR_TARGET.blast),
 
   // ── Step 8: scores ──
   createAutoAdvanceStep('scores', 'tutorial.step9.title', 'tutorial.step9', (state: GameState) => ({
@@ -70,33 +89,35 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   }), '#bs-hud-scores'),
 
   // ── Step 9: event-fire-resolve ──
+  // The only step the tutorial drives itself: it fast-forwards a few ticks and
+  // fires the scripted consultant event so the player sees the dialog once.
   {
     id: 'event-fire-resolve',
     titleKey: 'tutorial.step10.title',
     textKey: 'tutorial.step10',
-    highlightTarget: '#bs-event-dialog',
-    commands: ['tick 3'],
+    highlightTarget: '#bs-hud-top .bs-event-badge',
+    autoCommands: ['tick 3', 'event fire tutorial_synergy_consultant'],
     isComplete: (state: GameState) => {
       return state.events?.pendingEvent != null;
     },
   },
 
   // ── Step 10: hire-manager ──
-  createHireStepWithEventGuard('hire-manager', 'tutorial.step11.title', 'tutorial.step11', 'manager', '#bs-employee-panel'),
+  createHireStepWithEventGuard('hire-manager', 'tutorial.step11.title', 'tutorial.step11', 'manager'),
 
   // ── Step 11: contract-accept ──
-  createComparisonStep('contract-accept', 'tutorial.step12.title', 'tutorial.step12', (s) => (s.contracts?.active ?? []).length, ['contracts'], '#bs-contract-panel'),
+  createComparisonStep('contract-accept', 'tutorial.step12.title', 'tutorial.step12', (s) => (s.contracts?.active ?? []).length, ['contract accept 1'], TOOLBAR_TARGET.contracts),
 
   // ── Step 12: hire-driver ──
-  createHireStep('hire-driver', 'tutorial.step13.title', 'tutorial.step13', 'driver', '#bs-employee-panel'),
+  createHireStep('hire-driver', 'tutorial.step13.title', 'tutorial.step13', 'driver'),
 
   // ── Step 13: vehicle-buy-assign ──
   {
     id: 'vehicle-buy-assign',
     titleKey: 'tutorial.step14.title',
     textKey: 'tutorial.step14',
-    highlightTarget: '#bs-vehicle-panel',
-    commands: ['buy debris_hauler'],
+    highlightTarget: TOOLBAR_TARGET.vehicles,
+    commands: ['vehicle buy debris_hauler', 'vehicle driver 1 1'],
     captureSnapshot: (state: GameState) => ({
       prevVehicleCount: getVehicles(state).length,
     }),
@@ -110,10 +131,10 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   },
 
   // ── Step 14: build-storage ──
-  createComparisonStep('build-storage', 'tutorial.step15.title', 'tutorial.step15', (s) => countBuildingsOfType(s, 'freight_warehouse'), ['build freight_warehouse'], '#bs-build-panel'),
+  createComparisonStep('build-storage', 'tutorial.step15.title', 'tutorial.step15', (s) => countBuildingsOfType(s, 'freight_warehouse'), ['build freight_warehouse at:12,8'], TOOLBAR_TARGET.build),
 
   // ── Step 15: contract-deliver ──
-  createComparisonStep('contract-deliver', 'tutorial.step16.title', 'tutorial.step16', (s) => (s.contracts?.completedHistory ?? []).length, ['logistics'], '#bs-contract-panel'),
+  createComparisonStep('contract-deliver', 'tutorial.step16.title', 'tutorial.step16', (s) => (s.contracts?.completedHistory ?? []).length, ['contract deliver 1 amount:5000'], TOOLBAR_TARGET.contracts),
 
   // ── Step 16: finances ──
   createAutoAdvanceStep('finances', 'tutorial.step17.title', 'tutorial.step17', (state: GameState) => ({
@@ -126,8 +147,8 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     id: 'build-ramp',
     titleKey: 'tutorial.step18.title',
     textKey: 'tutorial.step18',
-    highlightTarget: '#bs-build-panel',
-    commands: ['build ramp'],
+    highlightTarget: TOOLBAR_TARGET.build,
+    commands: ['build_ramp start:10,15 end:10,25'],
     captureSnapshot: (state: GameState) => ({
       prevRampCount: state.navGrid
         ? countNavCellsByType(state.navGrid.cells, 'ramp')
@@ -150,14 +171,15 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
       fatigue: (e as unknown as Record<string, unknown>).fatigue as number ?? 0,
       breakNeed: (e as unknown as Record<string, unknown>).breakNeed as number ?? 0,
     })),
-  }), '#bs-employee-panel'),
+  }), TOOLBAR_TARGET.employees),
 
   // ── Step 19: set-policy ──
   {
     id: 'set-policy',
     titleKey: 'tutorial.step20.title',
     textKey: 'tutorial.step20',
-    commands: ['policy'],
+    commands: ['set_policy mode:shift_8h'],
+    highlightTarget: TOOLBAR_TARGET.settings,
     captureSnapshot: (state: GameState) => ({
       shiftMode: state.sitePolicy?.shiftMode,
       hungerRestThreshold: state.sitePolicy?.hungerRestThreshold,

@@ -123,6 +123,16 @@ const VISUAL_SCENARIO_NAMES = [
   'survey-result-visualization',
   'survey-seismic-side-effects',
   'survey-stale-handling',
+  'tutorial-interactive',
+] as const;
+
+/**
+ * Scenarios that exercise the UI by clicking real controls rather than
+ * replaying console commands. These are the ones that prove a panel is
+ * reachable and a button is not covered by something else.
+ */
+const UI_DRIVEN_SCENARIO_NAMES = [
+  'tutorial-interactive',
 ] as const;
 
 const ALL_SCENARIO_NAMES = [
@@ -517,7 +527,11 @@ describe('Every scenario step has a dual-play interaction array', () => {
       }
     });
 
-    it(`${name} — interaction[0] is always a command-type action and matches step.command`, () => {
+    it(`${name} — command-mirror steps replay step.command as their first action`, () => {
+      // UI-driven scenarios deliberately click real controls instead of
+      // replaying the command, so they are exempt; their `command` field is the
+      // command-mode equivalent, not a script for interaction mode.
+      if (UI_DRIVEN_SCENARIO_NAMES.includes(name as never)) return;
       const scenario = loadScenarioDef(name, SCENARIO_DIR);
       for (let i = 0; i < scenario.steps.length; i++) {
         const step = scenario.steps[i] as ScenarioStepDef;
@@ -527,6 +541,35 @@ describe('Every scenario step has a dual-play interaction array', () => {
         expect(firstAction.type).toBe('command');
         if (firstAction.type === 'command') {
           expect(firstAction.command).toBe(step.command);
+        }
+      }
+    });
+  }
+});
+
+// ──────────────────────────────────────────────
+// 12. UI-driven scenarios actually drive the UI
+// ──────────────────────────────────────────────
+describe('UI-driven scenarios click real controls', () => {
+  for (const name of UI_DRIVEN_SCENARIO_NAMES) {
+    it(`${name} — has clickSelector actions on more than half its steps`, () => {
+      const scenario = loadScenarioDef(name, SCENARIO_DIR);
+      const clicking = scenario.steps.filter(step => {
+        const s = step as ScenarioStepDef;
+        return (s.interaction ?? []).some(a => a.type === 'clickSelector');
+      });
+      expect(clicking.length).toBeGreaterThan(scenario.steps.length / 2);
+    });
+
+    it(`${name} — every clickSelector targets a non-empty selector`, () => {
+      const scenario = loadScenarioDef(name, SCENARIO_DIR);
+      for (let i = 0; i < scenario.steps.length; i++) {
+        const s = scenario.steps[i] as ScenarioStepDef;
+        for (const action of s.interaction ?? []) {
+          if (action.type === 'clickSelector') {
+            expect(typeof action.selector, `step[${i}] selector`).toBe('string');
+            expect(action.selector.length).toBeGreaterThan(0);
+          }
         }
       }
     });

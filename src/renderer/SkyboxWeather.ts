@@ -53,6 +53,8 @@ export class SkyboxWeather {
 
   private currentWeather: WeatherState = 'sunny';
   private readonly currentSky = new THREE.Color(WEATHER_COLORS.sunny.skyLow);
+  /** False until the first setWeather() call, which snaps instead of lerping. */
+  private weatherInitialised = false;
 
   // Rain
   private rainPoints: THREE.Points | null = null;
@@ -84,6 +86,16 @@ export class SkyboxWeather {
    */
   setWeather(state: WeatherState): void {
     this.currentWeather = state;
+
+    // The first assignment snaps. Lerping in from the hardcoded blue would open
+    // the game on several seconds of a muddy in-between colour.
+    if (!this.weatherInitialised) {
+      this.weatherInitialised = true;
+      const colors = WEATHER_COLORS[state];
+      this.currentSky.copy(colors.skyLow);
+      this.sun.intensity = colors.sunIntensity;
+      this.ambient.intensity = colors.ambientIntensity;
+    }
 
     const isRaining = state === 'light_rain' || state === 'heavy_rain' || state === 'storm';
     if (this.rainPoints) {

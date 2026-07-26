@@ -53,13 +53,13 @@
       ]
     },
     {
-      "command": "time speed:2",
+      "command": "time speed 2",
       "timeout": 15,
-      "description": "Step 0 complete: increase time speed → overlay advances to step 1 (hire-surveyor)",
+      "description": "Step 0 complete: increase time speed (positional form actually applies the change) → overlay advances to step 1 (hire-surveyor)",
       "interaction": [
         {
           "type": "command",
-          "command": "time speed:2"
+          "command": "time speed 2"
         }
       ]
     },

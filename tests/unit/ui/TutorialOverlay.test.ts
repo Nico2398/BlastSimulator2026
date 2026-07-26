@@ -24,6 +24,20 @@ function createMockState(): GameState {
   } as GameState;
 }
 
+/**
+ * Walk the card to the final (congratulations) step.
+ *
+ * The overlay only moves when a step's own condition is satisfied, so a test
+ * that wants to reach the end drives the advance directly rather than firing
+ * commands that satisfy nothing.
+ */
+function walkToCongratulations(tut: TutorialOverlay): void {
+  const t = tut as unknown as { stepIndex: number; advanceToNextStep(): void };
+  while (t.stepIndex < TOTAL_TUTORIAL_STEPS - 1) {
+    t.advanceToNextStep();
+  }
+}
+
 describe('TutorialOverlay (12.4)', () => {
   let container: HTMLDivElement;
   let overlay: TutorialOverlay | null;
@@ -43,12 +57,12 @@ describe('TutorialOverlay (12.4)', () => {
   });
 
   describe('construction', () => {
-    it('creates overlay element with bs-confirm-overlay class and all child elements', () => {
+    it('creates the coach-mark card with all child elements', () => {
       const tut = new TutorialOverlay(container);
       overlay = tut;
 
-      expect(container.querySelector('.bs-confirm-overlay')).not.toBeNull();
-      expect(container.querySelector('.bs-confirm-box')).not.toBeNull();
+      expect(container.querySelector('.bs-tutorial-overlay')).not.toBeNull();
+      expect(container.querySelector('.bs-tutorial-box')).not.toBeNull();
       expect(container.querySelector('.bs-panel-title')).not.toBeNull();
       expect(container.querySelector('.bs-panel-text')).not.toBeNull();
       expect(container.querySelector('.bs-tutorial-progress')).not.toBeNull();
@@ -69,7 +83,7 @@ describe('TutorialOverlay (12.4)', () => {
       tut.start(state);
 
       expect(tut.isActive).toBe(true);
-      const oe = container.querySelector('.bs-confirm-overlay') as HTMLElement;
+      const oe = container.querySelector('.bs-tutorial-overlay') as HTMLElement;
       expect(oe.style.display).not.toBe('none');
       expect(state.isPaused).toBe(true);
       expect(container.querySelector('.bs-panel-title')?.textContent).toBeTruthy();
@@ -100,6 +114,40 @@ describe('TutorialOverlay (12.4)', () => {
     });
   });
 
+  describe('pause handling', () => {
+    it('pauses on start so the player can read the opening card', () => {
+      const tut = new TutorialOverlay(container);
+      overlay = tut;
+      const state = createMockState();
+      tut.start(state);
+      expect(state.isPaused).toBe(true);
+    });
+
+    it('resumes the simulation once the first step is done', () => {
+      // Survey, drilling, hauling and delivery are queued actions that only
+      // resolve on a tick — a permanently paused tutorial can never finish them.
+      const tut = new TutorialOverlay(container);
+      overlay = tut;
+      const state = createMockState();
+      tut.start(state);
+      expect(state.isPaused).toBe(true);
+
+      state.timeScale = 2;
+      tut.onCommandExecuted(state);
+      expect(state.isPaused).toBe(false);
+    });
+
+    it('stays unpaused across later steps', () => {
+      const tut = new TutorialOverlay(container) as any;
+      overlay = tut;
+      const state = createMockState();
+      tut.start(state);
+      tut.advanceToNextStep();
+      tut.advanceToNextStep();
+      expect(state.isPaused).toBe(false);
+    });
+  });
+
   describe('skip()', () => {
     it('deactivates, hides overlay, unpauses game', () => {
       const tut = new TutorialOverlay(container);
@@ -109,7 +157,7 @@ describe('TutorialOverlay (12.4)', () => {
       tut.skip();
 
       expect(tut.isActive).toBe(false);
-      const oe = container.querySelector('.bs-confirm-overlay') as HTMLElement;
+      const oe = container.querySelector('.bs-tutorial-overlay') as HTMLElement;
       expect(oe.style.display).toBe('none');
       expect(state.isPaused).toBe(false);
     });
@@ -195,28 +243,69 @@ describe('TutorialOverlay (12.4)', () => {
       expect(tut.autoAdvanceTimer).toBeNull();
     });
 
-    it('timer fires and advances to next step after autoAdvanceMs', () => {
+    it('poll timer advances the step once its condition becomes true', () => {
       vi.useFakeTimers();
       const tut = new TutorialOverlay(container);
       overlay = tut;
-      tut.start(createMockState());
+      const state = createMockState();
+      tut.start(state);
 
       const titleEl = container.querySelector('.bs-panel-title');
       const before = titleEl?.textContent ?? '';
+
+      // Nothing satisfied yet — polling must leave the card where it is.
       vi.advanceTimersByTime(5000);
+      expect(titleEl?.textContent).toBe(before);
+
+      // The player raises the speed; the next poll picks it up.
+      state.timeScale = 2;
+      vi.advanceTimersByTime(2500);
       expect(titleEl?.textContent).not.toBe(before);
       vi.useRealTimers();
     });
   });
 
   describe('next button and commands hint', () => {
-    it('does NOT render skip or next buttons for any step', () => {
+    it('renders a Skip and a Next control so the player is never trapped', () => {
       const tut = new TutorialOverlay(container);
       overlay = tut;
       tut.start(createMockState());
 
-      expect(container.querySelector('.bs-btn-skip')).toBeNull();
-      expect(container.querySelector('.bs-btn-primary')).toBeNull();
+      expect(container.querySelector('.bs-btn-skip')).not.toBeNull();
+      expect(container.querySelector('.bs-btn-next')).not.toBeNull();
+    });
+
+    it('Skip ends the tutorial and unpauses the game', () => {
+      const tut = new TutorialOverlay(container);
+      overlay = tut;
+      const state = createMockState();
+      tut.start(state);
+
+      (container.querySelector('.bs-btn-skip') as HTMLButtonElement).click();
+      expect(tut.isActive).toBe(false);
+      expect(state.isPaused).toBe(false);
+    });
+
+    it('Next advances the card even when the step condition is unmet', () => {
+      const tut = new TutorialOverlay(container);
+      overlay = tut;
+      tut.start(createMockState());
+
+      const titleEl = container.querySelector('.bs-panel-title');
+      const before = titleEl?.textContent ?? '';
+      (container.querySelector('.bs-btn-next') as HTMLButtonElement).click();
+      expect(titleEl?.textContent).not.toBe(before);
+    });
+
+    it('hides Next on the final card', () => {
+      const tut = new TutorialOverlay(container) as any;
+      overlay = tut;
+      tut.start(createMockState());
+      tut.stepIndex = TOTAL_TUTORIAL_STEPS - 1;
+      tut.render();
+
+      const nextBtn = container.querySelector('.bs-btn-next') as HTMLElement;
+      expect(nextBtn.style.display).toBe('none');
     });
 
     it('shows commands hint element when step has commands array', () => {
@@ -230,13 +319,30 @@ describe('TutorialOverlay (12.4)', () => {
       // Step 0 (time-speed) has no commands → hint is hidden
       expect(hintEl.style.display).toBe('none');
 
-      // Advance to step 2 (survey) which has commands: ['survey seismic']
+      // Advance to step 2 (survey), whose hint is the real console command
       // `as any` needed to set private stepIndex and call private render()
       (tut as any).stepIndex = 2;
       (tut as any).render();
 
       expect(hintEl.style.display).not.toBe('none');
-      expect(hintEl.textContent).toBe('survey seismic');
+      expect(hintEl.textContent).toBe('survey seismic x:12 z:12');
+    });
+
+    it('never executes a step hint on the player behalf', () => {
+      const tut = new TutorialOverlay(container) as any;
+      overlay = tut;
+      const gameConsole = vi.fn();
+      tut.setGameConsole(gameConsole);
+      tut.start(createMockState());
+
+      // Walk to the survey step — its hint is `survey seismic ...`, which the
+      // tutorial must never run itself.
+      tut.advanceToNextStep();
+      tut.advanceToNextStep();
+
+      const executed = gameConsole.mock.calls.map((c: unknown[]) => c[0]);
+      expect(executed).not.toContain('survey seismic x:12 z:12');
+      expect(executed).not.toContain('hire employee');
     });
   });
 
@@ -348,10 +454,10 @@ describe('TutorialOverlay (12.4)', () => {
       const tut = new TutorialOverlay(container);
       overlay = tut;
 
-      expect(container.querySelector('.bs-confirm-overlay')).not.toBeNull();
+      expect(container.querySelector('.bs-tutorial-overlay')).not.toBeNull();
       tut.dispose();
       overlay = null;
-      expect(container.querySelector('.bs-confirm-overlay')).toBeNull();
+      expect(container.querySelector('.bs-tutorial-overlay')).toBeNull();
     });
   });
 
@@ -418,9 +524,7 @@ describe('TutorialOverlay (12.4)', () => {
       tut.start(state);
 
       expect(tut.isActive).toBe(true);
-      for (let i = 0; i < TOTAL_TUTORIAL_STEPS; i++) {
-        tut.onCommandExecuted(state);
-      }
+      walkToCongratulations(tut);
       // After the implementation change: finish() is delayed by 4s
       // so isActive remains true until the timer fires.
       // On current code: finish() is called immediately → isActive becomes false.
@@ -457,9 +561,7 @@ describe('TutorialOverlay (12.4)', () => {
       tut.start(state);
 
       // Advance through all steps to trigger the congratulations guard
-      for (let i = 0; i < TOTAL_TUTORIAL_STEPS; i++) {
-        tut.onCommandExecuted(state);
-      }
+      walkToCongratulations(tut);
 
       // After change: 4s timer set, still active
       expect(tut.isActive).toBe(true);
@@ -483,9 +585,7 @@ describe('TutorialOverlay (12.4)', () => {
       tut.start(state);
 
       // Advance through all steps to the congratulations step
-      for (let i = 0; i < TOTAL_TUTORIAL_STEPS; i++) {
-        tut.onCommandExecuted(state);
-      }
+      walkToCongratulations(tut);
 
       // After change: still active because of the 4s timer
       expect(tut.isActive).toBe(true);
@@ -505,9 +605,7 @@ describe('TutorialOverlay (12.4)', () => {
       tut.start(state);
 
       // Advance through all steps
-      for (let i = 0; i < TOTAL_TUTORIAL_STEPS; i++) {
-        tut.onCommandExecuted(state);
-      }
+      walkToCongratulations(tut);
 
       tut.skip();
       expect(tut.isActive).toBe(false);
@@ -529,9 +627,7 @@ describe('TutorialOverlay (12.4)', () => {
       const state = createMockState();
       tut.start(state);
 
-      for (let i = 0; i < TOTAL_TUTORIAL_STEPS; i++) {
-        tut.onCommandExecuted(state);
-      }
+      walkToCongratulations(tut);
 
       // On current code: finish() called during the loop → isCompleted() already true (FAILS)
       // After change: finish() delayed by 4s → isCompleted() still false (PASSES)

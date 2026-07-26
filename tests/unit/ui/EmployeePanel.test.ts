@@ -792,3 +792,78 @@ describe('EmployeePanel', () => {
     });
   });
 });
+
+describe('EmployeePanel — per-frame rebuild guard', () => {
+  it('keeps an expanded detail panel open across repeated updates', () => {
+    // UIManager.update runs on every rendered frame. Rebuilding the roster each
+    // time wiped the detail panel a frame after the player opened it, which made
+    // the hunger / fatigue / break meters impossible to read.
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const panel = new EmployeePanel(container);
+    const state = makeMockState();
+    state.employees.employees = [makeEmployee()];
+
+    panel.update(state);
+    (container.querySelector('.bs-detail-toggle') as HTMLElement).click();
+    expect(container.querySelector('.bs-employee-detail')).not.toBeNull();
+
+    panel.update(state);
+    panel.update(state);
+    expect(container.querySelector('.bs-employee-detail')).not.toBeNull();
+
+    panel.dispose();
+    container.remove();
+  });
+
+  it('keeps the same button nodes when nothing changed', () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const panel = new EmployeePanel(container);
+    const state = makeMockState();
+    state.employees.employees = [makeEmployee()];
+
+    panel.update(state);
+    const firstRow = container.querySelector('.bs-employee-row');
+    panel.update(state);
+    expect(container.querySelector('.bs-employee-row')).toBe(firstRow);
+
+    panel.dispose();
+    container.remove();
+  });
+
+  it('still rebuilds when the roster changes', () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const panel = new EmployeePanel(container);
+    const state = makeMockState();
+    state.employees.employees = [makeEmployee()];
+
+    panel.update(state);
+    expect(container.querySelectorAll('.bs-employee-row').length).toBe(1);
+
+    state.employees.employees = [makeEmployee(), makeEmployee({ id: 2, name: 'Second' })];
+    panel.update(state);
+    expect(container.querySelectorAll('.bs-employee-row').length).toBe(2);
+
+    panel.dispose();
+    container.remove();
+  });
+
+  it('rebuilds when morale changes so the row text stays truthful', () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const panel = new EmployeePanel(container);
+    const state = makeMockState();
+    const worker = makeEmployee();
+    state.employees.employees = [worker];
+
+    panel.update(state);
+    worker.morale = 12;
+    panel.update(state);
+    expect(container.querySelector('.bs-employee-row')?.textContent).toContain('12');
+
+    panel.dispose();
+    container.remove();
+  });
+});

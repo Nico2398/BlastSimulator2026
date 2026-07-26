@@ -9,11 +9,25 @@ import type { CommandResult } from '../console/ConsoleRunner.js';
 
 export type GameConsoleFn = (cmd: string) => CommandResult;
 
+/**
+ * Price per kilo for display: two decimals, thousands separators, and never
+ * rounded down to "$0.00" for the cheap rubble-disposal contracts.
+ */
+export function formatPricePerKg(price: number): string {
+  const decimals = price < 1 ? 3 : 2;
+  return price.toLocaleString('en-US', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+}
+
 export class ContractUI {
   private readonly el: HTMLElement;
   private readonly availableList: HTMLElement;
   private readonly activeList: HTMLElement;
   private gameConsole?: GameConsoleFn;
+  /** Fingerprint of the last rendered contract lists — guards per-frame rebuilds. */
+  private lastSignature = '';
 
   constructor(container: HTMLElement) {
     this.el = document.createElement('div');
@@ -51,34 +65,67 @@ export class ContractUI {
   update(state: GameState): void {
     const { available, active } = state.contracts;
 
+    // Called every rendered frame. Rebuilding the rows each time destroys the
+    // Accept buttons ~60 times a second, so a click can land on a node that is
+    // already detached. Rows are rebuilt only when the offer list itself
+    // changes; the countdown and progress bar are refreshed in place.
+    const structure = [
+      available.map(c => `${c.id}:${c.pricePerKg}:${c.quantityKg}`).join(','),
+      active.map(c => c.id).join(','),
+    ].join('#');
+
+    if (structure !== this.lastSignature) {
+      this.lastSignature = structure;
+      this.rebuildRows(available, active);
+    }
+
+    this.refreshActiveRows(active, state.tickCount);
+  }
+
+  dispose(): void { this.el.remove(); }
+
+  private rebuildRows(available: Contract[], active: Contract[]): void {
     this.availableList.innerHTML = '';
     if (available.length === 0) {
-      const msg = document.createElement('div');
-      msg.style.cssText = 'color:#806050;font-size:11px;margin:4px 0';
-      msg.textContent = t('ui.contracts.none');
-      this.availableList.appendChild(msg);
+      this.availableList.appendChild(this.makeEmptyMessage(t('ui.contracts.none')));
     } else {
       for (const c of available) {
-        this.availableList.appendChild(this.makeAvailableRow(c, state.tickCount));
+        this.availableList.appendChild(this.makeAvailableRow(c));
       }
     }
 
     this.activeList.innerHTML = '';
     if (active.length === 0) {
-      const msg = document.createElement('div');
-      msg.style.cssText = 'color:#806050;font-size:11px;margin:4px 0';
-      msg.textContent = t('ui.contracts.none_active');
-      this.activeList.appendChild(msg);
+      this.activeList.appendChild(this.makeEmptyMessage(t('ui.contracts.none_active')));
     } else {
       for (const c of active) {
-        this.activeList.appendChild(this.makeActiveRow(c, state.tickCount));
+        this.activeList.appendChild(this.makeActiveRow(c));
       }
     }
   }
 
-  dispose(): void { this.el.remove(); }
+  /** Update the live numbers on existing rows without replacing any nodes. */
+  private refreshActiveRows(active: Contract[], currentTick: number): void {
+    for (const c of active) {
+      const row = this.activeList.querySelector<HTMLElement>(`[data-contract-id="${c.id}"]`);
+      if (!row) continue;
+      const pct = c.quantityKg > 0 ? Math.round((c.deliveredKg / c.quantityKg) * 100) : 0;
+      const remaining = Math.max(0, c.acceptedAtTick + c.deadlineTicks - currentTick);
+      const details = row.querySelector<HTMLElement>('.bs-contract-details');
+      if (details) details.textContent = `${t('ui.contracts.progress')}: ${pct}% — ${remaining}t left`;
+      const fill = row.querySelector<HTMLElement>('.bs-progress-bar-fill');
+      if (fill) fill.style.width = `${pct}%`;
+    }
+  }
 
-  private makeAvailableRow(c: Contract, _currentTick: number): HTMLElement {
+  private makeEmptyMessage(text: string): HTMLElement {
+    const msg = document.createElement('div');
+    msg.style.cssText = 'color:#806050;font-size:11px;margin:4px 0';
+    msg.textContent = text;
+    return msg;
+  }
+
+  private makeAvailableRow(c: Contract): HTMLElement {
     const row = document.createElement('div');
     row.className = 'bs-contract-row';
 
@@ -88,7 +135,9 @@ export class ContractUI {
 
     const details = document.createElement('div');
     details.className = 'bs-contract-details';
-    details.textContent = `${c.quantityKg}kg @ $${c.pricePerKg}/kg — ${c.deadlineTicks}t deadline`;
+    // pricePerKg is a raw float from the offer generator — printing it straight
+    // gives the player "$0.6273750268155709/kg".
+    details.textContent = `${c.quantityKg.toLocaleString('en-US')}kg @ $${formatPricePerKg(c.pricePerKg)}/kg — ${c.deadlineTicks}t deadline`;
 
     const btnRow = document.createElement('div');
     btnRow.style.cssText = 'display:flex;gap:4px;margin-top:4px';
@@ -116,25 +165,25 @@ export class ContractUI {
     return row;
   }
 
-  private makeActiveRow(c: Contract, currentTick: number): HTMLElement {
+  /** Structure only — the numbers are filled in by refreshActiveRows(). */
+  private makeActiveRow(c: Contract): HTMLElement {
     const row = document.createElement('div');
     row.className = 'bs-contract-row bs-contract-active';
+    row.dataset['contractId'] = String(c.id);
 
     const desc = document.createElement('div');
     desc.className = 'bs-contract-desc';
     desc.textContent = c.description;
 
-    const pct = c.quantityKg > 0 ? Math.round((c.deliveredKg / c.quantityKg) * 100) : 0;
-    const deadline = c.acceptedAtTick + c.deadlineTicks - currentTick;
-
     const progress = document.createElement('div');
     progress.className = 'bs-contract-details';
-    progress.textContent = `${t('ui.contracts.progress')}: ${pct}% — ${Math.max(0, deadline)}t left`;
 
     const bar = document.createElement('div');
+    bar.className = 'bs-progress-bar-bg';
     bar.style.cssText = 'background:#3a2a1a;height:4px;border-radius:2px;margin:3px 0';
     const fill = document.createElement('div');
-    fill.style.cssText = `background:#70c050;height:100%;border-radius:2px;width:${pct}%`;
+    fill.className = 'bs-progress-bar-fill';
+    fill.style.cssText = 'background:#70c050;height:100%;border-radius:2px;width:0%';
     bar.appendChild(fill);
 
     row.append(desc, progress, bar);

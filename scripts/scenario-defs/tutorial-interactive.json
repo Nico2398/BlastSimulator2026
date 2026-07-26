@@ -1,0 +1,521 @@
+{
+  "name": "tutorial-interactive",
+  "description": "Plays the Tutorial Pit the way a first-time player does: every step is driven by a real click on the control the tutorial card points at — speed button, toolbar, hire buttons, blast panel, event choices — so each screenshot shows the coach mark, the highlighted target and the panel together.",
+  "shots": [
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45
+    },
+    {
+      "name": "birdseye",
+      "yaw": 0,
+      "pitch": 80
+    }
+  ],
+  "steps": [
+    {
+      "command": "new_game seed:42 size:24",
+      "timeout": 30,
+      "description": "Setup: the Tutorial menu button creates a 24-wide game before starting the level",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 size:24"
+        }
+      ]
+    },
+    {
+      "command": "campaign start level:tutorial_pit",
+      "timeout": 30,
+      "description": "Setup: load Tutorial Pit — camera must re-frame onto the smaller 24x24 grid",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign start level:tutorial_pit"
+        }
+      ]
+    },
+    {
+      "command": "tutorial_start",
+      "timeout": 30,
+      "description": "Step 0 (Game Speed): coach mark docked bottom-centre, speed button glowing, mine still visible",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tutorial_start"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tutorial-overlay"
+        }
+      ]
+    },
+    {
+      "command": "time speed:2",
+      "timeout": 30,
+      "description": "Step 0 complete: real click on the speed button cycles 1x to 2x, card advances to Hire Surveyor",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn"
+        },
+        {
+          "type": "wait",
+          "durationMs": 400
+        }
+      ]
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "Player follows the glowing Crew button — the tutorial card must not swallow the click",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:surveyor",
+      "timeout": 30,
+      "description": "Step 1 complete: Hire clicked in the crew panel, surveyor appears on site",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        },
+        {
+          "type": "wait",
+          "durationMs": 400
+        }
+      ]
+    },
+    {
+      "command": "employee assign_skill 1 skill:geology level:3",
+      "timeout": 30,
+      "description": "Give the surveyor geology so the seismic survey returns usable estimates",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 1 skill:geology level:3"
+        }
+      ]
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "Step 2 (Survey Terrain): Survey toolbar button glowing, survey panel opens",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"survey\"]"
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
+        }
+      ]
+    },
+    {
+      "command": "survey seismic x:12 z:12",
+      "timeout": 30,
+      "description": "Step 2 complete: seismic survey resolves after the surveyor works it — confidence quads on terrain, ore pixels on the minimap",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "survey seismic x:12 z:12"
+        },
+        {
+          "type": "command",
+          "command": "tick 15"
+        },
+        {
+          "type": "wait",
+          "durationMs": 800
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:driller",
+      "timeout": 30,
+      "description": "Step 3 complete: driller hired through the crew panel",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "wait",
+          "durationMs": 400
+        }
+      ]
+    },
+    {
+      "command": "employee assign_skill 2 skill:blasting level:3",
+      "timeout": 30,
+      "description": "Give the driller blasting proficiency",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 2 skill:blasting level:3"
+        }
+      ]
+    },
+    {
+      "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:8,8",
+      "timeout": 30,
+      "description": "Step 4 complete: Blast panel open, 9 holes with X-ray shafts drawn on the bench",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:8,8"
+        },
+        {
+          "type": "wait",
+          "durationMs": 400
+        }
+      ]
+    },
+    {
+      "command": "charge hole:* explosive:pop_rock amount:3 stemming:2",
+      "timeout": 30,
+      "description": "Step 5 complete: Charge All Holes clicked — the panel applies its own form defaults (pop_rock 3kg) and hole rows turn green",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+        },
+        {
+          "type": "wait",
+          "durationMs": 400
+        }
+      ]
+    },
+    {
+      "command": "sequence auto",
+      "timeout": 30,
+      "description": "Step 6 complete: Auto Sequence clicked, delay labels appear on every hole",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
+        },
+        {
+          "type": "wait",
+          "durationMs": 400
+        }
+      ]
+    },
+    {
+      "command": "blast",
+      "timeout": 60,
+      "description": "Step 7 complete: Execute clicked, confirm dialog answered, crater and fragments appear",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "wait",
+          "durationMs": 900
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "timeout": 30,
+      "description": "Step 8 (Scores Overview): score bars moved by the blast, card auto-advances after 2s",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        },
+        {
+          "type": "wait",
+          "durationMs": 2500
+        }
+      ]
+    },
+    {
+      "command": "tick 1",
+      "timeout": 60,
+      "description": "Step 9 (Events): the tutorial fires the scripted consultant event; dialog must be readable, not covered by the card",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 1"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-event-dialog .bs-event-choice"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "timeout": 30,
+      "description": "Answer the consultant through the dialog, read the outcome line, then dismiss so the site is playable again",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-event-dialog .bs-event-choice"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-event-dialog .bs-event-dismiss"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-event-dialog .bs-event-dismiss"
+        },
+        {
+          "type": "wait",
+          "durationMs": 500
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:manager",
+      "timeout": 30,
+      "description": "Step 10 complete: manager hired now that the event is resolved",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
+        },
+        {
+          "type": "wait",
+          "durationMs": 400
+        }
+      ]
+    },
+    {
+      "command": "contract accept 1",
+      "timeout": 30,
+      "description": "Step 11 complete: Accept clicked on the first offer in the Contracts panel",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"contracts\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel .bs-btn-primary"
+        },
+        {
+          "type": "wait",
+          "durationMs": 400
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:driver",
+      "timeout": 30,
+      "description": "Step 12 complete: driver hired through the crew panel",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "wait",
+          "durationMs": 400
+        }
+      ]
+    },
+    {
+      "command": "employee assign_skill 4 skill:driving.truck level:3",
+      "timeout": 30,
+      "description": "Qualify the driver for trucks",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 4 skill:driving.truck level:3"
+        }
+      ]
+    },
+    {
+      "command": "vehicle buy debris_hauler",
+      "timeout": 30,
+      "description": "Step 13: Vehicles panel open, hauler bought and placed on the terrain surface",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "command",
+          "command": "vehicle buy debris_hauler"
+        },
+        {
+          "type": "wait",
+          "durationMs": 400
+        }
+      ]
+    },
+    {
+      "command": "vehicle driver 1 4",
+      "timeout": 30,
+      "description": "Step 13 complete: driver assigned to the hauler",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 1 4"
+        },
+        {
+          "type": "wait",
+          "durationMs": 400
+        }
+      ]
+    },
+    {
+      "command": "build freight_warehouse at:12,8",
+      "timeout": 30,
+      "description": "Step 14 complete: Build panel open, warehouse mesh on the surface and a pixel on the minimap",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "command",
+          "command": "build freight_warehouse at:12,8"
+        },
+        {
+          "type": "wait",
+          "durationMs": 400
+        }
+      ]
+    },
+    {
+      "command": "contract deliver 1 amount:5000",
+      "timeout": 30,
+      "description": "Step 15 complete: contract fulfilled, balance rises",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"contracts\"]"
+        },
+        {
+          "type": "command",
+          "command": "contract deliver 1 amount:5000"
+        },
+        {
+          "type": "wait",
+          "durationMs": 2500
+        }
+      ]
+    },
+    {
+      "command": "build_ramp start:10,15 end:10,25",
+      "timeout": 30,
+      "description": "Step 17 complete: ramp carved into the terrain, navgrid gains ramp cells",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build_ramp start:10,15 end:10,25"
+        },
+        {
+          "type": "wait",
+          "durationMs": 2500
+        }
+      ]
+    },
+    {
+      "command": "set_policy mode:shift_8h",
+      "timeout": 30,
+      "description": "Step 19 complete: shift policy changed (step 18 needs auto-advances first)",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "set_policy mode:shift_8h"
+        },
+        {
+          "type": "wait",
+          "durationMs": 400
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "timeout": 60,
+      "description": "Step 20 complete: clock advances more than 5 ticks",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        },
+        {
+          "type": "wait",
+          "durationMs": 400
+        }
+      ]
+    },
+    {
+      "command": "campaign complete",
+      "timeout": 30,
+      "description": "Step 21 complete: level ends, card shows Tutorial Complete",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign complete"
+        },
+        {
+          "type": "wait",
+          "durationMs": 600
+        }
+      ]
+    },
+    {
+      "command": "campaign status",
+      "timeout": 30,
+      "description": "Final: the congratulations card dismisses itself and the game is unpaused",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign status"
+        },
+        {
+          "type": "wait",
+          "durationMs": 4500
+        }
+      ]
+    }
+  ]
+}

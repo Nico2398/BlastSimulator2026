@@ -20,6 +20,8 @@ export class EmployeePanel {
   private readonly listEl: HTMLElement;
   private readonly hireSection: HTMLElement;
   private gameConsole?: GameConsoleFn;
+  /** Fingerprint of the last rendered roster — guards against per-frame rebuilds. */
+  private lastSignature = '';
 
   constructor(container: HTMLElement) {
     this.el = document.createElement('div');
@@ -59,6 +61,15 @@ export class EmployeePanel {
 
   update(state: GameState): void {
     const { employees } = state.employees;
+
+    // UIManager.update runs every rendered frame. Rebuilding the list each time
+    // destroys any expanded detail panel within a frame of the player opening
+    // it, and detaches buttons out from under an in-flight click. Rebuild only
+    // when something the list actually shows has changed.
+    const signature = this.computeSignature(state);
+    if (signature === this.lastSignature) return;
+    this.lastSignature = signature;
+
     this.listEl.replaceChildren();
 
     if (employees.length === 0) {
@@ -81,6 +92,20 @@ export class EmployeePanel {
   }
 
   dispose(): void { this.el.remove(); }
+
+  /**
+   * Everything the roster rows and hire buttons render from. Cash is bucketed
+   * to the hire prices so a salary tick does not force a rebuild — only
+   * crossing a price threshold does.
+   */
+  private computeSignature(state: GameState): string {
+    const rows = state.employees.employees
+      .filter(e => e.alive)
+      .map(e => `${e.id}:${e.role}:${e.morale}:${e.unionized ? 1 : 0}:${e.injured ? 1 : 0}:${e.collapsing ? 1 : 0}:${e.name}`)
+      .join('|');
+    const affordable = ROLES.map(r => (state.cash < HIRE_COSTS[r] ? '0' : '1')).join('');
+    return `${rows}#${affordable}`;
+  }
 
   private makeEmployeeRow(e: Employee, state: GameState): HTMLElement {
     const row = document.createElement('div');

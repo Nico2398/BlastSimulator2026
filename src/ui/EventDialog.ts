@@ -25,6 +25,9 @@ export class EventDialog {
 
   constructor(container: HTMLElement) {
     this.overlay = document.createElement('div');
+    // The stylesheet has always carried #bs-event-dialog rules; without the id
+    // they were dead and the dialog had no stable selector for UI tests.
+    this.overlay.id = 'bs-event-dialog';
     this.overlay.className = 'bs-confirm-overlay';
     this.overlay.style.display = 'none';
 
@@ -55,7 +58,7 @@ export class EventDialog {
     this.outcomeEl.style.display = 'none';
 
     this.dismissBtn = document.createElement('button');
-    this.dismissBtn.className = 'bs-btn';
+    this.dismissBtn.className = 'bs-btn bs-event-dismiss';
     this.dismissBtn.style.cssText = 'width:100%;margin-top:12px';
     this.dismissBtn.textContent = t('ui.event.dismiss');
     this.dismissBtn.style.display = 'none';

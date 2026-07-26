@@ -5,6 +5,7 @@ import { t } from '../core/i18n/I18n.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { CommandResult } from '../console/ConsoleRunner.js';
 import { TUTORIAL_STEPS, TOTAL_TUTORIAL_STEPS } from './tutorialSteps.js';
+import { buildTutorialCard } from './tutorialOverlayDom.js';
 
 /** How often (ms) to poll for step completion. */
 const POLL_INTERVAL_MS = 2000;
@@ -12,20 +13,29 @@ const POLL_INTERVAL_MS = 2000;
 /** How long (ms) to show the congratulations step before auto-dismiss. */
 const CONGRATULATIONS_DISPLAY_MS = 4000;
 
+/** Index of the final (congratulations) step. */
+const LAST_STEP_INDEX = TOTAL_TUTORIAL_STEPS - 1;
+
 /**
- * Modal tutorial overlay that guides new players through the first
- * campaign level step by step. The overlay is built entirely in the
- * constructor as a .bs-confirm-overlay > .bs-confirm-box hierarchy
- * appended to the given container element.
+ * Coach-mark tutorial overlay that guides new players through the first
+ * campaign level step by step.
+ *
+ * The card is deliberately NOT a modal: it docks at the bottom of the screen,
+ * lets pointer events through everywhere except on the card itself, and sits
+ * below the event dialog in the stacking order. A tutorial that tells the
+ * player to click the Crew button has to leave that button visible and
+ * clickable.
  */
 export class TutorialOverlay {
   private readonly overlay: HTMLElement;
-  private readonly box: HTMLElement;
   private readonly titleEl: HTMLElement;
   private readonly textEl: HTMLElement;
   private readonly stepCounter: HTMLElement;
   private readonly progressEl: HTMLElement;
+  private readonly commandsLabel: HTMLElement;
   private readonly commandsHint: HTMLElement;
+  private readonly nextBtn: HTMLButtonElement;
+  private readonly skipBtn: HTMLButtonElement;
   private highlightedEl: HTMLElement | null = null;
   private _active = false;
   private _executingCommands = false;
@@ -37,46 +47,28 @@ export class TutorialOverlay {
   private gameConsole: ((cmd: string) => CommandResult) | null = null;
 
   constructor(container: HTMLElement) {
-    this.overlay = document.createElement('div');
-    this.overlay.className = 'bs-confirm-overlay';
-    this.overlay.style.display = 'none';
+    const els = buildTutorialCard(container);
+    this.overlay = els.overlay;
+    this.titleEl = els.titleEl;
+    this.textEl = els.textEl;
+    this.stepCounter = els.stepCounter;
+    this.progressEl = els.progressEl;
+    this.commandsLabel = els.commandsLabel;
+    this.commandsHint = els.commandsHint;
+    this.skipBtn = els.skipBtn;
+    this.nextBtn = els.nextBtn;
 
-    this.box = document.createElement('div');
-    this.box.className = 'bs-confirm-box';
-
-    this.titleEl = document.createElement('div');
-    this.titleEl.className = 'bs-panel-title';
-
-    this.textEl = document.createElement('p');
-    this.textEl.className = 'bs-panel-text';
-
-    this.stepCounter = document.createElement('div');
-    this.stepCounter.className = 'bs-tutorial-progress';
-
-    this.progressEl = document.createElement('div');
-    this.progressEl.className = 'bs-tutorial-progress-fill';
-    this.progressEl.style.cssText = 'height:4px;background:#f0b840;width:0%;transition:width 0.3s ease';
-
-    this.commandsHint = document.createElement('div');
-    this.commandsHint.className = 'bs-tutorial-commands';
-    this.commandsHint.style.display = 'none';
-
-    this.box.append(
-      this.titleEl,
-      this.textEl,
-      this.stepCounter,
-      this.progressEl,
-      this.commandsHint,
-    );
-    this.overlay.appendChild(this.box);
-    container.appendChild(this.overlay);
+    this.skipBtn.addEventListener('click', () => this.skip());
+    this.nextBtn.addEventListener('click', () => this.advanceToNextStep());
   }
 
   start(state?: GameState): void {
+    this.clearTimer('pollTimer');
+    this.clearTimer('autoAdvanceTimer');
     this.stepIndex = 0;
     this.snapshots = {};
     this._active = true;
-    this.overlay.style.display = 'flex';
+    this.overlay.style.display = '';
 
     if (state) {
       this.gameState = state;
@@ -112,9 +104,17 @@ export class TutorialOverlay {
     this.overlay.remove();
   }
 
+  /**
+   * Re-evaluate the current step after a console command.
+   *
+   * The step index only moves when the step's own completion condition is
+   * satisfied. Advancing on every command would race the tutorial through all
+   * 23 steps — running their commands along the way — while the card kept
+   * displaying a step the player had not finished.
+   */
   onCommandExecuted(state: GameState): void {
     if (!this._active) return;
-    // Guard against re-entrancy: command execution inside advanceOneStep
+    // Guard against re-entrancy: command execution inside advanceToNextStep
     // ultimately calls back into onCommandExecuted via the console bridge.
     if (this._executingCommands) return;
     this.gameState = state;
@@ -122,63 +122,67 @@ export class TutorialOverlay {
     const step = TUTORIAL_STEPS[this.stepIndex];
     if (!step) return;
 
-    const complete = step.isComplete(state, this.snapshots ?? {});
-    this.advanceOneStep(complete); // render only when step condition is met
+    if (step.isComplete(state, this.snapshots ?? {})) {
+      this.advanceToNextStep();
+    }
   }
 
-  /** Advance one step. When `render` is true the new step content is
-   *  displayed immediately. When false the step advances silently —
-   *  the title / text remain on the old (pre-advance) step's content,
-   *  which satisfies the test expectation that an incomplete step
-   *  does not visibly advance. */
-  private advanceOneStep(render: boolean): void {
-    if (this.stepIndex >= TOTAL_TUTORIAL_STEPS - 1) {
-      if (render && this._active) {
-        this.clearTimer('pollTimer');
-        this.clearTimer('autoAdvanceTimer');
-        this.render();
-        this.autoAdvanceTimer = setTimeout(() => this.finish(), CONGRATULATIONS_DISPLAY_MS);
-        return;
-      }
+  /** Move to the next step, or finish when the last one is already showing. */
+  private advanceToNextStep(): void {
+    if (!this._active) return;
+    this.clearTimer('pollTimer');
+
+    if (this.stepIndex >= LAST_STEP_INDEX) {
       this.finish();
       return;
     }
-    this.clearTimer('pollTimer');
-    this.stepIndex++;
 
-    // Execute commands for the new step — guarded against re-entrancy
-    const step = TUTORIAL_STEPS[this.stepIndex];
-    if (step?.commands && step.commands.length > 0 && this.gameConsole) {
-      this._executingCommands = true;
-      try {
-        for (const cmd of step.commands) {
-          this.gameConsole(cmd);
-        }
-        // Auto-fire tutorial event for event-fire-resolve step
-        if (step.id === 'event-fire-resolve' && this.gameState) {
-          if (!this.gameState.events?.pendingEvent) {
-            this.gameConsole('event fire tutorial_synergy_consultant');
-          }
-        }
-      } finally {
-        this._executingCommands = false;
-      }
+    // The opening card pauses so the player can read it. From the first
+    // advance on, the simulation has to run: survey, drilling, hauling and
+    // contract delivery are all queued work that only resolves on a tick, so a
+    // tutorial that stayed paused could never get past "Survey Terrain".
+    if (this.gameState) {
+      this.gameState.isPaused = false;
     }
+
+    this.stepIndex++;
+    this.runAutoCommands();
 
     if (this.gameState) {
       this.captureSnapshotForCurrentStep();
     }
-    if (render) {
-      this.render();
+    this.render();
+
+    if (this.stepIndex === LAST_STEP_INDEX) {
+      // Congratulations: show for a fixed beat, then dismiss. No polling —
+      // otherwise a later command would keep re-arming the timer.
+      this.clearTimer('autoAdvanceTimer');
+      this.autoAdvanceTimer = setTimeout(() => this.finish(), CONGRATULATIONS_DISPLAY_MS);
+      return;
     }
+
     this.schedulePollTimer();
   }
 
-  /** Called when the step condition is genuinely met (isComplete === true)
-   *  during auto-advance timers, next‑button clicks, or after a command that
-   *  satisfies the step. */
-  private advanceToNextStep(): void {
-    this.advanceOneStep(true); // re-render UI for the new step
+  /**
+   * Run the commands the tutorial itself is responsible for (currently only
+   * the scripted event demo). A step's `commands` array is a hint shown to the
+   * player and is never executed on their behalf.
+   */
+  private runAutoCommands(): void {
+    const step = TUTORIAL_STEPS[this.stepIndex];
+    if (!step || !this.gameConsole) return;
+    const auto = step.autoCommands;
+    if (!auto || auto.length === 0) return;
+
+    this._executingCommands = true;
+    try {
+      for (const cmd of auto) {
+        this.gameConsole(cmd);
+      }
+    } finally {
+      this._executingCommands = false;
+    }
   }
 
   private finish(): void {
@@ -226,6 +230,9 @@ export class TutorialOverlay {
       if (step && step.isComplete(this.gameState, this.snapshots ?? {})) {
         this.advanceToNextStep();
       } else {
+        // Panels are rebuilt as the player interacts; re-attach the glow so the
+        // step's target keeps pulsing for as long as the step is active.
+        this.applyHighlight();
         this.schedulePollTimer();
       }
     }, POLL_INTERVAL_MS);
@@ -235,6 +242,19 @@ export class TutorialOverlay {
     if (this.highlightedEl) {
       this.highlightedEl.classList.remove('bs-tutorial-highlight');
       this.highlightedEl = null;
+    }
+  }
+
+  /** Re-attach the pulsing glow to the current step's highlight target. */
+  private applyHighlight(): void {
+    const step = TUTORIAL_STEPS[this.stepIndex];
+    this.clearHighlight();
+    if (!step?.highlightTarget) return;
+
+    const target = document.querySelector(step.highlightTarget) as HTMLElement | null;
+    if (target) {
+      target.classList.add('bs-tutorial-highlight');
+      this.highlightedEl = target;
     }
   }
 
@@ -260,24 +280,24 @@ export class TutorialOverlay {
 
     // TODO: use i18n t('tutorial.progress', { current, total }) once locale values have {current}/{total} placeholders
     this.stepCounter.textContent = `${this.stepIndex + 1} / ${TOTAL_TUTORIAL_STEPS}`;
-    this.clearHighlight();
 
     const progress = ((this.stepIndex + 1) / TOTAL_TUTORIAL_STEPS) * 100;
     this.progressEl.style.width = `${progress}%`;
 
-    if (step.highlightTarget) {
-      const target = document.querySelector(step.highlightTarget) as HTMLElement | null;
-      if (target) {
-        target.classList.add('bs-tutorial-highlight');
-        this.highlightedEl = target;
-      }
-    }
+    this.applyHighlight();
 
     if (step.commands && step.commands.length > 0) {
+      this.commandsLabel.style.display = '';
       this.commandsHint.style.display = '';
       this.commandsHint.textContent = step.commands.join(', ');
     } else {
+      this.commandsLabel.style.display = 'none';
       this.commandsHint.style.display = 'none';
     }
+
+    // The final card has nothing left to advance to — offer only a dismiss.
+    const isLast = this.stepIndex >= LAST_STEP_INDEX;
+    this.nextBtn.style.display = isLast ? 'none' : '';
+    this.skipBtn.textContent = isLast ? t('tutorial.finish') : t('tutorial.skip');
   }
 }

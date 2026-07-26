@@ -32,22 +32,22 @@ export class BlastPlanUI {
     title.className = 'bs-panel-title';
     title.textContent = t('ui.blast.title');
 
-    const gridBtn = this.makeBtn('bs-btn', t('ui.blast.grid_tool'), () => this.openGridTool());
-    const clearBtn = this.makeBtn('bs-btn bs-btn-danger', t('ui.blast.clear_holes'), () => { this.gameConsole?.('drill_plan clear'); });
+    const gridBtn = this.makeBtn('bs-btn', t('ui.blast.grid_tool'), () => this.openGridTool(), 'grid-tool');
+    const clearBtn = this.makeBtn('bs-btn bs-btn-danger', t('ui.blast.clear_holes'), () => { this.gameConsole?.('drill_plan clear'); }, 'clear-holes');
     this.holeListEl = document.createElement('div');
     this.chargeForm = document.createElement('div');
     this.chargeForm.style.display = 'none';
     this.chargeForm.style.marginTop = '8px';
     this.buildChargeForm();
 
-    const chargeAllBtn = this.makeBtn('bs-btn bs-btn-primary', t('ui.blast.charge_all'), () => this.chargeAllHoles());
+    const chargeAllBtn = this.makeBtn('bs-btn bs-btn-primary', t('ui.blast.charge_all'), () => this.chargeAllHoles(), 'charge-all');
     const seqBtn = this.makeBtn('bs-btn', t('ui.blast.auto_seq'), () => {
       const result = this.gameConsole?.('sequence auto');
       if (result?.success) this.showStatus(t('ui.blast.status_sequenced'), 'success');
       else this.showStatus(result?.output || t('ui.blast.status_no_holes'), 'error');
-    });
-    const previewBtn = this.makeBtn('bs-btn', t('ui.blast.preview'), () => { this.gameConsole?.('preview energy'); });
-    const execBtn = this.makeBtn('bs-btn bs-btn-primary bs-blast-btn', t('ui.blast.execute'), () => this.confirmBlast());
+    }, 'auto-sequence');
+    const previewBtn = this.makeBtn('bs-btn', t('ui.blast.preview'), () => { this.gameConsole?.('preview energy'); }, 'preview');
+    const execBtn = this.makeBtn('bs-btn bs-btn-primary bs-blast-btn', t('ui.blast.execute'), () => this.confirmBlast(), 'execute');
 
     this.statusEl = document.createElement('div');
     this.statusEl.className = 'bs-blast-status';
@@ -207,11 +207,13 @@ export class BlastPlanUI {
     );
   }
 
-  private makeBtn(cls: string, text: string, handler: () => void): HTMLButtonElement {
+  /** `action` gives each control a label-independent selector for UI tests. */
+  private makeBtn(cls: string, text: string, handler: () => void, action?: string): HTMLButtonElement {
     const btn = document.createElement('button');
     btn.className = cls;
     btn.style.cssText = 'width:100%;margin-bottom:4px';
     btn.textContent = text;
+    if (action) btn.dataset['action'] = action;
     btn.addEventListener('click', handler);
     return btn;
   }

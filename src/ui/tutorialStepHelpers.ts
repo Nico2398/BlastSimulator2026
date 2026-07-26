@@ -7,21 +7,39 @@ import type { EmployeeRole } from '../core/entities/Employee.js';
 import type { TutorialStep } from './tutorialSteps.js';
 
 /**
+ * Selectors for the toolbar buttons that open each panel. The panels themselves
+ * are `display:none` until the player opens them, so a step that says "open the
+ * Crew panel" has to glow the button that opens it, not the hidden panel.
+ */
+export const TOOLBAR_TARGET = {
+  blast: '#bs-toolbar [data-panel="blast"]',
+  contracts: '#bs-toolbar [data-panel="contracts"]',
+  build: '#bs-toolbar [data-panel="build"]',
+  vehicles: '#bs-toolbar [data-panel="vehicles"]',
+  employees: '#bs-toolbar [data-panel="employees"]',
+  survey: '#bs-toolbar [data-panel="survey"]',
+  settings: '#bs-toolbar [data-panel="settings"]',
+} as const;
+
+/**
  * Helper: create a "hire employee" step that completes when an employee
  * with the given role has been hired (total count increased).
+ *
+ * Defaults to highlighting the Crew toolbar button, since every hire step asks
+ * the player to open that panel.
  */
 export function createHireStep(
   id: string,
   titleKey: string,
   textKey: string,
   role: EmployeeRole,
-  highlightTarget?: string,
+  highlightTarget: string = TOOLBAR_TARGET.employees,
 ): TutorialStep {
   return {
     id,
     titleKey,
     textKey,
-    commands: ['hire employee'],
+    commands: [`employee hire role:${role}`],
     ...(highlightTarget ? { highlightTarget } : {}),
     captureSnapshot: (state: GameState) => ({
       prevEmployeeCount: getEmployees(state).length,
@@ -47,7 +65,7 @@ export function createHireStepWithEventGuard(
   titleKey: string,
   textKey: string,
   role: EmployeeRole,
-  highlightTarget?: string,
+  highlightTarget: string = TOOLBAR_TARGET.employees,
 ): TutorialStep {
   const base = createHireStep(id, titleKey, textKey, role, highlightTarget);
   const origIsComplete = base.isComplete;
