@@ -4,7 +4,10 @@
 import { t } from '../core/i18n/I18n.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { Employee, EmployeeRole, TrainingState } from '../core/entities/Employee.js';
-import { XP_THRESHOLDS, QUALIFICATION_SALARY_BONUS, BASE_SALARIES } from '../core/config/balance.js';
+import { QUALIFICATION_SALARY_BONUS, BASE_SALARIES } from '../core/config/balance.js';
+import { makeTrainingSection, availableCourses } from './employeeTrainingSection.js';
+import { planTraining } from '../core/entities/EmployeeTraining.js';
+import { makeSkillSection, makeNeedBar, makeTaskQueue, formatNeed } from './employeeDetailSections.js';
 
 import type { CommandResult } from '../console/ConsoleRunner.js';
 
@@ -22,6 +25,8 @@ export class EmployeePanel {
   private gameConsole?: GameConsoleFn;
   /** Fingerprint of the last rendered roster — guards against per-frame rebuilds. */
   private lastSignature = '';
+  /** Employee ids whose detail the player has expanded, kept across rebuilds. */
+  private readonly expanded = new Set<number>();
 
   constructor(container: HTMLElement) {
     this.el = document.createElement('div');
@@ -67,7 +72,14 @@ export class EmployeePanel {
     // it, and detaches buttons out from under an in-flight click. Rebuild only
     // when something the list actually shows has changed.
     const signature = this.computeSignature(state);
-    if (signature === this.lastSignature) return;
+    if (signature === this.lastSignature) {
+      // Nothing structural moved, but morale and the need gauges drift every
+      // tick. Write those in place rather than rebuilding: replacing the nodes
+      // detaches whatever the player is reaching for, and a click that lands
+      // between the query and the rebuild hits nothing at all.
+      this.refreshDynamic(state);
+      return;
+    }
     this.lastSignature = signature;
 
     this.listEl.replaceChildren();
@@ -94,22 +106,92 @@ export class EmployeePanel {
   dispose(): void { this.el.remove(); }
 
   /**
-   * Everything the roster rows and hire buttons render from. Cash is bucketed
-   * to the hire prices so a salary tick does not force a rebuild — only
-   * crossing a price threshold does.
+   * What the roster's *structure* depends on — which rows exist and which
+   * controls they carry. Values that drift on their own (morale, need gauges,
+   * a training countdown) are deliberately excluded: they change every tick, so
+   * including them would rebuild the panel continuously and no control would
+   * survive long enough to be clicked. `refreshDynamic` writes those in place.
+   *
+   * Cash is bucketed to the hire prices, so a salary tick only forces a rebuild
+   * when it crosses a price threshold.
    */
   private computeSignature(state: GameState): string {
     const rows = state.employees.employees
       .filter(e => e.alive)
-      .map(e => `${e.id}:${e.role}:${e.morale}:${e.unionized ? 1 : 0}:${e.injured ? 1 : 0}:${e.collapsing ? 1 : 0}:${e.name}`)
+      .map(e => {
+        const quals = e.qualifications.map(q => `${q.category}${q.proficiencyLevel}`).join(',');
+        // Whether a course is running changes which controls the row shows;
+        // how many ticks are left does not.
+        const training = e.trainingState ? e.trainingState.skill : '-';
+        return `${e.id}:${e.role}:${e.unionized ? 1 : 0}:${e.injured ? 1 : 0}`
+          + `:${e.collapsing ? 1 : 0}:${e.name}:${quals}:${training}`;
+      })
       .join('|');
     const affordable = ROLES.map(r => (state.cash < HIRE_COSTS[r] ? '0' : '1')).join('');
-    return `${rows}#${affordable}`;
+    // Schools change which courses the panel can offer at all.
+    const schools = state.buildings.buildings.map(b => `${b.type}${b.tier}`).sort().join(',');
+    // Affording a course flips the Train buttons between enabled and disabled.
+    const canTrain = state.employees.employees
+      .filter(e => e.alive)
+      .map(e => (this.affordsAnyCourse(e, state) ? '1' : '0')).join('');
+    return `${rows}#${affordable}#${schools}#${canTrain}`;
+  }
+
+  private affordsAnyCourse(e: Employee, state: GameState): boolean {
+    return availableCourses(state).some(c => {
+      const plan = planTraining(e, c.skill, c.building.tier);
+      return plan !== null && state.cash >= plan.fee;
+    });
+  }
+
+  /**
+   * Update the values that change every tick without touching the DOM
+   * structure, so an in-flight click keeps its target.
+   */
+  private refreshDynamic(state: GameState): void {
+    for (const e of state.employees.employees) {
+      if (!e.alive) continue;
+      const row = this.listEl.querySelector<HTMLElement>(`[data-employee-id="${e.id}"]`);
+      if (!row) continue;
+
+      const meta = row.querySelector<HTMLElement>('.bs-employee-meta');
+      if (meta) meta.textContent = this.metaLine(e);
+
+      for (const [key, value] of [
+        ['hunger', e.hunger], ['fatigue', e.fatigue], ['break', e.breakNeed],
+      ] as Array<[string, number]>) {
+        const fill = row.querySelector<HTMLElement>(`[data-need="${key}"] .bs-need-bar-fill`);
+        if (fill) fill.style.width = `${value}%`;
+        const readout = row.querySelector<HTMLElement>(`[data-need="${key}"] .bs-need-value`);
+        if (readout) readout.textContent = formatNeed(value);
+      }
+
+      if (e.trainingState) {
+        const status = row.querySelector<HTMLElement>('.bs-training-status');
+        if (status) {
+          status.textContent = t('ui.employees.training_in_progress')
+            .replace('{skill}', e.trainingState.skill)
+            .replace('{ticks}', String(e.trainingState.ticksRemaining));
+        }
+        const badge = row.querySelector<HTMLElement>('.bs-training-badge');
+        if (badge) {
+          badge.textContent = `${t('ui.employees.training')}: ${e.trainingState.skill} `
+            + `(${e.trainingState.ticksRemaining}t)`;
+        }
+      }
+    }
+  }
+
+  private metaLine(e: Employee): string {
+    const unionTag = e.unionized ? ` [${t('ui.employees.union')}]` : '';
+    const injuredTag = e.injured ? ' ⚠️' : '';
+    return `${e.role} | ${t('ui.employees.morale')}: ${e.morale}%${unionTag}${injuredTag}`;
   }
 
   private makeEmployeeRow(e: Employee, state: GameState): HTMLElement {
     const row = document.createElement('div');
     row.className = 'bs-employee-row';
+    row.dataset['employeeId'] = String(e.id);
     if (e.collapsing) row.classList.add('collapsing');
 
     const nameEl = document.createElement('div');
@@ -117,10 +199,9 @@ export class EmployeePanel {
     nameEl.textContent = e.name;
 
     const details = document.createElement('div');
+    details.className = 'bs-employee-meta';
     details.style.cssText = 'font-size:10px;color:#a08060';
-    const unionTag = e.unionized ? ` [${t('ui.employees.union')}]` : '';
-    const injuredTag = e.injured ? ' ⚠️' : '';
-    details.textContent = `${e.role} | ${t('ui.employees.morale')}: ${e.morale}%${unionTag}${injuredTag}`;
+    details.textContent = this.metaLine(e);
 
     const btnRow = document.createElement('div');
     btnRow.style.cssText = 'display:flex;gap:4px;margin-top:3px';
@@ -151,152 +232,12 @@ export class EmployeePanel {
     col.style.cssText = 'flex:1;min-width:0';
     col.append(nameEl, details, btnRow);
     row.appendChild(col);
+
+    // Restore an expansion the player made before the last rebuild.
+    if (this.expanded.has(e.id)) row.appendChild(this.makeDetail(e, state));
     return row;
   }
 
-  // ── Skill/detail display ──
-
-  private makeSkillStars(level: number): string {
-    const filled = '★'.repeat(level);
-    const empty = '☆'.repeat(5 - level);
-    return filled + empty;
-  }
-
-  private makeSkillSection(e: Employee): HTMLElement {
-    const el = document.createElement('div');
-
-    if (e.qualifications.length === 0) {
-      const msg = document.createElement('div');
-      msg.textContent = t('ui.employees.no_skills');
-      el.appendChild(msg);
-      return el;
-    }
-
-    for (const q of e.qualifications) {
-      const row = document.createElement('div');
-      row.className = 'bs-skill-row';
-
-      const catEl = document.createElement('span');
-      catEl.className = 'bs-skill-category';
-      catEl.textContent = q.category;
-
-      const starsEl = document.createElement('span');
-      starsEl.className = 'bs-skill-stars';
-      starsEl.textContent = this.makeSkillStars(q.proficiencyLevel);
-
-      const xpBar = this.makeXpBar(q.xp, q.proficiencyLevel);
-
-      row.append(catEl, starsEl, xpBar);
-      el.appendChild(row);
-    }
-    return el;
-  }
-
-  private makeXpBar(xp: number, level: number): HTMLElement {
-    const el = document.createElement('div');
-    el.className = 'bs-xp-bar-bg';
-
-    const fill = document.createElement('div');
-    fill.className = 'bs-xp-bar-fill';
-
-    const currentThreshold = XP_THRESHOLDS[level as keyof typeof XP_THRESHOLDS] ?? 0;
-    let pct = 100;
-    if (level < 5) {
-      const nextThreshold = XP_THRESHOLDS[(level + 1) as keyof typeof XP_THRESHOLDS] ?? currentThreshold;
-      const range = nextThreshold - currentThreshold;
-      if (range > 0) {
-        pct = Math.min(100, Math.round(((xp - currentThreshold) / range) * 100));
-      } else {
-        pct = 0;
-      }
-    }
-    fill.style.width = `${Math.max(0, pct)}%`;
-
-    el.appendChild(fill);
-    return el;
-  }
-
-  private makeNeedBar(label: string, value: number, color: string): HTMLElement {
-    const el = document.createElement('div');
-    el.className = 'bs-need-row';
-
-    const labelEl = document.createElement('span');
-    labelEl.className = 'bs-need-label';
-    labelEl.textContent = label;
-
-    const barBg = document.createElement('div');
-    barBg.className = 'bs-need-bar-bg';
-
-    const barFill = document.createElement('div');
-    barFill.className = 'bs-need-bar-fill';
-    barFill.style.width = `${value}%`;
-    barFill.style.background = color;
-    if (value <= 15) barFill.classList.add('critical');
-    else if (value <= 35) barFill.classList.add('low');
-    else barFill.classList.add('normal');
-
-    const valueEl = document.createElement('span');
-    valueEl.textContent = String(value);
-
-    barBg.appendChild(barFill);
-    el.append(labelEl, barBg, valueEl);
-    return el;
-  }
-
-  private makeTaskQueue(e: Employee, state: GameState): HTMLElement {
-    const el = document.createElement('div');
-    el.className = 'bs-task-queue';
-
-    // Current task section
-    const currentLabel = document.createElement('div');
-    currentLabel.style.cssText = 'font-size:9px;color:#857b6b;text-transform:uppercase;margin-bottom:2px';
-    currentLabel.textContent = t('ui.employees.active_task');
-    el.appendChild(currentLabel);
-
-    const hasActive = e.activeActionId !== null;
-    const actions = state.pendingActions;
-
-    if (hasActive) {
-      const taskEl = document.createElement('div');
-      taskEl.className = 'bs-task-entry current';
-      const action = actions.find(a => a.id === e.activeActionId);
-      taskEl.textContent = action ? `#${action.id} (${action.type})` : t('ui.employees.active_fallback', { id: String(e.activeActionId) });
-      el.appendChild(taskEl);
-    } else {
-      const noTask = document.createElement('div');
-      noTask.className = 'bs-queue-empty';
-      noTask.textContent = t('ui.employees.no_task');
-      el.appendChild(noTask);
-    }
-
-    // Show pending actions (up to 5)
-    const displayActions = actions.slice(0, 5);
-    const overflow = actions.length > 5 ? actions.length - 5 : 0;
-
-    for (const a of displayActions) {
-      const entry = document.createElement('div');
-      entry.className = 'bs-task-entry';
-      if (a.id === e.activeActionId) entry.classList.add('current');
-      entry.textContent = `#${a.id} (${a.type})`;
-      el.appendChild(entry);
-    }
-
-    if (overflow > 0) {
-      const overflowEl = document.createElement('div');
-      overflowEl.className = 'bs-task-entry';
-      overflowEl.textContent = t('ui.employees.overflow', { count: String(overflow) });
-      el.appendChild(overflowEl);
-    }
-
-    if (actions.length === 0 && !hasActive) {
-      const emptyEl = document.createElement('div');
-      emptyEl.className = 'bs-queue-empty';
-      emptyEl.textContent = t('ui.employees.queue_empty');
-      el.appendChild(emptyEl);
-    }
-
-    return el;
-  }
 
   private makeSalaryBreakdown(e: Employee): HTMLElement {
     const el = document.createElement('div');
@@ -362,25 +303,33 @@ export class EmployeePanel {
     const existing = row.querySelector('.bs-employee-detail');
     if (existing) {
       existing.remove();
+      this.expanded.delete(e.id);
       return;
     }
+    // Remembered across rebuilds: morale and needs drift every tick, so the
+    // roster re-renders on its own. Without this the detail a player just
+    // opened — and the training controls inside it — vanish a moment later.
+    this.expanded.add(e.id);
+    row.appendChild(this.makeDetail(e, state));
+  }
 
+  private makeDetail(e: Employee, state: GameState): HTMLElement {
     const detail = document.createElement('div');
     detail.className = 'bs-employee-detail';
 
     // Skills section
-    detail.appendChild(this.makeSkillSection(e));
+    detail.appendChild(makeSkillSection(e));
 
     // Need meters
     const needRow = document.createElement('div');
     needRow.style.cssText = 'margin-top:4px';
-    needRow.appendChild(this.makeNeedBar(t('ui.employees.hunger'), e.hunger, '#e09040'));
-    needRow.appendChild(this.makeNeedBar(t('ui.employees.fatigue'), e.fatigue, '#7090c0'));
-    needRow.appendChild(this.makeNeedBar(t('ui.employees.break'), e.breakNeed, '#90b070'));
+    needRow.appendChild(makeNeedBar(t('ui.employees.hunger'), e.hunger, '#e09040', 'hunger'));
+    needRow.appendChild(makeNeedBar(t('ui.employees.fatigue'), e.fatigue, '#7090c0', 'fatigue'));
+    needRow.appendChild(makeNeedBar(t('ui.employees.break'), e.breakNeed, '#90b070', 'break'));
     detail.appendChild(needRow);
 
     // Task queue
-    detail.appendChild(this.makeTaskQueue(e, state));
+    detail.appendChild(makeTaskQueue(e, state));
 
     // Salary breakdown
     detail.appendChild(this.makeSalaryBreakdown(e));
@@ -392,7 +341,11 @@ export class EmployeePanel {
     const badge = this.makeTrainingBadge(e);
     if (badge) detail.appendChild(badge);
 
-    row.appendChild(detail);
+    // Training controls — the only in-game way to gain a qualification a role
+    // is not hired with, or to rise above Rookie.
+    detail.appendChild(makeTrainingSection(e, state, this.gameConsole));
+
+    return detail;
   }
 
   private buildHireSection(): void {

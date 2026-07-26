@@ -332,6 +332,49 @@ export const QUALIFICATION_SALARY_BONUS: Record<1 | 2 | 3 | 4 | 5, number> = {
   5: 500,
 } as const;
 
+// ─── Employee Training ─────────────────────────────────────────────────────────
+
+/**
+ * Which skills each training building teaches. A skill absent from every entry
+ * here cannot be obtained by training, which for a skill no role is hired with
+ * means it cannot be obtained at all.
+ *
+ * The Driving Center covers all three vehicle licences: excavator and drill-rig
+ * work is reachable only through it, since no role is hired holding them.
+ */
+export const TRAINING_BUILDING_SKILLS = {
+  driving_center: ['driving.truck', 'driving.excavator', 'driving.drill_rig'],
+  blasting_academy: ['blasting'],
+  management_office: ['management'],
+  geology_lab: ['geology'],
+} as const satisfies Partial<Record<BuildingType, readonly string[]>>;
+
+/** Ticks a course takes at a Tier 1 school. */
+export const TRAINING_BASE_TICKS = 20;
+
+/** Course-length multiplier by school tier — a better school teaches faster. */
+export const TRAINING_TIER_SPEED: Record<1 | 2 | 3, number> = {
+  1: 1,
+  2: 0.75,
+  3: 0.5,
+} as const;
+
+/** Fee to teach a skill the employee does not hold yet ($). */
+export const TRAINING_BASE_FEE = 2500;
+
+/**
+ * Fee and duration multiplier by the level being trained *to*. Reaching Master
+ * costs several times what a first licence does, so raising one specialist is a
+ * real alternative to hiring another body.
+ */
+export const TRAINING_LEVEL_COST_MULTIPLIER: Record<1 | 2 | 3 | 4 | 5, number> = {
+  1: 1,
+  2: 1.6,
+  3: 2.4,
+  4: 3.4,
+  5: 4.6,
+} as const;
+
 // ─── Employee Needs ────────────────────────────────────────────────────────────
 
 /** Drain rates per tick for each need gauge. */

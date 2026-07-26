@@ -17,6 +17,8 @@ import {
   fireEmployee,
 } from '../../src/core/entities/Employee.js';
 import { createBuildingState, placeBuilding } from '../../src/core/entities/Building.js';
+import { tickCommand } from '../../src/console/commands/events.js';
+import { tickEmployees } from '../../src/core/engine/GameLoop.js';
 import { computeTaskDuration } from '../../src/core/entities/EmployeeTaskDuration.js';
 import { Random } from '../../src/core/math/Random.js';
 
@@ -255,6 +257,80 @@ describe('Employee skills', () => {
     expect(fireResult.success).toBe(true);
     expect(fireResult.error).toBeUndefined();
     expect(empState.employees).toHaveLength(0);
+  });
+
+  // ── Training through the console ─────────────────────────────────────────
+
+  it('employee train enrols, charges the fee, and completes on ticks', () => {
+    const state = ctx.state!;
+    placeBuilding(state.buildings, 'driving_center', 5, 5, 32, 32, 1);
+    const cashBefore = state.cash;
+
+    const result = employeeCommand(ctx, ['train', String(empId)], { skill: 'driving.excavator' });
+    expect(result.success, result.output).toBe(true);
+    expect(state.cash).toBeLessThan(cashBefore);
+
+    const emp = () => state.employees.employees.find(e => e.id === empId)!;
+    expect(emp().trainingState).not.toBeNull();
+
+    // Run the course out through the real tick command, not tickTraining directly:
+    // the wiring between the two is the thing that was missing.
+    tickCommand(ctx, [String(emp().trainingState!.ticksRemaining)], {});
+
+    expect(emp().trainingState).toBeNull();
+    expect(emp().qualifications.some(q => q.category === 'driving.excavator')).toBe(true);
+  });
+
+  it('employee train raises proficiency in a skill already held', () => {
+    const state = ctx.state!;
+    placeBuilding(state.buildings, 'blasting_academy', 5, 5, 32, 32, 1);
+    const emp = () => state.employees.employees.find(e => e.id === empId)!;
+    const before = emp().qualifications.find(q => q.category === 'blasting')!.proficiencyLevel;
+
+    expect(employeeCommand(ctx, ['train', String(empId)], { skill: 'blasting' }).success).toBe(true);
+    tickCommand(ctx, [String(emp().trainingState!.ticksRemaining)], {});
+
+    expect(emp().qualifications.find(q => q.category === 'blasting')!.proficiencyLevel).toBe(before + 1);
+  });
+
+  it('employee train refuses when no school for that skill is built', () => {
+    const result = employeeCommand(ctx, ['train', String(empId)], { skill: 'geology' });
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('geology_lab');
+  });
+
+  it('employee train refuses when the site cannot afford the course', () => {
+    const state = ctx.state!;
+    placeBuilding(state.buildings, 'geology_lab', 5, 5, 32, 32, 1);
+    state.cash = 1;
+
+    const result = employeeCommand(ctx, ['train', String(empId)], { skill: 'geology' });
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('Insufficient funds');
+    expect(state.employees.employees.find(e => e.id === empId)!.trainingState).toBeNull();
+  });
+
+  it('employee train rejects an unknown skill', () => {
+    const result = employeeCommand(ctx, ['train', String(empId)], { skill: 'underwater_basketry' });
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('Usage:');
+  });
+
+  it('an employee in training is not dispatched to work', () => {
+    const state = ctx.state!;
+    placeBuilding(state.buildings, 'blasting_academy', 5, 5, 32, 32, 1);
+    employeeCommand(ctx, ['train', String(empId)], { skill: 'blasting' });
+
+    state.pendingActions.push({
+      id: 1, type: 'charge_hole', requiredSkill: 'blasting',
+      requiredVehicleRole: null, targetEmployeeId: null,
+      targetX: 1, targetZ: 1, targetY: 0, payload: {},
+    } as unknown as (typeof state.pendingActions)[number]);
+
+    tickEmployees(state);
+
+    expect(state.employees.employees.find(e => e.id === empId)!.activeActionId).toBeNull();
+    expect(state.pendingActions).toHaveLength(1);
   });
 
   // ── Task-duration computation (bonus) ────────────────────────────────────

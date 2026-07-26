@@ -324,7 +324,12 @@ const CSS = `
 .bs-vehicle-row:last-child { border-bottom: none; }
 .bs-employee-row {
   display: flex;
-  align-items: center;
+  /* Wraps so an expanded detail drops onto its own full-width line. As a
+     non-wrapping flex sibling it was laid out beside the name column and drawn
+     over it, leaving the name, morale and the Raise/Fire buttons unreadable and
+     unclickable. */
+  flex-wrap: wrap;
+  align-items: flex-start;
   gap: 8px;
   border-bottom: 1px solid rgba(255,255,255,0.06);
   padding: 6px 0;
@@ -364,7 +369,7 @@ const CSS = `
 .bs-modifier-tag { background: rgba(255,200,64,0.1); border-radius: 2px; padding: 1px 4px; font-size: 9px; color: #c8a848; display: inline-block; margin: 1px; }
 .bs-need-row { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; font-size: 10px; }
 .bs-need-label { width: 48px; color: #9a8868; font-size: 9px; }
-.bs-employee-detail { margin-top: 6px; padding: 6px 8px; background: rgba(255,255,255,0.04); border-radius: 4px; border: 1px solid rgba(255,255,255,0.06); }
+.bs-employee-detail { flex: 0 0 100%; margin-top: 6px; padding: 6px 8px; background: rgba(255,255,255,0.04); border-radius: 4px; border: 1px solid rgba(255,255,255,0.06); }
 .bs-detail-toggle { cursor: pointer; font-size: 9px; color: #706050; margin-left: auto; user-select: none; }
 .bs-queue-empty { font-size: 10px; color: #605040; font-style: italic; padding: 2px 0; }
 

@@ -290,6 +290,53 @@ The harness is now the fifth verification channel, `playability`, and
 `tests/unit/playtest-defs.test.ts` fails the suite if a definition reaches for a
 gameplay command. Procedures live in the `dev-playability-testing` skill.
 
+### Fourth pass — the skills hiring does not grant
+
+The third pass left one gap recorded rather than fixed: `driving.excavator`,
+`driving.drill_rig` and every proficiency above Rookie belong to no hiring role,
+so training is their only source — and training was unreachable. It turned out
+to be unreachable in three separate ways at once:
+
+| # | Severity | Was | Now |
+|---|----------|-----|-----|
+| 27 | Blocker | `tickTraining` was never called by anything. A course, once begun, counted down forever. | The tick advances courses and reports each completion. |
+| 28 | Blocker | `startTraining` was called by nothing — no console command, no button. | `employee train <id> skill:<cat> [building:<id>]` for the scenario channel, and a Training block in each roster row's detail for the player: one row per course with its fee and duration, disabled with a stated reason when there is no school, no money, or nothing left to teach. |
+| 29 | Blocker | Completing a course granted a qualification only when the employee did **not** already hold it. Training a held skill charged the fee and changed nothing, so no proficiency above Rookie was reachable by any means. | A course grants the skill at Rookie, or raises it one level, capped at Master. Salary follows. |
+
+Two more defects surfaced while proving the above by clicking, both of which the
+`visual` channel had photographed without anyone noticing:
+
+| # | Severity | Was | Now |
+|---|----------|-----|-----|
+| 30 | Major | `.bs-employee-row` is a non-wrapping flex row, so an expanded detail was laid out *beside* the name column and drawn on top of it. Name, role, morale and the Raise/Fire buttons were unreadable and unclickable — the probe reported them `covered`. | The row wraps and the detail takes a full-width line of its own. |
+| 31 | Major | The roster's rebuild fingerprint included morale, which drifts every tick. The panel therefore rebuilt continuously, closing any detail the player had expanded and detaching controls out from under an in-flight click. | The fingerprint covers structure only; morale, need gauges and the training countdown are written in place. Expanded rows are remembered across rebuilds. |
+
+Finding 31 is the interesting one: an earlier pass had added a rebuild guard for
+exactly this symptom, and its test proved the panel *skipped* a rebuild when
+nothing changed. Something always changes. The guard passed its test and the
+defect survived.
+
+Also fixed in passing: need gauges printed the raw drain value
+(`Hunger 69.85000000000016`), now rounded to whole percent.
+
+`scripts/playtests/training.json` covers it — hire a driver, build a driving
+center, take the excavator licence, then promote the truck licence, entirely by
+clicking.
+
+### Known gap: XP from work is still unwired
+
+`gainXp` implements the spec's on-the-job progression (`xpPerTick = 1 + floor(level * 0.5)`)
+and is exported, tested, and called by nothing. Training is now a complete route
+to every proficiency level, so no skill is unobtainable, but an employee still
+never improves by doing the job.
+
+Wiring it needs the pending-action lifecycle finished first: `tickEmployees`
+removes an action from `state.pendingActions` when an employee claims it and
+sets `activeActionId`, and nothing outside collapse handling ever clears that
+field again. There is no "the work finished" moment to award XP at, and a worker
+who claims one action stays flagged busy indefinitely. That is a separate change
+with its own verification, so it is recorded here rather than bundled in.
+
 ### Known gap, not changed here
 
 **Tutorial Pit terrain is perfectly flat.** With `sizeY = 12` and the desert preset

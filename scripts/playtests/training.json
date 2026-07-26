@@ -1,0 +1,133 @@
+{
+  "name": "training",
+  "description": "Trains an employee using only controls a player can click. Proves the two licences no role is hired with (driving.excavator, driving.drill_rig) and every proficiency above Rookie are actually obtainable in game, rather than only through the console.",
+  "beats": [
+    {
+      "goal": "start a fresh site with money to spend",
+      "setup": [
+        "new_game seed:42 size:24",
+        "campaign start level:tutorial_pit"
+      ],
+      "expect": {
+        "equals": {
+          "qualificationCount": 0
+        }
+      }
+    },
+    {
+      "goal": "hire a driver, who arrives with the truck licence only",
+      "actions": [
+        {
+          "do": "click",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "do": "click",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "employeeCount": 1,
+          "qualificationCount": 1,
+          "proficiencyTotal": 1
+        }
+      }
+    },
+    {
+      "goal": "build a driving center, the only school that teaches vehicle licences",
+      "actions": [
+        {
+          "do": "click",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "do": "click",
+          "selector": "#bs-build-panel [data-build-type=\"driving_center\"] .bs-build-buy-btn"
+        },
+        {
+          "do": "pickTile",
+          "x": 4,
+          "z": 4
+        },
+        {
+          "do": "click",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "expect": {
+        "increased": [
+          "buildingCount"
+        ]
+      }
+    },
+    {
+      "goal": "the excavator licence is offered to the driver",
+      "actions": [
+        {
+          "do": "click",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "do": "click",
+          "selector": "#bs-employee-panel .bs-detail-toggle"
+        }
+      ],
+      "expect": {
+        "usable": "#bs-employee-panel .bs-train-btn[data-skill=\"driving.excavator\"]",
+        "note": "No role is hired with driving.excavator. If this control is missing or disabled with a school standing, the licence belongs to nobody and every excavator task is unreachable."
+      }
+    },
+    {
+      "goal": "enrol the driver on the excavator course",
+      "actions": [
+        {
+          "do": "click",
+          "selector": "#bs-employee-panel .bs-train-btn[data-skill=\"driving.excavator\"]"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "trainingCount": 1
+        }
+      }
+    },
+    {
+      "goal": "let the course run and collect the licence",
+      "actions": [
+        {
+          "do": "letTimePass",
+          "ticks": 20
+        }
+      ],
+      "expect": {
+        "equals": {
+          "trainingCount": 0,
+          "qualificationCount": 2
+        }
+      }
+    },
+    {
+      "goal": "raise the truck licence above Rookie",
+      "actions": [
+        {
+          "do": "click",
+          "selector": "#bs-employee-panel .bs-train-btn[data-skill=\"driving.truck\"]"
+        },
+        {
+          "do": "letTimePass",
+          "ticks": 32
+        }
+      ],
+      "expect": {
+        "increased": [
+          "proficiencyTotal"
+        ],
+        "equals": {
+          "qualificationCount": 2
+        },
+        "note": "A promotion raises the level of a held qualification rather than adding a second copy of it."
+      }
+    }
+  ]
+}

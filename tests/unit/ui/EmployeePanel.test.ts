@@ -816,6 +816,52 @@ describe('EmployeePanel — per-frame rebuild guard', () => {
     container.remove();
   });
 
+  it('keeps an expanded detail open when a rebuild is actually forced', () => {
+    // The guard above only proves the panel skipped the rebuild. Morale and the
+    // need gauges drift every tick, so a rebuild is unavoidable — and it used to
+    // close the detail the player had just opened, taking the training controls
+    // inside it with it.
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const panel = new EmployeePanel(container);
+    const state = makeMockState();
+    state.employees.employees = [makeEmployee({ morale: 75 })];
+
+    panel.update(state);
+    (container.querySelector('.bs-detail-toggle') as HTMLElement).click();
+    expect(container.querySelector('.bs-employee-detail')).not.toBeNull();
+
+    state.employees.employees[0]!.morale = 61;
+    panel.update(state);
+
+    expect(container.querySelector('.bs-employee-detail')).not.toBeNull();
+    expect(container.querySelector('.bs-training-section')).not.toBeNull();
+
+    panel.dispose();
+    container.remove();
+  });
+
+  it('a collapsed detail stays collapsed across a forced rebuild', () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const panel = new EmployeePanel(container);
+    const state = makeMockState();
+    state.employees.employees = [makeEmployee({ morale: 75 })];
+
+    panel.update(state);
+    const toggle = () => (container.querySelector('.bs-detail-toggle') as HTMLElement).click();
+    toggle();
+    toggle();
+    expect(container.querySelector('.bs-employee-detail')).toBeNull();
+
+    state.employees.employees[0]!.morale = 61;
+    panel.update(state);
+    expect(container.querySelector('.bs-employee-detail')).toBeNull();
+
+    panel.dispose();
+    container.remove();
+  });
+
   it('keeps the same button nodes when nothing changed', () => {
     const container = document.createElement('div');
     document.body.appendChild(container);

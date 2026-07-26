@@ -70,6 +70,7 @@ const REGION_HINTS: Record<string, string> = {
   blast: '.bs-blast-status',
   build: '#bs-build-panel div[style*="min-height"]',
   'tile-picker': '.bs-tile-select-info',
+  crew: '.bs-training-status',
 };
 
 function isHidden(el: Element): boolean {

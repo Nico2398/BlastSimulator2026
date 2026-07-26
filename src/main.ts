@@ -201,6 +201,13 @@ window.__gameState = () => {
     buildingCount: s.buildings.buildings.length,
     vehicleCount: s.vehicles.vehicles.length,
     employeeCount: s.employees.employees.length,
+    // Qualifications the roster holds, so a playtest can prove a skill was
+    // actually obtained rather than that a button merely looked clickable.
+    qualificationCount: s.employees.employees
+      .reduce((n, e) => n + e.qualifications.length, 0),
+    proficiencyTotal: s.employees.employees
+      .reduce((n, e) => n + e.qualifications.reduce((m, q) => m + q.proficiencyLevel, 0), 0),
+    trainingCount: s.employees.employees.filter(e => e.trainingState !== null).length,
     levelEnded: s.levelEnded,
     levelEndReason: s.levelEndReason,
     // ── Game-over detection fields ──

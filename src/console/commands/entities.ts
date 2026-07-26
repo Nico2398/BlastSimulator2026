@@ -12,33 +12,18 @@ import {
   type BuildingType,
   type BuildingTier,
 } from '../../core/entities/Building.js';
-import {
-  hireEmployee,
-  giveRaise,
-  fireEmployee,
-  assignSkill,
-  type EmployeeRole,
-  type SkillCategory,
-} from '../../core/entities/Employee.js';
 import { addExpense } from '../../core/economy/Finance.js';
-import { Random } from '../../core/math/Random.js';
 import { NavGrid } from '../../core/nav/NavGrid.js';
 import type { BlastRegion } from '../../core/mining/BlastExecution.js';
 import { defineZone, clearZone, isZoneClear, type ZoneBounds } from '../../core/entities/Zone.js';
 import type { GameState } from '../../core/state/GameState.js';
 import type { VoxelGrid } from '../../core/world/VoxelGrid.js';
 
-const VALID_SKILL_CATEGORIES: SkillCategory[] = [
-  'driving.truck', 'driving.excavator', 'driving.drill_rig',
-  'blasting', 'management', 'geology',
-];
+import { requireGame, NO_EMPLOYEES_MSG } from './commandUtils.js';
 
-const NO_EMPLOYEES_MSG = 'No employees.';
-
-function requireGame(ctx: GameContext): CommandResult | null {
-  if (!ctx.state) return { success: false, output: 'No game loaded. Use new_game first.' };
-  return null;
-}
+// The employee command moved to ./employees.ts; re-exported so existing imports
+// and the runner registration keep resolving from here.
+export { employeeCommand } from './employees.js';
 
 const GRID_SIZE = 64;
 
@@ -176,85 +161,6 @@ export function buildCommand(
       }
       return { success: true, output: `Built ${type} T${tier} #${result.building!.id} at (${atCoords[0]},${atCoords[1]}). Cost: $${result.cost}` };
     }
-  }
-}
-
-// ── employee command ──
-
-export function employeeCommand(
-  ctx: GameContext,
-  args: string[],
-  named: Record<string, string>,
-): CommandResult {
-  const err = requireGame(ctx);
-  if (err) return err;
-  const state = ctx.state!;
-  const sub = args[0] ?? 'list';
-  const rng = new Random(state.seed + state.tickCount);
-
-  switch (sub) {
-    case 'list': {
-      if (state.employees.employees.length === 0) {
-        return { success: true, output: NO_EMPLOYEES_MSG };
-      }
-      const lines = ['Employees:'];
-      for (const e of state.employees.employees) {
-        const status = !e.alive ? 'DEAD' : e.injured ? 'INJURED' : 'OK';
-        const union = e.unionized ? ' [UNION]' : '';
-        lines.push(`  [${e.id}] ${e.name} (${e.role}) $${e.salary}/cycle morale:${e.morale} ${status}${union}`);
-      }
-      return { success: true, output: lines.join('\n') };
-    }
-    case 'hire': {
-      const role = (named['role'] ?? '') as EmployeeRole;
-      const validRoles: EmployeeRole[] = ['driller', 'blaster', 'driver', 'surveyor', 'manager'];
-      if (!validRoles.includes(role)) {
-        return { success: false, output: `Usage: employee hire role:(${validRoles.join('|')})` };
-      }
-      const empX = state.world ? state.world.sizeX / 2 + (state.employees.employees.length % 5) * 2 : 32;
-      const empZ = state.world ? state.world.sizeZ / 2 : 32;
-      const { employee, hiringCost } = hireEmployee(state.employees, role, rng, empX, empZ);
-      state.cash -= hiringCost;
-      addExpense(state.finances, hiringCost, 'salaries', `Hire ${role}: ${employee.name}`, state.tickCount);
-      return { success: true, output: `Hired ${employee.name} (${role}). Cost: $${hiringCost}` };
-    }
-    case 'raise': {
-      const id = parseInt(args[1] ?? named['id'] ?? '', 10);
-      const amount = parseFloat(named['amount'] ?? '0');
-      if (isNaN(id) || amount <= 0) {
-        return { success: false, output: 'Usage: employee raise <id> amount:500' };
-      }
-      if (!giveRaise(state.employees, id, amount)) {
-        return { success: false, output: `Employee #${id} not found.` };
-      }
-      return { success: true, output: `Raise of $${amount} given to employee #${id}.` };
-    }
-    case 'fire': {
-      const id = parseInt(args[1] ?? named['id'] ?? '', 10);
-      if (isNaN(id)) return { success: false, output: 'Usage: employee fire <id>' };
-      const result = fireEmployee(state.employees, id);
-      if (!result.success) return { success: false, output: result.error! };
-      return { success: true, output: `Employee #${id} fired.` };
-    }
-    case 'assign_skill': {
-      const id = parseInt(args[1] ?? '', 10);
-      const skillRaw = named['skill'] ?? '';
-      const levelRaw = named['level'] ?? '';
-      const level = parseInt(levelRaw, 10);
-      const usageMsg = 'Usage: employee assign_skill <id> skill:<category> level:1-5';
-
-      if (isNaN(id)) return { success: false, output: usageMsg };
-      if (!VALID_SKILL_CATEGORIES.includes(skillRaw as SkillCategory)) return { success: false, output: usageMsg };
-      if (isNaN(level) || level < 1 || level > 5) return { success: false, output: usageMsg };
-
-      const emp = state.employees.employees.find(e => e.id === id);
-      if (!emp) return { success: false, output: `Employee #${id} not found.` };
-
-      assignSkill(state.employees, id, skillRaw as SkillCategory, level as 1 | 2 | 3 | 4 | 5);
-      return { success: true, output: `Employee #${id} assigned skill: ${skillRaw} (level ${level}).` };
-    }
-    default:
-      return { success: false, output: 'Usage: employee (list|hire|raise|fire|assign_skill)' };
   }
 }
 

@@ -19,6 +19,7 @@ import {
   type EmployeeState,
   // ── New exports (CH1.4 — not yet implemented in Employee.ts) ────────────────
   assignSkill,
+  calculateSalary,
   startTraining,
   tickTraining,
 } from '../../../src/core/entities/Employee.js';
@@ -228,12 +229,83 @@ describe('tickTraining', () => {
   });
 
   it('granted qualification has proficiencyLevel 1 when employee had no prior qualification', () => {
+    // A driller is hired holding 'blasting', so training that skill is a
+    // promotion rather than a first grant. 'geology' is one the role never has.
+    startTraining(state, empId, 1, 'geology' as SkillCategory, 1, 100);
+    tickTraining(state);
+
+    const quals: SkillQualification[] = (state.employees.find(e => e.id === empId) as any).qualifications;
+    const geology = quals.find((q: SkillQualification) => q.category === 'geology')!;
+    expect(geology.proficiencyLevel).toBe(1);
+  });
+
+  it('raises proficiency by one level when the employee already holds the skill', () => {
+    // Training a held skill used to leave the qualification untouched: the fee
+    // was charged and nothing changed, which made every level above Rookie
+    // unobtainable.
+    const before = (state.employees.find(e => e.id === empId) as any).qualifications
+      .find((q: SkillQualification) => q.category === 'blasting')!.proficiencyLevel;
+
+    startTraining(state, empId, 1, 'blasting' as SkillCategory, 1, 100);
+    tickTraining(state);
+
+    const after = (state.employees.find(e => e.id === empId) as any).qualifications
+      .find((q: SkillQualification) => q.category === 'blasting')!;
+    expect(after.proficiencyLevel).toBe(before + 1);
+  });
+
+  it('does not add a duplicate qualification when promoting', () => {
     startTraining(state, empId, 1, 'blasting' as SkillCategory, 1, 100);
     tickTraining(state);
 
     const quals: SkillQualification[] = (state.employees.find(e => e.id === empId) as any).qualifications;
-    const blasting = quals.find((q: SkillQualification) => q.category === 'blasting')!;
-    expect(blasting.proficiencyLevel).toBe(1);
+    expect(quals.filter((q: SkillQualification) => q.category === 'blasting')).toHaveLength(1);
+  });
+
+  it('never promotes past level 5', () => {
+    assignSkill(state, empId, 'blasting' as SkillCategory, 5);
+    startTraining(state, empId, 1, 'blasting' as SkillCategory, 1, 100);
+    tickTraining(state);
+
+    const quals: SkillQualification[] = (state.employees.find(e => e.id === empId) as any).qualifications;
+    expect(quals.find((q: SkillQualification) => q.category === 'blasting')!.proficiencyLevel).toBe(5);
+  });
+
+  it('reports each completion so the caller can tell the player', () => {
+    startTraining(state, empId, 1, 'geology' as SkillCategory, 1, 100);
+    const completions = tickTraining(state);
+
+    expect(completions).toHaveLength(1);
+    expect(completions[0]!.employeeId).toBe(empId);
+    expect(completions[0]!.skill).toBe('geology');
+    expect(completions[0]!.level).toBe(1);
+    expect(completions[0]!.isNew).toBe(true);
+  });
+
+  it('reports a promotion as not new', () => {
+    startTraining(state, empId, 1, 'blasting' as SkillCategory, 1, 100);
+    const completions = tickTraining(state);
+
+    expect(completions[0]!.isNew).toBe(false);
+    expect(completions[0]!.level).toBe(2);
+  });
+
+  it('returns no completions while a course is still running', () => {
+    startTraining(state, empId, 1, 'geology' as SkillCategory, 3, 100);
+    expect(tickTraining(state)).toEqual([]);
+    expect(tickTraining(state)).toEqual([]);
+    expect(tickTraining(state)).toHaveLength(1);
+  });
+
+  it('raises the salary to match the new qualification', () => {
+    const emp = () => state.employees.find(e => e.id === empId)!;
+    const before = emp().salary;
+
+    startTraining(state, empId, 1, 'geology' as SkillCategory, 1, 100);
+    tickTraining(state);
+
+    expect(emp().salary).toBeGreaterThan(before);
+    expect(emp().salary).toBe(calculateSalary(emp()));
   });
 
   it('granted qualification has xp initialised to 0', () => {

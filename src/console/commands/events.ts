@@ -16,6 +16,7 @@ import {
 } from '../../core/economy/Corruption.js';
 import { addExpense, addIncome } from '../../core/economy/Finance.js';
 import { processPayCycle } from '../../core/entities/Employee.js';
+import { tickTraining } from '../../core/entities/EmployeeTraining.js';
 import { tickNeedGauges, needsMoraleEffect } from '../../core/entities/EmployeeNeeds.js';
 import type { FiredEvent } from '../../core/events/EventSystem.js';
 import { tickCollapse, autoInsertNeedTasks, processShiftCycle, tickEmployees } from '../../core/engine/GameLoop.js';
@@ -188,7 +189,15 @@ export function tickCommand(
       }
     }
 
-    // 8c. Dispatch remaining pending actions to idle qualified employees
+    // 8c. Training courses — advance and report completions. Without this the
+    //     course never ends: the fee is charged and the qualification never
+    //     arrives, which made every skill no role is hired with unobtainable.
+    for (const done of tickTraining(state.employees, emitter)) {
+      const what = done.isNew ? 'qualified in' : 'promoted to level ' + done.level + ' in';
+      lines.push(`[tick ${state.tickCount}] ${done.employeeName} ${what} ${done.skill}.`);
+    }
+
+    // 8d. Dispatch remaining pending actions to idle qualified employees
     tickEmployees(state);
 
     // 9. Level stats snapshot + campaign profit check
