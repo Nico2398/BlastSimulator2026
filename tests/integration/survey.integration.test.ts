@@ -229,15 +229,17 @@ describe('Survey system', () => {
     expect(result.output).toContain('core_sample survey complete');
   });
 
-  it('tickCommand leaves a pending survey queued when no qualified surveyor is available', () => {
-    // No employee hired — the survey action has no surveyor to complete it.
-    surveyCommand(ctx as any, ['core_sample'], { x: '16', z: '16' });
-    expect(ctx.state!.pendingActions.filter(a => a.type === 'survey')).toHaveLength(1);
+  it('surveyCommand rejects and queues nothing when no qualified surveyor is available', () => {
+    // No employee hired — runSurvey requires a qualified surveyor at queue time.
+    const result = surveyCommand(ctx as any, ['core_sample'], { x: '16', z: '16' });
+
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('No available surveyor');
+    expect(ctx.state!.pendingActions.filter(a => a.type === 'survey')).toHaveLength(0);
 
     tickCommand(ctx, ['1'], {});
 
-    // Action stays queued rather than being silently dropped.
-    expect(ctx.state!.pendingActions.filter(a => a.type === 'survey')).toHaveLength(1);
+    expect(ctx.state!.pendingActions.filter(a => a.type === 'survey')).toHaveLength(0);
     expect(ctx.state!.surveyResults).toHaveLength(0);
   });
 
