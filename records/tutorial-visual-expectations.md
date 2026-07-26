@@ -323,6 +323,61 @@ Also fixed in passing: need gauges printed the raw drain value
 center, take the excavator licence, then promote the truck licence, entirely by
 clicking.
 
+### Fifth pass — the tutorial on rails
+
+Reported: "I managed to lose the tutorial, which shouldn't be possible since I
+tried to follow it properly." Four changes, all aimed at removing every way to
+end up somewhere the card is not describing.
+
+**No exit.** The Skip button is gone, and the card now carries no buttons at
+all. The only way out of a step is to perform it.
+
+**Every click is guided, not just the first.** A step is usually several
+controls — open a panel, press a button in it, confirm a picker — and only the
+first was highlighted. `src/ui/tutorialStages.ts` now lists the full click
+sequence per step, and the card shows the next one with a counter
+("Open the Survey panel from the toolbar. (1/5)").
+
+Stages resolve by *reachability* rather than by counting clicks: the active
+stage is the last one whose control is on screen and enabled. Later controls
+only exist once earlier ones have been used — a panel's button does not render
+until the panel is open, a picker's Confirm stays disabled until a tile is
+chosen — so the sequence tracks itself, and it recovers on its own when the
+player closes a panel and falls back a stage.
+
+**Everything else is inert.** While the tutorial is up, every control that is
+not the current stage's is `pointer-events: none` and dimmed. The rule is
+written as "not marked allowed", so a control rendered between two passes of
+the guide is inert from its first frame rather than briefly live. Two
+exceptions, both required for the rails not to trap the player:
+
+- An open modal is always operable. It covers the screen, so blocking its own
+  buttons would seal the game behind it — with no Skip button left to escape
+  with. Found by the playtest, which reached the event dialog and could not
+  dismiss it.
+- Nothing else. In particular the block is deliberately unscoped: **"Return to
+  Map" is a fixed-position button owned by the main menu and sits outside the
+  panel tree**, so a rule scoped to `.bs-ui` left it live. That is almost
+  certainly the reported way to lose the tutorial — one click and the player is
+  on the world map with an orphaned card. The playtest now asserts it is
+  blocked.
+
+**The clock cannot outrun the step.** Each step gets a tick allowance
+(`DEFAULT_TICK_BUDGET`, overridable per step). Spend it and the game pauses
+until the player acts, with the card saying so. The subtlety is that pausing
+naively would deadlock any step waiting on queued work — a paused surveyor never
+finishes — so the clock keeps running while `pendingActions` is non-empty or an
+employee is mid-task, up to a grace cap that stops a stuck queue running
+forever.
+
+That fixed an earlier finding outright: contracts used to expire between the
+accept step and the deliver step, four steps and an unbounded amount of game
+time apart. With the drift bounded they no longer do, and the playtest no longer
+needs to accept a second contract to have something to deliver.
+
+Also corrected: the survey step's text and console hint both said *seismic*
+while the highlight pointed at *Core Sample*.
+
 ### Known gap: XP from work is still unwired
 
 `gainXp` implements the spec's on-the-job progression (`xpPerTick = 1 + floor(level * 0.5)`)

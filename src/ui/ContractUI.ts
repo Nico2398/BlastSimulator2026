@@ -172,19 +172,19 @@ export class ContractUI {
     btnRow.style.cssText = 'display:flex;gap:4px;margin-top:4px';
 
     const acceptBtn = document.createElement('button');
-    acceptBtn.className = 'bs-btn bs-btn-primary';
+    acceptBtn.className = 'bs-btn bs-btn-primary bs-contract-accept';
     acceptBtn.style.cssText = 'padding:2px 6px;font-size:10px';
     acceptBtn.textContent = t('ui.contracts.accept');
     acceptBtn.addEventListener('click', () => this.gameConsole?.(`contract accept id:${c.id}`));
 
     const negBtn = document.createElement('button');
-    negBtn.className = 'bs-btn';
+    negBtn.className = 'bs-btn bs-contract-negotiate';
     negBtn.style.cssText = 'padding:2px 6px;font-size:10px';
     negBtn.textContent = t('ui.contracts.negotiate');
     negBtn.addEventListener('click', () => this.gameConsole?.(`contract negotiate id:${c.id}`));
 
     const declineBtn = document.createElement('button');
-    declineBtn.className = 'bs-btn bs-btn-danger';
+    declineBtn.className = 'bs-btn bs-btn-danger bs-contract-decline';
     declineBtn.style.cssText = 'padding:2px 6px;font-size:10px';
     declineBtn.textContent = t('ui.contracts.decline');
     declineBtn.addEventListener('click', () => this.gameConsole?.(`contract decline id:${c.id}`));

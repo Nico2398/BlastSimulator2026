@@ -1,14 +1,22 @@
 // BlastSimulator2026 — Tutorial Overlay (12.4)
-// Step-by-step first-time player guidance.
+// Step-by-step first-time player guidance, on rails.
 
 import { t } from '../core/i18n/I18n.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { CommandResult } from '../console/ConsoleRunner.js';
 import { TUTORIAL_STEPS, TOTAL_TUTORIAL_STEPS } from './tutorialSteps.js';
 import { buildTutorialCard } from './tutorialOverlayDom.js';
+import { GUIDED_CLASS } from './tutorialGuide.js';
+import { TutorialRails } from './tutorialRails.js';
 
-/** How often (ms) to poll for step completion. */
-const POLL_INTERVAL_MS = 2000;
+/**
+ * How often (ms) the guide re-reads the DOM.
+ *
+ * Fast, because it drives which control is live: a panel the player just opened
+ * has to become usable now, not in two seconds. Everything it does is a handful
+ * of selector lookups.
+ */
+const GUIDE_INTERVAL_MS = 250;
 
 /** How long (ms) to show the congratulations step before auto-dismiss. */
 const CONGRATULATIONS_DISPLAY_MS = 4000;
@@ -17,32 +25,31 @@ const CONGRATULATIONS_DISPLAY_MS = 4000;
 const LAST_STEP_INDEX = TOTAL_TUTORIAL_STEPS - 1;
 
 /**
- * Coach-mark tutorial overlay that guides new players through the first
- * campaign level step by step.
+ * Coach-mark tutorial that guides new players through the first campaign level.
  *
- * The card is deliberately NOT a modal: it docks at the bottom of the screen,
- * lets pointer events through everywhere except on the card itself, and sits
- * below the event dialog in the stacking order. A tutorial that tells the
- * player to click the Crew button has to leave that button visible and
- * clickable.
+ * The card docks at the bottom and never covers the control it is pointing at.
+ * While it is up the game is on rails: one control is live at a time, every
+ * other control is inert, and the clock is held once a step has spent its tick
+ * allowance — so the world cannot move on while the player is still reading.
  */
 export class TutorialOverlay {
   private readonly overlay: HTMLElement;
   private readonly titleEl: HTMLElement;
   private readonly textEl: HTMLElement;
+  private readonly stageEl: HTMLElement;
+  private readonly pausedEl: HTMLElement;
   private readonly stepCounter: HTMLElement;
   private readonly progressEl: HTMLElement;
   private readonly commandsLabel: HTMLElement;
   private readonly commandsHint: HTMLElement;
-  private readonly skipBtn: HTMLButtonElement;
-  private highlightedEl: HTMLElement | null = null;
   private _active = false;
   private _executingCommands = false;
   private stepIndex = 0;
+  private readonly rails = new TutorialRails();
   private gameState: GameState | null = null;
   private snapshots: Record<string, unknown> | null = null;
   private autoAdvanceTimer: ReturnType<typeof setTimeout> | null = null;
-  private pollTimer: ReturnType<typeof setTimeout> | null = null;
+  private guideTimer: ReturnType<typeof setInterval> | null = null;
   private gameConsole: ((cmd: string) => CommandResult) | null = null;
 
   constructor(container: HTMLElement) {
@@ -50,40 +57,42 @@ export class TutorialOverlay {
     this.overlay = els.overlay;
     this.titleEl = els.titleEl;
     this.textEl = els.textEl;
+    this.stageEl = els.stageEl;
+    this.pausedEl = els.pausedEl;
     this.stepCounter = els.stepCounter;
     this.progressEl = els.progressEl;
     this.commandsLabel = els.commandsLabel;
     this.commandsHint = els.commandsHint;
-    this.skipBtn = els.skipBtn;
-
-    this.skipBtn.addEventListener('click', () => this.skip());
   }
 
   start(state?: GameState): void {
-    this.clearTimer('pollTimer');
-    this.clearTimer('autoAdvanceTimer');
+    this.clearAutoAdvance();
+    this.stopGuide();
     this.stepIndex = 0;
     this.snapshots = {};
     this._active = true;
     this.overlay.style.display = '';
+    document.body.classList.add(GUIDED_CLASS);
 
     if (state) {
       this.gameState = state;
+      this.rails.beginStep(this.step(), state);
+      // The opening card pauses so the player can read it before anything moves.
       state.isPaused = true;
       this.captureSnapshotForCurrentStep();
     }
 
     this.render();
-    this.schedulePollTimer();
-  }
-
-  skip(): void {
-    if (!this._active) return;
-    this.finish();
+    this.startGuide();
   }
 
   get isActive(): boolean {
     return this._active;
+  }
+
+  /** Which click of the current step the player is on, and how many there are. */
+  get stageProgress(): { index: number; total: number; target: string | null } {
+    return this.rails.progress;
   }
 
   static isCompleted(): boolean {
@@ -95,9 +104,10 @@ export class TutorialOverlay {
   }
 
   dispose(): void {
-    this.clearHighlight();
-    this.clearTimer('pollTimer');
-    this.clearTimer('autoAdvanceTimer');
+    this.stopGuide();
+    this.clearAutoAdvance();
+    this.rails.clear();
+    document.body.classList.remove(GUIDED_CLASS);
     this.overlay.remove();
   }
 
@@ -106,8 +116,7 @@ export class TutorialOverlay {
    *
    * The step index only moves when the step's own completion condition is
    * satisfied. Advancing on every command would race the tutorial through all
-   * 23 steps — running their commands along the way — while the card kept
-   * displaying a step the player had not finished.
+   * 23 steps while the card kept displaying a step the player had not finished.
    */
   onCommandExecuted(state: GameState): void {
     if (!this._active) return;
@@ -121,49 +130,49 @@ export class TutorialOverlay {
 
     if (step.isComplete(state, this.snapshots ?? {})) {
       this.advanceToNextStep();
+    } else {
+      this.refreshGuide();
     }
+  }
+
+  private step(): { id: string; highlightTarget?: string; tickBudget?: number } {
+    return TUTORIAL_STEPS[this.stepIndex] ?? { id: '' };
   }
 
   /** Move to the next step, or finish when the last one is already showing. */
   private advanceToNextStep(): void {
     if (!this._active) return;
-    this.clearTimer('pollTimer');
 
     if (this.stepIndex >= LAST_STEP_INDEX) {
       this.finish();
       return;
     }
 
-    // The opening card pauses so the player can read it. From the first
-    // advance on, the simulation has to run: survey, drilling, hauling and
-    // contract delivery are all queued work that only resolves on a tick, so a
-    // tutorial that stayed paused could never get past "Survey Terrain".
-    if (this.gameState) {
-      this.gameState.isPaused = false;
-    }
+    // From the first advance on, the simulation has to run: survey, drilling,
+    // hauling and contract delivery are queued work that only resolves on a tick.
+    this.rails.releaseClock(this.gameState);
+    this.pausedEl.style.display = 'none';
 
     this.stepIndex++;
     this.runAutoCommands();
 
+    this.rails.beginStep(this.step(), this.gameState);
     if (this.gameState) {
       this.captureSnapshotForCurrentStep();
     }
     this.render();
 
     if (this.stepIndex === LAST_STEP_INDEX) {
-      // Congratulations: show for a fixed beat, then dismiss. No polling —
-      // otherwise a later command would keep re-arming the timer.
-      this.clearTimer('autoAdvanceTimer');
+      // Congratulations: show for a fixed beat, then dismiss.
+      this.stopGuide();
+      this.clearAutoAdvance();
       this.autoAdvanceTimer = setTimeout(() => this.finish(), CONGRATULATIONS_DISPLAY_MS);
-      return;
     }
-
-    this.schedulePollTimer();
   }
 
   /**
-   * Run the commands the tutorial itself is responsible for (currently only
-   * the scripted event demo). A step's `commands` array is a hint shown to the
+   * Run the commands the tutorial itself is responsible for (currently only the
+   * scripted event demo). A step's `commands` array is a hint shown to the
    * player and is never executed on their behalf.
    */
   private runAutoCommands(): void {
@@ -183,14 +192,16 @@ export class TutorialOverlay {
   }
 
   private finish(): void {
-    this.clearHighlight();
-    this.clearTimer('pollTimer');
-    this.clearTimer('autoAdvanceTimer');
+    this.stopGuide();
+    this.clearAutoAdvance();
+    this.rails.clear();
+    document.body.classList.remove(GUIDED_CLASS);
     this.snapshots = {};
     this._active = false;
     if (this.gameState) {
       this.gameState.isPaused = false;
     }
+    this.pausedEl.style.display = 'none';
     this.overlay.style.display = 'none';
     try {
       localStorage.setItem('bs_tutorial_done', '1');
@@ -208,7 +219,7 @@ export class TutorialOverlay {
       this.snapshots = step.captureSnapshot(this.gameState);
     }
 
-    this.clearTimer('autoAdvanceTimer');
+    this.clearAutoAdvance();
 
     if (step.autoAdvanceMs !== undefined && step.autoAdvanceMs > 0) {
       this.autoAdvanceTimer = setTimeout(() => {
@@ -217,54 +228,47 @@ export class TutorialOverlay {
     }
   }
 
-  private schedulePollTimer(): void {
-    this.clearTimer('pollTimer');
+  // ── Guide loop ──
+
+  private startGuide(): void {
+    this.stopGuide();
     if (!this._active) return;
-    this.pollTimer = setTimeout(() => {
-      this.pollTimer = null;
-      if (!this._active || !this.gameState) return;
-      const step = TUTORIAL_STEPS[this.stepIndex];
-      if (step && step.isComplete(this.gameState, this.snapshots ?? {})) {
-        this.advanceToNextStep();
-      } else {
-        // Panels are rebuilt as the player interacts; re-attach the glow so the
-        // step's target keeps pulsing for as long as the step is active.
-        this.applyHighlight();
-        this.schedulePollTimer();
-      }
-    }, POLL_INTERVAL_MS);
+    this.refreshGuide();
+    this.guideTimer = setInterval(() => this.tickGuide(), GUIDE_INTERVAL_MS);
   }
 
-  private clearHighlight(): void {
-    if (this.highlightedEl) {
-      this.highlightedEl.classList.remove('bs-tutorial-highlight');
-      this.highlightedEl = null;
+  private stopGuide(): void {
+    if (this.guideTimer !== null) {
+      clearInterval(this.guideTimer);
+      this.guideTimer = null;
     }
   }
 
-  /** Re-attach the pulsing glow to the current step's highlight target. */
-  private applyHighlight(): void {
+  /** One pass: check completion, move the rails, hold or release the clock. */
+  private tickGuide(): void {
+    if (!this._active || !this.gameState) return;
+
     const step = TUTORIAL_STEPS[this.stepIndex];
-    this.clearHighlight();
-    if (!step?.highlightTarget) return;
-
-    const target = document.querySelector(step.highlightTarget) as HTMLElement | null;
-    if (target) {
-      target.classList.add('bs-tutorial-highlight');
-      this.highlightedEl = target;
+    if (step && step.isComplete(this.gameState, this.snapshots ?? {})) {
+      this.advanceToNextStep();
+      return;
     }
+
+    this.refreshGuide();
+    const held = this.rails.updateClock(this.gameState);
+    this.pausedEl.style.display = held ? '' : 'none';
   }
 
-  /** Unified helper — clears the referenced timeout and resets it to null. */
-  private clearTimer(timerName: 'autoAdvanceTimer' | 'pollTimer'): void {
-    const timer = timerName === 'autoAdvanceTimer' ? this.autoAdvanceTimer : this.pollTimer;
-    if (timer !== null) {
-      clearTimeout(timer);
-      if (timerName === 'autoAdvanceTimer') {
-        this.autoAdvanceTimer = null;
-      } else {
-        this.pollTimer = null;
-      }
+  /** Move the rails onto whichever control the player should be using now. */
+  private refreshGuide(): void {
+    if (!this._active) return;
+    this.stageEl.textContent = this.rails.refresh().hint;
+  }
+
+  private clearAutoAdvance(): void {
+    if (this.autoAdvanceTimer !== null) {
+      clearTimeout(this.autoAdvanceTimer);
+      this.autoAdvanceTimer = null;
     }
   }
 
@@ -274,14 +278,12 @@ export class TutorialOverlay {
 
     this.titleEl.textContent = t(step.titleKey);
     this.textEl.textContent = t(step.textKey);
-
-    // TODO: use i18n t('tutorial.progress', { current, total }) once locale values have {current}/{total} placeholders
     this.stepCounter.textContent = `${this.stepIndex + 1} / ${TOTAL_TUTORIAL_STEPS}`;
 
     const progress = ((this.stepIndex + 1) / TOTAL_TUTORIAL_STEPS) * 100;
     this.progressEl.style.width = `${progress}%`;
 
-    this.applyHighlight();
+    this.refreshGuide();
 
     if (step.commands && step.commands.length > 0) {
       this.commandsLabel.style.display = '';
@@ -291,9 +293,5 @@ export class TutorialOverlay {
       this.commandsLabel.style.display = 'none';
       this.commandsHint.style.display = 'none';
     }
-
-    // On the final card the escape hatch becomes a plain dismissal.
-    const isLast = this.stepIndex >= LAST_STEP_INDEX;
-    this.skipBtn.textContent = isLast ? t('tutorial.finish') : t('tutorial.skip');
   }
 }

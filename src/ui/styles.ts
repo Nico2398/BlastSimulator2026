@@ -634,6 +634,45 @@ const CSS = `
   0%, 100% { box-shadow: 0 0 8px 2px rgba(64, 156, 255, 0.6); }
   50% { box-shadow: 0 0 16px 6px rgba(64, 156, 255, 0.9); }
 }
+
+/* ─── Guided tutorial rails ───
+   While the tutorial is up, only the control it is pointing at responds.
+
+   Deliberately unscoped: every control on the page, not just the ones inside a
+   panel. "Return to Map" is a fixed-position button owned by the main menu and
+   sits outside the panel tree — leaving it live let a player walk out of the
+   tutorial mid-step and lose it, which is the whole reason these rails exist.
+   Written as "not marked allowed" so a control rendered between two passes of
+   the guide is inert from its first frame rather than briefly live. */
+body.bs-tutorial-guided button:not(.bs-tutorial-allowed),
+body.bs-tutorial-guided select:not(.bs-tutorial-allowed),
+body.bs-tutorial-guided input:not(.bs-tutorial-allowed),
+body.bs-tutorial-guided .bs-detail-toggle:not(.bs-tutorial-allowed) {
+  pointer-events: none;
+  opacity: 0.4;
+  filter: saturate(0.3);
+}
+/* The card itself is never blocked — it carries the instructions. */
+body.bs-tutorial-guided .bs-tutorial-box button,
+body.bs-tutorial-guided .bs-tutorial-box select,
+body.bs-tutorial-guided .bs-tutorial-box input {
+  pointer-events: all;
+  opacity: 1;
+  filter: none;
+}
+.bs-tutorial-stage {
+  font-size: 12px;
+  font-weight: 600;
+  color: #7ab8ff;
+  margin: 0 0 8px;
+  line-height: 1.4;
+}
+.bs-tutorial-paused {
+  font-size: 11px;
+  color: #f0c060;
+  margin: 0 0 8px;
+  line-height: 1.4;
+}
 `;
 
 let injected = false;

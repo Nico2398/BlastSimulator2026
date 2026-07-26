@@ -10,11 +10,12 @@ export interface TutorialCardElements {
   box: HTMLElement;
   titleEl: HTMLElement;
   textEl: HTMLElement;
+  stageEl: HTMLElement;
+  pausedEl: HTMLElement;
   stepCounter: HTMLElement;
   progressEl: HTMLElement;
   commandsLabel: HTMLElement;
   commandsHint: HTMLElement;
-  skipBtn: HTMLButtonElement;
 }
 
 /**
@@ -46,6 +47,18 @@ export function buildTutorialCard(container: HTMLElement): TutorialCardElements 
   const textEl = document.createElement('p');
   textEl.className = 'bs-panel-text';
 
+  // The one thing to do right now. A step is several clicks; the paragraph above
+  // explains the goal, this names the next control.
+  const stageEl = document.createElement('div');
+  stageEl.className = 'bs-tutorial-stage';
+
+  // Shown while the clock is held, so a paused game reads as deliberate rather
+  // than broken.
+  const pausedEl = document.createElement('div');
+  pausedEl.className = 'bs-tutorial-paused';
+  pausedEl.textContent = t('tutorial.clock_held');
+  pausedEl.style.display = 'none';
+
   const progressTrack = document.createElement('div');
   progressTrack.className = 'bs-tutorial-progress-track';
 
@@ -63,23 +76,14 @@ export function buildTutorialCard(container: HTMLElement): TutorialCardElements 
   commandsHint.className = 'bs-tutorial-commands';
   commandsHint.style.display = 'none';
 
-  const actions = document.createElement('div');
-  actions.className = 'bs-tutorial-actions';
-
-  // Skip only. There is deliberately no "Next": the way forward is to perform
-  // the step the card is asking for, so the tutorial cannot be clicked past.
-  const skipBtn = document.createElement('button');
-  skipBtn.className = 'bs-btn bs-btn-skip';
-  skipBtn.textContent = t('tutorial.skip');
-
-  actions.append(skipBtn);
-
-  box.append(header, textEl, progressTrack, commandsLabel, commandsHint, actions);
+  // No buttons at all. There is no "Next" and no "Skip": the only way through a
+  // step is to perform it, so the card offers nothing to click past it with.
+  box.append(header, textEl, stageEl, pausedEl, progressTrack, commandsLabel, commandsHint);
   overlay.appendChild(box);
   container.appendChild(overlay);
 
   return {
-    overlay, box, titleEl, textEl, stepCounter,
-    progressEl, commandsLabel, commandsHint, skipBtn,
+    overlay, box, titleEl, textEl, stageEl, pausedEl, stepCounter,
+    progressEl, commandsLabel, commandsHint,
   };
 }

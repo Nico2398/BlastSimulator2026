@@ -118,7 +118,7 @@ declare global {
     __startTutorial: () => void;
     __uiActions: () => ReturnType<typeof probeUiActions>;
     __probeSelector: (selector: string) => ReturnType<typeof probeSelector>;
-    __tutorialState: () => { active: boolean; stepIndex: number; stepId: string | null; title: string; total: number };
+    __tutorialState: () => { active: boolean; stepIndex: number; stepId: string | null; title: string; total: number; stageIndex: number; stageTotal: number; stageTarget: string | null; clockHeld: boolean };
     __resetTickAccumulator: () => void;
     __debugGridInfo: () => Record<string, unknown>;
   }
@@ -305,12 +305,20 @@ window.__tutorialState = () => {
   const el = document.querySelector('.bs-tutorial-box .bs-panel-title');
   const counter = document.querySelector('.bs-tutorial-progress');
   const parsed = /(\d+)\s*\/\s*(\d+)/.exec(counter?.textContent ?? '');
+  const stage = tutorial.stageProgress;
+  const paused = document.querySelector('.bs-tutorial-paused') as HTMLElement | null;
   return {
     active: tutorial.isActive,
     stepIndex: parsed ? Number(parsed[1]) - 1 : -1,
     stepId: TUTORIAL_STEPS[parsed ? Number(parsed[1]) - 1 : -1]?.id ?? null,
     title: el?.textContent ?? '',
     total: parsed ? Number(parsed[2]) : 0,
+    // Which click of the step the player is on — a step is several controls,
+    // and a harness that only knew the step could not tell them apart.
+    stageIndex: stage.index,
+    stageTotal: stage.total,
+    stageTarget: stage.target,
+    clockHeld: paused !== null && paused.style.display !== 'none',
   };
 };
 

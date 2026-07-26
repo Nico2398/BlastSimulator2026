@@ -148,13 +148,19 @@ describe('TutorialOverlay (12.4)', () => {
     });
   });
 
-  describe('skip()', () => {
-    it('deactivates, hides overlay, unpauses game', () => {
-      const tut = new TutorialOverlay(container);
+  describe('no escape hatch', () => {
+    it('exposes no skip method — the tutorial cannot be abandoned', () => {
+      const tut = new TutorialOverlay(container) as unknown as Record<string, unknown>;
+      overlay = tut as unknown as TutorialOverlay;
+      expect(tut['skip']).toBeUndefined();
+    });
+
+    it('finishing deactivates, hides the overlay and unpauses the game', () => {
+      const tut = new TutorialOverlay(container) as any;
       overlay = tut;
       const state = createMockState();
       tut.start(state);
-      tut.skip();
+      tut.finish();
 
       expect(tut.isActive).toBe(false);
       const oe = container.querySelector('.bs-tutorial-overlay') as HTMLElement;
@@ -162,13 +168,22 @@ describe('TutorialOverlay (12.4)', () => {
       expect(state.isPaused).toBe(false);
     });
 
-    it('isCompleted toggles from false to true after skip', () => {
+    it('isCompleted toggles from false to true once the tutorial finishes', () => {
       expect(TutorialOverlay.isCompleted()).toBe(false);
-      const tut = new TutorialOverlay(container);
+      const tut = new TutorialOverlay(container) as any;
       overlay = tut;
       tut.start(createMockState());
-      tut.skip();
+      tut.finish();
       expect(TutorialOverlay.isCompleted()).toBe(true);
+    });
+
+    it('takes the guided class off the body when it finishes', () => {
+      const tut = new TutorialOverlay(container) as any;
+      overlay = tut;
+      tut.start(createMockState());
+      expect(document.body.classList.contains('bs-tutorial-guided')).toBe(true);
+      tut.finish();
+      expect(document.body.classList.contains('bs-tutorial-guided')).toBe(false);
     });
   });
 
@@ -234,12 +249,12 @@ describe('TutorialOverlay (12.4)', () => {
       vi.useRealTimers();
     });
 
-    it('skip() clears pending auto-advance timer', () => {
+    it('finishing clears a pending auto-advance timer', () => {
       // `as any` needed to access private autoAdvanceTimer for verification
       const tut = new TutorialOverlay(container) as any;
       overlay = tut;
       tut.start(createMockState());
-      tut.skip();
+      tut.finish();
       expect(tut.autoAdvanceTimer).toBeNull();
     });
 
@@ -266,12 +281,12 @@ describe('TutorialOverlay (12.4)', () => {
   });
 
   describe('next button and commands hint', () => {
-    it('renders a Skip control so the player is never trapped', () => {
+    it('renders NO Skip control — the tutorial cannot be abandoned', () => {
       const tut = new TutorialOverlay(container);
       overlay = tut;
       tut.start(createMockState());
 
-      expect(container.querySelector('.bs-btn-skip')).not.toBeNull();
+      expect(container.querySelector('.bs-btn-skip')).toBeNull();
     });
 
     it('renders NO Next control — the only way forward is doing the step', () => {
@@ -282,41 +297,13 @@ describe('TutorialOverlay (12.4)', () => {
       expect(container.querySelector('.bs-btn-next')).toBeNull();
     });
 
-    it('Skip ends the tutorial and unpauses the game', () => {
-      const tut = new TutorialOverlay(container);
-      overlay = tut;
-      const state = createMockState();
-      tut.start(state);
-
-      (container.querySelector('.bs-btn-skip') as HTMLButtonElement).click();
-      expect(tut.isActive).toBe(false);
-      expect(state.isPaused).toBe(false);
-    });
-
-    it('no control on the card can skip a step forward', () => {
+    it('the card carries no buttons at all', () => {
       const tut = new TutorialOverlay(container);
       overlay = tut;
       tut.start(createMockState());
 
-      const titleEl = container.querySelector('.bs-panel-title');
-      const before = titleEl?.textContent ?? '';
-      // Every button on the card except Skip must leave the step where it is.
-      container.querySelectorAll<HTMLButtonElement>('.bs-tutorial-box button').forEach(btn => {
-        if (!btn.classList.contains('bs-btn-skip')) btn.click();
-      });
-      expect(titleEl?.textContent).toBe(before);
+      expect(container.querySelectorAll('.bs-tutorial-box button')).toHaveLength(0);
       expect(tut.isActive).toBe(true);
-    });
-
-    it('turns Skip into a plain dismissal on the final card', () => {
-      const tut = new TutorialOverlay(container) as any;
-      overlay = tut;
-      tut.start(createMockState());
-      tut.stepIndex = TOTAL_TUTORIAL_STEPS - 1;
-      tut.render();
-
-      const skipBtn = container.querySelector('.bs-btn-skip') as HTMLElement;
-      expect(skipBtn.textContent).toBe('Finish');
     });
 
     it('shows commands hint element when step has commands array', () => {
@@ -358,10 +345,10 @@ describe('TutorialOverlay (12.4)', () => {
   });
 
   describe('highlight system', () => {
-    it('clearHighlight safely handles null highlightedEl', () => {
+    it('clearing the rails is safe when nothing is highlighted', () => {
       const tut = new TutorialOverlay(container) as any;
       overlay = tut;
-      expect(() => tut.clearHighlight()).not.toThrow();
+      expect(() => tut.refreshGuide()).not.toThrow();
     });
 
     it('render() applies highlight class to element matching highlightTarget', () => {
@@ -404,7 +391,7 @@ describe('TutorialOverlay (12.4)', () => {
       hudTop.remove();
     });
 
-    it('highlight is cleared on tutorial skip/finish', () => {
+    it('highlight is cleared when the tutorial finishes', () => {
       const tut = new TutorialOverlay(container) as any;
       overlay = tut;
       const target = document.createElement('div');
@@ -417,7 +404,7 @@ describe('TutorialOverlay (12.4)', () => {
       tut.start(createMockState());
       expect(target.classList.contains('bs-tutorial-highlight')).toBe(true);
 
-      tut.skip();
+      tut.finish();
       expect(target.classList.contains('bs-tutorial-highlight')).toBe(false);
       hudTop.remove();
     });
@@ -588,7 +575,7 @@ describe('TutorialOverlay (12.4)', () => {
       vi.useRealTimers();
     });
 
-    it('skip() immediately finishes even during completion message', () => {
+    it('finishing takes effect immediately during the completion message', () => {
       vi.useFakeTimers();
       const tut = new TutorialOverlay(container);
       overlay = tut;
@@ -601,14 +588,14 @@ describe('TutorialOverlay (12.4)', () => {
       // After change: still active because of the 4s timer
       expect(tut.isActive).toBe(true);
 
-      // skip() must finish immediately without advancing timers
-      tut.skip();
+      // finish() must take effect immediately without advancing timers
+      tut.finish();
       expect(tut.isActive).toBe(false);
 
       vi.useRealTimers();
     });
 
-    it('finish() is idempotent — calling skip() multiple times does not throw', () => {
+    it('finish() is idempotent — calling it twice does not throw', () => {
       vi.useFakeTimers();
       const tut = new TutorialOverlay(container);
       overlay = tut;
@@ -618,11 +605,11 @@ describe('TutorialOverlay (12.4)', () => {
       // Advance through all steps
       walkToCongratulations(tut);
 
-      tut.skip();
+      tut.finish();
       expect(tut.isActive).toBe(false);
 
-      // Second skip must not throw (isActive check in skip returns early)
-      expect(() => tut.skip()).not.toThrow();
+      // A second finish must not throw.
+      expect(() => tut.finish()).not.toThrow();
       expect(tut.isActive).toBe(false);
 
       vi.useRealTimers();

@@ -35,6 +35,12 @@ export interface TutorialStep {
    */
   autoCommands?: string[];
   autoAdvanceMs?: number;
+  /**
+   * Ticks this step may consume before the clock is held. Steps that wait on
+   * queued work — a survey being run, ore being hauled — need more than steps
+   * that are a single click. Omit for the default.
+   */
+  tickBudget?: number;
   captureSnapshot?: ((state: GameState) => Record<string, unknown>) | undefined;
   isComplete: (state: GameState, snapshot: Record<string, unknown>) => boolean;
   /**

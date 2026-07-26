@@ -286,4 +286,23 @@ export async function checkGoal(
   if (goal.usable) {
     await requireUsable(page, goal.usable, DEFAULT_TIMEOUT_MS);
   }
+
+  if (goal.blocked) {
+    const reason = await blockedReason(page, goal.blocked);
+    if (reason === null) {
+      throw new PlaytestFailure(
+        `control "${goal.blocked}" is reachable but should not be`,
+        describeAvailable(await probe(page)),
+      );
+    }
+    if (reason === 'absent') {
+      // Absent technically satisfies "not reachable", but it is far more often
+      // a stale selector — which would make this assertion pass forever while
+      // proving nothing.
+      throw new PlaytestFailure(
+        `control "${goal.blocked}" is not in the DOM, so "blocked" proves nothing — fix the selector`,
+        describeAvailable(await probe(page)),
+      );
+    }
+  }
 }

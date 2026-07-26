@@ -46,6 +46,11 @@ export interface PlaytestGoal {
   equals?: Record<string, unknown>;
   /** A control that must be usable by now. */
   usable?: string;
+  /**
+   * A control that must NOT be reachable. For guided flows, where letting the
+   * player press the wrong thing is the defect.
+   */
+  blocked?: string;
   /** Free-text note shown in the report. */
   note?: string;
 }

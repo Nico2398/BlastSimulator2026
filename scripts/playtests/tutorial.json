@@ -41,7 +41,9 @@
         "tutorialStep": "survey",
         "increased": [
           "employeeCount"
-        ]
+        ],
+        "blocked": ".bs-return-map",
+        "note": "The tutorial is on rails: leaving for the world map mid-step is how a player loses it, so that button must be inert while the tutorial is up."
       }
     },
     {
@@ -62,7 +64,7 @@
       "actions": [
         {
           "do": "click",
-          "selector": "#bs-survey-panel [data-method=\"core_sample\"]"
+          "selector": "#bs-survey-panel [data-method=\"seismic\"]"
         },
         {
           "do": "click",
@@ -306,16 +308,11 @@
       }
     },
     {
-      "goal": "deliver against an active contract",
+      "goal": "deliver against the contract accepted earlier",
       "actions": [
         {
           "do": "click",
           "selector": "#bs-toolbar [data-panel=\"contracts\"]"
-        },
-        {
-          "do": "clickLabel",
-          "label": "Accept",
-          "region": "contracts"
         },
         {
           "do": "awaitUsable",
@@ -399,7 +396,10 @@
         }
       ],
       "expect": {
-        "tutorialStep": "victory"
+        "equals": {
+          "levelEnded": true
+        },
+        "note": "asserts the level outcome rather than a card: victory hands off to the completion card, which dismisses itself on a timer"
       }
     }
   ]
