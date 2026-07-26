@@ -378,6 +378,36 @@ needs to accept a second contract to have something to deliver.
 Also corrected: the survey step's text and console hint both said *seismic*
 while the highlight pointed at *Core Sample*.
 
+### Sixth pass — the picker was still unconstrained
+
+Reported: the grid tool ignored the tutorial. Highlighting the picker canvas
+says "drag here" and nothing more — the grid tool would happily lay a blast
+pattern in a corner of the map the step knew nothing about, and the same was
+true of the survey target, the warehouse site and the ramp.
+
+A stage can now declare the tiles it expects. The picker draws that area with a
+dashed outline and dims everything outside it, refuses to enable Confirm for a
+selection that leaves it, and says why in place of the usual "Selected: …"
+readout. `confirm()` re-checks independently of the button, since a disabled
+button is an affordance rather than a guarantee.
+
+The constraint is published when the *step* begins, not when the picker's stage
+goes live: the picker opens on the click that ends the previous stage, so
+publishing on stage change would leave that first picker unconstrained.
+
+Two defects surfaced while proving this by clicking, both of which made the
+tutorial lose-able:
+
+| # | Severity | Was | Now |
+|---|----------|-----|-----|
+| 32 | Major | Contract offers are regenerated on a timer, and `generateContracts` drops the *oldest* offer to stay under the cap — the first row, which is the one being clicked. `ContractUI` then replaced the whole list, so Accept was detached mid-click and the click did nothing. | Rows are synced by contract id, so an unrelated offer appearing or expiring no longer touches the row the player is reaching for. |
+| 33 | Major | Even with stable rows, the offer list churned while the player read it. The clock's grace period — "keep running while work is outstanding" — was applied to every step, including ones that only wait on a click. | Steps opt into the grace with `waitsOnWork`. Only the ones that genuinely need the simulation (survey, delivery, ramp, and the two closing steps) have it; choosing a contract holds the clock after a single tick. |
+
+Finding 33 is the interesting one: the grace rule existed to stop the clock
+deadlocking a step that waits on a surveyor, and it was correct for that. Applied
+to a step that waits on a *player*, it did precisely what this whole pass was
+meant to prevent — let the world move while someone was reading.
+
 ### Known gap: XP from work is still unwired
 
 `gainXp` implements the spec's on-the-job progression (`xpPerTick = 1 + floor(level * 0.5)`)

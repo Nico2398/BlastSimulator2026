@@ -96,6 +96,7 @@ export function createComparisonStep(
   getValue: (state: GameState) => number,
   commands?: string[],
   highlightTarget?: string,
+  clock?: { tickBudget?: number; waitsOnWork?: boolean },
 ): TutorialStep {
   return {
     id,
@@ -103,6 +104,8 @@ export function createComparisonStep(
     textKey,
     ...(commands ? { commands } : {}),
     ...(highlightTarget ? { highlightTarget } : {}),
+    ...(clock?.tickBudget !== undefined ? { tickBudget: clock.tickBudget } : {}),
+    ...(clock?.waitsOnWork ? { waitsOnWork: true } : {}),
     captureSnapshot: (state: GameState) => ({
       prevValue: getValue(state),
     }),

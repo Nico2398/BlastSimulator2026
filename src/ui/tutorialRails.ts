@@ -10,11 +10,13 @@ import { stagesFor, type TutorialStage } from './tutorialStages.js';
 import {
   applyRails, clearRails, resolveStageIndex, decideClock, DEFAULT_TICK_BUDGET,
 } from './tutorialGuide.js';
+import { setPickerRegion } from './tutorialPickerRegion.js';
 
 export interface RailsStep {
   id: string;
   highlightTarget?: string;
   tickBudget?: number;
+  waitsOnWork?: boolean;
 }
 
 /** What the card should show about the current stage and the clock. */
@@ -33,6 +35,7 @@ export class TutorialRails {
   private stageIndex = 0;
   private stepStartTick = 0;
   private budget = DEFAULT_TICK_BUDGET;
+  private waitsOnWork = false;
   private held = false;
 
   /** Point the rails at a new step and reset its tick allowance. */
@@ -40,7 +43,12 @@ export class TutorialRails {
     this.stages = stagesFor(step.id, step.highlightTarget);
     this.stageIndex = 0;
     this.budget = step.tickBudget ?? DEFAULT_TICK_BUDGET;
+    this.waitsOnWork = step.waitsOnWork === true;
     this.stepStartTick = state?.tickCount ?? 0;
+    // Published now rather than when the picker's stage goes live: the picker
+    // opens on the click that ends the previous stage, so publishing later
+    // would leave that first picker unconstrained.
+    setPickerRegion(this.stages.find(s => s.region)?.region ?? null);
     this.releaseClock(state);
   }
 
@@ -80,7 +88,7 @@ export class TutorialRails {
    */
   updateClock(state: GameState | null): boolean {
     if (!state) return this.held;
-    const { hold } = decideClock(state, this.stepStartTick, this.budget);
+    const { hold } = decideClock(state, this.stepStartTick, this.budget, this.waitsOnWork);
 
     if (hold && !state.isPaused) {
       state.isPaused = true;
@@ -113,6 +121,7 @@ export class TutorialRails {
   /** Take every mark off the DOM — used when the tutorial ends. */
   clear(): void {
     clearRails();
+    setPickerRegion(null);
     this.stages = [];
     this.stageIndex = 0;
     this.held = false;

@@ -2,6 +2,11 @@
 // Full-screen 2D top-down interactive overlay for selecting rectangular tile regions.
 // Replaces browser prompt() calls for building placement and drill grid creation.
 
+import { t } from '../core/i18n/I18n.js';
+import {
+  getPickerRegion, regionContainsSelection, type TileRegion,
+} from './tutorialPickerRegion.js';
+
 export interface ExtraField {
   id: string;
   label: string;
@@ -39,6 +44,12 @@ export interface TileSelectConfig {
   tileFill?: (x: number, z: number) => string | null;
   /** Optional tile to arrive pre-selected, so Confirm is reachable at once. */
   initialSelection?: { x: number; z: number };
+  /**
+   * Area the selection must stay inside. Drawn on the canvas and enforced on
+   * Confirm. Defaults to whatever the tutorial has published, so a guided step
+   * constrains every picker without each panel having to know about it.
+   */
+  requiredRegion?: TileRegion | null;
   onConfirm: (result: TileSelectResult) => void;
   onCancel?: () => void;
 }
@@ -51,6 +62,8 @@ export class TileSelectOverlay {
   private readonly canvas: HTMLCanvasElement;
   private readonly ctx: CanvasRenderingContext2D | null;
   private config: TileSelectConfig | null = null;
+  /** Area the selection must stay inside, resolved at open time. */
+  private requiredRegion: TileRegion | null = null;
 
   // Drag state
   private dragStart: { tx: number; tz: number } | null = null;
@@ -81,6 +94,10 @@ export class TileSelectOverlay {
 
   open(config: TileSelectConfig): void {
     this.config = config;
+    // An explicit region wins; otherwise take whatever the tutorial published.
+    this.requiredRegion = config.requiredRegion !== undefined
+      ? config.requiredRegion
+      : getPickerRegion();
     this.dragStart = config.initialSelection
       ? { tx: config.initialSelection.x, tz: config.initialSelection.z }
       : null;
@@ -103,9 +120,11 @@ export class TileSelectOverlay {
 
     const hint = document.createElement('div');
     hint.className = 'bs-tile-select-hint';
-    hint.textContent = config.mode === 'area'
-      ? 'Click and drag to select a rectangular area'
-      : 'Click a tile to select it';
+    hint.textContent = this.requiredRegion
+      ? t('ui.tile_select.stay_in_area')
+      : config.mode === 'area'
+        ? 'Click and drag to select a rectangular area'
+        : 'Click a tile to select it';
     form.appendChild(hint);
 
     const selectionInfo = document.createElement('div');
@@ -142,7 +161,7 @@ export class TileSelectOverlay {
     confirmBtn.className = 'bs-btn bs-btn-primary';
     confirmBtn.id = 'bs-tile-select-confirm';
     confirmBtn.textContent = 'Confirm';
-    confirmBtn.disabled = this.dragStart === null;
+    confirmBtn.disabled = !this.selectionIsAllowed();
     confirmBtn.addEventListener('click', () => this.confirm());
 
     const cancelBtn = document.createElement('button');
@@ -303,6 +322,31 @@ export class TileSelectOverlay {
       ctx.fillText(String(z), 3, z * tileH + (z < c.worldSizeZ ? tileH * 5 : -3));
     }
 
+    // Required area — everything outside it is dimmed and the area itself is
+    // outlined, so "drag here" is visible rather than only stated.
+    if (this.requiredRegion) {
+      const r = this.requiredRegion;
+      const rx = r.x1 * tileW;
+      const rz = r.z1 * tileH;
+      const rw = (r.x2 - r.x1 + 1) * tileW;
+      const rh = (r.z2 - r.z1 + 1) * tileH;
+
+      ctx.save();
+      // Dim outside by punching the area out of a full-canvas cover.
+      ctx.beginPath();
+      ctx.rect(0, 0, CANVAS_W, CANVAS_H);
+      ctx.rect(rx, rz, rw, rh);
+      ctx.fillStyle = 'rgba(6, 4, 2, 0.66)';
+      ctx.fill('evenodd');
+      ctx.restore();
+
+      ctx.setLineDash([6, 4]);
+      ctx.strokeStyle = '#7ab8ff';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(rx, rz, rw, rh);
+      ctx.setLineDash([]);
+    }
+
     // Hover highlight
     if (this.hoverTile && !this.dragStart) {
       const { px, pz } = this.tileToCanvas(this.hoverTile.tx, this.hoverTile.tz);
@@ -381,6 +425,11 @@ export class TileSelectOverlay {
     if (!el) return;
     const sel = this.getSelectionRect();
     if (!sel) { el.textContent = 'No selection'; return; }
+    if (!this.selectionIsAllowed()) {
+      // Say why Confirm is dead rather than leaving the player prodding it.
+      el.textContent = t('ui.tile_select.outside_area');
+      return;
+    }
     if (this.config?.mode === 'point') {
       el.textContent = `Selected: (${sel.x1}, ${sel.z1})`;
     } else {
@@ -390,14 +439,29 @@ export class TileSelectOverlay {
     }
   }
 
+  /**
+   * Whether the current selection may be confirmed: something is selected, and
+   * it lies inside the required area when there is one.
+   */
+  private selectionIsAllowed(): boolean {
+    const sel = this.getSelectionRect();
+    if (!sel) return false;
+    if (!this.requiredRegion) return true;
+    return regionContainsSelection(this.requiredRegion, sel);
+  }
+
   private enableConfirm(): void {
     const btn = this.overlay.querySelector('#bs-tile-select-confirm') as HTMLButtonElement | null;
-    if (btn) btn.disabled = false;
+    if (btn) btn.disabled = !this.selectionIsAllowed();
   }
 
   private confirm(): void {
     const sel = this.getSelectionRect();
     if (!sel || !this.config) return;
+    // Belt and braces: the button is disabled for an out-of-area selection, but
+    // a confirm that slipped through would place the thing the tutorial is
+    // teaching in a spot the step does not expect.
+    if (!this.selectionIsAllowed()) return;
     const fields: Record<string, number> = {};
     for (const field of this.config.extraFields ?? []) {
       const input = this.overlay.querySelector(`#bs-tsf-${field.id}`) as HTMLInputElement | null;

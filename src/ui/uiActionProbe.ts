@@ -60,6 +60,9 @@ const REGIONS: Array<[string, string]> = [
  */
 const TRANSIENT_CLASSES = new Set([
   'bs-tutorial-highlight',
+  // Moves with the tutorial's current stage, so baking it into a selector would
+  // make that selector stop matching the moment the stage advances.
+  'bs-tutorial-allowed',
   'active',
   'selected',
 ]);

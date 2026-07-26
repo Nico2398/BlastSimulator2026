@@ -247,27 +247,37 @@ describe('decideClock', () => {
     expect(decideClock(s, 0, DEFAULT_TICK_BUDGET).hold).toBe(true);
   });
 
-  it('keeps running past the allowance while queued work is outstanding', () => {
+  it('keeps running past the allowance while a work-waiting step has work outstanding', () => {
     // Pausing here would deadlock: the step is waiting on a surveyor, and a
     // paused surveyor never finishes.
     const s = state();
     s.tickCount = DEFAULT_TICK_BUDGET + 5;
     s.pendingActions = [{ id: 1 } as unknown as GameState['pendingActions'][number]];
-    expect(decideClock(s, 0, DEFAULT_TICK_BUDGET).hold).toBe(false);
+    expect(decideClock(s, 0, DEFAULT_TICK_BUDGET, true).hold).toBe(false);
   });
 
-  it('keeps running while an employee is mid-task', () => {
+  it('keeps running while an employee is mid-task on a work-waiting step', () => {
     const s = state();
     s.tickCount = DEFAULT_TICK_BUDGET + 5;
     s.employees.employees = [{ activeActionId: 7 } as never];
-    expect(decideClock(s, 0, DEFAULT_TICK_BUDGET).hold).toBe(false);
+    expect(decideClock(s, 0, DEFAULT_TICK_BUDGET, true).hold).toBe(false);
+  });
+
+  it('holds a step that only waits on a click, even with work in flight', () => {
+    // Contract offers are regenerated on a timer and the oldest is dropped, so
+    // letting the clock run while the player picks an offer pulls the row out
+    // from under them. Only steps that need the simulation get the grace.
+    const s = state();
+    s.tickCount = DEFAULT_TICK_BUDGET + 5;
+    s.pendingActions = [{ id: 1 } as unknown as GameState['pendingActions'][number]];
+    expect(decideClock(s, 0, DEFAULT_TICK_BUDGET).hold).toBe(true);
   });
 
   it('stops even outstanding work at the grace cap, so a stuck queue cannot run forever', () => {
     const s = state();
     s.tickCount = DEFAULT_TICK_BUDGET + WORK_GRACE_TICKS;
     s.pendingActions = [{ id: 1 } as unknown as GameState['pendingActions'][number]];
-    expect(decideClock(s, 0, DEFAULT_TICK_BUDGET).hold).toBe(true);
+    expect(decideClock(s, 0, DEFAULT_TICK_BUDGET, true).hold).toBe(true);
   });
 
   it('counts from the tick the step started, not from zero', () => {

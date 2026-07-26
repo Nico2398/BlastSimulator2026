@@ -25,11 +25,13 @@ export type PlayerAction =
   /** Wait for a selector to exist and be usable. */
   | { do: 'awaitUsable'; selector: string; timeoutMs?: number }
   /**
-   * Wait for the tutorial card to reach a step id. Needed because some cards
-   * auto-advance on a timer: acting on the next card before it appears makes the
-   * step capture its "before" snapshot after the change it is watching for.
+   * Wait for the tutorial card to reach a step id, or any of several. Needed
+   * because some cards auto-advance on a timer: acting on the next card before
+   * it appears makes the step capture its "before" snapshot after the change it
+   * is watching for. A list covers the case where two cards are both a correct
+   * outcome and which one is showing depends on how fast the run got there.
    */
-  | { do: 'awaitTutorialStep'; stepId: string; timeoutMs?: number }
+  | { do: 'awaitTutorialStep'; stepId: string | string[]; timeoutMs?: number }
   /** Let the simulation run. This is the only way a playtest passes time. */
   | { do: 'letTimePass'; ticks: number };
 

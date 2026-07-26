@@ -85,21 +85,39 @@ export class ContractUI {
   dispose(): void { this.el.remove(); }
 
   private rebuildRows(available: Contract[], active: Contract[]): void {
-    this.availableList.innerHTML = '';
-    if (available.length === 0) {
-      this.availableList.appendChild(this.makeEmptyMessage(t('ui.contracts.none')));
-    } else {
-      for (const c of available) {
-        this.availableList.appendChild(this.makeAvailableRow(c));
-      }
+    this.syncList(this.availableList, available, t('ui.contracts.none'), c => this.makeAvailableRow(c));
+    this.syncList(this.activeList, active, t('ui.contracts.none_active'), c => this.makeActiveRow(c));
+  }
+
+  /**
+   * Bring a list in line with its contracts without touching rows that are
+   * already correct.
+   *
+   * Replacing the whole list detached the Accept button under an in-flight
+   * click whenever an unrelated offer appeared or expired — offers refresh on a
+   * timer, so this happened while the player was reaching for a different row.
+   */
+  private syncList(
+    listEl: HTMLElement,
+    contracts: Contract[],
+    emptyText: string,
+    makeRow: (c: Contract) => HTMLElement,
+  ): void {
+    const wanted = new Set(contracts.map(c => String(c.id)));
+
+    for (const child of Array.from(listEl.children)) {
+      const id = (child as HTMLElement).dataset['contractId'];
+      if (id === undefined || !wanted.has(id)) child.remove();
     }
 
-    this.activeList.innerHTML = '';
-    if (active.length === 0) {
-      this.activeList.appendChild(this.makeEmptyMessage(t('ui.contracts.none_active')));
-    } else {
-      for (const c of active) {
-        this.activeList.appendChild(this.makeActiveRow(c));
+    if (contracts.length === 0) {
+      if (listEl.children.length === 0) listEl.appendChild(this.makeEmptyMessage(emptyText));
+      return;
+    }
+
+    for (const c of contracts) {
+      if (!listEl.querySelector(`[data-contract-id="${c.id}"]`)) {
+        listEl.appendChild(makeRow(c));
       }
     }
   }
@@ -157,6 +175,7 @@ export class ContractUI {
   private makeAvailableRow(c: Contract): HTMLElement {
     const row = document.createElement('div');
     row.className = 'bs-contract-row';
+    row.dataset['contractId'] = String(c.id);
 
     const desc = document.createElement('div');
     desc.className = 'bs-contract-desc';

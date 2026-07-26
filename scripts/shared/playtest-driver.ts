@@ -214,14 +214,16 @@ export async function runAction(page: Page, action: PlayerAction): Promise<void>
       break;
     }
     case 'awaitTutorialStep': {
+      const wanted = Array.isArray(action.stepId) ? action.stepId : [action.stepId];
       const deadline = Date.now() + (action.timeoutMs ?? DEFAULT_TIMEOUT_MS);
       let seen: TutorialSnapshot | null = null;
       for (;;) {
         seen = await tutorialState(page);
-        if (seen.stepId === action.stepId) break;
+        if (seen.stepId !== null && wanted.includes(seen.stepId)) break;
         if (Date.now() > deadline) {
           throw new PlaytestFailure(
-            `tutorial never reached "${action.stepId}" — it is on "${seen.stepId}" (${seen.title})`,
+            `tutorial never reached ${wanted.map(s => `"${s}"`).join(' or ')}`
+            + ` — it is on "${seen.stepId}" (${seen.title})`,
             describeAvailable(await probe(page)),
           );
         }

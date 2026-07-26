@@ -138,18 +138,23 @@ export interface ClockDecision {
 /**
  * Whether the clock has run far enough for this step.
  *
- * Work in flight keeps it running up to a grace cap, so a step waiting on a
- * surveyor cannot pause itself into a deadlock; an idle queue means the step is
- * waiting on the player, and waiting on the player is not a reason for the
- * world to keep moving.
+ * Steps that wait on the simulation — a surveyor walking out, ore being hauled
+ * in — opt into a grace period so they cannot pause themselves into a deadlock:
+ * a paused surveyor never arrives. Every other step holds the moment its
+ * allowance runs out, because waiting on the player is not a reason for the
+ * world to keep moving. Contract offers, for one, are regenerated on a timer
+ * and the oldest is dropped, so a step that asks the player to pick an offer
+ * must not let the list churn while they read it.
  */
 export function decideClock(
   state: GameState,
   stepStartTick: number,
   budget: number = DEFAULT_TICK_BUDGET,
+  waitsOnWork: boolean = false,
 ): ClockDecision {
   const spent = Math.max(0, (state.tickCount ?? 0) - stepStartTick);
   if (spent < budget) return { hold: false, spent };
+  if (!waitsOnWork) return { hold: true, spent };
 
   const working = (state.pendingActions?.length ?? 0) > 0
     || state.employees.employees.some(e => e.activeActionId !== null);

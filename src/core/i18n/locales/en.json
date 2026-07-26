@@ -1877,5 +1877,7 @@
   "tutorial.stage.ramp_area": "Drag a line across the pit to carve the ramp.",
   "tutorial.stage.open_settings": "Open the Settings panel from the toolbar.",
   "tutorial.stage.policy_apply": "Change the shift schedule, then press Apply Policy.",
-  "tutorial.stage.let_time_run": "Let the clock run — press the speed button."
+  "tutorial.stage.let_time_run": "Let the clock run — press the speed button.",
+  "ui.tile_select.stay_in_area": "Stay inside the highlighted area — the tutorial needs this placed there.",
+  "ui.tile_select.outside_area": "Outside the highlighted area. Select inside it to continue."
 }

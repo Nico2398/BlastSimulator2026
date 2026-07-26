@@ -11,6 +11,7 @@
 // it makes the next stage reachable at once. Closing the panel falls back.
 
 import { TOOLBAR_TARGET } from './tutorialStepHelpers.js';
+import type { TileRegion } from './tutorialPickerRegion.js';
 
 export interface TutorialStage {
   /** Selector for the one control the player should use now. */
@@ -23,18 +24,38 @@ export interface TutorialStage {
    * Deliver, or picking a tile on a canvas before Confirm enables.
    */
   also?: string[];
+  /**
+   * Tiles the player must stay inside when this step opens a picker.
+   *
+   * Highlighting the canvas says "drag here" and nothing more: the grid tool
+   * would happily lay a blast pattern in a corner of the map the step knows
+   * nothing about. The picker draws this area and refuses to confirm outside it.
+   */
+  region?: TileRegion;
 }
 
 const PICKER_CANVAS = '.bs-tile-select-canvas';
 const PICKER_CONFIRM = '#bs-tile-select-confirm';
 
 /** Pick a tile, then confirm — the shared tail of every placement step. */
-function pickerStages(pickHintKey: string): TutorialStage[] {
+function pickerStages(pickHintKey: string, region: TileRegion): TutorialStage[] {
   return [
-    { target: PICKER_CANVAS, hintKey: pickHintKey },
-    { target: PICKER_CONFIRM, hintKey: 'tutorial.stage.picker_confirm', also: [PICKER_CANVAS] },
+    { target: PICKER_CANVAS, hintKey: pickHintKey, region },
+    { target: PICKER_CONFIRM, hintKey: 'tutorial.stage.picker_confirm', also: [PICKER_CANVAS], region },
   ];
 }
+
+/**
+ * Where each guided placement belongs, in tiles on the 24×24 tutorial map.
+ * Central enough to be obviously "the pit", wide enough not to feel like
+ * threading a needle.
+ */
+const REGION = {
+  survey: { x1: 8, z1: 8, x2: 16, z2: 16 },
+  drill: { x1: 8, z1: 8, x2: 16, z2: 16 },
+  warehouse: { x1: 2, z1: 2, x2: 9, z2: 9 },
+  ramp: { x1: 8, z1: 4, x2: 13, z2: 20 },
+} as const satisfies Record<string, TileRegion>;
 
 /** Open the Crew panel, then hire one role. */
 function hireStages(role: string, hintKey: string): TutorialStage[] {
@@ -62,7 +83,7 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
     // exactly the kind of mismatch that loses a player.
     { target: '#bs-survey-panel [data-method="seismic"]', hintKey: 'tutorial.stage.survey_method' },
     { target: '#bs-survey-run', hintKey: 'tutorial.stage.survey_run' },
-    ...pickerStages('tutorial.stage.survey_target'),
+    ...pickerStages('tutorial.stage.survey_target', REGION.survey),
   ],
 
   'hire-driller': hireStages('driller', 'tutorial.stage.hire_driller'),
@@ -70,7 +91,7 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
   'drill-plan': [
     { target: TOOLBAR_TARGET.blast, hintKey: 'tutorial.stage.open_blast' },
     { target: '#bs-blast-panel [data-action="grid-tool"]', hintKey: 'tutorial.stage.grid_tool' },
-    ...pickerStages('tutorial.stage.drill_area'),
+    ...pickerStages('tutorial.stage.drill_area', REGION.drill),
   ],
 
   charge: [
@@ -118,7 +139,7 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
       target: '#bs-build-panel [data-build-type="freight_warehouse"] .bs-build-buy-btn',
       hintKey: 'tutorial.stage.build_warehouse',
     },
-    ...pickerStages('tutorial.stage.build_site'),
+    ...pickerStages('tutorial.stage.build_site', REGION.warehouse),
   ],
 
   'contract-deliver': [
@@ -133,7 +154,7 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
   'build-ramp': [
     { target: TOOLBAR_TARGET.build, hintKey: 'tutorial.stage.open_build' },
     { target: '#bs-build-panel .bs-build-ramp-btn', hintKey: 'tutorial.stage.ramp_tool' },
-    ...pickerStages('tutorial.stage.ramp_area'),
+    ...pickerStages('tutorial.stage.ramp_area', REGION.ramp),
   ],
 
   'set-policy': [

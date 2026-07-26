@@ -1877,5 +1877,7 @@
   "tutorial.stage.ramp_area": "Tracez une ligne à travers la fosse pour creuser la rampe.",
   "tutorial.stage.open_settings": "Ouvrez le panneau Paramètres depuis la barre d'outils.",
   "tutorial.stage.policy_apply": "Modifiez l'horaire des postes, puis appuyez sur Appliquer.",
-  "tutorial.stage.let_time_run": "Laissez l'horloge tourner — appuyez sur le bouton de vitesse."
+  "tutorial.stage.let_time_run": "Laissez l'horloge tourner — appuyez sur le bouton de vitesse.",
+  "ui.tile_select.stay_in_area": "Restez dans la zone en surbrillance — le tutoriel attend un placement à cet endroit.",
+  "ui.tile_select.outside_area": "Hors de la zone en surbrillance. Sélectionnez à l'intérieur pour continuer."
 }

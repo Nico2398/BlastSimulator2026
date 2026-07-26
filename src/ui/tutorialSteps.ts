@@ -41,6 +41,14 @@ export interface TutorialStep {
    * that are a single click. Omit for the default.
    */
   tickBudget?: number;
+  /**
+   * True when the step's completion depends on the simulation running — a
+   * surveyor walking out, ore being hauled in. Those steps get a grace period
+   * past their allowance so holding the clock cannot deadlock them. Steps that
+   * merely wait on a click leave this off, so the world stops while the player
+   * decides.
+   */
+  waitsOnWork?: boolean;
   captureSnapshot?: ((state: GameState) => Record<string, unknown>) | undefined;
   isComplete: (state: GameState, snapshot: Record<string, unknown>) => boolean;
   /**
@@ -71,7 +79,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   createHireStep('hire-surveyor', 'tutorial.step2.title', 'tutorial.step2', 'surveyor'),
 
   // ── Step 2: survey ──
-  createComparisonStep('survey', 'tutorial.step3.title', 'tutorial.step3', (s) => (s.surveyResults ?? []).length, ['survey seismic x:12 z:12'], TOOLBAR_TARGET.survey),
+  createComparisonStep('survey', 'tutorial.step3.title', 'tutorial.step3', (s) => (s.surveyResults ?? []).length, ['survey seismic x:12 z:12'], TOOLBAR_TARGET.survey, { tickBudget: 20, waitsOnWork: true }),
 
   // ── Step 3: hire-driller ──
   createHireStep('hire-driller', 'tutorial.step4.title', 'tutorial.step4', 'driller'),
@@ -123,7 +131,10 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   createHireStepWithEventGuard('hire-manager', 'tutorial.step11.title', 'tutorial.step11', 'manager'),
 
   // ── Step 11: contract-accept ──
-  createComparisonStep('contract-accept', 'tutorial.step12.title', 'tutorial.step12', (s) => (s.contracts?.active ?? []).length, ['contract accept 1'], TOOLBAR_TARGET.contracts),
+  // Offers are regenerated on a timer and the oldest is dropped, so the list
+  // rearranges itself under a player who is reading it. Hold the clock almost
+  // immediately: nothing about choosing an offer needs time to pass.
+  createComparisonStep('contract-accept', 'tutorial.step12.title', 'tutorial.step12', (s) => (s.contracts?.active ?? []).length, ['contract accept 1'], TOOLBAR_TARGET.contracts, { tickBudget: 1 }),
 
   // ── Step 12: hire-driver ──
   createHireStep('hire-driver', 'tutorial.step13.title', 'tutorial.step13', 'driver'),
@@ -151,7 +162,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   createComparisonStep('build-storage', 'tutorial.step15.title', 'tutorial.step15', (s) => countBuildingsOfType(s, 'freight_warehouse'), ['build freight_warehouse at:12,8'], TOOLBAR_TARGET.build),
 
   // ── Step 15: contract-deliver ──
-  createComparisonStep('contract-deliver', 'tutorial.step16.title', 'tutorial.step16', (s) => (s.contracts?.completedHistory ?? []).length, ['contract deliver 1 amount:5000'], TOOLBAR_TARGET.contracts),
+  createComparisonStep('contract-deliver', 'tutorial.step16.title', 'tutorial.step16', (s) => (s.contracts?.completedHistory ?? []).length, ['contract deliver 1 amount:5000'], TOOLBAR_TARGET.contracts, { tickBudget: 20, waitsOnWork: true }),
 
   // ── Step 16: finances ──
   createAutoAdvanceStep('finances', 'tutorial.step17.title', 'tutorial.step17', (state: GameState) => ({
@@ -166,6 +177,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     textKey: 'tutorial.step18',
     highlightTarget: TOOLBAR_TARGET.build,
     commands: ['build_ramp start:10,15 end:10,25'],
+    waitsOnWork: true,
     captureSnapshot: (state: GameState) => ({
       prevRampCount: state.navGrid
         ? countNavCellsByType(state.navGrid.cells, 'ramp')
@@ -221,6 +233,9 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     id: 'tick-advance',
     titleKey: 'tutorial.step21.title',
     textKey: 'tutorial.step21',
+    // The whole point of this step is that the clock runs.
+    tickBudget: 30,
+    waitsOnWork: true,
     highlightTarget: '#bs-hud-top .bs-speed-btn',
     captureSnapshot: (state: GameState) => ({
       prevTick: state.tickCount ?? 0,
@@ -236,6 +251,9 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     id: 'victory',
     titleKey: 'tutorial.step22.title',
     textKey: 'tutorial.step22',
+    // Waits on the level's profit target, which only accrues while time runs.
+    tickBudget: 60,
+    waitsOnWork: true,
     highlightTarget: '#bs-hud-scores',
     isComplete: (state: GameState) => state.levelEnded === true,
   },
