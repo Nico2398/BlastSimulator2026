@@ -96,3 +96,79 @@ describe('BlastPlanUI (10.2)', () => {
     ui.dispose();
   });
 });
+
+describe('BlastPlanUI — charge defaults and blast feedback', () => {
+  function setup() {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const ui = new BlastPlanUI(container);
+    const sent: string[] = [];
+    return { container, ui, sent };
+  }
+
+  it('opens on a charge that actually breaks rock', () => {
+    // pop_rock at 3 kg clears zero voxels: the blast cracks rock, moves none of
+    // it, and the terrain looks untouched. A select defaults to its first
+    // option, which is how the panel ended up offering exactly that.
+    const { container } = setup();
+    const explosive = container.querySelector('#bs-blast-explosive') as HTMLSelectElement;
+    const amount = container.querySelector('#bs-blast-amount') as HTMLInputElement;
+
+    expect(explosive.value).toBe('boomite');
+    expect(amount.value).toBe('5');
+  });
+
+  it('Charge All Holes charges with those defaults', () => {
+    const { container, ui } = setup();
+    const sent: string[] = [];
+    ui.setGameConsole((cmd: string) => { sent.push(cmd); return { success: true, output: '' }; });
+
+    (container.querySelector('[data-action="charge-all"]') as HTMLButtonElement).click();
+
+    expect(sent[0]).toContain('explosive:boomite');
+    expect(sent[0]).toContain('amount:5');
+  });
+
+  it('reports what the blast broke out', () => {
+    const { container, ui } = setup();
+    ui.setGameConsole(() => ({
+      success: true,
+      output: '=== BLAST REPORT ===\nRating: PERFECT\nCleared voxels: 782\nCracked voxels: 677',
+    }));
+
+    (container.querySelector('[data-action="execute"]') as HTMLButtonElement).click();
+    (document.querySelector('.bs-confirm-overlay .bs-btn-danger') as HTMLButtonElement).click();
+
+    const status = container.querySelector('.bs-blast-status') as HTMLElement;
+    expect(status.textContent).toContain('782');
+    expect(status.style.display).not.toBe('none');
+  });
+
+  it('says so when the charges broke no rock out at all', () => {
+    // Otherwise an undercharged blast is indistinguishable from a blast that
+    // did not happen: dust, then unchanged terrain and no explanation.
+    const { container, ui } = setup();
+    ui.setGameConsole(() => ({
+      success: true,
+      output: '=== BLAST REPORT ===\nRating: BAD\nCleared voxels: 0\nCracked voxels: 305',
+    }));
+
+    (container.querySelector('[data-action="execute"]') as HTMLButtonElement).click();
+    (document.querySelector('.bs-confirm-overlay .bs-btn-danger') as HTMLButtonElement).click();
+
+    const status = container.querySelector('.bs-blast-status') as HTMLElement;
+    expect(status.textContent).toContain('cracked');
+    expect(status.textContent).toContain('stronger');
+  });
+
+  it('surfaces a refused blast rather than swallowing it', () => {
+    const { container, ui } = setup();
+    ui.setGameConsole(() => ({ success: false, output: 'No charges loaded.' }));
+
+    (container.querySelector('[data-action="execute"]') as HTMLButtonElement).click();
+    (document.querySelector('.bs-confirm-overlay .bs-btn-danger') as HTMLButtonElement).click();
+
+    expect((container.querySelector('.bs-blast-status') as HTMLElement).textContent)
+      .toContain('No charges loaded.');
+  });
+});

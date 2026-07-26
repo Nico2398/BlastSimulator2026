@@ -11,6 +11,14 @@ import type { CommandResult } from '../console/ConsoleRunner.js';
 
 export type GameConsoleFn = (cmd: string) => CommandResult;
 
+/**
+ * Charge the panel offers by default. Weak enough to be a starting point,
+ * strong enough that the blast actually breaks ground — pop_rock at 3 kg cracks
+ * rock and clears nothing, which reads as a blast that did not happen.
+ */
+const DEFAULT_EXPLOSIVE = 'boomite';
+const DEFAULT_CHARGE_KG = '5';
+
 export class BlastPlanUI {
   private readonly el: HTMLElement;
   private readonly holeListEl: HTMLElement;
@@ -107,6 +115,34 @@ export class BlastPlanUI {
     }, 3000);
   }
 
+  /**
+   * Tell the player what the blast did.
+   *
+   * The report was computed and thrown away, so a blast that cleared nothing
+   * looked identical to one that moved half the bench: dust, then a terrain
+   * that had not changed. A blast which breaks no rock now says so, and names
+   * the reason a player can act on.
+   */
+  private reportBlast(result: CommandResult | undefined): void {
+    if (!result) return;
+    if (!result.success) {
+      this.showStatus(result.output || t('ui.blast.status_no_holes'), 'error');
+      return;
+    }
+    const cleared = Number(/Cleared voxels:\s*(\d+)/.exec(result.output)?.[1] ?? '0');
+    const rating = /Rating:\s*(\w+)/.exec(result.output)?.[1] ?? '';
+    if (cleared === 0) {
+      this.showStatus(t('ui.blast.status_no_rock_moved'), 'error');
+      return;
+    }
+    this.showStatus(
+      t('ui.blast.status_blasted')
+        .replace('{cleared}', String(cleared))
+        .replace('{rating}', rating.toLowerCase()),
+      'success',
+    );
+  }
+
   private chargeAllHoles(): void {
     // Use the current charge form values to charge all holes at once
     const explosiveEl = this.chargeForm.querySelector('#bs-blast-explosive') as HTMLSelectElement | null;
@@ -174,8 +210,14 @@ export class BlastPlanUI {
       opt.value = id; opt.textContent = id;
       explosiveSelect.appendChild(opt);
     }
+    // A select defaults to its first option, so the form opened on pop_rock at
+    // 3 kg — a charge that clears zero voxels. "Charge All Holes" reads these
+    // fields, so the one-click path produced a blast that cracked rock and moved
+    // nothing, and the panel's own fallbacks (boomite, 5 kg) never applied
+    // because the fields were present. These are those fallbacks.
+    explosiveSelect.value = DEFAULT_EXPLOSIVE;
 
-    const amountInput = this.makeNumberInput('bs-blast-amount', '3', '1', '100', '1');
+    const amountInput = this.makeNumberInput('bs-blast-amount', DEFAULT_CHARGE_KG, '1', '100', '1');
     const stemmingInput = this.makeNumberInput('bs-blast-stemming', '2', '0', '20', '0.5');
 
     const errorEl = document.createElement('div');
@@ -272,7 +314,10 @@ export class BlastPlanUI {
     const yesBtn = document.createElement('button');
     yesBtn.className = 'bs-btn bs-btn-danger';
     yesBtn.textContent = t('ui.blast.yes');
-    yesBtn.addEventListener('click', () => { overlay.remove(); this.gameConsole?.('blast'); });
+    yesBtn.addEventListener('click', () => {
+      overlay.remove();
+      this.reportBlast(this.gameConsole?.('blast'));
+    });
     const noBtn = document.createElement('button');
     noBtn.className = 'bs-btn';
     noBtn.textContent = t('ui.blast.no');

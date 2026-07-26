@@ -1874,10 +1874,12 @@
   "tutorial.stage.build_warehouse": "Press Place next to Freight Warehouse.",
   "tutorial.stage.build_site": "Click a clear tile to site the building.",
   "tutorial.stage.ramp_tool": "Press Build Ramp in the Terrain section.",
-  "tutorial.stage.ramp_area": "Drag a line across the pit to carve the ramp.",
+  "tutorial.stage.ramp_area": "Drag a line down the intact ground beside the pit to carve the ramp.",
   "tutorial.stage.open_settings": "Open the Settings panel from the toolbar.",
-  "tutorial.stage.policy_apply": "Change the shift schedule, then press Apply Policy.",
+  "tutorial.stage.policy_apply": "Press Apply Policy. Adjust the shift schedule first if you like.",
   "tutorial.stage.let_time_run": "Let the clock run — press the speed button.",
   "ui.tile_select.stay_in_area": "Stay inside the highlighted area — the tutorial needs this placed there.",
-  "ui.tile_select.outside_area": "Outside the highlighted area. Select inside it to continue."
+  "ui.tile_select.outside_area": "Outside the highlighted area. Select inside it to continue.",
+  "ui.blast.status_blasted": "Blast complete — {cleared} m³ of rock broken out ({rating}).",
+  "ui.blast.status_no_rock_moved": "The charges cracked the rock but broke none of it out. Use a stronger explosive or a bigger charge."
 }

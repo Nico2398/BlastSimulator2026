@@ -54,7 +54,11 @@ const REGION = {
   survey: { x1: 8, z1: 8, x2: 16, z2: 16 },
   drill: { x1: 8, z1: 8, x2: 16, z2: 16 },
   warehouse: { x1: 2, z1: 2, x2: 9, z2: 9 },
-  ramp: { x1: 8, z1: 4, x2: 13, z2: 20 },
+  // Beside the pit, not inside it. The blast leaves sloped crater walls that
+  // already register as ramp cells, so carving within them removes more than it
+  // adds and the step's "a ramp appeared" check never fires. A haul ramp
+  // belongs on intact ground anyway.
+  ramp: { x1: 2, z1: 2, x2: 5, z2: 20 },
 } as const satisfies Record<string, TileRegion>;
 
 /** Open the Crew panel, then hire one role. */

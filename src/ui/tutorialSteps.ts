@@ -2,7 +2,6 @@
 // Defines the TutorialStep interface and ordered step array.
 
 import type { GameState } from '../core/state/GameState.js';
-import type { ShiftMode } from '../core/entities/SitePolicy.js';
 import {
   createComparisonStep,
   createHireStep,
@@ -209,22 +208,17 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     textKey: 'tutorial.step20',
     commands: ['set_policy mode:shift_8h'],
     highlightTarget: TOOLBAR_TARGET.settings,
+    // Completes when a policy is applied, not when one of its values happens to
+    // differ. Comparing values left a player who pressed Apply on the settings
+    // already showing — the common case, since the form mirrors the policy in
+    // force — watching a "Site policy updated" message while the tutorial sat
+    // on the step forever.
     captureSnapshot: (state: GameState) => ({
-      shiftMode: state.sitePolicy?.shiftMode,
-      hungerRestThreshold: state.sitePolicy?.hungerRestThreshold,
-      fatigueRestThreshold: state.sitePolicy?.fatigueRestThreshold,
+      policyRevision: state.sitePolicy?.revision ?? 0,
     }),
     isComplete: (state: GameState, snapshot: Record<string, unknown>) => {
-      const snapShift = snapshot.shiftMode as ShiftMode | undefined;
-      const snapHunger = snapshot.hungerRestThreshold as number | undefined;
-      const snapFatigue = snapshot.fatigueRestThreshold as number | undefined;
-      const sp = state.sitePolicy;
-      if (!sp) return false;
-      return (
-        sp.shiftMode !== snapShift ||
-        sp.hungerRestThreshold !== snapHunger ||
-        sp.fatigueRestThreshold !== snapFatigue
-      );
+      const before = (snapshot.policyRevision as number | undefined) ?? 0;
+      return (state.sitePolicy?.revision ?? 0) > before;
     },
   },
 

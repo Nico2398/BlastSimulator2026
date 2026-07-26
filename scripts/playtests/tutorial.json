@@ -344,9 +344,9 @@
         },
         {
           "do": "dragTiles",
-          "x1": 10,
-          "z1": 6,
-          "x2": 10,
+          "x1": 4,
+          "z1": 4,
+          "x2": 4,
           "z2": 18
         },
         {
@@ -374,17 +374,13 @@
           "selector": "#bs-toolbar [data-panel=\"settings\"]"
         },
         {
-          "do": "set",
-          "selector": "#bs-policy-shift",
-          "value": "shift_12h"
-        },
-        {
           "do": "click",
           "selector": "#bs-policy-apply"
         }
       ],
       "expect": {
-        "tutorialStep": "tick-advance"
+        "tutorialStep": "tick-advance",
+        "note": "Deliberately presses Apply without touching a control first. The form mirrors the policy already in force, so this is the path a player takes — and it used to leave the step stuck while the panel said the policy had been updated."
       }
     },
     {

@@ -282,3 +282,16 @@ describe("shouldForceRest() — 'custom' mode with per-employee overrides (3.12)
     expect(result).toBe(true);
   });
 });
+
+describe('policy revision', () => {
+  it('a fresh policy starts at revision 0', () => {
+    expect(createSitePolicy().revision).toBe(0);
+  });
+
+  it('is part of the policy, so applying one can be observed at all', () => {
+    // Whether a player has set a policy cannot be read from the values:
+    // applying the policy already in force changes none of them.
+    const policy = createSitePolicy();
+    expect(typeof policy.revision).toBe('number');
+  });
+});

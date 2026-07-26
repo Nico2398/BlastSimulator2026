@@ -408,6 +408,41 @@ deadlocking a step that waits on a surveyor, and it was correct for that. Applie
 to a step that waits on a *player*, it did precisely what this whole pass was
 meant to prevent — let the world move while someone was reading.
 
+### Seventh pass — the blast that broke nothing, and the button that did nothing
+
+Three reports. Two were bugs; the third turned out to be missing content and is
+now issue #421.
+
+| # | Severity | Was | Now |
+|---|----------|-----|-----|
+| 34 | Blocker | **"Apply Policy" appeared to do nothing.** The step compared the policy's *values* against a snapshot, but the settings form mirrors the policy already in force — so pressing Apply without touching a control changed nothing, the step never completed, and the panel cheerfully reported "Site policy updated". The tutorial sat there forever. | `SitePolicy` carries a `revision` that `set_policy` bumps whether or not any value differs, and the step completes on that. Applying the policy in force *is* the player applying a policy. |
+| 35 | Blocker | **The blast left the terrain untouched.** The charge form's `<select>` defaults to its first option, `pop_rock`, at 3 kg. That charge cracks rock and clears **zero** voxels — verified: `Cleared voxels: 0`, rating BAD, solid count unchanged. "Charge All Holes" reads those fields, so the one-click path the tutorial points at produced a dust cloud and nothing else. The panel's own fallbacks (`boomite`, 5 kg) never applied, because the fields were present. | The form opens on those fallbacks. The same plan now clears 782 voxels, rates PERFECT, and leaves a crater with walls, debris on the floor and exposed ore. |
+| 36 | Major | The blast report was computed and thrown away — `this.gameConsole?.('blast')`, return value ignored. An undercharged blast was indistinguishable from a blast that did not happen. | The panel reports what was broken out, and a blast that clears nothing says so and names the fix: stronger explosive or a bigger charge. |
+
+Finding 35 is worth dwelling on: the intent was recorded in the code all along.
+`chargeAllHoles` reads `explosiveEl?.value ?? 'boomite'` and `amountEl?.value ?? '5'`.
+Those defaults were correct and unreachable, because the element always exists —
+the `??` only fires when the form is absent, which it never is.
+
+Also surfaced, and only visible once the blast actually worked: the ramp step
+stopped completing. Its check counts nav cells of type `ramp`, and a fresh
+crater's sloped walls already register as ramps — so carving inside the crater
+*removed* more ramp cells than it added. The guided ramp region moved to intact
+ground beside the pit, which is where a haul ramp belongs anyway.
+
+### Recorded, not fixed: events have no consequence prose (#421)
+
+Answering an event yields `Outcome: Lost $3000, safety -3` and no sentence. This
+is not a display bug — the sentences do not exist. Every one of the 1341
+`event.*` i18n keys is a `.title`, `.desc` or `.optN`, and `EventOption` carries
+only `labelKey`. 269 events, 799 options, zero consequence text.
+
+Writing 799 lines in two locales is a content task rather than a fix, so it is
+issue #421, which also specifies the plumbing (`resultKey` on `EventOption`
+derived in `ev()`, the resolved key returned by `EventResolver`, the sentence
+shown above the numbers in `EventDialog`) and the wrinkle that probabilistic
+options resolve two ways and so need two sentences.
+
 ### Known gap: XP from work is still unwired
 
 `gainXp` implements the spec's on-the-job progression (`xpPerTick = 1 + floor(level * 0.5)`)

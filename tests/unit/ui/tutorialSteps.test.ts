@@ -123,6 +123,38 @@ describe('tutorialSteps', () => {
     expect(TUTORIAL_STEPS[18].autoAdvanceMs).toBe(2000);
   });
 
+  // ── set-policy ───────────────────────────────────────────────────────────
+  describe('step 19 (set-policy)', () => {
+    const step = TUTORIAL_STEPS.find(s => s.id === 'set-policy')!;
+
+    const stateWith = (revision: number) =>
+      ({ sitePolicy: { shiftMode: 'shift_8h', revision } } as unknown as GameState);
+
+    it('completes when a policy is applied, even with every value unchanged', () => {
+      // The reported bug: pressing Apply on the settings already in force is the
+      // common case, since the form mirrors the current policy. Comparing values
+      // concluded nothing had happened and the tutorial sat there forever while
+      // the panel said "Site policy updated".
+      const snap = step.captureSnapshot!(stateWith(0));
+      expect(step.isComplete(stateWith(1), snap)).toBe(true);
+    });
+
+    it('does not complete before the player applies anything', () => {
+      const snap = step.captureSnapshot!(stateWith(3));
+      expect(step.isComplete(stateWith(3), snap)).toBe(false);
+    });
+
+    it('does not complete on a policy applied before the step opened', () => {
+      const snap = step.captureSnapshot!(stateWith(5));
+      expect(step.isComplete(stateWith(4), snap)).toBe(false);
+    });
+
+    it('survives a state with no site policy at all', () => {
+      const empty = {} as unknown as GameState;
+      expect(() => step.isComplete(empty, step.captureSnapshot!(empty))).not.toThrow();
+    });
+  });
+
   // ── 14 (event-fire-resolve) ──────────────────────────────────────────────
   describe('step 9 (event-fire-resolve, index 9)', () => {
     const step9 = TUTORIAL_STEPS[9];

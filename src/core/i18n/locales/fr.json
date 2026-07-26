@@ -1874,10 +1874,12 @@
   "tutorial.stage.build_warehouse": "Appuyez sur Placer à côté d'Entrepôt de fret.",
   "tutorial.stage.build_site": "Cliquez sur une tuile libre pour implanter le bâtiment.",
   "tutorial.stage.ramp_tool": "Appuyez sur Construire une rampe dans la section Terrain.",
-  "tutorial.stage.ramp_area": "Tracez une ligne à travers la fosse pour creuser la rampe.",
+  "tutorial.stage.ramp_area": "Tracez une ligne sur le terrain intact à côté de la fosse pour creuser la rampe.",
   "tutorial.stage.open_settings": "Ouvrez le panneau Paramètres depuis la barre d'outils.",
-  "tutorial.stage.policy_apply": "Modifiez l'horaire des postes, puis appuyez sur Appliquer.",
+  "tutorial.stage.policy_apply": "Appuyez sur Appliquer. Ajustez d'abord l'horaire des postes si vous le souhaitez.",
   "tutorial.stage.let_time_run": "Laissez l'horloge tourner — appuyez sur le bouton de vitesse.",
   "ui.tile_select.stay_in_area": "Restez dans la zone en surbrillance — le tutoriel attend un placement à cet endroit.",
-  "ui.tile_select.outside_area": "Hors de la zone en surbrillance. Sélectionnez à l'intérieur pour continuer."
+  "ui.tile_select.outside_area": "Hors de la zone en surbrillance. Sélectionnez à l'intérieur pour continuer.",
+  "ui.blast.status_blasted": "Tir terminé — {cleared} m³ de roche abattus ({rating}).",
+  "ui.blast.status_no_rock_moved": "Les charges ont fissuré la roche sans rien abattre. Utilisez un explosif plus puissant ou une charge plus importante."
 }
