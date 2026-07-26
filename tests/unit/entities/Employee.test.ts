@@ -28,6 +28,7 @@ import {
   type SkillQualification,
   type SkillCategory,
   type NeedKey,
+  ROLE_STARTING_QUALIFICATION,
 } from '../../../src/core/entities/Employee.js';
 import {
   XP_THRESHOLDS,
@@ -138,13 +139,27 @@ describe('Employee system', () => {
 describe('Employee — skill qualification fields (3.1)', () => {
   const rng = new Random(1);
 
-  it('newly hired employee has qualifications as an empty array', () => {
+  it('newly hired employee arrives qualified for the role, at Rookie level', () => {
+    // Hiring used to grant nothing, which made every skill-gated action
+    // unreachable for a player: the only way to get a qualification was the
+    // `employee assign_skill` console command.
     const state = createEmployeeState();
     const { employee } = hireEmployee(state, 'driller', rng);
 
-    expect(employee.qualifications).toBeDefined();
     expect(Array.isArray(employee.qualifications)).toBe(true);
-    expect(employee.qualifications).toHaveLength(0);
+    expect(employee.qualifications).toHaveLength(1);
+    expect(employee.qualifications[0]!.category).toBe(ROLE_STARTING_QUALIFICATION.driller);
+    expect(employee.qualifications[0]!.proficiencyLevel).toBe(1);
+    expect(employee.qualifications[0]!.xp).toBe(0);
+  });
+
+  it('every role arrives with its own defining qualification', () => {
+    for (const role of ['surveyor', 'driller', 'blaster', 'driver', 'manager'] as const) {
+      const state = createEmployeeState();
+      const { employee } = hireEmployee(state, role, new Random(7));
+      expect(employee.qualifications.map(q => q.category))
+        .toEqual([ROLE_STARTING_QUALIFICATION[role]]);
+    }
   });
 
   it('newly hired employee has trainingState as null', () => {
@@ -210,10 +225,10 @@ describe('gainXp() (3.3)', () => {
   it('returns null when the employee has no qualification for the given category', () => {
     const state = createEmployeeState();
     const rng = new Random(1);
+    // A blaster arrives with 'blasting', so ask about a category it lacks.
     const { employee } = hireEmployee(state, 'blaster', rng);
-    // employee has an empty qualifications array — no 'blasting' entry
 
-    const result = gainXp(state, employee.id, 'blasting', 50);
+    const result = gainXp(state, employee.id, 'geology', 50);
 
     expect(result).toBeNull();
   });
@@ -377,13 +392,15 @@ describe('calculateSalary() (3.4)', () => {
   });
 
   // ── Test 2 ──────────────────────────────────────────────────────────────────
-  it('a newly hired employee has employee.salary equal to BASE_SALARIES[role]', () => {
+  it('a newly hired employee has employee.salary equal to base + its role qualification', () => {
     const state = createEmployeeState();
     const rng = new Random(1);
     const { employee } = hireEmployee(state, 'blaster', rng);
 
-    // No qualifications assigned yet — salary should match the role's base salary
-    expect(employee.salary).toBe(BASE_SALARIES['blaster']);
+    // A hire arrives holding its role qualification at Rookie level, so the
+    // stored salary carries that level's bonus and agrees with calculateSalary.
+    expect(employee.salary).toBe(BASE_SALARIES['blaster'] + QUALIFICATION_SALARY_BONUS[1]);
+    expect(employee.salary).toBe(calculateSalary(employee));
   });
 
   // ── Test 3 ──────────────────────────────────────────────────────────────────
@@ -463,6 +480,9 @@ describe('calculateSalary() (3.4)', () => {
     const state = createEmployeeState();
     const rng = new Random(1);
     const { employee } = hireEmployee(state, 'blaster', rng);
+    // Clear the hire-granted qualification so this measures assignSkill alone.
+    employee.qualifications = [];
+    employee.salary = BASE_SALARIES['blaster'];
     const salaryBefore = employee.salary;
 
     assignSkill(state, employee.id, 'blasting', 1);

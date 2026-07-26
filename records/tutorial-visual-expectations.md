@@ -263,6 +263,33 @@ verifies the Deliver control itself.
 - **"Charge All Holes" silently uses the charge form's defaults** (`pop_rock`, 3 kg) even
   though that form is hidden until a hole is selected.
 
+### Third pass — playing it without the console
+
+The two passes above still verified through the console: every check ran
+`employee assign_skill 1 skill:geology level:3` before touching the survey panel.
+That is why the survey step read as fixed while a real player still could not run
+one. A console command standing in for a player action converts "no player can do
+this" into PASS.
+
+So the pass was redone with a harness that has no console access beyond
+`new_game`, `campaign`, `tutorial_start`, `tick` and `time` — `npm run playtest`.
+It plays the tutorial through its own buttons and stops at the first step a
+player could not complete. Three findings, all invisible to the other channels:
+
+| # | Severity | Was | Now |
+|---|----------|-----|-----|
+| 24 | Blocker | `hireEmployee` set `qualifications: []`. Surveying needs `geology`, driving needs a licence, so **a hired surveyor could not survey and a hired driver could not drive.** The only way to grant a qualification was the `employee assign_skill` console command. | A hire arrives holding its role's qualification at Rookie level (`ROLE_STARTING_QUALIFICATION`). Training raises proficiency from there. The stored salary is now computed by `calculateSalary`, which the base-only value had silently disagreed with. |
+| 25 | Blocker | Three panels each own a `TileSelectOverlay`, and their forms reuse element ids. `close()` left the form in the document, so `document.getElementById('bs-tile-select-confirm')` could resolve to a **closed** picker's button — present in the DOM, impossible to click. | `close()` removes the form, and every lookup is scoped to the instance's own root. |
+| 26 | Blocker | The event step completed only while `pendingEvent != null` — true only while the dialog was open. A player who answered between two polls left the tutorial **permanently stuck** on that card: the scripted event fires at most once per level and cannot be brought back. | Completes on fired-then-resolved (`firedEventIds` contains the event *and* nothing is pending), which is monotonic and cannot be missed. |
+
+Finding 24 is the one the owner reported. It had survived a full green run of
+`static`, `logic`, `scenario` and `visual`, because all four drive the simulation
+through `src/console/`, whose commands are a superset of what any button exposes.
+
+The harness is now the fifth verification channel, `playability`, and
+`tests/unit/playtest-defs.test.ts` fails the suite if a definition reaches for a
+gameplay command. Procedures live in the `dev-playability-testing` skill.
+
 ### Known gap, not changed here
 
 **Tutorial Pit terrain is perfectly flat.** With `sizeY = 12` and the desert preset

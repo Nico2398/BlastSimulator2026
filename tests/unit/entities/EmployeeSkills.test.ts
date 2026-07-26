@@ -43,11 +43,13 @@ function makeStateWithOne(): { state: EmployeeState; empId: number } {
 // ── Section 1: New fields present on a newly hired employee ──────────────────
 
 describe('Employee — new fields after hireEmployee (CH1.4)', () => {
-  it('newly hired employee starts with an empty qualifications array', () => {
+  it('newly hired employee starts with exactly its role qualification', () => {
     const { state, empId } = makeStateWithOne();
     const emp = state.employees.find(e => e.id === empId)!;
-    // qualifications must be an initialised empty array, not undefined
-    expect((emp as any).qualifications).toEqual([]);
+    // An initialised array holding one Rookie-level entry for the hired role.
+    expect(Array.isArray((emp as any).qualifications)).toBe(true);
+    expect((emp as any).qualifications).toHaveLength(1);
+    expect((emp as any).qualifications[0].proficiencyLevel).toBe(1);
   });
 
   it('newly hired employee starts with trainingState === null', () => {

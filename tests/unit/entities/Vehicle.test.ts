@@ -979,6 +979,10 @@ function makeDriverFixture(
   const rng = new Random(ASSIGN_DRIVER_SEED);
   const { employee } = hireEmployee(es, 'driver', rng);
 
+  // These tests are about the licence check itself, so state the employee's
+  // licences outright: exactly the one asked for, or none at all. Hiring grants
+  // the truck licence by default, which would otherwise mask the rejection.
+  employee.qualifications = [];
   if (licenceCategory !== undefined) {
     assignSkill(es, employee.id, licenceCategory as SkillCategory, 1);
   }

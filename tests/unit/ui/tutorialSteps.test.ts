@@ -131,16 +131,45 @@ describe('tutorialSteps', () => {
       expect(step9.autoCommands).toEqual(['tick 3', 'event fire tutorial_synergy_consultant']);
     });
 
-    it('isComplete returns true when pendingEvent is not null', () => {
+    it('isComplete returns true once the scripted event fired and was resolved', () => {
       const state = {
-        events: { pendingEvent: { eventId: 'test_evt', firedAtTick: 5 } },
+        events: { pendingEvent: null, firedEventIds: ['tutorial_synergy_consultant'] },
       } as unknown as GameState;
       expect(step9.isComplete(state, {})).toBe(true);
     });
 
-    it('isComplete returns false when pendingEvent is null', () => {
-      const state = { events: { pendingEvent: null } } as unknown as GameState;
+    it('isComplete returns false while the dialog is still open', () => {
+      const state = {
+        events: {
+          pendingEvent: { eventId: 'tutorial_synergy_consultant', firedAtTick: 5 },
+          firedEventIds: ['tutorial_synergy_consultant'],
+        },
+      } as unknown as GameState;
       expect(step9.isComplete(state, {})).toBe(false);
+    });
+
+    it('isComplete returns false before the scripted event has fired', () => {
+      const state = {
+        events: { pendingEvent: null, firedEventIds: [] },
+      } as unknown as GameState;
+      expect(step9.isComplete(state, {})).toBe(false);
+    });
+
+    it('resolving a different event does not complete the step', () => {
+      const state = {
+        events: { pendingEvent: null, firedEventIds: ['union_strike'] },
+      } as unknown as GameState;
+      expect(step9.isComplete(state, {})).toBe(false);
+    });
+
+    it('stays complete once resolved, so a fast answer cannot deadlock the tutorial', () => {
+      // The old condition was only true while the dialog was open. This is the
+      // regression guard: the completion signal must be monotonic.
+      const state = {
+        events: { pendingEvent: null, firedEventIds: ['tutorial_synergy_consultant'] },
+      } as unknown as GameState;
+      expect(step9.isComplete(state, {})).toBe(true);
+      expect(step9.isComplete(state, {})).toBe(true);
     });
   });
 

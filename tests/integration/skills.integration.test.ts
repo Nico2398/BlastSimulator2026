@@ -217,19 +217,27 @@ describe('Employee skills', () => {
   it('calculateSalary reflects qualifications', () => {
     const emp = () => ctx.state!.employees.employees.find(e => e.id === empId)!;
 
-    // Blaster base salary = 700
-    expect(emp().salary).toBe(700);
-    expect(calculateSalary(emp())).toBe(700);
+    // Measured rather than hardcoded: a blaster is hired holding 'blasting' at
+    // Rookie level, so the starting salary already carries that level's bonus.
+    const atHire = calculateSalary(emp());
+    expect(emp().salary).toBe(atHire);
 
     // Add geology level 3 → bonus 220
     assignSkill(ctx.state!.employees, empId, 'geology', 3);
-    expect(calculateSalary(emp())).toBe(700 + 220);
-    expect(emp().salary).toBe(700 + 220);
+    expect(calculateSalary(emp())).toBe(atHire + 220);
+    expect(emp().salary).toBe(atHire + 220);
 
     // Add management level 2 → bonus 120
     assignSkill(ctx.state!.employees, empId, 'management', 2);
-    expect(calculateSalary(emp())).toBe(700 + 220 + 120);
-    expect(emp().salary).toBe(700 + 220 + 120);
+    expect(calculateSalary(emp())).toBe(atHire + 220 + 120);
+    expect(emp().salary).toBe(atHire + 220 + 120);
+  });
+
+  it('a hired blaster arrives holding its role qualification at Rookie level', () => {
+    const emp = ctx.state!.employees.employees.find(e => e.id === empId)!;
+    expect(emp.qualifications).toHaveLength(1);
+    expect(emp.qualifications[0]!.category).toBe('blasting');
+    expect(emp.qualifications[0]!.proficiencyLevel).toBe(1);
   });
 
   it('fire employee succeeds for non-unionized', () => {

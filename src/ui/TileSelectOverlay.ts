@@ -162,6 +162,10 @@ export class TileSelectOverlay {
 
   close(): void {
     this.overlay.style.display = 'none';
+    // Remove the form outright. Leaving it behind kept a duplicate
+    // #bs-tile-select-confirm in the document, so the next lookup — and any UI
+    // test — could resolve to a closed picker's controls.
+    this.overlay.querySelector('.bs-tile-select-form')?.remove();
     this.config = null;
     this.dragStart = null;
     this.dragEnd = null;
@@ -371,7 +375,9 @@ export class TileSelectOverlay {
   }
 
   private updateSelectionInfo(): void {
-    const el = document.getElementById('bs-tile-select-info');
+    // Scoped to this instance: three panels each own a picker, and their forms
+    // share element ids, so a document-wide lookup can hit a closed one.
+    const el = this.overlay.querySelector('.bs-tile-select-info');
     if (!el) return;
     const sel = this.getSelectionRect();
     if (!sel) { el.textContent = 'No selection'; return; }
@@ -385,7 +391,7 @@ export class TileSelectOverlay {
   }
 
   private enableConfirm(): void {
-    const btn = document.getElementById('bs-tile-select-confirm') as HTMLButtonElement | null;
+    const btn = this.overlay.querySelector('#bs-tile-select-confirm') as HTMLButtonElement | null;
     if (btn) btn.disabled = false;
   }
 
@@ -394,7 +400,7 @@ export class TileSelectOverlay {
     if (!sel || !this.config) return;
     const fields: Record<string, number> = {};
     for (const field of this.config.extraFields ?? []) {
-      const input = document.getElementById(`bs-tsf-${field.id}`) as HTMLInputElement | null;
+      const input = this.overlay.querySelector(`#bs-tsf-${field.id}`) as HTMLInputElement | null;
       fields[field.id] = input ? (parseFloat(input.value) || field.defaultValue) : field.defaultValue;
     }
     const result: TileSelectResult = {

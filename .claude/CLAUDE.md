@@ -38,14 +38,14 @@ Never restate content across layers. Reference it by name.
 
 Prefix categories:
 - `gameplay-*` — game mechanics specs (blast, buildings, navmesh, survey, vehicles, employee skills/needs, game design)
-- `dev-*` — architecture, coding conventions, testing strategy, visual testing
+- `dev-*` — architecture, coding conventions, testing strategy, visual testing, playability testing
 - `agentic-*` — pipeline orchestration, context authoring, issue creation
 
 **Skills-First:** before any task, load related skill(s) for domain rules, procedures, and constraints.
 
 ## ▶ Verification Gate — RUN BEFORE CLAIMING ANY WORK DONE
 
-Four independent channels prove a change works. Each catches what the others miss. Never report a task complete on a single channel when a second one applies.
+Five independent channels prove a change works. Each catches what the others miss. Never report a task complete on a single channel when a second one applies.
 
 | Channel | Command | Proves | Required when |
 |---------|---------|--------|---------------|
@@ -53,11 +53,14 @@ Four independent channels prove a change works. Each catches what the others mis
 | `logic` | `npm run test` | Unit + integration behaviour matches expectations | Every code change |
 | `scenario` | `npm run scenarios` | Full command sequences produce the expected game state | Gameplay, console, economy, campaign changes |
 | `visual` | `npm run screenshot`, `npm run scenario -- --mode interaction --screenshots` | The game renders correctly and the UI responds to real clicks | Any change to `src/renderer/`, `src/ui/`, or anything a player sees |
+| `playability` | `npm run playtest` | A player can actually reach the goal by clicking — no console command stands in for a player action | Any change to a player-facing flow: tutorial, panels, hiring, skills, contracts, building, vehicles |
 
 1. Run `npm run verify:env` when unsure a channel is usable. It reports each channel as READY or BLOCKED with the remedy.
 2. Pick every channel the change touches, not the cheapest one.
 3. When two channels disagree, neither result stands — investigate until they agree.
 4. State which channels you ran and what each showed. "Tests pass" is not a verification report when the change was visual.
+
+**The other four channels can all pass on an unplayable game.** They drive the simulation through `src/console/`, which has commands no button exposes — so a feature can be fully correct in the model and completely unreachable by a player. `playability` is the only channel that plays the game. Procedures live in the `dev-playability-testing` skill.
 
 **You have vision.** Screenshots are readable evidence: capture the PNG, then open it with the Read tool and describe what is actually on screen. A rendering change is unverified until an image has been inspected — a green test suite proves the logic, not the picture. Procedures live in the `dev-visual-testing` skill.
 
@@ -74,7 +77,8 @@ npm run verify:env      # which verification channels are live
 npm run validate        # TypeScript → coverage → integration → scenario defs → build
 npm run test            # Vitest unit + integration
 npm run scenarios       # all 99 scenarios, command mode, no browser
-npm run dev             # dev server on :5173, required by the visual channel
+npm run playtest        # plays the game through its own UI, clicks only
+npm run dev             # dev server on :5173, required by the visual and playability channels
 npm run console         # interactive gameplay REPL, no browser
 ```
 

@@ -1,0 +1,406 @@
+{
+  "name": "tutorial",
+  "description": "Plays Tutorial Pit start to finish using only controls a player can click. No console command stands in for a player action — if a step cannot be completed by clicking, this fails and names the control that blocked.",
+  "beats": [
+    {
+      "goal": "start the tutorial from a fresh Tutorial Pit",
+      "setup": [
+        "new_game seed:42 size:24",
+        "campaign start level:tutorial_pit",
+        "tutorial_start"
+      ],
+      "expect": {
+        "tutorialStep": "time-speed"
+      }
+    },
+    {
+      "goal": "raise the game speed with the speed button",
+      "actions": [
+        {
+          "do": "click",
+          "selector": "#bs-hud-top .bs-speed-btn"
+        }
+      ],
+      "expect": {
+        "tutorialStep": "hire-surveyor"
+      }
+    },
+    {
+      "goal": "open the Crew panel and hire a surveyor",
+      "actions": [
+        {
+          "do": "click",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "do": "click",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        }
+      ],
+      "expect": {
+        "tutorialStep": "survey",
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "goal": "the hired surveyor can actually be sent to survey",
+      "actions": [
+        {
+          "do": "click",
+          "selector": "#bs-toolbar [data-panel=\"survey\"]"
+        }
+      ],
+      "expect": {
+        "usable": "#bs-survey-run",
+        "note": "A surveyor who cannot survey is not a surveyor. If Run is disabled here, hiring grants no geology qualification and no button in the game grants one."
+      }
+    },
+    {
+      "goal": "run a survey and let the surveyor complete it",
+      "actions": [
+        {
+          "do": "click",
+          "selector": "#bs-survey-panel [data-method=\"core_sample\"]"
+        },
+        {
+          "do": "click",
+          "selector": "#bs-survey-run"
+        },
+        {
+          "do": "pickTile",
+          "x": 12,
+          "z": 12
+        },
+        {
+          "do": "click",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "do": "letTimePass",
+          "ticks": 15
+        }
+      ],
+      "expect": {
+        "tutorialStep": "hire-driller"
+      }
+    },
+    {
+      "goal": "hire a driller",
+      "actions": [
+        {
+          "do": "click",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "do": "click",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "expect": {
+        "tutorialStep": "drill-plan"
+      }
+    },
+    {
+      "goal": "lay out a drill grid with the Blast panel's grid tool",
+      "actions": [
+        {
+          "do": "click",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "do": "click",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "do": "dragTiles",
+          "x1": 8,
+          "z1": 8,
+          "x2": 16,
+          "z2": 16
+        },
+        {
+          "do": "click",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "expect": {
+        "tutorialStep": "charge",
+        "increased": [
+          "holeCount"
+        ]
+      }
+    },
+    {
+      "goal": "charge every hole",
+      "actions": [
+        {
+          "do": "click",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+        }
+      ],
+      "expect": {
+        "tutorialStep": "sequence",
+        "increased": [
+          "chargedCount"
+        ]
+      }
+    },
+    {
+      "goal": "sequence the detonation delays",
+      "actions": [
+        {
+          "do": "click",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
+        }
+      ],
+      "expect": {
+        "tutorialStep": "blast",
+        "increased": [
+          "sequencedCount"
+        ]
+      }
+    },
+    {
+      "goal": "fire the blast and confirm it",
+      "actions": [
+        {
+          "do": "click",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "do": "clickLabel",
+          "label": "Blast",
+          "region": "confirm"
+        }
+      ],
+      "expect": {
+        "note": "scores step auto-advances, so the tutorial step is checked in the next beat"
+      }
+    },
+    {
+      "goal": "answer the scripted consultant event",
+      "actions": [
+        {
+          "do": "letTimePass",
+          "ticks": 2
+        },
+        {
+          "do": "awaitUsable",
+          "selector": "#bs-event-dialog .bs-event-choice"
+        },
+        {
+          "do": "click",
+          "selector": "#bs-event-dialog .bs-event-choice"
+        },
+        {
+          "do": "click",
+          "selector": "#bs-event-dialog .bs-event-dismiss"
+        }
+      ],
+      "expect": {
+        "tutorialStep": "hire-manager"
+      }
+    },
+    {
+      "goal": "hire a manager",
+      "actions": [
+        {
+          "do": "click",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "do": "click",
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
+        }
+      ],
+      "expect": {
+        "tutorialStep": "contract-accept"
+      }
+    },
+    {
+      "goal": "accept a contract",
+      "actions": [
+        {
+          "do": "click",
+          "selector": "#bs-toolbar [data-panel=\"contracts\"]"
+        },
+        {
+          "do": "clickLabel",
+          "label": "Accept",
+          "region": "contracts"
+        }
+      ],
+      "expect": {
+        "tutorialStep": "hire-driver"
+      }
+    },
+    {
+      "goal": "hire a driver",
+      "actions": [
+        {
+          "do": "click",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "do": "click",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "expect": {
+        "tutorialStep": "vehicle-buy-assign"
+      }
+    },
+    {
+      "goal": "buy a hauler and put the hired driver in it",
+      "actions": [
+        {
+          "do": "click",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "do": "click",
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"]"
+        },
+        {
+          "do": "awaitUsable",
+          "selector": "#bs-vehicle-panel .bs-vehicle-assign-btn"
+        },
+        {
+          "do": "click",
+          "selector": "#bs-vehicle-panel .bs-vehicle-assign-btn"
+        }
+      ],
+      "expect": {
+        "tutorialStep": "build-storage",
+        "note": "A hired driver with no licence makes Assign unreachable — same root cause as the surveyor."
+      }
+    },
+    {
+      "goal": "place a freight warehouse",
+      "actions": [
+        {
+          "do": "click",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "do": "click",
+          "selector": "#bs-build-panel [data-build-type=\"freight_warehouse\"] .bs-build-buy-btn"
+        },
+        {
+          "do": "pickTile",
+          "x": 4,
+          "z": 4
+        },
+        {
+          "do": "click",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "expect": {
+        "tutorialStep": "contract-deliver",
+        "increased": [
+          "buildingCount"
+        ]
+      }
+    },
+    {
+      "goal": "deliver against an active contract",
+      "actions": [
+        {
+          "do": "click",
+          "selector": "#bs-toolbar [data-panel=\"contracts\"]"
+        },
+        {
+          "do": "clickLabel",
+          "label": "Accept",
+          "region": "contracts"
+        },
+        {
+          "do": "awaitUsable",
+          "selector": "#bs-contract-panel .bs-contract-deliver"
+        },
+        {
+          "do": "click",
+          "selector": "#bs-contract-panel .bs-contract-deliver"
+        }
+      ],
+      "expect": {
+        "note": "finances step auto-advances; the ramp step is asserted next"
+      }
+    },
+    {
+      "goal": "carve a ramp",
+      "actions": [
+        {
+          "do": "awaitTutorialStep",
+          "stepId": "build-ramp"
+        },
+        {
+          "do": "click",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "do": "click",
+          "selector": "#bs-build-panel .bs-build-ramp-btn"
+        },
+        {
+          "do": "dragTiles",
+          "x1": 10,
+          "z1": 6,
+          "x2": 10,
+          "z2": 18
+        },
+        {
+          "do": "click",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "do": "letTimePass",
+          "ticks": 2
+        }
+      ],
+      "expect": {
+        "note": "the needs card auto-advances, so the next beat waits for set-policy rather than asserting a step here"
+      }
+    },
+    {
+      "goal": "change the site policy from Settings",
+      "actions": [
+        {
+          "do": "awaitTutorialStep",
+          "stepId": "set-policy"
+        },
+        {
+          "do": "click",
+          "selector": "#bs-toolbar [data-panel=\"settings\"]"
+        },
+        {
+          "do": "set",
+          "selector": "#bs-policy-shift",
+          "value": "shift_12h"
+        },
+        {
+          "do": "click",
+          "selector": "#bs-policy-apply"
+        }
+      ],
+      "expect": {
+        "tutorialStep": "tick-advance"
+      }
+    },
+    {
+      "goal": "let time run so production ticks over",
+      "actions": [
+        {
+          "do": "letTimePass",
+          "ticks": 8
+        }
+      ],
+      "expect": {
+        "tutorialStep": "victory"
+      }
+    }
+  ]
+}

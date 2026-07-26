@@ -16,6 +16,9 @@ import {
   TOOLBAR_TARGET,
 } from './tutorialStepHelpers.js';
 
+/** The one scripted event the tutorial fires, so the player meets the dialog. */
+const TUTORIAL_EVENT_ID = 'tutorial_synergy_consultant';
+
 export interface TutorialStep {
   id: string;
   titleKey: string;
@@ -97,8 +100,16 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     textKey: 'tutorial.step10',
     highlightTarget: '#bs-hud-top .bs-event-badge',
     autoCommands: ['tick 3', 'event fire tutorial_synergy_consultant'],
+    // The step asks the player to answer the dialog, so it completes on
+    // fired-then-resolved. Completing on "an event is pending" was only true
+    // while the dialog was open: a player who answered between two polls left
+    // the tutorial stuck on this card with nothing left to click, because the
+    // event fires at most once per level and cannot be brought back.
     isComplete: (state: GameState) => {
-      return state.events?.pendingEvent != null;
+      const events = state.events;
+      if (!events) return false;
+      return (events.firedEventIds ?? []).includes(TUTORIAL_EVENT_ID)
+        && events.pendingEvent == null;
     },
   },
 

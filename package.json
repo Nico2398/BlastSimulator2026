@@ -23,7 +23,8 @@
     "screenshot": "tsx scripts/screenshot.ts",
     "a11y": "tsx scripts/a11y-check.ts",
     "ui:diagnostic": "tsx scripts/ui-diagnostic.ts",
-    "validate:state": "tsx scripts/validate-state-schema.ts"
+    "validate:state": "tsx scripts/validate-state-schema.ts",
+    "playtest": "tsx scripts/playtest.ts"
   },
   "dependencies": {
     "cannon-es": "^0.20.0",

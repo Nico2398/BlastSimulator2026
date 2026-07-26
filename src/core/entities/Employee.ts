@@ -49,6 +49,20 @@ export type SkillCategory =
   | 'management'
   | 'geology';
 
+/**
+ * The qualification each role arrives with, at Rookie level.
+ *
+ * `driver` gets the truck licence; excavator and drill-rig licences are raised
+ * through training rather than hiring.
+ */
+export const ROLE_STARTING_QUALIFICATION: Record<EmployeeRole, SkillCategory> = {
+  surveyor: 'geology',
+  driller: 'blasting',
+  blaster: 'blasting',
+  driver: 'driving.truck',
+  manager: 'management',
+};
+
 export interface SkillQualification {
   category: SkillCategory;
   proficiencyLevel: 1 | 2 | 3 | 4 | 5;
@@ -129,7 +143,13 @@ export function hireEmployee(
     injured: false,
     alive: true,
     x, z,
-    qualifications: [],
+    // A hire arrives qualified for the job they were hired to do, at Rookie
+    // level. Hiring used to grant nothing, which made every role interchangeable
+    // and every skill-gated action unreachable: a surveyor could not survey and
+    // a driver could not drive, because the only way to grant a qualification
+    // was the `employee assign_skill` console command. Training raises
+    // proficiency from here.
+    qualifications: [{ category: ROLE_STARTING_QUALIFICATION[role], proficiencyLevel: 1, xp: 0 }],
     trainingState: null,
     activeActionId: null,
     hunger: 100,
@@ -140,6 +160,11 @@ export function hireEmployee(
     ticksWorked: 0,
     restTicksRemaining: null,
   };
+  // Keep the stored salary consistent with the qualification just granted —
+  // calculateSalary() sums qualification bonuses, so a base-only salary would
+  // disagree with it from the moment of hire.
+  employee.salary = calculateSalary(employee);
+
   state.employees.push(employee);
   return { employee, hiringCost: HIRING_COSTS[role] };
 }
