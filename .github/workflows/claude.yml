@@ -30,6 +30,29 @@ jobs:
         with:
           fetch-depth: 1
 
+      # Claude must be able to run the verification channels (typecheck, tests,
+      # scenarios). Without Node and installed dependencies every `npm run`
+      # invocation fails, and without the allow-list below it is refused with
+      # "This command requires approval".
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Cache npm dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Puppeteer Chrome
+        run: npx puppeteer browsers install chrome
+
       - name: Run Claude Code
         id: claude
         uses: anthropics/claude-code-action@v1
@@ -43,8 +66,12 @@ jobs:
           # Optional: Give a custom prompt to Claude. If this is not specified, Claude will perform the instructions specified in the comment that tagged it.
           # prompt: 'Update the pull request description to include a summary of changes.'
 
-          # Optional: Add claude_args to customize behavior and configuration
+          # Verification channels + git/gh inspection, allowed without prompting.
+          # This duplicates .claude/settings.json on purpose: the action checks
+          # out the PR head branch, which may predate that file.
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://code.claude.com/docs/en/cli-reference for available options
-          # claude_args: '--allowed-tools Bash(gh pr *)'
+          claude_args: >-
+            --allowed-tools
+            "Bash(npm ci),Bash(npm install),Bash(npm run:*),Bash(npx tsc:*),Bash(npx vitest:*),Bash(npx vite:*),Bash(npx tsx:*),Bash(npx puppeteer browsers install:*),Bash(node:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git rev-parse:*),Bash(git ls-files:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr list:*),Bash(gh issue view:*),Bash(gh issue list:*),Bash(gh run view:*),Bash(gh run list:*),Bash(curl -sf http://localhost:*)"
 
