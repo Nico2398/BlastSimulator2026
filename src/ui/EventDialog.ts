@@ -44,7 +44,7 @@ export class EventDialog {
     this.descEl.style.cssText = 'margin:0 0 14px';
 
     this.chooseLabel = document.createElement('div');
-    this.chooseLabel.style.cssText = 'font-size:10px;color:#7a7060;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px';
+    this.chooseLabel.style.cssText = 'font-size:10px;color:#857b6b;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px';
     this.chooseLabel.textContent = t('ui.event.choose');
 
     this.optionsEl = document.createElement('div');

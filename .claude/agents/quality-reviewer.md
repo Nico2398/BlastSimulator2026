@@ -1,16 +1,16 @@
 ---
 name: quality-reviewer
-description:  Code quality reviewer. Flags architecture violations, naming issues, dead code, file size limits, TypeScript strictness, config hardcoding. Read-only.
-allowed-tools: Read Search
-user-invocable: false
-disable-model-invocation: true
+description: Code quality reviewer. Flags architecture violations, naming issues, dead code, file size limits, TypeScript strictness, config hardcoding. Read-only.
+tools: Read, Grep, Glob, Bash, Skill, TodoWrite
+skills:
+  - dev-coding-conventions
+  - dev-architecture
 hooks:
   PreToolUse:
     - matcher: Bash
       hooks:
         - type: command
-          shell: powershell
-          command: .claude/hooks/block-git-gh.ps1
+          command: ${CLAUDE_PROJECT_DIR}/.claude/hooks/block-git-gh.sh
 ---
 
 # Quality Reviewer

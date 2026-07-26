@@ -1,16 +1,9 @@
 ---
 name: context-maintainer
 description: Maintains context files after pipeline changes. Updates skills, agent definitions, and other context files to reflect project changes, and commits updates.
-allowed-tools: Read Edit Search Execute
-user-invocable: false
-disable-model-invocation: true
-hooks:
-  PreToolUse:
-    - matcher: Bash
-      hooks:
-        - type: command
-          shell: powershell
-          command: .claude/hooks/block-git-gh.ps1
+tools: Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite
+skills:
+  - agentic-context-edition
 ---
 # Context Maintainer
 

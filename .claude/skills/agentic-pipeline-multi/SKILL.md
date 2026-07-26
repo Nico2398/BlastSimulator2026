@@ -41,6 +41,9 @@ Use when the prompt mixes multiple task types.
          [qualimetry]              → jscpd syntactic duplication check
                                      if fail → @implementer → re-run affected section
          [finalization]            → Delegate to `agentic-pipeline-finalization` skill
+         @context-maintainer       → Context maintenance
+                                     Update context files to reflect project changes.
+                                     Do nothing if no project logic changed.
 ```
 
 ### Branch Strategy

@@ -35,7 +35,7 @@ Write **minimum code** to pass failing tests.
 5. `npx tsc --noEmit` → verify type safety
 6. Commit: `git add -A && git commit -m "implement: <feature> (#<issue>)"`
 7. `git log --oneline -1` → confirm committed
-8. Hand off to refactorer
+ 8. Hand off to refactorer
 
 ## ▶ PROCEDURE — Visual Feedback Loop
 

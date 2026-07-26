@@ -1,16 +1,7 @@
 ---
 name: executor
 description: Executes simple imperative commands (create issue, comment, tag, etc.) using gh and shell.
-allowed-tools: Read Edit Search Execute
-user-invocable: false
-disable-model-invocation: true
-hooks:
-  PreToolUse:
-    - matcher: Bash
-      hooks:
-        - type: command
-          shell: powershell
-          command: .claude/hooks/block-git-gh.ps1
+tools: Read, Grep, Glob, Bash, Skill
 ---
 
 # Executor — Imperative Command Runner

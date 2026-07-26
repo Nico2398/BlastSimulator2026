@@ -1,9 +1,10 @@
 ---
 name: fixer
-description:  Independent bug-fix specialist: resolves test failures by comparing error output against source code. Reads both test expectations and implementation to determine which side is wrong, then fixes accordingly.
-allowed-tools: Read Edit Search Execute
-user-invocable: false
-disable-model-invocation: true
+description: Independent bug-fix specialist: resolves test failures by comparing error output against source code. Reads both test expectations and implementation to determine which side is wrong, then fixes accordingly.
+tools: Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite
+skills:
+  - dev-testing-strategy
+  - dev-coding-conventions
 ---
 
 # Fixer — Independent Test-Failure Fix

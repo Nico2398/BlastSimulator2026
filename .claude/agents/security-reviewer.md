@@ -1,16 +1,15 @@
 ---
 name: security-reviewer
-description:  Security-focused code reviewer. Flags exploitable vulnerabilities, auth bypasses, injection patterns, hardcoded secrets. Read-only — never modifies files.
-allowed-tools: Read Search
-user-invocable: false
-disable-model-invocation: true
+description: Security-focused code reviewer. Flags exploitable vulnerabilities, auth bypasses, injection patterns, hardcoded secrets. Read-only — never modifies files.
+tools: Read, Grep, Glob, Bash, Skill, TodoWrite
+skills:
+  - dev-coding-conventions
 hooks:
   PreToolUse:
     - matcher: Bash
       hooks:
         - type: command
-          shell: powershell
-          command: .claude/hooks/block-git-gh.ps1
+          command: ${CLAUDE_PROJECT_DIR}/.claude/hooks/block-git-gh.sh
 ---
 
 # Security Reviewer

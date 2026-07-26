@@ -49,6 +49,9 @@ jobs:
       - name: Run TypeScript type check on scripts/
         run: npx tsc --noEmit --project scripts/tsconfig.json
 
+      - name: Validate agent context files
+        run: npm run validate:context
+
   test:
     name: Unit & integration tests
     runs-on: ubuntu-latest

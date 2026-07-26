@@ -1,9 +1,10 @@
 ---
 name: refactorer
-description:  TDD Refactor phase: cleans up implementation for clarity, maintainability, convention compliance. No behavior change. All tests must still pass after refactoring.
-allowed-tools: Read Edit Search Execute
-user-invocable: false
-disable-model-invocation: true
+description: TDD Refactor phase: cleans up implementation for clarity, maintainability, convention compliance. No behavior change. All tests must still pass after refactoring.
+tools: Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite
+skills:
+  - dev-coding-conventions
+  - dev-architecture
 ---
 
 # Refactorer — TDD Refactor Phase

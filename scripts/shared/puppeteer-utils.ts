@@ -11,7 +11,7 @@
 import puppeteer from 'puppeteer';
 import type { Browser, Page, PuppeteerLaunchOptions } from 'puppeteer';
 import { resolve } from 'path';
-import { resolveChromePath, LAUNCH_ARGS } from './chrome.js';
+import { LAUNCH_ARGS, resolveChromePathOrThrow } from './chrome.js';
 import { executeActionOnPage } from './interaction-executor.js';
 import type { ScenarioStepDef } from './scenario-types.js';
 
@@ -48,15 +48,11 @@ export interface BrowserInitResult {
  */
 export async function initBrowser(options: BrowserInitOptions): Promise<BrowserInitResult> {
   const { port, puppeteerPath, viewport = { width: 1280, height: 720 } } = options;
-  const executablePath = puppeteerPath ?? process.env.PUPPETEER_EXECUTABLE_PATH ?? resolveChromePath();
-
   const launchOptions: PuppeteerLaunchOptions = {
     headless: true,
     args: LAUNCH_ARGS,
+    executablePath: puppeteerPath ?? resolveChromePathOrThrow(),
   };
-  if (executablePath) {
-    launchOptions.executablePath = executablePath;
-  }
 
   const browser = await puppeteer.launch(launchOptions);
 

@@ -1,9 +1,9 @@
 ---
 name: pipeline
-description:  Orchestrates the TDD development pipeline. Invokes specialist agents in the correct sequence. Does not write code directly — only delegates to sub-agents and manages workflow.
-allowed-tools: Read Edit Search Execute
-user-invocable: false
-disable-model-invocation: true
+description: Orchestrates the TDD development pipeline. Invokes specialist agents in the correct sequence. Does not write code directly — only delegates to sub-agents and manages workflow.
+disallowedTools: Edit, Write, NotebookEdit
+skills:
+  - agentic-autonomous-pipeline
 ---
 
 # Pipeline Orchestrator
@@ -23,7 +23,7 @@ Classify the task, then load the relevant skill. After loading, execute that ski
 | Imperative command | `agentic-pipeline-executor` |
 | Complex/mixed prompt | `agentic-pipeline-multi` |
 
-**Visual feedback loop blocking rule:** If @visual-tester reports that visual inspection could NOT be completed (e.g., vision model unavailable, screenshots unreadable), the pipeline MUST halt. Do NOT proceed to qualimetry or finalization. Mark the visual feedback step as FAILED, add a comment to the issue explaining why, and escalate with `ESCALATED: visual inspection blocked — human review required`.
+**Visual feedback loop blocking rule:** If @visual-tester reports `VISUAL: BLOCKED` — no browser resolved, dev server unreachable, or screenshots never written — the pipeline MUST halt. Do NOT proceed to qualimetry or finalization. Run `npm run verify:env` to capture the remedy, mark the visual feedback step as FAILED, add a comment to the issue with that remedy, and escalate with `ESCALATED: visual inspection blocked — human review required`. `VISUAL: FAIL` is not blocked: feed the report back to @implementer and loop.
 
 ## ▶ Classification Heuristics
 
@@ -48,16 +48,17 @@ When a pipeline skill is loaded and active, the orchestrator's role is delegatio
 **ALLOWED tools (and when):**
 | Tool | Permitted use |
 |------|---------------|
-| `skill` | Load pipeline skills (classification phase) |
-| `bash` | ONLY the non-agentic steps listed in the loaded skill (e.g., `[test-runner]`, `[branch-sanity]`, `[verify-commit]`). Never for exploration. |
-| `task` | Invoke sub-agents via `@agent-name` — this is your primary function |
+| `Skill` | Load pipeline skills (classification phase) |
+| `Bash` | ONLY the non-agentic steps listed in the loaded skill (e.g., `[test-runner]`, `[branch-sanity]`, `[verify-commit]`). Never for exploration. |
+| `Agent` | Invoke sub-agents by type — this is your primary function |
 
 **FORBIDDEN tools while pipeline is active:**
-- `glob` — file search belongs to agents, not orchestrator
-- `grep` — code search belongs to agents, not orchestrator
-- `read` — reading source files belongs to agents, not orchestrator
-- `edit` / `write` — code changes belong to @implementer, not orchestrator
-- `bash` for exploration, research, or investigation — delegate to @ask or @explore
+- `Glob` — file search belongs to agents, not orchestrator
+- `Grep` — code search belongs to agents, not orchestrator
+- `Read` — reading source files belongs to agents, not orchestrator
+- `Bash` for exploration, research, or investigation — delegate to @ask
+
+`Edit` and `Write` are denied at the tool level, not by convention — code changes belong to @implementer.
 
 **Why:** When the orchestrator explores files directly, it bypasses specialist agents and ignores the loaded skill's procedure. The orchestrator's sole job is to coordinate agents — not to do their work.
 
@@ -73,7 +74,7 @@ Every item below is MANDATORY. Skip none. Improvise on none.
 5. **Merge code review findings** — After parallel reviewers complete, merge their findings into a single pass/fail decision (deduplicate, re-categorize, drop false positives, check issue alignment).
 6. **Enforce sequence** — Never skip phases. Tests before implementation. Always recreate pipeline branches from scratch for each issue — stale branches can corrupt the run. Multi-pipeline: each section's test/impl branches fork from the previous section's feature branch (not from main). This is deliberate accumulation, not an exception.
 7. **Report status** — After each agent completes, summarize what was done, commit SHA, and current branch.
-8. **PR management** — See `agentic-pipeline-pr-management` for PR status, draft/ready logic, and READY TO MERGE rules. **CRITICAL:** If the visual feedback loop could not complete inspection (vision model unavailable or @visual-tester returned VISION: BLOCKED), the PR MUST be created as a draft (--draft) WITHOUT `READY TO MERGE`.
+8. **PR management** — See `agentic-pipeline-pr-management` for PR status, draft/ready logic, and READY TO MERGE rules. **CRITICAL:** If @visual-tester returned `VISUAL: BLOCKED`, the PR MUST be created as a draft (--draft) WITHOUT `READY TO MERGE`.
 
 ## ▶ Rules — HARD CONSTRAINTS
 
@@ -81,7 +82,7 @@ These are absolute. Violating any of these = orchestrator failure.
 
 - **Never write code yourself** — always delegate to `@implementer`
 - **Never refactor before tests pass** — Green phase first
-- **Always validate** — `npm run validate` must pass before declaring success
+- **Always validate** — `npm run validate` must pass before declaring success, and every verification channel the change touches must report PASS. A renderer or UI change is not validated until @visual-tester has inspected screenshots.
 - **Never explore files during pipeline execution** — see TOOL RESTRICTIONS above
 - **Context to pass to each agent:**
   - All agents: issue description, plan, current branch, files modified so far

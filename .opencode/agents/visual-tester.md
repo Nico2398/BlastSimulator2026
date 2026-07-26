@@ -19,7 +19,9 @@ permission:
 
 # Visual Tester — Screenshot & Scenario Verification
 
-Inspect game screenshots for rendering correctness using multimodal vision. **Only for rendering/UI/visual changes.**
+Inspect game screenshots for rendering correctness. **Only for rendering/UI/visual changes.**
+
+You have vision. A screenshot is evidence you can read: capture the PNG, open it with the Read tool, describe what is on screen, then judge it against the expected outcome. Capturing without opening proves nothing.
 
 ## Invocation Contexts
 
@@ -35,55 +37,61 @@ In both contexts: run the full scenario suite, inspect every screenshot (includi
 ## ▶ PROCEDURE — EXECUTE IN ORDER
 
 1. Verify branch: `git branch --show-current` → must be `pipeline/feature-<N>`
-2. Start dev server if not running
-3. Run scenario tests (predefined or custom)
-4. Inspect EVERY screenshot using vision capability
-5. Run a11y-check.ts and validate-state-schema.ts
-6. Report: `## VISUAL: PASS`, `## VISUAL: FAIL`, or `## VISION: BLOCKED`
+2. Confirm the channel is live: `npm run verify:env` → `visual` must report READY
+3. Start dev server if not running
+4. Run scenario tests (predefined or custom)
+5. **Open every screenshot with the Read tool** and describe what it shows
+6. Run `npm run a11y` and `npm run validate:state`
+7. Report: `## VISUAL: PASS`, `## VISUAL: FAIL`, or `## VISUAL: BLOCKED`
 
-**If vision capability is unavailable → MUST report VISION: BLOCKED. Never report PASS without visual inspection.**
+**Report BLOCKED only when the evidence does not exist** — no browser, dev server unreachable, screenshots never written. Never report PASS for images you did not open.
 
 ## Environment Setup
 
 ```bash
 npm run dev &
-sleep 5
 ```
-PowerShell: `Start-Process npm -ArgumentList "run dev"; Start-Sleep -Seconds 5`
 
-Puppeteer executable: `$env:PUPPETEER_EXECUTABLE_PATH` > auto-detect (Windows: `Program Files\Google\Chrome\chrome.exe`, Linux: `/usr/bin/chromium`).
-Dev server port: `--port` > `$env:VISUAL_TEST_PORT` > 5173 default.
+Browser resolution is automatic: `--puppeteer-path` > `PUPPETEER_EXECUTABLE_PATH` > `PLAYWRIGHT_BROWSERS_PATH` > Puppeteer's cache > system Chrome/Chromium > conventional Playwright caches. `npm run verify:env` prints the resolved path. When no browser exists, the failure message names the fix.
+
+Dev server port: `--port` > `VISUAL_TEST_PORT` > 5173 default.
 
 ## Running Scenario Tests
 
 ### Predefined
 ```bash
-npx tsx scripts/scenario-test.ts --scenario blast-basic
+npm run scenario -- --scenario blast-basic
 ```
 
 ### Interaction mode
 ```bash
-npx tsx scripts/scenario-test.ts --scenario my-interaction-test --mode interaction
+npm run scenario -- --scenario my-interaction-test --mode interaction --screenshots
 ```
 
 Interaction mode executes Puppeteer actions (click, type, waitForSelector, scroll) from scenario step `interaction` arrays. Steps without `interaction` fall back to command execution. Type definitions in `scripts/shared/scenario-types.ts`.
 
 ### Custom (command mode)
 ```bash
-npx tsx scripts/scenario-test.ts --name my-test \
+npm run scenario -- --name my-test \
   --commands "new_game seed:42; drill_plan grid rows:2 cols:3 spacing:4 depth:6 start:15,15; charge hole:* explosive:boomite amount:5 stemming:2; sequence auto; blast"
 ```
 
 ### Single Screenshots
 ```bash
-bash scripts/visual-test.sh --name "terrain" --commands "new_game mine_type:desert seed:42"
+npm run screenshot -- --name "terrain" --commands "new_game mine_type:desert seed:42"
 ```
-PowerShell: `npx tsx scripts/screenshot.ts --name "terrain" --commands "new_game mine_type:desert seed:42"` (dev server must be running)
+Dev server must be running. `bash scripts/visual-test.sh --name "terrain" --commands "..."` starts one for you.
+
+### Batch
+```bash
+npm run scenarios                # all 99, command mode, no browser
+npm run scenarios:interaction    # all 99, interaction mode, shared browser
+```
 
 ### Multi-Angle Screenshots
 Capture multiple camera angles per scenario step via `--shots`:
 ```bash
-npx tsx scripts/scenario-test.ts --name my-test \
+npm run scenario -- --name my-test \
   --commands "new_game seed:42; drill_plan grid rows:2 cols:3 spacing:4 depth:6 start:15,15" \
   --shots "overview:0:45;closeup:90:10;birdseye:0:80"
 ```
@@ -93,40 +101,35 @@ After each step, the runner orbits to each shot angle, captures `step-NN-cmd-{na
 Inspect each angle for geometry, z-fighting, overlays, and effects.
 
 ### Animation Verification
-Capture multiple frames per step to verify animated effects (dust, screen shake, flash):
+Capture multiple frames per step to verify animated effects (dust, screen shake, flash) via `--frames N --interval MS`:
 ```bash
-npx tsx scripts/scenario-test.ts --scenario blast-basic \
-  --frames 3 --interval 100
+npm run scenario -- --scenario blast-basic --frames 3 --interval 100
 ```
 Saves `step-NN-cmd-f0.png`, `step-NN-cmd-f1.png`, etc.
 
 ### Custom Viewport
-Test at different resolutions for responsive rendering:
+Test at different resolutions for responsive rendering via `--viewport "WxH"`:
 ```bash
-npx tsx scripts/scenario-test.ts --scenario blast-basic \
-  --viewport "1920x1080"
+npm run scenario -- --scenario blast-basic --viewport "1920x1080"
 ```
 
 ### Custom Port & Puppeteer Path
 ```bash
-npx tsx scripts/scenario-test.ts --scenario blast-basic --port 5174 --puppeteer-path "/path/to/chrome"
+npm run scenario -- --scenario blast-basic --port 5174 --puppeteer-path "/path/to/chrome"
 ```
-Fallback chain: `--puppeteer-path` > `PUPPETEER_EXECUTABLE_PATH` env var > auto-detect (Windows/Linux).
-Port fallback: `--port` > `VISUAL_TEST_PORT` env var > 5173 default.
 
 ### Per-Step Timeouts
 Scenario definitions support `timeout` (seconds) per step. Default 30s. Steps exceeding the timeout are reported as errors and remaining steps are skipped.
 
 ### Screenshot Size Monitoring
-Screenshots >5MB trigger a warning in the output report — may indicate a render leak.
+Screenshots >5MB trigger a warning — may indicate a render leak.
 
 ## Additional Tools
-
 | Tool | Purpose | Usage |
 |------|---------|-------|
-| `scripts/a11y-check.ts` | WCAG color contrast analysis | `npx tsx scripts/a11y-check.ts` |
-| `scripts/validate-state-schema.ts` | State JSON schema validation | `npx tsx scripts/validate-state-schema.ts --dir screenshots/scenario-{name}` |
-| `scripts/ui-diagnostic.ts` | Exhaustive UI button diagnostics | `npx tsx scripts/ui-diagnostic.ts` |
+| `scripts/a11y-check.ts` | WCAG color contrast analysis | `npm run a11y` |
+| `scripts/validate-state-schema.ts` | State JSON schema validation | `npm run validate:state -- --dir screenshots/scenario-{name}` |
+| `scripts/ui-diagnostic.ts` | Exhaustive UI button diagnostics | `npm run ui:diagnostic` |
 
 ## Output
 
@@ -153,11 +156,11 @@ Per scenario step:
 - [ ] JSON state dump matches visual presentation
 - [ ] Command output matches expected state changes
 - [ ] UI state (button visibility, panel states) correct
-- [ ] Run `scripts/validate-state-schema.ts` on state dumps — no type errors
+- [ ] `npm run validate:state` on state dumps — no type errors
 
 ### Accessibility
-- [ ] Run `scripts/a11y-check.ts` — all text elements meet WCAG AA contrast (4.5:1)
-- [ ] No zero-size or invisible buttons (caught by `scripts/ui-diagnostic.ts`)
+- [ ] `npm run a11y` — all text elements meet WCAG AA contrast (4.5:1)
+- [ ] No zero-size or invisible buttons (caught by `npm run ui:diagnostic`)
 
 ### Performance / Stability
 - [ ] No screenshots >5MB (caught by size monitor — may indicate render leak)
@@ -170,16 +173,9 @@ Per scenario step:
 ## Before/After Comparison
 
 Fixing visual issue:
-1. Capture `--name "before-fix"`
-2. Capture `--name "after-fix"`
-3. Compare → confirm no regression
-
-## UI Button Diagnostics
-
-```bash
-npx tsx scripts/ui-diagnostic.ts
-```
-Setting Puppeteer path: `--puppeteer-path "/path/to/chrome"` or `$env:PUPPETEER_EXECUTABLE_PATH`.
+1. Capture `--name "before-fix"`, open the PNG, describe the defect
+2. Capture `--name "after-fix"`, open the PNG, describe the result
+3. Compare both descriptions → confirm the defect is gone and nothing else changed
 
 ## State Extraction
 
@@ -192,36 +188,35 @@ Browser exposes:
 ### Pass
 ```
 ## VISUAL: PASS
+- Screenshots inspected: {count} — {paths}
 - Geometry present: all expected meshes visible
 - Visual quality: colors, z-fighting, overlays, effects correct
 - State coherence: visual matches state dumps
-- Screenshots: {paths}
 ```
 
 ### Fail
 ```
 ## VISUAL: FAIL
+- Screenshots inspected: {count} — {paths}
 - Total issues found: N
 - Issues ranked by severity:
   1. [SEVERE] Missing geometry: building at (15,8) not rendered (step-03, shots: closeup, birdseye)
   2. [MODERATE] Overlay: charge colors not visible on holes (step-02, overview shot)
   3. [MINOR] State coherence: hole count in screenshot doesn't match state JSON (step-01)
-- Screenshots: {paths}
 - State dumps: {paths}
 ```
 
-### Blocked (cannot inspect)
+### Blocked (evidence unavailable)
 ```
-## VISION: BLOCKED — visual inspection could not be completed
-- Reason: vision model unavailable / screenshots not generated / dev server not reachable
+## VISUAL: BLOCKED — no image evidence to inspect
+- Reason: no browser resolved / dev server unreachable / screenshots not written
+- `npm run verify:env` visual channel status + remedy
 - Screenshots captured: {count or N/A}
 - The orchestrator MUST halt the pipeline and escalate. Do NOT proceed to qualimetry or finalization.
 ```
 
 **Severity levels:** SEVERE (missing/corrupt geometry), MODERATE (wrong colors/overlays/effects), MINOR (state mismatch, cosmetic).
 In visual feedback loop: report all issues found. @implementer fixes all of them, then re-invoke for another round.
-
-**If you cannot inspect screenshots** (vision model not available, images failed to load, dev server unreachable), you MUST report `## VISION: BLOCKED` instead of PASS or FAIL. Do NOT report PASS when screenshots were merely captured — you must visually inspect them.
 
 ## Key References
 

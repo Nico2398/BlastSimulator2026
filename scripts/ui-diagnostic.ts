@@ -9,8 +9,9 @@
  */
 
 import puppeteer, { type Page, type PuppeteerLaunchOptions } from 'puppeteer';
-import { mkdirSync, writeFileSync, existsSync } from 'fs';
+import { mkdirSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
+import { LAUNCH_ARGS, resolveChromePathOrThrow } from './shared/chrome.js';
 
 const DEV_SERVER_URL = 'http://localhost:5173';
 const VIEWPORT = { width: 1280, height: 720 };
@@ -179,20 +180,11 @@ async function clickToolbarButton(page: Page, panelName: string): Promise<boolea
 async function run() {
   mkdirSync(SCREENSHOTS_DIR, { recursive: true });
 
-  const CHROMIUM_PATHS = [
-    '/root/.cache/ms-playwright/chromium-1194/chrome-linux/chrome',
-    '/usr/bin/chromium',
-    '/usr/bin/chromium-browser',
-  ];
-  const executablePath = CHROMIUM_PATHS.find(p => existsSync(p));
-
   const launchOptions: PuppeteerLaunchOptions = {
     headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    args: LAUNCH_ARGS,
+    executablePath: resolveChromePathOrThrow(),
   };
-  if (executablePath) {
-    launchOptions.executablePath = executablePath;
-  }
 
   const browser = await puppeteer.launch(launchOptions);
 
