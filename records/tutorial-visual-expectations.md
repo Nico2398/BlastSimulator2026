@@ -206,7 +206,17 @@ shades the site — bench relief, surveyed ore, ramps, buildings, drill holes �
 and opens with the centre tile selected. All three pickers (survey target,
 building placement, drill grid) share the shading.
 
-### Blocked: the tutorial is not affordable
+### Resolved: the tutorial is now affordable
+
+Tutorial Pit's starting cash was raised from **$20,000** to **$80,000**. Starting
+cash is not a finance transaction, so it does not feed `netProfit` and cannot
+hand the level's $5,000 completion threshold for free — the level still has to be
+earned. The tests that pinned `20000` now read the value from the level
+catalogue, so the next balance pass only has to change one number.
+
+The original numbers, kept for the record:
+
+### Was blocked: the tutorial was not affordable
 
 Tutorial Pit grants **$20,000**. The steps it scripts cost, from the game's own
 config:
@@ -226,6 +236,22 @@ reaches step 13 at **-$31,332** with the driver Hire button disabled, and stops
 there. This is arithmetic rather than a tuning preference, but the fix is a
 design call (starting cash, step order, or cheaper step requirements), so it is
 left for the owner to choose.
+
+### Surfaced by the affordability fix: contracts expire before their delivery step
+
+With cash no longer the wall, a UI-driven run gets to step 15 and finds nothing
+to deliver. Step 11 accepts a contract; steps 12–14 hire a driver, buy a vehicle
+and place a warehouse; only then does step 15 say "deliver". Offers carry
+deadlines as short as 43 ticks, and those four steps consume more than that at
+2× speed — one run accepted contract #6 at tick 144 and saw
+`Contract expired! Penalty: $62` by tick 188.
+
+So a player following the tutorial in order can be told to deliver against a
+contract that has already lapsed. Either the accept step should sit next to the
+delivery step, or tutorial-level offers need deadlines that outlast the four
+steps in between. Both are design calls, so this is recorded rather than guessed
+at. The interaction scenario accepts a fresh offer before delivering, so it still
+verifies the Deliver control itself.
 
 ### Also observed, left alone
 

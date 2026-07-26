@@ -36,6 +36,9 @@ function makeCtx(): GameContext {
 
 // ── Campaign ────────────────────────────────────────────────────────────────
 
+/** Starting cash comes from the level catalogue, not a copy of it. */
+const TUTORIAL_START_CASH = getLevel('tutorial_pit')!.startingCash;
+
 describe('Campaign', () => {
   let ctx: GameContext;
 
@@ -109,7 +112,7 @@ describe('Campaign', () => {
     // Order must be by difficulty tier
     expect(all[0]!.id).toBe('tutorial_pit');
     expect(all[0]!.difficultyTier).toBe(0);
-    expect(all[0]!.startingCash).toBe(20000);
+    expect(all[0]!.startingCash).toBe(80000);
     expect(all[0]!.unlockThreshold).toBe(5000);
 
     expect(all[1]!.id).toBe('dusty_hollow');
@@ -345,11 +348,11 @@ describe('Campaign', () => {
     expect(result.success).toBe(true);
     expect(result.output).toContain('tutorial_pit');
     expect(result.output).toContain('24×12×24');
-    expect(result.output).toContain('$20,000');
+    expect(result.output).toContain(`$${TUTORIAL_START_CASH.toLocaleString('en-US')}`);
 
     // State should be set up
     expect(ctx.state).not.toBeNull();
-    expect(ctx.state!.cash).toBe(20000);
+    expect(ctx.state!.cash).toBe(TUTORIAL_START_CASH);
     expect(ctx.state!.campaign.activeLevelId).toBe('tutorial_pit');
     expect(ctx.state!.world).not.toBeNull();
     expect(ctx.state!.world!.gridReady).toBe(true);
@@ -412,7 +415,7 @@ describe('Campaign', () => {
     expect(ctx.state!.levelEndReason).toBe('completed');
 
     // Profit should have been recorded in finances
-    expect(ctx.state!.cash).toBeGreaterThanOrEqual(20000 + 5000);
+    expect(ctx.state!.cash).toBeGreaterThanOrEqual(TUTORIAL_START_CASH + 5000);
   });
 
   // ── 14. stats command output ───────────────────────────────────────────────

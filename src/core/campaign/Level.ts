@@ -61,7 +61,13 @@ const LEVELS: readonly LevelDef[] = [
     gridX: 24,
     gridY: 12,
     gridZ: 24,
-    startingCash: 20000,
+    // The tutorial scripts every purchase it teaches: four hires ($5,000), a
+    // survey (up to $3,000), the scripted consultant ($3,000), a debris_hauler
+    // ($25,000) and a freight_warehouse ($15,000) — about $52,000 before the
+    // delivery step that first earns anything. At $20,000 the tutorial was
+    // unfinishable: the hauler alone cost more than the whole purse. This leaves
+    // headroom for salaries, fuel and maintenance across the run.
+    startingCash: 80000,
     availableExplosives: ['pop_rock', 'boomite'],
     unlockThreshold: 5000,
     eventFreqMultiplier: 0,

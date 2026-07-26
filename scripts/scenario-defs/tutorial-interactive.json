@@ -422,7 +422,7 @@
     {
       "command": "build freight_warehouse at:12,8",
       "timeout": 30,
-      "description": "Step 14 complete: warehouse placed through the Build panel and its tile picker",
+      "description": "Step 14 complete: warehouse placed by clicking a tile in the Build panel picker",
       "interaction": [
         {
           "type": "clickSelector",
@@ -437,6 +437,15 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
+          "type": "click",
+          "x": 531,
+          "y": 358
+        },
+        {
+          "type": "wait",
+          "durationMs": 200
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-tile-select-confirm"
         },
@@ -449,7 +458,7 @@
     {
       "command": "contract deliver 1 amount:5000",
       "timeout": 30,
-      "description": "Step 15 complete: tonnage delivered from the active contract row",
+      "description": "Step 15 complete: deliver tonnage from an active contract. Accepts a fresh offer first because short deadlines can expire the step-11 contract before the tutorial reaches its delivery step.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -457,18 +466,29 @@
         },
         {
           "type": "clickSelector",
+          "selector": "#bs-contract-panel .bs-btn-primary"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-contract-panel .bs-contract-deliver"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
           "selector": "#bs-contract-panel .bs-contract-deliver"
         },
         {
           "type": "wait",
-          "durationMs": 2500
+          "durationMs": 2000
         }
       ]
     },
     {
       "command": "build_ramp start:10,15 end:10,25",
       "timeout": 30,
-      "description": "Step 17 complete: ramp carved through the Build panel",
+      "description": "Step 17 complete: ramp carved by dragging a run in the Build panel picker",
       "interaction": [
         {
           "type": "clickSelector",
@@ -481,6 +501,33 @@
         {
           "type": "waitForSelector",
           "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "mousemove",
+          "x": 450,
+          "y": 250
+        },
+        {
+          "type": "mousedown",
+          "x": 450,
+          "y": 250
+        },
+        {
+          "type": "mousemove",
+          "x": 450,
+          "y": 460
+        },
+        {
+          "type": "mouseup",
+          "x": 450,
+          "y": 460
+        },
+        {
+          "type": "wait",
+          "durationMs": 200
+        },
+        {
+          "type": "screenshot"
         },
         {
           "type": "clickSelector",
