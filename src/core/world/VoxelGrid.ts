@@ -51,6 +51,10 @@ export class VoxelGrid {
   /** Size (in metres) of one voxel cell along each axis. Always 1.0 m. */
   static readonly CELL_SIZE = 1.0;
 
+  /** Unique ID for this grid instance — useful for debugging reference tracking. */
+  static nextId = 1;
+  readonly id = VoxelGrid.nextId++;
+
   readonly sizeX: number;
   readonly sizeY: number;
   readonly sizeZ: number;

@@ -21,11 +21,13 @@ import { GhostMesh } from './GhostMesh.js';
 import { syncEntitySets } from './EntitySync.js';
 import type { SurveyConfidenceOverlayOptions, SurveyConfidencePoint } from './SurveyConfidenceOverlay.js';
 import { isSurveyStale } from '../core/mining/SurveyCalc.js';
+import { SOLID_VOXEL_DENSITY_THRESHOLD } from '../core/config/balance.js';
+import { isInZone } from '../core/entities/Zone.js';
 
 export class GameRenderer {
   private readonly sm: SceneManager;
 
-  private terrain: TerrainMesh | null = null;
+  public terrain: TerrainMesh | null = null;
   private buildings: BuildingMesh | null = null;
   private vehicles: VehicleMesh | null = null;
   private characters: CharacterMesh | null = null;
@@ -50,6 +52,11 @@ export class GameRenderer {
     this.sm = sceneManager;
   }
 
+  /** ID of the currently-bound VoxelGrid, for diagnostics. Null if no grid is loaded. */
+  get lastGridId(): number | null {
+    return this.lastGrid?.id ?? null;
+  }
+
   /**
    * Sync rendered scene from the current MiningContext.
    * Call after every console command.
@@ -61,6 +68,16 @@ export class GameRenderer {
     if (this.loadedSeed !== ctx.state.seed) {
       this.loadGame(ctx.state, ctx.grid);
       this.loadedSeed = ctx.state.seed;
+    }
+
+    // Grid reference may have changed (e.g. campaign start generates a new grid
+    // while keeping the same seed). Detect and rebind if so.
+    if (this.lastGrid !== ctx.grid) {
+      console.log(`[GameRenderer] syncFromContext: grid changed! old=${this.lastGrid?.id} new=${ctx.grid.id}`);
+      this.lastGrid = ctx.grid;
+      // TerrainMesh holds a grid reference — rebind it so it reads from the new grid
+      this.terrain?.setGrid(ctx.grid);
+      this.terrain?.buildAll();
     }
 
     this.lastState = ctx.state;
@@ -78,9 +95,27 @@ export class GameRenderer {
       }
     }
 
+    // Place characters at terrain surface height (not buried at y=0)
+    if (this.characters && this.lastGrid) {
+      for (const e of ctx.state.employees.employees) {
+        if (this.renderedEmployeeIds.has(e.id)) {
+          const surfaceY = this.getTerrainSurfaceY(e.x, e.z);
+          this.characters.snapPosition(e.id, e.x, surfaceY, e.z);
+        }
+      }
+    }
+
     // Sync ghost previews for pending actions
     if (this.ghosts) {
       this.ghosts.sync(ctx.state.ghostPreviews);
+    }
+
+    // Blink employees still inside an active safety zone during clearing
+    if (this.characters) {
+      const zone = ctx.state.zone.activeZone;
+      for (const e of ctx.state.employees.employees) {
+        this.characters.setEvacuating(e.id, zone !== null && isInZone(e.x, e.z, zone));
+      }
     }
 
     // Sync weather
@@ -218,7 +253,7 @@ export class GameRenderer {
     const gz = Math.max(0, Math.min(this.lastGrid.sizeZ - 1, Math.floor(z)));
     for (let y = this.lastGrid.sizeY - 1; y >= 0; y--) {
       const v = this.lastGrid.getVoxel(gx, y, gz);
-      if (v && v.density >= 0.5) return y + 1;
+      if (v && v.density >= SOLID_VOXEL_DENSITY_THRESHOLD) return y + 1;
     }
     return 0;
   }
@@ -228,6 +263,7 @@ export class GameRenderer {
    * Call from main.ts immediately after a successful blast command.
    */
   onBlast(ctx: MiningContext): void {
+    console.log(`[GameRenderer] onBlast: lastGrid=${this.lastGrid?.id} fragments=${ctx.lastBlastFragments?.length ?? 0}`);
     if (!this.terrain || !this.lastGrid) return;
 
     // Clear the blast plan overlay (holes are consumed by blast)
@@ -296,6 +332,7 @@ export class GameRenderer {
 
   /** Force a full terrain rebuild (e.g. after blast modifies voxels). */
   rebuildTerrain(): void {
+    console.log(`[GameRenderer] rebuildTerrain: lastGrid=${this.lastGrid?.id}`);
     this.terrain?.buildAll();
   }
 
@@ -327,10 +364,11 @@ export class GameRenderer {
       this.vehicles.addVehicle(v, surfaceY);
     }
 
-    // Characters
+    // Characters (placed at terrain surface height, not y=0)
     this.characters = new CharacterMesh(scene);
     for (const e of state.employees.employees) {
-      this.characters.addEmployee(e);
+      const surfaceY = this.getTerrainSurfaceY(e.x, e.z);
+      this.characters.addEmployee(e, surfaceY);
     }
 
     // Weather sky

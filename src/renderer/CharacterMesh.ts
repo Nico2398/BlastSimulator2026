@@ -45,7 +45,7 @@ export class CharacterMesh {
     this.scene = scene;
   }
 
-  addEmployee(employee: Employee): void {
+  addEmployee(employee: Employee, surfaceY: number = 0): void {
     const roleColor = ROLE_COLORS[employee.role];
     const color = employee.injured ? INJURED_COLOR : roleColor;
 
@@ -73,7 +73,7 @@ export class CharacterMesh {
     hat.position.y = BODY_HEIGHT + HEAD_RADIUS * 1.8 + 0.05;
     group.add(hat);
 
-    group.position.set(employee.x, 0, employee.z);
+    group.position.set(employee.x, surfaceY, employee.z);
     this.scene.add(group);
     this.characters.set(employee.id, { group, bodyMat, headMat, employee, evacuating: false });
   }
@@ -112,6 +112,17 @@ export class CharacterMesh {
   }
 
   /**
+   * Snap a character to an exact position (e.g. after terrain rebuild repositions surface).
+   * Unlike the lerp-based update(), this sets the position immediately.
+   */
+  snapPosition(id: number, x: number, y: number, z: number): void {
+    const entry = this.characters.get(id);
+    if (entry) {
+      entry.group.position.set(x, y, z);
+    }
+  }
+
+  /**
    * Mark a character as evacuating (will blink to indicate urgency).
    */
   setEvacuating(employeeId: number, evacuating: boolean): void {
@@ -119,15 +130,6 @@ export class CharacterMesh {
     if (entry) {
       entry.evacuating = evacuating;
       if (!evacuating) entry.group.visible = true;
-    }
-  }
-
-  /** Move a character directly to safe zone exit position during zone clear. */
-  evacuateTo(employeeId: number, x: number, z: number): void {
-    const entry = this.characters.get(employeeId);
-    if (entry) {
-      entry.employee.x = x;
-      entry.employee.z = z;
     }
   }
 

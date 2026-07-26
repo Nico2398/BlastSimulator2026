@@ -9,9 +9,9 @@ import { CameraController } from './CameraController.js';
 const SKY_COLOR = 0x87ceeb;
 
 // Camera initial position: elevated, looking down at the mine area
-// Mine grid is ~100x100 units; camera pulls back to see the whole site
-const CAMERA_POSITION = new THREE.Vector3(50, 120, 180);
-const CAMERA_TARGET = new THREE.Vector3(50, 0, 50);
+// Tutorial pit grid is 24×12×24 — camera stays close enough to see blast craters
+const CAMERA_POSITION = new THREE.Vector3(12, 50, 60);
+const CAMERA_TARGET = new THREE.Vector3(12, 0, 12);
 const CAMERA_NEAR = 0.5;
 const CAMERA_FAR = 4000;
 const CAMERA_FOV = 55; // degrees — slightly narrow for cinematic feel
@@ -35,6 +35,9 @@ export class SceneManager {
 
   private animFrameId = -1;
   private readonly resizeHandler: () => void;
+
+  /** Number of frames rendered since start(). Exposed for diagnostics. */
+  frameCount = 0;
 
   constructor(canvas: HTMLCanvasElement) {
     // --- Scene ---
@@ -86,6 +89,10 @@ export class SceneManager {
       lastTime = now;
       if (onUpdate) onUpdate(dt);
       this.renderer.render(this.scene, this.camera);
+      // Force GPU to flush — ensures screenshot captures the latest frame
+      const gl = this.renderer.getContext();
+      if (gl) gl.finish();
+      this.frameCount++;
     };
     loop();
   }

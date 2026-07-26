@@ -6,6 +6,7 @@ import {
   blastCommand,
   blastPlanCommand,
   blastPreviewCommand,
+  buildRampCommand,
   buySoftwareCommand,
   chargeCommand,
   drillPlanCommand,
@@ -18,6 +19,7 @@ import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.j
 import { Random } from '../../../src/core/math/Random.js';
 import * as SurveyCalcModule from '../../../src/core/mining/SurveyCalc.js';
 import * as EventEngineModule from '../../../src/core/events/EventEngine.js';
+import { RAMP_COST_PER_METER } from '../../../src/core/mining/Ramp.js';
 
 function makeMiningContext(): MiningContext {
   const ctx: MiningContext = {
@@ -530,5 +532,54 @@ describe('blastCommand — ore report event wiring', () => {
     expect(detectSpy).toHaveBeenCalledOnce();
     expect(detectSpy).toHaveBeenCalledWith(mockedReport, ctx.state!.events, ctx.state!.tickCount);
     expect(ctx.state!.events.pendingEvent?.eventId).toBe('lucky_strike');
+  });
+});
+
+describe('buildRampCommand', () => {
+  it('builds a ramp from origin/direction/length and deducts cost', () => {
+    const ctx = makeMiningContext();
+    const cashBefore = ctx.state!.cash;
+
+    const result = buildRampCommand(ctx, [], {
+      origin: '5,5', direction: 'south', length: '5', depth: '8',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.output).toContain('Ramp built');
+    expect(ctx.state!.cash).toBe(cashBefore - 5 * RAMP_COST_PER_METER);
+  });
+
+  it('builds a ramp from start/end and infers direction and length', () => {
+    const ctx = makeMiningContext();
+    const cashBefore = ctx.state!.cash;
+
+    const result = buildRampCommand(ctx, [], { start: '5,5', end: '5,10', depth: '6' });
+
+    expect(result.success).toBe(true);
+    // Inferred length = |10 - 5| = 5
+    expect(ctx.state!.cash).toBe(cashBefore - 5 * RAMP_COST_PER_METER);
+  });
+
+  it('returns an error and does not deduct cash when funds are insufficient', () => {
+    const ctx = makeMiningContext();
+    ctx.state!.cash = 10;
+    const cashBefore = ctx.state!.cash;
+
+    const result = buildRampCommand(ctx, [], {
+      origin: '5,5', direction: 'south', length: '5', depth: '8',
+    });
+
+    expect(result.success).toBe(false);
+    expect(ctx.state!.cash).toBe(cashBefore);
+  });
+
+  it('requires a loaded game', () => {
+    const ctx: MiningContext = {
+      state: null, grid: null, softwareTier: 0,
+      tubingState: createTubingState(), emitter: new EventEmitter(),
+    };
+    const result = buildRampCommand(ctx, [], { origin: '0,0', direction: 'south', length: '5' });
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('No game loaded');
   });
 });

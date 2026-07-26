@@ -1,6 +1,9 @@
 {
   "name": "tutorial-playthrough",
   "description": "Full tutorial playthrough at Tutorial Pit: hiring employees, seismic surveying, drill planning, blasting, contract management, building infrastructure, and completing the campaign introduction",
+  "shots": [
+    { "name": "closeup", "yaw": -30, "pitch": 55 }
+  ],
   "steps": [
     {
       "command": "new_game seed:42",

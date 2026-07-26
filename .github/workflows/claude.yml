@@ -30,6 +30,28 @@ jobs:
         with:
           fetch-depth: 1
 
+      # Claude must be able to run the verification channels (typecheck, tests,
+      # scenarios). Without Node and installed dependencies every `npm run`
+      # invocation fails before permissions even come into play.
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Cache npm dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Puppeteer Chrome
+        run: npx puppeteer browsers install chrome
+
       - name: Run Claude Code
         id: claude
         uses: anthropics/claude-code-action@v1
@@ -43,8 +65,16 @@ jobs:
           # Optional: Give a custom prompt to Claude. If this is not specified, Claude will perform the instructions specified in the comment that tagged it.
           # prompt: 'Update the pull request description to include a summary of changes.'
 
-          # Optional: Add claude_args to customize behavior and configuration
-          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
-          # or https://code.claude.com/docs/en/cli-reference for available options
-          # claude_args: '--allowed-tools Bash(gh pr *)'
+          # No permission prompts. The runner is a throwaway VM with no access
+          # to anything beyond this checkout and the job's own scoped token, and
+          # there is no human present to approve anything -- a prompt is just a
+          # silent failure. An allow-list is not workable either: it would have
+          # to be kept in sync with every script the repo grows, and the action
+          # checks out the PR head branch, which may predate .claude/settings.json.
+          #
+          # `deny` rules still apply (they cannot be overridden by a mode), so
+          # the .env reads denied in .claude/settings.json stay denied.
+          # See https://code.claude.com/docs/en/cli-reference and
+          # https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
+          claude_args: '--permission-mode bypassPermissions'
 

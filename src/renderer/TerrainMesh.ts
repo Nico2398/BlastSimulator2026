@@ -71,7 +71,7 @@ function interpVertex(
 
 export class TerrainMesh {
   private readonly scene: THREE.Scene;
-  private readonly grid: VoxelGrid;
+  private grid: VoxelGrid;
   private mesh: THREE.Mesh | null = null;
   private readonly material: THREE.MeshPhongMaterial;
   private surveyOverlay: SurveyConfidenceOverlay | null = null;
@@ -86,6 +86,37 @@ export class TerrainMesh {
       shininess: 12,
       side: THREE.DoubleSide,
     });
+  }
+
+  /** Replace the underlying grid reference (e.g. after campaign start regenerates terrain). */
+  setGrid(grid: VoxelGrid): void {
+    console.log(`[TerrainMesh] setGrid: old=${this.grid.id} new=${grid.id}`);
+    this.grid = grid;
+  }
+
+  /** ID of the currently-bound VoxelGrid, for diagnostics. */
+  get gridId(): number {
+    return this.grid.id;
+  }
+
+  /** Bounding box and vertex count of the current mesh geometry, for diagnostics. Null if unbuilt. */
+  getBounds(): {
+    minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number;
+    vertexCount: number;
+  } | null {
+    if (!this.mesh) return null;
+    this.mesh.geometry.computeBoundingBox();
+    const bb = this.mesh.geometry.boundingBox;
+    if (!bb) return null;
+    return {
+      minX: Math.round(bb.min.x * 100) / 100,
+      maxX: Math.round(bb.max.x * 100) / 100,
+      minY: Math.round(bb.min.y * 100) / 100,
+      maxY: Math.round(bb.max.y * 100) / 100,
+      minZ: Math.round(bb.min.z * 100) / 100,
+      maxZ: Math.round(bb.max.z * 100) / 100,
+      vertexCount: this.mesh.geometry.attributes['position']!.count,
+    };
   }
 
   /** Build all chunks from scratch. Call once after grid is populated. */
@@ -108,6 +139,7 @@ export class TerrainMesh {
       }
     }
 
+    console.log(`[TerrainMesh] buildAll: grid=${this.grid.id} positions=${positions.length}`);
     if (positions.length === 0) return;
 
     const geometry = new THREE.BufferGeometry();

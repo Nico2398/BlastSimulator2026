@@ -115,11 +115,24 @@ declare global {
     __cameraReset: () => void;
     __startTutorial: () => void;
     __resetTickAccumulator: () => void;
+    __debugGridInfo: () => Record<string, unknown>;
   }
 }
 
+let lastCommandOutput = '';
+const consoleLogs: string[] = [];
+
+// Capture console.log for diagnostics
+const origLog = console.log;
+console.log = (...args: unknown[]) => {
+  const msg = args.map(a => String(a)).join(' ');
+  consoleLogs.push(msg);
+  origLog.apply(console, args);
+};
+
 window.__gameConsole = (cmd: string) => {
   const result = runner.run(cmd);
+  lastCommandOutput = result.output;
   // Sync the renderer after every command so visual changes appear immediately
   gameRenderer.syncFromContext(ctx);
   const cmdName = parseCommand(cmd).command;
@@ -132,7 +145,13 @@ window.__gameConsole = (cmd: string) => {
   // Trigger blast effects and terrain rebuild after a blast
   if (cmdName === 'blast' && result.success && ctx.state) {
     gameRenderer.onBlast(ctx);
+    // Force full terrain rebuild to ensure mesh reflects voxel changes
+    gameRenderer.rebuildTerrain();
     audioHooks.onBlast(ctx.state.sequenceDelays);
+  }
+  // Rebuild terrain after ramp carving (build_ramp mutates the voxel grid)
+  if (cmdName === 'build_ramp' && result.success && ctx.state) {
+    gameRenderer.rebuildTerrain();
   }
   // Show blast plan overlay during planning commands
   if (['drill_plan', 'charge', 'sequence'].includes(cmdName)) {
@@ -181,10 +200,48 @@ window.__gameState = () => {
     arrested: s.arrest.arrested,
     cash: s.cash,
     profit: s.levelStats?.totalWealth ?? 0,
+    lastCommandOutput,
+    frameCount: scene.frameCount,
+    ctxGridId: ctx.grid?.id ?? null,
+    consoleLogs: consoleLogs.splice(0, 50),
+    // Sample voxels at blast center to check if they're cleared
+    gridSample: ctx.grid ? (() => {
+      const g = ctx.grid;
+      const sample: Record<string, number> = {};
+      for (let y = 0; y < Math.min(g.sizeY, 10); y++) {
+        const v = g.getVoxel(15, y, 15);
+        sample[`15,${y},15`] = v?.density ?? -1;
+      }
+      return sample;
+    })() : null,
+    // Cross-section: sample a line of columns at y=0,1,2 through the blast center
+    gridCrossSection: ctx.grid ? (() => {
+      const g = ctx.grid;
+      const xs = [10,11,12,13,14,15,16,17,18,19,20,21,22];
+      const sample: Record<string, number> = {};
+      for (const x of xs) {
+        for (let y = 0; y < Math.min(g.sizeY, 6); y++) {
+          const v = g.getVoxel(x, y, 15);
+          sample[`${x},${y},15`] = v?.density ?? -1;
+        }
+      }
+      return sample;
+    })() : null,
+    // Terrain mesh bounding box from Three.js geometry
+    meshBounds: gameRenderer.terrain?.getBounds() ?? null,
   };
 };
 
 window.__resetTickAccumulator = () => { accumulatedGameMs = 0; };
+
+// Debug: expose grid reference info for diagnostics
+window.__debugGridInfo = () => {
+  return {
+    ctxGridId: ctx.grid?.id ?? null,
+    lastGridId: gameRenderer.lastGridId,
+    terrainGridId: gameRenderer.terrain?.gridId ?? null,
+  };
+};
 
 window.__uiState = () => {
   const panels = ['bs-blast-panel', 'bs-contract-panel', 'bs-build-panel',
@@ -259,7 +316,7 @@ saveLoadUI.setOnLoad((state) => {
 new KeyboardShortcuts({
   togglePause: () => window.__gameConsole('pause'),
   setSpeed: (n) => window.__gameConsole(`speed ${n}`),
-  togglePanel: (name) => uiManager.togglePanel(name as any),
+  togglePanel: (name) => uiManager.togglePanel(name),
   quickSave: () => { if (ctx.state) void saveLoadUI['autoSave'](ctx.state); },
   openSettings: () => uiManager.togglePanel('settings'),
 });

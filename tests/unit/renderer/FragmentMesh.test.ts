@@ -58,6 +58,40 @@ describe('FragmentMesh (InstancedMesh)', () => {
     fm.dispose();
   });
 
+  it('spawnFragments displaces fragments downward so they sit inside the crater', () => {
+    const scene = new THREE.Scene();
+    const fm = new FragmentMesh(scene);
+    fm.spawnFragments([makeFragment(0, { position: { x: 5, y: 10, z: 5 } })]);
+
+    const im = scene.children[0] as THREE.InstancedMesh;
+    const mtx = new THREE.Matrix4();
+    im.getMatrixAt(0, mtx);
+    const pos = new THREE.Vector3();
+    pos.setFromMatrixPosition(mtx);
+
+    // Rendered Y must be below the fragment's raw source position (crater offset),
+    // but never pushed below the render floor.
+    expect(pos.y).toBeLessThan(10);
+    expect(pos.y).toBeGreaterThanOrEqual(9.4);
+    fm.dispose();
+  });
+
+  it('spawnFragments clamps the render height to the minimum floor near y=0', () => {
+    const scene = new THREE.Scene();
+    const fm = new FragmentMesh(scene);
+    fm.spawnFragments([makeFragment(0, { position: { x: 5, y: 0.1, z: 5 } })]);
+
+    const im = scene.children[0] as THREE.InstancedMesh;
+    const mtx = new THREE.Matrix4();
+    im.getMatrixAt(0, mtx);
+    const pos = new THREE.Vector3();
+    pos.setFromMatrixPosition(mtx);
+
+    // A fragment near the floor must be clamped to the render floor, not pushed to/below 0.
+    expect(pos.y).toBeCloseTo(0.05, 5);
+    fm.dispose();
+  });
+
   it('projection fragments are rendered (isProjection=true)', () => {
     const scene = new THREE.Scene();
     const fm = new FragmentMesh(scene);
