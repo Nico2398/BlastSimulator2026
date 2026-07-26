@@ -123,13 +123,28 @@
       ]
     },
     {
-      "command": "survey seismic x:12 z:12",
+      "command": "survey core_sample x:12 z:12",
       "timeout": 30,
-      "description": "Step 2 complete: seismic survey resolves after the surveyor works it — confidence quads on terrain, ore pixels on the minimap",
+      "description": "Step 2 complete: pick a method, pick a target in the tile picker, dispatch — then the surveyor works it",
       "interaction": [
         {
-          "type": "command",
-          "command": "survey seismic x:12 z:12"
+          "type": "clickSelector",
+          "selector": "#bs-survey-panel [data-method=\"core_sample\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-run"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         },
         {
           "type": "command",
@@ -392,49 +407,57 @@
     {
       "command": "vehicle driver 1 4",
       "timeout": 30,
-      "description": "Step 13 complete: driver assigned to the hauler",
+      "description": "Step 13 complete: driver picked and assigned from the Vehicles panel",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle driver 1 4"
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-vehicle-assign-btn"
         },
         {
           "type": "wait",
-          "durationMs": 400
+          "durationMs": 500
         }
       ]
     },
     {
       "command": "build freight_warehouse at:12,8",
       "timeout": 30,
-      "description": "Step 14 complete: Build panel open, warehouse mesh on the surface and a pixel on the minimap",
+      "description": "Step 14 complete: warehouse placed through the Build panel and its tile picker",
       "interaction": [
         {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"build\"]"
         },
         {
-          "type": "command",
-          "command": "build freight_warehouse at:12,8"
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"freight_warehouse\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         },
         {
           "type": "wait",
-          "durationMs": 400
+          "durationMs": 500
         }
       ]
     },
     {
       "command": "contract deliver 1 amount:5000",
       "timeout": 30,
-      "description": "Step 15 complete: contract fulfilled, balance rises",
+      "description": "Step 15 complete: tonnage delivered from the active contract row",
       "interaction": [
         {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"contracts\"]"
         },
         {
-          "type": "command",
-          "command": "contract deliver 1 amount:5000"
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel .bs-contract-deliver"
         },
         {
           "type": "wait",
@@ -445,11 +468,23 @@
     {
       "command": "build_ramp start:10,15 end:10,25",
       "timeout": 30,
-      "description": "Step 17 complete: ramp carved into the terrain, navgrid gains ramp cells",
+      "description": "Step 17 complete: ramp carved through the Build panel",
       "interaction": [
         {
-          "type": "command",
-          "command": "build_ramp start:10,15 end:10,25"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel .bs-build-ramp-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         },
         {
           "type": "wait",
@@ -460,15 +495,30 @@
     {
       "command": "set_policy mode:shift_8h",
       "timeout": 30,
-      "description": "Step 19 complete: shift policy changed (step 18 needs auto-advances first)",
+      "description": "Step 19 complete: shift schedule changed in the Settings panel",
       "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"settings\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-policy-shift"
+        },
+        {
+          "type": "screenshot"
+        },
         {
           "type": "command",
           "command": "set_policy mode:shift_8h"
         },
         {
+          "type": "clickSelector",
+          "selector": "#bs-policy-apply"
+        },
+        {
           "type": "wait",
-          "durationMs": 400
+          "durationMs": 600
         }
       ]
     },

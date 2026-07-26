@@ -266,13 +266,20 @@ describe('TutorialOverlay (12.4)', () => {
   });
 
   describe('next button and commands hint', () => {
-    it('renders a Skip and a Next control so the player is never trapped', () => {
+    it('renders a Skip control so the player is never trapped', () => {
       const tut = new TutorialOverlay(container);
       overlay = tut;
       tut.start(createMockState());
 
       expect(container.querySelector('.bs-btn-skip')).not.toBeNull();
-      expect(container.querySelector('.bs-btn-next')).not.toBeNull();
+    });
+
+    it('renders NO Next control — the only way forward is doing the step', () => {
+      const tut = new TutorialOverlay(container);
+      overlay = tut;
+      tut.start(createMockState());
+
+      expect(container.querySelector('.bs-btn-next')).toBeNull();
     });
 
     it('Skip ends the tutorial and unpauses the game', () => {
@@ -286,26 +293,30 @@ describe('TutorialOverlay (12.4)', () => {
       expect(state.isPaused).toBe(false);
     });
 
-    it('Next advances the card even when the step condition is unmet', () => {
+    it('no control on the card can skip a step forward', () => {
       const tut = new TutorialOverlay(container);
       overlay = tut;
       tut.start(createMockState());
 
       const titleEl = container.querySelector('.bs-panel-title');
       const before = titleEl?.textContent ?? '';
-      (container.querySelector('.bs-btn-next') as HTMLButtonElement).click();
-      expect(titleEl?.textContent).not.toBe(before);
+      // Every button on the card except Skip must leave the step where it is.
+      container.querySelectorAll<HTMLButtonElement>('.bs-tutorial-box button').forEach(btn => {
+        if (!btn.classList.contains('bs-btn-skip')) btn.click();
+      });
+      expect(titleEl?.textContent).toBe(before);
+      expect(tut.isActive).toBe(true);
     });
 
-    it('hides Next on the final card', () => {
+    it('turns Skip into a plain dismissal on the final card', () => {
       const tut = new TutorialOverlay(container) as any;
       overlay = tut;
       tut.start(createMockState());
       tut.stepIndex = TOTAL_TUTORIAL_STEPS - 1;
       tut.render();
 
-      const nextBtn = container.querySelector('.bs-btn-next') as HTMLElement;
-      expect(nextBtn.style.display).toBe('none');
+      const skipBtn = container.querySelector('.bs-btn-skip') as HTMLElement;
+      expect(skipBtn.textContent).toBe('Finish');
     });
 
     it('shows commands hint element when step has commands array', () => {

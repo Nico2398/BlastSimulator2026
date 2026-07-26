@@ -5,6 +5,7 @@ import type { GameState } from '../core/state/GameState.js';
 import type { DrillHole } from '../core/mining/DrillPlan.js';
 import type { HoleCharge } from '../core/mining/ChargePlan.js';
 import { TileSelectOverlay } from './TileSelectOverlay.js';
+import { makeSiteTileFill } from './siteTileShading.js';
 
 import type { CommandResult } from '../console/ConsoleRunner.js';
 
@@ -20,6 +21,8 @@ export class BlastPlanUI {
   private selectedHoleId: string | null = null;
   private worldSizeX = 40;
   private worldSizeZ = 40;
+  /** Latest state, so the grid picker can draw the site. */
+  private lastState: GameState | null = null;
   private statusTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(container: HTMLElement) {
@@ -67,6 +70,7 @@ export class BlastPlanUI {
   get visible(): boolean { return this.el.style.display !== 'none'; }
 
   update(state: GameState): void {
+    this.lastState = state;
     if (state.world) {
       this.worldSizeX = state.world.sizeX;
       this.worldSizeZ = state.world.sizeZ;
@@ -239,6 +243,7 @@ export class BlastPlanUI {
       worldSizeX: this.worldSizeX,
       worldSizeZ: this.worldSizeZ,
       title: t('ui.blast.grid_tool'),
+      ...(this.lastState ? { tileFill: makeSiteTileFill(this.lastState) } : {}),
       extraFields: [
         { id: 'spacing', label: t('ui.blast.grid_spacing'), defaultValue: 5, min: 1, max: 20, step: 1 },
         { id: 'depth',   label: t('ui.blast.grid_depth'),   defaultValue: 6, min: 1, max: 40, step: 1 },

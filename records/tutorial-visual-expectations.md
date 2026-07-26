@@ -186,6 +186,47 @@ and inspected image by image.
 | 22 | Major | Contract offers printed the generator's raw float: `330kg @ $542.4273477250244/kg`. | Two decimals (three under a dollar so cheap rubble contracts don't read `$0.00`), thousands separators. |
 | 23 | Minor | The bankruptcy / game-over toast is docked at `bottom: 20px`, right on top of the tutorial card's Skip and Next buttons. | Raised clear of the card. |
 
+### Second pass — no Next button, so every step needs a UI path
+
+The Next control was removed on request: the only way forward is to perform the
+step. That turns any step without a reachable control into a hard dead end, so
+the whole sequence was audited for one. Five steps had none.
+
+| Step | Was | Now |
+|------|-----|-----|
+| 2 · Survey Terrain | The panel's only action was a "Survey Mode" button that ran `survey mode` — a method the console rejects (`Unknown method "mode"`). No way to choose a method or a target existed; `showMethodSelection`, `onMethodSelected` and `getSelectedMethod` were TODO stubs nothing called. **The survey could not be performed at all.** | Method rows with cost and accuracy, a target picker, dispatch, a progress line and a results readout with confidence and richest ore. |
+| 13 · Buy & Assign Vehicles | The Vehicles panel offered Buy and Scrap only — no way to put a driver in a vehicle. | Per-vehicle driver picker listing only crew holding that role's licence and not already driving. |
+| 15 · Deliver Contract | Contracts offered Accept / Negotiate / Decline. Nothing delivers itself — `deliverMaterials` is only reachable from the console. | Amount field plus Deliver on each active contract. |
+| 17 · Build Ramp | Ramps are carved into the voxel grid, not placed as buildings, so the Build panel had no control for them. | A Terrain section with Build Ramp, using the area picker. |
+| 19 · Site Policy | Shift mode and rest thresholds existed only as `set_policy` console arguments. | Site Policy section in Settings: shift schedule, hunger and fatigue thresholds, Apply. |
+
+Also fixed while verifying the above: the tile picker drew an empty grid with
+nothing to aim at, and its Confirm started disabled with no selection. It now
+shades the site — bench relief, surveyed ore, ramps, buildings, drill holes —
+and opens with the centre tile selected. All three pickers (survey target,
+building placement, drill grid) share the shading.
+
+### Blocked: the tutorial is not affordable
+
+Tutorial Pit grants **$20,000**. The steps it scripts cost, from the game's own
+config:
+
+| Item | Cost |
+|------|------|
+| Surveyor + driller + manager + driver | $5,000 |
+| Survey (core sample $800 / seismic $3,000) | $800–3,000 |
+| Consultant event (step 9, scripted) | $3,000 |
+| `debris_hauler` (step 13) | **$25,000** |
+| `freight_warehouse` T1 (step 14) | **$15,000** |
+| | **≈ $49,000 before any income** |
+
+The hauler alone costs more than the whole starting purse, and the delivery step
+that earns anything is step 15 — after both big purchases. A UI-driven run
+reaches step 13 at **-$31,332** with the driver Hire button disabled, and stops
+there. This is arithmetic rather than a tuning preference, but the fix is a
+design call (starting cash, step order, or cheaper step requirements), so it is
+left for the owner to choose.
+
 ### Also observed, left alone
 
 - **Tutorial Pit economy is tight.** Playing at 2× with four hires and no delivery yet, the

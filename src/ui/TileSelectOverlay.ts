@@ -32,6 +32,13 @@ export interface TileSelectConfig {
   worldSizeZ: number;
   title: string;
   extraFields?: ExtraField[];
+  /**
+   * Optional per-tile fill colour, so the picker shows the site instead of an
+   * empty grid. Return null to leave a tile on the background colour.
+   */
+  tileFill?: (x: number, z: number) => string | null;
+  /** Optional tile to arrive pre-selected, so Confirm is reachable at once. */
+  initialSelection?: { x: number; z: number };
   onConfirm: (result: TileSelectResult) => void;
   onCancel?: () => void;
 }
@@ -74,8 +81,10 @@ export class TileSelectOverlay {
 
   open(config: TileSelectConfig): void {
     this.config = config;
-    this.dragStart = null;
-    this.dragEnd = null;
+    this.dragStart = config.initialSelection
+      ? { tx: config.initialSelection.x, tz: config.initialSelection.z }
+      : null;
+    this.dragEnd = config.mode === 'area' ? this.dragStart : null;
     this.hoverTile = null;
 
     // Rebuild form controls
@@ -133,7 +142,7 @@ export class TileSelectOverlay {
     confirmBtn.className = 'bs-btn bs-btn-primary';
     confirmBtn.id = 'bs-tile-select-confirm';
     confirmBtn.textContent = 'Confirm';
-    confirmBtn.disabled = true;
+    confirmBtn.disabled = this.dragStart === null;
     confirmBtn.addEventListener('click', () => this.confirm());
 
     const cancelBtn = document.createElement('button');
@@ -147,6 +156,7 @@ export class TileSelectOverlay {
     panel.appendChild(form);
 
     this.overlay.style.display = 'flex';
+    this.updateSelectionInfo();
     this.render();
   }
 
@@ -231,6 +241,19 @@ export class TileSelectOverlay {
     // Background
     ctx.fillStyle = '#0c0a06';
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+    // Site contents, when the caller supplied them — an unshaded grid gives the
+    // player nothing to aim at.
+    if (c.tileFill) {
+      for (let z = 0; z < c.worldSizeZ; z++) {
+        for (let x = 0; x < c.worldSizeX; x++) {
+          const fill = c.tileFill(x, z);
+          if (!fill) continue;
+          ctx.fillStyle = fill;
+          ctx.fillRect(x * tileW, z * tileH, Math.ceil(tileW), Math.ceil(tileH));
+        }
+      }
+    }
 
     // Grid
     ctx.strokeStyle = 'rgba(200,160,60,0.15)';

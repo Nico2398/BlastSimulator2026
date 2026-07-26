@@ -15,7 +15,6 @@ export interface TutorialCardElements {
   commandsLabel: HTMLElement;
   commandsHint: HTMLElement;
   skipBtn: HTMLButtonElement;
-  nextBtn: HTMLButtonElement;
 }
 
 /**
@@ -67,15 +66,13 @@ export function buildTutorialCard(container: HTMLElement): TutorialCardElements 
   const actions = document.createElement('div');
   actions.className = 'bs-tutorial-actions';
 
+  // Skip only. There is deliberately no "Next": the way forward is to perform
+  // the step the card is asking for, so the tutorial cannot be clicked past.
   const skipBtn = document.createElement('button');
   skipBtn.className = 'bs-btn bs-btn-skip';
   skipBtn.textContent = t('tutorial.skip');
 
-  const nextBtn = document.createElement('button');
-  nextBtn.className = 'bs-btn bs-btn-primary bs-btn-next';
-  nextBtn.textContent = t('tutorial.next');
-
-  actions.append(skipBtn, nextBtn);
+  actions.append(skipBtn);
 
   box.append(header, textEl, progressTrack, commandsLabel, commandsHint, actions);
   overlay.appendChild(box);
@@ -83,6 +80,6 @@ export function buildTutorialCard(container: HTMLElement): TutorialCardElements 
 
   return {
     overlay, box, titleEl, textEl, stepCounter,
-    progressEl, commandsLabel, commandsHint, skipBtn, nextBtn,
+    progressEl, commandsLabel, commandsHint, skipBtn,
   };
 }

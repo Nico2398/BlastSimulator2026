@@ -12,6 +12,7 @@ import {
   type Building,
 } from '../core/entities/Building.js';
 import { TileSelectOverlay } from './TileSelectOverlay.js';
+import { makeSiteTileFill } from './siteTileShading.js';
 
 import type { CommandResult } from '../console/ConsoleRunner.js';
 
@@ -26,6 +27,8 @@ export class BuildMenu {
   private gameConsole?: GameConsoleFn;
   private worldSizeX = 40;
   private worldSizeZ = 40;
+  /** Latest state, so the placement picker can draw the site. */
+  private lastState: GameState | null = null;
   /** Selected placement tier per building type. */
   private readonly selectedTiers = new Map<BuildingType, BuildingTier>();
   /** Last cash value used for button state refresh. */
@@ -64,7 +67,11 @@ export class BuildMenu {
     closeBtn.textContent = t('ui.build.close');
     closeBtn.addEventListener('click', () => this.hide());
 
-    this.el.append(title, this.catalogEl, placedTitle, this.placedEl, this.statusEl, closeBtn);
+    this.el.append(
+      title, this.catalogEl,
+      this.makeRampSection(),
+      placedTitle, this.placedEl, this.statusEl, closeBtn,
+    );
     container.appendChild(this.el);
 
     // TileSelectOverlay appended to document.body so it escapes panel stacking context
@@ -79,6 +86,7 @@ export class BuildMenu {
   get visible(): boolean { return this.el.style.display !== 'none'; }
 
   update(state: GameState): void {
+    this.lastState = state;
     if (state.world) {
       this.worldSizeX = state.world.sizeX;
       this.worldSizeZ = state.world.sizeZ;
@@ -100,6 +108,50 @@ export class BuildMenu {
   }
 
   dispose(): void { this.el.remove(); this.tileSelect.dispose(); }
+
+  // ── Ramp (carved terrain, not a building) ─────────────────────────────────
+
+  /**
+   * Ramps are carved into the voxel grid rather than placed as a building, so
+   * they need their own control: drag the run from the upper bench to the lower.
+   */
+  private makeRampSection(): HTMLElement {
+    const wrap = document.createElement('div');
+
+    const header = document.createElement('div');
+    header.className = 'bs-section-header';
+    header.style.marginTop = '8px';
+    header.textContent = t('ui.build.ramp_section');
+
+    const btn = document.createElement('button');
+    btn.className = 'bs-btn bs-btn-primary bs-build-ramp-btn';
+    btn.style.cssText = 'width:100%';
+    btn.textContent = t('ui.build.ramp');
+    btn.addEventListener('click', () => {
+      this.tileSelect.open({
+        mode: 'area',
+        worldSizeX: this.worldSizeX,
+        worldSizeZ: this.worldSizeZ,
+        title: t('ui.build.ramp'),
+        ...(this.lastState ? { tileFill: makeSiteTileFill(this.lastState) } : {}),
+        extraFields: [
+          { id: 'depth', label: t('ui.build.ramp_depth'), defaultValue: 8, min: 1, max: 40, step: 1 },
+        ],
+        onConfirm: (result) => {
+          const x2 = result.x2 ?? result.x;
+          const z2 = result.z2 ?? result.z;
+          const depth = result.fields['depth'] ?? 8;
+          const cmd = this.gameConsole?.(
+            `build_ramp start:${result.x},${result.z} end:${x2},${z2} depth:${depth}`,
+          );
+          this.setStatus(cmd?.success ? t('ui.build.ramp_built') : (cmd?.output ?? ''));
+        },
+      });
+    });
+
+    wrap.append(header, btn);
+    return wrap;
+  }
 
   // ── Catalog (place new buildings) ──────────────────────────────────────────
 
@@ -157,6 +209,7 @@ export class BuildMenu {
         worldSizeX: this.worldSizeX,
         worldSizeZ: this.worldSizeZ,
         title: t(`building.${type}.t${tier}.name`),
+        ...(this.lastState ? { tileFill: makeSiteTileFill(this.lastState) } : {}),
         onConfirm: (result) => {
           const cmdResult = this.gameConsole?.(`build ${type} at:${result.x},${result.z} tier:${tier}`);
           this.setStatus(cmdResult?.success ? t('ui.build.placed') : (cmdResult?.output ?? t('ui.build.invalid_placement')));
@@ -224,6 +277,7 @@ export class BuildMenu {
         worldSizeX: this.worldSizeX,
         worldSizeZ: this.worldSizeZ,
         title: `${t('ui.build.move')} #${b.id}`,
+        ...(this.lastState ? { tileFill: makeSiteTileFill(this.lastState) } : {}),
         onConfirm: (result) => {
           const cmdResult = this.gameConsole?.(`build move ${b.id} to:${result.x},${result.z}`);
           this.setStatus(cmdResult?.success ? t('ui.build.moved') : (cmdResult?.output ?? ''));

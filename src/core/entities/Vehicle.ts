@@ -232,7 +232,8 @@ export function getVehicleCostsPerTick(state: VehicleState): number {
 
 // ── Licence mapping ──
 
-const ROLE_LICENCE_REQUIRED: Record<VehicleRole, SkillCategory> = {
+/** Qualification category a driver needs for each vehicle role. */
+export const ROLE_LICENCE_REQUIRED: Record<VehicleRole, SkillCategory> = {
   debris_hauler: 'driving.truck',
   building_destroyer: 'driving.truck',
   rock_digger: 'driving.excavator',

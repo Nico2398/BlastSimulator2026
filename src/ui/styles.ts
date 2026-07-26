@@ -405,6 +405,26 @@ const CSS = `
 .bs-event-choice { text-align: left; padding: 9px 14px; font-size: 12px; line-height: 1.4; }
 
 /* ─── Survey UI ─── */
+.bs-survey-method {
+  cursor: pointer;
+  border: 1px solid rgba(255,255,255,0.13);
+  border-radius: 5px;
+  padding: 5px 8px;
+  margin-bottom: 4px;
+  background: rgba(255,255,255,0.04);
+  transition: background 0.15s, border-color 0.15s;
+  pointer-events: all;
+}
+.bs-survey-method:hover { background: rgba(255,255,255,0.11); border-color: rgba(255,255,255,0.25); }
+.bs-survey-method.selected { border-color: #ffc840; background: rgba(255,200,64,0.14); }
+.bs-survey-method-name { font-size: 11px; color: #d0b090; font-weight: 600; }
+/* Lightened to clear WCAG AA against the selected row's warm tint. */
+.bs-survey-method-meta { font-size: 10px; color: #bda989; margin-top: 1px; }
+.bs-survey-result {
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  padding: 5px 0;
+}
+.bs-survey-result:last-child { border-bottom: none; }
 .bs-ore-row { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; font-size: 11px; }
 .bs-ore-bar-bg { flex: 1; background: rgba(255,255,255,0.1); border-radius: 3px; height: 8px; }
 .bs-ore-bar-fill { height: 100%; border-radius: 3px; background: #ffc840; }

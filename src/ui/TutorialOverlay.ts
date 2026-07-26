@@ -34,7 +34,6 @@ export class TutorialOverlay {
   private readonly progressEl: HTMLElement;
   private readonly commandsLabel: HTMLElement;
   private readonly commandsHint: HTMLElement;
-  private readonly nextBtn: HTMLButtonElement;
   private readonly skipBtn: HTMLButtonElement;
   private highlightedEl: HTMLElement | null = null;
   private _active = false;
@@ -56,10 +55,8 @@ export class TutorialOverlay {
     this.commandsLabel = els.commandsLabel;
     this.commandsHint = els.commandsHint;
     this.skipBtn = els.skipBtn;
-    this.nextBtn = els.nextBtn;
 
     this.skipBtn.addEventListener('click', () => this.skip());
-    this.nextBtn.addEventListener('click', () => this.advanceToNextStep());
   }
 
   start(state?: GameState): void {
@@ -295,9 +292,8 @@ export class TutorialOverlay {
       this.commandsHint.style.display = 'none';
     }
 
-    // The final card has nothing left to advance to — offer only a dismiss.
+    // On the final card the escape hatch becomes a plain dismissal.
     const isLast = this.stepIndex >= LAST_STEP_INDEX;
-    this.nextBtn.style.display = isLast ? 'none' : '';
     this.skipBtn.textContent = isLast ? t('tutorial.finish') : t('tutorial.skip');
   }
 }

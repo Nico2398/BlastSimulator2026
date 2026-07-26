@@ -118,6 +118,35 @@ export class ContractUI {
     }
   }
 
+  /**
+   * Delivery controls for an active contract. Deliveries are explicit — nothing
+   * ships itself — so an active contract needs a way to send tonnage.
+   */
+  private makeDeliverRow(c: Contract): HTMLElement {
+    const wrap = document.createElement('div');
+    wrap.className = 'bs-contract-btns';
+
+    const amount = document.createElement('input');
+    amount.type = 'number';
+    amount.className = 'bs-input bs-contract-amount';
+    amount.style.cssText = 'flex:1;font-size:10px;padding:1px 4px';
+    amount.min = '1';
+    amount.step = '100';
+    amount.value = String(Math.max(1, c.quantityKg - c.deliveredKg));
+    amount.title = t('ui.contracts.deliver_amount');
+
+    const deliverBtn = document.createElement('button');
+    deliverBtn.className = 'bs-btn bs-btn-primary bs-contract-deliver';
+    deliverBtn.style.cssText = 'padding:2px 6px;font-size:10px';
+    deliverBtn.textContent = t('ui.contracts.deliver');
+    deliverBtn.addEventListener('click', () => {
+      this.gameConsole?.(`contract deliver ${c.id} amount:${amount.value}`);
+    });
+
+    wrap.append(amount, deliverBtn);
+    return wrap;
+  }
+
   private makeEmptyMessage(text: string): HTMLElement {
     const msg = document.createElement('div');
     msg.style.cssText = 'color:#806050;font-size:11px;margin:4px 0';
@@ -186,7 +215,7 @@ export class ContractUI {
     fill.style.cssText = 'background:#70c050;height:100%;border-radius:2px;width:0%';
     bar.appendChild(fill);
 
-    row.append(desc, progress, bar);
+    row.append(desc, progress, bar, this.makeDeliverRow(c));
     return row;
   }
 }
