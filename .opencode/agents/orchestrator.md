@@ -85,6 +85,8 @@ These are absolute. Violating any of these = orchestrator failure.
 - **Never write code yourself** — always delegate to `@implementer`
 - **Never refactor before tests pass** — Green phase first
 - **Always validate** — `npm run validate` must pass before declaring success, and every verification channel the change touches must report PASS. A renderer or UI change is not validated until @visual-tester has inspected screenshots.
+- **Never close an issue on a subset of its own verification list** — an "already fixed on main" or "no code change needed" verdict ends the issue with no diff and no PR, so nothing downstream will ever re-check it. Before that verdict, run every channel the issue's verification section names, not the ones a diff would have touched. Any channel that fails turns the verdict into work: the issue is not resolved.
+- **Never route around a channel that is red on `main`** — a pre-existing failure is the finding, not an excuse to skip. Either fix it inside this run, or escalate it as `blocked` naming the channel and what fails. Declaring an issue done while a channel it depends on is red is a false report regardless of who broke it.
 - **Never explore files during pipeline execution** — see TOOL RESTRICTIONS above
 - **Never wait for a human** — a GitHub Actions run has nobody to answer mid-run. When blocked, label the issue `blocked`, comment what is missing, and stop with `ESCALATED: human intervention required`. Never idle, never guess past a hard blocker.
 - **Context to pass to each agent:**
