@@ -458,15 +458,11 @@
     {
       "command": "contract deliver 1 amount:5000",
       "timeout": 30,
-      "description": "Step 15 complete: deliver tonnage from an active contract. Accepts a fresh offer first because short deadlines can expire the step-11 contract before the tutorial reaches its delivery step.",
+      "description": "Step 15 complete: deliver against the contract accepted at step 12. The step advances on completedHistory growing, so the delivery has to finish a contract — do not accept a second offer first, which puts an empty contract's Deliver button first in the panel and delivers against stock that was never hauled.",
       "interaction": [
         {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"contracts\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-contract-panel .bs-contract-accept"
         },
         {
           "type": "waitForSelector",
