@@ -1,0 +1,200 @@
+name: "Assign next agent task"
+description: >
+  Picks the next unblocked ready issue, flips its labels, and posts the standard
+  pipeline assignment comment addressed to the configured autonomous agent. The
+  comment is the trigger: mentioning @claude or @opencode starts that runtime's
+  runner workflow. Comment text is identical for both agents apart from the
+  mention itself.
+
+inputs:
+  token:
+    description: >
+      Token used to post the assignment comment. Must be a PAT — a comment
+      posted with GITHUB_TOKEN never triggers the runner workflows.
+    required: true
+  agent:
+    description: >
+      Configured autonomous agent, from the AGENTIC_AGENT repository variable.
+      Accepts "@claude", "claude", "@opencode", "opencode". Empty means @opencode.
+    required: false
+    default: ""
+  reason:
+    description: "Why this assignment happened. Quoted in the comment."
+    required: true
+  guard:
+    description: >
+      Precondition to check before assigning.
+      "idle" — do nothing while another issue is in-progress (manual kickstart).
+      "closed_without_pr" — only chain when completed_issue closed without a linked PR.
+      "none" — assign unconditionally (post-merge chain).
+    required: false
+    default: "none"
+  completed_issue:
+    description: "Issue just finished. Excluded from the stall check and read by the closed_without_pr guard."
+    required: false
+    default: ""
+
+outputs:
+  issue:
+    description: "Issue number that was assigned, empty when nothing was assigned."
+    value: ${{ steps.assign.outputs.issue }}
+  mention:
+    description: "Resolved agent mention (@claude or @opencode)."
+    value: ${{ steps.assign.outputs.mention }}
+
+runs:
+  using: composite
+  steps:
+    - id: assign
+      uses: actions/github-script@v7
+      env:
+        AGENTIC_AGENT: ${{ inputs.agent }}
+        ASSIGN_REASON: ${{ inputs.reason }}
+        ASSIGN_GUARD: ${{ inputs.guard }}
+        COMPLETED_ISSUE: ${{ inputs.completed_issue }}
+      with:
+        github-token: ${{ inputs.token }}
+        script: |
+          const owner = context.repo.owner;
+          const repo = context.repo.repo;
+
+          // --- Resolve which agent answers the assignment comment ---
+          const raw = (process.env.AGENTIC_AGENT || '').trim().replace(/^@/, '').toLowerCase();
+          const handles = { '': '@opencode', opencode: '@opencode', claude: '@claude' };
+          const mention = handles[raw];
+          if (!mention) {
+            core.setFailed(
+              `AGENTIC_AGENT is "${process.env.AGENTIC_AGENT}" — expected "@claude" or "@opencode".`
+            );
+            return;
+          }
+          core.setOutput('mention', mention);
+          core.setOutput('issue', '');
+          core.info(`Configured autonomous agent: ${mention}`);
+
+          const guard = process.env.ASSIGN_GUARD || 'none';
+          const reason = process.env.ASSIGN_REASON || 'pipeline assignment';
+          const completed = process.env.COMPLETED_ISSUE
+            ? parseInt(process.env.COMPLETED_ISSUE, 10)
+            : null;
+
+          const hasLinkedPr = async (number) => {
+            const { data: events } = await github.rest.issues.listEventsForTimeline({
+              owner, repo, issue_number: number, per_page: 100
+            });
+            return events.some((e) => e.event === 'cross-referenced' && e.source?.issue?.pull_request);
+          };
+
+          // --- Guard: only chain when the finished issue produced no PR ---
+          if (guard === 'closed_without_pr') {
+            if (!completed) {
+              core.info('No completed issue supplied — nothing to chain from.');
+              return;
+            }
+            const { data: finished } = await github.rest.issues.get({
+              owner, repo, issue_number: completed
+            });
+            if (finished.state !== 'closed') {
+              core.info(`Issue #${completed} still open — a PR is expected to carry the chain.`);
+              return;
+            }
+            if (await hasLinkedPr(completed)) {
+              core.info(`Issue #${completed} has a linked PR — the merge event carries the chain.`);
+              return;
+            }
+            core.info(`Issue #${completed} closed without a PR — chaining directly.`);
+          }
+
+          const { data: inProgress } = await github.rest.issues.listForRepo({
+            owner, repo, labels: 'in-progress', state: 'open', per_page: 20
+          });
+
+          // --- Guard: manual kickstart refuses to start a second run ---
+          if (guard === 'idle' && inProgress.length > 0) {
+            core.info(`Issue #${inProgress[0].number} already in progress — pipeline busy.`);
+            return;
+          }
+
+          // --- A stalled in-progress issue means the loop lost a run; stop here ---
+          for (const stuck of inProgress) {
+            if (stuck.number === completed) continue;
+            if (await hasLinkedPr(stuck.number)) continue;
+            core.warning(`Issue #${stuck.number} is in-progress with no linked PR — halting the chain.`);
+            await github.rest.issues.createComment({
+              owner, repo, issue_number: stuck.number,
+              body: [
+                '⏸️ Pipeline halted — this issue was marked **in-progress** but no linked PR was created.',
+                '',
+                'Diagnose the agent run, then either close this issue or remove `in-progress`, add `ready`,',
+                'and re-run the "Pipeline: run the configured agent on the next ready issue" workflow.'
+              ].join('\n')
+            });
+            return;
+          }
+
+          // --- Pick the next assignable issue ---
+          const { data: ready } = await github.rest.issues.listForRepo({
+            owner, repo, labels: 'ready', state: 'open', sort: 'created', direction: 'asc', per_page: 30
+          });
+          ready.sort((a, b) => a.number - b.number);
+
+          for (const issue of ready) {
+            if (issue.pull_request) continue;
+            if (issue.labels.some((l) => (typeof l === 'string' ? l : l.name) === 'blocked')) {
+              core.info(`#${issue.number}: labelled blocked, skipping.`);
+              continue;
+            }
+
+            const depMatch = issue.body?.match(/[Dd]epends?\s+on:?\s*#(\d+)/);
+            if (depMatch) {
+              const dep = await github.rest.issues.get({
+                owner, repo, issue_number: parseInt(depMatch[1], 10)
+              });
+              if (dep.data.state !== 'closed') {
+                core.info(`#${issue.number}: dependency #${depMatch[1]} not closed, skipping.`);
+                continue;
+              }
+            }
+
+            const n = issue.number;
+            await github.rest.issues.removeLabel({
+              owner, repo, issue_number: n, name: 'ready'
+            }).catch(() => {});
+            await github.rest.issues.addLabels({
+              owner, repo, issue_number: n, labels: ['in-progress']
+            });
+
+            // The comment IS the trigger. It must carry the whole assignment:
+            // which agent answers, what to build, and how the pipeline runs it.
+            // Identical for every agent apart from the mention on the first line.
+            const body = [
+              `${mention} — autonomous pipeline assignment for issue #${n} (${reason}).`,
+              '',
+              `**Task:** resolve issue #${n} end to end and open the pull request that closes it.`,
+              '',
+              '**▶ FIRST ACTION — hand this task to the `pipeline` orchestrator agent.**',
+              'Classification, planning, TDD, code review and PR creation are the orchestrator\'s job,',
+              'delegated to specialist sub-agents. Do not implement anything in this session directly,',
+              'and do not explore the codebase before the orchestrator has classified the task.',
+              '',
+              'The orchestrator then follows its own procedure:',
+              '',
+              `1. Classify the task and load the matching \`agentic-pipeline-*\` skill. The system itself is described in the \`agentic-autonomous-pipeline\` skill.`,
+              `2. Run the TDD cycle with branch isolation on \`pipeline/tests-${n}\` and \`pipeline/impl-${n}\` — the implementer never sees the tests.`,
+              `3. Cherry-pick the implementation onto \`pipeline/feature-${n}\`, then run code review, refactor and validation there.`,
+              '4. Run every verification channel the change touches. A renderer or UI change is not done until screenshots have been inspected; a player-facing flow is not done until `npm run playtest` passes.',
+              `5. Open the PR from \`pipeline/feature-${n}\` to \`main\`. Its body must contain \`Closes #${n}\`, plus \`READY TO MERGE\` on a line of its own when the run was clean. Otherwise open it as a draft without that line and say why.`,
+              '',
+              'Do not use `[skip ci]` on pipeline branches — it suppresses the auto-merge workflow.',
+              '',
+              `If you cannot proceed, label this issue \`blocked\`, comment what is missing, and stop. Do not close issue #${n} without a PR unless no code change was needed.`
+            ].join('\n');
+
+            await github.rest.issues.createComment({ owner, repo, issue_number: n, body });
+
+            core.setOutput('issue', String(n));
+            core.info(`Assigned issue #${n} to ${mention}.`);
+            return;
+          }
+
+          core.info('No assignable ready issues. Pipeline idle.');

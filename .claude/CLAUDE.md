@@ -43,6 +43,10 @@ Prefix categories:
 
 **Skills-First:** before any task, load related skill(s) for domain rules, procedures, and constraints.
 
+## ▶ Autonomous pipeline sessions
+
+A session started by the autonomous pipeline — a GitHub Actions run woken by the `@claude` mention in a pipeline assignment comment — is not an ordinary session. Its first action is to hand the task to the `pipeline` orchestrator agent, which classifies it and delegates every step to specialists. Never implement a pipeline-assigned task in the main session, and never explore the codebase before the orchestrator has classified it. The `/agentic-run` command carries that mandate; the system around it is described in `agentic-autonomous-pipeline`.
+
 ## ▶ Verification Gate — RUN BEFORE CLAIMING ANY WORK DONE
 
 Five independent channels prove a change works. Each catches what the others miss. Never report a task complete on a single channel when a second one applies.

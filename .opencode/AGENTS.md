@@ -38,6 +38,10 @@ npx tsx src/console.ts  # Interactive gameplay testing
 
 Before any task, load related skill(s) for domain rules, procedures, and constraints.
 
+## ▶ Autonomous pipeline sessions
+
+A session started by the autonomous pipeline — a GitHub Actions run woken by the configured agent mention in a pipeline assignment comment — is not an ordinary session. Its first action is to run as the orchestrator: classify the task, then delegate every step to specialists. Never implement a pipeline-assigned task directly, and never explore the codebase before the task has been classified. The `/agentic-run` command carries that mandate; the system around it is described in `agentic-autonomous-pipeline`.
+
 ## ▶ Capability Gate — CHECK BEFORE ANY ACTION
 
 **Run first. Before everything.**

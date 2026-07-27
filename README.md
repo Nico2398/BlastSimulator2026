@@ -17,7 +17,7 @@
 | Testing | Vitest | latest | Unit + integration tests, Node.js native |
 | Visual testing | Puppeteer | latest | Headless Chrome screenshot capture |
 | Console mode | Node.js + tsx | latest | CLI gameplay for testing without a browser |
-| CI agent | [opencode-agent](https://github.com/apps/opencode-agent) | latest | Autonomous PR creation and code review via GitHub App |
+| CI agent | Claude Code or OpenCode | latest | Autonomous PR creation and code review, selected by the `AGENTIC_AGENT` repository variable |
 
 ---
 
@@ -355,7 +355,8 @@ scripts/
   agents/             Agent role definitions
   skills/             Domain-specific skill specs
 
-.github/workflows/    GitHub Actions workflows (CI + OpenCode pipeline)
+.github/workflows/    GitHub Actions workflows (CI + agentic pipeline runners)
+.github/actions/      Composite actions shared by the pipeline workflows
 ```
 
 ---
@@ -395,8 +396,31 @@ If the pipeline reaches the PR creation step, `gh` must be authenticated with a 
 
 If these commands fail with permission/auth errors, the agent will not be able to open or update PRs.
 
-### Comment trigger migration
+### Choosing the autonomous agent
 
-> **Status: ACTIVE**
->
-> Trigger path: `/opencode` or `/oc` comment invocation on issues and PRs triggers the OpenCode pipeline via `.github/workflows/opencode-runner.yml`.
+The pipeline runs under Claude Code or OpenCode. One repository variable decides which:
+
+| Repository variable | Values | Effect |
+|---------------------|--------|--------|
+| `AGENTIC_AGENT` | `@claude`, `@opencode` (leading `@` and case optional; unset means `@opencode`) | Which agent the assignment comments address, and therefore which runner workflow starts |
+| `AGENTIC_AUTO_ASSIGN_ENABLED` | `true` / anything else | Whether a finished issue chains to the next `ready` one |
+| `AGENTIC_AUTO_MERGE_ENABLED` | `true` / anything else | Whether a PR whose body carries `READY TO MERGE` gets GitHub native auto-merge |
+
+Set them under **Settings → Secrets and variables → Actions → Variables**. Switching agent is a one-value change; nothing else moves.
+
+Required secrets: `PAT_TOKEN_COPILOT_AUTOMATION` (both agents — the loop dies without it, see below), `CLAUDE_CODE_OAUTH_TOKEN` (Claude), `DEEPSEEK_API_KEY` (OpenCode).
+
+### Trigger paths
+
+| Trigger | Result |
+|---------|--------|
+| Run the **"Pipeline: run the configured agent on the next ready issue"** workflow | Picks the oldest unblocked `ready` issue and posts the assignment comment |
+| A merged PR whose body says `Closes #N` | Closes `#N`, then assigns the next `ready` issue the same way |
+| Comment `@claude …` on an issue or PR | Runs `.github/workflows/claude-runner.yml` |
+| Comment `@opencode …` on an issue or PR | Runs `.github/workflows/opencode-runner.yml` |
+
+The assignment comment *is* the trigger, and it carries the whole assignment: the issue, the mandate to delegate to the `pipeline` orchestrator before anything else, the branch names, the verification expectation, and the PR conventions. Its wording is identical for both agents apart from the mention on the first line — so both runtimes read the same instructions. Both runners stay enabled regardless of `AGENTIC_AGENT`, so you can always summon the other one by hand.
+
+**Why the PAT matters:** GitHub does not trigger workflows from events created with `GITHUB_TOKEN`. An assignment comment posted with it wakes no runner, and a PR opened with it raises no `pull_request` event, so auto-merge and the next assignment never happen. Every comment and PR in the loop must come from `PAT_TOKEN_COPILOT_AUTOMATION`.
+
+Full architecture — branch isolation, cherry-pick, the halt conditions — lives in the `agentic-autonomous-pipeline` skill.

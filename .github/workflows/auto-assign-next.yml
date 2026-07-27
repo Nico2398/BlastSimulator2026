@@ -1,4 +1,4 @@
-name: "Pipeline: assign next issue to OpenCode"
+name: "Pipeline: assign next issue to the configured agent"
 
 on:
   pull_request:
@@ -32,11 +32,10 @@ jobs:
         run: |
           gh pr merge --auto --squash "${{ github.event.pull_request.html_url }}"
 
-      - name: Close done issue + assign next ready issue to OpenCode
+      - name: Close the completed issue
+        id: close-issue
         if: github.event.pull_request.merged == true
         uses: actions/github-script@v7
-        env:
-          AGENTIC_AUTO_ASSIGN_ENABLED: ${{ vars.AGENTIC_AUTO_ASSIGN_ENABLED }}
         with:
           github-token: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
           script: |
@@ -44,114 +43,47 @@ jobs:
             const repo = context.repo.repo;
             const prBody = context.payload.pull_request.body || '';
 
-            // --- 1. Find and close the completed issue ---
             const closesMatch = prBody.match(/(?:Closes?|Resolves|Fixes)\s+#(\d+)/i);
-            const issueNum = closesMatch?.[1];
-
-            if (!issueNum) {
-              console.log('No explicit close directive found in PR body. Skipping issue close.');
+            if (!closesMatch) {
+              core.info('No explicit close directive found in PR body. Skipping issue close.');
+              core.setOutput('issue', '');
+              return;
             }
 
-            const n = issueNum ? parseInt(issueNum) : null;
-            if (n) {
-              console.log(`Closing issue #${n} (referenced in merged PR body).`);
-              await github.rest.issues.update({ owner, repo, issue_number: n, state: 'closed' });
-              await github.rest.issues.addLabels({ owner, repo, issue_number: n, labels: ['done'] }).catch(() => {});
-              await github.rest.issues.removeLabel({ owner, repo, issue_number: n, name: 'in-progress' }).catch(() => {});
-            }
+            const n = parseInt(closesMatch[1], 10);
+            core.info(`Closing issue #${n} (referenced in merged PR body).`);
+            await github.rest.issues.update({ owner, repo, issue_number: n, state: 'closed' });
+            await github.rest.issues.addLabels({ owner, repo, issue_number: n, labels: ['done'] }).catch(() => {});
+            await github.rest.issues.removeLabel({ owner, repo, issue_number: n, name: 'in-progress' }).catch(() => {});
+            core.setOutput('issue', String(n));
 
-            // --- Auto-assign next issue (only when enabled) ---
-            const autoAssignEnabled = (process.env.AGENTIC_AUTO_ASSIGN_ENABLED || 'false') === 'true';
+      - name: Checkout repository
+        if: github.event.pull_request.merged == true && vars.AGENTIC_AUTO_ASSIGN_ENABLED == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 1
 
-            if (autoAssignEnabled) {
-              // --- Check for stalled in-progress issues ---
-              const { data: inProgress } = await github.rest.issues.listForRepo({
-                owner, repo,
-                labels: 'in-progress',
-                state: 'open',
-                per_page: 10
-              });
+      # The assignment comment mentions whichever agent AGENTIC_AGENT names, and
+      # that mention starts the matching runner workflow. This is the link that
+      # closes the autonomy loop: merged PR → next issue → next agent run.
+      - name: Assign the next ready issue
+        id: assign
+        if: github.event.pull_request.merged == true && vars.AGENTIC_AUTO_ASSIGN_ENABLED == 'true'
+        uses: ./.github/actions/agentic-assign
+        with:
+          token: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
+          agent: ${{ vars.AGENTIC_AGENT }}
+          reason: auto-assigned from merged PR #${{ github.event.pull_request.number }}
+          completed_issue: ${{ steps.close-issue.outputs.issue }}
 
-              for (const stuck of inProgress) {
-                if (stuck.number === n) continue;
-
-                const { data: events } = await github.rest.issues.listEventsForTimeline({
-                  owner, repo,
-                  issue_number: stuck.number,
-                  per_page: 100
-                });
-
-                const hasPR = events.some(e => e.event === 'cross-referenced' && e.source?.issue?.pull_request);
-                if (!hasPR) {
-                  console.log(`Issue #${stuck.number} is in-progress but has no linked PR. Halting chain.`);
-                  await github.rest.issues.createComment({
-                    owner, repo,
-                    issue_number: stuck.number,
-                    body: '⏸️ Pipeline halted — this issue was marked **in-progress** but no linked PR was created. Please diagnose manually, then either close it or remove `in-progress` and add `ready`.'
-                  });
-                  return;
-                }
-              }
-
-              // --- 2. Find next ready issue (oldest first) ---
-              const { data: ready } = await github.rest.issues.listForRepo({
-                owner, repo,
-                labels: 'ready',
-                state: 'open',
-                sort: 'created',
-                direction: 'asc',
-                per_page: 10
-              });
-
-              ready.sort((a, b) => a.number - b.number);
-
-              for (const issue of ready) {
-                const depMatch = issue.body?.match(/[Dd]epends?\s+on:?\s*#(\d+)/);
-                if (depMatch) {
-                  const dep = await github.rest.issues.get({
-                    owner, repo, issue_number: parseInt(depMatch[1])
-                  });
-                  if (dep.data.state !== 'closed') {
-                    console.log(`#${issue.number}: dependency #${depMatch[1]} not closed, skipping.`);
-                    continue;
-                  }
-                }
-
-                console.log(`Assigning #${issue.number} to OpenCode pipeline.`);
-                await github.rest.issues.removeLabel({
-                  owner, repo,
-                  issue_number: issue.number,
-                  name: 'ready'
-                }).catch(() => {});
-                await github.rest.issues.addLabels({
-                  owner, repo,
-                  issue_number: issue.number,
-                  labels: ['in-progress']
-                });
-
-                await github.rest.issues.createComment({
-                  owner, repo,
-                  issue_number: issue.number,
-                  body: `⚙️ Auto-assigned from merged PR #${context.payload.pull_request.number}`
-                });
-
-                await github.rest.actions.createWorkflowDispatch({
-                  owner, repo,
-                  workflow_id: 'opencode-runner.yml',
-                  ref: 'main',
-                   inputs: {
-                     issue_number: String(issue.number)
-                   }
-                });
-                console.log(`OpenCode pipeline dispatched for issue #${issue.number}.`);
-
-                return;
-              }
-
-              console.log('No more ready issues. Pipeline idle.');
-            } else {
-              if (!autoAssignEnabled) {
-                console.log('Auto-assign is disabled (AGENTIC_AUTO_ASSIGN_ENABLED is not set to "true").');
-              }
-              console.log(`PR author is ${context.payload.pull_request.user.type} — auto-assign enabled.`);
-            }
+      - name: Report auto-assign state
+        if: github.event.pull_request.merged == true
+        run: |
+          if [ "${{ vars.AGENTIC_AUTO_ASSIGN_ENABLED }}" != "true" ]; then
+            echo 'Auto-assign is disabled (AGENTIC_AUTO_ASSIGN_ENABLED is not "true").'
+          elif [ -n "${{ steps.assign.outputs.issue }}" ]; then
+            echo "Assigned issue #${{ steps.assign.outputs.issue }} to ${{ steps.assign.outputs.mention }}."
+          else
+            echo "Nothing assigned — see the assign step for the reason."
+          fi
