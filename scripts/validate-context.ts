@@ -13,6 +13,8 @@
  *   4. Hook commands point at files that exist and are executable
  *   5. Skill directory name matches its frontmatter `name`
  *   6. Body content is identical across .claude/, .github/, and .opencode/
+ *   7. A command's `agent:` resolves to an agent that exists
+ *   8. Every command has a mirror in the other two runtimes
  *
  * Usage:
  *   npx tsx scripts/validate-context.ts
@@ -115,6 +117,34 @@ function skillNames(): Set<string> {
   const dir = join(ROOT, '.claude/skills');
   if (!existsSync(dir)) return new Set();
   return new Set(readdirSync(dir).filter((entry) => existsSync(join(dir, entry, 'SKILL.md'))));
+}
+
+/** Agent names as declared in frontmatter, which need not match the filename. */
+function agentNames(): Set<string> {
+  const names = new Set<string>();
+  for (const path of markdownFiles(join(ROOT, '.claude/agents'))) {
+    const file = parse(path);
+    const name = file && listField(file.frontmatter, 'name')[0];
+    if (name) names.add(name);
+  }
+  return names;
+}
+
+/**
+ * A command's `agent:` must name an agent that exists. Renaming an agent
+ * without updating its commands leaves them pointing at nothing, and the
+ * command silently runs in the default agent instead of the one it declared.
+ */
+function checkCommand(file: ParsedFile, agents: Set<string>): ContextIssue[] {
+  const issues = checkUnknownFields(file, SKILL_FIELDS, 'command');
+  const agent = listField(file.frontmatter, 'agent')[0];
+  if (agent && !agents.has(agent)) {
+    issues.push({
+      file: file.path,
+      message: `\`agent\` names unknown agent \`${agent}\` — the command falls back to the default agent`,
+    });
+  }
+  return issues;
 }
 
 function checkUnknownFields(file: ParsedFile, allowed: Set<string>, kind: string): ContextIssue[] {
@@ -223,6 +253,22 @@ function checkCrossRuntimeSync(): ContextIssue[] {
     }
   }
 
+  // Commands are checked for existence, not body equality: each runtime spells
+  // its arguments differently (`$ARGUMENTS` vs `${input:name}`), so identical
+  // bodies are not achievable. A missing mirror means one runtime silently
+  // lacks an entry point the others have.
+  for (const path of markdownFiles(join(ROOT, '.claude/commands'))) {
+    const stem = basename(path, '.md');
+    for (const mirror of [
+      join(ROOT, '.github/prompts', `${stem}.prompt.md`),
+      join(ROOT, '.opencode/commands', `${stem}.md`),
+    ]) {
+      if (!existsSync(mirror)) {
+        issues.push({ file: mirror, message: `missing mirror of command \`${stem}\`` });
+      }
+    }
+  }
+
   return issues;
 }
 
@@ -253,10 +299,11 @@ export function validateContextFiles(): ContextIssue[] {
     issues.push(...checkSkill(file, skills));
   }
 
+  const agents = agentNames();
   for (const path of markdownFiles(join(ROOT, '.claude/commands'))) {
     const file = parse(path);
     if (file) {
-      issues.push(...checkUnknownFields(file, SKILL_FIELDS, 'command'));
+      issues.push(...checkCommand(file, agents));
     }
   }
 

@@ -23,10 +23,9 @@ inputs:
     required: true
   guard:
     description: >
-      Precondition to check before assigning.
-      "idle" — do nothing while another issue is in-progress (manual kickstart).
+      Extra precondition to check before assigning.
       "closed_without_pr" — only chain when completed_issue closed without a linked PR.
-      "none" — assign unconditionally (post-merge chain).
+      "none" — no extra precondition. Single-flight is enforced either way.
     required: false
     default: "none"
   completed_issue:
@@ -109,24 +108,33 @@ runs:
             owner, repo, labels: 'in-progress', state: 'open', per_page: 20
           });
 
-          // --- Guard: manual kickstart refuses to start a second run ---
-          if (guard === 'idle' && inProgress.length > 0) {
-            core.info(`Issue #${inProgress[0].number} already in progress — pipeline busy.`);
-            return;
-          }
+          // --- Single flight: never let two agent sessions run at once ---
+          // An issue keeps `in-progress` until its PR merges, so any other one
+          // still carrying that label means a run is live. Assigning now would
+          // put a second session on the same working tree of branches.
+          for (const busy of inProgress) {
+            if (busy.number === completed) continue;
 
-          // --- A stalled in-progress issue means the loop lost a run; stop here ---
-          for (const stuck of inProgress) {
-            if (stuck.number === completed) continue;
-            if (await hasLinkedPr(stuck.number)) continue;
-            core.warning(`Issue #${stuck.number} is in-progress with no linked PR — halting the chain.`);
+            if (await hasLinkedPr(busy.number)) {
+              core.info(
+                `Issue #${busy.number} is in progress with a linked PR — deferring. ` +
+                'Merging that PR re-enters this step.'
+              );
+              return;
+            }
+
+            // No PR and still in-progress: the run was lost. Say so, loudly.
+            core.warning(`Issue #${busy.number} is in-progress with no linked PR — halting the chain.`);
             await github.rest.issues.createComment({
-              owner, repo, issue_number: stuck.number,
+              owner, repo, issue_number: busy.number,
               body: [
                 '⏸️ Pipeline halted — this issue was marked **in-progress** but no linked PR was created.',
                 '',
                 'Diagnose the agent run, then either close this issue or remove `in-progress`, add `ready`,',
-                'and re-run the "Pipeline: run the configured agent on the next ready issue" workflow.'
+                'and re-run the "Pipeline: run the configured agent on the next ready issue" workflow.',
+                '',
+                'The watchdog labels an issue `blocked` on its own once it has been in-progress without a PR',
+                'for longer than `AGENTIC_STALL_MINUTES`, so this state does not need to be swept by hand.'
               ].join('\n')
             });
             return;
@@ -172,7 +180,7 @@ runs:
               '',
               `**Task:** resolve issue #${n} end to end and open the pull request that closes it.`,
               '',
-              '**▶ FIRST ACTION — hand this task to the `pipeline` orchestrator agent.**',
+              '**▶ FIRST ACTION — hand this task to the `orchestrator` agent.**',
               'Classification, planning, TDD, code review and PR creation are the orchestrator\'s job,',
               'delegated to specialist sub-agents. Do not implement anything in this session directly,',
               'and do not explore the codebase before the orchestrator has classified the task.',

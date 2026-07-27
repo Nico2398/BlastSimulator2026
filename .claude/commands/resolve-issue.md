@@ -3,7 +3,7 @@ description: Resolve a GitHub issue end-to-end through the TDD pipeline.
 argument-hint: <issue number>
 disable-model-invocation: true
 context: fork
-agent: pipeline
+agent: orchestrator
 ---
 
 If $ARGUMENTS is non-empty, resolve GitHub issue #$ARGUMENTS.

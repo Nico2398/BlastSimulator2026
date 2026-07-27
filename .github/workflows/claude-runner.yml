@@ -12,6 +12,13 @@ on:
   pull_request_review_comment:
     types: [created]
 
+concurrency:
+  # Repo-wide, and shared by name with the other runner: exactly one autonomous
+  # agent session may run at a time, whichever runtime it is. Queued runs wait
+  # rather than cancel the live one.
+  group: agentic-runner
+  cancel-in-progress: false
+
 permissions:
   id-token: write
   contents: write
@@ -107,7 +114,11 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           additional_permissions: |
             actions: read
-          # `/agentic-run` forks straight into the `pipeline` agent, so the
+          # Any branch the harness generates for itself lands inside the
+          # pipeline namespace, where it cannot be mistaken for the deliverable
+          # `pipeline/feature-<N>` and is already skipped by claude-code-review.
+          branch_prefix: 'pipeline/scratch-'
+          # `/agentic-run` forks straight into the `orchestrator` agent, so the
           # orchestrator is the first thing that runs — the equivalent of
           # OpenCode's `default_agent`. The entity reference leads the argument
           # so the fork still knows what it is working on even if the multi-line

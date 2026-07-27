@@ -12,6 +12,13 @@ on:
   pull_request_review_comment:
     types: [created]
 
+concurrency:
+  # Repo-wide, and shared by name with the other runner: exactly one autonomous
+  # agent session may run at a time, whichever runtime it is. Queued runs wait
+  # rather than cancel the live one.
+  group: agentic-runner
+  cancel-in-progress: false
+
 permissions:
   id-token: write
   contents: write

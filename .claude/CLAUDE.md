@@ -45,7 +45,7 @@ Prefix categories:
 
 ## ▶ Autonomous pipeline sessions
 
-A session started by the autonomous pipeline — a GitHub Actions run woken by the `@claude` mention in a pipeline assignment comment — is not an ordinary session. Its first action is to hand the task to the `pipeline` orchestrator agent, which classifies it and delegates every step to specialists. Never implement a pipeline-assigned task in the main session, and never explore the codebase before the orchestrator has classified it. The `/agentic-run` command carries that mandate; the system around it is described in `agentic-autonomous-pipeline`.
+A session started by the autonomous pipeline — a GitHub Actions run woken by the `@claude` mention in a pipeline assignment comment — is not an ordinary session. Its first action is to hand the task to the `orchestrator` agent, which classifies it and delegates every step to specialists. Never implement a pipeline-assigned task in the main session, and never explore the codebase before the orchestrator has classified it. The `/agentic-run` command carries that mandate; the system around it is described in `agentic-autonomous-pipeline`.
 
 ## ▶ Verification Gate — RUN BEFORE CLAIMING ANY WORK DONE
 

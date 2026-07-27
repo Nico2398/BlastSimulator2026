@@ -3,7 +3,7 @@ description: Entry point for an autonomous pipeline run triggered from GitHub.
 argument-hint: <issue N | pr N> [trigger context]
 disable-model-invocation: true
 context: fork
-agent: pipeline
+agent: orchestrator
 ---
 
 This is an autonomous pipeline run triggered from GitHub. You are the orchestrator for it. Classify the task, load the matching `agentic-pipeline-*` skill, and execute that skill's first step. Do not read source files or write code before the task is classified — delegation is your only job.

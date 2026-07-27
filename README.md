@@ -405,6 +405,7 @@ The pipeline runs under Claude Code or OpenCode. One repository variable decides
 | `AGENTIC_AGENT` | `@claude`, `@opencode` (leading `@` and case optional; unset means `@opencode`) | Which agent the assignment comments address, and therefore which runner workflow starts |
 | `AGENTIC_AUTO_ASSIGN_ENABLED` | `true` / anything else | Whether a finished issue chains to the next `ready` one |
 | `AGENTIC_AUTO_MERGE_ENABLED` | `true` / anything else | Whether a PR whose body carries `READY TO MERGE` gets GitHub native auto-merge |
+| `AGENTIC_STALL_MINUTES` | minutes, default `240` | How long an issue may stay `in-progress` without a linked PR before the watchdog marks it `blocked` |
 
 Set them under **Settings → Secrets and variables → Actions → Variables**. Switching agent is a one-value change; nothing else moves.
 
