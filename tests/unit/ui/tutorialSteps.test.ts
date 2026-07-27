@@ -123,24 +123,85 @@ describe('tutorialSteps', () => {
     expect(TUTORIAL_STEPS[18].autoAdvanceMs).toBe(2000);
   });
 
+  // ── set-policy ───────────────────────────────────────────────────────────
+  describe('step 19 (set-policy)', () => {
+    const step = TUTORIAL_STEPS.find(s => s.id === 'set-policy')!;
+
+    const stateWith = (revision: number) =>
+      ({ sitePolicy: { shiftMode: 'shift_8h', revision } } as unknown as GameState);
+
+    it('completes when a policy is applied, even with every value unchanged', () => {
+      // The reported bug: pressing Apply on the settings already in force is the
+      // common case, since the form mirrors the current policy. Comparing values
+      // concluded nothing had happened and the tutorial sat there forever while
+      // the panel said "Site policy updated".
+      const snap = step.captureSnapshot!(stateWith(0));
+      expect(step.isComplete(stateWith(1), snap)).toBe(true);
+    });
+
+    it('does not complete before the player applies anything', () => {
+      const snap = step.captureSnapshot!(stateWith(3));
+      expect(step.isComplete(stateWith(3), snap)).toBe(false);
+    });
+
+    it('does not complete on a policy applied before the step opened', () => {
+      const snap = step.captureSnapshot!(stateWith(5));
+      expect(step.isComplete(stateWith(4), snap)).toBe(false);
+    });
+
+    it('survives a state with no site policy at all', () => {
+      const empty = {} as unknown as GameState;
+      expect(() => step.isComplete(empty, step.captureSnapshot!(empty))).not.toThrow();
+    });
+  });
+
   // ── 14 (event-fire-resolve) ──────────────────────────────────────────────
   describe('step 9 (event-fire-resolve, index 9)', () => {
     const step9 = TUTORIAL_STEPS[9];
 
-    it('has commands ["tick 3"]', () => {
-      expect(step9.commands).toEqual(['tick 3']);
+    it('drives itself: autoCommands fast-forward and fire the scripted event', () => {
+      expect(step9.autoCommands).toEqual(['tick 3', 'event fire tutorial_synergy_consultant']);
     });
 
-    it('isComplete returns true when pendingEvent is not null', () => {
+    it('isComplete returns true once the scripted event fired and was resolved', () => {
       const state = {
-        events: { pendingEvent: { eventId: 'test_evt', firedAtTick: 5 } },
+        events: { pendingEvent: null, firedEventIds: ['tutorial_synergy_consultant'] },
       } as unknown as GameState;
       expect(step9.isComplete(state, {})).toBe(true);
     });
 
-    it('isComplete returns false when pendingEvent is null', () => {
-      const state = { events: { pendingEvent: null } } as unknown as GameState;
+    it('isComplete returns false while the dialog is still open', () => {
+      const state = {
+        events: {
+          pendingEvent: { eventId: 'tutorial_synergy_consultant', firedAtTick: 5 },
+          firedEventIds: ['tutorial_synergy_consultant'],
+        },
+      } as unknown as GameState;
       expect(step9.isComplete(state, {})).toBe(false);
+    });
+
+    it('isComplete returns false before the scripted event has fired', () => {
+      const state = {
+        events: { pendingEvent: null, firedEventIds: [] },
+      } as unknown as GameState;
+      expect(step9.isComplete(state, {})).toBe(false);
+    });
+
+    it('resolving a different event does not complete the step', () => {
+      const state = {
+        events: { pendingEvent: null, firedEventIds: ['union_strike'] },
+      } as unknown as GameState;
+      expect(step9.isComplete(state, {})).toBe(false);
+    });
+
+    it('stays complete once resolved, so a fast answer cannot deadlock the tutorial', () => {
+      // The old condition was only true while the dialog was open. This is the
+      // regression guard: the completion signal must be monotonic.
+      const state = {
+        events: { pendingEvent: null, firedEventIds: ['tutorial_synergy_consultant'] },
+      } as unknown as GameState;
+      expect(step9.isComplete(state, {})).toBe(true);
+      expect(step9.isComplete(state, {})).toBe(true);
     });
   });
 
@@ -245,5 +306,60 @@ describe('tutorialSteps', () => {
         ).toBe(true);
       }
     }
+  });
+
+  // ── 16 ───────────────────────────────────────────────────────────────────
+  it('step 0 (time-speed) only completes on a genuine speed increase', () => {
+    const step0 = TUTORIAL_STEPS[0]!;
+    const snap = step0.captureSnapshot!({ timeScale: 1 } as GameState);
+    // Same speed as when the step opened — the player has not acted yet.
+    expect(step0.isComplete({ timeScale: 1 } as GameState, snap)).toBe(false);
+    expect(step0.isComplete({ timeScale: 2 } as GameState, snap)).toBe(true);
+  });
+
+  // ── 17 ───────────────────────────────────────────────────────────────────
+  it('only the scripted event step carries autoCommands', () => {
+    for (const step of TUTORIAL_STEPS) {
+      if (step.id === 'event-fire-resolve') continue;
+      expect(step.autoCommands).toBeUndefined();
+    }
+  });
+
+  // ── 18 ───────────────────────────────────────────────────────────────────
+  it('every highlightTarget points at a control that stays on screen', () => {
+    // Panels are display:none until the player opens them, so a step may only
+    // highlight the always-present HUD, score panel or toolbar buttons.
+    const allowed = /^#bs-hud-top |^#bs-hud-scores$|^#bs-toolbar \[data-panel="[a-z]+"\]$/;
+    for (const step of TUTORIAL_STEPS) {
+      if (!step.highlightTarget) continue;
+      expect(step.highlightTarget).toMatch(allowed);
+    }
+  });
+
+  // ── 19 ───────────────────────────────────────────────────────────────────
+  describe('step 7 (blast, index 7)', () => {
+    const blastStep = TUTORIAL_STEPS[7]!;
+
+    it('completes on a barren blast, not only when ore is found', () => {
+      // A legitimate blast that turns up no ore still satisfied the objective:
+      // "execute the blast sequence". Keying on ore alone dead-ends the card.
+      const before = { levelStats: { blastsPerformed: 0 }, collectedOre: {} } as unknown as GameState;
+      const snap = blastStep.captureSnapshot!(before);
+      const after = { levelStats: { blastsPerformed: 1 }, collectedOre: {} } as unknown as GameState;
+      expect(blastStep.isComplete(after, snap)).toBe(true);
+    });
+
+    it('still completes when ore is collected outside a campaign level', () => {
+      const before = { collectedOre: {} } as unknown as GameState;
+      const snap = blastStep.captureSnapshot!(before);
+      const after = { collectedOre: { gravelite: 400 } } as unknown as GameState;
+      expect(blastStep.isComplete(after, snap)).toBe(true);
+    });
+
+    it('does not complete before the player blasts', () => {
+      const before = { levelStats: { blastsPerformed: 0 }, collectedOre: {} } as unknown as GameState;
+      const snap = blastStep.captureSnapshot!(before);
+      expect(blastStep.isComplete(before, snap)).toBe(false);
+    });
   });
 });

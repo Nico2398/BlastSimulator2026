@@ -187,8 +187,8 @@ export class MainMenu {
   /** Show "Return to Map" button in-game. */
   makeReturnToMapButton(container: HTMLElement, onReturn: () => void): HTMLElement {
     const btn = document.createElement('button');
-    btn.className = 'bs-btn';
-    btn.style.cssText = 'position:fixed;top:8px;right:140px;z-index:300;font-size:10px;padding:3px 8px;pointer-events:all';
+    btn.className = 'bs-btn bs-return-map';
+    btn.style.cssText = 'position:fixed;top:8px;right:140px;z-index:300;font-size:10px;padding:3px 8px';
     btn.textContent = t('menu.return_to_map');
     btn.addEventListener('click', onReturn);
     container.appendChild(btn);

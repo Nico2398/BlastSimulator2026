@@ -45,11 +45,15 @@ export async function executeActionOnPage(
     }
     case 'mousedown': {
       const btn = BUTTON_MAP[action.button ?? 'left'] ?? 'left';
+      // The action carries coordinates, so honour them rather than pressing
+      // wherever the cursor happens to be.
+      await page.mouse.move(action.x, action.y);
       await page.mouse.down({ button: btn });
       break;
     }
     case 'mouseup': {
       const btn = BUTTON_MAP[action.button ?? 'left'] ?? 'left';
+      await page.mouse.move(action.x, action.y);
       await page.mouse.up({ button: btn });
       break;
     }

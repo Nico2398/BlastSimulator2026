@@ -44,6 +44,10 @@ export function setPolicyCommand(
     if (!isNaN(v)) state.sitePolicy.socialBreakThreshold = v;
   }
 
+  // Bumped even when every value is unchanged: applying the policy already in
+  // force is still the player applying a policy.
+  state.sitePolicy.revision = (state.sitePolicy.revision ?? 0) + 1;
+
   const hunger = state.sitePolicy.hungerRestThreshold;
   const fatigue = state.sitePolicy.fatigueRestThreshold;
   const social = state.sitePolicy.socialBreakThreshold;

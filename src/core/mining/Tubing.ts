@@ -1,3 +1,4 @@
+import { formatMoney } from '../economy/formatMoney.js';
 // BlastSimulator2026 — Tubing / casing system
 // Player buys tubing units and installs them in drill holes to waterproof them.
 // Tubing prevents water infiltration from rain, protecting water-sensitive explosives.
@@ -40,7 +41,7 @@ export function buyTubing(
   }
   const totalCost = amount * TUBING_COST;
   if (cash < totalCost) {
-    return { success: false, message: `Insufficient funds: need $${totalCost}, have $${cash}`, cost: 0 };
+    return { success: false, message: `Insufficient funds: need $${formatMoney(totalCost)}, have $${formatMoney(cash)}`, cost: 0 };
   }
   state.inventory += amount;
   return { success: true, message: `Bought ${amount} tubing units`, cost: totalCost };

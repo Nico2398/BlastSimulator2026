@@ -126,6 +126,8 @@ export class UIManager {
     if (this.buildMenu.visible) this.buildMenu.update(state);
     if (this.vehiclePanel.visible) this.vehiclePanel.update(state);
     if (this.employeePanel.visible) this.employeePanel.update(state);
+    if (this.surveyUI.visible) this.surveyUI.update(state);
+    if (this.settingsMenu.visible) this.settingsMenu.update(state);
 
     // Event dialog — auto-show when pending event exists, keep open during outcome
     if (state.events.pendingEvent && !this.eventDialog.visible) {

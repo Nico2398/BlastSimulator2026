@@ -15,6 +15,14 @@ export interface SitePolicy {
   socialBreakThreshold: number;
   /** Per-employee threshold overrides keyed by employee ID. */
   customThresholds: Record<number, { hunger: number; fatigue: number; social: number }>;
+  /**
+   * Bumped every time a policy is applied, whether or not any value differs.
+   *
+   * "Has the player set a policy?" cannot be answered by comparing values:
+   * applying the policy already in force changes nothing, so anything watching
+   * for a difference concludes nothing happened and waits forever.
+   */
+  revision: number;
 }
 
 /** Create a SitePolicy with sensible defaults. */
@@ -25,6 +33,7 @@ export function createSitePolicy(mode: ShiftMode = 'shift_8h'): SitePolicy {
     fatigueRestThreshold: SITE_POLICY_DEFAULT_THRESHOLDS.fatigueRest,
     socialBreakThreshold: SITE_POLICY_DEFAULT_THRESHOLDS.socialBreak,
     customThresholds: {},
+    revision: 0,
   };
 }
 

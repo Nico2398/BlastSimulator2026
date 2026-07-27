@@ -143,3 +143,9 @@ Never mark rendering task complete unless:
 3. State dumps confirm logical state matches expectations
 
 When images could not be produced at all, say the visual channel is unverified and give the `npm run verify:env` remedy. Never report a rendering change verified on the strength of the test suite alone.
+
+## This Channel Does Not Prove Playability
+
+A screenshot shows a button. It does not show that the button is enabled, that a click reaches it, or that a player can satisfy its preconditions. An interaction-mode scenario may click a control and continue past a click that did nothing, because "no selector timed out" is not "the step completed".
+
+When the change touches a player-facing flow, run the `playability` channel too: `npm run playtest`. Procedures, the `__uiActions` / `__probeSelector` / `__tutorialState` bridges, and the no-console-commands rule live in the `dev-playability-testing` skill.

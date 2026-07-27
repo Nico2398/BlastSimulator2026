@@ -4,7 +4,7 @@
 import { t } from '../core/i18n/I18n.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { Vehicle } from '../core/entities/Vehicle.js';
-import { getAllVehicleRoles, getVehicleDef } from '../core/entities/Vehicle.js';
+import { getAllVehicleRoles, getVehicleDef, ROLE_LICENCE_REQUIRED } from '../core/entities/Vehicle.js';
 
 import type { CommandResult } from '../console/ConsoleRunner.js';
 
@@ -15,6 +15,8 @@ export class VehiclePanel {
   private readonly listEl: HTMLElement;
   private readonly buySection: HTMLElement;
   private gameConsole?: GameConsoleFn;
+  /** Fingerprint of the last rendered fleet — guards against per-frame rebuilds. */
+  private lastSignature = '';
 
   constructor(container: HTMLElement) {
     this.el = document.createElement('div');
@@ -54,6 +56,19 @@ export class VehiclePanel {
 
   update(state: GameState): void {
     const { vehicles } = state.vehicles;
+
+    // Rebuilt only when the fleet changes: this list holds a driver <select>,
+    // and a per-frame rebuild would discard the player's choice mid-interaction.
+    const signature = [
+      vehicles.map(v => `${v.id}:${v.type}:${v.task}:${v.hp}:${v.driverId ?? '-'}`).join('|'),
+      state.employees.employees.filter(e => e.alive).map(e => `${e.id}:${e.qualifications.length}`).join('|'),
+    ].join('#');
+    if (signature === this.lastSignature) {
+      this.refreshBuyButtons(state.cash);
+      return;
+    }
+    this.lastSignature = signature;
+
     this.listEl.innerHTML = '';
 
     if (vehicles.length === 0) {
@@ -63,22 +78,25 @@ export class VehiclePanel {
       this.listEl.appendChild(msg);
     } else {
       for (const v of vehicles) {
-        this.listEl.appendChild(this.makeVehicleRow(v));
+        this.listEl.appendChild(this.makeVehicleRow(v, state));
       }
     }
 
-    // Update buy button disabled states
-    const buyBtns = this.buySection.querySelectorAll<HTMLButtonElement>('[data-vtype]');
-    buyBtns.forEach(btn => {
-      const type = btn.dataset['vtype']!;
-      const def = getVehicleDef(type as any);
-      btn.disabled = state.cash < def.purchaseCost;
-    });
+    this.refreshBuyButtons(state.cash);
   }
 
   dispose(): void { this.el.remove(); }
 
-  private makeVehicleRow(v: Vehicle): HTMLElement {
+  private refreshBuyButtons(cash: number): void {
+    const buyBtns = this.buySection.querySelectorAll<HTMLButtonElement>('[data-vtype]');
+    buyBtns.forEach(btn => {
+      const type = btn.dataset['vtype']!;
+      const def = getVehicleDef(type as any);
+      btn.disabled = cash < def.purchaseCost;
+    });
+  }
+
+  private makeVehicleRow(v: Vehicle, state: GameState): HTMLElement {
     const row = document.createElement('div');
     row.className = 'bs-vehicle-row';
 
@@ -98,9 +116,70 @@ export class VehiclePanel {
 
     const col = document.createElement('div');
     col.style.cssText = 'flex:1;min-width:0';
-    col.append(info, status);
+    col.append(info, status, this.makeDriverRow(v, state));
     row.append(col, scrapBtn);
     return row;
+  }
+
+  /**
+   * Driver picker for one vehicle. Only crew holding the licence this role
+   * requires — and not already behind another wheel — are offered.
+   */
+  private makeDriverRow(v: Vehicle, state: GameState): HTMLElement {
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'display:flex;align-items:center;gap:4px;margin-top:3px';
+
+    const label = document.createElement('span');
+    label.style.cssText = 'font-size:10px;color:#908070';
+    label.textContent = t('ui.vehicles.driver');
+
+    const licence = ROLE_LICENCE_REQUIRED[v.type];
+    const taken = new Set(
+      state.vehicles.vehicles.filter(o => o.id !== v.id && o.driverId !== null).map(o => o.driverId),
+    );
+    const eligible = state.employees.employees.filter(
+      e => e.alive && !taken.has(e.id) && e.qualifications.some(q => q.category === licence),
+    );
+
+    if (v.driverId !== null) {
+      const driver = state.employees.employees.find(e => e.id === v.driverId);
+      const name = document.createElement('span');
+      name.className = 'bs-vehicle-driver-name';
+      name.style.cssText = 'font-size:10px;color:#90c070;flex:1';
+      name.textContent = driver?.name ?? `#${v.driverId}`;
+      wrap.append(label, name);
+      return wrap;
+    }
+
+    if (eligible.length === 0) {
+      const none = document.createElement('span');
+      none.style.cssText = 'font-size:10px;color:#806050;flex:1';
+      none.textContent = t('ui.vehicles.no_qualified', { licence });
+      wrap.append(label, none);
+      return wrap;
+    }
+
+    const select = document.createElement('select');
+    select.className = 'bs-select bs-vehicle-driver-select';
+    select.style.cssText = 'flex:1;font-size:10px;padding:1px 3px';
+    select.dataset['vehicleId'] = String(v.id);
+    for (const e of eligible) {
+      const opt = document.createElement('option');
+      opt.value = String(e.id);
+      opt.textContent = e.name;
+      select.appendChild(opt);
+    }
+
+    const assignBtn = document.createElement('button');
+    assignBtn.className = 'bs-btn bs-btn-primary bs-vehicle-assign-btn';
+    assignBtn.style.cssText = 'padding:1px 6px;font-size:10px';
+    assignBtn.textContent = t('ui.vehicles.assign');
+    assignBtn.addEventListener('click', () => {
+      this.gameConsole?.(`vehicle driver ${v.id} ${select.value}`);
+    });
+
+    wrap.append(label, select, assignBtn);
+    return wrap;
   }
 
   private buildBuySection(): void {

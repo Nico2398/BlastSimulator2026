@@ -14,6 +14,7 @@
  *   2. logic     — Vitest unit + integration suites
  *   3. scenario  — command-mode scenario runner (pure Node.js)
  *   4. visual    — Puppeteer screenshots + interaction-mode scenarios
+ *   5. playability — plays the game through its own UI, clicks only
  *
  * @module verify-env
  */
@@ -61,9 +62,9 @@ async function devServerUp(port: number): Promise<boolean> {
   }
 }
 
-function scenarioCount(): number {
+function jsonCount(dir: string): number {
   try {
-    return readdirSync(resolve(ROOT, 'scripts/scenario-defs')).filter((f) => f.endsWith('.json')).length;
+    return readdirSync(resolve(ROOT, dir)).filter((f) => f.endsWith('.json')).length;
   } catch {
     return 0;
   }
@@ -96,7 +97,7 @@ async function collectChannels(): Promise<Channel[]> {
       proves: 'Full command sequences produce the expected game state',
       command: 'npm run scenarios',
       status: deps ? 'ready' : 'blocked',
-      detail: `${scenarioCount()} scenario definitions`,
+      detail: `${jsonCount('scripts/scenario-defs')} scenario definitions`,
       ...(deps ? {} : { remedy: depsRemedy }),
     },
     {
@@ -110,6 +111,19 @@ async function collectChannels(): Promise<Channel[]> {
           }
         : {}),
       ...(deps && chromePath ? {} : { remedy: deps ? CHROME_MISSING_HELP : depsRemedy }),
+    },
+    {
+      id: 'playability',
+      proves: 'A player can reach the goal by clicking — no console command stands in for a player action',
+      command: 'npm run playtest',
+      // Unlike `visual`, a running server is not optional here: the harness
+      // drives the live page from the first beat and has nothing to capture
+      // without it.
+      status: deps && chromePath && serverUp ? 'ready' : 'blocked',
+      detail: `${jsonCount('scripts/playtests')} playtest definitions`,
+      ...(deps && chromePath && serverUp
+        ? {}
+        : { remedy: !deps ? depsRemedy : !chromePath ? CHROME_MISSING_HELP : 'npm run dev &' }),
     },
   ];
 

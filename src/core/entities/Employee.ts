@@ -49,6 +49,20 @@ export type SkillCategory =
   | 'management'
   | 'geology';
 
+/**
+ * The qualification each role arrives with, at Rookie level.
+ *
+ * `driver` gets the truck licence; excavator and drill-rig licences are raised
+ * through training rather than hiring.
+ */
+export const ROLE_STARTING_QUALIFICATION: Record<EmployeeRole, SkillCategory> = {
+  surveyor: 'geology',
+  driller: 'blasting',
+  blaster: 'blasting',
+  driver: 'driving.truck',
+  manager: 'management',
+};
+
 export interface SkillQualification {
   category: SkillCategory;
   proficiencyLevel: 1 | 2 | 3 | 4 | 5;
@@ -129,7 +143,13 @@ export function hireEmployee(
     injured: false,
     alive: true,
     x, z,
-    qualifications: [],
+    // A hire arrives qualified for the job they were hired to do, at Rookie
+    // level. Hiring used to grant nothing, which made every role interchangeable
+    // and every skill-gated action unreachable: a surveyor could not survey and
+    // a driver could not drive, because the only way to grant a qualification
+    // was the `employee assign_skill` console command. Training raises
+    // proficiency from here.
+    qualifications: [{ category: ROLE_STARTING_QUALIFICATION[role], proficiencyLevel: 1, xp: 0 }],
     trainingState: null,
     activeActionId: null,
     hunger: 100,
@@ -140,6 +160,11 @@ export function hireEmployee(
     ticksWorked: 0,
     restTicksRemaining: null,
   };
+  // Keep the stored salary consistent with the qualification just granted —
+  // calculateSalary() sums qualification bonuses, so a base-only salary would
+  // disagree with it from the moment of hire.
+  employee.salary = calculateSalary(employee);
+
   state.employees.push(employee);
   return { employee, hiringCost: HIRING_COSTS[role] };
 }
@@ -258,51 +283,15 @@ export function assignSkill(
   return true;
 }
 
-/**
- * Begin training an employee at a building.
- * Fails if employee not found / not alive, or already in training.
- */
-export function startTraining(
-  state: EmployeeState,
-  employeeId: number,
-  buildingId: number,
-  skill: SkillCategory,
-  durationTicks: number,
-  fee: number,
-): { success: boolean; fee?: number; error?: string } {
-  const emp = state.employees.find(e => e.id === employeeId);
-  if (!emp || !emp.alive) {
-    return { success: false, error: 'Employee not found or not alive' };
-  }
-  if (emp.trainingState !== null) {
-    return { success: false, error: 'Employee already in training' };
-  }
-  emp.trainingState = { buildingId, skill, ticksRemaining: durationTicks, fee };
-  return { success: true, fee };
-}
-
-/**
- * Tick all training employees. When ticksRemaining reaches 0:
- * - assign qualification with proficiencyLevel: 1, xp: 0 (if not already higher)
- * - set trainingState = null
- */
-export function tickTraining(state: EmployeeState): void {
-  for (const emp of state.employees) {
-    if (!emp.trainingState) continue;
-    emp.trainingState.ticksRemaining -= 1;
-    if (emp.trainingState.ticksRemaining <= 0) {
-      const skill = emp.trainingState.skill;
-      emp.trainingState = null;
-      const existing = emp.qualifications.find(q => q.category === skill);
-      if (!existing) {
-        emp.qualifications.push({ category: skill, proficiencyLevel: 1, xp: 0 });
-      }
-    }
-  }
-}
-
 export type { GainXpResult } from './EmployeeGainXp.js';
 export { gainXp } from './EmployeeGainXp.js';
 export type { NeedKey } from './EmployeeNeeds.js';
 export { tickNeeds, tickNeedGauges, getNeedMultiplier, tickNeedMorale, replenishNeed, needsMoraleEffect, checkCollapse } from './EmployeeNeeds.js';
 export { computeTaskDuration } from './EmployeeTaskDuration.js';
+export type {
+  ProficiencyLevel, TrainingPlan, StartTrainingResult, TrainingCompletion,
+} from './EmployeeTraining.js';
+export {
+  MAX_PROFICIENCY, trainableSkills, isTrainingBuilding, schoolFor,
+  planTraining, startTraining, enrolInTraining, tickTraining,
+} from './EmployeeTraining.js';

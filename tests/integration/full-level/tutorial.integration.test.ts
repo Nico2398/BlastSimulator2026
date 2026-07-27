@@ -18,6 +18,10 @@ import { contractCommand } from '../../../src/console/commands/economy.js';
 import { vehicleCommand } from '../../../src/console/commands/vehicle.js';
 import { setPolicyCommand } from '../../../src/console/commands/policy.js';
 import { stateCommand } from '../../../src/console/commands/state.js';
+import { getLevel } from '../../../src/core/campaign/Level.js';
+
+/** Starting cash comes from the level catalogue, not a copy of it. */
+const TUTORIAL_START_CASH = getLevel('tutorial_pit')!.startingCash;
 
 describe('Tutorial Level — Full Walkthrough', () => {
   let ctx: ReturnType<typeof makeCampaignCtx>;
@@ -31,7 +35,7 @@ describe('Tutorial Level — Full Walkthrough', () => {
   it('sets up tutorial_pit with correct initial state', () => {
     expect(ctx.state).not.toBeNull();
     // startingCash from Level definition
-    expect(ctx.state!.cash).toBe(20000);
+    expect(ctx.state!.cash).toBe(TUTORIAL_START_CASH);
     expect(ctx.state!.campaign.activeLevelId).toBe('tutorial_pit');
     // Verify grid dimensions: tutorial_pit = 24x12x24
     expect(ctx.grid).not.toBeNull();

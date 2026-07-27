@@ -20,6 +20,21 @@ const WEATHER_ICONS: Partial<Record<WeatherState, string>> = {
 // Speed labels use i18n key hud.speed_x with interpolation
 const SPEED_CYCLE = [1, 2, 4, 8];
 
+/** Balance colour: gold in the black, red in the red. */
+const BALANCE_COLOR_POSITIVE = '#ffd54f';
+const BALANCE_COLOR_NEGATIVE = '#ff6b52';
+
+/**
+ * Format a cash amount for the top bar: whole dollars, thousands separators,
+ * and the minus sign in front of the currency symbol (`-$1,234`, not
+ * `$-1,234.567` — cash is a float and prints its rounding error otherwise).
+ */
+export function formatBalance(cash: number): string {
+  const rounded = Math.round(cash);
+  const magnitude = Math.abs(rounded).toLocaleString('en-US');
+  return rounded < 0 ? `-$${magnitude}` : `$${magnitude}`;
+}
+
 export class HUD {
   private readonly topBar: HTMLElement;
   private readonly scoresPanel: HTMLElement;
@@ -105,7 +120,8 @@ export class HUD {
   /** Update all HUD elements from current game state. */
   update(state: GameState, weather?: WeatherState): void {
     // Balance
-    this.balanceEl.textContent = `$${state.cash.toLocaleString('en-US')}`;
+    this.balanceEl.textContent = formatBalance(state.cash);
+    this.balanceEl.style.color = state.cash < 0 ? BALANCE_COLOR_NEGATIVE : BALANCE_COLOR_POSITIVE;
 
     // Time — each tick is 1 in-game hour; 24 ticks = 1 day
     const day = Math.floor(state.tickCount / 24) + 1;

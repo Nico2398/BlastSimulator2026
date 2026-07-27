@@ -23,6 +23,7 @@ export interface GameEventMap {
   'employee:levelup': { employeeId: number; category: SkillCategory; oldLevel: number; newLevel: number };
 
   // Phase 8 — Employee need events
+  'employee:trained': { employeeId: number; skill: SkillCategory; level: number; isNew: boolean };
   'employee:need_warning': { employeeId: number; needKey: string };
   'employee:collapsed': { employeeId: number; needKey: string };
   'employee:shift_change': { employeeId: number };

@@ -16,6 +16,7 @@ import {
 } from '../../core/economy/Corruption.js';
 import { addExpense, addIncome } from '../../core/economy/Finance.js';
 import { processPayCycle } from '../../core/entities/Employee.js';
+import { tickTraining } from '../../core/entities/EmployeeTraining.js';
 import { tickNeedGauges, needsMoraleEffect } from '../../core/entities/EmployeeNeeds.js';
 import type { FiredEvent } from '../../core/events/EventSystem.js';
 import { tickCollapse, autoInsertNeedTasks, processShiftCycle, tickEmployees } from '../../core/engine/GameLoop.js';
@@ -188,7 +189,15 @@ export function tickCommand(
       }
     }
 
-    // 8c. Dispatch remaining pending actions to idle qualified employees
+    // 8c. Training courses — advance and report completions. Without this the
+    //     course never ends: the fee is charged and the qualification never
+    //     arrives, which made every skill no role is hired with unobtainable.
+    for (const done of tickTraining(state.employees, emitter)) {
+      const what = done.isNew ? 'qualified in' : 'promoted to level ' + done.level + ' in';
+      lines.push(`[tick ${state.tickCount}] ${done.employeeName} ${what} ${done.skill}.`);
+    }
+
+    // 8d. Dispatch remaining pending actions to idle qualified employees
     tickEmployees(state);
 
     // 9. Level stats snapshot + campaign profit check
@@ -453,12 +462,15 @@ export function mafiaCommand(
 export function timeCommand(
   ctx: GameContext,
   args: string[],
-  _named: Record<string, string>,
+  named: Record<string, string>,
 ): CommandResult {
   const err = requireGame(ctx);
   if (err) return err;
   const state = ctx.state!;
-  const sub = args[0] ?? 'status';
+  // `time speed 2` and `time speed:2` are both accepted — the named form is the
+  // house style for every other command, and silently reporting status for it
+  // made scenarios look like they had changed the speed when they had not.
+  const sub = args[0] ?? (named['speed'] !== undefined ? 'speed' : 'status');
 
   switch (sub) {
     case 'status':
@@ -480,7 +492,7 @@ export function timeCommand(
       return { success: true, output: `Game resumed at ${state.timeScale}x speed.` };
 
     case 'speed': {
-      const speed = parseInt(args[1] ?? '', 10);
+      const speed = parseInt(args[1] ?? named['speed'] ?? '', 10);
       if (![1, 2, 4, 8].includes(speed)) {
         return { success: false, output: 'Valid speeds: 1, 2, 4, 8' };
       }

@@ -147,7 +147,7 @@ export function createRunner(): RunnerWithContext {
   runner.register('vehicle', 'Manage vehicles (list|buy|assign|move)', (args, named) =>
     vehicleCommand(ctx, args, named),
   );
-  runner.register('employee', 'Manage employees (list|hire|raise|fire|assign_skill)', (args, named) =>
+  runner.register('employee', 'Manage employees (list|hire|raise|fire|assign_skill|train)', (args, named) =>
     employeeCommand(ctx, args, named),
   );
   runner.register('scores', 'Show all four scores', (args, named) =>

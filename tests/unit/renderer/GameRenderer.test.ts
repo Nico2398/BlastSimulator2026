@@ -22,7 +22,7 @@ function makeMockSceneManager() {
   const camera = new THREE.PerspectiveCamera();
   const sun = new THREE.DirectionalLight();
   const ambient = new THREE.AmbientLight();
-  const cameraController = { setTarget: vi.fn(), update: vi.fn() };
+  const cameraController = { setTarget: vi.fn(), frameSite: vi.fn(), update: vi.fn() };
   return { scene, camera, sun, ambient, cameraController, renderer: { render: vi.fn() } as unknown };
 }
 
@@ -156,5 +156,49 @@ describe('GameRenderer — safety zone evacuation wiring', () => {
 
     expect(evacSpy).toHaveBeenCalledWith(employee.id, false);
     evacSpy.mockRestore();
+  });
+});
+
+describe('GameRenderer — camera framing', () => {
+  it('frames the site on the first load, using the grid size as the span', () => {
+    const sm = makeMockSceneManager();
+    const renderer = new GameRenderer(sm as any);
+    renderer.syncFromContext(makeCtx());
+
+    expect(sm.cameraController.frameSite).toHaveBeenCalled();
+    const [cx, , cz, span] = sm.cameraController.frameSite.mock.calls.at(-1)!;
+    expect(cx).toBe(16);
+    expect(cz).toBe(16);
+    expect(span).toBe(32);
+  });
+
+  it('re-frames when a level swaps the grid while keeping the seed', () => {
+    // campaign start replaces the VoxelGrid but not the seed, so loadGame()
+    // never runs — without a re-frame the new site renders off-centre.
+    const sm = makeMockSceneManager();
+    const renderer = new GameRenderer(sm as any);
+    const ctx = makeCtx();
+    renderer.syncFromContext(ctx);
+    sm.cameraController.frameSite.mockClear();
+
+    ctx.grid = new VoxelGrid(24, 12, 24);
+    renderer.syncFromContext(ctx);
+
+    expect(sm.cameraController.frameSite).toHaveBeenCalled();
+    const [cx, , cz, span] = sm.cameraController.frameSite.mock.calls.at(-1)!;
+    expect(cx).toBe(12);
+    expect(cz).toBe(12);
+    expect(span).toBe(24);
+  });
+
+  it('does not re-frame when the grid is unchanged', () => {
+    const sm = makeMockSceneManager();
+    const renderer = new GameRenderer(sm as any);
+    const ctx = makeCtx();
+    renderer.syncFromContext(ctx);
+    sm.cameraController.frameSite.mockClear();
+
+    renderer.syncFromContext(ctx);
+    expect(sm.cameraController.frameSite).not.toHaveBeenCalled();
   });
 });

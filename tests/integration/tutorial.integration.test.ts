@@ -6,6 +6,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { type GameContext, newGameCommand } from '../../src/console/commands/world.js';
 import { campaignStartCommand } from '../../src/console/commands/campaign.js';
 import { EventEmitter } from '../../src/core/state/EventEmitter.js';
+import { getLevel } from '../../src/core/campaign/Level.js';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -14,6 +15,9 @@ function makeCtx(): GameContext {
 }
 
 // ── Tests ──────────────────────────────────────────────────────────────────
+
+/** Starting cash comes from the level catalogue, not a copy of it. */
+const TUTORIAL_START_CASH = getLevel('tutorial_pit')!.startingCash;
 
 describe('Tutorial flow', () => {
   let ctx: GameContext;
@@ -52,12 +56,12 @@ describe('Tutorial flow', () => {
     expect(result.success).toBe(true);
     expect(result.output).toContain('tutorial_pit');
     expect(result.output).toContain('24×12×24');
-    expect(result.output).toContain('$20,000');
+    expect(result.output).toContain(`$${TUTORIAL_START_CASH.toLocaleString('en-US')}`);
 
     // State should reflect the tutorial_pit level config
     expect(ctx.state).not.toBeNull();
     expect(ctx.state!.campaign.activeLevelId).toBe('tutorial_pit');
-    expect(ctx.state!.cash).toBe(20000);
+    expect(ctx.state!.cash).toBe(TUTORIAL_START_CASH);
 
     // World should be set up with tutorial_pit dimensions (24×12×24)
     expect(ctx.state!.world).not.toBeNull();
@@ -104,6 +108,6 @@ describe('Tutorial flow', () => {
     expect(ctx.state!.navGrid).not.toBeNull();
 
     // Starting cash matches tutorial_pit config
-    expect(ctx.state!.cash).toBe(20000);
+    expect(ctx.state!.cash).toBe(TUTORIAL_START_CASH);
   });
 });

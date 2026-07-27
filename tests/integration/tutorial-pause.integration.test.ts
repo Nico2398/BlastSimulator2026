@@ -74,25 +74,27 @@ describe('Tutorial pause behaviour (#371)', () => {
     expect(() => tutorial.start(undefined)).not.toThrow();
 
     // The overlay should be visible even without a state
-    const oe = container.querySelector('.bs-confirm-overlay') as HTMLElement;
+    const oe = container.querySelector('.bs-tutorial-overlay') as HTMLElement;
     expect(oe.style.display).not.toBe('none');
   });
 
   // ── 3. skip unpauses ─────────────────────────────────────────────────────
 
-  it('skip() resets isPaused to false', () => {
+  it('finishing resets isPaused to false', () => {
     newGameCommand(ctx, [], { seed: '42', size: '24' });
     campaignStartCommand(ctx, [], { level: 'tutorial_pit' });
 
-    const tutorial = new TutorialOverlay(container);
+    // There is no skip(): the tutorial cannot be abandoned, so the only route
+    // out is finishing it. The game must not be left paused either way.
+    const tutorial = new TutorialOverlay(container) as unknown as
+      TutorialOverlay & { finish: () => void };
     overlay = tutorial;
 
     // Start with state → game pauses
     tutorial.start(ctx.state!);
     expect(ctx.state!.isPaused).toBe(true);
 
-    // Skip the tutorial → game unpauses
-    tutorial.skip();
+    tutorial.finish();
     expect(ctx.state!.isPaused).toBe(false);
   });
 

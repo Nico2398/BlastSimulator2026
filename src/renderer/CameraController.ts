@@ -25,6 +25,14 @@ const PAN_SPEED_FACTOR = 0.001;
 const POLAR_MIN = 0.08;  // ~5° from horizon (almost horizontal)
 const POLAR_MAX = Math.PI / 2 - 0.05; // ~85° — nearly straight down
 
+// ---------- Default framing ----------
+// Orbit distance as a multiple of the site's horizontal span. At FOV 55° this
+// leaves the whole pit on screen with a comfortable margin: too small and the
+// benches run off the edges, too large and the mine shrinks to a distant patch.
+const FRAME_DISTANCE_FACTOR = 1.15;
+/** Default vertical angle — ~45° above the horizon, reads as an overview. */
+const DEFAULT_POLAR = Math.PI / 4;
+
 // ---------- Touch helpers ----------
 function touchDistance(a: Touch, b: Touch): number {
   const dx = a.clientX - b.clientX;
@@ -81,6 +89,26 @@ export class CameraController {
   /** Point the camera looks at (can be updated externally for tracking). */
   setTarget(x: number, y: number, z: number): void {
     this.target.set(x, y, z);
+    this.apply();
+  }
+
+  /**
+   * Centre the view on a site and pull back far enough to see all of it.
+   *
+   * `span` is the largest horizontal extent of the site in world units. The
+   * resulting orbit becomes the camera's new default, so `reset()` and the
+   * multi-angle screenshot shots frame the same site.
+   */
+  frameSite(centerX: number, centerY: number, centerZ: number, span: number): void {
+    this.target.set(centerX, centerY, centerZ);
+    this.spherical.radius = THREE.MathUtils.clamp(
+      span * FRAME_DISTANCE_FACTOR,
+      ZOOM_MIN,
+      ZOOM_MAX,
+    );
+    this.spherical.phi = DEFAULT_POLAR;
+    this.defaultTarget = this.target.clone();
+    this.defaultSpherical = this.spherical.clone();
     this.apply();
   }
 

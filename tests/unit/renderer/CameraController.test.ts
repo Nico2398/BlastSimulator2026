@@ -89,4 +89,45 @@ describe('CameraController', () => {
     expect(distOut).toBeGreaterThanOrEqual(5);
     expect(distOut).toBeLessThanOrEqual(600);
   });
+
+  describe('frameSite', () => {
+    it('centres on the site and pulls back proportionally to its span', () => {
+      controller.frameSite(12, 4, 12, 24);
+      const dist = camera.position.distanceTo(new THREE.Vector3(12, 4, 12));
+      // 24-unit site: close enough to fill the frame, far enough to see it all.
+      expect(dist).toBeGreaterThan(24);
+      expect(dist).toBeLessThan(24 * 2);
+    });
+
+    it('frames a bigger site from further away', () => {
+      controller.frameSite(12, 0, 12, 24);
+      const near = camera.position.distanceTo(new THREE.Vector3(12, 0, 12));
+      controller.frameSite(32, 0, 32, 64);
+      const far = camera.position.distanceTo(new THREE.Vector3(32, 0, 32));
+      expect(far).toBeGreaterThan(near);
+    });
+
+    it('looks at the new centre, not the previous one', () => {
+      controller.frameSite(12, 4, 12, 24);
+      // Camera sits above and away from the target on the XZ plane it orbits.
+      expect(camera.position.y).toBeGreaterThan(4);
+      const horizontal = Math.hypot(camera.position.x - 12, camera.position.z - 12);
+      expect(horizontal).toBeGreaterThan(0);
+    });
+
+    it('becomes the new default so reset() returns to the framed site', () => {
+      controller.frameSite(12, 4, 12, 24);
+      const framed = camera.position.clone();
+      controller.setTarget(0, 0, 0);
+      controller.reset();
+      expect(camera.position.distanceTo(framed)).toBeLessThan(0.001);
+    });
+
+    it('clamps the distance for a degenerate span', () => {
+      controller.frameSite(0, 0, 0, 0);
+      const dist = camera.position.length();
+      expect(dist).toBeGreaterThan(0);
+      expect(Number.isFinite(dist)).toBe(true);
+    });
+  });
 });

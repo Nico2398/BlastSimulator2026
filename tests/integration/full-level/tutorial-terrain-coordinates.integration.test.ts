@@ -17,8 +17,12 @@ import {
 import { getDominantRockId } from '../../../src/core/world/VoxelGrid.js';
 import { getRock } from '../../../src/core/world/RockCatalog.js';
 import type { CommandResult } from '../../../src/console/ConsoleRunner.js';
+import { getLevel } from '../../../src/core/campaign/Level.js';
 
 const DESERT_ROCKS = ['cruite', 'sandite', 'molite'];
+
+/** Starting cash comes from the level catalogue, not a copy of it. */
+const TUTORIAL_START_CASH = getLevel('tutorial_pit')!.startingCash;
 
 describe('Tutorial Level Terrain Coordinates (Issue #333)', () => {
   let ctx: ReturnType<typeof makeCampaignCtx>;
@@ -122,7 +126,7 @@ describe('Tutorial Level Terrain Coordinates (Issue #333)', () => {
     expect(building.tier).toBe(1);
 
     // Construction cost deducted from cash
-    expect(ctx.state!.cash).toBe(20000 - 15000);
+    expect(ctx.state!.cash).toBe(TUTORIAL_START_CASH - 15000);
   });
 
   // ── Test 3: Ramp construction ─────────────────────────────────────────────
@@ -151,7 +155,7 @@ describe('Tutorial Level Terrain Coordinates (Issue #333)', () => {
     }
 
     // Ramp construction should have deducted cost
-    expect(ctx.state!.cash).toBeLessThan(20000);
+    expect(ctx.state!.cash).toBeLessThan(TUTORIAL_START_CASH);
   });
 
   // ── Test 4: Surface height uniformity ─────────────────────────────────────

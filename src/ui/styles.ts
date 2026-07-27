@@ -41,7 +41,9 @@ const CSS = `
   height: 44px;
   display: flex;
   align-items: center;
-  padding: 0 12px;
+  /* Right padding reserves the strip the fixed "Return to Map" button occupies,
+     so the event badge does not slide underneath it when it appears. */
+  padding: 0 215px 0 12px;
   gap: 14px;
   background: rgba(6,5,2,0.92);
   border-bottom: 1px solid rgba(200,160,60,0.2);
@@ -322,7 +324,12 @@ const CSS = `
 .bs-vehicle-row:last-child { border-bottom: none; }
 .bs-employee-row {
   display: flex;
-  align-items: center;
+  /* Wraps so an expanded detail drops onto its own full-width line. As a
+     non-wrapping flex sibling it was laid out beside the name column and drawn
+     over it, leaving the name, morale and the Raise/Fire buttons unreadable and
+     unclickable. */
+  flex-wrap: wrap;
+  align-items: flex-start;
   gap: 8px;
   border-bottom: 1px solid rgba(255,255,255,0.06);
   padding: 6px 0;
@@ -362,7 +369,7 @@ const CSS = `
 .bs-modifier-tag { background: rgba(255,200,64,0.1); border-radius: 2px; padding: 1px 4px; font-size: 9px; color: #c8a848; display: inline-block; margin: 1px; }
 .bs-need-row { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; font-size: 10px; }
 .bs-need-label { width: 48px; color: #9a8868; font-size: 9px; }
-.bs-employee-detail { margin-top: 6px; padding: 6px 8px; background: rgba(255,255,255,0.04); border-radius: 4px; border: 1px solid rgba(255,255,255,0.06); }
+.bs-employee-detail { flex: 0 0 100%; margin-top: 6px; padding: 6px 8px; background: rgba(255,255,255,0.04); border-radius: 4px; border: 1px solid rgba(255,255,255,0.06); }
 .bs-detail-toggle { cursor: pointer; font-size: 9px; color: #706050; margin-left: auto; user-select: none; }
 .bs-queue-empty { font-size: 10px; color: #605040; font-style: italic; padding: 2px 0; }
 
@@ -403,6 +410,26 @@ const CSS = `
 .bs-event-choice { text-align: left; padding: 9px 14px; font-size: 12px; line-height: 1.4; }
 
 /* ─── Survey UI ─── */
+.bs-survey-method {
+  cursor: pointer;
+  border: 1px solid rgba(255,255,255,0.13);
+  border-radius: 5px;
+  padding: 5px 8px;
+  margin-bottom: 4px;
+  background: rgba(255,255,255,0.04);
+  transition: background 0.15s, border-color 0.15s;
+  pointer-events: all;
+}
+.bs-survey-method:hover { background: rgba(255,255,255,0.11); border-color: rgba(255,255,255,0.25); }
+.bs-survey-method.selected { border-color: #ffc840; background: rgba(255,200,64,0.14); }
+.bs-survey-method-name { font-size: 11px; color: #d0b090; font-weight: 600; }
+/* Lightened to clear WCAG AA against the selected row's warm tint. */
+.bs-survey-method-meta { font-size: 10px; color: #bda989; margin-top: 1px; }
+.bs-survey-result {
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  padding: 5px 0;
+}
+.bs-survey-result:last-child { border-bottom: none; }
 .bs-ore-row { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; font-size: 11px; }
 .bs-ore-bar-bg { flex: 1; background: rgba(255,255,255,0.1); border-radius: 3px; height: 8px; }
 .bs-ore-bar-fill { height: 100%; border-radius: 3px; background: #ffc840; }
@@ -497,7 +524,8 @@ const CSS = `
 /* ─── Notification toast ─── */
 .bs-notification {
   position: fixed;
-  bottom: 20px;
+  /* Clears the tutorial coach mark, which docks along the bottom edge. */
+  bottom: 220px;
   left: 50%;
   transform: translateX(-50%);
   background: rgba(60,20,8,0.95);
@@ -513,6 +541,86 @@ const CSS = `
   box-shadow: 0 4px 20px rgba(0,0,0,0.7);
 }
 
+/* ─── Tutorial coach mark ───
+   Docked bottom-centre, never modal: the wrapper lets clicks through so the
+   player can actually use the control the step is pointing at, and it sits
+   below the event dialog (z 600) so the two never fight for the same pixels. */
+.bs-tutorial-overlay {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  display: flex;
+  justify-content: center;
+  padding: 0 150px 18px;
+  z-index: 500;
+  pointer-events: none;
+}
+.bs-tutorial-box {
+  background: rgba(14, 11, 6, 0.95);
+  border: 1px solid rgba(200, 160, 60, 0.55);
+  border-radius: 10px;
+  padding: 12px 16px 14px;
+  width: 100%;
+  max-width: 560px;
+  pointer-events: all;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.8);
+  font-family: 'Segoe UI', system-ui, Arial, sans-serif;
+  color: #e8e0d0;
+}
+.bs-tutorial-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.bs-tutorial-header .bs-panel-title { margin-bottom: 6px; flex: 1; }
+.bs-tutorial-box .bs-panel-text {
+  font-size: 13px;
+  line-height: 1.55;
+  color: #d8c8a8;
+  margin: 0 0 10px;
+}
+.bs-tutorial-progress {
+  font-size: 11px;
+  color: #9a8868;
+  white-space: nowrap;
+  letter-spacing: 0.04em;
+}
+.bs-tutorial-progress-track {
+  background: rgba(255,255,255,0.1);
+  border-radius: 3px;
+  height: 4px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+.bs-tutorial-progress-fill {
+  height: 100%;
+  background: #f0b840;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+.bs-tutorial-commands-label {
+  font-size: 9px;
+  color: #7a6b55;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 2px;
+}
+.bs-tutorial-commands {
+  font-family: ui-monospace, 'Consolas', monospace;
+  font-size: 11px;
+  color: #a89060;
+  background: rgba(255,255,255,0.05);
+  border-radius: 4px;
+  padding: 4px 8px;
+  margin-bottom: 10px;
+  word-break: break-word;
+}
+.bs-tutorial-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 /* ─── Tutorial step highlight (bright blue pulsating glow) ─── */
 .bs-tutorial-highlight {
   animation: bs-tutorial-pulse 1.5s ease-in-out infinite !important;
@@ -525,6 +633,45 @@ const CSS = `
 @keyframes bs-tutorial-pulse {
   0%, 100% { box-shadow: 0 0 8px 2px rgba(64, 156, 255, 0.6); }
   50% { box-shadow: 0 0 16px 6px rgba(64, 156, 255, 0.9); }
+}
+
+/* ─── Guided tutorial rails ───
+   While the tutorial is up, only the control it is pointing at responds.
+
+   Deliberately unscoped: every control on the page, not just the ones inside a
+   panel. "Return to Map" is a fixed-position button owned by the main menu and
+   sits outside the panel tree — leaving it live let a player walk out of the
+   tutorial mid-step and lose it, which is the whole reason these rails exist.
+   Written as "not marked allowed" so a control rendered between two passes of
+   the guide is inert from its first frame rather than briefly live. */
+body.bs-tutorial-guided button:not(.bs-tutorial-allowed),
+body.bs-tutorial-guided select:not(.bs-tutorial-allowed),
+body.bs-tutorial-guided input:not(.bs-tutorial-allowed),
+body.bs-tutorial-guided .bs-detail-toggle:not(.bs-tutorial-allowed) {
+  pointer-events: none;
+  opacity: 0.4;
+  filter: saturate(0.3);
+}
+/* The card itself is never blocked — it carries the instructions. */
+body.bs-tutorial-guided .bs-tutorial-box button,
+body.bs-tutorial-guided .bs-tutorial-box select,
+body.bs-tutorial-guided .bs-tutorial-box input {
+  pointer-events: all;
+  opacity: 1;
+  filter: none;
+}
+.bs-tutorial-stage {
+  font-size: 12px;
+  font-weight: 600;
+  color: #7ab8ff;
+  margin: 0 0 8px;
+  line-height: 1.4;
+}
+.bs-tutorial-paused {
+  font-size: 11px;
+  color: #f0c060;
+  margin: 0 0 8px;
+  line-height: 1.4;
 }
 `;
 

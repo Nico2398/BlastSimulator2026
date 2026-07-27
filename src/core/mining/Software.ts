@@ -2,6 +2,7 @@
 // Player purchases software upgrades to unlock prediction capabilities.
 // Tier 0: no preview. Tier 1: energy. Tier 2: fragments. Tier 3: projections. Tier 4: vibrations.
 
+import { formatMoney } from '../economy/formatMoney.js';
 import type { BlastPlan } from './BlastPlan.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 import { getDominantRockId } from '../world/VoxelGrid.js';
@@ -74,7 +75,7 @@ export function purchaseSoftware(
   }
   const cost = SOFTWARE_TIER_COSTS[nextTier] ?? 0;
   if (cash < cost) {
-    return { error: `Insufficient funds: need $${cost}, have $${cash}` };
+    return { error: `Insufficient funds: need $${formatMoney(cost)}, have $${formatMoney(cash)}` };
   }
   return { newTier: nextTier, cost };
 }

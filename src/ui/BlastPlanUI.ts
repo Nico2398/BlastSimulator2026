@@ -5,10 +5,19 @@ import type { GameState } from '../core/state/GameState.js';
 import type { DrillHole } from '../core/mining/DrillPlan.js';
 import type { HoleCharge } from '../core/mining/ChargePlan.js';
 import { TileSelectOverlay } from './TileSelectOverlay.js';
+import { makeSiteTileFill } from './siteTileShading.js';
 
 import type { CommandResult } from '../console/ConsoleRunner.js';
 
 export type GameConsoleFn = (cmd: string) => CommandResult;
+
+/**
+ * Charge the panel offers by default. Weak enough to be a starting point,
+ * strong enough that the blast actually breaks ground — pop_rock at 3 kg cracks
+ * rock and clears nothing, which reads as a blast that did not happen.
+ */
+const DEFAULT_EXPLOSIVE = 'boomite';
+const DEFAULT_CHARGE_KG = '5';
 
 export class BlastPlanUI {
   private readonly el: HTMLElement;
@@ -20,6 +29,8 @@ export class BlastPlanUI {
   private selectedHoleId: string | null = null;
   private worldSizeX = 40;
   private worldSizeZ = 40;
+  /** Latest state, so the grid picker can draw the site. */
+  private lastState: GameState | null = null;
   private statusTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(container: HTMLElement) {
@@ -32,22 +43,22 @@ export class BlastPlanUI {
     title.className = 'bs-panel-title';
     title.textContent = t('ui.blast.title');
 
-    const gridBtn = this.makeBtn('bs-btn', t('ui.blast.grid_tool'), () => this.openGridTool());
-    const clearBtn = this.makeBtn('bs-btn bs-btn-danger', t('ui.blast.clear_holes'), () => { this.gameConsole?.('drill_plan clear'); });
+    const gridBtn = this.makeBtn('bs-btn', t('ui.blast.grid_tool'), () => this.openGridTool(), 'grid-tool');
+    const clearBtn = this.makeBtn('bs-btn bs-btn-danger', t('ui.blast.clear_holes'), () => { this.gameConsole?.('drill_plan clear'); }, 'clear-holes');
     this.holeListEl = document.createElement('div');
     this.chargeForm = document.createElement('div');
     this.chargeForm.style.display = 'none';
     this.chargeForm.style.marginTop = '8px';
     this.buildChargeForm();
 
-    const chargeAllBtn = this.makeBtn('bs-btn bs-btn-primary', t('ui.blast.charge_all'), () => this.chargeAllHoles());
+    const chargeAllBtn = this.makeBtn('bs-btn bs-btn-primary', t('ui.blast.charge_all'), () => this.chargeAllHoles(), 'charge-all');
     const seqBtn = this.makeBtn('bs-btn', t('ui.blast.auto_seq'), () => {
       const result = this.gameConsole?.('sequence auto');
       if (result?.success) this.showStatus(t('ui.blast.status_sequenced'), 'success');
       else this.showStatus(result?.output || t('ui.blast.status_no_holes'), 'error');
-    });
-    const previewBtn = this.makeBtn('bs-btn', t('ui.blast.preview'), () => { this.gameConsole?.('preview energy'); });
-    const execBtn = this.makeBtn('bs-btn bs-btn-primary bs-blast-btn', t('ui.blast.execute'), () => this.confirmBlast());
+    }, 'auto-sequence');
+    const previewBtn = this.makeBtn('bs-btn', t('ui.blast.preview'), () => { this.gameConsole?.('preview energy'); }, 'preview');
+    const execBtn = this.makeBtn('bs-btn bs-btn-primary bs-blast-btn', t('ui.blast.execute'), () => this.confirmBlast(), 'execute');
 
     this.statusEl = document.createElement('div');
     this.statusEl.className = 'bs-blast-status';
@@ -67,6 +78,7 @@ export class BlastPlanUI {
   get visible(): boolean { return this.el.style.display !== 'none'; }
 
   update(state: GameState): void {
+    this.lastState = state;
     if (state.world) {
       this.worldSizeX = state.world.sizeX;
       this.worldSizeZ = state.world.sizeZ;
@@ -101,6 +113,34 @@ export class BlastPlanUI {
     this.statusTimer = setTimeout(() => {
       this.statusEl.style.display = 'none';
     }, 3000);
+  }
+
+  /**
+   * Tell the player what the blast did.
+   *
+   * The report was computed and thrown away, so a blast that cleared nothing
+   * looked identical to one that moved half the bench: dust, then a terrain
+   * that had not changed. A blast which breaks no rock now says so, and names
+   * the reason a player can act on.
+   */
+  private reportBlast(result: CommandResult | undefined): void {
+    if (!result) return;
+    if (!result.success) {
+      this.showStatus(result.output || t('ui.blast.status_no_holes'), 'error');
+      return;
+    }
+    const cleared = Number(/Cleared voxels:\s*(\d+)/.exec(result.output)?.[1] ?? '0');
+    const rating = /Rating:\s*(\w+)/.exec(result.output)?.[1] ?? '';
+    if (cleared === 0) {
+      this.showStatus(t('ui.blast.status_no_rock_moved'), 'error');
+      return;
+    }
+    this.showStatus(
+      t('ui.blast.status_blasted')
+        .replace('{cleared}', String(cleared))
+        .replace('{rating}', rating.toLowerCase()),
+      'success',
+    );
   }
 
   private chargeAllHoles(): void {
@@ -170,8 +210,14 @@ export class BlastPlanUI {
       opt.value = id; opt.textContent = id;
       explosiveSelect.appendChild(opt);
     }
+    // A select defaults to its first option, so the form opened on pop_rock at
+    // 3 kg — a charge that clears zero voxels. "Charge All Holes" reads these
+    // fields, so the one-click path produced a blast that cracked rock and moved
+    // nothing, and the panel's own fallbacks (boomite, 5 kg) never applied
+    // because the fields were present. These are those fallbacks.
+    explosiveSelect.value = DEFAULT_EXPLOSIVE;
 
-    const amountInput = this.makeNumberInput('bs-blast-amount', '3', '1', '100', '1');
+    const amountInput = this.makeNumberInput('bs-blast-amount', DEFAULT_CHARGE_KG, '1', '100', '1');
     const stemmingInput = this.makeNumberInput('bs-blast-stemming', '2', '0', '20', '0.5');
 
     const errorEl = document.createElement('div');
@@ -207,11 +253,13 @@ export class BlastPlanUI {
     );
   }
 
-  private makeBtn(cls: string, text: string, handler: () => void): HTMLButtonElement {
+  /** `action` gives each control a label-independent selector for UI tests. */
+  private makeBtn(cls: string, text: string, handler: () => void, action?: string): HTMLButtonElement {
     const btn = document.createElement('button');
     btn.className = cls;
     btn.style.cssText = 'width:100%;margin-bottom:4px';
     btn.textContent = text;
+    if (action) btn.dataset['action'] = action;
     btn.addEventListener('click', handler);
     return btn;
   }
@@ -237,6 +285,7 @@ export class BlastPlanUI {
       worldSizeX: this.worldSizeX,
       worldSizeZ: this.worldSizeZ,
       title: t('ui.blast.grid_tool'),
+      ...(this.lastState ? { tileFill: makeSiteTileFill(this.lastState) } : {}),
       extraFields: [
         { id: 'spacing', label: t('ui.blast.grid_spacing'), defaultValue: 5, min: 1, max: 20, step: 1 },
         { id: 'depth',   label: t('ui.blast.grid_depth'),   defaultValue: 6, min: 1, max: 40, step: 1 },
@@ -265,7 +314,10 @@ export class BlastPlanUI {
     const yesBtn = document.createElement('button');
     yesBtn.className = 'bs-btn bs-btn-danger';
     yesBtn.textContent = t('ui.blast.yes');
-    yesBtn.addEventListener('click', () => { overlay.remove(); this.gameConsole?.('blast'); });
+    yesBtn.addEventListener('click', () => {
+      overlay.remove();
+      this.reportBlast(this.gameConsole?.('blast'));
+    });
     const noBtn = document.createElement('button');
     noBtn.className = 'bs-btn';
     noBtn.textContent = t('ui.blast.no');

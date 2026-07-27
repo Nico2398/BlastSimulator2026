@@ -68,6 +68,10 @@ function addQualifiedEmployee(
 ): void {
   const rng = new Random(rngSeed);
   const { employee } = hireEmployee(state.employees, 'driller', rng);
+  // These tests describe routing by skill, so the roster must hold exactly the
+  // skill named here. Hiring grants the role's own qualification, which would
+  // otherwise make an "unqualified" case accidentally qualified.
+  employee.qualifications = [];
   // assignSkill may also be unimplemented — we fall back to direct mutation
   // so the TaskDispatch tests can still describe independent behaviour
   try {

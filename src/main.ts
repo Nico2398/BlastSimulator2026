@@ -6,6 +6,7 @@ import { GameRenderer } from './renderer/GameRenderer.js';
 import { UIManager } from './ui/UIManager.js';
 import { SaveLoadUI } from './ui/SaveLoadUI.js';
 import { TutorialOverlay } from './ui/TutorialOverlay.js';
+import { TUTORIAL_STEPS } from './ui/tutorialSteps.js';
 import { KeyboardShortcuts } from './ui/KeyboardShortcuts.js';
 import { MainMenu } from './ui/MainMenu.js';
 import { AudioManager } from './audio/AudioManager.js';
@@ -16,6 +17,7 @@ import { createRunner } from './console/createRunner.js';
 import { parseCommand } from './console/ConsoleRunner.js';
 import { BASE_TICK_MS } from './core/engine/GameLoop.js';
 import { incrementActionCount } from './core/events/EventSystem.js';
+import { probeUiActions, probeSelector } from './ui/uiActionProbe.js';
 
 /** Console commands that should not count as user actions for event cooldown gating. */
 const META_COMMANDS = ['tick', 'speed', 'pause', 'time'] as const;
@@ -114,6 +116,9 @@ declare global {
     __cameraOrbit: (yaw: number, pitch: number) => void;
     __cameraReset: () => void;
     __startTutorial: () => void;
+    __uiActions: () => ReturnType<typeof probeUiActions>;
+    __probeSelector: (selector: string) => ReturnType<typeof probeSelector>;
+    __tutorialState: () => { active: boolean; stepIndex: number; stepId: string | null; title: string; total: number; stageIndex: number; stageTotal: number; stageTarget: string | null; clockHeld: boolean };
     __resetTickAccumulator: () => void;
     __debugGridInfo: () => Record<string, unknown>;
   }
@@ -181,6 +186,11 @@ window.__gameState = () => {
     tickCount: s.tickCount,
     isPaused: s.isPaused,
     mineType: s.mineType,
+    // World dimensions, so a harness can map grid coordinates to the tile
+    // picker without inferring them from a terrain bounding box that blasts and
+    // ramps change underneath it.
+    worldSizeX: s.world?.sizeX ?? null,
+    worldSizeZ: s.world?.sizeZ ?? null,
     drillHoles: s.drillHoles,
     chargesByHole: s.chargesByHole,
     sequenceDelays: s.sequenceDelays,
@@ -191,6 +201,13 @@ window.__gameState = () => {
     buildingCount: s.buildings.buildings.length,
     vehicleCount: s.vehicles.vehicles.length,
     employeeCount: s.employees.employees.length,
+    // Qualifications the roster holds, so a playtest can prove a skill was
+    // actually obtained rather than that a button merely looked clickable.
+    qualificationCount: s.employees.employees
+      .reduce((n, e) => n + e.qualifications.length, 0),
+    proficiencyTotal: s.employees.employees
+      .reduce((n, e) => n + e.qualifications.reduce((m, q) => m + q.proficiencyLevel, 0), 0),
+    trainingCount: s.employees.employees.filter(e => e.trainingState !== null).length,
     levelEnded: s.levelEnded,
     levelEndReason: s.levelEndReason,
     // ── Game-over detection fields ──
@@ -275,6 +292,34 @@ window.__uiState = () => {
     });
   }
   return { panels: panelStates, blastPanelButtons: buttons };
+};
+
+// What can a player actually click right now? Used by the playtest harness so a
+// failure reports "Run is disabled because <hint>" rather than a selector timeout.
+window.__uiActions = () => probeUiActions();
+window.__probeSelector = (selector: string) => probeSelector(selector);
+
+// Where the tutorial believes it is. A harness that only checks for thrown
+// errors cannot tell a completed step from a silently stuck one.
+window.__tutorialState = () => {
+  const el = document.querySelector('.bs-tutorial-box .bs-panel-title');
+  const counter = document.querySelector('.bs-tutorial-progress');
+  const parsed = /(\d+)\s*\/\s*(\d+)/.exec(counter?.textContent ?? '');
+  const stage = tutorial.stageProgress;
+  const paused = document.querySelector('.bs-tutorial-paused') as HTMLElement | null;
+  return {
+    active: tutorial.isActive,
+    stepIndex: parsed ? Number(parsed[1]) - 1 : -1,
+    stepId: TUTORIAL_STEPS[parsed ? Number(parsed[1]) - 1 : -1]?.id ?? null,
+    title: el?.textContent ?? '',
+    total: parsed ? Number(parsed[2]) : 0,
+    // Which click of the step the player is on — a step is several controls,
+    // and a harness that only knew the step could not tell them apart.
+    stageIndex: stage.index,
+    stageTotal: stage.total,
+    stageTarget: stage.target,
+    clockHeld: paused !== null && paused.style.display !== 'none',
+  };
 };
 
 // Camera control bridges (used by scenario-test.ts for multi-angle screenshots)

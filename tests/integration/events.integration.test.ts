@@ -419,6 +419,29 @@ describe('Event system', () => {
     expect(result.output).toContain('Paused:');
   });
 
+  it('time speed:N sets the speed like the positional form', () => {
+    // Scenario files use the named form; it used to fall through to `status`,
+    // reporting success while leaving the speed untouched.
+    const result = timeCommand(ctx, [], { speed: '4' });
+
+    expect(result.success).toBe(true);
+    expect(ctx.state!.timeScale).toBe(4);
+  });
+
+  it('time speed:N rejects an invalid speed instead of silently reporting status', () => {
+    const result = timeCommand(ctx, [], { speed: '3' });
+
+    expect(result.success).toBe(false);
+    expect(ctx.state!.timeScale).toBe(1);
+  });
+
+  it('time speed 2 still works positionally', () => {
+    const result = timeCommand(ctx, ['speed', '2'], {});
+
+    expect(result.success).toBe(true);
+    expect(ctx.state!.timeScale).toBe(2);
+  });
+
   it('time status shows Tick count', () => {
     // Advance a tick first so tickCount > 0
     tickCommand(ctx, ['1'], {});

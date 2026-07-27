@@ -2,6 +2,7 @@
 // Ramps provide vehicle access to lower pit levels by carving sloped passages.
 // Each ramp clears a diagonal column of voxels from surface to target depth.
 
+import { formatMoney } from '../economy/formatMoney.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 
 // ── Config ──
@@ -59,7 +60,7 @@ export function buildRamp(
   const totalCost = ramp.length * RAMP_COST_PER_METER;
 
   if (cash < totalCost) {
-    return { success: false, message: `Insufficient funds: need $${totalCost}, have $${cash}`, cost: 0, voxelsCleared: 0 };
+    return { success: false, message: `Insufficient funds: need $${formatMoney(totalCost)}, have $${formatMoney(cash)}`, cost: 0, voxelsCleared: 0 };
   }
 
   if (ramp.length <= 0) {
