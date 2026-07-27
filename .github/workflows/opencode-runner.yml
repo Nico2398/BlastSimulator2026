@@ -50,6 +50,12 @@ jobs:
           GH_TOKEN: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
         run: gh auth setup-git
 
+      # The pipeline creates every branch from `main` by name. On a PR review
+      # comment the workspace is on the PR head, and `git rev-parse main` fails
+      # when only `origin/main` exists — fetch-depth 0 above guarantees it does.
+      - name: Ensure a local main ref to branch from
+        run: git rev-parse --verify --quiet main >/dev/null || git branch main origin/main
+
       - name: Get opencode version
         id: version
         shell: bash

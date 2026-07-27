@@ -21,6 +21,11 @@ outputs:
   issue:
     description: "Issue number this run resolves, or empty when the trigger was not an issue."
     value: ${{ steps.build.outputs.issue }}
+  entity:
+    description: >
+      Single-line reference to what triggered the run ("issue 42", "pr 17",
+      "manual"). Safe to pass as a slash-command argument.
+    value: ${{ steps.build.outputs.entity }}
 
 runs:
   using: composite
@@ -36,11 +41,13 @@ runs:
           const event = context.eventName;
           let prompt = '';
           let issue = '';
+          let entity = 'manual';
 
           if (event === 'workflow_dispatch') {
             const issueNum = (process.env.DISPATCH_ISSUE || '').trim();
             if (issueNum) {
               issue = issueNum;
+              entity = 'issue ' + issueNum;
               const { data: target } = await github.rest.issues.get({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
@@ -69,6 +76,7 @@ runs:
             if (!isPR && num) {
               issue = String(num);
             }
+            entity = (isPR ? 'pr ' : 'issue ') + num;
 
             prompt = [
               'You have been mentioned in a comment from ' + type + ' #' + num + '.',
@@ -89,6 +97,7 @@ runs:
             const num = context.payload.pull_request?.number;
             const commentBody = context.payload.comment?.body || '';
             const prBody = context.payload.pull_request?.body || '(No description)';
+            entity = 'pr ' + num;
 
             prompt = [
               'You have been mentioned in a review comment from Pull Request #' + num + '.',
@@ -114,3 +123,4 @@ runs:
           fs.appendFileSync(process.env.GITHUB_ENV, 'PROMPT<<' + delimiter + '\n' + prompt + '\n' + delimiter + '\n', 'utf8');
           core.setOutput('prompt', prompt);
           core.setOutput('issue', issue);
+          core.setOutput('entity', entity);

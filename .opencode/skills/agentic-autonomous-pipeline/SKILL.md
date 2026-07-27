@@ -24,14 +24,20 @@ The pipeline runs as an **Orchestrator Agent** (`pipeline` agent) invoked by the
 | Runtime | Entry point | Delegation mechanism |
 |---------|-------------|---------------------|
 | Claude Code, CLI | `/resolve-issue <issue>` — forks into the `pipeline` agent | `Agent` tool, one sub-agent per pipeline step |
-| Claude Code, GitHub Actions | `.github/workflows/claude-runner.yml` → `/agentic-run <trigger context>` | `Agent` tool |
+| Claude Code, GitHub Actions | `.github/workflows/claude-runner.yml` → `/agentic-run <entity> <trigger context>` — forks into the `pipeline` agent | `Agent` tool |
 | OpenCode, CLI | `opencode run /resolve-issue` | `task` tool |
 | OpenCode, GitHub Actions | `.github/workflows/opencode-runner.yml` → `opencode github run` | `task` tool |
 
 Both runners must land in the orchestrator on their first action, and they get there differently:
 
 - **OpenCode** sets `default_agent: orchestrator` in `.opencode/opencode.json`, so the session *is* the orchestrator from turn one.
-- **Claude Code** has no equivalent setting. `claude-runner.yml` prefixes the task with the `/agentic-run` command, whose body mandates delegation to the `pipeline` agent before anything else is read or written.
+- **Claude Code** has no equivalent setting. `claude-runner.yml` prefixes the task with `/agentic-run`, a command whose `agent: pipeline` + `context: fork` frontmatter forks the session into the orchestrator before the first tool call. No main-session hop, and no chance of the default agent starting the work itself.
+
+The command's argument opens with a single-line entity reference (`issue 42`, `pr 17`) followed by the trigger context, so the fork knows what it is working on even if the multi-line remainder does not survive argument substitution. When the remainder is missing the orchestrator reads the thread with `gh`.
+
+**Branch safety.** Every pipeline branch is created from `main` by name (`git checkout -b pipeline/tests-<N> main`), never from `HEAD`. Whatever branch a runner leaves the workspace on — `claude-code-action` may generate one from `branch_prefix` — the pipeline is unaffected. Both runners clone with `fetch-depth: 0` and materialise a local `main` before handing over, because `git rev-parse main` fails when only `origin/main` exists, which is what a PR-review-comment checkout leaves behind.
+
+**Model.** Claude runs on `claude-sonnet-5`, set through `claude_args` in `claude-runner.yml`. Every agent inherits it; no agent definition pins a model of its own.
 
 ### Claude Code prerequisites
 
