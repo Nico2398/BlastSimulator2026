@@ -11,6 +11,7 @@ const currentDir = dirname(fileURLToPath(import.meta.url));
 
 const KNOWN_INTERACTION_ACTION_TYPES = [
   'click', 'clickSelector', 'mousedown', 'mouseup', 'mousemove',
+  'pickTile', 'dragTiles',
   'keypress', 'keydown', 'keyup',
   'scroll', 'wheel',
   'wait', 'waitForSelector', 'type',

@@ -347,7 +347,7 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel .bs-btn-primary"
+          "selector": "#bs-contract-panel .bs-contract-accept"
         },
         {
           "type": "wait",
@@ -420,7 +420,7 @@
       ]
     },
     {
-      "command": "build freight_warehouse at:12,8",
+      "command": "build freight_warehouse at:4,4",
       "timeout": 30,
       "description": "Step 14 complete: warehouse placed by clicking a tile in the Build panel picker",
       "interaction": [
@@ -437,9 +437,9 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
-          "type": "click",
-          "x": 531,
-          "y": 358
+          "type": "pickTile",
+          "x": 4,
+          "z": 4
         },
         {
           "type": "wait",
@@ -466,7 +466,7 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel .bs-btn-primary"
+          "selector": "#bs-contract-panel .bs-contract-accept"
         },
         {
           "type": "waitForSelector",
@@ -486,7 +486,7 @@
       ]
     },
     {
-      "command": "build_ramp start:10,15 end:10,25",
+      "command": "build_ramp start:4,4 end:4,18",
       "timeout": 30,
       "description": "Step 17 complete: ramp carved by dragging a run in the Build panel picker",
       "interaction": [
@@ -503,24 +503,11 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
-          "type": "mousemove",
-          "x": 450,
-          "y": 250
-        },
-        {
-          "type": "mousedown",
-          "x": 450,
-          "y": 250
-        },
-        {
-          "type": "mousemove",
-          "x": 450,
-          "y": 460
-        },
-        {
-          "type": "mouseup",
-          "x": 450,
-          "y": 460
+          "type": "dragTiles",
+          "x1": 4,
+          "z1": 4,
+          "x2": 4,
+          "z2": 18
         },
         {
           "type": "wait",

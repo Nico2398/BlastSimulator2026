@@ -155,7 +155,15 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
     {
       target: '#bs-contract-panel .bs-contract-deliver',
       hintKey: 'tutorial.stage.contract_deliver',
-      also: ['#bs-contract-panel .bs-contract-amount'],
+      // Accept stays live alongside the delivery it is not pointing at. The
+      // contract taken back at step 12 carries a deadline, and the player
+      // spends several steps hiring a driver, buying a hauler and raising a
+      // warehouse before arriving here — long enough for that contract to
+      // expire. With Accept railed off, an expired contract left the step
+      // demanding a delivery against something that no longer existed and
+      // barred the one control that could restore it. The highlight still
+      // sits on Deliver, so the guidance is unchanged for the common path.
+      also: ['#bs-contract-panel .bs-contract-amount', '#bs-contract-panel .bs-contract-accept'],
     },
   ],
 

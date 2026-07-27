@@ -132,23 +132,18 @@ jobs:
           # `deny` rules still apply, so the .env reads denied in
           # .claude/settings.json stay denied.
           claude_args: '--permission-mode bypassPermissions --model claude-sonnet-5'
-
-      # The action prints "full output hidden for security", so the job log holds
-      # no tool trace whatsoever — a finished run cannot be audited after the
-      # fact, and the orchestrator's delegation to its specialists can only be
-      # inferred from the issue comment it wrote. The execution file is the
-      # complete record: every prompt, tool call, sub-agent invocation and
-      # result. Keep it as an artifact so past sessions stay reviewable.
-      # `always()` because the runs most worth reading are the ones that failed
-      # or escalated, and the step above is what would have failed.
-      - name: Upload session transcript for retrospectives
-        if: always() && steps.claude.outputs.execution_file != ''
-        uses: actions/upload-artifact@v4
-        with:
-          name: claude-session-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ steps.claude.outputs.execution_file }}
-          retention-days: 90
-          if-no-files-found: warn
+          # Without this the action prints "full output hidden for security" and
+          # the job log carries no tool trace at all, so a finished run cannot be
+          # audited: which specialists the orchestrator delegated to, and which
+          # verification channels it actually ran, are only knowable from the
+          # summary comment the session writes about itself.
+          #
+          # This repo is public, so the log — not an artifact — is the right
+          # place for it. Actions redacts registered secrets from log output;
+          # uploaded artifacts get no such treatment, and this runner holds a PAT
+          # and runs under `bypassPermissions`, so a transcript artifact would
+          # publish anything a Bash step happened to echo.
+          show_full_output: true
 
       # When the run closed the issue without opening a PR, no pull_request event
       # will ever fire, so auto-assign-next.yml cannot carry the chain. Do it here.
