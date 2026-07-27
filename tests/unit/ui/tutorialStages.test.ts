@@ -92,6 +92,40 @@ describe('tutorial stage table', () => {
     }
   });
 
+  it('the stage that asks for an exact selection names the coordinates', () => {
+    // "Drag a rectangle over the middle of the map" is not an answer when only
+    // one rectangle will be accepted. Checked on the stage that asks for the
+    // selection — the Confirm stage that follows it just says "Press Confirm".
+    for (const { stepId, stage } of ALL_STAGES) {
+      if (!stage.region?.exact || !stage.target.includes('canvas')) continue;
+      const text = messages[stage.hintKey] ?? '';
+      for (const token of ['{x1}', '{z1}', '{x2}', '{z2}']) {
+        expect(
+          text.includes(token),
+          `${stepId}: exact stage hint must name ${token}`,
+        ).toBe(true);
+      }
+      expect(messagesFr[stage.hintKey] ?? '').toContain('{x1}');
+    }
+  });
+
+  it('a region is a well-formed rectangle', () => {
+    for (const { stepId, stage } of ALL_STAGES) {
+      const r = stage.region;
+      if (!r) continue;
+      expect(r.x2, `${stepId} region x`).toBeGreaterThanOrEqual(r.x1);
+      expect(r.z2, `${stepId} region z`).toBeGreaterThanOrEqual(r.z1);
+      expect(r.x1).toBeGreaterThanOrEqual(0);
+      expect(r.z1).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it('the grid tool demands an exact rectangle', () => {
+    const canvasStage = TUTORIAL_STAGES['drill-plan']!
+      .find(s => s.target.includes('canvas'))!;
+    expect(canvasStage.region?.exact).toBe(true);
+  });
+
   it('multi-click steps really do have more than one stage', () => {
     // Every one of these opens a panel before acting in it. A single stage here
     // is the bug this whole table exists to fix.

@@ -52,7 +52,11 @@ function pickerStages(pickHintKey: string, region: TileRegion): TutorialStage[] 
  */
 const REGION = {
   survey: { x1: 8, z1: 8, x2: 16, z2: 16 },
-  drill: { x1: 8, z1: 8, x2: 16, z2: 16 },
+  // Exact, and sized to the grid it produces: the tool derives
+  // cols = round((x2 - x1) / spacing) + 1, so at the default spacing of 5 an
+  // 8→18 span is exactly three holes at 8, 13 and 18. An outline the resulting
+  // holes spilled out of would be telling the player the wrong thing.
+  drill: { x1: 8, z1: 8, x2: 18, z2: 18, exact: true },
   warehouse: { x1: 2, z1: 2, x2: 9, z2: 9 },
   // Beside the pit, not inside it. The blast leaves sloped crater walls that
   // already register as ramp cells, so carving within them removes more than it

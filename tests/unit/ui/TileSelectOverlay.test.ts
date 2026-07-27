@@ -225,3 +225,100 @@ describe('TileSelectOverlay — required area', () => {
     expect(confirmBtn(container).disabled).toBe(false);
   });
 });
+
+describe('TileSelectOverlay — exact target', () => {
+  const EXACT = { x1: 8, z1: 8, x2: 16, z2: 16, exact: true };
+
+  function openArea(overlay: TileSelectOverlay, onConfirm = () => {}) {
+    overlay.open({ mode: 'area', worldSizeX: WORLD, worldSizeZ: WORLD, title: 'x', onConfirm });
+  }
+
+  it('enables Confirm only for the exact rectangle', () => {
+    setPickerRegion(EXACT);
+    const { container, overlay, canvas } = setup();
+    openArea(overlay);
+
+    drag(canvas, 8, 8, 16, 16);
+    expect(confirmBtn(container).disabled).toBe(false);
+  });
+
+  it('refuses a selection that is inside but smaller', () => {
+    // Under the old "stay inside the area" rule this was accepted.
+    setPickerRegion(EXACT);
+    const { container, overlay, canvas } = setup();
+    openArea(overlay);
+
+    drag(canvas, 9, 9, 15, 15);
+    expect(confirmBtn(container).disabled).toBe(true);
+  });
+
+  it('refuses a selection short by one tile', () => {
+    setPickerRegion(EXACT);
+    const { container, overlay, canvas } = setup();
+    openArea(overlay);
+
+    drag(canvas, 8, 8, 15, 16);
+    expect(confirmBtn(container).disabled).toBe(true);
+  });
+
+  it('names the rectangle it wants instead of a bare rejection', () => {
+    setPickerRegion(EXACT);
+    const { container, overlay, canvas } = setup();
+    openArea(overlay);
+
+    drag(canvas, 9, 9, 15, 15);
+    const info = infoText(container);
+    expect(info).toContain('8');
+    expect(info).toContain('16');
+  });
+
+  it('clamps an overshooting drag onto the target, so it can be hit', () => {
+    // Dragging from outside one corner to outside the opposite corner is the
+    // natural gesture; without clamping it would select the whole map and be
+    // refused, making an exact target a mouse-accuracy test.
+    setPickerRegion(EXACT);
+    const { container, overlay, canvas } = setup();
+    const onConfirm = vi.fn<(r: TileSelectResult) => void>();
+    openArea(overlay, onConfirm as unknown as () => void);
+
+    drag(canvas, 2, 2, 22, 22);
+
+    expect(confirmBtn(container).disabled).toBe(false);
+    confirmBtn(container).click();
+    expect(onConfirm.mock.calls[0]![0]).toMatchObject({ x: 8, z: 8, x2: 16, z2: 16 });
+  });
+
+  it('does not clamp when the region is not exact', () => {
+    // A plain area leaves the player free to choose within it, so silently
+    // moving their selection would be changing their intent.
+    setPickerRegion({ x1: 8, z1: 8, x2: 16, z2: 16 });
+    const { container, overlay, canvas } = setup();
+    openArea(overlay);
+
+    drag(canvas, 2, 2, 22, 22);
+    expect(confirmBtn(container).disabled).toBe(true);
+  });
+
+  it('tells the player up front that the square must be covered exactly', () => {
+    setPickerRegion(EXACT);
+    const { container, overlay } = setup();
+    openArea(overlay);
+
+    expect(container.querySelector('.bs-tile-select-hint')?.textContent)
+      .toContain('exactly');
+  });
+
+  it('still refuses a forced Confirm on a wrong selection', () => {
+    setPickerRegion(EXACT);
+    const { container, overlay, canvas } = setup();
+    const onConfirm = vi.fn<(r: TileSelectResult) => void>();
+    openArea(overlay, onConfirm as unknown as () => void);
+
+    drag(canvas, 9, 9, 15, 15);
+    const btn = confirmBtn(container);
+    btn.disabled = false;
+    btn.click();
+
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+});

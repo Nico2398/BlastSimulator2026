@@ -72,12 +72,28 @@ export class TutorialRails {
       ? `  (${this.stageIndex + 1}/${this.stages.length})`
       : '';
     return {
-      hint: stage ? `${t(stage.hintKey)}${counter}` : '',
+      hint: stage ? `${this.stageHint(stage)}${counter}` : '',
       clockHeld: this.held,
       stageIndex: this.stageIndex,
       stageTotal: this.stages.length,
       stageTarget: stage?.target ?? null,
     };
+  }
+
+  /**
+   * The stage's instruction, with the target rectangle filled in.
+   *
+   * A step that demands an exact selection has to say which one — "drag a
+   * rectangle over the middle of the map" is not an answer when only one
+   * rectangle will be accepted.
+   */
+  private stageHint(stage: TutorialStage): string {
+    const text = t(stage.hintKey);
+    const r = stage.region;
+    if (!r) return text;
+    return text
+      .replace('{x1}', String(r.x1)).replace('{z1}', String(r.z1))
+      .replace('{x2}', String(r.x2)).replace('{z2}', String(r.z2));
   }
 
   /**

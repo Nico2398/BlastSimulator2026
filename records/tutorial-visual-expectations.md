@@ -430,6 +430,39 @@ crater's sloped walls already register as ramps — so carving inside the crater
 *removed* more ramp cells than it added. The guided ramp region moved to intact
 ground beside the pit, which is where a haul ramp belongs anyway.
 
+### Eighth pass — the grid tool takes the exact coordinates or nothing
+
+A region said "stay inside here", which still let the drill grid be laid
+anywhere within a 9×9 area while the step taught one specific layout. A region
+can now be marked `exact`: the selection must be that rectangle, corner for
+corner, and Confirm stays dead for anything else — including a selection wholly
+inside it.
+
+Three things make that strict without making it fiddly:
+
+- **Clamping.** In exact mode the picker pulls every tile into the target, so
+  dragging from outside one corner to outside the other lands on it precisely.
+  Without this, "exactly this rectangle" would be a test of mouse accuracy.
+  Non-exact regions are not clamped — there the player has real freedom inside
+  the area, and silently moving their selection would be changing their intent.
+- **The target is drawn as a target.** Solid outline, tint and corner ticks,
+  rather than the dashed boundary an ordinary region gets.
+- **Both the card and the picker name the coordinates.** The stage hint
+  substitutes them from the region, so the card reads "Drag the grid over the
+  outlined square exactly: (8, 8) to (18, 18)", and a wrong selection is told
+  "Not the outlined square. Cover (8, 8) to (18, 18) exactly." A step that will
+  accept only one answer has to say which one.
+
+The target is (8,8)→(18,18) rather than the earlier (8,8)→(16,16), because the
+grid tool derives `cols = round((x2 - x1) / spacing) + 1`: at the default
+spacing of 5 an 8→18 span is exactly three holes at 8, 13 and 18. The old
+outline would have had the resulting holes spilling out of it — an outline that
+lies about where the grid lands is worse than no outline.
+
+Only the drill grid is exact. Survey target, warehouse site and ramp remain
+areas, since those steps genuinely leave the choice open; flipping any of them
+is one flag.
+
 ### Recorded, not fixed: events have no consequence prose (#421)
 
 Answering an event yields `Outcome: Lost $3000, safety -3` and no sentence. This

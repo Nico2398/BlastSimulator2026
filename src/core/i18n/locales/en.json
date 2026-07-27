@@ -1857,7 +1857,7 @@
   "tutorial.stage.picker_confirm": "Press Confirm.",
   "tutorial.stage.open_blast": "Open the Blast panel from the toolbar.",
   "tutorial.stage.grid_tool": "Press Grid Tool to lay out drill holes.",
-  "tutorial.stage.drill_area": "Drag a rectangle over the middle of the map to place the grid.",
+  "tutorial.stage.drill_area": "Drag the grid over the outlined square exactly: ({x1}, {z1}) to ({x2}, {z2}).",
   "tutorial.stage.charge_all": "Press Charge All Holes.",
   "tutorial.stage.auto_sequence": "Press Auto Sequence to set the detonation delays.",
   "tutorial.stage.execute": "Press BLAST!",
@@ -1881,5 +1881,7 @@
   "ui.tile_select.stay_in_area": "Stay inside the highlighted area — the tutorial needs this placed there.",
   "ui.tile_select.outside_area": "Outside the highlighted area. Select inside it to continue.",
   "ui.blast.status_blasted": "Blast complete — {cleared} m³ of rock broken out ({rating}).",
-  "ui.blast.status_no_rock_moved": "The charges cracked the rock but broke none of it out. Use a stronger explosive or a bigger charge."
+  "ui.blast.status_no_rock_moved": "The charges cracked the rock but broke none of it out. Use a stronger explosive or a bigger charge.",
+  "ui.tile_select.cover_area_exactly": "Cover the outlined square exactly — drag past its corners and the selection snaps to them.",
+  "ui.tile_select.match_area_exactly": "Not the outlined square. Cover ({x1}, {z1}) to ({x2}, {z2}) exactly."
 }

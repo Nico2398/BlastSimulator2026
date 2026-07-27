@@ -4,7 +4,7 @@
 
 import { t } from '../core/i18n/I18n.js';
 import {
-  getPickerRegion, regionContainsSelection, type TileRegion,
+  getPickerRegion, regionAccepts, clampToRegion, type TileRegion,
 } from './tutorialPickerRegion.js';
 
 export interface ExtraField {
@@ -120,7 +120,9 @@ export class TileSelectOverlay {
 
     const hint = document.createElement('div');
     hint.className = 'bs-tile-select-hint';
-    hint.textContent = this.requiredRegion
+    hint.textContent = this.requiredRegion?.exact
+      ? t('ui.tile_select.cover_area_exactly')
+      : this.requiredRegion
       ? t('ui.tile_select.stay_in_area')
       : config.mode === 'area'
         ? 'Click and drag to select a rectangular area'
@@ -242,6 +244,15 @@ export class TileSelectOverlay {
     const tx = Math.floor(px / (CANVAS_W / this.config.worldSizeX));
     const tz = Math.floor(pz / (CANVAS_H / this.config.worldSizeZ));
     if (tx < 0 || tx >= this.config.worldSizeX || tz < 0 || tz >= this.config.worldSizeZ) return null;
+
+    // An exact region is a target, not a suggestion. Clamping lets the player
+    // drag past the corners and still land on it — without this, "exactly this
+    // rectangle" would mean hitting two specific tiles with the mouse.
+    const region = this.requiredRegion;
+    if (region?.exact) {
+      const c = clampToRegion(region, tx, tz);
+      return { tx: c.x, tz: c.z };
+    }
     return { tx, tz };
   }
 
@@ -340,11 +351,33 @@ export class TileSelectOverlay {
       ctx.fill('evenodd');
       ctx.restore();
 
-      ctx.setLineDash([6, 4]);
-      ctx.strokeStyle = '#7ab8ff';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(rx, rz, rw, rh);
-      ctx.setLineDash([]);
+      if (r.exact) {
+        // A target rather than a boundary: solid outline, a tint, and corner
+        // ticks, so it reads as "cover this" rather than "stay inside this".
+        ctx.fillStyle = 'rgba(122, 184, 255, 0.10)';
+        ctx.fillRect(rx, rz, rw, rh);
+        ctx.strokeStyle = '#7ab8ff';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(rx, rz, rw, rh);
+        const tick = Math.min(10, tileW, tileH);
+        ctx.lineWidth = 3;
+        for (const [cx, cz, dx, dz] of [
+          [rx, rz, 1, 1], [rx + rw, rz, -1, 1],
+          [rx, rz + rh, 1, -1], [rx + rw, rz + rh, -1, -1],
+        ] as Array<[number, number, number, number]>) {
+          ctx.beginPath();
+          ctx.moveTo(cx + dx * tick, cz);
+          ctx.lineTo(cx, cz);
+          ctx.lineTo(cx, cz + dz * tick);
+          ctx.stroke();
+        }
+      } else {
+        ctx.setLineDash([6, 4]);
+        ctx.strokeStyle = '#7ab8ff';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(rx, rz, rw, rh);
+        ctx.setLineDash([]);
+      }
     }
 
     // Hover highlight
@@ -426,8 +459,14 @@ export class TileSelectOverlay {
     const sel = this.getSelectionRect();
     if (!sel) { el.textContent = 'No selection'; return; }
     if (!this.selectionIsAllowed()) {
-      // Say why Confirm is dead rather than leaving the player prodding it.
-      el.textContent = t('ui.tile_select.outside_area');
+      // Say why Confirm is dead rather than leaving the player prodding it, and
+      // for an exact target name the rectangle being asked for.
+      const region = this.requiredRegion;
+      el.textContent = region?.exact
+        ? t('ui.tile_select.match_area_exactly')
+          .replace('{x1}', String(region.x1)).replace('{z1}', String(region.z1))
+          .replace('{x2}', String(region.x2)).replace('{z2}', String(region.z2))
+        : t('ui.tile_select.outside_area');
       return;
     }
     if (this.config?.mode === 'point') {
@@ -447,7 +486,7 @@ export class TileSelectOverlay {
     const sel = this.getSelectionRect();
     if (!sel) return false;
     if (!this.requiredRegion) return true;
-    return regionContainsSelection(this.requiredRegion, sel);
+    return regionAccepts(this.requiredRegion, sel);
   }
 
   private enableConfirm(): void {

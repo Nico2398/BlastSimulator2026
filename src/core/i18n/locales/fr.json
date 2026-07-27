@@ -1857,7 +1857,7 @@
   "tutorial.stage.picker_confirm": "Appuyez sur Confirmer.",
   "tutorial.stage.open_blast": "Ouvrez le panneau Tir depuis la barre d'outils.",
   "tutorial.stage.grid_tool": "Appuyez sur Outil Grille pour disposer les trous de forage.",
-  "tutorial.stage.drill_area": "Tracez un rectangle au centre de la carte pour placer la grille.",
+  "tutorial.stage.drill_area": "Tracez la grille exactement sur le carré délimité : ({x1}, {z1}) à ({x2}, {z2}).",
   "tutorial.stage.charge_all": "Appuyez sur Charger tous les trous.",
   "tutorial.stage.auto_sequence": "Appuyez sur Séquence auto pour régler les retards de détonation.",
   "tutorial.stage.execute": "Appuyez sur TIR !",
@@ -1881,5 +1881,7 @@
   "ui.tile_select.stay_in_area": "Restez dans la zone en surbrillance — le tutoriel attend un placement à cet endroit.",
   "ui.tile_select.outside_area": "Hors de la zone en surbrillance. Sélectionnez à l'intérieur pour continuer.",
   "ui.blast.status_blasted": "Tir terminé — {cleared} m³ de roche abattus ({rating}).",
-  "ui.blast.status_no_rock_moved": "Les charges ont fissuré la roche sans rien abattre. Utilisez un explosif plus puissant ou une charge plus importante."
+  "ui.blast.status_no_rock_moved": "Les charges ont fissuré la roche sans rien abattre. Utilisez un explosif plus puissant ou une charge plus importante.",
+  "ui.tile_select.cover_area_exactly": "Couvrez exactement le carré délimité — dépassez ses coins et la sélection s'y aligne.",
+  "ui.tile_select.match_area_exactly": "Ce n'est pas le carré délimité. Couvrez exactement ({x1}, {z1}) à ({x2}, {z2})."
 }

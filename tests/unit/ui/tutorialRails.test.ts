@@ -87,6 +87,30 @@ describe('TutorialRails', () => {
     expect(rails.refresh().hint).not.toContain('/');
   });
 
+  it('fills the target coordinates into the hint for an exact selection', () => {
+    // The drill grid demands one specific rectangle, so the card has to say
+    // which one rather than gesturing at the middle of the map.
+    const bar = document.createElement('div');
+    bar.id = 'bs-toolbar';
+    const btn = document.createElement('button');
+    btn.dataset['panel'] = 'blast';
+    bar.appendChild(btn);
+    document.body.appendChild(bar);
+    withBox(btn);
+
+    const canvas = document.createElement('div');
+    canvas.className = 'bs-tile-select-canvas';
+    document.body.appendChild(canvas);
+    withBox(canvas);
+
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'drill-plan' }, state());
+    const hint = rails.refresh().hint;
+
+    expect(hint).not.toContain('{x1}');
+    expect(hint).toMatch(/\d+/);
+  });
+
   it('clears the rails for a step with nothing to point at', () => {
     const stray = withBox(document.createElement('button'));
     stray.classList.add(ALLOWED_CLASS);
