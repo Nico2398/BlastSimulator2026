@@ -1,0 +1,126 @@
+name: "Agentic trigger prompt"
+description: >
+  Builds the task prompt for an autonomous pipeline run from the triggering
+  event (workflow_dispatch, issue comment, or PR review comment) and resolves
+  the issue number the run is working on. Runtime-agnostic: the same text is
+  handed to OpenCode and to Claude Code.
+
+inputs:
+  token:
+    description: "Token used to read the issue body. GITHUB_TOKEN is enough."
+    required: true
+  issue_number:
+    description: "Issue number from a workflow_dispatch input. Empty for comment triggers."
+    required: false
+    default: ""
+
+outputs:
+  prompt:
+    description: "Task prompt describing the trigger. Also exported as the PROMPT environment variable."
+    value: ${{ steps.build.outputs.prompt }}
+  issue:
+    description: "Issue number this run resolves, or empty when the trigger was not an issue."
+    value: ${{ steps.build.outputs.issue }}
+  entity:
+    description: >
+      Single-line reference to what triggered the run ("issue 42", "pr 17",
+      "manual"). Safe to pass as a slash-command argument.
+    value: ${{ steps.build.outputs.entity }}
+
+runs:
+  using: composite
+  steps:
+    - id: build
+      uses: actions/github-script@v7
+      env:
+        DISPATCH_ISSUE: ${{ inputs.issue_number }}
+      with:
+        github-token: ${{ inputs.token }}
+        script: |
+          const fs = require('fs');
+          const event = context.eventName;
+          let prompt = '';
+          let issue = '';
+          let entity = 'manual';
+
+          if (event === 'workflow_dispatch') {
+            const issueNum = (process.env.DISPATCH_ISSUE || '').trim();
+            if (issueNum) {
+              issue = issueNum;
+              entity = 'issue ' + issueNum;
+              const { data: target } = await github.rest.issues.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: parseInt(issueNum, 10)
+              });
+              prompt = [
+                'You have been assigned to GitHub Issue #' + issueNum + '.',
+                '',
+                'The issue description is:',
+                '--- BEGIN DESCRIPTION ---',
+                target.body || '(No description)',
+                '--- END DESCRIPTION ---',
+                '',
+                'Read the full Issue #' + issueNum + ' thread for more context. You have access to tools to read issues from the GitHub repo.'
+              ].join('\n');
+            } else {
+              prompt = 'You have been triggered manually.';
+            }
+          } else if (event === 'issue_comment') {
+            const commentBody = context.payload.comment?.body || '';
+            const isPR = !!context.payload.issue?.pull_request;
+            const num = context.payload.issue?.number;
+            const entityBody = context.payload.issue?.body || '(No description)';
+            const type = isPR ? 'Pull Request' : 'Issue';
+            const threadType = isPR ? 'pull requests' : 'issues';
+            if (!isPR && num) {
+              issue = String(num);
+            }
+            entity = (isPR ? 'pr ' : 'issue ') + num;
+
+            prompt = [
+              'You have been mentioned in a comment from ' + type + ' #' + num + '.',
+              '',
+              'The message that triggered this session was:',
+              '--- BEGIN TRIGGER MESSAGE ---',
+              commentBody,
+              '--- END TRIGGER MESSAGE ---',
+              '',
+              'The description of this ' + type.toLowerCase() + ' is:',
+              '--- BEGIN DESCRIPTION ---',
+              entityBody,
+              '--- END DESCRIPTION ---',
+              '',
+              'Read the full ' + type + ' #' + num + ' thread for more context. You have access to tools to read ' + threadType + ' from the GitHub repo.'
+            ].join('\n');
+          } else if (event === 'pull_request_review_comment') {
+            const num = context.payload.pull_request?.number;
+            const commentBody = context.payload.comment?.body || '';
+            const prBody = context.payload.pull_request?.body || '(No description)';
+            entity = 'pr ' + num;
+
+            prompt = [
+              'You have been mentioned in a review comment from Pull Request #' + num + '.',
+              '',
+              'The message that triggered this session was:',
+              '--- BEGIN TRIGGER MESSAGE ---',
+              commentBody,
+              '--- END TRIGGER MESSAGE ---',
+              '',
+              'The pull request description is:',
+              '--- BEGIN DESCRIPTION ---',
+              prBody,
+              '--- END DESCRIPTION ---',
+              '',
+              'Read the full Pull Request #' + num + ' thread for more context. You have access to tools to read pull requests from the GitHub repo.'
+            ].join('\n');
+          } else {
+            prompt = 'A user triggered you. Read the context and respond appropriately.';
+          }
+
+          // OpenCode reads the task from $PROMPT; Claude Code reads the step output.
+          const delimiter = 'PROMPT_EOF_' + context.runId;
+          fs.appendFileSync(process.env.GITHUB_ENV, 'PROMPT<<' + delimiter + '\n' + prompt + '\n' + delimiter + '\n', 'utf8');
+          core.setOutput('prompt', prompt);
+          core.setOutput('issue', issue);
+          core.setOutput('entity', entity);

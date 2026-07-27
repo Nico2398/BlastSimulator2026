@@ -1,0 +1,146 @@
+name: Claude Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: 'Issue number to resolve'
+        required: false
+        type: string
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+
+concurrency:
+  # Repo-wide, and shared by name with the other runner: exactly one autonomous
+  # agent session may run at a time, whichever runtime it is. Queued runs wait
+  # rather than cancel the live one.
+  group: agentic-runner
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: write
+  pull-requests: write
+  issues: write
+  actions: read
+
+jobs:
+  run:
+    # Mirrors opencode-runner.yml's trigger, with @claude as the mention. Both
+    # runners stay enabled: the assignment comment names exactly one agent, so
+    # only the configured one answers, and a human can still summon the other
+    # by hand.
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event.comment.user.type != 'Bot' &&
+        (
+          startsWith(github.event.comment.body, '@claude ') ||
+          contains(github.event.comment.body, ' @claude ') ||
+          endsWith(github.event.comment.body, ' @claude') ||
+          github.event.comment.body == '@claude' ||
+          startsWith(github.event.comment.body, '@Claude ') ||
+          contains(github.event.comment.body, ' @Claude ') ||
+          endsWith(github.event.comment.body, ' @Claude') ||
+          github.event.comment.body == '@Claude'
+        )
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # The pipeline branches off main and cherry-picks between its own
+          # branches; a shallow clone loses the history those operations need.
+          fetch-depth: 0
+          persist-credentials: false
+
+      # Branch pushes and `gh pr create` must run under the PAT. A PR opened
+      # with GITHUB_TOKEN raises no pull_request event, which would leave
+      # auto-assign-next.yml dormant and break the autonomy loop.
+      - name: Setup git auth for push operations
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
+        run: gh auth setup-git
+
+      # The pipeline creates every branch from `main` by name. On a PR review
+      # comment the workspace is on the PR head, and `git rev-parse main` fails
+      # when only `origin/main` exists — fetch-depth 0 above guarantees it does.
+      - name: Ensure a local main ref to branch from
+        run: git rev-parse --verify --quiet main >/dev/null || git branch main origin/main
+
+      # Claude runs the verification channels itself. Without Node, dependencies
+      # and a browser, every `npm run` fails before permissions matter.
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Cache npm dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Puppeteer Chrome
+        run: npx puppeteer browsers install chrome
+
+      # Shared with opencode-runner.yml so both runtimes receive the same task text.
+      - name: Build trigger context prompt
+        id: context
+        uses: ./.github/actions/agentic-prompt
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          issue_number: ${{ inputs.issue_number }}
+
+      # OpenCode starts in the orchestrator through `default_agent` in
+      # .opencode/opencode.json. Claude Code has no equivalent setting, so the
+      # /agentic-run command carries that mandate instead.
+      - name: Run Claude Code
+        id: claude
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          additional_permissions: |
+            actions: read
+          # Any branch the harness generates for itself lands inside the
+          # pipeline namespace, where it cannot be mistaken for the deliverable
+          # `pipeline/feature-<N>` and is already skipped by claude-code-review.
+          branch_prefix: 'pipeline/scratch-'
+          # `/agentic-run` forks straight into the `orchestrator` agent, so the
+          # orchestrator is the first thing that runs — the equivalent of
+          # OpenCode's `default_agent`. The entity reference leads the argument
+          # so the fork still knows what it is working on even if the multi-line
+          # context that follows does not survive argument substitution.
+          prompt: |
+            /agentic-run ${{ steps.context.outputs.entity }}
+            ${{ steps.context.outputs.prompt }}
+          # No permission prompts. The runner is a throwaway VM with no access
+          # beyond this checkout and the job's own scoped tokens, and there is
+          # no human present to approve anything -- a prompt is a silent hang.
+          # `deny` rules still apply, so the .env reads denied in
+          # .claude/settings.json stay denied.
+          claude_args: '--permission-mode bypassPermissions --model claude-sonnet-5'
+
+      # When the run closed the issue without opening a PR, no pull_request event
+      # will ever fire, so auto-assign-next.yml cannot carry the chain. Do it here.
+      - name: Chain to next issue if resolved without PR
+        if: steps.context.outputs.issue != '' && vars.AGENTIC_AUTO_ASSIGN_ENABLED == 'true'
+        uses: ./.github/actions/agentic-assign
+        with:
+          token: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
+          agent: ${{ vars.AGENTIC_AGENT }}
+          guard: closed_without_pr
+          completed_issue: ${{ steps.context.outputs.issue }}
+          reason: auto-assigned after issue #${{ steps.context.outputs.issue }} was resolved without a PR

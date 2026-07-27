@@ -1,97 +1,35 @@
-name: "Pipeline: run agent on next ready issue"
+name: "Pipeline: run the configured agent on the next ready issue"
 
 on:
   workflow_dispatch:  # manual trigger only
 
 permissions:
   issues: write
-  actions: write
 
 jobs:
   kickstart:
     runs-on: ubuntu-latest
     steps:
-      - name: Check for idle ready issues
-        uses: actions/github-script@v7
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const owner = context.repo.owner;
-            const repo = context.repo.repo;
+          fetch-depth: 1
 
-            // Check if any issue is already in-progress
-            const { data: inProgress } = await github.rest.issues.listForRepo({
-              owner, repo,
-              labels: 'in-progress',
-              state: 'open',
-              per_page: 1
-            });
+      # Posts the assignment comment that mentions the configured agent, which
+      # in turn starts claude-runner.yml or opencode-runner.yml. The PAT matters:
+      # a comment posted with GITHUB_TOKEN triggers no workflow at all.
+      - name: Assign the next ready issue
+        id: assign
+        uses: ./.github/actions/agentic-assign
+        with:
+          token: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
+          agent: ${{ vars.AGENTIC_AGENT }}
+          reason: manual pipeline trigger
 
-            if (inProgress.length > 0) {
-              console.log(`Issue #${inProgress[0].number} already in progress.`);
-              return;
-            }
-
-            // Find next ready issue (oldest first, respecting dependencies)
-            const { data: ready } = await github.rest.issues.listForRepo({
-              owner, repo,
-              labels: 'ready',
-              state: 'open',
-              sort: 'created',
-              direction: 'asc',
-              per_page: 10
-            });
-
-            if (ready.length === 0) {
-              console.log('No ready issues.');
-              return;
-            }
-
-            for (const issue of ready) {
-              // Check dependencies
-              const depMatch = issue.body?.match(/[Dd]epends?\s+on:?\s*#(\d+)/);
-              if (depMatch) {
-                const dep = await github.rest.issues.get({
-                  owner, repo, issue_number: parseInt(depMatch[1])
-                });
-                if (dep.data.state !== 'closed') {
-                  console.log(`#${issue.number}: dependency #${depMatch[1]} not closed, skipping.`);
-                  continue;
-                }
-              }
-
-              console.log(`Agent pipeline picking up issue #${issue.number}`);
-
-              await github.rest.issues.removeLabel({
-                owner, repo,
-                issue_number: issue.number,
-                name: 'ready'
-              }).catch(() => {});
-              await github.rest.issues.addLabels({
-                owner, repo,
-                issue_number: issue.number,
-                labels: ['in-progress']
-              });
-
-              // Acknowledge assignment on the issue
-              await github.rest.issues.createComment({
-                owner, repo,
-                issue_number: issue.number,
-                body: '⚙️ Assigned via manual trigger'
-              });
-
-              // Dispatch the agent pipeline workflow
-              await github.rest.actions.createWorkflowDispatch({
-                owner, repo,
-                workflow_id: 'opencode-runner.yml',
-                ref: 'main',
-                inputs: {
-                  issue_number: String(issue.number)
-                }
-              });
-              console.log(`Agent pipeline dispatched for issue #${issue.number}.`);
-
-              return; // Only start one at a time
-            }
-
-            console.log('No assignable ready issues (all have unmet dependencies). Pipeline idle.');
+      - name: Report
+        run: |
+          if [ -n "${{ steps.assign.outputs.issue }}" ]; then
+            echo "Assigned issue #${{ steps.assign.outputs.issue }} to ${{ steps.assign.outputs.mention }}."
+          else
+            echo "Nothing assigned — see the step above for the reason."
+          fi

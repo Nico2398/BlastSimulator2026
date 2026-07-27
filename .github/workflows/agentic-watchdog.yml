@@ -1,0 +1,103 @@
+name: "Pipeline: watchdog for stalled agent runs"
+
+on:
+  schedule:
+    # Offset from the hour so it does not collide with other scheduled jobs.
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    steps:
+      # A run that dies without labelling the issue `blocked` — OOM, a hung
+      # tool call, the job timeout, a revoked token — leaves the issue
+      # `in-progress` forever. The chain then halts correctly but silently, and
+      # nobody is told. This sweeps those into `blocked`, which handle-failure.yml
+      # already notifies on. The PAT is required: labelling with GITHUB_TOKEN
+      # raises no `issues: labeled` event, so the notification would never fire.
+      - name: Label stalled in-progress issues as blocked
+        uses: actions/github-script@v7
+        env:
+          STALL_MINUTES: ${{ vars.AGENTIC_STALL_MINUTES }}
+        with:
+          github-token: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            // Default comfortably above the runners' 180-minute job timeout, so
+            // a slow-but-alive run is never mistaken for a dead one.
+            const stallMinutes = parseInt(process.env.STALL_MINUTES || '', 10) || 240;
+            const cutoff = Date.now() - stallMinutes * 60_000;
+
+            const { data: inProgress } = await github.rest.issues.listForRepo({
+              owner, repo, labels: 'in-progress', state: 'open', per_page: 50
+            });
+
+            if (inProgress.length === 0) {
+              core.info('No in-progress issues. Nothing to sweep.');
+              return;
+            }
+
+            let swept = 0;
+            for (const issue of inProgress) {
+              const n = issue.number;
+
+              const { data: events } = await github.rest.issues.listEventsForTimeline({
+                owner, repo, issue_number: n, per_page: 100
+              });
+
+              // A linked PR means the run produced something; it is the PR's
+              // CI and review that carry it from here, however long that takes.
+              if (events.some((e) => e.event === 'cross-referenced' && e.source?.issue?.pull_request)) {
+                core.info(`#${n}: has a linked PR, leaving alone.`);
+                continue;
+              }
+
+              const labelledAt = events
+                .filter((e) => e.event === 'labeled' && e.label?.name === 'in-progress')
+                .map((e) => Date.parse(e.created_at))
+                .filter((t) => !Number.isNaN(t))
+                .sort((a, b) => b - a)[0];
+
+              if (labelledAt === undefined) {
+                core.warning(`#${n}: in-progress but no labelling event found — cannot age it, skipping.`);
+                continue;
+              }
+
+              const ageMinutes = Math.round((Date.now() - labelledAt) / 60_000);
+              if (labelledAt > cutoff) {
+                core.info(`#${n}: in-progress for ${ageMinutes}m, under the ${stallMinutes}m threshold.`);
+                continue;
+              }
+
+              core.warning(`#${n}: in-progress for ${ageMinutes}m with no PR — marking blocked.`);
+
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: n,
+                body: [
+                  `🕳️ **Watchdog: this run was lost.**`,
+                  '',
+                  `Issue #${n} has been \`in-progress\` for ${ageMinutes} minutes (threshold ${stallMinutes}) and no pull request was ever linked to it. The agent session ended without labelling the issue \`blocked\` — a crash, a hung tool call, the job timeout, or a revoked token.`,
+                  '',
+                  'Marking it `blocked` so the failure is visible and the chain can be restarted deliberately.',
+                  '',
+                  'Check the runner workflow logs for that window before resuming. Any `pipeline/*-' + n + '` branches left behind are safe to delete — the pipeline recreates them from scratch on the next run.'
+                ].join('\n')
+              });
+
+              await github.rest.issues.addLabels({
+                owner, repo, issue_number: n, labels: ['blocked']
+              });
+              await github.rest.issues.removeLabel({
+                owner, repo, issue_number: n, name: 'in-progress'
+              }).catch(() => {});
+
+              swept += 1;
+            }
+
+            core.info(`Swept ${swept} stalled issue(s).`);

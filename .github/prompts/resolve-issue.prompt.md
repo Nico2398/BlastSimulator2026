@@ -1,5 +1,5 @@
 ---
-agent: pipeline
+agent: orchestrator
 description: Resolve a GitHub issue end-to-end through the TDD pipeline.
 argument-hint: "<issue number>"
 ---
