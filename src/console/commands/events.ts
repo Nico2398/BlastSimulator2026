@@ -145,7 +145,7 @@ export function tickCommand(
     // 8. Employee needs — drain gauges, update morale, check collapse
     for (const emp of state.employees.employees) {
       if (!emp.alive) continue;
-      const isWorking = emp.activeActionId !== null;
+      const isWorking = emp.activeActionId !== null && emp.restTicksRemaining === null;
       tickNeedGauges(emp, isWorking);
       emp.morale = Math.max(0, Math.min(100, emp.morale + needsMoraleEffect(emp)));
     }

@@ -12,6 +12,7 @@ import { detectTrafficJam } from '../events/EventEngine.js';
 import { checkCollapse, type NeedKey, type Employee } from '../entities/Employee.js';
 import { replenishNeed } from '../entities/EmployeeNeeds.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
+import { addExpense } from '../economy/Finance.js';
 
 // ── Config ──
 
@@ -522,8 +523,10 @@ function findNearestLivingQuarters(
  */
 export function deductRestCost(state: GameState, needKey: NeedKey): number {
   const cost = NEED_REST_COSTS[needKey];
+  const actualDeduction = Math.min(state.cash, cost);
 
   state.cash = Math.max(0, state.cash - cost);
+  addExpense(state.finances, actualDeduction, 'needs', `Rest: ${needKey}`, state.tickCount);
   return cost;
 }
 
