@@ -88,6 +88,24 @@ export function formatNeed(value: number): string {
   return String(Math.round(value));
 }
 
+/**
+ * Threshold-coded class for a need gauge's value text: 'good' (>50), 'warn'
+ * (30-50), or 'bad' (<30). Kept separate from the bar-fill's own
+ * critical/low/normal classes (thresholds 15/35), which read the bar, not
+ * the number next to it.
+ */
+export function needValueClass(value: number): 'good' | 'warn' | 'bad' {
+  if (value > 50) return 'good';
+  if (value >= 30) return 'warn';
+  return 'bad';
+}
+
+/** Apply the threshold-coded class to a need-value element, replacing any prior one. */
+export function applyNeedValueClass(el: HTMLElement, value: number): void {
+  el.classList.remove('good', 'warn', 'bad');
+  el.classList.add(needValueClass(value));
+}
+
 export function makeNeedBar(label: string, value: number, color: string, key?: string): HTMLElement {
   const el = document.createElement('div');
   el.className = 'bs-need-row';
@@ -113,6 +131,7 @@ export function makeNeedBar(label: string, value: number, color: string, key?: s
   const valueEl = document.createElement('span');
   valueEl.className = 'bs-need-value';
   valueEl.textContent = formatNeed(value);
+  applyNeedValueClass(valueEl, value);
 
   barBg.appendChild(barFill);
   el.append(labelEl, barBg, valueEl);

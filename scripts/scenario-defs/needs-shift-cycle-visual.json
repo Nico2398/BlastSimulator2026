@@ -57,6 +57,15 @@
       ]
     },
     {
+      "command": "employee dispatch 1 x:10 z:10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:10 z:10"
+        }
+      ]
+    },
+    {
       "command": "employee list",
       "interaction": [
         {

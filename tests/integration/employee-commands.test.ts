@@ -354,3 +354,43 @@ describe('Console — employee hire (regression)', () => {
     expect(result.output).toContain('Usage: employee hire role:');
   });
 });
+
+// ── employee dispatch ────────────────────────────────────────────────────────
+
+describe('Console — employee dispatch', () => {
+  let ctx: GameContext;
+  let empId: number;
+
+  beforeEach(() => {
+    ctx = makeCtx();
+    empId = hireOne(ctx, 'driller');
+  });
+
+  it('pushes a rest-pool PendingAction claimable by tickEmployees', () => {
+    const result = employeeCommand(ctx, ['dispatch', String(empId)], { x: '10', z: '10' });
+
+    expect(result.success).toBe(true);
+    expect(result.output).toBe(`Employee #${empId} dispatched to work at (10, 10). Action ID: 1.`);
+
+    const action = ctx.state!.pendingActions.find(a => a.targetEmployeeId === empId);
+    expect(action).toBeDefined();
+    expect(action!.type).toBe('drill_hole');
+    expect(action!.requiredSkill).toBeNull();
+    expect(action!.targetX).toBe(10);
+    expect(action!.targetZ).toBe(10);
+  });
+
+  it('reports employee not found when the ID does not exist', () => {
+    const result = employeeCommand(ctx, ['dispatch', '999'], { x: '10', z: '10' });
+
+    expect(result.success).toBe(false);
+    expect(result.output).toBe('Employee #999 not found.');
+  });
+
+  it('rejects the call when x/z coordinates are missing', () => {
+    const result = employeeCommand(ctx, ['dispatch', String(empId)], {});
+
+    expect(result.success).toBe(false);
+    expect(result.output).toBe('Usage: employee dispatch <id> x:<X> z:<Z>');
+  });
+});
