@@ -2,9 +2,9 @@
 // BlastSimulator2026 — Roster row class names
 //
 // EmployeePanel.makeEmployeeRow adds `collapsing` to a row's classList when
-// the employee is mid-collapse, but no CSS rule renders it — a visual
-// no-op (issue #405). This locks the class-list logic itself so a fix to
-// styles.ts can be verified against a stable, DOM-independent contract.
+// the employee is mid-collapse; styles.ts renders it with a red border/tint
+// (issue #405). This locks the class-list logic itself against a stable,
+// DOM-independent contract, decoupled from the CSS rule that paints it.
 
 import { describe, it, expect } from 'vitest';
 import {
