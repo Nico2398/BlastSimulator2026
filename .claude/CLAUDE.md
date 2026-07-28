@@ -82,7 +82,7 @@ Before acting, check whether the task needs a capability you lack (audio playbac
 npm run verify:env      # which verification channels are live
 npm run validate        # TypeScript → coverage → integration → scenario defs → build
 npm run test            # Vitest unit + integration
-npm run scenarios       # all 99 scenarios, command mode, no browser
+npm run scenarios       # all scenarios, command mode, no browser
 npm run playtest        # plays the game through its own UI, clicks only
 npm run dev             # dev server on :5173, required by the visual and playability channels
 npm run console         # interactive gameplay REPL, no browser
