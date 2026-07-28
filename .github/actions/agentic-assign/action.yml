@@ -112,6 +112,14 @@ runs:
           // An issue keeps `in-progress` until its PR merges, so any other one
           // still carrying that label means a run is live. Assigning now would
           // put a second session on the same working tree of branches.
+          //
+          // Defer either way, and never diagnose. From the labels alone a run
+          // forty seconds old is indistinguishable from one that died hours
+          // ago; only `agentic-watchdog.yml` ages it against
+          // AGENTIC_STALL_MINUTES, so declaring a run lost is its job alone.
+          // This step used to comment "Pipeline halted — no linked PR was
+          // created" on sight, and posted it on #404 one minute into a
+          // two-hour session that was still running.
           for (const busy of inProgress) {
             if (busy.number === completed) continue;
 
@@ -120,23 +128,12 @@ runs:
                 `Issue #${busy.number} is in progress with a linked PR — deferring. ` +
                 'Merging that PR re-enters this step.'
               );
-              return;
+            } else {
+              core.info(
+                `Issue #${busy.number} is in progress with no linked PR yet — deferring. ` +
+                'The watchdog labels it `blocked` if the run turns out to be lost.'
+              );
             }
-
-            // No PR and still in-progress: the run was lost. Say so, loudly.
-            core.warning(`Issue #${busy.number} is in-progress with no linked PR — halting the chain.`);
-            await github.rest.issues.createComment({
-              owner, repo, issue_number: busy.number,
-              body: [
-                '⏸️ Pipeline halted — this issue was marked **in-progress** but no linked PR was created.',
-                '',
-                'Diagnose the agent run, then either close this issue or remove `in-progress`, add `ready`,',
-                'and re-run the "Pipeline: run the configured agent on the next ready issue" workflow.',
-                '',
-                'The watchdog labels an issue `blocked` on its own once it has been in-progress without a PR',
-                'for longer than `AGENTIC_STALL_MINUTES`, so this state does not need to be swept by hand.'
-              ].join('\n')
-            });
             return;
           }
 

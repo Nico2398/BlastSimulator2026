@@ -19,6 +19,8 @@ Runs after qualimetry passes. Branch: `pipeline/feature-<N>`.
 
  1. Code review (parallel):
         Delegate to `agentic-pipeline-review-pr` skill's code review step.
+        All five delegations go out in ONE message and are awaited in that same
+        turn — never backgrounded. See that skill's rules for why.
  2. [merge-findings]     → Orchestrator merges all sub-reviewer findings → pass/fail.
                             Pass/fail evaluated AFTER all reviewers complete.
                             if fail → @implementer (big loop)
