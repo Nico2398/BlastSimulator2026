@@ -5,6 +5,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { type GameContext, newGameCommand } from '../../src/console/commands/world.js';
 import { employeeCommand, needsCommand } from '../../src/console/commands/entities.js';
+import { tickCommand } from '../../src/console/commands/events.js';
 import { EventEmitter } from '../../src/core/state/EventEmitter.js';
 
 import {
@@ -264,5 +265,44 @@ describe('Employee needs', () => {
 
     // fatigue critical → 0.50, hunger none → 1.0
     expect(mult).toBeCloseTo(0.50, 2);
+  });
+});
+
+// ── tick command — resting employee drains at idle rate, not working rate ────
+//
+// Fixes the bug where a resting employee (activeActionId set to the rest
+// action, restTicksRemaining non-null) was drained at the working rate
+// because the old isWorking check only looked at activeActionId. See
+// src/console/commands/events.ts: isWorking now also requires
+// restTicksRemaining === null.
+
+describe('tick command — idle-vs-working drain rate for resting employees', () => {
+  let ctx: GameContext;
+  let empId: number;
+
+  beforeEach(() => {
+    ctx = makeCtx();
+    empId = hireOne(ctx);
+  });
+
+  it('drains a resting employee at the idle rate during tick', () => {
+    const emp = getEmployee(ctx, empId);
+    // Simulate mid-rest: claimed by a rest action, timer running.
+    emp.activeActionId = 999;
+    emp.restTicksRemaining = 10;
+    emp.interruptedActionPayload = null; // not owned by tickGeneralRestCompletion or processShiftCycle
+    emp.hunger = 100;
+    emp.breakNeed = 100;
+
+    const result = tickCommand(ctx, ['1'], {});
+
+    expect(result.success).toBe(true);
+    // idle rate: hunger drains 0.5/tick (not 1 as it would while genuinely working)
+    expect(emp.hunger).toBe(99.5);
+    // idle rate: breakNeed does not drain at all while idle (0, vs 0.8 working)
+    expect(emp.breakNeed).toBe(100);
+    // Rest state itself is untouched by the needs-drain step.
+    expect(emp.restTicksRemaining).toBe(10);
+    expect(emp.activeActionId).toBe(999);
   });
 });

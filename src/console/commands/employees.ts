@@ -117,11 +117,15 @@ export function employeeCommand(
       const emp = state.employees.employees.find(e => e.id === id);
       if (!emp) return { success: false, output: `Employee #${id} not found.` };
       if (!emp.alive) return { success: false, output: `Employee #${id} is not available.` };
+      if (emp.injured) return { success: false, output: `Employee #${id} is injured and cannot be dispatched.` };
+      if (emp.trainingState !== null) {
+        return { success: false, output: `Employee #${id} is in training and cannot be dispatched.` };
+      }
 
       const actionId = state.nextPendingActionId++;
       state.pendingActions.push({
         id: actionId,
-        type: 'drill_hole',
+        type: 'general_work',
         requiredSkill: null,
         requiredVehicleRole: null,
         targetX: x,

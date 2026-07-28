@@ -366,7 +366,7 @@ describe('Console — employee dispatch', () => {
     empId = hireOne(ctx, 'driller');
   });
 
-  it('pushes a rest-pool PendingAction claimable by tickEmployees', () => {
+  it('pushes a generic-work PendingAction claimable by tickEmployees', () => {
     const result = employeeCommand(ctx, ['dispatch', String(empId)], { x: '10', z: '10' });
 
     expect(result.success).toBe(true);
@@ -374,10 +374,33 @@ describe('Console — employee dispatch', () => {
 
     const action = ctx.state!.pendingActions.find(a => a.targetEmployeeId === empId);
     expect(action).toBeDefined();
-    expect(action!.type).toBe('drill_hole');
+    expect(action!.type).toBe('general_work');
     expect(action!.requiredSkill).toBeNull();
     expect(action!.targetX).toBe(10);
     expect(action!.targetZ).toBe(10);
+  });
+
+  it('rejects dispatch when the employee is injured', () => {
+    ctx.state!.employees.employees.find(e => e.id === empId)!.injured = true;
+
+    const result = employeeCommand(ctx, ['dispatch', String(empId)], { x: '10', z: '10' });
+
+    expect(result.success).toBe(false);
+    expect(result.output).toBe(`Employee #${empId} is injured and cannot be dispatched.`);
+  });
+
+  it('rejects dispatch when the employee is in training', () => {
+    ctx.state!.employees.employees.find(e => e.id === empId)!.trainingState = {
+      buildingId: 1,
+      skill: 'blasting',
+      ticksRemaining: 5,
+      fee: 100,
+    };
+
+    const result = employeeCommand(ctx, ['dispatch', String(empId)], { x: '10', z: '10' });
+
+    expect(result.success).toBe(false);
+    expect(result.output).toBe(`Employee #${empId} is in training and cannot be dispatched.`);
   });
 
   it('reports employee not found when the ID does not exist', () => {

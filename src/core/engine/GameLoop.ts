@@ -538,6 +538,35 @@ export interface GeneralRestCompletionResult {
 }
 
 /**
+ * Shared rest-completion sequence used by both tickGeneralRestCompletion and
+ * completeRestTick: replenish the resting need gauge from the nearest active
+ * living_quarters (falling back to a full gauge if none is found), deduct the
+ * visit's NEED_REST_COSTS entry, clear the collapsing flag, and null out
+ * restTicksRemaining/activeActionId so the employee returns to normal task
+ * dispatch. Callers own any remaining wrap-up specific to their rest source
+ * (pendingActions removal + result recording, or ticksWorked reset).
+ */
+function completeRestForEmployee(state: GameState, emp: Employee, needKey: NeedKey): void {
+  const building = findNearestLivingQuarters(state, emp.x, emp.z);
+  if (building) {
+    const def = getBuildingDef(building.type, building.tier);
+    replenishNeed(emp, needKey, building.tier, def.capacity);
+  } else {
+    // Fallback — no building found (shouldn't happen; the action targeted one).
+    emp[needKey] = MAX_NEED_GAUGE;
+  }
+
+  deductRestCost(state, needKey);
+
+  if (emp.collapsing) {
+    emp.collapsing = false;
+  }
+
+  emp.restTicksRemaining = null;
+  emp.activeActionId = null;
+}
+
+/**
  * Completion path for 'rest' PendingActions created by tickCollapse,
  * tickNeedRestoration, and autoInsertNeedTasks — every hunger and breakNeed
  * rest, plus fatigue rest when no Bunkhouse Tier 2+ living_quarters exists to
@@ -550,12 +579,16 @@ export interface GeneralRestCompletionResult {
  * need (set at rest-start by the three creators above, or by tickEmployees
  * when it claims a queued autoInsertNeedTasks action) — Bunkhouse Tier 2+
  * shift-cycle rest remains owned by processShiftCycle/completeRestTick.
+ *
+ * Injury does not block completion — an employee who becomes injured mid-rest
+ * must still have their rest action finished and cleaned up, or activeActionId
+ * would stay set forever.
  */
 export function tickGeneralRestCompletion(state: GameState): GeneralRestCompletionResult {
   const completed: Array<{ employeeId: number; needKey: NeedKey }> = [];
 
   for (const emp of state.employees.employees) {
-    if (!emp.alive || emp.injured) continue;
+    if (!emp.alive) continue;
     if (emp.restTicksRemaining === null) continue;
 
     const needKey = resolveRestNeedKey(emp.interruptedActionPayload ?? {});
@@ -564,25 +597,8 @@ export function tickGeneralRestCompletion(state: GameState): GeneralRestCompleti
     emp.restTicksRemaining -= 1;
     if (emp.restTicksRemaining > 0) continue;
 
-    // Find nearest active living_quarters for replenishment
-    const building = findNearestLivingQuarters(state, emp.x, emp.z);
-    if (building) {
-      const def = getBuildingDef(building.type, building.tier);
-      replenishNeed(emp, needKey, building.tier, def.capacity);
-    } else {
-      // Fallback — no building found (shouldn't happen; the action targeted one).
-      emp[needKey] = MAX_NEED_GAUGE;
-    }
-
-    deductRestCost(state, needKey);
-
-    if (emp.collapsing) {
-      emp.collapsing = false;
-    }
-
     const completedActionId = emp.activeActionId;
-    emp.restTicksRemaining = null;
-    emp.activeActionId = null;
+    completeRestForEmployee(state, emp, needKey);
     emp.interruptedActionPayload = null;
     // tickCollapse/tickNeedRestoration leave the rest action in pendingActions
     // at creation (they self-claim instead of routing through tickEmployees),
@@ -673,24 +689,7 @@ function completeRestTick(
   emp.restTicksRemaining -= 1;
 
   if (emp.restTicksRemaining <= 0) {
-    // Find nearest active living_quarters for replenishment
-    const building = findNearestLivingQuarters(state, emp.x, emp.z);
-    if (building) {
-      const def = getBuildingDef(building.type, building.tier);
-      replenishNeed(emp, 'fatigue', building.tier, def.capacity);
-    } else {
-      // Fallback — no building found (shouldn't happen since we checked hasBunkhouse)
-      emp.fatigue = MAX_NEED_GAUGE;
-    }
-
-    deductRestCost(state, 'fatigue');
-
-    if (emp.collapsing) {
-      emp.collapsing = false;
-    }
-
-    emp.restTicksRemaining = null;
-    emp.activeActionId = null;
+    completeRestForEmployee(state, emp, 'fatigue');
     emp.ticksWorked = 0;
     restCompleted.push(emp.id);
   }
