@@ -36,6 +36,30 @@ Both runners must land in the orchestrator on their first action, and they get t
 
 The command's argument opens with a single-line entity reference (`issue 42`, `pr 17`) followed by the trigger context, so the fork knows what it is working on even if the multi-line remainder does not survive argument substitution. When the remainder is missing the orchestrator reads the thread with `gh`.
 
+### A runner session gets exactly one turn
+
+Both runners are single-shot: the harness sends one message, the agent works until it stops producing tool calls, and the process exits. **There is no second turn.** Anything the session was waiting for when it ended is never delivered, and the runner's disk — every `pipeline/*` branch not yet pushed — is discarded with the VM.
+
+The pipeline's rule follows from that, and it is stated in the orchestrator definition and the review skills in runtime-neutral terms: **parallel means several delegations in one message, all awaited in that same turn.** A turn ends on a PR, an `ESCALATED:` line, or the `blocked` label — never on outstanding work.
+
+The rule is uniform; what it costs to state is not, because the runtimes disagree on what delegation defaults to:
+
+| Runtime | Delegation | Default | Enforced by |
+|---------|-----------|---------|-------------|
+| OpenCode | `task` | Synchronous — a turn cannot end while a sub-agent runs | The mechanism itself. Nothing to configure. |
+| Copilot | `@agent-name` | Synchronous | The mechanism itself. |
+| Claude Code | `Agent` tool | **Backgrounded**, reporting through a notification delivered on a *later* turn | A `PreToolUse` hook in the orchestrator's `.claude/` frontmatter — see *Claude Code prerequisites* below |
+
+So "invoke the reviewers in parallel" reads as *fan out and await* under OpenCode and as *launch and come back later* under Claude Code. It is the same sentence producing opposite behaviour, which is why the rule cannot rest on wording alone. Issue #404 died on that gap: the orchestrator ended its turn with `Waiting for completion notifications`, the process exited, and 2h08 of finished work went with the runner — TDD complete, validation complete, `pipeline/feature-404` never pushed, no PR.
+
+The lesson generalises past this one parameter. **Where runtimes differ, the shared context states the invariant and each runtime's own configuration layer enforces it.** Frontmatter, settings and hooks are per-runtime and exempt from the identical-wording rule; skill and agent bodies are not. A body that names one runtime's parameters is a body that is wrong for the other two.
+
+### Rescue: a run that ends early must not end silently
+
+Intent is not a mechanism, so `agentic-rescue` runs after the agent step in both runners, with `if: always()` — it also covers the crash, the 180-minute timeout and the cancelled run, none of which the agent can write instructions for. It pushes `pipeline/feature-<N>` if commits exist on it and opens a **draft** PR carrying `Closes #<N>` and no `READY TO MERGE`; when no feature branch was ever produced, it comments on the issue saying so. Either way the failure becomes visible immediately and the work survives, instead of surfacing hours later as a watchdog sweep over an issue whose branches no longer exist.
+
+The rescue PR is a diagnosis, not a deliverable: it is unreviewed and unvalidated by definition, and it deliberately holds the chain (an in-progress issue with a linked PR defers assignment) until a human decides whether to finish it or drop it.
+
 ### Branch namespace — solution-independent
 
 Every AI solution wants to name branches its own way, and several create one before the agent gets control. The pipeline owns the `pipeline/` namespace and ignores all of them.
@@ -62,6 +86,7 @@ Harness prefixes are also skipped by `claude-code-review.yml`, so a stray branch
 Delegation depends on configuration that is off by default:
 
 - **Nested spawning.** A subagent cannot spawn subagents unless `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` is set in `.claude/settings.json`. Without it the orchestrator does every step itself, collapsing branch isolation and the whole TDD guarantee.
+- **Foreground delegation.** The `Agent` tool's `run_in_background` defaults to `true`, which under a single-turn runner discards the run. `.claude/hooks/require-foreground-agents.sh`, declared as a `PreToolUse` hook in the orchestrator's frontmatter, rejects any delegation that is not explicitly foreground and tells the caller to re-issue it. It is the same shape as `block-git-gh.sh`: a rule the shared bodies state in runtime-neutral terms, enforced here because this is the runtime whose default breaks it.
 - **Tool budgets.** Each agent's `tools` / `disallowedTools` frontmatter is the enforcement layer. The orchestrator is denied `Edit` and `Write`; read-only reviewers get no write tools at all.
 - **Preloaded skills.** Each specialist declares its domain skills in `skills:` frontmatter, so it starts with the spec already in context.
 
@@ -111,16 +136,18 @@ An issue the agent closes without opening a PR raises no `pull_request` event ei
 
 Two agent sessions must never run at once — they would compete over the same `pipeline/*` branch names and the same working tree. Two independent mechanisms enforce it:
 
-- **`agentic-assign` defers.** An issue keeps `in-progress` until its PR merges, so any *other* issue still carrying that label means a run is live. The action logs why and assigns nothing; merging the outstanding PR re-enters the step.
+- **`agentic-assign` defers.** An issue keeps `in-progress` until its PR merges, so any *other* issue still carrying that label means a run is live. The action logs why and assigns nothing; merging the outstanding PR re-enters the step. It defers whether or not that issue has a linked PR, and **it never diagnoses**: a run 40 seconds old and a run that died hours ago look identical from the labels alone, so declaring one lost belongs to the watchdog, which is the only mechanism that ages it. `agentic-assign` used to comment "Pipeline halted — no linked PR was created" on sight, which it posted on #404 while that run was one minute into a two-hour session.
 - **The runners share a `concurrency` group** named `agentic-runner`, declared identically in `claude-runner.yml` and `opencode-runner.yml`. Concurrency groups are repo-wide, so the two runners serialise against each other as well as themselves. `cancel-in-progress: false` — a queued run waits rather than killing the live one. GitHub keeps only one run pending per group; a third is dropped, which is correct here since a dropped assignment is re-derived from the labels on the next merge.
 
 ### Halt conditions
 
-The loop stops deliberately when an issue is labelled `blocked`, when an issue is `in-progress` with no linked PR (a lost run), or when no unblocked `ready` issue remains. `handle-failure.yml` comments on `blocked` issues with the resume procedure.
+The loop stops deliberately when an issue is labelled `blocked`, while an issue is still `in-progress` (single flight), or when no unblocked `ready` issue remains. `handle-failure.yml` comments on `blocked` issues with the resume procedure.
 
-A run that dies without labelling anything — OOM, a hung tool call, the job timeout, a revoked token — would otherwise leave its issue `in-progress` forever and halt the chain silently. `agentic-watchdog.yml` sweeps hourly: an issue `in-progress` past `AGENTIC_STALL_MINUTES` with no linked PR is commented on, labelled `blocked`, and stripped of `in-progress`. That labelling is what surfaces the failure, so the watchdog must use the PAT — a label applied with `GITHUB_TOKEN` raises no `issues: labeled` event and `handle-failure.yml` would never fire.
+A run that dies without labelling anything — OOM, a hung tool call, the job timeout, a revoked token, a turn ended on outstanding work — would otherwise leave its issue `in-progress` forever and halt the chain silently. `agentic-watchdog.yml` sweeps hourly: an issue `in-progress` past `AGENTIC_STALL_MINUTES` with no linked PR is commented on, labelled `blocked`, and stripped of `in-progress`. That labelling is what surfaces the failure, so the watchdog must use the PAT — a label applied with `GITHUB_TOKEN` raises no `issues: labeled` event and `handle-failure.yml` would never fire.
 
-The shared composite actions live in `.github/actions/`: `agentic-prompt` builds the trigger context both runners hand to their agent, `agentic-assign` picks and assigns the next issue.
+**The watchdog is the only mechanism allowed to declare a run lost.** It is the only one that ages the run against a threshold; every other step defers instead of diagnosing. Two mechanisms declaring death from the same evidence produce contradictory comments on a healthy run.
+
+The shared composite actions live in `.github/actions/`: `agentic-prompt` builds the trigger context both runners hand to their agent, `agentic-assign` picks and assigns the next issue, `agentic-rescue` salvages a feature branch from a run that ended before opening its PR.
 
 ## Git & GitHub Operations (Fixed)
 

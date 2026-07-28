@@ -1,0 +1,103 @@
+name: "Rescue an unfinished agent run"
+description: >
+  Runs after the agent step in both runners, with `if: always()`. An agent
+  session that ends before opening its PR — a crash, the job timeout, a
+  cancellation, or a turn ended while work was still outstanding — leaves
+  `pipeline/feature-<N>` on the runner's disk and nowhere else, and the VM is
+  reclaimed minutes later. This pushes that branch and opens a draft PR, so the
+  work survives and the failure is visible immediately instead of surfacing
+  hours later as a watchdog sweep over branches that no longer exist.
+
+inputs:
+  token:
+    description: >
+      Token used to push the branch and open the PR. Must be a PAT — a PR opened
+      with GITHUB_TOKEN raises no `pull_request` event, so auto-assign-next.yml
+      would stay dormant.
+    required: true
+  issue:
+    description: "Issue number the run was working on. Empty disables the step."
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Push the feature branch and open a draft PR if the run left one behind
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        ISSUE: ${{ inputs.issue }}
+      run: |
+        set -euo pipefail
+
+        if [ -z "${ISSUE}" ]; then
+          echo "No issue number — nothing to rescue."
+          exit 0
+        fi
+
+        BRANCH="pipeline/feature-${ISSUE}"
+
+        # An open PR means the run finished its job. Nothing to rescue, and
+        # re-opening one would duplicate the deliverable.
+        if [ "$(gh pr list --head "${BRANCH}" --state open --json number --jq 'length')" != "0" ]; then
+          echo "PR already open from ${BRANCH} — the run finished. Nothing to rescue."
+          exit 0
+        fi
+
+        # No feature branch at all: the run died before the cherry-pick, or it
+        # legitimately concluded no code change was needed. Say so on the issue
+        # either way — a silent death is what this action exists to prevent.
+        # The comment mentions no agent handle, so it cannot re-trigger a runner.
+        if ! git rev-parse --verify --quiet "${BRANCH}" >/dev/null; then
+          echo "No ${BRANCH} on disk — nothing to push."
+          cat > /tmp/agentic-rescue-body.md <<EOF
+        🧯 **The agent run ended without producing \`${BRANCH}\`.**
+
+        No branch was left on the runner, so there is nothing to salvage and no pull request to open. Either the run died before the cherry-pick, or it concluded that no code change was needed without saying so.
+
+        Check the runner workflow logs for this window. The issue stays \`in-progress\`; the watchdog will label it \`blocked\` once it passes \`AGENTIC_STALL_MINUTES\`.
+        EOF
+          gh issue comment "${ISSUE}" --body-file /tmp/agentic-rescue-body.md
+          exit 0
+        fi
+
+        if [ "$(git rev-list --count "main..${BRANCH}")" = "0" ]; then
+          echo "${BRANCH} has no commits beyond main — nothing to rescue."
+          exit 0
+        fi
+
+        echo "Rescuing ${BRANCH} — the run ended before opening its PR."
+
+        for attempt in 1 2 3 4; do
+          if git push -u origin "${BRANCH}"; then
+            break
+          fi
+          if [ "${attempt}" = "4" ]; then
+            echo "::error::Could not push ${BRANCH} after 4 attempts. The work is lost with this runner."
+            exit 1
+          fi
+          sleep $(( 2 ** attempt ))
+        done
+
+        # Draft, and deliberately without `READY TO MERGE`: this PR is
+        # unreviewed and unvalidated by definition. `Closes #N` is what
+        # cross-references the issue, which is how the watchdog and the
+        # single-flight check see that the work exists.
+        cat > /tmp/agentic-rescue-body.md <<EOF
+        Closes #${ISSUE}
+
+        🧯 **Rescued branch — the agent run ended before opening its own PR.**
+
+        This PR was opened by \`agentic-rescue\`, not by the pipeline. The run reached at least the cherry-pick onto \`${BRANCH}\`, then stopped: a crash, the job timeout, a cancellation, or a turn ended while delegated work was still outstanding. Without this the branch would have been discarded with the runner VM.
+
+        **Treat it as evidence, not as a deliverable.** It has not passed code review, refactoring, or validation, and no verification channel result should be assumed. Read the runner workflow logs for this window before deciding whether to finish it or drop it and re-run the issue.
+
+        It stays a draft and carries no \`READY TO MERGE\` line, so auto-merge will not pick it up. While it is open the issue counts as in-progress-with-a-PR, which holds the assignment chain until a human resolves it.
+        EOF
+
+        gh pr create \
+          --draft \
+          --base main \
+          --head "${BRANCH}" \
+          --title "wip: unfinished pipeline run for #${ISSUE}" \
+          --body-file /tmp/agentic-rescue-body.md

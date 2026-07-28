@@ -127,6 +127,18 @@ jobs:
             echo "(no session ID found)"
           fi
 
+      # A session that ends before opening its PR leaves `pipeline/feature-<N>`
+      # on this VM and nowhere else. `always()`: the cases worth rescuing are
+      # exactly the ones where the step above failed, timed out, or was
+      # cancelled — and the one where it "succeeded" having ended its turn on
+      # work it was still waiting for.
+      - name: Rescue an unfinished run
+        if: always() && steps.context.outputs.issue != ''
+        uses: ./.github/actions/agentic-rescue
+        with:
+          token: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
+          issue: ${{ steps.context.outputs.issue }}
+
       # When the run closed the issue without opening a PR, no pull_request event
       # will ever fire, so auto-assign-next.yml cannot carry the chain. Do it here.
       - name: Chain to next issue if resolved without PR

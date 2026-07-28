@@ -16,7 +16,7 @@ description: >
 
 ### Rules
 
-- Reviewers run in parallel — orchestrator invokes all simultaneously
+- Reviewers run in parallel — the orchestrator issues all five delegations **in a single message and awaits them all in that same turn**. Never backgrounded, under any runtime: a reviewer whose result is delivered after the turn ends is never delivered at all, and the run dies between step 1 and step 2 — no findings merged, no PR opened, and the unpushed branches lost with the runner. `agentic-autonomous-pipeline` records how each runtime enforces this.
 - @reviewer runs after findings are merged, sees the consolidated output
 - @reviewer runs full test suite to validate
 - @reviewer posts pass/fail outcome as PR comment
