@@ -13,9 +13,10 @@ import { XP_THRESHOLDS } from '../core/config/balance.js';
  * Extracted so a unit test can assert the class independent of DOM
  * construction and of whatever CSS rule renders it.
  */
-export function getEmployeeRowClassNames(_e: Employee): string[] {
-  // TODO: implement
-  return [];
+export function getEmployeeRowClassNames(e: Employee): string[] {
+  const classes = ['bs-employee-row'];
+  if (e.collapsing) classes.push('collapsing');
+  return classes;
 }
 
 export function makeSkillStars(level: number): string {

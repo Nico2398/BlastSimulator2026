@@ -7,7 +7,7 @@ import type { Employee, EmployeeRole, TrainingState } from '../core/entities/Emp
 import { QUALIFICATION_SALARY_BONUS, BASE_SALARIES } from '../core/config/balance.js';
 import { makeTrainingSection, availableCourses } from './employeeTrainingSection.js';
 import { planTraining } from '../core/entities/EmployeeTraining.js';
-import { makeSkillSection, makeNeedBar, makeTaskQueue, formatNeed } from './employeeDetailSections.js';
+import { makeSkillSection, makeNeedBar, makeTaskQueue, formatNeed, getEmployeeRowClassNames } from './employeeDetailSections.js';
 
 import type { CommandResult } from '../console/ConsoleRunner.js';
 
@@ -190,9 +190,8 @@ export class EmployeePanel {
 
   private makeEmployeeRow(e: Employee, state: GameState): HTMLElement {
     const row = document.createElement('div');
-    row.className = 'bs-employee-row';
+    row.className = getEmployeeRowClassNames(e).join(' ');
     row.dataset['employeeId'] = String(e.id);
-    if (e.collapsing) row.classList.add('collapsing');
 
     const nameEl = document.createElement('div');
     nameEl.style.cssText = 'font-size:11px;color:#d0b090;font-weight:bold';

@@ -336,6 +336,11 @@ const CSS = `
   font-size: 11px;
 }
 .bs-employee-row:last-child { border-bottom: none; }
+.bs-employee-row.collapsing {
+  border-left: 3px solid #e05040;
+  background: rgba(224,80,64,0.1);
+  padding-left: 5px;
+}
 .bs-entity-row {
   display: flex;
   align-items: center;
