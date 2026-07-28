@@ -9,6 +9,7 @@
 
 import type { Page } from 'puppeteer';
 import type { PlayerAction, PlaytestGoal } from './playtest-types.js';
+import { awaitPickerGeometry, tileToPoint, type PickerGeometry } from './tile-picker.js';
 
 /** Mirror of src/ui/uiActionProbe.ts UiAction, kept structural to avoid a src import. */
 export interface ProbedAction {
@@ -113,47 +114,17 @@ async function requireUsable(page: Page, selector: string, timeoutMs: number): P
 }
 
 /**
- * Geometry of the open tile picker, for coordinate-space clicks.
+ * Geometry of the open tile picker, with a playtest-shaped diagnosis on miss.
  *
- * Polls until a picker is visible: a panel opens its picker on the click that
- * precedes this action, and waiting on the Confirm button instead is wrong —
- * Confirm starts disabled in point mode and only enables once a tile is picked.
+ * The mapping itself lives in `tile-picker.ts` so the scenario channel drives
+ * the picker through the same code; only the failure report differs.
  */
-async function pickerGeometry(page: Page): Promise<{ x: number; y: number; w: number; h: number; sizeX: number; sizeZ: number }> {
-  const read = () => page.evaluate(() => {
-    const overlay = Array.from(document.querySelectorAll('.bs-tile-select-overlay'))
-      .find(o => getComputedStyle(o as HTMLElement).display !== 'none');
-    if (!overlay) return null;
-    const canvas = overlay.querySelector('.bs-tile-select-canvas') as HTMLCanvasElement | null;
-    if (!canvas) return null;
-    const r = canvas.getBoundingClientRect();
-    // The picker lays worldSize tiles across the canvas, so map through the real
-    // world dimensions rather than a terrain bounding box that blasting changes.
-    const state = (window as unknown as { __gameState: () => Record<string, unknown> | null }).__gameState();
-    return {
-      x: r.x, y: r.y, w: r.width, h: r.height,
-      sizeX: (state?.worldSizeX as number | null) ?? 24,
-      sizeZ: (state?.worldSizeZ as number | null) ?? 24,
-    };
-  });
-
-  const deadline = Date.now() + DEFAULT_TIMEOUT_MS;
-  for (;;) {
-    const geo = await read();
-    if (geo) return geo;
-    if (Date.now() > deadline) break;
-    await new Promise(r => setTimeout(r, 150));
+async function pickerGeometry(page: Page): Promise<PickerGeometry> {
+  try {
+    return await awaitPickerGeometry(page, DEFAULT_TIMEOUT_MS);
+  } catch {
+    throw new PlaytestFailure('no tile picker is open', describeAvailable(await probe(page)));
   }
-  throw new PlaytestFailure('no tile picker is open', describeAvailable(await probe(page)));
-}
-
-function tileToPoint(geo: Awaited<ReturnType<typeof pickerGeometry>>, x: number, z: number): { px: number; py: number } {
-  const tileW = geo.w / geo.sizeX;
-  const tileH = geo.h / geo.sizeZ;
-  return {
-    px: geo.x + (x + 0.5) * tileW,
-    py: geo.y + (z + 0.5) * tileH,
-  };
 }
 
 /** Run one player action, throwing PlaytestFailure with a diagnosis on failure. */

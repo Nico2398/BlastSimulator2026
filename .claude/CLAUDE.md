@@ -63,6 +63,8 @@ Five independent channels prove a change works. Each catches what the others mis
 2. Pick every channel the change touches, not the cheapest one.
 3. When two channels disagree, neither result stands — investigate until they agree.
 4. State which channels you ran and what each showed. "Tests pass" is not a verification report when the change was visual.
+5. **"Already fixed" and "no change needed" are claims about the whole issue, not about a diff.** With no diff there is nothing to scope the channels down to, so run every channel the issue's own verification list names. A verdict of already-resolved reached on a subset of them is unproven.
+6. **A channel already red before you arrived is a finding, not a precondition.** Never skip, downgrade, or discount a channel because it was failing on `main` when you started — that is how a red channel outlives the one session positioned to notice it. Fix it, or state plainly that it is red, what fails, and why you are not fixing it. Reporting work done while a required channel is red is a false report no matter who broke it.
 
 **The other four channels can all pass on an unplayable game.** They drive the simulation through `src/console/`, which has commands no button exposes — so a feature can be fully correct in the model and completely unreachable by a player. `playability` is the only channel that plays the game. Procedures live in the `dev-playability-testing` skill.
 
@@ -80,7 +82,7 @@ Before acting, check whether the task needs a capability you lack (audio playbac
 npm run verify:env      # which verification channels are live
 npm run validate        # TypeScript → coverage → integration → scenario defs → build
 npm run test            # Vitest unit + integration
-npm run scenarios       # all 99 scenarios, command mode, no browser
+npm run scenarios       # all scenarios, command mode, no browser
 npm run playtest        # plays the game through its own UI, clicks only
 npm run dev             # dev server on :5173, required by the visual and playability channels
 npm run console         # interactive gameplay REPL, no browser

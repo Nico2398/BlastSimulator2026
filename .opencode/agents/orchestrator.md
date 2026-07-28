@@ -85,6 +85,7 @@ These are absolute. Violating any of these = orchestrator failure.
 - **Never write code yourself** — always delegate to `@implementer`
 - **Never refactor before tests pass** — Green phase first
 - **Always validate** — `npm run validate` must pass before declaring success, and every verification channel the change touches must report PASS. A renderer or UI change is not validated until @visual-tester has inspected screenshots.
+- **Never end a run on an unverified verdict** — the Verification Gate decides which channels a verdict owes, including the "already fixed" and "no code change needed" verdicts that close an issue with no diff and no PR. The orchestrator's part is what follows from a red one: a failing channel turns the verdict into work. Never close an issue, and never mark a PR `READY TO MERGE`, while a channel it depends on is red — fix it in this run, or escalate as `blocked` naming the channel and what fails.
 - **Never explore files during pipeline execution** — see TOOL RESTRICTIONS above
 - **Never wait for a human** — a GitHub Actions run has nobody to answer mid-run. When blocked, label the issue `blocked`, comment what is missing, and stop with `ESCALATED: human intervention required`. Never idle, never guess past a hard blocker.
 - **Context to pass to each agent:**

@@ -20,6 +20,12 @@ export type InteractionStepAction =
   | { type: 'mousedown'; x: number; y: number; button?: 'left' | 'right' | 'middle' }
   | { type: 'mouseup'; x: number; y: number; button?: 'left' | 'right' | 'middle' }
   | { type: 'mousemove'; x: number; y: number }
+  // Tile-space picker actions. Prefer these over raw `click`/`mousedown` pixel
+  // coordinates whenever the target is a tile: the picker canvas moves with the
+  // HUD layout, so baked pixels silently drift onto the wrong tile — or off the
+  // grid — and surface only as "the step did not complete".
+  | { type: 'pickTile'; x: number; z: number }
+  | { type: 'dragTiles'; x1: number; z1: number; x2: number; z2: number }
   | { type: 'keypress'; key: string }
   | { type: 'keydown'; key: string }
   | { type: 'keyup'; key: string }
