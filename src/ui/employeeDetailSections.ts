@@ -7,6 +7,17 @@ import type { GameState } from '../core/state/GameState.js';
 import type { Employee } from '../core/entities/Employee.js';
 import { XP_THRESHOLDS } from '../core/config/balance.js';
 
+/**
+ * Class names an employee roster row should carry for its current state
+ * (e.g. `collapsing` while a need has driven the employee to a stop).
+ * Extracted so a unit test can assert the class independent of DOM
+ * construction and of whatever CSS rule renders it.
+ */
+export function getEmployeeRowClassNames(_e: Employee): string[] {
+  // TODO: implement
+  return [];
+}
+
 export function makeSkillStars(level: number): string {
   const filled = '★'.repeat(level);
   const empty = '☆'.repeat(5 - level);
