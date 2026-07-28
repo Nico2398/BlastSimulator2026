@@ -18,6 +18,14 @@
         {
           "type": "command",
           "command": "employee hire role:driller"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-detail-toggle"
         }
       ]
     },
