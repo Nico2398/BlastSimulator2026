@@ -40,16 +40,19 @@ The command's argument opens with a single-line entity reference (`issue 42`, `p
 
 Both runners are single-shot: the harness sends one message, the agent works until it stops producing tool calls, and the process exits. **There is no second turn.** Anything the session was waiting for when it ended is never delivered, and the runner's disk — every `pipeline/*` branch not yet pushed — is discarded with the VM.
 
-This is where the two delegation mechanisms diverge, and it is a live failure mode, not a hypothetical:
+The pipeline's rule follows from that, and it is stated in the orchestrator definition and the review skills in runtime-neutral terms: **parallel means several delegations in one message, all awaited in that same turn.** A turn ends on a PR, an `ESCALATED:` line, or the `blocked` label — never on outstanding work.
 
-| Runtime | Delegation | Default |
-|---------|-----------|---------|
-| OpenCode, Copilot | `@agent-name` / `task` | Synchronous. The turn cannot end while a sub-agent is running. |
-| Claude Code | `Agent` tool | **`run_in_background` defaults to `true`.** A backgrounded sub-agent reports through a notification delivered on a *later* turn. |
+The rule is uniform; what it costs to state is not, because the runtimes disagree on what delegation defaults to:
 
-So an instruction to "invoke the reviewers in parallel" reads as *fan out and await* under OpenCode and as *launch and come back later* under Claude Code. Under Claude Code the orchestrator then ends its turn with `Waiting for completion notifications`, the process exits, and the run is lost after every expensive step has already been paid for — TDD complete, validation complete, nothing pushed, no PR. Issue #404 died exactly this way: 2h08 of work, `pipeline/feature-404` never leaving the runner.
+| Runtime | Delegation | Default | Enforced by |
+|---------|-----------|---------|-------------|
+| OpenCode | `task` | Synchronous — a turn cannot end while a sub-agent runs | The mechanism itself. Nothing to configure. |
+| Copilot | `@agent-name` | Synchronous | The mechanism itself. |
+| Claude Code | `Agent` tool | **Backgrounded**, reporting through a notification delivered on a *later* turn | A `PreToolUse` hook in the orchestrator's `.claude/` frontmatter — see *Claude Code prerequisites* below |
 
-The rule the pipeline enforces: **parallel means several delegations in one message, all awaited in that same turn.** Under Claude Code every `Agent` call passes `run_in_background: false` explicitly. A turn ends on a PR, an `ESCALATED:` line, or the `blocked` label — never on outstanding work.
+So "invoke the reviewers in parallel" reads as *fan out and await* under OpenCode and as *launch and come back later* under Claude Code. It is the same sentence producing opposite behaviour, which is why the rule cannot rest on wording alone. Issue #404 died on that gap: the orchestrator ended its turn with `Waiting for completion notifications`, the process exited, and 2h08 of finished work went with the runner — TDD complete, validation complete, `pipeline/feature-404` never pushed, no PR.
+
+The lesson generalises past this one parameter. **Where runtimes differ, the shared context states the invariant and each runtime's own configuration layer enforces it.** Frontmatter, settings and hooks are per-runtime and exempt from the identical-wording rule; skill and agent bodies are not. A body that names one runtime's parameters is a body that is wrong for the other two.
 
 ### Rescue: a run that ends early must not end silently
 
@@ -83,6 +86,7 @@ Harness prefixes are also skipped by `claude-code-review.yml`, so a stray branch
 Delegation depends on configuration that is off by default:
 
 - **Nested spawning.** A subagent cannot spawn subagents unless `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` is set in `.claude/settings.json`. Without it the orchestrator does every step itself, collapsing branch isolation and the whole TDD guarantee.
+- **Foreground delegation.** The `Agent` tool's `run_in_background` defaults to `true`, which under a single-turn runner discards the run. `.claude/hooks/require-foreground-agents.sh`, declared as a `PreToolUse` hook in the orchestrator's frontmatter, rejects any delegation that is not explicitly foreground and tells the caller to re-issue it. It is the same shape as `block-git-gh.sh`: a rule the shared bodies state in runtime-neutral terms, enforced here because this is the runtime whose default breaks it.
 - **Tool budgets.** Each agent's `tools` / `disallowedTools` frontmatter is the enforcement layer. The orchestrator is denied `Edit` and `Write`; read-only reviewers get no write tools at all.
 - **Preloaded skills.** Each specialist declares its domain skills in `skills:` frontmatter, so it starts with the spec already in context.
 

@@ -4,6 +4,12 @@ description: Orchestrates the TDD development pipeline. Invokes specialist agent
 disallowedTools: Edit, Write, NotebookEdit
 skills:
   - agentic-autonomous-pipeline
+hooks:
+  PreToolUse:
+    - matcher: Agent|Task
+      hooks:
+        - type: command
+          command: ${CLAUDE_PROJECT_DIR}/.claude/hooks/require-foreground-agents.sh
 ---
 
 # Pipeline Orchestrator
@@ -68,7 +74,7 @@ These are NOT suggestions, NOT job description bullets, NOT background knowledge
 Every item below is MANDATORY. Skip none. Improvise on none.
 
 1. **DELEGATE ALL SPECIALIST WORK** — Invoke each named sub-agent through your runtime's delegation mechanism: `@agent-name` under OpenCode and Copilot, the `Agent` tool with that agent's name as `subagent_type` under Claude Code. You are a coordinator, not a doer. If no agent exists for the task, use `@ask` to determine the right approach — never attempt specialist work yourself.
-   **Every delegation is synchronous.** Under Claude Code that means `run_in_background: false` on every `Agent` call — the parameter defaults to `true`, and a backgrounded sub-agent reports through a notification that only arrives on a *later* turn. **Parallel means several delegations issued in ONE message and all awaited in that same turn.** It never means launching work and ending the turn to wait for it.
+   **Every delegation is synchronous** — it returns inside the turn that issued it. **Parallel means several delegations issued in ONE message and awaited together in that same turn.** It never means work launched now and collected later: whatever background, detached, or notify-me-when-done mode your runtime offers for delegation, the pipeline does not use it. A result that arrives after the turn ends never arrives at all.
 2. **Enforce branch isolation** — Never let @implementer see tests during TDD. The `agentic-pipeline-tdd` skill defines enforcement rules.
 3. **Enforce commit discipline** — Run branch-sanity before and verify-commit after every agent step. Never assume the agent committed — verify.
 4. **Handle non-agentic steps** — Each skill defines its own non-agentic step commands. Run them exactly as specified.
