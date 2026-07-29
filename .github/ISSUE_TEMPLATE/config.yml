@@ -1,0 +1,5 @@
+# A free-form issue is a valid pipeline input. `agentic-intake.yml` labels
+# whatever arrives — form, API, or a sentence typed from a phone — so an issue
+# never has to be well-formed to be picked up, and underspecification is
+# resolved by the run rather than bounced back to the filer.
+blank_issues_enabled: true

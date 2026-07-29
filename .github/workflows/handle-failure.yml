@@ -30,8 +30,10 @@ jobs:
                 '',
                 '@Nico2398 — please review:',
                 '1. The PR and agent session logs',
-                '2. Add clarification to this issue',
-                '3. Remove `blocked`, add `ready`, and run the "Pipeline: run the configured agent on the next ready issue" workflow to resume',
+                '2. Add the clarification this issue is missing as a comment',
+                '3. Remove `blocked` and add `ready`',
+                '',
+                'Adding `ready` is the whole resume procedure: it re-enters the intake workflow, which reassigns as soon as no other run is live. Nothing to dispatch by hand.',
                 '',
                 'Or complete the task manually and the pipeline will auto-continue on merge.'
               ].join('\n')

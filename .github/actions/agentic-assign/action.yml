@@ -77,6 +77,31 @@ runs:
             ? parseInt(process.env.COMPLETED_ISSUE, 10)
             : null;
 
+          // Issue numbers an issue declares itself blocked by. Two spellings
+          // reach here and both are canonical somewhere: the `Blocked by`
+          // section `agentic-issue-creation` and the issue form produce, and
+          // the inline `Depends on: #N` older issues carry. Matching only the
+          // second one used to let a correctly written issue run ahead of the
+          // dependency it named, which fails the run rather than deferring it.
+          const dependenciesOf = (body) => {
+            const deps = new Set();
+            let inSection = false;
+            for (const line of (body || '').split('\n')) {
+              if (/^\s*(?:#{1,6}\s*|\*\*)?(?:blocked\s+by|depends?\s+on|dependencies)\b/i.test(line)) {
+                inSection = true;
+              } else if (inSection && /^\s*(?:#{1,6}\s+\S|\*\*\S)/.test(line)) {
+                inSection = false;   // the next section starts; the list is over
+                continue;
+              } else if (!inSection) {
+                continue;
+              }
+              for (const ref of line.matchAll(/#(\d+)/g)) {
+                deps.add(parseInt(ref[1], 10));
+              }
+            }
+            return [...deps];
+          };
+
           const hasLinkedPr = async (number) => {
             const { data: events } = await github.rest.issues.listEventsForTimeline({
               owner, repo, issue_number: number, per_page: 100
@@ -150,16 +175,23 @@ runs:
               continue;
             }
 
-            const depMatch = issue.body?.match(/[Dd]epends?\s+on:?\s*#(\d+)/);
-            if (depMatch) {
+            let blocked = false;
+            for (const depNumber of dependenciesOf(issue.body)) {
+              if (depNumber === issue.number) continue;
               const dep = await github.rest.issues.get({
-                owner, repo, issue_number: parseInt(depMatch[1], 10)
-              });
-              if (dep.data.state !== 'closed') {
-                core.info(`#${issue.number}: dependency #${depMatch[1]} not closed, skipping.`);
+                owner, repo, issue_number: depNumber
+              }).catch(() => null);
+              if (!dep) {
+                core.warning(`#${issue.number}: dependency #${depNumber} does not exist, ignoring it.`);
                 continue;
               }
+              if (dep.data.state !== 'closed') {
+                core.info(`#${issue.number}: dependency #${depNumber} not closed, skipping.`);
+                blocked = true;
+                break;
+              }
             }
+            if (blocked) continue;
 
             const n = issue.number;
             await github.rest.issues.removeLabel({
@@ -192,7 +224,9 @@ runs:
               '',
               'Do not use `[skip ci]` on pipeline branches — it suppresses the auto-merge workflow.',
               '',
-              `Where this issue leaves a requirement open, choose the default the spec and surrounding code already imply, record it in the PR body under \`## Decisions taken\`, and finish the run — see the \`agentic-decision-autonomy\` skill for the rule and for the five blockers that genuinely stop a run. On one of those, label this issue \`blocked\`, comment what is missing, and stop. Do not close issue #${n} without a PR unless no code change was needed.`
+              `Where this issue leaves a requirement open, choose the default the spec and surrounding code already imply, record it in the PR body under \`## Decisions taken\`, and finish the run — see the \`agentic-decision-autonomy\` skill for the rule and for the five blockers that genuinely stop a run. On one of those, label this issue \`blocked\`, comment what is missing, and stop.`,
+              '',
+              `This issue now carries \`in-progress\`, and the queue reads that label as a live run. End the run with it in a terminal state: a merged-ready PR that closes it, \`blocked\` naming what is missing, or — when the deliverable is an answer or a command rather than a diff — issue #${n} closed and labelled \`done\`. An issue left holding \`in-progress\` defers every later assignment until the watchdog sweeps it.`
             ].join('\n');
 
             await github.rest.issues.createComment({ owner, repo, issue_number: n, body });

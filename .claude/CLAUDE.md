@@ -45,6 +45,8 @@ Prefix categories:
 
 ## ▶ Autonomous pipeline sessions
 
+The project takes one human input: a GitHub issue. Filing one starts a run — intake labels it, the queue assigns it, and the run carries it to a merged pull request or to a stated blocker. A run always leaves its issue in a terminal state; an issue left holding `in-progress` stalls every assignment behind it.
+
 A session started by the autonomous pipeline — a GitHub Actions run woken by the `@claude` mention in a pipeline assignment comment — is not an ordinary session. Its first action is to hand the task to the `orchestrator` agent, which classifies it and delegates every step to specialists. Never implement a pipeline-assigned task in the main session, and never explore the codebase before the orchestrator has classified it. The `/agentic-run` command carries that mandate; the system around it is described in `agentic-autonomous-pipeline`.
 
 ## ▶ Verification Gate — RUN BEFORE CLAIMING ANY WORK DONE

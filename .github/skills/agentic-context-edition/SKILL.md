@@ -91,7 +91,9 @@ An unrecognised frontmatter field raises no error — it is ignored. A tool rest
 npm run validate:context
 ```
 
-Checks frontmatter fields against the schema for each file type, resolves tool names and preloaded skills, confirms hook commands exist and are executable, and diffs bodies across the three runtime directories. Run it after any context edit — these failures are invisible at runtime.
+Checks frontmatter fields against the schema for each file type, resolves tool names and preloaded skills, confirms hook commands exist and are executable, confirms every bundled skill file is named by its SKILL.md, and diffs bodies across the three runtime directories. Run it after any context edit — these failures are invisible at runtime.
+
+Entry points are checked differently from everything else. Each runtime loads one on every session — `.claude/CLAUDE.md`, `.github/copilot-instructions.md`, `.opencode/AGENTS.md` — and their wording diverges by design: Claude Code has vision and a `rules/` layer, so the other two inline what those rules say and describe a capability gate of their own. Bodies are therefore not diffed. What is checked is what they promise: the same gates, the same verification channels, and skill names that resolve. Keep a divergence there only where the runtime genuinely differs, and state the same invariant on both sides of it.
 
 ## Communication Standards
 
@@ -120,6 +122,23 @@ Agents build context gradually as they work. Monolithic context files overload a
 One concept per file. When a skill or agent description covers multiple concepts, split into dedicated files that can be referenced independently.
 
 Short skills enforce clean separation. A skill exceeding 500 lines likely mixes concerns — split it.
+
+### Bundled Reference Files
+
+A skill directory holds its SKILL.md plus any files it splits detail into:
+
+```
+skills/<name>/
+  SKILL.md                  loaded whole, every time the skill loads
+  references/<subject>.md    read on demand, when a step needs that subject
+```
+
+SKILL.md carries what a reader needs *to act* and an index naming each reference file and what it answers. Reference files carry what a reader needs *sometimes*: design rationale, per-runtime configuration, post-mortems, long tables. The split matters most for a skill preloaded through an agent's `skills:` frontmatter — that content is paid for on every single run of that agent, whether the run needs it or not.
+
+Rules:
+- Every bundled file is named by its SKILL.md. A file nothing points at is context no agent reaches.
+- Reference paths are relative to the skill directory, forward slashes: `references/github-loop.md`.
+- Bundled files mirror across all three runtime directories exactly like SKILL.md does.
 
 ### Reference, Don't Duplicate
 
@@ -180,7 +199,7 @@ Prefix per project convention:
 
 ### File Paths
 
-Always forward slashes: `reference/guide.md`. Never backslashes.
+Always forward slashes: `references/guide.md`. Never backslashes.
 
 ## Workflows & Feedback Loops
 
@@ -222,5 +241,6 @@ Keep examples generic — domain-specific references lose meaning outside origin
 - [ ] No user-input instructions
 - [ ] Correct file type for purpose
 - [ ] Frontmatter fields belong to that runtime's schema
-- [ ] All 3 solution folders in sync (`.opencode`, `.claude`, `.github`) — same body content
+- [ ] Detail an agent needs only sometimes sits in `references/`, named by the SKILL.md
+- [ ] All 3 solution folders in sync (`.opencode`, `.claude`, `.github`) — same body content, bundled files included
 - [ ] `npm run validate:context` passes
