@@ -34,9 +34,20 @@ jobs:
             const owner = context.repo.owner;
             const repo = context.repo.repo;
 
-            // Default comfortably above the runners' 180-minute job timeout, so
-            // a slow-but-alive run is never mistaken for a dead one.
-            const stallMinutes = parseInt(process.env.STALL_MINUTES || '', 10) || 240;
+            // Comfortably above the runners' job timeout, so a slow-but-alive
+            // run is never mistaken for a dead one. A configured value below the
+            // timeout is a misconfiguration with teeth — it declares live runs
+            // lost and reassigns their issues underneath them — so it is clamped
+            // loudly rather than obeyed. Both runners declare `timeout-minutes`.
+            const jobTimeoutMinutes = 360;
+            const configured = parseInt(process.env.STALL_MINUTES || '', 10) || jobTimeoutMinutes + 60;
+            const stallMinutes = Math.max(configured, jobTimeoutMinutes + 60);
+            if (stallMinutes !== configured) {
+              core.warning(
+                `AGENTIC_STALL_MINUTES=${configured} is below the runners' ${jobTimeoutMinutes}-minute job timeout, ` +
+                `which would sweep live runs. Using ${stallMinutes} instead.`
+              );
+            }
             const cutoff = Date.now() - stallMinutes * 60_000;
 
             const { data: inProgress } = await github.rest.issues.listForRepo({

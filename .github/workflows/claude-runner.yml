@@ -48,7 +48,12 @@ jobs:
         )
       )
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    # GitHub-hosted maximum. 180 was not enough for a real run: issue #404 was
+    # still fixing code-review findings when the clock cut it off at three hours,
+    # and a cancelled job loses everything the rescue step cannot push. A run
+    # that overruns 360 minutes is stuck, not slow. `AGENTIC_STALL_MINUTES` must
+    # stay above this — see agentic-watchdog.yml.
+    timeout-minutes: 360
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
