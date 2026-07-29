@@ -33,12 +33,16 @@ When a requirement leaves a choice open, resolve it in this order and keep going
 When at least one decision changes gameplay, economy, or a player-facing default, open a follow-up issue after the PR:
 
 ```
+gh label create decision-review --color ededed --force \
+  --description "A default the pipeline chose; revisit when convenient"
 gh issue create --label decision-review \
   --title "Decision review: <one-line summary> (from #<N>)" \
   --body "<the Decisions taken block>, linking the PR"
 ```
 
-The `decision-review` label carries no `ready`, so the issue stays out of the assignment queue and halts nothing. It is where a human goes to revisit a default at leisure. Create the label if the repository lacks it.
+The `decision-review` label carries no `ready`, so the issue stays out of the assignment queue and halts nothing — `agentic-assign` selects on `ready` alone, `agentic-trigger` is manual-dispatch only, and `handle-failure` fires on `blocked` alone. It is where a human goes to revisit a default at leisure; adding `ready` later is how they send it back through the pipeline.
+
+`--force` updates the label when it already exists, so the step is safe to run on every issue rather than only the first. Both runners give the agent's shell a `GH_TOKEN` that already opens PRs and edits labels, and both workflows declare `issues: write`, so no extra permission is needed.
 
 ## ▶ Genuine blockers — the whole list
 
