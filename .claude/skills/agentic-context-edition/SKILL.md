@@ -93,6 +93,8 @@ npm run validate:context
 
 Checks frontmatter fields against the schema for each file type, resolves tool names and preloaded skills, confirms hook commands exist and are executable, confirms every bundled skill file is named by its SKILL.md, and diffs bodies across the three runtime directories. Run it after any context edit — these failures are invisible at runtime.
 
+Entry points are checked differently from everything else. Each runtime loads one on every session — `.claude/CLAUDE.md`, `.github/copilot-instructions.md`, `.opencode/AGENTS.md` — and their wording diverges by design: Claude Code has vision and a `rules/` layer, so the other two inline what those rules say and describe a capability gate of their own. Bodies are therefore not diffed. What is checked is what they promise: the same gates, the same verification channels, and skill names that resolve. Keep a divergence there only where the runtime genuinely differs, and state the same invariant on both sides of it.
+
 ## Communication Standards
 
 ### Minimal, Complete

@@ -16,6 +16,7 @@
  *   7. A command's `agent:` resolves to an agent that exists
  *   8. Every command has a mirror in the other two runtimes
  *   9. Files bundled with a skill are mirrored too, and named by their SKILL.md
+ *  10. Each runtime's entry point states the same gates, channels, and skills
  *
  * Usage:
  *   npx tsx scripts/validate-context.ts
@@ -213,6 +214,77 @@ function checkSkill(file: ParsedFile, skills: Set<string>): ContextIssue[] {
   return issues;
 }
 
+/** The file each runtime loads on every session. */
+const ENTRY_POINTS = [
+  '.claude/CLAUDE.md',
+  '.github/copilot-instructions.md',
+  '.opencode/AGENTS.md',
+];
+
+/** Sections every entry point carries, matched on the stable part of the heading. */
+const ENTRY_SECTIONS = [
+  'Autonomous pipeline sessions',
+  'Verification Gate',
+  'Capability Gate',
+  'Validation Commands',
+];
+
+/** Verification channels every entry point names. */
+const CHANNELS = ['static', 'logic', 'scenario', 'visual', 'playability'];
+
+/**
+ * Entry points are the only layer loaded on every session, and each runtime
+ * holds its own. Their wording legitimately diverges — Claude Code has vision
+ * and a `rules/` layer, the other two inline what those rules say — so the
+ * bodies cannot be diffed the way skill bodies are. What must never diverge is
+ * what they promise: the same gates, the same verification channels, and skill
+ * names that still resolve. A channel one runtime forgets to name is a channel
+ * that runtime silently stops running.
+ */
+function checkEntryPoints(skills: Set<string>): ContextIssue[] {
+  const issues: ContextIssue[] = [];
+
+  for (const relative of ENTRY_POINTS) {
+    const path = join(ROOT, relative);
+    if (!existsSync(path)) {
+      issues.push({ file: path, message: 'missing runtime entry point' });
+      continue;
+    }
+
+    const text = readFileSync(path, 'utf8');
+    const headings = text.split('\n').filter((line) => line.startsWith('## ')).join('\n');
+
+    for (const section of ENTRY_SECTIONS) {
+      if (!headings.includes(section)) {
+        issues.push({
+          file: path,
+          message: `no \`${section}\` section — this runtime lacks a gate the others state`,
+        });
+      }
+    }
+
+    for (const channel of CHANNELS) {
+      if (!text.includes(`\`${channel}\``)) {
+        issues.push({
+          file: path,
+          message: `verification channel \`${channel}\` unnamed — this runtime would skip it`,
+        });
+      }
+    }
+
+    const unknown = new Set(
+      [...text.matchAll(/`((?:gameplay|dev|agentic)-[a-z-]+)`/g)]
+        .map((match) => match[1]!)
+        .filter((name) => !skills.has(name))
+    );
+    for (const name of unknown) {
+      issues.push({ file: path, message: `references missing skill \`${name}\`` });
+    }
+  }
+
+  return issues;
+}
+
 /** Paths under a skill directory, relative to it, excluding its SKILL.md. */
 function bundledFiles(dir: string, prefix = ''): string[] {
   if (!existsSync(dir)) return [];
@@ -373,6 +445,7 @@ export function validateContextFiles(): ContextIssue[] {
     }
   }
 
+  issues.push(...checkEntryPoints(skills));
   issues.push(...checkCrossRuntimeSync());
   return issues;
 }
@@ -385,7 +458,7 @@ function main(): void {
   } else if (issues.length === 0) {
     console.log(
       'Context files valid: frontmatter schemas, tool names, preloaded skills, hooks, ' +
-        'bundled skill files, cross-runtime sync.'
+        'bundled skill files, runtime entry points, cross-runtime sync.'
     );
   } else {
     console.error(`${issues.length} context file issue(s):\n`);
