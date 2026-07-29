@@ -164,14 +164,20 @@ export function makeTaskQueue(e: Employee, state: GameState): HTMLElement {
     el.appendChild(noTask);
   }
 
-  // Show pending actions (up to 5)
-  const displayActions = actions.slice(0, 5);
-  const overflow = actions.length > 5 ? actions.length - 5 : 0;
+  // Show pending actions this employee could actually take (up to 5) — actions
+  // pinned to someone else belong in that employee's row, not this one. An
+  // unpinned action is open to whoever is qualified, so it stays listed.
+  // The claimed action is already rendered above under ACTIVE — listing it again
+  // here showed the same task twice for every resting or working employee.
+  const ownActions = actions.filter(
+    a => (a.targetEmployeeId === null || a.targetEmployeeId === e.id) && a.id !== e.activeActionId,
+  );
+  const displayActions = ownActions.slice(0, 5);
+  const overflow = ownActions.length > 5 ? ownActions.length - 5 : 0;
 
   for (const a of displayActions) {
     const entry = document.createElement('div');
     entry.className = 'bs-task-entry';
-    if (a.id === e.activeActionId) entry.classList.add('current');
     entry.textContent = `#${a.id} (${a.type})`;
     el.appendChild(entry);
   }
@@ -183,7 +189,7 @@ export function makeTaskQueue(e: Employee, state: GameState): HTMLElement {
     el.appendChild(overflowEl);
   }
 
-  if (actions.length === 0 && !hasActive) {
+  if (ownActions.length === 0 && !hasActive) {
     const emptyEl = document.createElement('div');
     emptyEl.className = 'bs-queue-empty';
     emptyEl.textContent = t('ui.employees.queue_empty');

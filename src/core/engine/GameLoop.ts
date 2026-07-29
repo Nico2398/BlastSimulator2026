@@ -237,7 +237,7 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
           ? action.payload['restDuration'] as number
           : NEED_REST_DURATIONS[needKey];
         idleMatch.restTicksRemaining = restDuration;
-        idleMatch.interruptedActionPayload = { needKey };
+        idleMatch.restNeedKey = needKey;
       }
     }
   }
@@ -304,7 +304,7 @@ export function tickNeedRestoration(state: GameState): NeedRestorationResult {
     emp.activeActionId = restAction.id;
     // Immediately claimed (unlike autoInsertNeedTasks) — start the rest timer now.
     emp.restTicksRemaining = restDuration;
-    emp.interruptedActionPayload = { needKey };
+    emp.restNeedKey = needKey;
     result.routed.push(emp.id);
   }
 
@@ -366,6 +366,15 @@ export function tickCollapse(state: GameState, _firedEvents?: FiredEvent[], _emi
       restDuration *= 2;
     }
 
+    // A warning-threshold rest queued by autoInsertNeedTasks while this employee
+    // was busy is now superseded: the collapse rest services the same gauge and
+    // is claimed immediately. Left in the queue it is claimed the moment the
+    // collapse rest ends — a second rest cycle and a second NEED_REST_COSTS
+    // charge for one collapse, listed alongside the active one in the roster panel.
+    state.pendingActions = state.pendingActions.filter(
+      a => !(a.type === 'rest' && a.targetEmployeeId === emp.id),
+    );
+
     const restAction = createRestPendingAction(state, {
       targetX,
       targetZ,
@@ -377,7 +386,7 @@ export function tickCollapse(state: GameState, _firedEvents?: FiredEvent[], _emi
     emp.activeActionId = restAction.id;
     // Immediately claimed — start the rest timer now (mirrors tickNeedRestoration).
     emp.restTicksRemaining = restDuration;
-    emp.interruptedActionPayload = { needKey: collapsedGauge };
+    emp.restNeedKey = collapsedGauge;
   }
 
   return result;
@@ -401,6 +410,16 @@ export function autoInsertNeedTasks(state: GameState, _firedEvents?: FiredEvent[
   for (const emp of state.employees.employees) {
     // Skip dead, injured, or collapsing employees
     if (!emp.alive || emp.injured || emp.collapsing) continue;
+
+    // Skip employees already mid-rest. Their gauge is still below its warning
+    // threshold — the replenishment only lands when the rest completes — so
+    // without this check a second rest is queued every cycle, claimed the
+    // instant the first one ends, and charged again: one wasted rest and one
+    // extra NEED_REST_COSTS payment per dip below the threshold. Rests created
+    // by tickCollapse/tickNeedRestoration stay in pendingActions and are caught
+    // by the hasRestAction check below; a rest claimed through tickEmployees is
+    // consumed from the queue, so only restTicksRemaining still marks it.
+    if (emp.restTicksRemaining !== null) continue;
 
     // Determine which gauges are below warning thresholds
     const triggeredGauges: NeedKey[] = [];
@@ -563,6 +582,7 @@ function completeRestForEmployee(state: GameState, emp: Employee, needKey: NeedK
   }
 
   emp.restTicksRemaining = null;
+  emp.restNeedKey = null;
   emp.activeActionId = null;
 }
 
@@ -575,10 +595,10 @@ function completeRestForEmployee(state: GameState, emp: Employee, needKey: NeedK
  * gauge, deduct its NEED_REST_COSTS entry, then clear activeActionId/
  * restTicksRemaining so the employee returns to normal task dispatch.
  *
- * Only owns employees whose interruptedActionPayload identifies a resting
- * need (set at rest-start by the three creators above, or by tickEmployees
- * when it claims a queued autoInsertNeedTasks action) — Bunkhouse Tier 2+
- * shift-cycle rest remains owned by processShiftCycle/completeRestTick.
+ * Only owns employees whose restNeedKey identifies a resting need (set at
+ * rest-start by the three creators above, or by tickEmployees when it claims
+ * a queued autoInsertNeedTasks action) — Bunkhouse Tier 2+ shift-cycle rest
+ * leaves restNeedKey null and remains owned by processShiftCycle/completeRestTick.
  *
  * Injury does not block completion — an employee who becomes injured mid-rest
  * must still have their rest action finished and cleaned up, or activeActionId
@@ -591,7 +611,7 @@ export function tickGeneralRestCompletion(state: GameState): GeneralRestCompleti
     if (!emp.alive) continue;
     if (emp.restTicksRemaining === null) continue;
 
-    const needKey = resolveRestNeedKey(emp.interruptedActionPayload ?? {});
+    const needKey = emp.restNeedKey;
     if (needKey === null) continue; // owned by processShiftCycle instead
 
     emp.restTicksRemaining -= 1;
@@ -599,7 +619,6 @@ export function tickGeneralRestCompletion(state: GameState): GeneralRestCompleti
 
     const completedActionId = emp.activeActionId;
     completeRestForEmployee(state, emp, needKey);
-    emp.interruptedActionPayload = null;
     // tickCollapse/tickNeedRestoration leave the rest action in pendingActions
     // at creation (they self-claim instead of routing through tickEmployees),
     // so nothing else removes it once the rest completes.
@@ -682,9 +701,9 @@ function completeRestTick(
 ): void {
   if (emp.restTicksRemaining === null) return;
   // Rests started by tickCollapse/tickNeedRestoration/autoInsertNeedTasks (hunger,
-  // breakNeed, or Tier-1 living_quarters fatigue) are owned by
-  // tickGeneralRestCompletion instead — skip them here to avoid double-processing.
-  if (resolveRestNeedKey(emp.interruptedActionPayload ?? {}) !== null) return;
+  // breakNeed, or Tier-1 living_quarters fatigue) carry a restNeedKey and are owned
+  // by tickGeneralRestCompletion instead — skip them here to avoid double-processing.
+  if (emp.restNeedKey !== null) return;
 
   emp.restTicksRemaining -= 1;
 

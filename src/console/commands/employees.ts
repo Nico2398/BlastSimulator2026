@@ -44,7 +44,9 @@ export function employeeCommand(
       }
       const lines = ['Employees:'];
       for (const e of state.employees.employees) {
-        const status = !e.alive ? 'DEAD' : e.injured ? 'INJURED' : 'OK';
+        // Collapsing is a distinct working state — the employee is alive and
+        // uninjured but stopped, and until now only the roster panel showed it.
+        const status = !e.alive ? 'DEAD' : e.injured ? 'INJURED' : e.collapsing ? 'COLLAPSING' : 'OK';
         const union = e.unionized ? ' [UNION]' : '';
         lines.push(`  [${e.id}] ${e.name} (${e.role}) $${e.salary}/cycle morale:${e.morale} ${status}${union}`);
       }

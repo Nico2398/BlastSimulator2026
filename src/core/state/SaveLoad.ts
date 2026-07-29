@@ -99,6 +99,22 @@ export function deserialize(json: string): GameState {
     }
   }
 
+  // Ensure restNeedKey exists on employees saved before the field was added.
+  // Absent means "not resting under the general rest path", which is what null
+  // encodes — an employee frozen mid-rest in such a save is released by the
+  // rest action still sitting in pendingActions.
+  const employeesRaw = obj['employees'] as Record<string, unknown> | undefined;
+  if (employeesRaw) {
+    const employeeList = employeesRaw['employees'] as Array<Record<string, unknown>> | undefined;
+    if (Array.isArray(employeeList)) {
+      for (const e of employeeList) {
+        if (e['restNeedKey'] === undefined) {
+          e['restNeedKey'] = null;
+        }
+      }
+    }
+  }
+
   // v4 → v5: collectedOre field added
   if (typeof obj['collectedOre'] !== 'object' || obj['collectedOre'] === null) {
     (obj as Record<string, unknown>)['collectedOre'] = {};

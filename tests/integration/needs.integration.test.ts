@@ -4,7 +4,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { type GameContext, newGameCommand } from '../../src/console/commands/world.js';
-import { employeeCommand, needsCommand } from '../../src/console/commands/entities.js';
+import { employeeCommand, needsCommand, buildCommand } from '../../src/console/commands/entities.js';
 import { tickCommand } from '../../src/console/commands/events.js';
 import { EventEmitter } from '../../src/core/state/EventEmitter.js';
 
@@ -16,6 +16,7 @@ import {
   getNeedMultiplier,
 } from '../../src/core/entities/EmployeeNeeds.js';
 import type { Employee } from '../../src/core/entities/Employee.js';
+import { NEED_WARNING_THRESHOLDS } from '../../src/core/config/balance.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -290,7 +291,7 @@ describe('tick command — idle-vs-working drain rate for resting employees', ()
     // Simulate mid-rest: claimed by a rest action, timer running.
     emp.activeActionId = 999;
     emp.restTicksRemaining = 10;
-    emp.interruptedActionPayload = null; // not owned by tickGeneralRestCompletion or processShiftCycle
+    emp.restNeedKey = null; // not owned by tickGeneralRestCompletion or processShiftCycle
     emp.hunger = 100;
     emp.breakNeed = 100;
 
@@ -304,5 +305,43 @@ describe('tick command — idle-vs-working drain rate for resting employees', ()
     // Rest state itself is untouched by the needs-drain step.
     expect(emp.restTicksRemaining).toBe(10);
     expect(emp.activeActionId).toBe(999);
+  });
+});
+
+// ── tick command — one dip below the warning threshold costs exactly one rest ─
+//
+// End-to-end guard for the duplicate-rest insertion: while an employee is
+// mid-rest the gauge is still below its warning threshold and the claimed rest
+// action is no longer in pendingActions, so autoInsertNeedTasks used to queue a
+// second rest that was claimed the moment the first completed — two
+// NEED_REST_COSTS charges and two rest cycles for a single dip.
+
+describe('tick command — a single threshold dip triggers a single rest', () => {
+  it('charges NEED_REST_COSTS.hunger once and restores the gauge once', () => {
+    const ctx = makeCtx();
+    const empId = hireOne(ctx, 'driller');
+    const state = ctx.state!;
+    const emp = getEmployee(ctx, empId);
+
+    const build = buildCommand(ctx, ['living_quarters'], { at: '5,5', tier: '1' });
+    expect(build.success).toBe(true);
+
+    state.cash = 100_000;
+    emp.x = 0;
+    emp.z = 0;
+    emp.hunger = 34; // just below the 35 warning threshold
+    emp.fatigue = 100;
+    emp.breakNeed = 100;
+
+    // Long enough for the rest to be queued, claimed, and completed.
+    for (let i = 0; i < 8; i++) tickCommand(ctx, ['1'], {});
+
+    const restCharges = state.finances.transactions.filter(t => t.category === 'needs');
+    expect(restCharges).toHaveLength(1);
+    expect(emp.restTicksRemaining).toBeNull();
+    expect(emp.restNeedKey).toBeNull();
+    expect(emp.activeActionId).toBeNull();
+    expect(emp.hunger).toBeGreaterThan(NEED_WARNING_THRESHOLDS.hunger);
+    expect(state.pendingActions.filter(a => a.type === 'rest')).toHaveLength(0);
   });
 });

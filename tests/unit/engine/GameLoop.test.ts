@@ -1050,6 +1050,39 @@ describe('tickCollapse (7.6)', () => {
     expect(firedEvents[1]!.eventId).toBe('employee_collapsed');
   });
 
+  // ── Collapse supersedes a warning-threshold rest queued while the employee was busy ──
+  // autoInsertNeedTasks queues a rest for a busy employee without claiming it.
+  // If that action survives the collapse, it is claimed the instant the collapse
+  // rest ends: a second rest cycle and a second NEED_REST_COSTS charge for one
+  // collapse, and two rest entries in the roster panel's task queue.
+  it('drops a rest action already queued for the employee it collapses', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.x = 0;
+    employee.z = 0;
+    employee.fatigue = 3; // below the collapse threshold
+
+    placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100);
+
+    // The warning-threshold rest queued earlier, still unclaimed.
+    autoInsertNeedTasks(state);
+    const queuedBefore = state.pendingActions.filter(
+      (a: PendingAction) => a.type === 'rest' && a.targetEmployeeId === employee.id,
+    );
+    expect(queuedBefore).toHaveLength(1);
+
+    tickCollapse(state);
+
+    const restActions = state.pendingActions.filter(
+      (a: PendingAction) => a.type === 'rest' && a.targetEmployeeId === employee.id,
+    );
+    expect(restActions).toHaveLength(1);
+    expect(restActions[0]!.id).toBe(employee.activeActionId);
+    expect(employee.restNeedKey).toBe('fatigue');
+  });
+
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1603,6 +1636,35 @@ describe('autoInsertNeedTasks (7.7)', () => {
 
     expect(firedEvents).toHaveLength(0);
   });
+
+  // ── Test 13: employee already mid-rest → no second rest queued ──────────────
+  // A rest claimed through tickEmployees is consumed from pendingActions, so
+  // hasRestAction cannot see it. The gauge only recovers when the rest
+  // completes, so without a restTicksRemaining check this inserts a duplicate
+  // rest that is claimed the instant the first ends — a wasted rest cycle and a
+  // second NEED_REST_COSTS charge per dip below the warning threshold.
+  it('does not queue a second rest for an employee already resting', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.x = 0;
+    employee.z = 0;
+    employee.hunger = 30; // still below the warning threshold — rest not finished yet
+    employee.fatigue = 80;
+    employee.breakNeed = 80;
+    employee.activeActionId = 7;      // claimed the rest action
+    employee.restTicksRemaining = 2;  // ...and is mid-rest
+    employee.restNeedKey = 'hunger';
+    // The claimed action is gone from pendingActions, as tickEmployees leaves it.
+
+    placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100);
+
+    const result = autoInsertNeedTasks(state);
+
+    expect(result.inserted).toHaveLength(0);
+    expect(state.pendingActions.filter((a: PendingAction) => a.type === 'rest')).toHaveLength(0);
+  });
 });
 
 // ─── 7.8: deductRestCost ──────────────────────────────────────────────────────
@@ -2033,7 +2095,7 @@ describe('tickGeneralRestCompletion', () => {
     employee.restTicksRemaining = 1; // one more tick → completes this call
     const actionId = state.nextPendingActionId++;
     employee.activeActionId = actionId;
-    employee.interruptedActionPayload = { needKey: 'hunger' };
+    employee.restNeedKey = 'hunger';
     state.pendingActions.push({
       id: actionId,
       type: 'rest',
@@ -2055,7 +2117,7 @@ describe('tickGeneralRestCompletion', () => {
     expect(employee.collapsing).toBe(false);
     expect(employee.restTicksRemaining).toBeNull();
     expect(employee.activeActionId).toBeNull();
-    expect(employee.interruptedActionPayload).toBeNull();
+    expect(employee.restNeedKey).toBeNull();
     expect(state.cash).toBe(1000 - NEED_REST_COSTS.hunger);
     expect(state.pendingActions.find(a => a.id === actionId)).toBeUndefined();
   });
@@ -2069,7 +2131,7 @@ describe('tickGeneralRestCompletion', () => {
     employee.fatigue = 5;
     employee.restTicksRemaining = 1;
     employee.activeActionId = 42;
-    employee.interruptedActionPayload = { needKey: 'fatigue' };
+    employee.restNeedKey = 'fatigue';
     // No living_quarters building placed at all.
 
     const result = tickGeneralRestCompletion(state);
@@ -2086,7 +2148,7 @@ describe('tickGeneralRestCompletion', () => {
     const { employee } = hireEmployee(state.employees, 'driller', rng);
     employee.restTicksRemaining = 1;
     employee.activeActionId = 99;
-    employee.interruptedActionPayload = null; // no needKey → shift-cycle rest, not general rest
+    employee.restNeedKey = null; // no rest need key → shift-cycle rest, not general rest
     employee.fatigue = 5;
 
     const result = tickGeneralRestCompletion(state);
@@ -2107,7 +2169,7 @@ describe('tickGeneralRestCompletion', () => {
     employee.restTicksRemaining = 1;
     const actionId = state.nextPendingActionId++;
     employee.activeActionId = actionId;
-    employee.interruptedActionPayload = { needKey: 'hunger' };
+    employee.restNeedKey = 'hunger';
 
     placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, 1);
 
