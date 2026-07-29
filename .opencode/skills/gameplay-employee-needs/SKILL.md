@@ -56,6 +56,17 @@ When any gauge hits its collapse threshold:
 
 If no suitable building within 20 cells: employee collapses in place, rest duration doubled.
 
+## Resting With No Building
+
+An employee whose need has no building to service it — none built, or the nearest beyond 20 cells — rests where they stand. Two penalties apply, and together they keep an empty site strictly worse than a Tier 1 one:
+
+| Penalty | Value | Constant |
+|---------|-------|----------|
+| Gauge ceiling | rest tops the gauge out at 70, never higher | `NEED_REST_NO_BUILDING_CAP` |
+| Duration | ×2 the same rest at a building | `NEED_REST_NO_BUILDING_DURATION_MULTIPLIER` |
+
+A gauge already above the ceiling is left alone, not pulled down to it. Per-visit cost still applies. Without the ceiling, resting in the dirt would restore a full gauge while a Tier 1 living_quarters restores about 11 — building nothing would be the optimal play.
+
 ## Building Replenishment Rates
 
 | Building | Tier 1 | Tier 2 | Tier 3 |

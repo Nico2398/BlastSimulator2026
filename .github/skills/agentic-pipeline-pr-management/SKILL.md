@@ -10,36 +10,36 @@ description: >
 
 Before open-pr step, evaluate: **is this PR ready to merge or should it be a draft?**
 
-Ask yourself:
-1. Did the visual feedback loop report VISUAL: BLOCKED (could not inspect screenshots)? → **draft** (visual inspection incomplete, human review REQUIRED)
-2. Did the visual feedback loop report persistent failures (3+ iterations without progress)? → draft (visuals need human review)
-3. Did the pipeline hit retry loops or heavy review findings? → draft (needs human review)
-4. Does the issue explicitly request human input? → draft
-5. Is this a simple fix or feature with full test coverage, no visual changes, and clean pipeline run? → ready
+**Verification decides, and nothing else.** A PR is `ready` when every verification channel the change owes reports PASS. Ask one question per channel the change touches — static, logic, scenario, visual, playability — and one question about the issue's own verification list. All PASS → `ready`.
 
-| Evaluation | Behavior | When |
-|------------|----------|------|
-| `ready` (default) | PR created as normal, `READY TO MERGE` in body triggers auto-merge | Simple fixes, features with full coverage, no human-dependency |
-| `draft` | PR created with `--draft` flag, `READY TO MERGE` NOT included | Visual-change tasks needing human sign-off, pipeline hit retry loops, explicit request |
+A PR is `draft` in exactly three cases:
+
+| Draft because | Shape |
+|---------------|-------|
+| A required channel could not run | `VISUAL: BLOCKED` — no browser, dev server unreachable, screenshots never written. The work may be right; nothing can prove it. |
+| A required channel is red and stayed red | The pipeline exhausted its retries against a genuine failure |
+| A genuine blocker was hit | One of the five in `agentic-decision-autonomy` — contradictory requirements, missing external dependency, capability gap, unrunnable channel, irreversible action |
+
+| Evaluation | Behavior |
+|------------|----------|
+| `ready` (default) | PR created as normal, `READY TO MERGE` in body triggers auto-merge |
+| `draft` | PR created with `--draft` flag, `READY TO MERGE` NOT included |
 
 The open-pr step passes `--draft` to `gh pr create` when evaluation is `draft`.
+
+**These never make a PR a draft:** iteration counts of any kind (visual loop rounds, implementer do-overs, review findings addressed, cherry-pick retries), a fix that reached beyond the issue's framing, or a requirement the run had to default. Churn measures how hard the problem was. The channels measure whether the answer is right — see `agentic-decision-autonomy`.
 
 ## READY TO MERGE
 
 After creating the PR, the body must include `READY TO MERGE` on its own line. The `auto-assign-next.yml` workflow detects this and enables GitHub native auto-merge via a PAT token, ensuring downstream CI events trigger correctly.
 
-This is the **default**. Skip `READY TO MERGE` when:
-1. Visual feedback loop was incomplete (VISUAL: BLOCKED) — human must inspect screenshots first.
-2. The issue requires human input (artistic direction, critical design decision).
-3. The pipeline hit significant churn (repeated failure loops, heavy review findings, multiple implementer do-overs).
-
-When skipping, post a comment explaining why:
+This is the **default**, skipped only in the three draft cases above. When skipping, post a comment naming the channel or blocker and the remedy — never a summary of how much work the run took:
 
 ```
-gh pr comment <pr-url> --body "READY TO MERGE skipped — human input needed: <reason>"
+gh pr comment <pr-url> --body "READY TO MERGE skipped — <channel or blocker>: <what fails, what would unblock it>"
 ```
 
-Include churn details in the reason so the reviewer understands the risk.
+A run that defaulted an open requirement keeps `READY TO MERGE` and records the choice in the PR body under `## Decisions taken`, per `agentic-decision-autonomy`.
 
 ## Critical: NEVER use `[skip ci]` on PR branches
 

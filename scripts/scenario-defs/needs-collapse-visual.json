@@ -133,6 +133,15 @@
       ]
     },
     {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
       "command": "employee list",
       "interaction": [
         {

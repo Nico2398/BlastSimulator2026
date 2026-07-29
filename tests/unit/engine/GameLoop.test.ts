@@ -49,6 +49,8 @@ import {
   WORK_DURATION_TICKS,
   SHIFT_SLEEP_DURATION_TICKS,
   MAX_NEED_GAUGE,
+  NEED_REST_NO_BUILDING_CAP,
+  NEED_REST_NO_BUILDING_DURATION_MULTIPLIER,
 } from '../../../src/core/config/balance.js';
 
 function buildContext(state: GameState): EventContext {
@@ -1637,6 +1639,53 @@ describe('autoInsertNeedTasks (7.7)', () => {
     expect(firedEvents).toHaveLength(0);
   });
 
+  // ── Test 12b: no building to rest at → rest takes the no-building multiplier ─
+  it('doubles the queued rest duration when no building services the need', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.x = 0;
+    employee.z = 0;
+    employee.hunger = 30; // below the warning threshold
+    employee.fatigue = 80;
+    employee.breakNeed = 80;
+    // No living_quarters placed — the employee will rest where they stand.
+
+    autoInsertNeedTasks(state);
+
+    const restAction = state.pendingActions.find(
+      (a: PendingAction) => a.type === 'rest' && a.targetEmployeeId === employee.id,
+    );
+    expect(restAction).toBeDefined();
+    expect(restAction!.payload['restDuration']).toBe(
+      NEED_REST_DURATIONS.hunger * NEED_REST_NO_BUILDING_DURATION_MULTIPLIER,
+    );
+    expect(restAction!.payload['buildingId']).toBeUndefined();
+  });
+
+  // ── Test 12c: a building in range keeps the base duration ───────────────────
+  it('keeps the base rest duration when a building services the need', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.x = 0;
+    employee.z = 0;
+    employee.hunger = 30;
+    employee.fatigue = 80;
+    employee.breakNeed = 80;
+
+    placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100);
+
+    autoInsertNeedTasks(state);
+
+    const restAction = state.pendingActions.find(
+      (a: PendingAction) => a.type === 'rest' && a.targetEmployeeId === employee.id,
+    );
+    expect(restAction!.payload['restDuration']).toBe(NEED_REST_DURATIONS.hunger);
+  });
+
   // ── Test 13: employee already mid-rest → no second rest queued ──────────────
   // A rest claimed through tickEmployees is consumed from pendingActions, so
   // hasRestAction cannot see it. The gauge only recovers when the rest
@@ -2122,8 +2171,9 @@ describe('tickGeneralRestCompletion', () => {
     expect(state.pendingActions.find(a => a.id === actionId)).toBeUndefined();
   });
 
-  // ── Test 2: Boundary — no living quarters in range falls back to MAX_NEED_GAUGE ──
-  it('falls back to MAX_NEED_GAUGE when no living_quarters building exists', () => {
+  // ── Test 2: Boundary — resting with no building tops out at the no-building cap ──
+  // A full restore here would make an empty site better than a Tier 1 living_quarters.
+  it('caps the gauge at NEED_REST_NO_BUILDING_CAP when no living_quarters exists', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
 
@@ -2136,8 +2186,25 @@ describe('tickGeneralRestCompletion', () => {
 
     const result = tickGeneralRestCompletion(state);
 
-    expect(employee.fatigue).toBe(MAX_NEED_GAUGE);
+    expect(employee.fatigue).toBe(NEED_REST_NO_BUILDING_CAP);
+    expect(employee.fatigue).toBeLessThan(MAX_NEED_GAUGE);
     expect(result.completed).toEqual([{ employeeId: employee.id, needKey: 'fatigue' }]);
+  });
+
+  // ── Test 2b: Rejection — a gauge above the cap is not pulled down to it ──
+  it('leaves a gauge already above the no-building cap untouched', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.fatigue = NEED_REST_NO_BUILDING_CAP + 15;
+    employee.restTicksRemaining = 1;
+    employee.activeActionId = 42;
+    employee.restNeedKey = 'fatigue';
+
+    tickGeneralRestCompletion(state);
+
+    expect(employee.fatigue).toBe(NEED_REST_NO_BUILDING_CAP + 15);
   });
 
   // ── Test 3: Not double-processed — owned by completeRestTick (Tier-2+ shift rest) instead ──

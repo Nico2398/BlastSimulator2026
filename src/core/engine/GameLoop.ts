@@ -16,7 +16,7 @@ import { addExpense } from '../economy/Finance.js';
 
 // ── Config ──
 
-import { BASE_TICK_MS as _BASE_TICK_MS, VALID_SPEEDS as _VALID_SPEEDS, MAX_NEED_GAUGE, NEED_REST_DURATIONS, NEED_REST_BUILDING_TYPES, NEED_REST_SEARCH_RADIUS, NEED_WARNING_THRESHOLDS, NEED_REST_COSTS, WORK_DURATION_TICKS, SHIFT_SLEEP_DURATION_TICKS } from '../config/balance.js';
+import { BASE_TICK_MS as _BASE_TICK_MS, VALID_SPEEDS as _VALID_SPEEDS, NEED_REST_DURATIONS, NEED_REST_NO_BUILDING_CAP, NEED_REST_NO_BUILDING_DURATION_MULTIPLIER, NEED_REST_BUILDING_TYPES, NEED_REST_SEARCH_RADIUS, NEED_WARNING_THRESHOLDS, NEED_REST_COSTS, WORK_DURATION_TICKS, SHIFT_SLEEP_DURATION_TICKS } from '../config/balance.js';
 
 /** Milliseconds per base tick at 1x speed. */
 export const BASE_TICK_MS = _BASE_TICK_MS;
@@ -358,12 +358,12 @@ export function tickCollapse(state: GameState, _firedEvents?: FiredEvent[], _emi
         targetZ = building.z;
         buildingId = building.id;
       } else {
-        // Building exists but too far — double rest duration
-        restDuration *= 2;
+        // Building exists but too far — the employee rests in place
+        restDuration *= NEED_REST_NO_BUILDING_DURATION_MULTIPLIER;
       }
     } else {
-      // No building at all — double rest duration
-      restDuration *= 2;
+      // No building at all — the employee rests in place
+      restDuration *= NEED_REST_NO_BUILDING_DURATION_MULTIPLIER;
     }
 
     // A warning-threshold rest queued by autoInsertNeedTasks while this employee
@@ -459,6 +459,11 @@ export function autoInsertNeedTasks(state: GameState, _firedEvents?: FiredEvent[
 
     const targetX = building?.x ?? emp.x;
     const targetZ = building?.z ?? emp.z;
+    // With nowhere to go the employee rests in place, which takes longer and
+    // (in completeRestForEmployee) tops the gauge out at NEED_REST_NO_BUILDING_CAP.
+    const restDuration = building
+      ? NEED_REST_DURATIONS[primaryGauge]
+      : NEED_REST_DURATIONS[primaryGauge] * NEED_REST_NO_BUILDING_DURATION_MULTIPLIER;
 
     const restAction = createRestPendingAction(state, {
       targetX,
@@ -466,7 +471,7 @@ export function autoInsertNeedTasks(state: GameState, _firedEvents?: FiredEvent[
       targetEmployeeId: emp.id,
       payload: {
         buildingId: building?.id,
-        restDuration: NEED_REST_DURATIONS[primaryGauge],
+        restDuration,
         triggeredBy: triggeredGauges,
         // Read by tickEmployees when this action is claimed, to start the
         // rest timer for the employee (see resolveRestNeedKey).
@@ -559,8 +564,9 @@ export interface GeneralRestCompletionResult {
 /**
  * Shared rest-completion sequence used by both tickGeneralRestCompletion and
  * completeRestTick: replenish the resting need gauge from the nearest active
- * living_quarters (falling back to a full gauge if none is found), deduct the
- * visit's NEED_REST_COSTS entry, clear the collapsing flag, and null out
+ * living_quarters (or, with no building in range, up to
+ * NEED_REST_NO_BUILDING_CAP only), deduct the visit's NEED_REST_COSTS entry,
+ * clear the collapsing flag, and null out
  * restTicksRemaining/activeActionId so the employee returns to normal task
  * dispatch. Callers own any remaining wrap-up specific to their rest source
  * (pendingActions removal + result recording, or ticksWorked reset).
@@ -571,8 +577,12 @@ function completeRestForEmployee(state: GameState, emp: Employee, needKey: NeedK
     const def = getBuildingDef(building.type, building.tier);
     replenishNeed(emp, needKey, building.tier, def.capacity);
   } else {
-    // Fallback — no building found (shouldn't happen; the action targeted one).
-    emp[needKey] = MAX_NEED_GAUGE;
+    // No building services this need — the employee rests where they stand.
+    // That keeps them on their feet but never fully satisfies them: the gauge
+    // rises no higher than NEED_REST_NO_BUILDING_CAP, and the rest itself took
+    // NEED_REST_NO_BUILDING_DURATION_MULTIPLIER times as long to get here. A
+    // gauge already above the cap is left alone rather than pulled down to it.
+    emp[needKey] = Math.max(emp[needKey], NEED_REST_NO_BUILDING_CAP);
   }
 
   deductRestCost(state, needKey);
