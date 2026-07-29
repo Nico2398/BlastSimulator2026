@@ -13,7 +13,9 @@ inputs:
     description: >
       Token used to push the branch and open the PR. Must be a PAT — a PR opened
       with GITHUB_TOKEN raises no `pull_request` event, so auto-assign-next.yml
-      would stay dormant.
+      would stay dormant, and GITHUB_TOKEN can never push a `.github/workflows/`
+      change at all. It is passed to `git push` as an explicit remote URL rather
+      than left to the job's git credentials, which the agent step rewrites.
     required: true
   issue:
     description: "Issue number the run was working on. Empty disables the step."
@@ -36,6 +38,11 @@ runs:
         fi
 
         BRANCH="pipeline/feature-${ISSUE}"
+        # "Check the runner logs" is not actionable without the link. Every
+        # comment and PR body below carries it, because the run that wrote them
+        # is the only place the failure is explained.
+        RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+        PUSH_LOG=/tmp/agentic-rescue-push.log
 
         # An open PR means the run finished its job. Nothing to rescue, and
         # re-opening one would duplicate the deliverable.
@@ -55,7 +62,9 @@ runs:
 
         No branch was left on the runner, so there is nothing to salvage and no pull request to open. Either the run died before the cherry-pick, or it concluded that no code change was needed without saying so.
 
-        Check the runner workflow logs for this window. The issue stays \`in-progress\`; the watchdog will label it \`blocked\` once it passes \`AGENTIC_STALL_MINUTES\`.
+        Runner logs: ${RUN_URL}
+
+        The issue stays \`in-progress\`; the watchdog will label it \`blocked\` once it passes \`AGENTIC_STALL_MINUTES\`.
         EOF
           gh issue comment "${ISSUE}" --body-file /tmp/agentic-rescue-body.md
           exit 0
@@ -68,16 +77,77 @@ runs:
 
         echo "Rescuing ${BRANCH} — the run ended before opening its PR."
 
-        for attempt in 1 2 3 4; do
-          if git push -u origin "${BRANCH}"; then
-            break
+        # `git push` never reads GH_TOKEN. It authenticates with whatever the
+        # job's git configuration carries, and by the time this action runs the
+        # agent step has replaced that with its own GitHub App installation
+        # token. That token cannot push a `.github/workflows/` change under any
+        # configuration — `permissions:` has no `workflows` key to grant — so a
+        # branch that differs from main on a workflow file is rejected outright,
+        # which is how issue #404 lost a three-hour run. Pushing to an explicitly
+        # authenticated URL makes the PAT this action is handed the credential
+        # that is actually used. Actions masks the secret in the log.
+        REMOTE="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+
+        push_branch() {
+          for attempt in 1 2 3 4; do
+            if git push "${REMOTE}" "refs/heads/${BRANCH}:refs/heads/${BRANCH}" >"${PUSH_LOG}" 2>&1; then
+              cat "${PUSH_LOG}"
+              return 0
+            fi
+            cat "${PUSH_LOG}"
+            if [ "${attempt}" = "4" ]; then
+              return 1
+            fi
+            sleep $(( 2 ** attempt ))
+          done
+        }
+
+        # A push that cannot be retried into success still has to be reported.
+        # This action exists so that a run ending early does not end silently,
+        # and an `::error::` in a job log nobody is watching is silence: the
+        # issue keeps `in-progress`, the chain stalls behind it, and the only
+        # account of what happened dies with the VM in minutes.
+        if ! push_branch; then
+          # Actions masks secrets in the job log but not in an API request body,
+          # and this text is about to be posted on a public issue. Git redacts
+          # credentials from the URLs it prints, so this is belt and braces —
+          # but the belt has to be there before the output leaves the runner.
+          # An empty pattern would match between every character, so the guard
+          # is load-bearing: an unset secret arrives as an empty string.
+          PUSH_ERROR="$(cat "${PUSH_LOG}")"
+          if [ -n "${GH_TOKEN}" ]; then
+            PUSH_ERROR="${PUSH_ERROR//${GH_TOKEN}/***}"
           fi
-          if [ "${attempt}" = "4" ]; then
-            echo "::error::Could not push ${BRANCH} after 4 attempts. The work is lost with this runner."
-            exit 1
-          fi
-          sleep $(( 2 ** attempt ))
-        done
+
+          {
+            echo "🧯 **The agent run ended early and its branch could not be saved.**"
+            echo
+            echo "\`${BRANCH}\` held everything this run produced. The push was rejected, so it dies with the runner VM."
+            echo
+            echo "\`\`\`"
+            printf '%s\n' "${PUSH_ERROR}"
+            echo "\`\`\`"
+            echo
+            if grep -qiE "without .(workflows. permission|workflow. scope)" "${PUSH_LOG}"; then
+              echo "The rejection is about \`.github/workflows/\`, not about the network: the pushing credential is not allowed to carry a workflow-file change. Grant \`PAT_TOKEN_COPILOT_AUTOMATION\` the \`workflow\` scope, or land the workflow part of this issue by hand."
+              echo
+            fi
+            echo "### What was lost"
+            echo
+            echo "\`\`\`"
+            git log --oneline -50 "main..${BRANCH}"
+            echo
+            git diff --stat --stat-count=40 "main...${BRANCH}"
+            echo "\`\`\`"
+            echo
+            echo "Runner logs: ${RUN_URL}"
+            echo
+            echo "The issue stays \`in-progress\`; the watchdog will label it \`blocked\` once it passes \`AGENTIC_STALL_MINUTES\`. Re-running the issue starts the work over from \`main\`."
+          } > /tmp/agentic-rescue-body.md
+          gh issue comment "${ISSUE}" --body-file /tmp/agentic-rescue-body.md
+          echo "::error::Could not push ${BRANCH} after 4 attempts. The work is lost with this runner; the loss is reported on issue #${ISSUE}."
+          exit 1
+        fi
 
         # Draft, and deliberately without `READY TO MERGE`: this PR is
         # unreviewed and unvalidated by definition. `Closes #N` is what
@@ -90,7 +160,7 @@ runs:
 
         This PR was opened by \`agentic-rescue\`, not by the pipeline. The run reached at least the cherry-pick onto \`${BRANCH}\`, then stopped: a crash, the job timeout, a cancellation, or a turn ended while delegated work was still outstanding. Without this the branch would have been discarded with the runner VM.
 
-        **Treat it as evidence, not as a deliverable.** It has not passed code review, refactoring, or validation, and no verification channel result should be assumed. Read the runner workflow logs for this window before deciding whether to finish it or drop it and re-run the issue.
+        **Treat it as evidence, not as a deliverable.** It has not passed code review, refactoring, or validation, and no verification channel result should be assumed. Read the runner logs — ${RUN_URL} — before deciding whether to finish it or drop it and re-run the issue.
 
         It stays a draft and carries no \`READY TO MERGE\` line, so auto-merge will not pick it up. While it is open the issue counts as in-progress-with-a-PR, which holds the assignment chain until a human resolves it.
         EOF

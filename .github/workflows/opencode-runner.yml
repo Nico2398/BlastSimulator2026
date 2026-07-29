@@ -43,7 +43,11 @@ jobs:
         )
       )
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    # Kept identical to claude-runner.yml: GitHub-hosted maximum, because 180 cut
+    # a real run off mid-finalization and a cancelled job loses everything the
+    # rescue step cannot push. `AGENTIC_STALL_MINUTES` must stay above this — see
+    # agentic-watchdog.yml.
+    timeout-minutes: 360
     steps:
       - uses: actions/checkout@v6
         with:
