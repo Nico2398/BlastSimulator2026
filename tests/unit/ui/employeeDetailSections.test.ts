@@ -11,8 +11,10 @@ import {
   getEmployeeRowClassNames,
   needValueClass,
   applyNeedValueClass,
+  makeTaskQueue,
 } from '../../../src/ui/employeeDetailSections.js';
 import type { Employee } from '../../../src/core/entities/Employee.js';
+import type { GameState, PendingAction } from '../../../src/core/state/GameState.js';
 
 function makeEmployee(overrides?: Partial<Employee>): Employee {
   return {
@@ -20,7 +22,7 @@ function makeEmployee(overrides?: Partial<Employee>): Employee {
     unionized: false, injured: false, alive: true, x: 0, z: 0,
     qualifications: [], trainingState: null, activeActionId: null,
     hunger: 100, fatigue: 100, breakNeed: 100, collapsing: false,
-    interruptedActionPayload: null, ticksWorked: 0, restTicksRemaining: null,
+    interruptedActionPayload: null, ticksWorked: 0, restTicksRemaining: null, restNeedKey: null,
     ...overrides,
   };
 }
@@ -86,5 +88,57 @@ describe('applyNeedValueClass', () => {
     applyNeedValueClass(el, 30);
     expect(el.classList.contains('warn')).toBe(true);
     expect(el.classList.contains('bad')).toBe(false);
+  });
+});
+
+// makeTaskQueue lists the pending actions an employee could take. Actions pinned
+// to another employee via targetEmployeeId used to be listed in every row, so a
+// healthy worker's panel showed a collapsed colleague's rest task as queued work.
+describe('makeTaskQueue — queued actions are scoped to the employee', () => {
+  function makeAction(id: number, targetEmployeeId: number | null): PendingAction {
+    return {
+      id, type: 'rest', requiredSkill: null, requiredVehicleRole: null,
+      targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId,
+    };
+  }
+
+  function makeState(actions: PendingAction[]): GameState {
+    return { pendingActions: actions } as unknown as GameState;
+  }
+
+  it("omits an action pinned to another employee", () => {
+    const el = makeTaskQueue(makeEmployee({ id: 1 }), makeState([makeAction(7, 2)]));
+
+    expect(el.textContent).not.toContain('#7');
+    expect(el.querySelector('.bs-queue-empty')).not.toBeNull();
+  });
+
+  it('lists an action pinned to this employee', () => {
+    const el = makeTaskQueue(makeEmployee({ id: 1 }), makeState([makeAction(7, 1)]));
+
+    expect(el.textContent).toContain('#7');
+  });
+
+  it('lists an unpinned action, which anyone qualified may claim', () => {
+    const el = makeTaskQueue(makeEmployee({ id: 1 }), makeState([makeAction(7, null)]));
+
+    expect(el.textContent).toContain('#7');
+  });
+});
+
+describe('makeTaskQueue — the active action is not repeated in the queue list', () => {
+  it('lists the claimed action only under ACTIVE', () => {
+    const action = {
+      id: 3, type: 'rest' as const, requiredSkill: null, requiredVehicleRole: null,
+      targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: 1,
+    };
+    const state = { pendingActions: [action] } as unknown as GameState;
+
+    const el = makeTaskQueue(makeEmployee({ id: 1, activeActionId: 3 }), state);
+
+    const entries = Array.from(el.querySelectorAll('.bs-task-entry'));
+    expect(entries).toHaveLength(1);
+    expect(entries[0]!.className).toContain('current');
+    expect(entries[0]!.textContent).toContain('#3');
   });
 });

@@ -60,6 +60,16 @@ Intent is not a mechanism, so `agentic-rescue` runs after the agent step in both
 
 The rescue PR is a diagnosis, not a deliverable: it is unreviewed and unvalidated by definition, and it deliberately holds the chain (an in-progress issue with a linked PR defers assignment) until a human decides whether to finish it or drop it.
 
+### What the loop stops for
+
+Autonomy is measured by what the pipeline can finish without a human, and every halt costs more than its own run: an issue holds `in-progress` until its PR merges, so a stopped run defers every later assignment behind it. A halt has to earn that.
+
+Two failure modes bracket the design. Guessing past a hard blocker produces work nobody can trust; stopping for an ordinary open question produces nothing at all and stalls the chain as well. The line between them is fixed in `agentic-decision-autonomy`: five blockers halt a run — contradictory requirements, a missing external dependency, a capability gap, a verification channel that cannot run, an irreversible action outside the ask. Everything else is defaulted from the spec, recorded in the PR body under `## Decisions taken`, written into the skill that owns the rule, and shipped.
+
+The rule is deliberately blind to effort. PR #425 arrived green on all five channels and was held anyway, for "real churn" — three visual iterations and nine review findings, all of them addressed. The one question that genuinely was open (what a rest with no rest building should restore) the run never asked; it was the churn that stopped it. That is the failure this rule removes: iteration count measures the problem's difficulty, the channels measure the answer's correctness, and only the second one gates a PR.
+
+A defaulted decision that turns out wrong is cheap by construction — it names the constant that reverses it, and `[decision-followup]` files it under the `decision-review` label, which carries no `ready` and so joins the backlog without entering the assignment queue.
+
 ### Branch namespace — solution-independent
 
 Every AI solution wants to name branches its own way, and several create one before the agent gets control. The pipeline owns the `pipeline/` namespace and ignores all of them.

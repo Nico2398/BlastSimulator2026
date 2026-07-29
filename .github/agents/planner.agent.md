@@ -17,7 +17,8 @@ Produce structured implementation plan from issue. Read-only — no code changes
 1. Read issue body. Understand requirements.
 2. Inspect codebase: `read_file`, `grep`, `list_dir`.
 3. Load skill spec if relevant: `get_skill_context('<skill>')`.
-4. Produce plan with exact file paths, acceptance criteria, edge cases.
+4. Resolve every requirement the issue leaves open, applying the default-and-record rule in `agentic-decision-autonomy`. Each one becomes a `Decision` entry in the plan with its own acceptance criterion — the implementer builds it, not re-decides it. Escalate only a genuine blocker from that skill's list.
+5. Produce plan with exact file paths, acceptance criteria, edge cases.
 
 ## Output Format
 ```
@@ -29,6 +30,8 @@ Produce structured implementation plan from issue. Read-only — no code changes
 ### Acceptance Criteria
 - [ ] criterion 1
 - [ ] criterion 2
+### Decisions
+- **Open:** what the issue left unspecified — **Chosen:** the default — **Why:** the spec, convention, or incentive it follows — **Reverse by:** the constant or branch a human would change
 ### Edge Cases
 - edge case 1
 ### Architecture Notes
@@ -38,5 +41,6 @@ Produce structured implementation plan from issue. Read-only — no code changes
 ## Rules
 - Specific file paths only. No vague "update relevant files".
 - Every acceptance criterion must be testable.
+- Every open requirement leaves the plan as a `Decision`, never as a question. `Decisions` is empty only when the issue truly left nothing open.
 - Reference skill specs when applicable.
 - End with `## RESULT: OK` or `## RESULT: FAIL`.

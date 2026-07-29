@@ -32,7 +32,7 @@ function makeEmployee(overrides?: Partial<Employee>): Employee {
     qualifications: [{ category: 'driving.truck', proficiencyLevel: 1, xp: 0 }],
     trainingState: null, activeActionId: null,
     hunger: 100, fatigue: 100, breakNeed: 100, collapsing: false,
-    interruptedActionPayload: null, ticksWorked: 0, restTicksRemaining: null,
+    interruptedActionPayload: null, ticksWorked: 0, restTicksRemaining: null, restNeedKey: null,
     ...overrides,
   };
 }

@@ -188,11 +188,11 @@ runs:
               `2. Run the TDD cycle with branch isolation on \`pipeline/tests-${n}\` and \`pipeline/impl-${n}\` — the implementer never sees the tests.`,
               `3. Cherry-pick the implementation onto \`pipeline/feature-${n}\`, then run code review, refactor and validation there.`,
               '4. Run every verification channel the change touches. A renderer or UI change is not done until screenshots have been inspected; a player-facing flow is not done until `npm run playtest` passes.',
-              `5. Open the PR from \`pipeline/feature-${n}\` to \`main\`. Its body must contain \`Closes #${n}\`, plus \`READY TO MERGE\` on a line of its own when the run was clean. Otherwise open it as a draft without that line and say why.`,
+              `5. Open the PR from \`pipeline/feature-${n}\` to \`main\`. Its body must contain \`Closes #${n}\`, plus \`READY TO MERGE\` on a line of its own once every verification channel the change owes reports PASS. Open it as a draft without that line only when a channel could not run or stayed red — name the channel. How many review findings, visual iterations or retries the run took does not decide PR status.`,
               '',
               'Do not use `[skip ci]` on pipeline branches — it suppresses the auto-merge workflow.',
               '',
-              `If you cannot proceed, label this issue \`blocked\`, comment what is missing, and stop. Do not close issue #${n} without a PR unless no code change was needed.`
+              `Where this issue leaves a requirement open, choose the default the spec and surrounding code already imply, record it in the PR body under \`## Decisions taken\`, and finish the run — see the \`agentic-decision-autonomy\` skill for the rule and for the five blockers that genuinely stop a run. On one of those, label this issue \`blocked\`, comment what is missing, and stop. Do not close issue #${n} without a PR unless no code change was needed.`
             ].join('\n');
 
             await github.rest.issues.createComment({ owner, repo, issue_number: n, body });

@@ -2,6 +2,7 @@
 // Workers with roles, morale, union status, and injury tracking.
 
 import { Random } from '../math/Random.js';
+import type { NeedKey } from './EmployeeNeeds.js';
 import { HIRING_COSTS as _HIRING_COSTS, BASE_SALARIES as _BASE_SALARIES, PAY_CYCLE_TICKS as _PAY_CYCLE_TICKS, QUALIFICATION_SALARY_BONUS } from '../config/balance.js';
 
 // ── Roles ──
@@ -103,6 +104,14 @@ export interface Employee {
   ticksWorked: number;
   /** Ticks of rest remaining when employee is in bunkhouse rest mode, or null if not resting. */
   restTicksRemaining: number | null;
+  /**
+   * Which need gauge the in-progress rest is restoring, or null when the
+   * employee is not resting or is resting under the Bunkhouse Tier 2+ shift
+   * cycle (which processShiftCycle owns end to end). Set alongside
+   * restTicksRemaining and cleared with it — the two are the rest's whole
+   * state, and the key decides which completion path owns the employee.
+   */
+  restNeedKey: NeedKey | null;
 }
 
 // ── Employee state ──
@@ -159,6 +168,7 @@ export function hireEmployee(
     interruptedActionPayload: null,
     ticksWorked: 0,
     restTicksRemaining: null,
+    restNeedKey: null,
   };
   // Keep the stored salary consistent with the qualification just granted —
   // calculateSalary() sums qualification bonuses, so a base-only salary would

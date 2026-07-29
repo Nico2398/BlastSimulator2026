@@ -5,6 +5,7 @@ tools: Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite
 skills:
   - dev-architecture
   - dev-coding-conventions
+  - agentic-decision-autonomy
 ---
 
 # Implementer — TDD Green Phase

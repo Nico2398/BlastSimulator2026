@@ -37,6 +37,7 @@ function makeEmployee(overrides?: Partial<Employee>): Employee {
     interruptedActionPayload: null,
     ticksWorked: 0,
     restTicksRemaining: null,
+    restNeedKey: null,
     ...overrides,
   };
 }
@@ -360,7 +361,10 @@ describe('EmployeePanel', () => {
     });
 
     it('up to 5 pending actions shown in queue', () => {
-      const emp = makeEmployee({ activeActionId: 1 });
+      // Idle employee: the cap applies to the queued actions themselves. An
+      // employee's claimed action is rendered under ACTIVE and excluded from
+      // this list, so leaving it unclaimed keeps this test about the 5-entry cap.
+      const emp = makeEmployee({ activeActionId: null });
       const state = withEmployees(makeMockState(), [emp]);
       // Create 8 pending actions to test the 5-entry cap
       state.pendingActions = Array.from({ length: 8 }, (_, i) => ({
