@@ -1,0 +1,172 @@
+name: "Autonomous run state"
+description: >
+  Answers one question after an agent session ends: did this run leave its issue
+  in a terminal state? A run is terminal when it produced a pull request, said it
+  was blocked, or closed the issue. Anything else means the session stopped with
+  the work unfinished and nobody told — the failure mode that cost issue #404
+  three hours and killed issue #406 fifty-eight seconds in.
+
+  It also reports whether a retry is worth attempting inside the remaining job
+  budget, and what the previous attempt left on the runner's disk, so the retry
+  prompt can tell the next session where to pick up.
+
+inputs:
+  token:
+    description: "Token used to read the issue, its labels and its linked PRs. GITHUB_TOKEN is enough."
+    required: true
+  issue:
+    description: "Issue number the run was working on. Empty makes every output inert."
+    required: true
+  started_at:
+    description: >
+      Unix epoch seconds recorded when the job started, used with `budget_minutes`
+      to decide whether a retry can still finish. Empty skips the clock check and
+      only reports whether the run was terminal.
+    required: false
+    default: ""
+  budget_minutes:
+    description: "The job's `timeout-minutes`. Retrying past this is pointless — the job is cancelled mid-attempt."
+    required: false
+    default: "360"
+  min_remaining_minutes:
+    description: >
+      A retry needs enough clock to reach a PR. Below this, report the run as lost
+      rather than starting an attempt that the job timeout will cut off — which is
+      how issue #404 lost everything it had done.
+    required: false
+    default: "75"
+
+outputs:
+  terminal:
+    description: "'true' when the issue is in a terminal state and needs no further attempt."
+    value: ${{ steps.state.outputs.terminal }}
+  reason:
+    description: "One line explaining the verdict, suitable for a job log or an issue comment."
+    value: ${{ steps.state.outputs.reason }}
+  retry:
+    description: "'true' when the run is not terminal and the remaining job budget can still carry an attempt."
+    value: ${{ steps.state.outputs.retry }}
+  branch_state:
+    description: "What the previous attempt left behind: local `pipeline/*-<N>` branches and their commit counts against main."
+    value: ${{ steps.branches.outputs.branch_state }}
+
+runs:
+  using: composite
+  steps:
+    # Read from disk, not from the remote. The whole point of the retry is that
+    # the previous attempt's branches never reached the remote, so `git branch -r`
+    # would report nothing while the work sits in the working copy.
+    - name: Describe what the previous attempt left on disk
+      id: branches
+      shell: bash
+      env:
+        ISSUE: ${{ inputs.issue }}
+      run: |
+        set -euo pipefail
+
+        {
+          echo "branch_state<<AGENTIC_BRANCH_STATE_EOF"
+          if [ -z "${ISSUE}" ]; then
+            echo "(no issue number — nothing to describe)"
+          else
+            found=0
+            for branch in $(git for-each-ref --format='%(refname:short)' "refs/heads/pipeline/*-${ISSUE}"); do
+              found=1
+              ahead=$(git rev-list --count "main..${branch}" 2>/dev/null || echo '?')
+              echo "- ${branch}: ${ahead} commit(s) beyond main"
+            done
+            if [ "${found}" = "0" ]; then
+              echo "- none: no pipeline/*-${ISSUE} branch exists on this runner, so the work starts from main"
+            fi
+          fi
+          echo "AGENTIC_BRANCH_STATE_EOF"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Decide whether the run is terminal
+      id: state
+      uses: actions/github-script@v7
+      env:
+        ISSUE: ${{ inputs.issue }}
+        STARTED_AT: ${{ inputs.started_at }}
+        BUDGET_MINUTES: ${{ inputs.budget_minutes }}
+        MIN_REMAINING_MINUTES: ${{ inputs.min_remaining_minutes }}
+      with:
+        github-token: ${{ inputs.token }}
+        script: |
+          const owner = context.repo.owner;
+          const repo = context.repo.repo;
+          const number = parseInt(process.env.ISSUE || '', 10);
+
+          const settle = (terminal, retry, reason) => {
+            core.setOutput('terminal', terminal ? 'true' : 'false');
+            core.setOutput('retry', retry ? 'true' : 'false');
+            core.setOutput('reason', reason);
+            core.info(reason);
+          };
+
+          // A run triggered from a PR review comment carries no issue. There is
+          // no lifecycle label to leave in a terminal state, so there is nothing
+          // here to judge and nothing to retry.
+          if (!Number.isInteger(number)) {
+            settle(true, false, 'No issue number — this run has no lifecycle state to settle.');
+            return;
+          }
+
+          const { data: issue } = await github.rest.issues.get({
+            owner, repo, issue_number: number
+          });
+          const labels = new Set(
+            (issue.labels || []).map((l) => (typeof l === 'string' ? l : l.name))
+          );
+
+          if (issue.state === 'closed') {
+            settle(true, false, `Issue #${number} is closed — the run settled it.`);
+            return;
+          }
+          if (labels.has('blocked')) {
+            settle(true, false, `Issue #${number} is labelled \`blocked\` — the run stated what is missing.`);
+            return;
+          }
+
+          // A linked PR is the deliverable. Its own CI and review carry it from
+          // here, however long that takes, so the run is done either way.
+          const { data: events } = await github.rest.issues.listEventsForTimeline({
+            owner, repo, issue_number: number, per_page: 100
+          });
+          const linked = events.find(
+            (e) => e.event === 'cross-referenced' && e.source?.issue?.pull_request
+          );
+          if (linked) {
+            settle(true, false, `Issue #${number} has a linked pull request — the run produced its deliverable.`);
+            return;
+          }
+
+          // Not terminal. Whether that is worth another attempt is a question
+          // about the clock: an attempt that the job timeout cuts off mid-work
+          // is strictly worse than reporting the run lost, because a cancelled
+          // job takes its unpushed branches with it.
+          const startedAt = parseInt(process.env.STARTED_AT || '', 10);
+          const budget = parseInt(process.env.BUDGET_MINUTES || '', 10) || 360;
+          const floor = parseInt(process.env.MIN_REMAINING_MINUTES || '', 10) || 75;
+
+          if (!Number.isInteger(startedAt)) {
+            settle(
+              false, false,
+              `Issue #${number} has no PR, no \`blocked\` label and is still open — the run did not settle it. ` +
+              'No start time was supplied, so no retry is scheduled.'
+            );
+            return;
+          }
+
+          const elapsed = Math.round((Date.now() / 1000 - startedAt) / 60);
+          const remaining = budget - elapsed;
+          const worthRetrying = remaining >= floor;
+
+          settle(
+            false, worthRetrying,
+            `Issue #${number} has no PR, no \`blocked\` label and is still open — the run did not settle it. ` +
+            `${elapsed}m of the ${budget}m budget spent, ${remaining}m left; ` +
+            (worthRetrying
+              ? `at least ${floor}m is needed for an attempt, so one more will run.`
+              : `an attempt needs ${floor}m, so this run is reported lost instead of being cut off mid-work.`)
+          );

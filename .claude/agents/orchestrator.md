@@ -5,6 +5,12 @@ disallowedTools: Edit, Write, NotebookEdit
 skills:
   - agentic-autonomous-pipeline
   - agentic-decision-autonomy
+# Enforcement lives in `.claude/settings.json`, not here. A frontmatter hook is
+# registered only for an agent started through the `Agent` tool, and `/agentic-run`
+# forks the session into this agent instead — so this block alone never fired, and
+# issue #406 lost its run to a backgrounded sub-agent. Kept as a fallback for the
+# case where the orchestrator IS invoked as a sub-agent. Do not delete the
+# settings.json entry; `npm run validate:context` fails without it.
 hooks:
   PreToolUse:
     - matcher: Agent|Task

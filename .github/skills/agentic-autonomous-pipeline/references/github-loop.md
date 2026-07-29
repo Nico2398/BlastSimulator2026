@@ -18,6 +18,9 @@ agentic-intake.yml                          auto-assign-next.yml  agentic-watchd
              claude-runner.yml  ─or─  opencode-runner.yml   (whichever mention matched)
                                      │  orchestrator → pipeline skill → TDD → PR with
                                      │  `Closes #N` + `READY TO MERGE`
+                                     │  [agentic-run-state]  settled nothing? one more attempt
+                                     │  [agentic-rescue]     still nothing? push what exists,
+                                     │                       report it, label the issue `blocked`
                                      ▼
                               auto-assign-next.yml
                                      │  enables auto-merge → CI → merge → close #N, label `done`
@@ -41,8 +44,8 @@ Events get lost — GitHub keeps one pending run per concurrency group and drops
 |-------|-------|-----------|-----------|
 | `agent-task` | The pipeline owns this issue | Intake, or the issue form | — |
 | `ready` | Waiting in the assignment queue | Intake, the issue form, or a human unblocking | `agentic-assign`, on assignment |
-| `in-progress` | A run owns it. Single flight reads this label | `agentic-assign` | The merged-PR chain, the run itself when its deliverable is not a diff, or the watchdog |
-| `blocked` | Halted; a human has to answer something | The run, or the watchdog | A human, by adding `ready` |
+| `in-progress` | A run owns it. Single flight reads this label | `agentic-assign` | The merged-PR chain, the run itself when its deliverable is not a diff, `agentic-rescue` when the run ended without finishing, or the watchdog |
+| `blocked` | Halted; a human has to answer something | The run, `agentic-rescue`, or the watchdog | A human, by adding `ready` |
 | `done` | Finished | The merged-PR chain, or a run releasing a non-PR deliverable | — |
 | `decision-review` | A default the run chose, revisit at leisure. Carries no `ready`, so it never enters the queue | The run — see `agentic-decision-autonomy` | A human, by adding `ready` |
 
@@ -71,13 +74,25 @@ The loop stops deliberately when an issue is labelled `blocked`, while an issue 
 
 A run that dies without labelling anything — OOM, a hung tool call, the job timeout, a revoked token, a turn ended on outstanding work — would otherwise leave its issue `in-progress` forever and halt the chain silently. `agentic-watchdog.yml` sweeps hourly: an issue `in-progress` past `AGENTIC_STALL_MINUTES` with no linked PR is commented on, labelled `blocked`, and stripped of `in-progress`. That labelling is what surfaces the failure, so the watchdog must use the PAT — a label applied with `GITHUB_TOKEN` raises no `issues: labeled` event and `handle-failure.yml` would never fire.
 
-**The watchdog is the only mechanism allowed to declare a run lost.** It is the only one that ages the run against a threshold; every other step defers instead of diagnosing. Two mechanisms declaring death from the same evidence produce contradictory comments on a healthy run.
+**Only a step that can see the run end may declare it lost.** That is a rule about evidence, not about seniority. `agentic-assign` sees labels alone, where a run 40 seconds old and one that died hours ago are indistinguishable, so it defers and never diagnoses. The watchdog ages the run against a threshold, which is inference — correct, but hours late. The runners' own post-agent steps have the one thing neither has: they run *after* the session is over, in the same job, so "this run finished and produced nothing" is an observation. They are allowed to settle the issue for that reason, and the watchdog remains the floor for the runs that never got that far — a job killed before its post-steps, a dropped webhook.
+
+## The run is retried before it is written off
+
+A session can end early for reasons no instruction reaches: a backgrounded delegation whose notification never arrives, a crash in the first minutes, a transient API error, a model that simply stops. Every one of those wastes a whole assignment and, before the retry existed, a whole day — #404 waited four hours for a watchdog sweep, and #406 sat `in-progress` after dying in 58 seconds.
+
+`agentic-run-state` answers one question after the agent step: is the issue in a terminal state? Terminal means a linked pull request, a `blocked` label, or a closed issue. Anything else means the session stopped with the work unfinished, and the runner starts one more attempt in the same job — carrying what went wrong, an inventory of the `pipeline/*-<N>` branches the previous attempt left on disk (never pushed, so visible nowhere else), and the rule that most often broke it. The retry is gated on the clock as well: with less than `min_remaining_minutes` of the job budget left, the run is written off rather than cut off mid-work, because a cancelled job takes its unpushed branches with it.
+
+One retry, not three. A real run takes over two hours, so a second attempt is all a 360-minute budget holds — and the failures worth retrying die early and leave the whole budget behind.
 
 ## Rescue: a run that ends early must not end silently
 
-Intent is not a mechanism, so `agentic-rescue` runs after the agent step in both runners, with `if: always()` — it also covers the crash, the job timeout and the cancelled run, none of which the agent can write instructions for. It pushes `pipeline/feature-<N>` if commits exist on it and opens a **draft** PR carrying `Closes #<N>` and no `READY TO MERGE`; when no feature branch was ever produced, it comments on the issue saying so. A push it cannot complete is reported too, with the rejection, the commit list and the diffstat of what is being lost: a step that ends on `::error::` alone leaves exactly the silence this action exists to prevent, since the job log is not somewhere anyone is watching. Either way the failure becomes visible immediately and the work survives, instead of surfacing hours later as a watchdog sweep over an issue whose branches no longer exist.
+Intent is not a mechanism, so `agentic-rescue` runs last in both runners, with `if: always()` — it also covers the crash, the job timeout and the cancelled run, none of which the agent can write instructions for. It pushes `pipeline/feature-<N>` if commits exist on it and opens a **draft** PR carrying `Closes #<N>` and no `READY TO MERGE`; when no feature branch was produced, or the branch is empty, it comments on the issue saying so. A push it cannot complete is reported too, with the rejection, the commit list and the diffstat of what is being lost: a step that ends on `::error::` alone leaves exactly the silence this action exists to prevent, since the job log is not somewhere anyone is watching. Either way the failure becomes visible immediately and the work survives, instead of surfacing hours later as a watchdog sweep over an issue whose branches no longer exist.
 
-The rescue PR is a diagnosis, not a deliverable: it is unreviewed and unvalidated by definition, and it deliberately holds the chain (an in-progress issue with a linked PR defers assignment) until a human decides whether to finish it or drop it.
+**Every outcome here labels the issue `blocked`**, because reaching this step at all means the run did not finish it — and by then the session is over, so there is nothing left to wait for. That includes the successful rescue: an issue left `in-progress` with a draft PR attached passes both the single-flight check *and* the watchdog's linked-PR skip, so it would hold the queue for as long as the draft stayed open. `blocked` is the honest state — work preserved, human notified by `handle-failure.yml`, queue released. It is applied once and only to an issue that is still open and not already `blocked`: a run whose deliverable was an answer has closed its own issue, and re-labelling an escalated one would fire a second notification for the same failure.
+
+The rescue PR is a diagnosis, not a deliverable: unreviewed and unvalidated by definition. Finishing it or dropping it is a human decision, and adding `ready` back to the issue is the whole resume procedure.
+
+**An escalation does not chain to the next issue, and that is deliberate.** The runner's own chaining step covers a run whose deliverable was not a diff — an issue closed and labelled `done`. A run that failed is different: chaining from it means the queue restarts as fast as runs fail, and a systemic failure (an expired token, a broken `main`) would march through the whole backlog labelling every issue `blocked` in minutes. The hourly sweep restarts the queue instead, which rate-limits the damage to one issue an hour and gives a human time to see the first notification.
 
 ## Dependencies between issues
 
@@ -100,4 +115,4 @@ The orchestrator includes `READY TO MERGE` in the PR body when PR status is `rea
 
 ## Shared composite actions
 
-They live in `.github/actions/`: `agentic-prompt` builds the trigger context both runners hand to their agent, `agentic-assign` picks and assigns the next issue, `agentic-rescue` salvages a feature branch from a run that ended before opening its PR.
+They live in `.github/actions/`: `agentic-prompt` builds the trigger context both runners hand to their agent, `agentic-assign` picks and assigns the next issue, `agentic-run-state` reports whether a finished session left its issue terminal and whether the remaining job budget can carry another attempt, and `agentic-rescue` salvages a feature branch from a run that ended before opening its PR and settles the issue either way.

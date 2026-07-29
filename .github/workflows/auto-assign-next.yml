@@ -1,8 +1,16 @@
 name: "Pipeline: assign next issue to the configured agent"
 
 on:
+  # `READY TO MERGE` normally arrives with the PR, so `opened` carries the happy
+  # path. The others are the ways it can arrive later, and each was a dead end: a
+  # body edited to add the line, a draft marked ready (auto-merge cannot be
+  # enabled on a draft, so the attempt at `opened` is discarded), a PR reopened
+  # after being closed. Auto-merge never being enabled means the PR never merges,
+  # and an issue whose PR never merges holds the assignment queue for as long as
+  # it stays open — the watchdog skips issues that have a linked PR.
+  # `gh pr merge --auto` is idempotent, so re-evaluating costs nothing.
   pull_request:
-    types: [opened, synchronize, closed]
+    types: [opened, synchronize, reopened, edited, ready_for_review, closed]
 
 permissions:
   issues: write

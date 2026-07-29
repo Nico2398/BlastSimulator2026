@@ -10,7 +10,8 @@
  *   1. Frontmatter keys belong to the schema for that file type
  *   2. Tool names in `tools` / `disallowedTools` resolve to real Claude Code tools
  *   3. `skills:` entries reference skills that exist
- *   4. Hook commands point at files that exist and are executable
+ *   4. Hook commands point at files that exist and are executable, and the hooks
+ *      that only work when registered project-wide are registered in settings.json
  *   5. Skill directory name matches its frontmatter `name`
  *   6. Body content is identical across .claude/, .github/, and .opencode/
  *   7. A command's `agent:` resolves to an agent that exists
@@ -403,6 +404,97 @@ function checkCrossRuntimeSync(): ContextIssue[] {
   return issues;
 }
 
+/** Hooks that must be registered in settings.json, not in agent frontmatter. */
+const SETTINGS_HOOKS = [
+  {
+    script: '.claude/hooks/require-foreground-agents.sh',
+    event: 'PreToolUse',
+    /** Tool names the matcher has to cover for the guard to see a delegation. */
+    tools: ['Agent', 'Task'],
+    why:
+      'a frontmatter declaration only registers for agents started through the `Agent` ' +
+      'tool, and the orchestrator is entered by `/agentic-run` forking into it — so the ' +
+      'guard never ran, and issue #406 lost its run to a backgrounded sub-agent',
+  },
+];
+
+/**
+ * Checks `.claude/settings.json` hooks.
+ *
+ * A hook file that exists and is executable still does nothing until something
+ * registers it, and `checkAgent` above only proves the first half. Registration
+ * is where this project has been bitten: `require-foreground-agents.sh` passed
+ * every check while sitting inert, because it was declared in the one place the
+ * orchestrator's session never reads.
+ */
+function checkSettingsHooks(): ContextIssue[] {
+  const relative = '.claude/settings.json';
+  const path = join(ROOT, relative);
+  if (!existsSync(path)) {
+    return [{ file: relative, message: 'missing — project hooks and permissions live here' }];
+  }
+
+  let settings: { hooks?: Record<string, { matcher?: string; hooks?: { command?: string }[] }[]> };
+  try {
+    settings = JSON.parse(readFileSync(path, 'utf8'));
+  } catch (error) {
+    return [{ file: relative, message: `is not valid JSON: ${(error as Error).message}` }];
+  }
+
+  const issues: ContextIssue[] = [];
+  const hooks = settings.hooks ?? {};
+
+  for (const [event, entries] of Object.entries(hooks)) {
+    for (const entry of entries) {
+      for (const hook of entry.hooks ?? []) {
+        const command = (hook.command ?? '').replace('${CLAUDE_PROJECT_DIR}/', '');
+        if (!command) continue;
+        const target = join(ROOT, command);
+        if (!existsSync(target)) {
+          issues.push({ file: relative, message: `${event} hook command not found: ${command}` });
+        } else if (!(statSync(target).mode & 0o111)) {
+          issues.push({ file: relative, message: `${event} hook command not executable: ${command}` });
+        }
+      }
+    }
+  }
+
+  for (const required of SETTINGS_HOOKS) {
+    const entries = hooks[required.event] ?? [];
+    const registered = entries.filter((entry) =>
+      (entry.hooks ?? []).some((hook) => (hook.command ?? '').endsWith(basename(required.script)))
+    );
+    if (registered.length === 0) {
+      issues.push({
+        file: relative,
+        message: `${required.script} is not registered as a ${required.event} hook — ${required.why}`,
+      });
+      continue;
+    }
+    for (const tool of required.tools) {
+      const covered = registered.some((entry) => {
+        const matcher = entry.matcher ?? '';
+        if (!matcher || matcher === '*') return true;
+        try {
+          return new RegExp(matcher).test(tool);
+        } catch {
+          return false;
+        }
+      });
+      if (!covered) {
+        issues.push({
+          file: relative,
+          message:
+            `${required.script} is registered for ${required.event} but its matcher does not ` +
+            `match the \`${tool}\` tool`,
+        });
+      }
+    }
+  }
+
+  return issues;
+}
+
 /**
  * Validates every context file under `.claude/`, plus cross-runtime body sync.
  *
@@ -446,6 +538,7 @@ export function validateContextFiles(): ContextIssue[] {
   }
 
   issues.push(...checkEntryPoints(skills));
+  issues.push(...checkSettingsHooks());
   issues.push(...checkCrossRuntimeSync());
   return issues;
 }
@@ -458,7 +551,8 @@ function main(): void {
   } else if (issues.length === 0) {
     console.log(
       'Context files valid: frontmatter schemas, tool names, preloaded skills, hooks, ' +
-        'bundled skill files, runtime entry points, cross-runtime sync.'
+        'settings.json hook registration, bundled skill files, runtime entry points, ' +
+        'cross-runtime sync.'
     );
   } else {
     console.error(`${issues.length} context file issue(s):\n`);
