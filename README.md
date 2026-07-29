@@ -413,15 +413,22 @@ Required secrets: `PAT_TOKEN_COPILOT_AUTOMATION` (both agents — the loop dies 
 
 ### Trigger paths
 
+**Filing an issue is the whole handover.** Intake labels it `agent-task` + `ready` — whether it came from the issue form, the API, or a sentence typed on a phone — and it joins the queue in number order. The run that picks it up plans it, writes the tests, implements them, verifies the channels the change touches, and opens the pull request that closes it. Where the issue leaves a choice open, the run takes the default the specs imply and records it in the PR rather than waiting for an answer.
+
 | Trigger | Result |
 |---------|--------|
-| Run the **"Pipeline: run the configured agent on the next ready issue"** workflow | Picks the oldest unblocked `ready` issue and posts the assignment comment |
+| **File an issue** | Labels it, then assigns the oldest unblocked `ready` issue |
+| Add `ready` to an issue | Same — this is also how you resume a `blocked` one, with nothing to dispatch by hand |
 | A merged PR whose body says `Closes #N` | Closes `#N`, then assigns the next `ready` issue the same way |
+| Hourly watchdog | Sweeps stalled runs, and restarts the queue when the pipeline sits idle with issues waiting |
+| Run the **"Pipeline: run the configured agent on the next ready issue"** workflow | Forces the queue forward by hand |
 | Comment `@claude …` on an issue or PR | Runs `.github/workflows/claude-runner.yml` |
 | Comment `@opencode …` on an issue or PR | Runs `.github/workflows/opencode-runner.yml` |
+
+Only one agent session runs at a time, so an issue filed while another is live waits its turn instead of starting a second one.
 
 The assignment comment *is* the trigger, and it carries the whole assignment: the issue, the mandate to delegate to the `pipeline` orchestrator before anything else, the branch names, the verification expectation, and the PR conventions. Its wording is identical for both agents apart from the mention on the first line — so both runtimes read the same instructions. Both runners stay enabled regardless of `AGENTIC_AGENT`, so you can always summon the other one by hand.
 
 **Why the PAT matters:** GitHub does not trigger workflows from events created with `GITHUB_TOKEN`. An assignment comment posted with it wakes no runner, and a PR opened with it raises no `pull_request` event, so auto-merge and the next assignment never happen. Every comment and PR in the loop must come from `PAT_TOKEN_COPILOT_AUTOMATION`.
 
-Full architecture — branch isolation, cherry-pick, the halt conditions — lives in the `agentic-autonomous-pipeline` skill.
+Full architecture — branch isolation, cherry-pick, the halt conditions — lives in the `agentic-autonomous-pipeline` skill, which keeps the GitHub Actions loop itself (entry points, issue labels as state, single flight, rescue, watchdog) in `references/github-loop.md`.

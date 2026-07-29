@@ -71,6 +71,8 @@ Five independent channels prove a change works. Each catches what the others mis
 
 ## ▶ Autonomous pipeline sessions
 
+The project takes one human input: a GitHub issue. Filing one starts a run — intake labels it, the queue assigns it, and the run carries it to a merged pull request or to a stated blocker. A run always leaves its issue in a terminal state; an issue left holding `in-progress` stalls every assignment behind it.
+
 A session started by the autonomous pipeline — a GitHub Actions run woken by the configured agent mention in a pipeline assignment comment — is not an ordinary session. Its first action is to run as the orchestrator: classify the task, then delegate every step to specialists. Never implement a pipeline-assigned task directly, and never explore the codebase before the task has been classified. The `/agentic-run` command carries that mandate; the system around it is described in `agentic-autonomous-pipeline`.
 
 ## ▶ Capability Gate — CHECK BEFORE ANY ACTION

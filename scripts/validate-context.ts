@@ -15,6 +15,7 @@
  *   6. Body content is identical across .claude/, .github/, and .opencode/
  *   7. A command's `agent:` resolves to an agent that exists
  *   8. Every command has a mirror in the other two runtimes
+ *   9. Files bundled with a skill are mirrored too, and named by their SKILL.md
  *
  * Usage:
  *   npx tsx scripts/validate-context.ts
@@ -212,6 +213,63 @@ function checkSkill(file: ParsedFile, skills: Set<string>): ContextIssue[] {
   return issues;
 }
 
+/** Paths under a skill directory, relative to it, excluding its SKILL.md. */
+function bundledFiles(dir: string, prefix = ''): string[] {
+  if (!existsSync(dir)) return [];
+  const found: string[] = [];
+  for (const entry of readdirSync(dir).sort()) {
+    const relative = prefix ? `${prefix}/${entry}` : entry;
+    if (statSync(join(dir, entry)).isDirectory()) {
+      found.push(...bundledFiles(join(dir, entry), relative));
+    } else if (relative !== 'SKILL.md') {
+      found.push(relative);
+    }
+  }
+  return found;
+}
+
+/**
+ * A skill splits its detail into bundled files so the agent loads only what the
+ * step needs. Two ways that fails silently: a file the SKILL.md never names is
+ * context nothing reaches, and a file mirrored into one runtime only gives that
+ * runtime knowledge the others lack.
+ */
+function checkBundledFiles(skill: string, body: string): ContextIssue[] {
+  const issues: ContextIssue[] = [];
+  const claudeDir = join(ROOT, '.claude/skills', skill);
+
+  for (const relative of bundledFiles(claudeDir)) {
+    if (!body.includes(relative)) {
+      issues.push({
+        file: join(claudeDir, relative),
+        message: 'not named by its SKILL.md — nothing tells an agent to read it',
+      });
+    }
+    const source = readFileSync(join(claudeDir, relative), 'utf8');
+    for (const dir of ['.github/skills', '.opencode/skills']) {
+      const mirror = join(ROOT, dir, skill, relative);
+      if (!existsSync(mirror)) {
+        issues.push({ file: mirror, message: `missing mirror of ${skill}/${relative}` });
+      } else if (readFileSync(mirror, 'utf8').trim() !== source.trim()) {
+        issues.push({ file: mirror, message: `differs from .claude/skills/${skill}/${relative}` });
+      }
+    }
+  }
+
+  for (const dir of ['.github/skills', '.opencode/skills']) {
+    for (const relative of bundledFiles(join(ROOT, dir, skill))) {
+      if (!existsSync(join(claudeDir, relative))) {
+        issues.push({
+          file: join(ROOT, dir, skill, relative),
+          message: `has no counterpart in .claude/skills/${skill}/`,
+        });
+      }
+    }
+  }
+
+  return issues;
+}
+
 /** Bodies must match across runtimes; frontmatter is allowed to differ. */
 function checkCrossRuntimeSync(): ContextIssue[] {
   const issues: ContextIssue[] = [];
@@ -232,6 +290,7 @@ function checkCrossRuntimeSync(): ContextIssue[] {
         issues.push({ file: mirror, message: `body differs from .claude/skills/${skill}/SKILL.md` });
       }
     }
+    issues.push(...checkBundledFiles(skill, claude.body));
   }
 
   for (const path of markdownFiles(join(ROOT, '.claude/agents'))) {
@@ -324,7 +383,10 @@ function main(): void {
   if (process.argv.includes('--json')) {
     console.log(JSON.stringify({ issues }, null, 2));
   } else if (issues.length === 0) {
-    console.log('Context files valid: frontmatter schemas, tool names, preloaded skills, hooks, cross-runtime sync.');
+    console.log(
+      'Context files valid: frontmatter schemas, tool names, preloaded skills, hooks, ' +
+        'bundled skill files, cross-runtime sync.'
+    );
   } else {
     console.error(`${issues.length} context file issue(s):\n`);
     for (const issue of issues) {

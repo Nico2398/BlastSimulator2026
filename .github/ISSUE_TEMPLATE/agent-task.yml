@@ -1,7 +1,17 @@
 name: "Agent Task"
-description: "Atomic task for autonomous agent processing"
+description: "One atomic task for the autonomous pipeline"
 labels: ["agent-task", "ready"]
 body:
+  - type: markdown
+    attributes:
+      value: >
+        Filing this issue is the whole handover. The pipeline picks it up on its own,
+        plans it, writes the tests, implements it, verifies it, and opens the pull
+        request. Describe the outcome you want — the planner derives which files and
+        tests it needs. Where this issue leaves a choice open the run takes the default
+        the specs already imply and records it in the pull request, so an unanswered
+        corner is not a reason to hold the issue back.
+
   - type: textarea
     id: context
     attributes:
@@ -13,50 +23,38 @@ body:
   - type: textarea
     id: task
     attributes:
-      label: Task Description
+      label: Task
       description: >
-        What specifically needs to be done? Reference files, functions,
-        endpoints. Be precise — the agent will follow this literally.
+        What should be different once this is done? Name the mechanic, screen, or
+        behaviour. Reference files and functions when you already know them.
     validations:
       required: true
 
   - type: textarea
-    id: acceptance
+    id: verification
     attributes:
-      label: Acceptance Criteria
-      description: Checkboxes the agent can verify.
+      label: Verification
+      description: >
+        How a reader tells this is finished — observable outcomes, not commands.
+        The run picks the verification channels itself.
       value: |
         - [ ] Criterion 1
         - [ ] Criterion 2
-        - [ ] All existing tests still pass
-        - [ ] New tests cover the change
     validations:
       required: true
 
   - type: textarea
-    id: testing
+    id: blocked_by
     attributes:
-      label: Testing Procedure
+      label: Blocked by
       description: >
-        Exact commands to validate. The agent will run these.
-      value: |
-        ```bash
-        npm run validate
-        # Expected: all checks pass
-        ```
-    validations:
-      required: true
-
-  - type: textarea
-    id: dependencies
-    attributes:
-      label: Dependencies
-      description: Issues that must be merged before this one.
-      placeholder: "Depends on: #XX"
+        Issues that must be closed before this one starts. The pipeline defers this
+        issue until every one of them is closed.
+      placeholder: "#123 — level definition must exist first"
 
   - type: textarea
     id: constraints
     attributes:
-      label: Scope Constraints
-      description: What should NOT be changed.
+      label: Scope constraints
+      description: What this task should leave alone.
       placeholder: "Do not modify CI config, do not add dependencies"
