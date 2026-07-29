@@ -19,7 +19,7 @@ import { processPayCycle } from '../../core/entities/Employee.js';
 import { tickTraining } from '../../core/entities/EmployeeTraining.js';
 import { tickNeedGauges, needsMoraleEffect } from '../../core/entities/EmployeeNeeds.js';
 import type { FiredEvent } from '../../core/events/EventSystem.js';
-import { tickCollapse, autoInsertNeedTasks, processShiftCycle, tickEmployees } from '../../core/engine/GameLoop.js';
+import { tickCollapse, autoInsertNeedTasks, processShiftCycle, tickEmployees, tickGeneralRestCompletion } from '../../core/engine/GameLoop.js';
 import { estimateSurveyResult, type SurveyMethod } from '../../core/mining/SurveyCalc.js';
 import { checkDeadlines, generateContracts } from '../../core/economy/Contract.js';
 import { updateBankruptcy } from '../../core/campaign/Bankruptcy.js';
@@ -145,11 +145,14 @@ export function tickCommand(
     // 8. Employee needs — drain gauges, update morale, check collapse
     for (const emp of state.employees.employees) {
       if (!emp.alive) continue;
-      const isWorking = emp.activeActionId !== null;
+      const isWorking = emp.activeActionId !== null && emp.restTicksRemaining === null;
       tickNeedGauges(emp, isWorking);
       emp.morale = Math.max(0, Math.min(100, emp.morale + needsMoraleEffect(emp)));
     }
     const firedEvents: FiredEvent[] = [];
+    // Complete rests started on a prior tick before creating any new ones —
+    // mirrors processShiftCycle's own complete-then-create ordering.
+    tickGeneralRestCompletion(state);
     tickCollapse(state, firedEvents, emitter);
     autoInsertNeedTasks(state, firedEvents, emitter);
     processShiftCycle(state, firedEvents, emitter);

@@ -39,7 +39,7 @@ Never restate content across layers. Reference it by name.
 Prefix categories:
 - `gameplay-*` — game mechanics specs (blast, buildings, navmesh, survey, vehicles, employee skills/needs, game design)
 - `dev-*` — architecture, coding conventions, testing strategy, visual testing, playability testing
-- `agentic-*` — pipeline orchestration, context authoring, issue creation
+- `agentic-*` — pipeline orchestration, decision autonomy, context authoring, issue creation
 
 **Skills-First:** before any task, load related skill(s) for domain rules, procedures, and constraints.
 

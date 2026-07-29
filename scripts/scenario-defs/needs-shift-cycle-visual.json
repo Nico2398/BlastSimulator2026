@@ -18,6 +18,14 @@
         {
           "type": "command",
           "command": "employee hire role:driller"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-detail-toggle"
         }
       ]
     },
@@ -45,6 +53,15 @@
         {
           "type": "command",
           "command": "set_policy mode:shift_8h"
+        }
+      ]
+    },
+    {
+      "command": "employee dispatch 1 x:10 z:10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:10 z:10"
         }
       ]
     },

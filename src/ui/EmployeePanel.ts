@@ -7,7 +7,7 @@ import type { Employee, EmployeeRole, TrainingState } from '../core/entities/Emp
 import { QUALIFICATION_SALARY_BONUS, BASE_SALARIES } from '../core/config/balance.js';
 import { makeTrainingSection, availableCourses } from './employeeTrainingSection.js';
 import { planTraining } from '../core/entities/EmployeeTraining.js';
-import { makeSkillSection, makeNeedBar, makeTaskQueue, formatNeed } from './employeeDetailSections.js';
+import { makeSkillSection, makeNeedBar, makeTaskQueue, formatNeed, applyNeedValueClass, getEmployeeRowClassNames } from './employeeDetailSections.js';
 
 import type { CommandResult } from '../console/ConsoleRunner.js';
 
@@ -163,7 +163,10 @@ export class EmployeePanel {
         const fill = row.querySelector<HTMLElement>(`[data-need="${key}"] .bs-need-bar-fill`);
         if (fill) fill.style.width = `${value}%`;
         const readout = row.querySelector<HTMLElement>(`[data-need="${key}"] .bs-need-value`);
-        if (readout) readout.textContent = formatNeed(value);
+        if (readout) {
+          readout.textContent = formatNeed(value);
+          applyNeedValueClass(readout, value);
+        }
       }
 
       if (e.trainingState) {
@@ -179,6 +182,21 @@ export class EmployeePanel {
             + `(${e.trainingState.ticksRemaining}t)`;
         }
       }
+
+      // Task queue (active/queued actions) and modifier tags (morale tier,
+      // collapsing, injured) are built once at expand time by makeDetail and
+      // never touched again — a task claimed or a morale threshold crossed
+      // after expansion was invisible until an unrelated structural change
+      // forced a full rebuild. Re-render both sections in place every tick
+      // an employee's detail is open, same as the meta line and need bars above.
+      const detail = row.querySelector<HTMLElement>('.bs-employee-detail');
+      if (detail) {
+        const taskQueueEl = detail.querySelector<HTMLElement>('.bs-task-queue');
+        if (taskQueueEl) taskQueueEl.replaceWith(makeTaskQueue(e, state));
+
+        const modifiersEl = detail.querySelector<HTMLElement>('.bs-modifiers-section');
+        if (modifiersEl) modifiersEl.replaceWith(this.makeModifiersSection(e));
+      }
     }
   }
 
@@ -190,9 +208,8 @@ export class EmployeePanel {
 
   private makeEmployeeRow(e: Employee, state: GameState): HTMLElement {
     const row = document.createElement('div');
-    row.className = 'bs-employee-row';
+    row.className = getEmployeeRowClassNames(e).join(' ');
     row.dataset['employeeId'] = String(e.id);
-    if (e.collapsing) row.classList.add('collapsing');
 
     const nameEl = document.createElement('div');
     nameEl.style.cssText = 'font-size:11px;color:#d0b090;font-weight:bold';
@@ -270,6 +287,10 @@ export class EmployeePanel {
 
   private makeModifiersSection(e: Employee): HTMLElement {
     const el = document.createElement('div');
+    // Addressable so refreshDynamic can re-render this section in place each
+    // tick a row is expanded — modifiers depend on morale/collapsing/injured,
+    // which drift on their own like the meta line and need bars.
+    el.className = 'bs-modifiers-section';
 
     const modifiers = [
       { active: e.morale >= 70, text: t('ui.employees.high_morale') },

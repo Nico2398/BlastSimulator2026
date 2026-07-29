@@ -12,10 +12,11 @@ import { detectTrafficJam } from '../events/EventEngine.js';
 import { checkCollapse, type NeedKey, type Employee } from '../entities/Employee.js';
 import { replenishNeed } from '../entities/EmployeeNeeds.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
+import { addExpense } from '../economy/Finance.js';
 
 // ── Config ──
 
-import { BASE_TICK_MS as _BASE_TICK_MS, VALID_SPEEDS as _VALID_SPEEDS, MAX_NEED_GAUGE, NEED_REST_DURATIONS, NEED_REST_BUILDING_TYPES, NEED_REST_SEARCH_RADIUS, NEED_WARNING_THRESHOLDS, NEED_REST_COSTS, WORK_DURATION_TICKS, SHIFT_SLEEP_DURATION_TICKS } from '../config/balance.js';
+import { BASE_TICK_MS as _BASE_TICK_MS, VALID_SPEEDS as _VALID_SPEEDS, NEED_REST_DURATIONS, NEED_REST_NO_BUILDING_CAP, NEED_REST_NO_BUILDING_DURATION_MULTIPLIER, NEED_REST_BUILDING_TYPES, NEED_REST_SEARCH_RADIUS, NEED_WARNING_THRESHOLDS, NEED_REST_COSTS, WORK_DURATION_TICKS, SHIFT_SLEEP_DURATION_TICKS } from '../config/balance.js';
 
 /** Milliseconds per base tick at 1x speed. */
 export const BASE_TICK_MS = _BASE_TICK_MS;
@@ -221,10 +222,39 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
     idleMatch.activeActionId = action.id;
     result.claimed.push(action.id);
     // action is consumed — not pushed to remaining
+
+    // tickCollapse/tickNeedRestoration self-claim (see above) and start the rest
+    // timer immediately, so they never reach this path. autoInsertNeedTasks
+    // pushes 'rest' actions unclaimed (busy-employee case), so this is the
+    // first point an idle employee actually starts resting — start the timer
+    // here. Bunkhouse Tier 2+ shift-cycle rest (forceShiftRestIfNeeded) also
+    // self-claims and carries no 'needKey' payload, so resolveRestNeedKey
+    // returns null for it and this block is a no-op.
+    if (action.type === 'rest' && idleMatch.restTicksRemaining === null) {
+      const needKey = resolveRestNeedKey(action.payload);
+      if (needKey !== null) {
+        const restDuration = typeof action.payload['restDuration'] === 'number'
+          ? action.payload['restDuration'] as number
+          : NEED_REST_DURATIONS[needKey];
+        idleMatch.restTicksRemaining = restDuration;
+        idleMatch.restNeedKey = needKey;
+      }
+    }
   }
 
   state.pendingActions = remaining;
   return result;
+}
+
+/**
+ * Determine which need gauge a 'rest' PendingAction's payload is restoring,
+ * or null if the payload doesn't identify one — this is the case for the
+ * Bunkhouse Tier 2+ shift-cycle rest created by forceShiftRestIfNeeded, which
+ * processShiftCycle/completeRestTick already own end-to-end.
+ */
+function resolveRestNeedKey(payload: Record<string, unknown>): NeedKey | null {
+  const candidate = payload['needKey'];
+  return candidate === 'hunger' || candidate === 'fatigue' || candidate === 'breakNeed' ? candidate : null;
 }
 
 // ── Need restoration routing ──
@@ -253,6 +283,10 @@ export function tickNeedRestoration(state: GameState): NeedRestorationResult {
 
     if (!needsRest) continue;
 
+    // Hunger is checked first, matching the order used above and in autoInsertNeedTasks.
+    const needKey: NeedKey = emp.hunger < NEED_WARNING_THRESHOLDS.hunger ? 'hunger' : 'fatigue';
+    const restDuration = NEED_REST_DURATIONS[needKey];
+
     const building = findNearestLivingQuarters(state, emp.x, emp.z);
     if (!building) {
       result.noBuilding.push(emp.id);
@@ -263,11 +297,14 @@ export function tickNeedRestoration(state: GameState): NeedRestorationResult {
       targetX: building.x,
       targetZ: building.z,
       targetEmployeeId: emp.id,
-      payload: { buildingId: building.id },
+      payload: { buildingId: building.id, needKey, restDuration },
     });
 
     state.pendingActions.push(restAction);
     emp.activeActionId = restAction.id;
+    // Immediately claimed (unlike autoInsertNeedTasks) — start the rest timer now.
+    emp.restTicksRemaining = restDuration;
+    emp.restNeedKey = needKey;
     result.routed.push(emp.id);
   }
 
@@ -321,23 +358,35 @@ export function tickCollapse(state: GameState, _firedEvents?: FiredEvent[], _emi
         targetZ = building.z;
         buildingId = building.id;
       } else {
-        // Building exists but too far — double rest duration
-        restDuration *= 2;
+        // Building exists but too far — the employee rests in place
+        restDuration *= NEED_REST_NO_BUILDING_DURATION_MULTIPLIER;
       }
     } else {
-      // No building at all — double rest duration
-      restDuration *= 2;
+      // No building at all — the employee rests in place
+      restDuration *= NEED_REST_NO_BUILDING_DURATION_MULTIPLIER;
     }
+
+    // A warning-threshold rest queued by autoInsertNeedTasks while this employee
+    // was busy is now superseded: the collapse rest services the same gauge and
+    // is claimed immediately. Left in the queue it is claimed the moment the
+    // collapse rest ends — a second rest cycle and a second NEED_REST_COSTS
+    // charge for one collapse, listed alongside the active one in the roster panel.
+    state.pendingActions = state.pendingActions.filter(
+      a => !(a.type === 'rest' && a.targetEmployeeId === emp.id),
+    );
 
     const restAction = createRestPendingAction(state, {
       targetX,
       targetZ,
       targetEmployeeId: emp.id,
-      payload: { buildingId, collapsedNeed: collapsedGauge, restDuration },
+      payload: { buildingId, collapsedNeed: collapsedGauge, needKey: collapsedGauge, restDuration },
     });
 
     state.pendingActions.push(restAction);
     emp.activeActionId = restAction.id;
+    // Immediately claimed — start the rest timer now (mirrors tickNeedRestoration).
+    emp.restTicksRemaining = restDuration;
+    emp.restNeedKey = collapsedGauge;
   }
 
   return result;
@@ -361,6 +410,16 @@ export function autoInsertNeedTasks(state: GameState, _firedEvents?: FiredEvent[
   for (const emp of state.employees.employees) {
     // Skip dead, injured, or collapsing employees
     if (!emp.alive || emp.injured || emp.collapsing) continue;
+
+    // Skip employees already mid-rest. Their gauge is still below its warning
+    // threshold — the replenishment only lands when the rest completes — so
+    // without this check a second rest is queued every cycle, claimed the
+    // instant the first one ends, and charged again: one wasted rest and one
+    // extra NEED_REST_COSTS payment per dip below the threshold. Rests created
+    // by tickCollapse/tickNeedRestoration stay in pendingActions and are caught
+    // by the hasRestAction check below; a rest claimed through tickEmployees is
+    // consumed from the queue, so only restTicksRemaining still marks it.
+    if (emp.restTicksRemaining !== null) continue;
 
     // Determine which gauges are below warning thresholds
     const triggeredGauges: NeedKey[] = [];
@@ -400,6 +459,11 @@ export function autoInsertNeedTasks(state: GameState, _firedEvents?: FiredEvent[
 
     const targetX = building?.x ?? emp.x;
     const targetZ = building?.z ?? emp.z;
+    // With nowhere to go the employee rests in place, which takes longer and
+    // (in completeRestForEmployee) tops the gauge out at NEED_REST_NO_BUILDING_CAP.
+    const restDuration = building
+      ? NEED_REST_DURATIONS[primaryGauge]
+      : NEED_REST_DURATIONS[primaryGauge] * NEED_REST_NO_BUILDING_DURATION_MULTIPLIER;
 
     const restAction = createRestPendingAction(state, {
       targetX,
@@ -407,8 +471,11 @@ export function autoInsertNeedTasks(state: GameState, _firedEvents?: FiredEvent[
       targetEmployeeId: emp.id,
       payload: {
         buildingId: building?.id,
-        restDuration: NEED_REST_DURATIONS[primaryGauge],
+        restDuration,
         triggeredBy: triggeredGauges,
+        // Read by tickEmployees when this action is claimed, to start the
+        // rest timer for the employee (see resolveRestNeedKey).
+        needKey: primaryGauge,
       },
     });
 
@@ -480,9 +547,97 @@ function findNearestLivingQuarters(
  */
 export function deductRestCost(state: GameState, needKey: NeedKey): number {
   const cost = NEED_REST_COSTS[needKey];
+  const actualDeduction = Math.min(state.cash, cost);
 
   state.cash = Math.max(0, state.cash - cost);
+  addExpense(state.finances, actualDeduction, 'needs', `Rest: ${needKey}`, state.tickCount);
   return cost;
+}
+
+// ── General rest completion (hunger / breakNeed / Tier-1 fatigue) ──
+
+export interface GeneralRestCompletionResult {
+  /** Employee/need pairs whose rest completed this tick. */
+  completed: Array<{ employeeId: number; needKey: NeedKey }>;
+}
+
+/**
+ * Shared rest-completion sequence used by both tickGeneralRestCompletion and
+ * completeRestTick: replenish the resting need gauge from the nearest active
+ * living_quarters (or, with no building in range, up to
+ * NEED_REST_NO_BUILDING_CAP only), deduct the visit's NEED_REST_COSTS entry,
+ * clear the collapsing flag, and null out
+ * restTicksRemaining/activeActionId so the employee returns to normal task
+ * dispatch. Callers own any remaining wrap-up specific to their rest source
+ * (pendingActions removal + result recording, or ticksWorked reset).
+ */
+function completeRestForEmployee(state: GameState, emp: Employee, needKey: NeedKey): void {
+  const building = findNearestLivingQuarters(state, emp.x, emp.z);
+  if (building) {
+    const def = getBuildingDef(building.type, building.tier);
+    replenishNeed(emp, needKey, building.tier, def.capacity);
+  } else {
+    // No building services this need — the employee rests where they stand.
+    // That keeps them on their feet but never fully satisfies them: the gauge
+    // rises no higher than NEED_REST_NO_BUILDING_CAP, and the rest itself took
+    // NEED_REST_NO_BUILDING_DURATION_MULTIPLIER times as long to get here. A
+    // gauge already above the cap is left alone rather than pulled down to it.
+    emp[needKey] = Math.max(emp[needKey], NEED_REST_NO_BUILDING_CAP);
+  }
+
+  deductRestCost(state, needKey);
+
+  if (emp.collapsing) {
+    emp.collapsing = false;
+  }
+
+  emp.restTicksRemaining = null;
+  emp.restNeedKey = null;
+  emp.activeActionId = null;
+}
+
+/**
+ * Completion path for 'rest' PendingActions created by tickCollapse,
+ * tickNeedRestoration, and autoInsertNeedTasks — every hunger and breakNeed
+ * rest, plus fatigue rest when no Bunkhouse Tier 2+ living_quarters exists to
+ * service it via processShiftCycle. Mirrors completeRestTick's structure:
+ * decrement restTicksRemaining, and on completion replenish the resting need
+ * gauge, deduct its NEED_REST_COSTS entry, then clear activeActionId/
+ * restTicksRemaining so the employee returns to normal task dispatch.
+ *
+ * Only owns employees whose restNeedKey identifies a resting need (set at
+ * rest-start by the three creators above, or by tickEmployees when it claims
+ * a queued autoInsertNeedTasks action) — Bunkhouse Tier 2+ shift-cycle rest
+ * leaves restNeedKey null and remains owned by processShiftCycle/completeRestTick.
+ *
+ * Injury does not block completion — an employee who becomes injured mid-rest
+ * must still have their rest action finished and cleaned up, or activeActionId
+ * would stay set forever.
+ */
+export function tickGeneralRestCompletion(state: GameState): GeneralRestCompletionResult {
+  const completed: Array<{ employeeId: number; needKey: NeedKey }> = [];
+
+  for (const emp of state.employees.employees) {
+    if (!emp.alive) continue;
+    if (emp.restTicksRemaining === null) continue;
+
+    const needKey = emp.restNeedKey;
+    if (needKey === null) continue; // owned by processShiftCycle instead
+
+    emp.restTicksRemaining -= 1;
+    if (emp.restTicksRemaining > 0) continue;
+
+    const completedActionId = emp.activeActionId;
+    completeRestForEmployee(state, emp, needKey);
+    // tickCollapse/tickNeedRestoration leave the rest action in pendingActions
+    // at creation (they self-claim instead of routing through tickEmployees),
+    // so nothing else removes it once the rest completes.
+    state.pendingActions = state.pendingActions.filter(a => a.id !== completedActionId);
+
+    completed.push({ employeeId: emp.id, needKey });
+  }
+
+  return { completed };
 }
 
 // ── Shift cycle (Bunkhouse Tier 2+) ──
@@ -555,28 +710,15 @@ function completeRestTick(
   restCompleted: number[],
 ): void {
   if (emp.restTicksRemaining === null) return;
+  // Rests started by tickCollapse/tickNeedRestoration/autoInsertNeedTasks (hunger,
+  // breakNeed, or Tier-1 living_quarters fatigue) carry a restNeedKey and are owned
+  // by tickGeneralRestCompletion instead — skip them here to avoid double-processing.
+  if (emp.restNeedKey !== null) return;
 
   emp.restTicksRemaining -= 1;
 
   if (emp.restTicksRemaining <= 0) {
-    // Find nearest active living_quarters for replenishment
-    const building = findNearestLivingQuarters(state, emp.x, emp.z);
-    if (building) {
-      const def = getBuildingDef(building.type, building.tier);
-      replenishNeed(emp, 'fatigue', building.tier, def.capacity);
-    } else {
-      // Fallback — no building found (shouldn't happen since we checked hasBunkhouse)
-      emp.fatigue = MAX_NEED_GAUGE;
-    }
-
-    deductRestCost(state, 'fatigue');
-
-    if (emp.collapsing) {
-      emp.collapsing = false;
-    }
-
-    emp.restTicksRemaining = null;
-    emp.activeActionId = null;
+    completeRestForEmployee(state, emp, 'fatigue');
     emp.ticksWorked = 0;
     restCompleted.push(emp.id);
   }

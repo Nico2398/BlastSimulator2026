@@ -354,3 +354,66 @@ describe('Console — employee hire (regression)', () => {
     expect(result.output).toContain('Usage: employee hire role:');
   });
 });
+
+// ── employee dispatch ────────────────────────────────────────────────────────
+
+describe('Console — employee dispatch', () => {
+  let ctx: GameContext;
+  let empId: number;
+
+  beforeEach(() => {
+    ctx = makeCtx();
+    empId = hireOne(ctx, 'driller');
+  });
+
+  it('pushes a generic-work PendingAction claimable by tickEmployees', () => {
+    const result = employeeCommand(ctx, ['dispatch', String(empId)], { x: '10', z: '10' });
+
+    expect(result.success).toBe(true);
+    expect(result.output).toBe(`Employee #${empId} dispatched to work at (10, 10). Action ID: 1.`);
+
+    const action = ctx.state!.pendingActions.find(a => a.targetEmployeeId === empId);
+    expect(action).toBeDefined();
+    expect(action!.type).toBe('general_work');
+    expect(action!.requiredSkill).toBeNull();
+    expect(action!.targetX).toBe(10);
+    expect(action!.targetZ).toBe(10);
+  });
+
+  it('rejects dispatch when the employee is injured', () => {
+    ctx.state!.employees.employees.find(e => e.id === empId)!.injured = true;
+
+    const result = employeeCommand(ctx, ['dispatch', String(empId)], { x: '10', z: '10' });
+
+    expect(result.success).toBe(false);
+    expect(result.output).toBe(`Employee #${empId} is injured and cannot be dispatched.`);
+  });
+
+  it('rejects dispatch when the employee is in training', () => {
+    ctx.state!.employees.employees.find(e => e.id === empId)!.trainingState = {
+      buildingId: 1,
+      skill: 'blasting',
+      ticksRemaining: 5,
+      fee: 100,
+    };
+
+    const result = employeeCommand(ctx, ['dispatch', String(empId)], { x: '10', z: '10' });
+
+    expect(result.success).toBe(false);
+    expect(result.output).toBe(`Employee #${empId} is in training and cannot be dispatched.`);
+  });
+
+  it('reports employee not found when the ID does not exist', () => {
+    const result = employeeCommand(ctx, ['dispatch', '999'], { x: '10', z: '10' });
+
+    expect(result.success).toBe(false);
+    expect(result.output).toBe('Employee #999 not found.');
+  });
+
+  it('rejects the call when x/z coordinates are missing', () => {
+    const result = employeeCommand(ctx, ['dispatch', String(empId)], {});
+
+    expect(result.success).toBe(false);
+    expect(result.output).toBe('Usage: employee dispatch <id> x:<X> z:<Z>');
+  });
+});

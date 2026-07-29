@@ -7,6 +7,18 @@ import type { GameState } from '../core/state/GameState.js';
 import type { Employee } from '../core/entities/Employee.js';
 import { XP_THRESHOLDS } from '../core/config/balance.js';
 
+/**
+ * Class names an employee roster row should carry for its current state
+ * (e.g. `collapsing` while a need has driven the employee to a stop).
+ * Extracted so a unit test can assert the class independent of DOM
+ * construction and of whatever CSS rule renders it.
+ */
+export function getEmployeeRowClassNames(e: Employee): string[] {
+  const classes = ['bs-employee-row'];
+  if (e.collapsing) classes.push('collapsing');
+  return classes;
+}
+
 export function makeSkillStars(level: number): string {
   const filled = '★'.repeat(level);
   const empty = '☆'.repeat(5 - level);
@@ -76,6 +88,24 @@ export function formatNeed(value: number): string {
   return String(Math.round(value));
 }
 
+/**
+ * Threshold-coded class for a need gauge's value text: 'good' (>50), 'warn'
+ * (30-50), or 'bad' (<30). Kept separate from the bar-fill's own
+ * critical/low/normal classes (thresholds 15/35), which read the bar, not
+ * the number next to it.
+ */
+export function needValueClass(value: number): 'good' | 'warn' | 'bad' {
+  if (value > 50) return 'good';
+  if (value >= 30) return 'warn';
+  return 'bad';
+}
+
+/** Apply the threshold-coded class to a need-value element, replacing any prior one. */
+export function applyNeedValueClass(el: HTMLElement, value: number): void {
+  el.classList.remove('good', 'warn', 'bad');
+  el.classList.add(needValueClass(value));
+}
+
 export function makeNeedBar(label: string, value: number, color: string, key?: string): HTMLElement {
   const el = document.createElement('div');
   el.className = 'bs-need-row';
@@ -101,6 +131,7 @@ export function makeNeedBar(label: string, value: number, color: string, key?: s
   const valueEl = document.createElement('span');
   valueEl.className = 'bs-need-value';
   valueEl.textContent = formatNeed(value);
+  applyNeedValueClass(valueEl, value);
 
   barBg.appendChild(barFill);
   el.append(labelEl, barBg, valueEl);
@@ -133,14 +164,20 @@ export function makeTaskQueue(e: Employee, state: GameState): HTMLElement {
     el.appendChild(noTask);
   }
 
-  // Show pending actions (up to 5)
-  const displayActions = actions.slice(0, 5);
-  const overflow = actions.length > 5 ? actions.length - 5 : 0;
+  // Show pending actions this employee could actually take (up to 5) — actions
+  // pinned to someone else belong in that employee's row, not this one. An
+  // unpinned action is open to whoever is qualified, so it stays listed.
+  // The claimed action is already rendered above under ACTIVE — listing it again
+  // here showed the same task twice for every resting or working employee.
+  const ownActions = actions.filter(
+    a => (a.targetEmployeeId === null || a.targetEmployeeId === e.id) && a.id !== e.activeActionId,
+  );
+  const displayActions = ownActions.slice(0, 5);
+  const overflow = ownActions.length > 5 ? ownActions.length - 5 : 0;
 
   for (const a of displayActions) {
     const entry = document.createElement('div');
     entry.className = 'bs-task-entry';
-    if (a.id === e.activeActionId) entry.classList.add('current');
     entry.textContent = `#${a.id} (${a.type})`;
     el.appendChild(entry);
   }
@@ -152,7 +189,7 @@ export function makeTaskQueue(e: Employee, state: GameState): HTMLElement {
     el.appendChild(overflowEl);
   }
 
-  if (actions.length === 0 && !hasActive) {
+  if (ownActions.length === 0 && !hasActive) {
     const emptyEl = document.createElement('div');
     emptyEl.className = 'bs-queue-empty';
     emptyEl.textContent = t('ui.employees.queue_empty');

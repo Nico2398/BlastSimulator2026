@@ -173,6 +173,7 @@ function setup20AgentGameState(): { state: GameState; rng: Random } {
       interruptedActionPayload: null,
       ticksWorked: 0,
       restTicksRemaining: null,
+      restNeedKey: null,
     });
   }
 

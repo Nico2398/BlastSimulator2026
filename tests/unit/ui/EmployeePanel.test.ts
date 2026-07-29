@@ -37,6 +37,7 @@ function makeEmployee(overrides?: Partial<Employee>): Employee {
     interruptedActionPayload: null,
     ticksWorked: 0,
     restTicksRemaining: null,
+    restNeedKey: null,
     ...overrides,
   };
 }
@@ -360,7 +361,10 @@ describe('EmployeePanel', () => {
     });
 
     it('up to 5 pending actions shown in queue', () => {
-      const emp = makeEmployee({ activeActionId: 1 });
+      // Idle employee: the cap applies to the queued actions themselves. An
+      // employee's claimed action is rendered under ACTIVE and excluded from
+      // this list, so leaving it unclaimed keeps this test about the 5-entry cap.
+      const emp = makeEmployee({ activeActionId: null });
       const state = withEmployees(makeMockState(), [emp]);
       // Create 8 pending actions to test the 5-entry cap
       state.pendingActions = Array.from({ length: 8 }, (_, i) => ({
@@ -908,6 +912,65 @@ describe('EmployeePanel — per-frame rebuild guard', () => {
     worker.morale = 12;
     panel.update(state);
     expect(container.querySelector('.bs-employee-row')?.textContent).toContain('12');
+
+    panel.dispose();
+    container.remove();
+  });
+
+  it('shows a task claimed after the row was expanded, without a structural rebuild (issue #405)', () => {
+    // A rest task can become active in backend state (activeActionId set) while
+    // the row is already expanded. The task queue was built once by makeDetail
+    // at expand time and never touched again, so the panel kept showing
+    // "No current task" / "Queue empty" long after the employee started resting.
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const panel = new EmployeePanel(container);
+    const state = makeMockState();
+    const worker = makeEmployee({ activeActionId: null });
+    state.employees.employees = [worker];
+    state.pendingActions = [];
+
+    panel.update(state);
+    (container.querySelector('.bs-detail-toggle') as HTMLElement).click();
+    expect(container.querySelector('.bs-queue-empty')).not.toBeNull();
+
+    // Claim a rest action without any structural change to the roster.
+    worker.activeActionId = 1;
+    state.pendingActions = [{
+      id: 1, type: 'rest', requiredSkill: null, requiredVehicleRole: null,
+      targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: worker.id,
+    }];
+    panel.update(state);
+
+    const activeEntry = container.querySelector('.bs-task-entry.current');
+    expect(activeEntry).not.toBeNull();
+    expect(activeEntry!.textContent).toContain('rest');
+
+    panel.dispose();
+    container.remove();
+  });
+
+  it('shows a morale tier crossed after the row was expanded, without a structural rebuild (issue #405)', () => {
+    // Modifier tags (High Morale, Collapsing, Injured) were built once by
+    // makeDetail at expand time. Morale crossing the >=70 threshold while
+    // expanded left the meta line's percentage and the modifier tag disagreeing.
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const panel = new EmployeePanel(container);
+    const state = makeMockState();
+    const worker = makeEmployee({ morale: 67 });
+    state.employees.employees = [worker];
+
+    panel.update(state);
+    (container.querySelector('.bs-detail-toggle') as HTMLElement).click();
+    expect(container.querySelector('.bs-modifier-tag')).toBeNull();
+
+    worker.morale = 96;
+    panel.update(state);
+
+    const tag = container.querySelector('.bs-modifier-tag');
+    expect(tag).not.toBeNull();
+    expect(tag!.textContent).toContain('High Morale');
 
     panel.dispose();
     container.remove();

@@ -336,6 +336,11 @@ const CSS = `
   font-size: 11px;
 }
 .bs-employee-row:last-child { border-bottom: none; }
+.bs-employee-row.collapsing {
+  border-left: 3px solid #e05040;
+  background: rgba(224,80,64,0.1);
+  padding-left: 5px;
+}
 .bs-entity-row {
   display: flex;
   align-items: center;
@@ -369,6 +374,10 @@ const CSS = `
 .bs-modifier-tag { background: rgba(255,200,64,0.1); border-radius: 2px; padding: 1px 4px; font-size: 9px; color: #c8a848; display: inline-block; margin: 1px; }
 .bs-need-row { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; font-size: 10px; }
 .bs-need-label { width: 48px; color: #9a8868; font-size: 9px; }
+.bs-need-value { font-weight: 600; }
+.bs-need-value.good { color: #4caf50; }
+.bs-need-value.warn { color: #ffc107; }
+.bs-need-value.bad { color: #e05252; }
 .bs-employee-detail { flex: 0 0 100%; margin-top: 6px; padding: 6px 8px; background: rgba(255,255,255,0.04); border-radius: 4px; border: 1px solid rgba(255,255,255,0.06); }
 .bs-detail-toggle { cursor: pointer; font-size: 9px; color: #706050; margin-left: auto; user-select: none; }
 .bs-queue-empty { font-size: 10px; color: #605040; font-style: italic; padding: 2px 0; }

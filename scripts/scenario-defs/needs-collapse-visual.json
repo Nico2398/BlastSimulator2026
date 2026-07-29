@@ -1,6 +1,6 @@
 {
   "name": "needs-collapse-visual",
-  "description": "Visual check of collapse state: drive fatigue below collapse threshold (≤5) without replenishment, verify employee flagged as collapsing in state dump, then build living_quarters and advance ticks to confirm rest recovery and task resumption",
+  "description": "Visual check of collapse state: dispatch an employee to work so need gauges drain at the working rate and no rest can be claimed, drive fatigue below the collapse threshold (\u22645), verify the employee is flagged COLLAPSING in state and rendered with the collapsing row style, then build living_quarters and advance ticks to confirm rest recovery and a return to normal task dispatch",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -27,6 +27,81 @@
         {
           "type": "command",
           "command": "employee hire role:blaster"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-detail-toggle"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-employee-id=\"2\"] .bs-detail-toggle"
+        }
+      ]
+    },
+    {
+      "command": "employee dispatch 1 x:10 z:10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:10 z:10"
+        }
+      ]
+    },
+    {
+      "command": "needs",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "needs"
+        }
+      ]
+    },
+    {
+      "command": "tick 45",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 45"
+        }
+      ]
+    },
+    {
+      "command": "needs",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "needs"
+        }
+      ]
+    },
+    {
+      "command": "tick 5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 5"
+        }
+      ]
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ]
+    },
+    {
+      "command": "needs",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "needs"
         }
       ]
     },
@@ -54,6 +129,15 @@
         {
           "type": "command",
           "command": "tick 200"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
         }
       ]
     },

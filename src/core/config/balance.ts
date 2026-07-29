@@ -507,6 +507,21 @@ export const BUILDING_REPLENISH_RATES = {
   breakNeed: { 1: 10, 2: 16, 3: 22 },
 } as const;
 
+/**
+ * Ceiling a rest taken with no suitable building can raise a need gauge to.
+ * Resting in the dirt keeps an employee working; it never leaves them fully
+ * satisfied, so a site with no living_quarters is always worse off than one
+ * with a Tier 1 — which replenishes to the full gauge, just slowly.
+ */
+export const NEED_REST_NO_BUILDING_CAP = 70;
+
+/**
+ * Rest-duration multiplier when no suitable building services the need — either
+ * none exists or the nearest is beyond NEED_REST_SEARCH_RADIUS. Resting in place
+ * takes this many times as long as the same rest at a Tier 1 building.
+ */
+export const NEED_REST_NO_BUILDING_DURATION_MULTIPLIER = 2;
+
 /** Per-visit cost deducted from cash for each need gauge. Fatigue has no cost (0). */
 export const NEED_REST_COSTS = {
   hunger: 50,

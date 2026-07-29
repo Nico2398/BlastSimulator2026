@@ -67,7 +67,8 @@ export type ActionType =
   | 'survey'
   | 'fragment_debris'
   | 'haul_debris'
-  | 'rest';
+  | 'rest'
+  | 'general_work';
 
 /** A lightweight renderer preview entry — mirrors a PendingAction for ghost-mesh display. */
 export interface GhostPreview {

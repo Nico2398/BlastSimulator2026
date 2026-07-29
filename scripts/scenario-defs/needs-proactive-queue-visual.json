@@ -1,6 +1,6 @@
 {
   "name": "needs-proactive-queue-visual",
-  "description": "Visual check of proactive need queuing: drive fatigue to warning threshold (≤25) and hunger to warning threshold (≤35), then verify auto-inserted rest tasks appear in pending actions queue via state dump; also verify need_warning event fires when queue is full",
+  "description": "Visual check of proactive need queuing: dispatch an employee to work so no rest can be claimed, drive hunger and fatigue below their warning thresholds (35 / 25), then verify the auto-inserted rest task appears both in the pending-actions state dump and as a queued task in the roster panel",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -18,6 +18,50 @@
         {
           "type": "command",
           "command": "employee hire role:driller"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-detail-toggle"
+        }
+      ]
+    },
+    {
+      "command": "employee dispatch 1 x:10 z:10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:10 z:10"
+        }
+      ]
+    },
+    {
+      "command": "tick 40",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 40"
+        }
+      ]
+    },
+    {
+      "command": "needs",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "needs"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
         }
       ]
     },

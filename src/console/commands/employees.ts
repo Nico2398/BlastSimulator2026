@@ -44,7 +44,9 @@ export function employeeCommand(
       }
       const lines = ['Employees:'];
       for (const e of state.employees.employees) {
-        const status = !e.alive ? 'DEAD' : e.injured ? 'INJURED' : 'OK';
+        // Collapsing is a distinct working state — the employee is alive and
+        // uninjured but stopped, and until now only the roster panel showed it.
+        const status = !e.alive ? 'DEAD' : e.injured ? 'INJURED' : e.collapsing ? 'COLLAPSING' : 'OK';
         const union = e.unionized ? ' [UNION]' : '';
         lines.push(`  [${e.id}] ${e.name} (${e.role}) $${e.salary}/cycle morale:${e.morale} ${status}${union}`);
       }
@@ -97,6 +99,47 @@ export function employeeCommand(
 
       assignSkill(state.employees, id, skillRaw as SkillCategory, level as 1 | 2 | 3 | 4 | 5);
       return { success: true, output: `Employee #${id} assigned skill: ${skillRaw} (level ${level}).` };
+    }
+    case 'dispatch': {
+      // Pushes a generic work PendingAction targeting a specific employee —
+      // the same pending-action pool tickEmployees() already claims idle
+      // employees from (see GameLoop.ts). Exists so console/scenario driving
+      // can put an employee to genuine, ticksWorked-incrementing work without
+      // a full drill/haul pipeline: no console command currently creates one
+      // (drill_plan and build both mutate state directly, and survey completes
+      // synchronously), which left the Bunkhouse shift-cycle unreachable from
+      // any player-facing flow.
+      const id = parseInt(args[1] ?? named['id'] ?? '', 10);
+      const usageMsg = 'Usage: employee dispatch <id> x:<X> z:<Z>';
+      if (isNaN(id)) return { success: false, output: usageMsg };
+      const x = parseFloat(named['x'] ?? '');
+      const z = parseFloat(named['z'] ?? '');
+      if (isNaN(x) || isNaN(z)) return { success: false, output: usageMsg };
+
+      const emp = state.employees.employees.find(e => e.id === id);
+      if (!emp) return { success: false, output: `Employee #${id} not found.` };
+      if (!emp.alive) return { success: false, output: `Employee #${id} is not available.` };
+      if (emp.injured) return { success: false, output: `Employee #${id} is injured and cannot be dispatched.` };
+      if (emp.trainingState !== null) {
+        return { success: false, output: `Employee #${id} is in training and cannot be dispatched.` };
+      }
+
+      const actionId = state.nextPendingActionId++;
+      state.pendingActions.push({
+        id: actionId,
+        type: 'general_work',
+        requiredSkill: null,
+        requiredVehicleRole: null,
+        targetX: x,
+        targetZ: z,
+        targetY: 0,
+        payload: {},
+        targetEmployeeId: id,
+      });
+      return {
+        success: true,
+        output: `Employee #${id} dispatched to work at (${x}, ${z}). Action ID: ${actionId}.`,
+      };
     }
     case 'train': {
       const id = parseInt(args[1] ?? '', 10);
@@ -152,7 +195,7 @@ export function employeeCommand(
       };
     }
     default:
-      return { success: false, output: 'Usage: employee (list|hire|raise|fire|assign_skill|train)' };
+      return { success: false, output: 'Usage: employee (list|hire|raise|fire|assign_skill|dispatch|train)' };
   }
 }
 

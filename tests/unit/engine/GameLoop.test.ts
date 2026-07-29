@@ -26,6 +26,9 @@ import {
   // ── 7.9: shift cycle ──
   processShiftCycle,
   type ShiftCycleResult,
+  // ── tickGeneralRestCompletion ──
+  tickGeneralRestCompletion,
+  type GeneralRestCompletionResult,
 } from '../../../src/core/engine/GameLoop.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { hireEmployee, assignSkill, checkCollapse } from '../../../src/core/entities/Employee.js';
@@ -45,6 +48,9 @@ import {
   NEED_REST_COSTS,
   WORK_DURATION_TICKS,
   SHIFT_SLEEP_DURATION_TICKS,
+  MAX_NEED_GAUGE,
+  NEED_REST_NO_BUILDING_CAP,
+  NEED_REST_NO_BUILDING_DURATION_MULTIPLIER,
 } from '../../../src/core/config/balance.js';
 
 function buildContext(state: GameState): EventContext {
@@ -1046,6 +1052,39 @@ describe('tickCollapse (7.6)', () => {
     expect(firedEvents[1]!.eventId).toBe('employee_collapsed');
   });
 
+  // ── Collapse supersedes a warning-threshold rest queued while the employee was busy ──
+  // autoInsertNeedTasks queues a rest for a busy employee without claiming it.
+  // If that action survives the collapse, it is claimed the instant the collapse
+  // rest ends: a second rest cycle and a second NEED_REST_COSTS charge for one
+  // collapse, and two rest entries in the roster panel's task queue.
+  it('drops a rest action already queued for the employee it collapses', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.x = 0;
+    employee.z = 0;
+    employee.fatigue = 3; // below the collapse threshold
+
+    placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100);
+
+    // The warning-threshold rest queued earlier, still unclaimed.
+    autoInsertNeedTasks(state);
+    const queuedBefore = state.pendingActions.filter(
+      (a: PendingAction) => a.type === 'rest' && a.targetEmployeeId === employee.id,
+    );
+    expect(queuedBefore).toHaveLength(1);
+
+    tickCollapse(state);
+
+    const restActions = state.pendingActions.filter(
+      (a: PendingAction) => a.type === 'rest' && a.targetEmployeeId === employee.id,
+    );
+    expect(restActions).toHaveLength(1);
+    expect(restActions[0]!.id).toBe(employee.activeActionId);
+    expect(employee.restNeedKey).toBe('fatigue');
+  });
+
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1599,6 +1638,82 @@ describe('autoInsertNeedTasks (7.7)', () => {
 
     expect(firedEvents).toHaveLength(0);
   });
+
+  // ── Test 12b: no building to rest at → rest takes the no-building multiplier ─
+  it('doubles the queued rest duration when no building services the need', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.x = 0;
+    employee.z = 0;
+    employee.hunger = 30; // below the warning threshold
+    employee.fatigue = 80;
+    employee.breakNeed = 80;
+    // No living_quarters placed — the employee will rest where they stand.
+
+    autoInsertNeedTasks(state);
+
+    const restAction = state.pendingActions.find(
+      (a: PendingAction) => a.type === 'rest' && a.targetEmployeeId === employee.id,
+    );
+    expect(restAction).toBeDefined();
+    expect(restAction!.payload['restDuration']).toBe(
+      NEED_REST_DURATIONS.hunger * NEED_REST_NO_BUILDING_DURATION_MULTIPLIER,
+    );
+    expect(restAction!.payload['buildingId']).toBeUndefined();
+  });
+
+  // ── Test 12c: a building in range keeps the base duration ───────────────────
+  it('keeps the base rest duration when a building services the need', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.x = 0;
+    employee.z = 0;
+    employee.hunger = 30;
+    employee.fatigue = 80;
+    employee.breakNeed = 80;
+
+    placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100);
+
+    autoInsertNeedTasks(state);
+
+    const restAction = state.pendingActions.find(
+      (a: PendingAction) => a.type === 'rest' && a.targetEmployeeId === employee.id,
+    );
+    expect(restAction!.payload['restDuration']).toBe(NEED_REST_DURATIONS.hunger);
+  });
+
+  // ── Test 13: employee already mid-rest → no second rest queued ──────────────
+  // A rest claimed through tickEmployees is consumed from pendingActions, so
+  // hasRestAction cannot see it. The gauge only recovers when the rest
+  // completes, so without a restTicksRemaining check this inserts a duplicate
+  // rest that is claimed the instant the first ends — a wasted rest cycle and a
+  // second NEED_REST_COSTS charge per dip below the warning threshold.
+  it('does not queue a second rest for an employee already resting', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.x = 0;
+    employee.z = 0;
+    employee.hunger = 30; // still below the warning threshold — rest not finished yet
+    employee.fatigue = 80;
+    employee.breakNeed = 80;
+    employee.activeActionId = 7;      // claimed the rest action
+    employee.restTicksRemaining = 2;  // ...and is mid-rest
+    employee.restNeedKey = 'hunger';
+    // The claimed action is gone from pendingActions, as tickEmployees leaves it.
+
+    placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100);
+
+    const result = autoInsertNeedTasks(state);
+
+    expect(result.inserted).toHaveLength(0);
+    expect(state.pendingActions.filter((a: PendingAction) => a.type === 'rest')).toHaveLength(0);
+  });
 });
 
 // ─── 7.8: deductRestCost ──────────────────────────────────────────────────────
@@ -1675,6 +1790,30 @@ describe('deductRestCost', () => {
 
     expect(state.cash).toBe(0);
     expect(deducted).toBe(NEED_REST_COSTS.hunger);
+  });
+
+  // ── Test 7: Positive: records a 'needs'-category expense in state.finances ──
+  it('records a needs-category expense transaction in state.finances', () => {
+    const state = createGame({ seed: DEDUCT_SEED });
+    state.cash = 5000;
+
+    deductRestCost(state, 'hunger');
+
+    const entry = state.finances.transactions.find(t => t.category === 'needs');
+    expect(entry).toBeDefined();
+    expect(entry!.type).toBe('expense');
+    expect(entry!.amount).toBe(NEED_REST_COSTS.hunger);
+    expect(entry!.description).toBe('Rest: hunger');
+  });
+
+  // ── Test 8: Boundary: fatigue (0 cost) records no expense (addExpense no-ops on amount <= 0) ──
+  it('records no finance transaction for fatigue (zero-cost visit)', () => {
+    const state = createGame({ seed: DEDUCT_SEED });
+    state.cash = 5000;
+
+    deductRestCost(state, 'fatigue');
+
+    expect(state.finances.transactions.find(t => t.category === 'needs')).toBeUndefined();
   });
 });
 
@@ -1981,5 +2120,130 @@ describe('processShiftCycle (7.9)', () => {
     processShiftCycle(state, firedEvents, mockEmitter);
 
     expect(events).toContain('employee:shift_change');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// tickGeneralRestCompletion — completion path for hunger/breakNeed/Tier-1
+// fatigue rests created by tickCollapse, tickNeedRestoration, and
+// autoInsertNeedTasks (see GameLoop.ts). Distinct from processShiftCycle's
+// completeRestTick, which owns Tier-2+ Bunkhouse shift-cycle rest instead.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('tickGeneralRestCompletion', () => {
+  const SEED = 42;
+
+  // ── Test 1: Happy path ────────────────────────────────────────────────────
+  it('completes rest: replenishes gauge, deducts cost, clears collapsing and rest state', () => {
+    const state = createGame({ seed: SEED });
+    state.cash = 1000;
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.hunger = 10;
+    employee.collapsing = true;
+    employee.restTicksRemaining = 1; // one more tick → completes this call
+    const actionId = state.nextPendingActionId++;
+    employee.activeActionId = actionId;
+    employee.restNeedKey = 'hunger';
+    state.pendingActions.push({
+      id: actionId,
+      type: 'rest',
+      requiredSkill: null,
+      requiredVehicleRole: null,
+      targetX: 5,
+      targetZ: 5,
+      targetY: 0,
+      payload: { needKey: 'hunger' },
+      targetEmployeeId: employee.id,
+    });
+
+    placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, 1);
+
+    const result: GeneralRestCompletionResult = tickGeneralRestCompletion(state);
+
+    expect(result.completed).toEqual([{ employeeId: employee.id, needKey: 'hunger' }]);
+    expect(employee.hunger).toBeGreaterThan(10);
+    expect(employee.collapsing).toBe(false);
+    expect(employee.restTicksRemaining).toBeNull();
+    expect(employee.activeActionId).toBeNull();
+    expect(employee.restNeedKey).toBeNull();
+    expect(state.cash).toBe(1000 - NEED_REST_COSTS.hunger);
+    expect(state.pendingActions.find(a => a.id === actionId)).toBeUndefined();
+  });
+
+  // ── Test 2: Boundary — resting with no building tops out at the no-building cap ──
+  // A full restore here would make an empty site better than a Tier 1 living_quarters.
+  it('caps the gauge at NEED_REST_NO_BUILDING_CAP when no living_quarters exists', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.fatigue = 5;
+    employee.restTicksRemaining = 1;
+    employee.activeActionId = 42;
+    employee.restNeedKey = 'fatigue';
+    // No living_quarters building placed at all.
+
+    const result = tickGeneralRestCompletion(state);
+
+    expect(employee.fatigue).toBe(NEED_REST_NO_BUILDING_CAP);
+    expect(employee.fatigue).toBeLessThan(MAX_NEED_GAUGE);
+    expect(result.completed).toEqual([{ employeeId: employee.id, needKey: 'fatigue' }]);
+  });
+
+  // ── Test 2b: Rejection — a gauge above the cap is not pulled down to it ──
+  it('leaves a gauge already above the no-building cap untouched', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.fatigue = NEED_REST_NO_BUILDING_CAP + 15;
+    employee.restTicksRemaining = 1;
+    employee.activeActionId = 42;
+    employee.restNeedKey = 'fatigue';
+
+    tickGeneralRestCompletion(state);
+
+    expect(employee.fatigue).toBe(NEED_REST_NO_BUILDING_CAP + 15);
+  });
+
+  // ── Test 3: Not double-processed — owned by completeRestTick (Tier-2+ shift rest) instead ──
+  it('does not process an employee owned by the Tier-2+ shift-cycle rest path', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.restTicksRemaining = 1;
+    employee.activeActionId = 99;
+    employee.restNeedKey = null; // no rest need key → shift-cycle rest, not general rest
+    employee.fatigue = 5;
+
+    const result = tickGeneralRestCompletion(state);
+
+    expect(result.completed).toEqual([]);
+    expect(employee.restTicksRemaining).toBe(1); // untouched — still owned by processShiftCycle
+    expect(employee.fatigue).toBe(5);
+  });
+
+  // ── Test 4: Injury does not block rest completion (finding #8) ──
+  it('completes rest for an employee who became injured mid-rest', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.injured = true;
+    employee.hunger = 10;
+    employee.restTicksRemaining = 1;
+    const actionId = state.nextPendingActionId++;
+    employee.activeActionId = actionId;
+    employee.restNeedKey = 'hunger';
+
+    placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, 1);
+
+    const result = tickGeneralRestCompletion(state);
+
+    expect(result.completed).toEqual([{ employeeId: employee.id, needKey: 'hunger' }]);
+    expect(employee.restTicksRemaining).toBeNull();
+    expect(employee.activeActionId).toBeNull();
   });
 });
