@@ -1,6 +1,6 @@
 {
   "name": "blast-execution-visual",
-  "description": "Visual verification of blast execution and effects: explosion animation, energy propagation visualization, fragment spawning, and projection flyrock",
+  "description": "Visual verification of blast execution and effects: explosion animation, energy propagation visualization, fragment spawning, projection flyrock, Tier A projected vs Tier B collapse physics, and PHYSICS_FRAGMENT_CAP overflow fallback",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -75,6 +75,204 @@
         {
           "type": "command",
           "command": "inspect 20,20,0"
+        }
+      ]
+    },
+    {
+      "command": "drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:45,20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:45,20"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:2 stemming:2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:boomite amount:2 stemming:2"
+        }
+      ]
+    },
+    {
+      "command": "sequence auto delay_step:25",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sequence auto delay_step:25"
+        }
+      ]
+    },
+    {
+      "command": "blast",
+      "timeout": 20,
+      "frames": 6,
+      "interval": 50,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "blast"
+        }
+      ]
+    },
+    {
+      "command": "fragments",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "fragments"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "inspect 45,20,0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "inspect 45,20,0"
+        }
+      ]
+    },
+    {
+      "command": "drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:5,45",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:5,45"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:8 stemming:0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:boomite amount:8 stemming:0"
+        }
+      ]
+    },
+    {
+      "command": "sequence auto delay_step:25",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sequence auto delay_step:25"
+        }
+      ]
+    },
+    {
+      "command": "blast",
+      "timeout": 20,
+      "frames": 6,
+      "interval": 50,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "blast"
+        }
+      ]
+    },
+    {
+      "command": "fragments",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "fragments"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "inspect 5,45,0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "inspect 5,45,0"
+        }
+      ]
+    },
+    {
+      "command": "drill_plan grid rows:8 cols:8 spacing:4 depth:10 start:5,5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:8 cols:8 spacing:4 depth:10 start:5,5"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:8 stemming:0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:boomite amount:8 stemming:0"
+        }
+      ]
+    },
+    {
+      "command": "sequence auto delay_step:25",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sequence auto delay_step:25"
+        }
+      ]
+    },
+    {
+      "command": "blast",
+      "timeout": 30,
+      "frames": 8,
+      "interval": 50,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "blast"
+        }
+      ]
+    },
+    {
+      "command": "fragments",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "fragments"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "inspect 10,10,0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "inspect 10,10,0"
         }
       ]
     }
