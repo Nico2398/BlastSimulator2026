@@ -19,7 +19,8 @@ import { processPayCycle } from '../../core/entities/Employee.js';
 import { tickTraining } from '../../core/entities/EmployeeTraining.js';
 import { tickNeedGauges, needsMoraleEffect } from '../../core/entities/EmployeeNeeds.js';
 import type { FiredEvent } from '../../core/events/EventSystem.js';
-import { tickCollapse, autoInsertNeedTasks, processShiftCycle, tickEmployees, tickGeneralRestCompletion } from '../../core/engine/GameLoop.js';
+import { tickCollapse, autoInsertNeedTasks, processShiftCycle, tickEmployees, tickGeneralRestCompletion, tickTaskProgress } from '../../core/engine/GameLoop.js';
+import { detectUnqualifiedTask } from '../../core/events/EventEngine.js';
 import { estimateSurveyResult, type SurveyMethod } from '../../core/mining/SurveyCalc.js';
 import { checkDeadlines, generateContracts } from '../../core/economy/Contract.js';
 import { updateBankruptcy } from '../../core/campaign/Bankruptcy.js';
@@ -91,7 +92,7 @@ export function tickCommand(
 
     // 1. Event system
     const evCtx = buildEventContext(ctx);
-    const fired = tickEventSystem(state.events, evCtx, rng);
+    let fired = tickEventSystem(state.events, evCtx, rng);
 
     // 2. Payroll — processPayCycle increments ticksSincePayday internally
     const paySalary = processPayCycle(state.employees);
@@ -200,12 +201,25 @@ export function tickCommand(
       lines.push(`[tick ${state.tickCount}] ${done.employeeName} ${what} ${done.skill}.`);
     }
 
-    // 8d. Dispatch remaining pending actions to idle qualified employees
-    tickEmployees(state);
+    // 8d. Dispatch remaining pending actions to idle qualified employees.
+    // An action requiring a skill nobody on the roster holds is not left to
+    // queue silently forever — it raises the same unqualified_task_error event
+    // used elsewhere (auto-pause, resolved via "event choose").
+    const dispatchResult = tickEmployees(state);
+    fired = fired ?? detectUnqualifiedTask(dispatchResult.unqualified, state.events, state.tickCount);
 
     // 8e. Task duration progress + XP/level-up reporting.
-    // TODO: call tickTaskProgress per employee and push completion/level-up
-    // lines here once GameLoop.tickTaskProgress is implemented.
+    for (const emp of state.employees.employees) {
+      if (!emp.alive) continue;
+      const progress = tickTaskProgress(state, emp, emitter);
+      if (!progress) continue;
+      if (progress.completed) {
+        lines.push(`[tick ${state.tickCount}] TASK: ${emp.name} completed task.`);
+      }
+      if (progress.leveledUp) {
+        lines.push(`[tick ${state.tickCount}] LEVELUP: ${emp.name} reached level ${progress.newLevel} in ${progress.skill}.`);
+      }
+    }
 
     // 9. Level stats snapshot + campaign profit check
     snapshotStats(state.levelStats, state);

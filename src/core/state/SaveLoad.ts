@@ -111,6 +111,11 @@ export function deserialize(json: string): GameState {
         if (e['restNeedKey'] === undefined) {
           e['restNeedKey'] = null;
         }
+        // Ensure activeTaskSkill exists on employees saved before the field was
+        // added. Absent means "no dispatched-task skill tracked", encoded as null.
+        if (e['activeTaskSkill'] === undefined) {
+          e['activeTaskSkill'] = null;
+        }
       }
     }
   }
