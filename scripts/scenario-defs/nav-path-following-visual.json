@@ -40,7 +40,7 @@
     },
     {
       "command": "employee dispatch 1 x:0 z:0",
-      "description": "Send employee #1 walking toward the far corner — the management_office placed below will land on this path and block it.",
+      "description": "Send employee #1 walking toward the far corner — a 3-building wall placed below will completely seal that corner off, with no detour around it.",
       "interaction": [
         {
           "type": "command",
@@ -49,20 +49,52 @@
       ]
     },
     {
-      "command": "tick 10",
+      "command": "tick 19",
+      "description": "Let employee #1 travel most of the way toward (0,0) before the wall goes up, so it lands right at the wall once blocked.",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 10"
+          "command": "tick 19"
         }
       ]
     },
     {
-      "command": "build management_office at:3,3",
+      "command": "build management_office at:2,0",
+      "description": "First wall segment: seals the east side of the (0,0) corner (x:2-3, z:0-1).",
       "interaction": [
         {
           "type": "command",
-          "command": "build management_office at:3,3"
+          "command": "build management_office at:2,0"
+        }
+      ]
+    },
+    {
+      "command": "build management_office at:0,2",
+      "description": "Second wall segment: seals the south side of the (0,0) corner (x:0-1, z:2-3).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build management_office at:0,2"
+        }
+      ]
+    },
+    {
+      "command": "build management_office at:2,2",
+      "description": "Third wall segment: fills the diagonal corner gap (x:2-3, z:2-3) so no 8-directional diagonal move can slip past the wall.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build management_office at:2,2"
+        }
+      ]
+    },
+    {
+      "command": "tick 5",
+      "description": "Every re-route attempt now fails since (0,0) is fully enclosed — after STUCK_THRESHOLD consecutive failures employee #1 flips to the stuck state.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 5"
         }
       ]
     },
@@ -76,21 +108,39 @@
       ]
     },
     {
-      "command": "tick 15",
+      "command": "tick 10",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 15"
+          "command": "tick 10"
         }
       ]
     },
     {
       "command": "build destroy 1",
-      "description": "Demolish the blocking management_office — the previously stuck agent should be able to resume movement once the footprint clears.",
       "interaction": [
         {
           "type": "command",
           "command": "build destroy 1"
+        }
+      ]
+    },
+    {
+      "command": "build destroy 2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build destroy 2"
+        }
+      ]
+    },
+    {
+      "command": "build destroy 3",
+      "description": "Demolish all three wall segments — the previously stuck agent should be able to resume movement once the corner is fully open again.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build destroy 3"
         }
       ]
     },
