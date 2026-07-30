@@ -9,16 +9,29 @@ export type { PendingAction };
  * Dispatch a pending action to the game state.
  * Returns { success: false, error: 'unqualified' } if no employee on the roster
  * has the required skill.
+ *
+ * When `action.targetEmployeeId` is set, the action can only ever be claimed by
+ * that one employee (see tickEmployees' idleMatch in GameLoop.ts) — a roster-wide
+ * "does anyone qualify" check is not sufficient in that case, since a *different*
+ * qualified employee existing does nothing for an action only the target can
+ * claim. Qualification is checked against the target specifically (#406).
  */
 export function dispatchPendingAction(
   state: GameState,
   action: PendingAction,
 ): { success: boolean; error?: string } {
-  const hasQualified = action.requiredSkill === null
-    ? state.employees.employees.some(emp => emp.alive)
-    : state.employees.employees.some(
-        emp => emp.alive && emp.qualifications.some(q => q.category === action.requiredSkill),
-      );
+  const targetId = action.targetEmployeeId;
+  const isQualified = (emp: { alive: boolean; qualifications: { category: string }[] }): boolean =>
+    emp.alive && (action.requiredSkill === null
+      || emp.qualifications.some(q => q.category === action.requiredSkill));
+
+  const hasQualified = targetId !== null && targetId !== undefined
+    ? (() => {
+        const target = state.employees.employees.find(emp => emp.id === targetId);
+        return target !== undefined && isQualified(target);
+      })()
+    : state.employees.employees.some(isQualified);
+
   if (!hasQualified) {
     return { success: false, error: 'unqualified' };
   }

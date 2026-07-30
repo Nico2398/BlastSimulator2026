@@ -132,10 +132,11 @@ export function employeeCommand(
 
       const actionId = state.nextPendingActionId++;
       // dispatchPendingAction (TaskDispatch.ts) owns both the pendingActions
-      // push and the mirrored ghostPreviews push, plus a roster-wide
-      // qualification check — nobody on the roster ever holding requiredSkill
-      // now rejects at dispatch time instead of silently queuing until the
-      // tick loop's later unqualified_task_error detection catches it (#406).
+      // push and the mirrored ghostPreviews push, plus the qualification check
+      // — since this call always sets targetEmployeeId, that check validates
+      // employee #id specifically (not just "someone on the roster"), so a
+      // targeted-but-unqualified dispatch rejects here instead of silently
+      // queuing forever (idleMatch in GameLoop.ts can never match anyone else) (#406).
       const dispatch = dispatchPendingAction(state, {
         id: actionId,
         type: 'general_work',
