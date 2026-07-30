@@ -188,6 +188,17 @@ export const FRAGMENT_PROJECTION_RENDER_DISTANCE_SCALE = 0.15;
  *  velocity fragment still renders within the visible blast/crater area. */
 export const FRAGMENT_PROJECTION_RENDER_MAX_DISTANCE = 12;
 
+/** Default minimum search radius (metres) for the expanding-ring terrain-surface
+ *  search in GameRenderer's getBlastOriginSurfaceY. A fixed 3m ring only clears
+ *  a small blast's own crater; the search widens by this step until it clears
+ *  a large blast's footprint too. */
+export const BLAST_ORIGIN_SURFACE_SEARCH_MIN_RADIUS = 3;
+
+/** Margin (metres) added to a blast's own half-bounding-box-diagonal when sizing
+ *  the terrain-surface search ring in onBlast, so the ring sits just outside the
+ *  blast's own crater rather than exactly on its edge. */
+export const BLAST_ORIGIN_SURFACE_SEARCH_MARGIN = 3;
+
 /** Maximum iterations for the energy propagation overflow loop.
  *  Prevents infinite loops when energy is trapped with no dissipating neighbors.
  *  Real blasting energy dissipates in microseconds; this is a computational guard.

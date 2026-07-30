@@ -250,9 +250,8 @@ export class BlastPlanOverlay {
       });
       const ring = new THREE.Mesh(geo, mat);
       ring.rotation.x = -Math.PI / 2;
-      // Sit just above the actual blast-site surface, not a hardcoded near-zero
-      // world Y — a mine site is rarely near y=0, so the rings previously
-      // rendered underground, fully occluded by solid terrain.
+      // Sit just above the blast-site surface, not a hardcoded near-zero world Y
+      // — mine sites rarely sit near y=0, so a fixed offset rendered underground.
       ring.position.set(origin.x, origin.y + 0.15, origin.z);
       this.group.add(ring);
     }
@@ -271,9 +270,7 @@ export class BlastPlanOverlay {
     return new THREE.Mesh(geo, mat);
   }
 
-  private makeProjectionArc(
-    hx: number, hz: number, speed: number,
-  ): THREE.Line {
+  private makeProjectionArc(hx: number, hz: number, speed: number): THREE.Line {
     // Simple parabola: y = v² sin(2θ)/g, θ=45°
     const g = 9.81;
     const range = (speed * speed) / g;

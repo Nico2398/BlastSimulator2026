@@ -9,6 +9,7 @@ import { getDominantRockId } from '../world/VoxelGrid.js';
 import type { Vec3 } from '../math/Vec3.js';
 import { getRock, type RockType } from '../world/RockCatalog.js';
 import { calculateEnergyField } from './BlastCalc.js';
+import { SOLID_VOXEL_DENSITY_THRESHOLD } from '../config/balance.js';
 
 export const PREVIEW_RADIUS = 5;
 
@@ -38,7 +39,7 @@ export interface VoxelEnergyThreshold {
  * position rather than the voxel center. Returns null when the voxel has
  * no resolvable rock.
  */
-export function energyThresholdForVoxel(
+export function computeEnergyThresholdForVoxel(
   voxel: VoxelData,
   energyPoint: Vec3,
   plan: BlastPlan,
@@ -54,7 +55,7 @@ export function energyThresholdForVoxel(
 }
 
 /**
- * Same as {@link energyThresholdForVoxel}, but fetches the voxel at
+ * Same as {@link computeEnergyThresholdForVoxel}, but fetches the voxel at
  * (vx, vy, vz) first. Returns null when that voxel is empty or has no
  * resolvable rock.
  */
@@ -69,7 +70,7 @@ export function getVoxelEnergyThreshold(
 ): VoxelEnergyThreshold | null {
   const voxel = grid.getVoxel(vx, vy, vz);
   if (!voxel || voxel.density <= 0) return null;
-  return energyThresholdForVoxel(voxel, energyPoint, plan, ctx);
+  return computeEnergyThresholdForVoxel(voxel, energyPoint, plan, ctx);
 }
 
 /** Compute surface Y for each hole by scanning the column from top to bottom. */
@@ -81,7 +82,7 @@ export function getHoleSurfaceYs(plan: BlastPlan, grid: VoxelGrid): Record<strin
     let surfaceY = 0;
     for (let y = grid.sizeY - 1; y >= 0; y--) {
       const v = grid.getVoxel(gx, y, gz);
-      if (v && v.density >= 0.5) { surfaceY = y + 1; break; }
+      if (v && v.density >= SOLID_VOXEL_DENSITY_THRESHOLD) { surfaceY = y + 1; break; }
     }
     result[hole.id] = surfaceY;
   }
@@ -117,7 +118,12 @@ export function forEachBBoxVoxel(
   }
 }
 
-export function getBlastBBox(plan: BlastPlan, grid: VoxelGrid): BlastBBox {
+/**
+ * Bounds the blast zone in voxel space. Reuses `ctx.holeSurfaceYs` (already
+ * computed by {@link computeHoleContext}, which every caller invokes right
+ * before this) instead of rescanning each hole's column a second time.
+ */
+export function getBlastBBox(plan: BlastPlan, ctx: HoleContext): BlastBBox {
   let minX = Infinity, maxX = -Infinity;
   let minZ = Infinity, maxZ = -Infinity;
   let maxSurfaceY = 0;
@@ -128,13 +134,7 @@ export function getBlastBBox(plan: BlastPlan, grid: VoxelGrid): BlastBBox {
     minZ = Math.min(minZ, h.z);
     maxZ = Math.max(maxZ, h.z);
     maxDepth = Math.max(maxDepth, h.depth);
-    // Find surface Y for this hole column
-    const gx = Math.max(0, Math.min(grid.sizeX - 1, Math.floor(h.x)));
-    const gz = Math.max(0, Math.min(grid.sizeZ - 1, Math.floor(h.z)));
-    for (let y = grid.sizeY - 1; y >= 0; y--) {
-      const v = grid.getVoxel(gx, y, gz);
-      if (v && v.density >= 0.5) { maxSurfaceY = Math.max(maxSurfaceY, y + 1); break; }
-    }
+    maxSurfaceY = Math.max(maxSurfaceY, ctx.holeSurfaceYs[h.id] ?? 0);
   }
   return {
     minX: Math.floor(minX - PREVIEW_RADIUS),

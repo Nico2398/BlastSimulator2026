@@ -8,6 +8,7 @@ import {
   previewHoleDetails,
   MAX_SOFTWARE_TIER,
 } from '../../../src/core/mining/Software.js';
+import { MAX_PROJECTION_VELOCITY } from '../../../src/core/config/balance.js';
 import { resetHoleIds } from '../../../src/core/mining/DrillPlan.js';
 import { vec3 } from '../../../src/core/math/Vec3.js';
 import { makeTestPlan } from './softwareTestFixtures.js';
@@ -100,7 +101,7 @@ describe('Software — previewHoleDetails', () => {
       expect(detail).toBeDefined();
       if (detail!.projectionSpeedMs !== undefined) {
         expect(detail!.projectionSpeedMs).toBeGreaterThan(0);
-        expect(detail!.projectionSpeedMs).toBeLessThanOrEqual(80); // MAX_PROJECTION_VELOCITY
+        expect(detail!.projectionSpeedMs).toBeLessThanOrEqual(MAX_PROJECTION_VELOCITY);
       }
     }
   });

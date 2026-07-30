@@ -21,7 +21,11 @@ import { GhostMesh } from './GhostMesh.js';
 import { syncEntitySets } from './EntitySync.js';
 import type { SurveyConfidenceOverlayOptions, SurveyConfidencePoint } from './SurveyConfidenceOverlay.js';
 import { isSurveyStale } from '../core/mining/SurveyCalc.js';
-import { SOLID_VOXEL_DENSITY_THRESHOLD } from '../core/config/balance.js';
+import {
+  SOLID_VOXEL_DENSITY_THRESHOLD,
+  BLAST_ORIGIN_SURFACE_SEARCH_MIN_RADIUS,
+  BLAST_ORIGIN_SURFACE_SEARCH_MARGIN,
+} from '../core/config/balance.js';
 import { isInZone } from '../core/entities/Zone.js';
 import { assembleBlastPlan } from '../core/mining/BlastPlan.js';
 import { previewHoleDetails } from '../core/mining/Software.js';
@@ -293,7 +297,11 @@ export class GameRenderer {
    * doesn't (irregular crater edges, sloped walls), the search keeps
    * widening in `minRadius` steps up to the grid extent.
    */
-  private getBlastOriginSurfaceY(cx: number, cz: number, minRadius = 3): number {
+  private getBlastOriginSurfaceY(
+    cx: number,
+    cz: number,
+    minRadius = BLAST_ORIGIN_SURFACE_SEARCH_MIN_RADIUS,
+  ): number {
     const step = Math.max(1, minRadius);
     const maxRadius = this.lastGrid
       ? Math.max(this.lastGrid.sizeX, this.lastGrid.sizeZ)
@@ -347,17 +355,16 @@ export class GameRenderer {
     // Size the surface-sample ring to the blast's own footprint (half its
     // bounding-box diagonal + margin), so a large multi-hole blast's crater
     // doesn't swallow the whole sampling ring.
-    let sampleRadius = 3;
+    let sampleRadius: number = BLAST_ORIGIN_SURFACE_SEARCH_MIN_RADIUS;
     if (ctx.lastBlastFragments && ctx.lastBlastFragments.length > 0) {
       ox = ctx.lastBlastFragments.reduce((s, p) => s + p.x, 0) / ctx.lastBlastFragments.length;
       oz = ctx.lastBlastFragments.reduce((s, p) => s + p.z, 0) / ctx.lastBlastFragments.length;
-      let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
-      for (const p of ctx.lastBlastFragments) {
-        minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
-        minZ = Math.min(minZ, p.z); maxZ = Math.max(maxZ, p.z);
-      }
+      const { minX, maxX, minZ, maxZ } = boundingBoxXZ(ctx.lastBlastFragments);
       const halfDiagonal = Math.hypot(maxX - minX, maxZ - minZ) / 2;
-      sampleRadius = Math.max(3, halfDiagonal + 3);
+      sampleRadius = Math.max(
+        BLAST_ORIGIN_SURFACE_SEARCH_MIN_RADIUS,
+        halfDiagonal + BLAST_ORIGIN_SURFACE_SEARCH_MARGIN,
+      );
     }
     // Anchor at the surrounding terrain surface, not y=0. A mine site rarely
     // sits at grid y=0 — it's typically well above it — so a hardcoded 0 here
@@ -508,4 +515,16 @@ export class GameRenderer {
     this.renderedVehicleIds.clear();
     this.renderedEmployeeIds.clear();
   }
+}
+
+/** Min/max X and Z across a set of points — used to size the blast-origin surface search ring. */
+function boundingBoxXZ(
+  points: readonly { x: number; z: number }[],
+): { minX: number; maxX: number; minZ: number; maxZ: number } {
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  for (const p of points) {
+    minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+    minZ = Math.min(minZ, p.z); maxZ = Math.max(maxZ, p.z);
+  }
+  return { minX, maxX, minZ, maxZ };
 }

@@ -16,7 +16,7 @@ import {
 } from './BlastCalc.js';
 import {
   computeHoleContext,
-  energyThresholdForVoxel,
+  computeEnergyThresholdForVoxel,
   getVoxelEnergyThreshold,
   getBlastBBox,
   forEachBBoxVoxel,
@@ -98,7 +98,7 @@ export function previewEnergy(
 
   const ctx = computeHoleContext(plan, grid);
 
-  const bbox = getBlastBBox(plan, grid);
+  const bbox = getBlastBBox(plan, ctx);
   const energyMap = new Map<string, number>();
   let maxEnergy = 0;
   let minEnergy = Infinity;
@@ -125,12 +125,12 @@ export function previewFragments(
 
   const ctx = computeHoleContext(plan, grid);
 
-  const bbox = getBlastBBox(plan, grid);
+  const bbox = getBlastBBox(plan, ctx);
   let fractured = 0, cracked = 0, unaffected = 0;
   let totalFragSize = 0;
 
   forEachBBoxVoxel(grid, bbox, (x, y, z, voxel) => {
-    const vet = energyThresholdForVoxel(voxel, vec3(x, y, z), plan, ctx);
+    const vet = computeEnergyThresholdForVoxel(voxel, vec3(x, y, z), plan, ctx);
     if (!vet) return;
 
     const frag = calculateFragmentation(vet.energy, vet.threshold);
@@ -163,11 +163,11 @@ export function previewProjections(
 
   const ctx = computeHoleContext(plan, grid);
 
-  const bbox = getBlastBBox(plan, grid);
+  const bbox = getBlastBBox(plan, ctx);
   const positions: Array<{ x: number; y: number; z: number }> = [];
 
   forEachBBoxVoxel(grid, bbox, (x, y, z, voxel) => {
-    const vet = energyThresholdForVoxel(voxel, vec3(x, y, z), plan, ctx);
+    const vet = computeEnergyThresholdForVoxel(voxel, vec3(x, y, z), plan, ctx);
     if (!vet) return;
 
     const ratio = vet.threshold > 0 ? vet.energy / vet.threshold : 0;

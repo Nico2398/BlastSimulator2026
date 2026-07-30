@@ -38,6 +38,17 @@ function makeCtx(): MiningContext {
   };
 }
 
+/** Bind the private getBlastOriginSurfaceY for direct testing — least invasive
+ *  way to cover the expanding-ring search without exporting it or driving a
+ *  full onBlast()/BlastEffects setup. */
+function bindBlastOriginSurfaceY(
+  renderer: GameRenderer,
+): (cx: number, cz: number, minRadius?: number) => number {
+  return (
+    renderer as unknown as { getBlastOriginSurfaceY(cx: number, cz: number, minRadius?: number): number }
+  ).getBlastOriginSurfaceY.bind(renderer);
+}
+
 describe('GameRenderer — diagnostics accessors', () => {
   it('lastGridId is null before any game is loaded', () => {
     const renderer = new GameRenderer(makeMockSceneManager() as any);
@@ -113,6 +124,58 @@ describe('GameRenderer — onBlast()', () => {
     const ctx = makeCtx();
     // syncFromContext was never called — terrain/lastGrid are still null.
     expect(() => renderer.onBlast(ctx)).not.toThrow();
+  });
+});
+
+describe('GameRenderer — getBlastOriginSurfaceY', () => {
+  it('keeps expanding the search ring past a crater wider than the initial minRadius', () => {
+    // Solid ground everywhere, then a wide crater (radius 10) cleared around
+    // (20, 20). A single fixed-radius ring at the default minRadius (3) lands
+    // entirely inside the crater and would read back y=0 (the original bug —
+    // the dust cloud/flash rendered buried underground). The fix keeps
+    // widening the ring until it clears the crater edge.
+    const grid = new VoxelGrid(40, 10, 40);
+    const solidVoxel = {
+      composition: { rocks: [{ rockId: 'sandite', coefficient: 1 }] },
+      density: 1,
+      oreDensities: {},
+      fractureModifier: 1,
+    };
+    for (let x = 0; x < 40; x++) {
+      for (let z = 0; z < 40; z++) {
+        grid.setVoxel(x, 0, z, { ...solidVoxel });
+      }
+    }
+    for (let x = 10; x <= 30; x++) {
+      for (let z = 10; z <= 30; z++) {
+        if (Math.hypot(x - 20, z - 20) <= 10) grid.clearVoxel(x, 0, z);
+      }
+    }
+
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    const ctx = makeCtx();
+    ctx.grid = grid;
+    renderer.syncFromContext(ctx);
+    const getSurfaceY = bindBlastOriginSurfaceY(renderer);
+
+    // minRadius=3: every offset ring up to r=6 stays inside the radius-10
+    // crater (all density 0) — only the wider r=9 ring's diagonal offsets
+    // reach outside it and find solid ground.
+    expect(getSurfaceY(20, 20, 3)).toBe(1);
+  });
+
+  it('falls straight through to the direct terrain sample when even the widest ring is inside the crater', () => {
+    // A crater that covers the whole grid: every ring, however wide, stays
+    // inside it, so the function must fall back to getTerrainSurfaceY(cx, cz)
+    // rather than looping forever or throwing.
+    const grid = new VoxelGrid(10, 5, 10);
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    const ctx = makeCtx();
+    ctx.grid = grid;
+    renderer.syncFromContext(ctx);
+    const getSurfaceY = bindBlastOriginSurfaceY(renderer);
+
+    expect(getSurfaceY(5, 5, 3)).toBe(0);
   });
 });
 

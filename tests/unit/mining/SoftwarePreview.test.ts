@@ -61,7 +61,8 @@ describe('SoftwarePreview — getVoxelEnergyThreshold', () => {
 describe('SoftwarePreview — getBlastBBox', () => {
   it('bounds every hole with PREVIEW_RADIUS of margin', () => {
     const { grid, plan } = makeTestPlan();
-    const bbox = getBlastBBox(plan, grid);
+    const ctx = computeHoleContext(plan, grid);
+    const bbox = getBlastBBox(plan, ctx);
     for (const hole of plan.holes) {
       expect(hole.x).toBeGreaterThanOrEqual(bbox.minX);
       expect(hole.x).toBeLessThanOrEqual(bbox.maxX);
