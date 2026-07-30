@@ -27,6 +27,10 @@ export function makeSkillStars(level: number): string {
 
 export function makeSkillSection(e: Employee): HTMLElement {
   const el = document.createElement('div');
+  // Addressable so refreshDynamic can re-render this section in place each
+  // tick a row is expanded — xp drifts on its own like the need bars and
+  // task queue, but a same-level xp gain never changes the roster signature.
+  el.className = 'bs-skill-section';
 
   if (e.qualifications.length === 0) {
     const msg = document.createElement('div');

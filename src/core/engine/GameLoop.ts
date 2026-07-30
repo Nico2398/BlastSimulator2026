@@ -9,14 +9,16 @@ import type { Random } from '../math/Random.js';
 import type { EventContext } from '../events/EventPool.js';
 import { tickEventSystem, type FiredEvent } from '../events/EventSystem.js';
 import { detectTrafficJam } from '../events/EventEngine.js';
-import { checkCollapse, type NeedKey, type Employee } from '../entities/Employee.js';
-import { replenishNeed } from '../entities/EmployeeNeeds.js';
+import { checkCollapse, gainXp, type NeedKey, type Employee, type SkillCategory } from '../entities/Employee.js';
+import { computeTaskDuration } from '../entities/EmployeeTaskDuration.js';
+import { replenishNeed, getNeedMultiplier } from '../entities/EmployeeNeeds.js';
+import { getLivingQuartersWellbeingMultiplier } from '../entities/BuildingWellbeing.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { addExpense } from '../economy/Finance.js';
 
 // ── Config ──
 
-import { BASE_TICK_MS as _BASE_TICK_MS, VALID_SPEEDS as _VALID_SPEEDS, NEED_REST_DURATIONS, NEED_REST_NO_BUILDING_CAP, NEED_REST_NO_BUILDING_DURATION_MULTIPLIER, NEED_REST_BUILDING_TYPES, NEED_REST_SEARCH_RADIUS, NEED_WARNING_THRESHOLDS, NEED_REST_COSTS, WORK_DURATION_TICKS, SHIFT_SLEEP_DURATION_TICKS } from '../config/balance.js';
+import { BASE_TICK_MS as _BASE_TICK_MS, VALID_SPEEDS as _VALID_SPEEDS, NEED_REST_DURATIONS, NEED_REST_NO_BUILDING_CAP, NEED_REST_NO_BUILDING_DURATION_MULTIPLIER, NEED_REST_BUILDING_TYPES, NEED_REST_SEARCH_RADIUS, NEED_WARNING_THRESHOLDS, NEED_REST_COSTS, WORK_DURATION_TICKS, SHIFT_SLEEP_DURATION_TICKS, BASE_TASK_DURATION_TICKS } from '../config/balance.js';
 
 /** Milliseconds per base tick at 1x speed. */
 export const BASE_TICK_MS = _BASE_TICK_MS;
@@ -223,6 +225,13 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
     result.claimed.push(action.id);
     // action is consumed — not pushed to remaining
 
+    // This is the actual claim path the tick loop uses (claimPendingAction in
+    // TaskDispatch.ts is a separate helper nothing here calls), so it owns
+    // clearing the ghost preview too — otherwise the blue marker never
+    // disappears once a real employee picks up the work (#406).
+    const ghostIdx = state.ghostPreviews.findIndex(g => g.id === action.id);
+    if (ghostIdx !== -1) state.ghostPreviews.splice(ghostIdx, 1);
+
     // tickCollapse/tickNeedRestoration self-claim (see above) and start the rest
     // timer immediately, so they never reach this path. autoInsertNeedTasks
     // pushes 'rest' actions unclaimed (busy-employee case), so this is the
@@ -239,6 +248,18 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
         idleMatch.restTicksRemaining = restDuration;
         idleMatch.restNeedKey = needKey;
       }
+    }
+
+    // Non-rest actions requiring a skill start their task-duration countdown
+    // here — the claimed employee is guaranteed (via allWithSkill above) to
+    // hold requiredSkill, so proficiency lookup below always succeeds.
+    if (action.type !== 'rest' && action.requiredSkill !== null) {
+      const qual = idleMatch.qualifications.find(q => q.category === action.requiredSkill);
+      const level = qual?.proficiencyLevel ?? 1;
+      const needMult = getNeedMultiplier(idleMatch);
+      const lqMult = getLivingQuartersWellbeingMultiplier(state.buildings, state.employees.employees.length);
+      idleMatch.taskTicksRemaining = computeTaskDuration(BASE_TASK_DURATION_TICKS, level, needMult, lqMult, 1);
+      idleMatch.activeTaskSkill = action.requiredSkill;
     }
   }
 
@@ -698,6 +719,65 @@ export function processShiftCycle(
   }
 
   return { restCompleted, shiftRested, active: true };
+}
+
+export interface TaskProgressResult {
+  /** True when taskTicksRemaining reached 0 this tick and the task completed. */
+  completed: boolean;
+  /** True when this tick's XP gain crossed a proficiency level threshold. */
+  leveledUp: boolean;
+  /** Skill category XP was granted to, or null when the task carries no skill. */
+  skill: SkillCategory | null;
+  oldLevel?: 1 | 2 | 3 | 4 | 5;
+  newLevel?: 1 | 2 | 3 | 4 | 5;
+}
+
+/**
+ * Advance an employee's dispatched task toward completion, granting XP and
+ * reporting completion when taskTicksRemaining reaches zero. Mirrors
+ * completeRestTick's shape for taskTicksRemaining instead of restTicksRemaining.
+ *
+ * No-op (returns null) for an employee with no in-progress task
+ * (taskTicksRemaining === null) — includes employees currently resting and
+ * employees dispatched with no required skill (taskTicksRemaining never seeded
+ * for those, see tickEmployees).
+ */
+export function tickTaskProgress(state: GameState, emp: Employee, emitter?: EventEmitter): TaskProgressResult | null {
+  if (emp.taskTicksRemaining === null) return null;
+
+  emp.taskTicksRemaining -= 1;
+
+  const skill = emp.activeTaskSkill;
+  let leveledUp = false;
+  let levelUpLevels: { oldLevel: 1 | 2 | 3 | 4 | 5; newLevel: 1 | 2 | 3 | 4 | 5 } | null = null;
+
+  if (skill !== null) {
+    const qual = emp.qualifications.find(q => q.category === skill);
+    const currentLevel = qual?.proficiencyLevel ?? 1;
+    const xpPerTick = 1 + Math.floor(currentLevel * 0.5);
+    const xpResult = gainXp(state.employees, emp.id, skill, xpPerTick, emitter);
+    if (xpResult) {
+      leveledUp = xpResult.leveledUp;
+      if (xpResult.leveledUp) {
+        levelUpLevels = { oldLevel: xpResult.oldLevel, newLevel: xpResult.newLevel };
+      }
+    }
+  }
+
+  let completed = false;
+  if (emp.taskTicksRemaining <= 0) {
+    completed = true;
+    emp.activeActionId = null;
+    emp.taskTicksRemaining = null;
+    emp.activeTaskSkill = null;
+  }
+
+  return {
+    completed,
+    leveledUp,
+    skill,
+    ...(levelUpLevels ? { oldLevel: levelUpLevels.oldLevel, newLevel: levelUpLevels.newLevel } : {}),
+  };
 }
 
 /**

@@ -18,6 +18,7 @@ import {
   trainableSkills,
 } from '../../core/entities/EmployeeTraining.js';
 import { addExpense } from '../../core/economy/Finance.js';
+import { dispatchPendingAction } from '../../core/engine/TaskDispatch.js';
 import { Random } from '../../core/math/Random.js';
 import { requireGame, NO_EMPLOYEES_MSG } from './commandUtils.js';
 
@@ -110,11 +111,18 @@ export function employeeCommand(
       // synchronously), which left the Bunkhouse shift-cycle unreachable from
       // any player-facing flow.
       const id = parseInt(args[1] ?? named['id'] ?? '', 10);
-      const usageMsg = 'Usage: employee dispatch <id> x:<X> z:<Z>';
+      const usageMsg = 'Usage: employee dispatch <id> x:<X> z:<Z> [skill:<category>]';
       if (isNaN(id)) return { success: false, output: usageMsg };
       const x = parseFloat(named['x'] ?? '');
       const z = parseFloat(named['z'] ?? '');
       if (isNaN(x) || isNaN(z)) return { success: false, output: usageMsg };
+      // Optional named skill param, threaded through to requiredSkill below.
+      // Not validated against VALID_SKILL_CATEGORIES like assign_skill/train are:
+      // an unrecognized category just matches no employee's qualifications, so
+      // dispatchPendingAction rejects it below as "no one qualifies" rather than
+      // as a usage error.
+      const skillRaw = named['skill'];
+      const requiredSkill: SkillCategory | null = skillRaw !== undefined ? (skillRaw as SkillCategory) : null;
 
       const emp = state.employees.employees.find(e => e.id === id);
       if (!emp) return { success: false, output: `Employee #${id} not found.` };
@@ -125,10 +133,16 @@ export function employeeCommand(
       }
 
       const actionId = state.nextPendingActionId++;
-      state.pendingActions.push({
+      // dispatchPendingAction (TaskDispatch.ts) owns both the pendingActions
+      // push and the mirrored ghostPreviews push, plus the qualification check
+      // — since this call always sets targetEmployeeId, that check validates
+      // employee #id specifically (not just "someone on the roster"), so a
+      // targeted-but-unqualified dispatch rejects here instead of silently
+      // queuing forever (idleMatch in GameLoop.ts can never match anyone else) (#406).
+      const dispatch = dispatchPendingAction(state, {
         id: actionId,
         type: 'general_work',
-        requiredSkill: null,
+        requiredSkill,
         requiredVehicleRole: null,
         targetX: x,
         targetZ: z,
@@ -136,6 +150,18 @@ export function employeeCommand(
         payload: {},
         targetEmployeeId: id,
       });
+      if (!dispatch.success) {
+        // dispatch.reason (TaskDispatch.ts) distinguishes "nobody on the roster
+        // holds this skill" from "this specific target doesn't, though someone
+        // else might" — the two need different messages or the latter wrongly
+        // reads as "nobody qualifies" (#406).
+        const message = dispatch.reason === 'target-unqualified'
+          ? `Employee #${id} (${emp.name}) does not hold skill: ${requiredSkill}.`
+          : requiredSkill !== null
+            ? `No employee on the roster holds skill: ${requiredSkill}.`
+            : `Dispatch rejected: no eligible employee on the roster.`;
+        return { success: false, output: message };
+      }
       return {
         success: true,
         output: `Employee #${id} dispatched to work at (${x}, ${z}). Action ID: ${actionId}.`,

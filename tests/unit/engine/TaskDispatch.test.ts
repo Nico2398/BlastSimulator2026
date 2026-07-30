@@ -38,17 +38,19 @@ const SEED = 42;
  */
 function makePendingAction(overrides: Partial<{
   id: number;
-  requiredSkill: string;
+  requiredSkill: string | null;
   targetX: number;
   targetZ: number;
   payload: Record<string, unknown>;
+  targetEmployeeId: number | null;
 }>): PendingAction {
   return {
     id: overrides.id ?? 1,
-    requiredSkill: (overrides.requiredSkill ?? 'blasting') as SkillCategory,
+    requiredSkill: (overrides.requiredSkill === undefined ? 'blasting' : overrides.requiredSkill) as SkillCategory | null,
     targetX: overrides.targetX ?? 10,
     targetZ: overrides.targetZ ?? 20,
     payload: overrides.payload ?? {},
+    targetEmployeeId: overrides.targetEmployeeId ?? null,
   } as unknown as PendingAction;
 }
 
@@ -226,6 +228,112 @@ describe('dispatchPendingAction — at least one qualified employee on roster', 
     ];
 
     const action = makePendingAction({ requiredSkill: 'management' });
+    const result = dispatchPendingAction(state, action);
+
+    expect(result.success).toBe(true);
+  });
+});
+
+// ── Section 3b: dispatchPendingAction — targetEmployeeId narrows eligibility ──
+//   Regression coverage for #406: a roster-wide "does anyone qualify" check is
+//   not sufficient once targetEmployeeId is set — tickEmployees' idleMatch
+//   (GameLoop.ts) can only ever be claimed by that one employee, so dispatch
+//   must reject when THAT employee specifically lacks requiredSkill, even if a
+//   different roster member holds it.
+
+describe('dispatchPendingAction — targeted dispatch to a specific employee (#406)', () => {
+  let state: GameState;
+
+  beforeEach(() => {
+    state = makeGame();
+  });
+
+  it('rejects when the targeted employee lacks requiredSkill, even though another roster member holds it', () => {
+    // Driver (id 1): no geology. Blaster (id 2): holds geology.
+    const rng = new Random(SEED);
+    const { employee: driver } = hireEmployee(state.employees, 'driller', rng);
+    driver.qualifications = [];
+    const { employee: blaster } = hireEmployee(state.employees, 'driller', rng);
+    blaster.qualifications = [];
+    assignSkill(state.employees, blaster.id, 'geology', 1);
+
+    const action = makePendingAction({
+      requiredSkill: 'geology',
+      targetEmployeeId: driver.id,
+    });
+    const result = dispatchPendingAction(state, action);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('unqualified');
+    const pending: PendingAction[] = (state as any).pendingActions;
+    expect(pending).toHaveLength(0);
+  });
+
+  it('accepts when the targeted employee itself holds requiredSkill', () => {
+    const rng = new Random(SEED);
+    const { employee: blaster } = hireEmployee(state.employees, 'driller', rng);
+    blaster.qualifications = [];
+    assignSkill(state.employees, blaster.id, 'geology', 1);
+
+    const action = makePendingAction({
+      requiredSkill: 'geology',
+      targetEmployeeId: blaster.id,
+    });
+    const result = dispatchPendingAction(state, action);
+
+    expect(result.success).toBe(true);
+    const pending: PendingAction[] = (state as any).pendingActions;
+    expect(pending).toHaveLength(1);
+  });
+
+  it('rejects when targetEmployeeId refers to nobody on the roster', () => {
+    const action = makePendingAction({ requiredSkill: 'geology', targetEmployeeId: 999 });
+    const result = dispatchPendingAction(state, action);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('unqualified');
+  });
+});
+
+// ── Section 3c: dispatchPendingAction — requiredSkill === null branch ────────
+//   "any alive employee qualifies" — success path and reject-when-nobody-alive.
+
+describe('dispatchPendingAction — requiredSkill === null (any alive employee qualifies)', () => {
+  let state: GameState;
+
+  beforeEach(() => {
+    state = makeGame();
+  });
+
+  it('returns { success: true } when at least one alive employee exists, regardless of skills', () => {
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.qualifications = [];
+
+    const action = makePendingAction({ requiredSkill: null });
+    const result = dispatchPendingAction(state, action);
+
+    expect(result.success).toBe(true);
+    const pending: PendingAction[] = (state as any).pendingActions;
+    expect(pending).toHaveLength(1);
+  });
+
+  it('returns { success: false, error: "unqualified" } when the roster has nobody alive', () => {
+    const action = makePendingAction({ requiredSkill: null });
+    const result = dispatchPendingAction(state, action);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('unqualified');
+    const pending: PendingAction[] = (state as any).pendingActions;
+    expect(pending).toHaveLength(0);
+  });
+
+  it('targeted dispatch with requiredSkill null succeeds when the target is alive', () => {
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.qualifications = [];
+
+    const action = makePendingAction({ requiredSkill: null, targetEmployeeId: employee.id });
     const result = dispatchPendingAction(state, action);
 
     expect(result.success).toBe(true);

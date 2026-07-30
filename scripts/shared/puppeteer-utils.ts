@@ -59,7 +59,11 @@ export async function initBrowser(options: BrowserInitOptions): Promise<BrowserI
   const page = await browser.newPage();
   await page.setViewport(viewport);
 
-  const devServerUrl = `http://localhost:${port}`;
+  // `scenarioMode=1` tells main.ts to skip its own real-time auto-tick loop —
+  // a Puppeteer-driven run only advances simulation time via scripted `tick N`
+  // commands, so checkpoints stay reproducible instead of racing wall-clock
+  // time spent on clicks, waits, and screenshots (#406).
+  const devServerUrl = `http://localhost:${port}/?scenarioMode=1`;
   console.log(`Navigating to ${devServerUrl}...`);
   await page.goto(devServerUrl, { waitUntil: 'networkidle0' });
   await page.waitForSelector('#game-canvas, canvas', { timeout: 10000 });

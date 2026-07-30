@@ -64,6 +64,11 @@ export class GameRenderer {
     return this.lastGrid?.id ?? null;
   }
 
+  /** Number of ghost-preview meshes currently rendered — for diagnostics. */
+  get ghostCount(): number {
+    return this.ghosts?.count ?? 0;
+  }
+
   /**
    * Sync rendered scene from the current MiningContext.
    * Call after every console command.
@@ -116,9 +121,15 @@ export class GameRenderer {
       }
     }
 
-    // Sync ghost previews for pending actions
+    // Sync ghost previews for pending actions. Every dispatch sets targetY:0
+    // (see employees.ts), so at the terrain's actual height that box renders
+    // buried inside solid voxels — snap it onto the surface like vehicles and
+    // characters above, or the ghost is queued but never visible (#406).
     if (this.ghosts) {
-      this.ghosts.sync(ctx.state.ghostPreviews);
+      const previews = this.lastGrid
+        ? ctx.state.ghostPreviews.map(p => ({ ...p, targetY: this.getTerrainSurfaceY(p.targetX, p.targetZ) }))
+        : ctx.state.ghostPreviews;
+      this.ghosts.sync(previews);
     }
 
     // Blink employees still inside an active safety zone during clearing

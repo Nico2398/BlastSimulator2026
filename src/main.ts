@@ -13,14 +13,10 @@ import { AudioManager } from './audio/AudioManager.js';
 import { AudioHooks } from './audio/AudioHooks.js';
 import { IndexedDBPersistence } from './persistence/IndexedDBPersistence.js';
 import { DownloadPersistence } from './persistence/DownloadPersistence.js';
-import { createRunner } from './console/createRunner.js';
+import { createRunner, runCommand } from './console/createRunner.js';
 import { parseCommand } from './console/ConsoleRunner.js';
 import { BASE_TICK_MS } from './core/engine/GameLoop.js';
-import { incrementActionCount } from './core/events/EventSystem.js';
 import { probeUiActions, probeSelector } from './ui/uiActionProbe.js';
-
-/** Console commands that should not count as user actions for event cooldown gating. */
-const META_COMMANDS = ['tick', 'speed', 'pause', 'time'] as const;
 
 // --- 3D Scene ---
 const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
@@ -120,6 +116,7 @@ declare global {
     __probeSelector: (selector: string) => ReturnType<typeof probeSelector>;
     __tutorialState: () => { active: boolean; stepIndex: number; stepId: string | null; title: string; total: number; stageIndex: number; stageTotal: number; stageTarget: string | null; clockHeld: boolean };
     __resetTickAccumulator: () => void;
+    __setAutoTick: (enabled: boolean) => void;
     __debugGridInfo: () => Record<string, unknown>;
   }
 }
@@ -136,16 +133,11 @@ console.log = (...args: unknown[]) => {
 };
 
 window.__gameConsole = (cmd: string) => {
-  const result = runner.run(cmd);
+  const result = runCommand({ runner, ctx, emitter }, cmd);
   lastCommandOutput = result.output;
   // Sync the renderer after every command so visual changes appear immediately
   gameRenderer.syncFromContext(ctx);
   const cmdName = parseCommand(cmd).command;
-
-  // Increment action count for non-meta commands (event cooldown gating)
-  if (ctx.state && !META_COMMANDS.includes(cmdName as typeof META_COMMANDS[number])) {
-    incrementActionCount(ctx.state.events);
-  }
 
   // Trigger blast effects and terrain rebuild after a blast
   if (cmdName === 'blast' && result.success && ctx.state) {
@@ -254,12 +246,22 @@ window.__gameState = () => {
 
 window.__resetTickAccumulator = () => { accumulatedGameMs = 0; };
 
+// A Puppeteer-driven run (scenario/interaction mode, playtest) navigates with
+// `?scenarioMode=1` so only its own scripted `tick N` commands advance
+// simulation time — otherwise the render loop's own real-time ticking races
+// scripted checkpoints and desyncs them (see #406). Exposed as a bridge too,
+// for a mode that wants to flip it after load.
+let autoTickEnabled = new URLSearchParams(window.location.search).get('scenarioMode') !== '1';
+window.__setAutoTick = (enabled: boolean) => { autoTickEnabled = enabled; };
+
 // Debug: expose grid reference info for diagnostics
 window.__debugGridInfo = () => {
   return {
     ctxGridId: ctx.grid?.id ?? null,
     lastGridId: gameRenderer.lastGridId,
     terrainGridId: gameRenderer.terrain?.gridId ?? null,
+    ghostCount: gameRenderer.ghostCount,
+    ghostPreviewsInState: ctx.state?.ghostPreviews.length ?? -1,
   };
 };
 
@@ -380,7 +382,7 @@ scene.start((dt) => {
   gameRenderer.update(dt);
 
   // Advance game time
-  if (ctx.state && !ctx.state.isPaused) {
+  if (ctx.state && !ctx.state.isPaused && autoTickEnabled) {
     accumulatedGameMs += dt * 1000;
     // Tick every BASE_TICK_MS ms; timeScale is handled inside tickCommand
     while (accumulatedGameMs >= BASE_TICK_MS) {

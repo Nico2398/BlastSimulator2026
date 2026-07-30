@@ -360,7 +360,7 @@ const CSS = `
 .bs-skill-row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; font-size: 10px; }
 .bs-skill-category { color: #d0b090; font-weight: 600; }
 .bs-skill-stars { color: #ffc840; font-size: 11px; }
-.bs-xp-bar-bg { background: rgba(255,255,255,0.1); border-radius: 2px; height: 4px; margin-top: 2px; }
+.bs-xp-bar-bg { background: rgba(255,255,255,0.1); border-radius: 2px; height: 4px; margin-top: 2px; flex: 1; min-width: 40px; }
 .bs-xp-bar-fill { height: 100%; background: linear-gradient(90deg, #4caf50, #8bc34a); border-radius: 2px; transition: width 0.3s; }
 .bs-need-bar-bg { background: rgba(255,255,255,0.08); border-radius: 2px; height: 5px; margin-top: 1px; }
 .bs-need-bar-fill { height: 100%; border-radius: 2px; transition: width 0.3s; }

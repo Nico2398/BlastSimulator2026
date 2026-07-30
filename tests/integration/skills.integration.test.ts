@@ -358,3 +358,112 @@ describe('Employee skills', () => {
     expect(d2).toBeLessThan(d1);
   });
 });
+
+// ── Tick-driven task/XP pipeline (dispatch + tick command) — issue #406 ──────
+//
+// Exercises TaskDispatch → tickEmployees (duration seeding) → tickTaskProgress
+// (per-tick XP + completion) as driven by the real console `employee dispatch`
+// and `tick` commands — the same path a scenario or player-facing flow uses.
+// No living_quarters is built in this section, so the Bunkhouse Tier 2+ shift
+// cycle never engages and task duration stays deterministic.
+
+describe('Tick-driven task/XP pipeline (dispatch + tick command, issue #406)', () => {
+  it('dispatching to a required skill decrements taskTicksRemaining tick by tick, grants XP, and frees the employee on completion', () => {
+    const ctx = makeCtx();
+    const empId = hireOne(ctx, 'blaster'); // arrives with 'blasting' level 1
+
+    const dispatchResult = employeeCommand(
+      ctx, ['dispatch', String(empId)], { x: '5', z: '5', skill: 'blasting' },
+    );
+    expect(dispatchResult.success, dispatchResult.output).toBe(true);
+
+    const emp = () => ctx.state!.employees.employees.find(e => e.id === empId)!;
+
+    // One tick lets tickEmployees claim + seed the task.
+    tickCommand(ctx, ['1'], {});
+    expect(emp().activeActionId).not.toBeNull();
+    expect(emp().taskTicksRemaining).not.toBeNull();
+
+    const seeded = emp().taskTicksRemaining!;
+    expect(seeded).toBeGreaterThan(0);
+
+    const observedRemaining: number[] = [emp().taskTicksRemaining!];
+    for (let i = 0; i < seeded + 2 && emp().taskTicksRemaining !== null; i++) {
+      tickCommand(ctx, ['1'], {});
+      observedRemaining.push(emp().taskTicksRemaining ?? 0);
+    }
+
+    // Strictly decreasing while active — proves a per-tick countdown, not an
+    // instant jump straight to completion.
+    const activeValues = observedRemaining.filter(v => v > 0);
+    for (let i = 1; i < activeValues.length; i++) {
+      expect(activeValues[i]).toBeLessThan(activeValues[i - 1]!);
+    }
+
+    expect(emp().taskTicksRemaining).toBeNull();
+    expect(emp().activeActionId).toBeNull();
+
+    const qual = emp().qualifications.find(q => q.category === 'blasting')!;
+    expect(qual.xp).toBeGreaterThan(0);
+  });
+
+  it('a higher-proficiency employee completes the identical dispatched task in fewer ticks', () => {
+    const ctxRookie = makeCtx();
+    const rookieId = hireOne(ctxRookie, 'blaster');
+    employeeCommand(ctxRookie, ['dispatch', String(rookieId)], { x: '5', z: '5', skill: 'blasting' });
+    tickCommand(ctxRookie, ['1'], {});
+    const rookieSeeded = ctxRookie.state!.employees.employees.find(e => e.id === rookieId)!.taskTicksRemaining!;
+
+    const ctxMaster = makeCtx();
+    const masterId = hireOne(ctxMaster, 'blaster');
+    employeeCommand(ctxMaster, ['assign_skill', String(masterId)], { skill: 'blasting', level: '5' });
+    employeeCommand(ctxMaster, ['dispatch', String(masterId)], { x: '5', z: '5', skill: 'blasting' });
+    tickCommand(ctxMaster, ['1'], {});
+    const masterSeeded = ctxMaster.state!.employees.employees.find(e => e.id === masterId)!.taskTicksRemaining!;
+
+    expect(rookieSeeded).toBeGreaterThan(0);
+    expect(masterSeeded).toBeGreaterThan(0);
+    expect(masterSeeded).toBeLessThan(rookieSeeded);
+  });
+
+  it('dispatch without a skill: param still queues general_work with requiredSkill: null and gets claimed (regression)', () => {
+    const ctx = makeCtx();
+    const empId = hireOne(ctx, 'driller');
+
+    const result = employeeCommand(ctx, ['dispatch', String(empId)], { x: '3', z: '3' });
+    expect(result.success, result.output).toBe(true);
+
+    const action = ctx.state!.pendingActions.find(a => a.targetEmployeeId === empId);
+    expect(action).toBeDefined();
+    expect(action!.requiredSkill).toBeNull();
+    expect(action!.type).toBe('general_work');
+
+    tickCommand(ctx, ['1'], {});
+    const emp = ctx.state!.employees.employees.find(e => e.id === empId)!;
+    expect(emp.activeActionId).not.toBeNull();
+  });
+
+  it('dispatching to a skill nobody on the roster holds is rejected immediately, rather than silently queuing forever', () => {
+    // dispatch now routes through dispatchPendingAction (TaskDispatch.ts),
+    // which rejects a roster-wide-unqualified dispatch at dispatch time —
+    // the tick loop's unqualified_task_error path (EventEngine.ts) still
+    // exists for actions that can't be routed here (e.g. dispatched before
+    // the roster's only qualified employee is fired), but a dispatch this
+    // command builds is no longer one of them (#406 follow-up).
+    const ctx = makeCtx();
+    const empId = hireOne(ctx, 'driver'); // arrives with 'driving.truck' only — nobody holds 'geology'
+
+    const dispatchResult = employeeCommand(
+      ctx, ['dispatch', String(empId)], { x: '1', z: '1', skill: 'geology' },
+    );
+    expect(dispatchResult.success).toBe(false);
+    expect(dispatchResult.output).toContain('geology');
+
+    // Nothing was queued — a tick can't claim, complete, or flag it.
+    expect(ctx.state!.pendingActions).toHaveLength(0);
+    tickCommand(ctx, ['1'], {});
+    expect(ctx.state!.events.pendingEvent?.eventId).not.toBe('unqualified_task_error');
+    const emp = ctx.state!.employees.employees.find(e => e.id === empId)!;
+    expect(emp.activeActionId).toBeNull();
+  });
+});

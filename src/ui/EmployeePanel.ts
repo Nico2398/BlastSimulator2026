@@ -191,6 +191,9 @@ export class EmployeePanel {
       // an employee's detail is open, same as the meta line and need bars above.
       const detail = row.querySelector<HTMLElement>('.bs-employee-detail');
       if (detail) {
+        const skillEl = detail.querySelector<HTMLElement>('.bs-skill-section');
+        if (skillEl) skillEl.replaceWith(makeSkillSection(e));
+
         const taskQueueEl = detail.querySelector<HTMLElement>('.bs-task-queue');
         if (taskQueueEl) taskQueueEl.replaceWith(makeTaskQueue(e, state));
 
@@ -331,7 +334,12 @@ export class EmployeePanel {
     // roster re-renders on its own. Without this the detail a player just
     // opened — and the training controls inside it — vanish a moment later.
     this.expanded.add(e.id);
-    row.appendChild(this.makeDetail(e, state));
+    const detail = this.makeDetail(e, state);
+    row.appendChild(detail);
+    // A row near the top of a long, already-scrolled roster opens off-screen
+    // otherwise — its own expansion is never in frame to click or screenshot.
+    // jsdom (unit tests) doesn't implement scrollIntoView at all.
+    detail.scrollIntoView?.({ block: 'nearest' });
   }
 
   private makeDetail(e: Employee, state: GameState): HTMLElement {

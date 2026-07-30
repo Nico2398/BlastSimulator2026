@@ -104,6 +104,14 @@ export interface Employee {
   ticksWorked: number;
   /** Ticks of rest remaining when employee is in bunkhouse rest mode, or null if not resting. */
   restTicksRemaining: number | null;
+  /** Ticks remaining on the employee's currently dispatched task, or null if no task is in progress. */
+  taskTicksRemaining: number | null;
+  /**
+   * Skill category of the in-progress dispatched task (mirrors taskTicksRemaining
+   * lifecycle: set together on claim, cleared together on completion). Null when
+   * no task is in progress, or when the in-progress task required no skill.
+   */
+  activeTaskSkill: SkillCategory | null;
   /**
    * Which need gauge the in-progress rest is restoring, or null when the
    * employee is not resting or is resting under the Bunkhouse Tier 2+ shift
@@ -169,6 +177,8 @@ export function hireEmployee(
     ticksWorked: 0,
     restTicksRemaining: null,
     restNeedKey: null,
+    taskTicksRemaining: null,
+    activeTaskSkill: null,
   };
   // Keep the stored salary consistent with the qualification just granted —
   // calculateSalary() sums qualification bonuses, so a base-only salary would

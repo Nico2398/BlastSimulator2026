@@ -365,6 +365,12 @@ export const QUALIFICATION_SALARY_BONUS: Record<1 | 2 | 3 | 4 | 5, number> = {
   5: 500,
 } as const;
 
+/**
+ * Baseline duration (ticks) for a dispatched task before proficiency scaling.
+ * Applied as: ticksRequired = ceil(BASE_TASK_DURATION_TICKS * PROFICIENCY_MULTIPLIERS[level]).
+ */
+export const BASE_TASK_DURATION_TICKS = 20;
+
 // ─── Employee Training ─────────────────────────────────────────────────────────
 
 /**
