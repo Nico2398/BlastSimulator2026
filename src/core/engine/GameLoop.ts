@@ -16,7 +16,7 @@ import { getLivingQuartersWellbeingMultiplier } from '../entities/BuildingWellbe
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { addExpense } from '../economy/Finance.js';
 import { findPath } from '../nav/Pathfinding.js';
-import { advanceAgent, recordStuckFailure, resetStuckState, type AgentState } from '../nav/AgentMovement.js';
+import { advanceAlongPath } from '../nav/AgentAdvance.js';
 
 // ── Config ──
 
@@ -206,33 +206,27 @@ function tickVehicleOnNavGrid(state: GameState, vehicle: Vehicle, emitter?: Even
     avoidVehicles: false,
   });
 
-  const stuckInput: AgentState = {
+  const outcome = advanceAlongPath({
     x: vehicle.x,
     z: vehicle.z,
-    waypoints: [],
-    waypointIndex: 0,
     walkSpeed: getVehicleDefByTier(vehicle.type, vehicle.tier).speed,
     destinationX: vehicle.targetX,
     destinationZ: vehicle.targetZ,
     consecutiveFailures: vehicle.moveConsecutiveFailures,
     isStuck: vehicle.isMoveStuck,
-  };
+    path,
+  });
 
-  if (!path.found) {
-    const wasStuck = vehicle.isMoveStuck;
-    const next = recordStuckFailure(stuckInput);
-    vehicle.moveConsecutiveFailures = next.consecutiveFailures;
-    vehicle.isMoveStuck = next.isStuck;
-    if (vehicle.isMoveStuck && !wasStuck) {
+  vehicle.moveConsecutiveFailures = outcome.consecutiveFailures;
+  vehicle.isMoveStuck = outcome.isStuck;
+
+  if (!outcome.pathFound) {
+    if (outcome.becameStuck) {
       emitter?.emit('vehicle:stuck', { vehicleId: vehicle.id });
     }
     markVehicleWaiting(vehicle);
     return;
   }
-
-  const reset = resetStuckState(stuckInput);
-  vehicle.moveConsecutiveFailures = reset.consecutiveFailures;
-  vehicle.isMoveStuck = reset.isStuck;
 
   const nextStep = nextGridStep(vehicle, path.waypoints);
   if (nextStep && isCellOccupiedByOtherVehicle(state, vehicle, nextStep.x, nextStep.z)) {
@@ -240,24 +234,12 @@ function tickVehicleOnNavGrid(state: GameState, vehicle: Vehicle, emitter?: Even
     return;
   }
 
-  const advance = advanceAgent({
-    x: vehicle.x,
-    z: vehicle.z,
-    waypoints: path.waypoints,
-    waypointIndex: 0,
-    walkSpeed: getVehicleDefByTier(vehicle.type, vehicle.tier).speed,
-    destinationX: vehicle.targetX,
-    destinationZ: vehicle.targetZ,
-    consecutiveFailures: vehicle.moveConsecutiveFailures,
-    isStuck: vehicle.isMoveStuck,
-  });
-
-  vehicle.x = advance.x;
-  vehicle.z = advance.z;
+  vehicle.x = outcome.x;
+  vehicle.z = outcome.z;
   vehicle.state = 'moving';
   vehicle.waitingTicks = 0;
 
-  if (advance.isPathComplete) {
+  if (outcome.isPathComplete) {
     vehicle.x = vehicle.targetX;
     vehicle.z = vehicle.targetZ;
     setVehicleIdle(vehicle);
@@ -1058,44 +1040,37 @@ export function tickEmployeeMovement(state: GameState, emitter?: EventEmitter): 
       continue;
     }
 
-    let waypoints: Array<{ x: number; z: number }>;
-    let pathFound: boolean;
-
-    if (state.navGrid) {
-      const path = findPath(state.navGrid, {
+    const path = state.navGrid
+      ? findPath(state.navGrid, {
         agentId: emp.id,
         fromX: emp.x,
         fromZ: emp.z,
         toX: emp.destinationX,
         toZ: emp.destinationZ,
         avoidVehicles: false,
-      });
-      pathFound = path.found;
-      waypoints = path.waypoints;
-    } else {
-      pathFound = true;
-      waypoints = [{ x: emp.x, z: emp.z }, { x: emp.destinationX, z: emp.destinationZ }];
-    }
+      })
+      // No NavGrid yet: synthesize a direct two-point path (start, destination) —
+      // findPath is never called, so this always "succeeds", matching the
+      // pre-navmesh direct-line fallback tickVehicle also falls back to.
+      : { found: true, waypoints: [{ x: emp.x, z: emp.z }, { x: emp.destinationX, z: emp.destinationZ }] };
 
-    const stuckInput: AgentState = {
+    const outcome = advanceAlongPath({
       x: emp.x,
       z: emp.z,
-      waypoints: [],
-      waypointIndex: 0,
       walkSpeed: AGENT_WALK_SPEED,
       destinationX: emp.destinationX,
       destinationZ: emp.destinationZ,
       consecutiveFailures: emp.moveConsecutiveFailures,
       isStuck: emp.isMoveStuck,
-    };
+      path,
+    });
 
-    if (!pathFound) {
-      const wasStuck = emp.isMoveStuck;
-      const next = recordStuckFailure(stuckInput);
-      emp.moveConsecutiveFailures = next.consecutiveFailures;
-      emp.isMoveStuck = next.isStuck;
+    emp.moveConsecutiveFailures = outcome.consecutiveFailures;
+    emp.isMoveStuck = outcome.isStuck;
+
+    if (!outcome.pathFound) {
       if (emp.isMoveStuck) {
-        if (!wasStuck) {
+        if (outcome.becameStuck) {
           result.stuck.push(emp.id);
           emitter?.emit('agent:stuck', { employeeId: emp.id });
         }
@@ -1104,27 +1079,11 @@ export function tickEmployeeMovement(state: GameState, emitter?: EventEmitter): 
       continue;
     }
 
-    const reset = resetStuckState(stuckInput);
-    emp.moveConsecutiveFailures = reset.consecutiveFailures;
-    emp.isMoveStuck = reset.isStuck;
-
-    const advance = advanceAgent({
-      x: emp.x,
-      z: emp.z,
-      waypoints,
-      waypointIndex: 0,
-      walkSpeed: AGENT_WALK_SPEED,
-      destinationX: emp.destinationX,
-      destinationZ: emp.destinationZ,
-      consecutiveFailures: emp.moveConsecutiveFailures,
-      isStuck: emp.isMoveStuck,
-    });
-
-    emp.x = advance.x;
-    emp.z = advance.z;
+    emp.x = outcome.x;
+    emp.z = outcome.z;
     result.moved.push(emp.id);
 
-    if (advance.isPathComplete) {
+    if (outcome.isPathComplete) {
       emp.x = emp.destinationX;
       emp.z = emp.destinationZ;
       emp.destinationX = null;

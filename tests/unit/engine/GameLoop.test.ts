@@ -267,6 +267,60 @@ describe('tickVehicle (Task 2.7)', () => {
   });
 });
 
+// ── tickVehicle — NavGrid stuck detection (issue #407 review round 2) ────────
+// Mirrors the tickEmployeeMovement stuck-threshold test below: the
+// tickVehicleOnNavGrid stuck branch (findPath fails every tick) previously had
+// zero test coverage — every tickVehicle test above runs with state.navGrid
+// null, which only ever exercises tickVehicleDirectLine.
+
+describe('tickVehicle — NavGrid stuck detection (issue #407 review round 2)', () => {
+  /** Solid rock voxel used to build a small hand-crafted NavGrid below. */
+  function solidVoxel() {
+    return { composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] }, density: 1.0, oreDensities: {}, fractureModifier: 1.0 };
+  }
+
+  it('crosses STUCK_THRESHOLD when no path exists: emits vehicle:stuck once, sets isMoveStuck, and moves the vehicle into waiting', () => {
+    const state = createGame({ seed: VEHICLE_TICK_SEED });
+
+    // A 5×5×5 NavGrid with rock only under (0,0) — every other column stays
+    // void (density 0 everywhere), so a target there is impassable and
+    // findPath returns found:false on every tick, forever.
+    const vg = new VoxelGrid(5, 5, 5);
+    vg.setVoxel(0, 0, 0, solidVoxel());
+    vg.setVoxel(0, 1, 0, solidVoxel());
+    state.navGrid = NavGrid.buildNavGrid(vg, [], []);
+
+    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 0);
+    vehicle.task = 'moving';
+    vehicle.state = 'moving';
+    vehicle.targetX = 3;
+    vehicle.targetZ = 3; // void column — unreachable
+
+    const emitter = new EventEmitter();
+    const stuckEvents: number[] = [];
+    emitter.on('vehicle:stuck', ({ vehicleId }) => stuckEvents.push(vehicleId));
+
+    for (let i = 0; i < STUCK_THRESHOLD; i++) {
+      tickVehicle(state, vehicle, emitter);
+    }
+
+    expect(vehicle.isMoveStuck).toBe(true);
+    expect(vehicle.moveConsecutiveFailures).toBe(STUCK_THRESHOLD);
+    expect(stuckEvents).toEqual([vehicle.id]); // fired exactly once, on the crossing tick
+    expect(vehicle.x).toBe(0); // never moved — no path ever resolved
+    expect(vehicle.z).toBe(0);
+    expect(vehicle.state).toBe('waiting');
+    expect(vehicle.waitingTicks).toBe(STUCK_THRESHOLD);
+
+    // One more failed tick past the threshold — still stuck, but the event
+    // does not re-fire on every subsequent tick, only on the falling edge.
+    tickVehicle(state, vehicle, emitter);
+    expect(stuckEvents).toEqual([vehicle.id]);
+    expect(vehicle.isMoveStuck).toBe(true);
+    expect(vehicle.waitingTicks).toBe(STUCK_THRESHOLD + 1);
+  });
+});
+
 // ── Task 2.8: Vehicle.waitingTicks tracking ──────────────────────────────────
 
 describe('tickVehicle — waitingTicks (Task 2.8)', () => {

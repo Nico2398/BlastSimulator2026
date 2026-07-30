@@ -1,6 +1,6 @@
 {
   "name": "nav-ramp-routing-visual",
-  "description": "Tests vehicle/employee NavGrid-aware movement and build_ramp construction on the same map. Note: generated 'desert' terrain at this seed is a single flat bench (see #407 code-review verification) — the ramp does not gate reachability of (8,20) here, but the scenario still exercises real A*-routed, tick-by-tick vehicle movement plus ramp construction end to end.",
+  "description": "Tests vehicle/employee NavGrid-aware movement and build_ramp construction on the same map. Note: generated 'desert' terrain at this seed is a single flat bench (see #407 code-review verification) — the ramp does not gate reachability of (8,20) here, but the scenario still exercises real A*-routed, tick-by-tick vehicle movement, employee movement, and ramp construction end to end.",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -75,6 +75,16 @@
         {
           "type": "command",
           "command": "employee hire role:driller"
+        }
+      ]
+    },
+    {
+      "command": "employee dispatch 1 x:8 z:20",
+      "description": "Send the hired driller walking toward (8,20) via the same real A*-routed, tick-by-tick NavGrid movement as the vehicle above (#407 review round 2) — this is what the scenario's own description claims but the driller previously never received a destination.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:8 z:20"
         }
       ]
     },
