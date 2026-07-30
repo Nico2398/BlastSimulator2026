@@ -40,11 +40,7 @@ import {
   processSmuggling,
   isExposed,
 } from '../../core/events/MafiaActions.js';
-
-function requireGame(ctx: GameContext): CommandResult | null {
-  if (!ctx.state) return { success: false, output: 'No game loaded. Use new_game first.' };
-  return null;
-}
+import { requireGame } from './commandUtils.js';
 
 /** Build the EventContext from the current GameState. */
 function buildEventContext(ctx: GameContext): EventContext {

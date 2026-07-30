@@ -2,7 +2,8 @@
 // Creates a fully-configured ConsoleRunner with all game commands registered.
 // Used by both console.ts (CLI mode) and main.ts (browser console bridge).
 
-import { ConsoleRunner, type CommandResult } from './ConsoleRunner.js';
+import { ConsoleRunner, parseCommand, type CommandResult } from './ConsoleRunner.js';
+import { incrementActionCount } from '../core/events/EventSystem.js';
 import {
   newGameCommand,
   inspectCommand,
@@ -60,6 +61,27 @@ export interface RunnerWithContext {
   ctx: MiningContext;
   /** Typed emitter — subscribe in main.ts / console.ts for game-over UI or log messages. */
   emitter: EventEmitter;
+}
+
+/** Console commands that should not count as user actions for event cooldown gating. */
+export const META_COMMANDS = ['tick', 'speed', 'pause', 'time'] as const;
+
+/**
+ * Run a command through the runner and apply the same action-count gating
+ * every command entry point must apply — browser (`window.__gameConsole`),
+ * CLI (`console.ts`), and headless scenario runners alike. Centralized here
+ * so command mode and interaction mode stay behaviorally identical: without
+ * this increment, `EventSystem`'s `MIN_EVENT_INTERVAL_ACTIONS` cooldown gate
+ * never opens, and timer-based events (e.g. politics_ev_mandate) can fire in
+ * one mode and never in the other despite an identical seed and command list.
+ */
+export function runCommand(engine: RunnerWithContext, cmd: string): CommandResult {
+  const result = engine.runner.run(cmd);
+  const cmdName = parseCommand(cmd).command;
+  if (engine.ctx.state && !META_COMMANDS.includes(cmdName as typeof META_COMMANDS[number])) {
+    incrementActionCount(engine.ctx.state.events);
+  }
+  return result;
 }
 
 /**

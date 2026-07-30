@@ -14,9 +14,11 @@ export function dispatchPendingAction(
   state: GameState,
   action: PendingAction,
 ): { success: boolean; error?: string } {
-  const hasQualified = state.employees.employees.some(
-    emp => emp.alive && emp.qualifications.some(q => q.category === action.requiredSkill),
-  );
+  const hasQualified = action.requiredSkill === null
+    ? state.employees.employees.some(emp => emp.alive)
+    : state.employees.employees.some(
+        emp => emp.alive && emp.qualifications.some(q => q.category === action.requiredSkill),
+      );
   if (!hasQualified) {
     return { success: false, error: 'unqualified' };
   }

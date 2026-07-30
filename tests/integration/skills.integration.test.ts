@@ -443,24 +443,26 @@ describe('Tick-driven task/XP pipeline (dispatch + tick command, issue #406)', (
     expect(emp.activeActionId).not.toBeNull();
   });
 
-  it('dispatching to a skill nobody on the roster holds fires unqualified_task_error rather than silently queuing forever', () => {
+  it('dispatching to a skill nobody on the roster holds is rejected immediately, rather than silently queuing forever', () => {
+    // dispatch now routes through dispatchPendingAction (TaskDispatch.ts),
+    // which rejects a roster-wide-unqualified dispatch at dispatch time —
+    // the tick loop's unqualified_task_error path (EventEngine.ts) still
+    // exists for actions that can't be routed here (e.g. dispatched before
+    // the roster's only qualified employee is fired), but a dispatch this
+    // command builds is no longer one of them (#406 follow-up).
     const ctx = makeCtx();
     const empId = hireOne(ctx, 'driver'); // arrives with 'driving.truck' only — nobody holds 'geology'
 
     const dispatchResult = employeeCommand(
       ctx, ['dispatch', String(empId)], { x: '1', z: '1', skill: 'geology' },
     );
-    expect(dispatchResult.success, dispatchResult.output).toBe(true);
+    expect(dispatchResult.success).toBe(false);
+    expect(dispatchResult.output).toContain('geology');
 
-    let fired = false;
-    for (let i = 0; i < 5 && !fired; i++) {
-      tickCommand(ctx, ['1'], {});
-      fired = ctx.state!.events.pendingEvent?.eventId === 'unqualified_task_error';
-    }
-
-    expect(fired).toBe(true);
-    expect(ctx.state!.events.pendingEvent!.eventId).toBe('unqualified_task_error');
-    // The action must not have silently completed or vanished.
+    // Nothing was queued — a tick can't claim, complete, or flag it.
+    expect(ctx.state!.pendingActions).toHaveLength(0);
+    tickCommand(ctx, ['1'], {});
+    expect(ctx.state!.events.pendingEvent?.eventId).not.toBe('unqualified_task_error');
     const emp = ctx.state!.employees.employees.find(e => e.id === empId)!;
     expect(emp.activeActionId).toBeNull();
   });

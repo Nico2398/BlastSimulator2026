@@ -5,6 +5,7 @@
 import { mkdirSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
 import { createRunner, serializeGameState } from '../../src/console-api.js';
+import { runCommand } from '../../src/console/createRunner.js';
 import type { RunnerWithContext } from '../../src/console/createRunner.js';
 import type { ScenarioStepDef, StepResult } from './scenario-types.js';
 import {
@@ -35,7 +36,7 @@ export function runSteps(
   outDir: string,
 ): StepResult[] {
   mkdirSync(outDir, { recursive: true });
-  const { runner, ctx } = engine;
+  const { ctx } = engine;
   const results: StepResult[] = [];
 
   for (let i = 0; i < steps.length; i++) {
@@ -44,7 +45,7 @@ export function runSteps(
     const cmdSlug = formatCommandSlug(step.command);
 
     try {
-      const result = runner.run(step.command);
+      const result = runCommand(engine, step.command);
       const gameState = serializeGameState(ctx) as Record<string, unknown> | null;
 
       const stateData = {

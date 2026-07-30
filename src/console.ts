@@ -2,13 +2,13 @@
 // Usage: npx tsx src/console.ts  OR  npm run console
 
 import * as readline from 'readline';
-import { createRunner } from './console/createRunner.js';
+import { createRunner, runCommand } from './console/createRunner.js';
 import { bold, error, info } from './console/ConsoleFormatter.js';
 
 console.log(bold('BlastSimulator2026 Console Mode'));
 console.log(info('Type "help" for available commands.\n'));
 
-const { runner } = createRunner();
+const engine = createRunner();
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -27,7 +27,7 @@ rl.on('line', (line: string) => {
     return;
   }
 
-  const result = runner.run(trimmed);
+  const result = runCommand(engine, trimmed);
   if (result.output) {
     if (result.success) {
       console.log(result.output);

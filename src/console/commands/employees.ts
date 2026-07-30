@@ -18,6 +18,7 @@ import {
   trainableSkills,
 } from '../../core/entities/EmployeeTraining.js';
 import { addExpense } from '../../core/economy/Finance.js';
+import { dispatchPendingAction } from '../../core/engine/TaskDispatch.js';
 import { Random } from '../../core/math/Random.js';
 import { requireGame, NO_EMPLOYEES_MSG } from './commandUtils.js';
 
@@ -130,7 +131,12 @@ export function employeeCommand(
       }
 
       const actionId = state.nextPendingActionId++;
-      state.pendingActions.push({
+      // dispatchPendingAction (TaskDispatch.ts) owns both the pendingActions
+      // push and the mirrored ghostPreviews push, plus a roster-wide
+      // qualification check — nobody on the roster ever holding requiredSkill
+      // now rejects at dispatch time instead of silently queuing until the
+      // tick loop's later unqualified_task_error detection catches it (#406).
+      const dispatch = dispatchPendingAction(state, {
         id: actionId,
         type: 'general_work',
         requiredSkill,
@@ -141,17 +147,14 @@ export function employeeCommand(
         payload: {},
         targetEmployeeId: id,
       });
-      // Every other path onto pendingActions (dispatchPendingAction in
-      // TaskDispatch.ts) mirrors the action into ghostPreviews so the renderer
-      // shows the pending-work marker; this direct push bypassed that and the
-      // ghost never appeared for a dispatched-but-unclaimed action (#406).
-      state.ghostPreviews.push({
-        id: actionId,
-        type: 'general_work',
-        targetX: x,
-        targetZ: z,
-        targetY: 0,
-      });
+      if (!dispatch.success) {
+        return {
+          success: false,
+          output: requiredSkill !== null
+            ? `No employee on the roster holds skill: ${requiredSkill}.`
+            : `Dispatch rejected: no eligible employee on the roster.`,
+        };
+      }
       return {
         success: true,
         output: `Employee #${id} dispatched to work at (${x}, ${z}). Action ID: ${actionId}.`,
