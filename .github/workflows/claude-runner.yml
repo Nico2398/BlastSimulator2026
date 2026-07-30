@@ -122,7 +122,19 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          # The PAT, not GITHUB_TOKEN. The action exports its own `github_token`
+          # into the session environment, overriding the step-level `GH_TOKEN`
+          # above — so whatever is passed here is the identity `gh pr create`
+          # runs under, and the account that ends up authoring the PR. With
+          # GITHUB_TOKEN that account is `github-actions[bot]`, and GitHub
+          # creates the PR's `pull_request` workflow runs already parked as
+          # `action_required`: "N workflows awaiting approval", no CI, no
+          # auto-assign, until something approves them by hand. PR #430 opened
+          # that way. Under the PAT the author is a real repository user, the
+          # runs start on their own, and the parked-run release in
+          # `agentic-auto-merge` goes back to being a safety net rather than the
+          # only thing that ever starts CI.
+          github_token: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
           additional_permissions: |
             actions: read
           # Any branch the harness generates for itself lands inside the
@@ -186,7 +198,9 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          # Same PAT as the first attempt, for the same reason: the retry is the
+          # attempt that opens the PR whenever the first one did not.
+          github_token: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
           additional_permissions: |
             actions: read
           branch_prefix: 'pipeline/scratch-'
