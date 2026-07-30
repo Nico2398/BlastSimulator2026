@@ -110,11 +110,16 @@ export function employeeCommand(
       // synchronously), which left the Bunkhouse shift-cycle unreachable from
       // any player-facing flow.
       const id = parseInt(args[1] ?? named['id'] ?? '', 10);
-      const usageMsg = 'Usage: employee dispatch <id> x:<X> z:<Z>';
+      const usageMsg = 'Usage: employee dispatch <id> x:<X> z:<Z> [skill:<category>]';
       if (isNaN(id)) return { success: false, output: usageMsg };
       const x = parseFloat(named['x'] ?? '');
       const z = parseFloat(named['z'] ?? '');
       if (isNaN(x) || isNaN(z)) return { success: false, output: usageMsg };
+      // Optional named skill param, threaded through to requiredSkill below.
+      // Stub: no validation beyond the cast — assign_skill's VALID_SKILL_CATEGORIES
+      // check is the pattern to follow once dispatch needs to reject bad values.
+      const skillRaw = named['skill'];
+      const requiredSkill: SkillCategory | null = skillRaw !== undefined ? (skillRaw as SkillCategory) : null;
 
       const emp = state.employees.employees.find(e => e.id === id);
       if (!emp) return { success: false, output: `Employee #${id} not found.` };
@@ -128,7 +133,7 @@ export function employeeCommand(
       state.pendingActions.push({
         id: actionId,
         type: 'general_work',
-        requiredSkill: null,
+        requiredSkill,
         requiredVehicleRole: null,
         targetX: x,
         targetZ: z,

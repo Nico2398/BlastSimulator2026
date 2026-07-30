@@ -701,6 +701,18 @@ export function processShiftCycle(
 }
 
 /**
+ * Advance an employee's dispatched task toward completion, granting XP and
+ * reporting completion when taskTicksRemaining reaches zero. Mirrors
+ * completeRestTick's shape for taskTicksRemaining instead of restTicksRemaining.
+ *
+ * TODO: implement task duration countdown, XP gain, and completion reporting.
+ */
+export function tickTaskProgress(_state: GameState, _emp: Employee): void {
+  // TODO: implement
+  return;
+}
+
+/**
  * Decrement restTicksRemaining for an employee who is currently resting.
  * If rest is complete (reaches ≤ 0), replenish fatigue, clear state, and record completion.
  */

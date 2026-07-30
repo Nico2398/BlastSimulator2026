@@ -203,6 +203,10 @@ export function tickCommand(
     // 8d. Dispatch remaining pending actions to idle qualified employees
     tickEmployees(state);
 
+    // 8e. Task duration progress + XP/level-up reporting.
+    // TODO: call tickTaskProgress per employee and push completion/level-up
+    // lines here once GameLoop.tickTaskProgress is implemented.
+
     // 9. Level stats snapshot + campaign profit check
     snapshotStats(state.levelStats, state);
     const levelResult = checkLevelComplete(state, state.campaign, emitter);

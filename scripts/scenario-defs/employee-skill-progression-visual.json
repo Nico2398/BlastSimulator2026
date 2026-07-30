@@ -1,0 +1,22 @@
+{
+  "name": "employee-skill-progression-visual",
+  "description": "Visual verification of employee skill progression: XP gain from dispatched tasks, proficiency level-ups, task duration scaling by level, and the employee detail panel reflecting each change.",
+  "steps": [
+    {
+      "command": "new_game seed:42",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ]
+    }
+  ],
+  "shots": [
+    {
+      "name": "initial-overview",
+      "yaw": 0,
+      "pitch": 45
+    }
+  ]
+}
