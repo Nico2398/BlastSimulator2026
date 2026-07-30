@@ -117,8 +117,10 @@ export function employeeCommand(
       const z = parseFloat(named['z'] ?? '');
       if (isNaN(x) || isNaN(z)) return { success: false, output: usageMsg };
       // Optional named skill param, threaded through to requiredSkill below.
-      // Stub: no validation beyond the cast — assign_skill's VALID_SKILL_CATEGORIES
-      // check is the pattern to follow once dispatch needs to reject bad values.
+      // Not validated against VALID_SKILL_CATEGORIES like assign_skill/train are:
+      // an unrecognized category just matches no employee's qualifications, so
+      // dispatchPendingAction rejects it below as "no one qualifies" rather than
+      // as a usage error.
       const skillRaw = named['skill'];
       const requiredSkill: SkillCategory | null = skillRaw !== undefined ? (skillRaw as SkillCategory) : null;
 
