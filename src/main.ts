@@ -45,15 +45,18 @@ saveLoadUI.setGetState(() => ctx.state);
 // --- Main Menu ---
 const mainMenu = new MainMenu(uiContainer);
 mainMenu.setOnNewCampaign(() => {
-  // Show world map so the player can pick a level.
-  // Tutorial overlay sits on top and doesn't block the map.
+  // Show world map so the player can pick a level. The tutorial (if not yet
+  // completed) triggers later, once a level is actually entered — starting it
+  // here would stack its coach-marks on top of the level-selection cards.
   mainMenu.showWorldMap(null);
-  if (!TutorialOverlay.isCompleted()) tutorial.start(ctx.state ?? undefined);
 });
 mainMenu.setOnStartLevel((levelId) => {
   // Ensure a base GameState (with campaign) exists before starting a level.
   if (!ctx.state) window.__gameConsole('new_game');
   window.__gameConsole(`campaign start level:${levelId}`);
+  // First-time players get tutorial guidance once their level is actually
+  // loaded, not while still picking one from the world map.
+  if (!TutorialOverlay.isCompleted()) tutorial.start(ctx.state ?? undefined);
 });
 mainMenu.setOnLoad(() => { saveLoadUI.show(); });
 mainMenu.setOnSettings(() => { uiManager.showPanel('settings'); });
