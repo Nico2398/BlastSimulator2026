@@ -1,0 +1,70 @@
+name: "Pipeline: enable auto-merge on agent PRs"
+
+# Auto-merge used to live only on `pull_request` in auto-assign-next.yml, which
+# made it depend on who opened the PR. A PR opened with `GITHUB_TOKEN` is
+# authored by `github-actions[bot]`, and every `pull_request` workflow run it
+# raises is created and then parked as `action_required` — CI never starts and
+# the auto-merge step never runs. PR #430 sat open that way with zero checks:
+# the pipeline had done everything right and nothing downstream was listening.
+#
+# None of the triggers below can be gated that way. `workflow_run` fires when a
+# runner finishes, whatever identity its PR ended up with; `schedule` runs from
+# the default branch on a clock and is the floor under the whole mechanism, the
+# same role agentic-watchdog.yml plays for the assignment queue. Authorship is
+# never consulted — `agentic-auto-merge` selects on the `READY TO MERGE` marker,
+# which only the pipeline writes.
+on:
+  workflow_run:
+    workflows: ["Claude Pipeline", "OpenCode Pipeline"]
+    types: [completed]
+  schedule:
+    # Offset from the hour, and away from the watchdog's :17, so the sweeps do
+    # not collide.
+    - cron: '7,22,37,52 * * * *'
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: 'PR number to evaluate. Empty sweeps every open PR.'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+concurrency:
+  # A scheduled sweep and a runner finishing can land together; two sweeps
+  # enabling auto-merge on the same PR is harmless but pointless.
+  group: agentic-auto-merge
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    if: vars.AGENTIC_AUTO_MERGE_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      # The PAT, not GITHUB_TOKEN: releasing a gated workflow run needs
+      # `actions: write` that a job token does not carry across the bot
+      # boundary, and a merge performed by the PAT raises the `pull_request:
+      # closed` event that auto-assign-next.yml chains the next issue from.
+      - name: Enable auto-merge on marked PRs
+        id: merge
+        uses: ./.github/actions/agentic-auto-merge
+        with:
+          token: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
+          pr: ${{ inputs.pr }}
+
+      - name: Report
+        run: |
+          if [ -n "${{ steps.merge.outputs.enabled }}" ]; then
+            echo "Auto-merge covers PR(s): ${{ steps.merge.outputs.enabled }}."
+          else
+            echo "No open PR carried READY TO MERGE in a mergeable state."
+          fi
+          echo "Released ${{ steps.merge.outputs.approved }} gated workflow run(s)."

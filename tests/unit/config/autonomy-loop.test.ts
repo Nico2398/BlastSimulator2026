@@ -121,3 +121,105 @@ describe('dependency gating', () => {
     expect(dependenciesOf('## Context\n\nSee #55 for background.\n')).toEqual([]);
   });
 });
+
+// PR #430 was opened by the pipeline, fully verified, marked `READY TO MERGE`,
+// and then sat open with zero checks. Its author was `github-actions[bot]`, and
+// every `pull_request` workflow run a bot-authored PR raises is created and
+// immediately parked as `action_required`: CI never started and the auto-merge
+// step never ran. Auto-merge therefore has to be reachable on triggers no
+// account can gate, and has to decide on something other than who authored the
+// PR.
+describe('auto-merge does not depend on the PR author', () => {
+  const AUTO_MERGE_ACTION = 'uses: ./.github/actions/agentic-auto-merge';
+
+  /** Every workflow that can put a PR into auto-merge. */
+  const MERGING_WORKFLOWS = ['auto-assign-next.yml', 'agentic-auto-merge.yml'];
+
+  it.each(MERGING_WORKFLOWS)('%s enables auto-merge through the shared action', (name) => {
+    expect(workflow(name)).toContain(AUTO_MERGE_ACTION);
+  });
+
+  // A `pull_request` trigger is the one thing the bot-authored PR cannot reach,
+  // so the sweep must not be built on it. Losing these triggers reproduces #430
+  // exactly: the mechanism is present, correct, and never invoked.
+  it('sweeps on triggers a bot-authored PR cannot gate', () => {
+    const sweep = workflow('agentic-auto-merge.yml');
+    const triggers = sweep.slice(sweep.indexOf('\non:'), sweep.indexOf('\npermissions:'));
+
+    expect(triggers).toContain('schedule:');
+    expect(triggers).toContain('workflow_run:');
+    expect(triggers).toContain('workflow_dispatch:');
+    expect(triggers).not.toContain('pull_request:');
+  });
+
+  // `workflow_run` names workflows by their `name:`, not their filename, so a
+  // renamed runner silently detaches the sweep from the run that produced the PR.
+  it.each([
+    ['claude-runner.yml'],
+    ['opencode-runner.yml'],
+  ])('watches %s by the name that workflow actually declares', (runner) => {
+    const declared = /^name:\s*(.+)$/m.exec(workflow(runner))?.[1].trim();
+    expect(declared).toBeTruthy();
+    expect(workflow('agentic-auto-merge.yml')).toContain(`"${declared}"`);
+  });
+
+  // Releasing a parked run needs `actions: write`, and the merge itself has to
+  // raise a `pull_request: closed` event that the chain step reacts to — a merge
+  // performed with GITHUB_TOKEN raises none, so the queue stops at the merge.
+  it.each(MERGING_WORKFLOWS)('%s drives auto-merge with the PAT', (name) => {
+    const text = workflow(name);
+    const block = text.slice(text.indexOf(AUTO_MERGE_ACTION));
+    const token = /token:\s*\$\{\{\s*secrets\.(\w+)\s*\}\}/.exec(block);
+    expect(token?.[1]).toBe('PAT_TOKEN_COPILOT_AUTOMATION');
+    expect(text).toMatch(/permissions:[\s\S]*?actions: write/);
+  });
+
+  // The author may appear in a log line or a comment — it is worth reporting.
+  // What must never appear is a branch taken on it.
+  it('never selects a PR by the account that opened it', () => {
+    const code = readFileSync(
+      join(ROOT, '.github/actions/agentic-auto-merge/action.yml'), 'utf8'
+    )
+      .split('\n')
+      .filter((line) => !line.trim().startsWith('#') && !line.trim().startsWith('//'))
+      .join('\n');
+
+    expect(code).not.toMatch(/login\s*[=!]==/);
+    expect(code).not.toMatch(/['"`]github-actions/);
+  });
+});
+
+describe('the READY TO MERGE marker', () => {
+  // Lifted out of the composite action's inline script rather than copied, so
+  // the test exercises the shipped source instead of a drifting duplicate.
+  const source = readFileSync(
+    join(ROOT, '.github/actions/agentic-auto-merge/action.yml'), 'utf8'
+  );
+  const start = source.indexOf('const carriesMergeMarker');
+  const end = source.indexOf('\n          };', start);
+  expect(start).toBeGreaterThan(-1);
+  expect(end).toBeGreaterThan(start);
+
+  const carriesMergeMarker = new Function(
+    `${source.slice(start, end + '\n          };'.length)} return carriesMergeMarker;`
+  )() as (body: string | null | undefined) => boolean;
+
+  it('accepts the marker on a line of its own', () => {
+    expect(carriesMergeMarker('Closes #404\n\nREADY TO MERGE\n')).toBe(true);
+  });
+
+  it('accepts the whitespace an API round trip leaves on the line', () => {
+    expect(carriesMergeMarker('Closes #404\n\n  READY TO MERGE  \r\n')).toBe(true);
+  });
+
+  it('rejects the phrase inside a sentence, which is how a run says it is not', () => {
+    expect(carriesMergeMarker('READY TO MERGE skipped — visual: BLOCKED')).toBe(false);
+    expect(carriesMergeMarker('This is not READY TO MERGE yet.')).toBe(false);
+  });
+
+  it('treats an empty body as unmarked', () => {
+    expect(carriesMergeMarker('')).toBe(false);
+    expect(carriesMergeMarker(null)).toBe(false);
+    expect(carriesMergeMarker(undefined)).toBe(false);
+  });
+});
