@@ -94,6 +94,82 @@
       ]
     },
     {
+      "command": "event fire mafia_protection_racket",
+      "description": "Mafia category: 'consulting fee' protection racket, 3 options — dialog must render the mafia-specific tone/consequences",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event fire mafia_protection_racket"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "event fire lawsuit_wrongful_death",
+      "description": "Lawsuit category: wrongful death suit, 3 options — dialog must render the lawsuit-specific tone/consequences",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event fire lawsuit_wrongful_death"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "event fire politics_explosive_embargo",
+      "description": "Politics category: explosive embargo, 3 options — dialog must render the politics-specific tone/consequences",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event fire politics_explosive_embargo"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "event fire weather_pit_flood",
+      "description": "Weather category: pit flood, 3 options — dialog must render the weather-specific tone/consequences",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event fire weather_pit_flood"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
       "command": "tick 8",
       "interaction": [
         {
