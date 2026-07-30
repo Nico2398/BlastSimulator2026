@@ -17,11 +17,20 @@ inputs:
     description: 'merge, squash or rebase.'
     required: false
     default: 'squash'
+  settle_seconds:
+    description: >-
+      How long to wait for a PR to settle when GitHub refuses native auto-merge
+      and the merge has to happen here. Only the fallback path spends it.
+    required: false
+    default: '600'
 
 outputs:
   enabled:
     description: 'Space-separated PR numbers that now have auto-merge enabled or were merged outright.'
     value: ${{ steps.sweep.outputs.enabled }}
+  unarmed:
+    description: 'Space-separated PR numbers that carried the marker and are still neither armed nor merged.'
+    value: ${{ steps.sweep.outputs.unarmed }}
   approved:
     description: 'Number of gated workflow runs released across the swept PRs.'
     value: ${{ steps.sweep.outputs.approved }}
@@ -36,6 +45,7 @@ runs:
         ONLY_PR: ${{ inputs.pr }}
         ONLY_HEAD: ${{ inputs.head }}
         MERGE_METHOD: ${{ inputs.merge_method }}
+        SETTLE_SECONDS: ${{ inputs.settle_seconds }}
       with:
         github-token: ${{ inputs.token }}
         script: |
@@ -59,9 +69,37 @@ runs:
               .some((line) => line.trim() === 'READY TO MERGE');
           };
 
+          // What `mergeable_state` means for a PR this action has to merge
+          // itself. GitHub computes mergeability in the background, so a PR read
+          // seconds after it was opened — exactly when a runner arms the PR it
+          // just created — answers `unknown`, and a PR whose checks are still
+          // running answers `unstable` or `blocked`. Those are "not yet", and
+          // waiting resolves them. `dirty` and `behind` are "not without a
+          // human or a branch update": no amount of waiting changes either, so
+          // they end the wait immediately rather than burning the whole budget.
+          const mergeVerdict = (state) => {
+            if (state === 'clean') return 'merge';
+            if (state === 'dirty' || state === 'behind') return 'stuck';
+            return 'wait';
+          };
+
           const method = (process.env.MERGE_METHOD || 'squash').toUpperCase();
           const only = parseInt(process.env.ONLY_PR || '', 10);
           const head = (process.env.ONLY_HEAD || '').trim();
+          const settleMs = (parseInt(process.env.SETTLE_SECONDS || '', 10) || 600) * 1000;
+          const POLL_MS = 15_000;
+
+          // Poll until the PR stops saying "ask again", or the budget runs out.
+          const settledState = async (n) => {
+            const deadline = Date.now() + settleMs;
+            for (;;) {
+              const { data } = await github.rest.pulls.get({ owner, repo, pull_number: n });
+              const state = data.mergeable_state;
+              if (mergeVerdict(state) !== 'wait' || Date.now() >= deadline) return state;
+              core.info(`#${n}: \`${state}\` — waiting for it to settle.`);
+              await new Promise((resolve) => setTimeout(resolve, POLL_MS));
+            }
+          };
 
           // By number when a `pull_request` event named one, by head branch when
           // a runner is arming the PR it just opened, everything open otherwise.
@@ -82,6 +120,7 @@ runs:
           }
 
           const enabled = [];
+          const unarmed = [];
           let approved = 0;
 
           for (const summary of candidates) {
@@ -132,14 +171,22 @@ runs:
             // `gh pr merge --auto` is idempotent and so is this: re-running over
             // a PR that already has auto-merge enabled is the normal case on a
             // sweep, and costs one rejected mutation.
+            //
+            // The variable is `$mergeMethod`, not `$method`: @octokit/graphql
+            // reserves its own request-option names — method, url, baseUrl,
+            // headers, query, request, mediaType — and throws
+            // `"method" cannot be used as variable name` before the mutation
+            // ever leaves the runner. That threw on every call, so auto-merge
+            // was never once enabled and PR #434 sat open, green and marked,
+            // while both arming paths reported success.
             try {
               await github.graphql(
-                `mutation($id: ID!, $method: PullRequestMergeMethod!) {
-                   enablePullRequestAutoMerge(input: { pullRequestId: $id, mergeMethod: $method }) {
+                `mutation($id: ID!, $mergeMethod: PullRequestMergeMethod!) {
+                   enablePullRequestAutoMerge(input: { pullRequestId: $id, mergeMethod: $mergeMethod }) {
                      clientMutationId
                    }
                  }`,
-                { id: summary.node_id, method }
+                { id: summary.node_id, mergeMethod: method }
               );
               core.info(`#${n}: auto-merge enabled.`);
               enabled.push(n);
@@ -153,23 +200,23 @@ runs:
                 continue;
               }
 
-              // GitHub refuses auto-merge on a PR that has nothing left to wait
-              // for, and on a repository with the feature switched off. Both end
-              // the same way: this PR is meant to merge and every check it owes
-              // has already reported, so merge it. `clean` is exactly the state
-              // auto-merge would have waited for.
-              const mergeNow = /clean status/i.test(message) || /not allowed/i.test(message);
-              if (!mergeNow) {
-                core.warning(`#${n}: could not enable auto-merge: ${message}`);
-                continue;
-              }
+              // Every other refusal is decided on the PR's state, never on the
+              // wording of the error. GitHub refuses auto-merge on a PR that has
+              // nothing left to wait for and on a repository with the feature
+              // switched off, and those two messages used to be the only ones
+              // that reached the merge below — so the one failure nobody had
+              // predicted, the `$method` throw above, fell through to a warning
+              // and a green step. A message this action does not recognise now
+              // costs a wait, not a stalled queue.
+              core.info(`#${n}: auto-merge refused (${message}) — merging it here instead.`);
 
-              const { data: fresh } = await github.rest.pulls.get({ owner, repo, pull_number: n });
-              if (fresh.mergeable_state !== 'clean') {
+              const state = await settledState(n);
+              if (mergeVerdict(state) !== 'merge') {
                 core.warning(
-                  `#${n}: auto-merge unavailable (${message}) and the PR is \`${fresh.mergeable_state}\`, ` +
-                  'not `clean` — leaving it for the next sweep.'
+                  `#${n}: auto-merge unavailable (${message}) and the PR settled as \`${state}\`, ` +
+                  'not `clean` — it needs a look.'
                 );
+                unarmed.push(n);
                 continue;
               }
 
@@ -181,14 +228,27 @@ runs:
                 enabled.push(n);
               } catch (mergeError) {
                 core.warning(`#${n}: direct merge failed: ${mergeError.message}`);
+                unarmed.push(n);
               }
             }
           }
 
           core.setOutput('enabled', enabled.join(' '));
+          core.setOutput('unarmed', unarmed.join(' '));
           core.setOutput('approved', String(approved));
           core.info(
             enabled.length === 0
               ? 'No PR carried the marker in a mergeable state.'
               : `Auto-merge covers PR(s): ${enabled.map((n) => `#${n}`).join(', ')}.`
           );
+
+          // A marked PR that ends neither armed nor merged holds its issue, and
+          // the queue behind it, for as long as it stays open. Nothing else is
+          // watching, so this is the last place it can be said out loud: the
+          // step goes red rather than passing with a warning nobody reads.
+          if (unarmed.length > 0) {
+            core.setFailed(
+              `Marked READY TO MERGE but neither armed nor merged: ${unarmed.map((n) => `#${n}`).join(', ')}. ` +
+              'Each warning above names the PR state that stopped it.'
+            );
+          }

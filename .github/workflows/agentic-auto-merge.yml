@@ -44,11 +44,17 @@ jobs:
           token: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
           pr: ${{ inputs.pr }}
 
+      # `always()`: the sweep fails the job when a marked PR ends unarmed, and
+      # that is precisely the run whose numbers are worth printing.
       - name: Report
+        if: always()
         run: |
           if [ -n "${{ steps.merge.outputs.enabled }}" ]; then
             echo "Auto-merge covers PR(s): ${{ steps.merge.outputs.enabled }}."
           else
             echo "No open PR carried READY TO MERGE in a mergeable state."
+          fi
+          if [ -n "${{ steps.merge.outputs.unarmed }}" ]; then
+            echo "Still neither armed nor merged: ${{ steps.merge.outputs.unarmed }}."
           fi
           echo "Released ${{ steps.merge.outputs.approved }} parked workflow run(s)."

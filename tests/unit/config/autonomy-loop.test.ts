@@ -200,6 +200,84 @@ describe('auto-merge does not depend on the PR author', () => {
   });
 });
 
+// PR #434 was opened by the pipeline, fully verified, marked `READY TO MERGE`,
+// went green — and sat open. Both arming paths ran and both reported success:
+// the `enablePullRequestAutoMerge` mutation named its variable `$method`, which
+// @octokit/graphql rejects before the request leaves the runner, and the catch
+// block only recognised two error messages, so the throw became a warning in a
+// log nobody reads.
+describe('enabling auto-merge actually reaches GitHub', () => {
+  const source = readFileSync(
+    join(ROOT, '.github/actions/agentic-auto-merge/action.yml'), 'utf8'
+  );
+
+  // @octokit/graphql merges the variables object into its own request options,
+  // so a variable sharing a name with one of them is a hard throw:
+  // `[@octokit/graphql] "method" cannot be used as variable name`.
+  // From `NON_VARIABLE_OPTIONS` in @octokit/graphql.
+  const RESERVED = ['method', 'baseUrl', 'url', 'headers', 'query', 'mediaType', 'request'];
+
+  it('names no GraphQL variable after an @octokit/graphql request option', () => {
+    const declarations = source.match(/\$[A-Za-z_][A-Za-z0-9_]*\s*:\s*[A-Za-z[]/g) ?? [];
+    expect(declarations.length, 'no GraphQL variable declarations found').toBeGreaterThan(0);
+
+    for (const declaration of declarations) {
+      const name = /\$([A-Za-z_][A-Za-z0-9_]*)/.exec(declaration)?.[1] ?? '';
+      expect(RESERVED, `$${name} is an @octokit/graphql request option`).not.toContain(name);
+    }
+  });
+
+  // Same collision seen from the other side: the object handed to
+  // `github.graphql` is what octokit inspects, so its keys carry the rule too.
+  it('passes no GraphQL variable keyed by a request option', () => {
+    const call = source.slice(source.indexOf('await github.graphql('));
+    const variables = /\{([^{}]*)\}\s*\n\s*\);/.exec(call)?.[1] ?? '';
+    expect(variables, 'no variables object found on the graphql call').not.toBe('');
+
+    for (const key of variables.split(',').map((pair) => pair.split(':')[0].trim())) {
+      expect(RESERVED, `\`${key}\` is an @octokit/graphql request option`).not.toContain(key);
+    }
+  });
+
+  // The bug was survivable; the silence was not. A marked PR that ends neither
+  // armed nor merged holds its issue, and every assignment behind it.
+  it('fails the step when a marked PR ends neither armed nor merged', () => {
+    expect(source).toContain("core.setOutput('unarmed'");
+    expect(source).toMatch(/if \(unarmed\.length > 0\) \{\s*\n\s*core\.setFailed\(/);
+  });
+});
+
+describe('deciding whether to merge a PR auto-merge refused', () => {
+  // Lifted out of the composite action's inline script, as above.
+  const source = readFileSync(
+    join(ROOT, '.github/actions/agentic-auto-merge/action.yml'), 'utf8'
+  );
+  const start = source.indexOf('const mergeVerdict');
+  const end = source.indexOf('\n          };', start);
+  expect(start).toBeGreaterThan(-1);
+  expect(end).toBeGreaterThan(start);
+
+  const mergeVerdict = new Function(
+    `${source.slice(start, end + '\n          };'.length)} return mergeVerdict;`
+  )() as (state: string) => string;
+
+  it('merges only on `clean`, the state auto-merge would have waited for', () => {
+    expect(mergeVerdict('clean')).toBe('merge');
+  });
+
+  // The arming step runs seconds after the PR was opened, while GitHub is still
+  // computing mergeability and the checks have not reported. Reading that as
+  // "not mergeable" is how a PR opened and armed in one job never merges.
+  it.each(['unknown', 'unstable', 'blocked', 'has_hooks'])('waits out `%s`', (state) => {
+    expect(mergeVerdict(state)).toBe('wait');
+  });
+
+  // Neither resolves on its own, so waiting only burns the budget.
+  it.each(['dirty', 'behind'])('gives up immediately on `%s`', (state) => {
+    expect(mergeVerdict(state)).toBe('stuck');
+  });
+});
+
 describe('the READY TO MERGE marker', () => {
   // Lifted out of the composite action's inline script rather than copied, so
   // the test exercises the shipped source instead of a drifting duplicate.
