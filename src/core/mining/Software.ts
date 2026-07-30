@@ -9,6 +9,7 @@ import { getDominantRockId } from '../world/VoxelGrid.js';
 import type { VillagePosition } from './BlastExecution.js';
 import { vec3 } from '../math/Vec3.js';
 import { getRock } from '../world/RockCatalog.js';
+import { VOXEL_SIZE_CM, MAX_PROJECTION_VELOCITY } from '../config/balance.js';
 import {
   calculateEnergyField,
   calculateFragmentation,
@@ -204,6 +205,70 @@ export function previewProjections(
   }
 
   return { projectionZoneCount: positions.length, projectionZonePositions: positions };
+}
+
+export interface HolePreviewDetail {
+  /** Predicted average fragment size at this hole's position (cm). Tier >= 2. */
+  fragSizeCm?: number;
+  /** Predicted projection speed (m/s), only set when the hole's rock is predicted
+   *  to be thrown clear (energy ratio >= projection threshold). Tier >= 3. */
+  projectionSpeedMs?: number;
+}
+
+/**
+ * Preview per-hole fragmentation and projection detail, for the blast-plan
+ * overlay (BlastPlanOverlay.ts) to render fragment-size dots and projection
+ * arcs per hole. Tier-gated the same as previewFragments/previewProjections —
+ * an entry's `fragSizeCm` is only present at tier >= 2, `projectionSpeedMs`
+ * only at tier >= 3.
+ */
+export function previewHoleDetails(
+  plan: BlastPlan,
+  grid: VoxelGrid,
+  softwareTier: number,
+): Record<string, HolePreviewDetail> {
+  const result: Record<string, HolePreviewDetail> = {};
+  if (softwareTier < 2) return result;
+
+  const holeDepths: Record<string, number> = {};
+  for (const hole of plan.holes) holeDepths[hole.id] = hole.depth;
+  const holeSurfaceYs = getHoleSurfaceYs(plan, grid);
+
+  for (const hole of plan.holes) {
+    const charge = plan.charges[hole.id];
+    if (!charge) continue;
+
+    const surfaceY = holeSurfaceYs[hole.id] ?? 0;
+    const gx = Math.max(0, Math.min(grid.sizeX - 1, Math.floor(hole.x)));
+    const gz = Math.max(0, Math.min(grid.sizeZ - 1, Math.floor(hole.z)));
+    const gy = Math.max(0, Math.min(grid.sizeY - 1, surfaceY - 1));
+    const voxel = grid.getVoxel(gx, gy, gz);
+    if (!voxel) continue;
+    const dominantRockId = getDominantRockId(voxel.composition);
+    const rock = getRock(dominantRockId);
+    if (!rock) continue;
+
+    const point = vec3(hole.x, surfaceY, hole.z);
+    const energy = calculateEnergyField(point, plan.holes, plan.charges, holeDepths, holeSurfaceYs);
+    const threshold = rock.fractureThreshold * voxel.fractureModifier;
+    const frag = calculateFragmentation(energy, threshold);
+
+    const detail: HolePreviewDetail = {
+      fragSizeCm: frag.fragmentSizeFraction * VOXEL_SIZE_CM,
+    };
+
+    if (softwareTier >= 3 && frag.isProjection) {
+      const overflow = Math.max(0, energy - threshold);
+      detail.projectionSpeedMs = Math.min(
+        MAX_PROJECTION_VELOCITY,
+        Math.sqrt((2 * overflow) / Math.max(rock.density, 1)),
+      );
+    }
+
+    result[hole.id] = detail;
+  }
+
+  return result;
 }
 
 /** Preview vibrations at villages. Requires software tier >= 4. */

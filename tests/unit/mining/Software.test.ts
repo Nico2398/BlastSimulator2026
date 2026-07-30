@@ -5,6 +5,7 @@ import {
   previewFragments,
   previewProjections,
   previewVibrations,
+  previewHoleDetails,
   MAX_SOFTWARE_TIER,
 } from '../../../src/core/mining/Software.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
@@ -88,5 +89,45 @@ describe('Software — preview tiers', () => {
     expect(result).not.toBeNull();
     expect(result!.villages.length).toBe(1);
     expect(result!.maxVibration).toBeGreaterThan(0);
+  });
+});
+
+describe('Software — previewHoleDetails', () => {
+  it('returns empty record below tier 2', () => {
+    const { grid, plan } = makeTestPlan();
+    expect(previewHoleDetails(plan, grid, 0)).toEqual({});
+    expect(previewHoleDetails(plan, grid, 1)).toEqual({});
+  });
+
+  it('at tier >= 2, gives every charged hole a predicted fragment size in cm', () => {
+    const { grid, plan } = makeTestPlan();
+    const details = previewHoleDetails(plan, grid, 2);
+    const holeIds = plan.holes.map(h => h.id);
+    expect(holeIds.length).toBeGreaterThan(0);
+    for (const id of holeIds) {
+      expect(details[id]).toBeDefined();
+      expect(details[id]!.fragSizeCm).toBeGreaterThan(0);
+      // Tier 2 only — no projection speed yet.
+      expect(details[id]!.projectionSpeedMs).toBeUndefined();
+    }
+  });
+
+  it('at tier >= 3, adds projectionSpeedMs only for holes predicted to project', () => {
+    const { grid, plan } = makeTestPlan();
+    const details = previewHoleDetails(plan, grid, 3);
+    for (const hole of plan.holes) {
+      const detail = details[hole.id];
+      expect(detail).toBeDefined();
+      if (detail!.projectionSpeedMs !== undefined) {
+        expect(detail!.projectionSpeedMs).toBeGreaterThan(0);
+        expect(detail!.projectionSpeedMs).toBeLessThanOrEqual(80); // MAX_PROJECTION_VELOCITY
+      }
+    }
+  });
+
+  it('skips holes with no charge', () => {
+    const { grid, plan } = makeTestPlan();
+    const uncharged = { ...plan, charges: {} };
+    expect(previewHoleDetails(uncharged, grid, 3)).toEqual({});
   });
 });

@@ -170,4 +170,81 @@ describe('FragmentMesh (InstancedMesh)', () => {
     expect(fm.count).toBe(2000);
     fm.dispose();
   });
+
+  it('samples the whole fragment array, not a leading prefix, when over the render cap', () => {
+    // Regression: a large blast's fragments are generated in raster-scan
+    // order, so a plain slice(0, cap) only ever showed one corner of the
+    // blast zone — a visible "grid at the crater rim" artifact. All 20000
+    // fragments span x=0..19999; rendered instances must cover that whole
+    // span, not just the low end.
+    const scene = new THREE.Scene();
+    const fm = new FragmentMesh(scene);
+    const frags = Array.from({ length: 20000 }, (_, i) =>
+      makeFragment(i, { position: { x: i, y: 0.5, z: 0 } }));
+    fm.spawnFragments(frags);
+    // Sampling is hashed per-stratum (see sampleEvenly), so bucket fill isn't
+    // perfectly even — assert "close to the cap", not exactly at it.
+    expect(fm.count).toBeGreaterThan(1900);
+    expect(fm.count).toBeLessThanOrEqual(2000);
+
+    const xs: number[] = [];
+    const mtx = new THREE.Matrix4();
+    const pos = new THREE.Vector3();
+    for (const child of scene.children) {
+      const im = child as THREE.InstancedMesh;
+      for (let i = 0; i < im.count; i++) {
+        im.getMatrixAt(i, mtx);
+        pos.setFromMatrixPosition(mtx);
+        xs.push(pos.x);
+      }
+    }
+    expect(Math.max(...xs)).toBeGreaterThan(15000);
+    fm.dispose();
+  });
+
+  it('scatters rendered (x, z) around the source voxel instead of stacking every fragment at the exact same point', () => {
+    const scene = new THREE.Scene();
+    const fm = new FragmentMesh(scene);
+    // All fragments share the same source voxel (as multiple fragments from
+    // one voxel do) — without render-only jitter they'd render at identical
+    // (x, z), reading as a regular lattice instead of settled rubble.
+    const frags = Array.from({ length: 20 }, (_, i) =>
+      makeFragment(i, { position: { x: 5, y: 0.5, z: 5 } }));
+    fm.spawnFragments(frags);
+
+    const xz = new Set<string>();
+    const mtx = new THREE.Matrix4();
+    const pos = new THREE.Vector3();
+    for (const child of scene.children) {
+      const im = child as THREE.InstancedMesh;
+      for (let i = 0; i < im.count; i++) {
+        im.getMatrixAt(i, mtx);
+        pos.setFromMatrixPosition(mtx);
+        xz.add(`${pos.x.toFixed(3)},${pos.z.toFixed(3)}`);
+      }
+    }
+    expect(xz.size).toBeGreaterThan(1);
+    fm.dispose();
+  });
+
+  it('displaces projected fragments along their initial velocity direction', () => {
+    const scene = new THREE.Scene();
+    const fm = new FragmentMesh(scene);
+    fm.spawnFragments([makeFragment(0, {
+      position: { x: 5, y: 0.5, z: 5 },
+      isProjection: true,
+      initialVelocity: { x: 20, y: 5, z: 0 },
+    })]);
+
+    const im = scene.children[0] as THREE.InstancedMesh;
+    const mtx = new THREE.Matrix4();
+    im.getMatrixAt(0, mtx);
+    const pos = new THREE.Vector3();
+    pos.setFromMatrixPosition(mtx);
+
+    // Positive x velocity must displace the rendered fragment further in +x
+    // than jitter alone (jitter radius is well under a metre).
+    expect(pos.x).toBeGreaterThan(6);
+    fm.dispose();
+  });
 });

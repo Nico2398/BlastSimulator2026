@@ -16,6 +16,9 @@ import {
   FRAGMENT_CRATER_YOFFSET_SPREAD,
   FRAGMENT_CRATER_YOFFSET_HASH_BUCKETS,
   FRAGMENT_MIN_RENDER_Y,
+  FRAGMENT_RENDER_JITTER_RADIUS,
+  FRAGMENT_PROJECTION_RENDER_DISTANCE_SCALE,
+  FRAGMENT_PROJECTION_RENDER_MAX_DISTANCE,
 } from '../core/config/balance.js';
 
 // ---------- Config ----------
@@ -108,7 +111,12 @@ export class FragmentMesh {
    * Call after executeBlast() returns a BlastResult.
    */
   spawnFragments(fragments: FragmentData[]): void {
-    const toRender = fragments.slice(0, MAX_RENDERED_FRAGMENTS);
+    // Sample evenly across the whole fragment array rather than taking the
+    // first N. Fragments are generated in a raster scan of the blast zone, so
+    // taking a prefix only ever shows one corner of a large blast — the
+    // "rigid lattice at the crater rim" artifact. A stride keeps coverage of
+    // the full crater regardless of how many fragments were fractured.
+    const toRender = sampleEvenly(fragments, MAX_RENDERED_FRAGMENTS);
 
     for (const frag of toRender) {
       const meshIdx = frag.id % SHAPE_VARIANTS;
@@ -126,8 +134,15 @@ export class FragmentMesh {
           * (FRAGMENT_CRATER_YOFFSET_SPREAD / FRAGMENT_CRATER_YOFFSET_HASH_BUCKETS);
       const fragY = Math.max(FRAGMENT_MIN_RENDER_Y, frag.position.y - yOffset);
 
+      // Horizontal render-only scatter: fragments sharing a source voxel would
+      // otherwise all render at the exact same (x,z), reading as a regular
+      // grid instead of settled rubble. Projected fragments additionally
+      // displace along their initial velocity direction, hinting at the
+      // ballistic throw distance without simulating every fragment.
+      const { x: renderX, z: renderZ } = computeRenderScatter(frag);
+
       // Build transform matrix
-      FragmentMesh._pos.set(frag.position.x, fragY, frag.position.z);
+      FragmentMesh._pos.set(renderX, fragY, renderZ);
       FragmentMesh._scale.setScalar(halfExtent * 2);
       FragmentMesh._quat.setFromEuler(new THREE.Euler(
         (frag.id * 1.3) % (Math.PI * 2),
@@ -253,4 +268,65 @@ export class FragmentMesh {
     this.instancedMeshes.length = 0;
     // Shared geometries are intentionally kept alive for reuse
   }
+}
+
+// ---------- Helpers ----------
+
+/** Deterministic 0..1 hash of an integer seed — not gameplay randomness, just
+ *  per-fragment render variety (kept stable across re-renders of the same id). */
+function hash01(seed: number): number {
+  const h = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
+  return h - Math.floor(h);
+}
+
+/**
+ * Sample up to `max` entries spread across the whole array (stratified: one
+ * pick per equal-sized stratum, at a hashed offset within it). Unlike
+ * `slice(0, max)`, this keeps coverage of the whole array when it's larger
+ * than `max` — required so a large blast's rendered fragments aren't all
+ * drawn from a single corner of the raster scan that produced them.
+ *
+ * The per-stratum offset is hashed (not a fixed stride) because fragment ids
+ * are sequential and bucketed into shape variants by `id % SHAPE_VARIANTS` —
+ * a fixed stride that shares a factor with SHAPE_VARIANTS (e.g. stride 10
+ * against 8 buckets) would only ever land on some buckets, silently
+ * under-filling the rest.
+ */
+function sampleEvenly<T>(items: readonly T[], max: number): T[] {
+  if (items.length <= max) return items as T[];
+  const step = items.length / max;
+  const sampled: T[] = new Array(max);
+  for (let i = 0; i < max; i++) {
+    const idx = Math.min(items.length - 1, Math.floor(i * step + hash01(i) * step));
+    sampled[i] = items[idx]!;
+  }
+  return sampled;
+}
+
+/**
+ * Render-only (x, z) offset for a fragment's InstancedMesh transform.
+ * Does not touch `FragmentData.position`, which gameplay logic (debris hauler
+ * travel, projection impact damage) still reads unmodified.
+ */
+function computeRenderScatter(frag: FragmentData): { x: number; z: number } {
+  const jx = (hash01(frag.id * 2 + 1) - 0.5) * 2 * FRAGMENT_RENDER_JITTER_RADIUS;
+  const jz = (hash01(frag.id * 2 + 2) - 0.5) * 2 * FRAGMENT_RENDER_JITTER_RADIUS;
+  let x = frag.position.x + jx;
+  let z = frag.position.z + jz;
+
+  if (frag.isProjection) {
+    const vx = frag.initialVelocity.x;
+    const vz = frag.initialVelocity.z;
+    const horizSpeed = Math.hypot(vx, vz);
+    if (horizSpeed > 1e-6) {
+      const dist = Math.min(
+        FRAGMENT_PROJECTION_RENDER_MAX_DISTANCE,
+        horizSpeed * FRAGMENT_PROJECTION_RENDER_DISTANCE_SCALE,
+      );
+      x += (vx / horizSpeed) * dist;
+      z += (vz / horizSpeed) * dist;
+    }
+  }
+
+  return { x, z };
 }

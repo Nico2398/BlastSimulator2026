@@ -23,6 +23,8 @@ import type { SurveyConfidenceOverlayOptions, SurveyConfidencePoint } from './Su
 import { isSurveyStale } from '../core/mining/SurveyCalc.js';
 import { SOLID_VOXEL_DENSITY_THRESHOLD } from '../core/config/balance.js';
 import { isInZone } from '../core/entities/Zone.js';
+import { assembleBlastPlan } from '../core/mining/BlastPlan.js';
+import { previewHoleDetails } from '../core/mining/Software.js';
 
 export class GameRenderer {
   private readonly sm: SceneManager;
@@ -171,6 +173,16 @@ export class GameRenderer {
     const cz = drillHoles.reduce((s, h) => s + h.z, 0) / drillHoles.length;
     const originSurfaceY = this.getTerrainSurfaceY(cx, cz);
 
+    // Per-hole fragment-size / projection-speed predictions, tier-gated the
+    // same as the console `preview` commands. Without these, BlastPlanOverlay's
+    // fragment-size dots and projection arcs never render — their per-hole
+    // fields stay undefined and the overlay's own guards skip them.
+    let holeDetails: Record<string, import('../core/mining/Software.js').HolePreviewDetail> = {};
+    if (ctx.softwareTier >= 2 && ctx.grid) {
+      const plan = assembleBlastPlan(drillHoles, chargesByHole, sequenceDelays);
+      holeDetails = previewHoleDetails(plan, ctx.grid, ctx.softwareTier);
+    }
+
     this.blastOverlay.show({
       softwareTier: ctx.softwareTier,
       origin: new THREE.Vector3(cx, originSurfaceY, cz),
@@ -182,6 +194,9 @@ export class GameRenderer {
         };
         const charge = chargesByHole[h.id];
         if (charge) hd.charge = charge;
+        const detail = holeDetails[h.id];
+        if (detail?.fragSizeCm !== undefined) hd.predictedFragSizeCm = detail.fragSizeCm;
+        if (detail?.projectionSpeedMs !== undefined) hd.projectionSpeed = detail.projectionSpeedMs;
         return hd;
       }),
     });
@@ -263,6 +278,25 @@ export class GameRenderer {
   }
 
   /**
+   * Surface Y to anchor blast effects (dust cloud, detonation flash) at.
+   * The blast centroid's own column is very likely fully cleared by the blast
+   * that just happened (density 0 all the way down), so sampling it directly
+   * usually returns 0 — burying the effect underground. Sampling a small ring
+   * around the centre and taking the highest surface found lands on the
+   * surrounding, still-standing ground level instead.
+   */
+  private getBlastOriginSurfaceY(cx: number, cz: number): number {
+    const offsets: readonly [number, number][] = [
+      [0, 0], [3, 0], [-3, 0], [0, 3], [0, -3], [3, 3], [-3, -3], [3, -3], [-3, 3],
+    ];
+    let maxY = 0;
+    for (const [dx, dz] of offsets) {
+      maxY = Math.max(maxY, this.getTerrainSurfaceY(cx + dx, cz + dz));
+    }
+    return maxY;
+  }
+
+  /**
    * Trigger blast visual effects and rebuild terrain.
    * Call from main.ts immediately after a successful blast command.
    */
@@ -299,7 +333,11 @@ export class GameRenderer {
       ox = ctx.lastBlastFragments.reduce((s, p) => s + p.x, 0) / ctx.lastBlastFragments.length;
       oz = ctx.lastBlastFragments.reduce((s, p) => s + p.z, 0) / ctx.lastBlastFragments.length;
     }
-    const origin = new THREE.Vector3(ox, 0, oz);
+    // Anchor at the surrounding terrain surface, not y=0. A mine site rarely
+    // sits at grid y=0 — it's typically well above it — so a hardcoded 0 here
+    // buried the dust cloud and detonation flash inside solid terrain, fully
+    // occluded and never visible on screen.
+    const origin = new THREE.Vector3(ox, this.getBlastOriginSurfaceY(ox, oz), oz);
 
     // Build per-hole detonation list from sequence delays
     const holes: import('./BlastEffects.js').HoleDetonation[] = [];
@@ -324,7 +362,7 @@ export class GameRenderer {
 
     // Fallback: single explosion at centroid if no per-hole data
     if (holes.length === 0) {
-      holes.push({ x: ox, y: 0, z: oz, delaySeconds: 0 });
+      holes.push({ x: ox, y: origin.y, z: oz, delaySeconds: 0 });
     }
 
     this.blastEffects.trigger({
