@@ -105,6 +105,25 @@ describe('BlastPlanOverlay', () => {
     expect(scene.children.length).toBe(0);
   });
 
+  it('vibration wave rings anchor at the blast-site surface Y, not a hardcoded near-zero height', () => {
+    const scene = new THREE.Scene();
+    const overlay = new BlastPlanOverlay(scene);
+    // A mine site is rarely near world Y=0 — use a non-zero origin so a
+    // hardcoded ring height (the old bug) is distinguishable from one that
+    // actually reads origin.y.
+    const options: BlastPlanOverlayOptions = { ...makeOptions(4, 2), origin: new THREE.Vector3(20, 12, 20) };
+    overlay.show(options);
+    const group = scene.children[0] as THREE.Group;
+    const rings = group.children.filter(
+      (c): c is THREE.Mesh => c instanceof THREE.Mesh && c.geometry instanceof THREE.RingGeometry,
+    );
+    expect(rings.length).toBeGreaterThan(0);
+    for (const ring of rings) {
+      expect(ring.position.y).toBeCloseTo(options.origin.y + 0.15, 5);
+    }
+    overlay.dispose();
+  });
+
   it('high-speed projection holes get arc lines (tier 3)', () => {
     const scene = new THREE.Scene();
     const overlay = new BlastPlanOverlay(scene);

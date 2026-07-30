@@ -158,8 +158,11 @@ window.__gameConsole = (cmd: string) => {
   if (cmdName === 'build_ramp' && result.success && ctx.state) {
     gameRenderer.rebuildTerrain();
   }
-  // Show blast plan overlay during planning commands
-  if (['drill_plan', 'charge', 'sequence'].includes(cmdName)) {
+  // Show blast plan overlay during planning commands, and refresh it whenever
+  // a preview command runs or software tier changes — otherwise the overlay's
+  // softwareTier and preview data are frozen at whatever the last drill_plan/
+  // charge/sequence call baked in, and a purchased tier's overlay never appears.
+  if (['drill_plan', 'charge', 'sequence', 'preview', 'buy_software', 'blast_preview'].includes(cmdName)) {
     gameRenderer.showBlastPlanOverlay(ctx);
   }
   // UI click sound for any command

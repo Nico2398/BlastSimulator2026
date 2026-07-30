@@ -5,33 +5,15 @@ import {
   previewFragments,
   previewProjections,
   previewVibrations,
+  previewHoleDetails,
   MAX_SOFTWARE_TIER,
 } from '../../../src/core/mining/Software.js';
-import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
-import { createGridPlan, resetHoleIds } from '../../../src/core/mining/DrillPlan.js';
-import { batchCharge } from '../../../src/core/mining/ChargePlan.js';
-import { autoVPattern } from '../../../src/core/mining/Sequence.js';
-import { assembleBlastPlan } from '../../../src/core/mining/BlastPlan.js';
+import { MAX_PROJECTION_VELOCITY } from '../../../src/core/config/balance.js';
+import { resetHoleIds } from '../../../src/core/mining/DrillPlan.js';
 import { vec3 } from '../../../src/core/math/Vec3.js';
+import { makeTestPlan } from './softwareTestFixtures.js';
 
 beforeEach(() => resetHoleIds());
-
-function makeTestPlan() {
-  const grid = new VoxelGrid(30, 15, 30);
-  for (let z = 5; z <= 20; z++)
-    for (let y = 0; y <= 8; y++)
-      for (let x = 5; x <= 20; x++)
-        grid.setVoxel(x, y, z, { composition: { rocks: [{ rockId: 'molite', coefficient: 1.0 }] }, density: 1.0, oreDensities: {}, fractureModifier: 1.0 });
-
-  const holes = createGridPlan({ x: 10, z: 10 }, 2, 2, 3, 6, 0.15);
-  const holeIds = holes.map(h => h.id);
-  const holeDepths: Record<string, number> = {};
-  for (const h of holes) holeDepths[h.id] = h.depth;
-  const { charges } = batchCharge(holeIds, holeDepths, 'boomite', 5, 2);
-  const delays = autoVPattern(holes, 25);
-  const plan = assembleBlastPlan(holes, charges, delays);
-  return { grid, plan };
-}
 
 describe('Software — purchase', () => {
   it('purchase tier 1 succeeds with enough cash', () => {
@@ -88,5 +70,45 @@ describe('Software — preview tiers', () => {
     expect(result).not.toBeNull();
     expect(result!.villages.length).toBe(1);
     expect(result!.maxVibration).toBeGreaterThan(0);
+  });
+});
+
+describe('Software — previewHoleDetails', () => {
+  it('returns empty record below tier 2', () => {
+    const { grid, plan } = makeTestPlan();
+    expect(previewHoleDetails(plan, grid, 0)).toEqual({});
+    expect(previewHoleDetails(plan, grid, 1)).toEqual({});
+  });
+
+  it('at tier >= 2, gives every charged hole a predicted fragment size in cm', () => {
+    const { grid, plan } = makeTestPlan();
+    const details = previewHoleDetails(plan, grid, 2);
+    const holeIds = plan.holes.map(h => h.id);
+    expect(holeIds.length).toBeGreaterThan(0);
+    for (const id of holeIds) {
+      expect(details[id]).toBeDefined();
+      expect(details[id]!.fragSizeCm).toBeGreaterThan(0);
+      // Tier 2 only — no projection speed yet.
+      expect(details[id]!.projectionSpeedMs).toBeUndefined();
+    }
+  });
+
+  it('at tier >= 3, adds projectionSpeedMs only for holes predicted to project', () => {
+    const { grid, plan } = makeTestPlan();
+    const details = previewHoleDetails(plan, grid, 3);
+    for (const hole of plan.holes) {
+      const detail = details[hole.id];
+      expect(detail).toBeDefined();
+      if (detail!.projectionSpeedMs !== undefined) {
+        expect(detail!.projectionSpeedMs).toBeGreaterThan(0);
+        expect(detail!.projectionSpeedMs).toBeLessThanOrEqual(MAX_PROJECTION_VELOCITY);
+      }
+    }
+  });
+
+  it('skips holes with no charge', () => {
+    const { grid, plan } = makeTestPlan();
+    const uncharged = { ...plan, charges: {} };
+    expect(previewHoleDetails(uncharged, grid, 3)).toEqual({});
   });
 });

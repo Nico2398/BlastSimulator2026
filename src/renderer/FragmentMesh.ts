@@ -17,6 +17,7 @@ import {
   FRAGMENT_CRATER_YOFFSET_HASH_BUCKETS,
   FRAGMENT_MIN_RENDER_Y,
 } from '../core/config/balance.js';
+import { sampleEvenly, computeRenderScatter } from './FragmentRenderSampling.js';
 
 // ---------- Config ----------
 
@@ -108,7 +109,12 @@ export class FragmentMesh {
    * Call after executeBlast() returns a BlastResult.
    */
   spawnFragments(fragments: FragmentData[]): void {
-    const toRender = fragments.slice(0, MAX_RENDERED_FRAGMENTS);
+    // Sample evenly across the whole fragment array rather than taking the
+    // first N. Fragments are generated in a raster scan of the blast zone, so
+    // taking a prefix only ever shows one corner of a large blast — the
+    // "rigid lattice at the crater rim" artifact. A stride keeps coverage of
+    // the full crater regardless of how many fragments were fractured.
+    const toRender = sampleEvenly(fragments, MAX_RENDERED_FRAGMENTS);
 
     for (const frag of toRender) {
       const meshIdx = frag.id % SHAPE_VARIANTS;
@@ -126,8 +132,15 @@ export class FragmentMesh {
           * (FRAGMENT_CRATER_YOFFSET_SPREAD / FRAGMENT_CRATER_YOFFSET_HASH_BUCKETS);
       const fragY = Math.max(FRAGMENT_MIN_RENDER_Y, frag.position.y - yOffset);
 
+      // Horizontal render-only scatter: fragments sharing a source voxel would
+      // otherwise all render at the exact same (x,z), reading as a regular
+      // grid instead of settled rubble. Projected fragments additionally
+      // displace along their initial velocity direction, hinting at the
+      // ballistic throw distance without simulating every fragment.
+      const { x: renderX, z: renderZ } = computeRenderScatter(frag);
+
       // Build transform matrix
-      FragmentMesh._pos.set(frag.position.x, fragY, frag.position.z);
+      FragmentMesh._pos.set(renderX, fragY, renderZ);
       FragmentMesh._scale.setScalar(halfExtent * 2);
       FragmentMesh._quat.setFromEuler(new THREE.Euler(
         (frag.id * 1.3) % (Math.PI * 2),

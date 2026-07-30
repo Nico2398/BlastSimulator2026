@@ -171,6 +171,34 @@ export const FRAGMENT_CRATER_YOFFSET_HASH_BUCKETS = 9;
 /** Minimum fragment render height (voxels) above the grid floor. */
 export const FRAGMENT_MIN_RENDER_Y = 0.05;
 
+/** Horizontal render-only jitter radius (metres) applied to every rendered fragment
+ *  instance so fragments sharing a source voxel don't render at the exact same
+ *  (x,z) — without this, a large blast's fragments read as a regular voxel-lattice
+ *  grid instead of settled rubble. Gameplay-significant FragmentData.position is
+ *  never mutated; this only offsets the InstancedMesh transform. */
+export const FRAGMENT_RENDER_JITTER_RADIUS = 0.6;
+
+/** How far (metres per m/s of horizontal initial speed) a projected fragment's
+ *  rendered instance is displaced from its source voxel along its initial
+ *  velocity direction, suggesting the ballistic throw distance without running
+ *  full physics on every fragment. */
+export const FRAGMENT_PROJECTION_RENDER_DISTANCE_SCALE = 0.15;
+
+/** Cap (metres) on the projection render-displacement above, so a very high
+ *  velocity fragment still renders within the visible blast/crater area. */
+export const FRAGMENT_PROJECTION_RENDER_MAX_DISTANCE = 12;
+
+/** Default minimum search radius (metres) for the expanding-ring terrain-surface
+ *  search in getBlastOriginSurfaceY (BlastOriginSampling.ts). A fixed 3m ring only
+ *  clears a small blast's own crater; the search widens by this step until it
+ *  clears a large blast's footprint too. */
+export const BLAST_ORIGIN_SURFACE_SEARCH_MIN_RADIUS = 3;
+
+/** Margin (metres) added to a blast's own half-bounding-box-diagonal when sizing
+ *  the terrain-surface search ring in GameRenderer.onBlast, so the ring sits just
+ *  outside the blast's own crater rather than exactly on its edge. */
+export const BLAST_ORIGIN_SURFACE_SEARCH_MARGIN = 3;
+
 /** Maximum iterations for the energy propagation overflow loop.
  *  Prevents infinite loops when energy is trapped with no dissipating neighbors.
  *  Real blasting energy dissipates in microseconds; this is a computational guard.
@@ -200,6 +228,11 @@ export const MERGE_PROBABILITY = 0.35;
  *  Creates a small gap between visual and collision meshes to prevent physics catching
  *  on visual edges. 0.05 m = 5 cm for 1 m voxels. */
 export const COLLISION_DEFLATE_AMOUNT = 0.05;
+
+/** Edge length of one voxel in centimetres. Voxels are 1 m³ (see world/VoxelGrid),
+ *  so a fragment's size fraction of a voxel converts to cm by this factor —
+ *  used by the FragPredict (tier 2) software preview. */
+export const VOXEL_SIZE_CM = 100;
 
 // ─── Fragment Velocity Simulation ────────────────────────────────────────────────
 

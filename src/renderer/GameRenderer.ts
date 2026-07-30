@@ -21,8 +21,15 @@ import { GhostMesh } from './GhostMesh.js';
 import { syncEntitySets } from './EntitySync.js';
 import type { SurveyConfidenceOverlayOptions, SurveyConfidencePoint } from './SurveyConfidenceOverlay.js';
 import { isSurveyStale } from '../core/mining/SurveyCalc.js';
-import { SOLID_VOXEL_DENSITY_THRESHOLD } from '../core/config/balance.js';
+import {
+  SOLID_VOXEL_DENSITY_THRESHOLD,
+  BLAST_ORIGIN_SURFACE_SEARCH_MIN_RADIUS,
+  BLAST_ORIGIN_SURFACE_SEARCH_MARGIN,
+} from '../core/config/balance.js';
 import { isInZone } from '../core/entities/Zone.js';
+import { assembleBlastPlan } from '../core/mining/BlastPlan.js';
+import { previewHoleDetails } from '../core/mining/Software.js';
+import { boundingBoxXZ, getBlastOriginSurfaceY } from './BlastOriginSampling.js';
 
 export class GameRenderer {
   private readonly sm: SceneManager;
@@ -171,6 +178,16 @@ export class GameRenderer {
     const cz = drillHoles.reduce((s, h) => s + h.z, 0) / drillHoles.length;
     const originSurfaceY = this.getTerrainSurfaceY(cx, cz);
 
+    // Per-hole fragment-size / projection-speed predictions, tier-gated the
+    // same as the console `preview` commands. Without these, BlastPlanOverlay's
+    // fragment-size dots and projection arcs never render — their per-hole
+    // fields stay undefined and the overlay's own guards skip them.
+    let holeDetails: Record<string, import('../core/mining/Software.js').HolePreviewDetail> = {};
+    if (ctx.softwareTier >= 2 && ctx.grid) {
+      const plan = assembleBlastPlan(drillHoles, chargesByHole, sequenceDelays);
+      holeDetails = previewHoleDetails(plan, ctx.grid, ctx.softwareTier);
+    }
+
     this.blastOverlay.show({
       softwareTier: ctx.softwareTier,
       origin: new THREE.Vector3(cx, originSurfaceY, cz),
@@ -182,6 +199,9 @@ export class GameRenderer {
         };
         const charge = chargesByHole[h.id];
         if (charge) hd.charge = charge;
+        const detail = holeDetails[h.id];
+        if (detail?.fragSizeCm !== undefined) hd.predictedFragSizeCm = detail.fragSizeCm;
+        if (detail?.projectionSpeedMs !== undefined) hd.projectionSpeed = detail.projectionSpeedMs;
         return hd;
       }),
     });
@@ -295,11 +315,29 @@ export class GameRenderer {
     // Compute blast origin from fragment centroid or grid centre
     let ox = this.lastGrid.sizeX / 2;
     let oz = this.lastGrid.sizeZ / 2;
+    // Size the surface-sample ring to the blast's own footprint (half its
+    // bounding-box diagonal + margin), so a large multi-hole blast's crater
+    // doesn't swallow the whole sampling ring.
+    let sampleRadius: number = BLAST_ORIGIN_SURFACE_SEARCH_MIN_RADIUS;
     if (ctx.lastBlastFragments && ctx.lastBlastFragments.length > 0) {
       ox = ctx.lastBlastFragments.reduce((s, p) => s + p.x, 0) / ctx.lastBlastFragments.length;
       oz = ctx.lastBlastFragments.reduce((s, p) => s + p.z, 0) / ctx.lastBlastFragments.length;
+      const { minX, maxX, minZ, maxZ } = boundingBoxXZ(ctx.lastBlastFragments);
+      const halfDiagonal = Math.hypot(maxX - minX, maxZ - minZ) / 2;
+      sampleRadius = Math.max(
+        BLAST_ORIGIN_SURFACE_SEARCH_MIN_RADIUS,
+        halfDiagonal + BLAST_ORIGIN_SURFACE_SEARCH_MARGIN,
+      );
     }
-    const origin = new THREE.Vector3(ox, 0, oz);
+    // Anchor at the surrounding terrain surface, not y=0. A mine site rarely
+    // sits at grid y=0 — it's typically well above it — so a hardcoded 0 here
+    // buried the dust cloud and detonation flash inside solid terrain, fully
+    // occluded and never visible on screen.
+    const origin = new THREE.Vector3(
+      ox,
+      getBlastOriginSurfaceY(this.lastGrid, (x, z) => this.getTerrainSurfaceY(x, z), ox, oz, sampleRadius),
+      oz,
+    );
 
     // Build per-hole detonation list from sequence delays
     const holes: import('./BlastEffects.js').HoleDetonation[] = [];
@@ -324,7 +362,7 @@ export class GameRenderer {
 
     // Fallback: single explosion at centroid if no per-hole data
     if (holes.length === 0) {
-      holes.push({ x: ox, y: 0, z: oz, delaySeconds: 0 });
+      holes.push({ x: ox, y: origin.y, z: oz, delaySeconds: 0 });
     }
 
     this.blastEffects.trigger({
