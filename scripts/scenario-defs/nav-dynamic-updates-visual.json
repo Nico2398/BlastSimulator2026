@@ -21,11 +21,11 @@
       ]
     },
     {
-      "command": "charge hole:H1 explosive:boomite amount:500kg stemming:2m",
+      "command": "charge hole:H1 explosive:boomite amount:8kg stemming:2m",
       "interaction": [
         {
           "type": "command",
-          "command": "charge hole:H1 explosive:boomite amount:500kg stemming:2m"
+          "command": "charge hole:H1 explosive:boomite amount:8kg stemming:2m"
         }
       ]
     },

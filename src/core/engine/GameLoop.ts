@@ -15,10 +15,12 @@ import { replenishNeed, getNeedMultiplier } from '../entities/EmployeeNeeds.js';
 import { getLivingQuartersWellbeingMultiplier } from '../entities/BuildingWellbeing.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { addExpense } from '../economy/Finance.js';
+import { findPath } from '../nav/Pathfinding.js';
+import { advanceAgent } from '../nav/AgentMovement.js';
 
 // ── Config ──
 
-import { BASE_TICK_MS as _BASE_TICK_MS, VALID_SPEEDS as _VALID_SPEEDS, NEED_REST_DURATIONS, NEED_REST_NO_BUILDING_CAP, NEED_REST_NO_BUILDING_DURATION_MULTIPLIER, NEED_REST_BUILDING_TYPES, NEED_REST_SEARCH_RADIUS, NEED_WARNING_THRESHOLDS, NEED_REST_COSTS, WORK_DURATION_TICKS, SHIFT_SLEEP_DURATION_TICKS, BASE_TASK_DURATION_TICKS } from '../config/balance.js';
+import { BASE_TICK_MS as _BASE_TICK_MS, VALID_SPEEDS as _VALID_SPEEDS, NEED_REST_DURATIONS, NEED_REST_NO_BUILDING_CAP, NEED_REST_NO_BUILDING_DURATION_MULTIPLIER, NEED_REST_BUILDING_TYPES, NEED_REST_SEARCH_RADIUS, NEED_WARNING_THRESHOLDS, NEED_REST_COSTS, WORK_DURATION_TICKS, SHIFT_SLEEP_DURATION_TICKS, BASE_TASK_DURATION_TICKS, AGENT_WALK_SPEED, STUCK_THRESHOLD } from '../config/balance.js';
 
 /** Milliseconds per base tick at 1x speed. */
 export const BASE_TICK_MS = _BASE_TICK_MS;
@@ -225,6 +227,12 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
     result.claimed.push(action.id);
     // action is consumed — not pushed to remaining
 
+    // Send the employee walking toward the action's location — targetX/targetZ
+    // is documented on PendingAction as existing for exactly this purpose
+    // ("ghost rendering and employee pathfinding"), previously unused.
+    idleMatch.destinationX = action.targetX;
+    idleMatch.destinationZ = action.targetZ;
+
     // This is the actual claim path the tick loop uses (claimPendingAction in
     // TaskDispatch.ts is a separate helper nothing here calls), so it owns
     // clearing the ghost preview too — otherwise the blue marker never
@@ -326,6 +334,8 @@ export function tickNeedRestoration(state: GameState): NeedRestorationResult {
     // Immediately claimed (unlike autoInsertNeedTasks) — start the rest timer now.
     emp.restTicksRemaining = restDuration;
     emp.restNeedKey = needKey;
+    emp.destinationX = building.x;
+    emp.destinationZ = building.z;
     result.routed.push(emp.id);
   }
 
@@ -408,6 +418,8 @@ export function tickCollapse(state: GameState, _firedEvents?: FiredEvent[], _emi
     // Immediately claimed — start the rest timer now (mirrors tickNeedRestoration).
     emp.restTicksRemaining = restDuration;
     emp.restNeedKey = collapsedGauge;
+    emp.destinationX = targetX;
+    emp.destinationZ = targetZ;
   }
 
   return result;
@@ -863,6 +875,8 @@ function forceShiftRestIfNeeded(
 
   state.pendingActions.push(restAction);
   emp.activeActionId = restAction.id;
+  emp.destinationX = targetX;
+  emp.destinationZ = targetZ;
   shiftRested.push(emp.id);
   firedEvents.push({ eventId: 'employee_shift_change', firedAtTick: state.tickCount });
   _emitter?.emit('employee:shift_change', { employeeId: emp.id });
@@ -875,4 +889,112 @@ function getBuildingCenter(building: Building): { x: number; z: number } {
   const def = getBuildingDef(building.type, building.tier);
   const { sizeX, sizeZ } = getDefSize(def);
   return { x: building.x + sizeX / 2, z: building.z + sizeZ / 2 };
+}
+
+// ── Employee movement ──
+
+export interface EmployeeMovementResult {
+  /** Employee IDs that advanced position this tick. */
+  moved: number[];
+  /** Employee IDs that reached destinationX/destinationZ this tick. */
+  arrived: number[];
+  /** Employee IDs that newly entered the stuck state this tick. */
+  stuck: number[];
+}
+
+/**
+ * Advance every alive employee with a destination (set by tickEmployees on
+ * claim, or by the rest self-claim paths in tickCollapse/tickNeedRestoration/
+ * forceShiftRestIfNeeded) one tick's worth of movement toward it, using the
+ * NavGrid-aware A* pathfinder (Pathfinding.findPath) and the generic
+ * per-tick advancer (AgentMovement.advanceAgent) — the "already implemented,
+ * already unit-tested" navmesh pieces that nothing wired to a caller before.
+ *
+ * The path is recomputed fresh every tick rather than cached on the employee:
+ * this doubles as the "re-request from current position" behaviour the
+ * gameplay-navmesh spec calls for whenever the next step is blocked, without
+ * needing to persist a waypoint list on GameState. A path that repeatedly
+ * fails to resolve (STUCK_THRESHOLD consecutive ticks) marks the employee
+ * stuck — idle, morale −2/tick — until the grid changes and a path resolves
+ * again, at which point movement resumes on its own the very next tick.
+ *
+ * With no NavGrid built yet (state.navGrid === null), falls back to a direct
+ * line toward the destination, ignoring obstacles — better than the total
+ * non-movement this replaces, and consistent with tickVehicle's own
+ * pre-navmesh behaviour.
+ */
+export function tickEmployeeMovement(state: GameState, emitter?: EventEmitter): EmployeeMovementResult {
+  const result: EmployeeMovementResult = { moved: [], arrived: [], stuck: [] };
+
+  for (const emp of state.employees.employees) {
+    if (!emp.alive) continue;
+    if (emp.destinationX === null || emp.destinationZ === null) continue;
+
+    if (emp.x === emp.destinationX && emp.z === emp.destinationZ) {
+      emp.destinationX = null;
+      emp.destinationZ = null;
+      continue;
+    }
+
+    let waypoints: Array<{ x: number; z: number }>;
+    let pathFound: boolean;
+
+    if (state.navGrid) {
+      const path = findPath(state.navGrid, {
+        agentId: emp.id,
+        fromX: emp.x,
+        fromZ: emp.z,
+        toX: emp.destinationX,
+        toZ: emp.destinationZ,
+        avoidVehicles: false,
+      });
+      pathFound = path.found;
+      waypoints = path.waypoints;
+    } else {
+      pathFound = true;
+      waypoints = [{ x: emp.x, z: emp.z }, { x: emp.destinationX, z: emp.destinationZ }];
+    }
+
+    if (!pathFound) {
+      emp.moveConsecutiveFailures += 1;
+      if (emp.moveConsecutiveFailures >= STUCK_THRESHOLD) {
+        if (!emp.moveStuck) {
+          emp.moveStuck = true;
+          result.stuck.push(emp.id);
+          emitter?.emit('agent:stuck', { employeeId: emp.id });
+        }
+        emp.morale = Math.max(0, emp.morale - 2);
+      }
+      continue;
+    }
+
+    emp.moveConsecutiveFailures = 0;
+    emp.moveStuck = false;
+
+    const advance = advanceAgent({
+      x: emp.x,
+      z: emp.z,
+      waypoints,
+      waypointIndex: 0,
+      walkSpeed: AGENT_WALK_SPEED,
+      destinationX: emp.destinationX,
+      destinationZ: emp.destinationZ,
+      consecutiveFailures: emp.moveConsecutiveFailures,
+      isStuck: emp.moveStuck,
+    });
+
+    emp.x = advance.x;
+    emp.z = advance.z;
+    result.moved.push(emp.id);
+
+    if (advance.isPathComplete) {
+      emp.x = emp.destinationX;
+      emp.z = emp.destinationZ;
+      emp.destinationX = null;
+      emp.destinationZ = null;
+      result.arrived.push(emp.id);
+    }
+  }
+
+  return result;
 }

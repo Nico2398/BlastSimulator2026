@@ -19,7 +19,7 @@ import { processPayCycle } from '../../core/entities/Employee.js';
 import { tickTraining } from '../../core/entities/EmployeeTraining.js';
 import { tickNeedGauges, needsMoraleEffect } from '../../core/entities/EmployeeNeeds.js';
 import type { FiredEvent } from '../../core/events/EventSystem.js';
-import { tickCollapse, autoInsertNeedTasks, processShiftCycle, tickEmployees, tickGeneralRestCompletion, tickTaskProgress } from '../../core/engine/GameLoop.js';
+import { tickCollapse, autoInsertNeedTasks, processShiftCycle, tickEmployees, tickGeneralRestCompletion, tickTaskProgress, tickVehicle, tickEmployeeMovement } from '../../core/engine/GameLoop.js';
 import { detectUnqualifiedTask } from '../../core/events/EventEngine.js';
 import { estimateSurveyResult, type SurveyMethod } from '../../core/mining/SurveyCalc.js';
 import { checkDeadlines, generateContracts } from '../../core/economy/Contract.js';
@@ -215,6 +215,22 @@ export function tickCommand(
       if (progress.leveledUp) {
         lines.push(`[tick ${state.tickCount}] LEVELUP: ${emp.name} reached level ${progress.newLevel} in ${progress.skill}.`);
       }
+    }
+
+    // 8f. Vehicle movement — advance every vehicle currently task='moving' one
+    // step toward its target (moveVehicle/vehicle-move-command only set the
+    // target; nothing advanced x/z toward it before this).
+    for (const vehicle of state.vehicles.vehicles) {
+      tickVehicle(state, vehicle);
+    }
+
+    // 8g. Employee movement — walk employees with a destination (set by
+    // tickEmployees/tickCollapse/tickNeedRestoration/forceShiftRestIfNeeded
+    // above) one tick's worth of movement along a NavGrid path.
+    const movementResult = tickEmployeeMovement(state, emitter);
+    for (const empId of movementResult.stuck) {
+      const emp = state.employees.employees.find(e => e.id === empId);
+      lines.push(`[tick ${state.tickCount}] STUCK: ${emp?.name ?? `employee #${empId}`} can't find a path — waiting.`);
     }
 
     // 9. Level stats snapshot + campaign profit check

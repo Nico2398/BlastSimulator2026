@@ -8,6 +8,10 @@
         {
           "type": "command",
           "command": "new_game seed:42"
+        },
+        {
+          "type": "keypress",
+          "key": "KeyN"
         }
       ]
     },
@@ -30,6 +34,25 @@
       ]
     },
     {
+      "command": "vehicle buy debris_hauler",
+      "description": "Buy a vehicle and send it moving across cells of different NavGrid cost (walkable, drill_hole) so per-tick progress is visible.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle buy debris_hauler"
+        }
+      ]
+    },
+    {
+      "command": "vehicle move 1 to:5,9",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle move 1 to:5,9"
+        }
+      ]
+    },
+    {
       "command": "state full",
       "interaction": [
         {
@@ -39,11 +62,21 @@
       ]
     },
     {
-      "command": "tick 5",
+      "command": "tick 10",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 5"
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "description": "Final state dump — vehicle x/z should have advanced toward (5,9) across the drill_hole row.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
         }
       ]
     }

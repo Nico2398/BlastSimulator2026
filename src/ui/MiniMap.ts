@@ -24,11 +24,11 @@ const SHADE_MAX = 1.15;
 
 /** Semi-transparent color overlay per NavCellType — shared across frames to avoid re-allocation. */
 const NAV_GRID_COLOR_MAP: Record<NavCellType, string> = {
-  walkable: 'rgba(0, 180, 0, 0.15)',
-  blocked: 'rgba(180, 0, 0, 0.3)',
-  drill_hole: 'rgba(180, 120, 0, 0.4)',
-  ramp: 'rgba(180, 180, 0, 0.3)',
-  void: 'rgba(0, 0, 0, 0.4)',
+  walkable: 'rgba(0, 180, 0, 0.25)',
+  blocked: 'rgba(180, 0, 0, 0.45)',
+  drill_hole: 'rgba(180, 120, 0, 0.55)',
+  ramp: 'rgba(180, 180, 0, 0.45)',
+  void: 'rgba(0, 0, 0, 0.5)',
 };
 
 /** Multiply an RGB triplet by `factor` and return a CSS colour. */
