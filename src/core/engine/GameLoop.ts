@@ -225,6 +225,13 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
     result.claimed.push(action.id);
     // action is consumed — not pushed to remaining
 
+    // This is the actual claim path the tick loop uses (claimPendingAction in
+    // TaskDispatch.ts is a separate helper nothing here calls), so it owns
+    // clearing the ghost preview too — otherwise the blue marker never
+    // disappears once a real employee picks up the work (#406).
+    const ghostIdx = state.ghostPreviews.findIndex(g => g.id === action.id);
+    if (ghostIdx !== -1) state.ghostPreviews.splice(ghostIdx, 1);
+
     // tickCollapse/tickNeedRestoration self-claim (see above) and start the rest
     // timer immediately, so they never reach this path. autoInsertNeedTasks
     // pushes 'rest' actions unclaimed (busy-employee case), so this is the

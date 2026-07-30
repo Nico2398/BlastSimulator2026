@@ -68,7 +68,7 @@
     },
     {
       "command": "employee hire role:driller",
-      "description": "Employee #6 — hired but never given an assign_skill call. Only carries its role's default 'blasting' qualification, exercising the minimal-qualifications display (contrast with #1, which gets two more assigned below).",
+      "description": "Employee #6 — hired but never given an assign_skill call. Only carries its role's default 'blasting' qualification, exercising the minimal-qualifications display (contrast with #1, which gets two more assigned below). Toggled bottom-up (6 -> 1) so the panel's own scrollIntoView leaves it resting on #1's card once every row is expanded — #1 is the one that later gains a second qualification, and every screenshot from here on needs it in frame, not wherever the last click of a top-down pass happened to land. A screenshot right after each individual click — before the next click's own scrollIntoView moves the panel again — is what gets #2-#5's cards in frame too; the step's single closing screenshot only ever shows one scroll position.",
       "interaction": [
         {
           "type": "command",
@@ -80,28 +80,34 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-detail-toggle"
+          "selector": "#bs-employee-panel [data-employee-id=\"6\"] .bs-detail-toggle"
         },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-employee-id=\"2\"] .bs-detail-toggle"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-employee-id=\"3\"] .bs-detail-toggle"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-employee-id=\"4\"] .bs-detail-toggle"
-        },
+        { "type": "screenshot" },
         {
           "type": "clickSelector",
           "selector": "#bs-employee-panel [data-employee-id=\"5\"] .bs-detail-toggle"
         },
+        { "type": "screenshot" },
         {
           "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-employee-id=\"6\"] .bs-detail-toggle"
-        }
+          "selector": "#bs-employee-panel [data-employee-id=\"4\"] .bs-detail-toggle"
+        },
+        { "type": "screenshot" },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-employee-id=\"3\"] .bs-detail-toggle"
+        },
+        { "type": "screenshot" },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-employee-id=\"2\"] .bs-detail-toggle"
+        },
+        { "type": "screenshot" },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-detail-toggle"
+        },
+        { "type": "screenshot" }
       ]
     },
     {
@@ -233,11 +239,19 @@
     },
     {
       "command": "employee dispatch 6 x:15 z:10 skill:blasting",
-      "description": "6th dispatch targeting the same employee — task queue now holds 6 own actions, one past the 5-entry display cap.",
+      "description": "6th dispatch targeting the same employee — task queue now holds 6 own actions, one past the 5-entry display cap. Collapsing and reopening #6's card scrolls the panel back onto it (it rested on #1 since the hire step above) so the '+1 more' overflow line is actually in frame for this and the remaining screenshots.",
       "interaction": [
         {
           "type": "command",
           "command": "employee dispatch 6 x:15 z:10 skill:blasting"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-employee-id=\"6\"] .bs-detail-toggle"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-employee-id=\"6\"] .bs-detail-toggle"
         }
       ]
     },

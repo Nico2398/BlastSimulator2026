@@ -380,6 +380,17 @@ describe('Console — employee dispatch', () => {
     expect(action!.targetZ).toBe(10);
   });
 
+  it('pushes a matching GhostPreview so the renderer can show the pending marker (#406)', () => {
+    const result = employeeCommand(ctx, ['dispatch', String(empId)], { x: '10', z: '10' });
+    expect(result.success).toBe(true);
+
+    const ghost = ctx.state!.ghostPreviews.find(g => g.id === 1);
+    expect(ghost).toBeDefined();
+    expect(ghost!.type).toBe('general_work');
+    expect(ghost!.targetX).toBe(10);
+    expect(ghost!.targetZ).toBe(10);
+  });
+
   it('rejects dispatch when the employee is injured', () => {
     ctx.state!.employees.employees.find(e => e.id === empId)!.injured = true;
 

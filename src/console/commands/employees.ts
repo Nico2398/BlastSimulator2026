@@ -141,6 +141,17 @@ export function employeeCommand(
         payload: {},
         targetEmployeeId: id,
       });
+      // Every other path onto pendingActions (dispatchPendingAction in
+      // TaskDispatch.ts) mirrors the action into ghostPreviews so the renderer
+      // shows the pending-work marker; this direct push bypassed that and the
+      // ghost never appeared for a dispatched-but-unclaimed action (#406).
+      state.ghostPreviews.push({
+        id: actionId,
+        type: 'general_work',
+        targetX: x,
+        targetZ: z,
+        targetY: 0,
+      });
       return {
         success: true,
         output: `Employee #${id} dispatched to work at (${x}, ${z}). Action ID: ${actionId}.`,

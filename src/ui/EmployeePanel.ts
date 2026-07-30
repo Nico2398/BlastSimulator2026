@@ -331,7 +331,12 @@ export class EmployeePanel {
     // roster re-renders on its own. Without this the detail a player just
     // opened — and the training controls inside it — vanish a moment later.
     this.expanded.add(e.id);
-    row.appendChild(this.makeDetail(e, state));
+    const detail = this.makeDetail(e, state);
+    row.appendChild(detail);
+    // A row near the top of a long, already-scrolled roster opens off-screen
+    // otherwise — its own expansion is never in frame to click or screenshot.
+    // jsdom (unit tests) doesn't implement scrollIntoView at all.
+    detail.scrollIntoView?.({ block: 'nearest' });
   }
 
   private makeDetail(e: Employee, state: GameState): HTMLElement {

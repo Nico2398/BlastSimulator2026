@@ -381,6 +381,39 @@ describe('tickEmployees — claim logic (Task 3.6)', () => {
     expect((employee as any).activeActionId).toBe(action.id);
   });
 
+  it('removes the matching GhostPreview when the action is claimed (issue #406)', () => {
+    // tickEmployees is the tick loop's real claim path — claimPendingAction in
+    // TaskDispatch.ts is a separate helper nothing in the loop calls — so it
+    // must own clearing ghostPreviews itself, or the blue marker never
+    // disappears once an employee actually picks up the work.
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    assignSkill(state.employees, employee.id, 'blasting', 1);
+
+    const action = makePendingAction({ id: 3, requiredSkill: 'blasting', targetX: 5, targetZ: 6 });
+    state.pendingActions.push(action);
+    state.ghostPreviews.push({ id: 3, type: action.type, targetX: 5, targetZ: 6, targetY: 0 });
+
+    tickEmployees(state);
+
+    expect(state.ghostPreviews.find(g => g.id === 3)).toBeUndefined();
+  });
+
+  it('leaves an unclaimed action\'s GhostPreview untouched (issue #406)', () => {
+    const state = createGame({ seed: SEED });
+    // No employees hired — action stays pending and unclaimed.
+
+    const action = makePendingAction({ id: 4, requiredSkill: 'geology', targetX: 1, targetZ: 2 });
+    state.pendingActions.push(action);
+    state.ghostPreviews.push({ id: 4, type: action.type, targetX: 1, targetZ: 2, targetY: 0 });
+
+    tickEmployees(state);
+
+    expect(state.ghostPreviews.find(g => g.id === 4)).toBeDefined();
+  });
+
   it('returns claimed action ID in result.claimed', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);

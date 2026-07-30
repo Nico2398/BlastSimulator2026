@@ -159,6 +159,32 @@ describe('GameRenderer — safety zone evacuation wiring', () => {
   });
 });
 
+describe('GameRenderer — ghost preview positioning (issue #406)', () => {
+  it('snaps a ghost preview onto the terrain surface instead of the raw targetY:0 every dispatch sets', () => {
+    // employees.ts always dispatches with targetY:0 — at any tile whose
+    // surface sits above y=0 that box rendered buried inside solid voxels
+    // and was never visible. syncFromContext must read the grid's actual
+    // surface height the same way it already does for vehicles/characters.
+    const sm = makeMockSceneManager();
+    const renderer = new GameRenderer(sm as any);
+    const ctx = makeCtx();
+    // Solid column at (5, z) up to y=3 — surface sits at y=4 (getTerrainSurfaceY returns y+1).
+    for (let y = 0; y <= 3; y++) {
+      ctx.grid!.setVoxel(5, y, 5, { composition: { rocks: [] }, density: 1, oreDensities: {}, fractureModifier: 1 });
+    }
+    renderer.syncFromContext(ctx);
+    const before = new Set(sm.scene.children);
+
+    ctx.state!.ghostPreviews.push({ id: 1, type: 'general_work', targetX: 5, targetZ: 5, targetY: 0 });
+    renderer.syncFromContext(ctx);
+
+    expect(renderer.ghostCount).toBe(1);
+    const mesh = sm.scene.children.find(c => !before.has(c)) as THREE.Mesh;
+    expect(mesh).toBeDefined();
+    expect(mesh.position.y).toBeGreaterThan(4); // above the y=4 surface, not buried at raw targetY:0
+  });
+});
+
 describe('GameRenderer — camera framing', () => {
   it('frames the site on the first load, using the grid size as the span', () => {
     const sm = makeMockSceneManager();

@@ -120,6 +120,7 @@ declare global {
     __probeSelector: (selector: string) => ReturnType<typeof probeSelector>;
     __tutorialState: () => { active: boolean; stepIndex: number; stepId: string | null; title: string; total: number; stageIndex: number; stageTotal: number; stageTarget: string | null; clockHeld: boolean };
     __resetTickAccumulator: () => void;
+    __setAutoTick: (enabled: boolean) => void;
     __debugGridInfo: () => Record<string, unknown>;
   }
 }
@@ -254,12 +255,22 @@ window.__gameState = () => {
 
 window.__resetTickAccumulator = () => { accumulatedGameMs = 0; };
 
+// A Puppeteer-driven run (scenario/interaction mode, playtest) navigates with
+// `?scenarioMode=1` so only its own scripted `tick N` commands advance
+// simulation time — otherwise the render loop's own real-time ticking races
+// scripted checkpoints and desyncs them (see #406). Exposed as a bridge too,
+// for a mode that wants to flip it after load.
+let autoTickEnabled = new URLSearchParams(window.location.search).get('scenarioMode') !== '1';
+window.__setAutoTick = (enabled: boolean) => { autoTickEnabled = enabled; };
+
 // Debug: expose grid reference info for diagnostics
 window.__debugGridInfo = () => {
   return {
     ctxGridId: ctx.grid?.id ?? null,
     lastGridId: gameRenderer.lastGridId,
     terrainGridId: gameRenderer.terrain?.gridId ?? null,
+    ghostCount: gameRenderer.ghostCount,
+    ghostPreviewsInState: ctx.state?.ghostPreviews.length ?? -1,
   };
 };
 
@@ -380,7 +391,7 @@ scene.start((dt) => {
   gameRenderer.update(dt);
 
   // Advance game time
-  if (ctx.state && !ctx.state.isPaused) {
+  if (ctx.state && !ctx.state.isPaused && autoTickEnabled) {
     accumulatedGameMs += dt * 1000;
     // Tick every BASE_TICK_MS ms; timeScale is handled inside tickCommand
     while (accumulatedGameMs >= BASE_TICK_MS) {
