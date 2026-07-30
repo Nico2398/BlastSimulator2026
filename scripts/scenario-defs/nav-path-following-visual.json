@@ -39,6 +39,16 @@
       ]
     },
     {
+      "command": "employee dispatch 1 x:0 z:0",
+      "description": "Send employee #1 walking toward the far corner — the management_office placed below will land on this path and block it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:0 z:0"
+        }
+      ]
+    },
+    {
       "command": "tick 10",
       "interaction": [
         {

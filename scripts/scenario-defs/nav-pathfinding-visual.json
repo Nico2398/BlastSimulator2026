@@ -57,6 +57,16 @@
       ]
     },
     {
+      "command": "employee dispatch 1 x:2 z:2",
+      "description": "Send the driller toward the far corner beyond the 3-building cluster at (5,5)/(5,7)/(7,5), forcing A* to route around them.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:2 z:2"
+        }
+      ]
+    },
+    {
       "command": "tick 20",
       "interaction": [
         {
