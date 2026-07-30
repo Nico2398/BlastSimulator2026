@@ -52,6 +52,18 @@ describe('entry points into the assignment queue', () => {
     expect(chain).toContain(ASSIGN_ACTION);
   });
 
+  // Auto-merge is enabled from the PR body, and `READY TO MERGE` does not always
+  // arrive with the PR. Every event that can add it has to re-evaluate, or the PR
+  // never merges — and an unmerged PR holds the queue indefinitely, because the
+  // watchdog skips an issue that has one linked.
+  it('re-evaluates auto-merge on every event that can add the marker', () => {
+    const chain = workflow('auto-assign-next.yml');
+    const types = /pull_request:\s*\n\s*types:\s*\[([^\]]+)\]/.exec(chain)?.[1] ?? '';
+    for (const type of ['opened', 'synchronize', 'reopened', 'edited', 'ready_for_review']) {
+      expect(types, `pull_request trigger is missing \`${type}\``).toContain(type);
+    }
+  });
+
   it('restarts an idle queue from the hourly sweep', () => {
     const watchdog = workflow('agentic-watchdog.yml');
     expect(watchdog).toContain('schedule:');

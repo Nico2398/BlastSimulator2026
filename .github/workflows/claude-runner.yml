@@ -55,6 +55,12 @@ jobs:
     # stay above this — see agentic-watchdog.yml.
     timeout-minutes: 360
     steps:
+      # First step, so elapsed time measured against it matches the window
+      # `timeout-minutes` is counting. The retry gate below spends it.
+      - name: Record when the job started
+        id: clock
+        run: echo "started_at=$(date +%s)" >> "$GITHUB_OUTPUT"
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -149,6 +155,76 @@ jobs:
           # and runs under `bypassPermissions`, so a transcript artifact would
           # publish anything a Bash step happened to echo.
           show_full_output: true
+
+      # `always()`: a crashed, failed or early-ended attempt is exactly the case
+      # this gate exists to catch. A cancelled job (the 360-minute timeout) skips
+      # it, which is correct — there is no clock left to retry inside.
+      - name: Did the run settle its issue?
+        id: state
+        if: always() && steps.context.outputs.issue != ''
+        uses: ./.github/actions/agentic-run-state
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          issue: ${{ steps.context.outputs.issue }}
+          started_at: ${{ steps.clock.outputs.started_at }}
+          budget_minutes: '360'
+
+      # Spelled out rather than looped because Actions has no loop over a `uses:`
+      # step. One retry, not three: a real run takes over two hours, so a second
+      # attempt is all the 360-minute budget holds — and the failures this catches
+      # (a turn ended with work outstanding, a crash in the first minutes, a
+      # transient API error) all die early and leave the whole budget behind.
+      #
+      # The `if` has no `success()` in it deliberately: this must run precisely
+      # when the attempt above did not settle the issue, whether it reported
+      # failure or reported success having done nothing.
+      - name: Retry the run when the first attempt settled nothing
+        id: claude_retry
+        if: steps.state.outputs.retry == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          additional_permissions: |
+            actions: read
+          branch_prefix: 'pipeline/scratch-'
+          # Same entry point as the first attempt, prefixed with what went wrong.
+          # The branch inventory matters: a branch the previous attempt built is
+          # on this disk and nowhere else, so the retry either continues it or
+          # rebuilds it, and it cannot know which without being told.
+          prompt: |
+            /agentic-run ${{ steps.context.outputs.entity }}
+            ▶ THIS IS A RETRY. The previous session in this job ended without settling this issue.
+
+            ${{ steps.state.outputs.reason }}
+
+            What that attempt left on this runner's disk:
+            ${{ steps.state.outputs.branch_state }}
+
+            Those branches exist here and nowhere else — they were never pushed. Inspect them
+            before deciding: continue the furthest one that is sound, or rebuild from `main`.
+            Either way this attempt owes the same terminal outcome as any other run.
+
+            The most likely reason the last attempt ended early is a delegation that did not
+            return inside the turn that issued it. Every delegation is synchronous. Parallel
+            means several delegations in ONE message, all awaited in that same turn — never
+            work launched now and collected later, because there is no later turn.
+
+            ${{ steps.context.outputs.prompt }}
+          claude_args: '--permission-mode bypassPermissions --model claude-sonnet-5'
+          show_full_output: true
+
+      # Reported, not acted on: the rescue step below reads the state itself and
+      # owns what happens next. This exists so the job log names the outcome of
+      # the retry instead of leaving it to be inferred from the rescue comment.
+      - name: Did the retry settle its issue?
+        if: always() && steps.claude_retry.outcome != 'skipped'
+        uses: ./.github/actions/agentic-run-state
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          issue: ${{ steps.context.outputs.issue }}
 
       # A session that ends before opening its PR leaves `pipeline/feature-<N>`
       # on this VM and nowhere else. `always()`: the cases worth rescuing are
