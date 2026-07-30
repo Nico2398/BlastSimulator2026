@@ -221,7 +221,7 @@ export function tickCommand(
     // step toward its target (moveVehicle/vehicle-move-command only set the
     // target; nothing advanced x/z toward it before this).
     for (const vehicle of state.vehicles.vehicles) {
-      tickVehicle(state, vehicle);
+      tickVehicle(state, vehicle, emitter);
     }
 
     // 8g. Employee movement — walk employees with a destination (set by

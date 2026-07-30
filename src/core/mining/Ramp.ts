@@ -3,7 +3,7 @@
 // Each ramp clears a diagonal column of voxels from surface to target depth.
 
 import { formatMoney } from '../economy/formatMoney.js';
-import type { VoxelGrid } from '../world/VoxelGrid.js';
+import { computeVoxelColumnSurfaceY, type VoxelGrid } from '../world/VoxelGrid.js';
 
 // ── Config ──
 
@@ -123,23 +123,14 @@ export function buildRamp(
 
 /**
  * Resolve the local surface Y for column (x, z) — the highest voxel with
- * density >= 0.5, matching NavGrid.computeSurfaceY's contract. Duplicated
- * locally (not imported from '../nav/NavGrid.js') to avoid introducing a
- * core/mining -> core/nav dependency edge; core/nav already depends on
- * core/mining (DrillPlan, BlastExecution), so the reverse edge would cycle.
- * Returns -1 if the column is entirely void.
- *
+ * density >= 0.5, matching NavGrid.computeSurfaceY's contract. Both delegate
+ * to VoxelGrid.computeVoxelColumnSurfaceY (a leaf-module free function) so
+ * core/mining doesn't need to import from core/nav (core/nav already depends
+ * on core/mining — DrillPlan, BlastExecution — so the reverse edge would
+ * cycle). Returns -1 if the column is entirely void.
  */
 function computeColumnSurfaceY(grid: VoxelGrid, x: number, z: number): number {
-  if (grid.sizeX <= 0 || grid.sizeZ <= 0) return -1;
-
-  const cx = Math.max(0, Math.min(grid.sizeX - 1, Math.floor(x)));
-  const cz = Math.max(0, Math.min(grid.sizeZ - 1, Math.floor(z)));
-  for (let y = grid.sizeY - 1; y >= 0; y--) {
-    const voxel = grid.getVoxel(cx, y, cz);
-    if (voxel && voxel.density >= 0.5) return y;
-  }
-  return -1;
+  return computeVoxelColumnSurfaceY(grid, x, z);
 }
 
 export { RAMP_COST_PER_METER, RAMP_WIDTH, computeColumnSurfaceY };

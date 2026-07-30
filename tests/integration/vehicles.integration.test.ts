@@ -159,12 +159,16 @@ describe('Vehicle fleet', () => {
     v.state = 'idle';
 
     const origX = v.x;
+    // makeCtx() runs new_game, which builds a NavGrid — tickVehicle routes via
+    // Pathfinding.findPath and advances at debris_hauler's own speed (3
+    // cells/tick, see VEHICLE_BASE_STATS) rather than a flat 1 cell/tick (#407).
+    const debrisHaulerSpeed = 3;
 
     tickVehicle(ctx.state!, v);
 
-    // Should have moved one cell closer to target (20, 16)
+    // Should have moved debrisHaulerSpeed cells closer to target (20, 16)
     if (v.task === 'moving') {
-      expect(v.x).toBe(origX + 1);
+      expect(v.x).toBe(origX + debrisHaulerSpeed);
     }
     // If the vehicle arrived, task becomes 'idle' and x == targetX
     if (v.task === 'idle') {

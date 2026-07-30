@@ -30,6 +30,7 @@ export interface GameEventMap {
 
   // Phase 9 — Navmesh path-following
   'agent:stuck': { employeeId: number };
+  'vehicle:stuck': { vehicleId: number };
 }
 
 type EventHandler<T> = (data: T) => void;

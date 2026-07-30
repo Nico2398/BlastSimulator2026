@@ -131,7 +131,7 @@ export interface Employee {
   /** Consecutive ticks tickEmployeeMovement failed to find a path to destinationX/Z. */
   moveConsecutiveFailures: number;
   /** True once moveConsecutiveFailures reaches STUCK_THRESHOLD — idle, morale −2/tick until the path clears. */
-  moveStuck: boolean;
+  isMoveStuck: boolean;
 }
 
 // ── Employee state ──
@@ -194,7 +194,7 @@ export function hireEmployee(
     destinationX: null,
     destinationZ: null,
     moveConsecutiveFailures: 0,
-    moveStuck: false,
+    isMoveStuck: false,
   };
   // Keep the stored salary consistent with the qualification just granted —
   // calculateSalary() sums qualification bonuses, so a base-only salary would

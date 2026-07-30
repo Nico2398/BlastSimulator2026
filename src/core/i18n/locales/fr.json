@@ -1732,6 +1732,7 @@
   "shortcuts.employees": "E : Équipe",
   "shortcuts.survey": "S : Mode sondage",
   "shortcuts.map": "M : Mini-carte",
+  "shortcuts.navgrid": "N : Afficher la grille de navigation",
   "shortcuts.saves": "F5 : Sauvegarde rapide",
   "shortcuts.settings": "Échap : Paramètres",
   "building.driving_center.name": "Centre de Conduite",

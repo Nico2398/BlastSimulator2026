@@ -32,6 +32,8 @@ import {
   // ── tickTaskProgress: task-duration countdown + tick-driven XP (issue #406) ──
   // Stub as of this branch — the tests below are the Red-phase spec for it.
   tickTaskProgress,
+  // ── tickEmployeeMovement: NavGrid-aware movement (issue #407) ──
+  tickEmployeeMovement,
 } from '../../../src/core/engine/GameLoop.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 import {
@@ -41,11 +43,13 @@ import type { NeedKey } from '../../../src/core/entities/Employee.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
 import type { EventContext } from '../../../src/core/events/EventPool.js';
 import type { FiredEvent } from '../../../src/core/events/EventSystem.js';
-import type { EventEmitter } from '../../../src/core/state/EventEmitter.js';
+import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { setupEvents } from '../../../src/core/events/index.js';
 import { clearEvents, registerEvents } from '../../../src/core/events/EventPool.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { getLivingQuartersWellbeingMultiplier } from '../../../src/core/entities/BuildingWellbeing.js';
+import { NavGrid } from '../../../src/core/nav/NavGrid.js';
+import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import {
   NEED_REST_DURATIONS,
   NEED_REST_BUILDING_TYPES,
@@ -59,6 +63,9 @@ import {
   NEED_REST_NO_BUILDING_DURATION_MULTIPLIER,
   BASE_TASK_DURATION_TICKS,
   XP_THRESHOLDS,
+  AGENT_WALK_SPEED,
+  STUCK_THRESHOLD,
+  STUCK_MORALE_PENALTY,
 } from '../../../src/core/config/balance.js';
 
 function buildContext(state: GameState): EventContext {
@@ -2504,5 +2511,110 @@ describe('tickGeneralRestCompletion', () => {
     expect(result.completed).toEqual([{ employeeId: employee.id, needKey: 'hunger' }]);
     expect(employee.restTicksRemaining).toBeNull();
     expect(employee.activeActionId).toBeNull();
+  });
+});
+
+// ── tickEmployeeMovement (issue #407) ────────────────────────────────────────
+
+describe('tickEmployeeMovement', () => {
+  const SEED = 42;
+
+  /** Solid rock voxel used to build small hand-crafted NavGrids below. */
+  function solidVoxel() {
+    return { composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] }, density: 1.0, oreDensities: {}, fractureModifier: 1.0 };
+  }
+
+  it('is a no-op for an employee with no destination set', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.x = 5;
+    employee.z = 7;
+    employee.destinationX = null;
+    employee.destinationZ = null;
+
+    const result = tickEmployeeMovement(state);
+
+    expect(employee.x).toBe(5);
+    expect(employee.z).toBe(7);
+    expect(employee.destinationX).toBeNull();
+    expect(employee.destinationZ).toBeNull();
+    expect(result).toEqual({ moved: [], arrived: [], stuck: [] });
+  });
+
+  it('falls back to a direct line toward the destination when no NavGrid has been built yet, without crashing', () => {
+    const state = createGame({ seed: SEED });
+    expect(state.navGrid).toBeNull();
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.x = 0;
+    employee.z = 0;
+    employee.destinationX = 10;
+    employee.destinationZ = 0;
+
+    let result;
+    expect(() => { result = tickEmployeeMovement(state); }).not.toThrow();
+
+    // AGENT_WALK_SPEED cells covered this tick, straight toward (10, 0) — not yet arrived.
+    expect(employee.x).toBeCloseTo(AGENT_WALK_SPEED, 5);
+    expect(employee.z).toBe(0);
+    expect(employee.destinationX).toBe(10);
+    expect(result!.moved).toEqual([employee.id]);
+    expect(result!.arrived).toEqual([]);
+  });
+
+  it('reaches its destination in one tick when already within walking speed — position exact, destination cleared', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.x = 0;
+    employee.z = 0;
+    employee.destinationX = 1; // 1 cell away, well within AGENT_WALK_SPEED
+    employee.destinationZ = 0;
+
+    const result = tickEmployeeMovement(state);
+
+    expect(employee.x).toBe(1);
+    expect(employee.z).toBe(0);
+    expect(employee.destinationX).toBeNull();
+    expect(employee.destinationZ).toBeNull();
+    expect(result.arrived).toEqual([employee.id]);
+  });
+
+  it('crosses STUCK_THRESHOLD when no path exists: emits agent:stuck once, sets isMoveStuck, applies the morale penalty', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+
+    // A 5×5×5 NavGrid with rock only under (0,0) — every other column stays
+    // void (density 0 everywhere), so a destination there is impassable and
+    // findPath returns found:false on every tick, forever.
+    const vg = new VoxelGrid(5, 5, 5);
+    vg.setVoxel(0, 0, 0, solidVoxel());
+    vg.setVoxel(0, 1, 0, solidVoxel());
+    state.navGrid = NavGrid.buildNavGrid(vg, [], []);
+
+    employee.x = 0;
+    employee.z = 0;
+    employee.destinationX = 3;
+    employee.destinationZ = 3; // void column — unreachable
+    employee.morale = 60;
+
+    const emitter = new EventEmitter();
+    const stuckEvents: number[] = [];
+    emitter.on('agent:stuck', ({ employeeId }) => stuckEvents.push(employeeId));
+
+    let result;
+    for (let i = 0; i < STUCK_THRESHOLD; i++) {
+      result = tickEmployeeMovement(state, emitter);
+    }
+
+    expect(employee.isMoveStuck).toBe(true);
+    expect(employee.moveConsecutiveFailures).toBe(STUCK_THRESHOLD);
+    expect(stuckEvents).toEqual([employee.id]); // fired exactly once, on the crossing tick
+    expect(result!.stuck).toEqual([employee.id]);
+    expect(employee.x).toBe(0); // never moved — no path ever resolved
+    expect(employee.z).toBe(0);
+    expect(employee.morale).toBe(60 - STUCK_MORALE_PENALTY);
   });
 });

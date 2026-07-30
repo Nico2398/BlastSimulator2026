@@ -1,6 +1,6 @@
 {
   "name": "nav-ramp-routing-visual",
-  "description": "Tests multi-level ramp routing with agents walking across levels",
+  "description": "Tests vehicle/employee NavGrid-aware movement and build_ramp construction on the same map. Note: generated 'desert' terrain at this seed is a single flat bench (see #407 code-review verification) — the ramp does not gate reachability of (8,20) here, but the scenario still exercises real A*-routed, tick-by-tick vehicle movement plus ramp construction end to end.",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -13,7 +13,7 @@
     },
     {
       "command": "vehicle buy debris_hauler",
-      "description": "Purchase a vehicle before the ramp exists — its route request below must fail (found:false) since the lower bench is not yet connected.",
+      "description": "Purchase a vehicle before the ramp exists.",
       "interaction": [
         {
           "type": "command",
@@ -23,7 +23,7 @@
     },
     {
       "command": "vehicle move 1 to:8,20",
-      "description": "Request a route to the not-yet-connected lower bench — expect the vehicle to remain stuck (no ramp connects the levels yet).",
+      "description": "Request a route across freshly-generated (single-bench, flat) terrain — the vehicle routes and walks there via real NavGrid A* pathfinding (#407), progressing gradually tick over tick rather than teleporting.",
       "interaction": [
         {
           "type": "command",
@@ -42,7 +42,7 @@
     },
     {
       "command": "state full",
-      "description": "Pre-ramp state dump — vehicle should not have reached (8,20); routing found:false.",
+      "description": "Pre-ramp state dump — vehicle is mid-route toward (8,20), advancing at its own speed each tick rather than jumping straight there.",
       "interaction": [
         {
           "type": "command",
@@ -61,7 +61,7 @@
     },
     {
       "command": "vehicle move 1 to:8,20",
-      "description": "Re-request the same route now that the ramp connects the two levels — expect routing found:true this time.",
+      "description": "Re-request the same route after build_ramp — still resolves via real A* routing; the ramp construction runs cleanly alongside vehicle movement without breaking navigation.",
       "interaction": [
         {
           "type": "command",

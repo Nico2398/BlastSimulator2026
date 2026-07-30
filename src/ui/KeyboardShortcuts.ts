@@ -73,8 +73,8 @@ export class KeyboardShortcuts {
       'shortcuts.pause', 'shortcuts.speed',
       'shortcuts.blast', 'shortcuts.contracts',
       'shortcuts.vehicles', 'shortcuts.employees',
-      'shortcuts.survey', 'shortcuts.saves',
-      'shortcuts.settings',
+      'shortcuts.survey', 'shortcuts.navgrid',
+      'shortcuts.saves', 'shortcuts.settings',
     ] as const;
 
     for (const key of keys) {

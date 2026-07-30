@@ -281,6 +281,9 @@ export const STUCK_THRESHOLD = 3;
 /** Employee agent walking speed in grid cells per tick (1 tick = 1 game-hour). */
 export const AGENT_WALK_SPEED = 2;
 
+/** Morale penalty applied per tick to an employee stuck with no walkable path (see NEED_MORALE_PENALTIES for the analogous need-driven table). */
+export const STUCK_MORALE_PENALTY = 2;
+
 /** Height of one bench level in voxels. Affects benchLevel computation in NavGrid. */
 export const NAV_BENCH_HEIGHT = 5;
 

@@ -3,7 +3,7 @@
 // Pure logic: no timers, no DOM. The caller drives the loop.
 
 import type { GameState, PendingAction } from '../state/GameState.js';
-import type { Vehicle } from '../entities/Vehicle.js';
+import { getVehicleDefByTier, type Vehicle } from '../entities/Vehicle.js';
 import { getBuildingDef, getDefSize, type Building, type BuildingType } from '../entities/Building.js';
 import type { Random } from '../math/Random.js';
 import type { EventContext } from '../events/EventPool.js';
@@ -16,11 +16,11 @@ import { getLivingQuartersWellbeingMultiplier } from '../entities/BuildingWellbe
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { addExpense } from '../economy/Finance.js';
 import { findPath } from '../nav/Pathfinding.js';
-import { advanceAgent } from '../nav/AgentMovement.js';
+import { advanceAgent, recordStuckFailure, resetStuckState, type AgentState } from '../nav/AgentMovement.js';
 
 // ── Config ──
 
-import { BASE_TICK_MS as _BASE_TICK_MS, VALID_SPEEDS as _VALID_SPEEDS, NEED_REST_DURATIONS, NEED_REST_NO_BUILDING_CAP, NEED_REST_NO_BUILDING_DURATION_MULTIPLIER, NEED_REST_BUILDING_TYPES, NEED_REST_SEARCH_RADIUS, NEED_WARNING_THRESHOLDS, NEED_REST_COSTS, WORK_DURATION_TICKS, SHIFT_SLEEP_DURATION_TICKS, BASE_TASK_DURATION_TICKS, AGENT_WALK_SPEED, STUCK_THRESHOLD } from '../config/balance.js';
+import { BASE_TICK_MS as _BASE_TICK_MS, VALID_SPEEDS as _VALID_SPEEDS, NEED_REST_DURATIONS, NEED_REST_NO_BUILDING_CAP, NEED_REST_NO_BUILDING_DURATION_MULTIPLIER, NEED_REST_BUILDING_TYPES, NEED_REST_SEARCH_RADIUS, NEED_WARNING_THRESHOLDS, NEED_REST_COSTS, WORK_DURATION_TICKS, SHIFT_SLEEP_DURATION_TICKS, BASE_TASK_DURATION_TICKS, AGENT_WALK_SPEED, STUCK_MORALE_PENALTY } from '../config/balance.js';
 
 /** Milliseconds per base tick at 1x speed. */
 export const BASE_TICK_MS = _BASE_TICK_MS;
@@ -125,14 +125,52 @@ export function isValidSpeed(speed: number): speed is SpeedMultiplier {
   return VALID_SPEEDS.includes(speed as SpeedMultiplier);
 }
 
-/** Process one vehicle movement step; advances at most one grid cell per tick, waits if the next cell is occupied. */
-export function tickVehicle(state: GameState, vehicle: Vehicle): void {
+/**
+ * Process one vehicle movement step toward vehicle.targetX/targetZ.
+ *
+ * With a NavGrid built (state.navGrid !== null), routes via Pathfinding.findPath
+ * and advances via AgentMovement.advanceAgent — the same pipeline
+ * tickEmployeeMovement uses — so ramps, blocked cells, and NavCell move costs
+ * (walkable:1.0, ramp:1.8, drill_hole:5.0, blocked/void: impassable) all affect
+ * a vehicle's route exactly as they do an employee's. Previously this stepped
+ * a flat one grid cell per tick in a straight line, ignoring the NavGrid
+ * entirely regardless of terrain (#407).
+ *
+ * With no NavGrid yet (e.g. before a world is generated), falls back to the
+ * original direct-line, one-cell-per-tick stepper — unchanged from before
+ * this fix, and still exercised by callers/tests that construct a GameState
+ * without a NavGrid.
+ *
+ * Vehicle-vs-vehicle collision avoidance is a separate, simpler mechanism
+ * from NavCell.vehicleOccupied — no caller in src/ ever sets that flag true,
+ * so Pathfinding/AgentMovement's own avoidVehicles checks against it are
+ * always a no-op today. tickVehicle instead checks other vehicles' live x/z
+ * directly via isCellOccupiedByOtherVehicle before committing to the next
+ * grid cell, which is what actually stops two vehicles from occupying the
+ * same cell. On the NavGrid path this is only checked for the immediate next
+ * cell, not every cell a multi-cell-per-tick (speed > 1) vehicle would cross
+ * in the same tick — a vehicle already mid-tick will not stop for one that
+ * enters a farther cell of its path within that same tick.
+ */
+export function tickVehicle(state: GameState, vehicle: Vehicle, emitter?: EventEmitter): void {
   if (!canTickVehicle(vehicle)) return;
 
+  if (vehicle.x === vehicle.targetX && vehicle.z === vehicle.targetZ) {
+    setVehicleIdle(vehicle);
+    return;
+  }
+
+  if (state.navGrid) {
+    tickVehicleOnNavGrid(state, vehicle, emitter);
+  } else {
+    tickVehicleDirectLine(state, vehicle);
+  }
+}
+
+/** Original pre-#407 stepper: one grid cell per tick in a straight line, ignoring terrain. */
+function tickVehicleDirectLine(state: GameState, vehicle: Vehicle): void {
   const deltaX = vehicle.targetX - vehicle.x;
   const deltaZ = vehicle.targetZ - vehicle.z;
-
-  if (deltaX === 0 && deltaZ === 0) return setVehicleIdle(vehicle);
 
   let nextX = vehicle.x;
   let nextZ = vehicle.z;
@@ -142,14 +180,8 @@ export function tickVehicle(state: GameState, vehicle: Vehicle): void {
     nextZ += Math.sign(deltaZ);
   }
 
-  const isOccupied = isCellOccupiedByOtherVehicle(state, vehicle, nextX, nextZ);
-  if (isOccupied) {
-    if (vehicle.state !== 'waiting') {
-      vehicle.state = 'waiting';
-      vehicle.waitingTicks = 1;
-    } else {
-      vehicle.waitingTicks = (vehicle.waitingTicks ?? 0) + 1;
-    }
+  if (isCellOccupiedByOtherVehicle(state, vehicle, nextX, nextZ)) {
+    markVehicleWaiting(vehicle);
     return;
   }
 
@@ -160,6 +192,96 @@ export function tickVehicle(state: GameState, vehicle: Vehicle): void {
 
   if (vehicle.x === vehicle.targetX && vehicle.z === vehicle.targetZ) {
     setVehicleIdle(vehicle);
+  }
+}
+
+/** NavGrid-aware stepper: routes via A*, respects move costs, tracks stuck state. */
+function tickVehicleOnNavGrid(state: GameState, vehicle: Vehicle, emitter?: EventEmitter): void {
+  const path = findPath(state.navGrid!, {
+    agentId: vehicle.id,
+    fromX: vehicle.x,
+    fromZ: vehicle.z,
+    toX: vehicle.targetX,
+    toZ: vehicle.targetZ,
+    avoidVehicles: false,
+  });
+
+  const stuckInput: AgentState = {
+    x: vehicle.x,
+    z: vehicle.z,
+    waypoints: [],
+    waypointIndex: 0,
+    walkSpeed: getVehicleDefByTier(vehicle.type, vehicle.tier).speed,
+    destinationX: vehicle.targetX,
+    destinationZ: vehicle.targetZ,
+    consecutiveFailures: vehicle.moveConsecutiveFailures,
+    isStuck: vehicle.isMoveStuck,
+  };
+
+  if (!path.found) {
+    const wasStuck = vehicle.isMoveStuck;
+    const next = recordStuckFailure(stuckInput);
+    vehicle.moveConsecutiveFailures = next.consecutiveFailures;
+    vehicle.isMoveStuck = next.isStuck;
+    if (vehicle.isMoveStuck && !wasStuck) {
+      emitter?.emit('vehicle:stuck', { vehicleId: vehicle.id });
+    }
+    markVehicleWaiting(vehicle);
+    return;
+  }
+
+  const reset = resetStuckState(stuckInput);
+  vehicle.moveConsecutiveFailures = reset.consecutiveFailures;
+  vehicle.isMoveStuck = reset.isStuck;
+
+  const nextStep = nextGridStep(vehicle, path.waypoints);
+  if (nextStep && isCellOccupiedByOtherVehicle(state, vehicle, nextStep.x, nextStep.z)) {
+    markVehicleWaiting(vehicle);
+    return;
+  }
+
+  const advance = advanceAgent({
+    x: vehicle.x,
+    z: vehicle.z,
+    waypoints: path.waypoints,
+    waypointIndex: 0,
+    walkSpeed: getVehicleDefByTier(vehicle.type, vehicle.tier).speed,
+    destinationX: vehicle.targetX,
+    destinationZ: vehicle.targetZ,
+    consecutiveFailures: vehicle.moveConsecutiveFailures,
+    isStuck: vehicle.isMoveStuck,
+  });
+
+  vehicle.x = advance.x;
+  vehicle.z = advance.z;
+  vehicle.state = 'moving';
+  vehicle.waitingTicks = 0;
+
+  if (advance.isPathComplete) {
+    vehicle.x = vehicle.targetX;
+    vehicle.z = vehicle.targetZ;
+    setVehicleIdle(vehicle);
+  }
+}
+
+/** The immediate next grid cell along a found path — the one occupancy is checked against. */
+function nextGridStep(
+  vehicle: Vehicle,
+  waypoints: Array<{ x: number; z: number }>,
+): { x: number; z: number } | null {
+  if (waypoints.length === 0) return null;
+  const first = waypoints[0]!;
+  const atFirst = Math.floor(vehicle.x) === first.x && Math.floor(vehicle.z) === first.z;
+  if (atFirst && waypoints.length > 1) return waypoints[1]!;
+  return first;
+}
+
+function markVehicleWaiting(vehicle: Vehicle): void {
+  if (vehicle.state !== 'waiting') {
+    vehicle.state = 'waiting';
+    vehicle.waitingTicks = 1;
+  } else {
+    vehicle.waitingTicks = (vehicle.waitingTicks ?? 0) + 1;
   }
 }
 
@@ -955,21 +1077,36 @@ export function tickEmployeeMovement(state: GameState, emitter?: EventEmitter): 
       waypoints = [{ x: emp.x, z: emp.z }, { x: emp.destinationX, z: emp.destinationZ }];
     }
 
+    const stuckInput: AgentState = {
+      x: emp.x,
+      z: emp.z,
+      waypoints: [],
+      waypointIndex: 0,
+      walkSpeed: AGENT_WALK_SPEED,
+      destinationX: emp.destinationX,
+      destinationZ: emp.destinationZ,
+      consecutiveFailures: emp.moveConsecutiveFailures,
+      isStuck: emp.isMoveStuck,
+    };
+
     if (!pathFound) {
-      emp.moveConsecutiveFailures += 1;
-      if (emp.moveConsecutiveFailures >= STUCK_THRESHOLD) {
-        if (!emp.moveStuck) {
-          emp.moveStuck = true;
+      const wasStuck = emp.isMoveStuck;
+      const next = recordStuckFailure(stuckInput);
+      emp.moveConsecutiveFailures = next.consecutiveFailures;
+      emp.isMoveStuck = next.isStuck;
+      if (emp.isMoveStuck) {
+        if (!wasStuck) {
           result.stuck.push(emp.id);
           emitter?.emit('agent:stuck', { employeeId: emp.id });
         }
-        emp.morale = Math.max(0, emp.morale - 2);
+        emp.morale = Math.max(0, emp.morale - STUCK_MORALE_PENALTY);
       }
       continue;
     }
 
-    emp.moveConsecutiveFailures = 0;
-    emp.moveStuck = false;
+    const reset = resetStuckState(stuckInput);
+    emp.moveConsecutiveFailures = reset.consecutiveFailures;
+    emp.isMoveStuck = reset.isStuck;
 
     const advance = advanceAgent({
       x: emp.x,
@@ -980,7 +1117,7 @@ export function tickEmployeeMovement(state: GameState, emitter?: EventEmitter): 
       destinationX: emp.destinationX,
       destinationZ: emp.destinationZ,
       consecutiveFailures: emp.moveConsecutiveFailures,
-      isStuck: emp.moveStuck,
+      isStuck: emp.isMoveStuck,
     });
 
     emp.x = advance.x;
