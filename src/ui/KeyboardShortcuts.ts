@@ -13,6 +13,8 @@ export interface ShortcutCallbacks {
   togglePanel: (name: PanelName) => void;
   quickSave: () => void;
   openSettings: () => void;
+  /** Toggle the NavGrid overlay on the MiniMap. */
+  onToggleNavGrid?: () => void;
 }
 
 export class KeyboardShortcuts {
@@ -40,6 +42,7 @@ export class KeyboardShortcuts {
         case 'KeyV': callbacks.togglePanel('vehicles'); break;
         case 'KeyE': callbacks.togglePanel('employees'); break;
         case 'KeyS': callbacks.togglePanel('survey'); break;
+        case 'KeyN': callbacks.onToggleNavGrid?.(); break;
         case 'F5':
           e.preventDefault();
           callbacks.quickSave();

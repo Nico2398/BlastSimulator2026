@@ -112,4 +112,24 @@ export function buildRamp(
   };
 }
 
-export { RAMP_COST_PER_METER, RAMP_WIDTH };
+// ── Local column surface resolution ──
+
+/**
+ * Resolve the local surface Y for column (x, z) — the highest voxel with
+ * density >= 0.5, matching NavGrid.computeSurfaceY's contract. Duplicated
+ * locally (not imported from '../nav/NavGrid.js') to avoid introducing a
+ * core/mining -> core/nav dependency edge; core/nav already depends on
+ * core/mining (DrillPlan, BlastExecution), so the reverse edge would cycle.
+ * Returns -1 if the column is entirely void.
+ *
+ * TODO: implement — buildRamp() will call this per-column so carved depth
+ * is relative to actual local terrain height instead of absolute world Y.
+ */
+function computeColumnSurfaceY(grid: VoxelGrid, x: number, z: number): number {
+  void grid;
+  void x;
+  void z;
+  throw new Error('not implemented');
+}
+
+export { RAMP_COST_PER_METER, RAMP_WIDTH, computeColumnSurfaceY };

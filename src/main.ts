@@ -369,6 +369,7 @@ new KeyboardShortcuts({
   togglePanel: (name) => uiManager.togglePanel(name),
   quickSave: () => { if (ctx.state) void saveLoadUI['autoSave'](ctx.state); },
   openSettings: () => uiManager.togglePanel('settings'),
+  onToggleNavGrid: () => uiManager.toggleNavGridOverlay(),
 });
 
 // --- Render loop + game tick timer ---

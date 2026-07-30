@@ -162,6 +162,15 @@ export class UIManager {
     this.syncToolbarActive();
   }
 
+  /**
+   * Toggle the NavGrid overlay on the MiniMap.
+   * TODO: implement — wire state.navGrid into this.miniMap via
+   * setNavGrid/setNavGridVisible.
+   */
+  toggleNavGridOverlay(): void {
+    // TODO: implement
+  }
+
   dispose(): void {
     this.hud.dispose();
     this.blastUI.dispose();
