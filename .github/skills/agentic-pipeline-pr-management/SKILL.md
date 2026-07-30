@@ -43,7 +43,7 @@ A run that defaulted an open requirement keeps `READY TO MERGE` and records the 
 
 ## Critical: NEVER use `[skip ci]` on PR branches
 
-`auto-assign-next.yml` (triggered on `pull_request: [synchronize]`) is the fast path into auto-merge. **Any commit with `[skip ci]` on a PR branch prevents that workflow from triggering**, so the PR waits for the quarter-hourly sweep in `agentic-auto-merge.yml` instead of merging when it is ready. `[skip ci]` also suppresses the CI run auto-merge is waiting on, which no sweep can substitute for.
+`auto-assign-next.yml` (triggered on `pull_request: [synchronize]`) re-arms auto-merge when the marker arrives after the PR did. **Any commit with `[skip ci]` on a PR branch prevents that workflow from triggering.** It also suppresses the CI run auto-merge is waiting on, which nothing downstream can substitute for: the PR then sits armed and unmergeable until a human intervenes.
 
 Rules:
 - **NEVER** include `[skip ci]` in any commit message on `pipeline/feature-*` branches

@@ -1,30 +1,21 @@
-name: "Pipeline: enable auto-merge on agent PRs"
+name: "Pipeline: enable auto-merge on an agent PR"
 
-# Auto-merge used to live only on `pull_request` in auto-assign-next.yml, which
-# made it depend on who opened the PR. A PR opened with `GITHUB_TOKEN` is
-# authored by `github-actions[bot]`, and every `pull_request` workflow run it
-# raises is created and then parked as `action_required` — CI never starts and
-# the auto-merge step never runs. PR #430 sat open that way with zero checks:
-# the pipeline had done everything right and nothing downstream was listening.
+# The manual handle on the mechanism the runners arm for themselves.
 #
-# None of the triggers below can be gated that way. `workflow_run` fires when a
-# runner finishes, whatever identity its PR ended up with; `schedule` runs from
-# the default branch on a clock and is the floor under the whole mechanism, the
-# same role agentic-watchdog.yml plays for the assignment queue. Authorship is
-# never consulted — `agentic-auto-merge` selects on the `READY TO MERGE` marker,
-# which only the pipeline writes.
+# Auto-merge is armed twice on the normal path, both times by an event: the
+# runner's own `Arm auto-merge on the PR this run opened` step, in the same job
+# that created the PR, and `auto-assign-next.yml` on `pull_request`. Neither
+# reaches a PR whose run was cancelled mid-flight, and the `pull_request` path
+# does not fire at all for a PR authored by `github-actions[bot]` — GitHub
+# parks those runs as `action_required` and never executes them.
+#
+# This workflow exists for that leftover, and for a PR left stranded by an older
+# run. It is deliberately dispatch-only: nothing here runs on a clock.
 on:
-  workflow_run:
-    workflows: ["Claude Pipeline", "OpenCode Pipeline"]
-    types: [completed]
-  schedule:
-    # Offset from the hour, and away from the watchdog's :17, so the sweeps do
-    # not collide.
-    - cron: '7,22,37,52 * * * *'
   workflow_dispatch:
     inputs:
       pr:
-        description: 'PR number to evaluate. Empty sweeps every open PR.'
+        description: 'PR number to arm. Empty evaluates every open PR.'
         required: false
         type: string
 
@@ -33,14 +24,8 @@ permissions:
   pull-requests: write
   actions: write
 
-concurrency:
-  # A scheduled sweep and a runner finishing can land together; two sweeps
-  # enabling auto-merge on the same PR is harmless but pointless.
-  group: agentic-auto-merge
-  cancel-in-progress: false
-
 jobs:
-  sweep:
+  arm:
     if: vars.AGENTIC_AUTO_MERGE_ENABLED == 'true'
     runs-on: ubuntu-latest
     steps:
@@ -49,10 +34,9 @@ jobs:
         with:
           fetch-depth: 1
 
-      # The PAT, not GITHUB_TOKEN: releasing a gated workflow run needs
-      # `actions: write` that a job token does not carry across the bot
-      # boundary, and a merge performed by the PAT raises the `pull_request:
-      # closed` event that auto-assign-next.yml chains the next issue from.
+      # The PAT, not GITHUB_TOKEN: releasing a parked workflow run needs
+      # `actions: write`, and a merge performed by the PAT raises the
+      # `pull_request: closed` event that auto-assign-next.yml chains from.
       - name: Enable auto-merge on marked PRs
         id: merge
         uses: ./.github/actions/agentic-auto-merge
@@ -67,4 +51,4 @@ jobs:
           else
             echo "No open PR carried READY TO MERGE in a mergeable state."
           fi
-          echo "Released ${{ steps.merge.outputs.approved }} gated workflow run(s)."
+          echo "Released ${{ steps.merge.outputs.approved }} parked workflow run(s)."

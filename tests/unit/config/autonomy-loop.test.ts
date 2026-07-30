@@ -126,52 +126,63 @@ describe('dependency gating', () => {
 // and then sat open with zero checks. Its author was `github-actions[bot]`, and
 // every `pull_request` workflow run a bot-authored PR raises is created and
 // immediately parked as `action_required`: CI never started and the auto-merge
-// step never ran. Auto-merge therefore has to be reachable on triggers no
-// account can gate, and has to decide on something other than who authored the
-// PR.
+// step never ran. So the run that opens the PR arms auto-merge itself, in the
+// same job, on the branch it was told to build — the one moment that exists
+// whoever the PR ends up attributed to.
 describe('auto-merge does not depend on the PR author', () => {
   const AUTO_MERGE_ACTION = 'uses: ./.github/actions/agentic-auto-merge';
 
   /** Every workflow that can put a PR into auto-merge. */
-  const MERGING_WORKFLOWS = ['auto-assign-next.yml', 'agentic-auto-merge.yml'];
+  const MERGING_WORKFLOWS = [
+    'claude-runner.yml',
+    'opencode-runner.yml',
+    'auto-assign-next.yml',
+    'agentic-auto-merge.yml',
+  ];
 
-  it.each(MERGING_WORKFLOWS)('%s enables auto-merge through the shared action', (name) => {
+  it.each(MERGING_WORKFLOWS)('%s arms auto-merge through the shared action', (name) => {
     expect(workflow(name)).toContain(AUTO_MERGE_ACTION);
-  });
-
-  // A `pull_request` trigger is the one thing the bot-authored PR cannot reach,
-  // so the sweep must not be built on it. Losing these triggers reproduces #430
-  // exactly: the mechanism is present, correct, and never invoked.
-  it('sweeps on triggers a bot-authored PR cannot gate', () => {
-    const sweep = workflow('agentic-auto-merge.yml');
-    const triggers = sweep.slice(sweep.indexOf('\non:'), sweep.indexOf('\npermissions:'));
-
-    expect(triggers).toContain('schedule:');
-    expect(triggers).toContain('workflow_run:');
-    expect(triggers).toContain('workflow_dispatch:');
-    expect(triggers).not.toContain('pull_request:');
-  });
-
-  // `workflow_run` names workflows by their `name:`, not their filename, so a
-  // renamed runner silently detaches the sweep from the run that produced the PR.
-  it.each([
-    ['claude-runner.yml'],
-    ['opencode-runner.yml'],
-  ])('watches %s by the name that workflow actually declares', (runner) => {
-    const declared = /^name:\s*(.+)$/m.exec(workflow(runner))?.[1].trim();
-    expect(declared).toBeTruthy();
-    expect(workflow('agentic-auto-merge.yml')).toContain(`"${declared}"`);
   });
 
   // Releasing a parked run needs `actions: write`, and the merge itself has to
   // raise a `pull_request: closed` event that the chain step reacts to — a merge
   // performed with GITHUB_TOKEN raises none, so the queue stops at the merge.
-  it.each(MERGING_WORKFLOWS)('%s drives auto-merge with the PAT', (name) => {
+  it.each(MERGING_WORKFLOWS)('%s arms auto-merge with the PAT', (name) => {
     const text = workflow(name);
     const block = text.slice(text.indexOf(AUTO_MERGE_ACTION));
     const token = /token:\s*\$\{\{\s*secrets\.(\w+)\s*\}\}/.exec(block);
     expect(token?.[1]).toBe('PAT_TOKEN_COPILOT_AUTOMATION');
-    expect(text).toMatch(/permissions:[\s\S]*?actions: write/);
+  });
+
+  // The whole point of arming inside the runner: it is reached by the run that
+  // created the PR, not by an event the PR's author can suppress. Without
+  // `always()` an agent step that crashed after opening its PR leaves it unarmed.
+  it.each(['claude-runner.yml', 'opencode-runner.yml'])(
+    '%s arms the branch it was told to build, even when the agent step failed',
+    (name) => {
+      const text = workflow(name);
+      const step = text.slice(text.indexOf('- name: Arm auto-merge'), text.indexOf(ASSIGN_ACTION, text.indexOf('- name: Arm auto-merge')));
+      expect(step).toContain(AUTO_MERGE_ACTION);
+      expect(step).toContain('head: pipeline/feature-${{ steps.context.outputs.issue }}');
+      expect(step).toMatch(/if:\s*always\(\)/);
+    }
+  );
+
+  // No clock anywhere in the path. Auto-merge is armed by the run that opens the
+  // PR and re-armed by `pull_request`; a PR that reaches neither is a manual
+  // dispatch, not a polled one.
+  it.each(MERGING_WORKFLOWS)('%s arms auto-merge on an event, never on a schedule', (name) => {
+    const text = workflow(name);
+    const triggers = text.slice(text.indexOf('\non:'), text.indexOf('\npermissions:'));
+    expect(triggers).not.toContain('schedule:');
+    expect(triggers).not.toContain('cron:');
+  });
+
+  it('keeps the standalone auto-merge workflow manual-only', () => {
+    const sweep = workflow('agentic-auto-merge.yml');
+    const triggers = sweep.slice(sweep.indexOf('\non:'), sweep.indexOf('\npermissions:'));
+    expect(triggers).toContain('workflow_dispatch:');
+    expect(triggers.replace('workflow_dispatch:', '')).not.toMatch(/^\s{2}\w+.*:$/m);
   });
 
   // The author may appear in a log line or a comment — it is worth reporting.

@@ -115,15 +115,16 @@ The orchestrator includes `READY TO MERGE` in the PR body when PR status is `rea
 
 **The marker decides, never the account.** A pipeline PR is opened by whichever identity the runner's token resolved to — `github-actions[bot]` when the agent step overrides the PAT it was handed, a real user when it does not — and a PR authored by `github-actions[bot]` raises `pull_request` workflow runs that GitHub creates and immediately parks as `action_required`. Nothing runs: not CI, not the auto-merge step. PR #430 sat open that way, fully verified and marked, with zero checks and no auto-merge, holding its issue and the queue behind it.
 
-So auto-merge has two entry points, and only one of them can be gated:
+The fix is not a poller. It is that **the run which opens the PR arms it, in the same job**:
 
 | Entry | Fires on | Covers |
 |-------|----------|--------|
-| `auto-assign-next.yml` | `pull_request: opened, synchronize, reopened, edited, ready_for_review` | The fast path — enables auto-merge the moment the marker arrives, when the author's events are not gated |
-| `agentic-auto-merge.yml` | `workflow_run` on either runner, a quarter-hourly schedule, manual dispatch | The guarantee — none of these triggers can be gated by who opened the PR |
+| Both runners, `Arm auto-merge on the PR this run opened` | The run itself, after the agent step and after `agentic-rescue`, with `always()` | Every PR the pipeline opens, whatever account it ends up attributed to. The step reads the marker off `pipeline/feature-<N>` — the branch the assignment told the run to build |
+| `auto-assign-next.yml` | `pull_request: opened, synchronize, reopened, edited, ready_for_review` | The marker arriving after the PR did — a body edited, a draft marked ready. Only reached when the author's events are not gated |
+| `agentic-auto-merge.yml` | manual dispatch | A PR stranded by an older run, or by a job cancelled before its arming step. Deliberately not on a clock |
 
-Both call the same composite action, so they cannot disagree about what "ready to merge" means. Selection is the marker on a line of its own plus a non-draft PR; the author is logged and never branched on. Releasing a parked run needs `actions: write` on the PAT — without it the sweep still enables auto-merge, warns, and the PR waits on checks that never start.
+All three call the same composite action, so they cannot disagree about what "ready to merge" means. Selection is the marker on a line of its own plus a non-draft PR; the author is logged and never branched on. The action also releases any workflow run parked as `action_required` on the PR head, which is what makes CI start at all on a bot-authored PR — that needs `actions: write` on the PAT, and without it the step still enables auto-merge, warns naming the missing scope, and the PR waits on checks that never start.
 
 ## Shared composite actions
 
-They live in `.github/actions/`: `agentic-prompt` builds the trigger context both runners hand to their agent, `agentic-assign` picks and assigns the next issue, `agentic-run-state` reports whether a finished session left its issue terminal and whether the remaining job budget can carry another attempt, `agentic-rescue` salvages a feature branch from a run that ended before opening its PR and settles the issue either way, and `agentic-auto-merge` puts a marked PR into auto-merge whatever account opened it.
+They live in `.github/actions/`: `agentic-prompt` builds the trigger context both runners hand to their agent, `agentic-assign` picks and assigns the next issue, `agentic-run-state` reports whether a finished session left its issue terminal and whether the remaining job budget can carry another attempt, `agentic-rescue` salvages a feature branch from a run that ended before opening its PR and settles the issue either way, and `agentic-auto-merge` puts a marked PR into auto-merge whatever account opened it, releasing any workflow run parked as `action_required` on the way.

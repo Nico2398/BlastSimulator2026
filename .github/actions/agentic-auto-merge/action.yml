@@ -6,7 +6,11 @@ inputs:
     description: 'PAT with contents, pull-requests and actions write. GITHUB_TOKEN cannot approve gated runs.'
     required: true
   pr:
-    description: 'Restrict to a single PR number. Empty sweeps every open PR.'
+    description: 'Restrict to a single PR number. Empty means use `head`, or every open PR.'
+    required: false
+    default: ''
+  head:
+    description: 'Restrict to the open PR opened from this head branch, e.g. pipeline/feature-404.'
     required: false
     default: ''
   merge_method:
@@ -30,6 +34,7 @@ runs:
       uses: actions/github-script@v7
       env:
         ONLY_PR: ${{ inputs.pr }}
+        ONLY_HEAD: ${{ inputs.head }}
         MERGE_METHOD: ${{ inputs.merge_method }}
       with:
         github-token: ${{ inputs.token }}
@@ -56,12 +61,25 @@ runs:
 
           const method = (process.env.MERGE_METHOD || 'squash').toUpperCase();
           const only = parseInt(process.env.ONLY_PR || '', 10);
+          const head = (process.env.ONLY_HEAD || '').trim();
 
-          const candidates = Number.isNaN(only)
-            ? await github.paginate(github.rest.pulls.list, {
-                owner, repo, state: 'open', per_page: 100
-              })
-            : [(await github.rest.pulls.get({ owner, repo, pull_number: only })).data];
+          // By number when a `pull_request` event named one, by head branch when
+          // a runner is arming the PR it just opened, everything open otherwise.
+          let candidates;
+          if (!Number.isNaN(only)) {
+            candidates = [(await github.rest.pulls.get({ owner, repo, pull_number: only })).data];
+          } else if (head) {
+            candidates = await github.paginate(github.rest.pulls.list, {
+              owner, repo, state: 'open', head: `${owner}:${head}`, per_page: 100
+            });
+            if (candidates.length === 0) {
+              core.info(`No open PR from ${head}. The run produced none, or it is not open yet.`);
+            }
+          } else {
+            candidates = await github.paginate(github.rest.pulls.list, {
+              owner, repo, state: 'open', per_page: 100
+            });
+          }
 
           const enabled = [];
           let approved = 0;
