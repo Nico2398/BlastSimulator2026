@@ -191,6 +191,9 @@ export class EmployeePanel {
       // an employee's detail is open, same as the meta line and need bars above.
       const detail = row.querySelector<HTMLElement>('.bs-employee-detail');
       if (detail) {
+        const skillEl = detail.querySelector<HTMLElement>('.bs-skill-section');
+        if (skillEl) skillEl.replaceWith(makeSkillSection(e));
+
         const taskQueueEl = detail.querySelector<HTMLElement>('.bs-task-queue');
         if (taskQueueEl) taskQueueEl.replaceWith(makeTaskQueue(e, state));
 
