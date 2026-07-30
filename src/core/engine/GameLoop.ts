@@ -11,7 +11,8 @@ import { tickEventSystem, type FiredEvent } from '../events/EventSystem.js';
 import { detectTrafficJam } from '../events/EventEngine.js';
 import { checkCollapse, gainXp, type NeedKey, type Employee, type SkillCategory } from '../entities/Employee.js';
 import { computeTaskDuration } from '../entities/EmployeeTaskDuration.js';
-import { replenishNeed } from '../entities/EmployeeNeeds.js';
+import { replenishNeed, getNeedMultiplier } from '../entities/EmployeeNeeds.js';
+import { getLivingQuartersWellbeingMultiplier } from '../entities/BuildingWellbeing.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { addExpense } from '../economy/Finance.js';
 
@@ -248,7 +249,9 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
     if (action.type !== 'rest' && action.requiredSkill !== null) {
       const qual = idleMatch.qualifications.find(q => q.category === action.requiredSkill);
       const level = qual?.proficiencyLevel ?? 1;
-      idleMatch.taskTicksRemaining = computeTaskDuration(BASE_TASK_DURATION_TICKS, level, 1, 1, 1);
+      const needMult = getNeedMultiplier(idleMatch);
+      const lqMult = getLivingQuartersWellbeingMultiplier(state.buildings, state.employees.employees.length);
+      idleMatch.taskTicksRemaining = computeTaskDuration(BASE_TASK_DURATION_TICKS, level, needMult, lqMult, 1);
       idleMatch.activeTaskSkill = action.requiredSkill;
     }
   }
