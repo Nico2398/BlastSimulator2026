@@ -17,6 +17,7 @@ describe('KeyboardShortcuts (12.7)', () => {
     togglePanel: ReturnType<typeof vi.fn>;
     quickSave: ReturnType<typeof vi.fn>;
     openSettings: ReturnType<typeof vi.fn>;
+    onToggleNavGrid: ReturnType<typeof vi.fn>;
   };
   let ks: KeyboardShortcuts;
 
@@ -27,6 +28,7 @@ describe('KeyboardShortcuts (12.7)', () => {
       togglePanel: vi.fn(),
       quickSave: vi.fn(),
       openSettings: vi.fn(),
+      onToggleNavGrid: vi.fn(),
     };
     ks = new KeyboardShortcuts(callbacks);
   });
@@ -71,6 +73,25 @@ describe('KeyboardShortcuts (12.7)', () => {
     fireKey('KeyC');
     expect(callbacks.togglePanel).toHaveBeenCalledWith('contracts');
     ks.dispose();
+  });
+
+  it('KeyN triggers onToggleNavGrid', () => {
+    fireKey('KeyN');
+    expect(callbacks.onToggleNavGrid).toHaveBeenCalledOnce();
+    ks.dispose();
+  });
+
+  it('KeyN is a no-op when onToggleNavGrid is not provided', () => {
+    const partialCallbacks = {
+      togglePause: vi.fn(),
+      setSpeed: vi.fn(),
+      togglePanel: vi.fn(),
+      quickSave: vi.fn(),
+      openSettings: vi.fn(),
+    };
+    const partialKs = new KeyboardShortcuts(partialCallbacks);
+    expect(() => fireKey('KeyN')).not.toThrow();
+    partialKs.dispose();
   });
 
   it('Escape opens settings', () => {

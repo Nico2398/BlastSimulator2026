@@ -9,6 +9,39 @@ function fillGrid(grid: VoxelGrid) {
         grid.setVoxel(x, y, z, { composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] }, density: 1.0, oreDensities: {}, fractureModifier: 1.0 });
 }
 
+/**
+ * Scan a column top-down for the highest voxel with density >= 0.5 — same rule as
+ * NavGrid.computeSurfaceY, kept independent here so the assertion below tests
+ * observable behaviour (does the physical terrain change?) rather than reaching
+ * into Ramp.ts's own (not-yet-implemented) computeColumnSurfaceY helper.
+ */
+function localSurfaceY(grid: VoxelGrid, x: number, z: number): number {
+  for (let y = grid.sizeY - 1; y >= 0; y--) {
+    const voxel = grid.getVoxel(x, y, z);
+    if (voxel && voxel.density >= 0.5) return y;
+  }
+  return -1;
+}
+
+/**
+ * Realistic (non-flat-from-0) terrain: solid rock from y=0 up to a surface well
+ * above the ramp's carved depth range, mirroring real game terrain (surface ~y=23)
+ * rather than the thin fillGrid() helper above, which happens to hide the
+ * absolute-vs-relative-depth bug because its surface sits right where the ramp
+ * carves anyway.
+ */
+function makeElevatedGrid(sizeX: number, sizeY: number, sizeZ: number, surfaceY: number): VoxelGrid {
+  const grid = new VoxelGrid(sizeX, sizeY, sizeZ);
+  for (let z = 0; z < sizeZ; z++) {
+    for (let x = 0; x < sizeX; x++) {
+      for (let y = 0; y <= surfaceY; y++) {
+        grid.setVoxel(x, y, z, { composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] }, density: 1.0, oreDensities: {}, fractureModifier: 1.0 });
+      }
+    }
+  }
+  return grid;
+}
+
 describe('Ramp building', () => {
   it('buildRamp modifies voxel grid to create a sloped passage', () => {
     const grid = new VoxelGrid(20, 15, 20);
@@ -65,5 +98,52 @@ describe('Ramp building', () => {
 
     expect(result.success).toBe(false);
     expect(result.cost).toBe(0);
+  });
+
+  it('lowers the local surface height along the path on realistic (elevated) terrain', () => {
+    // Surface at y=22 — not flat-from-0 — matching a real game map's terrain height,
+    // where the buggy absolute-Y carving lands deep underground and never touches
+    // the topmost solid voxel, so the column's surface never visibly drops.
+    const grid = makeElevatedGrid(20, 30, 30, 22);
+
+    const originSurfaceBefore = localSurfaceY(grid, 10, 10);
+    expect(originSurfaceBefore).toBe(22);
+
+    const length = 15;
+    const targetDepth = 8;
+    const result = buildRamp(grid, {
+      originX: 10, originZ: 10, direction: 'south', length, targetDepth,
+    }, 50000);
+
+    expect(result.success).toBe(true);
+
+    // Origin column (start of ramp, step 0) — should be measurably lower than
+    // the untouched surface once the ramp is actually an open cut, not buried rock.
+    const originSurfaceAfter = localSurfaceY(grid, 10, 10);
+    const originDrop = originSurfaceBefore - originSurfaceAfter;
+    expect(originDrop).toBeGreaterThan(0);
+    expect(originDrop).toBeLessThanOrEqual(targetDepth);
+
+    // End column (last carved step, z = originZ + length - 1) — should have
+    // dropped substantially further than the origin, consistent with targetDepth.
+    const endZ = 10 + length - 1;
+    const endSurfaceAfter = localSurfaceY(grid, 10, endZ);
+    const endDrop = originSurfaceBefore - endSurfaceAfter;
+    expect(endDrop).toBeGreaterThan(originDrop);
+    expect(endDrop).toBeGreaterThanOrEqual(targetDepth - 3);
+    expect(endDrop).toBeLessThanOrEqual(targetDepth + 1);
+  });
+
+  it('does not affect surface height of columns far outside the ramp path', () => {
+    const grid = makeElevatedGrid(20, 30, 30, 22);
+    const farSurfaceBefore = localSurfaceY(grid, 2, 2);
+
+    const result = buildRamp(grid, {
+      originX: 10, originZ: 10, direction: 'south', length: 10, targetDepth: 8,
+    }, 50000);
+
+    expect(result.success).toBe(true);
+    const farSurfaceAfter = localSurfaceY(grid, 2, 2);
+    expect(farSurfaceAfter).toBe(farSurfaceBefore);
   });
 });

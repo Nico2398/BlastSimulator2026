@@ -73,6 +73,26 @@
           "command": "tick 15"
         }
       ]
+    },
+    {
+      "command": "build destroy 1",
+      "description": "Demolish the blocking management_office — the previously stuck agent should be able to resume movement once the footprint clears.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build destroy 1"
+        }
+      ]
+    },
+    {
+      "command": "tick 15",
+      "description": "Advance ticks after demolition — the stuck agent should resume moving toward its destination.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 15"
+        }
+      ]
     }
   ],
   "shots": [

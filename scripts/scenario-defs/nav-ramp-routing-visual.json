@@ -12,11 +12,60 @@
       ]
     },
     {
+      "command": "vehicle buy debris_hauler",
+      "description": "Purchase a vehicle before the ramp exists — its route request below must fail (found:false) since the lower bench is not yet connected.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle buy debris_hauler"
+        }
+      ]
+    },
+    {
+      "command": "vehicle move 1 to:8,20",
+      "description": "Request a route to the not-yet-connected lower bench — expect the vehicle to remain stuck (no ramp connects the levels yet).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle move 1 to:8,20"
+        }
+      ]
+    },
+    {
+      "command": "tick 5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 5"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "description": "Pre-ramp state dump — vehicle should not have reached (8,20); routing found:false.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
       "command": "build_ramp origin:5,15 direction:south length:10 depth:8",
       "interaction": [
         {
           "type": "command",
           "command": "build_ramp origin:5,15 direction:south length:10 depth:8"
+        }
+      ]
+    },
+    {
+      "command": "vehicle move 1 to:8,20",
+      "description": "Re-request the same route now that the ramp connects the two levels — expect routing found:true this time.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle move 1 to:8,20"
         }
       ]
     },
