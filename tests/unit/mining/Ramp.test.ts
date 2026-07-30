@@ -13,7 +13,7 @@ function fillGrid(grid: VoxelGrid) {
  * Scan a column top-down for the highest voxel with density >= 0.5 — same rule as
  * NavGrid.computeSurfaceY, kept independent here so the assertion below tests
  * observable behaviour (does the physical terrain change?) rather than reaching
- * into Ramp.ts's own (not-yet-implemented) computeColumnSurfaceY helper.
+ * into Ramp.ts's own computeColumnSurfaceY helper.
  */
 function localSurfaceY(grid: VoxelGrid, x: number, z: number): number {
   for (let y = grid.sizeY - 1; y >= 0; y--) {

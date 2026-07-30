@@ -21,12 +21,12 @@ export interface NavCell {
   /**
    * Reserved for a future per-cell vehicle-occupancy pass (checked by
    * Pathfinding.findPath/AgentMovement.isPathBlocked when a caller requests
-   * avoidVehicles). No caller in src/ ever sets this true — GameLoop's
+   * avoidVehicles). No caller in src/ ever sets this true — EntityMovementTick's
    * tickVehicle/tickEmployeeMovement both request avoidVehicles:false and
    * instead do vehicle-vs-vehicle collision avoidance by comparing live x/z
-   * directly (see isCellOccupiedByOtherVehicle in GameLoop.ts) — so this
-   * field is always false today and the avoidVehicles checks against it are
-   * a no-op.
+   * directly (see isCellOccupiedByOtherVehicle in EntityMovementTick.ts) — so
+   * this field is always false today and the avoidVehicles checks against it
+   * are a no-op.
    */
   vehicleOccupied: boolean;
 }

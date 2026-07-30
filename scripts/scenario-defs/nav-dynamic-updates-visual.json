@@ -67,7 +67,7 @@
     },
     {
       "command": "vehicle buy debris_hauler",
-      "description": "Purchase a vehicle and send it across the grid — its parking/departure should trigger a single-cell NavGrid vehicleOccupied update per tick.",
+      "description": "Purchase a vehicle and send it across the grid — its position should advance tick by tick via the NavGrid-aware pathfinding stepper.",
       "interaction": [
         {
           "type": "command",
@@ -95,7 +95,7 @@
     },
     {
       "command": "state full",
-      "description": "Final state dump — vehicle parked/departed cell(s) should show the single-cell NavGrid occupancy update.",
+      "description": "Final state dump — vehicle should have advanced toward its destination along the NavGrid path.",
       "interaction": [
         {
           "type": "command",

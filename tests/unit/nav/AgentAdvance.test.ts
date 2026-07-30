@@ -1,5 +1,5 @@
 // BlastSimulator2026 — Unit tests: advanceAlongPath (shared find-path/stuck/advance skeleton)
-// Extracted from GameLoop.ts's tickVehicleOnNavGrid and tickEmployeeMovement, which
+// Extracted from EntityMovementTick.ts's tickVehicleOnNavGrid and tickEmployeeMovement, which
 // duplicated this sequence end to end (#407 review round 2).
 
 import { describe, it, expect } from 'vitest';

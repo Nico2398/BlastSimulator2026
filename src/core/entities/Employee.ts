@@ -124,7 +124,7 @@ export interface Employee {
    * Grid position the employee is currently walking toward (set from a claimed
    * PendingAction's targetX/targetZ, or a self-claimed rest action's building
    * location), or null when the employee has nowhere to walk. Consumed by
-   * tickEmployeeMovement in GameLoop.ts — cleared on arrival.
+   * tickEmployeeMovement in EntityMovementTick.ts — cleared on arrival.
    */
   destinationX: number | null;
   destinationZ: number | null;

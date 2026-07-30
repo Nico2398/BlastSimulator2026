@@ -1,8 +1,8 @@
 // BlastSimulator2026 — AgentAdvance: shared find-path/stuck-tracking/advance skeleton
-// Factored out of GameLoop.ts's tickVehicleOnNavGrid and tickEmployeeMovement (#407
-// review round 2), which ran the identical stuck-detection + per-tick-advance sequence
-// end to end, differing only in field names and caller-specific bookkeeping (vehicle
-// occupancy pre-check, employee morale penalty).
+// Factored out of EntityMovementTick.ts's tickVehicleOnNavGrid and tickEmployeeMovement
+// (#407 review round 2), which ran the identical stuck-detection + per-tick-advance
+// sequence end to end, differing only in field names and caller-specific bookkeeping
+// (vehicle occupancy pre-check, employee morale penalty).
 
 import { advanceAgent, recordStuckFailure, resetStuckState, type AgentState } from './AgentMovement.js';
 
