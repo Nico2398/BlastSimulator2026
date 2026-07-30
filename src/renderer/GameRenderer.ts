@@ -281,19 +281,34 @@ export class GameRenderer {
    * Surface Y to anchor blast effects (dust cloud, detonation flash) at.
    * The blast centroid's own column is very likely fully cleared by the blast
    * that just happened (density 0 all the way down), so sampling it directly
-   * usually returns 0 — burying the effect underground. Sampling a small ring
+   * usually returns 0 — burying the effect underground. Sampling a ring
    * around the centre and taking the highest surface found lands on the
    * surrounding, still-standing ground level instead.
+   *
+   * A fixed 3m ring only clears a small blast's own crater. A large,
+   * tightly-spaced, multi-hole blast clears a crater far wider than that —
+   * the whole ring can land inside it and still read back y=0. `minRadius`
+   * should be sized to the blast's own footprint (e.g. half its bounding-box
+   * diagonal) so the first ring already sits outside the crater; if it
+   * doesn't (irregular crater edges, sloped walls), the search keeps
+   * widening in `minRadius` steps up to the grid extent.
    */
-  private getBlastOriginSurfaceY(cx: number, cz: number): number {
-    const offsets: readonly [number, number][] = [
-      [0, 0], [3, 0], [-3, 0], [0, 3], [0, -3], [3, 3], [-3, -3], [3, -3], [-3, 3],
-    ];
-    let maxY = 0;
-    for (const [dx, dz] of offsets) {
-      maxY = Math.max(maxY, this.getTerrainSurfaceY(cx + dx, cz + dz));
+  private getBlastOriginSurfaceY(cx: number, cz: number, minRadius = 3): number {
+    const step = Math.max(1, minRadius);
+    const maxRadius = this.lastGrid
+      ? Math.max(this.lastGrid.sizeX, this.lastGrid.sizeZ)
+      : step;
+    for (let r = step; r <= maxRadius; r += step) {
+      const offsets: readonly [number, number][] = [
+        [r, 0], [-r, 0], [0, r], [0, -r], [r, r], [-r, -r], [r, -r], [-r, r],
+      ];
+      let maxY = 0;
+      for (const [dx, dz] of offsets) {
+        maxY = Math.max(maxY, this.getTerrainSurfaceY(cx + dx, cz + dz));
+      }
+      if (maxY > 0) return maxY;
     }
-    return maxY;
+    return this.getTerrainSurfaceY(cx, cz);
   }
 
   /**
@@ -329,15 +344,26 @@ export class GameRenderer {
     // Compute blast origin from fragment centroid or grid centre
     let ox = this.lastGrid.sizeX / 2;
     let oz = this.lastGrid.sizeZ / 2;
+    // Size the surface-sample ring to the blast's own footprint (half its
+    // bounding-box diagonal + margin), so a large multi-hole blast's crater
+    // doesn't swallow the whole sampling ring.
+    let sampleRadius = 3;
     if (ctx.lastBlastFragments && ctx.lastBlastFragments.length > 0) {
       ox = ctx.lastBlastFragments.reduce((s, p) => s + p.x, 0) / ctx.lastBlastFragments.length;
       oz = ctx.lastBlastFragments.reduce((s, p) => s + p.z, 0) / ctx.lastBlastFragments.length;
+      let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+      for (const p of ctx.lastBlastFragments) {
+        minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+        minZ = Math.min(minZ, p.z); maxZ = Math.max(maxZ, p.z);
+      }
+      const halfDiagonal = Math.hypot(maxX - minX, maxZ - minZ) / 2;
+      sampleRadius = Math.max(3, halfDiagonal + 3);
     }
     // Anchor at the surrounding terrain surface, not y=0. A mine site rarely
     // sits at grid y=0 — it's typically well above it — so a hardcoded 0 here
     // buried the dust cloud and detonation flash inside solid terrain, fully
     // occluded and never visible on screen.
-    const origin = new THREE.Vector3(ox, this.getBlastOriginSurfaceY(ox, oz), oz);
+    const origin = new THREE.Vector3(ox, this.getBlastOriginSurfaceY(ox, oz, sampleRadius), oz);
 
     // Build per-hole detonation list from sequence delays
     const holes: import('./BlastEffects.js').HoleDetonation[] = [];
