@@ -120,6 +120,18 @@ export interface Employee {
    * state, and the key decides which completion path owns the employee.
    */
   restNeedKey: NeedKey | null;
+  /**
+   * Grid position the employee is currently walking toward (set from a claimed
+   * PendingAction's targetX/targetZ, or a self-claimed rest action's building
+   * location), or null when the employee has nowhere to walk. Consumed by
+   * tickEmployeeMovement in EntityMovementTick.ts — cleared on arrival.
+   */
+  destinationX: number | null;
+  destinationZ: number | null;
+  /** Consecutive ticks tickEmployeeMovement failed to find a path to destinationX/Z. */
+  moveConsecutiveFailures: number;
+  /** True once moveConsecutiveFailures reaches STUCK_THRESHOLD — idle, morale −2/tick until the path clears. */
+  isMoveStuck: boolean;
 }
 
 // ── Employee state ──
@@ -179,6 +191,10 @@ export function hireEmployee(
     restNeedKey: null,
     taskTicksRemaining: null,
     activeTaskSkill: null,
+    destinationX: null,
+    destinationZ: null,
+    moveConsecutiveFailures: 0,
+    isMoveStuck: false,
   };
   // Keep the stored salary consistent with the qualification just granted —
   // calculateSalary() sums qualification bonuses, so a base-only salary would

@@ -3,7 +3,7 @@
 // Each ramp clears a diagonal column of voxels from surface to target depth.
 
 import { formatMoney } from '../economy/formatMoney.js';
-import type { VoxelGrid } from '../world/VoxelGrid.js';
+import { computeVoxelColumnSurfaceY, type VoxelGrid } from '../world/VoxelGrid.js';
 
 // ── Config ──
 
@@ -80,7 +80,7 @@ export function buildRamp(
   const halfWidth = Math.floor(RAMP_WIDTH / 2);
 
   for (let step = 0; step < ramp.length; step++) {
-    // Current Y level: descends linearly from 0 to targetDepth
+    // Depth of descent at this step: grows linearly from 0 to targetDepth
     const currentDepth = Math.floor((step / ramp.length) * ramp.targetDepth);
     // Height clearance for vehicles: 3 voxels
     const clearanceHeight = 3;
@@ -88,11 +88,18 @@ export function buildRamp(
     const cx = ramp.originX + offset.dx * step;
     const cz = ramp.originZ + offset.dz * step;
 
+    // Carve relative to this column's live surface height, not an absolute
+    // world Y — real terrain sits far above y=0, so an absolute band would
+    // land buried under solid rock and never change the surface.
+    const surfaceY = computeColumnSurfaceY(grid, cx, cz);
+    const floorY = surfaceY - currentDepth;
+    const ceilingY = surfaceY + clearanceHeight;
+
     for (let w = -halfWidth; w <= halfWidth; w++) {
       const wx = cx + perpDx * w;
       const wz = cz + perpDz * w;
 
-      for (let y = currentDepth; y < currentDepth + clearanceHeight; y++) {
+      for (let y = floorY; y < ceilingY; y++) {
         if (grid.isInBounds(wx, y, wz)) {
           const voxel = grid.getVoxel(wx, y, wz);
           if (voxel && voxel.density > 0) {
@@ -112,4 +119,18 @@ export function buildRamp(
   };
 }
 
-export { RAMP_COST_PER_METER, RAMP_WIDTH };
+// ── Local column surface resolution ──
+
+/**
+ * Resolve the local surface Y for column (x, z) — the highest voxel with
+ * density >= 0.5, matching NavGrid.computeSurfaceY's contract. Both delegate
+ * to VoxelGrid.computeVoxelColumnSurfaceY (a leaf-module free function) so
+ * core/mining doesn't need to import from core/nav (core/nav already depends
+ * on core/mining — DrillPlan, BlastExecution — so the reverse edge would
+ * cycle). Returns -1 if the column is entirely void.
+ */
+function computeColumnSurfaceY(grid: VoxelGrid, x: number, z: number): number {
+  return computeVoxelColumnSurfaceY(grid, x, z);
+}
+
+export { RAMP_COST_PER_METER, RAMP_WIDTH, computeColumnSurfaceY };

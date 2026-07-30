@@ -21,11 +21,11 @@
       ]
     },
     {
-      "command": "charge hole:H1 explosive:boomite amount:500kg stemming:2m",
+      "command": "charge hole:H1 explosive:boomite amount:8kg stemming:2m",
       "interaction": [
         {
           "type": "command",
-          "command": "charge hole:H1 explosive:boomite amount:500kg stemming:2m"
+          "command": "charge hole:H1 explosive:boomite amount:8kg stemming:2m"
         }
       ]
     },
@@ -58,6 +58,44 @@
     },
     {
       "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "vehicle buy debris_hauler",
+      "description": "Purchase a vehicle and send it across the grid — its position should advance tick by tick via the NavGrid-aware pathfinding stepper.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle buy debris_hauler"
+        }
+      ]
+    },
+    {
+      "command": "vehicle move 1 to:15,15",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle move 1 to:15,15"
+        }
+      ]
+    },
+    {
+      "command": "tick 5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 5"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "description": "Final state dump — vehicle should have advanced toward its destination along the NavGrid path.",
       "interaction": [
         {
           "type": "command",

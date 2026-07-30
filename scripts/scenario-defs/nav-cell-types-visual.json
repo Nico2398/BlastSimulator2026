@@ -1,6 +1,6 @@
 {
   "name": "nav-cell-types-visual",
-  "description": "Tests all 5 NavCell types (walkable, blocked, drill_hole, ramp, void) are visible",
+  "description": "Tests the 4 console-reachable NavCell types (walkable, blocked, drill_hole, ramp) render on the overlay",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -8,6 +8,10 @@
         {
           "type": "command",
           "command": "new_game seed:42"
+        },
+        {
+          "type": "keypress",
+          "key": "KeyN"
         }
       ]
     },

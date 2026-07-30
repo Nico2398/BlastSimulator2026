@@ -119,3 +119,26 @@ export class VoxelGrid {
     return results;
   }
 }
+
+/**
+ * Resolve the surface Y for column (x, z) — the highest voxel with density
+ * >= 0.5. Returns -1 if the column is entirely void. Out-of-bounds (x, z)
+ * coordinates are clamped to the grid limits.
+ *
+ * Shared by NavGrid.computeSurfaceY and Ramp.ts's local column-surface
+ * resolution — both need this exact scan and previously kept independent
+ * copies to avoid a core/mining <-> core/nav import cycle (core/nav already
+ * depends on core/mining). VoxelGrid is a true leaf module (no imports of its
+ * own), so both can import from here instead.
+ */
+export function computeVoxelColumnSurfaceY(grid: VoxelGrid, x: number, z: number): number {
+  if (grid.sizeX <= 0 || grid.sizeZ <= 0) return -1;
+
+  const cx = Math.max(0, Math.min(grid.sizeX - 1, Math.floor(x)));
+  const cz = Math.max(0, Math.min(grid.sizeZ - 1, Math.floor(z)));
+  for (let y = grid.sizeY - 1; y >= 0; y--) {
+    const voxel = grid.getVoxel(cx, y, cz);
+    if (voxel && voxel.density >= 0.5) return y;
+  }
+  return -1;
+}

@@ -3,7 +3,6 @@
 // Pure logic: no timers, no DOM. The caller drives the loop.
 
 import type { GameState, PendingAction } from '../state/GameState.js';
-import type { Vehicle } from '../entities/Vehicle.js';
 import { getBuildingDef, getDefSize, type Building, type BuildingType } from '../entities/Building.js';
 import type { Random } from '../math/Random.js';
 import type { EventContext } from '../events/EventPool.js';
@@ -15,10 +14,16 @@ import { replenishNeed, getNeedMultiplier } from '../entities/EmployeeNeeds.js';
 import { getLivingQuartersWellbeingMultiplier } from '../entities/BuildingWellbeing.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { addExpense } from '../economy/Finance.js';
+import { tickVehicle, tickEmployeeMovement, type EmployeeMovementResult } from './EntityMovementTick.js';
 
 // ── Config ──
 
 import { BASE_TICK_MS as _BASE_TICK_MS, VALID_SPEEDS as _VALID_SPEEDS, NEED_REST_DURATIONS, NEED_REST_NO_BUILDING_CAP, NEED_REST_NO_BUILDING_DURATION_MULTIPLIER, NEED_REST_BUILDING_TYPES, NEED_REST_SEARCH_RADIUS, NEED_WARNING_THRESHOLDS, NEED_REST_COSTS, WORK_DURATION_TICKS, SHIFT_SLEEP_DURATION_TICKS, BASE_TASK_DURATION_TICKS } from '../config/balance.js';
+
+// Vehicle and employee per-tick movement (NavGrid pathing, stuck-tracking) live
+// in EntityMovementTick.ts (#407 refactor) — re-exported here so GameLoop.ts
+// stays the single public surface for tick-orchestration callers.
+export { tickVehicle, tickEmployeeMovement, type EmployeeMovementResult };
 
 /** Milliseconds per base tick at 1x speed. */
 export const BASE_TICK_MS = _BASE_TICK_MS;
@@ -123,60 +128,6 @@ export function isValidSpeed(speed: number): speed is SpeedMultiplier {
   return VALID_SPEEDS.includes(speed as SpeedMultiplier);
 }
 
-/** Process one vehicle movement step; advances at most one grid cell per tick, waits if the next cell is occupied. */
-export function tickVehicle(state: GameState, vehicle: Vehicle): void {
-  if (!canTickVehicle(vehicle)) return;
-
-  const deltaX = vehicle.targetX - vehicle.x;
-  const deltaZ = vehicle.targetZ - vehicle.z;
-
-  if (deltaX === 0 && deltaZ === 0) return setVehicleIdle(vehicle);
-
-  let nextX = vehicle.x;
-  let nextZ = vehicle.z;
-  if (deltaX !== 0) {
-    nextX += Math.sign(deltaX);
-  } else if (deltaZ !== 0) {
-    nextZ += Math.sign(deltaZ);
-  }
-
-  const isOccupied = isCellOccupiedByOtherVehicle(state, vehicle, nextX, nextZ);
-  if (isOccupied) {
-    if (vehicle.state !== 'waiting') {
-      vehicle.state = 'waiting';
-      vehicle.waitingTicks = 1;
-    } else {
-      vehicle.waitingTicks = (vehicle.waitingTicks ?? 0) + 1;
-    }
-    return;
-  }
-
-  vehicle.x = nextX;
-  vehicle.z = nextZ;
-  vehicle.state = 'moving';
-  vehicle.waitingTicks = 0;
-
-  if (vehicle.x === vehicle.targetX && vehicle.z === vehicle.targetZ) {
-    setVehicleIdle(vehicle);
-  }
-}
-
-function canTickVehicle(vehicle: Vehicle): boolean {
-  // moveVehicle() sets task='moving'; vehicle state may still be 'idle' on the very first tick.
-  return vehicle.task === 'moving' &&
-    (vehicle.state === 'idle' || vehicle.state === 'moving' || vehicle.state === 'waiting');
-}
-
-function setVehicleIdle(vehicle: Vehicle): void {
-  vehicle.task = 'idle';
-  vehicle.state = 'idle';
-  vehicle.waitingTicks = 0;
-}
-
-function isCellOccupiedByOtherVehicle(state: GameState, vehicle: Vehicle, x: number, z: number): boolean {
-  return state.vehicles.vehicles.some(v => v.id !== vehicle.id && v.x === x && v.z === z);
-}
-
 // ── Employee dispatch ──
 
 export interface TickEmployeesResult {
@@ -224,6 +175,12 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
     idleMatch.activeActionId = action.id;
     result.claimed.push(action.id);
     // action is consumed — not pushed to remaining
+
+    // Send the employee walking toward the action's location — targetX/targetZ
+    // is documented on PendingAction as existing for exactly this purpose
+    // ("ghost rendering and employee pathfinding"), previously unused.
+    idleMatch.destinationX = action.targetX;
+    idleMatch.destinationZ = action.targetZ;
 
     // This is the actual claim path the tick loop uses (claimPendingAction in
     // TaskDispatch.ts is a separate helper nothing here calls), so it owns
@@ -326,6 +283,8 @@ export function tickNeedRestoration(state: GameState): NeedRestorationResult {
     // Immediately claimed (unlike autoInsertNeedTasks) — start the rest timer now.
     emp.restTicksRemaining = restDuration;
     emp.restNeedKey = needKey;
+    emp.destinationX = building.x;
+    emp.destinationZ = building.z;
     result.routed.push(emp.id);
   }
 
@@ -408,6 +367,8 @@ export function tickCollapse(state: GameState, _firedEvents?: FiredEvent[], _emi
     // Immediately claimed — start the rest timer now (mirrors tickNeedRestoration).
     emp.restTicksRemaining = restDuration;
     emp.restNeedKey = collapsedGauge;
+    emp.destinationX = targetX;
+    emp.destinationZ = targetZ;
   }
 
   return result;
@@ -863,6 +824,8 @@ function forceShiftRestIfNeeded(
 
   state.pendingActions.push(restAction);
   emp.activeActionId = restAction.id;
+  emp.destinationX = targetX;
+  emp.destinationZ = targetZ;
   shiftRested.push(emp.id);
   firedEvents.push({ eventId: 'employee_shift_change', firedAtTick: state.tickCount });
   _emitter?.emit('employee:shift_change', { employeeId: emp.id });

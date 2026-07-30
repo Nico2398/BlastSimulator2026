@@ -8,6 +8,7 @@ import { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import { createBuildingState, placeBuilding } from '../../src/core/entities/Building.js';
 import { generateTerrain } from '../../src/core/world/TerrainGen.js';
 import { getMinePreset } from '../../src/core/world/MineType.js';
+import { buildRamp } from '../../src/core/mining/Ramp.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -20,6 +21,16 @@ function fillSolid(grid: VoxelGrid, yMax: number) {
           composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
           density: 1.0, oreDensities: {}, fractureModifier: 1.0,
         });
+}
+
+/** Fill a single column with solid rock from y=0 to yMax (inclusive). */
+function fillSolidColumn(grid: VoxelGrid, x: number, z: number, yMax: number) {
+  for (let y = 0; y <= yMax; y++) {
+    grid.setVoxel(x, y, z, {
+      composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
+      density: 1.0, oreDensities: {}, fractureModifier: 1.0,
+    });
+  }
 }
 
 // ── NavMesh and pathfinding ──────────────────────────────────────────────────
@@ -249,6 +260,67 @@ describe('NavMesh and pathfinding', () => {
 
     // Same point: h = 0
     expect(octileHeuristic(3, 3, 3, 3)).toBe(0);
+  });
+
+  // ── Multi-level via ramp (real Ramp.buildRamp() on realistic terrain) ──────
+  // Regression coverage for issue #407: buildRamp treated depth as absolute
+  // world Y, so on realistic (elevated, non-flat-from-0) terrain it never
+  // changed any column's surface height and multi-level routing could never
+  // discover a ramp connection between benches.
+
+  it('multi-level routing succeeds via a ramp built on realistic (elevated) terrain', () => {
+    const grid = new VoxelGrid(20, 30, 30);
+    fillSolid(grid, 22); // flat plateau, surface Y=22 — not flat-from-0
+
+    // Before carving: uniformly flat, single bench everywhere, no ramp connections.
+    const navBefore = NavGrid.buildNavGrid(grid, [], []);
+    expect(findRampConnections(navBefore)).toEqual([]);
+
+    const rampResult = buildRamp(grid, {
+      originX: 10, originZ: 5, direction: 'south', length: 12, targetDepth: 10,
+    }, 100000);
+    expect(rampResult.success).toBe(true);
+
+    const navAfter = NavGrid.buildNavGrid(grid, [], []);
+
+    // The fix must produce at least one ramp connector spanning two distinct
+    // bench levels.
+    const connections = findRampConnections(navAfter);
+    expect(connections.length).toBeGreaterThan(0);
+
+    const conn = connections[0]!;
+    expect(conn.upperLevel).not.toBe(conn.lowerLevel);
+
+    // Pathfinding from the upper side of the connection to the lower side
+    // must succeed now that the ramp physically exists.
+    const result = findPath(navAfter, {
+      agentId: 1, fromX: conn.upperX, fromZ: conn.upperZ,
+      toX: conn.lowerX, toZ: conn.lowerZ, avoidVehicles: false,
+    });
+    expect(result.found).toBe(true);
+  });
+
+  it('multi-level routing returns found:false when no ramp connects two separated benches', () => {
+    const grid = new VoxelGrid(20, 30, 30);
+    // Upper bench: z=0..9, surface Y=22.
+    for (let z = 0; z <= 9; z++) {
+      for (let x = 0; x < grid.sizeX; x++) fillSolidColumn(grid, x, z, 22);
+    }
+    // Void gap: z=10..19 — left entirely empty, genuinely impassable and wide
+    // enough that no cardinal adjacency crosses it.
+    // Lower bench: z=20..29, surface Y=10.
+    for (let z = 20; z < grid.sizeZ; z++) {
+      for (let x = 0; x < grid.sizeX; x++) fillSolidColumn(grid, x, z, 10);
+    }
+
+    const nav = NavGrid.buildNavGrid(grid, [], []);
+    // No ramp connects the two benches.
+    expect(findRampConnections(nav)).toEqual([]);
+
+    const result = findPath(nav, {
+      agentId: 1, fromX: 10, fromZ: 5, toX: 10, toZ: 25, avoidVehicles: false,
+    });
+    expect(result.found).toBe(false);
   });
 
 });

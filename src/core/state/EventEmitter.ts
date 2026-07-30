@@ -27,6 +27,10 @@ export interface GameEventMap {
   'employee:need_warning': { employeeId: number; needKey: string };
   'employee:collapsed': { employeeId: number; needKey: string };
   'employee:shift_change': { employeeId: number };
+
+  // Phase 9 — Navmesh path-following
+  'agent:stuck': { employeeId: number };
+  'vehicle:stuck': { vehicleId: number };
 }
 
 type EventHandler<T> = (data: T) => void;

@@ -8,6 +8,10 @@
         {
           "type": "command",
           "command": "new_game seed:42"
+        },
+        {
+          "type": "keypress",
+          "key": "KeyN"
         }
       ]
     },

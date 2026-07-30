@@ -118,6 +118,10 @@ export class UIManager {
 
   update(state: GameState, weather?: WeatherState): void {
     this.hud.update(state, weather);
+    // setNavGrid before update() — otherwise the overlay draws against the
+    // previous tick's navgrid for one frame after any navgrid change (new
+    // game, fresh ramp, blast).
+    this.miniMap.setNavGrid(state.navGrid ?? null);
     this.miniMap.update(state);
 
     // Update active panel
@@ -160,6 +164,11 @@ export class UIManager {
       this.showPanel(name);
     }
     this.syncToolbarActive();
+  }
+
+  /** Toggle the NavGrid overlay on the MiniMap. */
+  toggleNavGridOverlay(): void {
+    this.miniMap.setNavGridVisible(!this.miniMap.navGridVisible);
   }
 
   dispose(): void {

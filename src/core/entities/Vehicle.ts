@@ -132,6 +132,10 @@ export interface Vehicle {
   payloadKg: number;
   /** Number of consecutive ticks the vehicle has spent in the waiting state. */
   waitingTicks: number;
+  /** Consecutive ticks tickVehicle failed to find a NavGrid path to targetX/Z. */
+  moveConsecutiveFailures: number;
+  /** True once moveConsecutiveFailures reaches STUCK_THRESHOLD — idle until the path clears. */
+  isMoveStuck: boolean;
 }
 
 // ── Fleet state ──
@@ -169,6 +173,8 @@ export function purchaseVehicle(
     state: 'idle',
     payloadKg: 0,
     waitingTicks: 0,
+    moveConsecutiveFailures: 0,
+    isMoveStuck: false,
   };
   state.vehicles.push(vehicle);
   return { vehicle, cost: def.purchaseCost };

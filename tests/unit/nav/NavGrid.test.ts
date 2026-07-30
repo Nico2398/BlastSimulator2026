@@ -19,6 +19,7 @@ import { addHole } from '../../../src/core/mining/DrillPlan.js';
 import { batchCharge } from '../../../src/core/mining/ChargePlan.js';
 import { autoVPattern } from '../../../src/core/mining/Sequence.js';
 import { assembleBlastPlan } from '../../../src/core/mining/BlastPlan.js';
+import { buildRamp } from '../../../src/core/mining/Ramp.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Helpers
@@ -461,6 +462,44 @@ describe('NavGrid.buildNavGrid — ramp detection', () => {
     for (let z = 0; z < 5; z++) {
       expect(nav.cells[z]![0]!.type).toBe('walkable');
     }
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Group 2c: buildNavGrid — ramp detection after a real Ramp.buildRamp() carve on
+// realistic (elevated) terrain. Regression coverage for issue #407: buildRamp
+// treating depth as an absolute world Y meant it never changed a column's
+// surface height, so this classification path never fired outside hand-crafted
+// NavCell fixtures.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('NavGrid.buildNavGrid — ramp detection after buildRamp() on elevated terrain', () => {
+  it('produces at least one ramp-typed cell along a freshly carved ramp path', () => {
+    // Flat plateau at surface Y=22 (not flat-from-0) — every column starts on the
+    // same bench, so before carving there is no natural elevation cliff anywhere.
+    const grid = makeSolidGrid(20, 30, 30, 22);
+    const beforeNav = NavGrid.buildNavGrid(grid, [], []);
+    // Sanity: uniformly flat terrain has no ramp cells yet.
+    for (let z = 0; z < 30; z++) {
+      for (let x = 0; x < 20; x++) {
+        expect(beforeNav.cells[z]![x]!.type).not.toBe('ramp');
+      }
+    }
+
+    const rampResult = buildRamp(grid, {
+      originX: 10, originZ: 5, direction: 'south', length: 12, targetDepth: 10,
+    }, 100000);
+    expect(rampResult.success).toBe(true);
+
+    const afterNav = NavGrid.buildNavGrid(grid, [], []);
+    let rampCellCount = 0;
+    for (let z = 0; z < 30; z++) {
+      for (let x = 0; x < 20; x++) {
+        if (afterNav.cells[z]![x]!.type === 'ramp') rampCellCount++;
+      }
+    }
+    // The fix must make at least one carved column register as a ramp-typed cell.
+    expect(rampCellCount).toBeGreaterThan(0);
   });
 });
 

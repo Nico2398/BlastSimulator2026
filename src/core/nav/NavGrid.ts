@@ -2,7 +2,7 @@
 // Each cell represents walkability for A* pathfinding.
 // Part of the navmesh system.
 
-import type { VoxelGrid } from '../world/VoxelGrid.js';
+import { computeVoxelColumnSurfaceY, type VoxelGrid } from '../world/VoxelGrid.js';
 import type { Building } from '../entities/Building.js';
 import type { DrillHole } from '../mining/DrillPlan.js';
 import type { BlastRegion } from '../mining/BlastExecution.js';
@@ -18,6 +18,16 @@ export interface NavCell {
   type: NavCellType;
   moveCost: number;
   benchLevel: number;
+  /**
+   * Reserved for a future per-cell vehicle-occupancy pass (checked by
+   * Pathfinding.findPath/AgentMovement.isPathBlocked when a caller requests
+   * avoidVehicles). No caller in src/ ever sets this true — EntityMovementTick's
+   * tickVehicle/tickEmployeeMovement both request avoidVehicles:false and
+   * instead do vehicle-vs-vehicle collision avoidance by comparing live x/z
+   * directly (see isCellOccupiedByOtherVehicle in EntityMovementTick.ts) — so
+   * this field is always false today and the avoidVehicles checks against it
+   * are a no-op.
+   */
   vehicleOccupied: boolean;
 }
 
@@ -41,16 +51,7 @@ export class NavGrid {
    * Out-of-bounds (x, z) coordinates are clamped to the grid limits.
    */
   static computeSurfaceY(voxelGrid: VoxelGrid, x: number, z: number): number {
-    // Guard against degenerate grids with zero dimensions
-    if (voxelGrid.sizeX <= 0 || voxelGrid.sizeZ <= 0) return -1;
-
-    const cx = Math.max(0, Math.min(voxelGrid.sizeX - 1, Math.floor(x)));
-    const cz = Math.max(0, Math.min(voxelGrid.sizeZ - 1, Math.floor(z)));
-    for (let y = voxelGrid.sizeY - 1; y >= 0; y--) {
-      const voxel = voxelGrid.getVoxel(cx, y, cz);
-      if (voxel && voxel.density >= 0.5) return y;
-    }
-    return -1;
+    return computeVoxelColumnSurfaceY(voxelGrid, x, z);
   }
 
   /**
