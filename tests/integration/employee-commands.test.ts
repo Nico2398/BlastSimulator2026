@@ -414,6 +414,6 @@ describe('Console — employee dispatch', () => {
     const result = employeeCommand(ctx, ['dispatch', String(empId)], {});
 
     expect(result.success).toBe(false);
-    expect(result.output).toBe('Usage: employee dispatch <id> x:<X> z:<Z>');
+    expect(result.output).toBe('Usage: employee dispatch <id> x:<X> z:<Z> [skill:<category>]');
   });
 });

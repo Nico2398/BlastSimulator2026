@@ -70,6 +70,7 @@ const VISUAL_SCENARIO_NAMES = [
   'blast-report-visual',
   'blast-voxel-fragmentation-visual',
   'blast-visual-full',
+  'employee-skill-progression-visual',
   'needs-gauges-visual',
   'needs-drain-visual',
   'needs-morale-visual',

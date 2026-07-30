@@ -1,13 +1,189 @@
 {
   "name": "employee-skill-progression-visual",
-  "description": "Visual verification of employee skill progression: XP gain from dispatched tasks, proficiency level-ups, task duration scaling by level, and the employee detail panel reflecting each change.",
+  "description": "Visual verification of employee skill progression: XP gain from a dispatched task tracked across tick checkpoints, task duration scaling by proficiency, the pending-action ghost preview persisting while its target employee is busy, the ghost disappearing once claimed, and the employee detail panel reflecting each change.",
   "steps": [
     {
       "command": "new_game seed:42",
+      "timeout": 10,
       "interaction": [
         {
           "type": "command",
           "command": "new_game seed:42"
+        }
+      ]
+    },
+    {
+      "command": "campaign start level:dusty_hollow",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign start level:dusty_hollow"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:blaster",
+      "description": "Employee A (#1) — will be dispatched to real blasting work below.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:blaster"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:driver",
+      "description": "Employee B (#2) — holds a different skill (driving.truck), so the second dispatch later has nobody else on the roster able to claim it, which is what keeps its ghost preview alive.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:driver"
+        }
+      ]
+    },
+    {
+      "command": "employee assign_skill 1 skill:blasting level:1",
+      "description": "Explicit level-1 assignment for #1, opening both roster rows so every later checkpoint screenshot shows the detail panel already expanded.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 1 skill:blasting level:1"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-detail-toggle"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-employee-id=\"2\"] .bs-detail-toggle"
+        }
+      ]
+    },
+    {
+      "command": "employee assign_skill 2 skill:driving.truck level:1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 2 skill:driving.truck level:1"
+        }
+      ]
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ]
+    },
+    {
+      "command": "employee dispatch 1 x:20 z:20 skill:blasting",
+      "description": "Dispatches employee A to a real blasting-required task — the first pending action this scenario creates.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:20 z:20 skill:blasting"
+        }
+      ]
+    },
+    {
+      "command": "tick 1",
+      "description": "tickEmployees claims the dispatch: employee A becomes busy and taskTicksRemaining is seeded from BASE_TASK_DURATION_TICKS scaled by proficiency/need/living-quarters multipliers.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 1"
+        }
+      ]
+    },
+    {
+      "command": "employee dispatch 1 x:25 z:22 skill:blasting",
+      "description": "Second blasting-required dispatch, pinned to the same (now busy) employee A. Nobody else on the roster holds 'blasting', so this action cannot be claimed until A frees up — it stays in the pending-action pool with a ghost preview rendered at (25, 22).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:25 z:22 skill:blasting"
+        }
+      ]
+    },
+    {
+      "command": "employee list",
+      "description": "Checkpoint 0 — task in progress, ghost preview live at the second dispatch's target tile.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "description": "Checkpoint 1 (+10 ticks) — employee A's XP bar should show partial fill from the first task's per-tick XP gain; the ghost preview for the still-unclaimed second dispatch should still be visible.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ]
+    },
+    {
+      "command": "tick 60",
+      "description": "Checkpoint 2 (+60 ticks, 70 cumulative) — long enough for the first task to complete at any proficiency level and for employee A to auto-claim the second dispatch once freed, which should make its ghost preview disappear.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 60"
+        }
+      ]
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ]
+    },
+    {
+      "command": "tick 150",
+      "description": "Checkpoint 3 (+150 ticks, 220 cumulative) — final state: both dispatched tasks complete, employee A idle again, XP bar reflecting the full accumulated total, no ghost previews remaining.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 150"
+        }
+      ]
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
         }
       ]
     }
@@ -17,6 +193,16 @@
       "name": "initial-overview",
       "yaw": 0,
       "pitch": 45
+    },
+    {
+      "name": "employee-detail-panel",
+      "yaw": 90,
+      "pitch": 10
+    },
+    {
+      "name": "ghost-preview-tile",
+      "yaw": 45,
+      "pitch": 60
     }
   ]
 }

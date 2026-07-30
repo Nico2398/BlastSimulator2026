@@ -1,6 +1,6 @@
 {
   "name": "employee-skills-visual",
-  "description": "Visual verification of employee skills UI: skill categories, proficiency stars, XP bars, task queue, salary breakdown, need gauges, training badges, and modifiers",
+  "description": "Visual verification of employee skills UI: skill categories, proficiency stars, XP bars, task queue (incl. overflow), salary breakdown, need gauges, training badges, an employee with no assigned extra skills, and modifiers",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -67,56 +67,94 @@
       ]
     },
     {
-      "command": "employee assign_skill id:1 skill:driving.excavator level:3",
+      "command": "employee hire role:driller",
+      "description": "Employee #6 — hired but never given an assign_skill call. Only carries its role's default 'blasting' qualification, exercising the minimal-qualifications display (contrast with #1, which gets two more assigned below).",
       "interaction": [
         {
           "type": "command",
-          "command": "employee assign_skill id:1 skill:driving.excavator level:3"
+          "command": "employee hire role:driller"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-detail-toggle"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-employee-id=\"2\"] .bs-detail-toggle"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-employee-id=\"3\"] .bs-detail-toggle"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-employee-id=\"4\"] .bs-detail-toggle"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-employee-id=\"5\"] .bs-detail-toggle"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-employee-id=\"6\"] .bs-detail-toggle"
         }
       ]
     },
     {
-      "command": "employee assign_skill id:1 skill:geology level:2",
+      "command": "employee assign_skill 1 skill:driving.excavator level:3",
       "interaction": [
         {
           "type": "command",
-          "command": "employee assign_skill id:1 skill:geology level:2"
+          "command": "employee assign_skill 1 skill:driving.excavator level:3"
         }
       ]
     },
     {
-      "command": "employee assign_skill id:2 skill:blasting level:4",
+      "command": "employee assign_skill 1 skill:geology level:2",
       "interaction": [
         {
           "type": "command",
-          "command": "employee assign_skill id:2 skill:blasting level:4"
+          "command": "employee assign_skill 1 skill:geology level:2"
         }
       ]
     },
     {
-      "command": "employee assign_skill id:3 skill:driving.truck level:1",
+      "command": "employee assign_skill 2 skill:blasting level:4",
       "interaction": [
         {
           "type": "command",
-          "command": "employee assign_skill id:3 skill:driving.truck level:1"
+          "command": "employee assign_skill 2 skill:blasting level:4"
         }
       ]
     },
     {
-      "command": "employee assign_skill id:4 skill:geology level:5",
+      "command": "employee assign_skill 3 skill:driving.truck level:1",
       "interaction": [
         {
           "type": "command",
-          "command": "employee assign_skill id:4 skill:geology level:5"
+          "command": "employee assign_skill 3 skill:driving.truck level:1"
         }
       ]
     },
     {
-      "command": "employee assign_skill id:5 skill:management level:2",
+      "command": "employee assign_skill 4 skill:geology level:5",
       "interaction": [
         {
           "type": "command",
-          "command": "employee assign_skill id:5 skill:management level:2"
+          "command": "employee assign_skill 4 skill:geology level:5"
+        }
+      ]
+    },
+    {
+      "command": "employee assign_skill 5 skill:management level:2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 5 skill:management level:2"
         }
       ]
     },
@@ -135,6 +173,71 @@
         {
           "type": "command",
           "command": "tick 1"
+        }
+      ]
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ]
+    },
+    {
+      "command": "employee dispatch 6 x:10 z:10 skill:blasting",
+      "description": "First of 6 dispatches targeted at employee #6, none of which are claimed (no further tick happens in this scenario) — 5 show in the task queue and the 6th pushes the 'overflow' (+N more) line.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 6 x:10 z:10 skill:blasting"
+        }
+      ]
+    },
+    {
+      "command": "employee dispatch 6 x:11 z:10 skill:blasting",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 6 x:11 z:10 skill:blasting"
+        }
+      ]
+    },
+    {
+      "command": "employee dispatch 6 x:12 z:10 skill:blasting",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 6 x:12 z:10 skill:blasting"
+        }
+      ]
+    },
+    {
+      "command": "employee dispatch 6 x:13 z:10 skill:blasting",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 6 x:13 z:10 skill:blasting"
+        }
+      ]
+    },
+    {
+      "command": "employee dispatch 6 x:14 z:10 skill:blasting",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 6 x:14 z:10 skill:blasting"
+        }
+      ]
+    },
+    {
+      "command": "employee dispatch 6 x:15 z:10 skill:blasting",
+      "description": "6th dispatch targeting the same employee — task queue now holds 6 own actions, one past the 5-entry display cap.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 6 x:15 z:10 skill:blasting"
         }
       ]
     },
@@ -167,6 +270,11 @@
       "name": "employee-panel",
       "yaw": 90,
       "pitch": 10
+    },
+    {
+      "name": "task-queue-overflow",
+      "yaw": 45,
+      "pitch": 30
     }
   ]
 }
