@@ -1,0 +1,54 @@
+name: "Pipeline: enable auto-merge on an agent PR"
+
+# The manual handle on the mechanism the runners arm for themselves.
+#
+# Auto-merge is armed twice on the normal path, both times by an event: the
+# runner's own `Arm auto-merge on the PR this run opened` step, in the same job
+# that created the PR, and `auto-assign-next.yml` on `pull_request`. Neither
+# reaches a PR whose run was cancelled mid-flight, and the `pull_request` path
+# does not fire at all for a PR authored by `github-actions[bot]` — GitHub
+# parks those runs as `action_required` and never executes them.
+#
+# This workflow exists for that leftover, and for a PR left stranded by an older
+# run. It is deliberately dispatch-only: nothing here runs on a clock.
+on:
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: 'PR number to arm. Empty evaluates every open PR.'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+jobs:
+  arm:
+    if: vars.AGENTIC_AUTO_MERGE_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      # The PAT, not GITHUB_TOKEN: releasing a parked workflow run needs
+      # `actions: write`, and a merge performed by the PAT raises the
+      # `pull_request: closed` event that auto-assign-next.yml chains from.
+      - name: Enable auto-merge on marked PRs
+        id: merge
+        uses: ./.github/actions/agentic-auto-merge
+        with:
+          token: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
+          pr: ${{ inputs.pr }}
+
+      - name: Report
+        run: |
+          if [ -n "${{ steps.merge.outputs.enabled }}" ]; then
+            echo "Auto-merge covers PR(s): ${{ steps.merge.outputs.enabled }}."
+          else
+            echo "No open PR carried READY TO MERGE in a mergeable state."
+          fi
+          echo "Released ${{ steps.merge.outputs.approved }} parked workflow run(s)."

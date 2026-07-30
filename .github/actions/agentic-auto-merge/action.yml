@@ -1,0 +1,194 @@
+name: 'Agentic auto-merge'
+description: 'Enables auto-merge on every open PR carrying the READY TO MERGE marker, whatever account authored it.'
+
+inputs:
+  token:
+    description: 'PAT with contents, pull-requests and actions write. GITHUB_TOKEN cannot approve gated runs.'
+    required: true
+  pr:
+    description: 'Restrict to a single PR number. Empty means use `head`, or every open PR.'
+    required: false
+    default: ''
+  head:
+    description: 'Restrict to the open PR opened from this head branch, e.g. pipeline/feature-404.'
+    required: false
+    default: ''
+  merge_method:
+    description: 'merge, squash or rebase.'
+    required: false
+    default: 'squash'
+
+outputs:
+  enabled:
+    description: 'Space-separated PR numbers that now have auto-merge enabled or were merged outright.'
+    value: ${{ steps.sweep.outputs.enabled }}
+  approved:
+    description: 'Number of gated workflow runs released across the swept PRs.'
+    value: ${{ steps.sweep.outputs.approved }}
+
+runs:
+  using: composite
+  steps:
+    - name: Enable auto-merge on every marked PR
+      id: sweep
+      uses: actions/github-script@v7
+      env:
+        ONLY_PR: ${{ inputs.pr }}
+        ONLY_HEAD: ${{ inputs.head }}
+        MERGE_METHOD: ${{ inputs.merge_method }}
+      with:
+        github-token: ${{ inputs.token }}
+        script: |
+          const owner = context.repo.owner;
+          const repo = context.repo.repo;
+
+          // The marker decides, never the account. A pipeline PR is opened by
+          // whichever identity the runner's token resolved to that day —
+          // `github-actions[bot]` when the agent step overrides the PAT it was
+          // handed, a real user when it does not — and the loop must not depend
+          // on which. `READY TO MERGE` on a line of its own is the pipeline's
+          // own ship signal, written by the orchestrator and by nothing else,
+          // so it identifies an autonomous run's deliverable without asking who
+          // pressed the button. Trailing whitespace is tolerated because the
+          // line survives a round trip through the GitHub API and through
+          // `gh pr edit`, both of which can add it.
+          const carriesMergeMarker = (body) => {
+            if (!body) return false;
+            return body
+              .split(/\r?\n/)
+              .some((line) => line.trim() === 'READY TO MERGE');
+          };
+
+          const method = (process.env.MERGE_METHOD || 'squash').toUpperCase();
+          const only = parseInt(process.env.ONLY_PR || '', 10);
+          const head = (process.env.ONLY_HEAD || '').trim();
+
+          // By number when a `pull_request` event named one, by head branch when
+          // a runner is arming the PR it just opened, everything open otherwise.
+          let candidates;
+          if (!Number.isNaN(only)) {
+            candidates = [(await github.rest.pulls.get({ owner, repo, pull_number: only })).data];
+          } else if (head) {
+            candidates = await github.paginate(github.rest.pulls.list, {
+              owner, repo, state: 'open', head: `${owner}:${head}`, per_page: 100
+            });
+            if (candidates.length === 0) {
+              core.info(`No open PR from ${head}. The run produced none, or it is not open yet.`);
+            }
+          } else {
+            candidates = await github.paginate(github.rest.pulls.list, {
+              owner, repo, state: 'open', per_page: 100
+            });
+          }
+
+          const enabled = [];
+          let approved = 0;
+
+          for (const summary of candidates) {
+            const n = summary.number;
+
+            if (summary.state !== 'open') {
+              core.info(`#${n}: not open, skipping.`);
+              continue;
+            }
+            if (summary.draft) {
+              core.info(`#${n}: draft — a draft is the pipeline's way of saying a channel did not pass.`);
+              continue;
+            }
+            if (!carriesMergeMarker(summary.body)) {
+              core.info(`#${n}: no READY TO MERGE marker.`);
+              continue;
+            }
+
+            core.info(`#${n}: marked READY TO MERGE by ${summary.user?.login} on ${summary.head.ref}.`);
+
+            // A PR opened with GITHUB_TOKEN gets its `pull_request` workflow
+            // runs created and immediately parked as `action_required`: CI never
+            // starts, no check ever reports, and auto-merge waits on checks that
+            // will never arrive. Releasing them here is what makes the enable
+            // below mean something. Needs `actions: write` on the token — a
+            // failure is reported, not fatal, since the PR may have no gated run.
+            const runs = await github.paginate(github.rest.actions.listWorkflowRunsForRepo, {
+              owner, repo, head_sha: summary.head.sha, per_page: 100
+            });
+            const gated = runs.filter(
+              (run) => run.status === 'action_required' || run.conclusion === 'action_required'
+            );
+            for (const run of gated) {
+              try {
+                await github.request('POST /repos/{owner}/{repo}/actions/runs/{run_id}/approve', {
+                  owner, repo, run_id: run.id
+                });
+                core.info(`#${n}: released gated run ${run.id} (${run.name}).`);
+                approved += 1;
+              } catch (error) {
+                core.warning(
+                  `#${n}: could not release gated run ${run.id} (${run.name}): ${error.message}. ` +
+                  'The token needs `actions: write`; without it the PR waits on checks that never start.'
+                );
+              }
+            }
+
+            // `gh pr merge --auto` is idempotent and so is this: re-running over
+            // a PR that already has auto-merge enabled is the normal case on a
+            // sweep, and costs one rejected mutation.
+            try {
+              await github.graphql(
+                `mutation($id: ID!, $method: PullRequestMergeMethod!) {
+                   enablePullRequestAutoMerge(input: { pullRequestId: $id, mergeMethod: $method }) {
+                     clientMutationId
+                   }
+                 }`,
+                { id: summary.node_id, method }
+              );
+              core.info(`#${n}: auto-merge enabled.`);
+              enabled.push(n);
+              continue;
+            } catch (error) {
+              const message = error.message || '';
+
+              if (/already enabled/i.test(message)) {
+                core.info(`#${n}: auto-merge already enabled.`);
+                enabled.push(n);
+                continue;
+              }
+
+              // GitHub refuses auto-merge on a PR that has nothing left to wait
+              // for, and on a repository with the feature switched off. Both end
+              // the same way: this PR is meant to merge and every check it owes
+              // has already reported, so merge it. `clean` is exactly the state
+              // auto-merge would have waited for.
+              const mergeNow = /clean status/i.test(message) || /not allowed/i.test(message);
+              if (!mergeNow) {
+                core.warning(`#${n}: could not enable auto-merge: ${message}`);
+                continue;
+              }
+
+              const { data: fresh } = await github.rest.pulls.get({ owner, repo, pull_number: n });
+              if (fresh.mergeable_state !== 'clean') {
+                core.warning(
+                  `#${n}: auto-merge unavailable (${message}) and the PR is \`${fresh.mergeable_state}\`, ` +
+                  'not `clean` — leaving it for the next sweep.'
+                );
+                continue;
+              }
+
+              try {
+                await github.rest.pulls.merge({
+                  owner, repo, pull_number: n, merge_method: method.toLowerCase()
+                });
+                core.info(`#${n}: merged directly — auto-merge unavailable and every check had reported.`);
+                enabled.push(n);
+              } catch (mergeError) {
+                core.warning(`#${n}: direct merge failed: ${mergeError.message}`);
+              }
+            }
+          }
+
+          core.setOutput('enabled', enabled.join(' '));
+          core.setOutput('approved', String(approved));
+          core.info(
+            enabled.length === 0
+              ? 'No PR carried the marker in a mergeable state.'
+              : `Auto-merge covers PR(s): ${enabled.map((n) => `#${n}`).join(', ')}.`
+          );

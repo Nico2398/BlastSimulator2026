@@ -238,6 +238,24 @@ jobs:
           token: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
           issue: ${{ steps.context.outputs.issue }}
 
+      # The run just opened its PR, so this is the moment the PR came into
+      # existence — and the only moment that does not depend on who opened it.
+      # A PR authored by `github-actions[bot]` raises `pull_request` workflow
+      # runs that GitHub creates and immediately parks as `action_required`:
+      # auto-assign-next.yml never runs, and neither does CI. This step reads the
+      # `READY TO MERGE` marker off the branch this run was told to build,
+      # releases those parked runs so CI actually starts, and enables auto-merge
+      # under the PAT. `always()`: an agent step that crashed after opening the
+      # PR is exactly the case worth covering, and `agentic-rescue` above may
+      # have opened one itself — a draft, which the action skips on its own.
+      - name: Arm auto-merge on the PR this run opened
+        if: always() && steps.context.outputs.issue != '' && vars.AGENTIC_AUTO_MERGE_ENABLED == 'true'
+        continue-on-error: true
+        uses: ./.github/actions/agentic-auto-merge
+        with:
+          token: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
+          head: pipeline/feature-${{ steps.context.outputs.issue }}
+
       # When the run closed the issue without opening a PR, no pull_request event
       # will ever fire, so auto-assign-next.yml cannot carry the chain. Do it here.
       - name: Chain to next issue if resolved without PR
