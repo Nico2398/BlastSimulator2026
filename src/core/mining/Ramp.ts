@@ -80,7 +80,7 @@ export function buildRamp(
   const halfWidth = Math.floor(RAMP_WIDTH / 2);
 
   for (let step = 0; step < ramp.length; step++) {
-    // Current Y level: descends linearly from 0 to targetDepth
+    // Depth of descent at this step: grows linearly from 0 to targetDepth
     const currentDepth = Math.floor((step / ramp.length) * ramp.targetDepth);
     // Height clearance for vehicles: 3 voxels
     const clearanceHeight = 3;
@@ -88,11 +88,18 @@ export function buildRamp(
     const cx = ramp.originX + offset.dx * step;
     const cz = ramp.originZ + offset.dz * step;
 
+    // Carve relative to this column's live surface height, not an absolute
+    // world Y — real terrain sits far above y=0, so an absolute band would
+    // land buried under solid rock and never change the surface.
+    const surfaceY = computeColumnSurfaceY(grid, cx, cz);
+    const floorY = surfaceY - currentDepth;
+    const ceilingY = surfaceY + clearanceHeight;
+
     for (let w = -halfWidth; w <= halfWidth; w++) {
       const wx = cx + perpDx * w;
       const wz = cz + perpDz * w;
 
-      for (let y = currentDepth; y < currentDepth + clearanceHeight; y++) {
+      for (let y = floorY; y < ceilingY; y++) {
         if (grid.isInBounds(wx, y, wz)) {
           const voxel = grid.getVoxel(wx, y, wz);
           if (voxel && voxel.density > 0) {
@@ -122,14 +129,17 @@ export function buildRamp(
  * core/mining (DrillPlan, BlastExecution), so the reverse edge would cycle.
  * Returns -1 if the column is entirely void.
  *
- * TODO: implement — buildRamp() will call this per-column so carved depth
- * is relative to actual local terrain height instead of absolute world Y.
  */
 function computeColumnSurfaceY(grid: VoxelGrid, x: number, z: number): number {
-  void grid;
-  void x;
-  void z;
-  throw new Error('not implemented');
+  if (grid.sizeX <= 0 || grid.sizeZ <= 0) return -1;
+
+  const cx = Math.max(0, Math.min(grid.sizeX - 1, Math.floor(x)));
+  const cz = Math.max(0, Math.min(grid.sizeZ - 1, Math.floor(z)));
+  for (let y = grid.sizeY - 1; y >= 0; y--) {
+    const voxel = grid.getVoxel(cx, y, cz);
+    if (voxel && voxel.density >= 0.5) return y;
+  }
+  return -1;
 }
 
 export { RAMP_COST_PER_METER, RAMP_WIDTH, computeColumnSurfaceY };

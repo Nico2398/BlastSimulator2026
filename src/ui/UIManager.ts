@@ -119,6 +119,7 @@ export class UIManager {
   update(state: GameState, weather?: WeatherState): void {
     this.hud.update(state, weather);
     this.miniMap.update(state);
+    this.miniMap.setNavGrid(state.navGrid ?? null);
 
     // Update active panel
     if (this.blastUI.visible) this.blastUI.update(state);
@@ -162,13 +163,9 @@ export class UIManager {
     this.syncToolbarActive();
   }
 
-  /**
-   * Toggle the NavGrid overlay on the MiniMap.
-   * TODO: implement — wire state.navGrid into this.miniMap via
-   * setNavGrid/setNavGridVisible.
-   */
+  /** Toggle the NavGrid overlay on the MiniMap. */
   toggleNavGridOverlay(): void {
-    // TODO: implement
+    this.miniMap.setNavGridVisible(!this.miniMap.navGridVisible);
   }
 
   dispose(): void {
