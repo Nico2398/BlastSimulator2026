@@ -149,12 +149,16 @@ export function employeeCommand(
         targetEmployeeId: id,
       });
       if (!dispatch.success) {
-        return {
-          success: false,
-          output: requiredSkill !== null
+        // dispatch.reason (TaskDispatch.ts) distinguishes "nobody on the roster
+        // holds this skill" from "this specific target doesn't, though someone
+        // else might" — the two need different messages or the latter wrongly
+        // reads as "nobody qualifies" (#406).
+        const message = dispatch.reason === 'target-unqualified'
+          ? `Employee #${id} (${emp.name}) does not hold skill: ${requiredSkill}.`
+          : requiredSkill !== null
             ? `No employee on the roster holds skill: ${requiredSkill}.`
-            : `Dispatch rejected: no eligible employee on the roster.`,
-        };
+            : `Dispatch rejected: no eligible employee on the roster.`;
+        return { success: false, output: message };
       }
       return {
         success: true,
