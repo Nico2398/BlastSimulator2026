@@ -4,6 +4,7 @@ import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import type { Vehicle, VehicleTier, VehicleOperationalState } from '../../../src/core/entities/Vehicle.js';
 import { VehicleMesh, STATE_COLOR_MAP, applyStateIndicator } from '../../../src/renderer/VehicleMesh.js';
+import { WAITING_QUEUE_SLOT_OFFSETS } from '../../../src/core/config/balance.js';
 
 function makeVehicle(id: number, type: Vehicle['type'], x = 0, z = 0, tier = 1 as VehicleTier): Vehicle {
   return { id, type, x, z, hp: 100, task: 'idle', targetX: x, targetZ: z, tier } as Vehicle;
@@ -232,5 +233,128 @@ describe('applyStateIndicator (#411)', () => {
     applyStateIndicator(group, 'working');
 
     expect(group.children).toContain(body);
+  });
+});
+
+// ── Issue #411: waitingQueueOffset / waitingRenderPosition ─────────────────
+// Rewritten across 3 bug-fix rounds (idle-occupant slot collision, offset
+// anchored to the shared target rather than each vehicle's own raw x/z).
+// These tests lock in the fixed behavior of both rounds.
+
+describe('waitingQueueOffset / waitingRenderPosition (#411)', () => {
+  it('an idle vehicle occupying the exact target cell reserves slot 0 and renders at its own unoffset position', () => {
+    const scene = new THREE.Scene();
+    const vm = new VehicleMesh(scene);
+
+    const idleAtTarget = makeVehicle(1, 'debris_hauler', 10, 10, 1);
+    idleAtTarget.state = 'idle';
+    idleAtTarget.targetX = 10;
+    idleAtTarget.targetZ = 10;
+
+    const waiting = makeVehicle(2, 'debris_hauler', 5, 5, 1);
+    waiting.state = 'waiting';
+    waiting.targetX = 10;
+    waiting.targetZ = 10;
+
+    const pool = [idleAtTarget, waiting];
+
+    // Idle occupant is never offset regardless of slot bookkeeping.
+    expect(vm.waitingQueueOffset(idleAtTarget, pool)).toEqual([0, 0]);
+    expect(vm.waitingRenderPosition(idleAtTarget, pool)).toEqual([10, 10]);
+
+    // Idle occupant claims slot 0 first (ascending id), so the waiting
+    // vehicle must NOT also get the [0, 0] offset — it would render on top.
+    expect(vm.waitingQueueOffset(waiting, pool)).toEqual(WAITING_QUEUE_SLOT_OFFSETS[1]);
+
+    vm.dispose();
+  });
+
+  it('waiting vehicles anchor to the shared target, not their own raw x/z (round 4 regression)', () => {
+    const scene = new THREE.Scene();
+    const vm = new VehicleMesh(scene);
+
+    // Two vehicles converging on the same target from very different raw
+    // positions — the bug this guards against added the offset to each
+    // vehicle's own x/z, scattering them instead of anchoring to the target.
+    const v1 = makeVehicle(1, 'debris_hauler', 1, 1, 1);
+    v1.state = 'waiting';
+    v1.targetX = 20;
+    v1.targetZ = 20;
+
+    const v2 = makeVehicle(2, 'debris_hauler', 40, 45, 1);
+    v2.state = 'waiting';
+    v2.targetX = 20;
+    v2.targetZ = 20;
+
+    const pool = [v1, v2];
+
+    const [o1x, o1z] = WAITING_QUEUE_SLOT_OFFSETS[0]!;
+    const [o2x, o2z] = WAITING_QUEUE_SLOT_OFFSETS[1]!;
+
+    expect(vm.waitingRenderPosition(v1, pool)).toEqual([20 + o1x, 20 + o1z]);
+    expect(vm.waitingRenderPosition(v2, pool)).toEqual([20 + o2x, 20 + o2z]);
+
+    vm.dispose();
+  });
+
+  it('4 waiting vehicles sharing a target get distinct slots at least one slot-spacing apart', () => {
+    const scene = new THREE.Scene();
+    const vm = new VehicleMesh(scene);
+
+    const vehicles = [1, 2, 3, 4].map(id => {
+      const v = makeVehicle(id, 'debris_hauler', id, id, 1);
+      v.state = 'waiting';
+      v.targetX = 50;
+      v.targetZ = 50;
+      return v;
+    });
+
+    const positions = vehicles.map(v => vm.waitingRenderPosition(v, vehicles));
+
+    // sharingTarget is ascending-id order with no idle occupant, so vehicle
+    // at array index i gets WAITING_QUEUE_SLOT_OFFSETS[i] — derive the
+    // expected minimum spacing from the real constant, not a hardcoded value.
+    const usedOffsets = [0, 1, 2, 3].map(i => WAITING_QUEUE_SLOT_OFFSETS[i]!);
+    const pairwiseOffsetDistances = usedOffsets.flatMap((a, i) =>
+      usedOffsets.slice(i + 1).map(b => Math.hypot(a[0] - b[0], a[1] - b[1])),
+    );
+    const minExpectedDistance = Math.min(...pairwiseOffsetDistances);
+    expect(minExpectedDistance).toBeGreaterThan(0);
+
+    for (let i = 0; i < positions.length; i++) {
+      for (let j = i + 1; j < positions.length; j++) {
+        const [ax, az] = positions[i]!;
+        const [bx, bz] = positions[j]!;
+        const dist = Math.hypot(ax - bx, az - bz);
+        expect(dist).toBeGreaterThanOrEqual(minExpectedDistance);
+      }
+    }
+
+    vm.dispose();
+  });
+
+  it('slot index wraps around via modulo when contenders exceed WAITING_QUEUE_SLOT_OFFSETS.length', () => {
+    const scene = new THREE.Scene();
+    const vm = new VehicleMesh(scene);
+
+    // One more contender than there are slots — current implementation is
+    // `sharingTarget.indexOf(id) % WAITING_QUEUE_SLOT_OFFSETS.length`, so the
+    // (length + 1)th vehicle (index === length) wraps back to slot 0.
+    const count = WAITING_QUEUE_SLOT_OFFSETS.length + 1;
+    const vehicles = Array.from({ length: count }, (_, i) => {
+      const v = makeVehicle(i + 1, 'debris_hauler', i, i, 1);
+      v.state = 'waiting';
+      v.targetX = 5;
+      v.targetZ = 5;
+      return v;
+    });
+
+    const firstOffset = vm.waitingQueueOffset(vehicles[0]!, vehicles);
+    const wrappedOffset = vm.waitingQueueOffset(vehicles[vehicles.length - 1]!, vehicles);
+
+    expect(wrappedOffset).toEqual(firstOffset);
+    expect(wrappedOffset).toEqual(WAITING_QUEUE_SLOT_OFFSETS[0]);
+
+    vm.dispose();
   });
 });

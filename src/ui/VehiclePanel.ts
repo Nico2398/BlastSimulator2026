@@ -4,7 +4,7 @@
 import { t } from '../core/i18n/I18n.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { Vehicle, VehicleRole, VehicleTier } from '../core/entities/Vehicle.js';
-import { getAllVehicleRoles, getVehicleDef, getVehicleDefByTier, ROLE_LICENCE_REQUIRED } from '../core/entities/Vehicle.js';
+import { getAllVehicleRoles, getVehicleDefByTier, ROLE_LICENCE_REQUIRED } from '../core/entities/Vehicle.js';
 
 const VEHICLE_TIERS: VehicleTier[] = [1, 2, 3];
 
@@ -66,7 +66,6 @@ export class VehiclePanel {
       state.employees.employees.filter(e => e.alive).map(e => `${e.id}:${e.qualifications.length}`).join('|'),
     ].join('#');
     if (signature === this.lastSignature) {
-      this.refreshBuyButtons(state.cash);
       this.refreshTierButtons(state.cash);
       return;
     }
@@ -85,20 +84,10 @@ export class VehiclePanel {
       }
     }
 
-    this.refreshBuyButtons(state.cash);
     this.refreshTierButtons(state.cash);
   }
 
   dispose(): void { this.el.remove(); }
-
-  private refreshBuyButtons(cash: number): void {
-    const buyBtns = this.buySection.querySelectorAll<HTMLButtonElement>('[data-vtype]:not([data-tier])');
-    buyBtns.forEach(btn => {
-      const type = btn.dataset['vtype']!;
-      const def = getVehicleDef(type as any);
-      btn.disabled = cash < def.purchaseCost;
-    });
-  }
 
   private makeVehicleRow(v: Vehicle, state: GameState): HTMLElement {
     const row = document.createElement('div');
@@ -238,7 +227,7 @@ export class VehiclePanel {
 
       const label = document.createElement('div');
       label.style.cssText = 'font-size:11px;color:#d0b090';
-      label.textContent = type;
+      label.textContent = this.vehicleDisplayName(type, 1);
 
       row.append(label, this.buildTierButtons(type));
       this.buySection.appendChild(row);

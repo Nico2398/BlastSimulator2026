@@ -23,6 +23,7 @@ import {
 } from '../../src/core/entities/Employee.js';
 import { tickVehicle } from '../../src/core/engine/GameLoop.js';
 import { Random } from '../../src/core/math/Random.js';
+import { TRAFFIC_JAM_MIN_VEHICLES, TRAFFIC_JAM_MIN_TICKS } from '../../src/core/config/balance.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -469,6 +470,55 @@ describe('Vehicle fleet', () => {
         const v = ctx.state!.vehicles.vehicles.find(veh => veh.id === id)!;
         expect(v.state, `task=${task} should drive state to working`).toBe('working');
       }
+    });
+  });
+
+  // ── traffic jam event, driven through the real console tick path (#411) ──
+  // detectTrafficJam is unit-tested by direct call elsewhere; this drives it
+  // through tickCommand (src/console/commands/events.ts step 8f-2) instead —
+  // the real path a console/scenario "tick" step exercises.
+
+  describe('traffic jam event fires via tickCommand (#411)', () => {
+    it('sets pendingEvent to traffic_jam once enough vehicles have waited long enough on a shared target', () => {
+      // Anchor vehicle occupies the contended target cell. It never ticks
+      // (task stays 'idle'), so it just blocks the cell for occupancy checks.
+      vehicleCommand(ctx, ['buy', 'debris_hauler'], {});
+      const anchor = ctx.state!.vehicles.vehicles[0]!;
+      anchor.x = 20;
+      anchor.z = 20;
+      anchor.targetX = 20;
+      anchor.targetZ = 20;
+      anchor.task = 'idle';
+      anchor.state = 'idle';
+
+      // TRAFFIC_JAM_MIN_VEHICLES vehicles, each one grid step from the
+      // anchor's cell (their shared target), already at
+      // TRAFFIC_JAM_MIN_TICKS - 1 waiting ticks — one real tickCommand tick
+      // finds their path blocked by the anchor and pushes waitingTicks over
+      // the threshold, which detectTrafficJam should pick up.
+      const neighborOffsets: Array<[number, number]> = [
+        [-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, 1], [-1, 1], [1, -1],
+      ];
+      expect(TRAFFIC_JAM_MIN_VEHICLES).toBeLessThanOrEqual(neighborOffsets.length);
+
+      for (let i = 0; i < TRAFFIC_JAM_MIN_VEHICLES; i++) {
+        vehicleCommand(ctx, ['buy', 'debris_hauler'], {});
+        const v = ctx.state!.vehicles.vehicles[ctx.state!.vehicles.vehicles.length - 1]!;
+        const [dx, dz] = neighborOffsets[i]!;
+        v.x = 20 + dx;
+        v.z = 20 + dz;
+        v.targetX = 20;
+        v.targetZ = 20;
+        v.task = 'moving';
+        v.state = 'waiting';
+        v.waitingTicks = TRAFFIC_JAM_MIN_TICKS - 1;
+      }
+
+      const result = tickCommand(ctx, ['1'], {});
+
+      expect(result.success).toBe(true);
+      expect(ctx.state!.events.pendingEvent).not.toBeNull();
+      expect(ctx.state!.events.pendingEvent?.eventId).toBe('traffic_jam');
     });
   });
 });

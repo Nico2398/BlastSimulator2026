@@ -18,11 +18,10 @@ import { SPAWN_RING_SIZE, SPAWN_TILE_SPACING } from '../../core/config/balance.j
 // ── tier arg parsing ──
 
 /**
- * Parses and validates the `tier:` named arg for `vehicle buy` (default '1';
- * only 1|2|3 accepted, matching the role-validation branch below). Not yet
- * wired into the buy case — purchaseVehicle there still defaults tier=1 until
- * the implementer wires this in (#411), which is what makes Tier 2/3
- * vehicles unreachable by any player action today.
+ * Parses and validates the `tier:` named arg for `vehicle buy` (default 1;
+ * only 1|2|3 accepted, matching the role-validation branch below). Returns
+ * the parsed tier, or `null` when the arg is present but not 1|2|3. Called
+ * from the `buy` case below, which threads the result into purchaseVehicle.
  */
 export function parseVehicleTierArg(named: Record<string, string>): VehicleTier | null {
   const raw = named['tier'];

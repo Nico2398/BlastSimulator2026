@@ -180,8 +180,7 @@ function isCellOccupiedByOtherVehicle(state: GameState, vehicle: Vehicle, x: num
  * never assigned anywhere prior to this (#411) — vehicle-task-states-visual's
  * working-state screenshot was unreachable.
  *
- * Not yet wired into the tick pipeline — the implementer calls this per
- * vehicle alongside tickVehicle in the tick loop (events.ts step 8f).
+ * Called per vehicle alongside tickVehicle in the tick loop (events.ts step 8f).
  */
 const WORK_TASKS: ReadonlySet<Vehicle['task']> = new Set(['transport', 'loading', 'drilling', 'clearing']);
 
