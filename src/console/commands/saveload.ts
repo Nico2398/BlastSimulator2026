@@ -14,7 +14,7 @@
 // system's documented scope rather than adding a new limitation (#408).
 
 import type { GameContext } from './world.js';
-import { regenerateGrid } from './world.js';
+import { regenerateGrid, DEFAULT_GRID_SIZE } from './world.js';
 import type { CommandResult } from '../ConsoleRunner.js';
 import { serialize, deserialize } from '../../core/state/SaveLoad.js';
 import { getMinePreset } from '../../core/world/MineType.js';
@@ -48,7 +48,9 @@ export function loadCommand(
   const preset = getMinePreset(state.mineType);
   if (!preset) return { success: false, output: `Save has unknown mine type "${state.mineType}".` };
 
-  const { sizeX, sizeY, sizeZ } = state.world ?? { sizeX: 64, sizeY: 64, sizeZ: 64, gridReady: true };
+  const { sizeX, sizeY, sizeZ } = state.world ?? {
+    sizeX: DEFAULT_GRID_SIZE, sizeY: DEFAULT_GRID_SIZE, sizeZ: DEFAULT_GRID_SIZE, gridReady: true,
+  };
   ctx.state = state;
   regenerateGrid(ctx, { seed: state.seed, preset, sizeX, sizeY, sizeZ });
 

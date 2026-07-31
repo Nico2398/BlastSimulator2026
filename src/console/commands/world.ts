@@ -18,7 +18,8 @@ export interface GameContext {
   emitter: EventEmitter;
 }
 
-const DEFAULT_GRID_SIZE = 64;
+/** Grid edge length (voxels) used when a size is not explicitly given. */
+export const DEFAULT_GRID_SIZE = 64;
 
 /**
  * Regenerate `ctx.grid` and its dependent navgrid for `ctx.state`. The

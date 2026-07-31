@@ -15,7 +15,7 @@ import { IndexedDBPersistence } from './persistence/IndexedDBPersistence.js';
 import { DownloadPersistence } from './persistence/DownloadPersistence.js';
 import { createRunner, runCommand } from './console/createRunner.js';
 import { parseCommand } from './console/ConsoleRunner.js';
-import { regenerateGrid } from './console/commands/world.js';
+import { regenerateGrid, DEFAULT_GRID_SIZE } from './console/commands/world.js';
 import { getMinePreset } from './core/world/MineType.js';
 import { BASE_TICK_MS } from './core/engine/GameLoop.js';
 import { probeUiActions, probeSelector } from './ui/uiActionProbe.js';
@@ -392,7 +392,9 @@ saveLoadUI.setOnLoad((state) => {
   // (e.g. post-blast craters) was on screen before this load (#408).
   ctx.state = state;
   const preset = getMinePreset(state.mineType);
-  const { sizeX, sizeY, sizeZ } = state.world ?? { sizeX: 64, sizeY: 64, sizeZ: 64, gridReady: true };
+  const { sizeX, sizeY, sizeZ } = state.world ?? {
+    sizeX: DEFAULT_GRID_SIZE, sizeY: DEFAULT_GRID_SIZE, sizeZ: DEFAULT_GRID_SIZE, gridReady: true,
+  };
   if (preset) regenerateGrid(ctx, { seed: state.seed, preset, sizeX, sizeY, sizeZ });
   gameRenderer.syncFromContext(ctx);
 });
