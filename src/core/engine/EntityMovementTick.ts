@@ -171,6 +171,23 @@ function isCellOccupiedByOtherVehicle(state: GameState, vehicle: Vehicle, x: num
   return state.vehicles.vehicles.some(v => v.id !== vehicle.id && v.x === x && v.z === z);
 }
 
+// ── Vehicle task/work state ──
+
+/**
+ * Transitions vehicle.state to 'working' while vehicle.task is one of the
+ * work tasks ('transport' | 'loading' | 'drilling' | 'clearing'), and back to
+ * 'idle' when task returns to 'idle'. VehicleOperationalState.working was
+ * never assigned anywhere prior to this (#411) — vehicle-task-states-visual's
+ * working-state screenshot was unreachable.
+ *
+ * Not yet wired into the tick pipeline — the implementer calls this per
+ * vehicle alongside tickVehicle in the tick loop (events.ts step 8f).
+ */
+export function tickVehicleTaskState(_vehicle: Vehicle): void {
+  // TODO: implement — task in ('transport'|'loading'|'drilling'|'clearing') → state='working';
+  // task==='idle' → state='idle'.
+}
+
 // ── Employee movement ──
 
 export interface EmployeeMovementResult {

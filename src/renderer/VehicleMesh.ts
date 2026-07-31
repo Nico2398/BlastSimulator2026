@@ -12,7 +12,7 @@
 // Vehicles move smoothly to their target position via lerp each frame.
 
 import * as THREE from 'three';
-import type { Vehicle, VehicleRole, VehicleTier } from '../core/entities/Vehicle.js';
+import type { Vehicle, VehicleRole, VehicleTier, VehicleOperationalState } from '../core/entities/Vehicle.js';
 
 // ---------- Colors ----------
 const YELLOW = 0xf5c518;   // Caterpillar yellow
@@ -252,6 +252,24 @@ function brightenColor(hex: number, shift: number): number {
     (Math.round(g + (0xff - g) * shift) << 8)  |
      Math.round(b + (0xff - b) * shift)
   );
+}
+
+// ---------- State indicator ----------
+
+/**
+ * Marker color per VehicleOperationalState. Empty until the implementer
+ * fills it in (#411) — today waiting/broken/working all render identically
+ * to idle since only position lerps.
+ */
+export const STATE_COLOR_MAP: Partial<Record<VehicleOperationalState, number>> = {};
+
+/**
+ * Adds or updates a small colored marker on a vehicle's group reflecting its
+ * operational state, following the same material-color-manipulation pattern
+ * as applyTierVariation below. Not yet called from addVehicle/update (#411).
+ */
+export function applyStateIndicator(_group: THREE.Group, _state: VehicleOperationalState): void {
+  // TODO: implement — small marker mesh or material tint keyed by STATE_COLOR_MAP[state]
 }
 
 function applyTierVariation(group: THREE.Group, tier: VehicleTier): void {

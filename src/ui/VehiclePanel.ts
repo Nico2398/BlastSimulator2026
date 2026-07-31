@@ -3,8 +3,8 @@
 
 import { t } from '../core/i18n/I18n.js';
 import type { GameState } from '../core/state/GameState.js';
-import type { Vehicle } from '../core/entities/Vehicle.js';
-import { getAllVehicleRoles, getVehicleDef, ROLE_LICENCE_REQUIRED } from '../core/entities/Vehicle.js';
+import type { Vehicle, VehicleRole } from '../core/entities/Vehicle.js';
+import { getAllVehicleRoles, getVehicleDef, getVehicleDefByTier, ROLE_LICENCE_REQUIRED } from '../core/entities/Vehicle.js';
 
 import type { CommandResult } from '../console/ConsoleRunner.js';
 
@@ -46,6 +46,12 @@ export class VehiclePanel {
 
     this.el.append(title, this.listEl, buyHeader, this.buySection, closeBtn);
     container.appendChild(this.el);
+
+    // Stubs not yet wired into render paths (#411) — referenced here only to
+    // satisfy noUnusedLocals until the implementer calls them for real.
+    void this.vehicleDisplayName;
+    void this.buildTierButtons;
+    void this.refreshTierButtons;
   }
 
   setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
@@ -180,6 +186,36 @@ export class VehiclePanel {
 
     wrap.append(label, select, assignBtn);
     return wrap;
+  }
+
+  /**
+   * Localized display name for a vehicle's current tier def — t(def.nameKey)
+   * instead of the raw role id makeVehicleRow shows today. Not yet wired
+   * into makeVehicleRow (#411).
+   */
+  private vehicleDisplayName(_v: Vehicle): string {
+    void getVehicleDefByTier;
+    // TODO: implement — t(getVehicleDefByTier(v.type, v.tier).nameKey)
+    return '';
+  }
+
+  /**
+   * Tier 1/2/3 buy buttons for one role, each dispatching
+   * `vehicle buy <type> tier:<n>` and labelled with t(def.nameKey). Not yet
+   * wired into buildBuySection (#411) — buildBuySection still renders one
+   * raw-id buy button per role with no tier selector.
+   */
+  private buildTierButtons(_type: VehicleRole): HTMLElement {
+    // TODO: implement — one button per tier 1|2|3, label t(def.nameKey)
+    return document.createElement('div');
+  }
+
+  /**
+   * Refreshes tier-button disabled state against current cash — the
+   * per-tier counterpart to refreshBuyButtons. Not yet called (#411).
+   */
+  private refreshTierButtons(_cash: number): void {
+    // TODO: implement — disable each tier button when cash < that tier's cost
   }
 
   private buildBuySection(): void {

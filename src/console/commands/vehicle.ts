@@ -10,8 +10,23 @@ import {
   getAllVehicleRoles,
   type VehicleRole,
   type VehicleTask,
+  type VehicleTier,
 } from '../../core/entities/Vehicle.js';
 import { addExpense } from '../../core/economy/Finance.js';
+
+// ── tier arg parsing ──
+
+/**
+ * Parses and validates the `tier:` named arg for `vehicle buy` (default '1';
+ * only 1|2|3 accepted, matching the role-validation branch below). Not yet
+ * wired into the buy case — purchaseVehicle there still defaults tier=1 until
+ * the implementer wires this in (#411), which is what makes Tier 2/3
+ * vehicles unreachable by any player action today.
+ */
+export function parseVehicleTierArg(_named: Record<string, string>): VehicleTier | null {
+  // TODO: implement — default '1', reject values outside 1|2|3.
+  return null;
+}
 
 // ── vehicle command ──
 
