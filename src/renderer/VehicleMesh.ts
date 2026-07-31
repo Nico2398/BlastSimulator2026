@@ -159,6 +159,7 @@ export class VehicleMesh {
     const builder = VEHICLE_BUILDERS[vehicle.type];
     const group = builder();
     applyTierVariation(group, vehicle.tier);
+    applyStateIndicator(group, vehicle.state);
     group.position.set(vehicle.x, surfaceY, vehicle.z);
     this.scene.add(group);
     this.vehicles.set(vehicle.id, { group, vehicle });
@@ -177,6 +178,7 @@ export class VehicleMesh {
       // Lerp toward target
       entry.group.position.x += (v.x - entry.group.position.x) * MOVE_LERP;
       entry.group.position.z += (v.z - entry.group.position.z) * MOVE_LERP;
+      applyStateIndicator(entry.group, v.state);
     }
   }
 
@@ -256,20 +258,41 @@ function brightenColor(hex: number, shift: number): number {
 
 // ---------- State indicator ----------
 
-/**
- * Marker color per VehicleOperationalState. Empty until the implementer
- * fills it in (#411) — today waiting/broken/working all render identically
- * to idle since only position lerps.
- */
-export const STATE_COLOR_MAP: Partial<Record<VehicleOperationalState, number>> = {};
+/** Marker color per VehicleOperationalState. */
+export const STATE_COLOR_MAP: Record<VehicleOperationalState, number> = {
+  idle: 0x999999,     // grey — not working
+  moving: 0x3399ff,   // blue — en route
+  working: 0x33cc33,  // green — actively working
+  waiting: 0xffcc00,  // amber — blocked/waiting
+  broken: 0xff3333,   // red — broken down
+};
+
+const STATE_INDICATOR_RADIUS = 0.25;
 
 /**
  * Adds or updates a small colored marker on a vehicle's group reflecting its
  * operational state, following the same material-color-manipulation pattern
- * as applyTierVariation below. Not yet called from addVehicle/update (#411).
+ * as applyTierVariation below. Idempotent — reuses the existing marker mesh
+ * (tagged group.userData.isStateIndicator) rather than adding a duplicate.
  */
-export function applyStateIndicator(_group: THREE.Group, _state: VehicleOperationalState): void {
-  // TODO: implement — small marker mesh or material tint keyed by STATE_COLOR_MAP[state]
+export function applyStateIndicator(group: THREE.Group, state: VehicleOperationalState): void {
+  const color = STATE_COLOR_MAP[state];
+  let marker = group.children.find(
+    (child): child is THREE.Mesh => child instanceof THREE.Mesh && child.userData['isStateIndicator'] === true,
+  );
+
+  if (!marker) {
+    marker = new THREE.Mesh(
+      new THREE.SphereGeometry(STATE_INDICATOR_RADIUS, 8, 8),
+      new THREE.MeshPhongMaterial({ color }),
+    );
+    marker.userData['isStateIndicator'] = true;
+    marker.position.set(0, 3.2, 0);
+    group.add(marker);
+    return;
+  }
+
+  (marker.material as THREE.MeshPhongMaterial).color.setHex(color);
 }
 
 function applyTierVariation(group: THREE.Group, tier: VehicleTier): void {

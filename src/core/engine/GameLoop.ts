@@ -14,7 +14,7 @@ import { replenishNeed, getNeedMultiplier } from '../entities/EmployeeNeeds.js';
 import { getLivingQuartersWellbeingMultiplier } from '../entities/BuildingWellbeing.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { addExpense } from '../economy/Finance.js';
-import { tickVehicle, tickEmployeeMovement, type EmployeeMovementResult } from './EntityMovementTick.js';
+import { tickVehicle, tickVehicleTaskState, tickEmployeeMovement, type EmployeeMovementResult } from './EntityMovementTick.js';
 
 // ── Config ──
 
@@ -23,7 +23,7 @@ import { BASE_TICK_MS as _BASE_TICK_MS, VALID_SPEEDS as _VALID_SPEEDS, NEED_REST
 // Vehicle and employee per-tick movement (NavGrid pathing, stuck-tracking) live
 // in EntityMovementTick.ts (#407 refactor) — re-exported here so GameLoop.ts
 // stays the single public surface for tick-orchestration callers.
-export { tickVehicle, tickEmployeeMovement, type EmployeeMovementResult };
+export { tickVehicle, tickVehicleTaskState, tickEmployeeMovement, type EmployeeMovementResult };
 
 /** Milliseconds per base tick at 1x speed. */
 export const BASE_TICK_MS = _BASE_TICK_MS;

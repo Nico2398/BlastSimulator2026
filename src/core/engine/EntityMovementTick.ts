@@ -183,9 +183,14 @@ function isCellOccupiedByOtherVehicle(state: GameState, vehicle: Vehicle, x: num
  * Not yet wired into the tick pipeline — the implementer calls this per
  * vehicle alongside tickVehicle in the tick loop (events.ts step 8f).
  */
-export function tickVehicleTaskState(_vehicle: Vehicle): void {
-  // TODO: implement — task in ('transport'|'loading'|'drilling'|'clearing') → state='working';
-  // task==='idle' → state='idle'.
+const WORK_TASKS: ReadonlySet<Vehicle['task']> = new Set(['transport', 'loading', 'drilling', 'clearing']);
+
+export function tickVehicleTaskState(vehicle: Vehicle): void {
+  if (WORK_TASKS.has(vehicle.task)) {
+    vehicle.state = 'working';
+  } else if (vehicle.task === 'idle') {
+    vehicle.state = 'idle';
+  }
 }
 
 // ── Employee movement ──

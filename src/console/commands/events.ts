@@ -20,7 +20,7 @@ import { tickTraining } from '../../core/entities/EmployeeTraining.js';
 import { tickResearch } from '../../core/entities/Building.js';
 import { tickNeedGauges, needsMoraleEffect } from '../../core/entities/EmployeeNeeds.js';
 import type { FiredEvent } from '../../core/events/EventSystem.js';
-import { tickCollapse, autoInsertNeedTasks, processShiftCycle, tickEmployees, tickGeneralRestCompletion, tickTaskProgress, tickVehicle, tickEmployeeMovement } from '../../core/engine/GameLoop.js';
+import { tickCollapse, autoInsertNeedTasks, processShiftCycle, tickEmployees, tickGeneralRestCompletion, tickTaskProgress, tickVehicle, tickVehicleTaskState, tickEmployeeMovement } from '../../core/engine/GameLoop.js';
 import { detectUnqualifiedTask } from '../../core/events/EventEngine.js';
 import { estimateSurveyResult, type SurveyMethod } from '../../core/mining/SurveyCalc.js';
 import { checkDeadlines, generateContracts } from '../../core/economy/Contract.js';
@@ -227,6 +227,7 @@ export function tickCommand(
     // target; nothing advanced x/z toward it before this).
     for (const vehicle of state.vehicles.vehicles) {
       tickVehicle(state, vehicle, emitter);
+      tickVehicleTaskState(vehicle);
     }
 
     // 8g. Employee movement — walk employees with a destination (set by

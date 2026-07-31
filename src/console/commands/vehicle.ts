@@ -23,9 +23,12 @@ import { addExpense } from '../../core/economy/Finance.js';
  * the implementer wires this in (#411), which is what makes Tier 2/3
  * vehicles unreachable by any player action today.
  */
-export function parseVehicleTierArg(_named: Record<string, string>): VehicleTier | null {
-  // TODO: implement — default '1', reject values outside 1|2|3.
-  return null;
+export function parseVehicleTierArg(named: Record<string, string>): VehicleTier | null {
+  const raw = named['tier'];
+  if (raw === undefined) return 1;
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || (parsed !== 1 && parsed !== 2 && parsed !== 3)) return null;
+  return parsed;
 }
 
 // ── vehicle command ──
@@ -56,10 +59,14 @@ export function vehicleCommand(
       if (!getAllVehicleRoles().includes(type)) {
         return { success: false, output: `Usage: vehicle buy (${getAllVehicleRoles().join('|')})` };
       }
+      const tier = parseVehicleTierArg(named);
+      if (tier === null) {
+        return { success: false, output: 'Usage: vehicle buy <role> tier:(1|2|3)' };
+      }
       // Spawn near grid centre so vehicles are visible from default camera
       const spawnX = state.world ? state.world.sizeX / 2 : 32;
       const spawnZ = state.world ? state.world.sizeZ / 2 : 32;
-      const { vehicle, cost } = purchaseVehicle(state.vehicles, type, spawnX, spawnZ);
+      const { vehicle, cost } = purchaseVehicle(state.vehicles, type, spawnX, spawnZ, tier);
       state.cash -= cost;
       addExpense(state.finances, cost, 'equipment', `Buy ${type}`, state.tickCount);
       return { success: true, output: `Purchased ${type} #${vehicle.id}. Cost: $${cost}` };
