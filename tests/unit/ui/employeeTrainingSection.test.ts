@@ -19,6 +19,9 @@ function makeState(schools: Array<[BuildingType, BuildingTier]> = []): GameState
   s.cash = 99_999;
   let x = 2;
   for (const [type, tier] of schools) {
+    // Placement is gated on research for tier > 1 — these tests exercise the
+    // training panel, not the research gate, so pre-unlock the requested tier.
+    s.buildings.unlockedTiers[type] = tier;
     placeBuilding(s.buildings, type, x, 2, 64, 64, tier);
     x += 6;
   }

@@ -417,6 +417,24 @@ export const TRAINING_LEVEL_COST_MULTIPLIER: Record<1 | 2 | 3 | 4 | 5, number> =
   5: 4.6,
 } as const;
 
+// ─── Research Center ───────────────────────────────────────────────────────────
+
+/**
+ * Duration and cost of a Research Center task by the tier it unlocks. Tier 3
+ * research costs and takes more than tier 2 — a straight step up mirrors the
+ * training level multiplier so late-game tiers stay a real investment rather
+ * than a rubber-stamp.
+ */
+export const RESEARCH_TIER_TICKS: Record<2 | 3, number> = {
+  2: 30,
+  3: 50,
+} as const;
+
+export const RESEARCH_TIER_COST: Record<2 | 3, number> = {
+  2: 5000,
+  3: 12000,
+} as const;
+
 // ─── Employee Needs ────────────────────────────────────────────────────────────
 
 /** Drain rates per tick for each need gauge. */

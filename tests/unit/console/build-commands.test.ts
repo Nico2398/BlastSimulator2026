@@ -18,6 +18,9 @@ function makeCtx(): MiningContext {
     emitter: new EventEmitter(),
   };
   newGameCommand(ctx, [], { mine_type: 'desert', seed: '1', size: '32' });
+  // These tests exercise tier placement/upgrade mechanics directly, not the
+  // research gate — pre-unlock every tier so placement isn't blocked.
+  ctx.state!.buildings.unlockedTiers.management_office = 3;
   return ctx;
 }
 

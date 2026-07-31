@@ -42,7 +42,11 @@ describe('Explosive warehouse BuildingDef capacity values', () => {
 describe('getExplosivesCapacity', () => {
   let state: BuildingState;
 
-  beforeEach(() => { state = createBuildingState(); });
+  beforeEach(() => {
+    state = createBuildingState();
+    // Tier 2/3 warehouses require research to be unlocked before placement.
+    state.unlockedTiers.explosive_warehouse = 3;
+  });
 
   it('returns 0 when no buildings exist', () => {
     expect(getExplosivesCapacity(state)).toBe(0);

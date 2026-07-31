@@ -114,11 +114,18 @@ export function startTraining(
  * Validates what `startTraining` alone cannot: that the building teaches this
  * skill, and that there is a level left to gain. Deducting the fee is the
  * caller's job — this module does not touch cash.
+ *
+ * On success the employee is relocated to the building — otherwise they stay
+ * wherever they were dispatched last while a course "trains" them in place,
+ * which is what left an enrolled employee's sprite standing in the pit while
+ * their qualification changed. Mirrors the convention used for need-driven
+ * building visits (`tickCollapse`, `autoInsertNeedTasks` in GameLoop.ts):
+ * `building.x` / `building.z`, the building's own origin.
  */
 export function enrolInTraining(
   state: EmployeeState,
   employeeId: number,
-  building: { id: number; type: BuildingType; tier: BuildingTier },
+  building: { id: number; type: BuildingType; tier: BuildingTier; x: number; z: number },
   skill: SkillCategory,
 ): StartTrainingResult {
   const emp = state.employees.find(e => e.id === employeeId);
@@ -134,6 +141,10 @@ export function enrolInTraining(
 
   const started = startTraining(state, employeeId, building.id, skill, plan.ticks, plan.fee);
   if (!started.success) return { success: false, ...(started.error ? { error: started.error } : {}) };
+
+  emp.x = building.x;
+  emp.z = building.z;
+
   return { success: true, fee: plan.fee, plan };
 }
 

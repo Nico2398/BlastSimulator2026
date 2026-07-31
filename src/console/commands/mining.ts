@@ -11,7 +11,7 @@ import { executeBlast } from '../../core/mining/BlastExecution.js';
 import { addIncome } from '../../core/economy/Finance.js';
 import { addBlastFragments } from '../../core/economy/Logistics.js';
 
-import { recordVibration } from '../../core/scores/ScoreManager.js';
+import { recordVibration, recordBuildingDestruction } from '../../core/scores/ScoreManager.js';
 import { recordBlastResult, snapshotStats } from '../../core/campaign/SuccessTracker.js';
 import {
   previewEnergy,
@@ -231,7 +231,7 @@ export function blastCommand(
     return { success: false, output: `Invalid plan:\n${errors.map(e => `  ${e.holeId}: ${e.issue}`).join('\n')}` };
   }
 
-  const result = executeBlast(plan, ctx.grid!, []);
+  const result = executeBlast(plan, ctx.grid!, [], undefined, ctx.state!.buildings);
   if (!result) return { success: false, output: 'Blast execution failed.' };
 
   // Store fragment data for renderer (localized remesh + mesh spawning)
@@ -239,6 +239,14 @@ export function blastCommand(
   ctx.lastBlastFragmentData = result.fragments;
 
   const state = ctx.state!;
+
+  // Buildings destroyed by the blast: score penalty per building. Their freed
+  // footprint is already inside clearedRegion (a building is only destroyed
+  // when its footprint overlaps a cleared voxel), so the NavGrid patch below
+  // — keyed on clearedRegion — covers it without a second patch call.
+  for (const destroyed of result.destroyedBuildings) {
+    recordBuildingDestruction(state.scores, destroyed.type === 'explosive_warehouse');
+  }
 
   // Credit ore revenue to finances
   if (result.totalOreValue > 0) {
@@ -294,6 +302,9 @@ export function blastCommand(
       `Projections: ${result.projectionCount}`,
       `Total rock volume: ${result.totalRockVolume.toFixed(1)} m³`,
       `Total ore value: $${result.totalOreValue.toFixed(0)}`,
+      ...(result.destroyedBuildings.length > 0
+        ? [`Buildings destroyed: ${result.destroyedBuildings.map(b => `${b.type} #${b.buildingId}`).join(', ')}`]
+        : []),
     ].join('\n'),
   };
 }

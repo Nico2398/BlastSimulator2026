@@ -1927,6 +1927,7 @@ describe('processShiftCycle (7.9)', () => {
   // ── Test 1 ──────────────────────────────────────────────────────────────────
   it('inactive when no living_quarters buildings exist', () => {
     const state = createGame({ seed: SEED });
+    state.buildings.unlockedTiers.living_quarters = 3;
     const rng = new Random(SEED);
 
     const { employee } = hireEmployee(state.employees, 'driller', rng);
@@ -1943,6 +1944,7 @@ describe('processShiftCycle (7.9)', () => {
   // ── Test 2 ──────────────────────────────────────────────────────────────────
   it('inactive when only tier 1 living_quarters exists', () => {
     const state = createGame({ seed: SEED });
+    state.buildings.unlockedTiers.living_quarters = 3;
     const rng = new Random(SEED);
 
     hireEmployee(state.employees, 'driller', rng);
@@ -1957,6 +1959,7 @@ describe('processShiftCycle (7.9)', () => {
   // ── Test 3 ──────────────────────────────────────────────────────────────────
   it('active when tier 2 living_quarters exists', () => {
     const state = createGame({ seed: SEED });
+    state.buildings.unlockedTiers.living_quarters = 3;
     const rng = new Random(SEED);
 
     hireEmployee(state.employees, 'driller', rng);
@@ -1971,6 +1974,7 @@ describe('processShiftCycle (7.9)', () => {
   // ── Test 4 ──────────────────────────────────────────────────────────────────
   it('active when tier 3 living_quarters exists', () => {
     const state = createGame({ seed: SEED });
+    state.buildings.unlockedTiers.living_quarters = 3;
     const rng = new Random(SEED);
 
     hireEmployee(state.employees, 'driller', rng);
@@ -1985,6 +1989,7 @@ describe('processShiftCycle (7.9)', () => {
   // ── Test 5 ──────────────────────────────────────────────────────────────────
   it('ticksWorked increments for working employees', () => {
     const state = createGame({ seed: SEED });
+    state.buildings.unlockedTiers.living_quarters = 3;
     const rng = new Random(SEED);
 
     const { employee } = hireEmployee(state.employees, 'driller', rng);
@@ -2002,6 +2007,7 @@ describe('processShiftCycle (7.9)', () => {
   // ── Test 6 ──────────────────────────────────────────────────────────────────
   it('ticksWorked NOT incremented for idle employees', () => {
     const state = createGame({ seed: SEED });
+    state.buildings.unlockedTiers.living_quarters = 3;
     const rng = new Random(SEED);
 
     const { employee } = hireEmployee(state.employees, 'driller', rng);
@@ -2021,6 +2027,7 @@ describe('processShiftCycle (7.9)', () => {
   // ── Test 7 ──────────────────────────────────────────────────────────────────
   it('forced rest when ticksWorked reaches WORK_DURATION_TICKS (6)', () => {
     const state = createGame({ seed: SEED });
+    state.buildings.unlockedTiers.living_quarters = 3;
     const rng = new Random(SEED);
 
     const ORIGINAL_ACTION_ID = 100;
@@ -2043,6 +2050,7 @@ describe('processShiftCycle (7.9)', () => {
   // ── Test 8 ──────────────────────────────────────────────────────────────────
   it('restTicksRemaining decrements each tick while resting', () => {
     const state = createGame({ seed: SEED });
+    state.buildings.unlockedTiers.living_quarters = 3;
     const rng = new Random(SEED);
 
     const { employee } = hireEmployee(state.employees, 'driller', rng);
@@ -2060,6 +2068,7 @@ describe('processShiftCycle (7.9)', () => {
   // ── Test 9 ──────────────────────────────────────────────────────────────────
   it('rest completes after SHIFT_SLEEP_DURATION_TICKS ticks', () => {
     const state = createGame({ seed: SEED });
+    state.buildings.unlockedTiers.living_quarters = 3;
     const rng = new Random(SEED);
 
     const { employee } = hireEmployee(state.employees, 'driller', rng);
@@ -2084,6 +2093,7 @@ describe('processShiftCycle (7.9)', () => {
   // ── Test 10 ─────────────────────────────────────────────────────────────────
   it('employee_shift_change event fired when employee enters shift rest', () => {
     const state = createGame({ seed: SEED });
+    state.buildings.unlockedTiers.living_quarters = 3;
     const rng = new Random(SEED);
 
     const { employee } = hireEmployee(state.employees, 'driller', rng);
@@ -2102,6 +2112,7 @@ describe('processShiftCycle (7.9)', () => {
   // ── Test 11 ─────────────────────────────────────────────────────────────────
   it('dead employees are skipped', () => {
     const state = createGame({ seed: SEED });
+    state.buildings.unlockedTiers.living_quarters = 3;
     const rng = new Random(SEED);
 
     const { employee } = hireEmployee(state.employees, 'driller', rng);
@@ -2124,6 +2135,7 @@ describe('processShiftCycle (7.9)', () => {
   // ── Test 12 ─────────────────────────────────────────────────────────────────
   it('injured employees are skipped', () => {
     const state = createGame({ seed: SEED });
+    state.buildings.unlockedTiers.living_quarters = 3;
     const rng = new Random(SEED);
 
     const { employee } = hireEmployee(state.employees, 'driller', rng);
@@ -2145,6 +2157,7 @@ describe('processShiftCycle (7.9)', () => {
   // ── Test 13 ─────────────────────────────────────────────────────────────────
   it('employee with restTicksRemaining does NOT increment ticksWorked', () => {
     const state = createGame({ seed: SEED });
+    state.buildings.unlockedTiers.living_quarters = 3;
     const rng = new Random(SEED);
 
     const { employee } = hireEmployee(state.employees, 'driller', rng);
@@ -2168,6 +2181,7 @@ describe('processShiftCycle (7.9)', () => {
   // ── Test 14 ─────────────────────────────────────────────────────────────────
   it('multiple employees cycle independently', () => {
     const state = createGame({ seed: SEED });
+    state.buildings.unlockedTiers.living_quarters = 3;
     const rng = new Random(SEED);
 
     const { employee: emp1 } = hireEmployee(state.employees, 'driller', rng);
@@ -2198,6 +2212,7 @@ describe('processShiftCycle (7.9)', () => {
   // ── Test 15 ─────────────────────────────────────────────────────────────────
   it('emits employee:shift_change via emitter when shift rest starts', () => {
     const state = createGame({ seed: SEED });
+    state.buildings.unlockedTiers.living_quarters = 3;
     const rng = new Random(SEED);
 
     const { employee } = hireEmployee(state.employees, 'driller', rng);

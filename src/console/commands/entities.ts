@@ -9,6 +9,7 @@ import {
   getAllBuildingTypes,
   getBuildingDef,
   getDefSize,
+  isPlacementBlockedByResearch,
   type BuildingType,
   type BuildingTier,
 } from '../../core/entities/Building.js';
@@ -84,6 +85,9 @@ export function buildCommand(
       if (!toUpgrade) return { success: false, output: `Building #${id} not found.` };
       if (toUpgrade.tier >= 3) return { success: false, output: `Building #${id} is already at max tier (T3).` };
       const nextTier = (toUpgrade.tier + 1) as BuildingTier;
+      if (isPlacementBlockedByResearch(state.buildings, toUpgrade.type, nextTier)) {
+        return { success: false, output: `Tier ${nextTier} ${toUpgrade.type} is not researched — research required before upgrade.` };
+      }
       const oldDef = getBuildingDef(toUpgrade.type, toUpgrade.tier);
       const newDef = getBuildingDef(toUpgrade.type, nextTier);
       const totalCost = oldDef.demolishCost + newDef.constructionCost;

@@ -29,6 +29,9 @@ function makeCtx(): MiningContext {
     emitter: new EventEmitter(),
   };
   newGameCommand(ctx, [], { mine_type: 'desert', seed: '1', size: '32' });
+  // These tests exercise NavGrid patching on placement/upgrade, not the
+  // research gate — pre-unlock every tier so placement isn't blocked.
+  ctx.state!.buildings.unlockedTiers.management_office = 3;
   return ctx;
 }
 
