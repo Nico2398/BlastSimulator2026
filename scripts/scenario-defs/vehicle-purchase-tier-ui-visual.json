@@ -49,6 +49,48 @@
       ]
     },
     {
+      "command": "vehicle buy debris_hauler tier:2",
+      "description": "Tier-2 purchase via the new `tier:` arg (#411), dual-played identically in both modes through the console.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle buy debris_hauler tier:2"
+        }
+      ]
+    },
+    {
+      "command": "vehicle buy drill_rig tier:3",
+      "description": "Tier-3 purchase via the new `tier:` arg (#411), dual-played identically in both modes through the console.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle buy drill_rig tier:3"
+        }
+      ]
+    },
+    {
+      "command": "vehicle list",
+      "description": "Command mode only lists the fleet; interaction mode additionally opens the Vehicles panel and clicks the real tier-2 buy button for rock_fragmenter — a genuine UI click on the new tier selector, not a replayed console command — proving the tier buttons are reachable and enabled, not just that `vehicle buy ... tier:N` works headlessly.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle list"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"rock_fragmenter\"][data-tier=\"2\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"rock_fragmenter\"][data-tier=\"2\"]"
+        }
+      ]
+    },
+    {
       "command": "vehicle list",
       "interaction": [
         {

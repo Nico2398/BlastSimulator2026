@@ -5,6 +5,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { type GameContext, newGameCommand } from '../../src/console/commands/world.js';
 import { vehicleCommand } from '../../src/console/commands/vehicle.js';
 import { employeeCommand } from '../../src/console/commands/entities.js';
+import { tickCommand } from '../../src/console/commands/events.js';
 import { EventEmitter } from '../../src/core/state/EventEmitter.js';
 import {
   createVehicleState,
@@ -12,6 +13,7 @@ import {
   assignDriver,
   destroyVehicle,
   getVehicleDef,
+  getVehicleDefByTier,
   getAllVehicleRoles,
 } from '../../src/core/entities/Vehicle.js';
 import {
@@ -354,5 +356,119 @@ describe('Vehicle fleet', () => {
 
     expect(result.success).toBe(false);
     expect(result.output).toContain('already has a driver');
+  });
+
+  // ── vehicle buy — tier arg (#411) ──
+
+  describe('vehicle buy — tier arg (#411)', () => {
+    it('buy with tier:2 purchases a tier-2 vehicle', () => {
+      const result = vehicleCommand(ctx, ['buy', 'debris_hauler'], { tier: '2' });
+
+      expect(result.success).toBe(true);
+      const v = ctx.state!.vehicles.vehicles[0]!;
+      expect(v.tier).toBe(2);
+    });
+
+    it('buy with tier:2 deducts the tier-2 cost (not tier-1) from cash', () => {
+      const cashBefore = ctx.state!.cash;
+      const tier2Def = getVehicleDefByTier('debris_hauler', 2);
+
+      vehicleCommand(ctx, ['buy', 'debris_hauler'], { tier: '2' });
+
+      expect(ctx.state!.cash).toBe(cashBefore - tier2Def.purchaseCost);
+    });
+
+    it('buy with tier:3 purchases a tier-3 vehicle at tier-3 cost', () => {
+      const cashBefore = ctx.state!.cash;
+      const tier3Def = getVehicleDefByTier('drill_rig', 3);
+
+      const result = vehicleCommand(ctx, ['buy', 'drill_rig'], { tier: '3' });
+
+      expect(result.success).toBe(true);
+      const v = ctx.state!.vehicles.vehicles[0]!;
+      expect(v.tier).toBe(3);
+      expect(ctx.state!.cash).toBe(cashBefore - tier3Def.purchaseCost);
+    });
+
+    it('buy without a tier arg still defaults to tier 1 (backward compatible)', () => {
+      vehicleCommand(ctx, ['buy', 'debris_hauler'], {});
+
+      const v = ctx.state!.vehicles.vehicles[0]!;
+      expect(v.tier).toBe(1);
+    });
+
+    it('rejects tier:0 as out of range and does not add a vehicle', () => {
+      const result = vehicleCommand(ctx, ['buy', 'debris_hauler'], { tier: '0' });
+
+      expect(result.success).toBe(false);
+      expect(ctx.state!.vehicles.vehicles).toHaveLength(0);
+    });
+
+    it('rejects tier:9 as out of range and does not add a vehicle', () => {
+      const result = vehicleCommand(ctx, ['buy', 'debris_hauler'], { tier: '9' });
+
+      expect(result.success).toBe(false);
+      expect(ctx.state!.vehicles.vehicles).toHaveLength(0);
+    });
+
+    it('rejects non-numeric tier:abc and does not add a vehicle', () => {
+      const result = vehicleCommand(ctx, ['buy', 'debris_hauler'], { tier: 'abc' });
+
+      expect(result.success).toBe(false);
+      expect(ctx.state!.vehicles.vehicles).toHaveLength(0);
+    });
+
+    it('does not deduct cash when the tier is rejected', () => {
+      const cashBefore = ctx.state!.cash;
+
+      vehicleCommand(ctx, ['buy', 'debris_hauler'], { tier: '9' });
+
+      expect(ctx.state!.cash).toBe(cashBefore);
+    });
+  });
+
+  // ── vehicle work-task → working operational state, via the real tick loop (#411) ──
+
+  describe('vehicle work-task → working operational state (#411)', () => {
+    it('vehicle.state becomes working after a tick once task is set to a work task', () => {
+      vehicleCommand(ctx, ['buy', 'debris_hauler'], {});
+      const v = ctx.state!.vehicles.vehicles[0]!;
+      expect(v.state).toBe('idle');
+
+      vehicleCommand(ctx, ['assign', '1'], { task: 'transport' });
+      expect(v.state).toBe('idle'); // assign alone does not flip state — only the tick loop does
+
+      tickCommand(ctx, ['1'], {});
+
+      expect(v.state).toBe('working');
+    });
+
+    it('vehicle.state returns to idle after a tick once task returns to idle', () => {
+      vehicleCommand(ctx, ['buy', 'rock_digger'], {});
+      const v = ctx.state!.vehicles.vehicles[0]!;
+
+      vehicleCommand(ctx, ['assign', '1'], { task: 'loading' });
+      tickCommand(ctx, ['1'], {});
+      expect(v.state).toBe('working');
+
+      vehicleCommand(ctx, ['assign', '1'], { task: 'idle' });
+      tickCommand(ctx, ['1'], {});
+
+      expect(v.state).toBe('idle');
+    });
+
+    it('each work task (transport, loading, drilling, clearing) drives state to working via the tick loop', () => {
+      const workTasks = ['transport', 'loading', 'drilling', 'clearing'];
+      for (const task of workTasks) {
+        vehicleCommand(ctx, ['buy', 'debris_hauler'], {});
+        const id = ctx.state!.vehicles.vehicles[ctx.state!.vehicles.vehicles.length - 1]!.id;
+        vehicleCommand(ctx, ['assign', String(id)], { task });
+
+        tickCommand(ctx, ['1'], {});
+
+        const v = ctx.state!.vehicles.vehicles.find(veh => veh.id === id)!;
+        expect(v.state, `task=${task} should drive state to working`).toBe('working');
+      }
+    });
   });
 });

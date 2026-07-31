@@ -2,8 +2,8 @@
 
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
-import type { Vehicle, VehicleTier } from '../../../src/core/entities/Vehicle.js';
-import { VehicleMesh } from '../../../src/renderer/VehicleMesh.js';
+import type { Vehicle, VehicleTier, VehicleOperationalState } from '../../../src/core/entities/Vehicle.js';
+import { VehicleMesh, STATE_COLOR_MAP, applyStateIndicator } from '../../../src/renderer/VehicleMesh.js';
 
 function makeVehicle(id: number, type: Vehicle['type'], x = 0, z = 0, tier = 1 as VehicleTier): Vehicle {
   return { id, type, x, z, hp: 100, task: 'idle', targetX: x, targetZ: z, tier } as Vehicle;
@@ -154,5 +154,83 @@ describe('VehicleMesh — tier color brightening', () => {
     const c3 = getBodyColor(3);
     const brighter = c3.r > c2.r || c3.g > c2.g || c3.b > c2.b;
     expect(brighter).toBe(true);
+  });
+});
+
+// ── Issue #411: operational-state visual indicator ─────────────────────────
+// Prior to this, VehicleOperationalState.working (and waiting/broken) all
+// rendered identically to idle since only position lerped — no color/marker
+// distinguished them. STATE_COLOR_MAP and applyStateIndicator close that gap,
+// following the same material-manipulation pattern as applyTierVariation.
+
+describe('STATE_COLOR_MAP (#411)', () => {
+  const ALL_STATES: VehicleOperationalState[] = ['idle', 'moving', 'working', 'waiting', 'broken'];
+
+  it('has a numeric color entry for every VehicleOperationalState', () => {
+    for (const state of ALL_STATES) {
+      expect(STATE_COLOR_MAP[state], `missing color for state "${state}"`).toBeTypeOf('number');
+    }
+  });
+
+  it('assigns a distinct color to each of the 5 states', () => {
+    const colors = ALL_STATES.map(s => STATE_COLOR_MAP[s]);
+    const unique = new Set(colors);
+    expect(unique.size).toBe(ALL_STATES.length);
+  });
+});
+
+describe('applyStateIndicator (#411)', () => {
+  /** Marker mesh contract: a single child tagged userData.isStateIndicator. */
+  function getIndicatorMeshes(group: THREE.Group): THREE.Mesh[] {
+    return group.children.filter(
+      (c): c is THREE.Mesh => c instanceof THREE.Mesh && c.userData?.['isStateIndicator'] === true,
+    );
+  }
+
+  it('adds exactly one state-indicator marker mesh to the group', () => {
+    const group = new THREE.Group();
+    applyStateIndicator(group, 'working');
+
+    expect(getIndicatorMeshes(group)).toHaveLength(1);
+  });
+
+  it("marker material color matches STATE_COLOR_MAP['broken']", () => {
+    const group = new THREE.Group();
+    applyStateIndicator(group, 'broken');
+
+    const marker = getIndicatorMeshes(group)[0]!;
+    const mat = marker.material as THREE.MeshBasicMaterial | THREE.MeshPhongMaterial;
+    expect(mat.color.getHex()).toBe(STATE_COLOR_MAP['broken']);
+  });
+
+  it("marker material color matches STATE_COLOR_MAP['waiting']", () => {
+    const group = new THREE.Group();
+    applyStateIndicator(group, 'waiting');
+
+    const marker = getIndicatorMeshes(group)[0]!;
+    const mat = marker.material as THREE.MeshBasicMaterial | THREE.MeshPhongMaterial;
+    expect(mat.color.getHex()).toBe(STATE_COLOR_MAP['waiting']);
+  });
+
+  it('updates the existing marker in place on repeated calls rather than stacking duplicates', () => {
+    const group = new THREE.Group();
+    applyStateIndicator(group, 'idle');
+    applyStateIndicator(group, 'moving');
+    applyStateIndicator(group, 'working');
+
+    const markers = getIndicatorMeshes(group);
+    expect(markers).toHaveLength(1);
+    const mat = markers[0]!.material as THREE.MeshBasicMaterial | THREE.MeshPhongMaterial;
+    expect(mat.color.getHex()).toBe(STATE_COLOR_MAP['working']);
+  });
+
+  it('does not remove or alter the group\'s existing body meshes', () => {
+    const group = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshPhongMaterial({ color: 0xf5c518 }));
+    group.add(body);
+
+    applyStateIndicator(group, 'working');
+
+    expect(group.children).toContain(body);
   });
 });

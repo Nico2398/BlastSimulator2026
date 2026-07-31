@@ -103,6 +103,43 @@
       ]
     },
     {
+      "command": "vehicle move 1 to:36,32",
+      "description": "Stagger hauler targets around a shared cluster near spawn so paths cross and vehicles queue behind each other — a TrafficJamEvent (#411) never fires against parked vehicles.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle move 1 to:36,32"
+        }
+      ]
+    },
+    {
+      "command": "vehicle move 2 to:36,33",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle move 2 to:36,33"
+        }
+      ]
+    },
+    {
+      "command": "vehicle move 3 to:37,32",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle move 3 to:37,32"
+        }
+      ]
+    },
+    {
+      "command": "vehicle move 4 to:37,33",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle move 4 to:37,33"
+        }
+      ]
+    },
+    {
       "command": "tick 20",
       "interaction": [
         {
