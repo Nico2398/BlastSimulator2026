@@ -135,6 +135,8 @@ JSON files in `scripts/scenario-defs/`. Runner captures screenshot + state JSON 
 
 Scenario steps can define an `interaction` array of `InteractionStepAction` objects for UI-level testing. Steps without `interaction` fall back to command execution. Type definitions in `scripts/shared/scenario-types.ts`.
 
+**Async commands need tick padding.** A command that queues async work (e.g. `survey seismic`) must be followed by enough `tick` steps to let it resolve before a dependent step runs, or the dependent step reads stale state. Insert several `tick 10` steps after the async command, matching `survey-then-blast.json`.
+
 ### Feature Scenarios (Ch.1–7 visual regression)
 
 | Scenario File | Chapter | Purpose |

@@ -22,6 +22,42 @@ export const TOOLBAR_TARGET = {
 } as const;
 
 /**
+ * Snapshot shape for a hire step: ids of the employees who already hold the
+ * target role at capture time. Completion requires an employee with that
+ * role whose id is NOT in this set — plain count-increased + role-exists
+ * checks false-positive when the role was already staffed before the step
+ * opened (e.g. async survey resolution lag) and the player hires someone
+ * else entirely.
+ */
+export interface HireStepSnapshot {
+  prevIdsWithRole: number[];
+}
+
+/** Collect the ids of employees who already hold `role` at snapshot time. */
+function captureHireStepSnapshot(state: GameState, role: EmployeeRole): HireStepSnapshot {
+  return {
+    prevIdsWithRole: getEmployees(state)
+      .filter(e => e.role === role)
+      .map(e => e.id),
+  };
+}
+
+/**
+ * True only when an employee holds `role` with an id absent from
+ * `snapshot.prevIdsWithRole` — i.e. a genuinely new hire of that role, not
+ * one that already existed when the step started.
+ */
+function isHireStepComplete(
+  state: GameState,
+  snapshot: HireStepSnapshot,
+  role: EmployeeRole,
+): boolean {
+  return getEmployees(state).some(
+    e => e.role === role && !snapshot.prevIdsWithRole.includes(e.id),
+  );
+}
+
+/**
  * Helper: create a "hire employee" step that completes when an employee
  * with the given role has been hired (total count increased).
  *
@@ -41,17 +77,10 @@ export function createHireStep(
     textKey,
     commands: [`employee hire role:${role}`],
     ...(highlightTarget ? { highlightTarget } : {}),
-    captureSnapshot: (state: GameState) => ({
-      prevEmployeeCount: getEmployees(state).length,
-    }),
-    isComplete: (state: GameState, snapshot: Record<string, unknown>) => {
-      const prev = snapshot.prevEmployeeCount as number;
-      const employees = getEmployees(state);
-      return (
-        employees.length > prev &&
-        employees.some(e => e.role === role)
-      );
-    },
+    captureSnapshot: (state: GameState) =>
+      captureHireStepSnapshot(state, role) as unknown as Record<string, unknown>,
+    isComplete: (state: GameState, snapshot: Record<string, unknown>) =>
+      isHireStepComplete(state, snapshot as unknown as HireStepSnapshot, role),
   };
 }
 

@@ -88,11 +88,55 @@
     {
       "command": "survey seismic x:15 z:15",
       "timeout": 30,
-      "description": "Step 2 complete: run seismic survey → overlay advances to step 3 (hire-driller)",
+      "description": "Step 2: queue seismic survey (async — resolves over ticks, not on command return)",
       "interaction": [
         {
           "type": "command",
           "command": "survey seismic x:15 z:15"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "timeout": 30,
+      "description": "Let queued survey work run (1/4) — matches WORK_GRACE_TICKS so the overlay resolves the survey before later commands race ahead of it",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "timeout": 30,
+      "description": "Let queued survey work run (2/4)",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "timeout": 30,
+      "description": "Let queued survey work run (3/4)",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "timeout": 30,
+      "description": "Let queued survey work run (4/4): survey resolves → overlay advances to step 3 (hire-driller)",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
         }
       ]
     },
