@@ -329,7 +329,7 @@ export function eventCommand(
       const result = resolveEvent(state.events, state.finances, state.scores, idx, state.tickCount, rng);
       if (!result) return { success: false, output: 'No pending event or invalid option.' };
 
-      const lines = [`Event resolved: ${result.eventId}`, 'Consequences:'];
+      const lines = [`Event resolved: ${result.eventId}`, t(result.resultKey), 'Consequences:'];
       for (const e of result.effects) {
         lines.push(`  • ${e}`);
       }

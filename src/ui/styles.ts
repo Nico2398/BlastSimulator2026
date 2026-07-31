@@ -436,7 +436,8 @@ const CSS = `
 }
 .bs-event-title { font-size: 16px; font-weight: 700; color: #ffc840; margin-bottom: 10px; }
 .bs-event-text { font-size: 13px; line-height: 1.65; color: #d0c8b0; margin-bottom: 16px; }
-.bs-event-outcome { font-size: 12px; color: #80c878; margin-bottom: 14px; font-style: italic; }
+.bs-event-outcome-headline { font-size: 14px; color: #ffc840; font-weight: 600; line-height: 1.5; margin-bottom: 8px; }
+.bs-event-outcome { font-size: 10px; color: #80c878; margin-bottom: 14px; font-style: italic; opacity: 0.85; }
 .bs-event-choices { display: flex; flex-direction: column; gap: 6px; }
 .bs-event-choice { text-align: left; padding: 9px 14px; font-size: 12px; line-height: 1.4; }
 

@@ -16,6 +16,8 @@ export interface ResolutionResult {
   success: boolean;
   eventId: string;
   optionIndex: number;
+  /** i18n key for the resolved-outcome sentence. */
+  resultKey: string;
   /** What actually happened (human-readable). */
   effects: string[];
   cashChange: number;
@@ -46,14 +48,19 @@ export function resolveEvent(
   const consequence = eventDef.consequences[optionIndex];
   if (!consequence) return null;
 
+  const option = eventDef.options[optionIndex];
+  if (!option) return null;
+
   // Resolve probabilistic consequence
-  const resolved = resolveConsequence(consequence, rng);
+  const { consequence: resolved, isAlt } = resolveConsequence(consequence, rng);
 
   // Apply effects
   const result = applyConsequence(
     resolved,
     eventDef.id,
     optionIndex,
+    option.resultKey,
+    isAlt,
     finances,
     scores,
     eventSystem,
@@ -66,20 +73,25 @@ export function resolveEvent(
   return result;
 }
 
-function resolveConsequence(c: EventConsequence, rng: Random): EventConsequence {
+function resolveConsequence(
+  c: EventConsequence,
+  rng: Random,
+): { consequence: EventConsequence; isAlt: boolean } {
   if (c.probability !== undefined && c.probability < 1.0) {
     if (rng.chance(c.probability)) {
-      return c; // Success path
+      return { consequence: c, isAlt: false }; // Success path
     }
-    return c.altConsequence ?? {}; // Failure path
+    return { consequence: c.altConsequence ?? {}, isAlt: c.altConsequence !== undefined }; // Failure path
   }
-  return c;
+  return { consequence: c, isAlt: false };
 }
 
 function applyConsequence(
   c: EventConsequence,
   eventId: string,
   optionIndex: number,
+  resultKey: string,
+  isAlt: boolean,
   finances: FinanceState,
   scores: ScoreState,
   eventSystem: EventSystemState,
@@ -137,6 +149,7 @@ function applyConsequence(
     success: true,
     eventId,
     optionIndex,
+    resultKey: `${resultKey}${isAlt ? '_alt' : ''}`,
     effects,
     cashChange,
     scoreChanges,
