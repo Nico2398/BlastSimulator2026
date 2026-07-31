@@ -153,6 +153,7 @@ export class SaveLoadUI {
 
     const loadBtn = document.createElement('button');
     loadBtn.className = 'bs-btn';
+    loadBtn.dataset['action'] = 'load';
     loadBtn.style.cssText = 'padding:2px 6px;font-size:10px';
     loadBtn.textContent = t('saveload.load');
     loadBtn.disabled = !meta;

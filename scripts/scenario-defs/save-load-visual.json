@@ -131,12 +131,59 @@
       ]
     },
     {
-      "command": "load slot:quicksave",
-      "description": "Load back the console quick-save, proving the load path actually restores state (not just a UI no-op).",
+      "command": "drill_plan grid rows:2 cols:2 spacing:3 depth:4 start:15,15",
+      "description": "Drill a small plan after slot 1 was saved, so the blast below craters terrain the saved slot does not know about.",
       "interaction": [
         {
           "type": "command",
-          "command": "load slot:quicksave"
+          "command": "drill_plan grid rows:2 cols:2 spacing:3 depth:4 start:15,15"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:boomite amount:5 stemming:2"
+        }
+      ]
+    },
+    {
+      "command": "sequence auto delay_step:25",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sequence auto delay_step:25"
+        }
+      ]
+    },
+    {
+      "command": "blast",
+      "description": "Blast a crater into the live scene after slot 1's save, so the load step below must actually regenerate terrain (not just leave the cratered grid on screen) to prove itself.",
+      "timeout": 15,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "blast"
+        }
+      ]
+    },
+    {
+      "command": "state",
+      "description": "Load back slot 1 by clicking the Save/Load panel's own Load button (SaveLoadUI.ts, main.ts's setOnLoad handler) — not a raw console command — so this step exercises the click-driven path that must regenerate the grid, replacing the post-blast crater above with clean terrain matching the saved state. The command field stays the inert `state` read (rather than `load slot:...`) so command mode does not pre-clear the crater itself and mask a regression in the click path.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-save-panel [data-slot=\"slot_1\"] [data-action=\"load\"]"
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
         }
       ]
     },
