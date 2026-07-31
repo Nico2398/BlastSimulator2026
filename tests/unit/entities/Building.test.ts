@@ -8,6 +8,10 @@ import {
   getStorageCapacity,
   getBuildingScoreEffects,
   getBuildingDef,
+  isPlacementBlockedByResearch,
+  queueResearchTask,
+  tickResearch,
+  isTierUnlocked,
 } from '../../../src/core/entities/Building.js';
 
 describe('Building system', () => {
@@ -127,5 +131,89 @@ describe('demolishBuilding()', () => {
     expect(result.success).toBe(false);
     expect(result.freedCells).toHaveLength(0);
     expect(result.error).toContain('not found');
+  });
+});
+
+// ── isPlacementBlockedByResearch (#410 — currently a no-op stub, always false) ──
+
+describe('isPlacementBlockedByResearch', () => {
+  it('never blocks tier 1, regardless of research state', () => {
+    const state = createBuildingState();
+    expect(isPlacementBlockedByResearch(state, 'living_quarters', 1)).toBe(false);
+  });
+
+  it('blocks tier 2 when the tier has not been researched', () => {
+    const state = createBuildingState();
+    expect(isPlacementBlockedByResearch(state, 'living_quarters', 2)).toBe(true);
+  });
+
+  it('blocks tier 3 when only tier 2 has been researched', () => {
+    const state = createBuildingState();
+    state.unlockedTiers['living_quarters'] = 2;
+    expect(isPlacementBlockedByResearch(state, 'living_quarters', 3)).toBe(true);
+  });
+
+  it('does not block tier 2 once tier 2 has been researched', () => {
+    const state = createBuildingState();
+    state.unlockedTiers['living_quarters'] = 2;
+    expect(isPlacementBlockedByResearch(state, 'living_quarters', 2)).toBe(false);
+  });
+
+  it('does not block tier 3 once tier 3 has been researched', () => {
+    const state = createBuildingState();
+    state.unlockedTiers['living_quarters'] = 3;
+    expect(isPlacementBlockedByResearch(state, 'living_quarters', 3)).toBe(false);
+  });
+
+  it('a research unlock for one building type does not unblock another type', () => {
+    const state = createBuildingState();
+    state.unlockedTiers['geology_lab'] = 3;
+    expect(isPlacementBlockedByResearch(state, 'driving_center', 2)).toBe(true);
+  });
+});
+
+// ── placeBuilding — research gating (#410) ──────────────────────────────────
+
+describe('placeBuilding — research gating', () => {
+  it('places a tier-1 building with no research required', () => {
+    const state = createBuildingState();
+    const result = placeBuilding(state, 'living_quarters', 0, 0, 64, 64, 1);
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects placing a tier-2 building when the tier has not been researched', () => {
+    const state = createBuildingState();
+    const result = placeBuilding(state, 'living_quarters', 0, 0, 64, 64, 2);
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/research/i);
+    expect(state.buildings).toHaveLength(0);
+  });
+
+  it('rejects placing a tier-3 building when only tier 2 has been researched', () => {
+    const state = createBuildingState();
+    state.unlockedTiers['living_quarters'] = 2;
+    const result = placeBuilding(state, 'living_quarters', 0, 0, 64, 64, 3);
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/research/i);
+  });
+
+  it('allows placing a tier-2 building once tier 2 has been researched via the queue', () => {
+    const state = createBuildingState();
+    queueResearchTask(state, 'living_quarters', 2, 5, 5000);
+    for (let i = 0; i < 5; i++) tickResearch(state);
+    expect(isTierUnlocked(state, 'living_quarters', 2)).toBe(true);
+
+    const result = placeBuilding(state, 'living_quarters', 0, 0, 64, 64, 2);
+    expect(result.success).toBe(true);
+    expect(state.buildings).toHaveLength(1);
+  });
+
+  it('still rejects tier 3 after only tier 2 has completed research', () => {
+    const state = createBuildingState();
+    queueResearchTask(state, 'living_quarters', 2, 1, 5000);
+    tickResearch(state);
+
+    const result = placeBuilding(state, 'living_quarters', 0, 0, 64, 64, 3);
+    expect(result.success).toBe(false);
   });
 });

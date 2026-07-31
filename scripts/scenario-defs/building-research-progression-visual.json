@@ -1,6 +1,6 @@
 {
   "name": "building-research-progression-visual",
-  "description": "Placeholder — test-writer fills in the research queue/tick/unlock step sequence.",
+  "description": "Visual check of the research tier-gate: Tier 1 Research Center placed, a direct Tier 2 attempt rejected, then Tier 2 becomes buildable after research completes",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -11,6 +11,134 @@
           "command": "new_game seed:42"
         }
       ]
+    },
+    {
+      "command": "build research_center at:5,5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build research_center at:5,5"
+        }
+      ]
+    },
+    {
+      "command": "build list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build list"
+        }
+      ]
+    },
+    {
+      "command": "build research_center at:15,5 tier:2",
+      "description": "Rejected — tier 2 has not been researched yet.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build research_center at:15,5 tier:2"
+        }
+      ]
+    },
+    {
+      "command": "build list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build list"
+        }
+      ]
+    },
+    {
+      "command": "research queue type:research_center tier:2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "research queue type:research_center tier:2"
+        }
+      ]
+    },
+    {
+      "command": "research status",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "research status"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "research status",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "research status"
+        }
+      ]
+    },
+    {
+      "command": "tick 40",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 40"
+        }
+      ]
+    },
+    {
+      "command": "research status",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "research status"
+        }
+      ]
+    },
+    {
+      "command": "build research_center at:15,5 tier:2",
+      "description": "Now succeeds — tier 2 was just researched.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build research_center at:15,5 tier:2"
+        }
+      ]
+    },
+    {
+      "command": "build list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build list"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
     }
   ],
   "shots": [
@@ -18,6 +146,16 @@
       "name": "overview",
       "yaw": 0,
       "pitch": 45
+    },
+    {
+      "name": "research-area",
+      "yaw": 90,
+      "pitch": 10
+    },
+    {
+      "name": "closeup",
+      "yaw": 45,
+      "pitch": 30
     }
   ]
 }

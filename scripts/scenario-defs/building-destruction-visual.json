@@ -49,11 +49,11 @@
       ]
     },
     {
-      "command": "charge hole:* explosive:boomite amount:10 stemming:1",
+      "command": "charge hole:* explosive:boomite amount:8 stemming:1",
       "interaction": [
         {
           "type": "command",
-          "command": "charge hole:* explosive:boomite amount:10 stemming:1"
+          "command": "charge hole:* explosive:boomite amount:8 stemming:1"
         }
       ]
     },

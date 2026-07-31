@@ -85,11 +85,56 @@
       ]
     },
     {
-      "command": "tick 1",
+      "command": "employee train 1 skill:driving.excavator building:1",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 1"
+          "command": "employee train 1 skill:driving.excavator building:1"
+        }
+      ]
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ]
+    },
+    {
+      "command": "tick 15",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 15"
+        }
+      ]
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
         }
       ]
     },
