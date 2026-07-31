@@ -34,9 +34,12 @@ export interface HireStepSnapshot {
 }
 
 /** Collect the ids of employees who already hold `role` at snapshot time. */
-function captureHireStepSnapshot(_state: GameState, _role: EmployeeRole): HireStepSnapshot {
-  // TODO: implement — filter getEmployees(state) by role, map to id.
-  return undefined as unknown as HireStepSnapshot;
+function captureHireStepSnapshot(state: GameState, role: EmployeeRole): HireStepSnapshot {
+  return {
+    prevIdsWithRole: getEmployees(state)
+      .filter(e => e.role === role)
+      .map(e => e.id),
+  };
 }
 
 /**
@@ -45,13 +48,13 @@ function captureHireStepSnapshot(_state: GameState, _role: EmployeeRole): HireSt
  * one that already existed when the step started.
  */
 function isHireStepComplete(
-  _state: GameState,
-  _snapshot: HireStepSnapshot,
-  _role: EmployeeRole,
+  state: GameState,
+  snapshot: HireStepSnapshot,
+  role: EmployeeRole,
 ): boolean {
-  // TODO: implement — some employee with role === role whose id is not in
-  // snapshot.prevIdsWithRole.
-  throw new Error('not implemented');
+  return getEmployees(state).some(
+    e => e.role === role && !snapshot.prevIdsWithRole.includes(e.id),
+  );
 }
 
 /**
