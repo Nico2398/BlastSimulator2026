@@ -657,6 +657,16 @@ export function surveyCommand(
     return { success: true, output: `Pending surveys:\n${lines.join('\n')}` };
   }
 
+  if (sub === 'mode') {
+    // TODO: implement — report/toggle survey confidence overlay display mode.
+    return { success: false, output: 'not implemented' };
+  }
+
+  if (sub === 'ore_report') {
+    // TODO: implement — format and return the last post-blast ore report.
+    return { success: false, output: 'not implemented' };
+  }
+
   if (!sub) {
     return { success: false, output: 'Usage: survey <seismic|core_sample|aerial> x:<X> z:<Z>' };
   }

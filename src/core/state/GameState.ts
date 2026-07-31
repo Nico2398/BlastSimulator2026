@@ -5,6 +5,7 @@ import { STARTING_CASH } from '../config/balance.js';
 import type { DrillHole } from '../mining/DrillPlan.js';
 import type { HoleCharge } from '../mining/ChargePlan.js';
 import type { SurveyResult } from '../mining/SurveyCalc.js';
+import type { BlastOreReport } from '../mining/BlastOreReport.js';
 import type { FinanceState } from '../economy/Finance.js';
 import { createFinanceState } from '../economy/Finance.js';
 import type { ContractState } from '../economy/Contract.js';
@@ -198,6 +199,8 @@ export interface GameState {
   nextPendingActionId: number;
   /** Lightweight ghost-mesh preview entries for the renderer. */
   ghostPreviews: GhostPreview[];
+  /** Ore report from the most recent blast, or null if no blast has occurred yet. */
+  lastOreReport: BlastOreReport | null;
 }
 
 export interface WorldState {
@@ -259,6 +262,7 @@ export function createGame(config: GameConfig): GameState {
     pendingActions: [],
     nextPendingActionId: 1,
     ghostPreviews: [],
+    lastOreReport: null,
   };
 }
 
