@@ -18,7 +18,7 @@ import { BlastEffects } from './BlastEffects.js';
 import { DistantScenery } from './DistantScenery.js';
 import { BlastPlanOverlay } from './BlastPlanOverlay.js';
 import { GhostMesh } from './GhostMesh.js';
-import { syncEntitySets } from './EntitySync.js';
+import { syncEntitySets, buildingCenterSurfaceY } from './EntitySync.js';
 import type { SurveyConfidenceOverlayOptions, SurveyConfidencePoint } from './SurveyConfidenceOverlay.js';
 import { isSurveyStale } from '../core/mining/SurveyCalc.js';
 import {
@@ -27,7 +27,6 @@ import {
   BLAST_ORIGIN_SURFACE_SEARCH_MARGIN,
 } from '../core/config/balance.js';
 import { isInZone } from '../core/entities/Zone.js';
-import { getBuildingDef, getDefSize } from '../core/entities/Building.js';
 import { assembleBlastPlan } from '../core/mining/BlastPlan.js';
 import { previewHoleDetails } from '../core/mining/Software.js';
 import { boundingBoxXZ, getBlastOriginSurfaceY } from './BlastOriginSampling.js';
@@ -418,9 +417,7 @@ export class GameRenderer {
     // Buildings
     this.buildings = new BuildingMesh(scene);
     for (const b of state.buildings.buildings) {
-      const def = getBuildingDef(b.type, b.tier);
-      const { sizeX, sizeZ } = getDefSize(def);
-      const surfaceY = this.getTerrainSurfaceY(b.x + sizeX / 2, b.z + sizeZ / 2);
+      const surfaceY = buildingCenterSurfaceY(b, (x, z) => this.getTerrainSurfaceY(x, z));
       this.buildings.addBuilding(b, surfaceY);
     }
 

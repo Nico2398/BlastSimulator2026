@@ -2,10 +2,26 @@
 // Incremental diff-sync for buildings, vehicles, and characters.
 
 import type { GameState } from '../core/state/GameState.js';
+import type { Building } from '../core/entities/Building.js';
 import { getBuildingDef, getDefSize } from '../core/entities/Building.js';
 import type { BuildingMesh } from './BuildingMesh.js';
 import type { VehicleMesh } from './VehicleMesh.js';
 import type { CharacterMesh } from './CharacterMesh.js';
+
+/**
+ * Terrain surface height at a building's footprint center. Buildings are
+ * placed by top-left corner (b.x, b.z), so the center offsets by half the
+ * footprint size before sampling — shared by GameRenderer's initial load and
+ * EntitySync's incremental add/update so both snap buildings identically.
+ */
+export function buildingCenterSurfaceY(
+  b: Building,
+  getSurfaceY: (x: number, z: number) => number,
+): number {
+  const def = getBuildingDef(b.type, b.tier);
+  const { sizeX, sizeZ } = getDefSize(def);
+  return getSurfaceY(b.x + sizeX / 2, b.z + sizeZ / 2);
+}
 
 /**
  * Incrementally sync three entity collections against the current game state.
@@ -29,9 +45,7 @@ export function syncEntitySets(
 ): void {
   if (buildings) {
     for (const b of state.buildings.buildings) {
-      const def = getBuildingDef(b.type, b.tier);
-      const { sizeX, sizeZ } = getDefSize(def);
-      const surfaceY = getSurfaceY(b.x + sizeX / 2, b.z + sizeZ / 2);
+      const surfaceY = buildingCenterSurfaceY(b, getSurfaceY);
       if (!renderedBuildingIds.has(b.id)) {
         buildings.addBuilding(b, surfaceY);
         renderedBuildingIds.add(b.id);

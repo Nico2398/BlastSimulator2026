@@ -15,6 +15,8 @@ import { IndexedDBPersistence } from './persistence/IndexedDBPersistence.js';
 import { DownloadPersistence } from './persistence/DownloadPersistence.js';
 import { createRunner, runCommand } from './console/createRunner.js';
 import { parseCommand } from './console/ConsoleRunner.js';
+import { regenerateGrid } from './console/commands/world.js';
+import { getMinePreset } from './core/world/MineType.js';
 import { BASE_TICK_MS } from './core/engine/GameLoop.js';
 import { probeUiActions, probeSelector } from './ui/uiActionProbe.js';
 import { t } from './core/i18n/I18n.js';
@@ -383,8 +385,15 @@ saveLoadBtn.addEventListener('click', () => saveLoadUI.show());
 uiContainer.appendChild(saveLoadBtn);
 
 saveLoadUI.setOnLoad((state) => {
-  // Restore loaded state into the runner context
+  // Restore loaded state into the runner context. The VoxelGrid is not part
+  // of the serialized GameState (see the WorldState comment in
+  // GameState.ts), so it must be regenerated here the same way the console
+  // `load` command does — otherwise the scene keeps showing whatever terrain
+  // (e.g. post-blast craters) was on screen before this load (#408).
   ctx.state = state;
+  const preset = getMinePreset(state.mineType);
+  const { sizeX, sizeY, sizeZ } = state.world ?? { sizeX: 64, sizeY: 64, sizeZ: 64, gridReady: true };
+  if (preset) regenerateGrid(ctx, { seed: state.seed, preset, sizeX, sizeY, sizeZ });
   gameRenderer.syncFromContext(ctx);
 });
 

@@ -14,11 +14,10 @@
 // system's documented scope rather than adding a new limitation (#408).
 
 import type { GameContext } from './world.js';
+import { regenerateGrid } from './world.js';
 import type { CommandResult } from '../ConsoleRunner.js';
 import { serialize, deserialize } from '../../core/state/SaveLoad.js';
-import { buildGameNavGrid } from '../../core/state/GameState.js';
 import { getMinePreset } from '../../core/world/MineType.js';
-import { generateTerrain } from '../../core/world/TerrainGen.js';
 
 const DEFAULT_SLOT = 'quicksave';
 
@@ -51,8 +50,7 @@ export function loadCommand(
 
   const { sizeX, sizeY, sizeZ } = state.world ?? { sizeX: 64, sizeY: 64, sizeZ: 64, gridReady: true };
   ctx.state = state;
-  ctx.grid = generateTerrain({ sizeX, sizeY, sizeZ, seed: state.seed, preset });
-  buildGameNavGrid(ctx.state, ctx.grid, ctx.state.buildings.buildings, ctx.state.drillHoles);
+  regenerateGrid(ctx, { seed: state.seed, preset, sizeX, sizeY, sizeZ });
 
   return { success: true, output: `Loaded from slot "${slot}".` };
 }
