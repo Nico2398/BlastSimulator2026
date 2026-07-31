@@ -22,7 +22,7 @@ import { tickNeedGauges, needsMoraleEffect } from '../../core/entities/EmployeeN
 import type { FiredEvent } from '../../core/events/EventSystem.js';
 import { tickCollapse, autoInsertNeedTasks, processShiftCycle, tickEmployees, tickGeneralRestCompletion, tickTaskProgress, tickVehicle, tickVehicleTaskState, tickEmployeeMovement } from '../../core/engine/GameLoop.js';
 import { detectUnqualifiedTask, detectTrafficJam } from '../../core/events/EventEngine.js';
-import { estimateSurveyResult, type SurveyMethod } from '../../core/mining/SurveyCalc.js';
+import { estimateSurveyResult, applySeismicSurveyDamage, type SurveyMethod } from '../../core/mining/SurveyCalc.js';
 import { checkDeadlines, generateContracts } from '../../core/economy/Contract.js';
 import { updateBankruptcy } from '../../core/campaign/Bankruptcy.js';
 import { updateEcology } from '../../core/campaign/EcologicalDisaster.js';
@@ -183,6 +183,10 @@ export function tickCommand(
           completedTick: state.tickCount,
         }, new Random(state.seed + state.tickCount + action.id));
         state.surveyResults.push(surveyResult);
+        if (method === 'seismic') {
+          const seismicAccidents = applySeismicSurveyDamage(state.buildings, action.targetX, action.targetZ, state.tickCount);
+          state.damage.accidents.push(...seismicAccidents);
+        }
         lines.push(`[tick ${state.tickCount}] ${method} survey complete at (${action.targetX}, ${action.targetZ}).`);
       } else if (!surveyor) {
         // No eligible surveyor available — keep the action in queue

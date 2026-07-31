@@ -26,7 +26,7 @@ const HIT_RADIUS = 2.0;
 
 export interface AccidentRecord {
   tick: number;
-  type: 'building_damage' | 'building_destroyed' | 'vehicle_damage' | 'vehicle_destroyed' | 'injury' | 'death';
+  type: 'building_damage' | 'building_destroyed' | 'vehicle_damage' | 'vehicle_destroyed' | 'injury' | 'death' | 'seismic_damage' | 'seismic_destroyed';
   entityId: number;
   fragmentId: number;
   kineticEnergy: number;

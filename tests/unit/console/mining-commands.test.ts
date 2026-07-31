@@ -533,6 +533,142 @@ describe('blastCommand — ore report event wiring', () => {
     expect(detectSpy).toHaveBeenCalledWith(mockedReport, ctx.state!.events, ctx.state!.tickCount);
     expect(ctx.state!.events.pendingEvent?.eventId).toBe('lucky_strike');
   });
+
+  // ── GameState.lastOreReport wiring (issue #412) ───────────────────────────
+
+  it('leaves state.lastOreReport null before any blast has been executed', () => {
+    const ctx = makeMiningContext();
+    expect(ctx.state!.lastOreReport).toBeNull();
+  });
+
+  it('populates state.lastOreReport with the computed BlastOreReport after a blast', () => {
+    const ctx = makeMiningContext();
+
+    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+    chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
+    sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
+
+    const mockedReport = {
+      oreYields: { dirtite: 1300 },
+      totalYieldKg: 1300,
+      estimatedYieldKg: 1000,
+      yieldRatio: 1.3,
+      hasTreranium: false,
+      absurdiumFraction: 0,
+    };
+    vi.spyOn(SurveyCalcModule, 'computeBlastOreReport').mockReturnValue(mockedReport);
+
+    const result = blastCommand(ctx, [], {});
+
+    expect(result.success).toBe(true);
+    expect(ctx.state!.lastOreReport).not.toBeNull();
+    expect(ctx.state!.lastOreReport).toEqual(mockedReport);
+  });
+});
+
+// ── survey mode / ore_report subcommands (issue #412) ──────────────────────
+
+describe('surveyCommand — mode subcommand', () => {
+  it('returns success:true, not the "not implemented" stub placeholder', () => {
+    const ctx = makeMiningContext();
+    const result = surveyCommand(ctx, ['mode'], {});
+    expect(result.success).toBe(true);
+    expect(result.output).not.toBe('not implemented');
+  });
+
+  it('reports zero completed surveys when none have run yet', () => {
+    const ctx = makeMiningContext();
+    const result = surveyCommand(ctx, ['mode'], {});
+    expect(result.success).toBe(true);
+    expect(result.output.toLowerCase()).toMatch(/survey/);
+    expect(result.output).toMatch(/\b0\b/);
+  });
+
+  it('reflects the count of completed surveys in state.surveyResults', () => {
+    const ctx = makeMiningContext();
+    ctx.state!.surveyResults.push({
+      id: 1,
+      method: 'seismic',
+      centerX: 10,
+      centerZ: 10,
+      completedTick: 5,
+      surveyorId: 1,
+      estimates: {},
+      confidence: 0.9,
+    });
+
+    const result = surveyCommand(ctx, ['mode'], {});
+    expect(result.success).toBe(true);
+    expect(result.output).toMatch(/\b1\b/);
+  });
+
+  it('requires a loaded game', () => {
+    const ctx: MiningContext = {
+      state: null, grid: null, softwareTier: 0,
+      tubingState: createTubingState(), emitter: new EventEmitter(),
+    };
+    const result = surveyCommand(ctx, ['mode'], {});
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('No game loaded');
+  });
+});
+
+describe('surveyCommand — ore_report subcommand', () => {
+  it('returns success:false with a clear message when no ore report exists yet', () => {
+    const ctx = makeMiningContext();
+    expect(ctx.state!.lastOreReport).toBeNull();
+
+    const result = surveyCommand(ctx, ['ore_report'], {});
+    expect(result.success).toBe(false);
+    expect(result.output).not.toBe('not implemented');
+    expect(result.output.toLowerCase()).toMatch(/no.*(ore report|blast)/);
+  });
+
+  it('formats yield, estimate, and ratio data from a populated lastOreReport', () => {
+    const ctx = makeMiningContext();
+    ctx.state!.lastOreReport = {
+      oreYields: { dirtite: 1300 },
+      totalYieldKg: 1300,
+      estimatedYieldKg: 1000,
+      yieldRatio: 1.3,
+      hasTreranium: false,
+      absurdiumFraction: 0,
+    };
+
+    const result = surveyCommand(ctx, ['ore_report'], {});
+    expect(result.success).toBe(true);
+    expect(result.output).toContain('dirtite');
+    expect(result.output).toMatch(/1300/);
+    expect(result.output).toMatch(/1000/);
+    // Ratio 1.3 → 130% (or "1.3" / "1.30" depending on format) must appear somewhere
+    expect(result.output).toMatch(/130%|1\.3\b/);
+  });
+
+  it('does not crash or print NaN% when estimatedYieldKg is 0 and yieldRatio is 1.0', () => {
+    const ctx = makeMiningContext();
+    ctx.state!.lastOreReport = {
+      oreYields: {},
+      totalYieldKg: 0,
+      estimatedYieldKg: 0,
+      yieldRatio: 1.0,
+      hasTreranium: false,
+      absurdiumFraction: 0,
+    };
+
+    const result = surveyCommand(ctx, ['ore_report'], {});
+    expect(result.success).toBe(true);
+    expect(result.output).not.toMatch(/NaN/);
+  });
+
+  it('requires a loaded game', () => {
+    const ctx: MiningContext = {
+      state: null, grid: null, softwareTier: 0,
+      tubingState: createTubingState(), emitter: new EventEmitter(),
+    };
+    const result = surveyCommand(ctx, ['ore_report'], {});
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('No game loaded');
+  });
 });
 
 describe('buildRampCommand', () => {

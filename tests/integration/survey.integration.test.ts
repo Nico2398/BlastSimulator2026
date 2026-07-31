@@ -4,7 +4,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { type GameContext, newGameCommand } from '../../src/console/commands/world.js';
-import { employeeCommand } from '../../src/console/commands/entities.js';
+import { employeeCommand, buildCommand } from '../../src/console/commands/entities.js';
 import { surveyCommand } from '../../src/console/commands/mining.js';
 import { tickCommand } from '../../src/console/commands/events.js';
 import { EventEmitter } from '../../src/core/state/EventEmitter.js';
@@ -412,5 +412,107 @@ describe('Survey system', () => {
     expect(state.surveyResults).toHaveLength(1);
     expect(state.surveyResults[0]!.method).toBe('core_sample');
     expect(state.surveyResults[0]!.estimates['10,10']).toBeDefined();
+  });
+});
+
+// ── Survey system — seismic building side effects (issue #412) ─────────────
+//
+// Skill spec ("Survey Visibility Rules"): seismic surveys disturb nearby
+// buildings — −10 HP per survey if a building is within 5 cells of the
+// survey center. No such damage exists yet anywhere in src/core or
+// src/console — these tests define the expected behavior (TDD red phase).
+
+describe('Survey system — seismic building side effects', () => {
+  let ctx: GameContext;
+
+  beforeEach(() => {
+    ctx = makeCtx();
+  });
+
+  /** Hire a surveyor with geology skill so runSurvey()'s guard passes. */
+  function hireSurveyor(level = 3): void {
+    const empId = hireEmployeeByRole(ctx, 'surveyor');
+    employeeCommand(ctx, ['assign_skill', String(empId)], { skill: 'geology', level: String(level) });
+  }
+
+  /** Resolve queued survey pending-actions by advancing one tick. */
+  function resolveTick(): void {
+    tickCommand(ctx, ['1'], {});
+  }
+
+  function findBuilding(id: number) {
+    return ctx.state!.buildings.buildings.find(b => b.id === id)!;
+  }
+
+  it('applies -10 HP to a building within 5 cells of a completed seismic survey', () => {
+    hireSurveyor();
+    // Building at (22,20), survey center at (20,20) → Euclidean distance = 2 (within 5).
+    const buildResult = buildCommand(ctx, ['living_quarters'], { at: '22,20' });
+    expect(buildResult.success).toBe(true);
+    const building = ctx.state!.buildings.buildings[ctx.state!.buildings.buildings.length - 1]!;
+    const hpBefore = building.hp;
+
+    surveyCommand(ctx as any, ['seismic'], { x: '20', z: '20' });
+    resolveTick();
+
+    expect(findBuilding(building.id).hp).toBe(hpBefore - 10);
+  });
+
+  it('does not damage a building farther than 5 cells from the seismic survey center', () => {
+    hireSurveyor();
+    // Building at (25,25), survey center at (5,5) → distance ≈ 28 (outside 5-cell radius).
+    const buildResult = buildCommand(ctx, ['living_quarters'], { at: '25,25' });
+    expect(buildResult.success).toBe(true);
+    const building = ctx.state!.buildings.buildings[ctx.state!.buildings.buildings.length - 1]!;
+    const hpBefore = building.hp;
+
+    surveyCommand(ctx as any, ['seismic'], { x: '5', z: '5' });
+    resolveTick();
+
+    expect(findBuilding(building.id).hp).toBe(hpBefore);
+  });
+
+  it('does not damage a nearby building for a core_sample survey (seismic-only side effect)', () => {
+    hireSurveyor();
+    const buildResult = buildCommand(ctx, ['living_quarters'], { at: '12,10' });
+    expect(buildResult.success).toBe(true);
+    const building = ctx.state!.buildings.buildings[ctx.state!.buildings.buildings.length - 1]!;
+    const hpBefore = building.hp;
+
+    surveyCommand(ctx as any, ['core_sample'], { x: '10', z: '10' });
+    resolveTick();
+
+    expect(findBuilding(building.id).hp).toBe(hpBefore);
+  });
+
+  it('does not damage a nearby building for an aerial survey (seismic-only side effect)', () => {
+    hireSurveyor();
+    const buildResult = buildCommand(ctx, ['living_quarters'], { at: '12,10' });
+    expect(buildResult.success).toBe(true);
+    const building = ctx.state!.buildings.buildings[ctx.state!.buildings.buildings.length - 1]!;
+    const hpBefore = building.hp;
+
+    surveyCommand(ctx as any, ['aerial'], { x: '10', z: '10' });
+    resolveTick();
+
+    expect(findBuilding(building.id).hp).toBe(hpBefore);
+  });
+
+  it('damages every building within 5 cells when multiple are in range', () => {
+    hireSurveyor();
+    const b1Result = buildCommand(ctx, ['living_quarters'], { at: '19,20' });
+    const b2Result = buildCommand(ctx, ['management_office'], { at: '21,17' });
+    expect(b1Result.success).toBe(true);
+    expect(b2Result.success).toBe(true);
+    const b1 = ctx.state!.buildings.buildings.find(b => b.type === 'living_quarters')!;
+    const b2 = ctx.state!.buildings.buildings.find(b => b.type === 'management_office')!;
+    const b1HpBefore = b1.hp;
+    const b2HpBefore = b2.hp;
+
+    surveyCommand(ctx as any, ['seismic'], { x: '20', z: '20' });
+    resolveTick();
+
+    expect(findBuilding(b1.id).hp).toBe(b1HpBefore - 10);
+    expect(findBuilding(b2.id).hp).toBe(b2HpBefore - 10);
   });
 });

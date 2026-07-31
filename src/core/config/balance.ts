@@ -708,6 +708,12 @@ export const SURVEY_DURATION_TICKS = {
 /** Assumed bulk density of ore-bearing rock used for mass calculations (kg/m³). */
 export const ORE_DENSITY_KG_M3 = 2500;
 
+/** Radius (grid cells) within which a seismic survey's shockwave damages buildings. */
+export const SEISMIC_SURVEY_DAMAGE_RADIUS = 5;
+
+/** HP lost by each building within SEISMIC_SURVEY_DAMAGE_RADIUS of a seismic survey. */
+export const SEISMIC_SURVEY_DAMAGE_HP = 10;
+
 // ─── Physics ────────────────────────────────────────────────────────────────────
 
 /** Maximum fragments that get full Cannon-es rigid-body simulation. Rest use parabolic fallback. */

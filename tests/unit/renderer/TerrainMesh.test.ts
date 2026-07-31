@@ -432,8 +432,8 @@ describe('SurveyConfidenceOverlay', () => {
     overlay.dispose();
   });
 
-  // ── Stale point opacity (STALE_OPACITY = 0.25) ──
-  it('stale point has opacity multiplied by STALE_OPACITY (0.25)', () => {
+  // ── Stale point opacity (STALE_OPACITY = 0.6) ──
+  it('stale point has opacity multiplied by STALE_OPACITY (0.6)', () => {
     const scene = makeScene();
     const overlay = new SurveyConfidenceOverlay(scene);
     // Fresh point with opacity 0.6 → material opacity = 0.6 * 1.0 = 0.6
@@ -454,11 +454,11 @@ describe('SurveyConfidenceOverlay', () => {
     const staleMesh = group.children[0] as THREE.Mesh;
     const staleMat = staleMesh.material as THREE.MeshBasicMaterial;
 
-    // Stale opacity should be 0.25x the fresh opacity
+    // Stale opacity should be 0.6x the fresh opacity
     // Fresh: 0.6 * 1.0 = 0.6
-    // Stale: 0.6 * 0.25 = 0.15
+    // Stale: 0.6 * 0.6 = 0.36
     expect(freshOpacity).toBeCloseTo(0.6, 2);
-    expect(staleMat.opacity).toBeCloseTo(0.15, 2);
+    expect(staleMat.opacity).toBeCloseTo(0.36, 2);
     overlay.dispose();
   });
 

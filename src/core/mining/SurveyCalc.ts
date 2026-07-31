@@ -213,6 +213,8 @@ export function isSurveyStale(result: SurveyResult, currentTick: number): boolea
   return currentTick - result.completedTick > SURVEY_STALE_TICKS;
 }
 
+export { applySeismicSurveyDamage } from './SeismicSurveyDamage.js';
+
 /** Input parameters for {@link runSurvey}. */
 export interface RunSurveyParams {
   /** Survey method that determines cost, coverage, and duration. */

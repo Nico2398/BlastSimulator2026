@@ -75,6 +75,24 @@
       ]
     },
     {
+      "command": "build living_quarters at:22,20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build living_quarters at:22,20"
+        }
+      ]
+    },
+    {
+      "command": "build list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build list"
+        }
+      ]
+    },
+    {
       "command": "state full",
       "interaction": [
         {
@@ -269,6 +287,15 @@
         {
           "type": "command",
           "command": "survey show"
+        }
+      ]
+    },
+    {
+      "command": "build list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build list"
         }
       ]
     },
