@@ -33,7 +33,41 @@ const RAIN_PARTICLE_COUNT = 1500;
 const RAIN_AREA = 80;    // width/depth of rain box
 const RAIN_HEIGHT = 50;  // height rain falls from
 const RAIN_SPEED = 20;   // voxels per second downward
-const RAIN_POINT_SIZE = 0.8;
+const RAIN_POINT_SIZE = 1.4;
+const RAIN_STREAK_TEXTURE_SIZE = 16;
+
+/**
+ * Build a vertical streak alpha-mask for rain sprites. The default
+ * PointsMaterial sprite is a flat filled square, which reads as scattered
+ * confetti rather than falling rain — this shapes the point's square quad
+ * down to a thin, top/bottom-faded column so it reads as a streak instead (#408).
+ *
+ * Built as a DataTexture (raw pixel buffer) rather than a canvas so it needs
+ * no DOM — SkyboxWeather's constructor runs under Vitest's Node environment.
+ */
+function buildRainStreakTexture(): THREE.DataTexture {
+  const size = RAIN_STREAK_TEXTURE_SIZE;
+  const data = new Uint8Array(size * size * 4);
+  const centre = size / 2;
+  const streakHalfWidth = size * 0.16;
+  for (let y = 0; y < size; y++) {
+    // Fade the top and bottom of the column so the streak tapers rather than
+    // cuts off abruptly.
+    const edgeFade = Math.min(1, Math.min(y + 0.5, size - y - 0.5) / (size * 0.2));
+    for (let x = 0; x < size; x++) {
+      const dx = Math.abs(x + 0.5 - centre);
+      const coreAlpha = dx <= streakHalfWidth ? 1 : Math.max(0, 1 - (dx - streakHalfWidth) / 2);
+      const i = (y * size + x) * 4;
+      data[i] = 200;
+      data[i + 1] = 220;
+      data[i + 2] = 255;
+      data[i + 3] = Math.round(coreAlpha * edgeFade * 255);
+    }
+  }
+  const texture = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
+  texture.needsUpdate = true;
+  return texture;
+}
 
 // ---------- Transition speed ----------
 // Lerp factor per second (0.5 = reaches ~63% in 2 seconds)
@@ -167,8 +201,10 @@ export class SkyboxWeather {
     const mat = new THREE.PointsMaterial({
       color: 0xaaccff,
       size: RAIN_POINT_SIZE,
+      map: buildRainStreakTexture(),
+      alphaTest: 0.05,
       transparent: true,
-      opacity: 0.5,
+      opacity: 0.7,
       depthWrite: false,
     });
     this.rainPoints = new THREE.Points(geo, mat);

@@ -31,6 +31,72 @@
       ]
     },
     {
+      "command": "employee hire role:driller",
+      "description": "Hire crew and build the two score-linked buildings the scenario had no way to demonstrate decay without: management_office (safety +2/tick) and living_quarters (well-being +2/tick), plus a small blast below (immediate vibration hit to ecology/nuisance) — otherwise all four gauges sit flat at their neutral 50 default for the whole run.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:driller"
+        }
+      ]
+    },
+    {
+      "command": "build management_office at:5,5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build management_office at:5,5"
+        }
+      ]
+    },
+    {
+      "command": "build living_quarters at:12,5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build living_quarters at:12,5"
+        }
+      ]
+    },
+    {
+      "command": "drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:20,20",
+      "description": "Four holes at minimal spacing/stemming (vs. the wider, well-stemmed grids used elsewhere) so their energy overlaps enough to actually throw fragments (isProjection) — a single lightly-charged hole clears rock cleanly with zero projections and never moves Ecology/Nuisance at all.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:20,20"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:8 stemming:0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:boomite amount:8 stemming:0"
+        }
+      ]
+    },
+    {
+      "command": "sequence auto",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sequence auto"
+        }
+      ]
+    },
+    {
+      "command": "blast",
+      "description": "Vibration from this blast dips Ecology and Nuisance immediately — the following checkpoints show them decaying back toward neutral while Safety/Well-being climb from the buildings above.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "blast"
+        }
+      ]
+    },
+    {
       "command": "scores",
       "interaction": [
         {

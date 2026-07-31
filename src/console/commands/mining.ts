@@ -24,6 +24,9 @@ import { buildRamp, RAMP_WIDTH, type RampDirection } from '../../core/mining/Ram
 import {
   createWeatherCycle,
   forceAdvance,
+  setWeather,
+  ALL_WEATHER_STATES,
+  type WeatherState,
 } from '../../core/weather/WeatherCycle.js';
 import { Random } from '../../core/math/Random.js';
 import { buyTubing, installTubing, createTubingState } from '../../core/mining/Tubing.js';
@@ -571,6 +574,18 @@ export function weatherCommand(
 
   if (args[0] === 'advance') {
     forceAdvance(ctx.weatherCycle, ctx.rng!);
+    return { success: true, output: `Weather: ${ctx.weatherCycle.current}` };
+  }
+
+  if (args[0] === 'set') {
+    const target = args[1] as WeatherState | undefined;
+    if (!target || !ALL_WEATHER_STATES.includes(target)) {
+      return {
+        success: false,
+        output: `Usage: weather set <state>. Valid: ${ALL_WEATHER_STATES.join(', ')}`,
+      };
+    }
+    setWeather(ctx.weatherCycle, target);
     return { success: true, output: `Weather: ${ctx.weatherCycle.current}` };
   }
 

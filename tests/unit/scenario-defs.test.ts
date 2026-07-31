@@ -151,7 +151,7 @@ const KNOWN_COMMANDS = [
   'tutorial_start', 'corrupt', 'mafia', 'buy_software', 'weather', 'buy',
   'fragments', 'preview', 'blast_preview', 'install_tubing',
   'build_ramp', 'set_policy', 'terrain_info', 'help',
-  'blast_plan', 'needs',
+  'blast_plan', 'needs', 'save', 'load',
 ];
 
 /** Commands that inspect state — valid as a final playthrough step */

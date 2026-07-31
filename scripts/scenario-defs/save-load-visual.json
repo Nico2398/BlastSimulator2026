@@ -85,6 +85,62 @@
       ]
     },
     {
+      "command": "save slot:quicksave",
+      "description": "Quick-save the current run through the console save command, exercising the same serialize path the Save/Load panel's slot buttons use.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "save slot:quicksave"
+        }
+      ]
+    },
+    {
+      "command": "state",
+      "description": "Open the Save/Load panel (multiple slots, auto-save row, export/import, slot metadata) via its top-bar button.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-saveload-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-save-panel"
+        }
+      ]
+    },
+    {
+      "command": "state",
+      "description": "Save into numbered slot 1 through the panel's own Save button, populating its metadata (date, level, cash) for the slot list screenshot.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-save-panel [data-slot=\"slot_1\"] .bs-btn-primary"
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
+        }
+      ]
+    },
+    {
+      "command": "load slot:quicksave",
+      "description": "Load back the console quick-save, proving the load path actually restores state (not just a UI no-op).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "load slot:quicksave"
+        }
+      ]
+    },
+    {
       "command": "campaign status",
       "interaction": [
         {

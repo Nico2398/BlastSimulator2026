@@ -126,6 +126,7 @@ export class SaveLoadUI {
 
   private makeSlotRow(slotId: string, meta: SaveMeta | null): HTMLElement {
     const row = document.createElement('div');
+    row.dataset['slot'] = slotId;
     row.style.cssText = 'display:flex;align-items:center;gap:6px;margin-bottom:6px;padding:6px;background:#2a1a0a;border-radius:4px';
 
     const info = document.createElement('div');

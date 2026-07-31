@@ -17,6 +17,7 @@ import { createRunner, runCommand } from './console/createRunner.js';
 import { parseCommand } from './console/ConsoleRunner.js';
 import { BASE_TICK_MS } from './core/engine/GameLoop.js';
 import { probeUiActions, probeSelector } from './ui/uiActionProbe.js';
+import { t } from './core/i18n/I18n.js';
 
 // --- 3D Scene ---
 const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
@@ -141,6 +142,14 @@ window.__gameConsole = (cmd: string) => {
   // Sync the renderer after every command so visual changes appear immediately
   gameRenderer.syncFromContext(ctx);
   const cmdName = parseCommand(cmd).command;
+
+  // A fresh game replaces whatever the splash screen was showing — the normal
+  // click paths (world map "Start", tutorial button) already call
+  // mainMenu.hide() themselves, but `new_game` run directly (console mode,
+  // scenario harness) bypassed that and left the overlay covering the canvas.
+  if (cmdName === 'new_game' && result.success) {
+    mainMenu.hide();
+  }
 
   // Trigger blast effects and terrain rebuild after a blast
   if (cmdName === 'blast' && result.success && ctx.state) {
@@ -359,6 +368,20 @@ mainMenu.makeReturnToMapButton(uiContainer, () => {
   mainMenu.show();
   mainMenu.showWorldMap(ctx.state?.campaign ?? null);
 });
+
+// Save/Load button (fixed top bar, visible during gameplay). The Settings
+// panel's own Save/Load buttons only fire the bare `save`/`load` console
+// commands — this is the only in-game path to the full slot-list panel
+// (multiple slots, auto-save indicator, export/import), which was previously
+// reachable only from the main menu's "Load" button before a game existed (#408).
+const saveLoadBtn = document.createElement('button');
+saveLoadBtn.id = 'bs-saveload-btn';
+saveLoadBtn.className = 'bs-btn bs-return-map';
+saveLoadBtn.style.cssText = 'position:fixed;top:8px;right:250px;z-index:300;font-size:10px;padding:3px 8px';
+saveLoadBtn.textContent = '💾 ' + t('ui.toolbar.saves');
+saveLoadBtn.addEventListener('click', () => saveLoadUI.show());
+uiContainer.appendChild(saveLoadBtn);
+
 saveLoadUI.setOnLoad((state) => {
   // Restore loaded state into the runner context
   ctx.state = state;

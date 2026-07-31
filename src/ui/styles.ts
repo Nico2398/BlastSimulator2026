@@ -79,6 +79,16 @@ const CSS = `
   pointer-events: all;
 }
 #bs-hud-top .bs-speed-btn:hover { background: rgba(255,255,255,0.18); }
+#bs-hud-top .bs-speed-btn.bs-speed-paused {
+  background: rgba(220,60,20,0.35);
+  border-color: rgba(255,140,90,0.6);
+  color: #ffcfae;
+  animation: bs-pause-pulse 1.6s ease-in-out infinite;
+}
+@keyframes bs-pause-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
 #bs-hud-top .bs-weather { font-size: 18px; line-height: 1; }
 .bs-event-badge {
   background: rgba(220,60,20,0.9);
@@ -179,6 +189,18 @@ const CSS = `
   left: 50%;
   transform: translate(-50%,-50%);
   width: 320px;
+  z-index: 10000;
+}
+/* Never had a position rule — with no top/left, a .bs-ui (position:fixed)
+   element's static position falls back to its place in normal document flow,
+   which sits below #game-canvas (a full-viewport block above it in the
+   DOM). The panel rendered a full viewport-height below the fold — present
+   and "clickable" by every DOM check, invisible and unreachable on screen (#408). */
+#bs-save-panel {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%,-50%);
+  width: 340px;
   z-index: 10000;
 }
 .bs-settings-row {

@@ -69,11 +69,11 @@ export async function initBrowser(options: BrowserInitOptions): Promise<BrowserI
   await page.waitForSelector('#game-canvas, canvas', { timeout: 10000 });
   console.log('Game canvas detected. Waiting for initialization...');
 
-  // Dismiss main menu
-  await page.evaluate(() => {
-    const menu = document.getElementById('bs-main-menu');
-    if (menu) (menu as HTMLElement).style.display = 'none';
-  });
+  // The main menu overlay starts visible, same as a real player would see it.
+  // Scenarios that begin with `new_game` tear it down themselves the moment
+  // that command runs (see main.ts's console bridge) — forcing it hidden
+  // here, before any scenario step executes, broke scenarios that inspect
+  // the menu itself (main-menu-visual.json, #408).
 
   return { browser, page };
 }

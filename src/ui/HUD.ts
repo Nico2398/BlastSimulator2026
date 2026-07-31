@@ -51,6 +51,7 @@ export class HUD {
 
   private onSpeedChange?: (speed: number) => void;
   private currentSpeed = 1;
+  private isPaused = false;
 
   constructor(container: HTMLElement) {
     // ── Top bar ──
@@ -128,10 +129,17 @@ export class HUD {
     const hour = state.tickCount % 24;
     this.timeEl.textContent = t('hud.time', { day, hour: String(hour).padStart(2, '0') });
 
-    // Speed — only sync from state if the game overrides it (e.g. on load)
-    if (state.timeScale !== this.currentSpeed) {
+    // Speed — only sync from state if the game overrides it (e.g. on load).
+    // Paused is tracked separately from timeScale: `time pause` does not touch
+    // timeScale, so the button previously kept showing "1x" with no visual
+    // change while the sim sat fully stopped (#408).
+    if (state.timeScale !== this.currentSpeed || state.isPaused !== this.isPaused) {
       this.currentSpeed = state.timeScale;
-      this.speedBtn.textContent = t('hud.speed_x', { speed: String(state.timeScale) });
+      this.isPaused = state.isPaused;
+      this.speedBtn.textContent = this.isPaused
+        ? t('hud.paused')
+        : t('hud.speed_x', { speed: String(state.timeScale) });
+      this.speedBtn.classList.toggle('bs-speed-paused', this.isPaused);
     }
 
     // Weather icon
