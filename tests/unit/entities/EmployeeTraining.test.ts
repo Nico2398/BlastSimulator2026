@@ -209,7 +209,8 @@ describe('licences no role is hired with', () => {
 // The employee lands one tile outside the footprint (building.x - 1), not on
 // the raw origin corner — that corner sits on the building's own opaque
 // base-box footprint and renders fully occluded from every external camera
-// angle (#410 iteration 2).
+// angle (#410 iteration 2). At the x === 0 grid edge the offset flips to
+// building.x + 1 so the employee never lands off-grid (#410 iteration 3).
 
 describe('enrolInTraining — the employee relocates to the training building', () => {
   it('sets the employee position adjacent to the training building, not the pre-enrolment position', () => {
@@ -225,7 +226,7 @@ describe('enrolInTraining — the employee relocates to the training building', 
     expect(employee.z).toBe(building.z);
   });
 
-  it('relocates the employee even when the school sits at the origin', () => {
+  it('relocates the employee even when the school sits at the origin, without going off-grid', () => {
     const { state, employee } = makeStateWithOne('driver');
     employee.x = 25;
     employee.z = 25;
@@ -234,7 +235,8 @@ describe('enrolInTraining — the employee relocates to the training building', 
     const result = enrolInTraining(state, employee.id, building, 'driving.excavator');
     expect(result.success, result.error).toBe(true);
 
-    expect(employee.x).toBe(-1);
+    // building.x - 1 would be -1 (off-grid), so the offset flips to +1.
+    expect(employee.x).toBe(1);
     expect(employee.z).toBe(0);
   });
 

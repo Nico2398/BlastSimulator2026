@@ -48,6 +48,9 @@ export function researchCommand(
 
       const ticks = RESEARCH_TIER_TICKS[tier];
       const cost = RESEARCH_TIER_COST[tier];
+      if (state.cash < cost) {
+        return { success: false, output: `Insufficient funds: research costs $${cost}.` };
+      }
       queueResearchTask(state.buildings, type, tier, ticks, cost);
       state.cash -= cost;
       addExpense(state.finances, cost, 'construction', `Research ${type} T${tier}`, state.tickCount);

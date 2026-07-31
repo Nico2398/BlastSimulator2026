@@ -3,12 +3,12 @@
   "description": "Visual check of building tier upgrade system from T1 to T3 and demolition",
   "steps": [
     {
-      "command": "new_game seed:42",
+      "command": "new_game seed:42 cash:200000",
       "timeout": 10,
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42"
+          "command": "new_game seed:42 cash:200000"
         }
       ]
     },
@@ -121,11 +121,11 @@
       ]
     },
     {
-      "command": "build destroy 3",
+      "command": "build destroy 4",
       "interaction": [
         {
           "type": "command",
-          "command": "build destroy 3"
+          "command": "build destroy 4"
         }
       ]
     },

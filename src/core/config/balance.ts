@@ -417,6 +417,13 @@ export const TRAINING_LEVEL_COST_MULTIPLIER: Record<1 | 2 | 3 | 4 | 5, number> =
   5: 4.6,
 } as const;
 
+/**
+ * Tiles a training employee is relocated outward from the school's entry
+ * corner (`building.x`/`building.z`), so the sprite clears the building's
+ * opaque footprint instead of rendering occluded on top of it.
+ */
+export const TRAINING_RELOCATION_OFFSET = 1;
+
 // ─── Research Center ───────────────────────────────────────────────────────────
 
 /**

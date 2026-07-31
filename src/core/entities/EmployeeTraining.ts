@@ -15,6 +15,7 @@ import {
   TRAINING_TIER_SPEED,
   TRAINING_BASE_FEE,
   TRAINING_LEVEL_COST_MULTIPLIER,
+  TRAINING_RELOCATION_OFFSET,
 } from '../config/balance.js';
 
 export type ProficiencyLevel = 1 | 2 | 3 | 4 | 5;
@@ -125,6 +126,10 @@ export function startTraining(
  * origin coordinate sits on the building's own opaque base-box footprint, so
  * a character placed there renders fully occluded from every external camera
  * angle (#410).
+ *
+ * The offset moves in `-x` unless that would leave the grid — a school sitting
+ * at the `x === 0` edge (a legal placement) offsets in `+x` instead, so the
+ * employee never lands off-grid (#410).
  */
 export function enrolInTraining(
   state: EmployeeState,
@@ -147,8 +152,11 @@ export function enrolInTraining(
   if (!started.success) return { success: false, ...(started.error ? { error: started.error } : {}) };
 
   // One tile outside the footprint, adjacent to the entry corner — see doc
-  // comment above for why the raw origin corner is unusable.
-  emp.x = building.x - 1;
+  // comment above for why the raw origin corner is unusable, and why the
+  // offset direction flips at the grid edge.
+  emp.x = building.x - TRAINING_RELOCATION_OFFSET >= 0
+    ? building.x - TRAINING_RELOCATION_OFFSET
+    : building.x + TRAINING_RELOCATION_OFFSET;
   emp.z = building.z;
 
   return { success: true, fee: plan.fee, plan };
