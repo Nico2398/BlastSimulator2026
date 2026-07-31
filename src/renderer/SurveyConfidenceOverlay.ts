@@ -11,7 +11,7 @@ import * as THREE from 'three';
 const CONFIDENCE_QUAD_SIZE = 1.0;
 
 /** Opacity multiplier for stale (expired) survey points. */
-const STALE_OPACITY = 0.25;
+const STALE_OPACITY = 0.6;
 
 /** Z-fighting offset above terrain surface. */
 const OVERLAY_Y_OFFSET = 0.05;
