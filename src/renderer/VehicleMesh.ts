@@ -203,14 +203,34 @@ export class VehicleMesh {
    * would otherwise stomp this offset back to the fused raw position between
    * update()'s per-frame lerps — GameRenderer must fold this same offset into
    * the x/z it passes to snapPosition.
+   *
+   * Round 3 (#411 issue A): an `idle` vehicle already sitting at that exact
+   * target cell (x/z equal to the target, e.g. it arrived and stopped) also
+   * occupies a slot — otherwise a waiting vehicle's offset could still land
+   * on top of it. The idle vehicle itself is never offset (only 'waiting'
+   * vehicles get a non-zero return above), it just reserves slot 0 so the
+   * waiting vehicles route around it.
    */
   waitingQueueOffset(vehicle: Vehicle, pool: Vehicle[]): readonly [number, number] {
     if (vehicle.state !== 'waiting') return [0, 0];
 
-    const sharingTarget = pool
-      .filter(v => v.state === 'waiting' && v.targetX === vehicle.targetX && v.targetZ === vehicle.targetZ)
+    const sharesTarget = (v: Vehicle): boolean =>
+      v.targetX === vehicle.targetX && v.targetZ === vehicle.targetZ;
+
+    // Idle vehicles already occupying the target cell claim slot 0 first (in
+    // ascending id order) so waiting vehicles never compute an offset that
+    // lands on an idle occupant.
+    const occupyingIds = pool
+      .filter(v => v.state === 'idle' && v.x === v.targetX && v.z === v.targetZ && sharesTarget(v))
       .map(v => v.id)
       .sort((a, b) => a - b);
+
+    const waitingIds = pool
+      .filter(v => v.state === 'waiting' && sharesTarget(v))
+      .map(v => v.id)
+      .sort((a, b) => a - b);
+
+    const sharingTarget = [...occupyingIds, ...waitingIds];
 
     if (sharingTarget.length <= 1) return [0, 0];
 

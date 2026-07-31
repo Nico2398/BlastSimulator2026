@@ -159,11 +159,12 @@
       ]
     },
     {
-      "command": "tick 6",
+      "command": "tick 16",
+      "description": "Extended from tick 6 (#411 round 3, issue B): TRAFFIC_JAM_MIN_TICKS=10 consecutive waiting ticks on top of the ~8-10 ticks it takes the haulers to converge means the jam fires around cumulative tick 20 — this scenario's own stated purpose (demonstrating TrafficJamEvent) was previously unreachable within its 6+6=12 tick budget even after wiring detectTrafficJam into the console tick path. 6+16=22 gives margin past the tick-20 fire point.",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 6"
+          "command": "tick 16"
         }
       ]
     },
