@@ -214,7 +214,7 @@ describe('tutorialSteps', () => {
         events: { pendingEvent: { eventId: 'test_evt', firedAtTick: 5 } },
         employees: { employees: [{ role: 'manager' }] },
       } as unknown as GameState;
-      const snap = { prevEmployeeCount: 0 };
+      const snap = { prevIdsWithRole: [] };
       expect(step10.isComplete(state, snap)).toBe(false);
     });
 
@@ -223,7 +223,7 @@ describe('tutorialSteps', () => {
         events: { pendingEvent: null },
         employees: { employees: [{ role: 'manager' }] },
       } as unknown as GameState;
-      const snap = { prevEmployeeCount: 0 };
+      const snap = { prevIdsWithRole: [] };
       expect(step10.isComplete(state, snap)).toBe(true);
     });
   });
