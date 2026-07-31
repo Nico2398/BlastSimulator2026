@@ -21,7 +21,7 @@ export function ev(
     category,
     titleKey: `event.${id}.title`,
     descKey: `event.${id}.desc`,
-    options: opts.options.map((_, i) => ({ labelKey: `event.${id}.opt${i}` })),
+    options: opts.options.map((_, i) => ({ labelKey: `event.${id}.opt${i}`, resultKey: `event.${id}.res${i}` })),
     consequences: opts.options.map(o => {
       const c: EventConsequence = {};
       if (o.cashDelta !== undefined) c.cashDelta = o.cashDelta;

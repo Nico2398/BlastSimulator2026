@@ -16,6 +16,8 @@ export interface ResolutionResult {
   success: boolean;
   eventId: string;
   optionIndex: number;
+  /** i18n key for the resolved-outcome sentence. */
+  resultKey: string;
   /** What actually happened (human-readable). */
   effects: string[];
   cashChange: number;
@@ -137,6 +139,7 @@ function applyConsequence(
     success: true,
     eventId,
     optionIndex,
+    resultKey: `event.${eventId}.res${optionIndex}`,
     effects,
     cashChange,
     scoreChanges,

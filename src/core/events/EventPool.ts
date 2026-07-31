@@ -10,6 +10,8 @@ export type EventCategory = 'union' | 'politics' | 'weather' | 'mafia' | 'lawsui
 export interface EventOption {
   /** i18n key for option text. */
   labelKey: string;
+  /** i18n key for the resolved-outcome sentence shown after this option is chosen. */
+  resultKey: string;
 }
 
 export interface EventConsequence {
