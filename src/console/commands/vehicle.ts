@@ -13,6 +13,7 @@ import {
   type VehicleTier,
 } from '../../core/entities/Vehicle.js';
 import { addExpense } from '../../core/economy/Finance.js';
+import { SPAWN_RING_SIZE, SPAWN_TILE_SPACING } from '../../core/config/balance.js';
 
 // ── tier arg parsing ──
 
@@ -63,9 +64,15 @@ export function vehicleCommand(
       if (tier === null) {
         return { success: false, output: 'Usage: vehicle buy <role> tier:(1|2|3)' };
       }
-      // Spawn near grid centre so vehicles are visible from default camera
-      const spawnX = state.world ? state.world.sizeX / 2 : 32;
-      const spawnZ = state.world ? state.world.sizeZ / 2 : 32;
+      // Spawn near grid centre, staggered per fleet index so newly purchased
+      // vehicles land on distinct tiles instead of stacking on the depot
+      // point — every prior purchase overlapped at one tile, occluding all
+      // but the tallest mesh (#411).
+      const baseX = state.world ? state.world.sizeX / 2 : 32;
+      const baseZ = state.world ? state.world.sizeZ / 2 : 32;
+      const fleetIndex = state.vehicles.vehicles.length;
+      const spawnX = baseX + (fleetIndex % SPAWN_RING_SIZE) * SPAWN_TILE_SPACING;
+      const spawnZ = baseZ + Math.floor(fleetIndex / SPAWN_RING_SIZE) * SPAWN_TILE_SPACING;
       const { vehicle, cost } = purchaseVehicle(state.vehicles, type, spawnX, spawnZ, tier);
       state.cash -= cost;
       addExpense(state.finances, cost, 'equipment', `Buy ${type}`, state.tickCount);

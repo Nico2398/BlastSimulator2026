@@ -124,6 +124,20 @@ export const TRAFFIC_JAM_MIN_VEHICLES = 3;
 /** Minimum consecutive waiting ticks per vehicle before it counts toward a traffic jam. */
 export const TRAFFIC_JAM_MIN_TICKS = 10;
 
+// ─── Vehicle Spawn Placement ────────────────────────────────────────────────────
+
+/**
+ * `vehicle buy` spreads new arrivals across a ring/grid pattern around the
+ * depot point instead of stacking every purchase on one tile — a shared tile
+ * fully occluded all but the tallest mesh (#411). SPAWN_RING_SIZE columns
+ * before wrapping to the next row; SPAWN_TILE_SPACING tiles between spawns —
+ * wide enough that adjacent vehicle meshes stay visually distinct (1-tile
+ * spacing still let bodies merge, see TRAFFIC_JAM_MIN_TICKS's neighbour
+ * vehicle-traffic-routing-visual fix) while staying near the depot.
+ */
+export const SPAWN_RING_SIZE = 3;
+export const SPAWN_TILE_SPACING = 3;
+
 // ─── Ore Report Events ───────────────────────────────────────────────────────────
 
 /** Yield ratio threshold above which a blast is considered "Lucky Strike" (got more ore than surveyed). */

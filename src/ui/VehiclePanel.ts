@@ -200,13 +200,13 @@ export class VehiclePanel {
    */
   private buildTierButtons(type: VehicleRole): HTMLElement {
     const wrap = document.createElement('div');
-    wrap.style.cssText = 'display:flex;gap:4px';
+    wrap.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px;width:100%';
 
     for (const tier of VEHICLE_TIERS) {
       const def = getVehicleDefByTier(type, tier);
       const btn = document.createElement('button');
       btn.className = 'bs-btn bs-btn-primary';
-      btn.style.cssText = 'padding:2px 8px;font-size:10px';
+      btn.style.cssText = 'padding:2px 6px;font-size:9px;flex:1 1 auto;min-width:0;white-space:normal;line-height:1.3';
       btn.textContent = `${this.vehicleDisplayName(type, tier)} ($${def.purchaseCost})`;
       btn.dataset['vtype'] = type;
       btn.dataset['tier'] = String(tier);
@@ -234,10 +234,10 @@ export class VehiclePanel {
   private buildBuySection(): void {
     for (const type of getAllVehicleRoles()) {
       const row = document.createElement('div');
-      row.style.cssText = 'display:flex;align-items:center;gap:6px;margin-bottom:4px';
+      row.style.cssText = 'display:flex;flex-direction:column;gap:3px;margin-bottom:6px';
 
       const label = document.createElement('div');
-      label.style.cssText = 'flex:1;font-size:11px;color:#d0b090';
+      label.style.cssText = 'font-size:11px;color:#d0b090';
       label.textContent = type;
 
       row.append(label, this.buildTierButtons(type));

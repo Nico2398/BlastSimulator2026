@@ -3,21 +3,13 @@
   "description": "Visual check: vehicle purchase menu shows all roles with cost stats and purchase buttons for tier comparison",
   "steps": [
     {
-      "command": "new_game seed:42",
+      "command": "new_game seed:42 cash:100000",
       "timeout": 10,
+      "description": "$100k starting cash (not the dusty_hollow campaign level's $50k) so the fleet has headroom for the tier-2/3 purchases below plus the real tier-2 rock_fragmenter click ($64k) further down — dusty_hollow's cash alone is less than that one click's cost, and other campaign levels with more cash start locked (#411).",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42"
-        }
-      ]
-    },
-    {
-      "command": "campaign start level:dusty_hollow",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "campaign start level:dusty_hollow"
+          "command": "new_game seed:42 cash:100000"
         }
       ]
     },
@@ -36,6 +28,28 @@
         {
           "type": "command",
           "command": "vehicle buy debris_hauler"
+        }
+      ]
+    },
+    {
+      "command": "vehicle list",
+      "description": "Command mode only lists the fleet; interaction mode additionally opens the Vehicles panel and clicks the real tier-2 buy button for rock_fragmenter — a genuine UI click on the new tier selector, not a replayed console command — proving the tier buttons are reachable and enabled, not just that `vehicle buy ... tier:N` works headlessly. Run now, while only the one cheap debris_hauler purchase above has been spent, so cash ($75k) stays comfortably above this button's $64k cost — later steps' command-mode tier:2/tier:3 purchases (which push cash negative, harmless for command mode) happen only after this click (#411).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle list"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"rock_fragmenter\"][data-tier=\"2\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"rock_fragmenter\"][data-tier=\"2\"]"
         }
       ]
     },
@@ -65,28 +79,6 @@
         {
           "type": "command",
           "command": "vehicle buy drill_rig tier:3"
-        }
-      ]
-    },
-    {
-      "command": "vehicle list",
-      "description": "Command mode only lists the fleet; interaction mode additionally opens the Vehicles panel and clicks the real tier-2 buy button for rock_fragmenter — a genuine UI click on the new tier selector, not a replayed console command — proving the tier buttons are reachable and enabled, not just that `vehicle buy ... tier:N` works headlessly.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "vehicle list"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vtype=\"rock_fragmenter\"][data-tier=\"2\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vtype=\"rock_fragmenter\"][data-tier=\"2\"]"
         }
       ]
     },
