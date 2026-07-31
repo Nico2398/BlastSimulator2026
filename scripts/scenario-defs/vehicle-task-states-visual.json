@@ -40,11 +40,12 @@
       ]
     },
     {
-      "command": "vehicle move 1 to:25,25",
+      "command": "vehicle move 1 to:2,2",
+      "description": "Target far enough from spawn that tick 5 below (speed 3/tick = 15 cells) doesn't cover the whole distance in one batch — the old to:25,25 target was close enough that the vehicle arrived and reset to idle within the same tick command, so the moving-state shot never captured the blue in-transit marker (#411).",
       "interaction": [
         {
           "type": "command",
-          "command": "vehicle move 1 to:25,25"
+          "command": "vehicle move 1 to:2,2"
         }
       ]
     },

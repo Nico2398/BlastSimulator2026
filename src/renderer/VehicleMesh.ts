@@ -12,7 +12,8 @@
 // Vehicles move smoothly to their target position via lerp each frame.
 
 import * as THREE from 'three';
-import type { Vehicle, VehicleRole, VehicleTier } from '../core/entities/Vehicle.js';
+import type { Vehicle, VehicleRole, VehicleTier, VehicleOperationalState } from '../core/entities/Vehicle.js';
+import { waitingQueueOffset, waitingRenderPosition } from './VehicleWaitingQueue.js';
 
 // ---------- Colors ----------
 const YELLOW = 0xf5c518;   // Caterpillar yellow
@@ -159,7 +160,10 @@ export class VehicleMesh {
     const builder = VEHICLE_BUILDERS[vehicle.type];
     const group = builder();
     applyTierVariation(group, vehicle.tier);
-    group.position.set(vehicle.x, surfaceY, vehicle.z);
+    applyStateIndicator(group, vehicle.state);
+    const pool = [...Array.from(this.vehicles.values(), e => e.vehicle), vehicle];
+    const [renderX, renderZ] = this.waitingRenderPosition(vehicle, pool);
+    group.position.set(renderX, surfaceY, renderZ);
     this.scene.add(group);
     this.vehicles.set(vehicle.id, { group, vehicle });
   }
@@ -174,10 +178,29 @@ export class VehicleMesh {
       if (!entry) continue;
       // Update stored reference
       entry.vehicle = v;
-      // Lerp toward target
-      entry.group.position.x += (v.x - entry.group.position.x) * MOVE_LERP;
-      entry.group.position.z += (v.z - entry.group.position.z) * MOVE_LERP;
+      // Lerp toward target (+ queue offset for fused 'waiting' vehicles, #411 round 2)
+      const [targetX, targetZ] = this.waitingRenderPosition(v, vehicles);
+      entry.group.position.x += (targetX - entry.group.position.x) * MOVE_LERP;
+      entry.group.position.z += (targetZ - entry.group.position.z) * MOVE_LERP;
+      applyStateIndicator(entry.group, v.state);
     }
+  }
+
+  /**
+   * Render-only offset for a 'waiting' vehicle sharing its target cell with
+   * others (#411 round 2) — thin delegate to VehicleWaitingQueue.ts, kept as
+   * an instance method so callers/tests don't need a second import.
+   */
+  waitingQueueOffset(vehicle: Vehicle, pool: Vehicle[]): readonly [number, number] {
+    return waitingQueueOffset(vehicle, pool);
+  }
+
+  /**
+   * Render position for a vehicle, folding in the waiting-queue slot offset
+   * (#411 round 4) — thin delegate to VehicleWaitingQueue.ts.
+   */
+  waitingRenderPosition(vehicle: Vehicle, pool: Vehicle[]): readonly [number, number] {
+    return waitingRenderPosition(vehicle, pool);
   }
 
   /** Snap a vehicle directly to its world position (no lerp — use after teleport or initial placement). */
@@ -252,6 +275,45 @@ function brightenColor(hex: number, shift: number): number {
     (Math.round(g + (0xff - g) * shift) << 8)  |
      Math.round(b + (0xff - b) * shift)
   );
+}
+
+// ---------- State indicator ----------
+
+/** Marker color per VehicleOperationalState. */
+export const STATE_COLOR_MAP: Record<VehicleOperationalState, number> = {
+  idle: 0x999999,     // grey — not working
+  moving: 0x3399ff,   // blue — en route
+  working: 0x33cc33,  // green — actively working
+  waiting: 0xffcc00,  // amber — blocked/waiting
+  broken: 0xff3333,   // red — broken down
+};
+
+const STATE_INDICATOR_RADIUS = 0.25;
+
+/**
+ * Adds or updates a small colored marker on a vehicle's group reflecting its
+ * operational state, following the same material-color-manipulation pattern
+ * as applyTierVariation below. Idempotent — reuses the existing marker mesh
+ * (tagged group.userData.isStateIndicator) rather than adding a duplicate.
+ */
+export function applyStateIndicator(group: THREE.Group, state: VehicleOperationalState): void {
+  const color = STATE_COLOR_MAP[state];
+  let marker = group.children.find(
+    (child): child is THREE.Mesh => child instanceof THREE.Mesh && child.userData['isStateIndicator'] === true,
+  );
+
+  if (!marker) {
+    marker = new THREE.Mesh(
+      new THREE.SphereGeometry(STATE_INDICATOR_RADIUS, 8, 8),
+      new THREE.MeshPhongMaterial({ color }),
+    );
+    marker.userData['isStateIndicator'] = true;
+    marker.position.set(0, 3.2, 0);
+    group.add(marker);
+    return;
+  }
+
+  (marker.material as THREE.MeshPhongMaterial).color.setHex(color);
 }
 
 function applyTierVariation(group: THREE.Group, tier: VehicleTier): void {

@@ -10,8 +10,26 @@ import {
   getAllVehicleRoles,
   type VehicleRole,
   type VehicleTask,
+  type VehicleTier,
 } from '../../core/entities/Vehicle.js';
 import { addExpense } from '../../core/economy/Finance.js';
+import { SPAWN_RING_SIZE, SPAWN_TILE_SPACING } from '../../core/config/balance.js';
+
+// ── tier arg parsing ──
+
+/**
+ * Parses and validates the `tier:` named arg for `vehicle buy` (default 1;
+ * only 1|2|3 accepted, matching the role-validation branch below). Returns
+ * the parsed tier, or `null` when the arg is present but not 1|2|3. Called
+ * from the `buy` case below, which threads the result into purchaseVehicle.
+ */
+export function parseVehicleTierArg(named: Record<string, string>): VehicleTier | null {
+  const raw = named['tier'];
+  if (raw === undefined) return 1;
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || (parsed !== 1 && parsed !== 2 && parsed !== 3)) return null;
+  return parsed;
+}
 
 // ── vehicle command ──
 
@@ -41,10 +59,20 @@ export function vehicleCommand(
       if (!getAllVehicleRoles().includes(type)) {
         return { success: false, output: `Usage: vehicle buy (${getAllVehicleRoles().join('|')})` };
       }
-      // Spawn near grid centre so vehicles are visible from default camera
-      const spawnX = state.world ? state.world.sizeX / 2 : 32;
-      const spawnZ = state.world ? state.world.sizeZ / 2 : 32;
-      const { vehicle, cost } = purchaseVehicle(state.vehicles, type, spawnX, spawnZ);
+      const tier = parseVehicleTierArg(named);
+      if (tier === null) {
+        return { success: false, output: 'Usage: vehicle buy <role> tier:(1|2|3)' };
+      }
+      // Spawn near grid centre, staggered per fleet index so newly purchased
+      // vehicles land on distinct tiles instead of stacking on the depot
+      // point — every prior purchase overlapped at one tile, occluding all
+      // but the tallest mesh (#411).
+      const baseX = state.world ? state.world.sizeX / 2 : 32;
+      const baseZ = state.world ? state.world.sizeZ / 2 : 32;
+      const fleetIndex = state.vehicles.vehicles.length;
+      const spawnX = baseX + (fleetIndex % SPAWN_RING_SIZE) * SPAWN_TILE_SPACING;
+      const spawnZ = baseZ + Math.floor(fleetIndex / SPAWN_RING_SIZE) * SPAWN_TILE_SPACING;
+      const { vehicle, cost } = purchaseVehicle(state.vehicles, type, spawnX, spawnZ, tier);
       state.cash -= cost;
       addExpense(state.finances, cost, 'equipment', `Buy ${type}`, state.tickCount);
       return { success: true, output: `Purchased ${type} #${vehicle.id}. Cost: $${cost}` };

@@ -6,7 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { Random } from '../../../src/core/math/Random.js';
-import { tickVehicle, tickEmployeeMovement } from '../../../src/core/engine/EntityMovementTick.js';
+import { tickVehicle, tickEmployeeMovement, tickVehicleTaskState } from '../../../src/core/engine/EntityMovementTick.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
@@ -229,6 +229,74 @@ describe('tickVehicle — waitingTicks (Task 2.8)', () => {
     // Vehicle reached target → idle; waitingTicks must be 0
     expect(v.state).toBe('idle');
     expect(v.waitingTicks).toBe(0);
+  });
+});
+
+// ── tickVehicleTaskState (issue #411) ────────────────────────────────────────
+// VehicleOperationalState.working was never assigned anywhere prior to this —
+// vehicle-task-states-visual's working-state screenshot was unreachable.
+// tickVehicleTaskState is the pure per-vehicle transform; tick-loop wiring is
+// covered separately in tests/integration/vehicles.integration.test.ts.
+
+describe('tickVehicleTaskState (#411)', () => {
+  const WORK_TASKS = ['transport', 'loading', 'drilling', 'clearing'] as const;
+
+  it.each(WORK_TASKS)('sets state to working when task is %s', (task) => {
+    const state = createGame({ seed: VEHICLE_TICK_SEED });
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
+    vehicle.task = task;
+    vehicle.state = 'idle';
+
+    tickVehicleTaskState(vehicle);
+
+    expect(vehicle.state).toBe('working');
+  });
+
+  it('returns state to idle when task returns to idle', () => {
+    const state = createGame({ seed: VEHICLE_TICK_SEED });
+    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 0);
+    vehicle.task = 'loading';
+    vehicle.state = 'working';
+
+    vehicle.task = 'idle';
+    tickVehicleTaskState(vehicle);
+
+    expect(vehicle.state).toBe('idle');
+  });
+
+  it('is idempotent — calling repeatedly with the same work task keeps state working', () => {
+    const state = createGame({ seed: VEHICLE_TICK_SEED });
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+    vehicle.task = 'drilling';
+    vehicle.state = 'idle';
+
+    tickVehicleTaskState(vehicle);
+    tickVehicleTaskState(vehicle);
+    tickVehicleTaskState(vehicle);
+
+    expect(vehicle.state).toBe('working');
+  });
+
+  it('does not touch state when task is moving — tickVehicle owns moving/waiting transitions', () => {
+    const state = createGame({ seed: VEHICLE_TICK_SEED });
+    const { vehicle } = purchaseVehicle(state.vehicles, 'building_destroyer', 0, 0);
+    vehicle.task = 'moving';
+    vehicle.state = 'moving';
+
+    tickVehicleTaskState(vehicle);
+
+    expect(vehicle.state).toBe('moving');
+  });
+
+  it('does not touch a waiting state when task is moving', () => {
+    const state = createGame({ seed: VEHICLE_TICK_SEED });
+    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_fragmenter', 0, 0);
+    vehicle.task = 'moving';
+    vehicle.state = 'waiting';
+
+    tickVehicleTaskState(vehicle);
+
+    expect(vehicle.state).toBe('waiting');
   });
 });
 

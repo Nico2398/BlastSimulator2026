@@ -181,7 +181,7 @@ const CSS = `
 #bs-blast-panel     { top: 52px; left: 10px; width: 240px; max-height: calc(100vh - 62px); overflow-y: auto; }
 #bs-contract-panel  { top: 52px; left: 10px; width: 300px; max-height: calc(100vh - 62px); overflow-y: auto; }
 #bs-build-panel     { top: 52px; left: 10px; width: 270px; max-height: calc(100vh - 62px); overflow-y: auto; }
-#bs-vehicle-panel   { top: 52px; left: 10px; width: 290px; max-height: calc(100vh - 62px); overflow-y: auto; }
+#bs-vehicle-panel   { top: 52px; left: 10px; width: 340px; max-height: calc(100vh - 62px); overflow-y: auto; }
 #bs-employee-panel  { top: 52px; left: 10px; width: 290px; max-height: calc(100vh - 62px); overflow-y: auto; }
 #bs-survey-panel    { top: 52px; left: 10px; width: 240px; max-height: calc(100vh - 62px); overflow-y: auto; }
 #bs-settings-panel  {

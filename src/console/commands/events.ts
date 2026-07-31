@@ -20,8 +20,8 @@ import { tickTraining } from '../../core/entities/EmployeeTraining.js';
 import { tickResearch } from '../../core/entities/Building.js';
 import { tickNeedGauges, needsMoraleEffect } from '../../core/entities/EmployeeNeeds.js';
 import type { FiredEvent } from '../../core/events/EventSystem.js';
-import { tickCollapse, autoInsertNeedTasks, processShiftCycle, tickEmployees, tickGeneralRestCompletion, tickTaskProgress, tickVehicle, tickEmployeeMovement } from '../../core/engine/GameLoop.js';
-import { detectUnqualifiedTask } from '../../core/events/EventEngine.js';
+import { tickCollapse, autoInsertNeedTasks, processShiftCycle, tickEmployees, tickGeneralRestCompletion, tickTaskProgress, tickVehicle, tickVehicleTaskState, tickEmployeeMovement } from '../../core/engine/GameLoop.js';
+import { detectUnqualifiedTask, detectTrafficJam } from '../../core/events/EventEngine.js';
 import { estimateSurveyResult, type SurveyMethod } from '../../core/mining/SurveyCalc.js';
 import { checkDeadlines, generateContracts } from '../../core/economy/Contract.js';
 import { updateBankruptcy } from '../../core/campaign/Bankruptcy.js';
@@ -227,7 +227,13 @@ export function tickCommand(
     // target; nothing advanced x/z toward it before this).
     for (const vehicle of state.vehicles.vehicles) {
       tickVehicle(state, vehicle, emitter);
+      tickVehicleTaskState(vehicle);
     }
+
+    // 8f-2. Traffic jam detection — mirrors GameLoop.processFrame's own
+    // post-vehicle-tick check (src/core/engine/GameLoop.ts), reachable here so
+    // console/scenario "tick" steps can fire TrafficJamEvent too (#411).
+    fired = fired ?? detectTrafficJam(state.vehicles.vehicles, state.events, state.tickCount);
 
     // 8g. Employee movement — walk employees with a destination (set by
     // tickEmployees/tickCollapse/tickNeedRestoration/forceShiftRestIfNeeded

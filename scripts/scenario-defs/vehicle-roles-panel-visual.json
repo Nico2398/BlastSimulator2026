@@ -77,10 +77,15 @@
     },
     {
       "command": "vehicle list",
+      "description": "Opens the Vehicles panel via a real UI click so the roles-panel shot captures the actual panel (tier names + costs) instead of a 3D orbit angle — uiState.panels['bs-vehicle-panel'].visible stayed false the whole scenario before this (#411).",
       "interaction": [
         {
           "type": "command",
           "command": "vehicle list"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
         }
       ]
     },

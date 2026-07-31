@@ -50,10 +50,15 @@
     },
     {
       "command": "vehicle list",
+      "description": "Opens the Vehicles panel via a real UI click so the after-qualified/after-unqualified shots capture the .bs-vehicle-driver-name indicator instead of a 3D orbit — the panel stays open for every later step once opened here (#411).",
       "interaction": [
         {
           "type": "command",
           "command": "vehicle list"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
         }
       ]
     },

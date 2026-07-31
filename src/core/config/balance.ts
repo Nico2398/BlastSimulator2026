@@ -124,6 +124,47 @@ export const TRAFFIC_JAM_MIN_VEHICLES = 3;
 /** Minimum consecutive waiting ticks per vehicle before it counts toward a traffic jam. */
 export const TRAFFIC_JAM_MIN_TICKS = 10;
 
+// ─── Vehicle Spawn Placement ────────────────────────────────────────────────────
+
+/**
+ * `vehicle buy` spreads new arrivals across a ring/grid pattern around the
+ * depot point instead of stacking every purchase on one tile — a shared tile
+ * fully occluded all but the tallest mesh (#411). SPAWN_RING_SIZE columns
+ * before wrapping to the next row; SPAWN_TILE_SPACING tiles between spawns —
+ * wide enough that adjacent vehicle meshes stay visually distinct (1-tile
+ * spacing still let bodies merge, see TRAFFIC_JAM_MIN_TICKS's neighbour
+ * vehicle-traffic-routing-visual fix) while staying near the depot.
+ */
+export const SPAWN_RING_SIZE = 3;
+export const SPAWN_TILE_SPACING = 3;
+
+/**
+ * Render-only queue offsets for vehicles in the 'waiting' operational state
+ * that share a contended target cell (#411 round 2). detectTrafficJam groups
+ * waiting vehicles by exact targetX/targetZ, so the simulation intentionally
+ * drives every contending vehicle toward the identical point — that grouping
+ * must not change. Their *rendered* position, however, fanned out to
+ * sub-tile-distance fractional coordinates as each approached along its own
+ * path, fusing 3+ meshes into one blob. VehicleMesh spreads waiting vehicles
+ * that share a target across these slots (world-unit offsets from the shared
+ * target) purely for display — core vehicle.x/z and jam detection are
+ * untouched. Reuses SPAWN_TILE_SPACING above rather than its own literal —
+ * both need the same minimum gap (debris_hauler's widest body dimension is
+ * 2.5, so anything much under 3 still overlaps), so one constant enforces it
+ * for both instead of two numbers that could silently drift apart.
+ */
+const SPACING = SPAWN_TILE_SPACING;
+export const WAITING_QUEUE_SLOT_OFFSETS: ReadonlyArray<readonly [number, number]> = [
+  [0, 0],
+  [SPACING, 0],
+  [-SPACING, 0],
+  [0, SPACING],
+  [0, -SPACING],
+  [SPACING, SPACING],
+  [-SPACING, -SPACING],
+  [SPACING, -SPACING],
+];
+
 // ─── Ore Report Events ───────────────────────────────────────────────────────────
 
 /** Yield ratio threshold above which a blast is considered "Lucky Strike" (got more ore than surveyed). */

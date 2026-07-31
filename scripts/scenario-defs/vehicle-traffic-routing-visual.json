@@ -103,11 +103,68 @@
       ]
     },
     {
-      "command": "tick 20",
+      "command": "vehicle move 1 to:37,33",
+      "description": "All 4 haulers converge on the same target cell — detectTrafficJam groups waiting vehicles by shared targetX/targetZ (#411), so a common destination is what actually lets TRAFFIC_JAM_MIN_VEHICLES be reached, not just visually adjacent-but-different targets. Spawns are staggered (issue 1's fix) so the 4 approach from distinct tiles and queue behind whichever one claims the cell first, instead of spawning fused.",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 20"
+          "command": "vehicle move 1 to:37,33"
+        }
+      ]
+    },
+    {
+      "command": "vehicle move 2 to:37,33",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle move 2 to:37,33"
+        }
+      ]
+    },
+    {
+      "command": "vehicle move 3 to:37,33",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle move 3 to:37,33"
+        }
+      ]
+    },
+    {
+      "command": "vehicle move 4 to:37,33",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle move 4 to:37,33"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "description": "Split from a single tick 20 into smaller batches so a screenshot lands mid-route, before every vehicle has arrived and gone idle — TRAFFIC_JAM_MIN_TICKS=10 needs at least that many ticks of contention, so the congestion shot is captured around cumulative tick 12, not tick 20+ (#411).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "vehicle list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle list"
+        }
+      ]
+    },
+    {
+      "command": "tick 16",
+      "description": "Extended from tick 6 (#411 round 3, issue B): TRAFFIC_JAM_MIN_TICKS=10 consecutive waiting ticks on top of the ~8-10 ticks it takes the haulers to converge means the jam fires around cumulative tick 20 — this scenario's own stated purpose (demonstrating TrafficJamEvent) was previously unreachable within its 6+6=12 tick budget even after wiring detectTrafficJam into the console tick path. 6+16=22 gives margin past the tick-20 fire point.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 16"
         }
       ]
     },
