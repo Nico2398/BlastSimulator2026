@@ -5,9 +5,9 @@
 // non-echoing sentence in BOTH locales. This is the acceptance criterion for
 // #421 ("Outcome: Lost $3000, safety -3" replaced by satirical prose).
 //
-// This suite MUST fail today: no `event.*.res*` locale entries exist yet in
-// en.json or fr.json, so t() falls back to echoing the key itself for every
-// one of them.
+// Regression guard: every `event.*.res*` key must have a real locale entry
+// in both files. If t() ever falls back to echoing the key itself for one
+// of them, this suite catches it.
 //
 // One it() per registered event (not per option) keeps the ~1700-check total
 // down to a manageable, still individually-attributable set of CI failures —
