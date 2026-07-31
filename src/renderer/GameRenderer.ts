@@ -289,7 +289,7 @@ export class GameRenderer {
 
     if (points.length === 0) return null;
 
-    return { points, opacity: 0.6 };
+    return { points, opacity: 0.4 };
   }
 
   /**

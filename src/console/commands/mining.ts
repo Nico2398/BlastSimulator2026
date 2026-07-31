@@ -266,6 +266,7 @@ export function blastCommand(
 
   // Trigger one post-blast ore report event when conditions are met.
   const oreReport = computeBlastOreReport(result.fragments, state.surveyResults);
+  state.lastOreReport = oreReport;
   detectOreReport(oreReport, state.events, state.tickCount);
 
   // Track blast fragments in logistics for contract delivery.
@@ -658,13 +659,38 @@ export function surveyCommand(
   }
 
   if (sub === 'mode') {
-    // TODO: implement — report/toggle survey confidence overlay display mode.
-    return { success: false, output: 'not implemented' };
+    const pendingCount = ctx.state!.pendingActions.filter(a => a.type === 'survey').length;
+    const completedCount = ctx.state!.surveyResults.length;
+    return {
+      success: true,
+      output: `Survey status: ${completedCount} completed, ${pendingCount} pending.`,
+    };
   }
 
   if (sub === 'ore_report') {
-    // TODO: implement — format and return the last post-blast ore report.
-    return { success: false, output: 'not implemented' };
+    const report = ctx.state!.lastOreReport;
+    if (!report) {
+      return {
+        success: false,
+        output: 'No blast ore report available yet. Run a blast first.',
+      };
+    }
+
+    const oreLines = Object.entries(report.oreYields).map(
+      ([oreId, kg]) => `  ${oreId}: ${kg.toFixed(1)}kg`,
+    );
+
+    const lines = [
+      '=== ORE REPORT ===',
+      ...(oreLines.length > 0 ? oreLines : ['  (no ore recovered)']),
+      `Total yield: ${report.totalYieldKg.toFixed(1)}kg`,
+      `Estimated yield: ${report.estimatedYieldKg.toFixed(1)}kg`,
+      report.estimatedYieldKg === 0
+        ? 'Yield ratio: n/a (no surveyed ore in blast zone)'
+        : `Yield ratio: ${(report.yieldRatio * 100).toFixed(0)}% of estimate`,
+    ];
+
+    return { success: true, output: lines.join('\n') };
   }
 
   if (!sub) {

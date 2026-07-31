@@ -8,7 +8,7 @@ import * as THREE from 'three';
 // ---------- Constants ----------
 
 /** Size of each confidence indicator quad in world units. */
-const CONFIDENCE_QUAD_SIZE = 1.8;
+const CONFIDENCE_QUAD_SIZE = 1.0;
 
 /** Opacity multiplier for stale (expired) survey points. */
 const STALE_OPACITY = 0.25;
