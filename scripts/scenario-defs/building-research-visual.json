@@ -3,12 +3,12 @@
   "description": "Visual check of research center building at all three tiers for technology advancement",
   "steps": [
     {
-      "command": "new_game seed:42 cash:150000",
+      "command": "new_game seed:42 cash:230000",
       "timeout": 30,
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 cash:150000"
+          "command": "new_game seed:42 cash:230000"
         }
       ]
     },
