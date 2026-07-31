@@ -124,6 +124,9 @@ describe('build command — upgrade', () => {
 describe('build command — research gate', () => {
   it('rejects direct T2 placement when the tier has not been researched', () => {
     const ctx = makeCtx();
+    // makeCtx() pre-unlocks every tier for the other suites; re-lock here so
+    // this test exercises the unresearched state it claims to.
+    ctx.state!.buildings.unlockedTiers.management_office = 1;
     const result = buildCommand(ctx, ['management_office'], { at: '0,0', tier: '2' });
     expect(result.success).toBe(false);
     expect(result.output).toMatch(/research/i);
@@ -132,6 +135,7 @@ describe('build command — research gate', () => {
 
   it('rejects upgrade past T1 when the tier has not been researched', () => {
     const ctx = makeCtx();
+    ctx.state!.buildings.unlockedTiers.management_office = 1;
     buildCommand(ctx, ['management_office'], { at: '0,0' });
     const id = ctx.state!.buildings.buildings[0]!.id;
 
