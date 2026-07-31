@@ -139,6 +139,12 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   createHireStep('hire-driver', 'tutorial.step13.title', 'tutorial.step13', 'driver'),
 
   // ── Step 13: vehicle-buy-assign ──
+  // Uses the naive count-increased + existence-check pattern that #409 fixed
+  // for hire steps. Safe here only because the tutorial buys its first-ever
+  // vehicle at this step: there is no pre-existing vehicle for the "assigned"
+  // half of the check to false-positive on, unlike hire steps where a role
+  // could already be staffed before the step opened. Re-evaluate if a future
+  // tutorial revision buys a vehicle earlier or reorders this step.
   {
     id: 'vehicle-buy-assign',
     titleKey: 'tutorial.step14.title',
