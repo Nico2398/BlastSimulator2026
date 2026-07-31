@@ -184,7 +184,8 @@ export function tickCommand(
         }, new Random(state.seed + state.tickCount + action.id));
         state.surveyResults.push(surveyResult);
         if (method === 'seismic') {
-          applySeismicSurveyDamage(state.buildings, action.targetX, action.targetZ);
+          const seismicAccidents = applySeismicSurveyDamage(state.buildings, action.targetX, action.targetZ, state.tickCount);
+          state.damage.accidents.push(...seismicAccidents);
         }
         lines.push(`[tick ${state.tickCount}] ${method} survey complete at (${action.targetX}, ${action.targetZ}).`);
       } else if (!surveyor) {
