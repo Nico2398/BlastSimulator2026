@@ -327,20 +327,20 @@
       ]
     },
     {
-      "command": "vehicle buy excavator",
+      "command": "vehicle buy rock_digger",
       "interaction": [
         {
           "type": "command",
-          "command": "vehicle buy excavator"
+          "command": "vehicle buy rock_digger"
         }
       ]
     },
     {
-      "command": "vehicle buy truck",
+      "command": "vehicle buy debris_hauler",
       "interaction": [
         {
           "type": "command",
-          "command": "vehicle buy truck"
+          "command": "vehicle buy debris_hauler"
         }
       ]
     },

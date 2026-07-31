@@ -222,11 +222,11 @@
       ]
     },
     {
-      "command": "vehicle buy hauler",
+      "command": "vehicle buy debris_hauler",
       "interaction": [
         {
           "type": "command",
-          "command": "vehicle buy hauler"
+          "command": "vehicle buy debris_hauler"
         }
       ]
     },
