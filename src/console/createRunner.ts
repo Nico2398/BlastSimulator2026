@@ -37,6 +37,7 @@ import {
   zoneCommand,
   needsCommand,
 } from './commands/entities.js';
+import { researchCommand } from './commands/research.js';
 import { setPolicyCommand } from './commands/policy.js';
 import { vehicleCommand } from './commands/vehicle.js';
 import {
@@ -184,6 +185,9 @@ export function createRunner(): RunnerWithContext {
   );
   runner.register('set_policy', 'Set site policy (mode:shift_8h|shift_12h|continuous|custom [hunger:N] [fatigue:N] [social:N])', (args, named) =>
     setPolicyCommand(ctx, args, named),
+  );
+  runner.register('research', 'Research Center tasks (queue type:<BuildingType> tier:2|3|status)', (args, named) =>
+    researchCommand(ctx, args, named),
   );
 
   // --- Event commands (Phase 6) ---

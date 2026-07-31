@@ -159,6 +159,22 @@ export interface PlaceBuildingResult {
   cost?: number;
 }
 
+/**
+ * Whether placing or upgrading a building at this tier is blocked because the
+ * tier has not been unlocked via a Research Center task.
+ * No-op passthrough stub — always reports "not blocked". Implementer wires
+ * this to `isTierUnlocked` (BuildingResearch.ts) and calls it from
+ * `placeBuilding` / the upgrade path before construction proceeds.
+ */
+export function isPlacementBlockedByResearch(
+  _state: BuildingState,
+  _type: BuildingType,
+  _tier: BuildingTier,
+): boolean {
+  // TODO: implement
+  return false;
+}
+
 /** Place a building at grid coordinates. Returns cost to deduct. */
 export function placeBuilding(
   state: BuildingState,

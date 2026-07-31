@@ -1,0 +1,23 @@
+{
+  "name": "building-research-progression-visual",
+  "description": "Placeholder — test-writer fills in the research queue/tick/unlock step sequence.",
+  "steps": [
+    {
+      "command": "new_game seed:42",
+      "timeout": 30,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ]
+    }
+  ],
+  "shots": [
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45
+    }
+  ]
+}
