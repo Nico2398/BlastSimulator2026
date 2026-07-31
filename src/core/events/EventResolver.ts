@@ -49,13 +49,14 @@ export function resolveEvent(
   if (!consequence) return null;
 
   // Resolve probabilistic consequence
-  const resolved = resolveConsequence(consequence, rng);
+  const { consequence: resolved, isAlt } = resolveConsequence(consequence, rng);
 
   // Apply effects
   const result = applyConsequence(
     resolved,
     eventDef.id,
     optionIndex,
+    isAlt,
     finances,
     scores,
     eventSystem,
@@ -68,20 +69,24 @@ export function resolveEvent(
   return result;
 }
 
-function resolveConsequence(c: EventConsequence, rng: Random): EventConsequence {
+function resolveConsequence(
+  c: EventConsequence,
+  rng: Random,
+): { consequence: EventConsequence; isAlt: boolean } {
   if (c.probability !== undefined && c.probability < 1.0) {
     if (rng.chance(c.probability)) {
-      return c; // Success path
+      return { consequence: c, isAlt: false }; // Success path
     }
-    return c.altConsequence ?? {}; // Failure path
+    return { consequence: c.altConsequence ?? {}, isAlt: c.altConsequence !== undefined }; // Failure path
   }
-  return c;
+  return { consequence: c, isAlt: false };
 }
 
 function applyConsequence(
   c: EventConsequence,
   eventId: string,
   optionIndex: number,
+  isAlt: boolean,
   finances: FinanceState,
   scores: ScoreState,
   eventSystem: EventSystemState,
@@ -139,7 +144,7 @@ function applyConsequence(
     success: true,
     eventId,
     optionIndex,
-    resultKey: `event.${eventId}.res${optionIndex}`,
+    resultKey: `event.${eventId}.res${optionIndex}${isAlt ? '_alt' : ''}`,
     effects,
     cashChange,
     scoreChanges,

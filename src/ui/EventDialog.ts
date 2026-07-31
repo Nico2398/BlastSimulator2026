@@ -16,6 +16,7 @@ export class EventDialog {
   private readonly descEl: HTMLElement;
   private readonly chooseLabel: HTMLElement;
   private readonly optionsEl: HTMLElement;
+  private readonly outcomeHeadlineEl: HTMLElement;
   private readonly outcomeEl: HTMLElement;
   private readonly dismissBtn: HTMLElement;
   private gameConsole?: GameConsoleFn;
@@ -53,6 +54,10 @@ export class EventDialog {
     this.optionsEl = document.createElement('div');
     this.optionsEl.className = 'bs-event-choices';
 
+    this.outcomeHeadlineEl = document.createElement('div');
+    this.outcomeHeadlineEl.className = 'bs-event-outcome-headline';
+    this.outcomeHeadlineEl.style.display = 'none';
+
     this.outcomeEl = document.createElement('div');
     this.outcomeEl.className = 'bs-event-outcome';
     this.outcomeEl.style.display = 'none';
@@ -64,7 +69,7 @@ export class EventDialog {
     this.dismissBtn.style.display = 'none';
     this.dismissBtn.addEventListener('click', () => this.hide());
 
-    this.box.append(header, this.titleEl, this.descEl, this.chooseLabel, this.optionsEl, this.outcomeEl, this.dismissBtn);
+    this.box.append(header, this.titleEl, this.descEl, this.chooseLabel, this.optionsEl, this.outcomeHeadlineEl, this.outcomeEl, this.dismissBtn);
     this.overlay.appendChild(this.box);
     container.appendChild(this.overlay);
   }
@@ -102,6 +107,8 @@ export class EventDialog {
     if (pending.eventId !== this.lastEventId) {
       this.lastEventId = pending.eventId;
       this.showingOutcome = false;
+      this.outcomeHeadlineEl.style.display = 'none';
+      this.outcomeHeadlineEl.textContent = '';
       this.outcomeEl.style.display = 'none';
       this.outcomeEl.textContent = '';
       this.chooseLabel.style.display = '';
@@ -133,9 +140,20 @@ export class EventDialog {
     // Hide choice UI
     this.chooseLabel.style.display = 'none';
     this.optionsEl.style.display = 'none';
-    // Parse consequences from console output (lines starting with "  • ")
-    const effects = consoleOutput
-      .split('\n')
+
+    const lines = consoleOutput.split('\n');
+    // The resolved-outcome sentence sits between "Event resolved: <id>" and
+    // "Consequences:" — everything else is the numeric effect bullets below it.
+    const resolvedIdx = lines.findIndex(l => l.startsWith('Event resolved:'));
+    const consequencesIdx = lines.findIndex(l => l.startsWith('Consequences:'));
+    const headline = resolvedIdx !== -1 && consequencesIdx !== -1 && consequencesIdx > resolvedIdx + 1
+      ? lines.slice(resolvedIdx + 1, consequencesIdx).join(' ').trim()
+      : '';
+    this.outcomeHeadlineEl.textContent = headline;
+    this.outcomeHeadlineEl.style.display = headline ? '' : 'none';
+
+    // Parse the numeric effects (lines starting with "  • ") as fine print below it
+    const effects = lines
       .filter(l => l.startsWith('  • '))
       .map(l => l.slice(4));
     const outcomeText = effects.length > 0
