@@ -5,14 +5,24 @@
 // scripts/shared/command-runner.ts) and asserts on the resulting game state,
 // rather than just checking the JSON files parse.
 //
-//   - blast-overcharge: charges boomite at amount:25, out of boomite's
-//     [1,8]kg valid range (src/core/world/ExplosiveCatalog.ts). ChargePlan's
-//     createCharge rejects the charge, chargesByHole stays empty, and the
-//     later blast step fails validateBlastPlan with "Missing charge" for
-//     every hole — the blast never fires.
-//   - blast-undercharge: charges boomite at amount:1, in-range but too weak
-//     for the 2x2 hole grid, so the blast fires but clears nothing
-//     (Cleared voxels: 0 / Fragments: 0).
+// Regression this test guards against (pre-fix, issue #431): the
+// scenario JSONs used to charge boomite at amount:25 for blast-overcharge
+// (out of boomite's [1,8]kg valid range, src/core/world/ExplosiveCatalog.ts)
+// and amount:1 for blast-undercharge. ChargePlan's createCharge rejected the
+// amount:25 charge outright — chargesByHole stayed empty and the later blast
+// step failed validateBlastPlan with "Missing charge" for every hole, so the
+// blast never fired. amount:1 was in-range but too weak for the 2x2 hole
+// grid, so the blast fired but cleared nothing (Cleared voxels: 0 /
+// Fragments: 0).
+//
+// Current (fixed) scenario files: blast-overcharge now charges amount:8
+// (boomite's max valid amount — still an overcharge relative to the hole
+// grid, producing flyrock/projections) and blast-undercharge charges
+// amount:2 (boomite's min viable amount — clears voxels and produces
+// fragments but no projections). Both are within [1,8]kg, so the charge
+// step succeeds for both scenarios. That is why every assertion below
+// expects success (`not.toMatch(/out of range/i)`, `chargeStep.error
+// toBeUndefined()`) rather than the pre-fix rejection.
 //
 // DO NOT implement anything here — only add implementation to src/.
 
