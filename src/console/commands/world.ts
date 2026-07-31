@@ -55,7 +55,10 @@ export function newGameCommand(
   }
 
   const size = named['size'] ? parseInt(named['size'], 10) : DEFAULT_GRID_SIZE;
-  ctx.state = createGame({ seed, mineType });
+  ctx.state = createGame({
+    seed, mineType,
+    ...(named['cash'] ? { startingCash: parseInt(named['cash'], 10) } : {}),
+  });
   ctx.state.world = { sizeX: size, sizeY: size, sizeZ: size, gridReady: true };
   regenerateGrid(ctx, { seed, preset, sizeX: size, sizeY: size, sizeZ: size });
 

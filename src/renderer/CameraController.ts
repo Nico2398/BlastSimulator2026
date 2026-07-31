@@ -120,6 +120,18 @@ export class CameraController {
   }
   private _minHeight = -Infinity;
 
+  /**
+   * Move the orbit target and distance directly, without touching yaw/pitch.
+   * Used together with `setOrbit` by scenario multi-angle shots that need to
+   * centre and zoom on a specific point (e.g. a ramp excavation) rather than
+   * the whole-site default framing (#410).
+   */
+  focus(x: number, y: number, z: number, distance: number): void {
+    this.target.set(x, y, z);
+    this.spherical.radius = THREE.MathUtils.clamp(distance, ZOOM_MIN, ZOOM_MAX);
+    this.apply();
+  }
+
   /** Set absolute yaw (degrees) and pitch (degrees above horizon). */
   setOrbit(yawDeg: number, pitchDeg: number): void {
     this.spherical.theta = THREE.MathUtils.degToRad(yawDeg);

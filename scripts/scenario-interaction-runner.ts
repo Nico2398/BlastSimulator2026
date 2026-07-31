@@ -26,6 +26,10 @@ export interface ShotDef {
   name: string;
   yaw: number;
   pitch: number;
+  /** World (x, z) to centre the shot on before orbiting; terrain Y is resolved at capture time. */
+  target?: [number, number];
+  /** Camera distance from `target`, in world units. Ignored unless `target` is also set. */
+  distance?: number;
 }
 
 function checkScreenshotSize(filepath: string): string | undefined {
@@ -112,6 +116,11 @@ export async function runScenarioInteraction(
 
             if (enableScreenshots) {
               for (const shot of shots) {
+                if (shot.target && shot.distance !== undefined) {
+                  await page.evaluate(({ x, z, d }: { x: number; z: number; d: number }) => {
+                    (window as any).__cameraFocus(x, z, d);
+                  }, { x: shot.target[0], z: shot.target[1], d: shot.distance });
+                }
                 await page.evaluate(({ y, p }: { y: number; p: number }) => {
                   (window as any).__cameraOrbit(y, p);
                 }, { y: shot.yaw, p: shot.pitch });

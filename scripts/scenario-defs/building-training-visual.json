@@ -3,12 +3,12 @@
   "description": "Visual check of training buildings: driving center, blasting academy, management office, and geology lab",
   "steps": [
     {
-      "command": "new_game seed:42",
+      "command": "new_game seed:42 cash:60000",
       "timeout": 10,
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42"
+          "command": "new_game seed:42 cash:60000"
         }
       ]
     },
