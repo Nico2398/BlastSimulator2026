@@ -22,7 +22,7 @@ Five roles, 3 tiers each. All names are fictional, humorous, and i18n-localized.
 | **Building Destroyer** | "Wrecking Rascal" | "Demolition Darling" | "Obliterator Supreme" | Demolishes buildings; required for tier-upgrade workflow |
 | **Debris Hauler** | "Dumpster on Wheels" | "Haul-o-Matic 3000" | "Mega Mover XL" | Hauls fragmented rock from blast zone to Freight Warehouse |
 | **Drill Rig** | "Pokey McPoke" | "Bore Master" | "Helldriller" | Drills blast holes to specified depth and angle |
-| **Rock Digger** | "The Scratch" | "Scoop Sergeant" | "Voxel Vanquisher" | Removes one voxel at a time; used for ramp shaping and access routes |
+| **Rock Digger** | "The Scratch" | "Scoop Sergeant" | "Rock Reaper" | Removes one voxel at a time; used for ramp shaping and access routes |
 | **Rock Fragmenter** | "Cracky" | "Smasher 2000" | "The Atomizer" | Breaks oversized debris boulders into transportable fragments |
 
 ## Tier Stat Multipliers
