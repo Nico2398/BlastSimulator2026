@@ -162,8 +162,8 @@ export class VehicleMesh {
     applyTierVariation(group, vehicle.tier);
     applyStateIndicator(group, vehicle.state);
     const pool = [...Array.from(this.vehicles.values(), e => e.vehicle), vehicle];
-    const [offsetX, offsetZ] = this.waitingQueueOffset(vehicle, pool);
-    group.position.set(vehicle.x + offsetX, surfaceY, vehicle.z + offsetZ);
+    const [renderX, renderZ] = this.waitingRenderPosition(vehicle, pool);
+    group.position.set(renderX, surfaceY, renderZ);
     this.scene.add(group);
     this.vehicles.set(vehicle.id, { group, vehicle });
   }
@@ -179,9 +179,7 @@ export class VehicleMesh {
       // Update stored reference
       entry.vehicle = v;
       // Lerp toward target (+ queue offset for fused 'waiting' vehicles, #411 round 2)
-      const [offsetX, offsetZ] = this.waitingQueueOffset(v, vehicles);
-      const targetX = v.x + offsetX;
-      const targetZ = v.z + offsetZ;
+      const [targetX, targetZ] = this.waitingRenderPosition(v, vehicles);
       entry.group.position.x += (targetX - entry.group.position.x) * MOVE_LERP;
       entry.group.position.z += (targetZ - entry.group.position.z) * MOVE_LERP;
       applyStateIndicator(entry.group, v.state);
@@ -210,6 +208,15 @@ export class VehicleMesh {
    * on top of it. The idle vehicle itself is never offset (only 'waiting'
    * vehicles get a non-zero return above), it just reserves slot 0 so the
    * waiting vehicles route around it.
+   *
+   * Round 4 (#411 issue B): the offset alone is not enough — callers must add
+   * it to the *shared target point* (targetX/targetZ), not to the vehicle's
+   * own raw x/z. Multiple vehicles converging on the same jam land at
+   * slightly different raw positions (pathfinding doesn't put them on the
+   * exact identical point), so a fixed offset added to each vehicle's own
+   * base can still leave two of them under the body-width threshold even
+   * though the offsets themselves are correctly spaced apart. Use
+   * waitingRenderPosition() below, which anchors to the common point.
    */
   waitingQueueOffset(vehicle: Vehicle, pool: Vehicle[]): readonly [number, number] {
     if (vehicle.state !== 'waiting') return [0, 0];
@@ -236,6 +243,22 @@ export class VehicleMesh {
 
     const slot = sharingTarget.indexOf(vehicle.id) % WAITING_QUEUE_SLOT_OFFSETS.length;
     return WAITING_QUEUE_SLOT_OFFSETS[slot]!;
+  }
+
+  /**
+   * Render position for a vehicle, folding in the waiting-queue slot offset
+   * (#411 round 4). For a 'waiting' vehicle the offset is anchored to the
+   * shared targetX/targetZ — the common point every contending vehicle is
+   * driving toward — rather than to the vehicle's own raw x/z, which can
+   * differ slightly between vehicles even when they share a target and would
+   * otherwise undermine the slot spacing. Non-waiting vehicles (including the
+   * idle occupant reserving slot 0) get a zero offset and render at their own
+   * x/z, unchanged.
+   */
+  waitingRenderPosition(vehicle: Vehicle, pool: Vehicle[]): readonly [number, number] {
+    if (vehicle.state !== 'waiting') return [vehicle.x, vehicle.z];
+    const [offsetX, offsetZ] = this.waitingQueueOffset(vehicle, pool);
+    return [vehicle.targetX + offsetX, vehicle.targetZ + offsetZ];
   }
 
   /** Snap a vehicle directly to its world position (no lerp — use after teleport or initial placement). */
