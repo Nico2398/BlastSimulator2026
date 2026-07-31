@@ -148,18 +148,21 @@ export const SPAWN_TILE_SPACING = 3;
  * path, fusing 3+ meshes into one blob. VehicleMesh spreads waiting vehicles
  * that share a target across these slots (world-unit offsets from the shared
  * target) purely for display — core vehicle.x/z and jam detection are
- * untouched. Same 3-unit spacing as SPAWN_TILE_SPACING above (debris_hauler's
- * widest body dimension is 2.5, so anything much under 3 still overlaps).
+ * untouched. Reuses SPAWN_TILE_SPACING above rather than its own literal —
+ * both need the same minimum gap (debris_hauler's widest body dimension is
+ * 2.5, so anything much under 3 still overlaps), so one constant enforces it
+ * for both instead of two numbers that could silently drift apart.
  */
+const SPACING = SPAWN_TILE_SPACING;
 export const WAITING_QUEUE_SLOT_OFFSETS: ReadonlyArray<readonly [number, number]> = [
   [0, 0],
-  [3, 0],
-  [-3, 0],
-  [0, 3],
-  [0, -3],
-  [3, 3],
-  [-3, -3],
-  [3, -3],
+  [SPACING, 0],
+  [-SPACING, 0],
+  [0, SPACING],
+  [0, -SPACING],
+  [SPACING, SPACING],
+  [-SPACING, -SPACING],
+  [SPACING, -SPACING],
 ];
 
 // ─── Ore Report Events ───────────────────────────────────────────────────────────

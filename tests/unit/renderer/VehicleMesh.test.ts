@@ -7,7 +7,7 @@ import { VehicleMesh, STATE_COLOR_MAP, applyStateIndicator } from '../../../src/
 import { WAITING_QUEUE_SLOT_OFFSETS } from '../../../src/core/config/balance.js';
 
 function makeVehicle(id: number, type: Vehicle['type'], x = 0, z = 0, tier = 1 as VehicleTier): Vehicle {
-  return { id, type, x, z, hp: 100, task: 'idle', targetX: x, targetZ: z, tier } as Vehicle;
+  return { id, type, x, z, hp: 100, task: 'idle', state: 'idle', targetX: x, targetZ: z, tier } as Vehicle;
 }
 
 describe('VehicleMesh', () => {

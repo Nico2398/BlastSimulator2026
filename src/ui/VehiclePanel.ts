@@ -207,8 +207,7 @@ export class VehiclePanel {
   }
 
   /**
-   * Refreshes tier-button disabled state against current cash — the
-   * per-tier counterpart to refreshBuyButtons.
+   * Refreshes tier-button disabled state against current cash.
    */
   private refreshTierButtons(cash: number): void {
     const tierBtns = this.buySection.querySelectorAll<HTMLButtonElement>('[data-tier]');
