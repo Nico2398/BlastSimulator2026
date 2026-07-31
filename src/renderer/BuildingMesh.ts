@@ -93,7 +93,10 @@ export class BuildingMesh {
     baseMesh.position.y = scaledHeight / 2;
     group.add(baseMesh);
 
-    // Accent element (roof, chimney, etc.) — only for intact buildings
+    // Accent element (roof, chimney, etc.) — only for intact buildings.
+    // Track its top Y so markers can clear it too (#410 follow-up: an accent
+    // that covers the marker's footprint corner re-occludes it otherwise).
+    let markerBaseY = scaledHeight;
     if (vis.accent && !isDestroyed) {
       const ac = vis.accent;
       const acHeight = ac.height * heightMult;
@@ -105,19 +108,21 @@ export class BuildingMesh {
       const acMesh = new THREE.Mesh(acGeo, acMat);
       acMesh.position.y = scaledHeight + acHeight / 2;
       group.add(acMesh);
+      markerBaseY = scaledHeight + acHeight;
     }
 
     // Entry / exit markers — group is centred on footprint, so convert def offsets.
-    // Sit on top of the roof (y = scaledHeight) rather than at y=0..0.5, which
-    // buries them fully inside the opaque base box and makes them invisible
-    // from any external camera angle (#410).
+    // Sit above the tallest geometry at that footprint (base box, or the roof
+    // accent when present — #410) rather than at y=0..0.5, which buries them
+    // fully inside the opaque base box and makes them invisible from any
+    // external camera angle (#410).
     if (!isDestroyed) {
       const ex = def.entryPoint[0] + 0.5 - sizeX / 2;
       const ez = def.entryPoint[1] + 0.5 - sizeZ / 2;
       const xx = def.exitPoint[0]  + 0.5 - sizeX / 2;
       const xz = def.exitPoint[1]  + 0.5 - sizeZ / 2;
-      group.add(makeMarker(ex, ez, ENTRY_COLOR, scaledHeight));
-      group.add(makeMarker(xx, xz, EXIT_COLOR, scaledHeight));
+      group.add(makeMarker(ex, ez, ENTRY_COLOR, markerBaseY));
+      group.add(makeMarker(xx, xz, EXIT_COLOR, markerBaseY));
     }
 
     // Position: grid cell centre in world coords, resting on the terrain surface

@@ -118,9 +118,13 @@ export function startTraining(
  * On success the employee is relocated to the building — otherwise they stay
  * wherever they were dispatched last while a course "trains" them in place,
  * which is what left an enrolled employee's sprite standing in the pit while
- * their qualification changed. Mirrors the convention used for need-driven
- * building visits (`tickCollapse`, `autoInsertNeedTasks` in GameLoop.ts):
- * `building.x` / `building.z`, the building's own origin.
+ * their qualification changed.
+ *
+ * Placed one tile outside the footprint, adjacent to the entry point corner
+ * (`building.x`/`building.z`), rather than exactly on that corner: the raw
+ * origin coordinate sits on the building's own opaque base-box footprint, so
+ * a character placed there renders fully occluded from every external camera
+ * angle (#410).
  */
 export function enrolInTraining(
   state: EmployeeState,
@@ -142,7 +146,9 @@ export function enrolInTraining(
   const started = startTraining(state, employeeId, building.id, skill, plan.ticks, plan.fee);
   if (!started.success) return { success: false, ...(started.error ? { error: started.error } : {}) };
 
-  emp.x = building.x;
+  // One tile outside the footprint, adjacent to the entry corner — see doc
+  // comment above for why the raw origin corner is unusable.
+  emp.x = building.x - 1;
   emp.z = building.z;
 
   return { success: true, fee: plan.fee, plan };

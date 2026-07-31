@@ -68,14 +68,14 @@
       "name": "ramp-closeup",
       "yaw": 90,
       "pitch": 10,
-      "target": [16, 20],
+      "target": [5, 20],
       "distance": 22
     },
     {
       "name": "birdseye",
       "yaw": 0,
       "pitch": 80,
-      "target": [16, 20],
+      "target": [24, 15],
       "distance": 32
     },
     {
@@ -83,7 +83,7 @@
       "yaw": 135,
       "pitch": 30,
       "target": [16, 20],
-      "distance": 28
+      "distance": 60
     }
   ]
 }

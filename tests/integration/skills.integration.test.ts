@@ -292,7 +292,9 @@ describe('Employee skills', () => {
     expect(result.success, result.output).toBe(true);
 
     // The employee walks to the school, not left wherever they were hired.
-    expect(emp().x).toBe(building.x);
+    // Lands one tile outside the footprint (not the raw origin corner, which
+    // sits on the building's own opaque base-box and renders occluded, #410).
+    expect(emp().x).toBe(building.x - 1);
     expect(emp().z).toBe(building.z);
     expect(emp().x !== before.x || emp().z !== before.z).toBe(true);
   });

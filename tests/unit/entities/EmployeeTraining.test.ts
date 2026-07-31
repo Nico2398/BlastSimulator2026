@@ -205,9 +205,14 @@ describe('licences no role is hired with', () => {
 // Currently untouched: enrolInTraining never reads/writes employee.x/z, so a
 // trained employee stays wherever they were hired instead of walking to the
 // building teaching the course.
+//
+// The employee lands one tile outside the footprint (building.x - 1), not on
+// the raw origin corner — that corner sits on the building's own opaque
+// base-box footprint and renders fully occluded from every external camera
+// angle (#410 iteration 2).
 
 describe('enrolInTraining — the employee relocates to the training building', () => {
-  it('sets the employee position to the training building position, not the pre-enrolment position', () => {
+  it('sets the employee position adjacent to the training building, not the pre-enrolment position', () => {
     const { state, employee } = makeStateWithOne('driller');
     employee.x = 3;
     employee.z = 3;
@@ -216,7 +221,7 @@ describe('enrolInTraining — the employee relocates to the training building', 
     const result = enrolInTraining(state, employee.id, building, 'blasting');
     expect(result.success, result.error).toBe(true);
 
-    expect(employee.x).toBe(building.x);
+    expect(employee.x).toBe(building.x - 1);
     expect(employee.z).toBe(building.z);
   });
 
@@ -229,7 +234,7 @@ describe('enrolInTraining — the employee relocates to the training building', 
     const result = enrolInTraining(state, employee.id, building, 'driving.excavator');
     expect(result.success, result.error).toBe(true);
 
-    expect(employee.x).toBe(0);
+    expect(employee.x).toBe(-1);
     expect(employee.z).toBe(0);
   });
 
