@@ -7,6 +7,7 @@ import type { GameContext } from './world.js';
 import {
   queueResearchTask,
   isTierUnlocked,
+  isResearchQueued,
   getAllBuildingTypes,
   type BuildingType,
 } from '../../core/entities/Building.js';
@@ -34,22 +35,46 @@ export function researchCommand(
     case 'queue': {
       const type = named['type'] as BuildingType | undefined;
       if (!type || !getAllBuildingTypes().includes(type)) {
-        return { success: false, output: 'Usage: research queue type:<BuildingType> tier:2|3' };
+        return {
+          success: false,
+          code: 'usage',
+          output: 'Usage: research queue type:<BuildingType> tier:2|3',
+        };
       }
       const tierNum = parseInt(named['tier'] ?? '', 10);
       if (tierNum !== 2 && tierNum !== 3) {
-        return { success: false, output: 'Usage: research queue type:<BuildingType> tier:2|3' };
+        return {
+          success: false,
+          code: 'usage',
+          output: 'Usage: research queue type:<BuildingType> tier:2|3',
+        };
       }
       const tier = tierNum as 2 | 3;
 
       if (isTierUnlocked(state.buildings, type, tier)) {
-        return { success: false, output: `Tier ${tier} ${type} is already unlocked.` };
+        return {
+          success: false,
+          code: 'already_unlocked',
+          output: `Tier ${tier} ${type} is already unlocked.`,
+        };
+      }
+
+      if (isResearchQueued(state.buildings, type, tier)) {
+        return {
+          success: false,
+          code: 'already_queued',
+          output: `Tier ${tier} ${type} is already queued for research.`,
+        };
       }
 
       const ticks = RESEARCH_TIER_TICKS[tier];
       const cost = RESEARCH_TIER_COST[tier];
       if (state.cash < cost) {
-        return { success: false, output: `Insufficient funds: research costs $${cost}.` };
+        return {
+          success: false,
+          code: 'insufficient_funds',
+          output: `Insufficient funds: research costs $${cost}.`,
+        };
       }
       queueResearchTask(state.buildings, type, tier, ticks, cost);
       state.cash -= cost;

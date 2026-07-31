@@ -8,6 +8,7 @@ import {
   getAllBuildingTypes,
   getBuildingDef,
   isTierUnlocked,
+  isResearchQueued,
   type BuildingType,
   type BuildingTier,
   type Building,
@@ -41,6 +42,10 @@ export class BuildMenu {
   /** Serialized `unlockedTiers` for change detection — a completed research
    *  task changes tier availability without changing cash or placed count. */
   private lastUnlockedSignature = '';
+  /** Serialized `researchQueue` contents for change detection — queuing
+   *  research hides the "Queue Research" button without changing cash,
+   *  placed count, or unlockedTiers. */
+  private lastResearchQueueSignature = '';
 
   constructor(container: HTMLElement) {
     this.el = document.createElement('div');
@@ -105,11 +110,14 @@ export class BuildMenu {
     const unlockedSig = JSON.stringify(state.buildings.unlockedTiers);
     const unlockedChanged = unlockedSig !== this.lastUnlockedSignature;
     if (unlockedChanged) this.lastUnlockedSignature = unlockedSig;
-    if (placedSig !== this.lastPlacedSignature || unlockedChanged) {
+    const queueSig = state.buildings.researchQueue.map((r) => `${r.targetType}:${r.targetTier}`).join(',');
+    const queueChanged = queueSig !== this.lastResearchQueueSignature;
+    if (queueChanged) this.lastResearchQueueSignature = queueSig;
+    if (placedSig !== this.lastPlacedSignature || unlockedChanged || queueChanged) {
       this.lastPlacedSignature = placedSig;
       this.refreshPlacedList(state.buildings.buildings);
     }
-    if (unlockedChanged) this.refreshCatalogButtons(state.cash);
+    if (unlockedChanged || queueChanged) this.refreshCatalogButtons(state.cash);
   }
 
   setStatus(msg: string): void {
@@ -128,7 +136,7 @@ export class BuildMenu {
     if (tier === 1) return;
     const cmdResult = this.gameConsole?.(`research queue type:${type} tier:${tier}`);
     if (!cmdResult?.success) {
-      this.setStatus(cmdResult?.output ?? '');
+      this.setStatus(t(BuildMenu.RESEARCH_FAILURE_KEYS[cmdResult?.code ?? ''] ?? 'ui.build.research_queue_failed'));
       return;
     }
     const task = this.lastState?.buildings.researchQueue.find(
@@ -138,7 +146,18 @@ export class BuildMenu {
       task ? t('ui.build.research_queued', { ticks: task.ticksRemaining }) : t('ui.build.research_queued_generic'),
     );
     this.refreshCatalogButtons(this.lastCash);
+    if (this.lastState) this.refreshPlacedList(this.lastState.buildings.buildings);
   }
+
+  /** Maps `research queue`'s failure `code` (src/console/commands/research.ts)
+   *  to a translated status message — the raw `output` is core's plain-English
+   *  string and must never reach the player. */
+  private static readonly RESEARCH_FAILURE_KEYS: Record<string, string> = {
+    already_unlocked: 'ui.build.research_failed_already_unlocked',
+    already_queued: 'ui.build.research_failed_already_queued',
+    insufficient_funds: 'ui.build.research_failed_insufficient_funds',
+    usage: 'ui.build.research_queue_failed',
+  };
 
   // ── Ramp (carved terrain, not a building) ─────────────────────────────────
 
@@ -279,10 +298,11 @@ export class BuildMenu {
       const tier = (this.selectedTiers.get(type) ?? 1) as BuildingTier;
       const def = getBuildingDef(type, tier);
       const locked = tier > 1 && !!this.lastState && !isTierUnlocked(this.lastState.buildings, type, tier);
+      const queued = locked && !!this.lastState && isResearchQueued(this.lastState.buildings, type, tier);
       const btn = row.querySelector('.bs-build-buy-btn') as HTMLButtonElement | null;
       if (btn) btn.disabled = cash < def.constructionCost || locked;
       const researchBtn = row.querySelector('.bs-build-research-btn') as HTMLButtonElement | null;
-      if (researchBtn) researchBtn.style.display = locked ? '' : 'none';
+      if (researchBtn) researchBtn.style.display = locked && !queued ? '' : 'none';
     });
   }
 
@@ -336,6 +356,7 @@ export class BuildMenu {
 
     const nextTier = b.tier < 3 ? ((b.tier + 1) as BuildingTier) : null;
     const nextLocked = nextTier !== null && !!this.lastState && !isTierUnlocked(this.lastState.buildings, b.type, nextTier);
+    const nextQueued = nextTier !== null && nextLocked && !!this.lastState && isResearchQueued(this.lastState.buildings, b.type, nextTier);
 
     const upgradeBtn = document.createElement('button');
     upgradeBtn.className = 'bs-btn bs-btn-primary bs-build-upgrade-btn';
@@ -359,7 +380,7 @@ export class BuildMenu {
     researchBtn.className = 'bs-btn bs-build-research-btn';
     researchBtn.style.cssText = 'padding:1px 5px;font-size:9px';
     researchBtn.textContent = t('ui.build.queue_research_button');
-    researchBtn.style.display = nextTier !== null && nextLocked ? '' : 'none';
+    researchBtn.style.display = nextTier !== null && nextLocked && !nextQueued ? '' : 'none';
     researchBtn.addEventListener('click', () => {
       if (nextTier !== null) this.queueResearch(b.type, nextTier);
     });

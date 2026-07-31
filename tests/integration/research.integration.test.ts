@@ -116,6 +116,49 @@ describe('research command — queue (#410)', () => {
     const result = researchCommand(ctx, ['bogus'], {});
     expect(result.success).toBe(false);
   });
+
+  // ── #410 finding 1 — double-charge on repeated "Queue Research" clicks ─────
+
+  it('rejects a second queue request for the same {type, tier} already pending', () => {
+    const first = researchCommand(ctx, ['queue'], { type: 'driving_center', tier: '2' });
+    expect(first.success, first.output).toBe(true);
+
+    const second = researchCommand(ctx, ['queue'], { type: 'driving_center', tier: '2' });
+    expect(second.success).toBe(false);
+    expect(second.code).toBe('already_queued');
+  });
+
+  it('does not double-charge cash when the same task is queued twice', () => {
+    researchCommand(ctx, ['queue'], { type: 'driving_center', tier: '2' });
+    const cashAfterFirst = ctx.state!.cash;
+
+    researchCommand(ctx, ['queue'], { type: 'driving_center', tier: '2' });
+
+    expect(ctx.state!.cash).toBe(cashAfterFirst);
+    expect(ctx.state!.buildings.researchQueue).toHaveLength(1);
+  });
+
+  it('still allows queuing a different tier for the same type while one is pending', () => {
+    researchCommand(ctx, ['queue'], { type: 'driving_center', tier: '2' });
+    const result = researchCommand(ctx, ['queue'], { type: 'driving_center', tier: '3' });
+    expect(result.success, result.output).toBe(true);
+    expect(ctx.state!.buildings.researchQueue).toHaveLength(2);
+  });
+
+  it('sets code:"insufficient_funds" when cash is too low', () => {
+    ctx.state!.cash = 0;
+    const result = researchCommand(ctx, ['queue'], { type: 'driving_center', tier: '2' });
+    expect(result.success).toBe(false);
+    expect(result.code).toBe('insufficient_funds');
+  });
+
+  it('sets code:"already_unlocked" when the tier is already researched', () => {
+    researchCommand(ctx, ['queue'], { type: 'driving_center', tier: '2' });
+    tickCommand(ctx, ['500'], {});
+    const result = researchCommand(ctx, ['queue'], { type: 'driving_center', tier: '2' });
+    expect(result.success).toBe(false);
+    expect(result.code).toBe('already_unlocked');
+  });
 });
 
 // ── research command — status ─────────────────────────────────────────────────

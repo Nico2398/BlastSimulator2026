@@ -332,7 +332,7 @@ export {
   BUSY, buildPlacementGrid, getSurfaceY, canPlaceBuilding, isBuildingFootprintCell,
   type SurfaceY, type PlacementCell, type CanPlaceBuildingResult, type PlacementGrid,
 } from './BuildingPlacement.js';
-export { queueResearchTask, tickResearch, isTierUnlocked } from './BuildingResearch.js';
+export { queueResearchTask, tickResearch, isTierUnlocked, isResearchQueued } from './BuildingResearch.js';
 export { getLivingQuartersWellbeingMultiplier } from './BuildingWellbeing.js';
 export {
   getExplosivesCapacity, getExplosivesInStock,
