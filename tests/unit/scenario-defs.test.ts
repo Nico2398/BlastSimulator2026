@@ -136,6 +136,7 @@ const VISUAL_SCENARIO_NAMES = [
  */
 const UI_DRIVEN_SCENARIO_NAMES = [
   'tutorial-interactive',
+  'building-tier-system-visual',
 ] as const;
 
 const ALL_SCENARIO_NAMES = [
