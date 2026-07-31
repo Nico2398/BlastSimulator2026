@@ -151,8 +151,8 @@ Scenario steps can define an `interaction` array of `InteractionStepAction` obje
 | `building-lifecycle.json` | 1 | Place → research → demolish → rebuild Tier 2 |
 | `vehicle-traffic.json` | 2 | 4 haulers on narrow ramp → TrafficJamEvent |
 | `employee-training.json` | 3 | Hire generalist → train → blast task accepted |
-| `blast-undercharge.json` | 5 | 30% optimal charge → oversized fragments, zero projections |
-| `blast-overcharge.json` | 5 | 500% optimal charge → projections, catastrophic rating |
+| `blast-undercharge.json` | 5 | Minimum viable charge (2kg) → a couple oversized fragments, zero projections |
+| `blast-overcharge.json` | 5 | Maximum valid charge (8kg) → projections appear, rating degrades perfect to mediocre |
 | `collapse-recovery.json` | 7 | Fatigue hits collapse → rest → original task resumes |
 | `contract-negotiation.json` | — | Negotiate 10× → both improved and worsened outcomes |
 | `weather-flood.json` | — | Heavy rain → flooded holes → water-sensitive explosive fails |

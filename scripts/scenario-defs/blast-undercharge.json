@@ -1,6 +1,6 @@
 {
   "name": "blast-undercharge",
-  "description": "Chapter 5: Charge at 30 percent optimal explosive amount to produce oversized fragments with zero projections",
+  "description": "Chapter 5: Charge at the minimum viable boomite amount (2kg) to produce a couple of oversized fragments with zero projections",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -21,11 +21,11 @@
       ]
     },
     {
-      "command": "charge hole:* explosive:boomite amount:1 stemming:2",
+      "command": "charge hole:* explosive:boomite amount:2 stemming:2",
       "interaction": [
         {
           "type": "command",
-          "command": "charge hole:* explosive:boomite amount:1 stemming:2"
+          "command": "charge hole:* explosive:boomite amount:2 stemming:2"
         }
       ]
     },

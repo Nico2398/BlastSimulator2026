@@ -1,6 +1,6 @@
 {
   "name": "blast-overcharge",
-  "description": "Chapter 5: Charge at 500 percent optimal explosive amount to trigger flyrock projections and catastrophic rating",
+  "description": "Chapter 5: Charge at the maximum valid boomite amount (8kg) to trigger flyrock projections and degrade the blast rating from perfect toward mediocre",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -21,11 +21,11 @@
       ]
     },
     {
-      "command": "charge hole:* explosive:boomite amount:25 stemming:2",
+      "command": "charge hole:* explosive:boomite amount:8 stemming:2",
       "interaction": [
         {
           "type": "command",
-          "command": "charge hole:* explosive:boomite amount:25 stemming:2"
+          "command": "charge hole:* explosive:boomite amount:8 stemming:2"
         }
       ]
     },
