@@ -22,6 +22,7 @@ import {
   queueResearchTask,
   tickResearch,
   isTierUnlocked,
+  isResearchQueued,
 } from '../../../src/core/entities/Building.js';
 import type { ResearchTask } from '../../../src/core/entities/Building.js';
 
@@ -228,6 +229,40 @@ describe('tickResearch', () => {
     tickResearch(state); // 5 → 4, NOT complete
 
     expect((state as any).unlockedTiers['management_office']).toBeUndefined();
+  });
+});
+
+// ── Section 4b: isResearchQueued (#410 — double-charge fix) ──────────────────
+
+describe('isResearchQueued', () => {
+  it('is false for a type+tier that has no queued task', () => {
+    const state = freshState();
+    expect(isResearchQueued(state, 'driving_center' as BuildingType, 2 as BuildingTier)).toBe(false);
+  });
+
+  it('is true once a matching {type, tier} task is queued', () => {
+    const state = freshState();
+    queueResearchTask(state, 'driving_center' as BuildingType, 2, 50, 10000);
+    expect(isResearchQueued(state, 'driving_center' as BuildingType, 2 as BuildingTier)).toBe(true);
+  });
+
+  it('is false for the same type but a different tier', () => {
+    const state = freshState();
+    queueResearchTask(state, 'driving_center' as BuildingType, 2, 50, 10000);
+    expect(isResearchQueued(state, 'driving_center' as BuildingType, 3 as BuildingTier)).toBe(false);
+  });
+
+  it('is false for the same tier but a different type', () => {
+    const state = freshState();
+    queueResearchTask(state, 'driving_center' as BuildingType, 2, 50, 10000);
+    expect(isResearchQueued(state, 'blasting_academy' as BuildingType, 2 as BuildingTier)).toBe(false);
+  });
+
+  it('is false again once the matching task is removed from the queue (e.g. completed)', () => {
+    const state = freshState();
+    queueResearchTask(state, 'driving_center' as BuildingType, 2, 1, 10000);
+    tickResearch(state); // completes and shifts the task off the queue
+    expect(isResearchQueued(state, 'driving_center' as BuildingType, 2 as BuildingTier)).toBe(false);
   });
 });
 

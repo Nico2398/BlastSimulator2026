@@ -7,28 +7,26 @@
 
 import * as THREE from 'three';
 
-// ---------- Zoom limits (distance from target) ----------
-// Real mine overviews need to span ~200m (full grid) down to <5m (drill hole close-up)
-const ZOOM_MIN = 5;    // metres — close-up detail
-const ZOOM_MAX = 600;  // metres — full mine overview
+// Zoom limits (distance from target), metres. Spans full-grid overview (600)
+// down to drill-hole close-up (5).
+const ZOOM_MIN = 5;
+const ZOOM_MAX = 600;
 const ZOOM_SPEED = 0.12; // fraction of current distance per scroll tick
 
-// ---------- Orbit speed ----------
 const ORBIT_SPEED = 0.005; // radians per pixel
 
-// ---------- Pan speed ----------
 // Scales with distance so panning feels consistent at all zoom levels
 const PAN_SPEED_FACTOR = 0.001;
 
-// ---------- Vertical angle limits (theta from horizontal) ----------
-// Prevent camera from going below terrain surface or flipping over the top
+// Vertical angle limits (phi from vertical) — keep the camera from dipping
+// below the terrain or flipping over the top.
 const POLAR_MIN = 0.08;  // ~5° from horizon (almost horizontal)
 const POLAR_MAX = Math.PI / 2 - 0.05; // ~85° — nearly straight down
 
-// ---------- Default framing ----------
-// Orbit distance as a multiple of the site's horizontal span. At FOV 55° this
-// leaves the whole pit on screen with a comfortable margin: too small and the
-// benches run off the edges, too large and the mine shrinks to a distant patch.
+// Default framing: orbit distance as a multiple of the site's horizontal
+// span. At FOV 55° this keeps the whole pit on screen with a comfortable
+// margin — too small and the benches run off the edges, too large and the
+// mine shrinks to a distant patch.
 const FRAME_DISTANCE_FACTOR = 1.15;
 /** Default vertical angle — ~45° above the horizon, reads as an overview. */
 const DEFAULT_POLAR = Math.PI / 4;
@@ -100,12 +98,7 @@ export class CameraController {
    * multi-angle screenshot shots frame the same site.
    */
   frameSite(centerX: number, centerY: number, centerZ: number, span: number): void {
-    this.target.set(centerX, centerY, centerZ);
-    this.spherical.radius = THREE.MathUtils.clamp(
-      span * FRAME_DISTANCE_FACTOR,
-      ZOOM_MIN,
-      ZOOM_MAX,
-    );
+    this.setTargetAndDistance(centerX, centerY, centerZ, span * FRAME_DISTANCE_FACTOR, false);
     this.spherical.phi = DEFAULT_POLAR;
     this.defaultTarget = this.target.clone();
     this.defaultSpherical = this.spherical.clone();
@@ -119,6 +112,17 @@ export class CameraController {
     this.apply();
   }
   private _minHeight = -Infinity;
+
+  /**
+   * Move the orbit target and distance directly, without touching yaw/pitch.
+   * Used together with `setOrbit` by scenario multi-angle shots that need to
+   * centre and zoom on a specific point (e.g. a ramp excavation) rather than
+   * the whole-site default framing (#410). Unlike `frameSite`, this is a
+   * one-off move — it does not become the new default for `reset()`.
+   */
+  focus(x: number, y: number, z: number, distance: number): void {
+    this.setTargetAndDistance(x, y, z, distance);
+  }
 
   /** Set absolute yaw (degrees) and pitch (degrees above horizon). */
   setOrbit(yawDeg: number, pitchDeg: number): void {
@@ -247,6 +251,17 @@ export class CameraController {
   };
 
   // ---- Math helpers ----
+
+  /**
+   * Set orbit target + clamp radius to `distance`. Shared by `focus` and
+   * `frameSite` (see their docs for how the two differ). Pass `applyNow:
+   * false` to defer `apply()` when the caller still has more fields to set.
+   */
+  private setTargetAndDistance(x: number, y: number, z: number, distance: number, applyNow = true): void {
+    this.target.set(x, y, z);
+    this.spherical.radius = THREE.MathUtils.clamp(distance, ZOOM_MIN, ZOOM_MAX);
+    if (applyNow) this.apply();
+  }
 
   private orbit(dx: number, dy: number): void {
     this.spherical.theta -= dx * ORBIT_SPEED;

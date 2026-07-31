@@ -17,6 +17,7 @@ import {
 import { addExpense, addIncome } from '../../core/economy/Finance.js';
 import { processPayCycle } from '../../core/entities/Employee.js';
 import { tickTraining } from '../../core/entities/EmployeeTraining.js';
+import { tickResearch } from '../../core/entities/Building.js';
 import { tickNeedGauges, needsMoraleEffect } from '../../core/entities/EmployeeNeeds.js';
 import type { FiredEvent } from '../../core/events/EventSystem.js';
 import { tickCollapse, autoInsertNeedTasks, processShiftCycle, tickEmployees, tickGeneralRestCompletion, tickTaskProgress, tickVehicle, tickEmployeeMovement } from '../../core/engine/GameLoop.js';
@@ -196,6 +197,10 @@ export function tickCommand(
       const what = done.isNew ? 'qualified in' : 'promoted to level ' + done.level + ' in';
       lines.push(`[tick ${state.tickCount}] ${done.employeeName} ${what} ${done.skill}.`);
     }
+
+    // 8c-2. Research Center queue — advance the head task's progress each tick,
+    //       unlocking its target tier when it completes.
+    tickResearch(state.buildings);
 
     // 8d. Dispatch remaining pending actions to idle qualified employees.
     // An action requiring a skill nobody on the roster holds is not left to

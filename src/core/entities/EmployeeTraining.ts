@@ -15,6 +15,7 @@ import {
   TRAINING_TIER_SPEED,
   TRAINING_BASE_FEE,
   TRAINING_LEVEL_COST_MULTIPLIER,
+  TRAINING_RELOCATION_OFFSET,
 } from '../config/balance.js';
 
 export type ProficiencyLevel = 1 | 2 | 3 | 4 | 5;
@@ -114,11 +115,26 @@ export function startTraining(
  * Validates what `startTraining` alone cannot: that the building teaches this
  * skill, and that there is a level left to gain. Deducting the fee is the
  * caller's job — this module does not touch cash.
+ *
+ * On success the employee is relocated to the building — otherwise they stay
+ * wherever they were dispatched last while a course "trains" them in place,
+ * which is what left an enrolled employee's sprite standing in the pit while
+ * their qualification changed.
+ *
+ * Placed one tile outside the footprint, adjacent to the entry point corner
+ * (`building.x`/`building.z`), rather than exactly on that corner: the raw
+ * origin coordinate sits on the building's own opaque base-box footprint, so
+ * a character placed there renders fully occluded from every external camera
+ * angle (#410).
+ *
+ * The offset moves in `-x` unless that would leave the grid — a school sitting
+ * at the `x === 0` edge (a legal placement) offsets in `+x` instead, so the
+ * employee never lands off-grid (#410).
  */
 export function enrolInTraining(
   state: EmployeeState,
   employeeId: number,
-  building: { id: number; type: BuildingType; tier: BuildingTier },
+  building: { id: number; type: BuildingType; tier: BuildingTier; x: number; z: number },
   skill: SkillCategory,
 ): StartTrainingResult {
   const emp = state.employees.find(e => e.id === employeeId);
@@ -134,6 +150,15 @@ export function enrolInTraining(
 
   const started = startTraining(state, employeeId, building.id, skill, plan.ticks, plan.fee);
   if (!started.success) return { success: false, ...(started.error ? { error: started.error } : {}) };
+
+  // One tile outside the footprint, adjacent to the entry corner — see doc
+  // comment above for why the raw origin corner is unusable, and why the
+  // offset direction flips at the grid edge.
+  emp.x = building.x - TRAINING_RELOCATION_OFFSET >= 0
+    ? building.x - TRAINING_RELOCATION_OFFSET
+    : building.x + TRAINING_RELOCATION_OFFSET;
+  emp.z = building.z;
+
   return { success: true, fee: plan.fee, plan };
 }
 

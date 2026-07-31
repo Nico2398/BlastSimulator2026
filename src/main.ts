@@ -116,6 +116,7 @@ declare global {
     __gameState: () => Record<string, unknown> | null;
     __uiState: () => Record<string, unknown>;
     __cameraOrbit: (yaw: number, pitch: number) => void;
+    __cameraFocus: (x: number, z: number, distance: number) => void;
     __cameraReset: () => void;
     __startTutorial: () => void;
     __uiActions: () => ReturnType<typeof probeUiActions>;
@@ -344,6 +345,12 @@ window.__tutorialState = () => {
 // Camera control bridges (used by scenario-test.ts for multi-angle screenshots)
 window.__cameraOrbit = (yaw: number, pitch: number) => {
   scene.cameraController.setOrbit(yaw, pitch);
+};
+// Centre + zoom the camera on a world (x, z) point at the correct terrain
+// height, for shots that need to frame a specific feature (e.g. a ramp)
+// rather than the whole-site default view (#410).
+window.__cameraFocus = (x: number, z: number, distance: number) => {
+  scene.cameraController.focus(x, gameRenderer.surfaceYAt(x, z), z, distance);
 };
 window.__cameraReset = () => {
   scene.cameraController.reset();

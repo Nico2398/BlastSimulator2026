@@ -133,8 +133,11 @@ describe('Buildings lifecycle', () => {
   // ── 5. Upgrade + research tier-unlock ───────────────────────────────────────
 
   it('upgrade command changes building tier', () => {
-    // --- Research pipeline: queue, tick, unlock ---
-    const bs = createBuildingState();
+    // --- Research pipeline: queue, tick, unlock — on the SAME buildings state the
+    //     console upgrade command operates on. Queuing research on a disconnected
+    //     BuildingState would leave ctx.state!.buildings.unlockedTiers empty, and
+    //     the upgrade below would then be rejected by the research gate. ---
+    const bs = ctx.state!.buildings;
 
     // Tier 2 is locked initially
     expect(isTierUnlocked(bs, 'living_quarters', 2)).toBe(false);
@@ -173,10 +176,36 @@ describe('Buildings lifecycle', () => {
     expect(defT2.capacity).toBe(40); // Tier 2 living_quarters capacity
   });
 
+  // ── 5b. Reject direct placement of a non-unlocked tier ──────────────────────
+
+  it('rejects direct placement of an unresearched tier via the build command', () => {
+    const result = buildCommand(ctx, ['living_quarters'], { at: '10,10', tier: '2' });
+    expect(result.success).toBe(false);
+    expect(result.output).toMatch(/research/i);
+    expect(ctx.state!.buildings.buildings).toHaveLength(0);
+  });
+
+  // ── 5c. Reject upgrade to a tier that has not been researched ───────────────
+
+  it('rejects upgrade to a tier that has not been researched', () => {
+    buildCommand(ctx, ['living_quarters'], { at: '10,10', tier: '1' });
+    expect(ctx.state!.buildings.buildings[0]!.tier).toBe(1);
+
+    const result = buildCommand(ctx, ['upgrade', '1'], {});
+    expect(result.success).toBe(false);
+    expect(result.output).toMatch(/research/i);
+
+    // The failed upgrade must not have replaced the tier-1 building
+    expect(ctx.state!.buildings.buildings).toHaveLength(1);
+    expect(ctx.state!.buildings.buildings[0]!.tier).toBe(1);
+  });
+
   // ── 6. Reject upgrade at max tier ───────────────────────────────────────────
 
   it('rejects upgrade at max tier', () => {
-    // Place a tier-3 building directly
+    // Place a tier-3 building directly — pre-unlock tier 3 research so the setup
+    // placement itself is not the thing under test here (that's tests 5b/5c).
+    ctx.state!.buildings.unlockedTiers['living_quarters'] = 3;
     buildCommand(ctx, ['living_quarters'], { at: '10,10', tier: '3' });
     expect(ctx.state!.buildings.buildings[0]!.tier).toBe(3);
 

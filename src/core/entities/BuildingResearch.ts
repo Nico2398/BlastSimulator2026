@@ -47,3 +47,19 @@ export function isTierUnlocked(
   if (unlocked === undefined) return false;
   return unlocked >= tier;
 }
+
+/**
+ * Whether a research task for this exact {type, tier} already sits in the
+ * queue (in progress or pending). Shared by the console `research queue`
+ * command and the Build Menu UI so a repeat click neither double-charges
+ * nor pushes a redundant duplicate task.
+ */
+export function isResearchQueued(
+  state: BuildingState,
+  type: BuildingType,
+  tier: BuildingTier,
+): boolean {
+  return state.researchQueue.some(
+    (task) => task.targetType === type && task.targetTier === tier,
+  );
+}

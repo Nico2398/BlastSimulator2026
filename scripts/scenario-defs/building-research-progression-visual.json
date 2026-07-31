@@ -1,50 +1,23 @@
 {
-  "name": "building-training-visual",
-  "description": "Visual check of training buildings: driving center, blasting academy, management office, and geology lab",
+  "name": "building-research-progression-visual",
+  "description": "Visual check of the research tier-gate: Tier 1 Research Center placed, a direct Tier 2 attempt rejected, then Tier 2 becomes buildable after research completes",
   "steps": [
     {
-      "command": "new_game seed:42 cash:60000",
-      "timeout": 10,
+      "command": "new_game seed:42",
+      "timeout": 30,
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 cash:60000"
+          "command": "new_game seed:42"
         }
       ]
     },
     {
-      "command": "build driving_center at:5,5",
+      "command": "build research_center at:5,5",
       "interaction": [
         {
           "type": "command",
-          "command": "build driving_center at:5,5"
-        }
-      ]
-    },
-    {
-      "command": "build blasting_academy at:10,5",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "build blasting_academy at:10,5"
-        }
-      ]
-    },
-    {
-      "command": "build management_office at:15,5",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "build management_office at:15,5"
-        }
-      ]
-    },
-    {
-      "command": "build geology_lab at:20,5",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "build geology_lab at:20,5"
+          "command": "build research_center at:5,5"
         }
       ]
     },
@@ -58,47 +31,39 @@
       ]
     },
     {
-      "command": "employee hire role:driller",
+      "command": "build research_center at:15,5 tier:2",
+      "description": "Rejected — tier 2 has not been researched yet.",
       "interaction": [
         {
           "type": "command",
-          "command": "employee hire role:driller"
+          "command": "build research_center at:15,5 tier:2"
         }
       ]
     },
     {
-      "command": "employee hire role:blaster",
+      "command": "build list",
       "interaction": [
         {
           "type": "command",
-          "command": "employee hire role:blaster"
+          "command": "build list"
         }
       ]
     },
     {
-      "command": "employee list",
+      "command": "research queue type:research_center tier:2",
       "interaction": [
         {
           "type": "command",
-          "command": "employee list"
+          "command": "research queue type:research_center tier:2"
         }
       ]
     },
     {
-      "command": "employee train 1 skill:driving.excavator building:1",
+      "command": "research status",
       "interaction": [
         {
           "type": "command",
-          "command": "employee train 1 skill:driving.excavator building:1"
-        }
-      ]
-    },
-    {
-      "command": "employee list",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "employee list"
+          "command": "research status"
         }
       ]
     },
@@ -112,29 +77,57 @@
       ]
     },
     {
-      "command": "employee list",
+      "command": "research status",
       "interaction": [
         {
           "type": "command",
-          "command": "employee list"
+          "command": "research status"
         }
       ]
     },
     {
-      "command": "tick 15",
+      "command": "tick 40",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 15"
+          "command": "tick 40"
         }
       ]
     },
     {
-      "command": "employee list",
+      "command": "research status",
       "interaction": [
         {
           "type": "command",
-          "command": "employee list"
+          "command": "research status"
+        }
+      ]
+    },
+    {
+      "command": "build research_center at:15,5 tier:2",
+      "description": "Now succeeds — tier 2 was just researched.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build research_center at:15,5 tier:2"
+        }
+      ]
+    },
+    {
+      "command": "build list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build list"
+        }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
         }
       ]
     },
@@ -155,7 +148,7 @@
       "pitch": 45
     },
     {
-      "name": "training-area",
+      "name": "research-area",
       "yaw": 90,
       "pitch": 10
     },

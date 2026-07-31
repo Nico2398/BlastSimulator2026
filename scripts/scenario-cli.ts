@@ -55,7 +55,11 @@ export function parseArgs(): ParsedArgs {
         const def = loadScenarioDef(name, resolve(process.cwd(), 'scripts/scenario-defs'));
         steps = def.steps;
         if (def.shots && Array.isArray(def.shots)) {
-          shots = def.shots.map(s => ({ name: s.name, yaw: s.yaw, pitch: s.pitch }));
+          shots = def.shots.map(s => ({
+            name: s.name, yaw: s.yaw, pitch: s.pitch,
+            ...(s.target !== undefined ? { target: s.target } : {}),
+            ...(s.distance !== undefined ? { distance: s.distance } : {}),
+          }));
         }
       } catch (err) {
         console.error(`Scenario file not found: ${err instanceof Error ? err.message : err}`);

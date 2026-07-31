@@ -281,6 +281,24 @@ describe('Employee skills', () => {
     expect(emp().qualifications.some(q => q.category === 'driving.excavator')).toBe(true);
   });
 
+  it('employee train moves the employee to the training building (#410)', () => {
+    const state = ctx.state!;
+    placeBuilding(state.buildings, 'driving_center', 5, 5, 32, 32, 1);
+    const emp = () => state.employees.employees.find(e => e.id === empId)!;
+    const before = { x: emp().x, z: emp().z };
+    const building = state.buildings.buildings.find(b => b.type === 'driving_center')!;
+
+    const result = employeeCommand(ctx, ['train', String(empId)], { skill: 'driving.excavator' });
+    expect(result.success, result.output).toBe(true);
+
+    // The employee walks to the school, not left wherever they were hired.
+    // Lands one tile outside the footprint (not the raw origin corner, which
+    // sits on the building's own opaque base-box and renders occluded, #410).
+    expect(emp().x).toBe(building.x - 1);
+    expect(emp().z).toBe(building.z);
+    expect(emp().x !== before.x || emp().z !== before.z).toBe(true);
+  });
+
   it('employee train raises proficiency in a skill already held', () => {
     const state = ctx.state!;
     placeBuilding(state.buildings, 'blasting_academy', 5, 5, 32, 32, 1);

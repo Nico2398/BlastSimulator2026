@@ -10,6 +10,13 @@ export interface ParsedCommand {
 export interface CommandResult {
   success: boolean;
   output: string;
+  /**
+   * Optional machine-readable failure reason, set by commands whose UI
+   * caller needs to show a translated message instead of `output` (core's
+   * plain-English string). Absent on success and on commands that don't
+   * distinguish failure reasons.
+   */
+  code?: string;
 }
 
 export type CommandHandler = (args: string[], namedArgs: Record<string, string>) => CommandResult;

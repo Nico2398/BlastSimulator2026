@@ -105,6 +105,7 @@ const VISUAL_SCENARIO_NAMES = [
   'building-living-visual',
   'building-warehouse-visual',
   'building-research-visual',
+  'building-research-progression-visual',
   'building-vehicle-depot-visual',
   'building-ramp-visual',
   'building-destruction-visual',
@@ -135,6 +136,7 @@ const VISUAL_SCENARIO_NAMES = [
  */
 const UI_DRIVEN_SCENARIO_NAMES = [
   'tutorial-interactive',
+  'building-tier-system-visual',
 ] as const;
 
 const ALL_SCENARIO_NAMES = [
@@ -147,7 +149,7 @@ const KNOWN_COMMANDS = [
   'new_game', 'campaign', 'time', 'scores', 'finances',
   'employee', 'state', 'survey', 'tick', 'event',
   'drill_plan', 'charge', 'sequence', 'blast', 'contract',
-  'build', 'vehicle', 'stats', 'inspect', 'zone',
+  'build', 'vehicle', 'stats', 'inspect', 'zone', 'research',
   'tutorial_start', 'corrupt', 'mafia', 'buy_software', 'weather', 'buy',
   'fragments', 'preview', 'blast_preview', 'install_tubing',
   'build_ramp', 'set_policy', 'terrain_info', 'help',

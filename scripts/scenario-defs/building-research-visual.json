@@ -3,12 +3,12 @@
   "description": "Visual check of research center building at all three tiers for technology advancement",
   "steps": [
     {
-      "command": "new_game seed:42",
+      "command": "new_game seed:42 cash:230000",
       "timeout": 30,
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42"
+          "command": "new_game seed:42 cash:230000"
         }
       ]
     },
@@ -23,10 +23,56 @@
     },
     {
       "command": "build research_center at:15,5 tier:2",
+      "description": "Rejected — tier 2 has not been researched yet. Demonstrates the research gate.",
       "interaction": [
         {
           "type": "command",
           "command": "build research_center at:15,5 tier:2"
+        }
+      ]
+    },
+    {
+      "command": "research queue type:research_center tier:2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "research queue type:research_center tier:2"
+        }
+      ]
+    },
+    {
+      "command": "tick 50",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ]
+    },
+    {
+      "command": "build research_center at:15,5 tier:2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build research_center at:15,5 tier:2"
+        }
+      ]
+    },
+    {
+      "command": "research queue type:research_center tier:3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "research queue type:research_center tier:3"
+        }
+      ]
+    },
+    {
+      "command": "tick 50",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
         }
       ]
     },

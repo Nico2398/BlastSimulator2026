@@ -5,6 +5,7 @@
 // Research Center queue: BuildingResearch.ts
 
 import { BUILDING_DEFS } from './BuildingDefs.js';
+import { isTierUnlocked } from './BuildingResearch.js';
 
 // ── Building types ──
 
@@ -159,6 +160,19 @@ export interface PlaceBuildingResult {
   cost?: number;
 }
 
+/**
+ * Whether placing or upgrading a building at this tier is blocked because the
+ * tier has not been unlocked via a Research Center task.
+ * Tier 1 is always unlocked; tier 2/3 require `isTierUnlocked` to report true.
+ */
+export function isPlacementBlockedByResearch(
+  state: BuildingState,
+  type: BuildingType,
+  tier: BuildingTier,
+): boolean {
+  return !isTierUnlocked(state, type, tier);
+}
+
 /** Place a building at grid coordinates. Returns cost to deduct. */
 export function placeBuilding(
   state: BuildingState,
@@ -171,6 +185,10 @@ export function placeBuilding(
 ): PlaceBuildingResult {
   const def = getBuildingDef(type, tier);
   const { sizeX, sizeZ } = getDefSize(def);
+
+  if (isPlacementBlockedByResearch(state, type, tier)) {
+    return { success: false, error: `Tier ${tier} ${type} is not researched — research required before placement.` };
+  }
 
   if (x < 0 || z < 0 || x + sizeX > gridSizeX || z + sizeZ > gridSizeZ) {
     return { success: false, error: 'Out of bounds' };
@@ -314,7 +332,7 @@ export {
   BUSY, buildPlacementGrid, getSurfaceY, canPlaceBuilding, isBuildingFootprintCell,
   type SurfaceY, type PlacementCell, type CanPlaceBuildingResult, type PlacementGrid,
 } from './BuildingPlacement.js';
-export { queueResearchTask, tickResearch, isTierUnlocked } from './BuildingResearch.js';
+export { queueResearchTask, tickResearch, isTierUnlocked, isResearchQueued } from './BuildingResearch.js';
 export { getLivingQuartersWellbeingMultiplier } from './BuildingWellbeing.js';
 export {
   getExplosivesCapacity, getExplosivesInStock,

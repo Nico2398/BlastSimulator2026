@@ -286,6 +286,16 @@ export class GameRenderer {
     return { points, opacity: 0.6 };
   }
 
+  /**
+   * Public wrapper around `getTerrainSurfaceY`, used by the scenario camera
+   * bridge (`window.__cameraFocus`) so a scripted shot can centre on a world
+   * (x, z) point at the correct terrain height without duplicating the voxel
+   * lookup (#410).
+   */
+  surfaceYAt(x: number, z: number): number {
+    return this.getTerrainSurfaceY(x, z);
+  }
+
   /** Find the highest solid-voxel Y at the given (x, z) column. Returns 0 if no grid. */
   private getTerrainSurfaceY(x: number, z: number): number {
     if (!this.lastGrid) return 0;

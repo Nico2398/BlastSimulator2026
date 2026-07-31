@@ -58,7 +58,15 @@ export interface ScenarioDef {
   name: string;
   description: string;
   steps: ScenarioStepDef[];
-  shots?: Array<{ name: string; yaw: number; pitch: number }>;
+  shots?: Array<{
+    name: string;
+    yaw: number;
+    pitch: number;
+    /** World (x, z) to centre the shot on; terrain Y is resolved at capture time. Defaults to the whole-site framing when omitted. */
+    target?: [number, number];
+    /** Camera distance from `target`, in world units. Ignored unless `target` is also set. */
+    distance?: number;
+  }>;
 }
 
 /**

@@ -22,11 +22,47 @@
       ]
     },
     {
+      "command": "research queue type:living_quarters tier:2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "research queue type:living_quarters tier:2"
+        }
+      ]
+    },
+    {
+      "command": "tick 50",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ]
+    },
+    {
       "command": "build living_quarters at:12,5 tier:2",
       "interaction": [
         {
           "type": "command",
           "command": "build living_quarters at:12,5 tier:2"
+        }
+      ]
+    },
+    {
+      "command": "research queue type:living_quarters tier:3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "research queue type:living_quarters tier:3"
+        }
+      ]
+    },
+    {
+      "command": "tick 50",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
         }
       ]
     },
