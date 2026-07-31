@@ -4,6 +4,7 @@ import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import type { ScenarioDef, ScenarioStepDef } from '../../scripts/shared/scenario-types.js';
 import { loadScenarioDef, SCENARIO_DIR } from '../../scripts/shared/scenario-utils.js';
+import { getAllVehicleRoles } from '../../src/core/entities/Vehicle.js';
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 
@@ -314,6 +315,50 @@ describe('No steps use unknown commands', () => {
         }
       }
       expect(unknownCommands).toEqual([]);
+    });
+  }
+});
+
+// ──────────────────────────────────────────────
+// 8b. "vehicle buy" steps pass a valid VehicleRole
+// Regression: scripts/scenario-defs/vehicle-traffic.json used to pass
+// "hauler" as the role argument, which is not a member of VehicleRole
+// (the valid id is "debris_hauler"). Because the console command layer
+// rejects the buy with CommandResult.success:false rather than throwing,
+// `npm run scenarios` (command-mode runner) never surfaced the bug — it
+// only fails a step on a thrown exception. This test catches invalid
+// role tokens directly against the VehicleRole set instead of relying on
+// runtime command execution. See issue #445.
+//
+// Scoped to vehicle-traffic.json only — issue #445's exact scope. Two
+// other scenario files (level3-playthrough-win.json,
+// level1-lose-bankruptcy.json) were found to also carry invalid
+// VehicleRole tokens while writing this test, but fixing those is out of
+// scope for #445; they are tracked in a separate follow-up issue instead
+// of being folded into this regression test.
+// ──────────────────────────────────────────────
+describe('"vehicle buy" steps use a valid VehicleRole', () => {
+  const validRoles = getAllVehicleRoles();
+
+  for (const name of ['vehicle-traffic'] as const) {
+    it(`${name} — every "vehicle buy" step's role is a valid VehicleRole`, () => {
+      const scenario = loadScenarioDef(name, SCENARIO_DIR);
+      const invalidRoleSteps: string[] = [];
+      for (let i = 0; i < scenario.steps.length; i++) {
+        const step = scenario.steps[i];
+        const cmdStr = typeof step === 'string' ? step : (step as ScenarioStepDef).command;
+        if (!cmdStr.startsWith('vehicle buy ')) continue;
+        const role = cmdStr.trim().split(/\s+/)[2];
+        if (!validRoles.includes(role as never)) {
+          invalidRoleSteps.push(
+            `step[${i}]: "${cmdStr}" — role "${role}" is not a valid VehicleRole (valid: ${validRoles.join(', ')})`,
+          );
+        }
+      }
+      expect(
+        invalidRoleSteps,
+        `${name}.json has "vehicle buy" steps with invalid roles:\n${invalidRoleSteps.join('\n')}`,
+      ).toEqual([]);
     });
   }
 });
