@@ -13,6 +13,7 @@
 
 import * as THREE from 'three';
 import type { Vehicle, VehicleRole, VehicleTier, VehicleOperationalState } from '../core/entities/Vehicle.js';
+import { WAITING_QUEUE_SLOT_OFFSETS } from '../core/config/balance.js';
 
 // ---------- Colors ----------
 const YELLOW = 0xf5c518;   // Caterpillar yellow
@@ -160,7 +161,9 @@ export class VehicleMesh {
     const group = builder();
     applyTierVariation(group, vehicle.tier);
     applyStateIndicator(group, vehicle.state);
-    group.position.set(vehicle.x, surfaceY, vehicle.z);
+    const pool = [...Array.from(this.vehicles.values(), e => e.vehicle), vehicle];
+    const [offsetX, offsetZ] = this.waitingQueueOffset(vehicle, pool);
+    group.position.set(vehicle.x + offsetX, surfaceY, vehicle.z + offsetZ);
     this.scene.add(group);
     this.vehicles.set(vehicle.id, { group, vehicle });
   }
@@ -175,11 +178,44 @@ export class VehicleMesh {
       if (!entry) continue;
       // Update stored reference
       entry.vehicle = v;
-      // Lerp toward target
-      entry.group.position.x += (v.x - entry.group.position.x) * MOVE_LERP;
-      entry.group.position.z += (v.z - entry.group.position.z) * MOVE_LERP;
+      // Lerp toward target (+ queue offset for fused 'waiting' vehicles, #411 round 2)
+      const [offsetX, offsetZ] = this.waitingQueueOffset(v, vehicles);
+      const targetX = v.x + offsetX;
+      const targetZ = v.z + offsetZ;
+      entry.group.position.x += (targetX - entry.group.position.x) * MOVE_LERP;
+      entry.group.position.z += (targetZ - entry.group.position.z) * MOVE_LERP;
       applyStateIndicator(entry.group, v.state);
     }
+  }
+
+  /**
+   * Render-only positional offset for a vehicle in the 'waiting' state that
+   * shares its target cell with other waiting vehicles (#411 round 2).
+   * detectTrafficJam (src/core/events/EventEngine.ts) groups waiting vehicles
+   * by exact targetX/targetZ, so the simulation must keep driving every
+   * contending vehicle toward the identical point — this offset never touches
+   * vehicle.x/z or targetX/targetZ, only where the mesh is drawn, so jam
+   * detection is unaffected. Slot assignment is by ascending vehicle id among
+   * vehicles sharing that target, so it stays stable frame to frame.
+   *
+   * Public: GameRenderer's terrain-surface-height correction (syncFromContext)
+   * calls snapPosition with x/z straight from GameState every sync, which
+   * would otherwise stomp this offset back to the fused raw position between
+   * update()'s per-frame lerps — GameRenderer must fold this same offset into
+   * the x/z it passes to snapPosition.
+   */
+  waitingQueueOffset(vehicle: Vehicle, pool: Vehicle[]): readonly [number, number] {
+    if (vehicle.state !== 'waiting') return [0, 0];
+
+    const sharingTarget = pool
+      .filter(v => v.state === 'waiting' && v.targetX === vehicle.targetX && v.targetZ === vehicle.targetZ)
+      .map(v => v.id)
+      .sort((a, b) => a - b);
+
+    if (sharingTarget.length <= 1) return [0, 0];
+
+    const slot = sharingTarget.indexOf(vehicle.id) % WAITING_QUEUE_SLOT_OFFSETS.length;
+    return WAITING_QUEUE_SLOT_OFFSETS[slot]!;
   }
 
   /** Snap a vehicle directly to its world position (no lerp — use after teleport or initial placement). */

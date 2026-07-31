@@ -138,6 +138,30 @@ export const TRAFFIC_JAM_MIN_TICKS = 10;
 export const SPAWN_RING_SIZE = 3;
 export const SPAWN_TILE_SPACING = 3;
 
+/**
+ * Render-only queue offsets for vehicles in the 'waiting' operational state
+ * that share a contended target cell (#411 round 2). detectTrafficJam groups
+ * waiting vehicles by exact targetX/targetZ, so the simulation intentionally
+ * drives every contending vehicle toward the identical point — that grouping
+ * must not change. Their *rendered* position, however, fanned out to
+ * sub-tile-distance fractional coordinates as each approached along its own
+ * path, fusing 3+ meshes into one blob. VehicleMesh spreads waiting vehicles
+ * that share a target across these slots (world-unit offsets from the shared
+ * target) purely for display — core vehicle.x/z and jam detection are
+ * untouched. Same 3-unit spacing as SPAWN_TILE_SPACING above (debris_hauler's
+ * widest body dimension is 2.5, so anything much under 3 still overlaps).
+ */
+export const WAITING_QUEUE_SLOT_OFFSETS: ReadonlyArray<readonly [number, number]> = [
+  [0, 0],
+  [3, 0],
+  [-3, 0],
+  [0, 3],
+  [0, -3],
+  [3, 3],
+  [-3, -3],
+  [3, -3],
+];
+
 // ─── Ore Report Events ───────────────────────────────────────────────────────────
 
 /** Yield ratio threshold above which a blast is considered "Lucky Strike" (got more ore than surveyed). */

@@ -106,12 +106,17 @@ export class GameRenderer {
       (x, z) => this.getTerrainSurfaceY(x, z),
     );
 
-    // Place vehicles at terrain surface height (not buried at y=0)
+    // Place vehicles at terrain surface height (not buried at y=0).
+    // Also fold in the waiting-queue render offset (#411 round 2) — this snap
+    // runs on every sync (not just once per frame like update()'s lerp), so
+    // without it every sync would stomp fused 'waiting' vehicles back to
+    // their raw, near-identical GameState x/z.
     if (this.vehicles && this.lastGrid) {
       for (const v of ctx.state.vehicles.vehicles) {
         if (this.renderedVehicleIds.has(v.id)) {
           const surfaceY = this.getTerrainSurfaceY(v.x, v.z);
-          this.vehicles.snapPosition(v.id, v.x, surfaceY, v.z);
+          const [offsetX, offsetZ] = this.vehicles.waitingQueueOffset(v, ctx.state.vehicles.vehicles);
+          this.vehicles.snapPosition(v.id, v.x + offsetX, surfaceY, v.z + offsetZ);
         }
       }
     }
