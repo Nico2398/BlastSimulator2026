@@ -19,6 +19,7 @@ import {
   detectUnqualifiedTask,
 } from '../../src/core/events/EventEngine.js';
 import { Random } from '../../src/core/math/Random.js';
+import { t } from '../../src/core/i18n/I18n.js';
 import { setupEvents } from '../../src/core/events/index.js';
 import { clearEvents } from '../../src/core/events/EventPool.js';
 import { createRunner } from '../../src/console/createRunner.js';
@@ -174,6 +175,29 @@ describe('Event system', () => {
     expect(result.output).toContain('[0]');
     expect(result.output).toContain('[1]');
     expect(result.output).toContain('[2]');
+  });
+
+  // ── 3b. event choose output includes the resolved outcome sentence (#421) ──
+
+  it('event choose output includes the resolved outcome sentence between "Event resolved:" and "Consequences:"', () => {
+    ctx.state!.events.pendingEvent = { eventId: 'union_coffee_uprising', firedAtTick: ctx.state!.tickCount };
+
+    const result = eventCommand(ctx, ['choose', '0'], {});
+
+    expect(result.success).toBe(true);
+    // Option 0 of union_coffee_uprising has no probability field — the plain
+    // (non-_alt) key always applies.
+    const expectedSentence = t('event.union_coffee_uprising.res0');
+    expect(result.output).toContain(expectedSentence);
+
+    const lines = result.output.split('\n');
+    const resolvedIdx = lines.indexOf('Event resolved: union_coffee_uprising');
+    const consequencesIdx = lines.indexOf('Consequences:');
+    const sentenceIdx = lines.indexOf(expectedSentence);
+    expect(resolvedIdx).toBe(0);
+    expect(consequencesIdx).toBeGreaterThan(resolvedIdx);
+    expect(sentenceIdx).toBeGreaterThan(resolvedIdx);
+    expect(sentenceIdx).toBeLessThan(consequencesIdx);
   });
 
   // ── 4. tickEventSystem advances timers ─────────────────────────────────────

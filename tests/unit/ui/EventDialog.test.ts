@@ -78,12 +78,20 @@ describe('EventDialog', () => {
     container.remove();
   });
 
-  it('swaps the choices for an outcome line and a Dismiss button', () => {
+  it('swaps the choices for an outcome headline sentence plus numeric effects, and a Dismiss button', () => {
     const { container, dialog } = mount();
-    // The dialog parses effect lines out of the console output ("  • ...").
+    // Real shape of "event choose" output post-#421: the resolved outcome
+    // sentence sits between "Event resolved: <id>" and "Consequences:", with
+    // the numeric bullet effects following it. The dialog must surface the
+    // sentence as a distinct headline — not fold it silently into the
+    // existing numeric-effects readout.
     dialog.setGameConsole(vi.fn().mockReturnValue({
       success: true,
-      output: 'You hired the consultant.\n  • Lost $3000\n  • wellBeing +15',
+      output: 'Event resolved: tutorial_synergy_consultant\n'
+        + "The consultant's slideshow induces mass narcolepsy across the whole crew.\n"
+        + 'Consequences:\n'
+        + '  • Lost $3000\n'
+        + '  • wellBeing +15',
     }));
     dialog.update(stateWithPendingEvent());
     dialog.show();
@@ -92,7 +100,21 @@ describe('EventDialog', () => {
 
     const dismiss = container.querySelector('#bs-event-dialog .bs-event-dismiss') as HTMLElement;
     expect(dismiss.style.display).not.toBe('none');
-    expect(container.querySelector('.bs-event-outcome')?.textContent).toContain('wellBeing +15');
+
+    // The satirical outcome sentence gets its own headline element.
+    const headline = container.querySelector('.bs-event-outcome-headline');
+    expect(headline).not.toBeNull();
+    expect(headline!.textContent).toContain(
+      "The consultant's slideshow induces mass narcolepsy across the whole crew.",
+    );
+
+    // The numeric effects stay visible too, in a separate small-print element —
+    // the sentence itself must not leak into the numbers-only readout.
+    const numbers = container.querySelector('.bs-event-outcome');
+    expect(numbers).not.toBeNull();
+    expect(numbers!.textContent).toContain('Lost $3000');
+    expect(numbers!.textContent).toContain('wellBeing +15');
+    expect(numbers!.textContent).not.toContain('mass narcolepsy');
 
     dismiss.click();
     expect(dialog.visible).toBe(false);
