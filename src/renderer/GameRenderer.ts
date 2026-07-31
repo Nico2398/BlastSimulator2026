@@ -18,7 +18,7 @@ import { BlastEffects } from './BlastEffects.js';
 import { DistantScenery } from './DistantScenery.js';
 import { BlastPlanOverlay } from './BlastPlanOverlay.js';
 import { GhostMesh } from './GhostMesh.js';
-import { syncEntitySets } from './EntitySync.js';
+import { syncEntitySets, buildingCenterSurfaceY } from './EntitySync.js';
 import type { SurveyConfidenceOverlayOptions, SurveyConfidencePoint } from './SurveyConfidenceOverlay.js';
 import { isSurveyStale } from '../core/mining/SurveyCalc.js';
 import {
@@ -99,7 +99,12 @@ export class GameRenderer {
     this.lastState = ctx.state;
 
     // Sync entities added since last call
-    syncEntitySets(ctx.state, this.buildings, this.renderedBuildingIds, this.vehicles, this.renderedVehicleIds, this.characters, this.renderedEmployeeIds);
+    syncEntitySets(
+      ctx.state, this.buildings, this.renderedBuildingIds,
+      this.vehicles, this.renderedVehicleIds,
+      this.characters, this.renderedEmployeeIds,
+      (x, z) => this.getTerrainSurfaceY(x, z),
+    );
 
     // Place vehicles at terrain surface height (not buried at y=0)
     if (this.vehicles && this.lastGrid) {
@@ -404,10 +409,16 @@ export class GameRenderer {
     this.terrain = new TerrainMesh(scene, grid);
     this.terrain.buildAll();
 
+    // Bind the grid before sampling terrain height below — buildings, vehicles,
+    // and characters loaded from a save (not just a fresh new_game) need
+    // getTerrainSurfaceY() to see this grid, not the previous one (#408).
+    this.lastGrid = grid;
+
     // Buildings
     this.buildings = new BuildingMesh(scene);
     for (const b of state.buildings.buildings) {
-      this.buildings.addBuilding(b);
+      const surfaceY = buildingCenterSurfaceY(b, (x, z) => this.getTerrainSurfaceY(x, z));
+      this.buildings.addBuilding(b, surfaceY);
     }
 
     // Vehicles
@@ -432,8 +443,6 @@ export class GameRenderer {
 
     // Blast effects
     this.blastEffects = new BlastEffects(scene, this.sm.camera);
-
-    this.lastGrid = grid;
 
     // Distant scenery
     const preset = getMinePreset(state.mineType);

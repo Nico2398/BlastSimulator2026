@@ -232,7 +232,7 @@ export class BlastPlanOverlay {
   private addProjectionArcs(options: BlastPlanOverlayOptions): void {
     for (const hd of options.holes) {
       if (!hd.projectionSpeed || hd.projectionSpeed < 5) continue;
-      const arc = this.makeProjectionArc(hd.hole.x, hd.hole.z, hd.projectionSpeed);
+      const arc = this.makeProjectionArc(hd.hole.x, hd.hole.z, hd.surfaceY, hd.projectionSpeed);
       this.group.add(arc);
     }
   }
@@ -270,7 +270,7 @@ export class BlastPlanOverlay {
     return new THREE.Mesh(geo, mat);
   }
 
-  private makeProjectionArc(hx: number, hz: number, speed: number): THREE.Line {
+  private makeProjectionArc(hx: number, hz: number, surfaceY: number, speed: number): THREE.Line {
     // Simple parabola: y = v² sin(2θ)/g, θ=45°
     const g = 9.81;
     const range = (speed * speed) / g;
@@ -279,7 +279,10 @@ export class BlastPlanOverlay {
     for (let i = 0; i <= steps; i++) {
       const t = i / steps;
       const px = hx + Math.cos(0.8) * range * t;
-      const py = range * 0.5 * t * (1 - t) * 2;
+      // Offset from the terrain surface, not world y=0 — a blast site rarely
+      // sits near y=0, so an unoffset arc rendered underground (see the
+      // vibration-wave fix above for the same class of bug).
+      const py = surfaceY + range * 0.5 * t * (1 - t) * 2;
       const pz = hz + Math.sin(0.8) * range * t;
       points.push(new THREE.Vector3(px, py, pz));
     }

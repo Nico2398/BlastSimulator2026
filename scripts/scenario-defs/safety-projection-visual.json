@@ -58,11 +58,11 @@
       ]
     },
     {
-      "command": "build storage_depot at:35,25",
+      "command": "build freight_warehouse at:35,25",
       "interaction": [
         {
           "type": "command",
-          "command": "build storage_depot at:35,25"
+          "command": "build freight_warehouse at:35,25"
         }
       ]
     },
@@ -76,11 +76,12 @@
       ]
     },
     {
-      "command": "charge hole:* explosive:boomite amount:10 stemming:1",
+      "command": "charge hole:* explosive:boomite amount:8 stemming:1",
+      "description": "boomite's valid range is [1-8kg] (src/core/world/ExplosiveCatalog.ts) — amount:10 was out of range and made every hole error out with 'Missing charge', so blast_preview/preview projections/blast all ran against an uncharged, invalid plan. 8kg (boomite's own max) plus 1m stemming is still the maximum overcharge this explosive supports.",
       "interaction": [
         {
           "type": "command",
-          "command": "charge hole:* explosive:boomite amount:10 stemming:1"
+          "command": "charge hole:* explosive:boomite amount:8 stemming:1"
         }
       ]
     },
@@ -90,6 +91,34 @@
         {
           "type": "command",
           "command": "sequence auto delay_step:10"
+        }
+      ]
+    },
+    {
+      "command": "buy_software tier:1",
+      "description": "preview projections requires software tier 3+ (default tier is 0) — unlock sequentially so the projection preview actually computes instead of printing a lock message",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "buy_software tier:1"
+        }
+      ]
+    },
+    {
+      "command": "buy_software tier:2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "buy_software tier:2"
+        }
+      ]
+    },
+    {
+      "command": "buy_software tier:3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "buy_software tier:3"
         }
       ]
     },

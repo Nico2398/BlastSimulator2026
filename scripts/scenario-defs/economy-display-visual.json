@@ -103,20 +103,20 @@
       ]
     },
     {
-      "command": "vehicle buy hauler",
+      "command": "vehicle buy debris_hauler",
       "interaction": [
         {
           "type": "command",
-          "command": "vehicle buy hauler"
+          "command": "vehicle buy debris_hauler"
         }
       ]
     },
     {
-      "command": "build storage_depot at:25,25",
+      "command": "build freight_warehouse at:25,25",
       "interaction": [
         {
           "type": "command",
-          "command": "build storage_depot at:25,25"
+          "command": "build freight_warehouse at:25,25"
         }
       ]
     },

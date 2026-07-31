@@ -2,7 +2,7 @@
 
 import type { CommandResult } from '../ConsoleRunner.js';
 import { createGame, buildGameNavGrid, type GameState } from '../../core/state/GameState.js';
-import { getMinePreset, getAllMinePresets } from '../../core/world/MineType.js';
+import { getMinePreset, getAllMinePresets, type MinePreset } from '../../core/world/MineType.js';
 import { generateTerrain } from '../../core/world/TerrainGen.js';
 import { getRock } from '../../core/world/RockCatalog.js';
 import { getOre } from '../../core/world/OreCatalog.js';
@@ -18,7 +18,27 @@ export interface GameContext {
   emitter: EventEmitter;
 }
 
-const DEFAULT_GRID_SIZE = 64;
+/** Grid edge length (voxels) used when a size is not explicitly given. */
+export const DEFAULT_GRID_SIZE = 64;
+
+/**
+ * Regenerate `ctx.grid` and its dependent navgrid for `ctx.state`. The
+ * VoxelGrid is not part of the serialized GameState (see the WorldState
+ * comment in GameState.ts), so every path that creates or restores a
+ * GameState — new game, campaign level start, save load — must rebuild it
+ * from scratch the same way. Centralized here so all four call sites
+ * (`newGameCommand`, `campaignStartCommand`, `loadCommand`, and the
+ * Save/Load UI's load handler in main.ts) stay in sync (#408).
+ */
+export function regenerateGrid(
+  ctx: GameContext,
+  params: { seed: number; preset: MinePreset; sizeX: number; sizeY: number; sizeZ: number },
+): void {
+  if (!ctx.state) return;
+  const { seed, preset, sizeX, sizeY, sizeZ } = params;
+  ctx.grid = generateTerrain({ sizeX, sizeY, sizeZ, seed, preset });
+  buildGameNavGrid(ctx.state, ctx.grid, ctx.state.buildings.buildings, ctx.state.drillHoles);
+}
 
 export function newGameCommand(
   ctx: GameContext,
@@ -37,8 +57,7 @@ export function newGameCommand(
   const size = named['size'] ? parseInt(named['size'], 10) : DEFAULT_GRID_SIZE;
   ctx.state = createGame({ seed, mineType });
   ctx.state.world = { sizeX: size, sizeY: size, sizeZ: size, gridReady: true };
-  ctx.grid = generateTerrain({ sizeX: size, sizeY: size, sizeZ: size, seed, preset });
-  buildGameNavGrid(ctx.state, ctx.grid, ctx.state.buildings.buildings, ctx.state.drillHoles);
+  regenerateGrid(ctx, { seed, preset, sizeX: size, sizeY: size, sizeZ: size });
 
   return {
     success: true,

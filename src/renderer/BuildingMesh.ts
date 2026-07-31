@@ -63,8 +63,14 @@ export class BuildingMesh {
    * Add a building mesh to the scene.
    * Tier 2/3 buildings are taller and slightly brighter.
    * Entry (green) and exit (orange) markers are added at ground level.
+   *
+   * @param surfaceY - Terrain surface height under the building's footprint
+   *   centre. Buildings are static once placed, so unlike vehicles/characters
+   *   this is baked into the mesh at construction rather than corrected every
+   *   frame — pass the same `getTerrainSurfaceY` sample used for them, or the
+   *   building renders at y=0 and sits buried underground (#408).
    */
-  addBuilding(building: Building): void {
+  addBuilding(building: Building, surfaceY = 0): void {
     const def = getBuildingDef(building.type, building.tier);
     const vis = BUILDING_VISUALS[building.type];
     const group = new THREE.Group();
@@ -111,8 +117,8 @@ export class BuildingMesh {
       group.add(makeMarker(xx, xz, EXIT_COLOR));
     }
 
-    // Position: grid cell centre in world coords
-    group.position.set(building.x + sizeX / 2, 0, building.z + sizeZ / 2);
+    // Position: grid cell centre in world coords, resting on the terrain surface
+    group.position.set(building.x + sizeX / 2, surfaceY, building.z + sizeZ / 2);
 
     this.scene.add(group);
     this.buildings.set(building.id, group);
@@ -122,9 +128,9 @@ export class BuildingMesh {
    * Update an existing building (e.g., damaged or tier upgraded).
    * Removes the old mesh and adds a fresh one.
    */
-  updateBuilding(building: Building): void {
+  updateBuilding(building: Building, surfaceY = 0): void {
     this.removeBuilding(building.id);
-    this.addBuilding(building);
+    this.addBuilding(building, surfaceY);
   }
 
   /** Remove a building mesh from the scene. */

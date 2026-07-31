@@ -126,6 +126,7 @@ export class SaveLoadUI {
 
   private makeSlotRow(slotId: string, meta: SaveMeta | null): HTMLElement {
     const row = document.createElement('div');
+    row.dataset['slot'] = slotId;
     row.style.cssText = 'display:flex;align-items:center;gap:6px;margin-bottom:6px;padding:6px;background:#2a1a0a;border-radius:4px';
 
     const info = document.createElement('div');
@@ -152,6 +153,7 @@ export class SaveLoadUI {
 
     const loadBtn = document.createElement('button');
     loadBtn.className = 'bs-btn';
+    loadBtn.dataset['action'] = 'load';
     loadBtn.style.cssText = 'padding:2px 6px;font-size:10px';
     loadBtn.textContent = t('saveload.load');
     loadBtn.disabled = !meta;

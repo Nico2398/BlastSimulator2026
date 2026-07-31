@@ -92,6 +92,19 @@ export function forceAdvance(cycle: WeatherCycleState, rng: Random): WeatherCycl
   return advanceWeather(cycle, rng);
 }
 
+/**
+ * Force the weather cycle directly to a given state, bypassing the
+ * probabilistic transition table. `advance` is randomized by design — a
+ * scenario that needs to demonstrate a specific state (or the full cycle in
+ * order) has no other deterministic way to reach it (#408).
+ */
+export function setWeather(cycle: WeatherCycleState, state: WeatherState): WeatherCycleState {
+  cycle.current = state;
+  cycle.ticksRemaining = DURATION_RANGES[state][1];
+  cycle.history.push(state);
+  return cycle;
+}
+
 // ── Helpers ──
 
 function pickNextState(current: WeatherState, rng: Random): WeatherState {

@@ -85,10 +85,8 @@ async function runBatchInteraction(
         // Navigate to the game (happens once per scenario fresh tab)
         await page.goto(`http://localhost:${port}`, { waitUntil: 'networkidle0' });
         await page.waitForSelector('#game-canvas, canvas', { timeout: 10000 });
-        await page.evaluate(() => {
-          const menu = document.getElementById('bs-main-menu');
-          if (menu) (menu as HTMLElement).style.display = 'none';
-        });
+        // Main menu starts visible, same as initBrowser() — each scenario's
+        // own `new_game` first step tears it down (main.ts console bridge).
 
         let failed = false;
         let errorMsg = '';

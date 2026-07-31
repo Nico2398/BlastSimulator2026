@@ -15,8 +15,11 @@ import { IndexedDBPersistence } from './persistence/IndexedDBPersistence.js';
 import { DownloadPersistence } from './persistence/DownloadPersistence.js';
 import { createRunner, runCommand } from './console/createRunner.js';
 import { parseCommand } from './console/ConsoleRunner.js';
+import { regenerateGrid, DEFAULT_GRID_SIZE } from './console/commands/world.js';
+import { getMinePreset } from './core/world/MineType.js';
 import { BASE_TICK_MS } from './core/engine/GameLoop.js';
 import { probeUiActions, probeSelector } from './ui/uiActionProbe.js';
+import { t } from './core/i18n/I18n.js';
 
 // --- 3D Scene ---
 const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
@@ -45,15 +48,18 @@ saveLoadUI.setGetState(() => ctx.state);
 // --- Main Menu ---
 const mainMenu = new MainMenu(uiContainer);
 mainMenu.setOnNewCampaign(() => {
-  // Show world map so the player can pick a level.
-  // Tutorial overlay sits on top and doesn't block the map.
+  // Show world map so the player can pick a level. The tutorial (if not yet
+  // completed) triggers later, once a level is actually entered — starting it
+  // here would stack its coach-marks on top of the level-selection cards.
   mainMenu.showWorldMap(null);
-  if (!TutorialOverlay.isCompleted()) tutorial.start(ctx.state ?? undefined);
 });
 mainMenu.setOnStartLevel((levelId) => {
   // Ensure a base GameState (with campaign) exists before starting a level.
   if (!ctx.state) window.__gameConsole('new_game');
   window.__gameConsole(`campaign start level:${levelId}`);
+  // First-time players get tutorial guidance once their level is actually
+  // loaded, not while still picking one from the world map.
+  if (!TutorialOverlay.isCompleted()) tutorial.start(ctx.state ?? undefined);
 });
 mainMenu.setOnLoad(() => { saveLoadUI.show(); });
 mainMenu.setOnSettings(() => { uiManager.showPanel('settings'); });
@@ -138,6 +144,14 @@ window.__gameConsole = (cmd: string) => {
   // Sync the renderer after every command so visual changes appear immediately
   gameRenderer.syncFromContext(ctx);
   const cmdName = parseCommand(cmd).command;
+
+  // A fresh game replaces whatever the splash screen was showing — the normal
+  // click paths (world map "Start", tutorial button) already call
+  // mainMenu.hide() themselves, but `new_game` run directly (console mode,
+  // scenario harness) bypassed that and left the overlay covering the canvas.
+  if (cmdName === 'new_game' && result.success) {
+    mainMenu.hide();
+  }
 
   // Trigger blast effects and terrain rebuild after a blast
   if (cmdName === 'blast' && result.success && ctx.state) {
@@ -356,9 +370,32 @@ mainMenu.makeReturnToMapButton(uiContainer, () => {
   mainMenu.show();
   mainMenu.showWorldMap(ctx.state?.campaign ?? null);
 });
+
+// Save/Load button (fixed top bar, visible during gameplay). The Settings
+// panel's own Save/Load buttons only fire the bare `save`/`load` console
+// commands — this is the only in-game path to the full slot-list panel
+// (multiple slots, auto-save indicator, export/import), which was previously
+// reachable only from the main menu's "Load" button before a game existed (#408).
+const saveLoadBtn = document.createElement('button');
+saveLoadBtn.id = 'bs-saveload-btn';
+saveLoadBtn.className = 'bs-btn bs-return-map';
+saveLoadBtn.style.cssText = 'position:fixed;top:8px;right:250px;z-index:300;font-size:10px;padding:3px 8px';
+saveLoadBtn.textContent = '💾 ' + t('ui.toolbar.saves');
+saveLoadBtn.addEventListener('click', () => saveLoadUI.show());
+uiContainer.appendChild(saveLoadBtn);
+
 saveLoadUI.setOnLoad((state) => {
-  // Restore loaded state into the runner context
+  // Restore loaded state into the runner context. The VoxelGrid is not part
+  // of the serialized GameState (see the WorldState comment in
+  // GameState.ts), so it must be regenerated here the same way the console
+  // `load` command does — otherwise the scene keeps showing whatever terrain
+  // (e.g. post-blast craters) was on screen before this load (#408).
   ctx.state = state;
+  const preset = getMinePreset(state.mineType);
+  const { sizeX, sizeY, sizeZ } = state.world ?? {
+    sizeX: DEFAULT_GRID_SIZE, sizeY: DEFAULT_GRID_SIZE, sizeZ: DEFAULT_GRID_SIZE, gridReady: true,
+  };
+  if (preset) regenerateGrid(ctx, { seed: state.seed, preset, sizeX, sizeY, sizeZ });
   gameRenderer.syncFromContext(ctx);
 });
 

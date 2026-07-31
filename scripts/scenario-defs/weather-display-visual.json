@@ -32,6 +32,7 @@
     },
     {
       "command": "weather",
+      "description": "Initial weather is always sunny (see WeatherCycle.createWeatherCycle).",
       "interaction": [
         {
           "type": "command",
@@ -40,11 +41,12 @@
       ]
     },
     {
-      "command": "weather advance",
+      "command": "weather set cloudy",
+      "description": "`weather advance` transitions probabilistically and cannot guarantee any specific state or full-cycle order — `weather set <state>` forces it deterministically so every state in the cycle actually renders once (#408).",
       "interaction": [
         {
           "type": "command",
-          "command": "weather advance"
+          "command": "weather set cloudy"
         }
       ]
     },
@@ -58,11 +60,11 @@
       ]
     },
     {
-      "command": "weather advance",
+      "command": "weather set light_rain",
       "interaction": [
         {
           "type": "command",
-          "command": "weather advance"
+          "command": "weather set light_rain"
         }
       ]
     },
@@ -76,11 +78,11 @@
       ]
     },
     {
-      "command": "weather advance",
+      "command": "weather set heavy_rain",
       "interaction": [
         {
           "type": "command",
-          "command": "weather advance"
+          "command": "weather set heavy_rain"
         }
       ]
     },
@@ -94,11 +96,11 @@
       ]
     },
     {
-      "command": "weather advance",
+      "command": "weather set storm",
       "interaction": [
         {
           "type": "command",
-          "command": "weather advance"
+          "command": "weather set storm"
         }
       ]
     },
@@ -112,11 +114,11 @@
       ]
     },
     {
-      "command": "weather advance",
+      "command": "weather set heat_wave",
       "interaction": [
         {
           "type": "command",
-          "command": "weather advance"
+          "command": "weather set heat_wave"
         }
       ]
     },
@@ -130,29 +132,11 @@
       ]
     },
     {
-      "command": "weather advance",
+      "command": "weather set cold_snap",
       "interaction": [
         {
           "type": "command",
-          "command": "weather advance"
-        }
-      ]
-    },
-    {
-      "command": "weather",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "weather"
-        }
-      ]
-    },
-    {
-      "command": "weather advance",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "weather advance"
+          "command": "weather set cold_snap"
         }
       ]
     },

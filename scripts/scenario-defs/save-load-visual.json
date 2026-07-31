@@ -85,6 +85,109 @@
       ]
     },
     {
+      "command": "save slot:quicksave",
+      "description": "Quick-save the current run through the console save command, exercising the same serialize path the Save/Load panel's slot buttons use.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "save slot:quicksave"
+        }
+      ]
+    },
+    {
+      "command": "state",
+      "description": "Open the Save/Load panel (multiple slots, auto-save row, export/import, slot metadata) via its top-bar button.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-saveload-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-save-panel"
+        }
+      ]
+    },
+    {
+      "command": "state",
+      "description": "Save into numbered slot 1 through the panel's own Save button, populating its metadata (date, level, cash) for the slot list screenshot.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-save-panel [data-slot=\"slot_1\"] .bs-btn-primary"
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
+        }
+      ]
+    },
+    {
+      "command": "drill_plan grid rows:2 cols:2 spacing:3 depth:4 start:15,15",
+      "description": "Drill a small plan after slot 1 was saved, so the blast below craters terrain the saved slot does not know about.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:2 cols:2 spacing:3 depth:4 start:15,15"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:boomite amount:5 stemming:2"
+        }
+      ]
+    },
+    {
+      "command": "sequence auto delay_step:25",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sequence auto delay_step:25"
+        }
+      ]
+    },
+    {
+      "command": "blast",
+      "description": "Blast a crater into the live scene after slot 1's save, so the load step below must actually regenerate terrain (not just leave the cratered grid on screen) to prove itself.",
+      "timeout": 15,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "blast"
+        }
+      ]
+    },
+    {
+      "command": "state",
+      "description": "Load back slot 1 by clicking the Save/Load panel's own Load button (SaveLoadUI.ts, main.ts's setOnLoad handler) — not a raw console command — so this step exercises the click-driven path that must regenerate the grid, replacing the post-blast crater above with clean terrain matching the saved state. The command field stays the inert `state` read (rather than `load slot:...`) so command mode does not pre-clear the crater itself and mask a regression in the click path.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-save-panel [data-slot=\"slot_1\"] [data-action=\"load\"]"
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
+        }
+      ]
+    },
+    {
       "command": "campaign status",
       "interaction": [
         {

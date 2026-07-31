@@ -2,14 +2,36 @@
 // Incremental diff-sync for buildings, vehicles, and characters.
 
 import type { GameState } from '../core/state/GameState.js';
+import type { Building } from '../core/entities/Building.js';
+import { getBuildingDef, getDefSize } from '../core/entities/Building.js';
 import type { BuildingMesh } from './BuildingMesh.js';
 import type { VehicleMesh } from './VehicleMesh.js';
 import type { CharacterMesh } from './CharacterMesh.js';
 
 /**
+ * Terrain surface height at a building's footprint center. Buildings are
+ * placed by top-left corner (b.x, b.z), so the center offsets by half the
+ * footprint size before sampling — shared by GameRenderer's initial load and
+ * EntitySync's incremental add/update so both snap buildings identically.
+ */
+export function buildingCenterSurfaceY(
+  b: Building,
+  getSurfaceY: (x: number, z: number) => number,
+): number {
+  const def = getBuildingDef(b.type, b.tier);
+  const { sizeX, sizeZ } = getDefSize(def);
+  return getSurfaceY(b.x + sizeX / 2, b.z + sizeZ / 2);
+}
+
+/**
  * Incrementally sync three entity collections against the current game state.
  * Adds new entities, removes gone ones, and updates existing buildings.
  * Mutates the three rendered-ID sets in place.
+ *
+ * @param getSurfaceY - Terrain surface height sampler, same one used for
+ *   vehicles/characters. Buildings are static once placed (no per-frame
+ *   resnap like vehicles/characters get in GameRenderer.syncFromContext), so
+ *   the surface height is baked in here at add/update time (#408).
  */
 export function syncEntitySets(
   state: GameState,
@@ -19,14 +41,16 @@ export function syncEntitySets(
   renderedVehicleIds: Set<number>,
   characters: CharacterMesh | null,
   renderedEmployeeIds: Set<number>,
+  getSurfaceY: (x: number, z: number) => number = () => 0,
 ): void {
   if (buildings) {
     for (const b of state.buildings.buildings) {
+      const surfaceY = buildingCenterSurfaceY(b, getSurfaceY);
       if (!renderedBuildingIds.has(b.id)) {
-        buildings.addBuilding(b);
+        buildings.addBuilding(b, surfaceY);
         renderedBuildingIds.add(b.id);
       } else {
-        buildings.updateBuilding(b);
+        buildings.updateBuilding(b, surfaceY);
       }
     }
     // Remove destroyed buildings

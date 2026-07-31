@@ -1,7 +1,57 @@
 {
   "name": "main-menu-visual",
-  "description": "Visual verification of the main menu: title and subtitle display, menu buttons (New Campaign, Tutorial, Continue, Load, Settings), world map with three campaign level cards (Dusty Hollow, Grumpstone Ridge, Treranium Depths) with lock/unlock status and completion stars, and campaign level selection flow.",
+  "description": "Visual verification of the main menu: title and subtitle display, menu buttons (New Campaign, Tutorial, Continue, Load, Settings) as they first render before any game state exists, the New Campaign -> world map flow with three campaign level cards (Dusty Hollow, Grumpstone Ridge, Treranium Depths) showing lock/unlock status and completion stars, the Back button returning to the main menu, and then the in-game HUD after a level is started.",
   "steps": [
+    {
+      "command": "help",
+      "description": "Initial load: page has not run any command yet, so the main menu overlay (title, subtitle, and all 5 buttons) is the only thing on screen. 'help' is a read-only console command that does not touch game state or the DOM, used here purely so the step has a harmless command to pair with the screenshot.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "help"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-main-menu"
+        }
+      ]
+    },
+    {
+      "command": "state",
+      "description": "Click New Campaign: reveals the world map with 3 level cards. Dusty Hollow (tier 1) is unlocked with a Start button; Grumpstone Ridge and Treranium Depths are locked, showing the lock icon and the profit threshold required on the prior level. No game exists yet, so 'state' is the paired command (it fails gracefully with 'No game loaded' — this step is UI-only, the command exists only to satisfy the command/interaction pairing convention).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-main-menu .bs-btn-primary"
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
+        }
+      ]
+    },
+    {
+      "command": "state",
+      "description": "Click Back on the world map: returns to the main menu button list, confirming the round trip does not leave stray DOM behind.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-main-menu > div:nth-child(3) > button"
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
+        }
+      ]
+    },
     {
       "command": "new_game seed:42",
       "timeout": 15,

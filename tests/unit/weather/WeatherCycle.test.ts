@@ -4,8 +4,10 @@ import {
   createWeatherCycle,
   advanceWeather,
   forceAdvance,
+  setWeather,
   isRaining,
   ALL_WEATHER_STATES,
+  type WeatherState,
 } from '../../../src/core/weather/WeatherCycle.js';
 import {
   updateHoleFlooding,
@@ -61,6 +63,34 @@ describe('WeatherCycle', () => {
 
     // Should have visited multiple states
     expect(states.size).toBeGreaterThan(1);
+  });
+
+  it('setWeather forces the cycle directly to the given state', () => {
+    const cycle = createWeatherCycle(7);
+    const target: WeatherState = 'heavy_rain';
+
+    setWeather(cycle, target);
+
+    expect(cycle.current).toBe(target);
+    expect(cycle.ticksRemaining).toBeGreaterThan(0);
+  });
+
+  it('setWeather records the forced state in history', () => {
+    const cycle = createWeatherCycle(7);
+    const historyLengthBefore = cycle.history.length;
+
+    setWeather(cycle, 'storm');
+
+    expect(cycle.history.length).toBe(historyLengthBefore + 1);
+    expect(cycle.history[cycle.history.length - 1]).toBe('storm');
+  });
+
+  it('setWeather works for every valid weather state', () => {
+    const cycle = createWeatherCycle(7);
+    for (const state of ALL_WEATHER_STATES) {
+      setWeather(cycle, state);
+      expect(cycle.current).toBe(state);
+    }
   });
 });
 

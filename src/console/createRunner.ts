@@ -53,6 +53,7 @@ import {
   statsCommand,
 } from './commands/campaign.js';
 import { stateCommand } from './commands/state.js';
+import { saveCommand, loadCommand } from './commands/saveload.js';
 import { setupEvents } from '../core/events/index.js';
 import { EventEmitter } from '../core/state/EventEmitter.js';
 
@@ -138,7 +139,7 @@ export function createRunner(): RunnerWithContext {
   runner.register('build_ramp', 'Build ramp (origin:X,Z direction:south length:10)', (args, named) =>
     buildRampCommand(ctx, args, named),
   );
-  runner.register('weather', 'Show/advance weather (advance)', (args, named) =>
+  runner.register('weather', 'Show/advance/set weather (advance|set <state>)', (args, named) =>
     weatherCommand(ctx, args, named),
   );
   runner.register('buy', 'Buy items (tubing amount:10)', (_args, named) =>
@@ -218,6 +219,14 @@ export function createRunner(): RunnerWithContext {
   // --- State inspection (agent-friendly) ---
   runner.register('state', 'Dump game state as JSON (full|summary)', (args, named) =>
     stateCommand(ctx, args, named),
+  );
+
+  // --- Save/Load (quick-save round trip; see saveload.ts) ---
+  runner.register('save', 'Save game to a quick-save slot (slot:name)', (args, named) =>
+    saveCommand(ctx, args, named),
+  );
+  runner.register('load', 'Load game from a quick-save slot (slot:name)', (args, named) =>
+    loadCommand(ctx, args, named),
   );
 
   return { runner, ctx, emitter };

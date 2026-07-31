@@ -2,12 +2,11 @@
 
 import type { CommandResult } from '../ConsoleRunner.js';
 import type { GameContext } from './world.js';
+import { regenerateGrid } from './world.js';
 import { getAllLevels, getLevel } from '../../core/campaign/Level.js';
 import { getLevelProgress } from '../../core/campaign/Campaign.js';
 import { addIncome } from '../../core/economy/Finance.js';
 import { createGameForLevel } from '../../core/campaign/LevelTransition.js';
-import { buildGameNavGrid } from '../../core/state/GameState.js';
-import { generateTerrain } from '../../core/world/TerrainGen.js';
 import { getMinePreset } from '../../core/world/MineType.js';
 import { calculateStarRating } from '../../core/campaign/SuccessTracker.js';
 import { Random } from '../../core/math/Random.js';
@@ -104,15 +103,14 @@ export function campaignStartCommand(
   if (!preset) {
     return { success: false, output: `Unknown mine type: ${level.mineType}` };
   }
-  ctx.grid = generateTerrain({
+  if (ctx.state.world) ctx.state.world.gridReady = true;
+  regenerateGrid(ctx, {
+    seed: level.terrainSeed,
+    preset,
     sizeX: level.gridX,
     sizeY: level.gridY,
     sizeZ: level.gridZ,
-    seed: level.terrainSeed,
-    preset,
   });
-  if (ctx.state.world) ctx.state.world.gridReady = true;
-  buildGameNavGrid(ctx.state, ctx.grid, ctx.state.buildings.buildings, ctx.state.drillHoles);
 
   // Generate initial contracts so they're available immediately
   const contractRng = new Random(ctx.state.seed + ctx.state.tickCount);
