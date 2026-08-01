@@ -4,6 +4,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { type GameContext, newGameCommand } from '../../src/console/commands/world.js';
 import { financesCommand, contractCommand } from '../../src/console/commands/economy.js';
+import { buildCommand } from '../../src/console/commands/entities.js';
+import { vehicleCommand } from '../../src/console/commands/vehicle.js';
+import { tickCommand } from '../../src/console/commands/events.js';
 import { EventEmitter } from '../../src/core/state/EventEmitter.js';
 import {
   createFinanceState,
@@ -390,5 +393,57 @@ describe('Economy', () => {
     // Non-existent contract returns null
     const missing = negotiateContract(cs, 999, 100, rng);
     expect(missing).toBeNull();
+  });
+
+  // ── 11. Maintenance/fuel costs drain cash every tick (#456) ────────────────
+
+  it('ticking with owned buildings and vehicles and no active tasks strictly drains cash tick over tick', () => {
+    const buildResult = buildCommand(ctx, ['freight_warehouse'], { at: '5,5' });
+    expect(buildResult.success).toBe(true);
+
+    const buyResult = vehicleCommand(ctx, ['buy', 'debris_hauler'], {});
+    expect(buyResult.success).toBe(true);
+
+    const cashHistory: number[] = [ctx.state!.cash];
+    for (let i = 0; i < 5; i++) {
+      tickCommand(ctx, ['1'], {});
+      cashHistory.push(ctx.state!.cash);
+    }
+
+    // Cash must strictly decrease every single tick — building operating
+    // cost + vehicle maintenance cost, with nothing offsetting it (no active
+    // tasks, no sales).
+    for (let i = 1; i < cashHistory.length; i++) {
+      expect(cashHistory[i]).toBeLessThan(cashHistory[i - 1]!);
+    }
+
+    // The drain must be booked as categorized expense transactions.
+    const report = getFinancialReport(ctx.state!.finances, ctx.state!.tickCount);
+    const maintenanceCat = report.expensesByCategory.find(c => c.category === 'maintenance');
+    const fuelCat = report.expensesByCategory.find(c => c.category === 'fuel');
+    expect(maintenanceCat).toBeDefined();
+    expect(maintenanceCat!.total).toBeGreaterThan(0);
+    // Vehicle "fuel" expense category should also exist per issue #456's spec
+    // (getVehicleCostsPerTick routed through addExpense(..., 'fuel', ...)).
+    expect(fuelCat).toBeDefined();
+  });
+
+  // ── 12. No buildings/vehicles → no maintenance-category expenses ──────────
+
+  it('ticking with no buildings and no vehicles produces no new maintenance-category expense transactions', () => {
+    expect(ctx.state!.buildings.buildings.length).toBe(0);
+    expect(ctx.state!.vehicles.vehicles.length).toBe(0);
+
+    const transactionsBefore = ctx.state!.finances.transactions.length;
+
+    for (let i = 0; i < 5; i++) {
+      tickCommand(ctx, ['1'], {});
+    }
+
+    const newTransactions = ctx.state!.finances.transactions.slice(transactionsBefore);
+    const maintenanceOrFuel = newTransactions.filter(
+      t => t.category === 'maintenance' || t.category === 'fuel',
+    );
+    expect(maintenanceOrFuel).toHaveLength(0);
   });
 });

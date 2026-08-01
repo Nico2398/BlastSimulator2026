@@ -1,21 +1,17 @@
 // BlastSimulator2026 — Full-level integration test: Tutorial Contract Delivery
-// Goal: Verify that a tutorial-level blast (2×2 grid, boomite 3 kg/hole) produces
-// enough ore to deliver at least 200 kg of a contract, by tracking fragments
-// through logistics and accumulating collectedOre from blast yields.
-//
-// RED phase — all tests fail because:
-//   1. addBlastFragments is not yet called in blastCommand (line 14 of mining.ts)
-//   2. state.collectedOre is never populated after blast
-//   3. contract deliver does not check actual ore inventory
+// Goal: Verify the full economy pipeline for issue #456 — a blast only spawns
+// on-ground fragments (no instant cash/ore payout), a debris_hauler must
+// physically haul a fragment into a freight_warehouse before it counts as
+// collected/stored, and contract delivery is gated on that stored inventory
+// rather than paying out unconditionally.
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   makeCampaignCtx,
   tickWithEvents,
-  getStateSummary,
 } from './helpers.js';
 import { setupEvents, clearEvents } from '../../../src/core/events/index.js';
-import { employeeCommand } from '../../../src/console/commands/entities.js';
+import { employeeCommand, buildCommand } from '../../../src/console/commands/entities.js';
 import {
   surveyCommand,
   drillPlanCommand,
@@ -24,6 +20,7 @@ import {
   blastCommand,
 } from '../../../src/console/commands/mining.js';
 import { contractCommand } from '../../../src/console/commands/economy.js';
+import { vehicleCommand } from '../../../src/console/commands/vehicle.js';
 
 describe('Tutorial Level — Contract Delivery', () => {
   let ctx: ReturnType<typeof makeCampaignCtx>;
@@ -92,85 +89,151 @@ describe('Tutorial Level — Contract Delivery', () => {
     return blastResult.output;
   }
 
-  // ── Test 1: Fragments in logistics ────────────────────────────────────
+  /**
+   * Hire+skill a hauler driver, build a freight_warehouse, buy a
+   * debris_hauler, assign the driver, and tick until the driver has boarded
+   * the vehicle. Returns the vehicle and driver IDs.
+   */
+  function setupHaulingFleet(): { vehicleId: number; driverId: number } {
+    const hireDriver = employeeCommand(ctx, ['hire'], { role: 'driver' });
+    expect(hireDriver.success).toBe(true);
+    const driverId = ctx.state!.employees.employees.find(e => e.role === 'driver')!.id;
+    employeeCommand(ctx, ['assign_skill', String(driverId)], {
+      skill: 'driving.truck',
+      level: '5',
+    });
 
-  it('executes tutorial blast and tracks fragments in logistics', () => {
+    const buildResult = buildCommand(ctx, ['freight_warehouse'], { at: '5,5' });
+    expect(buildResult.success).toBe(true);
+
+    const buyResult = vehicleCommand(ctx, ['buy', 'debris_hauler'], {});
+    expect(buyResult.success).toBe(true);
+    const vehicleId = ctx.state!.vehicles.vehicles[0]!.id;
+
+    const assignResult = vehicleCommand(ctx, ['driver', String(vehicleId), String(driverId)], {});
+    expect(assignResult.success).toBe(true);
+
+    // Padding: let the driver walk to and board the vehicle.
+    tickWithEvents(ctx, 10);
+
+    return { vehicleId, driverId };
+  }
+
+  /**
+   * Haul a single fragment from the ground into the warehouse and tick until
+   * delivery completes (pickup leg + haul-to-warehouse leg).
+   */
+  function haulFragmentToStorage(vehicleId: number, fragmentId: number): void {
+    const haulResult = vehicleCommand(ctx, ['haul', String(vehicleId)], {
+      fragment: String(fragmentId),
+    });
+    expect(haulResult.success).toBe(true);
+
+    // Padding: pickup + travel to the depot, well beyond what a same-map
+    // haul needs (mirrors the tick-padding convention used elsewhere for
+    // arrival-gated actions).
+    tickWithEvents(ctx, 30);
+
+    const tracked = ctx.state!.logistics.fragments.find(f => f.fragment.id === fragmentId);
+    expect(tracked?.state).toBe('stored');
+  }
+
+  // ── (a) Blast shortcut is closed: no instant cash/ore payout ─────────────
+
+  it('a blast only spawns on-ground fragments — cash and collectedOre stay unchanged until hauled', () => {
+    const cashBefore = ctx.state!.cash;
+    const collectedOreBefore = { ...ctx.state!.collectedOre };
+    const fragmentsBefore = ctx.state!.logistics.fragments.length;
+
     executeTutorialBlast();
 
-    // Verify blast produced a positive ore value
-    const summary = getStateSummary(ctx);
-    expect(summary.cash).toBeGreaterThan(20000); // startingCash + ore value
+    // No instant payout: cash is byte-identical to its pre-blast value.
+    expect(ctx.state!.cash).toBe(cashBefore);
+    // collectedOre is byte-identical (deep equal) to its pre-blast value —
+    // a blast alone must not populate it.
+    expect(ctx.state!.collectedOre).toEqual(collectedOreBefore);
 
-    // ── RED: These assertions fail because addBlastFragments is never called ──
-    // After the implementer wires addBlastFragments into blastCommand,
-    // logistics.fragments should contain entries from the blast.
-
-    // Check that logistics fragments were populated by the blast
-    expect(ctx.state!.logistics.fragments.length).toBeGreaterThan(0);
-    // Every fragment should start as 'on_ground'
-    const onGround = ctx.state!.logistics.fragments.filter(
-      f => f.state === 'on_ground',
-    );
+    // The blast still spawns fragments — they just sit on the ground.
+    expect(ctx.state!.logistics.fragments.length).toBeGreaterThan(fragmentsBefore);
+    const onGround = ctx.state!.logistics.fragments.filter(f => f.state === 'on_ground');
     expect(onGround.length).toBe(ctx.state!.logistics.fragments.length);
+    // Nothing has reached storage yet.
+    expect(ctx.state!.logistics.storedMassKg).toBe(0);
   });
 
-  // ── Test 2: Collected ore accumulation ────────────────────────────────
+  // ── (c) Contract delivery before hauling fails on inventory ──────────────
 
-  it('accumulates collectedOre from blast fragments exceeds 200 kg', () => {
+  it('contract deliver immediately after the blast fails with an inventory error and leaves cash untouched', () => {
     executeTutorialBlast();
-
-    // ── RED: These assertions fail because collectedOre is never populated ──
-    // After the implementer wires fragment → depot delivery,
-    // collectedOre should contain ore type keys with accumulated kg totals.
-
-    // Verify collectedOre was populated from fragment ore content
-    const oreKeys = Object.keys(ctx.state!.collectedOre);
-    expect(oreKeys.length).toBeGreaterThan(0);
-
-    // Total collected mass should exceed 200 kg (enough for contract delivery)
-    const totalKg = Object.values(ctx.state!.collectedOre).reduce(
-      (sum, v) => sum + v,
-      0,
-    );
-    expect(totalKg).toBeGreaterThan(200);
-  });
-
-  // ── Test 3: Full contract delivery pipeline ───────────────────────────
-
-  it('fulfills a 200 kg contract with blast ore', () => {
-    executeTutorialBlast();
-
-    // ── RED: This assertion fails because collectedOre is never populated ──
-    const oreKeys = Object.keys(ctx.state!.collectedOre);
-    expect(oreKeys.length).toBeGreaterThan(0);
-
-    // Settle after blast
     tickWithEvents(ctx, 2);
 
-    // Accept contract #1
+    const cashBefore = ctx.state!.cash;
+
+    // Contract #1 in the tutorial's deterministic contract set is a
+    // rubble_disposal contract (materialId '') — draws from storedMassKg,
+    // which is still 0 because nothing has been hauled into a warehouse yet.
     const acceptResult = contractCommand(ctx, ['accept', '1'], {});
     expect(acceptResult.success).toBe(true);
-    expect(acceptResult.output).toContain('Accepted contract');
 
-    // Deliver 200 kg to contract #1
+    const deliverResult = contractCommand(ctx, ['deliver', '1'], { amount: '200' });
+
+    expect(deliverResult.success).toBe(false);
+    expect(deliverResult.output).not.toContain('Payment: $');
+    expect(deliverResult.output.length).toBeGreaterThan(0);
+    // Failure must not touch cash or finances.
+    expect(ctx.state!.cash).toBe(cashBefore);
+  });
+
+  // ── (b) Full haul-and-store loop (regression coverage for #437 wiring) ───
+
+  it('a full haul-and-store cycle moves a blast fragment into warehouse storage', () => {
+    executeTutorialBlast();
+    const { vehicleId } = setupHaulingFleet();
+
+    const collectedOreBeforeHaul = Object.values(ctx.state!.collectedOre).reduce((s, v) => s + v, 0);
+    expect(ctx.state!.logistics.storedMassKg).toBe(0);
+
+    haulFragmentToStorage(vehicleId, 0);
+
+    // Storage now holds the hauled fragment's mass.
+    expect(ctx.state!.logistics.storedMassKg).toBeGreaterThan(0);
+
+    // Ore collected from the actually-stored fragment now counts.
+    const collectedOreAfterHaul = Object.values(ctx.state!.collectedOre).reduce((s, v) => s + v, 0);
+    expect(collectedOreAfterHaul).toBeGreaterThan(collectedOreBeforeHaul);
+  });
+
+  // ── (d) Contract delivery after haul-and-store succeeds ───────────────────
+
+  it('contract deliver after the haul-and-store cycle succeeds, decrements storage, and pays out', () => {
+    executeTutorialBlast();
+    const { vehicleId } = setupHaulingFleet();
+    haulFragmentToStorage(vehicleId, 0);
+
+    const storedBefore = ctx.state!.logistics.storedMassKg;
+    expect(storedBefore).toBeGreaterThan(0);
+    const cashBefore = ctx.state!.cash;
+
+    const acceptResult = contractCommand(ctx, ['accept', '1'], {});
+    expect(acceptResult.success).toBe(true);
+
+    // Contract #1 is rubble_disposal (materialId '') — deliver an amount well
+    // within what was actually hauled into storage.
+    const deliverAmount = Math.min(200, storedBefore);
     const deliverResult = contractCommand(ctx, ['deliver', '1'], {
-      amount: '200',
+      amount: String(deliverAmount),
     });
+
     expect(deliverResult.success).toBe(true);
     expect(deliverResult.output).toContain('Payment: $');
-    // Payment must be positive — at minimum $1
     const match = deliverResult.output.match(/Payment: \$(\d+(?:\.\d+)?)/);
     expect(match).not.toBeNull();
-    expect(match![1]).toBeDefined();
-    const payment = parseFloat(match![1]);
+    const payment = parseFloat(match![1]!);
     expect(payment).toBeGreaterThan(0);
 
-    // Collected ore should be decremented by delivered amount
-    // (Implementer may deduct from collectedOre upon delivery)
-    const totalAfterDelivery = Object.values(
-      ctx.state!.collectedOre,
-    ).reduce((sum, v) => sum + v, 0);
-    // At minimum, collected ore should still be non-negative
-    expect(totalAfterDelivery).toBeGreaterThanOrEqual(0);
+    // Cash increased by the delivery.
+    expect(ctx.state!.cash).toBeGreaterThan(cashBefore);
+    // Storage decreased — material actually consumed from the warehouse.
+    expect(ctx.state!.logistics.storedMassKg).toBeLessThan(storedBefore);
   });
 });

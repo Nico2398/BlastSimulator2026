@@ -1,0 +1,285 @@
+{
+  "name": "economy-full-loop",
+  "description": "Full economy pipeline: blast spawns fragments without instant payout, a debris_hauler hauls them into a freight_warehouse, and contract delivery pays out only from that stored inventory (issue #456).",
+  "steps": [
+    {
+      "command": "new_game seed:42",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ]
+    },
+    {
+      "command": "campaign start level:tutorial_pit",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign start level:tutorial_pit"
+        }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:surveyor",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:surveyor"
+        }
+      ]
+    },
+    {
+      "command": "employee assign_skill 1 skill:geology level:5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 1 skill:geology level:5"
+        }
+      ]
+    },
+    {
+      "command": "survey seismic x:12 z:12",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "survey seismic x:12 z:12"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:driller"
+        }
+      ]
+    },
+    {
+      "command": "employee assign_skill 2 skill:blasting level:5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 2 skill:blasting level:5"
+        }
+      ]
+    },
+    {
+      "command": "drill_plan grid rows:2 cols:2 spacing:4 depth:8 start:10,10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:2 cols:2 spacing:4 depth:8 start:10,10"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:3 stemming:2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:boomite amount:3 stemming:2"
+        }
+      ]
+    },
+    {
+      "command": "sequence auto",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sequence auto"
+        }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "fragments status",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "fragments status"
+        }
+      ]
+    },
+    {
+      "command": "blast",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "blast"
+        }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "fragments status",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "fragments status"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:driver"
+        }
+      ]
+    },
+    {
+      "command": "employee assign_skill 3 skill:driving.truck level:5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 3 skill:driving.truck level:5"
+        }
+      ]
+    },
+    {
+      "command": "build freight_warehouse at:5,5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build freight_warehouse at:5,5"
+        }
+      ]
+    },
+    {
+      "command": "vehicle buy debris_hauler",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle buy debris_hauler"
+        }
+      ]
+    },
+    {
+      "command": "vehicle driver 1 3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 1 3"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "vehicle haul 1 fragment:0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle haul 1 fragment:0"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "fragments status",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "fragments status"
+        }
+      ]
+    },
+    {
+      "command": "contract accept 1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract accept 1"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver 1 amount:200",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract deliver 1 amount:200"
+        }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    }
+  ]
+}
