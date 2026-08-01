@@ -2749,18 +2749,18 @@
   "ui.tile_select.cancel": "Cancel",
   "ui.tile_select.selected_point": "Selected: ({x}, {z})",
   "ui.tile_select.selected_area": "Selected: ({x1}, {z1}) → ({x2}, {z2})  [{w} × {h} tiles]",
-  "ui.tile_select.drag_hint_area": "Click and drag to select a rectangular area",
-  "ui.tile_select.drag_hint_point": "Click a tile to select it",
+  "ui.tile_select.drag_hint": "Click and drag to select a rectangular area",
+  "ui.tile_select.pick_hint": "Click a tile to select it",
   "menu.subtitle": "dig  ·  blast  ·  profit",
   "ui.minimap.no_data": "No map data",
   "ui.blast.apply_charge_failed": "Failed to apply charge.",
   "ui.contracts.progress_line": "Progress: {pct}% — {remaining}t left",
   "ui.contracts.offer_line": "{qty}kg @ ${price}/kg — {deadline}t deadline",
   "notification.bankruptcy_triggered": "💸 BANKRUPTCY! Cash: ${cash}. Level failed.",
-  "notification.bankruptcy_warning": "⚠️ Low funds! Bankruptcy in {ticks} ticks.",
+  "notification.bankruptcy_warning": "⚠️ Low funds! Bankruptcy in {ticksRemaining} ticks.",
   "notification.ecology_shutdown": "🌿 ECOLOGICAL SHUTDOWN! Government closed the mine. Level failed.",
-  "notification.ecology_warning": "⚠️ Ecological violation! Shutdown in {ticks} ticks.",
+  "notification.ecology_warning": "⚠️ Ecological violation! Shutdown in {ticksRemaining} ticks.",
   "notification.arrest_triggered": "🚔 CRIMINAL ARREST! Mafia exposure too high. Level failed.",
   "notification.revolt_triggered": "✊ WORKER REVOLT! Permanent strike declared. Level failed.",
-  "notification.revolt_warning": "⚠️ Workers furious! Revolt in {ticks} ticks."
+  "notification.revolt_warning": "⚠️ Workers furious! Revolt in {ticksRemaining} ticks."
 }

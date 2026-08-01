@@ -2749,18 +2749,18 @@
   "ui.tile_select.cancel": "Annuler",
   "ui.tile_select.selected_point": "Sélection : ({x}, {z})",
   "ui.tile_select.selected_area": "Sélection : ({x1}, {z1}) → ({x2}, {z2})  [{w} × {h} tuiles]",
-  "ui.tile_select.drag_hint_area": "Cliquez-glissez pour sélectionner une zone rectangulaire",
-  "ui.tile_select.drag_hint_point": "Cliquez une tuile pour la sélectionner",
+  "ui.tile_select.drag_hint": "Cliquez-glissez pour sélectionner une zone rectangulaire",
+  "ui.tile_select.pick_hint": "Cliquez une tuile pour la sélectionner",
   "menu.subtitle": "creuser  ·  faire sauter  ·  encaisser",
   "ui.minimap.no_data": "Aucune donnée cartographique",
   "ui.blast.apply_charge_failed": "Échec de la mise en charge.",
   "ui.contracts.progress_line": "Avancement : {pct}% — {remaining}t restants",
   "ui.contracts.offer_line": "{qty}kg à ${price}/kg — échéance {deadline}t",
   "notification.bankruptcy_triggered": "💸 FAILLITE ! Trésorerie : ${cash}. Niveau échoué.",
-  "notification.bankruptcy_warning": "⚠️ Fonds au plus bas ! Faillite dans {ticks} ticks.",
+  "notification.bankruptcy_warning": "⚠️ Fonds au plus bas ! Faillite dans {ticksRemaining} ticks.",
   "notification.ecology_shutdown": "🌿 FERMETURE ÉCOLOGIQUE ! Le gouvernement a fermé la mine. Niveau échoué.",
-  "notification.ecology_warning": "⚠️ Infraction écologique ! Fermeture dans {ticks} ticks.",
+  "notification.ecology_warning": "⚠️ Infraction écologique ! Fermeture dans {ticksRemaining} ticks.",
   "notification.arrest_triggered": "🚔 ARRESTATION ! Vos accointances mafieuses ont fini par se voir. Niveau échoué.",
   "notification.revolt_triggered": "✊ RÉVOLTE OUVRIÈRE ! Grève illimitée déclarée. Niveau échoué.",
-  "notification.revolt_warning": "⚠️ Les ouvriers sont furieux ! Révolte dans {ticks} ticks."
+  "notification.revolt_warning": "⚠️ Les ouvriers sont furieux ! Révolte dans {ticksRemaining} ticks."
 }

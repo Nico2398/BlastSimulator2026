@@ -64,11 +64,11 @@ export class MainMenu {
       'box-shadow:0 8px 40px rgba(0,0,0,0.6)',
     ].join(';');
 
-    const newBtn = this.makeMenuBtn('menu.new_campaign', 'primary', () => this.onNewCampaign?.());
-    const tutorialBtn = this.makeMenuBtn('menu.tutorial', 'gold', () => this.onTutorial?.());
-    const continueBtn = this.makeMenuBtn('menu.continue', '', () => this.showWorldMap(this.lastCampaign));
-    const loadBtn = this.makeMenuBtn('menu.load', '', () => this.onLoad?.());
-    const settingsBtn = this.makeMenuBtn('menu.settings', '', () => this.onSettings?.());
+    const newBtn = this.makeMenuBtn('menu.new_campaign', 'primary', () => this.onNewCampaign?.(), '', true);
+    const tutorialBtn = this.makeMenuBtn('menu.tutorial', 'gold', () => this.onTutorial?.(), '', true);
+    const continueBtn = this.makeMenuBtn('menu.continue', '', () => this.showWorldMap(this.lastCampaign), '', true);
+    const loadBtn = this.makeMenuBtn('menu.load', '', () => this.onLoad?.(), '', true);
+    const settingsBtn = this.makeMenuBtn('menu.settings', '', () => this.onSettings?.(), '', true);
 
     this.menuBox.append(newBtn, tutorialBtn, continueBtn, loadBtn, settingsBtn);
 
@@ -214,11 +214,24 @@ export class MainMenu {
 
   dispose(): void { this.overlay.remove(); }
 
-  private makeMenuBtn(key: string, variant: 'primary' | 'gold' | '', onClick: () => void, prefix = ''): HTMLButtonElement {
+  /**
+   * @param persistent Register the caption with the locale registry. Only for
+   *   buttons that live as long as the menu — world-map buttons are rebuilt by
+   *   showWorldMap() on every refresh, so registering them would pile up
+   *   bindings pointing at discarded nodes.
+   */
+  private makeMenuBtn(
+    key: string,
+    variant: 'primary' | 'gold' | '',
+    onClick: () => void,
+    prefix = '',
+    persistent = false,
+  ): HTMLButtonElement {
     const btn = document.createElement('button');
     btn.className = `bs-btn${variant === 'primary' ? ' bs-btn-primary' : ''}`;
     btn.style.cssText = 'width:100%;padding:10px 16px;font-size:13px;font-weight:600;text-align:left;pointer-events:all';
-    btn.textContent = prefix + t(key);
+    if (persistent) this.locale.bindText(btn, key, undefined, prefix);
+    else btn.textContent = prefix + t(key);
     if (variant === 'gold') {
       btn.style.color = '#ffe090';
       btn.style.borderColor = 'rgba(255,225,144,0.4)';

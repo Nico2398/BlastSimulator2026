@@ -205,8 +205,7 @@ export class BlastPlanUI {
 
   private buildChargeForm(): void {
     const label = document.createElement('div');
-    label.className = 'bs-hole-id-label bs-panel-title';
-    label.style.fontSize = '11px';
+    label.className = 'bs-hole-id-label';
     label.textContent = '';
 
     const explosiveSelect = document.createElement('select');

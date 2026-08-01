@@ -95,13 +95,13 @@ emitter.on('bankruptcy:triggered', ({ cash }) => {
   uiManager.showNotification?.(t('notification.bankruptcy_triggered', { cash: Math.floor(cash) }));
 });
 emitter.on('bankruptcy:warning', ({ ticksRemaining }) => {
-  uiManager.showNotification?.(t('notification.bankruptcy_warning', { ticks: ticksRemaining }));
+  uiManager.showNotification?.(t('notification.bankruptcy_warning', { ticksRemaining }));
 });
 emitter.on('ecology:shutdown', () => {
   uiManager.showNotification?.(t('notification.ecology_shutdown'));
 });
 emitter.on('ecology:warning', ({ ticksRemaining }) => {
-  uiManager.showNotification?.(t('notification.ecology_warning', { ticks: ticksRemaining }));
+  uiManager.showNotification?.(t('notification.ecology_warning', { ticksRemaining }));
 });
 emitter.on('arrest:triggered', () => {
   uiManager.showNotification?.(t('notification.arrest_triggered'));
@@ -110,7 +110,7 @@ emitter.on('revolt:triggered', () => {
   uiManager.showNotification?.(t('notification.revolt_triggered'));
 });
 emitter.on('revolt:warning', ({ ticksRemaining }) => {
-  uiManager.showNotification?.(t('notification.revolt_warning', { ticks: ticksRemaining }));
+  uiManager.showNotification?.(t('notification.revolt_warning', { ticksRemaining }));
 });
 
 declare global {

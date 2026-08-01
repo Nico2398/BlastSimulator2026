@@ -21,6 +21,7 @@
 
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
+import { fileURLToPath } from 'url';
 
 import { LOCALE_SHARED_VALUE_ALLOWLIST } from '../src/core/i18n/localeSharedValuesAllowlist.js';
 
@@ -99,4 +100,7 @@ function main(): void {
   process.exit(failed ? 1 : 0);
 }
 
-main();
+// Run only when invoked as a CLI. Imported (by a unit test of checkParity) the
+// module must stay side-effect free — main() ends in process.exit().
+const invokedPath = process.argv[1] ? resolve(process.argv[1]) : '';
+if (invokedPath === resolve(fileURLToPath(import.meta.url))) main();

@@ -125,8 +125,8 @@ export class TileSelectOverlay {
       : this.requiredRegion
       ? t('ui.tile_select.stay_in_area')
       : config.mode === 'area'
-        ? t('ui.tile_select.drag_hint_area')
-        : t('ui.tile_select.drag_hint_point');
+        ? t('ui.tile_select.drag_hint')
+        : t('ui.tile_select.pick_hint');
     form.appendChild(hint);
 
     const selectionInfo = document.createElement('div');

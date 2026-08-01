@@ -38,6 +38,19 @@ const CSS = `
   border-bottom: 1px solid rgba(200,160,60,0.25);
   padding-bottom: 6px;
 }
+/* Same look as a panel title, but this one holds a hole id, not translated
+   text — keeping it out of .bs-panel-title lets a locale-refresh check assert
+   that every panel title is translated. */
+.bs-hole-id-label {
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #ffc840;
+  margin-bottom: 10px;
+  border-bottom: 1px solid rgba(200,160,60,0.25);
+  padding-bottom: 6px;
+}
 
 /* ─── HUD top bar ─── */
 #bs-hud-top {
