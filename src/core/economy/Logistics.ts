@@ -114,6 +114,23 @@ export function sellFragment(
 }
 
 /**
+ * Consume up to `amountKg` of `materialId` ore from warehouse-stored fragments,
+ * removing whole fragments (via sellFragment) until the requested amount is
+ * covered, decrementing collectedOre[materialId] (and every other ore key each
+ * removed fragment touches) by the exact ore-kg physically removed.
+ * materialId === '' (rubble_disposal) consumes raw stored mass regardless of
+ * ore content — any fragment, ore-bearing or not.
+ */
+export function consumeStoredOre(
+  _state: LogisticsState,
+  _collectedOre: Record<string, number>,
+  _materialId: string,
+  _amountKg: number,
+): { success: boolean; consumedKg: number; error?: string } {
+  throw new Error('not implemented');
+}
+
+/**
  * Synchronise logistics storage capacity with the freight warehouse total.
  * Call after building placement or demolition to keep capacity in sync.
  */
