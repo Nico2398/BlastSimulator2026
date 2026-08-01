@@ -31,6 +31,11 @@ export interface GameEventMap {
   // Phase 9 — Navmesh path-following
   'agent:stuck': { employeeId: number };
   'vehicle:stuck': { vehicleId: number };
+
+  // Arrival-gated vehicle actions
+  'vehicle:driver_boarded': { employeeId: number; vehicleId: number };
+  'vehicle:haul_loaded': { vehicleId: number; fragmentId: number };
+  'vehicle:haul_delivered': { vehicleId: number; fragmentId: number };
 }
 
 type EventHandler<T> = (data: T) => void;

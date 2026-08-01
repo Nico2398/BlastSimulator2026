@@ -306,6 +306,20 @@ export function getBuildingScoreEffects(state: BuildingState): Record<ScoreId, n
   return effects;
 }
 
+/**
+ * Find the nearest active building of a given type to a grid position, by
+ * straight-line distance from (x, z). Returns null when no active building
+ * of that type exists.
+ */
+export function findNearestActiveBuildingOfType(
+  _buildings: BuildingState,
+  _type: BuildingType,
+  _x: number,
+  _z: number,
+): Building | null {
+  throw new Error('not implemented: findNearestActiveBuildingOfType');
+}
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 function isOccupied(

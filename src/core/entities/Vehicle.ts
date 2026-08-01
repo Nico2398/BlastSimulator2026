@@ -136,6 +136,15 @@ export interface Vehicle {
   moveConsecutiveFailures: number;
   /** True once moveConsecutiveFailures reaches STUCK_THRESHOLD — idle until the path clears. */
   isMoveStuck: boolean;
+  /** Fragment ID this debris_hauler is currently hauling, or null when not hauling. */
+  haulingFragmentId: number | null;
+  /**
+   * Which leg of the haul the vehicle is on: driving to the fragment to load
+   * it, or driving to the depot to deliver it. Null when not hauling.
+   */
+  haulingPhase: 'to_fragment' | 'to_depot' | null;
+  /** Depot/warehouse building ID the current haul is delivering to, or null. */
+  haulingDepotBuildingId: number | null;
 }
 
 // ── Fleet state ──
@@ -175,6 +184,9 @@ export function purchaseVehicle(
     waitingTicks: 0,
     moveConsecutiveFailures: 0,
     isMoveStuck: false,
+    haulingFragmentId: null,
+    haulingPhase: null,
+    haulingDepotBuildingId: null,
   };
   state.vehicles.push(vehicle);
   return { vehicle, cost: def.purchaseCost };

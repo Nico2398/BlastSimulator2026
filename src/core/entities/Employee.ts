@@ -3,6 +3,7 @@
 
 import { Random } from '../math/Random.js';
 import type { NeedKey } from './EmployeeNeeds.js';
+import type { ActionType } from '../state/GameState.js';
 import { HIRING_COSTS as _HIRING_COSTS, BASE_SALARIES as _BASE_SALARIES, PAY_CYCLE_TICKS as _PAY_CYCLE_TICKS, QUALIFICATION_SALARY_BONUS } from '../config/balance.js';
 
 // ── Roles ──
@@ -132,6 +133,39 @@ export interface Employee {
   moveConsecutiveFailures: number;
   /** True once moveConsecutiveFailures reaches STUCK_THRESHOLD — idle, morale −2/tick until the path clears. */
   isMoveStuck: boolean;
+  /**
+   * Rest duration (ticks) to start once the employee arrives at the rest
+   * destination, or null when no rest arrival is pending. Set alongside
+   * destinationX/destinationZ by the claim step; consumed by
+   * ArrivalGate.tickArrivalGate on arrival, which moves it into
+   * restTicksRemaining.
+   */
+  pendingRestDuration: number | null;
+  /** Need gauge the pending rest (above) will restore, or null. */
+  pendingRestNeedKey: NeedKey | null;
+  /**
+   * Task duration (ticks) to start once the employee arrives at the task
+   * destination, or null when no task arrival is pending. Consumed by
+   * ArrivalGate.tickArrivalGate on arrival, which moves it into
+   * taskTicksRemaining.
+   */
+  pendingTaskDuration: number | null;
+  /** Action type of the pending task-on-arrival (above), or null. */
+  pendingActionType: ActionType | null;
+  /** Free-form payload for the pending task-on-arrival (above), or null. */
+  pendingActionPayload: Record<string, unknown> | null;
+  /**
+   * Vehicle ID the employee has requested to board once they arrive at its
+   * position, or null when no boarding is pending. Consumed by
+   * ArrivalGate.tickArrivalGate on arrival.
+   */
+  pendingDriverVehicleId: number | null;
+  /**
+   * Training course details to start once the employee arrives at the
+   * training building, or null when no training arrival is pending.
+   * Consumed by ArrivalGate.tickArrivalGate on arrival.
+   */
+  pendingTrainingStart: { buildingId: number; skill: string; ticksRemaining: number; fee: number } | null;
 }
 
 // ── Employee state ──
@@ -195,6 +229,13 @@ export function hireEmployee(
     destinationZ: null,
     moveConsecutiveFailures: 0,
     isMoveStuck: false,
+    pendingRestDuration: null,
+    pendingRestNeedKey: null,
+    pendingTaskDuration: null,
+    pendingActionType: null,
+    pendingActionPayload: null,
+    pendingDriverVehicleId: null,
+    pendingTrainingStart: null,
   };
   // Keep the stored salary consistent with the qualification just granted —
   // calculateSalary() sums qualification bonuses, so a base-only salary would
