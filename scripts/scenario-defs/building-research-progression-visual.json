@@ -1,6 +1,6 @@
 {
   "name": "building-research-progression-visual",
-  "description": "Visual check of the research tier-gate: Tier 1 Research Center placed, a direct Tier 2 attempt rejected, then Tier 2 becomes buildable after research completes",
+  "description": "Visual check of the research tier-gate: Tier 1 Research Center placed, a direct Tier 2 attempt rejected, Tier 2 researched instantly (cost-only), an early Tier 3 attempt rejected by the conditions gate, then Tier 3 progresses over ticks and becomes buildable once its own Tier 2 research has completed",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -51,10 +51,78 @@
     },
     {
       "command": "research queue type:research_center tier:2",
+      "description": "Tier-2 (first upgrade) is cost-only — no duration, no conditions.",
       "interaction": [
         {
           "type": "command",
           "command": "research queue type:research_center tier:2"
+        }
+      ]
+    },
+    {
+      "command": "research queue type:research_center tier:3",
+      "description": "Rejected (conditions_not_met) — tier-3's own condition (tier-2 research completed) is not yet satisfied: tier-2 is only queued, not yet processed by a tick. Demonstrates the conditions gate before the flow below completes tier-2 and queues tier-3 successfully.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "research queue type:research_center tier:3"
+        }
+      ]
+    },
+    {
+      "command": "research status",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "research status"
+        }
+      ]
+    },
+    {
+      "command": "tick 1",
+      "description": "Tier-2 is 0-duration — a single tick is enough to complete it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 1"
+        }
+      ]
+    },
+    {
+      "command": "research status",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "research status"
+        }
+      ]
+    },
+    {
+      "command": "build research_center at:15,5 tier:2",
+      "description": "Now succeeds — tier 2 was just researched.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build research_center at:15,5 tier:2"
+        }
+      ]
+    },
+    {
+      "command": "build list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build list"
+        }
+      ]
+    },
+    {
+      "command": "research queue type:research_center tier:3",
+      "description": "Now succeeds — tier-3's condition (tier-2 research completed) is satisfied. This task carries real duration (50 ticks), unlike the cost-only tier-2 task above.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "research queue type:research_center tier:3"
         }
       ]
     },
@@ -78,6 +146,7 @@
     },
     {
       "command": "research status",
+      "description": "Tier-3 task still in progress — ticksRemaining has decreased by 10 but has not reached 0.",
       "interaction": [
         {
           "type": "command",
@@ -96,6 +165,7 @@
     },
     {
       "command": "research status",
+      "description": "Tier-3 research has now completed (50 ticks total) — queue is empty again.",
       "interaction": [
         {
           "type": "command",
@@ -104,12 +174,12 @@
       ]
     },
     {
-      "command": "build research_center at:15,5 tier:2",
-      "description": "Now succeeds — tier 2 was just researched.",
+      "command": "build research_center at:25,5 tier:3",
+      "description": "Now succeeds — tier 3 was just researched.",
       "interaction": [
         {
           "type": "command",
-          "command": "build research_center at:15,5 tier:2"
+          "command": "build research_center at:25,5 tier:3"
         }
       ]
     },

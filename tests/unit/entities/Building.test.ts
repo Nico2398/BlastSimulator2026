@@ -200,18 +200,27 @@ describe('placeBuilding — research gating', () => {
 
   it('allows placing a tier-2 building once tier 2 has been researched via the queue', () => {
     const state = createBuildingState();
-    queueResearchTask(state, 'living_quarters', 2, 5, 5000);
-    for (let i = 0; i < 5; i++) tickResearch(state);
+    // A placed research_center is required before any research task can be queued.
+    placeBuilding(state, 'research_center', 40, 40, 64, 64);
+
+    const queueResult = queueResearchTask(state, 'living_quarters', 2);
+    expect(queueResult.success, JSON.stringify(queueResult)).toBe(true);
+    // Tier-2 (first upgrade) tasks are cost-only — 0 ticks, so a single tick completes them.
+    tickResearch(state);
     expect(isTierUnlocked(state, 'living_quarters', 2)).toBe(true);
 
     const result = placeBuilding(state, 'living_quarters', 0, 0, 64, 64, 2);
     expect(result.success).toBe(true);
-    expect(state.buildings).toHaveLength(1);
+    // Two buildings now: the research_center placed above, plus this living_quarters.
+    expect(state.buildings).toHaveLength(2);
   });
 
   it('still rejects tier 3 after only tier 2 has completed research', () => {
     const state = createBuildingState();
-    queueResearchTask(state, 'living_quarters', 2, 1, 5000);
+    placeBuilding(state, 'research_center', 40, 40, 64, 64);
+
+    const queueResult = queueResearchTask(state, 'living_quarters', 2);
+    expect(queueResult.success, JSON.stringify(queueResult)).toBe(true);
     tickResearch(state);
 
     const result = placeBuilding(state, 'living_quarters', 0, 0, 64, 64, 3);

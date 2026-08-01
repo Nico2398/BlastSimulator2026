@@ -136,22 +136,23 @@ describe('Buildings lifecycle', () => {
     // --- Research pipeline: queue, tick, unlock — on the SAME buildings state the
     //     console upgrade command operates on. Queuing research on a disconnected
     //     BuildingState would leave ctx.state!.buildings.unlockedTiers empty, and
-    //     the upgrade below would then be rejected by the research gate. ---
+    //     the upgrade below would then be rejected by the research gate. A placed
+    //     research_center is also a hard prerequisite (#442) to queue research at all. ---
     const bs = ctx.state!.buildings;
+    placeBuilding(bs, 'research_center', 50, 50, 64, 64);
 
     // Tier 2 is locked initially
     expect(isTierUnlocked(bs, 'living_quarters', 2)).toBe(false);
 
-    // Queue a research task for tier-2 living_quarters
-    const researchCost = queueResearchTask(bs, 'living_quarters', 2, 10, 5000);
-    expect(researchCost).toBe(5000);
+    // Queue a research task for tier-2 living_quarters — tier-2 (first upgrade) is
+    // cost-only: 0 ticks, no conditions.
+    const researchResult = queueResearchTask(bs, 'living_quarters', 2);
+    expect(researchResult.success, JSON.stringify(researchResult)).toBe(true);
     expect(bs.researchQueue).toHaveLength(1);
-    expect(bs.researchQueue[0]!.ticksRemaining).toBe(10);
+    expect(bs.researchQueue[0]!.ticksRemaining).toBe(0);
 
-    // Tick until complete
-    for (let i = 0; i < 10; i++) {
-      tickResearch(bs);
-    }
+    // Tick once — a 0-duration task completes on the very next tick.
+    tickResearch(bs);
 
     // Tier 2 should now be unlocked and queue empty
     expect(isTierUnlocked(bs, 'living_quarters', 2)).toBe(true);
@@ -159,14 +160,15 @@ describe('Buildings lifecycle', () => {
 
     // --- Console upgrade command ---
     buildCommand(ctx, ['living_quarters'], { at: '10,10', tier: '1' });
-    expect(ctx.state!.buildings.buildings[0]!.tier).toBe(1);
+    const placed = ctx.state!.buildings.buildings.find(b => b.type === 'living_quarters')!;
+    expect(placed.tier).toBe(1);
 
-    const upgradeResult = buildCommand(ctx, ['upgrade', '1'], {});
+    const upgradeResult = buildCommand(ctx, ['upgrade', String(placed.id)], {});
     expect(upgradeResult.success).toBe(true);
     expect(upgradeResult.output).toContain('T2');
 
     // The building is now tier 2
-    const upgraded = ctx.state!.buildings.buildings[0]!;
+    const upgraded = ctx.state!.buildings.buildings.find(b => b.type === 'living_quarters')!;
     expect(upgraded.tier).toBe(2);
     expect(upgraded.type).toBe('living_quarters');
 
