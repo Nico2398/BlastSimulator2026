@@ -13,7 +13,7 @@ Buildings are player's infrastructure layer. Gate actions behind qualified emplo
 
 - **Every action requires qualified employee.** No qualified employee → immediate error, not silent queue.
 - **Training buildings** upskill employees for time + fee. Hiring pre-qualified staff generally cheaper.
-- **Research Center** prerequisite for unlocking higher tiers of all other buildings.
+- **Research Center** prerequisite for unlocking higher tiers of all other buildings — a placed Research Center building is required before any research task can be queued, not just implied by the unlock fiction.
 - **Placement tradeoff:** Far-from-pit reduces projection damage risk but increases travel time (productivity loss).
 
 ## Building Types & Tier Names
@@ -34,11 +34,19 @@ All tier names are fictional and humorous. Localized via i18n (`en.json` + `fr.j
 
 ## Tier System
 
-Tier 1 is available from the start. Higher tiers unlocked by paid Research Center tasks:
-- Research task occupies Research Center for fixed duration + costs money
-- Higher tiers: larger capacity, better performance, larger physical footprint
-- Upgrading: demolish old building → construct new tier on same/adjacent cleared ground
-- Both construction and demolition carry a cost
+Tier 1 is available from the start. Higher tiers unlocked by paid Research Center tasks.
+
+**A placed `research_center` building is a hard prerequisite to queue any research task.** No research center on the map → no research task can be queued, enforced at the point research is queued, not left to the unlock fiction.
+
+Research task shape:
+- **Cost** (money) — every research task has one.
+- **Duration** (ticks occupying the Research Center) — every task beyond the first upgrade has one.
+- **Conditions** (prerequisites already met — e.g. a specific other building already at a given tier, or another research already completed) — every task beyond the first upgrade has these too.
+- **Exception — first upgrade (tier 1 → tier 2) of any building type:** cost only, no duration, no conditions.
+
+Higher tiers: larger capacity, better performance, larger physical footprint.
+Upgrading: demolish old building → construct new tier on same/adjacent cleared ground.
+Both construction and demolition carry a cost.
 
 ## Training Buildings
 
