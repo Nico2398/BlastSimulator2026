@@ -97,7 +97,7 @@ export function deliverToDepot(
 export function sellFragment(
   state: LogisticsState,
   fragmentId: number,
-): { mass: number; oreDensities: Record<string, number> } | null {
+): { mass: number; volume: number; oreDensities: Record<string, number> } | null {
   const idx = state.fragments.findIndex(
     f => f.fragment.id === fragmentId && f.state === 'stored',
   );
@@ -109,6 +109,7 @@ export function sellFragment(
 
   return {
     mass: tracked.fragment.mass,
+    volume: tracked.fragment.volume,
     oreDensities: tracked.fragment.oreDensities,
   };
 }
@@ -148,7 +149,7 @@ export function consumeStoredOre(
       const sold = sellFragment(state, id);
       if (!sold) continue;
       const acc: Record<string, number> = {};
-      accumulateOreMass(acc, sold.mass, sold.oreDensities);
+      accumulateOreMass(acc, sold.volume, sold.oreDensities);
       for (const [oreId, kg] of Object.entries(acc)) {
         collectedOre[oreId] = (collectedOre[oreId] ?? 0) - kg;
       }
