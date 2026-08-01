@@ -8,6 +8,7 @@ import { ensureLandscape } from '../console/commands/world.js';
 import type { GameState } from '../core/state/GameState.js';
 import { type VoxelGrid, computeVoxelColumnSurfaceY } from '../core/world/VoxelGrid.js';
 import { getBiome } from '../core/world/BiomeCatalog.js';
+import { BIOME_GRADES, NEUTRAL_GRADE } from './post/AerialPerspectivePass.js';
 import type { SceneManager } from './SceneManager.js';
 import { TerrainMesh, type DirtyRegion } from './TerrainMesh.js';
 import { BuildingMesh } from './BuildingMesh.js';
@@ -172,6 +173,7 @@ export class GameRenderer {
 
     if (this.skybox) {
       this.skybox.update(dt, cam.position.x, cam.position.z);
+      this.sm.postPipeline.aerial.setHazeColor(this.skybox.skyColor);
     }
 
     if (this.blastEffects) {
@@ -501,6 +503,12 @@ export class GameRenderer {
       this.landscape = new LandscapeMesh(this.sm.scene, this.terrain.sharedMaterial);
     }
     this.landscape.build(handle, ctx.grid.palette);
+
+    // Aerial perspective's haze thickness and per-biome grade — set once per
+    // level load, not per frame (#458 T5.2/A21).
+    const { aerial } = this.sm.postPipeline;
+    aerial.setHeightRef(handle.groundLevelY);
+    aerial.setGrade(BIOME_GRADES[biome.id] ?? NEUTRAL_GRADE);
   }
 
   /**

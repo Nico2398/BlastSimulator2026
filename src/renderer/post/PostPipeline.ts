@@ -1,8 +1,9 @@
-// BlastSimulator2026 — Post-processing composer (#458 T5.1/D11/A20)
-// RenderPass → GTAOPass → UnrealBloomPass → OutputPass → SMAAPass.
-// Tonemapping and sRGB conversion happen in OutputPass, after bloom — AA
-// runs last, on the final LDR output. The aerial-perspective pass (A21)
-// slots in between GTAOPass and UnrealBloomPass once T5.2 builds it.
+// BlastSimulator2026 — Post-processing composer (#458 T5.1/T5.2/D11/A20)
+// RenderPass → GTAOPass → AerialPerspectivePass → UnrealBloomPass →
+// OutputPass → SMAAPass. Tonemapping and sRGB conversion happen in
+// OutputPass, after bloom — AA runs last, on the final LDR output. Aerial
+// perspective sits before bloom/tonemapping so it works in linear HDR-ish
+// space (A21).
 
 import * as THREE from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
@@ -11,6 +12,7 @@ import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { SMAAPass } from 'three/examples/jsm/postprocessing/SMAAPass.js';
+import { AerialPerspectivePass } from './AerialPerspectivePass.js';
 
 // Low strength, high threshold — bloom should catch only the brightest
 // highlights, not wash out the cartoon-flat terrain shading (#458 A20).
@@ -21,6 +23,7 @@ const BLOOM_THRESHOLD = 0.9;
 export class PostPipeline {
   readonly composer: EffectComposer;
   readonly gtao: GTAOPass;
+  readonly aerial: AerialPerspectivePass;
 
   constructor(
     renderer: THREE.WebGLRenderer,
@@ -34,6 +37,25 @@ export class PostPipeline {
 
     this.gtao = new GTAOPass(scene, camera, width, height);
     this.composer.addPass(this.gtao);
+
+    // AerialPerspectivePass needs a per-pixel depth texture to reconstruct
+    // world position (#458 T5.2/A21). It reuses GTAOPass's own depthTexture
+    // rather than attaching one to the composer's own renderTarget1/2:
+    // those two buffers ping-pong as passes' write/read targets, and
+    // RenderPass.render() writes into whichever one is passed as its
+    // `readBuffer` argument — so a depthTexture attached to either of them
+    // eventually collides with a later pass's *write* target on the same
+    // frame (sampling a texture that's also the currently-bound
+    // framebuffer's depth attachment: a WebGL "feedback loop" error,
+    // verified by inspecting the actual GL warnings this produced,
+    // corrupting AerialPerspectivePass's output to solid black). GTAOPass
+    // avoids exactly this by rendering its own depth into a dedicated
+    // `normalRenderTarget`, entirely outside the composer's ping-pong chain
+    // (confirmed by reading GTAOPass.js) — reusing its `depthTexture` field
+    // sidesteps the whole hazard instead of re-deriving a broken variant of
+    // the same fix.
+    this.aerial = new AerialPerspectivePass(this.gtao.depthTexture);
+    this.composer.addPass(this.aerial);
 
     const bloom = new UnrealBloomPass(new THREE.Vector2(width, height), BLOOM_STRENGTH, BLOOM_RADIUS, BLOOM_THRESHOLD);
     this.composer.addPass(bloom);

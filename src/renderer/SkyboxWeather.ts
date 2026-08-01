@@ -193,6 +193,11 @@ export class SkyboxWeather {
     }
   }
 
+  /** Current lerped sky color — AerialPerspectivePass tints haze to match it each frame (#458 T5.2). */
+  get skyColor(): THREE.Color {
+    return this.currentSky;
+  }
+
   dispose(): void {
     if (this.rainPoints) {
       this.scene.remove(this.rainPoints);

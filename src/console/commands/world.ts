@@ -27,6 +27,8 @@ export interface LandscapeHandle {
   map: LandscapeMap;
   playableRect: Rect;
   sampleColumn(x: number, z: number): { height: number; biomeId: number; surfCompId: number };
+  /** Ground mean world-y (`groundOffset + centerHeight`) — the aerial-perspective pass's height reference for "thick in valleys, thin on peaks" (#458 T5.2/A21). */
+  groundLevelY: number;
 }
 
 /** Shared game context for console commands. */
@@ -105,6 +107,7 @@ export function ensureLandscape(
     map,
     playableRect: worldGen.playableRect,
     sampleColumn: (x, z) => sampleLandscapeColumn(worldGen, params.climateBias, structureSet, strata, palette, x, z),
+    groundLevelY: worldGen.groundOffset + worldGen.centerHeight,
   };
   return ctx.landscape;
 }

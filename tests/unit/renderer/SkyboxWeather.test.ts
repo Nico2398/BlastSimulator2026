@@ -79,6 +79,16 @@ describe('SkyboxWeather', () => {
     sw.dispose();
   });
 
+  it('skyColor getter tracks the lerped sky color AerialPerspectivePass tints haze with (#458 T5.2)', () => {
+    const { sw } = makeSetup();
+    sw.setWeather('storm'); // snaps — skyLow 0x3a4050
+    expect(sw.skyColor.getHex()).toBe(0x3a4050);
+    sw.setWeather('sunny');
+    for (let i = 0; i < 2000; i++) sw.update(0.016, 50, 50);
+    expect(sw.skyColor.getHex()).toBe(0x87ceeb);
+    sw.dispose();
+  });
+
   it('all weather states can be set without error', () => {
     const { sw } = makeSetup();
     const states: WeatherState[] = ['sunny', 'cloudy', 'light_rain', 'heavy_rain', 'storm', 'heat_wave', 'cold_snap'];

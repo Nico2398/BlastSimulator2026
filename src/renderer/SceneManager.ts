@@ -144,6 +144,7 @@ export class SceneManager {
       // case this frame's onUpdate moved the camera (#458 T5.1).
       this.camera.updateMatrixWorld();
       this.csm.update();
+      this.postPipeline.aerial.update(this.camera);
       this.postPipeline.composer.render();
       // Force GPU to flush — ensures screenshot captures the latest frame
       const gl = this.renderer.getContext();

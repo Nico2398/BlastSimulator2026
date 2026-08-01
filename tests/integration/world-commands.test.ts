@@ -5,7 +5,9 @@ import {
   inspectCommand,
   terrainInfoCommand,
   surveyCommand,
+  ensureLandscape,
 } from '../../src/console/commands/world.js';
+import { getBiome } from '../../src/core/world/BiomeCatalog.js';
 import { EventEmitter } from '../../src/core/state/EventEmitter.js';
 
 describe('Console — world commands', () => {
@@ -96,6 +98,31 @@ describe('Console — world commands', () => {
       expect(result.success).toBe(true);
       expect(result.output).toContain('32x32x32');
       expect(result.output).toContain('mountain');
+    });
+  });
+
+  describe('ensureLandscape groundLevelY (#458 T5.2/A21)', () => {
+    it('exposes groundOffset + centerHeight as the aerial-perspective height reference', () => {
+      newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32' });
+      const biome = getBiome(ctx.state!.mineType)!;
+      const handle = ensureLandscape(ctx, {
+        seed: ctx.state!.seed, climateBias: biome.climateCenter,
+        sizeX: 32, sizeY: 32, sizeZ: 32,
+      });
+      expect(handle).not.toBeNull();
+      // Sits within the voxel grid's Y range — a raw off-grid value here would
+      // mean the pass hazes valleys and peaks alike (#458 T5.2 accept criterion).
+      expect(handle!.groundLevelY).toBeGreaterThan(0);
+      expect(handle!.groundLevelY).toBeLessThan(32);
+    });
+
+    it('is cached — a second call with different params still returns the first handle', () => {
+      newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32' });
+      const biome = getBiome(ctx.state!.mineType)!;
+      const params = { seed: ctx.state!.seed, climateBias: biome.climateCenter, sizeX: 32, sizeY: 32, sizeZ: 32 };
+      const first = ensureLandscape(ctx, params);
+      const second = ensureLandscape(ctx, { ...params, seed: params.seed + 1 });
+      expect(second!.groundLevelY).toBe(first!.groundLevelY);
     });
   });
 });
