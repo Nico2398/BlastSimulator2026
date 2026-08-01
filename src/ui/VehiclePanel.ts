@@ -59,6 +59,17 @@ export class VehiclePanel {
 
   setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
 
+  /**
+   * Stable dispatcher passed to the haul-button helpers instead of
+   * `this.gameConsole` directly — those helpers capture the reference they're
+   * given at button-creation time in a click closure, so a raw
+   * possibly-undefined `this.gameConsole` would freeze at whatever it was
+   * when the button was built. Reading `this.gameConsole` live here keeps a
+   * late `setGameConsole()` call working, matching the driver-assign button's
+   * own `() => this.gameConsole?.(...)` pattern.
+   */
+  private readonly dispatch = (cmd: string): unknown => this.gameConsole?.(cmd);
+
   /** Re-render locale-dependent text (title, rows, buy section) after a language change. */
   refreshLocale(): void {
     this.locale.refresh();
@@ -91,7 +102,7 @@ export class VehiclePanel {
     ].join('#');
     if (signature === this.lastSignature) {
       this.refreshTierButtons(state.cash);
-      refreshHaulButtons(this.listEl, state, this.haulCache, this.gameConsole);
+      refreshHaulButtons(this.listEl, state, this.haulCache, this.dispatch);
       return;
     }
     this.lastSignature = signature;
@@ -110,7 +121,7 @@ export class VehiclePanel {
     }
 
     this.refreshTierButtons(state.cash);
-    refreshHaulButtons(this.listEl, state, this.haulCache, this.gameConsole);
+    refreshHaulButtons(this.listEl, state, this.haulCache, this.dispatch);
   }
 
   dispose(): void { this.el.remove(); }
@@ -139,7 +150,7 @@ export class VehiclePanel {
     col.style.cssText = 'flex:1;min-width:0';
     col.dataset['vehicleId'] = String(v.id);
     col.append(info, status, this.makeDriverRow(v, state));
-    const haulBtn = makeHaulButton(v, this.haulCache, this.gameConsole);
+    const haulBtn = makeHaulButton(v, this.haulCache, this.dispatch);
     if (haulBtn) col.appendChild(haulBtn);
     row.append(col, scrapBtn);
     return row;
