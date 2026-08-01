@@ -8,8 +8,15 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as THREE from 'three';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 import { FragmentMesh } from '../../../src/renderer/FragmentMesh.js';
+import { rockIndexOf } from '../../../src/core/world/RockCatalog.js';
+import { oreIndexOf } from '../../../src/core/world/OreCatalog.js';
 
 const SHAPE_VARIANTS = 8;
+
+/** A cheap stand-in for the shared TerrainMaterial — these tests exercise slot bookkeeping, not shading. */
+function makeMaterial(): THREE.Material {
+  return new THREE.MeshBasicMaterial();
+}
 
 function makeFragment(id: number, overrides: Partial<FragmentData> = {}): FragmentData {
   return {
@@ -50,7 +57,7 @@ describe('FragmentMesh (InstancedMesh)', () => {
 
   beforeEach(() => {
     scene = new THREE.Scene();
-    fm = new FragmentMesh(scene);
+    fm = new FragmentMesh(scene, makeMaterial());
   });
 
   afterEach(() => {
@@ -205,5 +212,50 @@ describe('FragmentMesh (InstancedMesh)', () => {
     // Positive x velocity must displace the rendered fragment further in +x
     // than jitter alone (jitter radius is well under a metre).
     expect(pos.x).toBeGreaterThan(6);
+  });
+
+  describe('per-instance rock/ore attributes (#458 T4.1/A18)', () => {
+    it('sets aRockA/aRockB to the fragment rock index and aRockWeight to 0 — a fragment is one source voxel', () => {
+      fm.spawnFragments([makeFragment(0, { rockId: 'titanite' })]);
+      const im = scene.children[0] as THREE.InstancedMesh;
+      const expected = rockIndexOf('titanite');
+      expect(im.geometry.getAttribute('aRockA').getX(0)).toBe(expected);
+      expect(im.geometry.getAttribute('aRockB').getX(0)).toBe(expected);
+      expect(im.geometry.getAttribute('aRockWeight').getX(0)).toBe(0);
+    });
+
+    it('sets aOre to (-1, 0) when the fragment carries no ore', () => {
+      fm.spawnFragments([makeFragment(0, { oreDensities: {} })]);
+      const im = scene.children[0] as THREE.InstancedMesh;
+      const ore = im.geometry.getAttribute('aOre');
+      expect(ore.getX(0)).toBe(-1);
+      expect(ore.getY(0)).toBe(0);
+    });
+
+    it('sets aOre to the dominant ore index and its density when the fragment carries several ores', () => {
+      fm.spawnFragments([makeFragment(0, { oreDensities: { rustite: 0.05, blingite: 0.22 } })]);
+      const im = scene.children[0] as THREE.InstancedMesh;
+      const ore = im.geometry.getAttribute('aOre');
+      expect(ore.getX(0)).toBe(oreIndexOf('blingite'));
+      expect(ore.getY(0)).toBeCloseTo(0.22, 6);
+    });
+
+    it('removeFragment swaps rock/ore attributes along with the matrix (swap-with-last)', () => {
+      // Same bucket (id % 8 === 0), distinct rocks so the swap is observable.
+      fm.spawnFragments([
+        makeFragment(0, { rockId: 'cruite' }),
+        makeFragment(8, { rockId: 'molite' }),
+        makeFragment(16, { rockId: 'titanite', oreDensities: { treranium: 0.4 } }),
+      ]);
+      const im = scene.children[0] as THREE.InstancedMesh;
+
+      fm.removeFragment(8); // vacates slot 1; slot 2 (titanite/treranium) swaps into it
+
+      expect(im.geometry.getAttribute('aRockA').getX(1)).toBe(rockIndexOf('titanite'));
+      expect(im.geometry.getAttribute('aRockB').getX(1)).toBe(rockIndexOf('titanite'));
+      const ore = im.geometry.getAttribute('aOre');
+      expect(ore.getX(1)).toBe(oreIndexOf('treranium'));
+      expect(ore.getY(1)).toBeCloseTo(0.4, 6);
+    });
   });
 });

@@ -459,8 +459,9 @@ export class GameRenderer {
     // Weather sky
     this.skybox = new SkyboxWeather(scene, sun, ambient);
 
-    // Fragments (empty until blast runs)
-    this.fragments = new FragmentMesh(scene);
+    // Fragments (empty until blast runs) — shares terrain's material so a
+    // fresh cut face matches the rock it broke off from (#458 T4.1/D9).
+    this.fragments = new FragmentMesh(scene, this.terrain.sharedMaterial);
 
     // Blast effects
     this.blastEffects = new BlastEffects(scene, this.sm.camera);

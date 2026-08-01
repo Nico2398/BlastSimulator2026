@@ -20,7 +20,7 @@ import type { LandscapeHandle } from '../../console/commands/world.js';
 import type { LandscapeTile } from '../../core/world/LandscapeMap.js';
 import type { Rect } from '../../core/world/WorldGen.js';
 import { getDominantRockId, type CompositionPalette } from '../../core/world/VoxelGrid.js';
-import { sampleRockColor } from '../ProceduralTexture.js';
+import { rockIndexOf } from '../../core/world/RockCatalog.js';
 
 /** Metres outside the playable rect within which the seam subdivides to FINE_STEP (#458 A16). */
 const FINE_MARGIN = 24;
@@ -39,9 +39,14 @@ function distanceInsideRect(rect: Rect, x: number, z: number): number {
   return Math.min(dx, dz);
 }
 
-function colorFor(palette: CompositionPalette, surfCompId: number, x: number, y: number, z: number): THREE.Color {
+/**
+ * Landscape samples carry one rock (no marching-cubes blend), so both shader
+ * rock slots are the same index and the blend weight is 0 — no ore data is
+ * tracked in LandscapeMap, so aOre is always "none" (#458 T4.1/A18).
+ */
+function rockIndexFor(palette: CompositionPalette, surfCompId: number): number {
   const comp = palette.get(surfCompId).comp;
-  return sampleRockColor(getDominantRockId(comp), x, y, z);
+  return Math.max(0, rockIndexOf(getDominantRockId(comp)));
 }
 
 export class LandscapeMesh {
@@ -50,7 +55,7 @@ export class LandscapeMesh {
   private readonly tileMeshes: THREE.Mesh[] = [];
   private seamMesh: THREE.Mesh | null = null;
 
-  /** `material` is shared with TerrainMesh (D9's "same interim material" — one shader, one draw-state for both zones). */
+  /** `material` is shared with TerrainMesh and FragmentMesh (D9's "one shared terrain material" — one shader, one draw-state everywhere). */
   constructor(scene: THREE.Scene, material: THREE.Material) {
     this.scene = scene;
     this.material = material;
@@ -96,7 +101,11 @@ export class LandscapeMesh {
     if (tile.heights.length === 0) return null;
 
     const positions = new Float32Array(n * n * 3);
-    const colors = new Float32Array(n * n * 3);
+    const rockA = new Float32Array(n * n);
+    const rockB = new Float32Array(n * n);
+    const rockWeight = new Float32Array(n * n); // all zero: single-rock samples (#458 A18)
+    const ore = new Float32Array(n * n * 2); // (id, amt) pairs; landscape never carries ore (#458 A18)
+    for (let i = 0; i < n * n; i++) ore[i * 2] = -1; // id = -1 (none); amt stays 0
     for (let row = 0; row < n; row++) {
       const z = tile.originZ + row * step;
       for (let col = 0; col < n; col++) {
@@ -108,10 +117,9 @@ export class LandscapeMesh {
         positions[idx * 3 + 1] = y;
         positions[idx * 3 + 2] = z;
 
-        const color = colorFor(palette, tile.surfCompIds[idx]!, x, y, z);
-        colors[idx * 3] = color.r;
-        colors[idx * 3 + 1] = color.g;
-        colors[idx * 3 + 2] = color.b;
+        const rockIdx = rockIndexFor(palette, tile.surfCompIds[idx]!);
+        rockA[idx] = rockIdx;
+        rockB[idx] = rockIdx;
       }
     }
 
@@ -129,7 +137,10 @@ export class LandscapeMesh {
 
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    geometry.setAttribute('aRockA', new THREE.BufferAttribute(rockA, 1));
+    geometry.setAttribute('aRockB', new THREE.BufferAttribute(rockB, 1));
+    geometry.setAttribute('aRockWeight', new THREE.BufferAttribute(rockWeight, 1));
+    geometry.setAttribute('aOre', new THREE.BufferAttribute(ore, 2));
     geometry.setIndex(indices);
     geometry.computeVertexNormals();
     geometry.computeBoundingSphere();
@@ -152,7 +163,10 @@ export class LandscapeMesh {
     const rows = Math.round((rect.maxZ + FINE_MARGIN - outerMinZ) / FINE_STEP) + 1;
 
     const positions: number[] = [];
-    const colors: number[] = [];
+    const rockA: number[] = [];
+    const rockB: number[] = [];
+    const rockWeight: number[] = [];
+    const ore: number[] = [];
     const indices: number[] = [];
     const vertexIndex = new Map<number, number>();
 
@@ -171,8 +185,13 @@ export class LandscapeMesh {
 
       const idx = positions.length / 3;
       positions.push(x, y, z);
-      const color = colorFor(palette, sample.surfCompId, x, y, z);
-      colors.push(color.r, color.g, color.b);
+      // Single-rock sample: both shader rock slots are the same index, blend
+      // weight 0, no ore data tracked by LandscapeMap (#458 A18).
+      const rockIdx = rockIndexFor(palette, sample.surfCompId);
+      rockA.push(rockIdx);
+      rockB.push(rockIdx);
+      rockWeight.push(0);
+      ore.push(-1, 0);
       vertexIndex.set(key, idx);
       return idx;
     };
@@ -199,7 +218,10 @@ export class LandscapeMesh {
 
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    geometry.setAttribute('aRockA', new THREE.Float32BufferAttribute(rockA, 1));
+    geometry.setAttribute('aRockB', new THREE.Float32BufferAttribute(rockB, 1));
+    geometry.setAttribute('aRockWeight', new THREE.Float32BufferAttribute(rockWeight, 1));
+    geometry.setAttribute('aOre', new THREE.Float32BufferAttribute(ore, 2));
     geometry.setIndex(indices);
     geometry.computeVertexNormals();
     geometry.computeBoundingSphere();

@@ -10,6 +10,7 @@ import {
   type SurveyConfidencePoint,
   type SurveyConfidenceOverlayOptions,
 } from '../../../src/renderer/TerrainMesh.js';
+import { TerrainMaterial } from '../../../src/renderer/terrain/TerrainMaterial.js';
 
 // Minimal mock THREE.Scene — just captures adds/removes
 function makeScene(): THREE.Scene {
@@ -84,7 +85,7 @@ describe('TerrainMesh', () => {
     tm.dispose();
   });
 
-  it('generated geometry has position, color, and rock/ore attributes (#458 T3.1/A18)', () => {
+  it('generated geometry has position and rock/ore attributes, no CPU vertex color (#458 T4.1/A18)', () => {
     const scene = makeScene();
     const grid = new VoxelGrid(8, 8, 8);
     for (let x = 0; x < 8; x++)
@@ -98,7 +99,8 @@ describe('TerrainMesh', () => {
     expect(mesh).toBeDefined();
     const geo = mesh.geometry as THREE.BufferGeometry;
     expect(geo.getAttribute('position')).toBeDefined();
-    expect(geo.getAttribute('color')).toBeDefined();
+    // Color now comes entirely from TerrainMaterial's shader (#458 T4.1/D9).
+    expect(geo.getAttribute('color')).toBeUndefined();
     expect(geo.getAttribute('aRockA')).toBeDefined();
     expect(geo.getAttribute('aRockB')).toBeDefined();
     expect(geo.getAttribute('aRockWeight')).toBeDefined();
@@ -242,8 +244,21 @@ describe('TerrainMesh', () => {
     tm.buildAll();
     const mesh = scene.children.find(c => c instanceof THREE.Mesh) as THREE.Mesh;
     expect(mesh).toBeDefined();
-    const mat = mesh.material as THREE.MeshPhongMaterial;
+    const mat = mesh.material as THREE.Material;
     expect(mat.side).toBe(THREE.DoubleSide);
+    tm.dispose();
+  });
+
+  it('sharedMaterial is a TerrainMaterial covering the grid extent as its playable rect (#458 T4.1)', () => {
+    const scene = makeScene();
+    const grid = new VoxelGrid(8, 12, 20);
+    const tm = new TerrainMesh(scene, grid);
+    expect(tm.sharedMaterial).toBeInstanceOf(TerrainMaterial);
+    const rect = tm.sharedMaterial.customUniforms['uPlayRect']!.value as THREE.Vector4;
+    expect(rect.x).toBe(0);
+    expect(rect.y).toBe(0);
+    expect(rect.z).toBe(8);
+    expect(rect.w).toBe(20);
     tm.dispose();
   });
 });

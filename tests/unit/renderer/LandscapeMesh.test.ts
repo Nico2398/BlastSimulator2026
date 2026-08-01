@@ -78,7 +78,7 @@ describe('LandscapeMesh', () => {
     lm.dispose();
   });
 
-  it('tile mesh geometry has position, color, and index attributes matching a regular grid', () => {
+  it('tile mesh geometry has position, index, and rock/ore attributes matching a regular grid (#458 T4.1)', () => {
     const scene = makeScene();
     const { palette, compId } = makePalette();
     const rect: Rect = { minX: 0, minZ: 0, maxX: 32, maxZ: 32 };
@@ -93,7 +93,8 @@ describe('LandscapeMesh', () => {
     expect(tileMesh).toBeDefined();
     const geo = tileMesh.geometry;
     expect(geo.getAttribute('position').count).toBe(n * n);
-    expect(geo.getAttribute('color')).toBeDefined();
+    // Color now comes entirely from TerrainMaterial's shader (#458 T4.1/D9).
+    expect(geo.getAttribute('color')).toBeUndefined();
     expect(geo.getIndex()).not.toBeNull();
     expect(geo.getIndex()!.count).toBe((n - 1) * (n - 1) * 6); // 2 triangles/quad, 3 indices/triangle
 
@@ -101,6 +102,19 @@ describe('LandscapeMesh', () => {
     const positions = geo.getAttribute('position').array as Float32Array;
     for (let i = 0; i < positions.length; i += 3) {
       expect(positions[i + 1]).toBeCloseTo(42, 5);
+    }
+
+    // Single-rock samples: both shader rock slots agree, weight 0, no ore (#458 A18).
+    const rockA = geo.getAttribute('aRockA').array as Float32Array;
+    const rockB = geo.getAttribute('aRockB').array as Float32Array;
+    const rockWeight = geo.getAttribute('aRockWeight').array as Float32Array;
+    const ore = geo.getAttribute('aOre').array as Float32Array;
+    expect(geo.getAttribute('aOre').itemSize).toBe(2);
+    for (let i = 0; i < n * n; i++) {
+      expect(rockA[i]).toBe(rockB[i]);
+      expect(rockWeight[i]).toBe(0);
+      expect(ore[i * 2]).toBe(-1);
+      expect(ore[i * 2 + 1]).toBe(0);
     }
     lm.dispose();
   });

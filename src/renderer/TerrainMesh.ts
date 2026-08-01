@@ -7,16 +7,16 @@
 //
 // Voxels with density >= SURFACE_THRESHOLD are "solid".
 // Re-meshing a single 16^3 chunk targets < 50ms.
-// Vertex colors are set from the rock type's hex color field — kept
-// alongside the new per-vertex rock/ore attributes for visual continuity
-// until T4.1's TerrainMaterial replaces them with triplanar shading.
+// Color comes entirely from TerrainMaterial's shader, driven by the
+// per-vertex aRockA/aRockB/aRockWeight/aOre attributes emitted below
+// (#458 T4.1/D9/A19) — no CPU-side vertex color is computed.
 
 import * as THREE from 'three';
 import type { VoxelGrid } from '../core/world/VoxelGrid.js';
 import { rockIndexOf } from '../core/world/RockCatalog.js';
 import { oreIndexOf } from '../core/world/OreCatalog.js';
 import { EDGE_TABLE, TRI_TABLE } from './MarchingCubesTables.js';
-import { sampleRockColor, clearColorSampleCache } from './ProceduralTexture.js';
+import { TerrainMaterial } from './terrain/TerrainMaterial.js';
 import { SurveyConfidenceOverlay } from './SurveyConfidenceOverlay.js';
 
 // Re-export survey overlay types/class so consumers can import from either location.
@@ -71,11 +71,11 @@ function sampleCorner(grid: VoxelGrid, x: number, y: number, z: number): CornerS
   return { density, rockId, oreId, oreAmt };
 }
 
-/** Appends one interpolated vertex's position, color, and rock/ore attributes to the output arrays. */
+/** Appends one interpolated vertex's position and rock/ore attributes to the output arrays. */
 function emitVertex(
   p0: readonly [number, number, number], c0: CornerSample,
   p1: readonly [number, number, number], c1: CornerSample,
-  outPos: number[], outColor: number[],
+  outPos: number[],
   outRockA: number[], outRockB: number[], outRockWeight: number[], outOre: number[],
 ): void {
   let t = 0.5;
@@ -88,15 +88,6 @@ function emitVertex(
   const vy = p0[1] + t * (p1[1] - p0[1]);
   const vz = p0[2] + t * (p1[2] - p0[2]);
   outPos.push(vx, vy, vz);
-
-  // 3D-coherent procedural color, blended across the boundary by t.
-  const rgb0 = sampleRockColor(c0.rockId, vx, vy, vz);
-  const rgb1 = sampleRockColor(c1.rockId, vx, vy, vz);
-  outColor.push(
-    rgb0.r + t * (rgb1.r - rgb0.r),
-    rgb0.g + t * (rgb1.g - rgb0.g),
-    rgb0.b + t * (rgb1.b - rgb0.b),
-  );
 
   // Air corners (rockId === '') inherit the other corner's rock (#458 A18).
   const rockIdA = c0.rockId || c1.rockId;
@@ -115,7 +106,7 @@ function emitVertex(
 export class TerrainMesh {
   private readonly scene: THREE.Scene;
   private grid: VoxelGrid;
-  private readonly material: THREE.MeshPhongMaterial;
+  private readonly material: TerrainMaterial;
   private surveyOverlay: SurveyConfidenceOverlay | null = null;
 
   /** Chunk-grid-index -> its Mesh, or null for a built-but-empty chunk (no triangles). */
@@ -128,12 +119,12 @@ export class TerrainMesh {
     this.scene = scene;
     this.grid = grid;
 
-    // Vertex-colored material — no texture needed (still true until T4.1).
-    this.material = new THREE.MeshPhongMaterial({
-      vertexColors: true,
-      shininess: 12,
-      side: THREE.DoubleSide,
+    // Playable rect matches WorldGen's own formula exactly (#458 A19.4) — no
+    // need to plumb the landscape handle through just for this.
+    this.material = new TerrainMaterial({
+      playRect: { minX: 0, minZ: 0, maxX: grid.sizeX, maxZ: grid.sizeZ },
     });
+    this.material.side = THREE.DoubleSide;
     this.updateChunkGridDims();
   }
 
@@ -149,8 +140,8 @@ export class TerrainMesh {
     return this.grid.id;
   }
 
-  /** The shared interim material — reused by LandscapeMesh so both zones render with identical shading (#458 T3.2/D9). */
-  get sharedMaterial(): THREE.MeshPhongMaterial {
+  /** The shared terrain material — reused by LandscapeMesh and FragmentMesh so every zone renders with identical shading (#458 T3.2/T4.1/D9). */
+  get sharedMaterial(): TerrainMaterial {
     return this.material;
   }
 
@@ -289,13 +280,10 @@ export class TerrainMesh {
     this.chunks.delete(key);
 
     const positions: number[] = [];
-    const colors: number[] = [];
     const rockA: number[] = [];
     const rockB: number[] = [];
     const rockWeight: number[] = [];
     const ore: number[] = [];
-
-    clearColorSampleCache(); // bound the color-sample cache per chunk, as before
 
     const ox = cx * CHUNK_SIZE, oy = cy * CHUNK_SIZE, oz = cz * CHUNK_SIZE;
     const xEnd = Math.min(ox + CHUNK_SIZE, this.grid.sizeX - 1);
@@ -305,7 +293,7 @@ export class TerrainMesh {
     for (let z = oz; z < zEnd; z++) {
       for (let y = oy; y < yEnd; y++) {
         for (let x = ox; x < xEnd; x++) {
-          this.marchCube(x, y, z, positions, colors, rockA, rockB, rockWeight, ore);
+          this.marchCube(x, y, z, positions, rockA, rockB, rockWeight, ore);
         }
       }
     }
@@ -317,7 +305,6 @@ export class TerrainMesh {
 
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
     geometry.setAttribute('aRockA', new THREE.Float32BufferAttribute(rockA, 1));
     geometry.setAttribute('aRockB', new THREE.Float32BufferAttribute(rockB, 1));
     geometry.setAttribute('aRockWeight', new THREE.Float32BufferAttribute(rockWeight, 1));
@@ -334,7 +321,7 @@ export class TerrainMesh {
 
   private marchCube(
     x: number, y: number, z: number,
-    outPos: number[], outColor: number[],
+    outPos: number[],
     outRockA: number[], outRockB: number[], outRockWeight: number[], outOre: number[],
   ): void {
     const corners: CornerSample[] = new Array(8);
@@ -353,7 +340,6 @@ export class TerrainMesh {
     if (!edgeMask) return;
 
     const edgeVerts: [number, number, number][] = new Array(12);
-    const edgeColors: [number, number, number][] = new Array(12);
     const edgeRockA: number[] = new Array(12);
     const edgeRockB: number[] = new Array(12);
     const edgeRockWeight: number[] = new Array(12);
@@ -366,7 +352,6 @@ export class TerrainMesh {
       const [dx1, dy1, dz1] = CORNER_OFFSETS[c1i]!;
 
       const tempPos: number[] = [];
-      const tempCol: number[] = [];
       const tempRockA: number[] = [];
       const tempRockB: number[] = [];
       const tempRockW: number[] = [];
@@ -374,10 +359,9 @@ export class TerrainMesh {
       emitVertex(
         [x + dx0, y + dy0, z + dz0], corners[c0i]!,
         [x + dx1, y + dy1, z + dz1], corners[c1i]!,
-        tempPos, tempCol, tempRockA, tempRockB, tempRockW, tempOre,
+        tempPos, tempRockA, tempRockB, tempRockW, tempOre,
       );
       edgeVerts[e] = [tempPos[0]!, tempPos[1]!, tempPos[2]!];
-      edgeColors[e] = [tempCol[0]!, tempCol[1]!, tempCol[2]!];
       edgeRockA[e] = tempRockA[0]!;
       edgeRockB[e] = tempRockB[0]!;
       edgeRockWeight[e] = tempRockW[0]!;
@@ -391,7 +375,6 @@ export class TerrainMesh {
       const e0 = tris[i]!, e1 = tris[i + 1]!, e2 = tris[i + 2]!;
       for (const e of [e0, e1, e2]) {
         outPos.push(...edgeVerts[e]!);
-        outColor.push(...edgeColors[e]!);
         outRockA.push(edgeRockA[e]!);
         outRockB.push(edgeRockB[e]!);
         outRockWeight.push(edgeRockWeight[e]!);

@@ -24,6 +24,14 @@ export interface RockType {
   readonly noiseFreq: number;
   /** Level bias for terrain generation. Higher = more common. Range ~[-1, 1]. */
   readonly levelBias: number;
+  /** Terrain shader macro-scale 3D FBM frequency (#458 T4.1/A19.2 uRockParams.x). */
+  readonly macroFreq: number;
+  /** Terrain shader detail-scale 3D FBM frequency (#458 T4.1/A19.2 uRockParams.y). */
+  readonly detailFreq: number;
+  /** Terrain shader vein-darkening strength, 0-0.5 (#458 T4.1/A19.2 uRockParams.z). */
+  readonly veinStrength: number;
+  /** Terrain shader macro-noise contrast, 0-0.6 (#458 T4.1/A19.2 uRockParams.w). */
+  readonly contrast: number;
 }
 
 // Fracture threshold formula: tier² × 150 + base
@@ -47,6 +55,10 @@ const ROCKS: readonly RockType[] = [
     color: '#e8dcc8',
     noiseFreq: 0.08,
     levelBias: -0.3,
+    macroFreq: 0.18,
+    detailFreq: 0.60,
+    veinStrength: 0.08,
+    contrast: 0.15,
   },
   {
     id: 'sandite',
@@ -61,6 +73,10 @@ const ROCKS: readonly RockType[] = [
     color: '#d4b483',
     noiseFreq: 0.10,
     levelBias: -0.2,
+    macroFreq: 0.25,
+    detailFreq: 0.90,
+    veinStrength: 0.06,
+    contrast: 0.22,
   },
   {
     id: 'molite',
@@ -75,6 +91,10 @@ const ROCKS: readonly RockType[] = [
     color: '#c9bfa3',
     noiseFreq: 0.07,
     levelBias: 0.0,
+    macroFreq: 0.15,
+    detailFreq: 0.55,
+    veinStrength: 0.12,
+    contrast: 0.18,
   },
   {
     id: 'grumpite',
@@ -89,6 +109,10 @@ const ROCKS: readonly RockType[] = [
     color: '#8a7f72',
     noiseFreq: 0.06,
     levelBias: 0.1,
+    macroFreq: 0.12,
+    detailFreq: 0.45,
+    veinStrength: 0.16,
+    contrast: 0.24,
   },
   {
     id: 'clunkite',
@@ -103,6 +127,10 @@ const ROCKS: readonly RockType[] = [
     color: '#6b6b6b',
     noiseFreq: 0.05,
     levelBias: 0.2,
+    macroFreq: 0.20,
+    detailFreq: 0.70,
+    veinStrength: 0.20,
+    contrast: 0.28,
   },
   {
     id: 'stubite',
@@ -117,6 +145,10 @@ const ROCKS: readonly RockType[] = [
     color: '#9e8e7e',
     noiseFreq: 0.05,
     levelBias: 0.3,
+    macroFreq: 0.22,
+    detailFreq: 0.80,
+    veinStrength: 0.22,
+    contrast: 0.30,
   },
   {
     id: 'obstiite',
@@ -131,6 +163,10 @@ const ROCKS: readonly RockType[] = [
     color: '#3d3d3d',
     noiseFreq: 0.04,
     levelBias: 0.4,
+    macroFreq: 0.30,
+    detailFreq: 1.10,
+    veinStrength: 0.28,
+    contrast: 0.35,
   },
   {
     id: 'gnarlite',
@@ -145,6 +181,10 @@ const ROCKS: readonly RockType[] = [
     color: '#2a4a2a',
     noiseFreq: 0.03,
     levelBias: 0.5,
+    macroFreq: 0.28,
+    detailFreq: 1.00,
+    veinStrength: 0.30,
+    contrast: 0.38,
   },
   {
     id: 'absurdite',
@@ -159,6 +199,10 @@ const ROCKS: readonly RockType[] = [
     color: '#c46bdb',
     noiseFreq: 0.03,
     levelBias: 0.6,
+    macroFreq: 0.35,
+    detailFreq: 1.20,
+    veinStrength: 0.35,
+    contrast: 0.45,
   },
   {
     id: 'titanite',
@@ -173,6 +217,10 @@ const ROCKS: readonly RockType[] = [
     color: '#1a1a3a',
     noiseFreq: 0.02,
     levelBias: 0.7,
+    macroFreq: 0.40,
+    detailFreq: 1.40,
+    veinStrength: 0.40,
+    contrast: 0.50,
   },
 ] as const;
 
