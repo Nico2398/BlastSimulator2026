@@ -135,4 +135,76 @@ describe('TerrainMaterial', () => {
       expect(shader.fragmentShader).not.toContain('#include <color_fragment>');
     });
   });
+
+  describe('attachCSM (#458 T5.1/D11)', () => {
+    function makeFakeShader(): THREE.WebGLProgramParametersWithUniforms {
+      return {
+        vertexShader: '#include <common>\nvoid main() {\n#include <begin_vertex>\n}',
+        fragmentShader: '#include <common>\nvoid main() {\n#include <color_fragment>\n}',
+        uniforms: {},
+      } as unknown as THREE.WebGLProgramParametersWithUniforms;
+    }
+
+    function makeFakeCSM(cascades = 3) {
+      return {
+        cascades,
+        maxFar: 1200,
+        camera: { near: 0.5, far: 4000 },
+        getExtendedBreaks: (target: THREE.Vector2[]) => {
+          target.length = 0;
+          target.push(new THREE.Vector2(0, 1));
+        },
+        shaders: new Map(),
+      };
+    }
+
+    it('sets USE_CSM/CSM_CASCADES defines matching the CSM instance', () => {
+      const mat = makeMaterial();
+      const csm = makeFakeCSM(4);
+      mat.attachCSM(csm as any);
+      expect(mat.defines?.['USE_CSM']).toBe(1);
+      expect(mat.defines?.['CSM_CASCADES']).toBe(4);
+    });
+
+    it('composes with the existing onBeforeCompile rather than replacing it — A19 albedo still runs', () => {
+      const mat = makeMaterial();
+      mat.attachCSM(makeFakeCSM() as any);
+
+      const shader = makeFakeShader();
+      mat.onBeforeCompile(shader, undefined as unknown as THREE.WebGLRenderer);
+
+      // A19's own injection still ran — this would fail if attachCSM had
+      // replaced onBeforeCompile instead of wrapping it.
+      expect(shader.fragmentShader).toContain('float fbm3(vec3 p)');
+      expect(shader.fragmentShader).toContain('diffuseColor.rgb = col * cloudShadow');
+      // ...and the CSM uniforms it needs got added on top.
+      expect(shader.uniforms['CSM_cascades']).toBeDefined();
+      expect(shader.uniforms['cameraNear']).toEqual({ value: 0.5 });
+      // shadowFar = min(camera.far, maxFar) — the fake CSM's maxFar (1200) is
+      // tighter than camera.far (4000), so the cap applies here too.
+      expect(shader.uniforms['shadowFar']).toEqual({ value: 1200 });
+    });
+
+    it('registers the compiled shader with csm.shaders so csm.updateUniforms() can refresh it', () => {
+      const mat = makeMaterial();
+      const csm = makeFakeCSM();
+      mat.attachCSM(csm as any);
+
+      const shader = makeFakeShader();
+      mat.onBeforeCompile(shader, undefined as unknown as THREE.WebGLRenderer);
+
+      expect(csm.shaders.get(mat)).toBe(shader);
+    });
+
+    it('caps shadowFar at csm.maxFar even when camera.far is larger', () => {
+      const mat = makeMaterial();
+      const csm = makeFakeCSM();
+      csm.camera.far = 9000; // exceeds maxFar
+      mat.attachCSM(csm as any);
+
+      const shader = makeFakeShader();
+      mat.onBeforeCompile(shader, undefined as unknown as THREE.WebGLRenderer);
+      expect(shader.uniforms['shadowFar']).toEqual({ value: csm.maxFar });
+    });
+  });
 });

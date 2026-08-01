@@ -7,11 +7,11 @@ import type { WeatherState } from '../../../src/core/weather/WeatherCycle.js';
 
 function makeSetup() {
   const scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(0x87ceeb, 800, 3000);
   const sun = new THREE.DirectionalLight(0xffffff, 1.2);
   const ambient = new THREE.AmbientLight(0xffffff, 0.55);
-  const sw = new SkyboxWeather(scene, sun, ambient);
-  return { scene, sun, ambient, sw };
+  const fill = new THREE.DirectionalLight(0xd0e8ff, 0.3);
+  const sw = new SkyboxWeather(scene, sun, ambient, fill);
+  return { scene, sun, ambient, fill, sw };
 }
 
 describe('SkyboxWeather', () => {
@@ -64,6 +64,18 @@ describe('SkyboxWeather', () => {
     sw.setWeather('heavy_rain');
     for (let i = 0; i < 120; i++) sw.update(0.016, 50, 50);
     expect(sun.intensity).toBeLessThan(initialIntensity);
+    sw.dispose();
+  });
+
+  it('fill light tracks sun intensity at a fixed ratio, weather-modulated like sun (#458 T5.1)', () => {
+    const { sun, fill, sw } = makeSetup();
+    sw.setWeather('heat_wave'); // snaps on first call — sunIntensity 1.5
+    expect(fill.intensity).toBeCloseTo(sun.intensity * 0.25, 5);
+
+    sw.setWeather('storm'); // sunIntensity 0.10 — well below heat_wave's 1.5
+    for (let i = 0; i < 120; i++) sw.update(0.016, 50, 50);
+    expect(fill.intensity).toBeCloseTo(sun.intensity * 0.25, 2);
+    expect(fill.intensity).toBeLessThan(0.25 * 1.5);
     sw.dispose();
   });
 

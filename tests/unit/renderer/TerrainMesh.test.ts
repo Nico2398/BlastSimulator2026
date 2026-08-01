@@ -85,6 +85,21 @@ describe('TerrainMesh', () => {
     tm.dispose();
   });
 
+  it('chunk meshes cast and receive shadows (#458 T5.1/CSM)', () => {
+    const scene = makeScene();
+    const grid = new VoxelGrid(8, 8, 8);
+    for (let x = 0; x < 8; x++)
+      for (let y = 0; y < 4; y++)
+        for (let z = 0; z < 8; z++)
+          grid.setVoxel(x, y, z, makeSolidVoxel());
+    const tm = new TerrainMesh(scene, grid);
+    tm.buildAll();
+    const mesh = scene.children.find(c => c instanceof THREE.Mesh) as THREE.Mesh;
+    expect(mesh.castShadow).toBe(true);
+    expect(mesh.receiveShadow).toBe(true);
+    tm.dispose();
+  });
+
   it('generated geometry has position and rock/ore attributes, no CPU vertex color (#458 T4.1/A18)', () => {
     const scene = makeScene();
     const grid = new VoxelGrid(8, 8, 8);

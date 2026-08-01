@@ -101,7 +101,9 @@ async function captureScreenshot(options: ScreenshotOptions): Promise<string> {
         await page.setViewport(options.viewport);
 
         console.log(`Navigating to ${devServerUrl} (viewport: ${options.viewport.width}x${options.viewport.height})...`);
-        await page.goto(devServerUrl, { waitUntil: 'networkidle0' });
+        // See puppeteer-utils.ts's initBrowser() for why this isn't
+        // 'networkidle0' (#458 T5.1 — EffectComposer/OutputPass regression).
+        await page.goto(devServerUrl, { waitUntil: 'domcontentloaded' });
 
         await page.waitForSelector('#game-canvas, canvas', { timeout: 10000 });
         console.log('Game canvas detected. Waiting for initialization...');

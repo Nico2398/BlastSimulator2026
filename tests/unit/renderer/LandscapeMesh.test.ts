@@ -119,6 +119,25 @@ describe('LandscapeMesh', () => {
     lm.dispose();
   });
 
+  it('tile and seam meshes cast and receive shadows (#458 T5.1/CSM)', () => {
+    const scene = makeScene();
+    const { palette, compId } = makePalette();
+    const rect: Rect = { minX: 0, minZ: 0, maxX: 32, maxZ: 32 };
+    const tiles = [makeFakeTile(-100, -100, 4, compId)];
+    const handle = makeFakeHandle(rect, tiles, 4, compId);
+
+    const lm = new LandscapeMesh(scene, makeMaterial());
+    lm.build(handle, palette);
+
+    expect(scene.children.length).toBeGreaterThan(0);
+    for (const child of scene.children) {
+      const mesh = child as THREE.Mesh;
+      expect(mesh.castShadow).toBe(true);
+      expect(mesh.receiveShadow).toBe(true);
+    }
+    lm.dispose();
+  });
+
   it('dispose() removes every mesh from the scene and clears meshCount', () => {
     const scene = makeScene();
     const { palette, compId } = makePalette();

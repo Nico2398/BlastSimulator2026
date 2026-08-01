@@ -20,10 +20,22 @@ import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 function makeMockSceneManager() {
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera();
-  const sun = new THREE.DirectionalLight();
+  const sunLight = new THREE.DirectionalLight();
+  const fill = new THREE.DirectionalLight();
   const ambient = new THREE.AmbientLight();
   const cameraController = { setTarget: vi.fn(), frameSite: vi.fn(), update: vi.fn() };
-  return { scene, camera, sun, ambient, cameraController, renderer: { render: vi.fn() } as unknown };
+  // Minimal fake CSM — attachCSM() reads .cascades synchronously; the rest
+  // (.camera/.maxFar/.getExtendedBreaks/.shaders) only matter inside
+  // onBeforeCompile, which these Node-only tests never trigger a real
+  // WebGL compile to run (#458 T5.1).
+  const csm = {
+    cascades: 3,
+    maxFar: 1200,
+    camera,
+    getExtendedBreaks: () => {},
+    shaders: new Map(),
+  };
+  return { scene, camera, sunLight, ambient, fill, csm, cameraController, renderer: { render: vi.fn() } as unknown };
 }
 
 function makeCtx(): MiningContext {

@@ -15,9 +15,23 @@
 // seam-blending cost.
 
 import * as THREE from 'three';
+import type { CSM } from 'three/examples/jsm/csm/CSM.js';
 import { getAllRocks } from '../../core/world/RockCatalog.js';
 import { getAllOres } from '../../core/world/OreCatalog.js';
 import type { Rect } from '../../core/world/WorldGen.js';
+
+/**
+ * `@types/three`'s CSM declaration lags the shipped implementation: `camera`
+ * is typed as the abstract `Camera` (no `near`/`far`) and `shaders` as
+ * `Map<unknown, string>` (the real value is the onBeforeCompile shader
+ * object, confirmed by reading node_modules/three/examples/jsm/csm/CSM.js
+ * directly — `shaders.set(material, shader)`). This local type patches both
+ * to match actual runtime behavior for the cast below.
+ */
+type CSMRuntime = Omit<CSM, 'camera' | 'shaders'> & {
+  camera: THREE.PerspectiveCamera;
+  shaders: Map<THREE.Material, THREE.WebGLProgramParametersWithUniforms | null>;
+};
 
 /** getAllRocks() has 10 entries today; sized with headroom (#458 A19.2). */
 const ROCK_SLOTS = 12;
@@ -180,5 +194,33 @@ export class TerrainMaterial extends THREE.MeshStandardMaterial {
         .replace('#include <color_fragment>', ALBEDO_GLSL);
     };
     this.customProgramCacheKey = () => 'terrain-material-v1';
+  }
+
+  /**
+   * Wires this material into a CSM instance for cascaded shadow sampling
+   * (#458 T5.1/D11). `CSM.setupMaterial()` sets `material.onBeforeCompile`
+   * itself — calling it directly would clobber the A19 shader above
+   * entirely. This replicates its two real effects (the USE_CSM/
+   * CSM_CASCADES defines, and the CSM_cascades/cameraNear/shadowFar
+   * uniforms CSMShader's injected lighting chunk reads) as an addition on
+   * top of the existing onBeforeCompile instead of a replacement.
+   */
+  attachCSM(csmIn: CSM): void {
+    const csm = csmIn as unknown as CSMRuntime;
+    this.defines = this.defines ?? {};
+    this.defines['USE_CSM'] = 1;
+    this.defines['CSM_CASCADES'] = csm.cascades;
+
+    const innerCompile = this.onBeforeCompile.bind(this);
+    const breaks: THREE.Vector2[] = [];
+    this.onBeforeCompile = (shader, renderer) => {
+      innerCompile(shader, renderer);
+      csm.getExtendedBreaks(breaks);
+      shader.uniforms['CSM_cascades'] = { value: breaks };
+      shader.uniforms['cameraNear'] = { value: csm.camera.near };
+      shader.uniforms['shadowFar'] = { value: Math.min(csm.camera.far, csm.maxFar) };
+      csm.shaders.set(this, shader);
+    };
+    this.needsUpdate = true;
   }
 }

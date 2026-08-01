@@ -314,6 +314,8 @@ export class TerrainMesh {
 
     const mesh = new THREE.Mesh(geometry, this.material);
     mesh.frustumCulled = true;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
     this.scene.add(mesh);
     this.chunks.set(key, mesh);
     return positions.length / 3;

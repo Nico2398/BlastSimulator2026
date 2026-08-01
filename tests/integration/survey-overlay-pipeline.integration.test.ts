@@ -19,18 +19,31 @@ import { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 function makeMockSceneManager() {
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera();
-  const sun = new THREE.DirectionalLight();
+  const sunLight = new THREE.DirectionalLight();
+  const fill = new THREE.DirectionalLight();
   const ambient = new THREE.AmbientLight();
   const cameraController = {
     setTarget: vi.fn(),
     frameSite: vi.fn(),
     update: vi.fn(),
   };
+  // Minimal fake CSM — attachCSM() reads .cascades synchronously; the rest
+  // only matters inside onBeforeCompile, which these Node-only tests never
+  // trigger a real WebGL compile to run (#458 T5.1).
+  const csm = {
+    cascades: 3,
+    maxFar: 1200,
+    camera,
+    getExtendedBreaks: () => {},
+    shaders: new Map(),
+  };
   return {
     scene,
     camera,
-    sun,
+    sunLight,
     ambient,
+    fill,
+    csm,
     cameraController,
     renderer: { render: vi.fn() } as unknown,
   };

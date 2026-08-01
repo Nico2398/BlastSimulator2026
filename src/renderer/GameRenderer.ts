@@ -424,11 +424,12 @@ export class GameRenderer {
     const grid = ctx.grid!;
     this.clearAll();
 
-    const { scene, sun, ambient } = this.sm;
+    const { scene, sunLight, ambient, fill, csm } = this.sm;
 
     // Terrain mesh (marching cubes)
     this.terrain = new TerrainMesh(scene, grid);
     this.terrain.buildAll();
+    this.terrain.sharedMaterial.attachCSM(csm);
 
     // Bind the grid before sampling terrain height below — buildings, vehicles,
     // and characters loaded from a save (not just a fresh new_game) need
@@ -457,7 +458,7 @@ export class GameRenderer {
     }
 
     // Weather sky
-    this.skybox = new SkyboxWeather(scene, sun, ambient);
+    this.skybox = new SkyboxWeather(scene, sunLight, ambient, fill);
 
     // Fragments (empty until blast runs) — shares terrain's material so a
     // fresh cut face matches the rock it broke off from (#458 T4.1/D9).

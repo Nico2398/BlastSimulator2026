@@ -9,11 +9,13 @@ import * as THREE from 'three';
 import type { WeatherState } from '../core/weather/WeatherCycle.js';
 
 // ---------- Sky colors per weather state ----------
-// Colors for: scene.background + scene.fog
+// Colors for: scene.background. THREE.Fog was removed in favour of the
+// aerial perspective post-process pass (#458 T5.1/D11); "skyLow" now only
+// feeds scene.background.
 
 interface WeatherColors {
   skyHigh: THREE.Color;  // upper sky
-  skyLow: THREE.Color;   // horizon / fog
+  skyLow: THREE.Color;   // horizon
   sunIntensity: number;  // directional light multiplier
   ambientIntensity: number;
 }
@@ -73,6 +75,19 @@ function buildRainStreakTexture(): THREE.DataTexture {
 // Lerp factor per second (0.5 = reaches ~63% in 2 seconds)
 const TRANSITION_SPEED = 0.5;
 
+/** Fill stays a fixed fraction of sun intensity — matches the original static 0.3/1.2 ratio (#458 T5.1). */
+const FILL_INTENSITY_RATIO = 0.25;
+
+/**
+ * Anything SkyboxWeather can drive the intensity of — a real DirectionalLight
+ * satisfies this structurally, but so does a proxy over CSM's cascade lights
+ * (#458 T5.1/D11: "give it a setter interface rather than reaching into
+ * sm.sun", since CSM has no single light to hand over directly).
+ */
+export interface SunLightSource {
+  intensity: number;
+}
+
 // ---------- Storm flash ----------
 const STORM_FLASH_INTERVAL_MIN = 3.0;  // seconds between lightning
 const STORM_FLASH_INTERVAL_MAX = 8.0;
@@ -82,8 +97,9 @@ const STORM_FLASH_DURATION = 0.08;     // seconds the flash lasts
 
 export class SkyboxWeather {
   private readonly scene: THREE.Scene;
-  private readonly sun: THREE.DirectionalLight;
+  private readonly sun: SunLightSource;
   private readonly ambient: THREE.AmbientLight;
+  private readonly fill: SunLightSource;
 
   private currentWeather: WeatherState = 'sunny';
   private readonly currentSky = new THREE.Color(WEATHER_COLORS.sunny.skyLow);
@@ -102,12 +118,14 @@ export class SkyboxWeather {
 
   constructor(
     scene: THREE.Scene,
-    sun: THREE.DirectionalLight,
+    sun: SunLightSource,
     ambient: THREE.AmbientLight,
+    fill: SunLightSource,
   ) {
     this.scene = scene;
     this.sun = sun;
     this.ambient = ambient;
+    this.fill = fill;
 
     // Pre-allocate rain positions
     this.rainPositions = new Float32Array(RAIN_PARTICLE_COUNT * 3);
@@ -129,6 +147,7 @@ export class SkyboxWeather {
       this.currentSky.copy(colors.skyLow);
       this.sun.intensity = colors.sunIntensity;
       this.ambient.intensity = colors.ambientIntensity;
+      this.fill.intensity = colors.sunIntensity * FILL_INTENSITY_RATIO;
     }
 
     const isRaining = state === 'light_rain' || state === 'heavy_rain' || state === 'storm';
@@ -157,13 +176,11 @@ export class SkyboxWeather {
     this.currentSky.lerp(target.skyLow, TRANSITION_SPEED * dt);
     this.scene.background = this.currentSky.clone();
 
-    if (this.scene.fog instanceof THREE.Fog) {
-      (this.scene.fog as THREE.Fog).color.copy(this.currentSky);
-    }
-
-    // Lerp sun / ambient
+    // Lerp sun / ambient / fill
     this.sun.intensity += (target.sunIntensity - this.sun.intensity) * TRANSITION_SPEED * dt;
     this.ambient.intensity += (target.ambientIntensity - this.ambient.intensity) * TRANSITION_SPEED * dt;
+    const targetFill = target.sunIntensity * FILL_INTENSITY_RATIO;
+    this.fill.intensity += (targetFill - this.fill.intensity) * TRANSITION_SPEED * dt;
 
     // Rain animation
     if (this.rainVisible) {
