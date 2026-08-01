@@ -288,6 +288,10 @@
         {
           "do": "click",
           "selector": "#bs-vehicle-panel .bs-vehicle-assign-btn"
+        },
+        {
+          "do": "letTimePass",
+          "ticks": 15
         }
       ],
       "expect": {

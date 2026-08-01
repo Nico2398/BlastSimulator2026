@@ -15,6 +15,7 @@ import { requestBoardVehicle } from '../../core/entities/VehicleBoarding.js';
 import { requestHaulFragment } from '../../core/economy/HaulingTask.js';
 import { addExpense } from '../../core/economy/Finance.js';
 import { SPAWN_RING_SIZE, SPAWN_TILE_SPACING } from '../../core/config/balance.js';
+import { NavGrid } from '../../core/nav/NavGrid.js';
 
 // ── tier arg parsing ──
 
@@ -71,8 +72,19 @@ export function vehicleCommand(
       const baseX = state.world ? state.world.sizeX / 2 : 32;
       const baseZ = state.world ? state.world.sizeZ / 2 : 32;
       const fleetIndex = state.vehicles.vehicles.length;
-      const spawnX = baseX + (fleetIndex % SPAWN_RING_SIZE) * SPAWN_TILE_SPACING;
-      const spawnZ = baseZ + Math.floor(fleetIndex / SPAWN_RING_SIZE) * SPAWN_TILE_SPACING;
+      const rawSpawnX = baseX + (fleetIndex % SPAWN_RING_SIZE) * SPAWN_TILE_SPACING;
+      const rawSpawnZ = baseZ + Math.floor(fleetIndex / SPAWN_RING_SIZE) * SPAWN_TILE_SPACING;
+      // A blast can clear the grid centre down to a floorless 'void' column,
+      // or wall off a pocket of "nearest" traversable tiles from the rest of
+      // the map entirely — #437 regression: driver boarding now walks to the
+      // vehicle instead of assigning instantly, and nothing can path onto an
+      // unreachable tile. Snap the spawn point to the nearest NavGrid cell
+      // that is actually path-connected to the map's main region (anchored
+      // at a corner, since blast sites are never placed on the map edge) so
+      // a freshly bought vehicle is always reachable on foot.
+      const { x: spawnX, z: spawnZ } = state.navGrid
+        ? NavGrid.findNearestReachableCell(state.navGrid, 0, 0, rawSpawnX, rawSpawnZ)
+        : { x: rawSpawnX, z: rawSpawnZ };
       const { vehicle, cost } = purchaseVehicle(state.vehicles, type, spawnX, spawnZ, tier);
       state.cash -= cost;
       addExpense(state.finances, cost, 'equipment', `Buy ${type}`, state.tickCount);
