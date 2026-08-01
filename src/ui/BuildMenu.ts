@@ -350,13 +350,13 @@ export class BuildMenu {
       'border-bottom:1px solid rgba(200,160,60,0.1)';
 
     const info = document.createElement('div');
-    info.style.cssText = 'flex:1;min-width:0;font-size:10px;color:#c0a060;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+    info.style.cssText = 'flex:1 1 50%;min-width:0;font-size:10px;color:#c0a060;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
     info.title = `${b.type} T${b.tier} at (${b.x},${b.z})`;
     info.textContent = `#${b.id} ${t(`building.${b.type}.t${b.tier}.name`)} (${b.x},${b.z})`;
 
     const moveBtn = document.createElement('button');
     moveBtn.className = 'bs-btn bs-build-move-btn';
-    moveBtn.style.cssText = 'padding:1px 5px;font-size:9px';
+    moveBtn.style.cssText = 'padding:1px 5px;font-size:9px;flex:0 1 auto;white-space:normal;min-width:0';
     moveBtn.textContent = t('ui.build.move');
     moveBtn.addEventListener('click', () => {
       this.tileSelect.open({
@@ -378,7 +378,7 @@ export class BuildMenu {
 
     const upgradeBtn = document.createElement('button');
     upgradeBtn.className = 'bs-btn bs-btn-primary bs-build-upgrade-btn';
-    upgradeBtn.style.cssText = 'padding:1px 5px;font-size:9px';
+    upgradeBtn.style.cssText = 'padding:1px 5px;font-size:9px;flex:0 1 auto;white-space:normal;min-width:0';
     upgradeBtn.textContent = t('ui.build.upgrade');
     upgradeBtn.disabled = nextTier === null;
     if (nextTier !== null) {
@@ -396,7 +396,7 @@ export class BuildMenu {
 
     const researchBtn = document.createElement('button');
     researchBtn.className = 'bs-btn bs-build-research-btn';
-    researchBtn.style.cssText = 'padding:1px 5px;font-size:9px';
+    researchBtn.style.cssText = 'padding:1px 5px;font-size:9px;flex:0 1 auto;white-space:normal;min-width:0';
     researchBtn.textContent = t('ui.build.queue_research_button');
     researchBtn.style.display = nextTier !== null && nextLocked && !nextQueued ? '' : 'none';
     researchBtn.addEventListener('click', () => {
@@ -405,7 +405,7 @@ export class BuildMenu {
 
     const demolishBtn = document.createElement('button');
     demolishBtn.className = 'bs-btn bs-build-demolish-btn';
-    demolishBtn.style.cssText = 'padding:1px 5px;font-size:9px;color:#ff6644';
+    demolishBtn.style.cssText = 'padding:1px 5px;font-size:9px;color:#ff6644;flex:0 1 auto;white-space:normal;min-width:0';
     demolishBtn.textContent = t('ui.build.demolish');
     demolishBtn.title = `$${def.demolishCost}`;
     demolishBtn.addEventListener('click', () => {
