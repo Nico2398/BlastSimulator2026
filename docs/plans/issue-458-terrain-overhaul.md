@@ -225,6 +225,7 @@ Composer order: `RenderPass → GTAOPass → AerialPerspectivePass (custom) → 
 ## 3. Execution phases and tasks
 
 Verification-channel key: `S` static, `L` logic, `Sc` scenario, `V` visual, `P` playability.
+**Every task's algorithmic detail lives in §7 — consult the mapping table in §7.0 before starting a task. Do not invent formulas, constants, or formats that §7 already fixes.**
 
 ### Phase 0 — Foundations (no visual change)
 
@@ -374,4 +375,609 @@ Building/vehicle/character restyling; gameplay balance changes beyond what scale
 
 ## 6. Defaulted decisions to surface in the PR
 
-D7 tile/extent numbers, D8 landscape-regenerated-not-stored, D13 exact level sizes and tile-overlay approach, T1.4 landmark picks, T7.3 ambient extras — all chosen by this plan or the executor under default-and-record; list them in the PR description for human review.
+D7 tile/extent numbers, D8 landscape-regenerated-not-stored, D13 exact level sizes and tile-overlay approach, T1.4 landmark picks, T7.3 ambient extras, §7 default constants — all chosen by this plan or the executor under default-and-record; list them in the PR description for human review.
+
+---
+
+## 7. Algorithm specifications
+
+These are prescriptive. Where a constant is given, use it as the starting value; tune only in the art pass (Phase 8) or where a task's acceptance criteria demand it, and record every change. Pseudocode is TypeScript-shaped; GLSL is literal.
+
+### 7.0 Task → spec mapping
+
+| Task | Specs |
+|---|---|
+| T0.1 | A7 (SoA grid), A8 (palette), A22 (integer keys) |
+| T0.2 | A9 (event payload + emission points) |
+| T0.3 | A10 (RLE save format) |
+| T1.1 | A1 (hash/sub-seeds), A2 (FBM fields), A3 (domain warp), A4 (height composition + splines + vertical datum), A5 (pit mask) |
+| T1.2 | A6 (biome selection + blending) |
+| T1.3 | A11 (strata), A12 (ore veins) |
+| T1.4 | A13 (structure overlay architecture), A14 (rivers), A15 (forests/villages/landmarks) |
+| T2.1 | A16 (landscape tiles + seam rule) |
+| T3.1 | A17 (chunked remesh + dirty-set math), A18 (vertex attributes) |
+| T3.2 | A16 |
+| T4.1 | A19 (terrain shader: noise GLSL, albedo, band, cloud shadow, injection points) |
+| T5.1 | A20 (composer wiring, CSM) |
+| T5.2 | A21 (aerial perspective + grade shader) |
+| T5.3 | A19.4 (band function — tuning only) |
+| T6.2 | A22 (typed-array A*/BFS), A23 (TerrainBody scoping) |
+| T7.1 | A24 (WindState), A25 (clouds + cloud shadows) |
+| T7.2 | A26 (birds, smoke, water, sway) |
+
+### A1 — Hash and sub-seed derivation
+
+New `src/core/math/Hash.ts`:
+
+```ts
+/** 32-bit avalanche hash (lowbias32). Deterministic, fast, well distributed. */
+export function hash32(x: number): number {
+  x = Math.imul(x ^ (x >>> 16), 0x7feb352d);
+  x = Math.imul(x ^ (x >>> 15), 0x846ca68b);
+  return (x ^ (x >>> 16)) >>> 0;
+}
+/** Combine a seed with a string label into a derived sub-seed. */
+export function subSeed(seed: number, label: string): number {
+  let h = seed >>> 0;
+  for (let i = 0; i < label.length; i++) h = hash32(h ^ label.charCodeAt(i));
+  return h;
+}
+/** 2D cell hash for jittered-grid placement. Returns [0,1). */
+export function cellRand(seed: number, cx: number, cz: number, salt: number): number {
+  return hash32(seed ^ Math.imul(cx, 0x9e3779b1) ^ Math.imul(cz, 0x85ebca77) ^ salt) / 4294967296;
+}
+```
+
+Every noise field is constructed as `createNoise2D(() => rng.next())` with `rng = new Random(subSeed(levelSeed, fieldLabel))`. One `Random` per field, never shared. Field labels are the exact strings in the A2 table — changing a label is a world-breaking change.
+
+### A2 — Noise fields (FBM)
+
+```ts
+/** Fractal Brownian motion over a simplex-noise 2D field. Output ~[-1, 1]. */
+function fbm2(noise: NoiseFunction2D, x: number, z: number, octaves: number,
+              baseFreq: number, gain = 0.5, lacunarity = 2.0): number {
+  let sum = 0, amp = 1, freq = baseFreq, norm = 0;
+  for (let o = 0; o < octaves; o++) {
+    sum += amp * noise(x * freq, z * freq);
+    norm += amp; amp *= gain; freq *= lacunarity;
+  }
+  return sum / norm;
+}
+/** Ridged variant: sharp crests. Output [0, 1]. */
+function ridged2(noise: NoiseFunction2D, x, z, octaves, baseFreq, gain = 0.5): number {
+  let sum = 0, amp = 1, freq = baseFreq, norm = 0;
+  for (let o = 0; o < octaves; o++) {
+    const n = 1 - Math.abs(noise(x * freq, z * freq)); // [0,1], crest at noise==0
+    sum += amp * n * n;
+    norm += amp; amp *= gain; freq *= lacunarity;
+  }
+  return sum / norm;
+}
+```
+
+Field table — **coordinates are always absolute world metres** (`worldX`, `worldZ`), never normalized by grid size:
+
+| Label | Kind | baseFreq | Octaves | Warped (A3)? | Range | Drives |
+|---|---|---|---|---|---|---|
+| `continentalness` | fbm2 | 1/800 | 4 | yes | [-1,1] | macro elevation |
+| `erosion` | fbm2 | 1/400 | 4 | yes | [-1,1] | relief multiplier |
+| `peaksValleys` | ridged2 | 1/150 | 5 | yes | [0,1] | ridges/hills |
+| `warpX` | fbm2 | 1/600 | 3 | no | [-1,1] | domain warp X |
+| `warpZ` | fbm2 | 1/600 | 3 | no | [-1,1] | domain warp Z |
+| `temperature` | fbm2 | 1/1200 | 3 | no | [-1,1] | biome climate |
+| `humidity` | fbm2 | 1/1100 | 3 | no | [-1,1] | biome climate |
+| `detail` | fbm2 | 1/24 | 3 | no | [-1,1] | metre-scale roughness |
+| `forest` | fbm2 | 1/90 | 3 | no | [-1,1] | forest density |
+| `riverSpring` | fbm2 | 1/300 | 2 | no | [-1,1] | spring candidacy |
+
+### A3 — Domain warp
+
+Applied to `continentalness`, `erosion`, `peaksValleys` only:
+
+```ts
+const WARP_AMPLITUDE = 120; // metres
+const wx = x + WARP_AMPLITUDE * fbm2(warpXNoise, x, z, 3, 1 / 600);
+const wz = z + WARP_AMPLITUDE * fbm2(warpZNoise, x, z, 3, 1 / 600);
+// then e.g. continentalness = fbm2(contNoise, wx, wz, 4, 1/800)
+```
+
+### A4 — Height composition, splines, vertical datum
+
+**Spline evaluation** — piecewise linear over sorted control points, clamped at both ends:
+
+```ts
+type Spline = ReadonlyArray<readonly [input: number, output: number]>;
+function evalSpline(s: Spline, t: number): number {
+  if (t <= s[0][0]) return s[0][1];
+  for (let i = 1; i < s.length; i++) {
+    if (t <= s[i][0]) {
+      const [t0, v0] = s[i - 1], [t1, v1] = s[i];
+      return v0 + ((t - t0) / (t1 - t0)) * (v1 - v0);
+    }
+  }
+  return s[s.length - 1][1];
+}
+```
+
+**Base splines** (biomes may override, see A6; these are the neutral defaults). Heights in world metres; sea level = 0:
+
+```ts
+const BASE_SPLINE: Spline    = [[-1, -10], [-0.4, 1], [0, 8], [0.4, 22], [0.7, 45], [1, 90]];   // continentalness → base height
+const RELIEF_SPLINE: Spline  = [[-1, 1.4], [-0.3, 1.0], [0.2, 0.55], [0.7, 0.25], [1, 0.12]];   // erosion → relief multiplier
+```
+
+**Height formula** (before structures, before pit mask):
+
+```
+c = continentalness(x, z)         // warped
+e = erosion(x, z)                 // warped
+pv = peaksValleys(x, z)           // warped, [0,1]
+base   = evalSpline(biome.baseSpline, c)
+relief = evalSpline(biome.reliefSpline, e)
+h = base + relief * biome.pvAmplitude * (pv - 0.35)    // pvAmplitude default 55 m
+  + 1.2 * detail(x, z)
+```
+
+`(pv - 0.35)` re-centres ridged noise so valleys can dip below `base`.
+
+**Vertical datum (world metres → voxel y).** Computed once at generation, stored on the grid/landscape metadata and reused by the renderer:
+
+```
+hCenter = h(playableCenterX, playableCenterZ)            // after pit mask, before structures
+groundOffset = floor(sizeY * 0.55) - Math.round(hCenter) // pit gets ~55% of sizeY as digging headroom below start surface
+surfaceYvox(x, z) = clamp(Math.round(h(x, z) + groundOffset), 1, sizeY - 1)
+```
+
+The landscape renders at `y = h + groundOffset` (float, no rounding) so elevations line up with the voxelized surface within ±0.5 — exactly the tolerance the boundary agreement test allows.
+
+### A5 — Pit-suitability mask
+
+Compresses relief inside the playable rect toward buildable terrain. Applied to `h` before structures:
+
+```ts
+const PIT_MASK_MARGIN = 24;      // metres of blend, measured inward from the playable edge
+const PIT_RELIEF_KEEP = 0.3;     // 30% of the original relief survives at full compression
+// dIn = distance from (x,z) to the nearest playable-rect edge, measured inward; negative outside.
+const w = smoothstep(0, PIT_MASK_MARGIN, dIn);            // 0 at edge, 1 deep inside
+const hRef = h(centerX, centerZ);                          // single sample, deterministic
+hMasked = lerp(h, hRef + (h - hRef) * PIT_RELIEF_KEEP, w);
+```
+
+`smoothstep(a, b, t) = s*s*(3-2*s)` with `s = clamp((t-a)/(b-a), 0, 1)` — add to `src/core/math/` if absent. Outside the rect `w = 0`: the landscape is untouched and continuous with the compressed interior through the 24 m blend band.
+
+### A6 — Biome selection and blending
+
+Climate space is `(temperature, humidity) ∈ [-1,1]²`. Each `BiomeDef` carries `climateCenter: [t, h]` and `climateRadius` (default 0.55). Per column:
+
+```ts
+// 1. Level climate override: bias climate inside/near the playable rect so the level lands in its intended biome.
+//    fade = smoothstep over 300 m outward from the playable rect edge (1 inside → 0 at 300 m out)
+t = clamp(tRaw + level.climateBias[0] * fade, -1, 1);
+h = clamp(hRaw + level.climateBias[1] * fade, -1, 1);
+
+// 2. Weights: quadratic falloff inside each biome's radius.
+wi = max(0, 1 - dist([t,h], biome_i.climateCenter) / biome_i.climateRadius) ** 2;
+// If all weights are 0, the nearest-center biome gets weight 1.
+// Normalize: wi /= Σw.
+
+// 3. NUMERIC params blend by weight: baseSpline/reliefSpline outputs, pvAmplitude, forestDensity,
+//    oreRichness, haze/grade params. (Blend the EVALUATED spline outputs, not control points.)
+// 4. CATEGORICAL params take argmax(wi): surface palette id, strata profile id, ambient set.
+```
+
+Blending evaluated-spline outputs keeps height continuous across biome boundaries; categorical snapping is acceptable because the numeric fields around it vary smoothly. Each `LevelDef` sets `climateBias` to the vector that lands its intended biome's climate center (e.g. `desert_badlands` center `[0.7, -0.6]` → tutorial bias picks up the difference from the raw fields at its seed — compute once at authoring, hardcode in the level).
+
+Initial biome climate centers (radius 0.55 each): `desert_badlands [0.7,-0.6]`, `red_canyon [0.5,-0.2]`, `alpine_granite [-0.7,0.1]`, `green_foothills [-0.1,0.4]`, `tropical_karst [0.6,0.7]`, `volcanic_flats [0.1,-0.8]`.
+
+### A7 — VoxelGrid SoA layout
+
+```ts
+class VoxelGrid {
+  static readonly CELL_SIZE = 1.0;
+  readonly sizeX: number; readonly sizeY: number; readonly sizeZ: number;
+  readonly id: number;                       // keep the identity counter — renderer rebind uses it
+  private readonly density: Uint8Array;      // 0 = air, 255 = solid; solid threshold: >= 128
+  private readonly compId: Uint16Array;      // palette index; 0 = reserved empty composition
+  private readonly fracture: Uint8Array;     // fractureModifier * 255, rounded
+  private readonly ores: Map<number, Record<string, number>>; // packedIndex → oreId → density
+  readonly palette: CompositionPalette;
+  // Index order UNCHANGED from today:
+  private idx(x: number, y: number, z: number) { return x + y * this.sizeX + z * this.sizeX * this.sizeY; }
+}
+```
+
+**New hot-path accessors** (no allocation): `densityAt(x,y,z): number` (0..1 as float, `raw/255`), `isSolidAt(x,y,z): boolean`, `dominantRockAt(x,y,z): string` (palette entry pre-computes its dominant rock at intern time — store `dominantRockId` on the palette entry), `compositionAt(x,y,z): VoxelRockComposition` (returns the **shared palette object — treat as immutable**), `oresAt(x,y,z): Record<string, number> | undefined`, `fractureAt(x,y,z): number`.
+
+**Mutators:** `fillVoxel(x,y,z, compId, ores?)`, `clearVoxelAt(x,y,z)` (density=0, compId=0, delete ores, fracture=255), `setFractureAt(x,y,z, f)`, `scaleFractureAt(x,y,z, factor)`.
+
+**Compatibility:** `getVoxel(x,y,z): VoxelData | undefined` materializes a **copy** (composition deep-copied from palette). It is read-only by contract now — **audit every existing `getVoxel` caller for mutation through the returned object** (the old API returned the live object). Known mutation sites to migrate: `BlastExecution.ts:221-224` (fracture scaling → `scaleFractureAt`), any `setVoxel(x,y,z, mutatedVoxel)` round-trip → `fillVoxel`/`setFractureAt`. `setVoxel(x,y,z, data: VoxelData)` survives as a shim that interns the composition and writes all fields (used by tests).
+
+**Iteration:** `forEachSolid(cb: (x,y,z, compId) => void)` and `forEachSolidInRegion(region, cb)` — plain loops inside the class over the typed arrays; consumers stop hand-rolling triple loops.
+
+**Surface-Y consolidation:** `computeVoxelColumnSurfaceY(grid, x, z)` stays the single canonical scan — top `y` with `density >= 0.5` (raw `>= 128`), returns `-1` if void. Migrate the divergent copies: `BuildingPlacement.getSurfaceY` and `SurveyCalc.getSurfaceY` return `y+1` today — their *call sites* expect "first air cell above ground"; migrate them to `computeVoxelColumnSurfaceY(...) + 1` explicitly so the convention difference is visible at the call site, then delete the local copies. `BlastExecution.getColumnSurfaceY`, `world.ts:172`, `GameRenderer.getTerrainSurfaceY`, `TerrainBody.findSurfaceY` likewise delegate.
+
+### A8 — Composition palette
+
+```ts
+class CompositionPalette {
+  private entries: Array<{ comp: VoxelRockComposition; dominantRockId: string }> = [
+    { comp: { rocks: [] }, dominantRockId: '' },   // index 0 = air/empty, reserved
+  ];
+  private keyToId = new Map<string, number>();
+  intern(comp: VoxelRockComposition): number {
+    // Quantize coefficients to 0.01, sort rocks by rockId, build key "cruite:0.62|sandite:0.38".
+    // Existing key → return id. New → push entry (compute dominantRockId once), return new id.
+  }
+  get(id: number) { return this.entries[id]; }
+  toJSON() / static fromJSON()               // arrays of {rocks:[{rockId,coefficient}]} — used by A10
+}
+```
+
+Quantization to 0.01 + strata (A11) generating layer-constant blends keeps palette cardinality small (expect < 2000 entries at level-4 size; `Uint16` gives 65535 headroom — assert `intern` never overflows).
+
+### A9 — Terrain event contract
+
+`GameEventMap` changes:
+
+```ts
+'terrain:updated': { region: { minX, minY, minZ, maxX, maxY, maxZ } };  // inclusive voxel coords, clamped to grid
+'blast:started':   { originX: number; originY: number; originZ: number };
+'blast:ended':     undefined;
+'fragment:created': { count: number };   // unchanged
+```
+
+Emission points (each exactly once per logical mutation, region = tight AABB of the voxels actually changed):
+
+| Mutator | Emit where |
+|---|---|
+| `executeBlast` | one `blast:started` before carving; one `terrain:updated` after all three passes (crack + clear + crater) with the union AABB; one `blast:ended` after fragments |
+| `drillHole` | after the hole's voxels are cleared |
+| `buildRamp` | after the carve band is cleared |
+| `regenerateGrid` | full-grid region after generation completes |
+
+The emitter lives on `GameContext.emitter` — mutators that don't currently receive it get it threaded as a parameter (core stays pure; the emitter is core-owned). Renderer subscription happens in `GameRenderer.loadGame` (subscribe) / `clearAll` (unsubscribe): `terrain:updated` → mark dirty chunks (A17) — **remove `main.ts:164-174` string matching in the same commit** so there is never a double path. NavGrid: the existing explicit `patchNavGrid` call sites stay (core→core, no event needed), but `patchNavGrid` gains a patch-local `maxSurfaceY` recomputation: scan the patch region columns; if any patched column's previous height equalled `navGrid.maxSurfaceY` and decreased, do one full `computeMaxSurfaceY` rescan (rare; correctness over cleverness).
+
+### A10 — Save v6 voxel serialization (RLE)
+
+JSON-embedded, byte-level RLE, base64. Format:
+
+```ts
+interface SerializedVoxels {
+  v: 6;
+  sizeX: number; sizeY: number; sizeZ: number;
+  palette: Array<{ rocks: Array<{ rockId: string; coefficient: number }> }>;  // index-aligned, entry 0 = empty
+  density: string;   // base64(rle(Uint8Array))
+  compId: string;    // base64(rle(new Uint8Array(compId.buffer)))  — little-endian u16 bytes
+  fracture: string;  // base64(rle(Uint8Array))
+  ores: Array<[packedIndex: number, Record<string, number>]>;      // sparse, sorted by index
+}
+```
+
+RLE codec (bytes → byte pairs):
+
+```ts
+function rleEncode(src: Uint8Array): Uint8Array {
+  // Emit (count, value) pairs; count 1..255. Long runs split into multiple pairs.
+  const out: number[] = [];
+  let i = 0;
+  while (i < src.length) {
+    let run = 1;
+    while (i + run < src.length && src[i + run] === src[i] && run < 255) run++;
+    out.push(run, src[i]); i += run;
+  }
+  return new Uint8Array(out);
+}
+// rleDecode is the inverse; total decoded length must equal sizeX*sizeY*sizeZ (×2 for compId) — else corrupt save → Result error, not throw.
+```
+
+Base64 without DOM (core purity — no `btoa`): implement a small pure base64 encoder/decoder in `src/core/state/Base64.ts` (standard alphabet, no padding tricks). `serialize` embeds `SerializedVoxels` under `state.world.voxels`; `deserialize` v6 rebuilds the `VoxelGrid` from it (grid still constructed by `regenerateGrid`'s funnel — pass the serialized payload down so the funnel either regenerates (v5, no payload) or restores (v6)). NavGrid: add `navGrid` to a `JSON.stringify` replacer skip-list (serialize as `null`); rebuild via `buildGameNavGrid` on every load path.
+
+### A11 — Strata (depth-layered rock)
+
+Each biome references a `strataProfileId`. A profile is an ordered top-down layer list:
+
+```ts
+interface StratumDef {
+  blend: Array<{ rockId: string; coefficient: number }>;  // the composition for this layer (pre-normalized)
+  meanThickness: number;      // metres
+  thicknessVariance: number;  // metres, driven by noise
+}
+```
+
+Default profile shape (per biome, 4-6 layers): topsoil (1-2 m, tier-1 rocks) → overburden (3-6 m, tier-1/2) → bedded (8-20 m, tier-2/3) → deep (rest, tier-3/4/5 per biome). `mixedRockHardness: true` swaps in a variant profile alternating tier-1 and tier-5 layers of 4-6 m.
+
+Per column, layer boundaries:
+
+```
+tiltNoise = fbm2(strataNoise_i, x, z, 2, 1/120)          // one sub-seeded field per layer index i
+boundaryDepth_i = boundaryDepth_{i-1} + max(0.5, layer_i.meanThickness + layer_i.thicknessVariance * tiltNoise)
+```
+
+Voxel at depth `d = surfaceY - y` (metres below surface) belongs to the layer whose `[boundaryDepth_{i-1}, boundaryDepth_i)` contains `d`. **Boundary perturbation** so blast cross-sections don't show flat bands: add `1.5 * noise3d(strataWarp, x*0.06, y*0.06, z*0.06)` to `d` before the lookup (one shared sub-seeded 3D field). Within ±0.75 m of a boundary, blend the two layers' compositions linearly by distance (produces intermediate palette entries — this is where palette cardinality comes from; the quantization in A8 caps it).
+
+### A12 — Ore veins
+
+Per ore, one sub-seeded 3D field (`subSeed(levelSeed, 'ore:' + oreId)`), **anisotropic** to elongate veins along strike:
+
+```ts
+// Strike direction per ore per level: angle = cellRand(levelSeed, 0, 0, hash of oreId) * 2π
+// Rotate (x,z) into strike space: (u, v) = rotate(x, z, -angle)
+n = 1 - Math.abs(noise3d(u * 0.015, y * 0.10, v * 0.10));  // ridged; freq along strike 6.7× lower → elongated
+inWindow = ore.depthMin <= d && d <= ore.depthMax;          // depth window per ore (add to OreCatalog: e.g. dirtite 0-8 m, treranium 30+ m)
+affinity = hostRockAffinity(compositionAt(x,y,z), ore);     // Σ coefficient_i * rock_i.oreProbabilities[oreId]
+threshold = 1 - affinity * biome.oreRichness * 0.9;
+if (inWindow && n > threshold) oreDensity = min(1, (n - threshold) * 4);
+```
+
+Store when `oreDensity > 0.05` (sparse map stays sparse). This replaces the shared-field hash-offset scheme and honours the composition weighting the old doc-comment promised.
+
+### A13 — Structure overlay architecture
+
+`WorldGen` output must stay a pure deterministic function of `(levelSeed, x, z)`. Structures modify heights, so they are computed **once** at world build into a `StructureSet`, then applied as bounded overlays during sampling:
+
+```ts
+interface HeightOverlay {
+  bounds: { minX, minZ, maxX, maxZ };          // support region, metres
+  apply(x, z, h): number;                       // pure; returns modified height
+}
+interface StructureSet {
+  overlays: HeightOverlay[];                    // ordered: rivers → landmarks → village pads
+  spatialIndex: Map<number, number[]>;          // coarse 128 m cell → overlay indices (packed key)
+  rivers: RiverPath[]; villages: Village[]; trees: TreePoint[]; landmarks: Landmark[];
+}
+// sampleColumn(x, z): h = baseHeight(x, z) [A4, A5] → for each overlay whose bounds contain (x,z), h = overlay.apply(x, z, h)
+```
+
+Build order is fixed: (1) rivers trace on the **base** height field; (2) landmarks; (3) village pads (flattening) — later overlays see earlier ones' effects only through `apply` chaining, which the fixed order makes deterministic. Trees and house placement run **after** all overlays, sampling final heights.
+
+### A14 — Rivers
+
+All on a coarse 8 m grid over the landscape extent, using base heights (pre-overlay):
+
+1. **Springs:** jittered-grid candidates, cell 400 m: point = cell corner + `(cellRand(..,1), cellRand(..,2)) * 400`. Keep if `h > 35` and `fbm2(riverSpringNoise, x, z, 2, 1/300) > 0.3`. Cap: 6 springs per world, highest-h first.
+2. **Trace:** from spring, step to the lowest of the 8 neighbours (8 m step). Stop when: `h < 0.5` (reached sea level), or no neighbour is lower (local minimum → place a **lake**: disc, radius `20 + 20 * cellRand`, water surface at min height + 0.5), or the path leaves the landscape extent, or 2000 steps.
+3. **Playable exclusion (default-and-record):** if any traced point enters the playable rect expanded by 32 m, **discard the whole river** (no deflection logic — simplicity wins; rivers are landscape-only like villages).
+4. **Smooth:** 2 iterations of Chaikin corner cutting on the point list.
+5. **Carve overlay:** width `W(s) = 3 + 5 * s` (s = normalized arc position 0→1), depth `D(s) = 1.5 + 1.5 * s`. For a column at distance `dist` from the nearest path segment (`dist < W`): `h -= D * (1 - (dist/W)²)`. Water surface per segment = carved bed at centreline + 1.0 m, monotonically non-increasing downstream (clamp each segment's water level to ≤ previous).
+6. Store `RiverPath { points, widths, waterLevels }` in `StructureSet` for the renderer's `WaterSurface` (A26).
+
+### A15 — Forests, villages, landmarks
+
+**Forests** (after overlays): jittered grid, cell 6 m. Tree at cell point if all: outside playable rect + 8 m; `slope < 0.55 rad` (slope from central differences at 4 m); not within any river `W + 3 m` or lake or village pad; `cellRand(seed, cx, cz, FOREST_SALT) < density` where `density = biome.forestDensity * clamp(fbm2(forestNoise, x, z, 3, 1/90) * 0.5 + 0.5, 0, 1)`. Store `TreePoint { x, z, h, scale: 0.7 + 0.6 * cellRand, variant: floor(3 * cellRand) }`. Expected count order: 5-20 k points — renderer instances them (A26).
+
+**Villages:** jittered grid, cell 600 m. Candidate per cell; **hard reject** if inside playable rect + 100 m (this is the invariant under test — 1000-seed property test lives here). Score = `2 * flatness + riverBonus` where `flatness = 1 - clamp(slope16m / 0.15, 0, 1)` (slope over a 16 m window) and `riverBonus = 1` if a river/lake is within 120 m. Accept `score > 1.2` and `2 < h < 40`. Cap 5 villages. Per village: pad overlay (radius 40 m, `h → lerp(h, hCenter, smoothstep(40, 15, r))`), then 5-12 houses on a jittered ring at 10-30 m from centre, each `House { x, z, rotation, w: 4-6, d: 5-8, h: 3-4, hasChimney: cellRand < 0.8 }`, skipping house sites where local slope after padding > 0.1. Houses are **renderer geometry** (boxes + triangular-prism roofs from these params); core stores only the data.
+
+**Landmarks** (2 per world, ≥ 400 m from playable rect, ≥ 500 m apart, picked by seeded choice from the implemented set — start with these two):
+
+- **Mesa:** radius `R = 60 + 40 * cellRand`, plateau at `hBase + 25`: `h → lerp(h, plateau, smoothstep(R, R * 0.7, r))` — steep smoothstep rim reads as cliffs.
+- **Crater lake:** radius `R = 50 + 30 * cellRand`: rim raise `+8 * smoothstep(R, R*0.75, r) * smoothstep(R*0.45, R*0.6, r)`, inner bowl `-10 * smoothstep(R*0.6, 0, r)`, water disc at `hBase - 2`.
+
+### A16 — Landscape tiles and the seam rule
+
+Tile layout (all in world metres, playable rect at `[0..sizeX]×[0..sizeZ]`):
+
+```
+extentHalf = 1600 (from playable centre)
+TILE_SPAN = 512, COARSE_STEP = 4      → 129×129 samples per tile (fence-post: span/step + 1)
+FINE_STEP = 1                          → only for the skirt band (below)
+Tiles on a grid aligned to playable centre; skip any tile whose entire span lies inside the playable rect.
+```
+
+Per sample: `height` (world h + groundOffset, float), `biomeId` (argmax, Uint8), `surfCompId` (palette id of the surface stratum, Uint16 — interned into the same palette as the grid so shader rock indices agree).
+
+**Seam rule (renderer, T3.2):** the landscape mesh is built for all samples whose position is **outside** the playable rect, **plus a 2 m overlap strip inside it**, with the overlap strip's vertices lowered by `0.15 m`. The marching-cubes surface therefore always covers the landscape in the overlap zone; no gap can open regardless of voxelization rounding, and the boundary band shader (A19.4) sits exactly over the junction. Within 24 m of the playable rect, tiles subdivide to `FINE_STEP = 1` (matching voxel resolution) so silhouette density matches across the seam. Tile geometry: indexed grid, smooth normals from central differences of the height samples. One `Mesh` per tile, all sharing the terrain material.
+
+### A17 — Chunked remesh
+
+Chunk coordinates: `cx = floor(x / 16)` etc. `TerrainMesh` holds `Map<number, ChunkMesh>` keyed `cx + cy * NCX + cz * NCX * NCY`.
+
+**Dirty-set math** for `terrain:updated { region }` — marching a cube at `(x,y,z)` reads corners up to `(x+1,y+1,z+1)`, so a changed voxel at `v` affects cubes from `v-1` to `v`:
+
+```
+cxMin = floor((region.minX - 1) / 16), cxMax = floor(region.maxX / 16)   // same for y, z; clamp to grid
+```
+
+Re-march exactly those chunks: dispose the chunk's old `BufferGeometry`, march its 16³ cells (cells at the chunk's high edge read into the neighbour chunk's voxels — reads only, so no ordering constraint), build a new geometry, keep the shared material. Full rebuild (`buildAll`) only on grid identity change (`grid.id`). Empty chunks (no triangles) store `null` and add no mesh. Per-chunk `frustumCulled = true` (chunks are small — this is a free win over the old single mesh).
+
+### A18 — Marching-cubes vertex attributes
+
+At each emitted vertex (from `interpVertex` between corner `p1` and corner `p2` with interpolant `t`):
+
+```
+aRockA  = rockIndexOf(dominantRockAt(p1))   // float; index into the shader's rock uniform table
+aRockB  = rockIndexOf(dominantRockAt(p2))
+aRockW  = t                                  // 0 → pure A, 1 → pure B
+aOreId  = index of the highest-density ore at the nearer corner (t < 0.5 ? p1 : p2), or -1 if none
+aOreAmt = that ore's density (0 if none)
+```
+
+`rockIndexOf`: fixed table = `getAllRocks()` order (10 entries today; shader arrays sized 12 for headroom). Air corners (`dominantRockAt === ''`) inherit the other corner's rock. The landscape mesher emits the same attributes from `surfCompId` (A = B = surface rock, W = 0, ore none). `FragmentMesh` supplies them as per-instance attributes (`InstancedBufferAttribute`) from the fragment's source voxel.
+
+### A19 — Terrain shader (TerrainMaterial)
+
+Base `MeshStandardMaterial({ roughness: 0.9, metalness: 0.0 })`; all customization via `onBeforeCompile`. **No triplanar projection is needed**: detail comes from *solid 3D noise* evaluated at the world position, which is UV-free and correct on arbitrary cut faces by construction (this satisfies the issue's intent; note it in code comments). Normal-based blending is still used for a top-surface tint.
+
+**A19.1 — GLSL noise library** (injected into `#include <common>` of the fragment shader):
+
+```glsl
+float hash13(vec3 p){ p = fract(p * 0.1031); p += dot(p, p.yzx + 33.33); return fract((p.x + p.y) * p.z); }
+float vnoise(vec3 p){
+  vec3 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(
+    mix(mix(hash13(i), hash13(i+vec3(1,0,0)), f.x), mix(hash13(i+vec3(0,1,0)), hash13(i+vec3(1,1,0)), f.x), f.y),
+    mix(mix(hash13(i+vec3(0,0,1)), hash13(i+vec3(1,0,1)), f.x), mix(hash13(i+vec3(0,1,1)), hash13(i+vec3(1,1,1)), f.x), f.y),
+    f.z);
+}
+float fbm3(vec3 p){ return (vnoise(p) * 0.5 + vnoise(p * 2.03) * 0.3 + vnoise(p * 4.09) * 0.2); }  // [0,1]
+```
+
+**A19.2 — Uniforms and attributes:**
+
+```glsl
+uniform vec3 uRockColor[12];      // linear-space albedo per rock (from RockCatalog visual params)
+uniform vec4 uRockParams[12];     // x: macroFreq (default 0.05), y: detailFreq (0.35), z: veinStrength (0-0.5), w: contrast (0-0.6)
+uniform vec4 uPlayRect;           // minX, minZ, maxX, maxZ
+uniform vec2 uCloudOffset;        // accumulated wind scroll (A25)
+uniform float uCloudCoverage;     // 0-1 from weather
+uniform float uBandStrength;      // default 0.35
+attribute float aRockA, aRockB, aRockW, aOreId, aOreAmt;   // declared in vertexShader; passed as flat-ish varyings
+varying vec3 vWorldPos;           // assigned in <begin_vertex> via modelMatrix
+```
+
+**A19.3 — Albedo** (replaces `#include <color_fragment>`):
+
+```glsl
+int ra = int(vRockA + 0.5); int rb = int(vRockB + 0.5);
+vec3 base = mix(uRockColor[ra], uRockColor[rb], vRockW);
+vec4 pa = mix(uRockParams[ra], uRockParams[rb], vRockW);
+float macro = fbm3(vWorldPos * pa.x) - 0.5;                     // ±0.5
+float detail = fbm3(vWorldPos * pa.y) - 0.5;
+float vein = max(0.0, 1.0 - abs(vnoise(vWorldPos * 0.13) - 0.5) * 8.0);   // thin sheets
+float b = macro * pa.w + detail * 0.25 - vein * pa.z;
+vec3 col = clamp(base * (1.0 + vec3(b, b * 0.92, b * 0.85)), 0.0, 1.0);   // warm-biased like the CPU version
+// Ore sparkle: tint toward the ore color scaled by amount and a high-freq mask.
+if (vOreId >= 0.0) col = mix(col, uOreColor[int(vOreId + 0.5)], vOreAmt * 0.35 * step(0.72, vnoise(vWorldPos * 3.1)));
+// Top tint (landscape grass/sand cap): geometryNormal.y-weighted blend toward the biome surface tint (uniform), playable zone excluded via uBandStrength path if desired — start simple: apply everywhere, weight = smoothstep(0.75, 0.95, normal.y) * uTopTintStrength.
+diffuseColor.rgb = col * cloudShadow(vWorldPos.xz) * boundaryBand(vWorldPos.xz);
+```
+
+**A19.4 — Boundary band:**
+
+```glsl
+float boundaryBand(vec2 p){
+  vec2 dmin = uPlayRect.xy - p, dmax = p - uPlayRect.zw;
+  float dOut = length(max(max(dmin, dmax), 0.0));        // 0 inside rect, metres outside
+  float band = smoothstep(0.0, 0.5, dOut) * (1.0 - smoothstep(2.5, 5.0, dOut));
+  return 1.0 - uBandStrength * band;                      // dark ring ~0.5-5 m outside the edge, normal beyond
+}
+```
+
+**A19.5 — Cloud shadow:**
+
+```glsl
+float cloudShadow(vec2 p){
+  float c = fbm3(vec3((p + uCloudOffset) * 0.004, 17.0));
+  return 1.0 - 0.25 * uCloudCoverage * smoothstep(0.55, 0.75, c);
+}
+```
+
+**Injection mechanics** (spell out for the executor): in `onBeforeCompile(shader)`, string-replace: vertexShader `#include <common>` → itself + attribute/varying declarations; `#include <begin_vertex>` → itself + varying assignments (`vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;` — terrain meshes have identity model matrices but keep it correct for fragments). fragmentShader `#include <common>` → itself + noise lib + uniforms + varyings; `#include <color_fragment>` → the A19.3 block. Copy uniform objects into `shader.uniforms` and keep references on the material instance for per-frame updates (`uCloudOffset`, `uCloudCoverage`). `customProgramCacheKey` returns a constant string. **Construct-time rule:** nothing here touches DOM/WebGL — `onBeforeCompile` only runs at first render, so the material is Node-test safe; add a unit test that constructs `TerrainMaterial` and asserts the uniform table matches `getAllRocks()` order.
+
+### A20 — Composer and shadows
+
+```ts
+// src/renderer/post/PostPipeline.ts
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
+import { SMAAPass } from 'three/examples/jsm/postprocessing/SMAAPass.js';
+
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;            // tune in art pass
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const gtao = new GTAOPass(scene, camera, w, h);  // defaults first; radius ≈ 2.5, tune in art pass
+composer.addPass(gtao);
+composer.addPass(aerialPass);                    // A21 — before tonemapping (works in linear HDR-ish space)
+const bloom = new UnrealBloomPass(new THREE.Vector2(w, h), 0.25, 0.6, 0.9); // strength LOW, threshold HIGH
+composer.addPass(bloom);
+composer.addPass(new OutputPass());              // tonemapping + sRGB conversion happens HERE
+composer.addPass(new SMAAPass(w * dpr, h * dpr)); // AA on final LDR output
+```
+
+`SceneManager.start` loop: `composer.render()` replaces `renderer.render(...)`; keep `gl.finish()` immediately after. `onResize`: `composer.setSize(w, h)` + `gtao.setSize` + SMAA re-size; re-apply `setPixelRatio`. Remove `antialias: true` from the `WebGLRenderer` options (useless behind a render target) and remove `scene.fog`.
+
+**Shadows (CSM):** `three/examples/jsm/csm/CSM.js` — `new CSM({ maxFar: 1200, cascades: 3, mode: 'practical', parent: scene, shadowMapSize: 2048, lightDirection, camera })`; `csm.setupMaterial(terrainMaterial)` and on other lit materials; `csm.update()` per frame after camera update. The existing `sun` DirectionalLight is retired in favour of CSM's lights; `SkyboxWeather` drives CSM light intensity/color instead (give it a setter interface rather than reaching into `sm.sun`). The anonymous fill light becomes `readonly fill` on `SceneManager`, weather-modulated. If CSM fights `onBeforeCompile` (both patch shaders — CSM must be set up **before** the material's first render; verify visually), fall back to a single `DirectionalLight` shadow with a camera-following ortho frustum sized to 1.5× the view span — record whichever ships.
+
+### A21 — Aerial perspective + grade pass
+
+Full-screen `ShaderMaterial` pass (extend three's `Pass`; read `tDiffuse` + `tDepth` — enable `RenderPass` depth texture or use `composer.readBuffer.depthTexture`):
+
+```glsl
+uniform sampler2D tDiffuse, tDepth;
+uniform mat4 uProjInv, uViewInv;
+uniform vec3 uHazeColor;         // per-biome, weather-lerped
+uniform float uDensity;          // 0.0016
+uniform float uHeightRef;        // ground mean world-y (groundOffset + hCenter)
+uniform float uHeightFalloff;    // 60
+uniform float uNearStart;        // 150 — pit stays haze-free
+uniform vec3 uLift; uniform vec3 uGain; uniform float uGamma;   // per-biome grade
+void main(){
+  vec4 col = texture2D(tDiffuse, vUv);
+  float depth = texture2D(tDepth, vUv).x;
+  if (depth >= 1.0) { gl_FragColor = grade(col); return; }        // sky: grade only, no haze
+  vec4 clip = vec4(vUv * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
+  vec4 view = uProjInv * clip; view /= view.w;
+  vec3 world = (uViewInv * view).xyz;
+  float dist = length(view.xyz);
+  float density = uDensity * exp(-max(world.y - uHeightRef, 0.0) / uHeightFalloff);  // thick in valleys, thin on peaks
+  float f = 1.0 - exp(-density * max(dist - uNearStart, 0.0));
+  f = min(f, 0.85);                                               // never fully swallow the horizon
+  vec3 desat = mix(col.rgb, vec3(dot(col.rgb, vec3(0.299, 0.587, 0.114))), f * 0.5);
+  vec3 hazed = mix(desat, uHazeColor, f);
+  gl_FragColor = grade(vec4(hazed, 1.0));
+}
+vec4 grade(vec4 c){ return vec4(pow(c.rgb, vec3(uGamma)) * uGain + uLift, c.a); }
+```
+
+Per-biome grade defaults: `desert_badlands` gamma 0.96 gain (1.05,1.0,0.92) lift (0.02,0.01,0.0); `alpine` gamma 1.0 gain (0.96,1.0,1.06); `tropical` gamma 0.94 gain (0.98,1.04,0.98); `volcanic` gamma 1.02 gain (1.0,0.96,0.94) — starting points for the art pass. Haze color lerps with weather (sunny: sky-tinted warm; storm: grey). The band (A19.4) is applied in the terrain material *before* haze, so it fades with distance like real shading — that is the intended behaviour (the band matters up close where the player acts).
+
+### A22 — Typed-array pathfinding and reachability
+
+- **A\*** (`Pathfinding.ts`): replace string-keyed maps with flat arrays over `width*height` cells: `gScore: Float64Array`, `cameFrom: Int32Array` (packed cell index, -1 none), `state: Uint8Array` (0 unvisited / 1 open / 2 closed), plus a **generation counter trick** to avoid reallocation: `stamp: Int32Array` + `currentStamp++` per search; a cell is initialized iff `stamp[i] === currentStamp`. Arrays live on a module-level scratch object sized to the largest grid seen (grow-only). Binary-heap open list keyed by `f` (replace array-scan if that's what exists — check first). Budget: `PATHFINDING_NODE_BUDGET_CAP = max(500, Math.floor(gridX * gridZ / 8))` computed where the cap is applied (balance.ts exports the formula's constants, not the product).
+- **Reachability BFS** (`NavGridReachability.ts`): `Uint8Array` visited + `Int32Array` ring-buffer queue, packed indices; result set exposed as the same `Set<string>` API if callers depend on it (check `HaulingTask.ts:152` and hire/buy call sites — if they only membership-test, expose a `has(x,z)` wrapper over the typed array instead and migrate).
+- `Survey.ts` `surveyedPositions` stays string-keyed (serialized, human-readable, low-frequency) — record as deliberate.
+
+### A23 — TerrainBody scoping
+
+`TerrainBody.build(grid, region)` takes the blast AABB expanded by `2 * BLAST_ZONE_RADIUS` (clamped to grid) and creates static bodies only for columns in that region (same two-surface-layer scheme as today). Call site: physics setup for a blast already knows the blast plan's AABB — thread it through. Assert body count ≤ region area in the unit test; the whole-grid path is deleted.
+
+### A24 — WindState
+
+```ts
+// src/renderer/ambient/WindState.ts — pure math, Node-testable.
+const TARGET_SPEED: Record<WeatherState, number> = {
+  sunny: 0.15, cloudy: 0.3, light_rain: 0.45, heavy_rain: 0.65, storm: 1.0, heat_wave: 0.1, cold_snap: 0.35,
+};
+class WindState {
+  constructor(seed: number) { this.baseAngle = cellRand(seed, 0, 0, WIND_SALT) * Math.PI * 2; this.p1 = ...; this.p2 = ...; } // seeded phases
+  update(dt: number, weather: WeatherState): void {
+    this.time += dt;
+    const targetSpeed = TARGET_SPEED[weather];
+    this.speed += (targetSpeed - this.speed) * Math.min(1, 0.1 * dt);          // ~10 s convergence
+    this.angle = this.baseAngle + 0.35 * Math.sin(this.time * 0.005 + this.p1)
+                                + 0.15 * Math.sin(this.time * 0.013 + this.p2); // slow coherent wander
+  }
+  get vector(): { x: number; z: number } { return { x: Math.cos(this.angle) * this.speed, z: Math.sin(this.angle) * this.speed }; }
+}
+```
+
+Owned by `GameRenderer`; updated each frame from `ctx.weatherCycle.current`; every ambient module and the terrain material's `uCloudOffset` accumulator read `windState.vector`. **One instance, one truth.**
+
+### A25 — Clouds and cloud shadows
+
+- Geometry: 5 pre-merged cluster variants (3-7 stretched icospheres/boxes each, flat-shaded, built procedurally — no DOM), one `InstancedMesh` per variant, `MeshStandardMaterial({ transparent: true, opacity: 0.9, depthWrite: false })` in a warm white; `castShadow = false` (shadows come from the shader term, cheaper and art-directable).
+- Placement: 40 instances in a 2000 m-radius disc around the playable centre, `y = 180 + 80 * cellRand`, seeded scale 30-90 m.
+- Drift: `pos += windVector * 18 * dt` (18 m/s at speed 1); wrap: an instance leaving the disc re-enters at the antipode with a new seeded lateral offset.
+- Coverage per weather (drives instance visible-count and `uCloudCoverage`): sunny 0.25, cloudy 0.7, rain states 0.9, storm 1.0 (also darken cloud material color), heat_wave 0.08, cold_snap 0.5. Lerp coverage at the same rate SkyboxWeather lerps sky color.
+- **Shadow sync:** CPU accumulates `uCloudOffset += windVector * 18 * dt * SHADOW_PARALLAX` with `SHADOW_PARALLAX = 1.0` — the shader FBM (A19.5) scrolls with the same velocity as the meshes, so shadow patches and clouds move together (they need not align 1:1 spatially; coherent motion is what sells it).
+- Gradient sky: replace flat `scene.background` with a `SphereGeometry(3000)` backside dome, 2-stop gradient shader (`skyLow` at horizon → `skyHigh` at zenith — finally using the dormant `skyHigh` values); `SkyboxWeather` keeps lerping both colors. The dome material is a tiny `ShaderMaterial` (fog/lights off) — construct-safe under Node.
+
+### A26 — Birds, smoke, water, vegetation
+
+- **Birds:** one `InstancedMesh` (cone + two flattened-box wings merged, ~30 tris), 6 flocks × 12. Flock path: seeded circle (centre in landscape zone, radius 80-200 m, height 60-120 m, angular speed `0.05-0.1 rad/s`, seeded direction). Bird `i`: `pos = centre + R(cos, 0, sin)(a + i * 0.12) + vec3(0, 1.5 * sin(t * 2 + i), 0)`; heading = path tangent; wing flap = instance scale.y oscillation `1 ± 0.4 * sin(t * 9 + i)`. **Blast scatter:** on `blast:started`, flocks whose centre is within 250 m of the origin get `scatter = 1`, decaying over 4 s; while scattering, radius ×= 1 + scatter, speed ×= 1 + 2*scatter, birds gain outward offset.
+- **Chimney smoke:** per chimneyed house, 4 recycled billboard quads (one shared `PlaneGeometry`, `InstancedMesh` across all chimneys, additive-free normal blending, soft round alpha from a `DataTexture` radial ramp). Puff lifecycle (period 6 s, phase-offset per chimney by `cellRand`): `t01 = (t + phase) mod 6 / 6`; `pos = chimneyTop + vec3(0, 8, 0) * t01 + windVector * 6 * t01 * t01`; scale `0.6 + 2.4 * t01`; opacity `0.5 * (1 - t01)`. Camera-facing via instanced quads oriented in the vertex shader (billboard) or per-frame lookAt on a small count — at < 200 instances either is fine; prefer the shader billboard.
+- **Water:** river/lake surfaces from `StructureSet` — triangulated strips along `RiverPath` (width `W(s)`, y = waterLevel + groundOffset) and lake discs. `MeshStandardMaterial` base color per biome, `onBeforeCompile`: scroll a 2-octave `vnoise` normal perturbation along the path direction at `0.4 m/s + windVector * 0.2`; sparkle = `step(0.97, vnoise(p * 8 + t))` added to emissive; foam: vertex color painted white within 1 m of banks (computed at build), slight opacity pulse.
+- **Vegetation:** trees = 3 merged low-poly variants (cone canopy + cylinder trunk), one `InstancedMesh` per variant fed from `TreePoint`s (5-20 k instances — cap draw distance at 900 m by building only tiles within range; static, no per-frame CPU updates). Sway in the vertex shader (`onBeforeCompile`): `transformed.xz += windVector * pow(max(position.y, 0.0) / canopyHeight, 2.0) * 0.4 * sin(uTime * 1.7 + instanceWorldX * 0.35)` — bend scales with height², phase varies per tree via world X. Grass: star-crossed quad patches (2 quads) instanced near the playable rim (within 60 m outside the rect), same sway uniform, ~2 k instances.
+- Uniform plumbing: a single shared `uniform` object `{ uTime, uWind: Vector2 }` created by `GameRenderer`, passed by reference into every ambient material's `onBeforeCompile` uniforms — one update per frame updates all.
+
+### A27 — Determinism guardrails (applies everywhere)
+
+- `Math.random()` allowed **only** in `src/renderer/` for transient jitter that never affects placement (e.g. lightning timing). All *placement* (clouds, flocks, trees, houses, smoke phases) uses `cellRand`/`subSeed` from the level seed — required by the issue ("seeded and stable") and by screenshot-based visual tests.
+- Pin `simplex-noise` to an exact version in `package.json` during T1.1.
+- Renderer ambient modules must construct without DOM/WebGL (Node tests): geometry from primitives, textures only as `DataTexture`, shaders as strings. Test each new module with a bare `new X(scene, seed)` construction test.
