@@ -6,6 +6,10 @@ import type { CommandResult } from '../ConsoleRunner.js';
 import type { GameContext } from './world.js';
 import {
   queueResearchTask,
+  hasActiveResearchCenter,
+  isTierUnlocked,
+  isResearchQueued,
+  getUnmetConditions,
   getAllBuildingTypes,
   type BuildingType,
 } from '../../core/entities/Building.js';
@@ -49,49 +53,62 @@ export function researchCommand(
       }
       const tier = tierNum as 2 | 3;
 
-      // TODO(implementer): precedence between no_research_center,
-      // already_unlocked, already_queued, conditions_not_met, and
-      // insufficient_funds is decided inside queueResearchTask; this handler
-      // only needs to relay whatever `code` comes back.
-      const result = queueResearchTask(state.buildings, type, tier);
-      if (!result.success) {
-        const def = getResearchTaskDef(type, tier);
-        switch (result.code) {
-          case 'no_research_center':
-            return {
-              success: false,
-              code: 'no_research_center',
-              output: `A Research Center is required before queueing tier ${tier} ${type}.`,
-            };
-          case 'already_unlocked':
-            return {
-              success: false,
-              code: 'already_unlocked',
-              output: `Tier ${tier} ${type} is already unlocked.`,
-            };
-          case 'already_queued':
-            return {
-              success: false,
-              code: 'already_queued',
-              output: `Tier ${tier} ${type} is already queued for research.`,
-            };
-          case 'conditions_not_met':
-            return {
-              success: false,
-              code: 'conditions_not_met',
-              output: `Tier ${tier} ${type} does not meet its research prerequisites.`,
-            };
-          case 'insufficient_funds':
-          default:
-            return {
-              success: false,
-              code: 'insufficient_funds',
-              output: `Insufficient funds: research costs $${def.cost}.`,
-            };
-        }
+      // Precedence: no_research_center, already_unlocked, already_queued,
+      // conditions_not_met (all read-only, replicated here so cash is only
+      // checked once every other precondition already passes), then
+      // insufficient_funds, and only then commit via queueResearchTask —
+      // avoids leaving a phantom queued task when funds are short.
+      const def = getResearchTaskDef(type, tier);
+
+      if (!hasActiveResearchCenter(state.buildings)) {
+        return {
+          success: false,
+          code: 'no_research_center',
+          output: `A Research Center is required before queueing tier ${tier} ${type}.`,
+        };
+      }
+      if (isTierUnlocked(state.buildings, type, tier)) {
+        return {
+          success: false,
+          code: 'already_unlocked',
+          output: `Tier ${tier} ${type} is already unlocked.`,
+        };
+      }
+      if (isResearchQueued(state.buildings, type, tier)) {
+        return {
+          success: false,
+          code: 'already_queued',
+          output: `Tier ${tier} ${type} is already queued for research.`,
+        };
+      }
+      if (getUnmetConditions(state.buildings, def.conditions).length > 0) {
+        return {
+          success: false,
+          code: 'conditions_not_met',
+          output: `Tier ${tier} ${type} does not meet its research prerequisites.`,
+        };
+      }
+      if (state.cash < def.cost) {
+        return {
+          success: false,
+          code: 'insufficient_funds',
+          output: `Insufficient funds: research costs $${def.cost}.`,
+        };
       }
 
-      const cost = result.cost ?? getResearchTaskDef(type, tier).cost;
+      const result = queueResearchTask(state.buildings, type, tier);
+      if (!result.success) {
+        // Preconditions were re-checked above; a failure here means state
+        // changed between the checks and the commit (should not happen in
+        // single-threaded console mode), but relay it defensively.
+        return {
+          success: false,
+          code: result.code ?? 'no_research_center',
+          output: `Could not queue research: ${result.code ?? 'unknown error'}.`,
+        };
+      }
+
+      const cost = result.cost ?? def.cost;
       state.cash -= cost;
       addExpense(state.finances, cost, 'construction', `Research ${type} T${tier}`, state.tickCount);
 

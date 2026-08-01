@@ -2,6 +2,7 @@
 // Handles tier-unlock research tasks queued at the Research Center.
 
 import type { BuildingType, BuildingTier, BuildingState, ResearchTask } from './Building.js';
+import { getResearchTaskDef } from '../config/balance.js';
 
 export type { ResearchTask };
 
@@ -29,34 +30,59 @@ export interface QueueResearchResult {
  * Whether a placed, active `research_center` building exists in state.
  * Research cannot be queued at all without one.
  */
-export function hasActiveResearchCenter(_state: BuildingState): boolean {
-  // TODO: implement
-  return false;
+export function hasActiveResearchCenter(state: BuildingState): boolean {
+  return state.buildings.some((b) => b.type === 'research_center' && b.active);
 }
 
 /** Whether a single research condition currently holds against state. */
-export function isConditionMet(_state: BuildingState, _condition: ResearchCondition): boolean {
-  // TODO: implement
-  return false;
+export function isConditionMet(state: BuildingState, condition: ResearchCondition): boolean {
+  switch (condition.kind) {
+    case 'building_tier':
+      return state.buildings.some(
+        (b) => b.type === condition.buildingType && b.active && b.tier >= condition.tier,
+      );
+    case 'research_completed':
+      return isTierUnlocked(state, condition.buildingType, condition.tier);
+  }
 }
 
 /** Return the subset of `conditions` that are not currently met. */
-export function getUnmetConditions(_state: BuildingState, conditions: ResearchCondition[]): ResearchCondition[] {
-  // TODO: implement
-  return conditions;
+export function getUnmetConditions(state: BuildingState, conditions: ResearchCondition[]): ResearchCondition[] {
+  return conditions.filter((condition) => !isConditionMet(state, condition));
 }
 
 /**
  * Enqueue a research task for `targetType`/`targetTier`, validating research
- * center presence, unlock/queue state, prerequisite conditions, and funds.
+ * center presence, unlock/queue state, and prerequisite conditions.
+ * Does not check funds — `BuildingState` has no cash concept; the console
+ * layer checks cash before/after calling this.
  */
 export function queueResearchTask(
-  _state: BuildingState,
-  _targetType: BuildingType,
-  _targetTier: 2 | 3,
+  state: BuildingState,
+  targetType: BuildingType,
+  targetTier: 2 | 3,
 ): QueueResearchResult {
-  // TODO: implement
-  return { success: false };
+  if (!hasActiveResearchCenter(state)) {
+    return { success: false, code: 'no_research_center' };
+  }
+  if (isTierUnlocked(state, targetType, targetTier)) {
+    return { success: false, code: 'already_unlocked' };
+  }
+  if (isResearchQueued(state, targetType, targetTier)) {
+    return { success: false, code: 'already_queued' };
+  }
+  const def = getResearchTaskDef(targetType, targetTier);
+  if (getUnmetConditions(state, def.conditions).length > 0) {
+    return { success: false, code: 'conditions_not_met' };
+  }
+  state.researchQueue.push({
+    targetType,
+    targetTier,
+    ticksRemaining: def.ticks,
+    cost: def.cost,
+    conditions: def.conditions,
+  });
+  return { success: true, cost: def.cost };
 }
 
 /**
