@@ -312,12 +312,22 @@ export function getBuildingScoreEffects(state: BuildingState): Record<ScoreId, n
  * of that type exists.
  */
 export function findNearestActiveBuildingOfType(
-  _buildings: BuildingState,
-  _type: BuildingType,
-  _x: number,
-  _z: number,
+  buildings: BuildingState,
+  type: BuildingType,
+  x: number,
+  z: number,
 ): Building | null {
-  throw new Error('not implemented: findNearestActiveBuildingOfType');
+  let nearest: Building | null = null;
+  let bestDistSq = Infinity;
+  for (const b of buildings.buildings) {
+    if (!b.active || b.type !== type) continue;
+    const distSq = (b.x - x) ** 2 + (b.z - z) ** 2;
+    if (distSq < bestDistSq) {
+      bestDistSq = distSq;
+      nearest = b;
+    }
+  }
+  return nearest;
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────

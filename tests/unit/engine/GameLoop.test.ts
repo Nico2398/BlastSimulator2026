@@ -31,7 +31,11 @@ import {
   // ── tickTaskProgress: task-duration countdown + tick-driven XP (issue #406) ──
   // Stub as of this branch — the tests below are the Red-phase spec for it.
   tickTaskProgress,
+  // ── ArrivalGate (#437): claim only queues pendingRestDuration/pendingTaskDuration —
+  // the timer itself starts once the employee has arrived at targetX/targetZ.
+  tickArrivalGate,
 } from '../../../src/core/engine/GameLoop.js';
+import { tickEmployeeMovement } from '../../../src/core/engine/EntityMovementTick.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 import {
   hireEmployee, assignSkill, checkCollapse, getNeedMultiplier, computeTaskDuration,
@@ -58,6 +62,19 @@ import {
   BASE_TASK_DURATION_TICKS,
   XP_THRESHOLDS,
 } from '../../../src/core/config/balance.js';
+
+/**
+ * Rest/task timers are arrival-gated (#437): tickEmployees only queues
+ * pendingRestDuration/pendingTaskDuration; ArrivalGate.tickArrivalGate
+ * promotes them into restTicksRemaining/taskTicksRemaining once the
+ * employee has actually walked to targetX/targetZ. Call after tickEmployees
+ * in tests that build fixtures already co-located with their target (the
+ * common case below, both at (0,0)) to resolve that walk in one step.
+ */
+function resolveArrival(state: GameState): void {
+  tickEmployeeMovement(state);
+  tickArrivalGate(state);
+}
 
 function buildContext(state: GameState): EventContext {
   return {
@@ -438,6 +455,7 @@ describe('tickEmployees — task duration seeding on claim (Ch.3 skill progressi
 
     state.pendingActions.push(makeSkillAction({ id: 1, targetEmployeeId: employee.id }));
     tickEmployees(state);
+    resolveArrival(state);
 
     expect(employee.activeActionId).toBe(1);
     const needMult = getNeedMultiplier(employee);
@@ -458,6 +476,7 @@ describe('tickEmployees — task duration seeding on claim (Ch.3 skill progressi
     state.pendingActions.push(makeSkillAction({ id: 1, targetEmployeeId: rookie.id }));
     state.pendingActions.push(makeSkillAction({ id: 2, targetEmployeeId: master.id }));
     tickEmployees(state);
+    resolveArrival(state);
 
     expect(rookie.taskTicksRemaining).not.toBeNull();
     expect(master.taskTicksRemaining).not.toBeNull();
@@ -480,6 +499,7 @@ describe('tickEmployees — task duration seeding on claim (Ch.3 skill progressi
     state.pendingActions.push(makeSkillAction({ id: 1, targetEmployeeId: fed.id }));
     state.pendingActions.push(makeSkillAction({ id: 2, targetEmployeeId: hungry.id }));
     tickEmployees(state);
+    resolveArrival(state);
 
     expect(fed.taskTicksRemaining).not.toBeNull();
     expect(hungry.taskTicksRemaining).not.toBeNull();
@@ -498,6 +518,7 @@ describe('tickEmployees — task duration seeding on claim (Ch.3 skill progressi
       targetEmployeeId: employee.id,
     });
     tickEmployees(state);
+    resolveArrival(state);
 
     expect(employee.restTicksRemaining).toBe(5);
     expect(employee.taskTicksRemaining).toBeNull();
@@ -507,13 +528,19 @@ describe('tickEmployees — task duration seeding on claim (Ch.3 skill progressi
 describe('tickTaskProgress — per-tick countdown, incremental XP, and completion (Ch.3 skill progression, issue #406)', () => {
   const SEED = 42;
 
-  /** Dispatch a 'blasting'-required task to `employeeId` and let tickEmployees claim + seed it. */
+  /**
+   * Dispatch a 'blasting'-required task to `employeeId` and let tickEmployees
+   * claim + seed it. targetX/Z (0,0) matches every hireEmployee call in this
+   * describe block (defaults to (0,0)), so resolveArrival's single movement
+   * pass resolves arrival immediately and taskTicksRemaining is seeded (#437).
+   */
   function dispatchAndClaim(state: GameState, employeeId: number, actionId: number): void {
     state.pendingActions.push({
       id: actionId, type: 'general_work', requiredSkill: 'blasting', requiredVehicleRole: null,
       targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: employeeId,
     });
     tickEmployees(state);
+    resolveArrival(state);
   }
 
   it('decrements taskTicksRemaining by exactly 1 per call', () => {
@@ -1175,7 +1202,10 @@ describe('tickCollapse (7.6)', () => {
     );
     expect(restActions).toHaveLength(1);
     expect(restActions[0]!.id).toBe(employee.activeActionId);
-    expect(employee.restNeedKey).toBe('fatigue');
+    // The rest timer itself does not start until ArrivalGate confirms the
+    // employee has walked to the building — restNeedKey stays queued as
+    // pendingRestNeedKey until then (#437).
+    expect(employee.pendingRestNeedKey).toBe('fatigue');
   });
 
 });
@@ -2041,7 +2071,10 @@ describe('processShiftCycle (7.9)', () => {
     const result = processShiftCycle(state, firedEvents);
 
     expect(result.shiftRested).toContain(employee.id);
-    expect(employee.restTicksRemaining).toBe(SHIFT_SLEEP_DURATION_TICKS);
+    // The rest timer itself does not start until ArrivalGate confirms the
+    // employee has walked to the bunkhouse — queued as pendingRestDuration
+    // until then (#437).
+    expect(employee.pendingRestDuration).toBe(SHIFT_SLEEP_DURATION_TICKS);
     // Employee should be claimed by a rest action (activeActionId changed)
     expect(employee.activeActionId).not.toBe(ORIGINAL_ACTION_ID);
     expect(employee.activeActionId).not.toBeNull();
@@ -2201,8 +2234,9 @@ describe('processShiftCycle (7.9)', () => {
     expect(result.shiftRested).toContain(emp1.id);
     expect(result.shiftRested).not.toContain(emp2.id);
 
-    // emp1's rest timer starts
-    expect(emp1.restTicksRemaining).toBe(SHIFT_SLEEP_DURATION_TICKS);
+    // emp1's rest timer is queued — it starts once ArrivalGate confirms
+    // arrival at the bunkhouse (#437).
+    expect(emp1.pendingRestDuration).toBe(SHIFT_SLEEP_DURATION_TICKS);
 
     // emp2 continues working
     expect(emp2.ticksWorked).toBe(3);

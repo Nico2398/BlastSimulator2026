@@ -5,13 +5,13 @@ import type { GameContext } from './world.js';
 import {
   purchaseVehicle,
   assignVehicle,
-  assignDriver,
   moveVehicle,
   getAllVehicleRoles,
   type VehicleRole,
   type VehicleTask,
   type VehicleTier,
 } from '../../core/entities/Vehicle.js';
+import { requestBoardVehicle } from '../../core/entities/VehicleBoarding.js';
 import { addExpense } from '../../core/economy/Finance.js';
 import { SPAWN_RING_SIZE, SPAWN_TILE_SPACING } from '../../core/config/balance.js';
 
@@ -109,11 +109,14 @@ export function vehicleCommand(
       if (!state.vehicles.vehicles.find(v => v.id === vehicleId)) {
         return { success: false, output: `Vehicle #${vehicleId} not found.` };
       }
-      const result = assignDriver(state.vehicles, state.employees, vehicleId, employeeId);
+      // Validates licence/availability now, but the employee must physically
+      // walk to the vehicle before they actually become its driver — resolved
+      // by ArrivalGate.tickArrivalGate once they arrive (#437).
+      const result = requestBoardVehicle(state, vehicleId, employeeId);
       if (!result.success) {
         return { success: false, output: result.error! };
       }
-      return { success: true, output: `Driver #${employeeId} assigned to vehicle #${vehicleId}.` };
+      return { success: true, output: `Driver #${employeeId} walking to vehicle #${vehicleId} to board.` };
     }
     default:
       return { success: false, output: 'Usage: vehicle (list|buy|assign|move|driver)' };

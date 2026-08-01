@@ -557,7 +557,12 @@ describe('Survey system — seismic building side effects', () => {
 
   it('damages every building within 5 cells when multiple are in range', () => {
     hireSurveyor();
-    const b1Result = buildCommand(ctx, ['living_quarters'], { at: '19,20' });
+    // living_quarters T1 is a 3x3 footprint; at (19,20) it would cover
+    // (20,20) — the survey's own target cell, which the surveyor must now be
+    // able to walk to and stand on (#437). Placed at (17,20) instead: still
+    // within the 5-cell damage radius (footprint centre (18.5,21.5), distance
+    // ≈2.1 from (20,20)), but no longer overlapping the survey centre.
+    const b1Result = buildCommand(ctx, ['living_quarters'], { at: '17,20' });
     const b2Result = buildCommand(ctx, ['management_office'], { at: '21,17' });
     expect(b1Result.success).toBe(true);
     expect(b2Result.success).toBe(true);

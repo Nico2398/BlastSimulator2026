@@ -304,7 +304,8 @@ describe('vehicle driver — domain validation errors', () => {
     const firstDriverId = addTruckDriver(ctx);
     const secondDriverId = addTruckDriver(ctx);
 
-    // Assign first driver successfully
+    // Assign first driver successfully — resolve the walk so driverId is
+    // actually set before the second request is evaluated (#437).
     vehicleCommand(ctx, ['driver', String(vehicleId), String(firstDriverId)], {});
     // Issue #437: driverId is only set once the arrival gate resolves — the
     // first driver must actually board before the second request can see the
@@ -328,7 +329,8 @@ describe('vehicle driver — domain validation errors', () => {
     const secondVehicleId = addTruckVehicle(ctx);
     const employeeId = addTruckDriver(ctx);
 
-    // Assign driver to first vehicle successfully
+    // Assign driver to first vehicle successfully — resolve the walk so
+    // driverId is actually set before the second request is evaluated (#437).
     vehicleCommand(ctx, ['driver', String(firstVehicleId), String(employeeId)], {});
     // Issue #437: driverId is only set once the arrival gate resolves.
     tickCommand(ctx, ['1'], {});

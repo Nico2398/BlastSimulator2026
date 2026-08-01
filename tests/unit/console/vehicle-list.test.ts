@@ -9,6 +9,44 @@ import type { MiningContext } from '../../../src/console/commands/mining.js';
 import { createTubingState } from '../../../src/core/mining/Tubing.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import type { Employee } from '../../../src/core/entities/Employee.js';
+import { tickEmployeeMovement } from '../../../src/core/engine/EntityMovementTick.js';
+import { tickArrivalGate } from '../../../src/core/engine/ArrivalGate.js';
+
+/** Default fields for hand-built Employee test fixtures below (mirrors hireEmployee's defaults). */
+const EMPLOYEE_DEFAULTS = {
+  activeActionId: null,
+  hunger: 100,
+  fatigue: 100,
+  breakNeed: 100,
+  collapsing: false,
+  interruptedActionPayload: null,
+  ticksWorked: 0,
+  restTicksRemaining: null,
+  restNeedKey: null,
+  taskTicksRemaining: null,
+  activeTaskSkill: null,
+  destinationX: null,
+  destinationZ: null,
+  moveConsecutiveFailures: 0,
+  isMoveStuck: false,
+  pendingRestDuration: null,
+  pendingRestNeedKey: null,
+  pendingTaskDuration: null,
+  pendingActionType: null,
+  pendingActionPayload: null,
+  pendingDriverVehicleId: null,
+  pendingTrainingStart: null,
+} as const;
+
+/**
+ * Boarding is arrival-gated (#437): `vehicle driver` only queues the walk.
+ * These fixtures spawn both vehicle and employee at (0,0), so a single
+ * movement + arrival-gate tick resolves it (the employee is already there).
+ */
+function resolveDriverBoarding(ctx: MiningContext): void {
+  tickEmployeeMovement(ctx.state!, ctx.emitter);
+  tickArrivalGate(ctx.state!, ctx.emitter);
+}
 
 // ── Test context factory ──
 
@@ -43,6 +81,7 @@ function addTruckDriver(ctx: MiningContext): number {
     z: 0,
     qualifications: [{ category: 'driving.truck', proficiencyLevel: 1, xp: 0 }],
     trainingState: null,
+    ...EMPLOYEE_DEFAULTS,
   };
   ctx.state!.employees.employees.push(emp);
   return emp.id;
@@ -66,6 +105,7 @@ describe('vehicle list — driver display', () => {
     const vehicleId = addTruckVehicle(ctx);
     const employeeId = addTruckDriver(ctx);
     vehicleCommand(ctx, ['driver', String(vehicleId), String(employeeId)], {});
+    resolveDriverBoarding(ctx);
 
     const result = vehicleCommand(ctx, ['list'], {});
 
@@ -79,6 +119,7 @@ describe('vehicle list — driver display', () => {
     const undrivenVehicleId = addTruckVehicle(ctx);
     const employeeId = addTruckDriver(ctx);
     vehicleCommand(ctx, ['driver', String(drivenVehicleId), String(employeeId)], {});
+    resolveDriverBoarding(ctx);
 
     const result = vehicleCommand(ctx, ['list'], {});
 
@@ -94,6 +135,7 @@ describe('vehicle list — driver display', () => {
     const vehicleId = addTruckVehicle(ctx);
     const employeeId = addTruckDriver(ctx);
     vehicleCommand(ctx, ['driver', String(vehicleId), String(employeeId)], {});
+    resolveDriverBoarding(ctx);
 
     const result = vehicleCommand(ctx, ['list'], {});
 

@@ -103,6 +103,7 @@ describe('Vehicle fleet', () => {
     const result = vehicleCommand(ctx, ['driver', '1', String(eid)], {});
 
     expect(result.success).toBe(true);
+    expect(result.output).toBe(`Driver #${eid} walking to vehicle #1 to board.`);
     // The request succeeds immediately, but boarding is deferred to arrival —
     // driverId must not be set synchronously (previously it was, unconditionally).
     expect(ctx.state!.vehicles.vehicles[0]!.driverId).toBeNull();
@@ -236,6 +237,8 @@ describe('Vehicle fleet', () => {
     employeeCommand(ctx, ['assign_skill', String(eid)], { skill: 'driving.truck', level: '1' });
     vehicleCommand(ctx, ['driver', '1', String(eid)], {});
     // Issue #437: driverId is only set once the arrival gate resolves.
+    // Boarding is arrival-gated (#437) — employee and vehicle both spawn at
+    // (16,16), so one tick resolves the walk (they're already co-located).
     tickCommand(ctx, ['1'], {});
 
     const result = vehicleCommand(ctx, ['list'], {});
