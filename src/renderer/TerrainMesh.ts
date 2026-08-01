@@ -149,6 +149,11 @@ export class TerrainMesh {
     return this.grid.id;
   }
 
+  /** The shared interim material — reused by LandscapeMesh so both zones render with identical shading (#458 T3.2/D9). */
+  get sharedMaterial(): THREE.MeshPhongMaterial {
+    return this.material;
+  }
+
   /** Union bounding box and total vertex count across every built chunk mesh, for diagnostics. Null if nothing is built. */
   getBounds(): {
     minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number;

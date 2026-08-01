@@ -4,6 +4,7 @@
 
 import * as THREE from 'three';
 import type { MiningContext } from '../console/commands/mining.js';
+import { ensureLandscape } from '../console/commands/world.js';
 import type { GameState } from '../core/state/GameState.js';
 import { type VoxelGrid, computeVoxelColumnSurfaceY } from '../core/world/VoxelGrid.js';
 import { getBiome } from '../core/world/BiomeCatalog.js';
@@ -15,7 +16,7 @@ import { CharacterMesh } from './CharacterMesh.js';
 import { SkyboxWeather } from './SkyboxWeather.js';
 import { FragmentMesh } from './FragmentMesh.js';
 import { BlastEffects } from './BlastEffects.js';
-import { DistantScenery } from './DistantScenery.js';
+import { LandscapeMesh } from './terrain/LandscapeMesh.js';
 import { BlastPlanOverlay } from './BlastPlanOverlay.js';
 import { GhostMesh } from './GhostMesh.js';
 import { syncEntitySets, buildingCenterSurfaceY } from './EntitySync.js';
@@ -40,7 +41,7 @@ export class GameRenderer {
   private skybox: SkyboxWeather | null = null;
   private fragments: FragmentMesh | null = null;
   private blastEffects: BlastEffects | null = null;
-  private scenery: DistantScenery | null = null;
+  private landscape: LandscapeMesh | null = null;
   private blastOverlay: BlastPlanOverlay | null = null;
   private ghosts: GhostMesh | null = null;
   private lastGrid: VoxelGrid | null = null;
@@ -77,7 +78,7 @@ export class GameRenderer {
 
     // New game (or first load) — rebuild everything
     if (this.loadedSeed !== ctx.state.seed) {
-      this.loadGame(ctx.state, ctx.grid);
+      this.loadGame(ctx);
       this.loadedSeed = ctx.state.seed;
     }
 
@@ -89,6 +90,10 @@ export class GameRenderer {
       // TerrainMesh holds a grid reference — rebind it so it reads from the new grid
       this.terrain?.setGrid(ctx.grid);
       this.terrain?.buildAll();
+      // A differently-sized grid needs a fresh landscape too — same rebuild
+      // loadGame() does, but this branch fires even when loadGame() didn't
+      // (campaign level swaps grid size while keeping the seed, #458 T3.2).
+      this.rebuildLandscapeMesh(ctx);
       // A campaign level can swap in a differently-sized grid while keeping the
       // seed, so loadGame() never runs. Re-frame or the new site renders as a
       // small off-centre patch of the previous site's view.
@@ -414,7 +419,9 @@ export class GameRenderer {
 
   // ---------- Internal ----------
 
-  private loadGame(state: GameState, grid: VoxelGrid): void {
+  private loadGame(ctx: MiningContext): void {
+    const state = ctx.state!;
+    const grid = ctx.grid!;
     this.clearAll();
 
     const { scene, sun, ambient } = this.sm;
@@ -458,12 +465,8 @@ export class GameRenderer {
     // Blast effects
     this.blastEffects = new BlastEffects(scene, this.sm.camera);
 
-    // Distant scenery
-    const biome = getBiome(state.mineType);
-    if (biome) {
-      this.scenery = new DistantScenery(scene);
-      this.scenery.generate(biome, grid.sizeX / 2, grid.sizeZ / 2);
-    }
+    // Landscape zone — real ground continuing past the playable rect (#458 T3.2)
+    this.rebuildLandscapeMesh(ctx);
 
     // Blast plan overlay (hidden until shown)
     this.blastOverlay = new BlastPlanOverlay(scene);
@@ -473,6 +476,29 @@ export class GameRenderer {
 
     // Frame the whole site
     this.frameCameraOnGrid();
+  }
+
+  /**
+   * Build (or rebuild) the landscape mesh for the current grid (#458 T3.2).
+   * Triggers ensureLandscape()'s lazy build — the first real consumer of it
+   * (T2.1 kept it lazy specifically because nothing rendered it yet).
+   * Command-mode scenarios never construct a GameRenderer at all, so this
+   * cost never lands on the fast, frequently-run scenario suite; only the
+   * browser game and interaction-mode/visual harnesses pay it.
+   */
+  private rebuildLandscapeMesh(ctx: MiningContext): void {
+    if (!this.terrain || !ctx.state?.world || !ctx.grid) return;
+    const biome = getBiome(ctx.state.mineType);
+    if (!biome) return;
+
+    const { sizeX, sizeY, sizeZ } = ctx.state.world;
+    const handle = ensureLandscape(ctx, { seed: ctx.state.seed, climateBias: biome.climateCenter, sizeX, sizeY, sizeZ });
+    if (!handle) return;
+
+    if (!this.landscape) {
+      this.landscape = new LandscapeMesh(this.sm.scene, this.terrain.sharedMaterial);
+    }
+    this.landscape.build(handle, ctx.grid.palette);
   }
 
   /**
@@ -496,7 +522,7 @@ export class GameRenderer {
     this.skybox?.dispose();
     this.fragments?.dispose();
     this.blastEffects?.dispose();
-    this.scenery?.clear();
+    this.landscape?.dispose();
     this.blastOverlay?.dispose();
     this.ghosts?.dispose();
 
@@ -507,7 +533,7 @@ export class GameRenderer {
     this.skybox = null;
     this.fragments = null;
     this.blastEffects = null;
-    this.scenery = null;
+    this.landscape = null;
     this.blastOverlay = null;
     this.ghosts = null;
     this.lastGrid = null;

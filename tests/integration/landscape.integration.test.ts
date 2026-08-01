@@ -20,7 +20,7 @@ describe('Console — landscape_info / lazy landscape build (#458 T2.1)', () => 
     expect(result.output).toContain('Tiles:');
     expect(result.output).toContain('129x129');
     expect(engine.ctx.landscape).not.toBeNull();
-    expect(engine.ctx.landscape!.tiles.length).toBeGreaterThan(0);
+    expect(engine.ctx.landscape!.map.tiles.length).toBeGreaterThan(0);
   });
 
   it('landscape_info is idempotent — a second call reuses the cached map', () => {

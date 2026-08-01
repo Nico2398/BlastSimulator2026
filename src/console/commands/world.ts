@@ -5,13 +5,29 @@ import { createGame, buildGameNavGrid, type GameState } from '../../core/state/G
 import { getBiome, getAllBiomes } from '../../core/world/BiomeCatalog.js';
 import { generateTerrain, buildTerrainContext } from '../../core/world/TerrainGen.js';
 import { buildStructureSet } from '../../core/world/Structures.js';
-import { buildLandscapeMap, type LandscapeMap } from '../../core/world/LandscapeMap.js';
+import { buildLandscapeMap, sampleLandscapeColumn, type LandscapeMap } from '../../core/world/LandscapeMap.js';
+import type { Rect } from '../../core/world/WorldGen.js';
 import { getRock } from '../../core/world/RockCatalog.js';
 import { getOre } from '../../core/world/OreCatalog.js';
 import { getDominantRockId } from '../../core/world/VoxelGrid.js';
 import type { VoxelGrid } from '../../core/world/VoxelGrid.js';
 import { EventEmitter } from '../../core/state/EventEmitter.js';
 import { decodeVoxelGrid, type SerializedVoxels } from '../../core/state/VoxelGridCodec.js';
+
+/**
+ * The landscape's coarse tile map plus a reusable fine-grained sampler
+ * (#458 T3.2) — the seam mesher needs point samples at 1m resolution near
+ * the playable rect, which the stored 4m tile arrays can't provide. Bundling
+ * both here means the sampler closes over the same worldGen/structureSet/
+ * strata/palette `ensureLandscape` already built, so a caller never needs to
+ * reconstruct the (expensive) structure set a second time just to sample a
+ * handful of extra points.
+ */
+export interface LandscapeHandle {
+  map: LandscapeMap;
+  playableRect: Rect;
+  sampleColumn(x: number, z: number): { height: number; biomeId: number; surfCompId: number };
+}
 
 /** Shared game context for console commands. */
 export interface GameContext {
@@ -20,12 +36,13 @@ export interface GameContext {
   /**
    * Purely-aesthetic landscape zone beside `grid` (#458 T2.1/D7) — never
    * serialized, never read by simulation. Built lazily via `ensureLandscape`
-   * rather than eagerly here: nothing consumes it yet (T3.2's landscape
-   * mesher is the first real caller), and eager construction would add
-   * several seconds to every `new_game`/`regenerateGrid` call, including the
-   * 106 existing scenarios that never reference it.
+   * rather than eagerly here: nothing consumed it before T3.2's landscape
+   * mesher, and eager construction would add several seconds to every
+   * `new_game`/`regenerateGrid` call. Command-mode scenarios never
+   * instantiate a renderer, so they never trigger this build at all; only
+   * the browser game and interaction-mode/visual harnesses pay the cost.
    */
-  landscape: LandscapeMap | null;
+  landscape: LandscapeHandle | null;
   /** Event emitter for game-over and campaign events. Listeners attached in main.ts/console.ts. */
   emitter: EventEmitter;
 }
@@ -75,13 +92,20 @@ export function ensureLandscape(
     sizeX: number; sizeY: number; sizeZ: number;
     mixedRockHardness?: boolean;
   },
-): LandscapeMap | null {
+): LandscapeHandle | null {
   if (!ctx.grid) return null;
   if (ctx.landscape) return ctx.landscape;
 
   const { worldGen, biome, strata } = buildTerrainContext(params);
   const structureSet = buildStructureSet(params.seed, worldGen.fields, worldGen.shapingAt, biome.forestDensity, worldGen.playableRect);
-  ctx.landscape = buildLandscapeMap(worldGen, params.climateBias, structureSet, strata, ctx.grid.palette);
+  const palette = ctx.grid.palette;
+  const map = buildLandscapeMap(worldGen, params.climateBias, structureSet, strata, palette);
+
+  ctx.landscape = {
+    map,
+    playableRect: worldGen.playableRect,
+    sampleColumn: (x, z) => sampleLandscapeColumn(worldGen, params.climateBias, structureSet, strata, palette, x, z),
+  };
   return ctx.landscape;
 }
 
@@ -234,13 +258,14 @@ export function landscapeInfoCommand(
   const landscape = ensureLandscape(ctx, { seed: ctx.state.seed, climateBias: biome.climateCenter, sizeX, sizeY, sizeZ });
   if (!landscape) return { success: false, output: 'Could not build landscape — no grid loaded.' };
 
+  const { map } = landscape;
   return {
     success: true,
     output: [
-      `Tiles: ${landscape.tiles.length}`,
-      `Samples/tile: ${landscape.samplesPerTile}x${landscape.samplesPerTile}`,
-      `Tile span: ${landscape.tileSpan}m, coarse step: ${landscape.coarseStep}m`,
-      `Extent half: ${landscape.extentHalf}m`,
+      `Tiles: ${map.tiles.length}`,
+      `Samples/tile: ${map.samplesPerTile}x${map.samplesPerTile}`,
+      `Tile span: ${map.tileSpan}m, coarse step: ${map.coarseStep}m`,
+      `Extent half: ${map.extentHalf}m`,
     ].join('\n'),
   };
 }
