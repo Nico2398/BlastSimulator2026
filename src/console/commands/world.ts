@@ -9,6 +9,7 @@ import { getOre } from '../../core/world/OreCatalog.js';
 import { getDominantRockId } from '../../core/world/VoxelGrid.js';
 import type { VoxelGrid } from '../../core/world/VoxelGrid.js';
 import { EventEmitter } from '../../core/state/EventEmitter.js';
+import { decodeVoxelGrid, type SerializedVoxels } from '../../core/state/VoxelGridCodec.js';
 
 /** Shared game context for console commands. */
 export interface GameContext {
@@ -40,6 +41,22 @@ export function regenerateGrid(
   buildGameNavGrid(ctx.state, ctx.grid, ctx.state.buildings.buildings, ctx.state.drillHoles);
   ctx.emitter.emit('terrain:updated', {
     region: { minX: 0, minY: 0, minZ: 0, maxX: sizeX - 1, maxY: sizeY - 1, maxZ: sizeZ - 1 },
+  });
+}
+
+/**
+ * Restore `ctx.grid` from a save's embedded voxel payload (v6+), preserving
+ * actual terrain mutations — blast craters, ramps — instead of discarding
+ * them the way `regenerateGrid`'s from-seed path does. Mirrors
+ * `regenerateGrid`'s navgrid-build and event-emission steps exactly; only
+ * the grid's origin (decoded vs. freshly generated) differs (#458 T0.3).
+ */
+export function restoreGrid(ctx: GameContext, voxels: SerializedVoxels): void {
+  if (!ctx.state) return;
+  ctx.grid = decodeVoxelGrid(voxels);
+  buildGameNavGrid(ctx.state, ctx.grid, ctx.state.buildings.buildings, ctx.state.drillHoles);
+  ctx.emitter.emit('terrain:updated', {
+    region: { minX: 0, minY: 0, minZ: 0, maxX: voxels.sizeX - 1, maxY: voxels.sizeY - 1, maxZ: voxels.sizeZ - 1 },
   });
 }
 

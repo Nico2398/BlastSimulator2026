@@ -103,6 +103,11 @@ export class CompositionPalette {
   get(id: number): PaletteEntry {
     return this.entries[id] ?? this.entries[0]!;
   }
+
+  /** All interned compositions in index order (index 0 is always the reserved air entry). For save serialization. */
+  toArray(): VoxelRockComposition[] {
+    return this.entries.map(e => e.comp);
+  }
 }
 
 /**
@@ -248,6 +253,24 @@ export class VoxelGrid {
     this.compId[i] = 0;
     this.fracture[i] = 1.0;
     this.ores.delete(i);
+  }
+
+  // ── Raw storage access — for VoxelGridCodec (save serialization) only ──
+  // Treat all four as read-only; use the mutators above to write. Exposed
+  // as the live arrays/map (no copy) since encoding immediately reads them.
+
+  get rawDensity(): Float64Array { return this.density; }
+  get rawCompId(): Uint16Array { return this.compId; }
+  get rawFracture(): Float64Array { return this.fracture; }
+  get rawOreEntries(): Array<[number, Record<string, number>]> { return [...this.ores.entries()]; }
+
+  /** Overwrite this grid's raw storage from a decoded save payload. For VoxelGridCodec only. */
+  restoreRaw(density: Float64Array, compId: Uint16Array, fracture: Float64Array, ores: ReadonlyMap<number, Record<string, number>>): void {
+    this.density.set(density);
+    this.compId.set(compId);
+    this.fracture.set(fracture);
+    this.ores.clear();
+    for (const [i, rec] of ores) this.ores.set(i, rec);
   }
 
   /** Get all voxels within a bounding box (inclusive on both ends). */

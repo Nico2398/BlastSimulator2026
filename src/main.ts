@@ -15,7 +15,8 @@ import { IndexedDBPersistence } from './persistence/IndexedDBPersistence.js';
 import { DownloadPersistence } from './persistence/DownloadPersistence.js';
 import { createRunner, runCommand } from './console/createRunner.js';
 import { parseCommand } from './console/ConsoleRunner.js';
-import { regenerateGrid, DEFAULT_GRID_SIZE } from './console/commands/world.js';
+import { regenerateGrid, restoreGrid, DEFAULT_GRID_SIZE } from './console/commands/world.js';
+import { encodeVoxelGrid } from './core/state/VoxelGridCodec.js';
 import { getMinePreset } from './core/world/MineType.js';
 import { BASE_TICK_MS } from './core/engine/GameLoop.js';
 import { probeUiActions, probeSelector } from './ui/uiActionProbe.js';
@@ -43,7 +44,16 @@ try {
 // --- Save/Load UI ---
 const saveLoadUI = new SaveLoadUI(uiContainer);
 saveLoadUI.setBackend(saveBackend);
-saveLoadUI.setGetState(() => ctx.state);
+saveLoadUI.setGetState(() => {
+  // Embed the current voxel grid right before a save is taken (#458 T0.3) —
+  // encoded lazily here rather than kept live on ctx.state, since most ticks
+  // never save. SaveLoadUI only sees GameState; it has no idea VoxelGrid or
+  // its codec exist, by design.
+  if (ctx.state && ctx.grid && ctx.state.world) {
+    ctx.state.world = { ...ctx.state.world, voxels: encodeVoxelGrid(ctx.grid) };
+  }
+  return ctx.state;
+});
 
 // --- Main Menu ---
 const mainMenu = new MainMenu(uiContainer);
@@ -401,17 +411,22 @@ saveLoadBtn.addEventListener('click', () => saveLoadUI.show());
 uiContainer.appendChild(saveLoadBtn);
 
 saveLoadUI.setOnLoad((state) => {
-  // Restore loaded state into the runner context. The VoxelGrid is not part
-  // of the serialized GameState (see the WorldState comment in
-  // GameState.ts), so it must be regenerated here the same way the console
-  // `load` command does — otherwise the scene keeps showing whatever terrain
-  // (e.g. post-blast craters) was on screen before this load (#408).
+  // Restore loaded state into the runner context. A v6+ save carries its
+  // voxel grid embedded in state.world.voxels (#458 T0.3) — restoring from
+  // it preserves blast craters/ramps instead of discarding them. A save
+  // without that payload (pre-v6, or one taken with no grid) falls back to
+  // regenerating pristine terrain from seed, same as the console `load`
+  // command and this codebase's whole prior history here (#408).
   ctx.state = state;
   const preset = getMinePreset(state.mineType);
-  const { sizeX, sizeY, sizeZ } = state.world ?? {
-    sizeX: DEFAULT_GRID_SIZE, sizeY: DEFAULT_GRID_SIZE, sizeZ: DEFAULT_GRID_SIZE, gridReady: true,
-  };
-  if (preset) regenerateGrid(ctx, { seed: state.seed, preset, sizeX, sizeY, sizeZ });
+  if (state.world?.voxels) {
+    restoreGrid(ctx, state.world.voxels);
+  } else if (preset) {
+    const { sizeX, sizeY, sizeZ } = state.world ?? {
+      sizeX: DEFAULT_GRID_SIZE, sizeY: DEFAULT_GRID_SIZE, sizeZ: DEFAULT_GRID_SIZE, gridReady: true,
+    };
+    regenerateGrid(ctx, { seed: state.seed, preset, sizeX, sizeY, sizeZ });
+  }
   gameRenderer.syncFromContext(ctx);
 });
 
