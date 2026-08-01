@@ -38,6 +38,16 @@ const ROCK_SLOTS = 12;
 /** getAllOres() has 8 entries today; same headroom convention as rocks. */
 const ORE_SLOTS = 10;
 
+/**
+ * Boundary-band darkening strength, tuned against the finished post stack
+ * (aerial perspective haze + ACES tonemapping) rather than the A19.2 spec's
+ * bare default in isolation (#458 T5.3/D9). Verified via screenshots across
+ * all 4 biomes and every weather state: legible up close without reading as
+ * a global darkening of the landscape beyond ~5m (the band function's own
+ * falloff already zeroes it there).
+ */
+const BAND_STRENGTH = 0.35;
+
 // ---------- A19.1 — GLSL noise library ----------
 const NOISE_GLSL = `
 float hash13(vec3 p){ p = fract(p * 0.1031); p += dot(p, p.yzx + 33.33); return fract((p.x + p.y) * p.z); }
@@ -139,9 +149,9 @@ export interface TerrainMaterialOptions {
  * so mutating e.g. `customUniforms.uCloudOffset.value` after first render
  * still reaches the GPU on the next frame (#458 A19 injection mechanics).
  *
- * uBandStrength and uCloudCoverage default to 0 (inert): the boundary band
- * and cloud-shadow terms are wired end-to-end here but produce no visible
- * effect until T5.3 (band tuning) and T7.1 (wind/clouds) turn them on.
+ * uCloudCoverage defaults to 0 (inert) — the cloud-shadow term is wired
+ * end-to-end here but produces no visible effect until T7.1 (wind/clouds)
+ * turns it on. uBandStrength is live from T5.3 (see BAND_STRENGTH).
  */
 export class TerrainMaterial extends THREE.MeshStandardMaterial {
   readonly customUniforms: Record<string, THREE.IUniform>;
@@ -179,7 +189,7 @@ export class TerrainMaterial extends THREE.MeshStandardMaterial {
       uPlayRect: { value: new THREE.Vector4(minX, minZ, maxX, maxZ) },
       uCloudOffset: { value: new THREE.Vector2(0, 0) },
       uCloudCoverage: { value: 0 },
-      uBandStrength: { value: 0 },
+      uBandStrength: { value: BAND_STRENGTH },
     };
 
     this.onBeforeCompile = (shader) => {

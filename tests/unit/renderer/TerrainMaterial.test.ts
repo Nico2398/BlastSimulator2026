@@ -71,13 +71,18 @@ describe('TerrainMaterial', () => {
     expect(rect.w).toBe(PLAY_RECT.maxZ);
   });
 
-  it('uBandStrength and uCloudCoverage default to 0 — inert until T5.3/T7.1 (#458 T4.1 scope)', () => {
+  it('uCloudCoverage defaults to 0 — inert until T7.1 (#458 T4.1 scope)', () => {
     const mat = makeMaterial();
-    expect(mat.customUniforms['uBandStrength']!.value).toBe(0);
     expect(mat.customUniforms['uCloudCoverage']!.value).toBe(0);
     const offset = mat.customUniforms['uCloudOffset']!.value as THREE.Vector2;
     expect(offset.x).toBe(0);
     expect(offset.y).toBe(0);
+  });
+
+  it('uBandStrength is live at the tuned default (#458 T5.3)', () => {
+    const mat = makeMaterial();
+    expect(mat.customUniforms['uBandStrength']!.value).toBe(0.35);
+    expect(mat.customUniforms['uBandStrength']!.value).toBeGreaterThan(0);
   });
 
   it('customProgramCacheKey returns a constant string (#458 A19 injection mechanics)', () => {
