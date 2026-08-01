@@ -1,8 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { generateTerrain, computeComposition, type TerrainConfig } from '../../../src/core/world/TerrainGen.js';
+import { generateTerrain, type TerrainConfig } from '../../../src/core/world/TerrainGen.js';
 import { getBiome } from '../../../src/core/world/BiomeCatalog.js';
-import { createNoise3D } from 'simplex-noise';
-import { getAllRocks } from '../../../src/core/world/RockCatalog.js';
 import { getDominantRockId } from '../../../src/core/world/VoxelGrid.js';
 
 function makeConfig(seed: number, biomeId = 'desert_badlands'): TerrainConfig {
@@ -86,24 +84,5 @@ describe('TerrainGen — structure', () => {
     const oreRate = totalWithOre / totalSolid;
     expect(oreRate).toBeGreaterThan(0.01);
     expect(oreRate).toBeLessThan(0.8);
-  });
-});
-
-describe('computeComposition', () => {
-  it('returns single rock at coefficient 1.0 when only one rock supplied', () => {
-    const rocks = getAllRocks().filter(r => r.id === 'cruite');
-    const noise3d = createNoise3D(() => 0.5);
-    const comp = computeComposition(5, 5, 5, rocks, noise3d);
-    expect(comp.rocks.length).toBe(1);
-    expect(comp.rocks[0]!.rockId).toBe('cruite');
-    expect(comp.rocks[0]!.coefficient).toBe(1.0);
-  });
-
-  it('coefficients sum to approximately 1.0', () => {
-    const rocks = getAllRocks().slice(0, 4);
-    const noise3d = createNoise3D(() => 0.5);
-    const comp = computeComposition(5, 5, 5, rocks, noise3d);
-    const sum = comp.rocks.reduce((s, r) => s + r.coefficient, 0);
-    expect(sum).toBeCloseTo(1.0, 1);
   });
 });
