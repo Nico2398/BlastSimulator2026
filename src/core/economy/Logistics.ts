@@ -128,6 +128,14 @@ export function consumeStoredOre(
   materialId: string,
   amountKg: number,
 ): { success: boolean; consumedKg: number; error?: string } {
+  if (!Number.isFinite(amountKg) || amountKg <= 0) {
+    return {
+      success: false,
+      consumedKg: 0,
+      error: `Invalid amount requested: ${amountKg}.`,
+    };
+  }
+
   if (materialId !== '') {
     const available = collectedOre[materialId] ?? 0;
     if (amountKg > available) {
