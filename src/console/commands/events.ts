@@ -14,7 +14,7 @@ import {
   getSuccessRate,
   type CorruptionTarget,
 } from '../../core/economy/Corruption.js';
-import { addExpense, addIncome } from '../../core/economy/Finance.js';
+import { addExpense, addIncome, type ExpenseCategory } from '../../core/economy/Finance.js';
 import { processPayCycle } from '../../core/entities/Employee.js';
 import { tickTraining } from '../../core/entities/EmployeeTraining.js';
 import { tickResearch, getTotalOperatingCost } from '../../core/entities/Building.js';
@@ -43,6 +43,19 @@ import {
   isExposed,
 } from '../../core/events/MafiaActions.js';
 import { requireGame } from './commandUtils.js';
+import type { GameState } from '../../core/state/GameState.js';
+
+/** Deduct a cash cost and log it as a finance expense, if the cost is positive. */
+function deductExpense(
+  state: GameState,
+  cost: number,
+  category: ExpenseCategory,
+  label: string,
+): void {
+  if (cost <= 0) return;
+  state.cash -= cost;
+  addExpense(state.finances, cost, category, label, state.tickCount);
+}
 
 /** Build the EventContext from the current GameState. */
 function buildEventContext(ctx: GameContext): EventContext {
@@ -94,22 +107,13 @@ export function tickCommand(
 
     // 2. Payroll — processPayCycle increments ticksSincePayday internally
     const paySalary = processPayCycle(state.employees);
-    if (paySalary > 0) {
-      state.cash -= paySalary;
-      addExpense(state.finances, paySalary, 'salaries', 'Payroll', state.tickCount);
-    }
+    deductExpense(state, paySalary, 'salaries', 'Payroll');
 
     // 2b. Building and vehicle maintenance — unconditional per-tick upkeep.
     const buildingUpkeep = getTotalOperatingCost(state.buildings);
-    if (buildingUpkeep > 0) {
-      state.cash -= buildingUpkeep;
-      addExpense(state.finances, buildingUpkeep, 'maintenance', 'Building upkeep', state.tickCount);
-    }
+    deductExpense(state, buildingUpkeep, 'maintenance', 'Building upkeep');
     const vehicleUpkeep = getVehicleCostsPerTick(state.vehicles);
-    if (vehicleUpkeep > 0) {
-      state.cash -= vehicleUpkeep;
-      addExpense(state.finances, vehicleUpkeep, 'fuel', 'Vehicle maintenance & fuel', state.tickCount);
-    }
+    deductExpense(state, vehicleUpkeep, 'fuel', 'Vehicle maintenance & fuel');
 
     // 3. Contract deadlines — expire overdue contracts and apply penalties
     const expired = checkDeadlines(state.contracts, state.tickCount);
