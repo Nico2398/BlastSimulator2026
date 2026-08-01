@@ -31,8 +31,14 @@ describe('Tutorial Level — Contract Delivery', () => {
     ctx = makeCampaignCtx('tutorial_pit');
   });
 
-  /** Run the standard tutorial blast sequence and return the blast output. */
-  function executeTutorialBlast(): string {
+  /**
+   * Run the standard tutorial blast sequence and return the blast output,
+   * plus the cash balance immediately before the blast itself (after hiring,
+   * drilling, and charging — all of which legitimately spend cash on wages
+   * and explosives, independent of the blast instant-payout shortcut #456
+   * closes).
+   */
+  function executeTutorialBlast(): { output: string; cashBeforeBlast: number } {
     // 1. Hire surveyor (ID=1) with geology skill
     const hireSurveyor = employeeCommand(ctx, ['hire'], { role: 'surveyor' });
     expect(hireSurveyor.success).toBe(true);
@@ -82,11 +88,12 @@ describe('Tutorial Level — Contract Delivery', () => {
     expect(seqResult.success).toBe(true);
 
     // 7. Blast
+    const cashBeforeBlast = ctx.state!.cash;
     const blastResult = blastCommand(ctx as any, [], {});
     expect(blastResult.success).toBe(true);
     expect(blastResult.output).toContain('BLAST REPORT');
 
-    return blastResult.output;
+    return { output: blastResult.output, cashBeforeBlast };
   }
 
   /**
@@ -141,14 +148,15 @@ describe('Tutorial Level — Contract Delivery', () => {
   // ── (a) Blast shortcut is closed: no instant cash/ore payout ─────────────
 
   it('a blast only spawns on-ground fragments — cash and collectedOre stay unchanged until hauled', () => {
-    const cashBefore = ctx.state!.cash;
     const collectedOreBefore = { ...ctx.state!.collectedOre };
     const fragmentsBefore = ctx.state!.logistics.fragments.length;
 
-    executeTutorialBlast();
+    const { cashBeforeBlast } = executeTutorialBlast();
 
-    // No instant payout: cash is byte-identical to its pre-blast value.
-    expect(ctx.state!.cash).toBe(cashBefore);
+    // No instant payout: cash right before the blast is unchanged after it
+    // (hiring, drilling, and charging spend cash — that's expected — but the
+    // blast itself must not credit anything).
+    expect(ctx.state!.cash).toBe(cashBeforeBlast);
     // collectedOre is byte-identical (deep equal) to its pre-blast value —
     // a blast alone must not populate it.
     expect(ctx.state!.collectedOre).toEqual(collectedOreBefore);
