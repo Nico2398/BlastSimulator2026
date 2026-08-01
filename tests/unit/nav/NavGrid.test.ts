@@ -8,7 +8,7 @@
 //   BlastResult      (§15):    clearedRegion returned by executeBlast
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { NavGrid, type NavCellType } from '../../../src/core/nav/NavGrid.js';
+import { NavGrid, type NavCellType, type NavCell } from '../../../src/core/nav/NavGrid.js';
 import { VoxelGrid, type VoxelData } from '../../../src/core/world/VoxelGrid.js';
 import type { Building } from '../../../src/core/entities/Building.js';
 import type { DrillHole } from '../../../src/core/mining/DrillPlan.js';
@@ -977,5 +977,109 @@ describe('executeBlast — clearedRegion', () => {
     expect(result!.clearedRegion.maxX).toBeDefined();
     expect(result!.clearedRegion.minZ).toBeDefined();
     expect(result!.clearedRegion.maxZ).toBeDefined();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Group 4: findNearestTraversableCell / findNearestReachableCell (#437 fix —
+// spawn placement for `vehicle buy` / `employee hire` so new hires/vehicles
+// don't land inside a blast-crater void).
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** Build a hand-crafted NavGrid directly from a type grid, rows[z][x]. Bypasses VoxelGrid entirely for precise control over which cells are walkable/blocked. */
+function makeNavGridFromTypes(rows: NavCellType[][]): NavGrid {
+  const height = rows.length;
+  const width = rows[0]!.length;
+  const cells = rows.map(row => row.map((type): NavCell => {
+    const moveCost = type === 'walkable' ? 1.0 : type === 'ramp' ? 1.8 : type === 'drill_hole' ? 5.0 : Infinity;
+    return { type, moveCost, benchLevel: 0, vehicleOccupied: false };
+  }));
+  return new NavGrid(width, height, cells, 0);
+}
+
+describe('NavGrid.findNearestTraversableCell', () => {
+  it('returns the point unchanged when it is already traversable', () => {
+    const nav = makeNavGridFromTypes([
+      ['walkable', 'walkable', 'walkable'],
+      ['walkable', 'walkable', 'walkable'],
+      ['walkable', 'walkable', 'walkable'],
+    ]);
+    const result = NavGrid.findNearestTraversableCell(nav, 1, 1);
+    expect(result).toEqual({ x: 1, z: 1 });
+  });
+
+  it('searches outward in expanding rings to find the nearest traversable cell', () => {
+    // 5×5 grid, entirely blocked except a single walkable cell at (4,4).
+    const rows: NavCellType[][] = Array.from({ length: 5 }, () =>
+      Array.from({ length: 5 }, (): NavCellType => 'blocked'));
+    rows[4]![4] = 'walkable';
+    const nav = makeNavGridFromTypes(rows);
+
+    const result = NavGrid.findNearestTraversableCell(nav, 0, 0);
+    expect(result).toEqual({ x: 4, z: 4 });
+  });
+
+  it('returns the original point unchanged when nothing traversable exists within maxRadius', () => {
+    // Same grid as above, but the walkable cell at (4,4) is farther than the
+    // search bound allows.
+    const rows: NavCellType[][] = Array.from({ length: 5 }, () =>
+      Array.from({ length: 5 }, (): NavCellType => 'blocked'));
+    rows[4]![4] = 'walkable';
+    const nav = makeNavGridFromTypes(rows);
+
+    const result = NavGrid.findNearestTraversableCell(nav, 0, 0, 2);
+    expect(result).toEqual({ x: 0, z: 0 });
+  });
+});
+
+describe('NavGrid.findNearestReachableCell', () => {
+  it('returns the target unchanged when it is already traversable and path-connected to the anchor', () => {
+    const rows: NavCellType[][] = Array.from({ length: 5 }, () =>
+      Array.from({ length: 5 }, (): NavCellType => 'walkable'));
+    const nav = makeNavGridFromTypes(rows);
+
+    const result = NavGrid.findNearestReachableCell(nav, 0, 0, 4, 4);
+    expect(result).toEqual({ x: 4, z: 4 });
+  });
+
+  it('falls back to the target unchanged when the anchor itself resolves to no traversable cell', () => {
+    const rows: NavCellType[][] = Array.from({ length: 5 }, () =>
+      Array.from({ length: 5 }, (): NavCellType => 'blocked'));
+    const nav = makeNavGridFromTypes(rows);
+
+    const result = NavGrid.findNearestReachableCell(nav, 0, 0, 2, 2);
+    expect(result).toEqual({ x: 2, z: 2 });
+  });
+
+  it('skips a cell that is nearest by raw distance but walled off from the anchor, in favor of an actually reachable cell', () => {
+    // 7×7 grid: a walkable pocket at (3,3) is fully surrounded on all 8 sides
+    // by blocked cells, isolating it from the rest of the (otherwise entirely
+    // walkable) grid, which anchor (0,0) sits in. findNearestTraversableCell
+    // on (3,3) would return (3,3) unchanged (it IS traversable) — but nothing
+    // can actually path there, which is exactly the bug this function fixes.
+    const rows: NavCellType[][] = Array.from({ length: 7 }, () =>
+      Array.from({ length: 7 }, (): NavCellType => 'walkable'));
+    for (const [x, z] of [[2, 2], [3, 2], [4, 2], [2, 3], [4, 3], [2, 4], [3, 4], [4, 4]] as const) {
+      rows[z]![x] = 'blocked';
+    }
+    const nav = makeNavGridFromTypes(rows);
+
+    // Sanity: the pocket itself is traversable, and pure-distance search
+    // (findNearestTraversableCell) on it returns itself unchanged — it does
+    // not know the cell is unreachable.
+    expect(NavGrid.findNearestTraversableCell(nav, 3, 3)).toEqual({ x: 3, z: 3 });
+
+    const result = NavGrid.findNearestReachableCell(nav, 0, 0, 3, 3);
+
+    // Must not be the isolated pocket itself.
+    expect(result).not.toEqual({ x: 3, z: 3 });
+    // Must be an actually walkable, reachable cell.
+    expect(nav.cells[result.z]![result.x]!.type).toBe('walkable');
+    // The 8 ring cells immediately surrounding the pocket are all blocked, so
+    // the true nearest reachable cell sits one ring farther out — distance²
+    // 4 (e.g. (1,3), (5,3), (3,1), (3,5)) — never distance² 1 or 2, which
+    // would mean it picked one of the (blocked) ring cells or the pocket.
+    const distSq = (result.x - 3) ** 2 + (result.z - 3) ** 2;
+    expect(distSq).toBe(4);
   });
 });

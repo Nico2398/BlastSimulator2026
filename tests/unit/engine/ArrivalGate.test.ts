@@ -1,10 +1,14 @@
 // BlastSimulator2026 — Tests for ArrivalGate.tickArrivalGate (issue #437)
 //
 // ArrivalGate.ts is the single place that promotes pending* fields (set at
-// claim time by tickEmployees / requestBoardVehicle / requestHaulFragment /
-// enrolInTraining) into their live counterparts (restTicksRemaining,
-// taskTicksRemaining, vehicle.driverId) — but only once the employee has
-// actually arrived (destinationX === null && destinationZ === null).
+// claim time by tickEmployees / requestBoardVehicle / requestHaulFragment)
+// into their live counterparts (restTicksRemaining, taskTicksRemaining,
+// vehicle.driverId) — but only once the employee has actually arrived
+// (destinationX === null && destinationZ === null).
+//
+// Training enrollment (enrolInTraining) is deliberately NOT arrival-gated:
+// it relocates the employee to the school instantly rather than queuing a
+// walk — see EmployeeTraining.ts and #410.
 //
 // RED PHASE: src/core/engine/ArrivalGate.ts's tickArrivalGate always throws
 // 'not implemented'. Every test below therefore fails until the implementer

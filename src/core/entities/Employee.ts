@@ -160,12 +160,6 @@ export interface Employee {
    * ArrivalGate.tickArrivalGate on arrival.
    */
   pendingDriverVehicleId: number | null;
-  /**
-   * Training course details to start once the employee arrives at the
-   * training building, or null when no training arrival is pending.
-   * Consumed by ArrivalGate.tickArrivalGate on arrival.
-   */
-  pendingTrainingStart: { buildingId: number; skill: string; ticksRemaining: number; fee: number } | null;
 }
 
 // ── Employee state ──
@@ -235,7 +229,6 @@ export function hireEmployee(
     pendingActionType: null,
     pendingActionPayload: null,
     pendingDriverVehicleId: null,
-    pendingTrainingStart: null,
   };
   // Keep the stored salary consistent with the qualification just granted —
   // calculateSalary() sums qualification bonuses, so a base-only salary would

@@ -35,7 +35,6 @@ const EMPLOYEE_DEFAULTS = {
   pendingActionType: null,
   pendingActionPayload: null,
   pendingDriverVehicleId: null,
-  pendingTrainingStart: null,
 } as const;
 
 /**

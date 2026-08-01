@@ -121,6 +121,12 @@ export function startTraining(
  * which is what left an enrolled employee's sprite standing in the pit while
  * their qualification changed.
  *
+ * This relocation is an instant teleport, not a queued walk — intentionally
+ * NOT gated on navmesh arrival like survey/rest/boarding/hauling (#437).
+ * That gating would replace this existing, intentional teleport-not-walk
+ * design (#410) with a walk, which is a larger behavioral change than #437
+ * asked for; out of scope here.
+ *
  * Placed one tile outside the footprint, adjacent to the entry point corner
  * (`building.x`/`building.z`), rather than exactly on that corner: the raw
  * origin coordinate sits on the building's own opaque base-box footprint, so
