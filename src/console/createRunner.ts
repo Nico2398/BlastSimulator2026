@@ -8,6 +8,7 @@ import {
   newGameCommand,
   inspectCommand,
   terrainInfoCommand,
+  landscapeInfoCommand,
 } from './commands/world.js';
 import {
   type MiningContext,
@@ -96,7 +97,7 @@ export function createRunner(): RunnerWithContext {
 
   const emitter = new EventEmitter();
   const runner = new ConsoleRunner();
-  const ctx: MiningContext = { state: null, grid: null, softwareTier: 0, tubingState: createTubingState(), emitter };
+  const ctx: MiningContext = { state: null, grid: null, landscape: null, softwareTier: 0, tubingState: createTubingState(), emitter };
 
   // --- World commands (Phase 2) ---
   runner.register('new_game', 'Create a new game (mine_type:desert seed:42)', (args, named) =>
@@ -107,6 +108,9 @@ export function createRunner(): RunnerWithContext {
   );
   runner.register('terrain_info', 'Show terrain grid info', (args, named) =>
     terrainInfoCommand(ctx, args, named),
+  );
+  runner.register('landscape_info', 'Build (if needed) and show the landscape zone tile count/layout', (args, named) =>
+    landscapeInfoCommand(ctx, args, named),
   );
   runner.register('survey', 'Survey terrain (seismic|core_sample|aerial) x:<X> z:<Z>', (args, named) =>
     surveyCommand(ctx, args, named),

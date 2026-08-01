@@ -600,6 +600,15 @@ export function placeForests(
       const z = extent.minZ + cz * FOREST_CELL + cellRand(seed, cx, cz, FOREST_JITTER_Z_SALT) * FOREST_CELL;
 
       if (insideRect(excludeRect, x, z)) continue;
+
+      // Density roll first: it's one noise call + one hash, versus the slope
+      // check's 4 full height samples through every overlay. Most cells fail
+      // density (typical forestDensity is well under 1), so checking it
+      // before slope avoids most of the expensive work for free — same
+      // accepted trees either way, since neither draw depends on the other.
+      const density = forestDensity * Math.max(0, Math.min(1, fields.forest(x, z) * 0.5 + 0.5));
+      if (cellRand(seed, cx, cz, FOREST_DENSITY_SALT) >= density) continue;
+
       if (rivers.some(r => {
         const info = nearestSegmentInfo(r.points, r.widths, x, z);
         return info.width > 0 && info.dist < info.width + 3;
@@ -608,9 +617,6 @@ export function placeForests(
 
       const slope = estimateSlopeOf(finalHeightAt, x, z, FOREST_SLOPE_WINDOW);
       if (slope >= FOREST_SLOPE_MAX) continue;
-
-      const density = forestDensity * Math.max(0, Math.min(1, fields.forest(x, z) * 0.5 + 0.5));
-      if (cellRand(seed, cx, cz, FOREST_DENSITY_SALT) >= density) continue;
 
       trees.push({
         x, z, h: finalHeightAt(x, z),

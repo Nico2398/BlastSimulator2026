@@ -110,6 +110,7 @@ export function campaignStartCommand(
     sizeX: level.gridX,
     sizeY: level.gridY,
     sizeZ: level.gridZ,
+    mixedRockHardness: level.mixedRockHardness,
   });
 
   // Generate initial contracts so they're available immediately

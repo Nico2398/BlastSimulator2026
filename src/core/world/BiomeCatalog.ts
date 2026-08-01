@@ -7,6 +7,7 @@
 // naturally between neighbouring biomes.
 
 import type { Spline } from './HeightSpline.js';
+import type { HeightShapingParams } from './WorldGen.js';
 
 export interface BiomeDef {
   readonly id: string;
@@ -136,6 +137,16 @@ export function getBiome(id: string): BiomeDef | undefined {
 
 export function getAllBiomes(): readonly BiomeDef[] {
   return BIOMES;
+}
+
+/** A biome's height-shaping triple, in WorldGen's own parameter shape. */
+export function biomeShaping(biome: BiomeDef): HeightShapingParams {
+  return { baseSpline: biome.baseSpline, reliefSpline: biome.reliefSpline, pvAmplitude: biome.pvAmplitude };
+}
+
+/** Stable index of a biome id into getAllBiomes()'s fixed order — for compact Uint8 storage (#458 T2.1/A16). */
+export function biomeIndexOf(id: string): number {
+  return BIOMES.findIndex(b => b.id === id);
 }
 
 export interface BiomeWeight {

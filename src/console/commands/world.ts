@@ -3,7 +3,9 @@
 import type { CommandResult } from '../ConsoleRunner.js';
 import { createGame, buildGameNavGrid, type GameState } from '../../core/state/GameState.js';
 import { getBiome, getAllBiomes } from '../../core/world/BiomeCatalog.js';
-import { generateTerrain } from '../../core/world/TerrainGen.js';
+import { generateTerrain, buildTerrainContext } from '../../core/world/TerrainGen.js';
+import { buildStructureSet } from '../../core/world/Structures.js';
+import { buildLandscapeMap, type LandscapeMap } from '../../core/world/LandscapeMap.js';
 import { getRock } from '../../core/world/RockCatalog.js';
 import { getOre } from '../../core/world/OreCatalog.js';
 import { getDominantRockId } from '../../core/world/VoxelGrid.js';
@@ -15,6 +17,15 @@ import { decodeVoxelGrid, type SerializedVoxels } from '../../core/state/VoxelGr
 export interface GameContext {
   state: GameState | null;
   grid: VoxelGrid | null;
+  /**
+   * Purely-aesthetic landscape zone beside `grid` (#458 T2.1/D7) — never
+   * serialized, never read by simulation. Built lazily via `ensureLandscape`
+   * rather than eagerly here: nothing consumes it yet (T3.2's landscape
+   * mesher is the first real caller), and eager construction would add
+   * several seconds to every `new_game`/`regenerateGrid` call, including the
+   * 106 existing scenarios that never reference it.
+   */
+  landscape: LandscapeMap | null;
   /** Event emitter for game-over and campaign events. Listeners attached in main.ts/console.ts. */
   emitter: EventEmitter;
 }
@@ -33,15 +44,45 @@ export const DEFAULT_GRID_SIZE = 64;
  */
 export function regenerateGrid(
   ctx: GameContext,
-  params: { seed: number; climateBias: readonly [number, number]; sizeX: number; sizeY: number; sizeZ: number },
+  params: {
+    seed: number; climateBias: readonly [number, number];
+    sizeX: number; sizeY: number; sizeZ: number;
+    mixedRockHardness?: boolean;
+  },
 ): void {
   if (!ctx.state) return;
-  const { seed, climateBias, sizeX, sizeY, sizeZ } = params;
-  ctx.grid = generateTerrain({ sizeX, sizeY, sizeZ, seed, climateBias });
+  const { seed, climateBias, sizeX, sizeY, sizeZ, mixedRockHardness } = params;
+  ctx.grid = generateTerrain({ sizeX, sizeY, sizeZ, seed, climateBias, ...(mixedRockHardness !== undefined ? { mixedRockHardness } : {}) });
+  ctx.landscape = null; // stale for the new grid — rebuilt lazily by ensureLandscape() (#458 T2.1)
   buildGameNavGrid(ctx.state, ctx.grid, ctx.state.buildings.buildings, ctx.state.drillHoles);
   ctx.emitter.emit('terrain:updated', {
     region: { minX: 0, minY: 0, minZ: 0, maxX: sizeX - 1, maxY: sizeY - 1, maxZ: sizeZ - 1 },
   });
+}
+
+/**
+ * Build (or return the already-built) landscape map for the current grid.
+ * Lazy and cached on `ctx.landscape` — call this the first time something
+ * actually needs landscape data (T3.2's mesher; `landscape_info` below);
+ * every other command that only touches the playable grid never pays this
+ * cost. `params` must match whatever `regenerateGrid`/`restoreGrid` most
+ * recently built the grid with, or the two will disagree at the boundary.
+ */
+export function ensureLandscape(
+  ctx: GameContext,
+  params: {
+    seed: number; climateBias: readonly [number, number];
+    sizeX: number; sizeY: number; sizeZ: number;
+    mixedRockHardness?: boolean;
+  },
+): LandscapeMap | null {
+  if (!ctx.grid) return null;
+  if (ctx.landscape) return ctx.landscape;
+
+  const { worldGen, biome, strata } = buildTerrainContext(params);
+  const structureSet = buildStructureSet(params.seed, worldGen.fields, worldGen.shapingAt, biome.forestDensity, worldGen.playableRect);
+  ctx.landscape = buildLandscapeMap(worldGen, params.climateBias, structureSet, strata, ctx.grid.palette);
+  return ctx.landscape;
 }
 
 /**
@@ -54,6 +95,7 @@ export function regenerateGrid(
 export function restoreGrid(ctx: GameContext, voxels: SerializedVoxels): void {
   if (!ctx.state) return;
   ctx.grid = decodeVoxelGrid(voxels);
+  ctx.landscape = null; // stale for the restored grid — rebuilt lazily by ensureLandscape() (#458 T2.1)
   buildGameNavGrid(ctx.state, ctx.grid, ctx.state.buildings.buildings, ctx.state.drillHoles);
   ctx.emitter.emit('terrain:updated', {
     region: { minX: 0, minY: 0, minZ: 0, maxX: voxels.sizeX - 1, maxY: voxels.sizeY - 1, maxZ: voxels.sizeZ - 1 },
@@ -164,6 +206,41 @@ export function terrainInfoCommand(
       `Seed: ${ctx.state.seed}`,
       `Solid voxels: ${solidCount}`,
       `Air voxels: ${airCount}`,
+    ].join('\n'),
+  };
+}
+
+/**
+ * Builds (or reports the already-built) landscape map for the current game
+ * — the first real trigger for `ensureLandscape`'s lazy build. Resolves
+ * climateBias from the saved mine type, same as `newGameCommand`/`loadCommand`;
+ * `mixedRockHardness` isn't persisted on GameState, so this always builds
+ * the normal (non-mixed) strata profile even for a mixedRockHardness level —
+ * a known limitation shared with `regenerateGrid`'s own load-path callers.
+ */
+export function landscapeInfoCommand(
+  ctx: GameContext,
+  _args: string[],
+  _named: Record<string, string>,
+): CommandResult {
+  if (!ctx.state || !ctx.grid || !ctx.state.world) {
+    return { success: false, output: 'No game loaded. Use new_game first.' };
+  }
+
+  const biome = getBiome(ctx.state.mineType);
+  if (!biome) return { success: false, output: `Unknown mine type: "${ctx.state.mineType}".` };
+
+  const { sizeX, sizeY, sizeZ } = ctx.state.world;
+  const landscape = ensureLandscape(ctx, { seed: ctx.state.seed, climateBias: biome.climateCenter, sizeX, sizeY, sizeZ });
+  if (!landscape) return { success: false, output: 'Could not build landscape — no grid loaded.' };
+
+  return {
+    success: true,
+    output: [
+      `Tiles: ${landscape.tiles.length}`,
+      `Samples/tile: ${landscape.samplesPerTile}x${landscape.samplesPerTile}`,
+      `Tile span: ${landscape.tileSpan}m, coarse step: ${landscape.coarseStep}m`,
+      `Extent half: ${landscape.extentHalf}m`,
     ].join('\n'),
   };
 }

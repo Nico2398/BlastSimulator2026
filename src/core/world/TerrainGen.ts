@@ -5,8 +5,8 @@
 
 import { VoxelGrid } from './VoxelGrid.js';
 import type { BiomeDef } from './BiomeCatalog.js';
-import { selectBiomeWeights, dominantBiome } from './BiomeCatalog.js';
-import { createWorldGenContext, sampleSurfaceVoxelY, type HeightShapingParams } from './WorldGen.js';
+import { selectBiomeWeights, dominantBiome, biomeShaping } from './BiomeCatalog.js';
+import { createWorldGenContext, sampleSurfaceVoxelY, type WorldGenContext } from './WorldGen.js';
 import { buildStrataProfile, buildMixedHardnessStrata, StrataSampler } from './Strata.js';
 import { OreVeinSampler } from './OreVeins.js';
 
@@ -31,33 +31,25 @@ export interface TerrainConfig {
   mixedRockHardness?: boolean;
 }
 
-function biomeShaping(biome: BiomeDef): HeightShapingParams {
-  return { baseSpline: biome.baseSpline, reliefSpline: biome.reliefSpline, pvAmplitude: biome.pvAmplitude };
+export interface TerrainContext {
+  worldGen: WorldGenContext;
+  biome: BiomeDef;
+  strata: StrataSampler;
+  oreVeins: OreVeinSampler;
 }
 
 /**
- * Generate terrain into a new VoxelGrid.
- * Algorithm:
- *   1. Sample surface height per (x, z) from the unified world generator (WorldGen.ts, #458 T1.1),
- *      climate-blended across biomes (BiomeCatalog.ts, #458 T1.2) — the same sampler the landscape
- *      heightmap will read from once it exists (T2.1), so the two representations cannot disagree
- *      at their shared boundary.
- *   2. Fill voxels below surface from a depth-stratified rock profile (Strata.ts, #458 T1.3/A11)
- *   3. Distribute ore veins using per-ore anisotropic noise (OreVeins.ts, #458 T1.3/A12)
- *   4. Clear border zone of ores (neutral zone)
- *
- * Height blends every biome's shaping by climate weight, evaluated per
- * column — a real gradient at a climate transition, not a seam. Rock/ore
- * generation (steps 2-4) still uses ONE dominant biome for the whole grid
- * (the highest-weighted biome at the grid's own centre) rather than
- * blending per column — full per-column biome-blended strata is out of
- * scope for T1.3 (no accept criterion calls for it) and would belong to a
- * future landscape-blending task if ever needed.
+ * Builds everything generateTerrain needs from one config: the world height
+ * sampler, the grid's single dominant biome, and its strata/ore samplers.
+ * Exported (not just internal to generateTerrain) so a caller building the
+ * landscape map alongside the playable grid (#458 T2.1) can reconstruct an
+ * equivalent context from the same config — determinism guarantees it
+ * produces byte-identical sampling to what generateTerrain used internally,
+ * without the two needing to share object references (unlike the palette,
+ * which genuinely must be the same instance — see LandscapeMap.ts).
  */
-export function generateTerrain(config: TerrainConfig): VoxelGrid {
+export function buildTerrainContext(config: TerrainConfig): TerrainContext {
   const { sizeX, sizeY, sizeZ, seed, climateBias, mixedRockHardness } = config;
-
-  const grid = new VoxelGrid(sizeX, sizeY, sizeZ);
 
   const worldGen = createWorldGenContext(seed, sizeX, sizeY, sizeZ, (fields) => (x, z) => {
     const weights = selectBiomeWeights(fields.temperature(x, z), fields.humidity(x, z), climateBias, 1.0);
@@ -77,6 +69,33 @@ export function generateTerrain(config: TerrainConfig): VoxelGrid {
     : buildStrataProfile(biome.dominantRocks);
   const strata = new StrataSampler(seed, profile);
   const oreVeins = new OreVeinSampler(seed);
+
+  return { worldGen, biome, strata, oreVeins };
+}
+
+/**
+ * Generate terrain into a new VoxelGrid.
+ * Algorithm:
+ *   1. Sample surface height per (x, z) from the unified world generator (WorldGen.ts, #458 T1.1),
+ *      climate-blended across biomes (BiomeCatalog.ts, #458 T1.2) — the same sampler the landscape
+ *      heightmap reads from (LandscapeMap.ts, #458 T2.1), so the two representations cannot disagree
+ *      at their shared boundary.
+ *   2. Fill voxels below surface from a depth-stratified rock profile (Strata.ts, #458 T1.3/A11)
+ *   3. Distribute ore veins using per-ore anisotropic noise (OreVeins.ts, #458 T1.3/A12)
+ *   4. Clear border zone of ores (neutral zone)
+ *
+ * Height blends every biome's shaping by climate weight, evaluated per
+ * column — a real gradient at a climate transition, not a seam. Rock/ore
+ * generation (steps 2-4) still uses ONE dominant biome for the whole grid
+ * (the highest-weighted biome at the grid's own centre) rather than
+ * blending per column — full per-column biome-blended strata is out of
+ * scope for T1.3 (no accept criterion calls for it) and would belong to a
+ * future landscape-blending task if ever needed.
+ */
+export function generateTerrain(config: TerrainConfig): VoxelGrid {
+  const { sizeX, sizeY, sizeZ } = config;
+  const grid = new VoxelGrid(sizeX, sizeY, sizeZ);
+  const { worldGen, biome, strata, oreVeins } = buildTerrainContext(config);
 
   for (let z = 0; z < sizeZ; z++) {
     for (let x = 0; x < sizeX; x++) {
