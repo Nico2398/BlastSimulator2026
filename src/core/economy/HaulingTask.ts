@@ -123,6 +123,19 @@ export function tickHaulingProgress(state: GameState, vehicle: Vehicle): void {
 }
 
 /**
+ * Find a reachability-aware ground fragment for `vehicleId` to haul: the
+ * nearest 'on_ground' fragment that is actually path-connected to the
+ * vehicle's current position (via NavGrid.computeReachableSet), rather than
+ * plain nearest-distance — a full-clear blast leaves most fragments in
+ * unreachable 'void' NavGrid cells. Returns null when none qualify.
+ *
+ * // TODO: implement
+ */
+export function findReachableGroundFragment(state: GameState, vehicleId: number): number | null {
+  throw new Error(`not implemented: findReachableGroundFragment(vehicleId=${vehicleId}, state has ${state.logistics.fragments.length} fragments)`);
+}
+
+/**
  * Resolve the nearest walkable NavGrid cell on the ring around a depot
  * building, closest to the vehicle. A building's raw (x, z) is always
  * NavGrid-blocked (see findBuildingApproachCell's doc), so both hauling

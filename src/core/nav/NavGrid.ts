@@ -247,6 +247,17 @@ export class NavGrid {
   }
 
   /**
+   * Compute the set of all cells 8-directionally path-connected to
+   * (anchorX, anchorZ) — same adjacency Pathfinding.findPath and
+   * findNearestReachableCell walk. Returns cell keys in `"x,z"` format.
+   *
+   * // TODO: implement
+   */
+  static computeReachableSet(navGrid: NavGrid, anchorX: number, anchorZ: number): Set<string> {
+    throw new Error(`not implemented: computeReachableSet(navGrid width=${navGrid.width}, anchor=${anchorX},${anchorZ})`);
+  }
+
+  /**
    * Classify a single NavGrid cell based on column solidity, drill holes, buildings, and ramps.
    * Priority order (highest to lowest): void > drill_hole > blocked > ramp > walkable.
    *
