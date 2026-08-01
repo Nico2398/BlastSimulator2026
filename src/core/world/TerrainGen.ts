@@ -1,11 +1,13 @@
 // BlastSimulator2026 — Procedural terrain generation
-// Uses simplex noise + seeded PRNG to populate a VoxelGrid.
+// Populates a VoxelGrid from the unified world height sampler (WorldGen.ts)
+// plus per-rock/per-ore 3D simplex noise for composition.
 
-import { createNoise2D, createNoise3D } from 'simplex-noise';
+import { createNoise3D } from 'simplex-noise';
 import { Random } from '../math/Random.js';
 import { VoxelGrid, type VoxelRockComposition } from './VoxelGrid.js';
 import { getAllRocks, type RockType } from './RockCatalog.js';
 import type { MinePreset } from './MineType.js';
+import { createWorldGenContext, sampleSurfaceVoxelY } from './WorldGen.js';
 
 export interface TerrainConfig {
   sizeX: number;
@@ -18,10 +20,18 @@ export interface TerrainConfig {
 /**
  * Generate terrain into a new VoxelGrid.
  * Algorithm:
- *   1. Compute surface height per (x, z) using layered 2D simplex noise
+ *   1. Sample surface height per (x, z) from the unified world generator (WorldGen.ts, #458 T1.1) —
+ *      the same sampler the landscape heightmap will read from once it exists (T2.1), so the two
+ *      representations cannot disagree at their shared boundary.
  *   2. Fill voxels below surface with rock (composition from per-rock 3D noise + level bias)
  *   3. Distribute ore veins using separate 3D noise per ore type
  *   4. Clear border zone of ores (neutral zone)
+ *
+ * `preset`'s baseElevation/elevationVariation/flatness fields are no longer
+ * read here — height now comes entirely from WorldGen's layered fields,
+ * using one neutral shaping profile for every preset until BiomeCatalog
+ * supplies per-biome splines (#458 T1.2). Composition/ore generation is
+ * unchanged pending its own rewrite in T1.3.
  */
 export function generateTerrain(config: TerrainConfig): VoxelGrid {
   const { sizeX, sizeY, sizeZ, seed, preset } = config;
@@ -29,16 +39,16 @@ export function generateTerrain(config: TerrainConfig): VoxelGrid {
 
   // simplex-noise uses a PRNG function for seeding
   const prngFn = () => rng.next();
-  const noise2d = createNoise2D(prngFn);
   const noise3dRock = createNoise3D(prngFn);
   const noise3dOre = createNoise3D(prngFn);
 
   const grid = new VoxelGrid(sizeX, sizeY, sizeZ);
   const rocks = selectRocksByPreset(preset);
+  const worldGen = createWorldGenContext(seed, sizeX, sizeY, sizeZ);
 
   for (let z = 0; z < sizeZ; z++) {
     for (let x = 0; x < sizeX; x++) {
-      const surfaceY = computeSurfaceHeight(x, z, sizeX, sizeZ, sizeY, preset, noise2d);
+      const surfaceY = sampleSurfaceVoxelY(worldGen, x, z);
 
       for (let y = 0; y < sizeY; y++) {
         if (y >= surfaceY) {
@@ -59,31 +69,6 @@ export function generateTerrain(config: TerrainConfig): VoxelGrid {
   }
 
   return grid;
-}
-
-function computeSurfaceHeight(
-  x: number, z: number,
-  sizeX: number, sizeZ: number, sizeY: number,
-  preset: MinePreset,
-  noise2d: ReturnType<typeof createNoise2D>,
-): number {
-  const nx = x / sizeX;
-  const nz = z / sizeZ;
-
-  // Layered noise: large features + detail
-  const n1 = noise2d(nx * 2, nz * 2) * 0.6;
-  const n2 = noise2d(nx * 5, nz * 5) * 0.3;
-  const n3 = noise2d(nx * 10, nz * 10) * 0.1;
-  const rawNoise = n1 + n2 + n3; // range roughly [-1, 1]
-
-  // Flatten based on preset
-  const flattened = rawNoise * (1 - preset.flatness);
-
-  const baseY = preset.baseElevation * sizeY;
-  const variation = preset.elevationVariation * sizeY;
-  const height = baseY + flattened * variation;
-
-  return Math.max(1, Math.min(sizeY - 1, Math.round(height)));
 }
 
 /** Select and weight rocks based on the preset's dominant rock list. */
