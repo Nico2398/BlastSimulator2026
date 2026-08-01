@@ -10,12 +10,17 @@ import { PostPipeline } from './post/PostPipeline.js';
 // Sky color for the default empty scene — cheerful daytime blue
 const SKY_COLOR = 0x87ceeb;
 
-// Camera initial position: elevated, looking down at the mine area
-// Tutorial pit grid is 24×12×24 — camera stays close enough to see blast craters
-const CAMERA_POSITION = new THREE.Vector3(12, 50, 60);
-const CAMERA_TARGET = new THREE.Vector3(12, 0, 12);
+// Camera initial position: an origin-centred placeholder for the brief window
+// before any game loads. Every level size (#458 T6.1/D13) immediately
+// replaces this via GameRenderer.frameCameraOnGrid()'s frame-on-grid call —
+// no size-specific tuning belongs here.
+const CAMERA_POSITION = new THREE.Vector3(0, 50, 80);
+const CAMERA_TARGET = new THREE.Vector3(0, 0, 0);
 const CAMERA_NEAR = 0.5;
-const CAMERA_FAR = 4000;
+// 6000 clears the largest campaign level (160×160 grid + 1600m-half
+// landscape extent) with room to spare; the aerial-perspective pass hides
+// the far clip in haze rather than a hard pop (#458 T6.1/D13).
+const CAMERA_FAR = 6000;
 const CAMERA_FOV = 55; // degrees — slightly narrow for cinematic feel
 
 // Cartoon-style sunlight, from upper-right — retired as a plain

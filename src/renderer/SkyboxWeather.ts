@@ -32,7 +32,17 @@ const WEATHER_COLORS: Record<WeatherState, WeatherColors> = {
 
 // ---------- Rain particle config ----------
 const RAIN_PARTICLE_COUNT = 1500;
-const RAIN_AREA = 80;    // width/depth of rain box
+/**
+ * Width/depth of the rain box. Scales with the camera's orbit distance
+ * (#458 T6.1/D13) — a fixed area sized for the tutorial's close-in camera
+ * read as a tiny, sparse patch once the larger campaign levels' cameras
+ * pull back to frame a 96-160m site; RAIN_AREA_FACTOR keeps the box roughly
+ * matching the visible ground regardless of zoom.
+ */
+const RAIN_AREA_BASE = 80;
+const RAIN_AREA_MIN = 80;
+const RAIN_AREA_MAX = 400;
+const RAIN_AREA_FACTOR = 1.4; // area = clamp(cameraDistance * factor, min, max)
 const RAIN_HEIGHT = 50;  // height rain falls from
 const RAIN_SPEED = 20;   // voxels per second downward
 const RAIN_POINT_SIZE = 1.4;
@@ -110,6 +120,8 @@ export class SkyboxWeather {
   private rainPoints: THREE.Points | null = null;
   private readonly rainPositions: Float32Array;
   private rainVisible = false;
+  /** Current rain-box width/depth — rescaled each frame from camera distance (#458 T6.1/D13). */
+  private rainArea = RAIN_AREA_BASE;
 
   // Storm
   private stormFlashTimer = 4.0;
@@ -168,8 +180,15 @@ export class SkyboxWeather {
    * @param dt - seconds since last call
    * @param cameraX - camera X position (rain follows camera)
    * @param cameraZ - camera Z position
+   * @param cameraDistance - camera orbit distance, scales the rain box so it
+   *   doesn't read as a sparse patch once the camera pulls back on a larger
+   *   level (#458 T6.1/D13). Omit to keep the base area, so existing test/
+   *   scenario call sites that predate this parameter still work.
    */
-  update(dt: number, cameraX: number, cameraZ: number): void {
+  update(dt: number, cameraX: number, cameraZ: number, cameraDistance?: number): void {
+    this.rainArea = cameraDistance === undefined
+      ? RAIN_AREA_BASE
+      : Math.min(RAIN_AREA_MAX, Math.max(RAIN_AREA_MIN, cameraDistance * RAIN_AREA_FACTOR));
     const target = WEATHER_COLORS[this.currentWeather];
 
     // Lerp sky color
@@ -211,9 +230,9 @@ export class SkyboxWeather {
 
   private initRainPositions(): void {
     for (let i = 0; i < RAIN_PARTICLE_COUNT; i++) {
-      this.rainPositions[i * 3]     = (Math.random() - 0.5) * RAIN_AREA;
+      this.rainPositions[i * 3]     = (Math.random() - 0.5) * this.rainArea;
       this.rainPositions[i * 3 + 1] = Math.random() * RAIN_HEIGHT;
-      this.rainPositions[i * 3 + 2] = (Math.random() - 0.5) * RAIN_AREA;
+      this.rainPositions[i * 3 + 2] = (Math.random() - 0.5) * this.rainArea;
     }
   }
 
@@ -238,7 +257,7 @@ export class SkyboxWeather {
     if (!this.rainPoints) return;
 
     const drop = RAIN_SPEED * dt;
-    const halfArea = RAIN_AREA / 2;
+    const halfArea = this.rainArea / 2;
 
     for (let i = 0; i < RAIN_PARTICLE_COUNT; i++) {
       const yIdx = i * 3 + 1;
@@ -247,9 +266,9 @@ export class SkyboxWeather {
       if ((this.rainPositions[yIdx] ?? 0) < 0) {
         // Positions are local to the rainPoints mesh (which is translated to cx,cz).
         // Adding cx/cz here would double the offset.
-        this.rainPositions[i * 3]     = (Math.random() - 0.5) * RAIN_AREA;
+        this.rainPositions[i * 3]     = (Math.random() - 0.5) * this.rainArea;
         this.rainPositions[i * 3 + 1] = RAIN_HEIGHT;
-        this.rainPositions[i * 3 + 2] = (Math.random() - 0.5) * RAIN_AREA;
+        this.rainPositions[i * 3 + 2] = (Math.random() - 0.5) * this.rainArea;
       }
     }
 

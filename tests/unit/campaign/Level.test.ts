@@ -88,9 +88,9 @@ describe('Level definition system (7.1)', () => {
     expect(level!.descKey).toBe('level.tutorial_pit.desc');
     expect(level!.biome).toBe('desert_badlands');
     expect(level!.terrainSeed).toBe(42);
-    expect(level!.gridX).toBe(24);
-    expect(level!.gridY).toBe(12);
-    expect(level!.gridZ).toBe(24);
+    expect(level!.gridX).toBe(32);
+    expect(level!.gridY).toBe(20);
+    expect(level!.gridZ).toBe(32);
     expect(level!.startingCash).toBe(80000);
     expect(level!.availableExplosives).toContain('pop_rock');
     expect(level!.availableExplosives).toContain('boomite');

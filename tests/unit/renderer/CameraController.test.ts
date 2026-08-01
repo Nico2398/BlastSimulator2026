@@ -68,7 +68,7 @@ describe('CameraController', () => {
     expect(countAfter).toBe(0);
   });
 
-  it('zoom limits are respected (ZOOM_MIN=5, ZOOM_MAX=600)', () => {
+  it('zoom limits are respected (ZOOM_MIN=5, ZOOM_MAX=1200 — #458 T6.1/D13)', () => {
     // Simulate wheel events using plain objects (Node.js has no WheelEvent)
     const makeWheel = (deltaY: number) =>
       Object.assign(Object.create({ preventDefault: () => {} }), { deltaY });
@@ -79,15 +79,15 @@ describe('CameraController', () => {
     }
     const distIn = camera.position.distanceTo(target);
     expect(distIn).toBeGreaterThanOrEqual(5);
-    expect(distIn).toBeLessThanOrEqual(600);
+    expect(distIn).toBeLessThanOrEqual(1200);
 
     // Simulate many scroll-out events
-    for (let i = 0; i < 500; i++) {
+    for (let i = 0; i < 1000; i++) {
       canvas._listeners['wheel']?.forEach((fn) => fn(makeWheel(1) as unknown as Event));
     }
     const distOut = camera.position.distanceTo(target);
     expect(distOut).toBeGreaterThanOrEqual(5);
-    expect(distOut).toBeLessThanOrEqual(600);
+    expect(distOut).toBeLessThanOrEqual(1200);
   });
 
   describe('frameSite', () => {
@@ -128,6 +128,64 @@ describe('CameraController', () => {
       const dist = camera.position.length();
       expect(dist).toBeGreaterThan(0);
       expect(Number.isFinite(dist)).toBe(true);
+    });
+  });
+
+  describe('setPanLeash (#458 T6.1/D13)', () => {
+    // A camera with zero X offset from its target (directly "north" of it,
+    // not straight overhead — straight-down lookAt is a gimbal-lock edge
+    // case) makes camera.position.x track target.x 1:1, so leash bounds can
+    // be asserted directly against the camera position.
+    function makeZeroXOffsetRig() {
+      const localTarget = new THREE.Vector3(50, 0, 50);
+      const localCamera = new THREE.PerspectiveCamera(55, 16 / 9, 0.5, 4000);
+      localCamera.position.set(50, 150, 170);
+      localCamera.lookAt(localTarget);
+      const localCanvas = makeMockCanvas();
+      const localController = new CameraController(localCamera, localTarget.clone(), localCanvas as unknown as HTMLElement);
+      return { localCamera, localCanvas, localController };
+    }
+
+    function dragPan(canvasRig: ReturnType<typeof makeMockCanvas>, steps: number, stepPx: number) {
+      const ev = (x: number, y: number, button = 2) =>
+        Object.assign(Object.create({ preventDefault: () => {} }), { button, clientX: x, clientY: y });
+      canvasRig._listeners['mousedown']?.forEach((fn) => fn(ev(0, 0) as unknown as Event));
+      for (let i = 1; i <= steps; i++) {
+        canvasRig._listeners['mousemove']?.forEach((fn) => fn(ev(i * stepPx, 0) as unknown as Event));
+      }
+      canvasRig._listeners['mouseup']?.forEach((fn) => fn(ev(0, 0) as unknown as Event));
+    }
+
+    it('clamps manual panning to the playable rect plus margin', () => {
+      const { localCamera, localCanvas, localController } = makeZeroXOffsetRig();
+      localController.setPanLeash({ minX: 0, minZ: 0, maxX: 100, maxZ: 100 }, 20);
+
+      // Sign convention verified empirically: positive dx pans toward -X.
+      dragPan(localCanvas, 50, 500); // drag hard toward -X, far past the leash
+      expect(localCamera.position.x).toBeGreaterThanOrEqual(-20);
+
+      dragPan(localCanvas, 50, -500); // drag hard toward +X, far past the leash
+      expect(localCamera.position.x).toBeLessThanOrEqual(120);
+    });
+
+    it('clearing the leash (null) removes the bound', () => {
+      const { localCamera, localCanvas, localController } = makeZeroXOffsetRig();
+      localController.setPanLeash({ minX: 0, minZ: 0, maxX: 100, maxZ: 100 }, 20);
+      localController.setPanLeash(null, 20);
+
+      dragPan(localCanvas, 50, 500); // pans toward -X, unbounded without the leash
+      expect(localCamera.position.x).toBeLessThan(-20);
+    });
+
+    it('does not constrain focus() or frameSite() — only manual panning', () => {
+      const { localCamera, localController } = makeZeroXOffsetRig();
+      localController.setPanLeash({ minX: 0, minZ: 0, maxX: 100, maxZ: 100 }, 20);
+
+      localController.frameSite(500, 0, 500, 50);
+      expect(localCamera.position.x).toBeGreaterThan(120);
+
+      localController.focus(800, 0, 800, 30);
+      expect(localCamera.position.x).toBeGreaterThan(120);
     });
   });
 });

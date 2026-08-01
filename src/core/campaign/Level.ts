@@ -65,9 +65,9 @@ const LEVELS: readonly LevelDef[] = [
     biome: 'desert_badlands',
     climateBias: [0.7, -0.6],
     terrainSeed: 42,
-    gridX: 24,
-    gridY: 12,
-    gridZ: 24,
+    gridX: 32,
+    gridY: 20,
+    gridZ: 32,
     // The tutorial scripts every purchase it teaches: four hires ($5,000), a
     // survey (up to $3,000), the scripted consultant ($3,000), a debris_hauler
     // ($25,000) and a freight_warehouse ($15,000) — about $52,000 before the
@@ -95,9 +95,9 @@ const LEVELS: readonly LevelDef[] = [
     biome: 'desert_badlands',
     climateBias: [0.7, -0.6],
     terrainSeed: 1138,
-    gridX: 40,
-    gridY: 20,
-    gridZ: 40,
+    gridX: 96,
+    gridY: 40,
+    gridZ: 96,
     startingCash: 50000,
     availableExplosives: ['pop_rock', 'boomite', 'krackle'],
     // Unlock threshold: $80k. Reachable in ~10 good blasts.
@@ -120,9 +120,9 @@ const LEVELS: readonly LevelDef[] = [
     biome: 'alpine_granite',
     climateBias: [-0.7, 0.1],
     terrainSeed: 2277,
-    gridX: 60,
-    gridY: 30,
-    gridZ: 60,
+    gridX: 128,
+    gridY: 56,
+    gridZ: 128,
     startingCash: 75000,
     availableExplosives: ['pop_rock', 'boomite', 'krackle', 'big_bada_boom', 'shatternite'],
     // Unlock threshold: $250k. Real mountain quarry margins are tighter.
@@ -147,9 +147,9 @@ const LEVELS: readonly LevelDef[] = [
     biome: 'tropical_karst',
     climateBias: [0.6, 0.7],
     terrainSeed: 3666,
-    gridX: 80,
-    gridY: 40,
-    gridZ: 80,
+    gridX: 160,
+    gridY: 64,
+    gridZ: 160,
     startingCash: 100000,
     availableExplosives: [
       'pop_rock', 'boomite', 'krackle',

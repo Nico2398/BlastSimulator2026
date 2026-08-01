@@ -593,8 +593,15 @@ describe('Economy', () => {
     const assignResult = vehicleCommand(ctx, ['driver', String(vehicleId), String(driverId)], {});
     expect(assignResult.success).toBe(true);
 
-    // 3. Build an active Freight Warehouse.
-    const buildResult = buildCommand(ctx, ['freight_warehouse'], { at: '5,5' });
+    // 3. Build an active Freight Warehouse. (13,13), near the drill site
+    // rather than (5,5): bigger levels (#458 T6.1/D13) carry far more
+    // natural terrain relief than the old ones, fragmenting NavGrid bench
+    // levels into small pockets more often — (5,5) sat on a different bench
+    // than the drill/fragment area with no nearby ramp connecting them, so
+    // a loaded hauler could never findPath there (confirmed via direct
+    // reproduction). Keeping pickup and drop-off on the same bench
+    // sidesteps that pathfinding gap; a deeper general fix belongs to T6.2.
+    const buildResult = buildCommand(ctx, ['freight_warehouse'], { at: '13,13' });
     expect(buildResult.success).toBe(true);
 
     // Let the driver walk to and board the vehicle.

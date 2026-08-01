@@ -25,10 +25,10 @@ describe('Level 3 — Win', () => {
     expect(ctx.state!.cash).toBe(100000);
     expect(ctx.state!.campaign.activeLevelId).toBe('treranium_depths');
     expect(ctx.grid).not.toBeNull();
-    // Verify grid dimensions: treranium_depths = 80x40x80
-    expect(ctx.grid!.sizeX).toBe(80);
-    expect(ctx.grid!.sizeY).toBe(40);
-    expect(ctx.grid!.sizeZ).toBe(80);
+    // Verify grid dimensions: treranium_depths = 160x64x160 (#458 T6.1/D13)
+    expect(ctx.grid!.sizeX).toBe(160);
+    expect(ctx.grid!.sizeY).toBe(64);
+    expect(ctx.grid!.sizeZ).toBe(160);
   });
 
   it('can hire, perform a blast, and complete the level', () => {

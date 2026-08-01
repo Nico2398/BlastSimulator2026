@@ -727,6 +727,55 @@ describe('findPath — multi-level routing', () => {
     expect(usesNearRamp).toBe(true);
   });
 
+  // ── #458 T6.1/D14: stable ramp selection under near-tied cost ──
+  //
+  // route1/route2's A* costs come from the CALLER's from-position, which for
+  // a moving agent shifts by fractions of a cell every tick (path is
+  // recomputed fresh each tick, never cached). When two candidate ramps are
+  // close enough in cost, a bare `<` comparison can flip the winner between
+  // ticks as that position shifts — producing a stable walk-toward-ramp-A /
+  // walk-toward-ramp-B oscillation that never actually arrives (confirmed
+  // via direct reproduction: an agent frozen retrying between two points for
+  // 100+ ticks). This grid is symmetric around two ramps equidistant from
+  // the goal, so calls from two different (but both near-tied) start
+  // columns must resolve to the SAME ramp rather than flip-flopping.
+
+  it('picks the same ramp consistently across near-tied start positions, not flip-flopping', () => {
+    const width = 21;
+    const height = 3;
+    const cells: NavCell[][] = [];
+    for (let z = 0; z < height; z++) {
+      const row: NavCell[] = [];
+      for (let x = 0; x < width; x++) {
+        if (z === 1) {
+          row.push(x === 8 || x === 12 ? makeCell('ramp', 0) : makeCell('void', 0));
+        } else if (z === 0) {
+          row.push(makeCell('walkable', 0));
+        } else {
+          row.push(makeCell('walkable', 1));
+        }
+      }
+      cells.push(row);
+    }
+    const grid = new NavGrid(width, height, cells, 10);
+
+    // The midpoint (x=10) is exactly equidistant from both ramps — cost to
+    // either entrance is tied. Calling repeatedly from the tied position
+    // must resolve to the same ramp every time (the lower-rampX one, by the
+    // tie-break's stable, position-independent key) rather than depending on
+    // map-iteration or heap-tie-breaking order to pick one arbitrarily.
+    const rampXFromTiedStart = () => {
+      const result = findPath(grid, { agentId: 1, fromX: 10, fromZ: 0, toX: 10, toZ: 2, avoidVehicles: false });
+      expect(result.found).toBe(true);
+      const rampWp = result.waypoints.find(wp => wp.z === 1);
+      return rampWp?.x;
+    };
+
+    const picks = Array.from({ length: 5 }, () => rampXFromTiedStart());
+    expect(picks[0]).toBe(8); // lower rampX wins the tie, deterministically
+    expect(picks.every(x => x === picks[0])).toBe(true);
+  });
+
   it('includes the ramp cell in the waypoints of a multi-level path', () => {
     // 10×10 grid with void wall and single ramp
     const grid = makeTwoLevelGrid(10, 10, 4);

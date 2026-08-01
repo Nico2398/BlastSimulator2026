@@ -32,6 +32,15 @@ import { assembleBlastPlan } from '../core/mining/BlastPlan.js';
 import { previewHoleDetails } from '../core/mining/Software.js';
 import { boundingBoxXZ, getBlastOriginSurfaceY } from './BlastOriginSampling.js';
 
+/**
+ * How far past the playable rect manual panning may wander (#458 T6.1/D13:
+ * "pan gets a soft leash to the playable rect ± margin"). No exact figure is
+ * specified in the plan (default-and-record); 80m clears the boundary-shading
+ * band (T5.3, ~5m) and reaches nearby landscape structures without letting
+ * the camera drift into the empty far landscape.
+ */
+const PAN_LEASH_MARGIN = 80;
+
 export class GameRenderer {
   private readonly sm: SceneManager;
 
@@ -172,7 +181,7 @@ export class GameRenderer {
     const cam = this.sm.camera;
 
     if (this.skybox) {
-      this.skybox.update(dt, cam.position.x, cam.position.z);
+      this.skybox.update(dt, cam.position.x, cam.position.z, this.sm.cameraController.distance);
       this.sm.postPipeline.aerial.setHazeColor(this.skybox.skyColor);
     }
 
@@ -522,6 +531,13 @@ export class GameRenderer {
     const cz = grid.sizeZ / 2;
     const span = Math.max(grid.sizeX, grid.sizeZ);
     this.sm.cameraController.frameSite(cx, this.getTerrainSurfaceY(cx, cz), cz, span);
+    // Manual panning may wander past the pit rim to glance at nearby
+    // landscape, but not indefinitely — the landscape is viewable, not the
+    // play focus (#458 T6.1/D13).
+    this.sm.cameraController.setPanLeash(
+      { minX: 0, minZ: 0, maxX: grid.sizeX, maxZ: grid.sizeZ },
+      PAN_LEASH_MARGIN,
+    );
   }
 
   private clearAll(): void {

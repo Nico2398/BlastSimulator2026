@@ -79,11 +79,26 @@ export function advanceAlongPath(input: AdvanceAlongPathInput): AdvanceAlongPath
   }
 
   const reset = resetStuckState(stuckInput);
+  // Both of findPath's sources (the A* reconstruction and the direct-line
+  // fallback) emit waypoints[0] as the agent's own (floor-rounded) starting
+  // cell — every path is a fresh from-here-to-there route recomputed each
+  // tick, so index 0 is never a real step to walk toward. Left at index 0,
+  // advanceAgent spends part of every tick's movement budget snapping the
+  // agent's continuous position onto that rounded echo of itself before
+  // making real progress — usually just a wasted fraction of a step, but
+  // near a bench/ramp boundary where the "correct" next hop flips depending
+  // on which side of an integer cell the agent is floored into, that wasted
+  // snap-back is enough to drag the agent back across the boundary every
+  // tick, producing a stable two-tick walk-forward/walk-back oscillation
+  // that never reaches the destination (found via a #458 T6.1 regression:
+  // resized levels carry more natural terrain relief, putting agents near a
+  // ramp far more often than the old, flatter levels did).
+  const startIndex = input.path.waypoints.length > 1 ? 1 : 0;
   const advance = advanceAgent({
     x: input.x,
     z: input.z,
     waypoints: input.path.waypoints,
-    waypointIndex: 0,
+    waypointIndex: startIndex,
     walkSpeed: input.walkSpeed,
     destinationX: input.destinationX,
     destinationZ: input.destinationZ,

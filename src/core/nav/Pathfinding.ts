@@ -329,7 +329,23 @@ function findMultiLevelPath(grid: NavGrid, request: PathRequest): PathResult {
     return { found: false, waypoints: [], totalCost: 0 };
   }
 
+  // Route-selection stability (#458 T6.1/D14): route1/route2's costs are A*
+  // results from the agent's CURRENT (continuously-shifting, sub-cell)
+  // position, recomputed fresh every tick. When two candidate ramps cost
+  // nearly the same, whichever one is marginally cheaper can flip from tick
+  // to tick as the agent's exact position shifts by fractions of a cell —
+  // producing a stable walk-toward-ramp-A / walk-toward-ramp-B oscillation
+  // that never actually arrives (confirmed via direct reproduction: an
+  // agent frozen retrying between two points for 100+ ticks, this loop
+  // returning a *different* best ramp on each call from the same physical
+  // vicinity). Ties within RAMP_TIE_EPSILON break on the ramp's own grid
+  // position — fixed regardless of the agent's position — so the same
+  // choice keeps winning as the agent approaches, instead of flapping.
+  // Bigger levels (#458 D13) carry far more natural relief than the old
+  // ones, giving agents many more close-cost ramp choices to flap between.
+  const RAMP_TIE_EPSILON = 1.0;
   let bestResult: PathResult | null = null;
+  let bestRampKey = Infinity;
 
   for (const ramp of candidateRamps) {
     // Determine entrance (on start level) and exit (on goal level)
@@ -373,9 +389,17 @@ function findMultiLevelPath(grid: NavGrid, request: PathRequest): PathResult {
 
     // Concatenate route1 → ramp → route2 waypoints with deduplication
     const waypoints = concatPaths(route1, { x: ramp.rampX, z: ramp.rampZ }, route2);
+    const rampKey = ramp.rampX * 100000 + ramp.rampZ;
 
-    if (bestResult === null || totalCost < bestResult.totalCost) {
+    const isClearlyBetter = bestResult === null || totalCost < bestResult.totalCost - RAMP_TIE_EPSILON;
+    const isTiedButStablyPreferred =
+      bestResult !== null &&
+      Math.abs(totalCost - bestResult.totalCost) <= RAMP_TIE_EPSILON &&
+      rampKey < bestRampKey;
+
+    if (isClearlyBetter || isTiedButStablyPreferred) {
       bestResult = { found: true, waypoints, totalCost };
+      bestRampKey = rampKey;
     }
   }
 
@@ -432,12 +456,46 @@ export function findPath(grid: NavGrid, request: PathRequest): PathResult {
     return { found: true, waypoints: [{ x: sx, z: sz }], totalCost: 0 };
   }
 
-  // 4b. Multi-level check: delegate to multi-level routing when levels differ
+  // 5. Ordinary search (direct line + A*) first, regardless of bench level.
+  //    isImpassable only excludes 'blocked'/'void' cells and, optionally,
+  //    vehicle-occupied ones — it never looks at benchLevel, so ordinary A*
+  //    already walks straight across a gentle one-level grade exactly like
+  //    any other terrain. benchLevel bands natural relief far more finely
+  //    than "genuinely blocked" (#458 T6.1/D14 found the bigger, hillier D13
+  //    levels carrying near-constant one-level differences between adjacent
+  //    cells), so gating every differing-level request behind ramp-only
+  //    findMultiLevelPath — as this used to, unconditionally — forced almost
+  //    every walk on those levels through the fragile ramp search, including
+  //    ones ordinary A* could have solved directly. That produced the ramp
+  //    tie-flip oscillation fixed above, and even with that fix, agents whose
+  //    start/goal sat in bench-fragmented terrain (many candidate ramps, none
+  //    close to the direct route) could walk in a stable loop that never
+  //    converges — confirmed via direct reproduction: a surveyor's position
+  //    cycling through the same handful of cells for 20+ ticks while
+  //    findMultiLevelPath kept returning a *found* path every tick, just a
+  //    detour nowhere near the goal.
+  const ordinary = findOrdinaryPath(grid, sx, sz, gx, gz, avoidVehicles);
+  if (ordinary.found) return ordinary;
+
+  // 6. Ordinary search found no connection at all — if start and goal sit on
+  //    different bench levels, a genuine wall (not just relief) may separate
+  //    them, so fall back to ramp-based multi-level routing before giving up.
   if (getBenchLevel(grid, sx, sz) !== getBenchLevel(grid, gx, gz)) {
     return findMultiLevelPath(grid, request);
   }
 
-  // 5. Fast path — try direct line before A* only if it's clearly optimal.
+  return ordinary;
+}
+
+function findOrdinaryPath(
+  grid: NavGrid,
+  sx: number,
+  sz: number,
+  gx: number,
+  gz: number,
+  avoidVehicles: boolean,
+): PathResult {
+  // Fast path — try direct line before A* only if it's clearly optimal.
   //    Compare direct-line cost to heuristic lower bound (octile * MIN_WALKABLE_COST).
   //    If directLine is more than 10% above heuristic, it's suboptimal — use A*.
   const directLine = directLineWalk(grid, sx, sz, gx, gz, avoidVehicles);
@@ -446,7 +504,7 @@ export function findPath(grid: NavGrid, request: PathRequest): PathResult {
     if (directLine.totalCost <= heuristicLowerBound * DIRECT_LINE_TOLERANCE) return directLine;
   }
 
-  // 6. A* main loop
+  // A* main loop
 
   interface AStarNode {
     key: number; // f = g + h, used by the min-heap

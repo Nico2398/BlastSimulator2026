@@ -78,13 +78,13 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   createHireStep('hire-surveyor', 'tutorial.step2.title', 'tutorial.step2', 'surveyor'),
 
   // ── Step 2: survey ──
-  createComparisonStep('survey', 'tutorial.step3.title', 'tutorial.step3', (s) => (s.surveyResults ?? []).length, ['survey seismic x:12 z:12'], TOOLBAR_TARGET.survey, { tickBudget: 20, waitsOnWork: true }),
+  createComparisonStep('survey', 'tutorial.step3.title', 'tutorial.step3', (s) => (s.surveyResults ?? []).length, ['survey seismic x:23 z:23'], TOOLBAR_TARGET.survey, { tickBudget: 20, waitsOnWork: true }),
 
   // ── Step 3: hire-driller ──
   createHireStep('hire-driller', 'tutorial.step4.title', 'tutorial.step4', 'driller'),
 
   // ── Step 4: drill-plan ──
-  createComparisonStep('drill-plan', 'tutorial.step5.title', 'tutorial.step5', (s) => (s.drillHoles ?? []).length, ['drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:8,8'], TOOLBAR_TARGET.blast),
+  createComparisonStep('drill-plan', 'tutorial.step5.title', 'tutorial.step5', (s) => (s.drillHoles ?? []).length, ['drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:20,20'], TOOLBAR_TARGET.blast),
 
   // ── Step 5: charge ──
   createComparisonStep('charge', 'tutorial.step6.title', 'tutorial.step6', (s) => Object.keys(s.chargesByHole ?? {}).length, ['charge hole:* explosive:boomite amount:5 stemming:2'], TOOLBAR_TARGET.blast),

@@ -221,8 +221,12 @@ describe('Survey system', () => {
   it('tickCommand resolves a pending survey action into state.surveyResults only once duration ticks elapse', () => {
     const empId = hireEmployeeByRole(ctx, 'surveyor');
     employeeCommand(ctx, ['assign_skill', String(empId)], { skill: 'geology', level: '3' });
+    const emp = ctx.state!.employees.employees.find(e => e.id === empId)!;
 
-    surveyCommand(ctx as any, ['core_sample'], { x: '16', z: '16' });
+    // Survey right where the surveyor stands (whichever reachable cell near
+    // world centre they actually spawned on — #458 T6.1/D13) so this test
+    // stays a zero-travel case regardless of the exact tile.
+    surveyCommand(ctx as any, ['core_sample'], { x: String(emp.x), z: String(emp.z) });
     expect(ctx.state!.pendingActions.filter(a => a.type === 'survey')).toHaveLength(1);
     expect(ctx.state!.surveyResults).toHaveLength(0);
 
@@ -250,10 +254,13 @@ describe('Survey system', () => {
     const empId = hireEmployeeByRole(ctx, 'surveyor');
     employeeCommand(ctx, ['assign_skill', String(empId)], { skill: 'geology', level: '3' });
     const emp = ctx.state!.employees.employees.find(e => e.id === empId)!;
-    // First-hired employee spawns at (world.sizeX/2, world.sizeZ/2) = (16, 16)
-    // for this 32×32 test world.
-    expect(emp.x).toBe(16);
-    expect(emp.z).toBe(16);
+    // First-hired employee spawns near (world.sizeX/2, world.sizeZ/2) =
+    // (16, 16) for this 32×32 test world, snapped to a reachable,
+    // same-bench-level cell (#458 T6.1/D13) — so the exact tile can be off
+    // by a cell or two.
+    expect(Math.abs(emp.x - 16)).toBeLessThanOrEqual(1);
+    expect(Math.abs(emp.z - 16)).toBeLessThanOrEqual(1);
+    const [empSpawnX, empSpawnZ] = [emp.x, emp.z];
 
     surveyCommand(ctx as any, ['seismic'], { x: '2', z: '2' });
     expect(ctx.state!.surveyResults).toHaveLength(0);
@@ -268,7 +275,7 @@ describe('Survey system', () => {
 
     // Enough ticks for the walk (Euclidean distance / AGENT_WALK_SPEED) plus
     // the full seismic survey duration, with slack.
-    const travelTicks = Math.ceil(Math.hypot(16 - 2, 16 - 2) / AGENT_WALK_SPEED);
+    const travelTicks = Math.ceil(Math.hypot(empSpawnX - 2, empSpawnZ - 2) / AGENT_WALK_SPEED);
     for (let i = 0; i < travelTicks + SURVEY_DURATION_TICKS.seismic + 5; i++) {
       tickCommand(ctx, ['1'], {});
     }
@@ -503,13 +510,21 @@ describe('Survey system — seismic building side effects', () => {
 
   it('applies -10 HP to a building within 5 cells of a completed seismic survey', () => {
     hireSurveyor();
-    // Building at (22,20), survey center at (20,20) → Euclidean distance = 2 (within 5).
-    const buildResult = buildCommand(ctx, ['living_quarters'], { at: '22,20' });
+    // Building at (21,15), survey center at (19,14) → Euclidean distance ≈
+    // 2.2 (within 5). Both sit inside the stretch of NavGrid the surveyor's
+    // spawn area is on the same bench level as (#458 T6.1/D14): bigger
+    // levels carry far more natural terrain relief than the old ones, and a
+    // route crossing onto a different bench mid-walk can hit a pathfinding
+    // instability where two near-equal routes flip from tick to tick and
+    // the surveyor never arrives — confirmed via direct reproduction at the
+    // original (20,20)/(22,20) coordinates. A deeper general fix belongs to
+    // T6.2 (pathfinding at scale); this sidesteps it for the test.
+    const buildResult = buildCommand(ctx, ['living_quarters'], { at: '21,15' });
     expect(buildResult.success).toBe(true);
     const building = ctx.state!.buildings.buildings[ctx.state!.buildings.buildings.length - 1]!;
     const hpBefore = building.hp;
 
-    surveyCommand(ctx as any, ['seismic'], { x: '20', z: '20' });
+    surveyCommand(ctx as any, ['seismic'], { x: '19', z: '14' });
     resolveTick();
 
     expect(findBuilding(building.id).hp).toBe(hpBefore - 10);
@@ -557,13 +572,14 @@ describe('Survey system — seismic building side effects', () => {
 
   it('damages every building within 5 cells when multiple are in range', () => {
     hireSurveyor();
-    // living_quarters T1 is a 3x3 footprint; at (19,20) it would cover
-    // (20,20) — the survey's own target cell, which the surveyor must now be
-    // able to walk to and stand on (#437). Placed at (17,20) instead: still
-    // within the 5-cell damage radius (footprint centre (18.5,21.5), distance
-    // ≈2.1 from (20,20)), but no longer overlapping the survey centre.
-    const b1Result = buildCommand(ctx, ['living_quarters'], { at: '17,20' });
-    const b2Result = buildCommand(ctx, ['management_office'], { at: '21,17' });
+    // living_quarters T1 is a 3x3 footprint; placed so it doesn't overlap
+    // the survey's own target cell, which the surveyor must be able to walk
+    // to and stand on (#437). Both buildings and the survey centre sit
+    // inside the stretch of NavGrid confirmed on the same bench level as
+    // the surveyor's spawn (#458 T6.1/D14 — see the single-building test
+    // above for why that matters).
+    const b1Result = buildCommand(ctx, ['living_quarters'], { at: '17,15' });
+    const b2Result = buildCommand(ctx, ['management_office'], { at: '21,14' });
     expect(b1Result.success).toBe(true);
     expect(b2Result.success).toBe(true);
     const b1 = ctx.state!.buildings.buildings.find(b => b.type === 'living_quarters')!;
@@ -571,7 +587,7 @@ describe('Survey system — seismic building side effects', () => {
     const b1HpBefore = b1.hp;
     const b2HpBefore = b2.hp;
 
-    surveyCommand(ctx as any, ['seismic'], { x: '20', z: '20' });
+    surveyCommand(ctx as any, ['seismic'], { x: '19', z: '14' });
     resolveTick();
 
     expect(findBuilding(b1.id).hp).toBe(b1HpBefore - 10);

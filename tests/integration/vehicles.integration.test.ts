@@ -135,16 +135,21 @@ describe('Vehicle fleet', () => {
   it('driverId is null immediately after "vehicle driver" and only set once the employee has walked to the vehicle', () => {
     vehicleCommand(ctx, ['buy', 'debris_hauler'], {});
     const v = ctx.state!.vehicles.vehicles[0]!;
-    // Vehicle spawns at (16, 16) for a 32×32 world (see "move vehicle" test below).
-    expect(v.x).toBe(16);
-    expect(v.z).toBe(16);
+    // Vehicle spawns near (16, 16) — the world centre for a 32×32 world (see
+    // "move vehicle" test below) — snapped to the nearest cell that's both
+    // NavGrid-reachable and on the same bench level as the map's main region
+    // (#458 T6.1/D13: NavGridReachability.findNearestReachableCell), so the
+    // exact tile can shift by a cell or two depending on terrain.
+    expect(Math.abs(v.x - 16)).toBeLessThanOrEqual(1);
+    expect(Math.abs(v.z - 16)).toBeLessThanOrEqual(1);
 
     const eid = hireOne(ctx, 'driver');
     employeeCommand(ctx, ['assign_skill', String(eid)], { skill: 'driving.truck', level: '1' });
     const emp = ctx.state!.employees.employees.find(e => e.id === eid)!;
-    // First-hired employee also spawns at (16, 16) — co-located with the vehicle.
-    expect(emp.x).toBe(16);
-    expect(emp.z).toBe(16);
+    // First-hired employee also spawns via the same reachable-cell snap —
+    // co-located with the vehicle.
+    expect(emp.x).toBe(v.x);
+    expect(emp.z).toBe(v.z);
 
     const result = vehicleCommand(ctx, ['driver', '1', String(eid)], {});
     expect(result.success).toBe(true);
@@ -158,10 +163,12 @@ describe('Vehicle fleet', () => {
 
   it('move vehicle to target coordinates', () => {
     vehicleCommand(ctx, ['buy', 'debris_hauler'], {});
-    // Vehicle spawns at sizeX/2, sizeZ/2 → (16, 16) for a 32x32 world
+    // Vehicle spawns near sizeX/2, sizeZ/2 → (16, 16) for a 32x32 world,
+    // snapped to a reachable, same-bench-level cell (#458 T6.1/D13) — see
+    // the driverId test above for why this isn't pinned to the exact tile.
     const v = ctx.state!.vehicles.vehicles[0]!;
-    expect(v.targetX).toBe(16);
-    expect(v.targetZ).toBe(16);
+    expect(Math.abs(v.targetX - 16)).toBeLessThanOrEqual(1);
+    expect(Math.abs(v.targetZ - 16)).toBeLessThanOrEqual(1);
 
     const result = vehicleCommand(ctx, ['move', '1'], { to: '30,30' });
 

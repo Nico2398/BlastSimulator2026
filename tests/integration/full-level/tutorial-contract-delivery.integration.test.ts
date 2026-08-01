@@ -110,7 +110,17 @@ describe('Tutorial Level — Contract Delivery', () => {
       level: '5',
     });
 
-    const buildResult = buildCommand(ctx, ['freight_warehouse'], { at: '5,5' });
+    // (13,13), near the drill site rather than the old (5,5): bigger levels
+    // (#458 T6.1/D13) carry far more natural terrain relief than the old
+    // ones, fragmenting NavGrid bench levels into small pockets more often.
+    // (5,5) sat on a different bench than the drill/fragment area with no
+    // ramp connecting them close by, so a loaded hauler could never findPath
+    // there — confirmed via direct reproduction (a vehicle stuck retrying a
+    // <2-tile trip for 10+ ticks, findMultiLevelPath returning found:false
+    // every time). Keeping pickup and drop-off on the same bench sidesteps
+    // that pathfinding gap rather than attempting to fix it here — a deeper,
+    // more general fix belongs to T6.2 (pathfinding at scale).
+    const buildResult = buildCommand(ctx, ['freight_warehouse'], { at: '13,13' });
     expect(buildResult.success).toBe(true);
 
     const buyResult = vehicleCommand(ctx, ['buy', 'debris_hauler'], {});

@@ -32,6 +32,26 @@ describe('Console — world commands', () => {
       expect(ctx.state!.seed).toBe(42);
     });
 
+    it('defaults sizeY to the cubic size when size_y is omitted', () => {
+      newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '48' });
+      expect(ctx.state!.world!.sizeX).toBe(48);
+      expect(ctx.state!.world!.sizeY).toBe(48);
+      expect(ctx.state!.world!.sizeZ).toBe(48);
+      expect(ctx.grid!.sizeY).toBe(48);
+    });
+
+    it('breaks cubic when size_y is given explicitly (#458 T6.1/D13)', () => {
+      const result = newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '48', size_y: '20' });
+      expect(result.success).toBe(true);
+      expect(result.output).toContain('48x20x48');
+      expect(ctx.state!.world!.sizeX).toBe(48);
+      expect(ctx.state!.world!.sizeY).toBe(20);
+      expect(ctx.state!.world!.sizeZ).toBe(48);
+      expect(ctx.grid!.sizeX).toBe(48);
+      expect(ctx.grid!.sizeY).toBe(20);
+      expect(ctx.grid!.sizeZ).toBe(48);
+    });
+
     it('rejects unknown mine types', () => {
       const result = newGameCommand(ctx, [], { mine_type: 'moon' });
       expect(result.success).toBe(false);

@@ -70,6 +70,46 @@ describe('advanceAlongPath', () => {
     expect(result.isPathComplete).toBe(false);
   });
 
+  // ── #458 T6.1/D14: skip the self-echo start waypoint ──
+  //
+  // findPath's own waypoint lists (both the A* reconstruction and the
+  // direct-line fallback) always include the agent's own floor-rounded
+  // starting cell as waypoints[0] — every path is freshly recomputed each
+  // tick, so index 0 is never a real step to walk toward. Left unskipped,
+  // an agent standing at a fractional position (e.g. x=4.6) would spend part
+  // of its movement budget snapping onto the rounded echo of itself (x=4)
+  // before making real progress — usually just a wasted fraction of a step,
+  // but a stable source of tick-to-tick position "drag" near any decision
+  // point where the correct next hop is sensitive to exact position.
+
+  it('does not waste movement budget snapping onto a self-echo start waypoint', () => {
+    const result = advanceAlongPath(baseInput({
+      x: 4.6,
+      z: 0,
+      destinationX: 10,
+      // Realistic findPath()-shaped waypoint list: [self-echo start, ...real steps].
+      path: { found: true, waypoints: [{ x: 4, z: 0 }, { x: 6, z: 0 }, { x: 10, z: 0 }] },
+    }));
+
+    // AGENT_WALK_SPEED (2) of forward progress from x=4.6, not (partly)
+    // consumed moving backward to the rounded x=4 self-echo first.
+    expect(result.x).toBeCloseTo(4.6 + AGENT_WALK_SPEED, 5);
+    expect(result.z).toBe(0);
+  });
+
+  it('still reaches the destination correctly when the path is only the self-echo (already there)', () => {
+    const result = advanceAlongPath(baseInput({
+      x: 10,
+      z: 0,
+      destinationX: 10,
+      path: { found: true, waypoints: [{ x: 10, z: 0 }] },
+    }));
+
+    expect(result.isPathComplete).toBe(true);
+    expect(result.x).toBe(10);
+    expect(result.z).toBe(0);
+  });
+
   it('crosses STUCK_THRESHOLD and reports becameStuck exactly on the falling edge', () => {
     let consecutiveFailures = 0;
     let isStuck = false;

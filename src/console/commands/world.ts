@@ -144,16 +144,20 @@ export function newGameCommand(
   }
 
   const size = named['size'] ? parseInt(named['size'], 10) : DEFAULT_GRID_SIZE;
+  // sizeY defaults to the cubic size but can be given separately — levels at
+  // the larger campaign sizes (#458 T6.1/D13) are not cubic, and console
+  // testing at those aspect ratios shouldn't require a same-sized cube.
+  const sizeY = named['size_y'] ? parseInt(named['size_y'], 10) : size;
   ctx.state = createGame({
     seed, mineType,
     ...(named['cash'] ? { startingCash: parseInt(named['cash'], 10) } : {}),
   });
-  ctx.state.world = { sizeX: size, sizeY: size, sizeZ: size, gridReady: true };
-  regenerateGrid(ctx, { seed, climateBias: biome.climateCenter, sizeX: size, sizeY: size, sizeZ: size });
+  ctx.state.world = { sizeX: size, sizeY, sizeZ: size, gridReady: true };
+  regenerateGrid(ctx, { seed, climateBias: biome.climateCenter, sizeX: size, sizeY, sizeZ: size });
 
   return {
     success: true,
-    output: `Game created. ${size}x${size}x${size} terrain, ${mineType} biome, seed ${seed}.`,
+    output: `Game created. ${size}x${sizeY}x${size} terrain, ${mineType} biome, seed ${seed}.`,
   };
 }
 

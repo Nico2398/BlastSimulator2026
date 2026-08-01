@@ -325,7 +325,7 @@ describe('TutorialOverlay (12.4)', () => {
       (tut as any).render();
 
       expect(hintEl.style.display).not.toBe('none');
-      expect(hintEl.textContent).toBe('survey seismic x:12 z:12');
+      expect(hintEl.textContent).toBe('survey seismic x:23 z:23');
     });
 
     it('never executes a step hint on the player behalf', () => {
@@ -341,7 +341,7 @@ describe('TutorialOverlay (12.4)', () => {
       tut.advanceToNextStep();
 
       const executed = gameConsole.mock.calls.map((c: unknown[]) => c[0]);
-      expect(executed).not.toContain('survey seismic x:12 z:12');
+      expect(executed).not.toContain('survey seismic x:23 z:23');
       expect(executed).not.toContain('hire employee');
     });
   });

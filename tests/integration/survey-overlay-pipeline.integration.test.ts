@@ -26,6 +26,8 @@ function makeMockSceneManager() {
     setTarget: vi.fn(),
     frameSite: vi.fn(),
     update: vi.fn(),
+    setPanLeash: vi.fn(),
+    distance: 100,
   };
   // Minimal fake CSM — attachCSM() reads .cascades synchronously; the rest
   // only matters inside onBeforeCompile, which these Node-only tests never

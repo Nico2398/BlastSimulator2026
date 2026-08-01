@@ -23,7 +23,7 @@ function makeMockSceneManager() {
   const sunLight = new THREE.DirectionalLight();
   const fill = new THREE.DirectionalLight();
   const ambient = new THREE.AmbientLight();
-  const cameraController = { setTarget: vi.fn(), frameSite: vi.fn(), update: vi.fn() };
+  const cameraController = { setTarget: vi.fn(), frameSite: vi.fn(), update: vi.fn(), setPanLeash: vi.fn(), distance: 100 };
   // Minimal fake CSM — attachCSM() reads .cascades synchronously; the rest
   // (.camera/.maxFar/.getExtendedBreaks/.shaders) only matter inside
   // onBeforeCompile, which these Node-only tests never trigger a real

@@ -74,6 +74,25 @@ export function findNearestTraversableCell(
  * connected region (callers typically use a world corner). Falls back to
  * (targetX, targetZ) unchanged if the anchor itself resolves to no
  * traversable cell, or if the connected component containing it is empty.
+ *
+ * Same-bench-level preference (#458 T6.1/D13): this flood fill is a flat
+ * 8-directional walkable/ramp/drill_hole adjacency check with no notion of
+ * bench level, so it happily calls a cell "reachable" that sits across a
+ * bench-level boundary from the anchor — connected by grid adjacency, but
+ * only actually walkable via Pathfinding.findMultiLevelPath's ramp-entrance/
+ * exit routing, which re-picks the cheapest candidate ramp fresh every tick
+ * from the agent's current (sub-cell, continuously moving) position. When
+ * two ramps have close-enough cost, that fresh-every-tick re-pick flips
+ * between them as the agent moves, producing a stable walk-forward/
+ * walk-back loop that never arrives (confirmed via direct reproduction: a
+ * driver stuck oscillating between two points for 150+ ticks trying to
+ * reach a vehicle across exactly this kind of boundary). Bigger levels
+ * (#458 D13) carry far more natural relief than the old ones, so this
+ * boundary comes up constantly rather than rarely. Preferring a
+ * same-bench-level candidate whenever one exists sidesteps multi-level
+ * routing for this call entirely, rather than attempting to stabilize its
+ * ramp selection (a larger, riskier change to Pathfinding.ts's stateless,
+ * recomputed-fresh-every-tick design).
  */
 export function findNearestReachableCell(
   navGrid: NavGrid,
@@ -89,8 +108,12 @@ export function findNearestReachableCell(
   // over the whole grid. Grids here are small (dozens of tiles per side),
   // so an O(width*height) BFS per call is negligible.
   const reachable = floodFillReachable(navGrid, anchor.x, anchor.z);
+  const anchorLevel = navGrid.cells[anchor.z]?.[anchor.x]?.benchLevel;
+
   let best = anchor;
   let bestDistSq = (anchor.x - targetX) ** 2 + (anchor.z - targetZ) ** 2;
+  let bestSameLevel: { x: number; z: number } | null = null;
+  let bestSameLevelDistSq = Infinity;
 
   for (const key of reachable) {
     const [xStr, zStr] = key.split(',');
@@ -101,9 +124,13 @@ export function findNearestReachableCell(
       bestDistSq = distSq;
       best = { x, z };
     }
+    if (anchorLevel !== undefined && navGrid.cells[z]?.[x]?.benchLevel === anchorLevel && distSq < bestSameLevelDistSq) {
+      bestSameLevelDistSq = distSq;
+      bestSameLevel = { x, z };
+    }
   }
 
-  return best;
+  return bestSameLevel ?? best;
 }
 
 /**

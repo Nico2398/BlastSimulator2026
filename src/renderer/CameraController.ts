@@ -6,11 +6,13 @@
 // - Touch: pinch-to-zoom, single-finger orbit
 
 import * as THREE from 'three';
+import type { Rect } from '../core/world/WorldGen.js';
 
-// Zoom limits (distance from target), metres. Spans full-grid overview (600)
-// down to drill-hole close-up (5).
+// Zoom limits (distance from target), metres. Spans full-grid overview
+// (1200 — enough to pull back on the largest campaign level, 160×160,
+// #458 T6.1/D13) down to drill-hole close-up (5).
 const ZOOM_MIN = 5;
-const ZOOM_MAX = 600;
+const ZOOM_MAX = 1200;
 const ZOOM_SPEED = 0.12; // fraction of current distance per scroll tick
 
 const ORBIT_SPEED = 0.005; // radians per pixel
@@ -51,6 +53,15 @@ export class CameraController {
   // Pan offset
   private panOffset: THREE.Vector3 = new THREE.Vector3();
 
+  /**
+   * Soft leash on manual panning — the landscape beyond the playable rect is
+   * viewable but not the play focus, so dragging the view shouldn't wander
+   * off into it indefinitely (#458 T6.1/D13). Null until a grid loads.
+   * Does not affect `focus`/`frameSite`, which are deliberate programmatic
+   * moves (e.g. multi-angle screenshot shots into the landscape zone).
+   */
+  private panLeash: { minX: number; maxX: number; minZ: number; maxZ: number } | null = null;
+
   // Interaction state
   private isOrbiting = false;
   private isPanning = false;
@@ -83,6 +94,11 @@ export class CameraController {
   }
 
   // ---- Public API ----
+
+  /** Current orbit distance (metres) — the zoom level, for effects that need to scale with it (#458 T6.1/D13). */
+  get distance(): number {
+    return this.spherical.radius;
+  }
 
   /** Point the camera looks at (can be updated externally for tracking). */
   setTarget(x: number, y: number, z: number): void {
@@ -122,6 +138,16 @@ export class CameraController {
    */
   focus(x: number, y: number, z: number, distance: number): void {
     this.setTargetAndDistance(x, y, z, distance);
+  }
+
+  /** Set (or clear, passing null) the playable-rect ± margin bound on manual panning (#458 T6.1/D13). */
+  setPanLeash(rect: Rect | null, margin: number): void {
+    this.panLeash = rect && {
+      minX: rect.minX - margin,
+      maxX: rect.maxX + margin,
+      minZ: rect.minZ - margin,
+      maxZ: rect.maxZ + margin,
+    };
   }
 
   /** Set absolute yaw (degrees) and pitch (degrees above horizon). */
@@ -287,6 +313,10 @@ export class CameraController {
     this.panOffset.addScaledVector(up, dy * panScale);
 
     this.target.add(this.panOffset);
+    if (this.panLeash) {
+      this.target.x = THREE.MathUtils.clamp(this.target.x, this.panLeash.minX, this.panLeash.maxX);
+      this.target.z = THREE.MathUtils.clamp(this.target.z, this.panLeash.minZ, this.panLeash.maxZ);
+    }
     this.panOffset.set(0, 0, 0);
     this.apply();
   }
