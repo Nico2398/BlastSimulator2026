@@ -128,6 +128,7 @@ export class VehiclePanel {
 
     const col = document.createElement('div');
     col.style.cssText = 'flex:1;min-width:0';
+    col.dataset['vehicleId'] = String(v.id);
     col.append(info, status, this.makeDriverRow(v, state));
     const haulBtn = this.makeHaulButton(v, state);
     if (haulBtn) col.appendChild(haulBtn);
@@ -136,16 +137,24 @@ export class VehiclePanel {
   }
 
   /**
-   * "Haul" button for a debris_hauler with a driver and no in-progress haul.
-   * Enabled state depends on a reachable on-ground fragment existing — see
-   * refreshHaulButtons, which re-evaluates it every update() pass (matching
-   * refreshTierButtons' per-frame cash check) since fragments and reachability
-   * change independently of this row's rebuild signature.
+   * A debris_hauler qualifies for the Haul button only with a driver aboard,
+   * no haul already in progress, and a reachable on-ground fragment — this
+   * last condition is why the button isn't just disabled otherwise: with
+   * ~90% of fragments landing in unreachable NavGrid 'void' cells, a visible
+   * disabled button would be the normal state, not an edge case (#466).
    */
-  private makeHaulButton(v: Vehicle, state: GameState): HTMLElement | null {
+  private haulEligibleFragment(v: Vehicle, state: GameState): number | null {
     if (v.type !== 'debris_hauler' || v.driverId === null || v.haulingPhase !== null) return null;
+    return findReachableGroundFragment(state, v.id);
+  }
+
+  /** "Haul" button for a debris_hauler with a driver, no in-progress haul, and a reachable fragment. */
+  private makeHaulButton(v: Vehicle, state: GameState): HTMLElement | null {
+    const fragmentId = this.haulEligibleFragment(v, state);
+    if (fragmentId === null) return null;
 
     const wrap = document.createElement('div');
+    wrap.className = 'bs-vehicle-haul-wrap';
     wrap.style.cssText = 'display:flex;align-items:center;gap:4px;margin-top:3px';
 
     const haulBtn = document.createElement('button');
@@ -154,39 +163,33 @@ export class VehiclePanel {
     haulBtn.textContent = t('ui.vehicles.haul');
     haulBtn.dataset['vehicleId'] = String(v.id);
     haulBtn.addEventListener('click', () => {
-      const fragmentId = findReachableGroundFragment(state, v.id);
-      if (fragmentId === null) return;
-      this.gameConsole?.(`vehicle haul ${v.id} fragment:${fragmentId}`);
+      const resolvedFragmentId = findReachableGroundFragment(state, v.id);
+      if (resolvedFragmentId === null) return;
+      this.gameConsole?.(`vehicle haul ${v.id} fragment:${resolvedFragmentId}`);
     });
 
-    const reason = document.createElement('span');
-    reason.className = 'bs-vehicle-haul-reason';
-    reason.style.cssText = 'font-size:10px;color:#806050';
-
-    wrap.append(haulBtn, reason);
-    this.updateHaulButtonState(haulBtn, reason, state, v.id);
+    wrap.append(haulBtn);
     return wrap;
   }
 
-  /** Re-evaluates every rendered haul button's enabled/disabled state and reason text. */
+  /**
+   * Adds/removes each row's haul button as eligibility (reachable fragment,
+   * haulingPhase, driver) changes independently of the row's rebuild
+   * signature — mirrors refreshTierButtons' per-frame re-evaluation.
+   */
   private refreshHaulButtons(state: GameState): void {
-    const haulBtns = this.listEl.querySelectorAll<HTMLButtonElement>('.bs-vehicle-haul-btn');
-    haulBtns.forEach(btn => {
-      const vehicleId = Number(btn.dataset['vehicleId']);
-      const reason = btn.nextElementSibling as HTMLElement | null;
-      this.updateHaulButtonState(btn, reason, state, vehicleId);
-    });
-  }
-
-  private updateHaulButtonState(
-    btn: HTMLButtonElement,
-    reason: HTMLElement | null,
-    state: GameState,
-    vehicleId: number,
-  ): void {
-    const fragmentId = findReachableGroundFragment(state, vehicleId);
-    btn.disabled = fragmentId === null;
-    if (reason) reason.textContent = fragmentId === null ? t('ui.vehicles.no_debris_in_reach') : '';
+    for (const v of state.vehicles.vehicles) {
+      const col = this.listEl.querySelector<HTMLElement>(`[data-vehicle-id="${v.id}"]`);
+      if (!col) continue;
+      const existing = col.querySelector('.bs-vehicle-haul-wrap');
+      const eligible = this.haulEligibleFragment(v, state) !== null;
+      if (eligible && !existing) {
+        const haulBtn = this.makeHaulButton(v, state);
+        if (haulBtn) col.appendChild(haulBtn);
+      } else if (!eligible && existing) {
+        existing.remove();
+      }
+    }
   }
 
   /**

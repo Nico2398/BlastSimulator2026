@@ -619,8 +619,18 @@ describe('Economy', () => {
     }
     expect(ctx.state!.logistics.storedMassKg).toBeGreaterThan(0);
 
-    // 7. Deliver against an active contract.
-    const contract = insertOreSaleContract(ctx.state!.contracts, 50, 10);
+    // 7. Deliver against an active contract. The blast is a real, RNG-driven
+    // pipeline — unlike the fixture-injected-fragment tests above, there is
+    // no guarantee this particular grid's fragments carry any given ore
+    // (blingite is a probabilistic vein, not a certainty per voxel). A
+    // rubble_disposal contract (materialId: '') is the one contract type
+    // that consumeStoredOre accepts against raw stored mass regardless of
+    // ore content, so it is the deterministic way to round-trip this leg.
+    const contract = insertOreSaleContract(ctx.state!.contracts, 50, 10, {
+      type: 'rubble_disposal',
+      materialId: '',
+      description: '[test fixture] dispose of 50 kg rubble @ $10/kg',
+    });
     const acceptResult = contractCommand(ctx, ['accept', String(contract.id)], {});
     expect(acceptResult.success).toBe(true);
 
