@@ -694,8 +694,14 @@ describe('findPath — multi-level routing', () => {
 
   it('uses the nearest ramp when multiple ramps connect the same levels', () => {
     // 20×3 grid with void center row and two ramps at different distances.
-    // Start (0,0) level 0, Goal (19,2) level 1.
-    // Ramps at (10,1) and (15,1). The nearer ramp (10,1) should be preferred.
+    // Start (0,0) level 0, Goal (11,2) level 1 — placed just past the near
+    // ramp so the two candidate routes are NOT cost-tied (#458 T6.2/D14: with
+    // the goal at x=19, equidistant from both ramps by the octile metric,
+    // going via (10,1) or (15,1) costs exactly the same — a genuine tie a
+    // correct A* is free to break either way, which plain-A*'s old Map
+    // iteration order happened to always resolve toward the near ramp but
+    // the typed-array/weighted-heuristic implementation doesn't guarantee).
+    // With the goal at x=11, the near ramp is unambiguously cheaper.
     const width = 20;
     const height = 3;
     const cells: NavCell[][] = [];
@@ -720,11 +726,13 @@ describe('findPath — multi-level routing', () => {
     }
     const grid = new NavGrid(width, height, cells, 10);
 
-    const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 19, toZ: 2, avoidVehicles: false });
+    const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 11, toZ: 2, avoidVehicles: false });
     expect(result.found).toBe(true);
     // The path should use the nearer ramp at (10,1) not the farther one at (15,1)
     const usesNearRamp = result.waypoints.some(wp => wp.x === 10 && wp.z === 1);
+    const usesFarRamp = result.waypoints.some(wp => wp.x === 15 && wp.z === 1);
     expect(usesNearRamp).toBe(true);
+    expect(usesFarRamp).toBe(false);
   });
 
   // ── #458 T6.1/D14: stable ramp selection under near-tied cost ──

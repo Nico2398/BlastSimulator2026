@@ -195,6 +195,11 @@ export const BLAST_ENERGY_EPSILON = 4.0;
 /** Density at/above which a voxel is considered solid ground (0–1 scale). */
 export const SOLID_VOXEL_DENSITY_THRESHOLD = 0.5;
 
+/** Blast zone radius around each hole (voxels). Margin added to a blast's hole AABB
+ *  to get the region actually affected — used both for BlastExecution's own cleared-
+ *  region computation and, expanded further, for TerrainBody's collider-building scope. */
+export const BLAST_ZONE_RADIUS = 5;
+
 /** Maximum crater excavation radius (voxels) around the blast center. Guarantees a
  *  visible crater in the terrain mesh even when the energy field doesn't consistently
  *  fracture surface voxels (attenuation + epsilon dampening). */
@@ -311,8 +316,24 @@ export const SAVE_SLOT_COUNT = 5;
 /** Maximum total fragments on screen before oldest are culled. */
 export const MAX_TOTAL_FRAGMENTS = 2000;
 
-/** Maximum nodes A* may explore before falling back to direct-line search. */
-export const PATHFINDING_NODE_BUDGET_CAP = 500;
+/**
+ * A* node-exploration budget formula (#458 T6.2/D14): actual cap is
+ * `max(PATHFINDING_NODE_BUDGET_MIN, gridX * gridZ / PATHFINDING_NODE_BUDGET_AREA_DIVISOR)`,
+ * computed by Pathfinding.ts where the grid's own dimensions are in scope — a
+ * flat 500-node cap sized for the old ~64² levels falls back to direct-line
+ * long before a legitimate cross-map route is found on D13's bigger levels
+ * (up to 160×160).
+ */
+export const PATHFINDING_NODE_BUDGET_MIN = 500;
+export const PATHFINDING_NODE_BUDGET_AREA_DIVISOR = 8;
+
+/** A* node-exploration budget for a grid of the given dimensions. */
+export function pathfindingNodeBudget(gridWidth: number, gridHeight: number): number {
+  return Math.max(
+    PATHFINDING_NODE_BUDGET_MIN,
+    Math.floor((gridWidth * gridHeight) / PATHFINDING_NODE_BUDGET_AREA_DIVISOR),
+  );
+}
 
 /** Number of consecutive failed re-route attempts before the agent transitions to stuck state. */
 export const STUCK_THRESHOLD = 3;
@@ -646,8 +667,19 @@ export const NEED_REST_BUILDING_TYPES = {
   breakNeed: 'living_quarters',
 } as const satisfies Record<string, BuildingType>;
 
-/** Max grid-cell distance to search for a suitable rest building. */
-export const NEED_REST_SEARCH_RADIUS = 20;
+/**
+ * Max grid-cell distance to search for a suitable rest building, scaled by
+ * grid width (#458 T6.2/D14): `max(NEED_REST_SEARCH_RADIUS_MIN, gridX / NEED_REST_SEARCH_RADIUS_GRID_DIVISOR)`.
+ * A flat radius sized for the old ~64-wide levels would leave a rest building
+ * unreachable from most of a 160-wide level even when one exists.
+ */
+export const NEED_REST_SEARCH_RADIUS_MIN = 20;
+export const NEED_REST_SEARCH_RADIUS_GRID_DIVISOR = 4;
+
+/** Rest-building search radius for a grid of the given width. */
+export function needRestSearchRadius(gridWidth: number): number {
+  return Math.max(NEED_REST_SEARCH_RADIUS_MIN, gridWidth / NEED_REST_SEARCH_RADIUS_GRID_DIVISOR);
+}
 
 /**
  * Per-tick replenishment rates for each need gauge by building tier.

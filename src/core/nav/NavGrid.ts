@@ -195,7 +195,7 @@ export class NavGrid {
    * (anchorX, anchorZ). See NavGridReachability.computeReachableSet for the
    * full doc.
    */
-  static computeReachableSet(navGrid: NavGrid, anchorX: number, anchorZ: number): Set<string> {
+  static computeReachableSet(navGrid: NavGrid, anchorX: number, anchorZ: number): reachability.ReachableSet {
     return reachability.computeReachableSet(navGrid, anchorX, anchorZ);
   }
 

@@ -26,12 +26,11 @@ import {
   SOLID_VOXEL_DENSITY_THRESHOLD,
   CRATER_EXCAVATION_MAX_RADIUS,
   CRATER_EXCAVATION_DEPTH_VOXELS,
+  BLAST_ZONE_RADIUS,
 } from '../config/balance.js';
 
 // ── Config ──
 
-/** Blast zone radius around each hole (voxels). */
-const BLAST_ZONE_RADIUS = 5;
 /** Default ground factor for vibration. */
 const DEFAULT_GROUND_FACTOR = 1.0;
 

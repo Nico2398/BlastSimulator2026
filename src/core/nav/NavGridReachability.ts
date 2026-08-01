@@ -104,10 +104,8 @@ export function findNearestReachableCell(
   const anchor = findNearestTraversableCell(navGrid, anchorX, anchorZ);
   if (!isTraversableCell(navGrid, anchor.x, anchor.z)) return { x: targetX, z: targetZ };
 
-  // 8-directional flood fill from the anchor — same adjacency A* uses —
-  // over the whole grid. Grids here are small (dozens of tiles per side),
-  // so an O(width*height) BFS per call is negligible.
-  const reachable = floodFillReachable(navGrid, anchor.x, anchor.z);
+  // 8-directional flood fill from the anchor — same adjacency A* uses.
+  const { width, count } = floodFillReachable(navGrid, anchor.x, anchor.z);
   const anchorLevel = navGrid.cells[anchor.z]?.[anchor.x]?.benchLevel;
 
   let best = anchor;
@@ -115,10 +113,12 @@ export function findNearestReachableCell(
   let bestSameLevel: { x: number; z: number } | null = null;
   let bestSameLevelDistSq = Infinity;
 
-  for (const key of reachable) {
-    const [xStr, zStr] = key.split(',');
-    const x = Number(xStr);
-    const z = Number(zStr);
+  // Consumed synchronously, immediately after the fill above — safe to read
+  // queueArr directly (see the scratch-buffer note on floodFillReachable).
+  for (let i = 0; i < count; i++) {
+    const idx = queueArr[i]!;
+    const x = idx % width;
+    const z = (idx / width) | 0;
     const distSq = (x - targetX) ** 2 + (z - targetZ) ** 2;
     if (distSq < bestDistSq) {
       bestDistSq = distSq;
@@ -134,42 +134,118 @@ export function findNearestReachableCell(
 }
 
 /**
+ * A reachable-set query result. `has`/`size` mirror the `Set<string>` API
+ * callers used to get back, without the per-cell string-key hashing —
+ * `has(x, z)` takes coordinates directly rather than a `"x,z"` key.
+ */
+export interface ReachableSet {
+  has(x: number, z: number): boolean;
+  readonly size: number;
+}
+
+const EMPTY_REACHABLE_SET: ReachableSet = { has: () => false, size: 0 };
+
+/**
  * Compute the set of all cells 8-directionally path-connected to
  * (anchorX, anchorZ) — same adjacency Pathfinding.findPath and
- * findNearestReachableCell walk. Returns cell keys in `"x,z"` format.
+ * findNearestReachableCell walk.
  *
  * Returns an empty set when the anchor cell itself is non-traversable
  * (no nudge to the nearest traversable cell, unlike findNearestReachableCell —
  * this is a raw reachability query from the exact anchor given).
  */
-export function computeReachableSet(navGrid: NavGrid, anchorX: number, anchorZ: number): Set<string> {
+export function computeReachableSet(navGrid: NavGrid, anchorX: number, anchorZ: number): ReachableSet {
   const ax = Math.round(anchorX);
   const az = Math.round(anchorZ);
-  if (!isTraversableCell(navGrid, ax, az)) return new Set<string>();
-  return floodFillReachable(navGrid, ax, az);
+  if (!isTraversableCell(navGrid, ax, az)) return EMPTY_REACHABLE_SET;
+
+  const { width, height, count } = floodFillReachable(navGrid, ax, az);
+  // Independent snapshot: floodFillReachable's next call reuses the shared
+  // scratch buffer, so a wrapper aliasing it directly would go stale (or
+  // wrong) the moment another reachability query runs before this one is
+  // done being read. A typed-array copy is still far cheaper — both to build
+  // and to query — than the Set<string> this replaced.
+  const visited = visitedArr.slice(0, width * height);
+
+  return {
+    has(x: number, z: number): boolean {
+      if (x < 0 || z < 0 || x >= width || z >= height) return false;
+      return visited[z * width + x] === 1;
+    },
+    size: count,
+  };
 }
+
+// ---------------------------------------------------------------------------
+// Flood-fill scratch (#458 T6.2/D14)
+// ---------------------------------------------------------------------------
+//
+// Same rationale as Pathfinding.ts's A* scratch arrays: a Set<string> per
+// call means a string-keyed hash-table entry (allocation + hashing) for
+// every one of potentially thousands of reachable cells on D13's bigger
+// levels, discarded as garbage on return. A flat Uint8Array visited flag
+// plus an Int32Array queue (packed row-major indices) replace it. Grown
+// (never shrunk) to fit the largest grid seen; only the cells touched by the
+// PREVIOUS call are cleared before reuse (via the queue itself), not the
+// whole buffer, so a small flood fill on a big level stays cheap regardless
+// of how large the level is.
+let scratchCapacity = 0;
+let visitedArr = new Uint8Array(0);
+let queueArr = new Int32Array(0);
+let lastFillCount = 0;
+
+function ensureReachabilityScratch(size: number): void {
+  if (size <= scratchCapacity) return;
+  scratchCapacity = size;
+  visitedArr = new Uint8Array(size);
+  queueArr = new Int32Array(size);
+  lastFillCount = 0; // fresh arrays are already all-zero; nothing to clear
+}
+
+const NEIGHBOUR_OFFSETS_8: readonly [number, number][] = [
+  [0, -1], [0, 1], [-1, 0], [1, 0],   // cardinal
+  [-1, -1], [1, -1], [-1, 1], [1, 1], // diagonal
+];
 
 /**
  * 8-directional flood fill from (anchorX, anchorZ), assumed already
- * traversable. Shared by findNearestReachableCell and computeReachableSet
- * so both agree on every fixture.
+ * traversable. Shared by findNearestReachableCell and computeReachableSet so
+ * both agree on every fixture. Result is only valid until the next call —
+ * callers must either consume it synchronously (findNearestReachableCell) or
+ * copy what they need out of it (computeReachableSet).
  */
-function floodFillReachable(navGrid: NavGrid, anchorX: number, anchorZ: number): Set<string> {
-  const visited = new Set<string>();
-  const queue: Array<{ x: number; z: number }> = [{ x: anchorX, z: anchorZ }];
-  visited.add(`${anchorX},${anchorZ}`);
+function floodFillReachable(
+  navGrid: NavGrid,
+  anchorX: number,
+  anchorZ: number,
+): { width: number; height: number; count: number } {
+  const width = navGrid.width;
+  const height = navGrid.height;
+  ensureReachabilityScratch(width * height);
 
-  for (let head = 0; head < queue.length; head++) {
-    const { x, z } = queue[head]!;
-    for (const [dx, dz] of [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]] as const) {
+  // Clear only what the previous call actually touched, not the whole grid.
+  for (let i = 0; i < lastFillCount; i++) visitedArr[queueArr[i]!] = 0;
+
+  let count = 0;
+  const startIdx = anchorZ * width + anchorX;
+  visitedArr[startIdx] = 1;
+  queueArr[count++] = startIdx;
+
+  for (let head = 0; head < count; head++) {
+    const idx = queueArr[head]!;
+    const x = idx % width;
+    const z = (idx / width) | 0;
+    for (const [dx, dz] of NEIGHBOUR_OFFSETS_8) {
       const nx = x + dx;
       const nz = z + dz;
-      const key = `${nx},${nz}`;
-      if (visited.has(key) || !isTraversableCell(navGrid, nx, nz)) continue;
-      visited.add(key);
-      queue.push({ x: nx, z: nz });
+      if (!isTraversableCell(navGrid, nx, nz)) continue;
+      const neighborIdx = nz * width + nx;
+      if (visitedArr[neighborIdx]) continue;
+      visitedArr[neighborIdx] = 1;
+      queueArr[count++] = neighborIdx;
     }
   }
 
-  return visited;
+  lastFillCount = count;
+  return { width, height, count };
 }

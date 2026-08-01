@@ -4,7 +4,7 @@
 
 import { length } from '../core/math/Vec3.js';
 import { PhysicsWorld } from './PhysicsWorld.js';
-import { TerrainBody, findSurfaceY } from './TerrainBody.js';
+import { TerrainBody, computeFragmentRegion, findSurfaceY } from './TerrainBody.js';
 import { FragmentBody } from './FragmentBody.js';
 import type { RockFragment } from './FragmentSim.js';
 import type { VoxelGrid } from '../core/world/VoxelGrid.js';
@@ -66,7 +66,7 @@ function simulateRigidBodies(fragments: RockFragment[], grid: VoxelGrid): void {
   world.init();
 
   const terrain = new TerrainBody(world);
-  terrain.build(grid);
+  terrain.build(grid, computeFragmentRegion(fragments));
 
   const bodyManager = new FragmentBody(world);
   bodyManager.addRockFragments(fragments.filter(isFragmentValidForPhysics));

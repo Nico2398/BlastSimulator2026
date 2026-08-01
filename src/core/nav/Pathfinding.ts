@@ -3,7 +3,7 @@
 
 import { NavGrid } from './NavGrid.js';
 import type { NavCell } from './NavGrid.js';
-import { PATHFINDING_NODE_BUDGET_CAP } from '../config/balance.js';
+import { pathfindingNodeBudget } from '../config/balance.js';
 
 /**
  * Describes a pathfinding request from one grid cell to another.
@@ -63,6 +63,28 @@ const MIN_WALKABLE_COST = 1.0;
  * bound, we consider it optimal enough to skip A* entirely.
  */
 const DIRECT_LINE_TOLERANCE = 1.1;
+
+/**
+ * Heuristic inflation for the A* main loop (#458 T6.2/D14). Any obstacle
+ * sitting directly on the optimal route between two far-apart points — a
+ * blast crater, a cluster of 'void' cells, a cracked outcrop — puts many
+ * detour cells within a hair of the true optimal f-score once the goal is
+ * 100+ cells away, since a short lateral step barely changes an admissible
+ * octile estimate to a distant goal. Plain A* then re-expands that whole
+ * near-tied frontier before it can be sure it found the optimal path: a
+ * 20-cell obstacle directly on a 160×160 cross-map route measured at 6100+
+ * explored nodes with weight 1.0 — nearly double pathfindingNodeBudget's own
+ * scaled cap — and grows worse with obstacle size, well past what any
+ * plausible node budget for this grid size should have to absorb. Inflating
+ * the heuristic (standard weighted-A*, trading a little optimality for a lot
+ * less exploration) cuts that same case to a fraction of the budget; 1.3 was
+ * the smallest weight that kept a 40-cell obstacle — bigger than any single
+ * blast crater or drill-grid clearance produces — within budget in measurement.
+ * Applied to the A* loop's own priority only, never to the direct-line
+ * fast-path's lower-bound check above, which needs the true admissible
+ * heuristic to stay a valid bound.
+ */
+const ASTAR_HEURISTIC_WEIGHT = 1.3;
 
 // ---------------------------------------------------------------------------
 // Internal binary min-heap (generic)
@@ -138,16 +160,40 @@ export function octileHeuristic(ax: number, az: number, bx: number, bz: number):
   return Math.max(dx, dz) + (Math.SQRT2 - 1) * Math.min(dx, dz);
 }
 
-/** Encode a coordinate pair as a single numeric key. */
-const POS_MULT = 100000;
-function encodePos(x: number, z: number): number {
-  return x * POS_MULT + z;
+/** Flat row-major index for a coordinate pair — also the A* scratch arrays' index space. */
+function cellIndex(x: number, z: number, width: number): number {
+  return z * width + x;
 }
-function posX(pos: number): number {
-  return (pos / POS_MULT) | 0;
-}
-function posZ(pos: number): number {
-  return pos % POS_MULT;
+
+// ---------------------------------------------------------------------------
+// A* scratch arrays (#458 T6.2/D14)
+// ---------------------------------------------------------------------------
+//
+// Per-search Map<number, number> allocation was the dominant A* cost once
+// D13's bigger levels (up to 160×160, node budget scaled accordingly — see
+// pathfindingNodeBudget) meant every search could touch thousands of nodes:
+// each Map.set/get is a hash-table operation, and a fresh Map per call
+// discards all of that work as garbage immediately after. Flat typed arrays
+// indexed by cellIndex(x, z, width) replace both gScore and cameFrom with
+// direct array access, and a generation-stamp counter (currentStamp) marks
+// which entries belong to the search in progress — a cell is "touched" iff
+// stampArr[i] === currentStamp — without needing to clear the arrays between
+// searches. Arrays live on module-level scratch, grown (never shrunk) to fit
+// the largest grid seen; small early-game searches reuse the same buffers a
+// later 160×160 search grew.
+let scratchCapacity = 0;
+let gScoreArr = new Float64Array(0);
+let cameFromArr = new Int32Array(0);
+let stampArr = new Int32Array(0);
+let currentStamp = 0;
+
+/** Grow the A* scratch arrays to at least `size` cells. Never shrinks. */
+function ensureScratchCapacity(size: number): void {
+  if (size <= scratchCapacity) return;
+  scratchCapacity = size;
+  gScoreArr = new Float64Array(size);
+  cameFromArr = new Int32Array(size);
+  stampArr = new Int32Array(size); // zero-filled; currentStamp starts at 1 so this never falsely reads as "touched"
 }
 
 /** Clamp a coordinate to the grid bounds. */
@@ -504,38 +550,44 @@ function findOrdinaryPath(
     if (directLine.totalCost <= heuristicLowerBound * DIRECT_LINE_TOLERANCE) return directLine;
   }
 
-  // A* main loop
+  // A* main loop — see the scratch-array block above for why gScore/cameFrom
+  // are flat typed arrays keyed by cellIndex rather than per-call Maps.
 
   interface AStarNode {
     key: number; // f = g + h, used by the min-heap
-    pos: number; // encoded position
+    pos: number; // cellIndex(x, z, width)
     g: number;   // gScore at push time (for stale check)
   }
 
+  const width = grid.width;
+  ensureScratchCapacity(width * grid.height);
+  currentStamp++;
+
   const openHeap = new MinHeap<AStarNode>();
-  const gScore = new Map<number, number>();
-  const cameFrom = new Map<number, number>();
   let exploredCount = 0;
 
-  const startPos = encodePos(sx, sz);
-  gScore.set(startPos, 0);
-  const hStart = octileHeuristic(sx, sz, gx, gz);
+  const budget = pathfindingNodeBudget(grid.width, grid.height);
+  const startPos = cellIndex(sx, sz, width);
+  gScoreArr[startPos] = 0;
+  stampArr[startPos] = currentStamp;
+  cameFromArr[startPos] = -1;
+  const hStart = octileHeuristic(sx, sz, gx, gz) * ASTAR_HEURISTIC_WEIGHT;
   openHeap.push({ key: hStart, pos: startPos, g: 0 });
 
-  while (openHeap.size > 0 && exploredCount < PATHFINDING_NODE_BUDGET_CAP) {
+  while (openHeap.size > 0 && exploredCount < budget) {
     const current = openHeap.pop()!;
-    const cx = posX(current.pos);
-    const cz = posZ(current.pos);
+    const cx = current.pos % width;
+    const cz = (current.pos / width) | 0;
 
     // Skip stale entries (re-expanded with outdated gScore)
-    const bestG = gScore.get(current.pos);
-    if (bestG === undefined || current.g !== bestG) continue;
+    const bestG = gScoreArr[current.pos];
+    if (bestG !== current.g) continue;
 
     exploredCount++;
 
     // Goal reached?
     if (cx === gx && cz === gz) {
-      return reconstructPath(cameFrom, gx, gz, gScore);
+      return reconstructPath(gx, gz, width);
     }
 
     // Explore neighbours
@@ -554,13 +606,15 @@ function findOrdinaryPath(
       const stepCost = isDiagonal ? neighborCell.moveCost * Math.SQRT2 : neighborCell.moveCost;
       const tentativeG = bestG + stepCost;
 
-      const neighborPos = encodePos(nx, nz);
-      const existingG = gScore.get(neighborPos);
+      const neighborPos = cellIndex(nx, nz, width);
+      const touched = stampArr[neighborPos] === currentStamp;
+      const existingG = touched ? gScoreArr[neighborPos]! : Infinity;
 
-      if (existingG === undefined || tentativeG < existingG) {
-        gScore.set(neighborPos, tentativeG);
-        cameFrom.set(neighborPos, current.pos);
-        const h = octileHeuristic(nx, nz, gx, gz);
+      if (!touched || tentativeG < existingG) {
+        gScoreArr[neighborPos] = tentativeG;
+        stampArr[neighborPos] = currentStamp;
+        cameFromArr[neighborPos] = current.pos;
+        const h = octileHeuristic(nx, nz, gx, gz) * ASTAR_HEURISTIC_WEIGHT;
         openHeap.push({ key: tentativeG + h, pos: neighborPos, g: tentativeG });
       }
     }
@@ -573,27 +627,19 @@ function findOrdinaryPath(
   return { found: false, waypoints: [], totalCost: 0 };
 }
 
-/** Reconstruct path by walking cameFrom map backwards from goal to start. */
-function reconstructPath(
-  cameFrom: Map<number, number>,
-  goalX: number,
-  goalZ: number,
-  gScore: Map<number, number>,
-): PathResult {
+/** Reconstruct path by walking the cameFromArr scratch array backwards from goal to start. */
+function reconstructPath(goalX: number, goalZ: number, width: number): PathResult {
   const waypoints: { x: number; z: number }[] = [];
-  let currentPos = encodePos(goalX, goalZ);
+  let idx = cellIndex(goalX, goalZ, width);
+  const totalCost = gScoreArr[idx]!;
 
-  // Walk backwards
-  while (true) {
-    waypoints.push({ x: posX(currentPos), z: posZ(currentPos) });
-    const parentPos = cameFrom.get(currentPos);
-    if (parentPos === undefined) break;
-    currentPos = parentPos;
+  // Walk backwards (-1 marks the start node, which has no parent)
+  while (idx !== -1) {
+    waypoints.push({ x: idx % width, z: (idx / width) | 0 });
+    idx = cameFromArr[idx]!;
   }
 
   waypoints.reverse();
-
-  const totalCost = gScore.get(encodePos(goalX, goalZ)) ?? 0;
 
   return { found: true, waypoints, totalCost };
 }

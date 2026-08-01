@@ -1155,7 +1155,7 @@ describe('NavGrid.computeReachableSet', () => {
     expect(reachable.size).toBe(25);
     for (let z = 0; z < 5; z++) {
       for (let x = 0; x < 5; x++) {
-        expect(reachable.has(`${x},${z}`)).toBe(true);
+        expect(reachable.has(x, z)).toBe(true);
       }
     }
   });
@@ -1174,11 +1174,11 @@ describe('NavGrid.computeReachableSet', () => {
     const reachable = NavGrid.computeReachableSet(nav, 0, 0);
 
     // The pocket cell itself is traversable but walled off by void on all 8 sides.
-    expect(reachable.has('3,3')).toBe(false);
+    expect(reachable.has(3, 3)).toBe(false);
     // The open field outside the ring is fully reachable from the anchor.
-    expect(reachable.has('0,0')).toBe(true);
-    expect(reachable.has('6,6')).toBe(true);
-    expect(reachable.has('1,1')).toBe(true);
+    expect(reachable.has(0, 0)).toBe(true);
+    expect(reachable.has(6, 6)).toBe(true);
+    expect(reachable.has(1, 1)).toBe(true);
   });
 
   it('includes only the pocket when the anchor itself sits inside it', () => {
@@ -1193,7 +1193,8 @@ describe('NavGrid.computeReachableSet', () => {
 
     // The void ring cuts the pocket off from the rest of the (otherwise fully
     // walkable) grid, so flood-filling from inside it finds nothing else.
-    expect(reachable).toEqual(new Set(['3,3']));
+    expect(reachable.size).toBe(1);
+    expect(reachable.has(3, 3)).toBe(true);
   });
 
   it('returns an empty set when the anchor itself sits on a non-traversable cell', () => {
@@ -1223,6 +1224,6 @@ describe('NavGrid.computeReachableSet', () => {
     // implementer extracts one flood-fill both functions share (as the doc
     // comments anticipate), a divergence here means that extraction broke one
     // of them.
-    expect(reachable.has(`${nearest.x},${nearest.z}`)).toBe(true);
+    expect(reachable.has(nearest.x, nearest.z)).toBe(true);
   });
 });
