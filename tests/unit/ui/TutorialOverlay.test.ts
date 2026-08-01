@@ -188,7 +188,9 @@ describe('TutorialOverlay (12.4)', () => {
   });
 
   describe('progress display', () => {
-    it('shows step counter "1 / 23" at step 0 and has progress bar fill', () => {
+    it('shows step counter "1 / 24" at step 0 and has progress bar fill', () => {
+      // 24, not 23: #466 inserts the haul-debris step between build-storage
+      // and contract-deliver.
       const tut = new TutorialOverlay(container);
       overlay = tut;
       tut.start(createMockState());
@@ -196,7 +198,7 @@ describe('TutorialOverlay (12.4)', () => {
       const els = Array.from(container.querySelectorAll('*'));
       const ctr = els.find(el => /\d\s*\/\s*\d/.test(el.textContent ?? ''));
       expect(ctr).toBeDefined();
-      expect(ctr?.textContent).toMatch(/1\s*\/\s*23/);
+      expect(ctr?.textContent).toMatch(/1\s*\/\s*24/);
       expect(container.querySelector('.bs-tutorial-progress-fill')).not.toBeNull();
     });
   });
@@ -429,10 +431,11 @@ describe('TutorialOverlay (12.4)', () => {
     });
 
     it('highlightTarget with undefined selector does not throw', () => {
-      // Step 22 (congratulations) has no highlightTarget
+      // Step 23 (congratulations, shifted from 22 by the #466 haul-debris
+      // insertion) has no highlightTarget
       const tut = new TutorialOverlay(container) as any;
       overlay = tut;
-      tut.stepIndex = 22;
+      tut.stepIndex = 23;
       expect(() => tut.render()).not.toThrow();
     });
 
@@ -539,8 +542,9 @@ describe('TutorialOverlay (12.4)', () => {
       overlay = tut;
       tut.start(createMockState());
 
-      // Directly set to congratulations step (index 22) and render
-      tut.stepIndex = 22;
+      // Directly set to congratulations step (index 23, shifted from 22 by
+      // the #466 haul-debris insertion) and render
+      tut.stepIndex = 23;
       tut.render();
 
       const titleEl = container.querySelector('.bs-panel-title') as HTMLElement;
