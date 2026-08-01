@@ -16,7 +16,7 @@ import {
   getNeedMultiplier,
 } from '../../src/core/entities/EmployeeNeeds.js';
 import type { Employee } from '../../src/core/entities/Employee.js';
-import { NEED_WARNING_THRESHOLDS } from '../../src/core/config/balance.js';
+import { NEED_WARNING_THRESHOLDS, NEED_REST_DURATIONS, AGENT_WALK_SPEED } from '../../src/core/config/balance.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -333,8 +333,16 @@ describe('tick command — a single threshold dip triggers a single rest', () =>
     emp.fatigue = 100;
     emp.breakNeed = 100;
 
-    // Long enough for the rest to be queued, claimed, and completed.
-    for (let i = 0; i < 8; i++) tickCommand(ctx, ['1'], {});
+    // The employee is routed toward the living_quarters on the very first
+    // tick, but (issue #437) the rest timer must not start until they have
+    // actually walked there — routing alone is not resolution.
+    tickCommand(ctx, ['1'], {});
+    expect(emp.destinationX).not.toBeNull();
+    expect(emp.destinationZ).not.toBeNull();
+    expect(emp.restTicksRemaining).toBeNull();
+
+    // Long enough for the walk to (5,5) plus the full rest duration, with slack.
+    for (let i = 0; i < 20; i++) tickCommand(ctx, ['1'], {});
 
     const restCharges = state.finances.transactions.filter(t => t.category === 'needs');
     expect(restCharges).toHaveLength(1);
@@ -343,5 +351,47 @@ describe('tick command — a single threshold dip triggers a single rest', () =>
     expect(emp.activeActionId).toBeNull();
     expect(emp.hunger).toBeGreaterThan(NEED_WARNING_THRESHOLDS.hunger);
     expect(state.pendingActions.filter(a => a.type === 'rest')).toHaveLength(0);
+  });
+
+  // ── New (issue #437): rest must not tick down while still travelling ──────
+
+  it('does not decrement restTicksRemaining while the employee is still travelling to the living_quarters', () => {
+    const ctx = makeCtx();
+    const empId = hireOne(ctx, 'driller');
+    const state = ctx.state!;
+    const emp = getEmployee(ctx, empId);
+
+    const build = buildCommand(ctx, ['living_quarters'], { at: '20,20', tier: '1' });
+    expect(build.success).toBe(true);
+
+    state.cash = 100_000;
+    emp.x = 0;
+    emp.z = 0;
+    emp.hunger = 20; // below warning threshold — triggers routing
+    emp.fatigue = 100;
+    emp.breakNeed = 100;
+
+    tickCommand(ctx, ['1'], {});
+
+    // Routed but not yet arrived: destination set, rest not started.
+    expect(emp.destinationX).not.toBeNull();
+    expect(emp.destinationZ).not.toBeNull();
+    expect(emp.restTicksRemaining).toBeNull();
+
+    // A few more ticks — still travelling (distance from (0,0) to the
+    // building is well beyond a few ticks at AGENT_WALK_SPEED), rest still
+    // has not started.
+    for (let i = 0; i < 3; i++) tickCommand(ctx, ['1'], {});
+    expect(emp.x === 20 && emp.z === 20).toBe(false);
+    expect(emp.restTicksRemaining).toBeNull();
+
+    // Enough ticks to arrive (distance (0,0)→(20,20) ≈ 28.3 cells / AGENT_WALK_SPEED)
+    // and finish the rest (NEED_REST_DURATIONS.hunger ticks of work once
+    // arrival gates the timer open), with slack.
+    const travelTicks = Math.ceil(Math.hypot(20, 20) / AGENT_WALK_SPEED);
+    for (let i = 0; i < travelTicks + NEED_REST_DURATIONS.hunger + 10; i++) tickCommand(ctx, ['1'], {});
+
+    expect(emp.restTicksRemaining).toBeNull(); // completed and cleared
+    expect(emp.hunger).toBeGreaterThan(NEED_WARNING_THRESHOLDS.hunger);
   });
 });

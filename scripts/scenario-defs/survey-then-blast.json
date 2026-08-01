@@ -102,11 +102,11 @@
       ]
     },
     {
-      "command": "tick 10",
+      "command": "tick 25",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 10"
+          "command": "tick 25"
         }
       ]
     },
@@ -210,11 +210,11 @@
       ]
     },
     {
-      "command": "tick 8",
+      "command": "tick 23",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 8"
+          "command": "tick 23"
         }
       ]
     },

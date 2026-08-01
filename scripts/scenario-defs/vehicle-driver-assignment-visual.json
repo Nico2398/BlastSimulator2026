@@ -72,6 +72,15 @@
       ]
     },
     {
+      "command": "tick 5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 5"
+        }
+      ]
+    },
+    {
       "command": "vehicle list",
       "interaction": [
         {
@@ -95,6 +104,15 @@
         {
           "type": "command",
           "command": "vehicle driver 1 2"
+        }
+      ]
+    },
+    {
+      "command": "tick 5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 5"
         }
       ]
     },

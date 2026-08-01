@@ -138,11 +138,11 @@
       ]
     },
     {
-      "command": "tick 10",
+      "command": "tick 40",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 10"
+          "command": "tick 40"
         }
       ]
     },

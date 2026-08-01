@@ -121,11 +121,11 @@
       ]
     },
     {
-      "command": "tick 15",
+      "command": "tick 25",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 15"
+          "command": "tick 25"
         }
       ]
     },

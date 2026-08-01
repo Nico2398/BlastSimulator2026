@@ -12,6 +12,7 @@ import {
   queueResearchTask,
   tickResearch,
   isTierUnlocked,
+  findNearestActiveBuildingOfType,
 } from '../../../src/core/entities/Building.js';
 
 describe('Building system', () => {
@@ -215,5 +216,95 @@ describe('placeBuilding — research gating', () => {
 
     const result = placeBuilding(state, 'living_quarters', 0, 0, 64, 64, 3);
     expect(result.success).toBe(false);
+  });
+});
+
+// ── findNearestActiveBuildingOfType (issue #437 — arrival-gated actions) ────
+//
+// RED PHASE: the function currently always throws 'not implemented'. Every
+// test below fails until the implementer fills in the real nearest-search.
+
+describe('findNearestActiveBuildingOfType', () => {
+  it('returns null when no building of that type exists at all', () => {
+    const state = createBuildingState();
+    placeBuilding(state, 'management_office', 0, 0, 64, 64);
+
+    const result = findNearestActiveBuildingOfType(state, 'living_quarters', 5, 5);
+    expect(result).toBeNull();
+  });
+
+  it('returns null when a building of that type exists but is inactive', () => {
+    const state = createBuildingState();
+    placeBuilding(state, 'living_quarters', 0, 0, 64, 64);
+    state.buildings[0]!.active = false;
+
+    const result = findNearestActiveBuildingOfType(state, 'living_quarters', 1, 1);
+    expect(result).toBeNull();
+  });
+
+  it('returns the sole matching active building when only one exists', () => {
+    const state = createBuildingState();
+    placeBuilding(state, 'living_quarters', 10, 10, 64, 64);
+    const building = state.buildings[0]!;
+
+    const result = findNearestActiveBuildingOfType(state, 'living_quarters', 0, 0);
+    expect(result).not.toBeNull();
+    expect(result!.id).toBe(building.id);
+  });
+
+  it('returns the nearest of several matching buildings by Euclidean distance from (x, z)', () => {
+    const state = createBuildingState();
+    placeBuilding(state, 'living_quarters', 0, 0, 64, 64);   // distance from (20,20) ≈ 28.28
+    placeBuilding(state, 'living_quarters', 18, 18, 64, 64); // distance from (20,20) ≈ 2.83 — nearest
+    placeBuilding(state, 'living_quarters', 40, 40, 64, 64); // distance from (20,20) ≈ 28.28
+
+    const nearest = state.buildings[1]!;
+    const result = findNearestActiveBuildingOfType(state, 'living_quarters', 20, 20);
+
+    expect(result).not.toBeNull();
+    expect(result!.id).toBe(nearest.id);
+  });
+
+  it('ignores buildings of a different type even when closer', () => {
+    const state = createBuildingState();
+    placeBuilding(state, 'management_office', 1, 1, 64, 64); // closest, wrong type
+    placeBuilding(state, 'living_quarters', 30, 30, 64, 64); // only correct-type match
+
+    const target = state.buildings[1]!;
+    const result = findNearestActiveBuildingOfType(state, 'living_quarters', 0, 0);
+
+    expect(result).not.toBeNull();
+    expect(result!.id).toBe(target.id);
+  });
+
+  it('ignores inactive buildings even when they are the nearest of the correct type', () => {
+    const state = createBuildingState();
+    placeBuilding(state, 'living_quarters', 1, 1, 64, 64);
+    state.buildings[0]!.active = false; // nearest, but inactive
+    placeBuilding(state, 'living_quarters', 30, 30, 64, 64); // farther, but active
+
+    const active = state.buildings[1]!;
+    const result = findNearestActiveBuildingOfType(state, 'living_quarters', 0, 0);
+
+    expect(result).not.toBeNull();
+    expect(result!.id).toBe(active.id);
+  });
+
+  it('a building exactly at the query position has distance 0 and is returned', () => {
+    const state = createBuildingState();
+    placeBuilding(state, 'freight_warehouse', 5, 5, 64, 64);
+    placeBuilding(state, 'freight_warehouse', 20, 20, 64, 64);
+
+    const exact = state.buildings[0]!;
+    const result = findNearestActiveBuildingOfType(state, 'freight_warehouse', 5, 5);
+
+    expect(result).not.toBeNull();
+    expect(result!.id).toBe(exact.id);
+  });
+
+  it('returns null against an empty building state', () => {
+    const state = createBuildingState();
+    const result = findNearestActiveBuildingOfType(state, 'freight_warehouse', 0, 0);
+    expect(result).toBeNull();
   });
 });

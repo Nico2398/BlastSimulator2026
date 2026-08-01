@@ -2,9 +2,21 @@
   "name": "survey-confidence-overlay",
   "description": "Dedicated scenario for survey confidence overlay: multiple survey methods at the same location showing confidence differences, stale/fresh rendering, and overlay lifecycle. The final screenshot must show colour-coded confidence markers (green = high, red/yellow = low, grey = stale). This scenario FAILS until GameRenderer wires getSurveyOverlay().show() into syncFromContext().",
   "shots": [
-    { "name": "overview", "yaw": 0, "pitch": 45 },
-    { "name": "seismic-focus", "yaw": 90, "pitch": 30 },
-    { "name": "core-sample-focus", "yaw": 180, "pitch": 45 }
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45
+    },
+    {
+      "name": "seismic-focus",
+      "yaw": 90,
+      "pitch": 30
+    },
+    {
+      "name": "core-sample-focus",
+      "yaw": 180,
+      "pitch": 45
+    }
   ],
   "steps": [
     {
@@ -143,11 +155,11 @@
       ]
     },
     {
-      "command": "tick 8",
+      "command": "tick 53",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 8"
+          "command": "tick 53"
         }
       ]
     },
@@ -359,11 +371,11 @@
       ]
     },
     {
-      "command": "tick 8",
+      "command": "tick 53",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 8"
+          "command": "tick 53"
         }
       ]
     },
