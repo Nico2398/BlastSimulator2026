@@ -1083,3 +1083,93 @@ describe('NavGrid.findNearestReachableCell', () => {
     expect(distSq).toBe(4);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Group 5: computeReachableSet (#466 — reachability-aware fragment selection for
+// hauling. A full-clear blast leaves most fragments sitting in 'void' NavGrid
+// cells; findReachableGroundFragment must never treat those as reachable, so
+// this is the flood-fill it (and the "Haul" UI button) are built on.)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('NavGrid.computeReachableSet', () => {
+  it('returns every traversable cell on a flat open grid', () => {
+    const rows: NavCellType[][] = Array.from({ length: 5 }, () =>
+      Array.from({ length: 5 }, (): NavCellType => 'walkable'));
+    const nav = makeNavGridFromTypes(rows);
+
+    const reachable = NavGrid.computeReachableSet(nav, 2, 2);
+
+    expect(reachable.size).toBe(25);
+    for (let z = 0; z < 5; z++) {
+      for (let x = 0; x < 5; x++) {
+        expect(reachable.has(`${x},${z}`)).toBe(true);
+      }
+    }
+  });
+
+  it('excludes a void-walled pocket from the reachable set when the anchor sits outside it', () => {
+    // Same 7×7 layout as the findNearestReachableCell pocket fixture above, but
+    // walled with 'void' — what a blast crater actually produces — instead of
+    // 'blocked'.
+    const rows: NavCellType[][] = Array.from({ length: 7 }, () =>
+      Array.from({ length: 7 }, (): NavCellType => 'walkable'));
+    for (const [x, z] of [[2, 2], [3, 2], [4, 2], [2, 3], [4, 3], [2, 4], [3, 4], [4, 4]] as const) {
+      rows[z]![x] = 'void';
+    }
+    const nav = makeNavGridFromTypes(rows);
+
+    const reachable = NavGrid.computeReachableSet(nav, 0, 0);
+
+    // The pocket cell itself is traversable but walled off by void on all 8 sides.
+    expect(reachable.has('3,3')).toBe(false);
+    // The open field outside the ring is fully reachable from the anchor.
+    expect(reachable.has('0,0')).toBe(true);
+    expect(reachable.has('6,6')).toBe(true);
+    expect(reachable.has('1,1')).toBe(true);
+  });
+
+  it('includes only the pocket when the anchor itself sits inside it', () => {
+    const rows: NavCellType[][] = Array.from({ length: 7 }, () =>
+      Array.from({ length: 7 }, (): NavCellType => 'walkable'));
+    for (const [x, z] of [[2, 2], [3, 2], [4, 2], [2, 3], [4, 3], [2, 4], [3, 4], [4, 4]] as const) {
+      rows[z]![x] = 'void';
+    }
+    const nav = makeNavGridFromTypes(rows);
+
+    const reachable = NavGrid.computeReachableSet(nav, 3, 3);
+
+    // The void ring cuts the pocket off from the rest of the (otherwise fully
+    // walkable) grid, so flood-filling from inside it finds nothing else.
+    expect(reachable).toEqual(new Set(['3,3']));
+  });
+
+  it('returns an empty set when the anchor itself sits on a non-traversable cell', () => {
+    const rows: NavCellType[][] = Array.from({ length: 5 }, () =>
+      Array.from({ length: 5 }, (): NavCellType => 'walkable'));
+    rows[2]![2] = 'void';
+    const nav = makeNavGridFromTypes(rows);
+
+    const reachable = NavGrid.computeReachableSet(nav, 2, 2);
+
+    expect(reachable.size).toBe(0);
+  });
+
+  it('agrees with findNearestReachableCell on a shared pocket fixture (regression guard)', () => {
+    const rows: NavCellType[][] = Array.from({ length: 7 }, () =>
+      Array.from({ length: 7 }, (): NavCellType => 'walkable'));
+    for (const [x, z] of [[2, 2], [3, 2], [4, 2], [2, 3], [4, 3], [2, 4], [3, 4], [4, 4]] as const) {
+      rows[z]![x] = 'void';
+    }
+    const nav = makeNavGridFromTypes(rows);
+
+    const reachable = NavGrid.computeReachableSet(nav, 0, 0);
+    const nearest = NavGrid.findNearestReachableCell(nav, 0, 0, 3, 3);
+
+    // findNearestReachableCell's answer must itself be a member of the set
+    // computeReachableSet reports as reachable from the same anchor — if the
+    // implementer extracts one flood-fill both functions share (as the doc
+    // comments anticipate), a divergence here means that extraction broke one
+    // of them.
+    expect(reachable.has(`${nearest.x},${nearest.z}`)).toBe(true);
+  });
+});

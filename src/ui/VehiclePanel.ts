@@ -6,6 +6,7 @@ import { LocaleTextRegistry } from './localeText.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { Vehicle, VehicleRole, VehicleTier } from '../core/entities/Vehicle.js';
 import { getAllVehicleRoles, getVehicleDefByTier, ROLE_LICENCE_REQUIRED } from '../core/entities/Vehicle.js';
+import { HaulEligibilityCache, makeHaulButton, refreshHaulButtons } from './vehicleHaulButton.js';
 
 const VEHICLE_TIERS: VehicleTier[] = [1, 2, 3];
 
@@ -23,6 +24,8 @@ export class VehiclePanel {
   /** Latest state, so a locale switch can re-render the fleet rows. */
   private lastState: GameState | null = null;
   private readonly locale = new LocaleTextRegistry();
+  /** Per-tick cache of each vehicle's best reachable haul fragment — see vehicleHaulButton.ts. */
+  private readonly haulCache = new HaulEligibilityCache();
 
   constructor(container: HTMLElement) {
     this.el = document.createElement('div');
@@ -56,6 +59,17 @@ export class VehiclePanel {
 
   setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
 
+  /**
+   * Stable dispatcher passed to the haul-button helpers instead of
+   * `this.gameConsole` directly — those helpers capture the reference they're
+   * given at button-creation time in a click closure, so a raw
+   * possibly-undefined `this.gameConsole` would freeze at whatever it was
+   * when the button was built. Reading `this.gameConsole` live here keeps a
+   * late `setGameConsole()` call working, matching the driver-assign button's
+   * own `() => this.gameConsole?.(...)` pattern.
+   */
+  private readonly dispatch = (cmd: string): unknown => this.gameConsole?.(cmd);
+
   /** Re-render locale-dependent text (title, rows, buy section) after a language change. */
   refreshLocale(): void {
     this.locale.refresh();
@@ -75,6 +89,11 @@ export class VehiclePanel {
     this.lastState = state;
     const { vehicles } = state.vehicles;
 
+    // Reachable-fragment eligibility only changes once per game tick, not
+    // once per rendered frame — refresh() below is a no-op except on the
+    // first update() call for a given state.tickCount.
+    this.haulCache.refresh(state);
+
     // Rebuilt only when the fleet changes: this list holds a driver <select>,
     // and a per-frame rebuild would discard the player's choice mid-interaction.
     const signature = [
@@ -83,6 +102,7 @@ export class VehiclePanel {
     ].join('#');
     if (signature === this.lastSignature) {
       this.refreshTierButtons(state.cash);
+      refreshHaulButtons(this.listEl, state, this.haulCache, this.dispatch);
       return;
     }
     this.lastSignature = signature;
@@ -101,6 +121,7 @@ export class VehiclePanel {
     }
 
     this.refreshTierButtons(state.cash);
+    refreshHaulButtons(this.listEl, state, this.haulCache, this.dispatch);
   }
 
   dispose(): void { this.el.remove(); }
@@ -124,8 +145,13 @@ export class VehiclePanel {
     scrapBtn.addEventListener('click', () => this.gameConsole?.(`vehicle scrap id:${v.id}`));
 
     const col = document.createElement('div');
+    col.className = 'bs-vehicle-col';
+    col.dataset['vehicleId'] = String(v.id);
     col.style.cssText = 'flex:1;min-width:0';
+    col.dataset['vehicleId'] = String(v.id);
     col.append(info, status, this.makeDriverRow(v, state));
+    const haulBtn = makeHaulButton(v, this.haulCache, this.dispatch);
+    if (haulBtn) col.appendChild(haulBtn);
     row.append(col, scrapBtn);
     return row;
   }

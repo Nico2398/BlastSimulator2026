@@ -9,6 +9,11 @@ import { VehiclePanel } from '../../../src/ui/VehiclePanel.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
 import { purchaseVehicle, getVehicleDefByTier, getAllVehicleRoles } from '../../../src/core/entities/Vehicle.js';
+import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
+import { Random } from '../../../src/core/math/Random.js';
+import { addBlastFragments } from '../../../src/core/economy/Logistics.js';
+import { NavGrid } from '../../../src/core/nav/NavGrid.js';
+import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 import { t } from '../../../src/core/i18n/I18n.js';
 import type { CommandResult } from '../../../src/console/ConsoleRunner.js';
 
@@ -25,6 +30,41 @@ function setupPanel(): { container: HTMLDivElement; panel: VehiclePanel } {
   document.body.appendChild(container);
   const panel = new VehiclePanel(container);
   return { container, panel };
+}
+
+const SEED = 42;
+
+function makeFragment(id: number, x: number, z: number, mass = 1000): FragmentData {
+  return {
+    id,
+    position: { x, y: 0, z },
+    volume: 1.0,
+    mass,
+    rockId: 'cruite',
+    oreDensities: {},
+    initialVelocity: { x: 0, y: 0, z: 0 },
+    isProjection: false,
+  };
+}
+
+/** A flat, fully walkable size×size NavGrid — GameState.navGrid is null until
+ *  a world is built via `new_game`, so the panel's own tests build one directly. */
+function makeFlatNavGrid(size: number): NavGrid {
+  const cells = Array.from({ length: size }, () =>
+    Array.from({ length: size }, () => ({ type: 'walkable' as const, moveCost: 1.0, benchLevel: 0, vehicleOccupied: false })));
+  return new NavGrid(size, size, cells, 0);
+}
+
+/** A debris_hauler with a licensed driver boarded, on a flat NavGrid. */
+function makeDrivenHaulerState(): { state: GameState; vehicleId: number } {
+  const state = makeState();
+  state.navGrid = makeFlatNavGrid(20);
+  const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
+  const rng = new Random(SEED);
+  const { employee } = hireEmployee(state.employees, 'driver', rng);
+  assignSkill(state.employees, employee.id, 'driving.truck', 1);
+  vehicle.driverId = employee.id;
+  return { state, vehicleId: vehicle.id };
 }
 
 // ── Buy section — per-tier buttons ──────────────────────────────────────────
@@ -166,5 +206,76 @@ describe('VehiclePanel — owned vehicle rows show localized tier name (#411)', 
     expect(rows).toHaveLength(2);
     expect(rows[0]!.textContent).toContain(t('vehicle.debris_hauler.tier1'));
     expect(rows[1]!.textContent).toContain(t('vehicle.debris_hauler.tier3'));
+  });
+});
+
+// ── Haul button (#466) ───────────────────────────────────────────────────────
+// The only UI control that can trigger `vehicle haul` — without it, a player
+// can never complete the tutorial's "Deliver Contract" step (issue #466).
+
+describe('VehiclePanel — Haul button (#466)', () => {
+  it('renders the Haul button for a debris_hauler with a driver and a reachable on-ground fragment', () => {
+    const { container, panel } = setupPanel();
+    const { state } = makeDrivenHaulerState();
+    addBlastFragments(state.logistics, [makeFragment(1, 3, 3)]);
+
+    panel.update(state);
+
+    expect(container.querySelector('.bs-vehicle-haul-btn')).not.toBeNull();
+  });
+
+  it('does not render the Haul button when no reachable on-ground fragment exists', () => {
+    const { container, panel } = setupPanel();
+    const { state } = makeDrivenHaulerState();
+    // No fragments at all — nothing to haul.
+
+    panel.update(state);
+
+    expect(container.querySelector('.bs-vehicle-haul-btn')).toBeNull();
+  });
+
+  it('does not render the Haul button when the vehicle is already hauling (haulingPhase !== null)', () => {
+    const { container, panel } = setupPanel();
+    const { state, vehicleId } = makeDrivenHaulerState();
+    addBlastFragments(state.logistics, [makeFragment(1, 3, 3)]);
+    const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId)!;
+    vehicle.haulingPhase = 'to_fragment';
+
+    panel.update(state);
+
+    expect(container.querySelector('.bs-vehicle-haul-btn')).toBeNull();
+  });
+
+  it('does not render the Haul button when the vehicle has no driver', () => {
+    const { container, panel } = setupPanel();
+    const state = makeState();
+    state.navGrid = makeFlatNavGrid(20);
+    purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
+    addBlastFragments(state.logistics, [makeFragment(1, 3, 3)]);
+
+    panel.update(state);
+
+    expect(container.querySelector('.bs-vehicle-haul-btn')).toBeNull();
+  });
+
+  it('clicking the Haul button dispatches "vehicle haul <vehicleId> fragment:<resolvedFragmentId>"', () => {
+    const { container, panel } = setupPanel();
+    const { state, vehicleId } = makeDrivenHaulerState();
+    addBlastFragments(state.logistics, [makeFragment(7, 3, 3)]);
+    panel.update(state);
+
+    const commands: string[] = [];
+    panel.setGameConsole((cmd: string): CommandResult => {
+      commands.push(cmd);
+      return { success: true, output: '' };
+    });
+
+    const btn = container.querySelector('.bs-vehicle-haul-btn') as HTMLButtonElement | null;
+    expect(btn).not.toBeNull();
+    btn!.click();
+
+    // Mirrors the driver-assign button's dispatch mechanism: a direct
+    // gameConsole(cmd) call, not a DOM CustomEvent.
+    expect(commands).toContain(`vehicle haul ${vehicleId} fragment:7`);
   });
 });

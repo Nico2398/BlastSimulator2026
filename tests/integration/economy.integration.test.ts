@@ -5,8 +5,16 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { type GameContext, newGameCommand } from '../../src/console/commands/world.js';
 import { financesCommand, contractCommand } from '../../src/console/commands/economy.js';
 import { buildCommand } from '../../src/console/commands/entities.js';
+import { employeeCommand } from '../../src/console/commands/employees.js';
 import { vehicleCommand } from '../../src/console/commands/vehicle.js';
 import { tickCommand } from '../../src/console/commands/events.js';
+import {
+  drillPlanCommand,
+  chargeCommand,
+  sequenceCommand,
+  blastCommand,
+} from '../../src/console/commands/mining.js';
+import { findReachableGroundFragment } from '../../src/core/economy/HaulingTask.js';
 import { EventEmitter } from '../../src/core/state/EventEmitter.js';
 import {
   createFinanceState,
@@ -527,5 +535,112 @@ describe('Economy', () => {
     expect(completed).toBeDefined();
     expect(completed!.deliveredKg).toBe(100);
     expect(completed!.completed).toBe(true);
+  });
+
+  // ── 14. Full round trip: blast -> reachable-fragment haul -> store -> ─────
+  //         contract deliver (#466 — playtest could not reach this because no
+  //         UI control could ever issue `vehicle haul`, and naive
+  //         nearest-fragment selection could hand the player an unreachable
+  //         fragment after a full-clear blast).
+  //
+  // Fails against the stubbed findReachableGroundFragment (throws). Once
+  // implemented, still exercises the real pipeline end to end — a
+  // reachability-unaware implementation that happens to return *some*
+  // fragment id would only diverge from this test if that id is not actually
+  // haulable, which the subsequent haul/tick/deliver steps would surface as a
+  // failed assertion rather than a thrown stub error.
+
+  it('completes the full economy loop: blast, findReachableGroundFragment, haul, store, and deliver against a contract', () => {
+    // 1. Blast a small grid so fragments land on the ground.
+    const drillResult = drillPlanCommand(ctx as any, ['grid'], {
+      origin: '10,10',
+      rows: '2',
+      cols: '2',
+      spacing: '4',
+      depth: '8',
+    });
+    expect(drillResult.success).toBe(true);
+
+    const chargeResult = chargeCommand(ctx as any, [], {
+      hole: '*',
+      explosive: 'boomite',
+      amount: '5kg',
+      stemming: '2m',
+    });
+    expect(chargeResult.success).toBe(true);
+
+    const seqResult = sequenceCommand(ctx as any, ['auto'], {});
+    expect(seqResult.success).toBe(true);
+
+    const blastResult = blastCommand(ctx as any, [], {});
+    expect(blastResult.success).toBe(true);
+    expect(ctx.state!.logistics.fragments.length).toBeGreaterThan(0);
+    expect(ctx.state!.logistics.storedMassKg).toBe(0);
+
+    // 2. Purchase and crew a debris_hauler.
+    const hireDriver = employeeCommand(ctx, ['hire'], { role: 'driver' });
+    expect(hireDriver.success).toBe(true);
+    const driverId = ctx.state!.employees.employees.find(e => e.role === 'driver')!.id;
+    employeeCommand(ctx, ['assign_skill', String(driverId)], {
+      skill: 'driving.truck',
+      level: '5',
+    });
+
+    const buyResult = vehicleCommand(ctx, ['buy', 'debris_hauler'], {});
+    expect(buyResult.success).toBe(true);
+    const vehicleId = ctx.state!.vehicles.vehicles[0]!.id;
+
+    const assignResult = vehicleCommand(ctx, ['driver', String(vehicleId), String(driverId)], {});
+    expect(assignResult.success).toBe(true);
+
+    // 3. Build an active Freight Warehouse.
+    const buildResult = buildCommand(ctx, ['freight_warehouse'], { at: '5,5' });
+    expect(buildResult.success).toBe(true);
+
+    // Let the driver walk to and board the vehicle.
+    for (let i = 0; i < 10; i++) tickCommand(ctx, ['1'], {});
+
+    // 4. Reachability-aware fragment selection — the fix under test.
+    const fragmentId = findReachableGroundFragment(ctx.state!, vehicleId);
+    expect(fragmentId).not.toBeNull();
+
+    // 5. Issue the haul.
+    const haulResult = vehicleCommand(ctx, ['haul', String(vehicleId)], {
+      fragment: String(fragmentId),
+    });
+    expect(haulResult.success).toBe(true);
+
+    // 6. Tick until the fragment is picked up, driven to the depot, and
+    // stored.
+    let ticks = 0;
+    while (ctx.state!.logistics.storedMassKg === 0 && ticks < 60) {
+      tickCommand(ctx, ['1'], {});
+      ticks++;
+    }
+    expect(ctx.state!.logistics.storedMassKg).toBeGreaterThan(0);
+
+    // 7. Deliver against an active contract. The blast is a real, RNG-driven
+    // pipeline — unlike the fixture-injected-fragment tests above, there is
+    // no guarantee this particular grid's fragments carry any given ore
+    // (blingite is a probabilistic vein, not a certainty per voxel). A
+    // rubble_disposal contract (materialId: '') is the one contract type
+    // that consumeStoredOre accepts against raw stored mass regardless of
+    // ore content, so it is the deterministic way to round-trip this leg.
+    const contract = insertOreSaleContract(ctx.state!.contracts, 50, 10, {
+      type: 'rubble_disposal',
+      materialId: '',
+      description: '[test fixture] dispose of 50 kg rubble @ $10/kg',
+    });
+    const acceptResult = contractCommand(ctx, ['accept', String(contract.id)], {});
+    expect(acceptResult.success).toBe(true);
+
+    const completedBefore = ctx.state!.contracts.completedHistory.length;
+    const deliverAmount = Math.min(50, ctx.state!.logistics.storedMassKg);
+    const deliverResult = contractCommand(ctx, ['deliver', String(contract.id)], {
+      amount: String(deliverAmount),
+    });
+
+    expect(deliverResult.success).toBe(true);
+    expect(ctx.state!.contracts.completedHistory.length).toBeGreaterThan(completedBefore);
   });
 });

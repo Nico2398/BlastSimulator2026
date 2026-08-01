@@ -321,10 +321,35 @@
         }
       ],
       "expect": {
-        "tutorialStep": "contract-deliver",
+        "tutorialStep": "haul-debris",
         "increased": [
           "buildingCount"
         ]
+      }
+    },
+    {
+      "goal": "haul the blasted debris into the warehouse with the Vehicles panel's Haul button",
+      "actions": [
+        {
+          "do": "click",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "do": "awaitUsable",
+          "selector": "#bs-vehicle-panel .bs-vehicle-haul-btn"
+        },
+        {
+          "do": "click",
+          "selector": "#bs-vehicle-panel .bs-vehicle-haul-btn"
+        },
+        {
+          "do": "letTimePass",
+          "ticks": 20
+        }
+      ],
+      "expect": {
+        "tutorialStep": "contract-deliver",
+        "note": "The reported bug: no UI control anywhere could trigger `vehicle haul`, so this is where a real player got stuck forever."
       }
     },
     {

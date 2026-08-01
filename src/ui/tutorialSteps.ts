@@ -166,6 +166,21 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   // ── Step 14: build-storage ──
   createComparisonStep('build-storage', 'tutorial.step15.title', 'tutorial.step15', (s) => countBuildingsOfType(s, 'freight_warehouse'), ['build freight_warehouse at:12,8'], TOOLBAR_TARGET.build),
 
+  // ── Step 14b: haul-debris ──
+  // Fires when stored mass increases — the same "value went up" pattern every
+  // other comparison step uses. Points at the Vehicles toolbar; the console
+  // hint names the reachability-aware fragment id a player would look up via
+  // the Haul button rather than guessing one.
+  createComparisonStep(
+    'haul-debris',
+    'tutorial.step_haul.title',
+    'tutorial.step_haul',
+    (s) => s.logistics?.storedMassKg ?? 0,
+    ['vehicle haul <vehicleId> fragment:<fragmentId>'],
+    TOOLBAR_TARGET.vehicles,
+    { tickBudget: 20, waitsOnWork: true },
+  ),
+
   // ── Step 15: contract-deliver ──
   createComparisonStep('contract-deliver', 'tutorial.step16.title', 'tutorial.step16', (s) => (s.contracts?.completedHistory ?? []).length, ['contract deliver 1 amount:5000'], TOOLBAR_TARGET.contracts, { tickBudget: 20, waitsOnWork: true }),
 

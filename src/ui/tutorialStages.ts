@@ -150,6 +150,11 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
     ...pickerStages('tutorial.stage.build_site', REGION.warehouse),
   ],
 
+  'haul-debris': [
+    { target: TOOLBAR_TARGET.vehicles, hintKey: 'tutorial.stage.open_vehicles' },
+    { target: '#bs-vehicle-panel .bs-vehicle-haul-btn', hintKey: 'tutorial.stage.vehicle_haul' },
+  ],
+
   'contract-deliver': [
     { target: TOOLBAR_TARGET.contracts, hintKey: 'tutorial.stage.open_contracts' },
     {

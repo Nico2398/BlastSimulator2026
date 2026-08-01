@@ -8,6 +8,7 @@ import type { DrillHole } from '../mining/DrillPlan.js';
 import type { BlastRegion } from '../mining/BlastExecution.js';
 import { isBuildingFootprintCell } from '../entities/BuildingPlacement.js';
 import { NAV_BENCH_HEIGHT } from '../config/balance.js';
+import * as reachability from './NavGridReachability.js';
 
 /** Cardinal offsets for 4-directional neighbor checks. */
 const CARDINAL_OFFSETS: readonly [number, number][] = [[0, -1], [0, 1], [-1, 0], [1, 0]];
@@ -140,24 +141,10 @@ export class NavGrid {
     }
   }
 
-  /** True when a cell exists, is in bounds, and has finite moveCost (walkable/ramp/drill_hole). */
-  private static isTraversableCell(navGrid: NavGrid, x: number, z: number): boolean {
-    if (x < 0 || z < 0 || x >= navGrid.width || z >= navGrid.height) return false;
-    const cell = navGrid.cells[z]?.[x];
-    return !!cell && cell.type !== 'blocked' && cell.type !== 'void';
-  }
-
   /**
-   * Find the nearest traversable cell (walkable/ramp/drill_hole — anything
-   * with finite moveCost) to (x, z), searching outward in expanding square
-   * rings. Returns (x, z) unchanged when it is already traversable, or when
-   * nothing traversable turns up within maxRadius.
-   *
-   * Distance-only: does not check that the cell found is actually path-
-   * connected to anywhere else. A blast crater can carve isolated traversable
-   * pockets walled off by 'void' on every side — nearest-by-distance can land
-   * on one of those. Callers that need an actually reachable point should use
-   * findNearestReachableCell instead.
+   * Find the nearest traversable cell (walkable/ramp/drill_hole) to (x, z).
+   * See NavGridReachability.findNearestTraversableCell for the full doc —
+   * distance-only, does not check path-connectivity.
    */
   static findNearestTraversableCell(
     navGrid: NavGrid,
@@ -165,47 +152,13 @@ export class NavGrid {
     z: number,
     maxRadius: number = Math.max(navGrid.width, navGrid.height),
   ): { x: number; z: number } {
-    if (NavGrid.isTraversableCell(navGrid, x, z)) return { x, z };
-
-    for (let r = 1; r <= maxRadius; r++) {
-      let best: { x: number; z: number } | null = null;
-      let bestDistSq = Infinity;
-      for (let dx = -r; dx <= r; dx++) {
-        for (let dz = -r; dz <= r; dz++) {
-          if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue; // ring only
-          const cx = x + dx;
-          const cz = z + dz;
-          if (!NavGrid.isTraversableCell(navGrid, cx, cz)) continue;
-          const distSq = dx * dx + dz * dz;
-          if (distSq < bestDistSq) {
-            bestDistSq = distSq;
-            best = { x: cx, z: cz };
-          }
-        }
-      }
-      if (best) return best;
-    }
-
-    return { x, z };
+    return reachability.findNearestTraversableCell(navGrid, x, z, maxRadius);
   }
 
   /**
-   * Find the nearest cell to (targetX, targetZ) that is actually 8-directionally
-   * path-connected to (anchorX, anchorZ) — same adjacency Pathfinding.findPath
-   * walks, so a cell this returns is guaranteed reachable from the anchor,
-   * unlike findNearestTraversableCell's plain distance search.
-   *
-   * Exists because a spawn/destination point picked without checking the
-   * NavGrid — e.g. a vehicle purchase or employee hire landing at the world's
-   * geometric centre — can resolve to a blast-cleared 'void' column, or to an
-   * isolated traversable pocket a blast crater walled off from the rest of the
-   * map with no floor at all, which arrival-gated actions (#437) can never
-   * actually path to even after nudging to the "nearest" traversable cell.
-   *
-   * anchorX/anchorZ should be a point known to sit in the map's main
-   * connected region (callers typically use a world corner). Falls back to
-   * (targetX, targetZ) unchanged if the anchor itself resolves to no
-   * traversable cell, or if the connected component containing it is empty.
+   * Find the nearest cell to (targetX, targetZ) actually path-connected to
+   * (anchorX, anchorZ). See NavGridReachability.findNearestReachableCell
+   * for the full doc.
    */
   static findNearestReachableCell(
     navGrid: NavGrid,
@@ -214,36 +167,16 @@ export class NavGrid {
     targetX: number,
     targetZ: number,
   ): { x: number; z: number } {
-    const anchor = NavGrid.findNearestTraversableCell(navGrid, anchorX, anchorZ);
-    if (!NavGrid.isTraversableCell(navGrid, anchor.x, anchor.z)) return { x: targetX, z: targetZ };
+    return reachability.findNearestReachableCell(navGrid, anchorX, anchorZ, targetX, targetZ);
+  }
 
-    // 8-directional flood fill from the anchor — same adjacency A* uses —
-    // over the whole grid. Grids here are small (dozens of tiles per side),
-    // so an O(width*height) BFS per call is negligible.
-    const visited = new Set<string>();
-    const queue: Array<{ x: number; z: number }> = [anchor];
-    visited.add(`${anchor.x},${anchor.z}`);
-    let best = anchor;
-    let bestDistSq = (anchor.x - targetX) ** 2 + (anchor.z - targetZ) ** 2;
-
-    for (let head = 0; head < queue.length; head++) {
-      const { x, z } = queue[head]!;
-      const distSq = (x - targetX) ** 2 + (z - targetZ) ** 2;
-      if (distSq < bestDistSq) {
-        bestDistSq = distSq;
-        best = { x, z };
-      }
-      for (const [dx, dz] of [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]] as const) {
-        const nx = x + dx;
-        const nz = z + dz;
-        const key = `${nx},${nz}`;
-        if (visited.has(key) || !NavGrid.isTraversableCell(navGrid, nx, nz)) continue;
-        visited.add(key);
-        queue.push({ x: nx, z: nz });
-      }
-    }
-
-    return best;
+  /**
+   * Compute the set of all cells 8-directionally path-connected to
+   * (anchorX, anchorZ). See NavGridReachability.computeReachableSet for the
+   * full doc.
+   */
+  static computeReachableSet(navGrid: NavGrid, anchorX: number, anchorZ: number): Set<string> {
+    return reachability.computeReachableSet(navGrid, anchorX, anchorZ);
   }
 
   /**

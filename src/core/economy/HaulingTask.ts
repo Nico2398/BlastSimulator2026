@@ -10,6 +10,21 @@ import { findNearestActiveBuildingOfType, getBuildingDef, type Building } from '
 import { findBuildingApproachCell } from '../nav/BuildingApproach.js';
 import { tickVehicle, tickVehicleTaskState } from '../engine/EntityMovementTick.js';
 import { pickupFragment, deliverToDepot } from './Logistics.js';
+import { NavGrid } from '../nav/NavGrid.js';
+
+/**
+ * True when `vehicle` is a debris_hauler with a driver assigned and no
+ * hauling task already in progress — the shared eligibility gate for
+ * findReachableGroundFragment and the UI's Haul button.
+ *
+ * requestHaulFragment keeps its own per-condition checks instead of calling
+ * this: it reports which specific condition failed (no driver vs. already
+ * hauling vs. wrong vehicle type), and collapsing that into one boolean
+ * would lose those distinct error messages.
+ */
+export function isHaulEligibleVehicle(vehicle: Vehicle | undefined): vehicle is Vehicle {
+  return !!vehicle && vehicle.type === 'debris_hauler' && vehicle.driverId !== null && vehicle.haulingPhase === null;
+}
 
 /**
  * Request that a debris_hauler vehicle haul a fragment to the nearest active
@@ -120,6 +135,38 @@ export function tickHaulingProgress(state: GameState, vehicle: Vehicle): void {
     vehicle.task = 'idle';
   }
   tickVehicleTaskState(vehicle);
+}
+
+/**
+ * Find a reachability-aware ground fragment for `vehicleId` to haul: the
+ * nearest 'on_ground' fragment that is actually path-connected to the
+ * vehicle's current position (via NavGrid.computeReachableSet), rather than
+ * plain nearest-distance — a full-clear blast leaves most fragments in
+ * unreachable 'void' NavGrid cells. Returns null when none qualify.
+ */
+export function findReachableGroundFragment(state: GameState, vehicleId: number): number | null {
+  const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId);
+  if (!isHaulEligibleVehicle(vehicle)) return null;
+  if (!state.navGrid) return null;
+
+  const reachable = NavGrid.computeReachableSet(state.navGrid, vehicle.x, vehicle.z);
+  if (reachable.size === 0) return null;
+
+  let bestId: number | null = null;
+  let bestDistSq = Infinity;
+  for (const tracked of state.logistics.fragments) {
+    if (tracked.state !== 'on_ground') continue;
+    const fx = Math.round(tracked.fragment.position.x);
+    const fz = Math.round(tracked.fragment.position.z);
+    if (!reachable.has(`${fx},${fz}`)) continue;
+    const distSq = (fx - vehicle.x) ** 2 + (fz - vehicle.z) ** 2;
+    if (distSq < bestDistSq) {
+      bestDistSq = distSq;
+      bestId = tracked.fragment.id;
+    }
+  }
+
+  return bestId;
 }
 
 /**

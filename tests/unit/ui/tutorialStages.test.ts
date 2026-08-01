@@ -9,6 +9,7 @@ import { readFileSync, readdirSync } from 'fs';
 import { resolve } from 'path';
 import { TUTORIAL_STAGES, stagesFor } from '../../../src/ui/tutorialStages.js';
 import { TUTORIAL_STEPS } from '../../../src/ui/tutorialSteps.js';
+import { TOOLBAR_TARGET } from '../../../src/ui/tutorialStepHelpers.js';
 import en from '../../../src/core/i18n/locales/en.json' with { type: 'json' };
 import fr from '../../../src/core/i18n/locales/fr.json' with { type: 'json' };
 
@@ -131,11 +132,21 @@ describe('tutorial stage table', () => {
     // is the bug this whole table exists to fix.
     for (const stepId of [
       'hire-surveyor', 'survey', 'drill-plan', 'blast', 'contract-accept',
-      'vehicle-buy-assign', 'build-storage', 'build-ramp', 'set-policy',
+      'vehicle-buy-assign', 'build-storage', 'haul-debris', 'build-ramp', 'set-policy',
     ]) {
       expect(TUTORIAL_STAGES[stepId]!.length, `${stepId} should be multi-stage`)
         .toBeGreaterThan(1);
     }
+  });
+});
+
+describe('haul-debris stage list (#466)', () => {
+  it('is a two-stage Vehicles-only sequence: open the toolbar, then use the Haul button', () => {
+    const stages = TUTORIAL_STAGES['haul-debris'];
+    expect(stages, 'TUTORIAL_STAGES is missing a "haul-debris" entry').toBeDefined();
+    expect(stages).toHaveLength(2);
+    expect(stages![0]!.target).toBe(TOOLBAR_TARGET.vehicles);
+    expect(stages![1]!.target).toBe('#bs-vehicle-panel .bs-vehicle-haul-btn');
   });
 });
 

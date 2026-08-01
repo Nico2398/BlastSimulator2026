@@ -5,7 +5,8 @@ import type { GameState } from '../../../src/core/state/GameState.js';
 
 describe('tutorialSteps', () => {
   // ── 1 ────────────────────────────────────────────────────────────────────
-  it('has exactly 23 entries', () => {
+  it('has exactly 24 entries (#466 adds haul-debris)', () => {
+    expect(TUTORIAL_STEPS.length).toBe(24);
     expect(TUTORIAL_STEPS.length).toBe(TOTAL_TUTORIAL_STEPS);
   });
 
@@ -102,6 +103,7 @@ describe('tutorialSteps', () => {
       'hire-driver',
       'vehicle-buy-assign',
       'build-storage',
+      'haul-debris',
       'contract-deliver',
       'finances',
       'build-ramp',
@@ -116,11 +118,14 @@ describe('tutorialSteps', () => {
   });
 
   // ── 12 ───────────────────────────────────────────────────────────────────
-  it('steps 9, 17, 19 (1-indexed) have autoAdvanceMs set to 2000', () => {
-    // 0-indexed: 8 = scores, 16 = finances, 18 = needs
+  it('steps 9, 18, 20 (1-indexed) have autoAdvanceMs set to 2000', () => {
+    // 0-indexed: 8 = scores, 17 = finances, 19 = needs.
+    // #466 inserts haul-debris at index 15 (between build-storage and
+    // contract-deliver), shifting finances/needs up by one from their old
+    // 16/18 positions.
     expect(TUTORIAL_STEPS[8].autoAdvanceMs).toBe(2000);
-    expect(TUTORIAL_STEPS[16].autoAdvanceMs).toBe(2000);
-    expect(TUTORIAL_STEPS[18].autoAdvanceMs).toBe(2000);
+    expect(TUTORIAL_STEPS[17].autoAdvanceMs).toBe(2000);
+    expect(TUTORIAL_STEPS[19].autoAdvanceMs).toBe(2000);
   });
 
   // ── set-policy ───────────────────────────────────────────────────────────
@@ -229,7 +234,7 @@ describe('tutorialSteps', () => {
   });
 
   // ── 13 ───────────────────────────────────────────────────────────────────
-  it('steps 9, 17, 19 (1-indexed) have captureSnapshot that returns step-specific data', () => {
+  it('steps 9, 18, 20 (1-indexed) have captureSnapshot that returns step-specific data', () => {
     // Step 9 (scores) — captures scores + collectedOre
     const step9 = TUTORIAL_STEPS[8];
     expect(step9.captureSnapshot).toBeDefined();
@@ -241,31 +246,32 @@ describe('tutorialSteps', () => {
     expect(snap9.scores).toBeDefined();
     expect(snap9.collectedOre).toBeDefined();
 
-    // Step 17 (finances) — captures cash + contracts
-    const step17 = TUTORIAL_STEPS[16];
-    expect(step17.captureSnapshot).toBeDefined();
-    const snap17 = step17.captureSnapshot!({
+    // Step 18 (finances, shifted from 17 by the #466 haul-debris insertion at
+    // index 15) — captures cash + contracts
+    const step18 = TUTORIAL_STEPS[17];
+    expect(step18.captureSnapshot).toBeDefined();
+    const snap18 = step18.captureSnapshot!({
       cash: 100000,
       contracts: { active: [{ id: 'c1' }] },
     } as GameState);
-    expect(snap17.cash).toBe(100000);
+    expect(snap18.cash).toBe(100000);
 
-    // Step 19 (needs) — captures employee needs
-    const step19 = TUTORIAL_STEPS[18];
-    expect(step19.captureSnapshot).toBeDefined();
-    const snap19 = step19.captureSnapshot!({
+    // Step 20 (needs, shifted from 19) — captures employee needs
+    const step20 = TUTORIAL_STEPS[19];
+    expect(step20.captureSnapshot).toBeDefined();
+    const snap20 = step20.captureSnapshot!({
       employees: { employees: [{ needs: { hunger: 50, fatigue: 30, breakPressure: 20 } }] },
     } as unknown as GameState);
-    expect(snap19).toBeDefined();
+    expect(snap20).toBeDefined();
   });
 
   // ── 15 ───────────────────────────────────────────────────────────────────
-  it('step 22 uses tutorial.complete_title and tutorial.complete_text', () => {
-    const step22 = TUTORIAL_STEPS[22];
+  it('step 23 (congratulations, shifted from 22 by the #466 haul-debris insertion) uses tutorial.complete_title and tutorial.complete_text', () => {
+    const step23 = TUTORIAL_STEPS[23];
     // After implementation: keys changed from tutorial.step23.title/tutorial.step23
     // to tutorial.complete_title / tutorial.complete_text
-    expect(step22.titleKey).toBe('tutorial.complete_title');
-    expect(step22.textKey).toBe('tutorial.complete_text');
+    expect(step23.titleKey).toBe('tutorial.complete_title');
+    expect(step23.textKey).toBe('tutorial.complete_text');
   });
 
   // ── 16 ───────────────────────────────────────────────────────────────────
@@ -285,7 +291,7 @@ describe('tutorialSteps', () => {
       'time-speed', 'hire-surveyor', 'survey', 'hire-driller',
       'drill-plan', 'charge', 'sequence', 'blast',
       'scores', 'event-fire-resolve', 'hire-manager', 'contract-accept',
-      'hire-driver', 'vehicle-buy-assign', 'build-storage', 'contract-deliver',
+      'hire-driver', 'vehicle-buy-assign', 'build-storage', 'haul-debris', 'contract-deliver',
       'finances', 'build-ramp', 'needs', 'tick-advance',
     ]);
     for (const step of TUTORIAL_STEPS) {
@@ -360,6 +366,47 @@ describe('tutorialSteps', () => {
       const before = { levelStats: { blastsPerformed: 0 }, collectedOre: {} } as unknown as GameState;
       const snap = blastStep.captureSnapshot!(before);
       expect(blastStep.isComplete(before, snap)).toBe(false);
+    });
+  });
+
+  // ── 20 (haul-debris, #466) ────────────────────────────────────────────────
+  describe('step haul-debris', () => {
+    const step = TUTORIAL_STEPS.find(s => s.id === 'haul-debris');
+
+    it('exists, positioned between build-storage and contract-deliver', () => {
+      const ids = TUTORIAL_STEPS.map(s => s.id);
+      const buildIdx = ids.indexOf('build-storage');
+      const haulIdx = ids.indexOf('haul-debris');
+      const deliverIdx = ids.indexOf('contract-deliver');
+      expect(haulIdx).toBeGreaterThan(-1);
+      expect(haulIdx).toBe(buildIdx + 1);
+      expect(deliverIdx).toBe(haulIdx + 1);
+    });
+
+    it('completes when storedMassKg increases past the value captured when the step opened', () => {
+      expect(step).toBeDefined();
+      const before = { logistics: { storedMassKg: 0 } } as unknown as GameState;
+      const snap = step!.captureSnapshot!(before);
+      const after = { logistics: { storedMassKg: 1200 } } as unknown as GameState;
+      expect(step!.isComplete(after, snap)).toBe(true);
+    });
+
+    it('does not complete while storedMassKg has not increased', () => {
+      const before = { logistics: { storedMassKg: 500 } } as unknown as GameState;
+      const snap = step!.captureSnapshot!(before);
+      const same = { logistics: { storedMassKg: 500 } } as unknown as GameState;
+      expect(step!.isComplete(same, snap)).toBe(false);
+    });
+
+    it('does not complete when storedMassKg decreases relative to the snapshot', () => {
+      const before = { logistics: { storedMassKg: 800 } } as unknown as GameState;
+      const snap = step!.captureSnapshot!(before);
+      const after = { logistics: { storedMassKg: 200 } } as unknown as GameState;
+      expect(step!.isComplete(after, snap)).toBe(false);
+    });
+
+    it('has a Vehicles-toolbar highlightTarget', () => {
+      expect(step!.highlightTarget).toBe('#bs-toolbar [data-panel="vehicles"]');
     });
   });
 });
