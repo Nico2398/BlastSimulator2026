@@ -84,7 +84,7 @@ describe('TerrainMesh', () => {
     tm.dispose();
   });
 
-  it('generated geometry has position and color attributes', () => {
+  it('generated geometry has position, color, and rock/ore attributes (#458 T3.1/A18)', () => {
     const scene = makeScene();
     const grid = new VoxelGrid(8, 8, 8);
     for (let x = 0; x < 8; x++)
@@ -99,34 +99,37 @@ describe('TerrainMesh', () => {
     const geo = mesh.geometry as THREE.BufferGeometry;
     expect(geo.getAttribute('position')).toBeDefined();
     expect(geo.getAttribute('color')).toBeDefined();
+    expect(geo.getAttribute('aRockA')).toBeDefined();
+    expect(geo.getAttribute('aRockB')).toBeDefined();
+    expect(geo.getAttribute('aRockWeight')).toBeDefined();
+    expect(geo.getAttribute('aOre')).toBeDefined();
+    expect(geo.getAttribute('aOre').itemSize).toBe(2);
+
+    // cruite is the only rock present — both A and B should index it, weight
+    // should be 0 or 1 everywhere (no cross-rock boundary in a single-rock grid).
+    const rockAAttr = geo.getAttribute('aRockA').array as Float32Array;
+    const cruiteIndex = rockAAttr[0]!;
+    for (const v of rockAAttr) expect(v).toBe(cruiteIndex);
     tm.dispose();
   });
 
-  it('update re-meshes affected chunk when voxels are cleared', () => {
+  it('aOreId is -1 and aOreAmt is 0 when no corner carries ore', () => {
     const scene = makeScene();
     const grid = new VoxelGrid(8, 8, 8);
     for (let x = 0; x < 8; x++)
       for (let y = 0; y < 4; y++)
         for (let z = 0; z < 8; z++)
-          grid.setVoxel(x, y, z, makeSolidVoxel());
+          grid.setVoxel(x, y, z, makeSolidVoxel('cruite')); // no ores set
 
     const tm = new TerrainMesh(scene, grid);
     tm.buildAll();
-    const countBefore = scene.children.length;
-
-    // Clear a column of voxels (simulating a blast crater)
-    for (let y = 0; y < 4; y++) {
-      grid.clearVoxel(3, y, 3);
+    const mesh = scene.children[0] as THREE.Mesh;
+    const oreAttr = mesh.geometry.getAttribute('aOre').array as Float32Array;
+    for (let i = 0; i < oreAttr.length; i += 2) {
+      expect(oreAttr[i]).toBe(-1);
+      expect(oreAttr[i + 1]).toBe(0);
     }
-    tm.update([{ x: 3, y: 0, z: 3 }, { x: 3, y: 1, z: 3 }, { x: 3, y: 2, z: 3 }, { x: 3, y: 3, z: 3 }]);
-
-    // There may be same or fewer chunks but geometry should have been rebuilt
-    expect(scene.children.length).toBeGreaterThanOrEqual(0);
-    // We can't easily assert exact counts without knowing the mesh structure
-    // Just verify no crash and valid state
     tm.dispose();
-    expect(scene.children.length).toBe(0);
-    void countBefore; // suppress unused warning
   });
 
   it('re-meshing a 16³ chunk completes in under 200ms', () => {
@@ -144,6 +147,87 @@ describe('TerrainMesh', () => {
     const elapsed = performance.now() - start;
     expect(elapsed).toBeLessThan(200);
     tm.dispose();
+  });
+
+  describe('remeshRegion — dirty-set precision (#458 T3.1/A17 accept criterion)', () => {
+    // 3 chunks along X (0..15, 16..31, 32..47), 1 along Y/Z. Solid bottom
+    // half everywhere so every chunk has real geometry to compare identity against.
+    function makeThreeChunkGrid(): VoxelGrid {
+      const grid = new VoxelGrid(48, 16, 16);
+      for (let x = 0; x < 48; x++)
+        for (let y = 0; y < 8; y++)
+          for (let z = 0; z < 16; z++)
+            grid.setVoxel(x, y, z, makeSolidVoxel());
+      return grid;
+    }
+
+    it('a region at a chunk boundary re-marches exactly the touched chunks plus the -1 halo, and no others', () => {
+      const scene = makeScene();
+      const grid = makeThreeChunkGrid();
+      const tm = new TerrainMesh(scene, grid);
+      tm.buildAll();
+      expect(tm.chunkGridDims).toEqual({ ncx: 3, ncy: 1, ncz: 1 });
+
+      const mesh0Before = tm.getChunkMesh(0, 0, 0);
+      const mesh1Before = tm.getChunkMesh(1, 0, 0);
+      const mesh2Before = tm.getChunkMesh(2, 0, 0);
+      expect(mesh0Before).not.toBeNull();
+      expect(mesh1Before).not.toBeNull();
+      expect(mesh2Before).not.toBeNull();
+
+      // Mutate one voxel at x=16 — chunk 1's very first column. The dirty
+      // region's min edge sits exactly on the chunk boundary, so the -1 read
+      // margin (marching a cube at v reads up to v+1, so a change at v
+      // affects cubes from v-1) pulls chunk 0 in too as a halo — this is the
+      // "+halo" the accept criterion names, not an off-by-one.
+      grid.clearVoxel(16, 0, 5);
+      tm.remeshRegion({ minX: 16, minY: 0, minZ: 5, maxX: 16, maxY: 0, maxZ: 5 });
+
+      // Touched: chunk 0 (halo) and chunk 1 (directly) — new mesh instances.
+      expect(tm.getChunkMesh(0, 0, 0)).not.toBe(mesh0Before);
+      expect(tm.getChunkMesh(1, 0, 0)).not.toBe(mesh1Before);
+      // Untouched: chunk 2 — same mesh instance, never disposed or rebuilt.
+      expect(tm.getChunkMesh(2, 0, 0)).toBe(mesh2Before);
+
+      tm.dispose();
+    });
+
+    it('a region entirely inside one chunk, away from its edges, touches only that chunk', () => {
+      const scene = makeScene();
+      const grid = makeThreeChunkGrid();
+      const tm = new TerrainMesh(scene, grid);
+      tm.buildAll();
+
+      const mesh0Before = tm.getChunkMesh(0, 0, 0);
+      const mesh1Before = tm.getChunkMesh(1, 0, 0);
+      const mesh2Before = tm.getChunkMesh(2, 0, 0);
+
+      // x=20..22 sits well inside chunk 1 (16..31), away from both edges.
+      grid.clearVoxel(20, 0, 5);
+      tm.remeshRegion({ minX: 20, minY: 0, minZ: 5, maxX: 22, maxY: 0, maxZ: 5 });
+
+      expect(tm.getChunkMesh(0, 0, 0)).toBe(mesh0Before); // untouched
+      expect(tm.getChunkMesh(1, 0, 0)).not.toBe(mesh1Before); // rebuilt
+      expect(tm.getChunkMesh(2, 0, 0)).toBe(mesh2Before); // untouched
+
+      tm.dispose();
+    });
+
+    it('full rebuild (buildAll) touches every chunk, including ones a prior remeshRegion left untouched', () => {
+      const scene = makeScene();
+      const grid = makeThreeChunkGrid();
+      const tm = new TerrainMesh(scene, grid);
+      tm.buildAll();
+
+      grid.clearVoxel(20, 0, 5);
+      tm.remeshRegion({ minX: 20, minY: 0, minZ: 5, maxX: 20, maxY: 0, maxZ: 5 });
+      const mesh2AfterPartialRemesh = tm.getChunkMesh(2, 0, 0); // untouched by the partial remesh above
+
+      tm.buildAll();
+      expect(tm.getChunkMesh(2, 0, 0)).not.toBe(mesh2AfterPartialRemesh); // full rebuild touches it too
+
+      tm.dispose();
+    });
   });
 
   it('material uses DoubleSide so terrain is visible from below', () => {

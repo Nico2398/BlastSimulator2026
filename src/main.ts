@@ -130,8 +130,13 @@ emitter.on('revolt:warning', ({ ticksRemaining }) => {
 // mutator (generation, blast, drill, ramp) emits this after mutating the grid
 // (#458 T0.2). Runs synchronously inside runCommand(), before onBlast() below
 // ever sees the command result — so onBlast() no longer needs its own remesh.
-emitter.on('terrain:updated', () => {
-  gameRenderer.rebuildTerrain();
+// Re-marches only the chunks the region touches (#458 T3.1) rather than the
+// whole grid — a single drill dig no longer pays for a full terrain rebuild.
+// A grid-identity change (new_game, campaign start, load) is handled
+// separately by syncFromContext()'s own comparison, which runs right after
+// this and does a full rebuildTerrain() with the new grid's real dimensions.
+emitter.on('terrain:updated', ({ region }) => {
+  gameRenderer.remeshTerrainRegion(region);
 });
 
 declare global {

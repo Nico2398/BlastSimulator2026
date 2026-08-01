@@ -311,9 +311,6 @@ export const SAVE_SLOT_COUNT = 5;
 /** Maximum total fragments on screen before oldest are culled. */
 export const MAX_TOTAL_FRAGMENTS = 2000;
 
-/** Terrain re-mesh radius in chunks after a blast (only nearby chunks update). */
-export const BLAST_REMESH_RADIUS_CHUNKS = 2;
-
 /** Maximum nodes A* may explore before falling back to direct-line search. */
 export const PATHFINDING_NODE_BUDGET_CAP = 500;
 

@@ -187,3 +187,12 @@ export function getRock(id: string): RockType | undefined {
 export function getAllRocks(): readonly RockType[] {
   return ROCKS;
 }
+
+/**
+ * Stable index of a rock id into getAllRocks()'s fixed order — shader rock-
+ * uniform-array index (aRockA/aRockB attributes, #458 T3.1/A18) and the
+ * landscape mesher's equivalent (T3.2). -1 for an unknown id (air).
+ */
+export function rockIndexOf(id: string): number {
+  return ROCKS.findIndex(r => r.id === id);
+}

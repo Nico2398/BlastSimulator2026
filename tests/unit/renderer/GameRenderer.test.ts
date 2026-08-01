@@ -60,17 +60,17 @@ describe('GameRenderer — onBlast()', () => {
     const ctx = makeCtx();
     renderer.syncFromContext(ctx);
 
-    const updateSpy = vi.spyOn(renderer.terrain!, 'update');
+    const remeshSpy = vi.spyOn(renderer.terrain!, 'remeshRegion');
     const buildAllSpy = vi.spyOn(renderer.terrain!, 'buildAll');
     ctx.lastBlastFragments = [{ x: 10, y: 5, z: 10 }];
 
     renderer.onBlast(ctx);
 
     // executeBlast emits terrain:updated as part of the blast command itself;
-    // main.ts's subscription calls gameRenderer.rebuildTerrain() from that
-    // event, before onBlast() ever runs. onBlast() now only owns fragment
-    // meshes and blast effects, not the terrain mesh.
-    expect(updateSpy).not.toHaveBeenCalled();
+    // main.ts's subscription calls gameRenderer.remeshTerrainRegion() from
+    // that event (#458 T3.1), before onBlast() ever runs. onBlast() now only
+    // owns fragment meshes and blast effects, not the terrain mesh.
+    expect(remeshSpy).not.toHaveBeenCalled();
     expect(buildAllSpy).not.toHaveBeenCalled();
   });
 

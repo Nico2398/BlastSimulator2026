@@ -102,3 +102,8 @@ export function getOre(id: string): OreType | undefined {
 export function getAllOres(): readonly OreType[] {
   return ORES;
 }
+
+/** Stable index of an ore id into getAllOres()'s fixed order — the aOre vertex attribute's ore-id component (#458 T3.1/A18). -1 for none/unknown. */
+export function oreIndexOf(id: string): number {
+  return ORES.findIndex(o => o.id === id);
+}

@@ -8,7 +8,7 @@ import type { GameState } from '../core/state/GameState.js';
 import { type VoxelGrid, computeVoxelColumnSurfaceY } from '../core/world/VoxelGrid.js';
 import { getBiome } from '../core/world/BiomeCatalog.js';
 import type { SceneManager } from './SceneManager.js';
-import { TerrainMesh } from './TerrainMesh.js';
+import { TerrainMesh, type DirtyRegion } from './TerrainMesh.js';
 import { BuildingMesh } from './BuildingMesh.js';
 import { VehicleMesh } from './VehicleMesh.js';
 import { CharacterMesh } from './CharacterMesh.js';
@@ -392,10 +392,20 @@ export class GameRenderer {
     });
   }
 
-  /** Force a full terrain rebuild (e.g. after blast modifies voxels). */
+  /** Force a full terrain rebuild — grid identity changes only (new_game, campaign start, load). */
   rebuildTerrain(): void {
     console.log(`[GameRenderer] rebuildTerrain: lastGrid=${this.lastGrid?.id}`);
     this.terrain?.buildAll();
+  }
+
+  /**
+   * Re-mesh only the chunks a terrain:updated region touches (#458 T3.1).
+   * The main.ts subscription calls this for every mutation (blast, drill,
+   * ramp) instead of rebuildTerrain() — a single-voxel drill dig no longer
+   * pays for re-marching chunks its region never touched.
+   */
+  remeshTerrainRegion(region: DirtyRegion): void {
+    this.terrain?.remeshRegion(region);
   }
 
   dispose(): void {
