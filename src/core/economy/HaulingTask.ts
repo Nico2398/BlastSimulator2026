@@ -25,6 +25,7 @@ export function requestHaulFragment(
   const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId);
   if (!vehicle) return { success: false, error: 'Vehicle not found' };
   if (vehicle.type !== 'debris_hauler') return { success: false, error: 'Vehicle is not a debris hauler' };
+  if (vehicle.driverId === null) return { success: false, error: 'Vehicle has no driver' };
   if (vehicle.haulingPhase !== null) return { success: false, error: 'Vehicle is already hauling' };
 
   const tracked = state.logistics.fragments.find(
@@ -35,11 +36,14 @@ export function requestHaulFragment(
   const depot = findNearestActiveBuildingOfType(state.buildings, 'freight_warehouse', vehicle.x, vehicle.z);
   if (!depot) return { success: false, error: 'No active freight warehouse available' };
 
-  // Intent only — the vehicle does not move or load until tickHaulingProgress
-  // (driven from ArrivalGate.tickArrivalGate) walks it to the fragment first.
+  // Intent only — the vehicle does not load until tickHaulingProgress (driven
+  // from ArrivalGate.tickArrivalGate) detects arrival. The movement target is
+  // set immediately so tickVehicle has somewhere to drive toward each tick.
   vehicle.haulingFragmentId = fragmentId;
   vehicle.haulingPhase = 'to_fragment';
   vehicle.haulingDepotBuildingId = depot.id;
+  vehicle.targetX = Math.round(tracked.fragment.position.x);
+  vehicle.targetZ = Math.round(tracked.fragment.position.z);
 
   return { success: true };
 }
@@ -73,6 +77,22 @@ export function tickHaulingProgress(state: GameState, vehicle: Vehicle): void {
         vehicle.payloadKg = tracked.fragment.mass;
         vehicle.haulingPhase = 'to_depot';
         vehicle.task = 'transport';
+        // Re-target toward the depot immediately so the vehicle has somewhere
+        // to drive on its next movement tick.
+        const depotBuilding = state.buildings.buildings.find(
+          b => b.id === vehicle.haulingDepotBuildingId && b.active,
+        );
+        if (depotBuilding) {
+          const approach = findBuildingApproachCell(
+            state.navGrid,
+            depotBuilding,
+            getBuildingDef(depotBuilding.type, depotBuilding.tier),
+            vehicle.x,
+            vehicle.z,
+          );
+          vehicle.targetX = approach.x;
+          vehicle.targetZ = approach.z;
+        }
       } else {
         // Storage full or fragment claimed by another vehicle this tick.
         abortHaul(vehicle);

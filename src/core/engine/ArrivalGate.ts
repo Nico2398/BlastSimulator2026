@@ -63,6 +63,11 @@ export function tickArrivalGate(state: GameState, emitter?: EventEmitter): Arriv
     if (emp.pendingTaskDuration !== null) {
       emp.taskTicksRemaining = emp.pendingTaskDuration;
       emp.pendingTaskDuration = null;
+      // pendingActionType/pendingActionPayload deliberately survive arrival —
+      // tickTaskProgress (GameLoop.ts) reads them at actual task completion
+      // to know what work just finished (e.g. resolving a survey) and clears
+      // them itself. Clearing them here would make every task's completion
+      // handler blind to what it just did (see survey.integration.test.ts).
       result.taskStarted.push(emp.id);
     }
 

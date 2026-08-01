@@ -341,8 +341,12 @@ describe('tick command — a single threshold dip triggers a single rest', () =>
     expect(emp.destinationZ).not.toBeNull();
     expect(emp.restTicksRemaining).toBeNull();
 
-    // Long enough for the walk to (5,5) plus the full rest duration, with slack.
-    for (let i = 0; i < 20; i++) tickCommand(ctx, ['1'], {});
+    // Long enough for the walk to (5,5) plus the full rest duration, with slack,
+    // but short of the ~14-tick idle hunger decay (NEED_DRAIN_RATES.hunger.idle)
+    // that would otherwise dip the gauge below the warning threshold a second
+    // time and start an unrelated second rest cycle — this test is only about
+    // the first, deliberately-triggered dip.
+    for (let i = 0; i < 12; i++) tickCommand(ctx, ['1'], {});
 
     const restCharges = state.finances.transactions.filter(t => t.category === 'needs');
     expect(restCharges).toHaveLength(1);
