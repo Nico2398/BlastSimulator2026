@@ -13,6 +13,20 @@ import { pickupFragment, deliverToDepot } from './Logistics.js';
 import { NavGrid } from '../nav/NavGrid.js';
 
 /**
+ * True when `vehicle` is a debris_hauler with a driver assigned and no
+ * hauling task already in progress — the shared eligibility gate for
+ * findReachableGroundFragment and the UI's Haul button.
+ *
+ * requestHaulFragment keeps its own per-condition checks instead of calling
+ * this: it reports which specific condition failed (no driver vs. already
+ * hauling vs. wrong vehicle type), and collapsing that into one boolean
+ * would lose those distinct error messages.
+ */
+export function isHaulEligibleVehicle(vehicle: Vehicle | undefined): vehicle is Vehicle {
+  return !!vehicle && vehicle.type === 'debris_hauler' && vehicle.driverId !== null && vehicle.haulingPhase === null;
+}
+
+/**
  * Request that a debris_hauler vehicle haul a fragment to the nearest active
  * depot/warehouse building. Sets the vehicle's hauling intent (fragmentId,
  * phase, destination depot) without moving or loading it immediately —
@@ -132,10 +146,7 @@ export function tickHaulingProgress(state: GameState, vehicle: Vehicle): void {
  */
 export function findReachableGroundFragment(state: GameState, vehicleId: number): number | null {
   const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId);
-  if (!vehicle) return null;
-  if (vehicle.type !== 'debris_hauler') return null;
-  if (vehicle.driverId === null) return null;
-  if (vehicle.haulingPhase !== null) return null;
+  if (!isHaulEligibleVehicle(vehicle)) return null;
   if (!state.navGrid) return null;
 
   const reachable = NavGrid.computeReachableSet(state.navGrid, vehicle.x, vehicle.z);

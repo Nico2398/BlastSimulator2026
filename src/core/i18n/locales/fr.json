@@ -2442,7 +2442,6 @@
   "ui.vehicles.driver": "Conducteur",
   "ui.vehicles.no_qualified": "Aucun employé habilité pour {licence}",
   "ui.vehicles.haul": "Transporter",
-  "ui.vehicles.no_debris_in_reach": "Aucun débris accessible",
   "ui.contracts.deliver": "Livrer",
   "ui.contracts.deliver_amount": "Kilogrammes à livrer",
   "ui.build.ramp_section": "Terrain",
