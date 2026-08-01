@@ -25,6 +25,7 @@ import {
   isConditionMet,
   getUnmetConditions,
   queueResearchTask,
+  getQueueBlockCode,
   tickResearch,
   isTierUnlocked,
   isResearchQueued,
@@ -400,6 +401,54 @@ describe('queueResearchTask — rejection precedence', () => {
 
     const result = queueResearchTask(state, 'vehicle_depot', 3);
     expect(result.code).toBe('already_queued');
+  });
+});
+
+// ── Section 4b: getQueueBlockCode — shared read-only precedence chain (#442 refactor) ──
+// queueResearchTask (above) and the console `research queue` command both delegate
+// their read-only precondition checks to this single helper — see BuildingResearch.ts.
+
+describe('getQueueBlockCode', () => {
+  it('returns undefined when every read-only precondition passes (happy path)', () => {
+    const state = freshState();
+    placeResearchCenter(state);
+    expect(getQueueBlockCode(state, 'driving_center', 2)).toBeUndefined();
+  });
+
+  it('returns "no_research_center" when no active research_center is placed (boundary)', () => {
+    const state = freshState();
+    expect(getQueueBlockCode(state, 'driving_center', 2)).toBe('no_research_center');
+  });
+
+  it('returns "already_unlocked" when the target tier is already unlocked (rejection)', () => {
+    const state = freshState();
+    placeResearchCenter(state);
+    state.unlockedTiers['driving_center'] = 2;
+    expect(getQueueBlockCode(state, 'driving_center', 2)).toBe('already_unlocked');
+  });
+
+  it('returns "already_queued" when the target {type, tier} already sits in the queue', () => {
+    const state = freshState();
+    placeResearchCenter(state);
+    state.researchQueue.push({ targetType: 'driving_center', targetTier: 2, ticksRemaining: 0, cost: 5000, conditions: [] });
+    expect(getQueueBlockCode(state, 'driving_center', 2)).toBe('already_queued');
+  });
+
+  it('returns "conditions_not_met" when the task\'s own prerequisites are unmet', () => {
+    const state = freshState();
+    placeResearchCenter(state);
+    expect(isTierUnlocked(state, 'vehicle_depot', 2)).toBe(false);
+    expect(getQueueBlockCode(state, 'vehicle_depot', 3)).toBe('conditions_not_met');
+  });
+
+  it('matches the precedence order queueResearchTask itself enforces', () => {
+    const state = freshState();
+    // Fabricate a state where multiple block reasons apply at once; the two
+    // functions must agree on which one wins.
+    state.unlockedTiers['driving_center'] = 2;
+    const blockCode = getQueueBlockCode(state, 'driving_center', 2);
+    const queueResult = queueResearchTask(state, 'driving_center', 2);
+    expect(queueResult.code).toBe(blockCode);
   });
 });
 

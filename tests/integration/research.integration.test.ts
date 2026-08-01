@@ -144,6 +144,9 @@ describe('research command — queue: tier gating (#442)', () => {
     expect(ctx.state!.buildings.researchQueue[0]!.targetType).toBe('driving_center');
     expect(ctx.state!.buildings.researchQueue[0]!.targetTier).toBe(2);
     expect(ctx.state!.buildings.researchQueue[0]!.ticksRemaining).toBe(0);
+    // 0-duration (tier-2) tasks omit tick count from the success message.
+    expect(result.output).not.toMatch(/ticks/);
+    expect(result.output).toContain('$5000');
   });
 
   it('rejects a tier-3 request with a clear error when the type\'s tier-2 research has not completed', () => {
@@ -161,7 +164,10 @@ describe('research command — queue: tier gating (#442)', () => {
     const result = researchCommand(ctx, ['queue'], { type: 'geology_lab', tier: '3' });
     expect(result.success, result.output).toBe(true);
     expect(ctx.state!.buildings.researchQueue[0]!.targetTier).toBe(3);
-    expect(ctx.state!.buildings.researchQueue[0]!.ticksRemaining).toBeGreaterThan(0);
+    const ticks = ctx.state!.buildings.researchQueue[0]!.ticksRemaining;
+    expect(ticks).toBeGreaterThan(0);
+    // Non-zero duration (tier-3) tasks report their tick count in the success message.
+    expect(result.output).toContain(`${ticks} ticks`);
   });
 
   it('deducts cash for the queued research task', () => {

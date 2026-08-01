@@ -360,7 +360,8 @@ export {
 } from './BuildingPlacement.js';
 export {
   queueResearchTask, tickResearch, isTierUnlocked, isResearchQueued,
-  hasActiveResearchCenter, getUnmetConditions,
+  hasActiveResearchCenter, getUnmetConditions, getQueueBlockCode,
+  type QueueBlockCode,
 } from './BuildingResearch.js';
 export { getLivingQuartersWellbeingMultiplier } from './BuildingWellbeing.js';
 export {

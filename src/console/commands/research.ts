@@ -6,16 +6,22 @@ import type { CommandResult } from '../ConsoleRunner.js';
 import type { GameContext } from './world.js';
 import {
   queueResearchTask,
-  hasActiveResearchCenter,
-  isTierUnlocked,
-  isResearchQueued,
-  getUnmetConditions,
+  getQueueBlockCode,
   getAllBuildingTypes,
   type BuildingType,
+  type QueueBlockCode,
 } from '../../core/entities/Building.js';
 import { addExpense } from '../../core/economy/Finance.js';
 import { getResearchTaskDef } from '../../core/config/balance.js';
 import { requireGame } from './commandUtils.js';
+
+/** Human-readable message for each read-only `getQueueBlockCode` result. */
+const QUEUE_BLOCK_MESSAGES: Record<QueueBlockCode, (type: BuildingType, tier: 2 | 3) => string> = {
+  no_research_center: (type, tier) => `A Research Center is required before queueing tier ${tier} ${type}.`,
+  already_unlocked: (type, tier) => `Tier ${tier} ${type} is already unlocked.`,
+  already_queued: (type, tier) => `Tier ${tier} ${type} is already queued for research.`,
+  conditions_not_met: (type, tier) => `Tier ${tier} ${type} does not meet its research prerequisites.`,
+};
 
 /**
  * Manage Research Center tasks.
@@ -54,38 +60,19 @@ export function researchCommand(
       const tier = tierNum as 2 | 3;
 
       // Precedence: no_research_center, already_unlocked, already_queued,
-      // conditions_not_met (all read-only, replicated here so cash is only
-      // checked once every other precondition already passes), then
-      // insufficient_funds, and only then commit via queueResearchTask —
-      // avoids leaving a phantom queued task when funds are short.
+      // conditions_not_met (the shared read-only chain from
+      // getQueueBlockCode, checked here so cash is only checked once every
+      // other precondition already passes), then insufficient_funds, and
+      // only then commit via queueResearchTask — avoids leaving a phantom
+      // queued task when funds are short.
       const def = getResearchTaskDef(type, tier);
 
-      if (!hasActiveResearchCenter(state.buildings)) {
+      const blockCode = getQueueBlockCode(state.buildings, type, tier);
+      if (blockCode) {
         return {
           success: false,
-          code: 'no_research_center',
-          output: `A Research Center is required before queueing tier ${tier} ${type}.`,
-        };
-      }
-      if (isTierUnlocked(state.buildings, type, tier)) {
-        return {
-          success: false,
-          code: 'already_unlocked',
-          output: `Tier ${tier} ${type} is already unlocked.`,
-        };
-      }
-      if (isResearchQueued(state.buildings, type, tier)) {
-        return {
-          success: false,
-          code: 'already_queued',
-          output: `Tier ${tier} ${type} is already queued for research.`,
-        };
-      }
-      if (getUnmetConditions(state.buildings, def.conditions).length > 0) {
-        return {
-          success: false,
-          code: 'conditions_not_met',
-          output: `Tier ${tier} ${type} does not meet its research prerequisites.`,
+          code: blockCode,
+          output: QUEUE_BLOCK_MESSAGES[blockCode](type, tier),
         };
       }
       if (state.cash < def.cost) {
@@ -112,9 +99,10 @@ export function researchCommand(
       state.cash -= cost;
       addExpense(state.finances, cost, 'construction', `Research ${type} T${tier}`, state.tickCount);
 
+      const durationSuffix = def.ticks > 0 ? `${def.ticks} ticks, $${cost}` : `$${cost}`;
       return {
         success: true,
-        output: `Queued research: ${type} tier ${tier} — $${cost}.`,
+        output: `Queued research: ${type} tier ${tier} — ${durationSuffix}.`,
       };
     }
     case 'status': {
