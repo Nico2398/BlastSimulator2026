@@ -6,6 +6,7 @@ import { LocaleTextRegistry } from './localeText.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { Vehicle, VehicleRole, VehicleTier } from '../core/entities/Vehicle.js';
 import { getAllVehicleRoles, getVehicleDefByTier, ROLE_LICENCE_REQUIRED } from '../core/entities/Vehicle.js';
+import { findReachableGroundFragment } from '../core/economy/HaulingTask.js';
 
 const VEHICLE_TIERS: VehicleTier[] = [1, 2, 3];
 
@@ -83,6 +84,7 @@ export class VehiclePanel {
     ].join('#');
     if (signature === this.lastSignature) {
       this.refreshTierButtons(state.cash);
+      this.refreshHaulButtons(state);
       return;
     }
     this.lastSignature = signature;
@@ -101,6 +103,7 @@ export class VehiclePanel {
     }
 
     this.refreshTierButtons(state.cash);
+    this.refreshHaulButtons(state);
   }
 
   dispose(): void { this.el.remove(); }
@@ -126,8 +129,64 @@ export class VehiclePanel {
     const col = document.createElement('div');
     col.style.cssText = 'flex:1;min-width:0';
     col.append(info, status, this.makeDriverRow(v, state));
+    const haulBtn = this.makeHaulButton(v, state);
+    if (haulBtn) col.appendChild(haulBtn);
     row.append(col, scrapBtn);
     return row;
+  }
+
+  /**
+   * "Haul" button for a debris_hauler with a driver and no in-progress haul.
+   * Enabled state depends on a reachable on-ground fragment existing — see
+   * refreshHaulButtons, which re-evaluates it every update() pass (matching
+   * refreshTierButtons' per-frame cash check) since fragments and reachability
+   * change independently of this row's rebuild signature.
+   */
+  private makeHaulButton(v: Vehicle, state: GameState): HTMLElement | null {
+    if (v.type !== 'debris_hauler' || v.driverId === null || v.haulingPhase !== null) return null;
+
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'display:flex;align-items:center;gap:4px;margin-top:3px';
+
+    const haulBtn = document.createElement('button');
+    haulBtn.className = 'bs-btn bs-btn-primary bs-vehicle-haul-btn';
+    haulBtn.style.cssText = 'padding:1px 6px;font-size:10px';
+    haulBtn.textContent = t('ui.vehicles.haul');
+    haulBtn.dataset['vehicleId'] = String(v.id);
+    haulBtn.addEventListener('click', () => {
+      const fragmentId = findReachableGroundFragment(state, v.id);
+      if (fragmentId === null) return;
+      this.gameConsole?.(`vehicle haul ${v.id} fragment:${fragmentId}`);
+    });
+
+    const reason = document.createElement('span');
+    reason.className = 'bs-vehicle-haul-reason';
+    reason.style.cssText = 'font-size:10px;color:#806050';
+
+    wrap.append(haulBtn, reason);
+    this.updateHaulButtonState(haulBtn, reason, state, v.id);
+    return wrap;
+  }
+
+  /** Re-evaluates every rendered haul button's enabled/disabled state and reason text. */
+  private refreshHaulButtons(state: GameState): void {
+    const haulBtns = this.listEl.querySelectorAll<HTMLButtonElement>('.bs-vehicle-haul-btn');
+    haulBtns.forEach(btn => {
+      const vehicleId = Number(btn.dataset['vehicleId']);
+      const reason = btn.nextElementSibling as HTMLElement | null;
+      this.updateHaulButtonState(btn, reason, state, vehicleId);
+    });
+  }
+
+  private updateHaulButtonState(
+    btn: HTMLButtonElement,
+    reason: HTMLElement | null,
+    state: GameState,
+    vehicleId: number,
+  ): void {
+    const fragmentId = findReachableGroundFragment(state, vehicleId);
+    btn.disabled = fragmentId === null;
+    if (reason) reason.textContent = fragmentId === null ? t('ui.vehicles.no_debris_in_reach') : '';
   }
 
   /**

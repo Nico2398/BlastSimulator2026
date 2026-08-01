@@ -10,6 +10,7 @@ import { findNearestActiveBuildingOfType, getBuildingDef, type Building } from '
 import { findBuildingApproachCell } from '../nav/BuildingApproach.js';
 import { tickVehicle, tickVehicleTaskState } from '../engine/EntityMovementTick.js';
 import { pickupFragment, deliverToDepot } from './Logistics.js';
+import { NavGrid } from '../nav/NavGrid.js';
 
 /**
  * Request that a debris_hauler vehicle haul a fragment to the nearest active
@@ -128,11 +129,33 @@ export function tickHaulingProgress(state: GameState, vehicle: Vehicle): void {
  * vehicle's current position (via NavGrid.computeReachableSet), rather than
  * plain nearest-distance — a full-clear blast leaves most fragments in
  * unreachable 'void' NavGrid cells. Returns null when none qualify.
- *
- * // TODO: implement
  */
 export function findReachableGroundFragment(state: GameState, vehicleId: number): number | null {
-  throw new Error(`not implemented: findReachableGroundFragment(vehicleId=${vehicleId}, state has ${state.logistics.fragments.length} fragments)`);
+  const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId);
+  if (!vehicle) return null;
+  if (vehicle.type !== 'debris_hauler') return null;
+  if (vehicle.driverId === null) return null;
+  if (vehicle.haulingPhase !== null) return null;
+  if (!state.navGrid) return null;
+
+  const reachable = NavGrid.computeReachableSet(state.navGrid, vehicle.x, vehicle.z);
+  if (reachable.size === 0) return null;
+
+  let bestId: number | null = null;
+  let bestDistSq = Infinity;
+  for (const tracked of state.logistics.fragments) {
+    if (tracked.state !== 'on_ground') continue;
+    const fx = Math.round(tracked.fragment.position.x);
+    const fz = Math.round(tracked.fragment.position.z);
+    if (!reachable.has(`${fx},${fz}`)) continue;
+    const distSq = (fx - vehicle.x) ** 2 + (fz - vehicle.z) ** 2;
+    if (distSq < bestDistSq) {
+      bestDistSq = distSq;
+      bestId = tracked.fragment.id;
+    }
+  }
+
+  return bestId;
 }
 
 /**

@@ -220,26 +220,18 @@ export class NavGrid {
     // 8-directional flood fill from the anchor — same adjacency A* uses —
     // over the whole grid. Grids here are small (dozens of tiles per side),
     // so an O(width*height) BFS per call is negligible.
-    const visited = new Set<string>();
-    const queue: Array<{ x: number; z: number }> = [anchor];
-    visited.add(`${anchor.x},${anchor.z}`);
+    const reachable = NavGrid.floodFillReachable(navGrid, anchor.x, anchor.z);
     let best = anchor;
     let bestDistSq = (anchor.x - targetX) ** 2 + (anchor.z - targetZ) ** 2;
 
-    for (let head = 0; head < queue.length; head++) {
-      const { x, z } = queue[head]!;
+    for (const key of reachable) {
+      const [xStr, zStr] = key.split(',');
+      const x = Number(xStr);
+      const z = Number(zStr);
       const distSq = (x - targetX) ** 2 + (z - targetZ) ** 2;
       if (distSq < bestDistSq) {
         bestDistSq = distSq;
         best = { x, z };
-      }
-      for (const [dx, dz] of [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]] as const) {
-        const nx = x + dx;
-        const nz = z + dz;
-        const key = `${nx},${nz}`;
-        if (visited.has(key) || !NavGrid.isTraversableCell(navGrid, nx, nz)) continue;
-        visited.add(key);
-        queue.push({ x: nx, z: nz });
       }
     }
 
@@ -251,10 +243,40 @@ export class NavGrid {
    * (anchorX, anchorZ) — same adjacency Pathfinding.findPath and
    * findNearestReachableCell walk. Returns cell keys in `"x,z"` format.
    *
-   * // TODO: implement
+   * Returns an empty set when the anchor cell itself is non-traversable
+   * (no nudge to the nearest traversable cell, unlike findNearestReachableCell —
+   * this is a raw reachability query from the exact anchor given).
    */
   static computeReachableSet(navGrid: NavGrid, anchorX: number, anchorZ: number): Set<string> {
-    throw new Error(`not implemented: computeReachableSet(navGrid width=${navGrid.width}, anchor=${anchorX},${anchorZ})`);
+    const ax = Math.round(anchorX);
+    const az = Math.round(anchorZ);
+    if (!NavGrid.isTraversableCell(navGrid, ax, az)) return new Set<string>();
+    return NavGrid.floodFillReachable(navGrid, ax, az);
+  }
+
+  /**
+   * 8-directional flood fill from (anchorX, anchorZ), assumed already
+   * traversable. Shared by findNearestReachableCell and computeReachableSet
+   * so both agree on every fixture.
+   */
+  private static floodFillReachable(navGrid: NavGrid, anchorX: number, anchorZ: number): Set<string> {
+    const visited = new Set<string>();
+    const queue: Array<{ x: number; z: number }> = [{ x: anchorX, z: anchorZ }];
+    visited.add(`${anchorX},${anchorZ}`);
+
+    for (let head = 0; head < queue.length; head++) {
+      const { x, z } = queue[head]!;
+      for (const [dx, dz] of [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]] as const) {
+        const nx = x + dx;
+        const nz = z + dz;
+        const key = `${nx},${nz}`;
+        if (visited.has(key) || !NavGrid.isTraversableCell(navGrid, nx, nz)) continue;
+        visited.add(key);
+        queue.push({ x: nx, z: nz });
+      }
+    }
+
+    return visited;
   }
 
   /**
