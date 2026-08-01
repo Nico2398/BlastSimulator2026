@@ -92,6 +92,11 @@ export class MiniMap {
   hide(): void { this.el.style.display = 'none'; }
   get visible(): boolean { return this.el.style.display !== 'none'; }
 
+  /** Re-render locale-dependent text (title, legend) after a language change. */
+  refreshLocale(): void {
+    // TODO: implement
+  }
+
   update(state: GameState): void {
     const ctx = this.ctx2d;
     ctx.clearRect(0, 0, MAP_SIZE, MAP_SIZE);

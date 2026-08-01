@@ -93,6 +93,11 @@ export class MainMenu {
   hide(): void { this.overlay.style.display = 'none'; }
   get visible(): boolean { return this.overlay.style.display !== 'none'; }
 
+  /** Re-render locale-dependent text (title, subtitle, menu/world-map buttons) after a language change. */
+  refreshLocale(): void {
+    // TODO: implement
+  }
+
   /** Show the world map with campaign progress. */
   showWorldMap(campaign: CampaignState | null): void {
     this.menuBox.style.display = 'none';

@@ -58,6 +58,11 @@ export class ContractUI {
 
   setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
 
+  /** Re-render locale-dependent text (title, headers, rows) after a language change. */
+  refreshLocale(): void {
+    // TODO: implement
+  }
+
   show(): void { this.el.style.display = ''; }
   hide(): void { this.el.style.display = 'none'; }
   get visible(): boolean { return this.el.style.display !== 'none'; }

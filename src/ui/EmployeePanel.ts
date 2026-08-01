@@ -60,6 +60,11 @@ export class EmployeePanel {
 
   setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
 
+  /** Re-render locale-dependent text (title, roster rows, hire section) after a language change. */
+  refreshLocale(): void {
+    // TODO: implement
+  }
+
   show(): void { this.el.style.display = ''; }
   hide(): void { this.el.style.display = 'none'; }
   get visible(): boolean { return this.el.style.display !== 'none'; }

@@ -146,6 +146,11 @@ export class SettingsMenu {
   setLanguageChangeHandler(cb: (lang: string) => void): void { this.onLanguageChange = cb; }
   setQuitHandler(cb: () => void): void { this.onQuit = cb; }
 
+  /** Re-render locale-dependent text (title, labels, buttons) after a language change. */
+  refreshLocale(): void {
+    // TODO: implement
+  }
+
   show(): void { this.el.style.display = ''; }
   hide(): void { this.el.style.display = 'none'; }
   get visible(): boolean { return this.el.style.display !== 'none'; }

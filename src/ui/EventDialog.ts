@@ -76,6 +76,11 @@ export class EventDialog {
 
   setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
 
+  /** Re-render locale-dependent text (header, choose label, dismiss button) after a language change. */
+  refreshLocale(): void {
+    // TODO: implement
+  }
+
   show(): void { this.overlay.style.display = ''; }
   hide(): void {
     this.overlay.style.display = 'none';

@@ -166,6 +166,11 @@ export class HUD {
     this.onSpeedChange = cb;
   }
 
+  /** Re-render locale-dependent text (labels, tooltips, badge) after a language change. */
+  refreshLocale(): void {
+    // TODO: implement
+  }
+
   dispose(): void {
     this.topBar.remove();
     this.scoresPanel.remove();

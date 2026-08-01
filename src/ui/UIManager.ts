@@ -99,6 +99,15 @@ export class UIManager {
     this.settingsMenu.setQuitHandler(cb);
   }
 
+  setLanguageChangeHandler(cb: (lang: string) => void): void {
+    this.settingsMenu.setLanguageChangeHandler(cb);
+  }
+
+  /** Re-render all owned panels' locale-dependent text after a language change. */
+  refreshLocale(): void {
+    // TODO: implement
+  }
+
   /**
    * Show a brief toast notification (game-over warnings, contract expiry, etc.).
    * Auto-dismisses after 6 seconds.
