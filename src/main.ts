@@ -65,7 +65,11 @@ mainMenu.setOnLoad(() => { saveLoadUI.show(); });
 mainMenu.setOnSettings(() => { uiManager.showPanel('settings'); });
 // Settings is reachable from the main menu, so a language switch made there has
 // to redraw the menu sitting underneath the panel as well as the panel itself.
-uiManager.setLanguageChangeHandler(() => mainMenu.refreshLocale());
+uiManager.setLanguageChangeHandler(() => {
+  mainMenu.refreshLocale();
+  saveLoadUI.refreshLocale();
+  saveLoadBtn.textContent = '💾 ' + t('ui.toolbar.saves');
+});
 mainMenu.show();
 
 // --- Tutorial ---

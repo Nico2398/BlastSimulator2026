@@ -3,6 +3,7 @@
 // and download/upload fallback for browsers without IndexedDB access.
 
 import { t } from '../core/i18n/I18n.js';
+import { LocaleTextRegistry } from './localeText.js';
 import type { GameState } from '../core/state/GameState.js';
 import { serialize, deserialize } from '../core/state/SaveLoad.js';
 import type { SaveBackend, SaveMeta } from '../core/state/SaveBackend.js';
@@ -24,6 +25,7 @@ export class SaveLoadUI {
   private getState?: GetStateCallback;
   private onLoad?: OnLoadCallback;
   private lastAutoSaveTick = -AUTO_SAVE_INTERVAL_TICKS;
+  private readonly locale = new LocaleTextRegistry();
 
   constructor(container: HTMLElement) {
     this.el = document.createElement('div');
@@ -35,7 +37,7 @@ export class SaveLoadUI {
 
     const title = document.createElement('div');
     title.className = 'bs-panel-title';
-    title.textContent = t('saveload.title');
+    this.locale.bindText(title, 'saveload.title');
 
     this.slotList = document.createElement('div');
 
@@ -45,13 +47,13 @@ export class SaveLoadUI {
     const exportBtn = document.createElement('button');
     exportBtn.className = 'bs-btn';
     exportBtn.style.cssText = 'width:100%;margin-top:6px';
-    exportBtn.textContent = t('saveload.export');
+    this.locale.bindText(exportBtn, 'saveload.export');
     exportBtn.addEventListener('click', () => this.exportSave());
 
     const importLabel = document.createElement('label');
     importLabel.className = 'bs-btn';
     importLabel.style.cssText = 'display:block;width:100%;margin-top:4px;text-align:center;cursor:pointer';
-    importLabel.textContent = t('saveload.import');
+    this.locale.bindText(importLabel, 'saveload.import');
     const importInput = document.createElement('input');
     importInput.type = 'file';
     importInput.accept = '.json';
@@ -62,7 +64,7 @@ export class SaveLoadUI {
     const closeBtn = document.createElement('button');
     closeBtn.className = 'bs-btn';
     closeBtn.style.cssText = 'width:100%;margin-top:6px';
-    closeBtn.textContent = t('saveload.close');
+    this.locale.bindText(closeBtn, 'saveload.close');
     closeBtn.addEventListener('click', () => this.hide());
 
     this.el.append(title, this.slotList, this.statusEl, exportBtn, importLabel, closeBtn);
@@ -72,6 +74,11 @@ export class SaveLoadUI {
   setBackend(backend: SaveBackend): void { this.backend = backend; }
   setGetState(fn: GetStateCallback): void { this.getState = fn; }
   setOnLoad(fn: OnLoadCallback): void { this.onLoad = fn; }
+
+  /** Re-render locale-dependent text (title, export/import/close buttons) after a language change. */
+  refreshLocale(): void {
+    this.locale.refresh();
+  }
 
   show(): void {
     this.el.style.display = '';
