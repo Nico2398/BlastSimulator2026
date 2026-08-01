@@ -17,7 +17,8 @@ import {
 import { addExpense, addIncome } from '../../core/economy/Finance.js';
 import { processPayCycle } from '../../core/entities/Employee.js';
 import { tickTraining } from '../../core/entities/EmployeeTraining.js';
-import { tickResearch } from '../../core/entities/Building.js';
+import { tickResearch, getTotalOperatingCost } from '../../core/entities/Building.js';
+import { getVehicleCostsPerTick } from '../../core/entities/Vehicle.js';
 import { tickNeedGauges, needsMoraleEffect } from '../../core/entities/EmployeeNeeds.js';
 import type { FiredEvent } from '../../core/events/EventSystem.js';
 import { tickCollapse, autoInsertNeedTasks, processShiftCycle, tickEmployees, tickGeneralRestCompletion, tickTaskProgress, tickVehicle, tickVehicleTaskState, tickEmployeeMovement, tickArrivalGate } from '../../core/engine/GameLoop.js';
@@ -96,6 +97,18 @@ export function tickCommand(
     if (paySalary > 0) {
       state.cash -= paySalary;
       addExpense(state.finances, paySalary, 'salaries', 'Payroll', state.tickCount);
+    }
+
+    // 2b. Building and vehicle maintenance — unconditional per-tick upkeep.
+    const buildingUpkeep = getTotalOperatingCost(state.buildings);
+    if (buildingUpkeep > 0) {
+      state.cash -= buildingUpkeep;
+      addExpense(state.finances, buildingUpkeep, 'maintenance', 'Building upkeep', state.tickCount);
+    }
+    const vehicleUpkeep = getVehicleCostsPerTick(state.vehicles);
+    if (vehicleUpkeep > 0) {
+      state.cash -= vehicleUpkeep;
+      addExpense(state.finances, vehicleUpkeep, 'fuel', 'Vehicle maintenance & fuel', state.tickCount);
     }
 
     // 3. Contract deadlines — expire overdue contracts and apply penalties

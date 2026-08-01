@@ -8,8 +8,7 @@ import { createCharge, batchCharge } from '../../core/mining/ChargePlan.js';
 import { setDelay, autoVPattern } from '../../core/mining/Sequence.js';
 import { assembleBlastPlan, validateBlastPlan } from '../../core/mining/BlastPlan.js';
 import { executeBlast } from '../../core/mining/BlastExecution.js';
-import { addIncome } from '../../core/economy/Finance.js';
-import { addBlastFragments } from '../../core/economy/Logistics.js';
+import { addBlastFragments, syncLogisticsCapacity } from '../../core/economy/Logistics.js';
 
 import { recordVibration, recordBuildingDestruction } from '../../core/scores/ScoreManager.js';
 import { recordBlastResult, snapshotStats } from '../../core/campaign/SuccessTracker.js';
@@ -35,6 +34,7 @@ import { runSurvey, SURVEY_METHODS, type SurveyMethod, computeBlastOreReport } f
 import { SURVEY_COSTS } from '../../core/config/balance.js';
 import { detectOreReport } from '../../core/events/EventEngine.js';
 import { NavGrid } from '../../core/nav/NavGrid.js';
+import { getStorageCapacity } from '../../core/entities/Building.js';
 
 // ── Extended context for mining ──
 
@@ -248,11 +248,13 @@ export function blastCommand(
     recordBuildingDestruction(state.scores, destroyed.type === 'explosive_warehouse');
   }
 
-  // Credit ore revenue to finances
-  if (result.totalOreValue > 0) {
-    state.cash += result.totalOreValue;
-    addIncome(state.finances, result.totalOreValue, 'sales', 'Blast ore extraction', state.tickCount);
+  // A blast can destroy a Freight Warehouse — keep logistics capacity honest.
+  if (result.destroyedBuildings.length > 0) {
+    syncLogisticsCapacity(state.logistics, getStorageCapacity(state.buildings));
   }
+
+  // Ore value is informational only here — cash is credited when the ore is
+  // actually hauled, stored, and sold/delivered (see Logistics.consumeStoredOre).
 
   // Update scores based on blast outcome
   if (result.projectionCount > 0) {
@@ -269,13 +271,10 @@ export function blastCommand(
   state.lastOreReport = oreReport;
   detectOreReport(oreReport, state.events, state.tickCount);
 
-  // Track blast fragments in logistics for contract delivery.
+  // Track blast fragments in logistics for contract delivery. collectedOre is
+  // only credited once a fragment is hauled and delivered to a warehouse
+  // (see Logistics.deliverToDepot), not the instant the blast resolves.
   addBlastFragments(state.logistics, result.fragments);
-
-  // Accumulate collected ore yields from the blast.
-  for (const [oreId, kg] of Object.entries(oreReport.oreYields)) {
-    state.collectedOre[oreId] = (state.collectedOre[oreId] ?? 0) + kg;
-  }
 
   // Store drill holes before clearing (needed by renderer for per-hole detonation timing)
   ctx.lastBlastHoles = [...state.drillHoles];

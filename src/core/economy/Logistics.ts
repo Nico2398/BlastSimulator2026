@@ -122,12 +122,65 @@ export function sellFragment(
  * ore content — any fragment, ore-bearing or not.
  */
 export function consumeStoredOre(
-  _state: LogisticsState,
-  _collectedOre: Record<string, number>,
-  _materialId: string,
-  _amountKg: number,
+  state: LogisticsState,
+  collectedOre: Record<string, number>,
+  materialId: string,
+  amountKg: number,
 ): { success: boolean; consumedKg: number; error?: string } {
-  throw new Error('not implemented');
+  if (materialId !== '') {
+    const available = collectedOre[materialId] ?? 0;
+    if (amountKg > available) {
+      return {
+        success: false,
+        consumedKg: 0,
+        error: `Not enough ${materialId} in storage: ${available.toFixed(1)} kg available, ${amountKg.toFixed(1)} kg requested.`,
+      };
+    }
+
+    // Oldest-first stored fragments containing this ore.
+    const storedIds = state.fragments
+      .filter(f => f.state === 'stored' && (f.fragment.oreDensities[materialId] ?? 0) > 0)
+      .map(f => f.fragment.id);
+
+    let tally = 0;
+    for (const id of storedIds) {
+      if (tally >= amountKg) break;
+      const sold = sellFragment(state, id);
+      if (!sold) continue;
+      const acc: Record<string, number> = {};
+      accumulateOreMass(acc, sold.mass, sold.oreDensities);
+      for (const [oreId, kg] of Object.entries(acc)) {
+        collectedOre[oreId] = (collectedOre[oreId] ?? 0) - kg;
+      }
+      tally += acc[materialId] ?? 0;
+    }
+
+    return { success: true, consumedKg: Math.min(tally, amountKg) };
+  }
+
+  // Rubble / no-ore materials: consume raw stored mass, any fragment, FIFO.
+  const available = state.storedMassKg;
+  if (amountKg > available) {
+    return {
+      success: false,
+      consumedKg: 0,
+      error: `Not enough stored material: ${available.toFixed(1)} kg available, ${amountKg.toFixed(1)} kg requested.`,
+    };
+  }
+
+  const storedIds = state.fragments
+    .filter(f => f.state === 'stored')
+    .map(f => f.fragment.id);
+
+  let removedMass = 0;
+  for (const id of storedIds) {
+    if (removedMass >= amountKg) break;
+    const sold = sellFragment(state, id);
+    if (!sold) continue;
+    removedMass += sold.mass;
+  }
+
+  return { success: true, consumedKg: Math.min(removedMass, amountKg) };
 }
 
 /**
