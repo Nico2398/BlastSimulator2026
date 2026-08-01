@@ -39,11 +39,12 @@
       ]
     },
     {
-      "command": "build bunkhouse at:5,5",
+      "command": "build living_quarters at:5,5",
+      "description": "'bunkhouse' was never a valid build type (NEED_REST_BUILDING_TYPES maps every need to 'living_quarters' — dedicated canteen/bunkhouse/break_room types don't exist yet), so this command always failed and the scenario ran with no rest building at all: collapse resolved via instant ground-rest in place, never exercising the arrival-gated building-rest path (#437) this scenario is named for.",
       "interaction": [
         {
           "type": "command",
-          "command": "build bunkhouse at:5,5"
+          "command": "build living_quarters at:5,5"
         }
       ]
     },
