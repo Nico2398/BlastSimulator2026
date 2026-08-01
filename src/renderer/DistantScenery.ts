@@ -8,7 +8,7 @@
 // well beyond the 64-unit mine grid.
 
 import * as THREE from 'three';
-import type { MinePreset } from '../core/world/MineType.js';
+import type { BiomeDef } from '../core/world/BiomeCatalog.js';
 
 // ---------- Config ----------
 
@@ -26,12 +26,15 @@ interface SceneryTheme {
 }
 
 const THEMES: Record<string, SceneryTheme> = {
-  desert:   { mountainColor: 0xd4a066, hillColor: 0xc8954d, vegetationColor: 0x778844, groundColor: 0xe8c888 },
-  mountain: { mountainColor: 0x8899aa, hillColor: 0x667788, vegetationColor: 0x336633, groundColor: 0x99aa88 },
-  tropical: { mountainColor: 0x4a7755, hillColor: 0x558866, vegetationColor: 0x22aa44, groundColor: 0x66aa55 },
+  desert_badlands: { mountainColor: 0xd4a066, hillColor: 0xc8954d, vegetationColor: 0x778844, groundColor: 0xe8c888 },
+  red_canyon:      { mountainColor: 0xb5613f, hillColor: 0xa8552e, vegetationColor: 0x6b7a3a, groundColor: 0xc97a4a },
+  alpine_granite:  { mountainColor: 0x8899aa, hillColor: 0x667788, vegetationColor: 0x336633, groundColor: 0x99aa88 },
+  green_foothills: { mountainColor: 0x7a8f6e, hillColor: 0x6a8060, vegetationColor: 0x3d7a3d, groundColor: 0x8fae7a },
+  tropical_karst:  { mountainColor: 0x4a7755, hillColor: 0x558866, vegetationColor: 0x22aa44, groundColor: 0x66aa55 },
+  volcanic_flats:  { mountainColor: 0x4a4a4a, hillColor: 0x3a3a3a, vegetationColor: 0x5a5a3a, groundColor: 0x554545 },
 };
 
-const DEFAULT_THEME: SceneryTheme = THEMES['mountain']!;
+const DEFAULT_THEME: SceneryTheme = THEMES['alpine_granite']!;
 
 // ---------- Main class ----------
 
@@ -45,16 +48,16 @@ export class DistantScenery {
   }
 
   /**
-   * Generate scenery for the given mine preset.
+   * Generate scenery for the given biome.
    * Call once after terrain is generated.
-   * @param preset    - Mine preset (determines biome look)
+   * @param biome    - Biome (determines scenery look)
    * @param gridCentreX - X centre of the mine grid (usually gridSize/2)
    * @param gridCentreZ - Z centre of the mine grid
    */
-  generate(preset: MinePreset, gridCentreX: number, gridCentreZ: number): void {
+  generate(biome: BiomeDef, gridCentreX: number, gridCentreZ: number): void {
     this.clear();
 
-    const theme = THEMES[preset.id] ?? DEFAULT_THEME;
+    const theme = THEMES[biome.id] ?? DEFAULT_THEME;
 
     // Ground plane (flat circle far out)
     const groundGeo = new THREE.CircleGeometry(SCENERY_RING_RADIUS * 3, 16);
@@ -89,7 +92,7 @@ export class DistantScenery {
     }
 
     // Trees / vegetation clusters
-    if (preset.id !== 'desert') {
+    if (biome.id !== 'desert_badlands' && biome.id !== 'red_canyon' && biome.id !== 'volcanic_flats') {
       for (let i = 0; i < TREE_COUNT; i++) {
         const angle = (i / TREE_COUNT) * Math.PI * 2 + Math.sin(i) * 0.4;
         const r = SCENERY_RING_RADIUS * 0.5 + (i % 4) * 20;

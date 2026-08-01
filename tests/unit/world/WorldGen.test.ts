@@ -87,6 +87,44 @@ describe('computeGroundOffset / heightToVoxelY', () => {
   });
 });
 
+describe('sampleBaseHeight — weighted shaping blend', () => {
+  const fields = new WorldNoiseFields(42);
+  const low: import('../../../src/core/world/WorldGen.js').HeightShapingParams = {
+    baseSpline: [[-1, 0], [1, 0]],
+    reliefSpline: [[-1, 0], [1, 0]],
+    pvAmplitude: 0,
+  };
+  const high: import('../../../src/core/world/WorldGen.js').HeightShapingParams = {
+    baseSpline: [[-1, 100], [1, 100]],
+    reliefSpline: [[-1, 0], [1, 0]],
+    pvAmplitude: 0,
+  };
+
+  it('a single-entry weighted array matches passing that shaping directly', () => {
+    const direct = sampleBaseHeight(fields, 10, 10, high);
+    const weighted = sampleBaseHeight(fields, 10, 10, [{ shaping: high, weight: 1 }]);
+    expect(weighted).toBe(direct);
+  });
+
+  it('blends two shaping profiles by weight (evaluated outputs, not control points)', () => {
+    const blended = sampleBaseHeight(fields, 10, 10, [
+      { shaping: low, weight: 0.5 },
+      { shaping: high, weight: 0.5 },
+    ]);
+    // detail() contributes the same +1.2*detail term either way — isolate the
+    // spline-blend contribution by comparing against the two pure cases.
+    const pureLow = sampleBaseHeight(fields, 10, 10, low);
+    const pureHigh = sampleBaseHeight(fields, 10, 10, high);
+    expect(blended).toBeCloseTo((pureLow + pureHigh) / 2, 10);
+  });
+
+  it('a 100%-weighted single profile in array form matches the unweighted profile', () => {
+    const asArray = sampleBaseHeight(fields, 20, 30, [{ shaping: low, weight: 1 }, { shaping: high, weight: 0 }]);
+    const direct = sampleBaseHeight(fields, 20, 30, low);
+    expect(asArray).toBeCloseTo(direct, 10);
+  });
+});
+
 describe('createWorldGenContext / sampleSurfaceVoxelY', () => {
   it('is deterministic for the same seed and dimensions', () => {
     const a = createWorldGenContext(42, 32, 32, 32);
@@ -115,6 +153,17 @@ describe('createWorldGenContext / sampleSurfaceVoxelY', () => {
         expect(y).toBeLessThanOrEqual(23);
       }
     }
+  });
+
+  it('accepts a per-column shaping function built from the context\'s own fields', () => {
+    const flatShaping = { baseSpline: [[-1, 5], [1, 5]] as const, reliefSpline: [[-1, 0], [1, 0]] as const, pvAmplitude: 0 };
+    const ctx = createWorldGenContext(42, 20, 20, 20, () => () => flatShaping);
+    // With zero relief and a constant base spline, every column should land
+    // on the same voxel Y (only the +1.2*detail term varies it, and that's
+    // tiny relative to the datum rounding at this scale).
+    const y1 = sampleSurfaceVoxelY(ctx, 2, 2);
+    const y2 = sampleSurfaceVoxelY(ctx, 15, 15);
+    expect(Math.abs(y1 - y2)).toBeLessThanOrEqual(1);
   });
 
   it('keeps relief compressed (small y-range) well inside a small grid, thanks to the pit mask', () => {

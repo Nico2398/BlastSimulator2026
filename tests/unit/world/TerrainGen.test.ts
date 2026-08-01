@@ -1,13 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { generateTerrain, computeComposition, type TerrainConfig } from '../../../src/core/world/TerrainGen.js';
-import { getMinePreset } from '../../../src/core/world/MineType.js';
+import { getBiome } from '../../../src/core/world/BiomeCatalog.js';
 import { createNoise3D } from 'simplex-noise';
 import { getAllRocks } from '../../../src/core/world/RockCatalog.js';
 import { getDominantRockId } from '../../../src/core/world/VoxelGrid.js';
 
-function makeConfig(seed: number, presetId = 'desert'): TerrainConfig {
-  const preset = getMinePreset(presetId)!;
-  return { sizeX: 32, sizeY: 32, sizeZ: 32, seed, preset };
+function makeConfig(seed: number, biomeId = 'desert_badlands'): TerrainConfig {
+  const biome = getBiome(biomeId)!;
+  return { sizeX: 32, sizeY: 32, sizeZ: 32, seed, climateBias: biome.climateCenter };
 }
 
 describe('TerrainGen — determinism', () => {
@@ -62,7 +62,7 @@ describe('TerrainGen — structure', () => {
 
   it('ore density distribution roughly matches rock type probabilities over large sample', () => {
     const grid = generateTerrain({
-      ...makeConfig(42, 'mountain'),
+      ...makeConfig(42, 'alpine_granite'),
       sizeX: 64,
       sizeY: 64,
       sizeZ: 64,

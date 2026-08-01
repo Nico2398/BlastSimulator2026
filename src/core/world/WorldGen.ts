@@ -27,31 +27,55 @@ export interface HeightShapingParams {
   pvAmplitude: number;
 }
 
-/** Neutral shaping used everywhere until BiomeCatalog supplies per-biome splines (#458 T1.2). */
+/**
+ * One shaping profile, or several blended by weight (BiomeCatalog's climate
+ * blend, #458 T1.2/A6). The array variant is deliberately a mutable Array,
+ * not ReadonlyArray — Array.isArray's type predicate is `arg is any[]`, and
+ * TypeScript can't narrow a ReadonlyArray branch away from that cleanly.
+ */
+export type ShapingInput = HeightShapingParams | Array<{ shaping: HeightShapingParams; weight: number }>;
+
+/** Neutral shaping used by callers with no biome concept (kept for T1.1's existing callers/tests). */
 export const DEFAULT_SHAPING: HeightShapingParams = {
   baseSpline: DEFAULT_BASE_SPLINE,
   reliefSpline: DEFAULT_RELIEF_SPLINE,
   pvAmplitude: DEFAULT_PV_AMPLITUDE,
 };
 
+function normalizeShaping(input: ShapingInput): Array<{ shaping: HeightShapingParams; weight: number }> {
+  return Array.isArray(input) ? input : [{ shaping: input, weight: 1 }];
+}
+
 /**
  * Raw world height in metres (sea level = 0) at absolute world (x, z),
  * before the pit-suitability mask. Deterministic and independent of any
  * grid's size — the same (x, z) always yields the same height for a given
  * seed and shaping, regardless of what grid a caller is generating (#458 A4).
+ *
+ * A weighted array of shaping profiles blends the *evaluated* base/relief
+ * spline outputs (not the control points) by weight — this is what makes a
+ * climate transition between two biomes a smooth height gradient rather than
+ * a seam (#458 A6).
  */
 export function sampleBaseHeight(
   fields: WorldNoiseFields,
   x: number,
   z: number,
-  shaping: HeightShapingParams = DEFAULT_SHAPING,
+  shaping: ShapingInput = DEFAULT_SHAPING,
 ): number {
   const c = fields.continentalness(x, z);
   const e = fields.erosion(x, z);
   const pv = fields.peaksValleys(x, z);
-  const base = evalSpline(shaping.baseSpline, c);
-  const relief = evalSpline(shaping.reliefSpline, e);
-  return base + relief * shaping.pvAmplitude * (pv - 0.35) + 1.2 * fields.detail(x, z);
+
+  const weighted = normalizeShaping(shaping);
+  let base = 0, relief = 0, pvAmplitude = 0;
+  for (const { shaping: s, weight } of weighted) {
+    base += weight * evalSpline(s.baseSpline, c);
+    relief += weight * evalSpline(s.reliefSpline, e);
+    pvAmplitude += weight * s.pvAmplitude;
+  }
+
+  return base + relief * pvAmplitude * (pv - 0.35) + 1.2 * fields.detail(x, z);
 }
 
 export interface Rect {
@@ -102,10 +126,13 @@ export function heightToVoxelY(height: number, groundOffset: number, sizeY: numb
   return Math.max(1, Math.min(sizeY - 1, Math.round(height + groundOffset)));
 }
 
+/** Resolves the shaping input to use at a given column — e.g. BiomeCatalog's climate blend. */
+export type ShapingAtFn = (x: number, z: number) => ShapingInput;
+
 /** Everything generateTerrain needs to sample surface voxel-Y for every column of one grid. */
 export interface WorldGenContext {
   readonly fields: WorldNoiseFields;
-  readonly shaping: HeightShapingParams;
+  readonly shapingAt: ShapingAtFn;
   readonly playableRect: Rect;
   readonly centerHeight: number;
   readonly groundOffset: number;
@@ -117,24 +144,31 @@ export interface WorldGenContext {
  * (not per-column), and derives the vertical datum from the height at the
  * rect's centre so the grid gets a sensible amount of digging headroom
  * regardless of what the underlying world height happens to be there.
+ *
+ * `makeShapingAt` receives the constructed fields (so a caller's shaping
+ * function — e.g. one that samples temperature/humidity for a climate
+ * blend — can use the exact same fields the height sampler does) and
+ * returns the per-column shaping resolver. Defaults to one neutral profile
+ * for every column, for callers with no biome concept.
  */
 export function createWorldGenContext(
   seed: number,
   sizeX: number,
   sizeY: number,
   sizeZ: number,
-  shaping: HeightShapingParams = DEFAULT_SHAPING,
+  makeShapingAt: (fields: WorldNoiseFields) => ShapingAtFn = () => () => DEFAULT_SHAPING,
 ): WorldGenContext {
   const fields = new WorldNoiseFields(seed);
+  const shapingAt = makeShapingAt(fields);
   const playableRect: Rect = { minX: 0, minZ: 0, maxX: sizeX, maxZ: sizeZ };
-  const centerHeight = sampleBaseHeight(fields, sizeX / 2, sizeZ / 2, shaping);
+  const centerHeight = sampleBaseHeight(fields, sizeX / 2, sizeZ / 2, shapingAt(sizeX / 2, sizeZ / 2));
   const groundOffset = computeGroundOffset(centerHeight, sizeY);
-  return { fields, shaping, playableRect, centerHeight, groundOffset, sizeY };
+  return { fields, shapingAt, playableRect, centerHeight, groundOffset, sizeY };
 }
 
 /** Surface voxel Y for column (x, z), including the pit mask and vertical datum. */
 export function sampleSurfaceVoxelY(ctx: WorldGenContext, x: number, z: number): number {
-  const raw = sampleBaseHeight(ctx.fields, x, z, ctx.shaping);
+  const raw = sampleBaseHeight(ctx.fields, x, z, ctx.shapingAt(x, z));
   const masked = applyPitMask(raw, ctx.centerHeight, ctx.playableRect, x, z);
   return heightToVoxelY(masked, ctx.groundOffset, ctx.sizeY);
 }

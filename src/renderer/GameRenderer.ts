@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import type { MiningContext } from '../console/commands/mining.js';
 import type { GameState } from '../core/state/GameState.js';
 import { type VoxelGrid, computeVoxelColumnSurfaceY } from '../core/world/VoxelGrid.js';
-import { getMinePreset } from '../core/world/MineType.js';
+import { getBiome } from '../core/world/BiomeCatalog.js';
 import type { SceneManager } from './SceneManager.js';
 import { TerrainMesh } from './TerrainMesh.js';
 import { BuildingMesh } from './BuildingMesh.js';
@@ -449,10 +449,10 @@ export class GameRenderer {
     this.blastEffects = new BlastEffects(scene, this.sm.camera);
 
     // Distant scenery
-    const preset = getMinePreset(state.mineType);
-    if (preset) {
+    const biome = getBiome(state.mineType);
+    if (biome) {
       this.scenery = new DistantScenery(scene);
-      this.scenery.generate(preset, grid.sizeX / 2, grid.sizeZ / 2);
+      this.scenery.generate(biome, grid.sizeX / 2, grid.sizeZ / 2);
     }
 
     // Blast plan overlay (hidden until shown)

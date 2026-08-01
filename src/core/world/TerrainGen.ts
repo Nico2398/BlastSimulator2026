@@ -6,35 +6,55 @@ import { createNoise3D } from 'simplex-noise';
 import { Random } from '../math/Random.js';
 import { VoxelGrid, type VoxelRockComposition } from './VoxelGrid.js';
 import { getAllRocks, type RockType } from './RockCatalog.js';
-import type { MinePreset } from './MineType.js';
-import { createWorldGenContext, sampleSurfaceVoxelY } from './WorldGen.js';
+import type { BiomeDef } from './BiomeCatalog.js';
+import { selectBiomeWeights, dominantBiome } from './BiomeCatalog.js';
+import { createWorldGenContext, sampleSurfaceVoxelY, type HeightShapingParams } from './WorldGen.js';
 
 export interface TerrainConfig {
   sizeX: number;
   sizeY: number;
   sizeZ: number;
   seed: number;
-  preset: MinePreset;
+  /**
+   * Bias added to the raw climate fields so this grid's own terrain lands
+   * near a specific biome's climate centre (#458 T1.2/A6) — [0, 0] samples
+   * the world's natural, unbiased climate. A level authors this to land its
+   * intended biome; a standalone `new_game biome:X` resolves X's own
+   * climateCenter and passes that directly.
+   */
+  climateBias: readonly [number, number];
+  /**
+   * Interleaves hard/soft rock layers when true. Threaded through for T1.3's
+   * depth-stratified rock system to consume — composition generation here
+   * does not yet act on it (#458 D4/T1.3).
+   */
+  mixedRockHardness?: boolean;
+}
+
+function biomeShaping(biome: BiomeDef): HeightShapingParams {
+  return { baseSpline: biome.baseSpline, reliefSpline: biome.reliefSpline, pvAmplitude: biome.pvAmplitude };
 }
 
 /**
  * Generate terrain into a new VoxelGrid.
  * Algorithm:
- *   1. Sample surface height per (x, z) from the unified world generator (WorldGen.ts, #458 T1.1) —
- *      the same sampler the landscape heightmap will read from once it exists (T2.1), so the two
- *      representations cannot disagree at their shared boundary.
+ *   1. Sample surface height per (x, z) from the unified world generator (WorldGen.ts, #458 T1.1),
+ *      climate-blended across biomes (BiomeCatalog.ts, #458 T1.2) — the same sampler the landscape
+ *      heightmap will read from once it exists (T2.1), so the two representations cannot disagree
+ *      at their shared boundary.
  *   2. Fill voxels below surface with rock (composition from per-rock 3D noise + level bias)
  *   3. Distribute ore veins using separate 3D noise per ore type
  *   4. Clear border zone of ores (neutral zone)
  *
- * `preset`'s baseElevation/elevationVariation/flatness fields are no longer
- * read here — height now comes entirely from WorldGen's layered fields,
- * using one neutral shaping profile for every preset until BiomeCatalog
- * supplies per-biome splines (#458 T1.2). Composition/ore generation is
- * unchanged pending its own rewrite in T1.3.
+ * Height blends every biome's shaping by climate weight, evaluated per
+ * column — a real gradient at a climate transition, not a seam. Rock/ore
+ * generation (steps 2-4) is unchanged pending T1.3's strata rewrite, and
+ * still uses ONE dominant biome for the whole grid (the highest-weighted
+ * biome at the grid's own centre) rather than blending per column — T1.3's
+ * depth-stratified system is what makes that biome-aware too.
  */
 export function generateTerrain(config: TerrainConfig): VoxelGrid {
-  const { sizeX, sizeY, sizeZ, seed, preset } = config;
+  const { sizeX, sizeY, sizeZ, seed, climateBias } = config;
   const rng = new Random(seed);
 
   // simplex-noise uses a PRNG function for seeding
@@ -43,8 +63,20 @@ export function generateTerrain(config: TerrainConfig): VoxelGrid {
   const noise3dOre = createNoise3D(prngFn);
 
   const grid = new VoxelGrid(sizeX, sizeY, sizeZ);
-  const rocks = selectRocksByPreset(preset);
-  const worldGen = createWorldGenContext(seed, sizeX, sizeY, sizeZ);
+
+  const worldGen = createWorldGenContext(seed, sizeX, sizeY, sizeZ, (fields) => (x, z) => {
+    const weights = selectBiomeWeights(fields.temperature(x, z), fields.humidity(x, z), climateBias, 1.0);
+    return weights.map(w => ({ shaping: biomeShaping(w.biome), weight: w.weight }));
+  });
+
+  const centerBiomeWeights = selectBiomeWeights(
+    worldGen.fields.temperature(sizeX / 2, sizeZ / 2),
+    worldGen.fields.humidity(sizeX / 2, sizeZ / 2),
+    climateBias,
+    1.0,
+  );
+  const biome = dominantBiome(centerBiomeWeights);
+  const rocks = selectRocksByBiome(biome);
 
   for (let z = 0; z < sizeZ; z++) {
     for (let x = 0; x < sizeX; x++) {
@@ -58,10 +90,10 @@ export function generateTerrain(config: TerrainConfig): VoxelGrid {
 
         const composition = computeComposition(x, y, z, rocks, noise3dRock);
         const compId = grid.palette.intern(composition);
-        const inBorder = isInBorderZone(x, z, sizeX, sizeZ, preset.borderWidth);
+        const inBorder = isInBorderZone(x, z, sizeX, sizeZ, biome.borderWidth);
         const oreDensities = inBorder
           ? {}
-          : computeOreDensities(x, y, z, rocks, composition, preset.oreRichness, noise3dOre);
+          : computeOreDensities(x, y, z, rocks, composition, biome.oreRichness, noise3dOre);
 
         grid.fillVoxel(x, y, z, compId, oreDensities);
       }
@@ -71,11 +103,11 @@ export function generateTerrain(config: TerrainConfig): VoxelGrid {
   return grid;
 }
 
-/** Select and weight rocks based on the preset's dominant rock list. */
-function selectRocksByPreset(preset: MinePreset): RockType[] {
+/** Select and weight rocks based on the biome's dominant rock list. */
+function selectRocksByBiome(biome: BiomeDef): RockType[] {
   const allRocks = getAllRocks();
   const selected: RockType[] = [];
-  for (const id of preset.dominantRocks) {
+  for (const id of biome.dominantRocks) {
     const rock = allRocks.find(r => r.id === id);
     if (rock) selected.push(rock);
   }

@@ -2,7 +2,7 @@
 
 import type { CommandResult } from '../ConsoleRunner.js';
 import { createGame, buildGameNavGrid, type GameState } from '../../core/state/GameState.js';
-import { getMinePreset, getAllMinePresets, type MinePreset } from '../../core/world/MineType.js';
+import { getBiome, getAllBiomes } from '../../core/world/BiomeCatalog.js';
 import { generateTerrain } from '../../core/world/TerrainGen.js';
 import { getRock } from '../../core/world/RockCatalog.js';
 import { getOre } from '../../core/world/OreCatalog.js';
@@ -33,11 +33,11 @@ export const DEFAULT_GRID_SIZE = 64;
  */
 export function regenerateGrid(
   ctx: GameContext,
-  params: { seed: number; preset: MinePreset; sizeX: number; sizeY: number; sizeZ: number },
+  params: { seed: number; climateBias: readonly [number, number]; sizeX: number; sizeY: number; sizeZ: number },
 ): void {
   if (!ctx.state) return;
-  const { seed, preset, sizeX, sizeY, sizeZ } = params;
-  ctx.grid = generateTerrain({ sizeX, sizeY, sizeZ, seed, preset });
+  const { seed, climateBias, sizeX, sizeY, sizeZ } = params;
+  ctx.grid = generateTerrain({ sizeX, sizeY, sizeZ, seed, climateBias });
   buildGameNavGrid(ctx.state, ctx.grid, ctx.state.buildings.buildings, ctx.state.drillHoles);
   ctx.emitter.emit('terrain:updated', {
     region: { minX: 0, minY: 0, minZ: 0, maxX: sizeX - 1, maxY: sizeY - 1, maxZ: sizeZ - 1 },
@@ -65,12 +65,12 @@ export function newGameCommand(
   _args: string[],
   named: Record<string, string>,
 ): CommandResult {
-  const mineType = named['mine_type'] ?? 'desert';
+  const mineType = named['mine_type'] ?? 'desert_badlands';
   const seed = named['seed'] ? parseInt(named['seed'], 10) : Date.now() % 100000;
 
-  const preset = getMinePreset(mineType);
-  if (!preset) {
-    const valid = getAllMinePresets().map(p => p.id).join(', ');
+  const biome = getBiome(mineType);
+  if (!biome) {
+    const valid = getAllBiomes().map(b => b.id).join(', ');
     return { success: false, output: `Unknown mine type: "${mineType}". Valid: ${valid}` };
   }
 
@@ -80,7 +80,7 @@ export function newGameCommand(
     ...(named['cash'] ? { startingCash: parseInt(named['cash'], 10) } : {}),
   });
   ctx.state.world = { sizeX: size, sizeY: size, sizeZ: size, gridReady: true };
-  regenerateGrid(ctx, { seed, preset, sizeX: size, sizeY: size, sizeZ: size });
+  regenerateGrid(ctx, { seed, climateBias: biome.climateCenter, sizeX: size, sizeY: size, sizeZ: size });
 
   return {
     success: true,

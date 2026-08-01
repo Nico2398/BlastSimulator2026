@@ -8,7 +8,7 @@ import { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import { Random } from '../../src/core/math/Random.js';
 import { createGame } from '../../src/core/state/GameState.js';
 import { generateTerrain } from '../../src/core/world/TerrainGen.js';
-import { getMinePreset } from '../../src/core/world/MineType.js';
+import { getBiome } from '../../src/core/world/BiomeCatalog.js';
 import { hireEmployee, assignSkill } from '../../src/core/entities/Employee.js';
 import {
   SurveyConfidenceOverlay,
@@ -75,14 +75,14 @@ function makeMultiOreGrid(positions: { x: number; z: number }[]): VoxelGrid {
  * so we get a realistic VoxelGrid with surface geometry.
  */
 function makeTerrainGrid(size = 32, seed = 42): VoxelGrid {
-  const preset = getMinePreset('desert');
-  if (!preset) throw new Error('desert preset not found');
+  const biome = getBiome('desert_badlands');
+  if (!biome) throw new Error('desert_badlands biome not found');
   return generateTerrain({
     sizeX: size,
     sizeY: size,
     sizeZ: size,
     seed,
-    preset,
+    climateBias: biome.climateCenter,
   });
 }
 

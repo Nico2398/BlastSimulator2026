@@ -17,7 +17,7 @@ import { createRunner, runCommand } from './console/createRunner.js';
 import { parseCommand } from './console/ConsoleRunner.js';
 import { regenerateGrid, restoreGrid, DEFAULT_GRID_SIZE } from './console/commands/world.js';
 import { encodeVoxelGrid } from './core/state/VoxelGridCodec.js';
-import { getMinePreset } from './core/world/MineType.js';
+import { getBiome } from './core/world/BiomeCatalog.js';
 import { BASE_TICK_MS } from './core/engine/GameLoop.js';
 import { probeUiActions, probeSelector } from './ui/uiActionProbe.js';
 import { t } from './core/i18n/I18n.js';
@@ -418,14 +418,14 @@ saveLoadUI.setOnLoad((state) => {
   // regenerating pristine terrain from seed, same as the console `load`
   // command and this codebase's whole prior history here (#408).
   ctx.state = state;
-  const preset = getMinePreset(state.mineType);
+  const biome = getBiome(state.mineType);
   if (state.world?.voxels) {
     restoreGrid(ctx, state.world.voxels);
-  } else if (preset) {
+  } else if (biome) {
     const { sizeX, sizeY, sizeZ } = state.world ?? {
       sizeX: DEFAULT_GRID_SIZE, sizeY: DEFAULT_GRID_SIZE, sizeZ: DEFAULT_GRID_SIZE, gridReady: true,
     };
-    regenerateGrid(ctx, { seed: state.seed, preset, sizeX, sizeY, sizeZ });
+    regenerateGrid(ctx, { seed: state.seed, climateBias: biome.climateCenter, sizeX, sizeY, sizeZ });
   }
   gameRenderer.syncFromContext(ctx);
 });

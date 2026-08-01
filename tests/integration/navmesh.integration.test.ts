@@ -7,7 +7,6 @@ import { findPath, findRampConnections, octileHeuristic } from '../../src/core/n
 import { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import { createBuildingState, placeBuilding } from '../../src/core/entities/Building.js';
 import { generateTerrain } from '../../src/core/world/TerrainGen.js';
-import { getMinePreset } from '../../src/core/world/MineType.js';
 import { buildRamp } from '../../src/core/mining/Ramp.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

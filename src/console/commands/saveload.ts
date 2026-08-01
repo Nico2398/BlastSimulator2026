@@ -18,7 +18,7 @@ import type { GameContext } from './world.js';
 import { regenerateGrid, restoreGrid, DEFAULT_GRID_SIZE } from './world.js';
 import type { CommandResult } from '../ConsoleRunner.js';
 import { serialize, deserialize } from '../../core/state/SaveLoad.js';
-import { getMinePreset } from '../../core/world/MineType.js';
+import { getBiome } from '../../core/world/BiomeCatalog.js';
 import { encodeVoxelGrid } from '../../core/state/VoxelGridCodec.js';
 
 const DEFAULT_SLOT = 'quicksave';
@@ -50,8 +50,8 @@ export function loadCommand(
   if (!data) return { success: false, output: `No save found in slot "${slot}".` };
 
   const state = deserialize(data);
-  const preset = getMinePreset(state.mineType);
-  if (!preset) return { success: false, output: `Save has unknown mine type "${state.mineType}".` };
+  const biome = getBiome(state.mineType);
+  if (!biome) return { success: false, output: `Save has unknown mine type "${state.mineType}".` };
 
   ctx.state = state;
   if (state.world?.voxels) {
@@ -60,7 +60,7 @@ export function loadCommand(
     const { sizeX, sizeY, sizeZ } = state.world ?? {
       sizeX: DEFAULT_GRID_SIZE, sizeY: DEFAULT_GRID_SIZE, sizeZ: DEFAULT_GRID_SIZE, gridReady: true,
     };
-    regenerateGrid(ctx, { seed: state.seed, preset, sizeX, sizeY, sizeZ });
+    regenerateGrid(ctx, { seed: state.seed, climateBias: biome.climateCenter, sizeX, sizeY, sizeZ });
   }
 
   return { success: true, output: `Loaded from slot "${slot}".` };

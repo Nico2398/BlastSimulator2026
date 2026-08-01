@@ -84,7 +84,7 @@ describe('Campaign', () => {
     expect(level!.id).toBe('dusty_hollow');
     expect(level!.nameKey).toBe('level.dusty_hollow.name');
     expect(level!.descKey).toBe('level.dusty_hollow.desc');
-    expect(level!.mineType).toBe('desert');
+    expect(level!.biome).toBe('desert_badlands');
     expect(level!.terrainSeed).toBe(1138);
     expect(level!.gridX).toBe(40);
     expect(level!.gridY).toBe(20);

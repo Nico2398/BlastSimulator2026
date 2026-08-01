@@ -84,7 +84,7 @@ export function createGameForLevel(
 
   const config: GameConfig = {
     seed: level.terrainSeed,
-    mineType: level.mineType,
+    mineType: level.biome,
     startingCash: level.startingCash,
     eventFreqMultiplier: level.eventFreqMultiplier,
   };

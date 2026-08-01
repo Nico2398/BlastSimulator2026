@@ -11,8 +11,14 @@ export interface LevelDef {
   nameKey: string;
   /** i18n key for the level description. */
   descKey: string;
-  /** Mine type preset to use. */
-  mineType: string;
+  /** Biome ID (BiomeCatalog) this level's terrain is biased toward. */
+  biome: string;
+  /**
+   * Bias added to the raw climate fields so this level's own grid lands near
+   * its intended biome's climate centre (#458 T1.2/A6) — authored once per
+   * level, typically the target biome's own climateCenter.
+   */
+  climateBias: readonly [number, number];
   /** Deterministic terrain seed. */
   terrainSeed: number;
   /** Grid dimensions. */
@@ -56,7 +62,8 @@ const LEVELS: readonly LevelDef[] = [
     id: 'tutorial_pit',
     nameKey: 'level.tutorial_pit.name',
     descKey: 'level.tutorial_pit.desc',
-    mineType: 'desert',
+    biome: 'desert_badlands',
+    climateBias: [0.7, -0.6],
     terrainSeed: 42,
     gridX: 24,
     gridY: 12,
@@ -85,7 +92,8 @@ const LEVELS: readonly LevelDef[] = [
     id: 'dusty_hollow',
     nameKey: 'level.dusty_hollow.name',
     descKey: 'level.dusty_hollow.desc',
-    mineType: 'desert',
+    biome: 'desert_badlands',
+    climateBias: [0.7, -0.6],
     terrainSeed: 1138,
     gridX: 40,
     gridY: 20,
@@ -109,7 +117,8 @@ const LEVELS: readonly LevelDef[] = [
     id: 'grumpstone_ridge',
     nameKey: 'level.grumpstone_ridge.name',
     descKey: 'level.grumpstone_ridge.desc',
-    mineType: 'mountain',
+    biome: 'alpine_granite',
+    climateBias: [-0.7, 0.1],
     terrainSeed: 2277,
     gridX: 60,
     gridY: 30,
@@ -135,7 +144,8 @@ const LEVELS: readonly LevelDef[] = [
     id: 'treranium_depths',
     nameKey: 'level.treranium_depths.name',
     descKey: 'level.treranium_depths.desc',
-    mineType: 'tropical',
+    biome: 'tropical_karst',
+    climateBias: [0.6, 0.7],
     terrainSeed: 3666,
     gridX: 80,
     gridY: 40,
