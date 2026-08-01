@@ -3,6 +3,7 @@
 // Also lists placed buildings with Move, Upgrade, and Demolish actions.
 
 import { t } from '../core/i18n/I18n.js';
+import { LocaleTextRegistry } from './localeText.js';
 import type { GameState } from '../core/state/GameState.js';
 import {
   getAllBuildingTypes,
@@ -46,6 +47,7 @@ export class BuildMenu {
    *  research hides the "Queue Research" button without changing cash,
    *  placed count, or unlockedTiers. */
   private lastResearchQueueSignature = '';
+  private readonly locale = new LocaleTextRegistry();
 
   constructor(container: HTMLElement) {
     this.el = document.createElement('div');
@@ -55,7 +57,7 @@ export class BuildMenu {
 
     const title = document.createElement('div');
     title.className = 'bs-panel-title';
-    title.textContent = t('ui.build.title');
+    this.locale.bindText(title, 'ui.build.title');
 
     this.catalogEl = document.createElement('div');
     this.catalogEl.id = 'bs-build-catalog';
@@ -64,7 +66,7 @@ export class BuildMenu {
     placedTitle.style.cssText =
       'font-size:10px;color:#c0a060;margin-top:8px;font-weight:bold;' +
       'text-transform:uppercase;letter-spacing:0.05em';
-    placedTitle.textContent = t('ui.build.placed_buildings');
+    this.locale.bindText(placedTitle, 'ui.build.placed_buildings');
 
     this.placedEl = document.createElement('div');
     this.placedEl.id = 'bs-build-placed';
@@ -75,7 +77,7 @@ export class BuildMenu {
     const closeBtn = document.createElement('button');
     closeBtn.className = 'bs-btn';
     closeBtn.style.cssText = 'width:100%;margin-top:6px';
-    closeBtn.textContent = t('ui.build.close');
+    this.locale.bindText(closeBtn, 'ui.build.close');
     closeBtn.addEventListener('click', () => this.hide());
 
     this.el.append(
@@ -91,6 +93,16 @@ export class BuildMenu {
   }
 
   setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
+
+  /** Re-render locale-dependent text (catalog, placed list, sections) after a language change. */
+  refreshLocale(): void {
+    this.locale.refresh();
+    // Catalog and placed rows are built on demand, not per tick, so they keep
+    // the previous locale until something structural changes. Rebuild both.
+    this.buildCatalog();
+    this.refreshCatalogButtons(this.lastCash);
+    this.refreshPlacedList(this.lastState?.buildings.buildings ?? []);
+  }
 
   show(): void { this.el.style.display = ''; }
   hide(): void { this.el.style.display = 'none'; }
@@ -173,12 +185,12 @@ export class BuildMenu {
     const header = document.createElement('div');
     header.className = 'bs-section-header';
     header.style.marginTop = '8px';
-    header.textContent = t('ui.build.ramp_section');
+    this.locale.bindText(header, 'ui.build.ramp_section');
 
     const btn = document.createElement('button');
     btn.className = 'bs-btn bs-btn-primary bs-build-ramp-btn';
     btn.style.cssText = 'width:100%';
-    btn.textContent = t('ui.build.ramp');
+    this.locale.bindText(btn, 'ui.build.ramp');
     btn.addEventListener('click', () => {
       this.tileSelect.open({
         mode: 'area',
@@ -220,7 +232,9 @@ export class BuildMenu {
     row.dataset['buildType'] = type;
 
     const info = document.createElement('div');
-    info.style.cssText = 'flex:1;min-width:0';
+    // A basis rather than pure flex:1 — with a nowrap action button the name
+    // column collapsed to nothing and the label overflowed across the controls.
+    info.style.cssText = 'flex:1 1 50%;min-width:0;overflow-wrap:break-word';
 
     const nameEl = document.createElement('div');
     nameEl.style.cssText = 'font-size:11px;color:#d0b090;font-weight:bold';
@@ -228,7 +242,9 @@ export class BuildMenu {
 
     const costEl = document.createElement('div');
     costEl.className = 'bs-build-cost';
-    costEl.style.cssText = 'font-size:10px;color:#a08060';
+    // nowrap: the French format puts the currency symbol after the amount, so
+    // "12000 $" broke across two lines and pushed the row out of shape.
+    costEl.style.cssText = 'font-size:10px;color:#a08060;white-space:nowrap';
     this.updateCostDisplay(costEl, type, 1);
     info.append(nameEl, costEl);
 
@@ -243,7 +259,7 @@ export class BuildMenu {
       opt.textContent = `T${tier}`;
       tierSel.appendChild(opt);
     }
-    tierSel.value = '1';
+    tierSel.value = String(this.selectedTiers.get(type) ?? 1);
     tierSel.addEventListener('change', () => {
       const selected = parseInt(tierSel.value, 10) as BuildingTier;
       this.selectedTiers.set(type, selected);
@@ -253,7 +269,7 @@ export class BuildMenu {
 
     const placeBtn = document.createElement('button');
     placeBtn.className = 'bs-btn bs-btn-primary bs-build-buy-btn';
-    placeBtn.style.cssText = 'padding:2px 8px;font-size:10px;white-space:nowrap';
+    placeBtn.style.cssText = 'padding:2px 8px;font-size:10px;white-space:normal;line-height:1.25;flex:0 1 auto;min-width:0';
     placeBtn.textContent = t('ui.build.place');
     placeBtn.addEventListener('click', () => {
       const tier = (this.selectedTiers.get(type) ?? 1) as BuildingTier;
@@ -276,7 +292,7 @@ export class BuildMenu {
 
     const researchBtn = document.createElement('button');
     researchBtn.className = 'bs-btn bs-build-research-btn';
-    researchBtn.style.cssText = 'padding:2px 6px;font-size:10px;white-space:nowrap;display:none';
+    researchBtn.style.cssText = 'padding:2px 6px;font-size:10px;white-space:normal;line-height:1.25;flex:0 1 auto;min-width:0;display:none';
     researchBtn.textContent = t('ui.build.queue_research_button');
     researchBtn.addEventListener('click', () => {
       const tier = (this.selectedTiers.get(type) ?? 1) as BuildingTier;

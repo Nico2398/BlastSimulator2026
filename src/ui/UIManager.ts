@@ -22,6 +22,18 @@ export type GameConsoleFn = (cmd: string) => CommandResult;
 
 export type PanelName = 'blast' | 'contracts' | 'build' | 'vehicles' | 'employees' | 'survey' | 'settings';
 
+/** Toolbar buttons, in order: panel, icon, i18n key. Shared by buildToolbar()
+ *  and refreshLocale() so the captions cannot drift apart. */
+const TOOLBAR_BUTTONS: ReadonlyArray<readonly [PanelName, string, string]> = [
+  ['blast',     '💣 ', 'ui.toolbar.blast'],
+  ['contracts', '📋 ', 'ui.toolbar.contracts'],
+  ['build',     '🏗 ',  'ui.toolbar.build'],
+  ['vehicles',  '🚛 ', 'ui.toolbar.vehicles'],
+  ['employees', '👷 ', 'ui.toolbar.employees'],
+  ['survey',    '🔍 ', 'ui.toolbar.survey'],
+  ['settings',  '⚙️ ',  'ui.toolbar.settings'],
+];
+
 export class UIManager {
   private readonly hud: HUD;
   private readonly blastUI: BlastPlanUI;
@@ -36,6 +48,7 @@ export class UIManager {
   private readonly toolbar: HTMLElement;
 
   private activePanel: PanelName | null = null;
+  private onLanguageChange?: (lang: string) => void;
 
   constructor(container: HTMLElement) {
     injectStyles();
@@ -78,6 +91,14 @@ export class UIManager {
     this.toolbar.id = 'bs-toolbar';
     container.appendChild(this.toolbar);
     this.buildToolbar();
+
+    // A language switch inside the settings panel has to re-render every panel
+    // already on screen, then let whoever else is listening (main.ts refreshes
+    // the main menu behind the panel) react.
+    this.settingsMenu.setLanguageChangeHandler((lang) => {
+      this.refreshLocale();
+      this.onLanguageChange?.(lang);
+    });
   }
 
   setGameConsole(fn: GameConsoleFn): void {
@@ -97,6 +118,30 @@ export class UIManager {
 
   setQuitHandler(cb: () => void): void {
     this.settingsMenu.setQuitHandler(cb);
+  }
+
+  setLanguageChangeHandler(cb: (lang: string) => void): void {
+    this.onLanguageChange = cb;
+  }
+
+  /** Re-render all owned panels' locale-dependent text after a language change. */
+  refreshLocale(): void {
+    this.hud.refreshLocale();
+    this.blastUI.refreshLocale();
+    this.contractUI.refreshLocale();
+    this.buildMenu.refreshLocale();
+    this.vehiclePanel.refreshLocale();
+    this.employeePanel.refreshLocale();
+    this.surveyUI.refreshLocale();
+    this.settingsMenu.refreshLocale();
+    this.miniMap.refreshLocale();
+    this.eventDialog.refreshLocale();
+
+    // Toolbar captions are baked once at construction.
+    for (const [name, icon, key] of TOOLBAR_BUTTONS) {
+      const btn = this.toolbar.querySelector<HTMLButtonElement>(`.bs-toolbar-btn[data-panel="${name}"]`);
+      if (btn) btn.textContent = icon + t(key);
+    }
   }
 
   /**
@@ -203,20 +248,10 @@ export class UIManager {
   }
 
   private buildToolbar(): void {
-    const buttons: [PanelName, string, string][] = [
-      ['blast',     '💣 ' + t('ui.toolbar.blast'),     'blast'],
-      ['contracts', '📋 ' + t('ui.toolbar.contracts'), 'contracts'],
-      ['build',     '🏗 '  + t('ui.toolbar.build'),     'build'],
-      ['vehicles',  '🚛 ' + t('ui.toolbar.vehicles'),  'vehicles'],
-      ['employees', '👷 ' + t('ui.toolbar.employees'), 'employees'],
-      ['survey',    '🔍 ' + t('ui.toolbar.survey'),    'survey'],
-      ['settings',  '⚙️ '  + t('ui.toolbar.settings'),  'settings'],
-    ];
-
-    for (const [name, label] of buttons) {
+    for (const [name, icon, key] of TOOLBAR_BUTTONS) {
       const btn = document.createElement('button');
       btn.className = 'bs-toolbar-btn';
-      btn.textContent = label;
+      btn.textContent = icon + t(key);
       btn.dataset['panel'] = name;
       btn.addEventListener('click', () => {
         this.togglePanel(name);

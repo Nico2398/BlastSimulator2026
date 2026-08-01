@@ -63,6 +63,13 @@ mainMenu.setOnStartLevel((levelId) => {
 });
 mainMenu.setOnLoad(() => { saveLoadUI.show(); });
 mainMenu.setOnSettings(() => { uiManager.showPanel('settings'); });
+// Settings is reachable from the main menu, so a language switch made there has
+// to redraw the menu sitting underneath the panel as well as the panel itself.
+uiManager.setLanguageChangeHandler(() => {
+  mainMenu.refreshLocale();
+  saveLoadUI.refreshLocale();
+  saveLoadBtn.textContent = '💾 ' + t('ui.toolbar.saves');
+});
 mainMenu.show();
 
 // --- Tutorial ---
@@ -89,25 +96,25 @@ const { runner, ctx, emitter } = createRunner();
 
 // --- Subscribe to game-over emitter events for UI notifications ---
 emitter.on('bankruptcy:triggered', ({ cash }) => {
-  uiManager.showNotification?.(`💸 BANKRUPTCY! Cash: $${Math.floor(cash)}. Level failed.`);
+  uiManager.showNotification?.(t('notification.bankruptcy_triggered', { cash: Math.floor(cash) }));
 });
 emitter.on('bankruptcy:warning', ({ ticksRemaining }) => {
-  uiManager.showNotification?.(`⚠️ Low funds! Bankruptcy in ${ticksRemaining} ticks.`);
+  uiManager.showNotification?.(t('notification.bankruptcy_warning', { ticksRemaining }));
 });
 emitter.on('ecology:shutdown', () => {
-  uiManager.showNotification?.('🌿 ECOLOGICAL SHUTDOWN! Government closed the mine. Level failed.');
+  uiManager.showNotification?.(t('notification.ecology_shutdown'));
 });
 emitter.on('ecology:warning', ({ ticksRemaining }) => {
-  uiManager.showNotification?.(`⚠️ Ecological violation! Shutdown in ${ticksRemaining} ticks.`);
+  uiManager.showNotification?.(t('notification.ecology_warning', { ticksRemaining }));
 });
 emitter.on('arrest:triggered', () => {
-  uiManager.showNotification?.('🚔 CRIMINAL ARREST! Mafia exposure too high. Level failed.');
+  uiManager.showNotification?.(t('notification.arrest_triggered'));
 });
 emitter.on('revolt:triggered', () => {
-  uiManager.showNotification?.('✊ WORKER REVOLT! Permanent strike declared. Level failed.');
+  uiManager.showNotification?.(t('notification.revolt_triggered'));
 });
 emitter.on('revolt:warning', ({ ticksRemaining }) => {
-  uiManager.showNotification?.(`⚠️ Workers furious! Revolt in ${ticksRemaining} ticks.`);
+  uiManager.showNotification?.(t('notification.revolt_warning', { ticksRemaining }));
 });
 
 declare global {

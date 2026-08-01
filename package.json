@@ -17,6 +17,7 @@
     "test:integration": "vitest run tests/integration",
     "verify:env": "tsx scripts/verify-env.ts",
     "validate:context": "tsx scripts/validate-context.ts",
+    "check:i18n": "tsx scripts/check-i18n-parity.ts",
     "scenario": "tsx scripts/scenario-test.ts",
     "scenarios": "tsx scripts/run-all-scenarios.ts",
     "scenarios:interaction": "tsx scripts/run-all-scenarios.ts --mode interaction",

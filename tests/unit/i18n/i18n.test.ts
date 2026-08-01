@@ -590,3 +590,197 @@ describe('tutorial_synergy_consultant event keys — en and fr translations diff
     expect(en, 'en and fr translations for event.tutorial_synergy_consultant.opt0 must differ').not.toBe(fr);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Issue #457 — new/reworked keys for the i18n bug fixes
+//
+// Key names below (ui.tile_select.*, menu.subtitle, ui.minimap.no_data,
+// notification.*, menu.level_locked's {threshold}/{level} params) are this
+// test's expectation for what the implementer adds to en.json/fr.json.
+// These do not exist yet on this branch, so every "resolves" assertion below
+// is expected to fail RED (t() returns the key itself for a missing key).
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── TileSelectOverlay keys (ui.tile_select.no_selection / confirm / cancel / selected_point / selected_area / drag_hint / pick_hint) ─
+
+const TILE_SELECT_NEW_KEYS = [
+  'ui.tile_select.no_selection',
+  'ui.tile_select.confirm',
+  'ui.tile_select.cancel',
+  'ui.tile_select.drag_hint',
+  'ui.tile_select.pick_hint',
+] as const;
+
+describe('ui.tile_select.* new keys resolve in both locales', () => {
+  for (const locale of LOCALES) {
+    it(`locale ${locale}: all new ui.tile_select.* keys resolve`, () => {
+      setLocale(locale);
+      for (const key of TILE_SELECT_NEW_KEYS) {
+        const result = t(key);
+        expect(result, `key "${key}" must resolve in ${locale}`).not.toBe(key);
+        expect(result.length, `key "${key}" must be non-empty in ${locale}`).toBeGreaterThan(0);
+      }
+    });
+  }
+});
+
+describe('ui.tile_select.* new keys — en and fr translations differ', () => {
+  for (const key of TILE_SELECT_NEW_KEYS) {
+    it(`${key} is translated differently in en vs fr`, () => {
+      setLocale('en');
+      const en = t(key);
+      setLocale('fr');
+      const fr = t(key);
+      expect(en, `${key} must resolve in en`).not.toBe(key);
+      expect(fr, `${key} must resolve in fr`).not.toBe(key);
+      expect(en, `en and fr translations for ${key} must differ`).not.toBe(fr);
+    });
+  }
+});
+
+describe('ui.tile_select.selected_point / selected_area — interpolation', () => {
+  for (const locale of LOCALES) {
+    it(`locale ${locale}: ui.tile_select.selected_point interpolates {x} and {z}`, () => {
+      setLocale(locale);
+      const result = t('ui.tile_select.selected_point', { x: 5, z: 7 });
+      expect(result, 'key must resolve').not.toBe('ui.tile_select.selected_point');
+      expect(result, `"${result}" must contain the x value`).toContain('5');
+      expect(result, `"${result}" must contain the z value`).toContain('7');
+    });
+
+    it(`locale ${locale}: ui.tile_select.selected_area interpolates {x1}/{z1}/{x2}/{z2}`, () => {
+      setLocale(locale);
+      const result = t('ui.tile_select.selected_area', { x1: 2, z1: 2, x2: 6, z2: 5, w: 5, h: 4 });
+      expect(result, 'key must resolve').not.toBe('ui.tile_select.selected_area');
+      expect(result, `"${result}" must contain x1`).toContain('2');
+      expect(result, `"${result}" must contain x2`).toContain('6');
+    });
+  }
+});
+
+// ── MainMenu subtitle (menu.subtitle) ──────────────────────────────────────
+
+describe('menu.subtitle key resolves in both locales', () => {
+  for (const locale of LOCALES) {
+    it(`locale ${locale}: menu.subtitle resolves`, () => {
+      setLocale(locale);
+      const result = t('menu.subtitle');
+      expect(result, 'menu.subtitle must resolve').not.toBe('menu.subtitle');
+      expect(result.length).toBeGreaterThan(0);
+    });
+  }
+});
+
+describe('menu.subtitle — en and fr translations differ', () => {
+  it('menu.subtitle is translated differently in en vs fr', () => {
+    setLocale('en');
+    const en = t('menu.subtitle');
+    setLocale('fr');
+    const fr = t('menu.subtitle');
+    expect(en).not.toBe('menu.subtitle');
+    expect(fr).not.toBe('menu.subtitle');
+    expect(en).not.toBe(fr);
+  });
+});
+
+// ── MiniMap "no data" placeholder (ui.minimap.no_data) ─────────────────────
+
+describe('ui.minimap.no_data key resolves in both locales', () => {
+  for (const locale of LOCALES) {
+    it(`locale ${locale}: ui.minimap.no_data resolves`, () => {
+      setLocale(locale);
+      const result = t('ui.minimap.no_data');
+      expect(result, 'ui.minimap.no_data must resolve').not.toBe('ui.minimap.no_data');
+      expect(result.length).toBeGreaterThan(0);
+    });
+  }
+});
+
+describe('ui.minimap.no_data — en and fr translations differ', () => {
+  it('ui.minimap.no_data is translated differently in en vs fr', () => {
+    setLocale('en');
+    const en = t('ui.minimap.no_data');
+    setLocale('fr');
+    const fr = t('ui.minimap.no_data');
+    expect(en).not.toBe('ui.minimap.no_data');
+    expect(fr).not.toBe('ui.minimap.no_data');
+    expect(en).not.toBe(fr);
+  });
+});
+
+// ── main.ts notification keys (notification.*) ─────────────────────────────
+
+const NOTIFICATION_KEYS = [
+  'notification.bankruptcy_triggered',
+  'notification.bankruptcy_warning',
+  'notification.ecology_shutdown',
+  'notification.ecology_warning',
+  'notification.arrest_triggered',
+  'notification.revolt_triggered',
+  'notification.revolt_warning',
+] as const;
+
+describe('notification.* keys resolve in both locales', () => {
+  for (const locale of LOCALES) {
+    it(`locale ${locale}: all 7 notification.* keys resolve`, () => {
+      setLocale(locale);
+      for (const key of NOTIFICATION_KEYS) {
+        const result = t(key);
+        expect(result, `key "${key}" must resolve in ${locale}`).not.toBe(key);
+        expect(result.length, `key "${key}" must be non-empty in ${locale}`).toBeGreaterThan(0);
+      }
+    });
+  }
+});
+
+describe('notification.* keys — en and fr translations differ', () => {
+  for (const key of NOTIFICATION_KEYS) {
+    it(`${key} is translated differently in en vs fr`, () => {
+      setLocale('en');
+      const en = t(key);
+      setLocale('fr');
+      const fr = t(key);
+      expect(en, `${key} must resolve in en`).not.toBe(key);
+      expect(fr, `${key} must resolve in fr`).not.toBe(key);
+      expect(en, `en and fr translations for ${key} must differ`).not.toBe(fr);
+    });
+  }
+});
+
+describe('notification.bankruptcy_warning / ecology_warning / revolt_warning — {ticksRemaining} interpolation', () => {
+  for (const locale of LOCALES) {
+    it(`locale ${locale}: warning notifications interpolate {ticksRemaining}`, () => {
+      setLocale(locale);
+      for (const key of ['notification.bankruptcy_warning', 'notification.ecology_warning', 'notification.revolt_warning']) {
+        const result = t(key, { ticksRemaining: 42 });
+        expect(result, `key "${key}" must resolve`).not.toBe(key);
+        expect(result, `"${result}" must contain the ticksRemaining value`).toContain('42');
+      }
+    });
+  }
+});
+
+// ── menu.level_locked reworked with {threshold}/{level} params ─────────────
+//
+// The current template takes a single {req} param that MainMenu.ts builds in
+// plain JS as `$X on <level name>` — baking the English word "on" into every
+// locale. The fix moves the connecting word into the template itself, keyed
+// on {threshold} and {level}.
+
+describe('menu.level_locked — reworked {threshold}/{level} interpolation', () => {
+  for (const locale of LOCALES) {
+    it(`locale ${locale}: menu.level_locked interpolates {threshold} and {level}`, () => {
+      setLocale(locale);
+      const result = t('menu.level_locked', { threshold: '$250,000', level: 'Dusty Hollow' });
+      expect(result, 'menu.level_locked must resolve').not.toBe('menu.level_locked');
+      expect(result, `"${result}" must contain the threshold value`).toContain('$250,000');
+      expect(result, `"${result}" must contain the level value`).toContain('Dusty Hollow');
+    });
+  }
+
+  it('the French render never contains the standalone English word "on"', () => {
+    setLocale('fr');
+    const result = t('menu.level_locked', { threshold: '$250,000', level: 'La Combe Poussiéreuse' });
+    expect(result).not.toMatch(/\bon\b/);
+  });
+});

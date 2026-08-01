@@ -4,6 +4,7 @@
 // Event notification badge when a pending event exists.
 
 import { t } from '../core/i18n/I18n.js';
+import { LocaleTextRegistry } from './localeText.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { WeatherState } from '../core/weather/WeatherCycle.js';
 
@@ -52,6 +53,9 @@ export class HUD {
   private onSpeedChange?: (speed: number) => void;
   private currentSpeed = 1;
   private isPaused = false;
+  /** Last weather rendered, so refreshLocale() can re-translate its tooltip. */
+  private lastWeather: WeatherState = 'sunny';
+  private readonly locale = new LocaleTextRegistry();
 
   constructor(container: HTMLElement) {
     // ── Top bar ──
@@ -67,17 +71,17 @@ export class HUD {
 
     this.weatherEl = document.createElement('span');
     this.weatherEl.className = 'bs-weather';
-    this.weatherEl.title = t('hud.weather.sunny');
+    this.locale.bindTitle(this.weatherEl, 'hud.weather.sunny');
 
     this.speedBtn = document.createElement('button');
     this.speedBtn.className = 'bs-speed-btn';
     this.speedBtn.textContent = t('hud.speed_x', { speed: '1' });
-    this.speedBtn.title = t('hud.speed');
+    this.locale.bindTitle(this.speedBtn, 'hud.speed');
     this.speedBtn.addEventListener('click', () => this.cycleSpeed());
 
     this.eventBadge = document.createElement('span');
     this.eventBadge.className = 'bs-event-badge';
-    this.eventBadge.textContent = t('hud.event_pending');
+    this.locale.bindText(this.eventBadge, 'hud.event_pending');
     this.eventBadge.style.display = 'none';
 
     this.topBar.append(this.balanceEl, this.timeEl, this.eventBadge, this.weatherEl, this.speedBtn);
@@ -101,7 +105,7 @@ export class HUD {
 
       const label = document.createElement('div');
       label.className = 'bs-score-label';
-      label.textContent = t(`hud.scores.${key}`);
+      this.locale.bindText(label, `hud.scores.${key}`);
 
       const barBg = document.createElement('div');
       barBg.className = 'bs-score-bar-bg';
@@ -144,6 +148,7 @@ export class HUD {
 
     // Weather icon
     if (weather) {
+      this.lastWeather = weather;
       this.weatherEl.textContent = WEATHER_ICONS[weather] ?? '☀️';
       this.weatherEl.title = t(`hud.weather.${weather}`);
     }
@@ -164,6 +169,17 @@ export class HUD {
   /** Register callback invoked when the player clicks the speed button. */
   setSpeedChangeHandler(cb: (speed: number) => void): void {
     this.onSpeedChange = cb;
+  }
+
+  /** Re-render locale-dependent text (labels, tooltips, badge) after a language change. */
+  refreshLocale(): void {
+    this.locale.refresh();
+    // Written by update()/cycleSpeed() rather than the registry: both the key
+    // and its interpolation depend on live state.
+    this.weatherEl.title = t(`hud.weather.${this.lastWeather}`);
+    this.speedBtn.textContent = this.isPaused
+      ? t('hud.paused')
+      : t('hud.speed_x', { speed: String(this.currentSpeed) });
   }
 
   dispose(): void {

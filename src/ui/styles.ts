@@ -23,10 +23,27 @@ const CSS = `
   pointer-events: all;
   backdrop-filter: blur(4px);
   box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+  /* #bs-left-col is a flex column with a capped height, so a panel taller than
+     the viewport was squashed and its rows drew on top of each other. Longer
+     labels (French) hit this constantly. Let the column scroll instead. */
+  flex-shrink: 0;
 }
 .bs-panel-title {
   font-weight: 700;
   font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #ffc840;
+  margin-bottom: 10px;
+  border-bottom: 1px solid rgba(200,160,60,0.25);
+  padding-bottom: 6px;
+}
+/* Same look as a panel title, but this one holds a hole id, not translated
+   text — keeping it out of .bs-panel-title lets a locale-refresh check assert
+   that every panel title is translated. */
+.bs-hole-id-label {
+  font-weight: 700;
+  font-size: 11px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: #ffc840;

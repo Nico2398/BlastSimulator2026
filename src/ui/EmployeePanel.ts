@@ -2,6 +2,7 @@
 // Lists employees with morale/union status; hire, fire, raise controls.
 
 import { t } from '../core/i18n/I18n.js';
+import { LocaleTextRegistry } from './localeText.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { Employee, EmployeeRole, TrainingState } from '../core/entities/Employee.js';
 import { QUALIFICATION_SALARY_BONUS, BASE_SALARIES } from '../core/config/balance.js';
@@ -27,6 +28,9 @@ export class EmployeePanel {
   private lastSignature = '';
   /** Employee ids whose detail the player has expanded, kept across rebuilds. */
   private readonly expanded = new Set<number>();
+  /** Latest state, so a locale switch can re-render the roster rows. */
+  private lastState: GameState | null = null;
+  private readonly locale = new LocaleTextRegistry();
 
   constructor(container: HTMLElement) {
     this.el = document.createElement('div');
@@ -36,14 +40,14 @@ export class EmployeePanel {
 
     const title = document.createElement('div');
     title.className = 'bs-panel-title';
-    title.textContent = t('ui.employees.title');
+    this.locale.bindText(title, 'ui.employees.title');
 
     this.listEl = document.createElement('div');
 
     const hireHeader = document.createElement('div');
     hireHeader.className = 'bs-section-header';
     hireHeader.style.marginTop = '8px';
-    hireHeader.textContent = t('ui.employees.hire');
+    this.locale.bindText(hireHeader, 'ui.employees.hire');
 
     this.hireSection = document.createElement('div');
     this.buildHireSection();
@@ -51,7 +55,7 @@ export class EmployeePanel {
     const closeBtn = document.createElement('button');
     closeBtn.className = 'bs-btn';
     closeBtn.style.cssText = 'width:100%;margin-top:6px';
-    closeBtn.textContent = t('ui.employees.close');
+    this.locale.bindText(closeBtn, 'ui.employees.close');
     closeBtn.addEventListener('click', () => this.hide());
 
     this.el.append(title, this.listEl, hireHeader, this.hireSection, closeBtn);
@@ -60,11 +64,23 @@ export class EmployeePanel {
 
   setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
 
+  /** Re-render locale-dependent text (title, roster rows, hire section) after a language change. */
+  refreshLocale(): void {
+    this.locale.refresh();
+    // The roster and the hire list are only rebuilt when the roster changes, so
+    // they hold the previous locale until it does — rebuild both now.
+    this.hireSection.replaceChildren();
+    this.buildHireSection();
+    this.lastSignature = '';
+    if (this.lastState) this.update(this.lastState);
+  }
+
   show(): void { this.el.style.display = ''; }
   hide(): void { this.el.style.display = 'none'; }
   get visible(): boolean { return this.el.style.display !== 'none'; }
 
   update(state: GameState): void {
+    this.lastState = state;
     const { employees } = state.employees;
 
     // UIManager.update runs every rendered frame. Rebuilding the list each time

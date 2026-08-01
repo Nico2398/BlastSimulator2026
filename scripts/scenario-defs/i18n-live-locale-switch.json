@@ -1,0 +1,63 @@
+{
+  "name": "i18n-live-locale-switch",
+  "description": "Regression test for issue #457 Bug 1: switching locale while a panel is already open must re-render that panel's static text (title, buttons, toolbar captions) in place, without the panel being closed and reopened. Also verifies a fired event renders fully in French when the locale is already French.",
+  "steps": [
+    {
+      "command": "new_game seed:42",
+      "timeout": 15,
+      "interaction": [
+        { "type": "command", "command": "new_game seed:42" }
+      ]
+    },
+    {
+      "command": "campaign start level:dusty_hollow",
+      "interaction": [
+        { "type": "command", "command": "campaign start level:dusty_hollow" }
+      ]
+    },
+    {
+      "command": "time resume",
+      "interaction": [
+        { "type": "command", "command": "time resume" }
+      ]
+    },
+    {
+      "command": "state full",
+      "description": "Open the Settings panel via the toolbar — English baseline, panel now open.",
+      "interaction": [
+        { "type": "clickSelector", "selector": ".bs-toolbar-btn[data-panel=\"settings\"]" },
+        { "type": "waitForSelector", "selector": "#bs-settings-panel" }
+      ]
+    },
+    {
+      "command": "state full",
+      "description": "Click FR inside the still-open Settings panel WITHOUT closing it. Core Bug 1 regression: title, English/French buttons, Close button, and toolbar captions must switch to French in place.",
+      "interaction": [
+        { "type": "clickSelector", "selector": "#bs-settings-panel > div:nth-child(3) > button:nth-child(2)" }
+      ]
+    },
+    {
+      "command": "state full",
+      "description": "Open the Build menu (Settings auto-hides via the toolbar's mutual-exclusion) — panel opened fresh while locale is already French, confirming the switch persists beyond the panel that triggered it.",
+      "interaction": [
+        { "type": "clickSelector", "selector": ".bs-toolbar-btn[data-panel=\"build\"]" },
+        { "type": "waitForSelector", "selector": "#bs-build-panel, .bs-build-panel" }
+      ]
+    },
+    {
+      "command": "event fire union_coffee_uprising",
+      "description": "Fire an event while locale is French — dialog title/description/option labels must render in French, not English.",
+      "interaction": [
+        { "type": "command", "command": "event fire union_coffee_uprising" }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "description": "Resolve the event, then open the top-bar Save/Load panel (opened via main.ts, outside UIManager) while locale is French — checks whether this panel picked up the live-switch fix too.",
+      "interaction": [
+        { "type": "command", "command": "event choose 0" },
+        { "type": "clickSelector", "selector": "#bs-saveload-btn" }
+      ]
+    }
+  ]
+}

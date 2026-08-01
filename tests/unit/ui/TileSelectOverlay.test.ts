@@ -4,10 +4,11 @@
 // The grid tool would otherwise happily lay a blast pattern anywhere on the map
 // while the tutorial believed it was teaching a specific placement.
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TileSelectOverlay } from '../../../src/ui/TileSelectOverlay.js';
 import type { TileSelectResult } from '../../../src/ui/TileSelectOverlay.js';
 import { setPickerRegion } from '../../../src/ui/tutorialPickerRegion.js';
+import { t, setLocale } from '../../../src/core/i18n/I18n.js';
 
 const CANVAS_W = 640;
 const CANVAS_H = 480;
@@ -320,5 +321,134 @@ describe('TileSelectOverlay — exact target', () => {
     btn.click();
 
     expect(onConfirm).not.toHaveBeenCalled();
+  });
+});
+
+// ── Bug 3: hardcoded English literals bypass t() (issue #457) ─────────────────
+//
+// 'No selection' (×2), 'Confirm', 'Cancel', both 'Selected: (...)' templates,
+// and both drag-hint fallback strings are set as plain JS literals rather than
+// through t(), so they never translate no matter which locale is active. Key
+// names below (ui.tile_select.no_selection / confirm / cancel / selected_point
+// / selected_area / drag_hint / pick_hint) are this test's expectation for
+// what the implementer adds to en.json/fr.json — adjust here if a different
+// naming is chosen, but the literal-leak assertions must stay.
+
+describe('TileSelectOverlay — hardcoded English literals go through t() (issue #457)', () => {
+  afterEach(() => {
+    setLocale('en');
+  });
+
+  it('shows the localized "no selection" text, not the hardcoded English literal, in French', () => {
+    setLocale('fr');
+    const { container, overlay } = setup();
+    overlay.open({
+      mode: 'point', worldSizeX: WORLD, worldSizeZ: WORLD, title: 'x', onConfirm: () => {},
+    });
+
+    const info = infoText(container);
+    expect(info).toBe(t('ui.tile_select.no_selection'));
+    expect(info).not.toBe('No selection');
+  });
+
+  it('re-shows the localized "no selection" text after close()/open() with nothing picked, in French', () => {
+    setLocale('fr');
+    const { container, overlay, canvas } = setup();
+    overlay.open({ mode: 'point', worldSizeX: WORLD, worldSizeZ: WORLD, title: 'x', onConfirm: () => {} });
+    pick(canvas, 3, 3);
+    overlay.close();
+
+    overlay.open({ mode: 'point', worldSizeX: WORLD, worldSizeZ: WORLD, title: 'x', onConfirm: () => {} });
+
+    const info = infoText(container);
+    expect(info).toBe(t('ui.tile_select.no_selection'));
+    expect(info).not.toBe('No selection');
+  });
+
+  it('Confirm button text is localized, not the hardcoded English literal, in French', () => {
+    setLocale('fr');
+    const { container, overlay } = setup();
+    overlay.open({
+      mode: 'point', worldSizeX: WORLD, worldSizeZ: WORLD, title: 'x', onConfirm: () => {},
+    });
+
+    const text = confirmBtn(container).textContent;
+    expect(text).toBe(t('ui.tile_select.confirm'));
+    expect(text).not.toBe('Confirm');
+  });
+
+  it('Cancel button text is localized, not the hardcoded English literal, in French', () => {
+    setLocale('fr');
+    const { container, overlay } = setup();
+    overlay.open({
+      mode: 'point', worldSizeX: WORLD, worldSizeZ: WORLD, title: 'x', onConfirm: () => {},
+    });
+
+    const cancelBtnEl = Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
+      .find((b) => b !== confirmBtn(container) && b.className.includes('bs-btn'));
+    expect(cancelBtnEl?.textContent).toBe(t('ui.tile_select.cancel'));
+    expect(cancelBtnEl?.textContent).not.toBe('Cancel');
+  });
+
+  it('the point-mode "Selected:" info string is localized and interpolates the tile, in French', () => {
+    setLocale('fr');
+    const { container, overlay, canvas } = setup();
+    overlay.open({ mode: 'point', worldSizeX: WORLD, worldSizeZ: WORLD, title: 'x', onConfirm: () => {} });
+
+    pick(canvas, 5, 7);
+
+    const info = infoText(container);
+    expect(info).toBe(t('ui.tile_select.selected_point', { x: 5, z: 7 }));
+    expect(info).not.toBe('Selected: (5, 7)');
+    expect(info).toContain('5');
+    expect(info).toContain('7');
+  });
+
+  it('the area-mode "Selected:" info string is localized and interpolates the rectangle, in French', () => {
+    setLocale('fr');
+    const { container, overlay, canvas } = setup();
+    overlay.open({ mode: 'area', worldSizeX: WORLD, worldSizeZ: WORLD, title: 'x', onConfirm: () => {} });
+
+    drag(canvas, 2, 2, 6, 5);
+
+    const info = infoText(container);
+    expect(info).toBe(t('ui.tile_select.selected_area', { x1: 2, z1: 2, x2: 6, z2: 5, w: 5, h: 4 }));
+    expect(info).not.toContain('Selected: (2, 2)'); // the hardcoded English literal's prefix
+    expect(info).toContain('2');
+    expect(info).toContain('6');
+  });
+
+  it('the point-mode "Selected:" info in English still resolves through t(), not a bypassing literal', () => {
+    setLocale('en');
+    const { container, overlay, canvas } = setup();
+    overlay.open({ mode: 'point', worldSizeX: WORLD, worldSizeZ: WORLD, title: 'x', onConfirm: () => {} });
+
+    pick(canvas, 5, 7);
+
+    expect(infoText(container)).toBe(t('ui.tile_select.selected_point', { x: 5, z: 7 }));
+  });
+
+  it('the area-mode drag hint is localized, not the hardcoded English fallback, in French', () => {
+    setLocale('fr');
+    const { container, overlay } = setup();
+    overlay.open({
+      mode: 'area', worldSizeX: WORLD, worldSizeZ: WORLD, title: 'x', onConfirm: () => {},
+    });
+
+    const hint = container.querySelector('.bs-tile-select-hint')?.textContent;
+    expect(hint).toBe(t('ui.tile_select.drag_hint'));
+    expect(hint).not.toBe('Click and drag to select a rectangular area');
+  });
+
+  it('the point-mode pick hint is localized, not the hardcoded English fallback, in French', () => {
+    setLocale('fr');
+    const { container, overlay } = setup();
+    overlay.open({
+      mode: 'point', worldSizeX: WORLD, worldSizeZ: WORLD, title: 'x', onConfirm: () => {},
+    });
+
+    const hint = container.querySelector('.bs-tile-select-hint')?.textContent;
+    expect(hint).toBe(t('ui.tile_select.pick_hint'));
+    expect(hint).not.toBe('Click a tile to select it');
   });
 });
