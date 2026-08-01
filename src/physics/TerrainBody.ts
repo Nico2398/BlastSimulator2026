@@ -44,8 +44,7 @@ export class TerrainBody {
         let solidCount = 0;
         // Scan from top to bottom, add SURFACE_LAYERS solid voxels per column
         for (let y = grid.sizeY - 1; y >= 0; y--) {
-          const voxel = grid.getVoxel(x, y, z);
-          if (!voxel || voxel.density <= 0) continue;
+          if (grid.densityAt(x, y, z) <= 0) continue;
 
           const half = VoxelGrid.CELL_SIZE / 2;
           const cx = x * VoxelGrid.CELL_SIZE + half;
@@ -86,11 +85,16 @@ export class TerrainBody {
 /**
  * Find the Y coordinate of the topmost solid voxel in a column (x, z).
  * Returns -1 if the entire column is empty.
+ *
+ * Deliberately independent of `computeVoxelColumnSurfaceY` (VoxelGrid.ts):
+ * that helper clamps out-of-bounds (x, z) to the nearest edge column, which
+ * is wrong here — this is used for physics ground-detection on fragments
+ * that can be mid-flight past the grid edge, where "no ground" (-1) is the
+ * correct answer, not the edge column's height.
  */
 export function findSurfaceY(grid: VoxelGrid, x: number, z: number): number {
   for (let y = grid.sizeY - 1; y >= 0; y--) {
-    const v = grid.getVoxel(x, y, z);
-    if (v && v.density > 0) return y;
+    if (grid.densityAt(x, y, z) > 0) return y;
   }
   return -1;
 }

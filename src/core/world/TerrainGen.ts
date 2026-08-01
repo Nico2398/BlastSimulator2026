@@ -3,7 +3,7 @@
 
 import { createNoise2D, createNoise3D } from 'simplex-noise';
 import { Random } from '../math/Random.js';
-import { VoxelGrid, type VoxelData, type VoxelRockComposition } from './VoxelGrid.js';
+import { VoxelGrid, type VoxelRockComposition } from './VoxelGrid.js';
 import { getAllRocks, type RockType } from './RockCatalog.js';
 import type { MinePreset } from './MineType.js';
 
@@ -47,18 +47,13 @@ export function generateTerrain(config: TerrainConfig): VoxelGrid {
         }
 
         const composition = computeComposition(x, y, z, rocks, noise3dRock);
+        const compId = grid.palette.intern(composition);
         const inBorder = isInBorderZone(x, z, sizeX, sizeZ, preset.borderWidth);
         const oreDensities = inBorder
           ? {}
           : computeOreDensities(x, y, z, rocks, composition, preset.oreRichness, noise3dOre);
 
-        const voxel: VoxelData = {
-          composition,
-          density: 1.0,
-          oreDensities,
-          fractureModifier: 1.0,
-        };
-        grid.setVoxel(x, y, z, voxel);
+        grid.fillVoxel(x, y, z, compId, oreDensities);
       }
     }
   }

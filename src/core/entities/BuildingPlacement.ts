@@ -2,7 +2,7 @@
 // Derives a 2D surface grid from the VoxelGrid and marks cells occupied by
 // building footprints. Used for placement validation and rendering hints.
 
-import type { VoxelGrid } from '../world/VoxelGrid.js';
+import { type VoxelGrid, computeVoxelColumnSurfaceY } from '../world/VoxelGrid.js';
 import type { BuildingType, BuildingTier } from './Building.js';
 import { getBuildingDef, type BuildingState, type Building } from './Building.js';
 
@@ -75,11 +75,7 @@ export function buildPlacementGrid(
  * voxel in column (x, z), or 0 if the entire column is empty.
  */
 export function getSurfaceY(voxelGrid: VoxelGrid, x: number, z: number): number {
-  for (let y = voxelGrid.sizeY - 1; y >= 0; y--) {
-    const voxel = voxelGrid.getVoxel(x, y, z);
-    if (voxel !== undefined && voxel.density > 0) return y + 1;
-  }
-  return 0;
+  return computeVoxelColumnSurfaceY(voxelGrid, x, z) + 1;
 }
 
 /**

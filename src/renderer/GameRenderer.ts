@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import type { MiningContext } from '../console/commands/mining.js';
 import type { GameState } from '../core/state/GameState.js';
-import type { VoxelGrid } from '../core/world/VoxelGrid.js';
+import { type VoxelGrid, computeVoxelColumnSurfaceY } from '../core/world/VoxelGrid.js';
 import { getMinePreset } from '../core/world/MineType.js';
 import type { SceneManager } from './SceneManager.js';
 import { TerrainMesh } from './TerrainMesh.js';
@@ -22,7 +22,6 @@ import { syncEntitySets, buildingCenterSurfaceY } from './EntitySync.js';
 import type { SurveyConfidenceOverlayOptions, SurveyConfidencePoint } from './SurveyConfidenceOverlay.js';
 import { isSurveyStale } from '../core/mining/SurveyCalc.js';
 import {
-  SOLID_VOXEL_DENSITY_THRESHOLD,
   BLAST_ORIGIN_SURFACE_SEARCH_MIN_RADIUS,
   BLAST_ORIGIN_SURFACE_SEARCH_MARGIN,
 } from '../core/config/balance.js';
@@ -305,13 +304,7 @@ export class GameRenderer {
   /** Find the highest solid-voxel Y at the given (x, z) column. Returns 0 if no grid. */
   private getTerrainSurfaceY(x: number, z: number): number {
     if (!this.lastGrid) return 0;
-    const gx = Math.max(0, Math.min(this.lastGrid.sizeX - 1, Math.floor(x)));
-    const gz = Math.max(0, Math.min(this.lastGrid.sizeZ - 1, Math.floor(z)));
-    for (let y = this.lastGrid.sizeY - 1; y >= 0; y--) {
-      const v = this.lastGrid.getVoxel(gx, y, gz);
-      if (v && v.density >= SOLID_VOXEL_DENSITY_THRESHOLD) return y + 1;
-    }
-    return 0;
+    return computeVoxelColumnSurfaceY(this.lastGrid, x, z) + 1;
   }
 
   /**
