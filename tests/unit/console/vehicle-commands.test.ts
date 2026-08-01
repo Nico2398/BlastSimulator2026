@@ -5,6 +5,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { newGameCommand } from '../../../src/console/commands/world.js';
 import { vehicleCommand } from '../../../src/console/commands/vehicle.js';
+import { tickCommand } from '../../../src/console/commands/events.js';
 import type { MiningContext } from '../../../src/console/commands/mining.js';
 import { createTubingState } from '../../../src/core/mining/Tubing.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
@@ -42,6 +43,44 @@ function addDrillRig(ctx: MiningContext): number {
 }
 
 /**
+ * Fields every Employee needs beyond the identity/role/qualification basics —
+ * factored out so the three fixture builders below stay in sync with the
+ * Employee interface (issue #437 added several "pending" and "destination"
+ * fields; a fixture missing them isn't a type error in test files — tests
+ * aren't typechecked — but tickCommand's movement/arrival-gate pipeline reads
+ * them directly and crashes on `undefined` rather than failing a clean
+ * assertion).
+ */
+function employeeMovementDefaults(): Omit<
+  Employee,
+  'id' | 'name' | 'role' | 'salary' | 'morale' | 'unionized' | 'injured' | 'alive' | 'x' | 'z' | 'qualifications' | 'trainingState'
+> {
+  return {
+    activeActionId: null,
+    hunger: 100,
+    fatigue: 100,
+    breakNeed: 100,
+    collapsing: false,
+    interruptedActionPayload: null,
+    ticksWorked: 0,
+    restTicksRemaining: null,
+    taskTicksRemaining: null,
+    activeTaskSkill: null,
+    restNeedKey: null,
+    destinationX: null,
+    destinationZ: null,
+    moveConsecutiveFailures: 0,
+    isMoveStuck: false,
+    pendingRestDuration: null,
+    pendingRestNeedKey: null,
+    pendingTaskDuration: null,
+    pendingActionType: null,
+    pendingActionPayload: null,
+    pendingDriverVehicleId: null,
+  };
+}
+
+/**
  * Push a qualified truck driver (driving.truck licence) directly into employee state.
  * Returns the new employee's ID.
  */
@@ -59,6 +98,7 @@ function addTruckDriver(ctx: MiningContext): number {
     z: 0,
     qualifications: [{ category: 'driving.truck', proficiencyLevel: 1, xp: 0 }],
     trainingState: null,
+    ...employeeMovementDefaults(),
   };
   ctx.state!.employees.employees.push(emp);
   return emp.id;
@@ -82,6 +122,7 @@ function addDrillRigDriver(ctx: MiningContext): number {
     z: 0,
     qualifications: [{ category: 'driving.drill_rig', proficiencyLevel: 1, xp: 0 }],
     trainingState: null,
+    ...employeeMovementDefaults(),
   };
   ctx.state!.employees.employees.push(emp);
   return emp.id;
@@ -105,6 +146,7 @@ function addUnqualifiedEmployee(ctx: MiningContext): number {
     z: 0,
     qualifications: [],
     trainingState: null,
+    ...employeeMovementDefaults(),
   };
   ctx.state!.employees.employees.push(emp);
   return emp.id;
@@ -113,6 +155,13 @@ function addUnqualifiedEmployee(ctx: MiningContext): number {
 // ── vehicle driver — happy path ──
 
 describe('vehicle driver — successful assignment', () => {
+  // Issue #437: "vehicle driver" now only *requests* boarding — the licence
+  // and availability checks still happen eagerly (so the command still
+  // reports success/failure immediately), but the actual driverId assignment
+  // is deferred to ArrivalGate.tickArrivalGate, once the employee has walked
+  // to the vehicle. Every fixture employee here spawns at the same (0,0) as
+  // the fixture vehicle, so a single tick is enough to resolve arrival.
+
   it('returns success when a qualified driver is assigned to a matching vehicle', () => {
     const ctx = makeCtx();
     const vehicleId = addTruckVehicle(ctx);
@@ -143,18 +192,22 @@ describe('vehicle driver — successful assignment', () => {
     expect(result.output).toContain(String(employeeId));
   });
 
-  it('sets driverId on the vehicle after assignment', () => {
+  it('does NOT set driverId synchronously — driverId stays null until a tick resolves arrival', () => {
     const ctx = makeCtx();
     const vehicleId = addTruckVehicle(ctx);
     const employeeId = addTruckDriver(ctx);
 
-    vehicleCommand(ctx, ['driver', String(vehicleId), String(employeeId)], {});
+    const result = vehicleCommand(ctx, ['driver', String(vehicleId), String(employeeId)], {});
+    expect(result.success).toBe(true);
 
     const vehicle = ctx.state!.vehicles.vehicles.find(v => v.id === vehicleId);
+    expect(vehicle!.driverId).toBeNull();
+
+    tickCommand(ctx, ['1'], {});
     expect(vehicle!.driverId).toBe(employeeId);
   });
 
-  it('assigns a drill_rig driver with the driving.drill_rig licence', () => {
+  it('assigns a drill_rig driver with the driving.drill_rig licence, once a tick resolves arrival', () => {
     const ctx = makeCtx();
     const vehicleId = addDrillRig(ctx);
     const employeeId = addDrillRigDriver(ctx);
@@ -163,6 +216,9 @@ describe('vehicle driver — successful assignment', () => {
 
     expect(result.success).toBe(true);
     const vehicle = ctx.state!.vehicles.vehicles.find(v => v.id === vehicleId);
+    expect(vehicle!.driverId).toBeNull();
+
+    tickCommand(ctx, ['1'], {});
     expect(vehicle!.driverId).toBe(employeeId);
   });
 });
@@ -247,8 +303,13 @@ describe('vehicle driver — domain validation errors', () => {
     const firstDriverId = addTruckDriver(ctx);
     const secondDriverId = addTruckDriver(ctx);
 
-    // Assign first driver successfully
+    // Assign first driver successfully — resolve the walk so driverId is
+    // actually set before the second request is evaluated (#437).
     vehicleCommand(ctx, ['driver', String(vehicleId), String(firstDriverId)], {});
+    // Issue #437: driverId is only set once the arrival gate resolves — the
+    // first driver must actually board before the second request can see the
+    // vehicle as taken.
+    tickCommand(ctx, ['1'], {});
 
     // Attempt to assign a second driver to the same vehicle
     const result = vehicleCommand(
@@ -267,8 +328,11 @@ describe('vehicle driver — domain validation errors', () => {
     const secondVehicleId = addTruckVehicle(ctx);
     const employeeId = addTruckDriver(ctx);
 
-    // Assign driver to first vehicle successfully
+    // Assign driver to first vehicle successfully — resolve the walk so
+    // driverId is actually set before the second request is evaluated (#437).
     vehicleCommand(ctx, ['driver', String(firstVehicleId), String(employeeId)], {});
+    // Issue #437: driverId is only set once the arrival gate resolves.
+    tickCommand(ctx, ['1'], {});
 
     // Attempt to assign same driver to second vehicle
     const result = vehicleCommand(

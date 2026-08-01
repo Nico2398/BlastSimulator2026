@@ -95,7 +95,7 @@ describe('Vehicle fleet', () => {
 
   // ── Driver assignment ──
 
-  it('assign driver with driving skill succeeds', () => {
+  it('assign driver with driving skill succeeds — driverId sets only after a tick resolves arrival (issue #437)', () => {
     vehicleCommand(ctx, ['buy', 'debris_hauler'], {});
     const eid = hireOne(ctx, 'driver');
     employeeCommand(ctx, ['assign_skill', String(eid)], { skill: 'driving.truck', level: '1' });
@@ -103,7 +103,14 @@ describe('Vehicle fleet', () => {
     const result = vehicleCommand(ctx, ['driver', '1', String(eid)], {});
 
     expect(result.success).toBe(true);
-    expect(result.output).toBe(`Driver #${eid} assigned to vehicle #1.`);
+    expect(result.output).toBe(`Driver #${eid} walking to vehicle #1 to board.`);
+    // The request succeeds immediately, but boarding is deferred to arrival —
+    // driverId must not be set synchronously (previously it was, unconditionally).
+    expect(ctx.state!.vehicles.vehicles[0]!.driverId).toBeNull();
+
+    // The employee (hired at the same spawn point as the vehicle here) needs
+    // one tick to resolve the arrival gate before driverId is actually set.
+    tickCommand(ctx, ['1'], {});
     expect(ctx.state!.vehicles.vehicles[0]!.driverId).toBe(eid);
   });
 
@@ -117,6 +124,34 @@ describe('Vehicle fleet', () => {
     expect(result.success).toBe(false);
     expect(result.output).toContain('lacks licence');
     expect(ctx.state!.vehicles.vehicles[0]!.driverId).toBeNull();
+
+    // Rejected at request time — a tick later, still no driver.
+    tickCommand(ctx, ['1'], {});
+    expect(ctx.state!.vehicles.vehicles[0]!.driverId).toBeNull();
+  });
+
+  // ── New (issue #437): driverId stays null until the arrival gate resolves ──
+
+  it('driverId is null immediately after "vehicle driver" and only set once the employee has walked to the vehicle', () => {
+    vehicleCommand(ctx, ['buy', 'debris_hauler'], {});
+    const v = ctx.state!.vehicles.vehicles[0]!;
+    // Vehicle spawns at (16, 16) for a 32×32 world (see "move vehicle" test below).
+    expect(v.x).toBe(16);
+    expect(v.z).toBe(16);
+
+    const eid = hireOne(ctx, 'driver');
+    employeeCommand(ctx, ['assign_skill', String(eid)], { skill: 'driving.truck', level: '1' });
+    const emp = ctx.state!.employees.employees.find(e => e.id === eid)!;
+    // First-hired employee also spawns at (16, 16) — co-located with the vehicle.
+    expect(emp.x).toBe(16);
+    expect(emp.z).toBe(16);
+
+    const result = vehicleCommand(ctx, ['driver', '1', String(eid)], {});
+    expect(result.success).toBe(true);
+    expect(v.driverId).toBeNull();
+
+    tickCommand(ctx, ['1'], {});
+    expect(v.driverId).toBe(eid);
   });
 
   // ── Movement ──
@@ -201,6 +236,10 @@ describe('Vehicle fleet', () => {
     const eid = hireOne(ctx, 'driver');
     employeeCommand(ctx, ['assign_skill', String(eid)], { skill: 'driving.truck', level: '1' });
     vehicleCommand(ctx, ['driver', '1', String(eid)], {});
+    // Issue #437: driverId is only set once the arrival gate resolves.
+    // Boarding is arrival-gated (#437) — employee and vehicle both spawn at
+    // (16,16), so one tick resolves the walk (they're already co-located).
+    tickCommand(ctx, ['1'], {});
 
     const result = vehicleCommand(ctx, ['list'], {});
 
@@ -346,6 +385,11 @@ describe('Vehicle fleet', () => {
     const eid1 = hireOne(ctx, 'driver');
     employeeCommand(ctx, ['assign_skill', String(eid1)], { skill: 'driving.truck', level: '1' });
     vehicleCommand(ctx, ['driver', '1', String(eid1)], {});
+    // Issue #437: driverId is only set once the arrival gate resolves — the
+    // first driver must actually board before the "already has a driver"
+    // rule can fire for a second request.
+    tickCommand(ctx, ['1'], {});
+    expect(ctx.state!.vehicles.vehicles[0]!.driverId).toBe(eid1);
 
     // Hire a second employee
     const rng = new Random(99);

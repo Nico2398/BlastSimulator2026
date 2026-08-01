@@ -2,9 +2,21 @@
   "name": "survey-overlay-lifecycle",
   "description": "Survey confidence overlay lifecycle: fresh survey rendering → tick past stale threshold → new survey refreshes overlay → blast terrain remesh preserves overlay. FAILS until GameRenderer wires getSurveyOverlay().show() in syncFromContext().",
   "shots": [
-    { "name": "overview", "yaw": 0, "pitch": 45 },
-    { "name": "survey-fresh", "yaw": 90, "pitch": 30 },
-    { "name": "post-blast", "yaw": 180, "pitch": 45 }
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45
+    },
+    {
+      "name": "survey-fresh",
+      "yaw": 90,
+      "pitch": 30
+    },
+    {
+      "name": "post-blast",
+      "yaw": 180,
+      "pitch": 45
+    }
   ],
   "steps": [
     {
@@ -125,11 +137,11 @@
       ]
     },
     {
-      "command": "tick 10",
+      "command": "tick 40",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 10"
+          "command": "tick 40"
         }
       ]
     },
@@ -242,11 +254,11 @@
       ]
     },
     {
-      "command": "tick 10",
+      "command": "tick 25",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 10"
+          "command": "tick 25"
         }
       ]
     },

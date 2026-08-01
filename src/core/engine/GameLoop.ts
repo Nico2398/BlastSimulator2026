@@ -2,8 +2,9 @@
 // Manages tick processing with variable speed (1x, 2x, 4x, 8x) and pause.
 // Pure logic: no timers, no DOM. The caller drives the loop.
 
-import type { GameState, PendingAction } from '../state/GameState.js';
-import { getBuildingDef, getDefSize, type Building, type BuildingType } from '../entities/Building.js';
+import type { GameState, PendingAction, ActionType } from '../state/GameState.js';
+import { getBuildingDef, findNearestActiveBuildingOfType, type Building, type BuildingType } from '../entities/Building.js';
+import { findBuildingApproachCell } from '../nav/BuildingApproach.js';
 import type { Random } from '../math/Random.js';
 import type { EventContext } from '../events/EventPool.js';
 import { tickEventSystem, type FiredEvent } from '../events/EventSystem.js';
@@ -15,6 +16,7 @@ import { getLivingQuartersWellbeingMultiplier } from '../entities/BuildingWellbe
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { addExpense } from '../economy/Finance.js';
 import { tickVehicle, tickVehicleTaskState, tickEmployeeMovement, type EmployeeMovementResult } from './EntityMovementTick.js';
+import { tickArrivalGate, type ArrivalGateResult } from './ArrivalGate.js';
 
 // ── Config ──
 
@@ -24,6 +26,11 @@ import { BASE_TICK_MS as _BASE_TICK_MS, VALID_SPEEDS as _VALID_SPEEDS, NEED_REST
 // in EntityMovementTick.ts (#407 refactor) — re-exported here so GameLoop.ts
 // stays the single public surface for tick-orchestration callers.
 export { tickVehicle, tickVehicleTaskState, tickEmployeeMovement, type EmployeeMovementResult };
+
+// Arrival-gated position-dependent actions (survey, rest/eating, vehicle
+// boarding, hauling) live in ArrivalGate.ts (#437) — re-exported here for the
+// same reason as the movement functions above.
+export { tickArrivalGate, type ArrivalGateResult };
 
 /** Milliseconds per base tick at 1x speed. */
 export const BASE_TICK_MS = _BASE_TICK_MS;
@@ -189,34 +196,53 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
     const ghostIdx = state.ghostPreviews.findIndex(g => g.id === action.id);
     if (ghostIdx !== -1) state.ghostPreviews.splice(ghostIdx, 1);
 
-    // tickCollapse/tickNeedRestoration self-claim (see above) and start the rest
-    // timer immediately, so they never reach this path. autoInsertNeedTasks
-    // pushes 'rest' actions unclaimed (busy-employee case), so this is the
-    // first point an idle employee actually starts resting — start the timer
-    // here. Bunkhouse Tier 2+ shift-cycle rest (forceShiftRestIfNeeded) also
-    // self-claims and carries no 'needKey' payload, so resolveRestNeedKey
-    // returns null for it and this block is a no-op.
-    if (action.type === 'rest' && idleMatch.restTicksRemaining === null) {
+    // tickCollapse/tickNeedRestoration self-claim (see above) and, like this
+    // branch, only ever *queue* the rest via pendingRestDuration/
+    // pendingRestNeedKey — ArrivalGate.tickArrivalGate promotes it into
+    // restTicksRemaining once the employee physically reaches the rest
+    // building (#437). autoInsertNeedTasks pushes 'rest' actions unclaimed
+    // (busy-employee case), so this is the first point an idle employee
+    // actually starts walking to rest. Bunkhouse Tier 2+ shift-cycle rest
+    // (forceShiftRestIfNeeded) also self-claims and carries no 'needKey'
+    // payload, so resolveRestNeedKey returns null for it and this block is a
+    // no-op there.
+    if (action.type === 'rest' && idleMatch.restTicksRemaining === null && idleMatch.pendingRestDuration === null) {
       const needKey = resolveRestNeedKey(action.payload);
       if (needKey !== null) {
         const restDuration = typeof action.payload['restDuration'] === 'number'
           ? action.payload['restDuration'] as number
           : NEED_REST_DURATIONS[needKey];
-        idleMatch.restTicksRemaining = restDuration;
-        idleMatch.restNeedKey = needKey;
+        idleMatch.pendingRestDuration = restDuration;
+        idleMatch.pendingRestNeedKey = needKey;
       }
     }
 
-    // Non-rest actions requiring a skill start their task-duration countdown
-    // here — the claimed employee is guaranteed (via allWithSkill above) to
-    // hold requiredSkill, so proficiency lookup below always succeeds.
+    // Non-rest actions requiring a skill queue their task duration here — the
+    // claimed employee is guaranteed (via allWithSkill above) to hold
+    // requiredSkill, so proficiency lookup below always succeeds. The
+    // countdown itself (taskTicksRemaining) does not start until
+    // ArrivalGate.tickArrivalGate confirms the employee has physically
+    // reached targetX/targetZ (#437) — a survey used to resolve the instant
+    // it was claimed, regardless of how far the surveyor still had to walk.
+    // pendingActionType/pendingActionPayload stay set through to completion
+    // (tickTaskProgress clears them) so completion handling (e.g. survey
+    // resolution) still knows what work just finished.
     if (action.type !== 'rest' && action.requiredSkill !== null) {
       const qual = idleMatch.qualifications.find(q => q.category === action.requiredSkill);
       const level = qual?.proficiencyLevel ?? 1;
       const needMult = getNeedMultiplier(idleMatch);
       const lqMult = getLivingQuartersWellbeingMultiplier(state.buildings, state.employees.employees.length);
-      idleMatch.taskTicksRemaining = computeTaskDuration(BASE_TASK_DURATION_TICKS, level, needMult, lqMult, 1);
+      // A survey's own durationTicks (SURVEY_DURATION_TICKS[method], set by
+      // runSurvey) overrides the generic proficiency-scaled duration, mirroring
+      // the 'rest' branch's restDuration override above — otherwise every
+      // survey silently took BASE_TASK_DURATION_TICKS instead of its method's
+      // own duration.
+      idleMatch.pendingTaskDuration = typeof action.payload['durationTicks'] === 'number'
+        ? action.payload['durationTicks'] as number
+        : computeTaskDuration(BASE_TASK_DURATION_TICKS, level, needMult, lqMult, 1);
       idleMatch.activeTaskSkill = action.requiredSkill;
+      idleMatch.pendingActionType = action.type;
+      idleMatch.pendingActionPayload = action.payload;
     }
   }
 
@@ -271,20 +297,24 @@ export function tickNeedRestoration(state: GameState): NeedRestorationResult {
       continue;
     }
 
+    const approach = resolveBuildingApproach(state, building, emp.x, emp.z);
+
     const restAction = createRestPendingAction(state, {
-      targetX: building.x,
-      targetZ: building.z,
+      targetX: approach.x,
+      targetZ: approach.z,
       targetEmployeeId: emp.id,
       payload: { buildingId: building.id, needKey, restDuration },
     });
 
     state.pendingActions.push(restAction);
     emp.activeActionId = restAction.id;
-    // Immediately claimed (unlike autoInsertNeedTasks) — start the rest timer now.
-    emp.restTicksRemaining = restDuration;
-    emp.restNeedKey = needKey;
-    emp.destinationX = building.x;
-    emp.destinationZ = building.z;
+    // Immediately claimed (unlike autoInsertNeedTasks) — but the rest timer
+    // itself does not start until ArrivalGate.tickArrivalGate confirms the
+    // employee has walked to the building (#437).
+    emp.pendingRestDuration = restDuration;
+    emp.pendingRestNeedKey = needKey;
+    emp.destinationX = approach.x;
+    emp.destinationZ = approach.z;
     result.routed.push(emp.id);
   }
 
@@ -334,8 +364,9 @@ export function tickCollapse(state: GameState, _firedEvents?: FiredEvent[], _emi
     if (building) {
       const distSq = (building.x - emp.x) ** 2 + (building.z - emp.z) ** 2;
       if (distSq <= NEED_REST_SEARCH_RADIUS ** 2) {
-        targetX = building.x;
-        targetZ = building.z;
+        const approach = resolveBuildingApproach(state, building, emp.x, emp.z);
+        targetX = approach.x;
+        targetZ = approach.z;
         buildingId = building.id;
       } else {
         // Building exists but too far — the employee rests in place
@@ -364,9 +395,12 @@ export function tickCollapse(state: GameState, _firedEvents?: FiredEvent[], _emi
 
     state.pendingActions.push(restAction);
     emp.activeActionId = restAction.id;
-    // Immediately claimed — start the rest timer now (mirrors tickNeedRestoration).
-    emp.restTicksRemaining = restDuration;
-    emp.restNeedKey = collapsedGauge;
+    // Immediately claimed — but the rest timer itself does not start until
+    // ArrivalGate.tickArrivalGate confirms arrival (mirrors tickNeedRestoration, #437).
+    // When resting in place (targetX/Z === emp.x/z, the two no-building branches
+    // above) the employee is already "arrived" and the gate resolves next tick.
+    emp.pendingRestDuration = restDuration;
+    emp.pendingRestNeedKey = collapsedGauge;
     emp.destinationX = targetX;
     emp.destinationZ = targetZ;
   }
@@ -393,15 +427,17 @@ export function autoInsertNeedTasks(state: GameState, _firedEvents?: FiredEvent[
     // Skip dead, injured, or collapsing employees
     if (!emp.alive || emp.injured || emp.collapsing) continue;
 
-    // Skip employees already mid-rest. Their gauge is still below its warning
-    // threshold — the replenishment only lands when the rest completes — so
-    // without this check a second rest is queued every cycle, claimed the
-    // instant the first one ends, and charged again: one wasted rest and one
-    // extra NEED_REST_COSTS payment per dip below the threshold. Rests created
-    // by tickCollapse/tickNeedRestoration stay in pendingActions and are caught
-    // by the hasRestAction check below; a rest claimed through tickEmployees is
-    // consumed from the queue, so only restTicksRemaining still marks it.
-    if (emp.restTicksRemaining !== null) continue;
+    // Skip employees already mid-rest — resting, or (#437) still walking to
+    // rest with the timer not yet started. Their gauge is still below its
+    // warning threshold — the replenishment only lands when the rest
+    // completes — so without this check a second rest is queued every cycle,
+    // claimed the instant the first one ends, and charged again: one wasted
+    // rest and one extra NEED_REST_COSTS payment per dip below the threshold.
+    // Rests created by tickCollapse/tickNeedRestoration stay in pendingActions
+    // and are caught by the hasRestAction check below; a rest claimed through
+    // tickEmployees is consumed from the queue, so only restTicksRemaining/
+    // pendingRestDuration still mark it.
+    if (emp.restTicksRemaining !== null || emp.pendingRestDuration !== null) continue;
 
     // Determine which gauges are below warning thresholds
     const triggeredGauges: NeedKey[] = [];
@@ -439,8 +475,9 @@ export function autoInsertNeedTasks(state: GameState, _firedEvents?: FiredEvent[
     const buildingType = NEED_REST_BUILDING_TYPES[primaryGauge];
     const building = findNearestBuildingOfType(state, buildingType, emp.x, emp.z);
 
-    const targetX = building?.x ?? emp.x;
-    const targetZ = building?.z ?? emp.z;
+    const approach = building ? resolveBuildingApproach(state, building, emp.x, emp.z) : null;
+    const targetX = approach?.x ?? emp.x;
+    const targetZ = approach?.z ?? emp.z;
     // With nowhere to go the employee rests in place, which takes longer and
     // (in completeRestForEmployee) tops the gauge out at NEED_REST_NO_BUILDING_CAP.
     const restDuration = building
@@ -499,17 +536,7 @@ function findNearestBuildingOfType(
   empX: number,
   empZ: number,
 ): Building | null {
-  let nearest: Building | null = null;
-  let bestDistSq = Infinity;
-  for (const b of state.buildings.buildings) {
-    if (!b.active || b.type !== buildingType) continue;
-    const distSq = (b.x - empX) ** 2 + (b.z - empZ) ** 2;
-    if (distSq < bestDistSq) {
-      bestDistSq = distSq;
-      nearest = b;
-    }
-  }
-  return nearest;
+  return findNearestActiveBuildingOfType(state.buildings, buildingType, empX, empZ);
 }
 
 function findNearestLivingQuarters(
@@ -518,6 +545,21 @@ function findNearestLivingQuarters(
   empZ: number,
 ): Building | null {
   return findNearestBuildingOfType(state, 'living_quarters', empX, empZ);
+}
+
+/**
+ * Resolve the nearest walkable NavGrid cell on the ring around a building,
+ * closest to (empX, empZ). See findBuildingApproachCell's doc for why a
+ * building's raw (x, z) can never be targeted directly (#437) — every
+ * rest-routing call site below needs this same resolution.
+ */
+function resolveBuildingApproach(
+  state: GameState,
+  building: Building,
+  empX: number,
+  empZ: number,
+): { x: number; z: number } {
+  return findBuildingApproachCell(state.navGrid, building, getBuildingDef(building.type, building.tier), empX, empZ);
 }
 
 /**
@@ -691,6 +733,10 @@ export interface TaskProgressResult {
   skill: SkillCategory | null;
   oldLevel?: 1 | 2 | 3 | 4 | 5;
   newLevel?: 1 | 2 | 3 | 4 | 5;
+  /** Action type of the task that just completed — only present when `completed` is true. */
+  actionType?: ActionType;
+  /** Payload of the task that just completed — only present when `completed` is true. */
+  actionPayload?: Record<string, unknown>;
 }
 
 /**
@@ -726,11 +772,20 @@ export function tickTaskProgress(state: GameState, emp: Employee, emitter?: Even
   }
 
   let completed = false;
+  let completedActionType: ActionType | undefined;
+  let completedActionPayload: Record<string, unknown> | undefined;
   if (emp.taskTicksRemaining <= 0) {
     completed = true;
+    // pendingActionType/pendingActionPayload were left set by tickEmployees at
+    // claim time (#437) specifically so completion handling — e.g. resolving
+    // a completed survey — still knows what work this was.
+    completedActionType = emp.pendingActionType ?? undefined;
+    completedActionPayload = emp.pendingActionPayload ?? undefined;
     emp.activeActionId = null;
     emp.taskTicksRemaining = null;
     emp.activeTaskSkill = null;
+    emp.pendingActionType = null;
+    emp.pendingActionPayload = null;
   }
 
   return {
@@ -738,6 +793,8 @@ export function tickTaskProgress(state: GameState, emp: Employee, emitter?: Even
     leveledUp,
     skill,
     ...(levelUpLevels ? { oldLevel: levelUpLevels.oldLevel, newLevel: levelUpLevels.newLevel } : {}),
+    ...(completedActionType !== undefined ? { actionType: completedActionType } : {}),
+    ...(completedActionPayload !== undefined ? { actionPayload: completedActionPayload } : {}),
   };
 }
 
@@ -775,6 +832,10 @@ function incrementWorkTick(
 ): void {
   if (emp.activeActionId === null) return;
   if (emp.restTicksRemaining !== null) return;
+  // Walking to a rest whose timer hasn't started yet is not work either
+  // (#437) — without this, a claimed-but-not-yet-arrived rest still counted
+  // toward the shift-cycle work quota for every tick of the walk.
+  if (emp.pendingRestDuration !== null) return;
 
   // Skip if employee already has a pending rest action (voluntary rest)
   const hasRestAction = state.pendingActions.some(
@@ -797,6 +858,11 @@ function forceShiftRestIfNeeded(
   _emitter?: EventEmitter,
 ): void {
   if (emp.restTicksRemaining !== null) return;
+  // Already walking to a shift rest queued on a prior tick — without this,
+  // ticksWorked stays >= WORK_DURATION_TICKS for the whole walk (it's only
+  // reset on rest completion) and this would requeue a duplicate rest action
+  // every tick until arrival (#437).
+  if (emp.pendingRestDuration !== null) return;
   if (emp.activeActionId === null) return;
   if (emp.ticksWorked < WORK_DURATION_TICKS) return;
 
@@ -807,13 +873,15 @@ function forceShiftRestIfNeeded(
   let buildingId: number | undefined;
 
   if (building) {
-    const center = getBuildingCenter(building);
-    targetX = center.x;
-    targetZ = center.z;
+    const approach = resolveBuildingApproach(state, building, emp.x, emp.z);
+    targetX = approach.x;
+    targetZ = approach.z;
     buildingId = building.id;
   }
 
-  emp.restTicksRemaining = SHIFT_SLEEP_DURATION_TICKS;
+  // The rest timer itself does not start until ArrivalGate.tickArrivalGate
+  // confirms the employee has walked to the bunkhouse (#437).
+  emp.pendingRestDuration = SHIFT_SLEEP_DURATION_TICKS;
 
   const restAction = createRestPendingAction(state, {
     targetX,
@@ -829,13 +897,4 @@ function forceShiftRestIfNeeded(
   shiftRested.push(emp.id);
   firedEvents.push({ eventId: 'employee_shift_change', firedAtTick: state.tickCount });
   _emitter?.emit('employee:shift_change', { employeeId: emp.id });
-}
-
-/**
- * Compute the centre position of a building based on its definition size.
- */
-function getBuildingCenter(building: Building): { x: number; z: number } {
-  const def = getBuildingDef(building.type, building.tier);
-  const { sizeX, sizeZ } = getDefSize(def);
-  return { x: building.x + sizeX / 2, z: building.z + sizeZ / 2 };
 }

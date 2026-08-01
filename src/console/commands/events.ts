@@ -20,7 +20,7 @@ import { tickTraining } from '../../core/entities/EmployeeTraining.js';
 import { tickResearch } from '../../core/entities/Building.js';
 import { tickNeedGauges, needsMoraleEffect } from '../../core/entities/EmployeeNeeds.js';
 import type { FiredEvent } from '../../core/events/EventSystem.js';
-import { tickCollapse, autoInsertNeedTasks, processShiftCycle, tickEmployees, tickGeneralRestCompletion, tickTaskProgress, tickVehicle, tickVehicleTaskState, tickEmployeeMovement } from '../../core/engine/GameLoop.js';
+import { tickCollapse, autoInsertNeedTasks, processShiftCycle, tickEmployees, tickGeneralRestCompletion, tickTaskProgress, tickVehicle, tickVehicleTaskState, tickEmployeeMovement, tickArrivalGate } from '../../core/engine/GameLoop.js';
 import { detectUnqualifiedTask, detectTrafficJam } from '../../core/events/EventEngine.js';
 import { estimateSurveyResult, applySeismicSurveyDamage, type SurveyMethod } from '../../core/mining/SurveyCalc.js';
 import { checkDeadlines, generateContracts } from '../../core/economy/Contract.js';
@@ -159,41 +159,6 @@ export function tickCommand(
       lines.push(`[tick ${state.tickCount}] NEED: ${fe.eventId}`);
     }
 
-    // 8b. Process survey pending actions — match surveyors and generate results.
-    //     Surveys complete instantly (duration system TBD); this ensures the
-    //     confidence overlay appears after queuing a survey + advancing time.
-    const surveyActions = state.pendingActions.filter(a => a.type === 'survey');
-    state.pendingActions = state.pendingActions.filter(a => a.type !== 'survey');
-    for (const action of surveyActions) {
-      // Find an idle qualified surveyor
-      const method = action.payload['method'] as SurveyMethod;
-      const surveyor = state.employees.employees.find(
-        emp => emp.alive && !emp.injured && emp.activeActionId === null &&
-               emp.qualifications.some(q => q.category === 'geology'),
-      );
-      if (surveyor && ctx.grid) {
-        const skillLevel = surveyor.qualifications.find(q => q.category === 'geology')?.proficiencyLevel ?? 1;
-        const surveyResult = estimateSurveyResult(ctx.grid, {
-          id: action.id,
-          method,
-          centerX: action.targetX,
-          centerZ: action.targetZ,
-          surveyorId: surveyor.id,
-          skillLevel,
-          completedTick: state.tickCount,
-        }, new Random(state.seed + state.tickCount + action.id));
-        state.surveyResults.push(surveyResult);
-        if (method === 'seismic') {
-          const seismicAccidents = applySeismicSurveyDamage(state.buildings, action.targetX, action.targetZ, state.tickCount);
-          state.damage.accidents.push(...seismicAccidents);
-        }
-        lines.push(`[tick ${state.tickCount}] ${method} survey complete at (${action.targetX}, ${action.targetZ}).`);
-      } else if (!surveyor) {
-        // No eligible surveyor available — keep the action in queue
-        state.pendingActions.push(action);
-      }
-    }
-
     // 8c. Training courses — advance and report completions. Without this the
     //     course never ends: the fee is charged and the qualification never
     //     arrives, which made every skill no role is hired with unobtainable.
@@ -213,13 +178,40 @@ export function tickCommand(
     const dispatchResult = tickEmployees(state);
     fired = fired ?? detectUnqualifiedTask(dispatchResult.unqualified, state.events, state.tickCount);
 
-    // 8e. Task duration progress + XP/level-up reporting.
+    // 8e. Task duration progress + XP/level-up reporting. taskTicksRemaining
+    // only counts down once ArrivalGate (8h below) has promoted it from
+    // pendingTaskDuration on a prior tick — see tickEmployees (#437).
     for (const emp of state.employees.employees) {
       if (!emp.alive) continue;
       const progress = tickTaskProgress(state, emp, emitter);
       if (!progress) continue;
       if (progress.completed) {
         lines.push(`[tick ${state.tickCount}] TASK: ${emp.name} completed task.`);
+
+        // A completed 'survey' task resolves here — after the surveyor has
+        // actually walked to and worked the site, not the instant it was
+        // claimed (#437).
+        if (progress.actionType === 'survey' && progress.actionPayload && ctx.grid) {
+          const method = progress.actionPayload['method'] as SurveyMethod;
+          const centerX = progress.actionPayload['centerX'] as number;
+          const centerZ = progress.actionPayload['centerZ'] as number;
+          const skillLevel = emp.qualifications.find(q => q.category === 'geology')?.proficiencyLevel ?? 1;
+          const surveyResult = estimateSurveyResult(ctx.grid, {
+            id: state.nextSurveyId++,
+            method,
+            centerX,
+            centerZ,
+            surveyorId: emp.id,
+            skillLevel,
+            completedTick: state.tickCount,
+          }, new Random(state.seed + state.tickCount + emp.id));
+          state.surveyResults.push(surveyResult);
+          if (method === 'seismic') {
+            const seismicAccidents = applySeismicSurveyDamage(state.buildings, centerX, centerZ, state.tickCount);
+            state.damage.accidents.push(...seismicAccidents);
+          }
+          lines.push(`[tick ${state.tickCount}] ${method} survey complete at (${centerX}, ${centerZ}).`);
+        }
       }
       if (progress.leveledUp) {
         lines.push(`[tick ${state.tickCount}] LEVELUP: ${emp.name} reached level ${progress.newLevel} in ${progress.skill}.`);
@@ -228,8 +220,11 @@ export function tickCommand(
 
     // 8f. Vehicle movement — advance every vehicle currently task='moving' one
     // step toward its target (moveVehicle/vehicle-move-command only set the
-    // target; nothing advanced x/z toward it before this).
+    // target; nothing advanced x/z toward it before this). Hauling vehicles
+    // are driven entirely by tickArrivalGate/tickHaulingProgress instead (8h)
+    // — ticking them here too would move them twice in the same tick (#437).
     for (const vehicle of state.vehicles.vehicles) {
+      if (vehicle.haulingPhase !== null) continue;
       tickVehicle(state, vehicle, emitter);
       tickVehicleTaskState(vehicle);
     }
@@ -246,6 +241,17 @@ export function tickCommand(
     for (const empId of movementResult.stuck) {
       const emp = state.employees.employees.find(e => e.id === empId);
       lines.push(`[tick ${state.tickCount}] STUCK: ${emp?.name ?? `employee #${empId}`} can't find a path — waiting.`);
+    }
+
+    // 8h. Arrival gate — must run after employee/vehicle movement above:
+    // promotes rest/task/vehicle-boarding intents queued this tick or a prior
+    // one into their active timers/effects once the entity has actually
+    // arrived, and drives hauling vehicles (move → load → move → unload) end
+    // to end (#437).
+    const arrivalResult = tickArrivalGate(state, emitter);
+    for (const cancelled of arrivalResult.boardingCancelled) {
+      const emp = state.employees.employees.find(e => e.id === cancelled.employeeId);
+      lines.push(`[tick ${state.tickCount}] BOARDING CANCELLED: ${emp?.name ?? `employee #${cancelled.employeeId}`} (${cancelled.reason}).`);
     }
 
     // 9. Level stats snapshot + campaign profit check

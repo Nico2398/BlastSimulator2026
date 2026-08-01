@@ -21,6 +21,7 @@ import { addExpense } from '../../core/economy/Finance.js';
 import { dispatchPendingAction } from '../../core/engine/TaskDispatch.js';
 import { Random } from '../../core/math/Random.js';
 import { requireGame, NO_EMPLOYEES_MSG } from './commandUtils.js';
+import { NavGrid } from '../../core/nav/NavGrid.js';
 
 const VALID_SKILL_CATEGORIES: SkillCategory[] = [
   'driving.truck', 'driving.excavator', 'driving.drill_rig',
@@ -59,8 +60,17 @@ export function employeeCommand(
       if (!validRoles.includes(role)) {
         return { success: false, output: `Usage: employee hire role:(${validRoles.join('|')})` };
       }
-      const empX = state.world ? state.world.sizeX / 2 + (state.employees.employees.length % 5) * 2 : 32;
-      const empZ = state.world ? state.world.sizeZ / 2 : 32;
+      const rawEmpX = state.world ? state.world.sizeX / 2 + (state.employees.employees.length % 5) * 2 : 32;
+      const rawEmpZ = state.world ? state.world.sizeZ / 2 : 32;
+      // Same void/isolated-pocket hazard as vehicle purchase spawn (#437): a
+      // blast can clear the grid centre where new hires spawn down to a
+      // floorless column. A hire whose own start tile is impassable can never
+      // path anywhere afterwards — findPath rejects an impassable start
+      // outright — so snap to the nearest tile actually connected to the
+      // map's main region before placing them.
+      const { x: empX, z: empZ } = state.navGrid
+        ? NavGrid.findNearestReachableCell(state.navGrid, 0, 0, rawEmpX, rawEmpZ)
+        : { x: rawEmpX, z: rawEmpZ };
       const { employee, hiringCost } = hireEmployee(state.employees, role, rng, empX, empZ);
       state.cash -= hiringCost;
       addExpense(state.finances, hiringCost, 'salaries', `Hire ${role}: ${employee.name}`, state.tickCount);

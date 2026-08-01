@@ -168,7 +168,7 @@ export function createRunner(): RunnerWithContext {
   runner.register('build', 'Place/manage buildings (list|destroy|move|<type> at:x,z)', (args, named) =>
     buildCommand(ctx, args, named),
   );
-  runner.register('vehicle', 'Manage vehicles (list|buy|assign|move)', (args, named) =>
+  runner.register('vehicle', 'Manage vehicles (list|buy|assign|move|driver|haul)', (args, named) =>
     vehicleCommand(ctx, args, named),
   );
   runner.register('employee', 'Manage employees (list|hire|raise|fire|assign_skill|dispatch|train)', (args, named) =>

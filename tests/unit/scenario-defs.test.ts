@@ -61,6 +61,7 @@ const FEATURE_SCENARIO_NAMES = [
   'level1-lose-revolt',
   'level1-win-conservative',
   'level1-win-efficient',
+  'hauling-gate',
 ] as const;
 
 const VISUAL_SCENARIO_NAMES = [

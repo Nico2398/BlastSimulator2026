@@ -88,6 +88,11 @@ export type VehicleState =
 - Employee without licence for role cannot be assigned to that vehicle
 - One driver per vehicle; one vehicle per driver at a time
 - Driver injured or leaves → vehicle idles until qualified replacement assigned
+- Assigning a driver (`vehicle driver <vehicleId> <employeeId>`) validates licence/availability immediately but only sets intent — the employee must walk to the vehicle's position first, and only becomes its driver on arrival (arrival-gated per `dev-architecture`'s arrival-gated-actions convention)
+
+## Hauling
+
+`vehicle haul <vehicleId> fragment:<fragmentId>` (Debris Hauler only, must already have a driver): sets intent to haul a fragment to the nearest active Freight Warehouse. Resolves in phases, each arrival-gated: drive to fragment → load on arrival → drive to depot → unload on arrival. A destination targeting the depot building resolves through the building-approach-cell lookup (`gameplay-navmesh`), not the building's raw coordinates.
 
 ## Traffic & Routing
 

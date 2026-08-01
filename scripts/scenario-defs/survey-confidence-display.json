@@ -138,11 +138,11 @@
       ]
     },
     {
-      "command": "tick 8",
+      "command": "tick 53",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 8"
+          "command": "tick 53"
         }
       ]
     },

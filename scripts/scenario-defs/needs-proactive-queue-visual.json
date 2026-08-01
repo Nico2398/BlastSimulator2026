@@ -66,11 +66,12 @@
       ]
     },
     {
-      "command": "build living_quarters at:10,10",
+      "command": "build living_quarters at:15,15",
+      "description": "Placed away from the (10,10) dispatch target (#437) — building on top of the employee's own tile made that cell permanently NavGrid-blocked with the employee still standing on it, so every later rest/collapse routing failed to path out and the employee got stuck COLLAPSING at 0/0/0 needs forever instead of demonstrating the queued-rest recovery this scenario is about.",
       "interaction": [
         {
           "type": "command",
-          "command": "build living_quarters at:10,10"
+          "command": "build living_quarters at:15,15"
         }
       ]
     },

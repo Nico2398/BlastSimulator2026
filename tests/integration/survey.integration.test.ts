@@ -21,7 +21,7 @@ import { computeBlastOreReport } from '../../src/core/mining/BlastOreReport.js';
 import { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import { Random } from '../../src/core/math/Random.js';
 import { createGame } from '../../src/core/state/GameState.js';
-import { SURVEY_STALE_TICKS, SURVEY_COSTS, STARTING_CASH } from '../../src/core/config/balance.js';
+import { SURVEY_STALE_TICKS, SURVEY_COSTS, STARTING_CASH, SURVEY_DURATION_TICKS, AGENT_WALK_SPEED } from '../../src/core/config/balance.js';
 import { hireEmployee, assignSkill } from '../../src/core/entities/Employee.js';
 import type { FragmentData } from '../../src/core/mining/BlastExecution.js';
 
@@ -209,9 +209,16 @@ describe('Survey system', () => {
     expect(ctx.state!.ghostPreviews[0]!.type).toBe('survey');
   });
 
-  // ── 6b. Pending survey resolves into surveyResults when ticked ────────────
+  // ── 6b. Pending survey resolves into surveyResults only after arrival + duration (issue #437) ──
+  //
+  // Previously surveys resolved INSTANTLY on the very next tick regardless of
+  // where the surveyor stood (src/console/commands/events.ts step "8b"). The
+  // arrival-gated pipeline requires the claimed surveyor to actually walk to
+  // the survey center (here: zero distance, since the surveyor spawns exactly
+  // on top of it) and then spend SURVEY_DURATION_TICKS[method] ticks working —
+  // a single tick is no longer enough even with zero travel distance.
 
-  it('tickCommand resolves a pending survey action into state.surveyResults', () => {
+  it('tickCommand resolves a pending survey action into state.surveyResults only once duration ticks elapse', () => {
     const empId = hireEmployeeByRole(ctx, 'surveyor');
     employeeCommand(ctx, ['assign_skill', String(empId)], { skill: 'geology', level: '3' });
 
@@ -219,14 +226,56 @@ describe('Survey system', () => {
     expect(ctx.state!.pendingActions.filter(a => a.type === 'survey')).toHaveLength(1);
     expect(ctx.state!.surveyResults).toHaveLength(0);
 
+    // One tick is not enough — SURVEY_DURATION_TICKS.core_sample ticks of work
+    // remain even though the surveyor starts right on top of the target.
     const result = tickCommand(ctx, ['1'], {});
     expect(result.success).toBe(true);
+    expect(ctx.state!.surveyResults).toHaveLength(0);
+
+    // Padding: no travel needed here (surveyor spawns on the survey center),
+    // just the full duration plus slack.
+    for (let i = 0; i < SURVEY_DURATION_TICKS.core_sample + 5; i++) {
+      tickCommand(ctx, ['1'], {});
+    }
 
     // The pending survey action is consumed and a result is produced.
     expect(ctx.state!.pendingActions.filter(a => a.type === 'survey')).toHaveLength(0);
     expect(ctx.state!.surveyResults).toHaveLength(1);
     expect(ctx.state!.surveyResults[0]!.method).toBe('core_sample');
-    expect(result.output).toContain('core_sample survey complete');
+  });
+
+  // ── 6c. Claiming a survey far from the surveyor stays pending through travel (issue #437) ──
+
+  it('a survey far from the surveyor produces no result immediately, and only resolves after travel + duration ticks', () => {
+    const empId = hireEmployeeByRole(ctx, 'surveyor');
+    employeeCommand(ctx, ['assign_skill', String(empId)], { skill: 'geology', level: '3' });
+    const emp = ctx.state!.employees.employees.find(e => e.id === empId)!;
+    // First-hired employee spawns at (world.sizeX/2, world.sizeZ/2) = (16, 16)
+    // for this 32×32 test world.
+    expect(emp.x).toBe(16);
+    expect(emp.z).toBe(16);
+
+    surveyCommand(ctx as any, ['seismic'], { x: '2', z: '2' });
+    expect(ctx.state!.surveyResults).toHaveLength(0);
+
+    const afterOneTick = tickCommand(ctx, ['1'], {});
+    expect(afterOneTick.success).toBe(true);
+    // Not resolved yet — the surveyor has only just started walking there.
+    expect(ctx.state!.surveyResults).toHaveLength(0);
+    expect(emp.destinationX).not.toBeNull();
+    expect(emp.destinationZ).not.toBeNull();
+    expect(emp.x === 2 && emp.z === 2).toBe(false);
+
+    // Enough ticks for the walk (Euclidean distance / AGENT_WALK_SPEED) plus
+    // the full seismic survey duration, with slack.
+    const travelTicks = Math.ceil(Math.hypot(16 - 2, 16 - 2) / AGENT_WALK_SPEED);
+    for (let i = 0; i < travelTicks + SURVEY_DURATION_TICKS.seismic + 5; i++) {
+      tickCommand(ctx, ['1'], {});
+    }
+
+    expect(ctx.state!.pendingActions.filter(a => a.type === 'survey')).toHaveLength(0);
+    expect(ctx.state!.surveyResults).toHaveLength(1);
+    expect(ctx.state!.surveyResults[0]!.method).toBe('seismic');
   });
 
   it('surveyCommand rejects and queues nothing when no qualified surveyor is available', () => {
@@ -435,9 +484,17 @@ describe('Survey system — seismic building side effects', () => {
     employeeCommand(ctx, ['assign_skill', String(empId)], { skill: 'geology', level: String(level) });
   }
 
-  /** Resolve queued survey pending-actions by advancing one tick. */
-  function resolveTick(): void {
-    tickCommand(ctx, ['1'], {});
+  /**
+   * Resolve queued survey pending-actions by advancing enough ticks for the
+   * surveyor to walk to the survey center and complete the full survey
+   * duration (issue #437 — surveys no longer resolve on the very next tick
+   * regardless of distance). 30 ticks comfortably covers every distance/method
+   * combination used in this describe block (worst case here: ~16 travel
+   * ticks + 8 duration ticks for a seismic survey at (5,5) from a surveyor
+   * spawned at (16,16)).
+   */
+  function resolveTick(ticks = 30): void {
+    for (let i = 0; i < ticks; i++) tickCommand(ctx, ['1'], {});
   }
 
   function findBuilding(id: number) {
@@ -500,7 +557,12 @@ describe('Survey system — seismic building side effects', () => {
 
   it('damages every building within 5 cells when multiple are in range', () => {
     hireSurveyor();
-    const b1Result = buildCommand(ctx, ['living_quarters'], { at: '19,20' });
+    // living_quarters T1 is a 3x3 footprint; at (19,20) it would cover
+    // (20,20) — the survey's own target cell, which the surveyor must now be
+    // able to walk to and stand on (#437). Placed at (17,20) instead: still
+    // within the 5-cell damage radius (footprint centre (18.5,21.5), distance
+    // ≈2.1 from (20,20)), but no longer overlapping the survey centre.
+    const b1Result = buildCommand(ctx, ['living_quarters'], { at: '17,20' });
     const b2Result = buildCommand(ctx, ['management_office'], { at: '21,17' });
     expect(b1Result.success).toBe(true);
     expect(b2Result.success).toBe(true);

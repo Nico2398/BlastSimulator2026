@@ -21,6 +21,8 @@ Three tools with different cost/accuracy/coverage tradeoffs:
 | Core Sample | Drills narrow extraction core | `survey.core_sample` | 800 | 4 | ±5% ore density | Single column, full depth |
 | Aerial Spectroscopy | Drone scans surface mineral signature | `survey.aerial` | 1,500 | 3 | ±25% ore density | 30-cell radius, surface only (Y=0 to Y=−1) |
 
+The Time (ticks) duration above starts once the assigned surveyor physically arrives at the target site, not when the survey is queued — walking there is separate travel time on top of it, arrival-gated per `dev-architecture`'s arrival-gated-actions convention.
+
 Accuracy improves with surveyor skill level:
 ```
 finalError = baseError * (1 - (skillLevel - 1) * 0.12)

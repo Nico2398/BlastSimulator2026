@@ -99,6 +99,17 @@ NavGrid is **incrementally updated** — full rebuild too expensive.
 
 Paths crossing updated region → marked stale, re-requested next tick. Paths outside region remain valid.
 
+## Reachability Helpers
+
+Two `NavGrid` static queries, beyond `findPath`, for picking a destination that isn't already known to be walkable:
+
+- `findNearestTraversableCell(navGrid, x, z)` — nearest walkable/ramp/drill_hole cell to (x, z) by pure distance, searching outward in rings. Can land on a traversable pocket a blast crater walled off from the rest of the map with `void` on every side — distance-only, no connectivity check.
+- `findNearestReachableCell(navGrid, anchorX, anchorZ, targetX, targetZ)` — BFS flood fill (same 8-directional adjacency as `findPath`) from an `anchorX/anchorZ` known to sit in the map's main connected region (a world corner works), returning the cell nearest `targetX/targetZ` that is actually path-connected to it. Use this, not `findNearestTraversableCell`, wherever a mover must be guaranteed to path away from the point afterward — e.g. snapping a new hire's or purchased vehicle's spawn point off a blast-cleared void or isolated pocket.
+
+## Building Approach Cells
+
+A building's entire footprint — including its `entryPoint`/`exitPoint` markers, which are cosmetic door offsets, not a walkability guarantee — classifies `blocked`. `findPath` rejects an impassable goal outright, so nothing can path onto a building's raw (x, z). `findBuildingApproachCell(navGrid, building, def, fromX, fromZ)` (`src/core/nav/BuildingApproach.ts`) finds the nearest walkable ring cell just outside the footprint, closest to the mover. Any destination that targets a building — rest routing, hauling delivery, shift-cycle sleep — resolves through this, never the building's own coordinates.
+
 ## Path Following & Stuck State
 
 Agents move at most `walkSpeed` cells/tick toward next waypoint. Next waypoint becomes `blocked` mid-path → re-request from current position. After **3 consecutive failed re-requests** → `stuck` state:

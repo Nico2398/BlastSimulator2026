@@ -5,15 +5,17 @@ import type { GameContext } from './world.js';
 import {
   purchaseVehicle,
   assignVehicle,
-  assignDriver,
   moveVehicle,
   getAllVehicleRoles,
   type VehicleRole,
   type VehicleTask,
   type VehicleTier,
 } from '../../core/entities/Vehicle.js';
+import { requestBoardVehicle } from '../../core/entities/VehicleBoarding.js';
+import { requestHaulFragment } from '../../core/economy/HaulingTask.js';
 import { addExpense } from '../../core/economy/Finance.js';
 import { SPAWN_RING_SIZE, SPAWN_TILE_SPACING } from '../../core/config/balance.js';
+import { NavGrid } from '../../core/nav/NavGrid.js';
 
 // ── tier arg parsing ──
 
@@ -70,8 +72,19 @@ export function vehicleCommand(
       const baseX = state.world ? state.world.sizeX / 2 : 32;
       const baseZ = state.world ? state.world.sizeZ / 2 : 32;
       const fleetIndex = state.vehicles.vehicles.length;
-      const spawnX = baseX + (fleetIndex % SPAWN_RING_SIZE) * SPAWN_TILE_SPACING;
-      const spawnZ = baseZ + Math.floor(fleetIndex / SPAWN_RING_SIZE) * SPAWN_TILE_SPACING;
+      const rawSpawnX = baseX + (fleetIndex % SPAWN_RING_SIZE) * SPAWN_TILE_SPACING;
+      const rawSpawnZ = baseZ + Math.floor(fleetIndex / SPAWN_RING_SIZE) * SPAWN_TILE_SPACING;
+      // A blast can clear the grid centre down to a floorless 'void' column,
+      // or wall off a pocket of "nearest" traversable tiles from the rest of
+      // the map entirely — #437 regression: driver boarding now walks to the
+      // vehicle instead of assigning instantly, and nothing can path onto an
+      // unreachable tile. Snap the spawn point to the nearest NavGrid cell
+      // that is actually path-connected to the map's main region (anchored
+      // at a corner, since blast sites are never placed on the map edge) so
+      // a freshly bought vehicle is always reachable on foot.
+      const { x: spawnX, z: spawnZ } = state.navGrid
+        ? NavGrid.findNearestReachableCell(state.navGrid, 0, 0, rawSpawnX, rawSpawnZ)
+        : { x: rawSpawnX, z: rawSpawnZ };
       const { vehicle, cost } = purchaseVehicle(state.vehicles, type, spawnX, spawnZ, tier);
       state.cash -= cost;
       addExpense(state.finances, cost, 'equipment', `Buy ${type}`, state.tickCount);
@@ -109,13 +122,31 @@ export function vehicleCommand(
       if (!state.vehicles.vehicles.find(v => v.id === vehicleId)) {
         return { success: false, output: `Vehicle #${vehicleId} not found.` };
       }
-      const result = assignDriver(state.vehicles, state.employees, vehicleId, employeeId);
+      // Validates licence/availability now, but the employee must physically
+      // walk to the vehicle before they actually become its driver — resolved
+      // by ArrivalGate.tickArrivalGate once they arrive (#437).
+      const result = requestBoardVehicle(state, vehicleId, employeeId);
       if (!result.success) {
         return { success: false, output: result.error! };
       }
-      return { success: true, output: `Driver #${employeeId} assigned to vehicle #${vehicleId}.` };
+      return { success: true, output: `Driver #${employeeId} walking to vehicle #${vehicleId} to board.` };
+    }
+    case 'haul': {
+      const vehicleId = parseInt(args[1] ?? '', 10);
+      const fragmentId = parseInt(named['fragment'] ?? '', 10);
+      if (isNaN(vehicleId) || isNaN(fragmentId)) {
+        return { success: false, output: 'Usage: vehicle haul <vehicleId> fragment:<fragmentId>' };
+      }
+      // Sets intent only — the vehicle must physically drive to the fragment
+      // before loading it, then to the depot before unloading — resolved by
+      // ArrivalGate.tickArrivalGate/tickHaulingProgress each tick (#437).
+      const result = requestHaulFragment(state, vehicleId, fragmentId);
+      if (!result.success) {
+        return { success: false, output: result.error! };
+      }
+      return { success: true, output: `Vehicle #${vehicleId} hauling fragment #${fragmentId}.` };
     }
     default:
-      return { success: false, output: 'Usage: vehicle (list|buy|assign|move|driver)' };
+      return { success: false, output: 'Usage: vehicle (list|buy|assign|move|driver|haul)' };
   }
 }

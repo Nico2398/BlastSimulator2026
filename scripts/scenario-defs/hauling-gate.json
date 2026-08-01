@@ -1,0 +1,213 @@
+{
+  "name": "hauling-gate",
+  "description": "Arrival-gated debris hauling (issue #437): 'vehicle haul <id> fragment:<id>' sets hauling intent only — a debris_hauler then drives to the blast fragment, loads it only on arrival, drives to the nearest freight_warehouse, and delivers it only on arrival. Immediately after the haul command (before the first post-command tick block), the fragment must still be on_ground/untransported — the state dump right after 'vehicle haul' proves the task did not start/complete instantly. After the first tick 20 the vehicle should be in transit (fragment picked up, hauling toward the depot) or already delivered; after the following tick 40 the fragment must be state:stored and logistics.storedMassKg increased.",
+  "steps": [
+    {
+      "command": "new_game seed:42 cash:100000",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 cash:100000"
+        }
+      ]
+    },
+    {
+      "command": "build freight_warehouse at:5,5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build freight_warehouse at:5,5"
+        }
+      ]
+    },
+    {
+      "command": "drill_plan grid rows:2 cols:2 spacing:5 depth:8 start:20,20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:2 cols:2 spacing:5 depth:8 start:20,20"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:boomite amount:5 stemming:2"
+        }
+      ]
+    },
+    {
+      "command": "sequence auto delay_step:25",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sequence auto delay_step:25"
+        }
+      ]
+    },
+    {
+      "command": "blast",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "blast"
+        }
+      ]
+    },
+    {
+      "command": "fragments",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "fragments"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "vehicle buy debris_hauler",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle buy debris_hauler"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:driver"
+        }
+      ]
+    },
+    {
+      "command": "employee assign_skill 1 skill:driving.truck level:1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 1 skill:driving.truck level:1"
+        }
+      ]
+    },
+    {
+      "command": "vehicle driver 1 1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 1 1"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "vehicle list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle list"
+        }
+      ]
+    },
+    {
+      "command": "vehicle haul 1 fragment:1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle haul 1 fragment:1"
+        }
+      ]
+    },
+    {
+      "command": "fragments",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "fragments"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "tick 20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 20"
+        }
+      ]
+    },
+    {
+      "command": "fragments",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "fragments"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "tick 40",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 40"
+        }
+      ]
+    },
+    {
+      "command": "fragments",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "fragments"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    }
+  ]
+}

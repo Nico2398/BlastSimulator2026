@@ -38,6 +38,20 @@ function hireOne(ctx: GameContext, role = 'blaster'): number {
   return ctx.state!.employees.employees[0]!.id;
 }
 
+/**
+ * Tick until taskTicksRemaining is seeded on the given employee (dispatch
+ * claims the action immediately, but the countdown itself does not start
+ * until ArrivalGate confirms the employee has walked to the dispatch target —
+ * #437). Caps at 30 ticks so a genuine regression fails fast instead of
+ * hanging.
+ */
+function tickUntilTaskSeeded(ctx: GameContext, empId: number): void {
+  const emp = () => ctx.state!.employees.employees.find(e => e.id === empId)!;
+  for (let i = 0; i < 30 && emp().taskTicksRemaining === null; i++) {
+    tickCommand(ctx, ['1'], {});
+  }
+}
+
 // ── Employee skills ──────────────────────────────────────────────────────────
 
 describe('Employee skills', () => {
@@ -397,9 +411,13 @@ describe('Tick-driven task/XP pipeline (dispatch + tick command, issue #406)', (
 
     const emp = () => ctx.state!.employees.employees.find(e => e.id === empId)!;
 
-    // One tick lets tickEmployees claim + seed the task.
+    // One tick lets tickEmployees claim the task (activeActionId set
+    // immediately); the countdown itself only starts once ArrivalGate
+    // confirms the employee has walked to (5,5) (#437).
     tickCommand(ctx, ['1'], {});
     expect(emp().activeActionId).not.toBeNull();
+
+    tickUntilTaskSeeded(ctx, empId);
     expect(emp().taskTicksRemaining).not.toBeNull();
 
     const seeded = emp().taskTicksRemaining!;
@@ -429,14 +447,17 @@ describe('Tick-driven task/XP pipeline (dispatch + tick command, issue #406)', (
     const ctxRookie = makeCtx();
     const rookieId = hireOne(ctxRookie, 'blaster');
     employeeCommand(ctxRookie, ['dispatch', String(rookieId)], { x: '5', z: '5', skill: 'blasting' });
-    tickCommand(ctxRookie, ['1'], {});
+    // The countdown itself only starts once ArrivalGate confirms the
+    // employee has walked to (5,5) (#437) — both hires walk the identical
+    // route, so this doesn't affect the rookie-vs-master comparison below.
+    tickUntilTaskSeeded(ctxRookie, rookieId);
     const rookieSeeded = ctxRookie.state!.employees.employees.find(e => e.id === rookieId)!.taskTicksRemaining!;
 
     const ctxMaster = makeCtx();
     const masterId = hireOne(ctxMaster, 'blaster');
     employeeCommand(ctxMaster, ['assign_skill', String(masterId)], { skill: 'blasting', level: '5' });
     employeeCommand(ctxMaster, ['dispatch', String(masterId)], { x: '5', z: '5', skill: 'blasting' });
-    tickCommand(ctxMaster, ['1'], {});
+    tickUntilTaskSeeded(ctxMaster, masterId);
     const masterSeeded = ctxMaster.state!.employees.employees.find(e => e.id === masterId)!.taskTicksRemaining!;
 
     expect(rookieSeeded).toBeGreaterThan(0);

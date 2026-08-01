@@ -57,11 +57,12 @@
       ]
     },
     {
-      "command": "employee dispatch 1 x:10 z:10",
+      "command": "employee dispatch 1 x:20 z:20",
+      "description": "Moved off (10,10) — that tile sits inside the living_quarters footprint just built there, which is permanently NavGrid-blocked, so the dispatch could never path to it and the employee got stuck (STUCK log, no arrival, shift-cycle work never counted) instead of demonstrating the work/rest transition (#437).",
       "interaction": [
         {
           "type": "command",
-          "command": "employee dispatch 1 x:10 z:10"
+          "command": "employee dispatch 1 x:20 z:20"
         }
       ]
     },
