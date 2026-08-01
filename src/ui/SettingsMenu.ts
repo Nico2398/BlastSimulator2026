@@ -2,6 +2,7 @@
 // Language, save/load, audio, and quit controls.
 
 import { t, setLocale } from '../core/i18n/I18n.js';
+import { LocaleTextRegistry } from './localeText.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { ShiftMode } from '../core/entities/SitePolicy.js';
 
@@ -23,6 +24,7 @@ export class SettingsMenu {
   private onQuit?: () => void;
   /** True once the player has touched a policy control — stops sync clobbering. */
   private policyDirty = false;
+  private readonly locale = new LocaleTextRegistry();
 
   constructor(container: HTMLElement) {
     this.el = document.createElement('div');
@@ -32,10 +34,10 @@ export class SettingsMenu {
 
     const title = document.createElement('div');
     title.className = 'bs-panel-title';
-    title.textContent = t('ui.settings.title');
+    this.locale.bindText(title, 'ui.settings.title');
 
     // Language
-    const langLabel = this.makeLabel(t('ui.settings.language'));
+    const langLabel = this.makeLabel('ui.settings.language');
 
     const langRow = document.createElement('div');
     langRow.style.cssText = 'display:flex;gap:4px;margin-bottom:8px';
@@ -43,7 +45,7 @@ export class SettingsMenu {
     const enBtn = document.createElement('button');
     enBtn.className = 'bs-btn';
     enBtn.style.cssText = 'flex:1;padding:3px';
-    enBtn.textContent = t('ui.settings.english');
+    this.locale.bindText(enBtn, 'ui.settings.english');
     enBtn.addEventListener('click', () => {
       setLocale('en');
       this.onLanguageChange?.('en');
@@ -52,7 +54,7 @@ export class SettingsMenu {
     const frBtn = document.createElement('button');
     frBtn.className = 'bs-btn';
     frBtn.style.cssText = 'flex:1;padding:3px';
-    frBtn.textContent = t('ui.settings.french');
+    this.locale.bindText(frBtn, 'ui.settings.french');
     frBtn.addEventListener('click', () => {
       setLocale('fr');
       this.onLanguageChange?.('fr');
@@ -64,7 +66,7 @@ export class SettingsMenu {
     const saveBtn = document.createElement('button');
     saveBtn.className = 'bs-btn bs-btn-primary';
     saveBtn.style.cssText = 'width:100%;margin-bottom:4px';
-    saveBtn.textContent = t('ui.settings.save');
+    this.locale.bindText(saveBtn, 'ui.settings.save');
     saveBtn.addEventListener('click', () => {
       this.gameConsole?.('save');
       this.setStatus(t('ui.settings.saved'));
@@ -73,7 +75,7 @@ export class SettingsMenu {
     const loadBtn = document.createElement('button');
     loadBtn.className = 'bs-btn';
     loadBtn.style.cssText = 'width:100%;margin-bottom:4px';
-    loadBtn.textContent = t('ui.settings.load');
+    this.locale.bindText(loadBtn, 'ui.settings.load');
     loadBtn.addEventListener('click', () => {
       this.gameConsole?.('load');
       this.setStatus(t('ui.settings.loaded'));
@@ -82,7 +84,7 @@ export class SettingsMenu {
     const quitBtn = document.createElement('button');
     quitBtn.className = 'bs-btn bs-btn-danger';
     quitBtn.style.cssText = 'width:100%;margin-bottom:4px';
-    quitBtn.textContent = t('ui.settings.quit');
+    this.locale.bindText(quitBtn, 'ui.settings.quit');
     quitBtn.addEventListener('click', () => this.onQuit?.());
 
     this.statusEl = document.createElement('div');
@@ -91,7 +93,7 @@ export class SettingsMenu {
     const closeBtn = document.createElement('button');
     closeBtn.className = 'bs-btn';
     closeBtn.style.cssText = 'width:100%;margin-top:6px';
-    closeBtn.textContent = t('ui.settings.close');
+    this.locale.bindText(closeBtn, 'ui.settings.close');
     closeBtn.addEventListener('click', () => this.hide());
 
     // ── Site policy ──
@@ -100,7 +102,7 @@ export class SettingsMenu {
     const policyHeader = document.createElement('div');
     policyHeader.className = 'bs-section-header';
     policyHeader.style.marginTop = '8px';
-    policyHeader.textContent = t('ui.policy.title');
+    this.locale.bindText(policyHeader, 'ui.policy.title');
 
     this.shiftSelect = document.createElement('select');
     this.shiftSelect.className = 'bs-select';
@@ -108,7 +110,7 @@ export class SettingsMenu {
     for (const mode of SHIFT_MODES) {
       const opt = document.createElement('option');
       opt.value = mode;
-      opt.textContent = t(`ui.policy.${mode}`);
+      this.locale.bindText(opt, `ui.policy.${mode}`);
       this.shiftSelect.appendChild(opt);
     }
     this.shiftSelect.addEventListener('change', () => { this.policyDirty = true; });
@@ -120,7 +122,7 @@ export class SettingsMenu {
     applyBtn.className = 'bs-btn bs-btn-primary';
     applyBtn.id = 'bs-policy-apply';
     applyBtn.style.cssText = 'width:100%;margin-top:6px';
-    applyBtn.textContent = t('ui.policy.apply');
+    this.locale.bindText(applyBtn, 'ui.policy.apply');
     applyBtn.addEventListener('click', () => {
       const result = this.gameConsole?.(
         `set_policy mode:${this.shiftSelect.value}` +
@@ -133,9 +135,9 @@ export class SettingsMenu {
     this.el.append(
       title, langLabel, langRow, saveBtn, loadBtn, quitBtn,
       policyHeader,
-      this.makeLabel(t('ui.policy.shift_mode')), this.shiftSelect,
-      this.makeLabel(t('ui.policy.hunger')), this.hungerInput,
-      this.makeLabel(t('ui.policy.fatigue')), this.fatigueInput,
+      this.makeLabel('ui.policy.shift_mode'), this.shiftSelect,
+      this.makeLabel('ui.policy.hunger'), this.hungerInput,
+      this.makeLabel('ui.policy.fatigue'), this.fatigueInput,
       applyBtn,
       this.statusEl, closeBtn,
     );
@@ -148,7 +150,7 @@ export class SettingsMenu {
 
   /** Re-render locale-dependent text (title, labels, buttons) after a language change. */
   refreshLocale(): void {
-    // TODO: implement
+    this.locale.refresh();
   }
 
   show(): void { this.el.style.display = ''; }
@@ -185,10 +187,9 @@ export class SettingsMenu {
     return el;
   }
 
-  private makeLabel(text: string): HTMLElement {
+  private makeLabel(key: string): HTMLElement {
     const el = document.createElement('div');
     el.style.cssText = 'font-size:10px;color:#908070;margin-bottom:2px;margin-top:4px';
-    el.textContent = text;
-    return el;
+    return this.locale.bindText(el, key);
   }
 }

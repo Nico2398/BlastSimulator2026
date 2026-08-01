@@ -1,6 +1,7 @@
 // BlastSimulator2026 — Blast Plan Editor UI (10.2)
 
 import { t } from '../core/i18n/I18n.js';
+import { LocaleTextRegistry } from './localeText.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { DrillHole } from '../core/mining/DrillPlan.js';
 import type { HoleCharge } from '../core/mining/ChargePlan.js';
@@ -32,6 +33,7 @@ export class BlastPlanUI {
   /** Latest state, so the grid picker can draw the site. */
   private lastState: GameState | null = null;
   private statusTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly locale = new LocaleTextRegistry();
 
   constructor(container: HTMLElement) {
     this.el = document.createElement('div');
@@ -41,24 +43,24 @@ export class BlastPlanUI {
 
     const title = document.createElement('div');
     title.className = 'bs-panel-title';
-    title.textContent = t('ui.blast.title');
+    this.locale.bindText(title, 'ui.blast.title');
 
-    const gridBtn = this.makeBtn('bs-btn', t('ui.blast.grid_tool'), () => this.openGridTool(), 'grid-tool');
-    const clearBtn = this.makeBtn('bs-btn bs-btn-danger', t('ui.blast.clear_holes'), () => { this.gameConsole?.('drill_plan clear'); }, 'clear-holes');
+    const gridBtn = this.makeBtn('bs-btn', 'ui.blast.grid_tool', () => this.openGridTool(), 'grid-tool');
+    const clearBtn = this.makeBtn('bs-btn bs-btn-danger', 'ui.blast.clear_holes', () => { this.gameConsole?.('drill_plan clear'); }, 'clear-holes');
     this.holeListEl = document.createElement('div');
     this.chargeForm = document.createElement('div');
     this.chargeForm.style.display = 'none';
     this.chargeForm.style.marginTop = '8px';
     this.buildChargeForm();
 
-    const chargeAllBtn = this.makeBtn('bs-btn bs-btn-primary', t('ui.blast.charge_all'), () => this.chargeAllHoles(), 'charge-all');
-    const seqBtn = this.makeBtn('bs-btn', t('ui.blast.auto_seq'), () => {
+    const chargeAllBtn = this.makeBtn('bs-btn bs-btn-primary', 'ui.blast.charge_all', () => this.chargeAllHoles(), 'charge-all');
+    const seqBtn = this.makeBtn('bs-btn', 'ui.blast.auto_seq', () => {
       const result = this.gameConsole?.('sequence auto');
       if (result?.success) this.showStatus(t('ui.blast.status_sequenced'), 'success');
       else this.showStatus(result?.output || t('ui.blast.status_no_holes'), 'error');
     }, 'auto-sequence');
-    const previewBtn = this.makeBtn('bs-btn', t('ui.blast.preview'), () => { this.gameConsole?.('preview energy'); }, 'preview');
-    const execBtn = this.makeBtn('bs-btn bs-btn-primary bs-blast-btn', t('ui.blast.execute'), () => this.confirmBlast(), 'execute');
+    const previewBtn = this.makeBtn('bs-btn', 'ui.blast.preview', () => { this.gameConsole?.('preview energy'); }, 'preview');
+    const execBtn = this.makeBtn('bs-btn bs-btn-primary bs-blast-btn', 'ui.blast.execute', () => this.confirmBlast(), 'execute');
 
     this.statusEl = document.createElement('div');
     this.statusEl.className = 'bs-blast-status';
@@ -75,7 +77,8 @@ export class BlastPlanUI {
 
   /** Re-render locale-dependent text (title, buttons, labels) after a language change. */
   refreshLocale(): void {
-    // TODO: implement
+    this.locale.refresh();
+    // Hole rows are rebuilt by update() every tick, so they follow on their own.
   }
 
   show(): void { this.el.style.display = ''; }
@@ -231,7 +234,7 @@ export class BlastPlanUI {
     const applyBtn = document.createElement('button');
     applyBtn.className = 'bs-btn bs-btn-primary';
     applyBtn.style.cssText = 'width:100%;margin-top:6px';
-    applyBtn.textContent = t('ui.blast.apply_charge');
+    this.locale.bindText(applyBtn, 'ui.blast.apply_charge');
     applyBtn.addEventListener('click', () => {
       if (!this.selectedHoleId) return;
       const exp = explosiveSelect.value;
@@ -243,37 +246,36 @@ export class BlastPlanUI {
         errorEl.style.display = 'none';
         this.showStatus(result.output, 'success');
       } else {
-        errorEl.textContent = result?.output || 'Failed to apply charge.';
+        errorEl.textContent = result?.output || t('ui.blast.apply_charge_failed');
         errorEl.style.display = '';
       }
     });
 
     this.chargeForm.append(
       label,
-      this.makeLabel(t('ui.blast.explosive')), explosiveSelect,
-      this.makeLabel(t('ui.blast.amount')), amountInput,
-      this.makeLabel(t('ui.blast.stemming')), stemmingInput,
+      this.makeLabel('ui.blast.explosive'), explosiveSelect,
+      this.makeLabel('ui.blast.amount'), amountInput,
+      this.makeLabel('ui.blast.stemming'), stemmingInput,
       applyBtn,
       errorEl,
     );
   }
 
   /** `action` gives each control a label-independent selector for UI tests. */
-  private makeBtn(cls: string, text: string, handler: () => void, action?: string): HTMLButtonElement {
+  private makeBtn(cls: string, key: string, handler: () => void, action?: string): HTMLButtonElement {
     const btn = document.createElement('button');
     btn.className = cls;
     btn.style.cssText = 'width:100%;margin-bottom:4px';
-    btn.textContent = text;
+    this.locale.bindText(btn, key);
     if (action) btn.dataset['action'] = action;
     btn.addEventListener('click', handler);
     return btn;
   }
 
-  private makeLabel(text: string): HTMLElement {
+  private makeLabel(key: string): HTMLElement {
     const el = document.createElement('div');
     el.style.cssText = 'font-size:10px;color:#908070;margin-top:4px;margin-bottom:2px';
-    el.textContent = text;
-    return el;
+    return this.locale.bindText(el, key);
   }
 
   private makeNumberInput(id: string, val: string, min: string, max: string, step: string): HTMLInputElement {

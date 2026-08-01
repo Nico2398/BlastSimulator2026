@@ -125,14 +125,14 @@ export class TileSelectOverlay {
       : this.requiredRegion
       ? t('ui.tile_select.stay_in_area')
       : config.mode === 'area'
-        ? 'Click and drag to select a rectangular area'
-        : 'Click a tile to select it';
+        ? t('ui.tile_select.drag_hint_area')
+        : t('ui.tile_select.drag_hint_point');
     form.appendChild(hint);
 
     const selectionInfo = document.createElement('div');
     selectionInfo.className = 'bs-tile-select-info';
     selectionInfo.id = 'bs-tile-select-info';
-    selectionInfo.textContent = 'No selection';
+    selectionInfo.textContent = t('ui.tile_select.no_selection');
     form.appendChild(selectionInfo);
 
     // Extra fields
@@ -162,13 +162,13 @@ export class TileSelectOverlay {
     const confirmBtn = document.createElement('button');
     confirmBtn.className = 'bs-btn bs-btn-primary';
     confirmBtn.id = 'bs-tile-select-confirm';
-    confirmBtn.textContent = 'Confirm';
+    confirmBtn.textContent = t('ui.tile_select.confirm');
     confirmBtn.disabled = !this.selectionIsAllowed();
     confirmBtn.addEventListener('click', () => this.confirm());
 
     const cancelBtn = document.createElement('button');
     cancelBtn.className = 'bs-btn';
-    cancelBtn.textContent = 'Cancel';
+    cancelBtn.textContent = t('ui.tile_select.cancel');
     cancelBtn.addEventListener('click', () => this.cancel());
 
     btnRow.append(confirmBtn, cancelBtn);
@@ -457,7 +457,7 @@ export class TileSelectOverlay {
     const el = this.overlay.querySelector('.bs-tile-select-info');
     if (!el) return;
     const sel = this.getSelectionRect();
-    if (!sel) { el.textContent = 'No selection'; return; }
+    if (!sel) { el.textContent = t('ui.tile_select.no_selection'); return; }
     if (!this.selectionIsAllowed()) {
       // Say why Confirm is dead rather than leaving the player prodding it, and
       // for an exact target name the rectangle being asked for.
@@ -470,11 +470,13 @@ export class TileSelectOverlay {
       return;
     }
     if (this.config?.mode === 'point') {
-      el.textContent = `Selected: (${sel.x1}, ${sel.z1})`;
+      el.textContent = t('ui.tile_select.selected_point', { x: sel.x1, z: sel.z1 });
     } else {
       const w = sel.x2 - sel.x1 + 1;
       const h = sel.z2 - sel.z1 + 1;
-      el.textContent = `Selected: (${sel.x1}, ${sel.z1}) → (${sel.x2}, ${sel.z2})  [${w} × ${h} tiles]`;
+      el.textContent = t('ui.tile_select.selected_area', {
+        x1: sel.x1, z1: sel.z1, x2: sel.x2, z2: sel.z2, w, h,
+      });
     }
   }
 

@@ -2,6 +2,7 @@
 // Pick a method, pick a target on the map, run the survey, read the results.
 
 import { t } from '../core/i18n/I18n.js';
+import { LocaleTextRegistry } from './localeText.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { SurveyMethod, SurveyResult } from '../core/mining/SurveyCalc.js';
 import { SURVEY_COSTS, SURVEY_BASE_ERROR } from '../core/config/balance.js';
@@ -60,6 +61,7 @@ export class SurveyUI {
   private statusTimer: ReturnType<typeof setTimeout> | null = null;
   /** Latest state, so the target picker can draw the site. */
   private lastState: GameState | null = null;
+  private readonly locale = new LocaleTextRegistry();
 
   constructor(container: HTMLElement) {
     this.el = document.createElement('div');
@@ -69,11 +71,11 @@ export class SurveyUI {
 
     const title = document.createElement('div');
     title.className = 'bs-panel-title';
-    title.textContent = t('ui.survey.title');
+    this.locale.bindText(title, 'ui.survey.title');
 
     const methodLabel = document.createElement('div');
     methodLabel.className = 'bs-section-header';
-    methodLabel.textContent = t('ui.survey.method');
+    this.locale.bindText(methodLabel, 'ui.survey.method');
 
     this.methodsEl = document.createElement('div');
     this.methodsEl.id = 'bs-survey-methods';
@@ -82,7 +84,7 @@ export class SurveyUI {
     this.runBtn.className = 'bs-btn bs-btn-primary';
     this.runBtn.id = 'bs-survey-run';
     this.runBtn.style.cssText = 'width:100%;margin-top:8px';
-    this.runBtn.textContent = t('ui.survey.run');
+    this.locale.bindText(this.runBtn, 'ui.survey.run');
     this.runBtn.addEventListener('click', () => this.pickTargetAndRun());
 
     this.statusEl = document.createElement('div');
@@ -92,7 +94,7 @@ export class SurveyUI {
     const resultsLabel = document.createElement('div');
     resultsLabel.className = 'bs-section-header';
     resultsLabel.style.marginTop = '8px';
-    resultsLabel.textContent = t('ui.survey.results');
+    this.locale.bindText(resultsLabel, 'ui.survey.results');
 
     this.resultsEl = document.createElement('div');
     this.resultsEl.id = 'bs-survey-results';
@@ -101,7 +103,7 @@ export class SurveyUI {
     const closeBtn = document.createElement('button');
     closeBtn.className = 'bs-btn';
     closeBtn.style.cssText = 'width:100%;margin-top:6px';
-    closeBtn.textContent = t('ui.survey.close');
+    this.locale.bindText(closeBtn, 'ui.survey.close');
     closeBtn.addEventListener('click', () => this.hide());
 
     this.el.append(
@@ -119,7 +121,14 @@ export class SurveyUI {
 
   /** Re-render locale-dependent text (title, method list, results) after a language change. */
   refreshLocale(): void {
-    // TODO: implement
+    this.locale.refresh();
+    // The method rows are built once at construction, and the results block is
+    // only re-rendered when the survey count changes — both need forcing.
+    this.methodsEl.replaceChildren();
+    this.buildMethodList();
+    this.lastResultCount = -1;
+    this.lastPendingCount = -1;
+    if (this.lastState) this.update(this.lastState);
   }
 
   show(): void { this.el.style.display = ''; }

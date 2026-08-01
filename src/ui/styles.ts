@@ -23,6 +23,10 @@ const CSS = `
   pointer-events: all;
   backdrop-filter: blur(4px);
   box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+  /* #bs-left-col is a flex column with a capped height, so a panel taller than
+     the viewport was squashed and its rows drew on top of each other. Longer
+     labels (French) hit this constantly. Let the column scroll instead. */
+  flex-shrink: 0;
 }
 .bs-panel-title {
   font-weight: 700;

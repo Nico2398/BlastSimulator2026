@@ -2,6 +2,7 @@
 // Lists vehicles with status/HP; buy and scrap controls.
 
 import { t } from '../core/i18n/I18n.js';
+import { LocaleTextRegistry } from './localeText.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { Vehicle, VehicleRole, VehicleTier } from '../core/entities/Vehicle.js';
 import { getAllVehicleRoles, getVehicleDefByTier, ROLE_LICENCE_REQUIRED } from '../core/entities/Vehicle.js';
@@ -19,6 +20,9 @@ export class VehiclePanel {
   private gameConsole?: GameConsoleFn;
   /** Fingerprint of the last rendered fleet — guards against per-frame rebuilds. */
   private lastSignature = '';
+  /** Latest state, so a locale switch can re-render the fleet rows. */
+  private lastState: GameState | null = null;
+  private readonly locale = new LocaleTextRegistry();
 
   constructor(container: HTMLElement) {
     this.el = document.createElement('div');
@@ -28,14 +32,14 @@ export class VehiclePanel {
 
     const title = document.createElement('div');
     title.className = 'bs-panel-title';
-    title.textContent = t('ui.vehicles.title');
+    this.locale.bindText(title, 'ui.vehicles.title');
 
     this.listEl = document.createElement('div');
 
     const buyHeader = document.createElement('div');
     buyHeader.className = 'bs-section-header';
     buyHeader.style.marginTop = '8px';
-    buyHeader.textContent = t('ui.vehicles.buy');
+    this.locale.bindText(buyHeader, 'ui.vehicles.buy');
 
     this.buySection = document.createElement('div');
     this.buildBuySection();
@@ -43,7 +47,7 @@ export class VehiclePanel {
     const closeBtn = document.createElement('button');
     closeBtn.className = 'bs-btn';
     closeBtn.style.cssText = 'width:100%;margin-top:6px';
-    closeBtn.textContent = t('ui.vehicles.close');
+    this.locale.bindText(closeBtn, 'ui.vehicles.close');
     closeBtn.addEventListener('click', () => this.hide());
 
     this.el.append(title, this.listEl, buyHeader, this.buySection, closeBtn);
@@ -54,7 +58,13 @@ export class VehiclePanel {
 
   /** Re-render locale-dependent text (title, rows, buy section) after a language change. */
   refreshLocale(): void {
-    // TODO: implement
+    this.locale.refresh();
+    // Both lists are rebuilt only on a fleet change, so they hold the previous
+    // locale until one happens — rebuild them against the last known state.
+    this.buySection.replaceChildren();
+    this.buildBuySection();
+    this.lastSignature = '';
+    if (this.lastState) this.update(this.lastState);
   }
 
   show(): void { this.el.style.display = ''; }
@@ -62,6 +72,7 @@ export class VehiclePanel {
   get visible(): boolean { return this.el.style.display !== 'none'; }
 
   update(state: GameState): void {
+    this.lastState = state;
     const { vehicles } = state.vehicles;
 
     // Rebuilt only when the fleet changes: this list holds a driver <select>,

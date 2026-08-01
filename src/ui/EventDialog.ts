@@ -2,6 +2,7 @@
 // Modal dialog shown when a pending event requires player decision.
 
 import { t } from '../core/i18n/I18n.js';
+import { LocaleTextRegistry } from './localeText.js';
 import type { GameState } from '../core/state/GameState.js';
 import { getEventById } from '../core/events/EventPool.js';
 
@@ -23,6 +24,7 @@ export class EventDialog {
   private lastEventId: string | null = null;
   /** True while we're displaying the outcome of a resolved event. */
   private showingOutcome = false;
+  private readonly locale = new LocaleTextRegistry();
 
   constructor(container: HTMLElement) {
     this.overlay = document.createElement('div');
@@ -38,7 +40,7 @@ export class EventDialog {
 
     const header = document.createElement('div');
     header.className = 'bs-panel-title';
-    header.textContent = t('ui.event.title');
+    this.locale.bindText(header, 'ui.event.title');
 
     this.titleEl = document.createElement('div');
     this.titleEl.className = 'bs-event-title';
@@ -49,7 +51,7 @@ export class EventDialog {
 
     this.chooseLabel = document.createElement('div');
     this.chooseLabel.style.cssText = 'font-size:10px;color:#857b6b;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px';
-    this.chooseLabel.textContent = t('ui.event.choose');
+    this.locale.bindText(this.chooseLabel, 'ui.event.choose');
 
     this.optionsEl = document.createElement('div');
     this.optionsEl.className = 'bs-event-choices';
@@ -65,7 +67,7 @@ export class EventDialog {
     this.dismissBtn = document.createElement('button');
     this.dismissBtn.className = 'bs-btn bs-event-dismiss';
     this.dismissBtn.style.cssText = 'width:100%;margin-top:12px';
-    this.dismissBtn.textContent = t('ui.event.dismiss');
+    this.locale.bindText(this.dismissBtn, 'ui.event.dismiss');
     this.dismissBtn.style.display = 'none';
     this.dismissBtn.addEventListener('click', () => this.hide());
 
@@ -78,7 +80,10 @@ export class EventDialog {
 
   /** Re-render locale-dependent text (header, choose label, dismiss button) after a language change. */
   refreshLocale(): void {
-    // TODO: implement
+    this.locale.refresh();
+    // Choice buttons are only rebuilt when the pending event changes; forget
+    // the last id so the next update() re-labels them in the new locale.
+    this.lastEventId = null;
   }
 
   show(): void { this.overlay.style.display = ''; }

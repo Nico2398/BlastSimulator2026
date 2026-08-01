@@ -2,6 +2,7 @@
 // Shows available and active contracts; accept/negotiate/decline actions.
 
 import { t } from '../core/i18n/I18n.js';
+import { LocaleTextRegistry } from './localeText.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { Contract } from '../core/economy/Contract.js';
 
@@ -28,6 +29,10 @@ export class ContractUI {
   private gameConsole?: GameConsoleFn;
   /** Fingerprint of the last rendered contract lists — guards per-frame rebuilds. */
   private lastSignature = '';
+  /** Last rendered offer lists, so a locale switch can rebuild their rows. */
+  private lastAvailable: Contract[] = [];
+  private lastActive: Contract[] = [];
+  private readonly locale = new LocaleTextRegistry();
 
   constructor(container: HTMLElement) {
     this.el = document.createElement('div');
@@ -37,18 +42,18 @@ export class ContractUI {
 
     const title = document.createElement('div');
     title.className = 'bs-panel-title';
-    title.textContent = t('ui.contracts.title');
+    this.locale.bindText(title, 'ui.contracts.title');
 
     const availHeader = document.createElement('div');
     availHeader.className = 'bs-section-header';
-    availHeader.textContent = t('ui.contracts.available');
+    this.locale.bindText(availHeader, 'ui.contracts.available');
 
     this.availableList = document.createElement('div');
 
     const activeHeader = document.createElement('div');
     activeHeader.className = 'bs-section-header';
     activeHeader.style.marginTop = '8px';
-    activeHeader.textContent = t('ui.contracts.active');
+    this.locale.bindText(activeHeader, 'ui.contracts.active');
 
     this.activeList = document.createElement('div');
 
@@ -60,7 +65,13 @@ export class ContractUI {
 
   /** Re-render locale-dependent text (title, headers, rows) after a language change. */
   refreshLocale(): void {
-    // TODO: implement
+    this.locale.refresh();
+    // Row buttons are only built when the offer list changes, so they would
+    // otherwise keep the previous locale until an offer appeared or expired.
+    this.availableList.replaceChildren();
+    this.activeList.replaceChildren();
+    this.lastSignature = '';
+    this.rebuildRows(this.lastAvailable, this.lastActive);
   }
 
   show(): void { this.el.style.display = ''; }
@@ -78,6 +89,9 @@ export class ContractUI {
       available.map(c => `${c.id}:${c.pricePerKg}:${c.quantityKg}`).join(','),
       active.map(c => c.id).join(','),
     ].join('#');
+
+    this.lastAvailable = available;
+    this.lastActive = active;
 
     if (structure !== this.lastSignature) {
       this.lastSignature = structure;
@@ -135,7 +149,7 @@ export class ContractUI {
       const pct = c.quantityKg > 0 ? Math.round((c.deliveredKg / c.quantityKg) * 100) : 0;
       const remaining = Math.max(0, c.acceptedAtTick + c.deadlineTicks - currentTick);
       const details = row.querySelector<HTMLElement>('.bs-contract-details');
-      if (details) details.textContent = `${t('ui.contracts.progress')}: ${pct}% — ${remaining}t left`;
+      if (details) details.textContent = t('ui.contracts.progress_line', { pct, remaining });
       const fill = row.querySelector<HTMLElement>('.bs-progress-bar-fill');
       if (fill) fill.style.width = `${pct}%`;
     }
@@ -156,6 +170,8 @@ export class ContractUI {
     amount.min = '1';
     amount.step = '100';
     amount.value = String(Math.max(1, c.quantityKg - c.deliveredKg));
+    // Rebuilt per row, so it is re-translated by the rebuild rather than the
+    // registry — registering here would grow a binding per rebuild.
     amount.title = t('ui.contracts.deliver_amount');
 
     const deliverBtn = document.createElement('button');
@@ -190,7 +206,11 @@ export class ContractUI {
     details.className = 'bs-contract-details';
     // pricePerKg is a raw float from the offer generator — printing it straight
     // gives the player "$0.6273750268155709/kg".
-    details.textContent = `${c.quantityKg.toLocaleString('en-US')}kg @ $${formatPricePerKg(c.pricePerKg)}/kg — ${c.deadlineTicks}t deadline`;
+    details.textContent = t('ui.contracts.offer_line', {
+      qty: c.quantityKg.toLocaleString('en-US'),
+      price: formatPricePerKg(c.pricePerKg),
+      deadline: c.deadlineTicks,
+    });
 
     const btnRow = document.createElement('div');
     btnRow.style.cssText = 'display:flex;gap:4px;margin-top:4px';

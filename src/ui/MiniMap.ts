@@ -2,6 +2,7 @@
 // Canvas-based overhead view of the mine: terrain elevation, buildings, vehicles, drill holes.
 
 import { t } from '../core/i18n/I18n.js';
+import { LocaleTextRegistry } from './localeText.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { NavGrid, NavCellType } from '../core/nav/NavGrid.js';
 
@@ -44,6 +45,7 @@ export class MiniMap {
   private readonly title: HTMLElement;
   private _navGridVisible: boolean = false;
   private _navGrid: NavGrid | null = null;
+  private readonly locale = new LocaleTextRegistry();
 
   constructor(container: HTMLElement) {
     this.el = document.createElement('div');
@@ -54,7 +56,7 @@ export class MiniMap {
     this.title = document.createElement('div');
     this.title.className = 'bs-panel-title';
     this.title.style.fontSize = '10px';
-    this.title.textContent = t('ui.minimap.title');
+    this.locale.bindText(this.title, 'ui.minimap.title');
 
     this.canvas = document.createElement('canvas');
     this.canvas.width = MAP_SIZE;
@@ -62,24 +64,24 @@ export class MiniMap {
     // Centred: the legend row is wider than the map, so a left-aligned canvas
     // leaves a lopsided gap on the right of the panel.
     this.canvas.style.cssText = `display:block;margin:0 auto;width:${MAP_SIZE}px;height:${MAP_SIZE}px;cursor:crosshair`;
-    this.canvas.title = t('ui.minimap.title');
+    this.locale.bindTitle(this.canvas, 'ui.minimap.title');
 
     const legend = document.createElement('div');
     legend.style.cssText = `display:flex;gap:6px;margin-top:3px;height:${LEGEND_HEIGHT}px;font-size:9px;align-items:center`;
 
     const items: [string, string][] = [
-      [COLOR_ROCK, t('ui.minimap.rock')],
-      [COLOR_ORE, t('ui.minimap.ore')],
-      [COLOR_BUILDING, t('ui.minimap.building')],
-      [COLOR_HOLE, t('ui.minimap.hole')],
-      [COLOR_CREW, t('ui.minimap.crew')],
+      [COLOR_ROCK, 'ui.minimap.rock'],
+      [COLOR_ORE, 'ui.minimap.ore'],
+      [COLOR_BUILDING, 'ui.minimap.building'],
+      [COLOR_HOLE, 'ui.minimap.hole'],
+      [COLOR_CREW, 'ui.minimap.crew'],
     ];
-    for (const [color, label] of items) {
+    for (const [color, labelKey] of items) {
       const swatch = document.createElement('span');
       swatch.style.cssText = `display:inline-block;width:8px;height:8px;background:${color};border-radius:1px`;
       const txt = document.createElement('span');
       txt.style.color = '#908070';
-      txt.textContent = label;
+      this.locale.bindText(txt, labelKey);
       legend.append(swatch, txt);
     }
 
@@ -94,7 +96,8 @@ export class MiniMap {
 
   /** Re-render locale-dependent text (title, legend) after a language change. */
   refreshLocale(): void {
-    // TODO: implement
+    this.locale.refresh();
+    // The canvas placeholder is painted by update(), which runs every tick.
   }
 
   update(state: GameState): void {
@@ -108,7 +111,7 @@ export class MiniMap {
       ctx.fillStyle = '#604030';
       ctx.font = '10px monospace';
       ctx.textAlign = 'center';
-      ctx.fillText('No map data', MAP_SIZE / 2, MAP_SIZE / 2);
+      ctx.fillText(t('ui.minimap.no_data'), MAP_SIZE / 2, MAP_SIZE / 2);
       return;
     }
 

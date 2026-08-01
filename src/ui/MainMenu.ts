@@ -3,6 +3,7 @@
 // with lock/unlock status and completion stars.
 
 import { t } from '../core/i18n/I18n.js';
+import { LocaleTextRegistry } from './localeText.js';
 import type { CampaignState } from '../core/campaign/Campaign.js';
 import { getAllLevels } from '../core/campaign/Level.js';
 import type { SaveBackend } from '../core/state/SaveBackend.js';
@@ -23,6 +24,9 @@ export class MainMenu {
   private onLoad?: OnLoad;
   private onSettings?: OnSettings;
   private onTutorial?: OnTutorial;
+  /** Campaign last passed to showWorldMap, so a locale switch can redraw it. */
+  private lastCampaign: CampaignState | null = null;
+  private readonly locale = new LocaleTextRegistry();
 
   constructor(container: HTMLElement) {
     this.overlay = document.createElement('div');
@@ -43,11 +47,11 @@ export class MainMenu {
       'text-shadow:0 0 30px rgba(200,100,0,0.6),0 2px 4px rgba(0,0,0,0.8)',
       'letter-spacing:0.04em',
     ].join(';');
-    title.textContent = t('menu.title');
+    this.locale.bindText(title, 'menu.title');
 
     const subtitle = document.createElement('div');
     subtitle.style.cssText = 'color:#6a5030;font-size:13px;margin-top:6px;letter-spacing:0.12em;text-transform:uppercase';
-    subtitle.textContent = 'dig  ·  blast  ·  profit';
+    this.locale.bindText(subtitle, 'menu.subtitle');
 
     titleWrap.append(title, subtitle);
 
@@ -60,11 +64,11 @@ export class MainMenu {
       'box-shadow:0 8px 40px rgba(0,0,0,0.6)',
     ].join(';');
 
-    const newBtn = this.makeMenuBtn(t('menu.new_campaign'), 'primary', () => this.onNewCampaign?.());
-    const tutorialBtn = this.makeMenuBtn(t('menu.tutorial'), 'gold', () => this.onTutorial?.());
-    const continueBtn = this.makeMenuBtn(t('menu.continue'), '', () => this.showWorldMap(null));
-    const loadBtn = this.makeMenuBtn(t('menu.load'), '', () => this.onLoad?.());
-    const settingsBtn = this.makeMenuBtn(t('menu.settings'), '', () => this.onSettings?.());
+    const newBtn = this.makeMenuBtn('menu.new_campaign', 'primary', () => this.onNewCampaign?.());
+    const tutorialBtn = this.makeMenuBtn('menu.tutorial', 'gold', () => this.onTutorial?.());
+    const continueBtn = this.makeMenuBtn('menu.continue', '', () => this.showWorldMap(this.lastCampaign));
+    const loadBtn = this.makeMenuBtn('menu.load', '', () => this.onLoad?.());
+    const settingsBtn = this.makeMenuBtn('menu.settings', '', () => this.onSettings?.());
 
     this.menuBox.append(newBtn, tutorialBtn, continueBtn, loadBtn, settingsBtn);
 
@@ -95,11 +99,14 @@ export class MainMenu {
 
   /** Re-render locale-dependent text (title, subtitle, menu/world-map buttons) after a language change. */
   refreshLocale(): void {
-    // TODO: implement
+    this.locale.refresh();
+    // The world map is built once per open, so redraw it when it is on screen.
+    if (this.worldMapBox.style.display !== 'none') this.showWorldMap(this.lastCampaign);
   }
 
   /** Show the world map with campaign progress. */
   showWorldMap(campaign: CampaignState | null): void {
+    this.lastCampaign = campaign;
     this.menuBox.style.display = 'none';
     this.worldMapBox.style.display = 'flex';
     this.worldMapBox.innerHTML = '';
@@ -157,8 +164,13 @@ export class MainMenu {
         const req = document.createElement('div');
         req.style.cssText = 'font-size:10px;color:#503820;margin-top:6px';
         const prevLevel = levels[levels.indexOf(lvl) - 1];
+        // The threshold and the previous level are separate params: baking the
+        // whole phrase into one leaked the English word "on" into every locale.
         req.textContent = prevLevel
-          ? t('menu.level_locked', { req: `$${lvl.unlockThreshold.toLocaleString('en-US')} on ${t(prevLevel.nameKey)}` })
+          ? t('menu.level_locked', {
+              threshold: `$${lvl.unlockThreshold.toLocaleString('en-US')}`,
+              level: t(prevLevel.nameKey),
+            })
           : '';
         card.appendChild(req);
       } else {
@@ -181,10 +193,10 @@ export class MainMenu {
       this.worldMapBox.appendChild(card);
     }
 
-    const backBtn = this.makeMenuBtn('← ' + t('ui.back'), '', () => {
+    const backBtn = this.makeMenuBtn('ui.back', '', () => {
       this.worldMapBox.style.display = 'none';
       this.menuBox.style.display = 'flex';
-    });
+    }, '← ');
     backBtn.style.marginTop = '4px';
     this.worldMapBox.appendChild(backBtn);
   }
@@ -194,7 +206,7 @@ export class MainMenu {
     const btn = document.createElement('button');
     btn.className = 'bs-btn bs-return-map';
     btn.style.cssText = 'position:fixed;top:8px;right:140px;z-index:300;font-size:10px;padding:3px 8px';
-    btn.textContent = t('menu.return_to_map');
+    this.locale.bindText(btn, 'menu.return_to_map');
     btn.addEventListener('click', onReturn);
     container.appendChild(btn);
     return btn;
@@ -202,11 +214,11 @@ export class MainMenu {
 
   dispose(): void { this.overlay.remove(); }
 
-  private makeMenuBtn(label: string, variant: 'primary' | 'gold' | '', onClick: () => void): HTMLButtonElement {
+  private makeMenuBtn(key: string, variant: 'primary' | 'gold' | '', onClick: () => void, prefix = ''): HTMLButtonElement {
     const btn = document.createElement('button');
     btn.className = `bs-btn${variant === 'primary' ? ' bs-btn-primary' : ''}`;
     btn.style.cssText = 'width:100%;padding:10px 16px;font-size:13px;font-weight:600;text-align:left;pointer-events:all';
-    btn.textContent = label;
+    btn.textContent = prefix + t(key);
     if (variant === 'gold') {
       btn.style.color = '#ffe090';
       btn.style.borderColor = 'rgba(255,225,144,0.4)';
