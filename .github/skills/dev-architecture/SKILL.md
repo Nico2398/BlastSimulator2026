@@ -37,6 +37,7 @@ description: >
 - **Core purity:** `src/core/` = zero side effects; no DOM, `window`, WebGL, or file I/O. `SaveBackend` interface in core; implementations in `src/persistence/`.
 - **Single serializable GameState:** enables save/load (JSON), console mode, deterministic tests.
 - **Tick loop steps:** (1) advance time, (2) weather, (3) events, (4) vehicles+tasks, (5) physics (blast only), (6) scores, (7) win/lose check, (8) emit state-change events. Renderer runs at 60fps, interpolates between ticks.
+- **Arrival-gated position-dependent actions:** any action requiring an employee or vehicle to physically be somewhere (survey, rest, vehicle boarding, hauling) queues intent on the acting entity (`pendingTaskDuration`, `pendingRestDuration`, `pendingDriverVehicleId`, hauling phase fields) at claim time, and only starts its timer/effect once navmesh arrival is detected. `src/core/engine/ArrivalGate.ts` (`tickArrivalGate`) resolves this once per tick, after movement (`EntityMovementTick.ts`) has advanced. Follow this pattern for any new position-dependent action instead of starting effects at claim time.
 - **Event-driven renderer:** Core emits `terrain:updated`, `blast:started`, `fragment:created`, etc. Renderer subscribes. Dependency one-way: renderer → core, never reverse.
 - **Asset replaceability:** AssetManager maps IDs → geometry/material; placeholders = Three.js primitives. Replace assets by updating AssetManager only.
 
@@ -76,11 +77,13 @@ src/
 ├── main.ts                 # Browser entry: initializes renderer + game
 ├── console.ts              # CLI entry: Node.js playable console mode
 ├── core/                   # PURE TypeScript — NO DOM, NO WebGL, NO side effects
-│   ├── state/              # GameState, GameLoop, SaveLoad, SaveBackend interface
+│   ├── state/              # GameState, SaveLoad, SaveBackend interface
+│   ├── engine/             # GameLoop (tick orchestration), ArrivalGate, EntityMovementTick, TaskDispatch
+│   ├── nav/                # NavGrid, Pathfinding, AgentMovement, BuildingApproach
 │   ├── campaign/           # Level definitions, Campaign progression
 │   ├── world/              # VoxelGrid, TerrainGen, RockCatalog, OreCatalog, MineType
 │   ├── mining/             # Survey, DrillPlan, ChargePlan, Sequence, BlastPlan, BlastCalc
-│   ├── economy/            # Finance, Contract, Market, Corruption
+│   ├── economy/            # Finance, Contract, Market, Corruption, HaulingTask
 │   ├── entities/           # Employee, Vehicle, Building, Fragment
 │   ├── scores/             # ScoreManager, WellBeing, Safety, Ecology, Nuisance
 │   ├── events/             # EventSystem, EventCategory, EventPool, EventResolver

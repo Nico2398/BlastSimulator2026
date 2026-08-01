@@ -56,6 +56,8 @@ When any gauge hits its collapse threshold:
 
 If no suitable building within 20 cells: employee collapses in place, rest duration doubled.
 
+Rest duration itself only starts counting down once the employee physically arrives at the building (or, resting in place, immediately) — walking there is separate travel time on top of the duration, arrival-gated per `dev-architecture`'s arrival-gated-actions convention.
+
 ## Resting With No Building
 
 An employee whose need has no building to service it — none built, or the nearest beyond 20 cells — rests where they stand. Two penalties apply, and together they keep an empty site strictly worse than a Tier 1 one:
