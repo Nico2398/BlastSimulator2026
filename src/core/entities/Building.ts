@@ -6,6 +6,7 @@
 
 import { BUILDING_DEFS } from './BuildingDefs.js';
 import { isTierUnlocked } from './BuildingResearch.js';
+import type { ResearchCondition } from './BuildingResearch.js';
 
 // ── Building types ──
 
@@ -138,6 +139,7 @@ export interface ResearchTask {
   targetTier: 2 | 3;
   ticksRemaining: number;
   cost: number;
+  conditions: ResearchCondition[];
 }
 
 export interface BuildingState {
@@ -356,7 +358,10 @@ export {
   BUSY, buildPlacementGrid, getSurfaceY, canPlaceBuilding, isBuildingFootprintCell,
   type SurfaceY, type PlacementCell, type CanPlaceBuildingResult, type PlacementGrid,
 } from './BuildingPlacement.js';
-export { queueResearchTask, tickResearch, isTierUnlocked, isResearchQueued } from './BuildingResearch.js';
+export {
+  queueResearchTask, tickResearch, isTierUnlocked, isResearchQueued,
+  hasActiveResearchCenter, getUnmetConditions,
+} from './BuildingResearch.js';
 export { getLivingQuartersWellbeingMultiplier } from './BuildingWellbeing.js';
 export {
   getExplosivesCapacity, getExplosivesInStock,

@@ -2352,6 +2352,8 @@
   "ui.build.research_failed_already_unlocked": "That tier is already unlocked.",
   "ui.build.research_failed_already_queued": "That tier is already queued for research.",
   "ui.build.research_failed_insufficient_funds": "Not enough cash to queue research.",
+  "ui.build.research_failed_no_research_center": "Build a Research Center before queueing research.",
+  "ui.build.research_failed_conditions_not_met": "That tier's prerequisites are not met yet.",
   "ui.vehicles.title": "Vehicles",
   "ui.vehicles.buy": "Buy",
   "ui.vehicles.assign": "Assign",

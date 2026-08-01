@@ -6,13 +6,11 @@ import type { CommandResult } from '../ConsoleRunner.js';
 import type { GameContext } from './world.js';
 import {
   queueResearchTask,
-  isTierUnlocked,
-  isResearchQueued,
   getAllBuildingTypes,
   type BuildingType,
 } from '../../core/entities/Building.js';
 import { addExpense } from '../../core/economy/Finance.js';
-import { RESEARCH_TIER_TICKS, RESEARCH_TIER_COST } from '../../core/config/balance.js';
+import { getResearchTaskDef } from '../../core/config/balance.js';
 import { requireGame } from './commandUtils.js';
 
 /**
@@ -51,38 +49,55 @@ export function researchCommand(
       }
       const tier = tierNum as 2 | 3;
 
-      if (isTierUnlocked(state.buildings, type, tier)) {
-        return {
-          success: false,
-          code: 'already_unlocked',
-          output: `Tier ${tier} ${type} is already unlocked.`,
-        };
+      // TODO(implementer): precedence between no_research_center,
+      // already_unlocked, already_queued, conditions_not_met, and
+      // insufficient_funds is decided inside queueResearchTask; this handler
+      // only needs to relay whatever `code` comes back.
+      const result = queueResearchTask(state.buildings, type, tier);
+      if (!result.success) {
+        const def = getResearchTaskDef(type, tier);
+        switch (result.code) {
+          case 'no_research_center':
+            return {
+              success: false,
+              code: 'no_research_center',
+              output: `A Research Center is required before queueing tier ${tier} ${type}.`,
+            };
+          case 'already_unlocked':
+            return {
+              success: false,
+              code: 'already_unlocked',
+              output: `Tier ${tier} ${type} is already unlocked.`,
+            };
+          case 'already_queued':
+            return {
+              success: false,
+              code: 'already_queued',
+              output: `Tier ${tier} ${type} is already queued for research.`,
+            };
+          case 'conditions_not_met':
+            return {
+              success: false,
+              code: 'conditions_not_met',
+              output: `Tier ${tier} ${type} does not meet its research prerequisites.`,
+            };
+          case 'insufficient_funds':
+          default:
+            return {
+              success: false,
+              code: 'insufficient_funds',
+              output: `Insufficient funds: research costs $${def.cost}.`,
+            };
+        }
       }
 
-      if (isResearchQueued(state.buildings, type, tier)) {
-        return {
-          success: false,
-          code: 'already_queued',
-          output: `Tier ${tier} ${type} is already queued for research.`,
-        };
-      }
-
-      const ticks = RESEARCH_TIER_TICKS[tier];
-      const cost = RESEARCH_TIER_COST[tier];
-      if (state.cash < cost) {
-        return {
-          success: false,
-          code: 'insufficient_funds',
-          output: `Insufficient funds: research costs $${cost}.`,
-        };
-      }
-      queueResearchTask(state.buildings, type, tier, ticks, cost);
+      const cost = result.cost ?? getResearchTaskDef(type, tier).cost;
       state.cash -= cost;
       addExpense(state.finances, cost, 'construction', `Research ${type} T${tier}`, state.tickCount);
 
       return {
         success: true,
-        output: `Queued research: ${type} tier ${tier} — ${ticks} ticks, $${cost}.`,
+        output: `Queued research: ${type} tier ${tier} — $${cost}.`,
       };
     }
     case 'status': {

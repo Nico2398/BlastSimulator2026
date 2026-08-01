@@ -3,6 +3,7 @@
 // Real-world research notes are included for each value.
 
 import type { BuildingType } from '../entities/Building.js';
+import type { ResearchCondition } from '../entities/BuildingResearch.js';
 
 // ─── Economy ──────────────────────────────────────────────────────────────────
 
@@ -473,15 +474,63 @@ export const TRAINING_RELOCATION_OFFSET = 1;
  * training level multiplier so late-game tiers stay a real investment rather
  * than a rubber-stamp.
  */
-export const RESEARCH_TIER_TICKS: Record<2 | 3, number> = {
-  2: 30,
-  3: 50,
-} as const;
+/** Cost, duration, and prerequisites for a single tier's research task. */
+export interface ResearchTaskDef {
+  cost: number;
+  ticks: number;
+  conditions: ResearchCondition[];
+}
 
-export const RESEARCH_TIER_COST: Record<2 | 3, number> = {
-  2: 5000,
-  3: 12000,
-} as const;
+/**
+ * Research task definitions per building type and tier. Tier 2 is a
+ * cost-only first upgrade (no duration, no prerequisites); tier 3 adds a
+ * duration and requires tier 2 already researched — a straight step up
+ * mirrors the training level multiplier so late-game tiers stay a real
+ * investment rather than a rubber-stamp.
+ */
+export const RESEARCH_TASK_DEFS: Record<BuildingType, { 2: ResearchTaskDef; 3: ResearchTaskDef }> = {
+  driving_center: {
+    2: { cost: 5000, ticks: 0, conditions: [] },
+    3: { cost: 12000, ticks: 50, conditions: [{ kind: 'research_completed', buildingType: 'driving_center', tier: 2 }] },
+  },
+  blasting_academy: {
+    2: { cost: 5000, ticks: 0, conditions: [] },
+    3: { cost: 12000, ticks: 50, conditions: [{ kind: 'research_completed', buildingType: 'blasting_academy', tier: 2 }] },
+  },
+  management_office: {
+    2: { cost: 5000, ticks: 0, conditions: [] },
+    3: { cost: 12000, ticks: 50, conditions: [{ kind: 'research_completed', buildingType: 'management_office', tier: 2 }] },
+  },
+  geology_lab: {
+    2: { cost: 5000, ticks: 0, conditions: [] },
+    3: { cost: 12000, ticks: 50, conditions: [{ kind: 'research_completed', buildingType: 'geology_lab', tier: 2 }] },
+  },
+  research_center: {
+    2: { cost: 5000, ticks: 0, conditions: [] },
+    3: { cost: 12000, ticks: 50, conditions: [{ kind: 'research_completed', buildingType: 'research_center', tier: 2 }] },
+  },
+  living_quarters: {
+    2: { cost: 5000, ticks: 0, conditions: [] },
+    3: { cost: 12000, ticks: 50, conditions: [{ kind: 'research_completed', buildingType: 'living_quarters', tier: 2 }] },
+  },
+  explosive_warehouse: {
+    2: { cost: 5000, ticks: 0, conditions: [] },
+    3: { cost: 12000, ticks: 50, conditions: [{ kind: 'research_completed', buildingType: 'explosive_warehouse', tier: 2 }] },
+  },
+  freight_warehouse: {
+    2: { cost: 5000, ticks: 0, conditions: [] },
+    3: { cost: 12000, ticks: 50, conditions: [{ kind: 'research_completed', buildingType: 'freight_warehouse', tier: 2 }] },
+  },
+  vehicle_depot: {
+    2: { cost: 5000, ticks: 0, conditions: [] },
+    3: { cost: 12000, ticks: 50, conditions: [{ kind: 'research_completed', buildingType: 'vehicle_depot', tier: 2 }] },
+  },
+};
+
+/** Look up the research task definition for a building type and tier. */
+export function getResearchTaskDef(type: BuildingType, tier: 2 | 3): ResearchTaskDef {
+  return RESEARCH_TASK_DEFS[type][tier];
+}
 
 // ─── Employee Needs ────────────────────────────────────────────────────────────
 

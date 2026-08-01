@@ -153,8 +153,10 @@ export class BuildMenu {
    *  to a translated status message — the raw `output` is core's plain-English
    *  string and must never reach the player. */
   private static readonly RESEARCH_FAILURE_KEYS: Record<string, string> = {
+    no_research_center: 'ui.build.research_failed_no_research_center',
     already_unlocked: 'ui.build.research_failed_already_unlocked',
     already_queued: 'ui.build.research_failed_already_queued',
+    conditions_not_met: 'ui.build.research_failed_conditions_not_met',
     insufficient_funds: 'ui.build.research_failed_insufficient_funds',
     usage: 'ui.build.research_queue_failed',
   };

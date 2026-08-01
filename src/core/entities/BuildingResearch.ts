@@ -5,18 +5,58 @@ import type { BuildingType, BuildingTier, BuildingState, ResearchTask } from './
 
 export type { ResearchTask };
 
+// ── Types ──
+
+/**
+ * A prerequisite a research task must satisfy before it can be queued.
+ * `building_tier` requires a building of the given type/tier to already be
+ * placed and active; `research_completed` requires the given type/tier to
+ * already be unlocked (used to gate tier 3 behind tier 2, for example).
+ */
+export type ResearchCondition =
+  | { kind: 'building_tier'; buildingType: BuildingType; tier: 2 | 3 }
+  | { kind: 'research_completed'; buildingType: BuildingType; tier: 2 | 3 };
+
+export interface QueueResearchResult {
+  success: boolean;
+  code?: 'no_research_center' | 'already_unlocked' | 'already_queued' | 'conditions_not_met' | 'insufficient_funds';
+  cost?: number;
+}
+
 // ── Functions ──
 
-/** Enqueue a research task. Returns the cost. */
+/**
+ * Whether a placed, active `research_center` building exists in state.
+ * Research cannot be queued at all without one.
+ */
+export function hasActiveResearchCenter(_state: BuildingState): boolean {
+  // TODO: implement
+  return false;
+}
+
+/** Whether a single research condition currently holds against state. */
+export function isConditionMet(_state: BuildingState, _condition: ResearchCondition): boolean {
+  // TODO: implement
+  return false;
+}
+
+/** Return the subset of `conditions` that are not currently met. */
+export function getUnmetConditions(_state: BuildingState, conditions: ResearchCondition[]): ResearchCondition[] {
+  // TODO: implement
+  return conditions;
+}
+
+/**
+ * Enqueue a research task for `targetType`/`targetTier`, validating research
+ * center presence, unlock/queue state, prerequisite conditions, and funds.
+ */
 export function queueResearchTask(
-  state: BuildingState,
-  targetType: BuildingType,
-  targetTier: 2 | 3,
-  durationTicks: number,
-  cost: number,
-): number {
-  state.researchQueue.push({ targetType, targetTier, ticksRemaining: durationTicks, cost });
-  return cost;
+  _state: BuildingState,
+  _targetType: BuildingType,
+  _targetTier: 2 | 3,
+): QueueResearchResult {
+  // TODO: implement
+  return { success: false };
 }
 
 /**
