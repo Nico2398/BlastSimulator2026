@@ -49,12 +49,8 @@
     },
     {
       "command": "build living_quarters at:5,5 tier:1",
-      "description": "Placed by clicking the Build panel's catalog row for living_quarters and picking the tile.",
+      "description": "Placed by clicking the Build panel's catalog row for living_quarters and picking the tile. The Build panel is already open from the research_center step above — re-clicking the toolbar toggle here would close it (UIManager.togglePanel), so this step goes straight to the catalog row.",
       "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"build\"]"
-        },
         {
           "type": "clickSelector",
           "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn"
