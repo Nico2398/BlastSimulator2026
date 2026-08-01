@@ -297,10 +297,7 @@ export function tickNeedRestoration(state: GameState): NeedRestorationResult {
       continue;
     }
 
-    // Every footprint cell of a building — including its raw (x, z) origin —
-    // is 'blocked' on the NavGrid, so that alone can never be pathfound to.
-    // Walk to the nearest walkable cell on the ring around it instead (#437).
-    const approach = findBuildingApproachCell(state.navGrid, building, getBuildingDef(building.type, building.tier), emp.x, emp.z);
+    const approach = resolveBuildingApproach(state, building, emp.x, emp.z);
 
     const restAction = createRestPendingAction(state, {
       targetX: approach.x,
@@ -367,10 +364,7 @@ export function tickCollapse(state: GameState, _firedEvents?: FiredEvent[], _emi
     if (building) {
       const distSq = (building.x - emp.x) ** 2 + (building.z - emp.z) ** 2;
       if (distSq <= NEED_REST_SEARCH_RADIUS ** 2) {
-        // See findBuildingApproachCell's doc — a building's raw (x, z) is
-        // always NavGrid-blocked; walk to the nearest walkable ring cell
-        // around it instead (#437).
-        const approach = findBuildingApproachCell(state.navGrid, building, getBuildingDef(building.type, building.tier), emp.x, emp.z);
+        const approach = resolveBuildingApproach(state, building, emp.x, emp.z);
         targetX = approach.x;
         targetZ = approach.z;
         buildingId = building.id;
@@ -481,11 +475,7 @@ export function autoInsertNeedTasks(state: GameState, _firedEvents?: FiredEvent[
     const buildingType = NEED_REST_BUILDING_TYPES[primaryGauge];
     const building = findNearestBuildingOfType(state, buildingType, emp.x, emp.z);
 
-    // See findBuildingApproachCell's doc — a building's raw (x, z) is always
-    // NavGrid-blocked, so target the nearest walkable ring cell instead (#437).
-    const approach = building
-      ? findBuildingApproachCell(state.navGrid, building, getBuildingDef(building.type, building.tier), emp.x, emp.z)
-      : null;
+    const approach = building ? resolveBuildingApproach(state, building, emp.x, emp.z) : null;
     const targetX = approach?.x ?? emp.x;
     const targetZ = approach?.z ?? emp.z;
     // With nowhere to go the employee rests in place, which takes longer and
@@ -555,6 +545,21 @@ function findNearestLivingQuarters(
   empZ: number,
 ): Building | null {
   return findNearestBuildingOfType(state, 'living_quarters', empX, empZ);
+}
+
+/**
+ * Resolve the nearest walkable NavGrid cell on the ring around a building,
+ * closest to (empX, empZ). See findBuildingApproachCell's doc for why a
+ * building's raw (x, z) can never be targeted directly (#437) — every
+ * rest-routing call site below needs this same resolution.
+ */
+function resolveBuildingApproach(
+  state: GameState,
+  building: Building,
+  empX: number,
+  empZ: number,
+): { x: number; z: number } {
+  return findBuildingApproachCell(state.navGrid, building, getBuildingDef(building.type, building.tier), empX, empZ);
 }
 
 /**
@@ -868,10 +873,7 @@ function forceShiftRestIfNeeded(
   let buildingId: number | undefined;
 
   if (building) {
-    // See findBuildingApproachCell's doc — a building's raw footprint
-    // (including its center) is always NavGrid-blocked; walk to the nearest
-    // walkable ring cell around it instead (#437).
-    const approach = findBuildingApproachCell(state.navGrid, building, getBuildingDef(building.type, building.tier), emp.x, emp.z);
+    const approach = resolveBuildingApproach(state, building, emp.x, emp.z);
     targetX = approach.x;
     targetZ = approach.z;
     buildingId = building.id;

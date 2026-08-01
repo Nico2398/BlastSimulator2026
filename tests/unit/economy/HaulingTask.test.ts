@@ -4,10 +4,6 @@
 // without loading it immediately; tickHaulingProgress advances the vehicle
 // through to_fragment -> pickup -> to_depot -> deliver -> idle, only acting
 // on arrival (never mid-transit).
-//
-// RED PHASE: src/core/economy/HaulingTask.ts's requestHaulFragment and
-// tickHaulingProgress both always throw 'not implemented'. Every test below
-// fails until the implementer fills in the real logic.
 
 import { describe, it, expect } from 'vitest';
 import { createGame } from '../../../src/core/state/GameState.js';

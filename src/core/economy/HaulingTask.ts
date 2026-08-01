@@ -6,7 +6,7 @@
 
 import type { GameState } from '../state/GameState.js';
 import type { Vehicle } from '../entities/Vehicle.js';
-import { findNearestActiveBuildingOfType, getBuildingDef } from '../entities/Building.js';
+import { findNearestActiveBuildingOfType, getBuildingDef, type Building } from '../entities/Building.js';
 import { findBuildingApproachCell } from '../nav/BuildingApproach.js';
 import { tickVehicle, tickVehicleTaskState } from '../engine/EntityMovementTick.js';
 import { pickupFragment, deliverToDepot } from './Logistics.js';
@@ -83,13 +83,7 @@ export function tickHaulingProgress(state: GameState, vehicle: Vehicle): void {
           b => b.id === vehicle.haulingDepotBuildingId && b.active,
         );
         if (depotBuilding) {
-          const approach = findBuildingApproachCell(
-            state.navGrid,
-            depotBuilding,
-            getBuildingDef(depotBuilding.type, depotBuilding.tier),
-            vehicle.x,
-            vehicle.z,
-          );
+          const approach = resolveDepotApproach(state, depotBuilding, vehicle);
           vehicle.targetX = approach.x;
           vehicle.targetZ = approach.z;
         }
@@ -111,10 +105,7 @@ export function tickHaulingProgress(state: GameState, vehicle: Vehicle): void {
     return;
   }
 
-  // A building's raw (x, z) is always NavGrid-blocked (see
-  // findBuildingApproachCell's doc) — target the nearest walkable ring cell
-  // around the depot instead (#437).
-  const approach = findBuildingApproachCell(state.navGrid, building, getBuildingDef(building.type, building.tier), vehicle.x, vehicle.z);
+  const approach = resolveDepotApproach(state, building, vehicle);
   vehicle.task = 'moving';
   vehicle.targetX = approach.x;
   vehicle.targetZ = approach.z;
@@ -129,6 +120,16 @@ export function tickHaulingProgress(state: GameState, vehicle: Vehicle): void {
     vehicle.task = 'idle';
   }
   tickVehicleTaskState(vehicle);
+}
+
+/**
+ * Resolve the nearest walkable NavGrid cell on the ring around a depot
+ * building, closest to the vehicle. A building's raw (x, z) is always
+ * NavGrid-blocked (see findBuildingApproachCell's doc), so both hauling
+ * legs that target a depot go through this instead (#437).
+ */
+function resolveDepotApproach(state: GameState, building: Building, vehicle: Vehicle): { x: number; z: number } {
+  return findBuildingApproachCell(state.navGrid, building, getBuildingDef(building.type, building.tier), vehicle.x, vehicle.z);
 }
 
 /** Cancel an in-progress haul and return the vehicle to idle. */

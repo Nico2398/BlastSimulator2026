@@ -9,10 +9,6 @@
 // Training enrollment (enrolInTraining) is deliberately NOT arrival-gated:
 // it relocates the employee to the school instantly rather than queuing a
 // walk — see EmployeeTraining.ts and #410.
-//
-// RED PHASE: src/core/engine/ArrivalGate.ts's tickArrivalGate always throws
-// 'not implemented'. Every test below therefore fails until the implementer
-// fills in the real gating logic.
 
 import { describe, it, expect } from 'vitest';
 import { createGame } from '../../../src/core/state/GameState.js';

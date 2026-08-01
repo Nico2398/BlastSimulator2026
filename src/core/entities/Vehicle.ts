@@ -259,13 +259,21 @@ export const ROLE_LICENCE_REQUIRED: Record<VehicleRole, SkillCategory> = {
   drill_rig: 'driving.drill_rig',
 };
 
-/** Assign a driver (employee) to a vehicle, enforcing licence and availability checks. */
-export function assignDriver(
+/**
+ * Validate that an employee may become a vehicle's driver: vehicle exists,
+ * employee exists and is alive, holds the role's required licence, isn't
+ * already driving another vehicle, and the vehicle has no driver yet.
+ * Shared by `assignDriver` (immediate assignment) and
+ * `VehicleBoarding.requestBoardVehicle` (deferred, arrival-gated assignment,
+ * #437) so the two stay in lockstep — same checks, same order, same error
+ * strings — without duplicating the logic itself.
+ */
+export function canAssignDriver(
   vehicleState: VehicleState,
   employeeState: EmployeeState,
   vehicleId: number,
   employeeId: number,
-): { success: boolean; error?: string } {
+): { success: true; vehicle: Vehicle; employee: EmployeeState['employees'][number] } | { success: false; error: string } {
   const vehicle = vehicleState.vehicles.find(v => v.id === vehicleId);
   if (!vehicle) return { success: false, error: 'Vehicle not found' };
 
@@ -281,7 +289,20 @@ export function assignDriver(
 
   if (vehicle.driverId !== null) return { success: false, error: 'Vehicle already has a driver' };
 
-  vehicle.driverId = employeeId;
+  return { success: true, vehicle, employee };
+}
+
+/** Assign a driver (employee) to a vehicle, enforcing licence and availability checks. */
+export function assignDriver(
+  vehicleState: VehicleState,
+  employeeState: EmployeeState,
+  vehicleId: number,
+  employeeId: number,
+): { success: boolean; error?: string } {
+  const check = canAssignDriver(vehicleState, employeeState, vehicleId, employeeId);
+  if (!check.success) return check;
+
+  check.vehicle.driverId = employeeId;
   return { success: true };
 }
 

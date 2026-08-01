@@ -5,10 +5,6 @@
 // (destinationX/Z + pendingDriverVehicleId) — it never sets vehicle.driverId
 // synchronously. ArrivalGate.tickArrivalGate is the only place driverId gets
 // set, once the employee has actually walked to the vehicle.
-//
-// RED PHASE: src/core/entities/VehicleBoarding.ts's requestBoardVehicle always
-// throws 'not implemented'. Every test below fails until the implementer
-// fills in the real request logic.
 
 import { describe, it, expect } from 'vitest';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';

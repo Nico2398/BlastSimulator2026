@@ -220,9 +220,6 @@ describe('placeBuilding — research gating', () => {
 });
 
 // ── findNearestActiveBuildingOfType (issue #437 — arrival-gated actions) ────
-//
-// RED PHASE: the function currently always throws 'not implemented'. Every
-// test below fails until the implementer fills in the real nearest-search.
 
 describe('findNearestActiveBuildingOfType', () => {
   it('returns null when no building of that type exists at all', () => {
