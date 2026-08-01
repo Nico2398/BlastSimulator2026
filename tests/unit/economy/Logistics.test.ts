@@ -298,6 +298,44 @@ describe('consumeStoredOre', () => {
     expect(state.storedMassKg).toBe(200);
   });
 
+  it('rejects a non-finite amount (NaN), leaving state and collectedOre untouched', () => {
+    const state = createLogisticsState();
+    const frag = makeStoredFragment(1, 500, 0.04, { oreH: 1.0 }); // 100kg oreH
+    putInStorage(state, frag);
+    const collectedOre: Record<string, number> = { oreH: 100 };
+    const collectedOreBefore = { ...collectedOre };
+    const storedMassBefore = state.storedMassKg;
+
+    const result = consumeStoredOre(state, collectedOre, 'oreH', NaN);
+
+    expect(result.success).toBe(false);
+    expect(result.consumedKg).toBe(0);
+    expect(result.error).toBeDefined();
+    expect(result.error!.length).toBeGreaterThan(0);
+    expect(collectedOre).toEqual(collectedOreBefore);
+    expect(state.storedMassKg).toBe(storedMassBefore);
+    expect(getFragmentCounts(state).stored).toBe(1);
+  });
+
+  it('rejects a non-finite amount (Infinity), leaving state and collectedOre untouched', () => {
+    const state = createLogisticsState();
+    const frag = makeStoredFragment(1, 500, 0.04, { oreI: 1.0 }); // 100kg oreI
+    putInStorage(state, frag);
+    const collectedOre: Record<string, number> = { oreI: 100 };
+    const collectedOreBefore = { ...collectedOre };
+    const storedMassBefore = state.storedMassKg;
+
+    const result = consumeStoredOre(state, collectedOre, 'oreI', Infinity);
+
+    expect(result.success).toBe(false);
+    expect(result.consumedKg).toBe(0);
+    expect(result.error).toBeDefined();
+    expect(result.error!.length).toBeGreaterThan(0);
+    expect(collectedOre).toEqual(collectedOreBefore);
+    expect(state.storedMassKg).toBe(storedMassBefore);
+    expect(getFragmentCounts(state).stored).toBe(1);
+  });
+
   it('multi-ore fragment: consuming one ore type also decrements every other ore the removed fragment touched', () => {
     const state = createLogisticsState();
     // volume 0.06 × 0.5 density × 2500 = 75kg for each of oreF and oreG.
