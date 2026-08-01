@@ -47,6 +47,20 @@ describe('getBiome / getAllBiomes', () => {
     const alpine = getBiome('alpine_granite')!;
     expect(desert.pvAmplitude).toBeLessThan(alpine.pvAmplitude);
   });
+
+  it('every biome has a forestDensity within [0, 1]', () => {
+    for (const b of getAllBiomes()) {
+      expect(b.forestDensity).toBeGreaterThanOrEqual(0);
+      expect(b.forestDensity).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('tropical_karst is denser forest than the arid biomes (#458 T1.4)', () => {
+    const tropical = getBiome('tropical_karst')!;
+    for (const aridId of ['desert_badlands', 'red_canyon', 'volcanic_flats']) {
+      expect(tropical.forestDensity).toBeGreaterThan(getBiome(aridId)!.forestDensity);
+    }
+  });
 });
 
 describe('computeBiomeWeights', () => {
