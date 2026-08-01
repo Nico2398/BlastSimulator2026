@@ -38,6 +38,9 @@ export function regenerateGrid(
   const { seed, preset, sizeX, sizeY, sizeZ } = params;
   ctx.grid = generateTerrain({ sizeX, sizeY, sizeZ, seed, preset });
   buildGameNavGrid(ctx.state, ctx.grid, ctx.state.buildings.buildings, ctx.state.drillHoles);
+  ctx.emitter.emit('terrain:updated', {
+    region: { minX: 0, minY: 0, minZ: 0, maxX: sizeX - 1, maxY: sizeY - 1, maxZ: sizeZ - 1 },
+  });
 }
 
 export function newGameCommand(

@@ -55,34 +55,23 @@ describe('GameRenderer — diagnostics accessors', () => {
 });
 
 describe('GameRenderer — onBlast()', () => {
-  it('routes to terrain.update() rather than a direct buildAll() call when fragment positions are available', () => {
+  it('no longer remeshes terrain itself — that is driven by the terrain:updated event (#458 T0.2)', () => {
     const renderer = new GameRenderer(makeMockSceneManager() as any);
     const ctx = makeCtx();
     renderer.syncFromContext(ctx);
 
     const updateSpy = vi.spyOn(renderer.terrain!, 'update');
+    const buildAllSpy = vi.spyOn(renderer.terrain!, 'buildAll');
     ctx.lastBlastFragments = [{ x: 10, y: 5, z: 10 }];
 
     renderer.onBlast(ctx);
 
-    // TerrainMesh.update() currently rebuilds via buildAll() internally
-    // (documented as "simple but correct"), so buildAll IS invoked — just
-    // not directly by onBlast. This asserts the onBlast routing, not
-    // TerrainMesh's internal remesh strategy.
-    expect(updateSpy).toHaveBeenCalledWith(ctx.lastBlastFragments);
-  });
-
-  it('falls back to a full rebuild when fragment position data is unavailable', () => {
-    const renderer = new GameRenderer(makeMockSceneManager() as any);
-    const ctx = makeCtx();
-    renderer.syncFromContext(ctx);
-
-    const buildAllSpy = vi.spyOn(renderer.terrain!, 'buildAll');
-    ctx.lastBlastFragments = [];
-
-    renderer.onBlast(ctx);
-
-    expect(buildAllSpy).toHaveBeenCalled();
+    // executeBlast emits terrain:updated as part of the blast command itself;
+    // main.ts's subscription calls gameRenderer.rebuildTerrain() from that
+    // event, before onBlast() ever runs. onBlast() now only owns fragment
+    // meshes and blast effects, not the terrain mesh.
+    expect(updateSpy).not.toHaveBeenCalled();
+    expect(buildAllSpy).not.toHaveBeenCalled();
   });
 
   it('spawns fragment meshes when full fragment data is available', () => {

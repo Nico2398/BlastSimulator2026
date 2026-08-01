@@ -2,6 +2,7 @@
 // A drill plan is a set of holes. Each hole has position, depth, and diameter.
 
 import { type VoxelGrid, computeVoxelColumnSurfaceY } from '../world/VoxelGrid.js';
+import type { EventEmitter } from '../state/EventEmitter.js';
 
 export interface DrillHole {
   id: string;
@@ -74,6 +75,7 @@ export function digVoxel(
   x: number,
   y: number,
   z: number,
+  emitter?: EventEmitter,
 ): DigVoxelResult {
   const fail = (error: string): DigVoxelResult => ({
     success: false,
@@ -91,6 +93,7 @@ export function digVoxel(
   }
 
   grid.clearVoxel(x, y, z);
+  emitter?.emit('terrain:updated', { region: { minX: x, maxX: x, minY: y, maxY: y, minZ: z, maxZ: z } });
 
   const newSurfaceY = computeVoxelColumnSurfaceY(grid, x, z);
 

@@ -116,6 +116,13 @@ emitter.on('revolt:triggered', () => {
 emitter.on('revolt:warning', ({ ticksRemaining }) => {
   uiManager.showNotification?.(t('notification.revolt_warning', { ticksRemaining }));
 });
+// Terrain mesh rebuild is event-driven, not command-name-matched: every voxel
+// mutator (generation, blast, drill, ramp) emits this after mutating the grid
+// (#458 T0.2). Runs synchronously inside runCommand(), before onBlast() below
+// ever sees the command result — so onBlast() no longer needs its own remesh.
+emitter.on('terrain:updated', () => {
+  gameRenderer.rebuildTerrain();
+});
 
 declare global {
   interface Window {
@@ -161,16 +168,11 @@ window.__gameConsole = (cmd: string) => {
     mainMenu.hide();
   }
 
-  // Trigger blast effects and terrain rebuild after a blast
+  // Trigger blast effects after a blast (terrain remesh already happened via
+  // the terrain:updated subscription above, fired from inside executeBlast).
   if (cmdName === 'blast' && result.success && ctx.state) {
     gameRenderer.onBlast(ctx);
-    // Force full terrain rebuild to ensure mesh reflects voxel changes
-    gameRenderer.rebuildTerrain();
     audioHooks.onBlast(ctx.state.sequenceDelays);
-  }
-  // Rebuild terrain after ramp carving (build_ramp mutates the voxel grid)
-  if (cmdName === 'build_ramp' && result.success && ctx.state) {
-    gameRenderer.rebuildTerrain();
   }
   // Show blast plan overlay during planning commands, and refresh it whenever
   // a preview command runs or software tier changes — otherwise the overlay's

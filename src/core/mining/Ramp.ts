@@ -4,6 +4,7 @@
 
 import { formatMoney } from '../economy/formatMoney.js';
 import { computeVoxelColumnSurfaceY, type VoxelGrid } from '../world/VoxelGrid.js';
+import type { EventEmitter } from '../state/EventEmitter.js';
 
 // ── Config ──
 
@@ -56,6 +57,7 @@ export function buildRamp(
   grid: VoxelGrid,
   ramp: RampDef,
   cash: number,
+  emitter?: EventEmitter,
 ): RampResult {
   const totalCost = ramp.length * RAMP_COST_PER_METER;
 
@@ -73,6 +75,7 @@ export function buildRamp(
 
   const offset = DIR_OFFSETS[ramp.direction];
   let voxelsCleared = 0;
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity;
 
   // Perpendicular direction for width
   const perpDx = offset.dz !== 0 ? 1 : 0;
@@ -100,15 +103,19 @@ export function buildRamp(
       const wz = cz + perpDz * w;
 
       for (let y = floorY; y < ceilingY; y++) {
-        if (grid.isInBounds(wx, y, wz)) {
-          const voxel = grid.getVoxel(wx, y, wz);
-          if (voxel && voxel.density > 0) {
-            grid.clearVoxel(wx, y, wz);
-            voxelsCleared++;
-          }
+        if (grid.densityAt(wx, y, wz) > 0) {
+          grid.clearVoxel(wx, y, wz);
+          voxelsCleared++;
+          minX = Math.min(minX, wx); maxX = Math.max(maxX, wx);
+          minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+          minZ = Math.min(minZ, wz); maxZ = Math.max(maxZ, wz);
         }
       }
     }
+  }
+
+  if (voxelsCleared > 0) {
+    emitter?.emit('terrain:updated', { region: { minX, maxX, minY, maxY, minZ, maxZ } });
   }
 
   return {

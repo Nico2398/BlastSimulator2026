@@ -20,6 +20,7 @@ import {
 import { getRock } from '../world/RockCatalog.js';
 import { getOre } from '../world/OreCatalog.js';
 import { VoxelGrid, computeVoxelColumnSurfaceY } from '../world/VoxelGrid.js';
+import type { EventEmitter } from '../state/EventEmitter.js';
 import { getBuildingDef, destroyBuilding, type BuildingState, type Building, type BuildingType } from '../entities/Building.js';
 import {
   SOLID_VOXEL_DENSITY_THRESHOLD,
@@ -130,6 +131,7 @@ export function executeBlast(
   villages: readonly VillagePosition[],
   groundFactor: number = DEFAULT_GROUND_FACTOR,
   buildingState?: BuildingState,
+  emitter?: EventEmitter,
 ): BlastResult | null {
   // 1. Validate
   const errors = validateBlastPlan(plan);
@@ -144,6 +146,10 @@ export function executeBlast(
 
   // 2b. Calculate blast zone bounding box anchored at the surface
   const bbox = calculateBlastZone(plan.holes, holeSurfaceYs);
+
+  const blastCenter = calculateBlastCenter(plan.holes);
+  const originY = Math.max(0, ...Object.values(holeSurfaceYs));
+  emitter?.emit('blast:started', { originX: blastCenter.x, originY, originZ: blastCenter.z });
 
   // 3-4. Process each voxel: energy → fragmentation → fragments
   const fragments: FragmentData[] = [];
@@ -278,6 +284,22 @@ export function executeBlast(
     }
   }
 
+  // 5c. Terrain changed — tell subscribers (renderer remesh, navgrid patch
+  //     callers already use clearedRegion directly) the exact voxel AABB that
+  //     changed, covering both the fracture-pass clears and anything the
+  //     crater pass added afterward.
+  if (toClear.length > 0) {
+    const updatedRegion = toClear.reduce(
+      (acc, { x, y, z }) => ({
+        minX: Math.min(acc.minX, x), maxX: Math.max(acc.maxX, x),
+        minY: Math.min(acc.minY, y), maxY: Math.max(acc.maxY, y),
+        minZ: Math.min(acc.minZ, z), maxZ: Math.max(acc.maxZ, z),
+      }),
+      { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity, minZ: Infinity, maxZ: -Infinity },
+    );
+    emitter?.emit('terrain:updated', { region: updatedRegion });
+  }
+
   // 5b. Check for building destruction: if any cleared voxel's (x, z) falls
   //     within a building's footprint, the building is destroyed.
   const destroyedBuildings: DestroyedBuildingInfo[] = [];
@@ -337,7 +359,6 @@ export function executeBlast(
   const effectiveGroundFactor = groundFactor * (vibModCount > 0 ? vibModSum / vibModCount : 1);
 
   const chargePerDelay = groupChargesByDelay(plan.holes, plan.charges, plan.delays);
-  const blastCenter = calculateBlastCenter(plan.holes);
   const vibrationAtVillages: VillageVibration[] = villages.map(v => {
     const dx = v.position.x - blastCenter.x;
     const dz = v.position.z - blastCenter.z;
@@ -363,6 +384,8 @@ export function executeBlast(
 
   const maxVibration = vibrationAtVillages.reduce((m, v) => Math.max(m, v.vibration), 0);
   const rating = calculateRating(projectionCount, oversizedFragments, clearedVoxels, maxVibration, fragments.length);
+
+  emitter?.emit('blast:ended', undefined);
 
   return {
     fragments,

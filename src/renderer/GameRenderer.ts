@@ -320,14 +320,9 @@ export class GameRenderer {
       this.blastOverlay.hide();
     }
 
-    // Localized terrain remesh: only rebuild chunks containing affected voxels.
-    // Fragment positions tell us exactly which voxels were blasted.
-    if (ctx.lastBlastFragments && ctx.lastBlastFragments.length > 0) {
-      this.terrain.update(ctx.lastBlastFragments);
-    } else {
-      // Fallback: full rebuild (e.g. if fragment data unavailable)
-      this.terrain.buildAll();
-    }
+    // Terrain remesh already happened: executeBlast emits terrain:updated,
+    // which main.ts's subscription turns into rebuildTerrain() synchronously
+    // before this method ever runs (#458 T0.2) — no longer this method's job.
 
     // Spawn fragment meshes for the blasted rock
     if (this.fragments && ctx.lastBlastFragmentData && ctx.lastBlastFragmentData.length > 0) {

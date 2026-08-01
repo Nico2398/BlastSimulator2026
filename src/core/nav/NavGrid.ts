@@ -35,7 +35,8 @@ export interface NavCell {
 export class NavGrid {
   readonly width: number;
   readonly height: number;
-  readonly maxSurfaceY: number;
+  /** Not readonly: patchNavGrid corrects this in place when a patch lowers the grid's tallest column. */
+  maxSurfaceY: number;
   readonly cells: NavCell[][];
 
   constructor(width: number, height: number, cells: NavCell[][], maxSurfaceY: number = 0) {
@@ -132,11 +133,30 @@ export class NavGrid {
     // Defensive check for regions entirely outside grid bounds after clamping
     if (minX > maxX || minZ > maxZ) return;
 
+    // Excavation (blast/drill/ramp) only ever lowers terrain, so the grid-wide
+    // maxSurfaceY can only go stale if this patch contained the column that
+    // WAS the tallest. A cell whose old benchLevel was 0 sat in that top band
+    // under the old maxSurfaceY — cheap to check before overwriting it below.
+    let mayHaveLoweredThePeak = false;
+
     for (let z = minZ; z <= maxZ; z++) {
       for (let x = minX; x <= maxX; x++) {
+        if (navGrid.cells[z]![x]!.benchLevel === 0) mayHaveLoweredThePeak = true;
         const surfaceY = NavGrid.computeSurfaceY(voxelGrid, x, z);
         const cellType = NavGrid.classifyCellType(x, z, voxelGrid, buildings, drillHoles, surfaceY);
         navGrid.cells[z]![x] = NavGrid.makeCell(cellType, NavGrid.computeBenchLevel(navGrid.maxSurfaceY, surfaceY));
+      }
+    }
+
+    // Rare: only when the patch may have touched the grid's tallest column.
+    // Cells outside the patch keep bench levels computed against the old
+    // maxSurfaceY until their own next patch or a full rebuild touches them —
+    // correcting maxSurfaceY itself is the load-bearing fix; a full grid-wide
+    // bench-level rebuild on every patch would defeat the point of patching.
+    if (mayHaveLoweredThePeak) {
+      const freshMax = NavGrid.computeMaxSurfaceY(voxelGrid);
+      if (freshMax !== navGrid.maxSurfaceY) {
+        navGrid.maxSurfaceY = freshMax;
       }
     }
   }
