@@ -1,6 +1,6 @@
 {
   "name": "hauling-gate",
-  "description": "Arrival-gated debris hauling (issue #437): a debris_hauler drives to a blast fragment, loads it only on arrival, drives to the nearest freight_warehouse, and delivers it only on arrival — fragment.state and logistics.storedMassKg only change after both travel legs complete. NOTE: the vehicle haul console subcommand does not exist yet (implementer adds it) — this scenario is expected to fail/error at the \"vehicle haul\" step until that lands.",
+  "description": "Arrival-gated debris hauling (issue #437): 'vehicle haul <id> fragment:<id>' sets hauling intent only — a debris_hauler then drives to the blast fragment, loads it only on arrival, drives to the nearest freight_warehouse, and delivers it only on arrival. Immediately after the haul command (before the first post-command tick block), the fragment must still be on_ground/untransported — the state dump right after 'vehicle haul' proves the task did not start/complete instantly. After the first tick 20 the vehicle should be in transit (fragment picked up, hauling toward the depot) or already delivered; after the following tick 40 the fragment must be state:stored and logistics.storedMassKg increased.",
   "steps": [
     {
       "command": "new_game seed:42 cash:100000",
@@ -138,6 +138,24 @@
       ]
     },
     {
+      "command": "fragments",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "fragments"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
       "command": "tick 20",
       "interaction": [
         {
@@ -165,11 +183,11 @@
       ]
     },
     {
-      "command": "tick 20",
+      "command": "tick 40",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 20"
+          "command": "tick 40"
         }
       ]
     },

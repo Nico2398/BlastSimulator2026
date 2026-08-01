@@ -156,9 +156,14 @@ function markVehicleWaiting(vehicle: Vehicle): void {
 }
 
 function canTickVehicle(vehicle: Vehicle): boolean {
-  // moveVehicle() sets task='moving'; vehicle state may still be 'idle' on the very first tick.
+  // moveVehicle() sets task='moving'; vehicle state may still be 'idle' on the very first
+  // tick, or 'working' when a caller just switched task off a work task (e.g. HaulingTask's
+  // to_fragment->pickup->to_depot transition leaves state='working' from the tick it loaded —
+  // #437). task is the sole authority on whether a vehicle should move; state is a derived
+  // display value tickVehicleTaskState/tickVehicle themselves update, so it must never block
+  // a 'moving' task from actually ticking.
   return vehicle.task === 'moving' &&
-    (vehicle.state === 'idle' || vehicle.state === 'moving' || vehicle.state === 'waiting');
+    (vehicle.state === 'idle' || vehicle.state === 'moving' || vehicle.state === 'waiting' || vehicle.state === 'working');
 }
 
 function setVehicleIdle(vehicle: Vehicle): void {
