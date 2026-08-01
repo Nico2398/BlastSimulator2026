@@ -2352,6 +2352,8 @@
   "ui.build.research_failed_already_unlocked": "Ce niveau est déjà débloqué.",
   "ui.build.research_failed_already_queued": "Ce niveau est déjà en cours de recherche.",
   "ui.build.research_failed_insufficient_funds": "Fonds insuffisants pour lancer la recherche.",
+  "ui.build.research_failed_no_research_center": "Construisez un Centre de recherche avant de lancer une recherche.",
+  "ui.build.research_failed_conditions_not_met": "Les prérequis de ce niveau ne sont pas encore remplis.",
   "ui.vehicles.title": "Véhicules",
   "ui.vehicles.buy": "Acheter",
   "ui.vehicles.assign": "Assigner",

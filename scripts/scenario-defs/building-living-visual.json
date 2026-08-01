@@ -3,12 +3,22 @@
   "description": "Visual check of living quarters tiers and employee needs display with hunger and fatigue gauges",
   "steps": [
     {
-      "command": "new_game seed:42",
+      "command": "new_game seed:42 cash:200000",
       "timeout": 10,
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42"
+          "command": "new_game seed:42 cash:200000"
+        }
+      ]
+    },
+    {
+      "command": "build research_center at:30,5",
+      "description": "Placed before any research is queued — a placed research_center is a hard prerequisite (#442) to queue a research task at all.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build research_center at:30,5"
         }
       ]
     },

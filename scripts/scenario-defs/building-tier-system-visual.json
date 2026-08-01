@@ -13,13 +13,44 @@
       ]
     },
     {
-      "command": "build living_quarters at:5,5 tier:1",
-      "description": "Placed by clicking the Build panel's catalog row for living_quarters and picking the tile.",
+      "command": "build research_center at:25,15",
+      "description": "Placed first — a research_center is a hard prerequisite (#442) to queue any research task below.",
       "interaction": [
         {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"build\"]"
         },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 25,
+          "z": 15
+        },
+        {
+          "type": "wait",
+          "durationMs": 200
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "wait",
+          "durationMs": 500
+        }
+      ]
+    },
+    {
+      "command": "build living_quarters at:5,5 tier:1",
+      "description": "Placed by clicking the Build panel's catalog row for living_quarters and picking the tile. The Build panel is already open from the research_center step above — re-clicking the toolbar toggle here would close it (UIManager.togglePanel), so this step goes straight to the catalog row.",
+      "interaction": [
         {
           "type": "clickSelector",
           "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn"
@@ -49,48 +80,7 @@
     },
     {
       "command": "research queue type:living_quarters tier:2",
-      "description": "Queued by clicking the placed building's real 'Queue Research' button — the only in-game path to unlock tier 2, not a console shortcut.",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-build-panel [data-building-id=\"1\"] .bs-build-research-btn"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-build-panel [data-building-id=\"1\"] .bs-build-research-btn"
-        },
-        {
-          "type": "wait",
-          "durationMs": 300
-        }
-      ]
-    },
-    {
-      "command": "tick 50",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 50"
-        }
-      ]
-    },
-    {
-      "command": "build upgrade 1",
-      "description": "Upgraded by clicking the placed building's Upgrade button, now enabled because tier 2 finished researching.",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-build-panel [data-building-id=\"1\"] .bs-build-upgrade-btn"
-        },
-        {
-          "type": "wait",
-          "durationMs": 300
-        }
-      ]
-    },
-    {
-      "command": "research queue type:living_quarters tier:3",
-      "description": "Queued by clicking the upgraded building's (now #2) real 'Queue Research' button.",
+      "description": "Queued by clicking the placed building's real 'Queue Research' button — the only in-game path to unlock tier 2, not a console shortcut. Building #2 (research_center placed above is #1).",
       "interaction": [
         {
           "type": "waitForSelector",
@@ -117,11 +107,52 @@
     },
     {
       "command": "build upgrade 2",
-      "description": "Upgraded to tier 3 by clicking the Upgrade button on building #2, now enabled because tier 3 finished researching.",
+      "description": "Upgraded by clicking the placed building's Upgrade button, now enabled because tier 2 finished researching.",
       "interaction": [
         {
           "type": "clickSelector",
           "selector": "#bs-build-panel [data-building-id=\"2\"] .bs-build-upgrade-btn"
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
+        }
+      ]
+    },
+    {
+      "command": "research queue type:living_quarters tier:3",
+      "description": "Queued by clicking the upgraded building's (now #3) real 'Queue Research' button.",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-build-panel [data-building-id=\"3\"] .bs-build-research-btn"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-building-id=\"3\"] .bs-build-research-btn"
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
+        }
+      ]
+    },
+    {
+      "command": "tick 50",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ]
+    },
+    {
+      "command": "build upgrade 3",
+      "description": "Upgraded to tier 3 by clicking the Upgrade button on building #3, now enabled because tier 3 finished researching.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-building-id=\"3\"] .bs-build-upgrade-btn"
         },
         {
           "type": "wait",
@@ -161,16 +192,16 @@
       ]
     },
     {
-      "command": "build destroy 4",
-      "description": "Demolished by clicking building #4's Demolish button.",
+      "command": "build destroy 5",
+      "description": "Demolished by clicking building #5's (management_office) Demolish button.",
       "interaction": [
         {
           "type": "waitForSelector",
-          "selector": "#bs-build-panel [data-building-id=\"4\"] .bs-build-demolish-btn"
+          "selector": "#bs-build-panel [data-building-id=\"5\"] .bs-build-demolish-btn"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-build-panel [data-building-id=\"4\"] .bs-build-demolish-btn"
+          "selector": "#bs-build-panel [data-building-id=\"5\"] .bs-build-demolish-btn"
         },
         {
           "type": "wait",

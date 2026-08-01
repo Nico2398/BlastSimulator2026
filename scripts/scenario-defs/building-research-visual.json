@@ -41,6 +41,16 @@
       ]
     },
     {
+      "command": "research queue type:research_center tier:3",
+      "description": "Rejected (conditions_not_met) — tier-2 research is queued but has not been processed by a tick yet, so its own tier-2 research is not yet 'completed'. Demonstrates the tier-ordering gate before the flow continues below to tick tier-2 to completion.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "research queue type:research_center tier:3"
+        }
+      ]
+    },
+    {
       "command": "tick 50",
       "interaction": [
         {
