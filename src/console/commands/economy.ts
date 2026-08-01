@@ -9,7 +9,7 @@ import {
   deliverMaterials,
 } from '../../core/economy/Contract.js';
 import { negotiateContract } from '../../core/economy/Negotiation.js';
-import { getFragmentCounts } from '../../core/economy/Logistics.js';
+import { getFragmentCounts, consumeStoredOre } from '../../core/economy/Logistics.js';
 import { Random } from '../../core/math/Random.js';
 
 function requireGame(ctx: GameContext): CommandResult | null {
@@ -134,10 +134,23 @@ export function contractCommand(
     case 'deliver': {
       const id = parseInt(args[1] ?? '', 10);
       const amount = parseFloat(named['amount'] ?? '0');
-      if (isNaN(id) || amount <= 0) {
+      if (isNaN(id) || !Number.isFinite(amount) || amount <= 0) {
         return { success: false, output: 'Usage: contract deliver <id> amount:<kg>' };
       }
-      const result = deliverMaterials(state.contracts, id, amount, state.tickCount);
+      const contract = state.contracts.active.find(c => c.id === id);
+      if (!contract) {
+        return { success: false, output: `Contract #${id} not found or already completed.` };
+      }
+      const cappedAmount = Math.min(amount, contract.quantityKg - contract.deliveredKg);
+      if (cappedAmount <= 0) {
+        return { success: false, output: `Contract #${id} already fulfilled or has no outstanding quantity.` };
+      }
+      const consumption = consumeStoredOre(state.logistics, state.collectedOre, contract.materialId, cappedAmount);
+      if (!consumption.success) {
+        return { success: false, output: consumption.error ?? `Not enough ${contract.materialId || 'material'} in storage to deliver.` };
+      }
+      const deliverKg = Math.min(consumption.consumedKg, cappedAmount);
+      const result = deliverMaterials(state.contracts, id, deliverKg, state.tickCount);
       if (result.payment === 0 && !result.completed) {
         return { success: false, output: `Contract #${id} not found or already completed.` };
       }

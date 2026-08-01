@@ -4,6 +4,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { type GameContext, newGameCommand } from '../../src/console/commands/world.js';
 import { financesCommand, contractCommand } from '../../src/console/commands/economy.js';
+import { buildCommand } from '../../src/console/commands/entities.js';
+import { vehicleCommand } from '../../src/console/commands/vehicle.js';
+import { tickCommand } from '../../src/console/commands/events.js';
 import { EventEmitter } from '../../src/core/state/EventEmitter.js';
 import {
   createFinanceState,
@@ -26,6 +29,7 @@ import {
 } from '../../src/core/economy/Contract.js';
 import { negotiateContract } from '../../src/core/economy/Negotiation.js';
 import { Random } from '../../src/core/math/Random.js';
+import type { FragmentData } from '../../src/core/mining/BlastExecution.js';
 
 // ── Contract fixture helpers ─────────────────────────────────────────────────
 
@@ -57,6 +61,32 @@ function insertOreSaleContract(
   };
   state.available.push(contract);
   return contract;
+}
+
+/**
+ * Push a fragment directly into warehouse storage (bypassing pickup/deliver)
+ * for `contract deliver` fixture setup — mirrors the unit-level `putInStorage`
+ * helper in tests/unit/economy/Logistics.test.ts.
+ */
+function pushStoredFragment(
+  ctx: GameContext,
+  id: number,
+  mass: number,
+  volume: number,
+  oreDensities: Record<string, number>,
+): void {
+  const fragment: FragmentData = {
+    id,
+    position: { x: 0, y: 0, z: 0 },
+    volume,
+    mass,
+    rockId: 'sandite',
+    oreDensities,
+    initialVelocity: { x: 0, y: 0, z: 0 },
+    isProjection: false,
+  };
+  ctx.state!.logistics.fragments.push({ fragment, state: 'stored', vehicleId: null });
+  ctx.state!.logistics.storedMassKg += mass;
 }
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
@@ -390,5 +420,112 @@ describe('Economy', () => {
     // Non-existent contract returns null
     const missing = negotiateContract(cs, 999, 100, rng);
     expect(missing).toBeNull();
+  });
+
+  // ── 11. Maintenance/fuel costs drain cash every tick (#456) ────────────────
+
+  it('ticking with owned buildings and vehicles and no active tasks strictly drains cash tick over tick', () => {
+    const buildResult = buildCommand(ctx, ['freight_warehouse'], { at: '5,5' });
+    expect(buildResult.success).toBe(true);
+
+    const buyResult = vehicleCommand(ctx, ['buy', 'debris_hauler'], {});
+    expect(buyResult.success).toBe(true);
+
+    const cashHistory: number[] = [ctx.state!.cash];
+    for (let i = 0; i < 5; i++) {
+      tickCommand(ctx, ['1'], {});
+      cashHistory.push(ctx.state!.cash);
+    }
+
+    // Cash must strictly decrease every single tick — building operating
+    // cost + vehicle maintenance cost, with nothing offsetting it (no active
+    // tasks, no sales).
+    for (let i = 1; i < cashHistory.length; i++) {
+      expect(cashHistory[i]).toBeLessThan(cashHistory[i - 1]!);
+    }
+
+    // The drain must be booked as categorized expense transactions.
+    const report = getFinancialReport(ctx.state!.finances, ctx.state!.tickCount);
+    const maintenanceCat = report.expensesByCategory.find(c => c.category === 'maintenance');
+    const fuelCat = report.expensesByCategory.find(c => c.category === 'fuel');
+    expect(maintenanceCat).toBeDefined();
+    expect(maintenanceCat!.total).toBeGreaterThan(0);
+    // Vehicle "fuel" expense category should also exist per issue #456's spec
+    // (getVehicleCostsPerTick routed through addExpense(..., 'fuel', ...)).
+    expect(fuelCat).toBeDefined();
+  });
+
+  // ── 12. No buildings/vehicles → no maintenance-category expenses ──────────
+
+  it('ticking with no buildings and no vehicles produces no new maintenance-category expense transactions', () => {
+    expect(ctx.state!.buildings.buildings.length).toBe(0);
+    expect(ctx.state!.vehicles.vehicles.length).toBe(0);
+
+    const transactionsBefore = ctx.state!.finances.transactions.length;
+
+    for (let i = 0; i < 5; i++) {
+      tickCommand(ctx, ['1'], {});
+    }
+
+    const newTransactions = ctx.state!.finances.transactions.slice(transactionsBefore);
+    const maintenanceOrFuel = newTransactions.filter(
+      t => t.category === 'maintenance' || t.category === 'fuel',
+    );
+    expect(maintenanceOrFuel).toHaveLength(0);
+  });
+
+  // ── 13. contract deliver amount validation & capping (#456) ────────────────
+
+  it('contract deliver rejects a non-finite amount and leaves cash unchanged', () => {
+    const c = insertOreSaleContract(ctx.state!.contracts, 100, 10);
+    const acceptResult = contractCommand(ctx, ['accept', String(c.id)], {});
+    expect(acceptResult.success).toBe(true);
+
+    const cashBefore = ctx.state!.cash;
+
+    const deliverResult = contractCommand(ctx, ['deliver', String(c.id)], { amount: 'garbage' });
+
+    expect(deliverResult.success).toBe(false);
+    expect(ctx.state!.cash).toBe(cashBefore);
+    expect(Number.isFinite(ctx.state!.cash)).toBe(true);
+  });
+
+  it('contract deliver caps an over-request to the contract\'s outstanding quantity, leaving surplus stock untouched', () => {
+    // Contract needs only 100kg of blingite.
+    const c = insertOreSaleContract(ctx.state!.contracts, 100, 10);
+    const acceptResult = contractCommand(ctx, ['accept', String(c.id)], {});
+    expect(acceptResult.success).toBe(true);
+
+    // Storage holds 300kg of blingite across three fragments (100kg each).
+    pushStoredFragment(ctx, 1, 500, 0.04, { blingite: 1.0 });
+    pushStoredFragment(ctx, 2, 500, 0.04, { blingite: 1.0 });
+    pushStoredFragment(ctx, 3, 500, 0.04, { blingite: 1.0 });
+    ctx.state!.collectedOre.blingite = 300;
+    const storedMassBefore = ctx.state!.logistics.storedMassKg;
+    expect(storedMassBefore).toBe(1500);
+    const cashBefore = ctx.state!.cash;
+
+    // Request far more than the contract needs.
+    const deliverResult = contractCommand(ctx, ['deliver', String(c.id)], { amount: '300' });
+
+    expect(deliverResult.success).toBe(true);
+    expect(deliverResult.output).toContain('Payment: $');
+
+    // Only the contract's real need (100kg) was consumed — one 100kg-of-blingite
+    // fragment removed, not all three.
+    expect(ctx.state!.collectedOre.blingite).toBe(200);
+    expect(ctx.state!.logistics.storedMassKg).toBe(1000);
+
+    // Payment matches the contract's actual need (100kg × $10/kg = $1000,
+    // plus the fixture's early-completion bonus of $150), not a payout sized
+    // to the requested 300kg.
+    expect(ctx.state!.cash).toBe(cashBefore + 1000 + 150);
+
+    // Contract is now fully delivered and completed.
+    expect(ctx.state!.contracts.active).toHaveLength(0);
+    const completed = ctx.state!.contracts.completedHistory.find(cc => cc.id === c.id);
+    expect(completed).toBeDefined();
+    expect(completed!.deliveredKg).toBe(100);
+    expect(completed!.completed).toBe(true);
   });
 });

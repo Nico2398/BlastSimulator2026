@@ -19,6 +19,7 @@ import { vehicleCommand } from '../../../src/console/commands/vehicle.js';
 import { setPolicyCommand } from '../../../src/console/commands/policy.js';
 import { stateCommand } from '../../../src/console/commands/state.js';
 import { getLevel } from '../../../src/core/campaign/Level.js';
+import { pickupFragment, deliverToDepot } from '../../../src/core/economy/Logistics.js';
 
 /** Starting cash comes from the level catalogue, not a copy of it. */
 const TUTORIAL_START_CASH = getLevel('tutorial_pit')!.startingCash;
@@ -176,7 +177,25 @@ describe('Tutorial Level — Full Walkthrough', () => {
     expect(buildResult.success).toBe(true);
     expect(ctx.state!.buildings.buildings.length).toBe(1);
 
-    // 22. Deliver 500kg to contract #1 — should generate positive payment
+    // 22. Deliver 500kg to contract #1 — should generate positive payment.
+    // Ore must actually be in storage first (#456 — blasting alone no longer
+    // credits cash/collectedOre; only hauled-and-stored fragments count).
+    // Fragments are moved into storage via Logistics.pickupFragment/
+    // deliverToDepot directly rather than driving the debris_hauler through
+    // full NavGrid pathfinding — that vehicle-driving mechanism (#437) is
+    // exercised by its own suites (HaulingTask.test.ts, ArrivalGate.test.ts);
+    // these are the exact two primitives HaulingTask.tickHaulingProgress
+    // calls internally on arrival.
+    const groundFragments = ctx.state!.logistics.fragments.filter(f => f.state === 'on_ground');
+    let stored = 0;
+    for (const f of groundFragments) {
+      if (stored >= 500) break;
+      pickupFragment(ctx.state!.logistics, f.fragment.id, 'vehicle-test');
+      deliverToDepot(ctx.state!.logistics, f.fragment.id, ctx.state!.collectedOre);
+      stored += f.fragment.mass;
+    }
+    expect(ctx.state!.logistics.storedMassKg).toBeGreaterThanOrEqual(500);
+
     const deliverResult = contractCommand(ctx, ['deliver', '1'], { amount: '500' });
     expect(deliverResult.success).toBe(true);
     expect(deliverResult.output).toContain('Payment: $');

@@ -97,7 +97,7 @@ export function deliverToDepot(
 export function sellFragment(
   state: LogisticsState,
   fragmentId: number,
-): { mass: number; oreDensities: Record<string, number> } | null {
+): { mass: number; volume: number; oreDensities: Record<string, number> } | null {
   const idx = state.fragments.findIndex(
     f => f.fragment.id === fragmentId && f.state === 'stored',
   );
@@ -109,8 +109,87 @@ export function sellFragment(
 
   return {
     mass: tracked.fragment.mass,
+    volume: tracked.fragment.volume,
     oreDensities: tracked.fragment.oreDensities,
   };
+}
+
+/**
+ * Consume up to `amountKg` of `materialId` ore from warehouse-stored fragments,
+ * removing whole fragments (via sellFragment) until the requested amount is
+ * covered, decrementing collectedOre[materialId] (and every other ore key each
+ * removed fragment touches) by the exact ore-kg physically removed.
+ * materialId === '' (rubble_disposal) consumes raw stored mass regardless of
+ * ore content — any fragment, ore-bearing or not.
+ */
+export function consumeStoredOre(
+  state: LogisticsState,
+  collectedOre: Record<string, number>,
+  materialId: string,
+  amountKg: number,
+): { success: boolean; consumedKg: number; error?: string } {
+  if (!Number.isFinite(amountKg) || amountKg <= 0) {
+    return {
+      success: false,
+      consumedKg: 0,
+      error: `Invalid amount requested: ${amountKg}.`,
+    };
+  }
+
+  if (materialId !== '') {
+    const available = collectedOre[materialId] ?? 0;
+    if (amountKg > available) {
+      return {
+        success: false,
+        consumedKg: 0,
+        error: `Not enough ${materialId} in storage: ${available.toFixed(1)} kg available, ${amountKg.toFixed(1)} kg requested.`,
+      };
+    }
+
+    // Oldest-first stored fragments containing this ore.
+    const storedIds = state.fragments
+      .filter(f => f.state === 'stored' && (f.fragment.oreDensities[materialId] ?? 0) > 0)
+      .map(f => f.fragment.id);
+
+    let tally = 0;
+    for (const id of storedIds) {
+      if (tally >= amountKg) break;
+      const sold = sellFragment(state, id);
+      if (!sold) continue;
+      const acc: Record<string, number> = {};
+      accumulateOreMass(acc, sold.volume, sold.oreDensities);
+      for (const [oreId, kg] of Object.entries(acc)) {
+        collectedOre[oreId] = (collectedOre[oreId] ?? 0) - kg;
+      }
+      tally += acc[materialId] ?? 0;
+    }
+
+    return { success: true, consumedKg: Math.min(tally, amountKg) };
+  }
+
+  // Rubble / no-ore materials: consume raw stored mass, any fragment, FIFO.
+  const available = state.storedMassKg;
+  if (amountKg > available) {
+    return {
+      success: false,
+      consumedKg: 0,
+      error: `Not enough stored material: ${available.toFixed(1)} kg available, ${amountKg.toFixed(1)} kg requested.`,
+    };
+  }
+
+  const storedIds = state.fragments
+    .filter(f => f.state === 'stored')
+    .map(f => f.fragment.id);
+
+  let removedMass = 0;
+  for (const id of storedIds) {
+    if (removedMass >= amountKg) break;
+    const sold = sellFragment(state, id);
+    if (!sold) continue;
+    removedMass += sold.mass;
+  }
+
+  return { success: true, consumedKg: Math.min(removedMass, amountKg) };
 }
 
 /**

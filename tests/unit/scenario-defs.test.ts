@@ -62,6 +62,8 @@ const FEATURE_SCENARIO_NAMES = [
   'level1-win-conservative',
   'level1-win-efficient',
   'hauling-gate',
+  'economy-full-loop',
+  'maintenance-cost-drain',
 ] as const;
 
 const VISUAL_SCENARIO_NAMES = [

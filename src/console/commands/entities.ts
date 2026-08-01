@@ -10,10 +10,12 @@ import {
   getBuildingDef,
   getDefSize,
   isPlacementBlockedByResearch,
+  getStorageCapacity,
   type BuildingType,
   type BuildingTier,
 } from '../../core/entities/Building.js';
 import { addExpense } from '../../core/economy/Finance.js';
+import { syncLogisticsCapacity } from '../../core/economy/Logistics.js';
 import { NavGrid } from '../../core/nav/NavGrid.js';
 import type { BlastRegion } from '../../core/mining/BlastExecution.js';
 import { defineZone, clearZone, isZoneClear, type ZoneBounds } from '../../core/entities/Zone.js';
@@ -36,6 +38,11 @@ function patchNavGrid(state: GameState, grid: VoxelGrid, region: BlastRegion): v
   if (state.navGrid) {
     NavGrid.patchNavGrid(state.navGrid, grid, state.buildings.buildings, state.drillHoles, region);
   }
+}
+
+/** Re-derive logistics storage capacity from the current warehouse total. Call after any building mutation (build/destroy/upgrade/move). */
+function refreshLogisticsCapacity(state: GameState): void {
+  syncLogisticsCapacity(state.logistics, getStorageCapacity(state.buildings));
 }
 
 // ── build command ──
@@ -71,6 +78,7 @@ export function buildCommand(
       state.cash -= destroyDef.demolishCost;
       addExpense(state.finances, destroyDef.demolishCost, 'construction', `Demolish ${toDestroy.type} #${id}`, state.tickCount);
       destroyBuilding(state.buildings, id);
+      refreshLogisticsCapacity(state);
       // Patch NavGrid for removed building footprint
       if (ctx.grid) {
         const { sizeX, sizeZ } = getDefSize(destroyDef);
@@ -99,6 +107,7 @@ export function buildCommand(
       }
       state.cash -= totalCost;
       addExpense(state.finances, totalCost, 'construction', `Upgrade ${upgradeType} to T${nextTier}`, state.tickCount);
+      refreshLogisticsCapacity(state);
       // Patch NavGrid covering both old and new footprint (size may change between tiers)
       if (ctx.grid) {
         const maxX = Math.max(getDefSize(oldDef).sizeX, getDefSize(newDef).sizeX);
@@ -126,6 +135,7 @@ export function buildCommand(
       if (!result.success) return { success: false, output: result.error! };
       state.cash -= result.cost!;
       addExpense(state.finances, result.cost!, 'construction', `Relocate building #${id}`, state.tickCount);
+      refreshLogisticsCapacity(state);
       // Patch NavGrid for old and new positions
       if (ctx.grid) {
         patchNavGrid(state, ctx.grid, makeFootprintRegion(oldX, oldZ, sizeX, sizeZ));
@@ -158,6 +168,7 @@ export function buildCommand(
       if (!result.success) return { success: false, output: result.error! };
       state.cash -= result.cost!;
       addExpense(state.finances, result.cost!, 'construction', `Build ${type} T${tier}`, state.tickCount);
+      refreshLogisticsCapacity(state);
       // Patch NavGrid for new building footprint
       if (ctx.grid) {
         const { sizeX, sizeZ } = getDefSize(getBuildingDef(type, tier));
