@@ -121,6 +121,15 @@ export class CameraController {
     return this.spherical.radius;
   }
 
+  /**
+   * The point the camera is looking at. Read by effects that key off where the
+   * player's attention is rather than where the camera happens to sit — the
+   * border wall lights up around this, not around the camera.
+   */
+  get viewTarget(): THREE.Vector3 {
+    return this.target;
+  }
+
   /** Point the camera looks at (can be updated externally for tracking). */
   setTarget(x: number, y: number, z: number): void {
     this.target.set(x, y, z);

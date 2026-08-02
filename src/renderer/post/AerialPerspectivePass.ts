@@ -10,7 +10,17 @@ import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 
 /** Haze thickens with proximity to the ground; literal from A21. */
 const DENSITY = 0.0016;
-const HEIGHT_FALLOFF = 60;
+/**
+ * How fast haze thins with altitude.
+ *
+ * A21's 60m made height dominate over distance at close range: an open pit is
+ * tens of metres below the ridge around it, so at a few hundred metres out the
+ * pit hazed roughly 40% harder than the ground immediately beside it and read
+ * as a cold blue hole punched through warm terrain. Height should tint a
+ * valley, not separate it from its own surroundings — at 220m the same drop is
+ * a ~13% difference, which reads as depth rather than as a different material.
+ */
+const HEIGHT_FALLOFF = 220;
 /** The playable pit stays haze-free up close — haze only kicks in past this distance. */
 const NEAR_START = 150;
 

@@ -25,6 +25,19 @@ export class PostPipeline {
   readonly gtao: GTAOPass;
   readonly aerial: AerialPerspectivePass;
 
+  /**
+   * Objects hidden while GTAO renders its depth/normal prepass.
+   *
+   * That prepass draws the whole scene with an override material, so
+   * depthWrite:false on a transparent overlay does not keep it out — it lands
+   * in the depth buffer like solid geometry. Everything behind it is then
+   * treated as occluded and shaded black, and the aerial pass, which
+   * reconstructs world position from the same depth texture, hazes it as if
+   * the overlay were the surface. A see-through effect has no business in
+   * either, so overlays are simply not present while that pass runs.
+   */
+  private readonly overlayObjects: THREE.Object3D[] = [];
+
   constructor(
     renderer: THREE.WebGLRenderer,
     scene: THREE.Scene,
@@ -36,6 +49,16 @@ export class PostPipeline {
     this.composer.addPass(new RenderPass(scene, camera));
 
     this.gtao = new GTAOPass(scene, camera, width, height);
+    const renderGtao = this.gtao.render.bind(this.gtao);
+    this.gtao.render = ((...args: Parameters<GTAOPass['render']>) => {
+      const wasVisible = this.overlayObjects.map((o) => o.visible);
+      for (const o of this.overlayObjects) o.visible = false;
+      try {
+        renderGtao(...args);
+      } finally {
+        this.overlayObjects.forEach((o, i) => { o.visible = wasVisible[i]!; });
+      }
+    }) as GTAOPass['render'];
     this.composer.addPass(this.gtao);
 
     // AerialPerspectivePass needs a per-pixel depth texture to reconstruct
@@ -64,6 +87,16 @@ export class PostPipeline {
 
     const dpr = renderer.getPixelRatio();
     this.composer.addPass(new SMAAPass(width * dpr, height * dpr));
+  }
+
+  /** Keep `object` out of the GTAO depth/normal prepass — see `overlayObjects`. */
+  addOverlayObject(object: THREE.Object3D): void {
+    if (!this.overlayObjects.includes(object)) this.overlayObjects.push(object);
+  }
+
+  removeOverlayObject(object: THREE.Object3D): void {
+    const i = this.overlayObjects.indexOf(object);
+    if (i >= 0) this.overlayObjects.splice(i, 1);
   }
 
   /**

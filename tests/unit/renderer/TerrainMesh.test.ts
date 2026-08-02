@@ -342,16 +342,14 @@ describe('TerrainMesh', () => {
     tm.dispose();
   });
 
-  it('sharedMaterial is a TerrainMaterial covering the grid extent as its playable rect (#458 T4.1)', () => {
+  it('sharedMaterial is a TerrainMaterial (#458 T4.1)', () => {
+    // The material no longer keeps a uPlayRect: the site edge is drawn by
+    // WorldBorderWall rather than shaded into the ground here.
     const scene = makeScene();
     const grid = new VoxelGrid(8, 12, 20);
     const tm = new TerrainMesh(scene, grid);
     expect(tm.sharedMaterial).toBeInstanceOf(TerrainMaterial);
-    const rect = tm.sharedMaterial.customUniforms['uPlayRect']!.value as THREE.Vector4;
-    expect(rect.x).toBe(0);
-    expect(rect.y).toBe(0);
-    expect(rect.z).toBe(8);
-    expect(rect.w).toBe(20);
+    expect(tm.sharedMaterial.customUniforms['uPlayRect']).toBeUndefined();
     tm.dispose();
   });
 });

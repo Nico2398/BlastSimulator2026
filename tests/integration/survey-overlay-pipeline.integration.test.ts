@@ -28,6 +28,7 @@ function makeMockSceneManager() {
     update: vi.fn(),
     setPanLeash: vi.fn(),
     distance: 100,
+    viewTarget: new THREE.Vector3(),
   };
   // Minimal fake CSM — attachCSM() reads .cascades synchronously; the rest
   // only matters inside onBeforeCompile, which these Node-only tests never

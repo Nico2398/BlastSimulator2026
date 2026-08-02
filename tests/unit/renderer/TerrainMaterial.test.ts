@@ -62,15 +62,6 @@ describe('TerrainMaterial', () => {
     }
   });
 
-  it('uPlayRect matches the constructor rect as (minX, minZ, maxX, maxZ)', () => {
-    const mat = makeMaterial();
-    const rect = mat.customUniforms['uPlayRect']!.value as THREE.Vector4;
-    expect(rect.x).toBe(PLAY_RECT.minX);
-    expect(rect.y).toBe(PLAY_RECT.minZ);
-    expect(rect.z).toBe(PLAY_RECT.maxX);
-    expect(rect.w).toBe(PLAY_RECT.maxZ);
-  });
-
   it('uCloudCoverage defaults to 0 — inert until T7.1 (#458 T4.1 scope)', () => {
     const mat = makeMaterial();
     expect(mat.customUniforms['uCloudCoverage']!.value).toBe(0);
@@ -79,10 +70,12 @@ describe('TerrainMaterial', () => {
     expect(offset.y).toBe(0);
   });
 
-  it('uBandStrength is live at the tuned default (#458 T5.3)', () => {
+  it('no longer darkens the ground at the site edge — WorldBorderWall marks it', () => {
+    // The band shaded a 5m strip of terrain, which read as a smudge rather
+    // than a boundary and was on screen whether or not the player cared.
     const mat = makeMaterial();
-    expect(mat.customUniforms['uBandStrength']!.value).toBe(0.35);
-    expect(mat.customUniforms['uBandStrength']!.value).toBeGreaterThan(0);
+    expect(mat.customUniforms['uBandStrength']).toBeUndefined();
+    expect(mat.customUniforms['uPlayRect']).toBeUndefined();
   });
 
   it('customProgramCacheKey returns a constant string (#458 A19 injection mechanics)', () => {
@@ -134,9 +127,9 @@ describe('TerrainMaterial', () => {
 
       expect(shader.fragmentShader).toContain('float fbm3(vec3 p)');
       expect(shader.fragmentShader).toContain('uniform vec3 uRockColor[12]');
-      expect(shader.fragmentShader).toContain('float boundaryBand(vec2 p)');
+      expect(shader.fragmentShader).not.toContain('boundaryBand');
       expect(shader.fragmentShader).toContain('float cloudShadow(vec2 p)');
-      expect(shader.fragmentShader).toContain('diffuseColor.rgb = clamp(col, 0.0, 1.0) * cloudShadow(vWorldPos.xz) * boundaryBand(vWorldPos.xz)');
+      expect(shader.fragmentShader).toContain('diffuseColor.rgb = clamp(col, 0.0, 1.0) * cloudShadow(vWorldPos.xz)');
       expect(shader.fragmentShader).not.toContain('#include <color_fragment>');
     });
 
@@ -201,7 +194,7 @@ describe('TerrainMaterial', () => {
 
       it('bumps the program cache key so the old compiled shader is not reused', () => {
         const mat = makeMaterial();
-        expect(mat.customProgramCacheKey()).toBe('terrain-material-v2');
+        expect(mat.customProgramCacheKey()).toBe('terrain-material-v4');
       });
     });
   });

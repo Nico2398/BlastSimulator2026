@@ -23,7 +23,7 @@ function makeMockSceneManager() {
   const sunLight = new THREE.DirectionalLight();
   const fill = new THREE.DirectionalLight();
   const ambient = new THREE.AmbientLight();
-  const cameraController = { setTarget: vi.fn(), frameSite: vi.fn(), update: vi.fn(), setPanLeash: vi.fn(), distance: 100 };
+  const cameraController = { setTarget: vi.fn(), frameSite: vi.fn(), update: vi.fn(), setPanLeash: vi.fn(), distance: 100, viewTarget: new THREE.Vector3() };
   // Minimal fake CSM — attachCSM() reads .cascades synchronously; the rest
   // (.camera/.maxFar/.getExtendedBreaks/.shaders) only matter inside
   // onBeforeCompile, which these Node-only tests never trigger a real
@@ -35,7 +35,11 @@ function makeMockSceneManager() {
     getExtendedBreaks: () => {},
     shaders: new Map(),
   };
-  const postPipeline = { aerial: { setHazeColor: vi.fn(), setHeightRef: vi.fn(), setGrade: vi.fn(), update: vi.fn() } };
+  const postPipeline = {
+    aerial: { setHazeColor: vi.fn(), setHeightRef: vi.fn(), setGrade: vi.fn(), update: vi.fn() },
+    addOverlayObject: vi.fn(),
+    removeOverlayObject: vi.fn(),
+  };
   return { scene, camera, sunLight, ambient, fill, csm, cameraController, postPipeline, renderer: { render: vi.fn() } as unknown };
 }
 

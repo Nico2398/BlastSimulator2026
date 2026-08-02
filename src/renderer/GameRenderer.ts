@@ -28,6 +28,7 @@ import { createAmbientUniforms, type AmbientUniforms } from './ambient/AmbientUn
 import { FragmentMesh } from './FragmentMesh.js';
 import { BlastEffects } from './BlastEffects.js';
 import { LandscapeMesh } from './terrain/LandscapeMesh.js';
+import { WorldBorderWall } from './WorldBorderWall.js';
 import { BlastPlanOverlay } from './BlastPlanOverlay.js';
 import { GhostMesh } from './GhostMesh.js';
 import { syncEntitySets, buildingCenterSurfaceY } from './EntitySync.js';
@@ -81,6 +82,7 @@ export class GameRenderer {
   private fragments: FragmentMesh | null = null;
   private blastEffects: BlastEffects | null = null;
   private landscape: LandscapeMesh | null = null;
+  private borderWall: WorldBorderWall | null = null;
   private blastOverlay: BlastPlanOverlay | null = null;
   private ghosts: GhostMesh | null = null;
   private lastGrid: VoxelGrid | null = null;
@@ -239,6 +241,7 @@ export class GameRenderer {
     if (this.windState) {
       const wind = this.windState.vector;
       this.ambientUniforms.uTime.value += dt;
+      this.borderWall?.update(dt, this.sm.cameraController.viewTarget);
       this.ambientUniforms.uWind.value.set(wind.x, wind.z);
       this.birds?.update(dt);
       this.smoke?.update(dt, wind, cam.position);
@@ -602,6 +605,18 @@ export class GameRenderer {
     // swap can call rebuildLandscapeMesh again for the same GameRenderer, so
     // stale instances from the previous grid must go first or their meshes
     // pile up in the scene).
+    // The site edge marker. Sized from the terrain's own height range so it
+    // stands on the ground rather than floating or being buried.
+    if (this.borderWall) this.sm.postPipeline.removeOverlayObject(this.borderWall.object3d);
+    this.borderWall?.dispose();
+    const terrainBounds = this.terrain.getBounds();
+    this.borderWall = new WorldBorderWall(this.sm.scene, {
+      rect: handle.playableRect,
+      minGroundY: terrainBounds?.minY ?? handle.groundLevelY,
+      maxGroundY: terrainBounds?.maxY ?? handle.groundLevelY + 20,
+    });
+    this.sm.postPipeline.addOverlayObject(this.borderWall.object3d);
+
     this.birds?.dispose();
     this.smoke?.dispose();
     this.water?.dispose();
@@ -655,6 +670,8 @@ export class GameRenderer {
     this.characters?.clearAll();
     this.skybox?.dispose();
     this.clouds?.dispose();
+    if (this.borderWall) this.sm.postPipeline.removeOverlayObject(this.borderWall.object3d);
+    this.borderWall?.dispose();
     this.birds?.dispose();
     this.smoke?.dispose();
     this.water?.dispose();
@@ -672,6 +689,7 @@ export class GameRenderer {
     this.vehicles = null;
     this.characters = null;
     this.skybox = null;
+    this.borderWall = null;
     this.windState = null;
     this.clouds = null;
     this.birds = null;

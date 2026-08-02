@@ -38,19 +38,31 @@ const ROCK_SLOTS = 12;
 /** getAllOres() has 8 entries today; same headroom convention as rocks. */
 const ORE_SLOTS = 10;
 
-/**
- * Boundary-band darkening strength, tuned against the finished post stack
- * (aerial perspective haze + ACES tonemapping) rather than the A19.2 spec's
- * bare default in isolation (#458 T5.3/D9). Verified via screenshots across
- * all 4 biomes and every weather state: legible up close without reading as
- * a global darkening of the landscape beyond ~5m (the band function's own
- * falloff already zeroes it there).
- */
-const BAND_STRENGTH = 0.35;
-
 // ---------- A19.1 — GLSL noise library ----------
+//
+// Detail is budgeted by view distance. The high-frequency octaves are the
+// expensive part and the least useful far away, where a whole octave can land
+// inside one pixel and alias into shimmer rather than texture. Every octave
+// past the first is therefore gated on distance: close surfaces get the full
+// stack, distant ones collapse to the macro shape.
+const DETAIL_FULL_DISTANCE = 40;   // metres — everything on
+// Detail is gone by here. The playable mesh is marching cubes at 1m against a
+// 4m landscape grid, so it carries far more geometric frequency; letting its
+// fine octaves run at range made the site fizz against smooth ground around
+// it. 550m left plenty of grain alive at the distances a zoomed-out player
+// actually looks from.
+const DETAIL_FADE_DISTANCE = 320;
+
 const NOISE_GLSL = `
-float hash13(vec3 p){ p = fract(p * 0.1031); p += dot(p, p.yzx + 33.33); return fract((p.x + p.y) * p.z); }
+// Three distinct multipliers, one per component. The original used 0.1031 for
+// all three, which made the hash symmetric in x/y/z: every point on a diagonal
+// hashed to the same value, and the noise carried a regular diagonal weave
+// that showed through the terrain at every zoom level as fine straight lines.
+float hash13(vec3 p){
+  p = fract(p * vec3(0.1031, 0.11369, 0.13787));
+  p += dot(p, p.yxz + 19.19);
+  return fract((p.x + p.y) * p.z);
+}
 float vnoise(vec3 p){
   vec3 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
   return mix(
@@ -58,6 +70,34 @@ float vnoise(vec3 p){
     mix(mix(hash13(i+vec3(0,0,1)), hash13(i+vec3(1,0,1)), f.x), mix(hash13(i+vec3(0,1,1)), hash13(i+vec3(1,1,1)), f.x), f.y),
     f.z);
 }
+
+/** 1 at the camera, 0 past DETAIL_FADE_DISTANCE. */
+float detailLod(vec3 wp){
+  float d = distance(wp, cameraPosition);
+  return 1.0 - smoothstep(float(${DETAIL_FULL_DISTANCE}), float(${DETAIL_FADE_DISTANCE}), d);
+}
+
+// Distance-budgeted FBM. Octaves switch off with range, and the running total
+// is divided by the weight actually used — without that the mean would slide
+// as octaves drop out and distant ground would visibly change brightness.
+// The branches are coherent across neighbouring pixels (they depend only on
+// distance), so the GPU really does skip the work rather than executing both
+// sides of each one.
+float fbm3lod(vec3 p, float lod){
+  float v = vnoise(p) * 0.5;
+  float w = 0.5;
+  float w2 = smoothstep(0.02, 0.25, lod);
+  if (w2 > 0.001) { v += vnoise(p * 2.03) * 0.30 * w2; w += 0.30 * w2; }
+  float w3 = smoothstep(0.30, 0.55, lod);
+  if (w3 > 0.001) { v += vnoise(p * 4.09) * 0.20 * w3; w += 0.20 * w3; }
+  float w4 = smoothstep(0.60, 0.80, lod);
+  if (w4 > 0.001) { v += vnoise(p * 8.17) * 0.12 * w4; w += 0.12 * w4; }
+  float w5 = smoothstep(0.85, 0.97, lod);
+  if (w5 > 0.001) { v += vnoise(p * 16.31) * 0.07 * w5; w += 0.07 * w5; }
+  return v / w;
+}
+
+/** Full-detail FBM, for terms that are not view dependent (cloud shadows). */
 float fbm3(vec3 p){ return (vnoise(p) * 0.5 + vnoise(p * 2.03) * 0.3 + vnoise(p * 4.09) * 0.2); }
 
 // Tetrahedral gradient of vnoise — four taps instead of the six a central
@@ -76,10 +116,8 @@ ${NOISE_GLSL}
 uniform vec3 uRockColor[${ROCK_SLOTS}];
 uniform vec4 uRockParams[${ROCK_SLOTS}];
 uniform vec3 uOreColor[${ORE_SLOTS}];
-uniform vec4 uPlayRect;
 uniform vec2 uCloudOffset;
 uniform float uCloudCoverage;
-uniform float uBandStrength;
 varying float vRockA;
 varying float vRockB;
 varying float vRockW;
@@ -87,13 +125,6 @@ varying float vOreId;
 varying float vOreAmt;
 varying vec3 vWorldPos;
 varying vec3 vWorldNormal;
-
-float boundaryBand(vec2 p){
-  vec2 dmin = uPlayRect.xy - p, dmax = p - uPlayRect.zw;
-  float dOut = length(max(max(dmin, dmax), 0.0));
-  float band = smoothstep(0.0, 0.5, dOut) * (1.0 - smoothstep(2.5, 5.0, dOut));
-  return 1.0 - uBandStrength * band;
-}
 
 float cloudShadow(vec2 p){
   float c = fbm3(vec3((p + uCloudOffset) * 0.004, 17.0));
@@ -159,11 +190,18 @@ vec4 pa = mix(uRockParams[ra], uRockParams[rb], vRockW);
 vec3 wn = normalize(vWorldNormal);
 float flatness = smoothstep(0.45, 0.9, abs(wn.y));
 
-float macro  = fbm3(vWorldPos * pa.x) - 0.5;
-float detail = fbm3(vWorldPos * pa.y) - 0.5;
-// Two grain octaves an octave and a half apart: the coarser one carries at
-// mid zoom, the finer one keeps a close-up from going smooth and plasticky.
-float grain  = (vnoise(vWorldPos * 3.7) - 0.5) + (vnoise(vWorldPos * 11.9) - 0.5) * 0.6;
+float lod = detailLod(vWorldPos);
+
+float macro  = fbm3lod(vWorldPos * pa.x, lod) - 0.5;
+float detail = fbm3lod(vWorldPos * pa.y, lod) - 0.5;
+// Grain is the finest thing here and the first to go: past a few tens of
+// metres an octave this tight is sub-pixel, so it stops reading as texture
+// and starts reading as noise crawling over the distance.
+float grain = 0.0;
+if (lod > 0.001) {
+  grain = ((vnoise(vWorldPos * 3.7) - 0.5)
+        + (vnoise(vWorldPos * 11.9) - 0.5) * 0.6 * smoothstep(0.45, 0.75, lod)) * lod;
+}
 float vein   = max(0.0, 1.0 - abs(vnoise(vWorldPos * 0.13) - 0.5) * 8.0);
 
 // Bedding planes wobble with a low-frequency field so they never look ruled.
@@ -178,22 +216,34 @@ vec3 col  = mix(cool, warm, clamp(macro * 2.2 + 0.5, 0.0, 1.0));
 
 // Loose surface material is paler and flatter; exposed rock is deeper and
 // keeps more of its noise contrast.
-float contrast = mix(1.35, 0.75, flatness);
-float b = (macro * pa.w + detail * 0.30 + grain * 0.12) * contrast - vein * pa.z;
+// Shading contrast is a near-field feature. The playable mesh is marching
+// cubes at 1m, so at range its triangles fall below a pixel and every
+// contrast term turns into speckle rather than texture — which is what made
+// the site read as a crunchy patch against smooth landscape. Fading the
+// contrast-carrying terms with distance lets the two converge.
+float contrast = mix(1.35, 0.75, flatness) * mix(0.45, 1.0, lod);
+float b = (macro * pa.w + detail * 0.30 + grain * 0.12) * contrast - vein * pa.z * mix(0.4, 1.0, lod);
 col *= 1.0 + vec3(b, b * 0.94, b * 0.86);
 col *= mix(0.84, 1.05, flatness);
-col *= 1.0 - bedding * 0.24;
+col *= 1.0 - bedding * 0.24 * lod;
 
 if (vOreId >= 0.0) col = mix(col, uOreColor[int(vOreId + 0.5)], vOreAmt * 0.35 * step(0.72, vnoise(vWorldPos * 3.1)));
-diffuseColor.rgb = clamp(col, 0.0, 1.0) * cloudShadow(vWorldPos.xz) * boundaryBand(vWorldPos.xz);
+diffuseColor.rgb = clamp(col, 0.0, 1.0) * cloudShadow(vWorldPos.xz);
 `;
 
 // Rock reads glossier than settled dust, and letting roughness wander with the
 // grain keeps large lit areas from turning into one even sheen.
 const ROUGHNESS_GLSL = `
 #include <roughnessmap_fragment>
-roughnessFactor = clamp(roughnessFactor - 0.18 * (1.0 - smoothstep(0.45, 0.9, abs(normalize(vWorldNormal).y)))
-                        + (vnoise(vWorldPos * 2.1) - 0.5) * 0.12, 0.35, 1.0);
+{
+  float rlod = detailLod(vWorldPos);
+  // Both the slope-driven gloss and its noise wobble are near-field: distant
+  // terrain goes uniformly matte, which is the cheapest way to stop specular
+  // speckle aliasing across sub-pixel triangles.
+  float gloss = 0.18 * (1.0 - smoothstep(0.45, 0.9, abs(normalize(vWorldNormal).y))) * rlod;
+  float wobble = rlod > 0.01 ? (vnoise(vWorldPos * 2.1) - 0.5) * 0.12 * rlod : 0.0;
+  roughnessFactor = clamp(roughnessFactor - gloss + wobble, 0.35, 1.0);
+}
 `;
 
 // A shallow bump derived from the same noise the albedo uses. This is what
@@ -202,18 +252,27 @@ roughnessFactor = clamp(roughnessFactor - 0.18 * (1.0 - smoothstep(0.45, 0.9, ab
 // projected onto the surface's tangent plane, then carried into view space by
 // viewMatrix, so it stays correct on rotated instances (blast fragments) as
 // well as on world-aligned terrain.
+// Eight vnoise taps if both gradients run, which makes this the most
+// expensive thing in the shader — and the least worthwhile far away, where
+// the bump it adds is smaller than a pixel. Both gradients are gated on
+// distance and the whole block is skipped once nothing would show.
 const NORMAL_BUMP_GLSL = `
 #include <normal_fragment_begin>
 {
-  vec3 wn = normalize(vWorldNormal);
-  vec3 g = vnoiseGrad(vWorldPos * 1.6, 0.4) + vnoiseGrad(vWorldPos * 5.3, 0.12) * 0.5;
-  g -= wn * dot(g, wn);
-  normal = normalize(normal - mat3(viewMatrix) * g * 0.45);
+  float bumpLod = detailLod(vWorldPos);
+  if (bumpLod > 0.01) {
+    vec3 wn = normalize(vWorldNormal);
+    vec3 g = vnoiseGrad(vWorldPos * 1.6, 0.4);
+    float fine = smoothstep(0.35, 0.7, bumpLod);
+    if (fine > 0.001) g += vnoiseGrad(vWorldPos * 5.3, 0.12) * 0.5 * fine;
+    g -= wn * dot(g, wn);
+    normal = normalize(normal - mat3(viewMatrix) * g * 0.45 * bumpLod);
+  }
 }
 `;
 
 export interface TerrainMaterialOptions {
-  /** World-space XZ bounds of the playable rect — drives the boundary-shading band (#458 A19.4). */
+  /** World-space XZ bounds of the playable rect. Kept for callers and future shader use. */
   playRect: Rect;
 }
 
@@ -225,12 +284,15 @@ export interface TerrainMaterialOptions {
  *
  * uCloudCoverage defaults to 0 (inert) — the cloud-shadow term is wired
  * end-to-end here but produces no visible effect until T7.1 (wind/clouds)
- * turns it on. uBandStrength is live from T5.3 (see BAND_STRENGTH).
+ * turns it on.
+ *
+ * The site edge is no longer marked by darkening the ground here; that reads
+ * as a smudge rather than a boundary. WorldBorderWall draws it instead.
  */
 export class TerrainMaterial extends THREE.MeshStandardMaterial {
   readonly customUniforms: Record<string, THREE.IUniform>;
 
-  constructor(options: TerrainMaterialOptions) {
+  constructor(_options: TerrainMaterialOptions) {
     super({ roughness: 0.9, metalness: 0.0 });
 
     const rocks = getAllRocks();
@@ -254,16 +316,12 @@ export class TerrainMaterial extends THREE.MeshStandardMaterial {
       oreColor.push(new THREE.Color(ore ? ore.color : '#000000'));
     }
 
-    const { minX, minZ, maxX, maxZ } = options.playRect;
-
     this.customUniforms = {
       uRockColor: { value: rockColor },
       uRockParams: { value: rockParams },
       uOreColor: { value: oreColor },
-      uPlayRect: { value: new THREE.Vector4(minX, minZ, maxX, maxZ) },
       uCloudOffset: { value: new THREE.Vector2(0, 0) },
       uCloudCoverage: { value: 0 },
-      uBandStrength: { value: BAND_STRENGTH },
     };
 
     this.onBeforeCompile = (shader) => {
@@ -279,7 +337,7 @@ export class TerrainMaterial extends THREE.MeshStandardMaterial {
         .replace('#include <roughnessmap_fragment>', ROUGHNESS_GLSL)
         .replace('#include <normal_fragment_begin>', NORMAL_BUMP_GLSL);
     };
-    this.customProgramCacheKey = () => 'terrain-material-v2';
+    this.customProgramCacheKey = () => 'terrain-material-v4';
   }
 
   /**
