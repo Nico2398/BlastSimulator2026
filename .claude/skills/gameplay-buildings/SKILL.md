@@ -96,6 +96,7 @@ Overcapacity (more employees than beds) → well-being penalty for all residents
 - Employees inside → injured
 - Stored contents lost; Explosive Warehouse detonation → secondary blast
 - Well-being, Safety, Ecology score penalties applied
+- Research Center destroyed while its enabling research task is in-flight and no other active Research Center remains → the in-flight task is cancelled and its cost refunded in full; a task still pending behind it in the queue is cancelled/refunded in turn once it reaches the head with no Research Center present. If another active Research Center still exists, the in-flight task is unaffected.
 
 ## Building Effects Summary
 
