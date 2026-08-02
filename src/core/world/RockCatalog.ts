@@ -52,13 +52,19 @@ const ROCKS: readonly RockType[] = [
     density: 2100,
     porosity: 0.35,
     oreProbabilities: { dirtite: 0.40, rustite: 0.15 },
-    color: '#e8dcc8',
+    // Deepened from #e8dcc8 (#458 T8.1 art pass) — cruite is desert_badlands's
+    // dominant rock (levelBias -0.3 is still the most common of the biome's
+    // three), and at its original near-white lightness the whole biome read
+    // washed out under normal exposure regardless of the ACES tuning above.
+    color: '#ddcba0',
     noiseFreq: 0.08,
     levelBias: -0.3,
     macroFreq: 0.18,
     detailFreq: 0.60,
     veinStrength: 0.08,
-    contrast: 0.15,
+    // 0.15 -> 0.20 (#458 T8.1) — cruite's macro-noise contrast was the
+    // lowest of any rock, compounding the flat look at its original colour.
+    contrast: 0.20,
   },
   {
     id: 'sandite',

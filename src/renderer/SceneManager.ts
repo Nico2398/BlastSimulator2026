@@ -92,13 +92,14 @@ export class SceneManager {
     this.renderer.setSize(canvas.clientWidth, canvas.clientHeight, false);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    // ACES's curve is calibrated for scene radiance well above the existing
-    // cartoon-lighting intensities (sun 1.2, ambient 0.55, fill 0.3) — at
-    // exposure 1.0 those under-drive it, reading visibly black-crushed
-    // (#458 T5.1 accept criterion). 1.8 keeps the same lights/materials but
-    // brings the output back to a normally-exposed range; full recalibration
-    // of every light/color is still the art pass's job (T8.1).
-    this.renderer.toneMappingExposure = 1.8;
+    // T5.1 set this to 1.8 purely to clear ACES's black-crush floor, deferring
+    // real calibration to this task (T8.1). 1.8 turned out to overshoot: every
+    // biome read pale and flat regardless of palette (screenshots, T8.1 art
+    // pass) — ACES's shoulder was compressing everything into the same washed
+    // highlight range. 1.3 keeps mid-tones comfortably above the 1.0
+    // black-crush floor while leaving the curve's shoulder room to hold colour
+    // and contrast.
+    this.renderer.toneMappingExposure = 1.3;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
