@@ -32,12 +32,18 @@ float hash13(vec3 p){
   return fract((p.x + p.y) * p.z);
 }
 
-/** Vector hash — gradients for Perlin, feature-point offsets for Worley. */
+/**
+ * Vector hash — gradients for Perlin, feature-point offsets for Worley.
+ *
+ * No sin(). The sin-based version is the textbook one and is fine on a GPU,
+ * but this shader also has to run under software rasterisation in CI, where
+ * three transcendentals per call multiplied by the eight calls Perlin makes
+ * and the twenty-seven Worley makes dominated the entire frame.
+ */
 vec3 hash33(vec3 p){
-  p = vec3(dot(p, vec3(127.1, 311.7, 74.7)),
-           dot(p, vec3(269.5, 183.3, 246.1)),
-           dot(p, vec3(113.5, 271.9, 124.6)));
-  return fract(sin(p) * 43758.5453123);
+  p = fract(p * vec3(0.1031, 0.1030, 0.0973));
+  p += dot(p, p.yxz + 33.33);
+  return fract((p.xxy + p.yxx) * p.zyx);
 }
 
 // ---- value noise ----
@@ -111,12 +117,15 @@ float snoise(vec3 p){
 // which is what cracked clay, ice and columnar basalt are made of.
 vec2 worley(vec3 p){
   vec3 i = floor(p), f = fract(p);
+  // Which 2x2x2 block of cells can hold the two nearest points, given the
+  // jitter clamp below.
+  vec3 s = step(vec3(0.5), f) * 2.0 - 1.0;
   float f1 = 8.0, f2 = 8.0;
-  for (int z = -1; z <= 1; z++) {
-    for (int y = -1; y <= 1; y++) {
-      for (int x = -1; x <= 1; x++) {
-        vec3 g = vec3(float(x), float(y), float(z));
-        vec3 o = hash33(i + g);
+  for (int z = 0; z < 2; z++) {
+    for (int y = 0; y < 2; y++) {
+      for (int x = 0; x < 2; x++) {
+        vec3 g = vec3(float(x), float(y), float(z)) * s;
+        vec3 o = 0.25 + hash33(i + g) * 0.5; // jitter confined to the cell's middle half
         float d = length(g + o - f);
         if (d < f1) { f2 = f1; f1 = d; }
         else if (d < f2) { f2 = d; }
@@ -144,10 +153,8 @@ export const NOISE_FBM_GLSL = /* glsl */`
   if (w2 > 0.001) { v += NOISEFN(p * 2.03) * 0.30 * w2; w += 0.30 * w2; } \\
   float w3 = smoothstep(0.30, 0.55, lod);                              \\
   if (w3 > 0.001) { v += NOISEFN(p * 4.09) * 0.20 * w3; w += 0.20 * w3; } \\
-  float w4 = smoothstep(0.60, 0.80, lod);                              \\
+  float w4 = smoothstep(0.88, 0.98, lod);                              \\
   if (w4 > 0.001) { v += NOISEFN(p * 8.17) * 0.12 * w4; w += 0.12 * w4; } \\
-  float w5 = smoothstep(0.85, 0.97, lod);                              \\
-  if (w5 > 0.001) { v += NOISEFN(p * 16.31) * 0.07 * w5; w += 0.07 * w5; } \\
   return v / w;
 
 float fbmValue(vec3 p, float lod){ FBM_BODY(vnoise) }
@@ -157,8 +164,8 @@ float fbmSimplex(vec3 p, float lod){ FBM_BODY(snoise) }
 /** Sharp-crested stack — the shape of eroded strata and wind-drifted snow. */
 float ridged(vec3 p, float lod){
   float v = 0.0, w = 0.0, amp = 0.5, freq = 1.0;
-  for (int i = 0; i < 4; i++) {
-    if (i > 0 && lod < float(i) * 0.22) break;
+  for (int i = 0; i < 3; i++) {
+    if (i > 0 && lod < float(i) * 0.3) break;
     float n = 1.0 - abs(pnoise(p * freq) * 2.0 - 1.0);
     v += n * n * amp;
     w += amp;
@@ -171,8 +178,8 @@ float ridged(vec3 p, float lod){
 /** Absolute-value stack — billowy, cloud-like; good for clay and mud. */
 float turbulence(vec3 p, float lod){
   float v = 0.0, w = 0.0, amp = 0.5, freq = 1.0;
-  for (int i = 0; i < 4; i++) {
-    if (i > 0 && lod < float(i) * 0.22) break;
+  for (int i = 0; i < 3; i++) {
+    if (i > 0 && lod < float(i) * 0.3) break;
     v += abs(snoise(p * freq) * 2.0 - 1.0) * amp;
     w += amp;
     amp *= 0.5;

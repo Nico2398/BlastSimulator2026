@@ -96,11 +96,8 @@ const loadingScreen = new LoadingScreen(uiContainer);
 
 function enterLevel(commands: readonly string[]): Promise<void> {
   return loadingScreen.runPhases([
-    {
-      labelKey: 'loading.terrain',
-      run: () => { for (const cmd of commands) runGameCommand(cmd, { syncRenderer: false }); },
-    },
-    { labelKey: 'loading.meshing', run: () => { gameRenderer.syncFromContext(ctx); } },
+    { run: () => { for (const cmd of commands) runGameCommand(cmd, { syncRenderer: false }); } },
+    { run: () => { gameRenderer.syncFromContext(ctx); } },
   ]);
 }
 

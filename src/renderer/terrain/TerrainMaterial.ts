@@ -90,7 +90,7 @@ const SURFACE_SELECT_GLSL = /* glsl */`
  * uniform sheets. Nothing here is quantised and nothing is decided per-vertex,
  * which is why no seam exists for a hard edge to form along.
  */
-float materialScore(int i, vec3 wp, float flatness, float altitude, float wetness){
+float materialScore(int i, vec3 wp, float flatness, float altitude, float wetness, float lod){
   vec4 where = uMatWhere[i];
   vec2 bias = uMatBias[i];
   if (bias.y <= 0.001) return 0.0; // absent from this biome
@@ -108,7 +108,10 @@ float materialScore(int i, vec3 wp, float flatness, float altitude, float wetnes
   // Slow, material-specific field: two materials that suit the same ground
   // still occupy different patches of it rather than averaging into mush.
   // ('patch' is a reserved word in GLSL ES.)
-  float drift = fbmValue(wp / max(uMatLook[i].w, 1.0) + float(i) * 17.3, 1.0);
+  // Budgeted by distance like everything else. Hardcoding full detail here
+  // meant every material ran a full octave stack at every pixel purely to
+  // decide who wins — thirteen of them, which dominated the whole frame.
+  float drift = fbmValue(wp / max(uMatLook[i].w, 1.0) + float(i) * 17.3, lod * 0.3);
 
   return bias.y * slopeFit * altFit * wetFit * (0.55 + 0.55 * drift);
 }
@@ -249,7 +252,7 @@ rockCol *= 1.0 + (rockN - 0.5) * pa.w * mix(0.45, 1.0, lod);
 // weaker than the gap between the first two and only greys the result.
 float altitude = clamp((vWorldPos.y - uHeightRange.x) / max(uHeightRange.y - uHeightRange.x, 1.0), 0.0, 1.0);
 // Wetness: low ground and hollows hold water, ridges shed it.
-float wetness = clamp(0.75 - altitude * 0.6 + (fbmValue(vWorldPos * 0.012, 1.0) - 0.5) * 0.7, 0.0, 1.0);
+float wetness = clamp(0.75 - altitude * 0.6 + (vnoise(vWorldPos * 0.012) - 0.5) * 0.7, 0.0, 1.0);
 
 // Scoring is cheap — bells and one slow noise, no recipe evaluation — so
 // every material is scored and only the two strongest are actually shaded.
@@ -257,7 +260,7 @@ int bestI = -1, secondI = -1;
 float bestW = 0.0, secondW = 0.0;
 for (int i = 0; i < ${SURFACE_MATERIAL_SLOTS}; i++) {
   if (i >= uMatCount) break;
-  float sc = materialScore(i, vWorldPos, flatness, altitude, wetness);
+  float sc = materialScore(i, vWorldPos, flatness, altitude, wetness, lod);
   if (sc > bestW) { secondW = bestW; secondI = bestI; bestW = sc; bestI = i; }
   else if (sc > secondW) { secondW = sc; secondI = i; }
 }

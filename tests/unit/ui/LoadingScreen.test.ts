@@ -3,6 +3,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { LoadingScreen, nextPaint } from '../../../src/ui/LoadingScreen.js';
+import { LOADING_QUIPS, QuipBag } from '../../../src/ui/loadingQuips.js';
 
 describe('LoadingScreen', () => {
   let container: HTMLElement;
@@ -33,16 +34,21 @@ describe('LoadingScreen', () => {
 
   it('setPhase updates the caption and the bar', () => {
     screen.show();
-    screen.setPhase('loading.terrain', 0.5);
-    expect(screen.phaseText.length).toBeGreaterThan(0);
+    screen.setPhase('Bribing the geological survey', 0.5);
+    expect(screen.phaseText).toBe('Bribing the geological survey');
     expect(screen.progress).toBeCloseTo(0.5, 2);
+  });
+
+  it('shows a satirical line rather than naming the work being done', () => {
+    screen.show();
+    expect(LOADING_QUIPS).toContain(screen.phaseText);
   });
 
   it('clamps progress to 0..1 rather than emitting a nonsense bar width', () => {
     screen.show();
-    screen.setPhase('loading.terrain', 5);
+    screen.setPhase('x', 5);
     expect(screen.progress).toBe(1);
-    screen.setPhase('loading.terrain', -3);
+    screen.setPhase('x', -3);
     expect(screen.progress).toBe(0);
   });
 
@@ -50,8 +56,8 @@ describe('LoadingScreen', () => {
     it('runs every phase in order and finishes hidden', async () => {
       const order: string[] = [];
       await screen.runPhases([
-        { labelKey: 'loading.terrain', run: () => order.push('a') },
-        { labelKey: 'loading.meshing', run: () => order.push('b') },
+        { run: () => order.push('a') },
+        { run: () => order.push('b') },
       ]);
       expect(order).toEqual(['a', 'b']);
       expect(screen.visible).toBe(false);
@@ -63,13 +69,13 @@ describe('LoadingScreen', () => {
       // with the overlay never actually visible.
       const seen: { visible: boolean; caption: string; progress: number }[] = [];
       await screen.runPhases([
-        { labelKey: 'loading.terrain', run: () => seen.push({ visible: screen.visible, caption: screen.phaseText, progress: screen.progress }) },
-        { labelKey: 'loading.meshing', run: () => seen.push({ visible: screen.visible, caption: screen.phaseText, progress: screen.progress }) },
+        { run: () => seen.push({ visible: screen.visible, caption: screen.phaseText, progress: screen.progress }) },
+        { run: () => seen.push({ visible: screen.visible, caption: screen.phaseText, progress: screen.progress }) },
       ]);
 
       expect(seen).toHaveLength(2);
       for (const s of seen) expect(s.visible).toBe(true);
-      expect(seen[0]!.caption).not.toBe(seen[1]!.caption); // caption tracked the phase
+      expect(seen[0]!.caption).not.toBe(seen[1]!.caption); // a fresh quip per phase
       expect(seen[1]!.progress).toBeGreaterThan(seen[0]!.progress);
     });
 
@@ -87,7 +93,7 @@ describe('LoadingScreen', () => {
 
     it('hides even when a phase throws, so a failed load cannot strand the player', async () => {
       await expect(screen.runPhases([
-        { labelKey: 'loading.terrain', run: () => { throw new Error('generation blew up'); } },
+        { run: () => { throw new Error('generation blew up'); } },
       ])).rejects.toThrow('generation blew up');
       expect(screen.visible).toBe(false);
     });
@@ -95,8 +101,8 @@ describe('LoadingScreen', () => {
     it('reaches full progress before hiding', async () => {
       let atEnd = -1;
       await screen.runPhases([
-        { labelKey: 'loading.terrain', run: () => {} },
-        { labelKey: 'loading.meshing', run: () => { /* last phase */ } },
+        { run: () => {} },
+        { run: () => { /* last phase */ } },
       ]).then(() => { atEnd = screen.progress; });
       // Progress is read after hide(); the bar keeps its final width.
       expect(atEnd).toBe(1);
@@ -127,5 +133,44 @@ describe('nextPaint', () => {
   it('resolves rather than hanging where requestAnimationFrame does not exist', async () => {
     vi.stubGlobal('requestAnimationFrame', undefined);
     await expect(nextPaint()).resolves.toBeUndefined();
+  });
+});
+
+describe('QuipBag', () => {
+  it('offers a decent spread of lines', () => {
+    expect(LOADING_QUIPS.length).toBeGreaterThanOrEqual(30);
+    expect(new Set(LOADING_QUIPS).size).toBe(LOADING_QUIPS.length);
+    for (const q of LOADING_QUIPS) expect(q.trim().length).toBeGreaterThan(0);
+  });
+
+  it('never repeats a line until every one has been used', () => {
+    const bag = new QuipBag();
+    const drawn = new Set<string>();
+    for (let i = 0; i < LOADING_QUIPS.length; i++) {
+      const q = bag.next();
+      expect(drawn.has(q), `repeated "${q}" before the bag was empty`).toBe(false);
+      drawn.add(q);
+    }
+    expect(drawn.size).toBe(LOADING_QUIPS.length);
+  });
+
+  it('refills once drained rather than running out', () => {
+    const bag = new QuipBag();
+    for (let i = 0; i < LOADING_QUIPS.length; i++) bag.next();
+    expect(bag.remainingCount).toBe(0);
+    expect(LOADING_QUIPS).toContain(bag.next());
+  });
+
+  it('draws in a different order for a different random source', () => {
+    const seq = (r: () => number) => {
+      const bag = new QuipBag(r);
+      return Array.from({ length: 8 }, () => bag.next()).join('|');
+    };
+    expect(seq(() => 0)).not.toBe(seq(() => 0.999));
+  });
+
+  it('a degenerate random source still yields valid lines', () => {
+    const bag = new QuipBag(() => 1);
+    for (let i = 0; i < 5; i++) expect(LOADING_QUIPS).toContain(bag.next());
   });
 });

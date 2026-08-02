@@ -14,6 +14,7 @@
 // while the work happens.
 
 import { t } from '../core/i18n/I18n.js';
+import { QuipBag } from './loadingQuips.js';
 
 /**
  * Resolve once the browser has presented a frame.
@@ -30,9 +31,14 @@ export function nextPaint(): Promise<void> {
   });
 }
 
-/** One blocking step of a load, with the caption shown while it runs. */
+/**
+ * One blocking step of a load.
+ *
+ * No caption: the screen shows a satirical line instead of naming the work.
+ * Reporting "Generating terrain" made the wait feel like somebody else's
+ * status meeting, and the phases are not the player's problem anyway.
+ */
 export interface LoadPhase {
-  labelKey: string;
   run: () => void;
 }
 
@@ -41,6 +47,7 @@ export class LoadingScreen {
   private readonly label: HTMLElement;
   private readonly barFill: HTMLElement;
   private readonly titleEl: HTMLElement;
+  private readonly quips = new QuipBag();
 
   constructor(container: HTMLElement) {
     this.overlay = document.createElement('div');
@@ -87,14 +94,18 @@ export class LoadingScreen {
 
   show(): void {
     this.titleEl.textContent = t('loading.title');
-    this.setPhase('loading.preparing', 0);
+    this.setPhase(this.quips.next(), 0);
     this.overlay.style.display = 'flex';
   }
 
-  setPhase(labelKey: string, fraction: number): void {
-    this.label.textContent = t(labelKey);
+  /** `caption` is shown verbatim — the quips are not translated strings. */
+  setPhase(caption: string, fraction: number): void {
+    this.label.textContent = caption;
     this.barFill.style.width = `${Math.round(Math.min(1, Math.max(0, fraction)) * 100)}%`;
   }
+
+  /** Next unused quip, so a caller driving its own phases can label them. */
+  nextQuip(): string { return this.quips.next(); }
 
   hide(): void { this.overlay.style.display = 'none'; }
 
@@ -117,11 +128,11 @@ export class LoadingScreen {
         // (i+1)/(n+1), not i/n: the bar would otherwise sit at zero through
         // the longest phase, which reads as nothing happening. This starts it
         // moving on the first phase and still leaves the last step for "ready".
-        this.setPhase(phase.labelKey, (i + 1) / (phases.length + 1));
+        this.setPhase(this.quips.next(), (i + 1) / (phases.length + 1));
         await nextPaint();
         phase.run();
       }
-      this.setPhase('loading.ready', 1);
+      this.setPhase(t('loading.ready'), 1);
       await nextPaint();
     } finally {
       this.hide();
