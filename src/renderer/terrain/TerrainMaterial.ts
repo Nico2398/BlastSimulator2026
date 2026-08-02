@@ -111,7 +111,13 @@ float materialScore(int i, vec3 wp, float flatness, float altitude, float wetnes
   // Budgeted by distance like everything else. Hardcoding full detail here
   // meant every material ran a full octave stack at every pixel purely to
   // decide who wins — thirteen of them, which dominated the whole frame.
-  float drift = fbmValue(wp / max(uMatLook[i].w, 1.0) + float(i) * 17.3, lod * 0.3);
+  // One octave, deliberately. This field only decides which material wins
+  // where; it is sampled once per material per pixel, so an octave stack here
+  // costs thirteen times whatever it costs anywhere else. vnoise has the same
+  // 0..1 range and 0.5 mean as the fbm it replaces, so the scores it feeds are
+  // distributed the same — an earlier attempt changed the formula's shape as
+  // well and let near-white materials take over whole hillsides.
+  float drift = vnoise(wp / max(uMatLook[i].w, 1.0) + float(i) * 17.3);
 
   return bias.y * slopeFit * altFit * wetFit * (0.55 + 0.55 * drift);
 }
@@ -231,7 +237,10 @@ float lod = detailLod(vWorldPos);
 int ra = int(vRockA + 0.5); int rb = int(vRockB + 0.5);
 vec4 recA = uRockRecipe[ra];
 vec4 pa = mix(uRockParams[ra], uRockParams[rb], vRockW);
-float rockN = evalRecipe(int(recA.x + 0.5), vWorldPos * pa.x, recA.y, recA.z, lod);
+// Cover clings to level ground, so on anything flat enough to be fully covered
+// the rock beneath contributes nothing visible and its recipe is dead work.
+float cling = smoothstep(-0.15, 0.95, flatness);
+float rockN = cling < 0.99 ? evalRecipe(int(recA.x + 0.5), vWorldPos * pa.x, recA.y, recA.z, lod) : 0.5;
 vec3 rockBase = mix(uRockColor[ra], uRockColor[rb], vRockW);
 // Warm on the crests of the field, cooler in the hollows — value modulation
 // alone reads as one tinted sheet.
@@ -293,12 +302,9 @@ if (bestI >= 0 && bestW > 0.0) {
   coverAmount = smoothstep(0.04, 0.55, bestW);
 }
 
-// Cover clings to level ground and thins out on steep faces, where the rock
-// beneath is exposed. Smoothstep on both ends, so there is no line anywhere
-// along the transition.
 // Wide and gentle: cover thins on steep faces rather than stopping at a line,
 // so a bench riser shades from soil to bare rock over its whole height.
-float cling = smoothstep(-0.15, 0.95, flatness);
+// cling is computed once, above, because the rock's recipe is skipped from it.
 float coverMix = coverAmount * cling;
 vec3 col = mix(rockCol, coverCol, coverMix);
 // Handed to the roughness and normal chunks below, which run later in the
