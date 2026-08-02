@@ -32,6 +32,20 @@ const FINE_STEP = 1;
 
 type SampleFn = (x: number, z: number) => { height: number; biomeId: number; surfCompId: number };
 
+/**
+ * Two triangles for one grid quad, alternating which diagonal splits it.
+ *
+ * Splitting every quad the same way gives the whole sheet a shared diagonal
+ * crease direction, and smooth-shaded normals turn that into corduroy running
+ * across open ground — the single most obvious artifact on the landscape at
+ * its 4m sample spacing. Flipping on parity breaks the run without changing
+ * the surface the quad describes.
+ */
+function pushQuad(indices: number[], i0: number, i1: number, i2: number, i3: number, parity: number): void {
+  if ((parity & 1) === 0) indices.push(i0, i2, i1, i1, i2, i3);
+  else indices.push(i0, i2, i3, i0, i3, i1);
+}
+
 /** Distance from (x, z) to the nearest edge of rect, measured inward — negative outside. */
 function distanceInsideRect(rect: Rect, x: number, z: number): number {
   const dx = Math.min(x - rect.minX, rect.maxX - x);
@@ -162,7 +176,7 @@ export class LandscapeMesh {
         const i1 = i0 + 1;
         const i2 = i0 + n;
         const i3 = i2 + 1;
-        indices.push(i0, i2, i1, i1, i2, i3);
+        pushQuad(indices, i0, i1, i2, i3, row + col);
       }
     }
     if (indices.length === 0) return null;
@@ -245,7 +259,7 @@ export class LandscapeMesh {
         const i1 = emitVertex(row, col + 1);
         const i2 = emitVertex(row + 1, col);
         const i3 = emitVertex(row + 1, col + 1);
-        indices.push(i0, i2, i1, i1, i2, i3);
+        pushQuad(indices, i0, i1, i2, i3, row + col);
       }
     }
     if (indices.length === 0) return null;

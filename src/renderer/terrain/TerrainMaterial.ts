@@ -59,6 +59,15 @@ float vnoise(vec3 p){
     f.z);
 }
 float fbm3(vec3 p){ return (vnoise(p) * 0.5 + vnoise(p * 2.03) * 0.3 + vnoise(p * 4.09) * 0.2); }
+
+// Tetrahedral gradient of vnoise — four taps instead of the six a central
+// difference needs. Used for surface bump, so the cost matters.
+vec3 vnoiseGrad(vec3 p, float e){
+  vec2 k = vec2(1.0, -1.0);
+  return normalize(
+    k.xyy * vnoise(p + k.xyy * e) + k.yyx * vnoise(p + k.yyx * e) +
+    k.yxy * vnoise(p + k.yxy * e) + k.xxx * vnoise(p + k.xxx * e) + 1e-6);
+}
 `;
 
 // ---------- A19.2 — uniforms, attributes, varyings ----------
@@ -77,6 +86,7 @@ varying float vRockW;
 varying float vOreId;
 varying float vOreAmt;
 varying vec3 vWorldPos;
+varying vec3 vWorldNormal;
 
 float boundaryBand(vec2 p){
   vec2 dmin = uPlayRect.xy - p, dmax = p - uPlayRect.zw;
@@ -102,6 +112,7 @@ varying float vRockW;
 varying float vOreId;
 varying float vOreAmt;
 varying vec3 vWorldPos;
+varying vec3 vWorldNormal;
 `;
 
 // Instanced meshes (FragmentMesh) apply their per-instance transform via
@@ -114,8 +125,10 @@ varying vec3 vWorldPos;
 const VERTEX_BEGIN_EXTRA = `
 #ifdef USE_INSTANCING
   vWorldPos = (modelMatrix * instanceMatrix * vec4(transformed, 1.0)).xyz;
+  vWorldNormal = normalize(mat3(modelMatrix) * mat3(instanceMatrix) * objectNormal);
 #else
   vWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;
+  vWorldNormal = normalize(mat3(modelMatrix) * objectNormal);
 #endif
 vRockA = aRockA;
 vRockB = aRockB;
@@ -125,17 +138,78 @@ vOreAmt = aOre.y;
 `;
 
 // ---------- A19.3 — albedo (replaces <color_fragment>) ----------
+//
+// The first version modulated one flat rock colour by a single noise value,
+// so every surface was the same hue and only got lighter or darker. Read as
+// painted noise rather than ground, and the regular grid triangulation showed
+// straight through it. Four things carry the surface now:
+//
+//   flatness  Loose weathered material settles on level ground; steep faces
+//             expose the rock underneath. Drives colour, contrast and grain.
+//   hue       Warm/cool drift across the macro field instead of pure value
+//             modulation — what stops it reading as a single tinted sheet.
+//   strata    Bedding planes in world Y, revealed on cut faces. Free
+//             legibility for benches and crater walls in a mining game.
+//   grain     A fine octave that survives close-up, plus the bump below.
 const ALBEDO_GLSL = `
 int ra = int(vRockA + 0.5); int rb = int(vRockB + 0.5);
 vec3 base = mix(uRockColor[ra], uRockColor[rb], vRockW);
 vec4 pa = mix(uRockParams[ra], uRockParams[rb], vRockW);
-float macro = fbm3(vWorldPos * pa.x) - 0.5;
+
+vec3 wn = normalize(vWorldNormal);
+float flatness = smoothstep(0.45, 0.9, abs(wn.y));
+
+float macro  = fbm3(vWorldPos * pa.x) - 0.5;
 float detail = fbm3(vWorldPos * pa.y) - 0.5;
-float vein = max(0.0, 1.0 - abs(vnoise(vWorldPos * 0.13) - 0.5) * 8.0);
-float b = macro * pa.w + detail * 0.25 - vein * pa.z;
-vec3 col = clamp(base * (1.0 + vec3(b, b * 0.92, b * 0.85)), 0.0, 1.0);
+// Two grain octaves an octave and a half apart: the coarser one carries at
+// mid zoom, the finer one keeps a close-up from going smooth and plasticky.
+float grain  = (vnoise(vWorldPos * 3.7) - 0.5) + (vnoise(vWorldPos * 11.9) - 0.5) * 0.6;
+float vein   = max(0.0, 1.0 - abs(vnoise(vWorldPos * 0.13) - 0.5) * 8.0);
+
+// Bedding planes wobble with a low-frequency field so they never look ruled.
+float bed     = vnoise(vec3(vWorldPos.xz * 0.045, vWorldPos.y * 0.02));
+float strata  = abs(sin(vWorldPos.y * 1.55 + bed * 3.2));
+float bedding = smoothstep(0.55, 1.0, strata) * (1.0 - flatness);
+
+// Warm on the crests of the macro field, cooler in the hollows.
+vec3 warm = base * vec3(1.13, 0.99, 0.79);
+vec3 cool = base * vec3(0.80, 0.89, 1.06);
+vec3 col  = mix(cool, warm, clamp(macro * 2.2 + 0.5, 0.0, 1.0));
+
+// Loose surface material is paler and flatter; exposed rock is deeper and
+// keeps more of its noise contrast.
+float contrast = mix(1.35, 0.75, flatness);
+float b = (macro * pa.w + detail * 0.30 + grain * 0.12) * contrast - vein * pa.z;
+col *= 1.0 + vec3(b, b * 0.94, b * 0.86);
+col *= mix(0.84, 1.05, flatness);
+col *= 1.0 - bedding * 0.24;
+
 if (vOreId >= 0.0) col = mix(col, uOreColor[int(vOreId + 0.5)], vOreAmt * 0.35 * step(0.72, vnoise(vWorldPos * 3.1)));
-diffuseColor.rgb = col * cloudShadow(vWorldPos.xz) * boundaryBand(vWorldPos.xz);
+diffuseColor.rgb = clamp(col, 0.0, 1.0) * cloudShadow(vWorldPos.xz) * boundaryBand(vWorldPos.xz);
+`;
+
+// Rock reads glossier than settled dust, and letting roughness wander with the
+// grain keeps large lit areas from turning into one even sheen.
+const ROUGHNESS_GLSL = `
+#include <roughnessmap_fragment>
+roughnessFactor = clamp(roughnessFactor - 0.18 * (1.0 - smoothstep(0.45, 0.9, abs(normalize(vWorldNormal).y)))
+                        + (vnoise(vWorldPos * 2.1) - 0.5) * 0.12, 0.35, 1.0);
+`;
+
+// A shallow bump derived from the same noise the albedo uses. This is what
+// actually breaks up the mesh triangulation — the regular grid's diagonal
+// split was legible straight through the old flat shading. The gradient is
+// projected onto the surface's tangent plane, then carried into view space by
+// viewMatrix, so it stays correct on rotated instances (blast fragments) as
+// well as on world-aligned terrain.
+const NORMAL_BUMP_GLSL = `
+#include <normal_fragment_begin>
+{
+  vec3 wn = normalize(vWorldNormal);
+  vec3 g = vnoiseGrad(vWorldPos * 1.6, 0.4) + vnoiseGrad(vWorldPos * 5.3, 0.12) * 0.5;
+  g -= wn * dot(g, wn);
+  normal = normalize(normal - mat3(viewMatrix) * g * 0.45);
+}
 `;
 
 export interface TerrainMaterialOptions {
@@ -201,9 +275,11 @@ export class TerrainMaterial extends THREE.MeshStandardMaterial {
 
       shader.fragmentShader = shader.fragmentShader
         .replace('#include <common>', `#include <common>\n${FRAGMENT_COMMON_EXTRA}`)
-        .replace('#include <color_fragment>', ALBEDO_GLSL);
+        .replace('#include <color_fragment>', ALBEDO_GLSL)
+        .replace('#include <roughnessmap_fragment>', ROUGHNESS_GLSL)
+        .replace('#include <normal_fragment_begin>', NORMAL_BUMP_GLSL);
     };
-    this.customProgramCacheKey = () => 'terrain-material-v1';
+    this.customProgramCacheKey = () => 'terrain-material-v2';
   }
 
   /**

@@ -95,7 +95,7 @@ describe('TerrainMaterial', () => {
     function makeFakeShader(): THREE.WebGLProgramParametersWithUniforms {
       return {
         vertexShader: '#include <common>\nvoid main() {\n#include <begin_vertex>\n}',
-        fragmentShader: '#include <common>\nvoid main() {\n#include <color_fragment>\n}',
+        fragmentShader: '#include <common>\nvoid main() {\n#include <color_fragment>\n#include <roughnessmap_fragment>\n#include <normal_fragment_begin>\n}',
         uniforms: {},
       } as unknown as THREE.WebGLProgramParametersWithUniforms;
     }
@@ -136,8 +136,73 @@ describe('TerrainMaterial', () => {
       expect(shader.fragmentShader).toContain('uniform vec3 uRockColor[12]');
       expect(shader.fragmentShader).toContain('float boundaryBand(vec2 p)');
       expect(shader.fragmentShader).toContain('float cloudShadow(vec2 p)');
-      expect(shader.fragmentShader).toContain('diffuseColor.rgb = col * cloudShadow(vWorldPos.xz) * boundaryBand(vWorldPos.xz)');
+      expect(shader.fragmentShader).toContain('diffuseColor.rgb = clamp(col, 0.0, 1.0) * cloudShadow(vWorldPos.xz) * boundaryBand(vWorldPos.xz)');
       expect(shader.fragmentShader).not.toContain('#include <color_fragment>');
+    });
+
+    describe('surface shading', () => {
+      // The original albedo modulated one flat rock colour by a single noise
+      // value, so every surface shared a hue and only varied in brightness.
+      // These pin the four things that replaced it.
+      it('carries a world-space normal through to the fragment stage', () => {
+        const mat = makeMaterial();
+        const shader = makeFakeShader();
+        mat.onBeforeCompile(shader, undefined as unknown as THREE.WebGLRenderer);
+
+        expect(shader.vertexShader).toContain('varying vec3 vWorldNormal');
+        expect(shader.fragmentShader).toContain('varying vec3 vWorldNormal');
+        // Instanced fragments are rotated per instance, so their normal has to
+        // go through instanceMatrix or debris would shade as if world-aligned.
+        expect(shader.vertexShader).toContain('mat3(instanceMatrix) * objectNormal');
+      });
+
+      it('splits shading by surface slope rather than treating all ground alike', () => {
+        const mat = makeMaterial();
+        const shader = makeFakeShader();
+        mat.onBeforeCompile(shader, undefined as unknown as THREE.WebGLRenderer);
+        expect(shader.fragmentShader).toContain('float flatness = smoothstep');
+      });
+
+      it('varies hue across the macro field instead of only brightness', () => {
+        const mat = makeMaterial();
+        const shader = makeFakeShader();
+        mat.onBeforeCompile(shader, undefined as unknown as THREE.WebGLRenderer);
+        expect(shader.fragmentShader).toContain('vec3 warm =');
+        expect(shader.fragmentShader).toContain('vec3 cool =');
+        expect(shader.fragmentShader).toContain('mix(cool, warm');
+      });
+
+      it('adds bedding planes that only show on exposed faces', () => {
+        const mat = makeMaterial();
+        const shader = makeFakeShader();
+        mat.onBeforeCompile(shader, undefined as unknown as THREE.WebGLRenderer);
+        // Multiplying by (1 - flatness) is what confines strata to cut faces.
+        expect(shader.fragmentShader).toContain('(1.0 - flatness)');
+      });
+
+      it('perturbs the normal so the mesh triangulation stops reading through', () => {
+        const mat = makeMaterial();
+        const shader = makeFakeShader();
+        mat.onBeforeCompile(shader, undefined as unknown as THREE.WebGLRenderer);
+
+        expect(shader.fragmentShader).toContain('vec3 vnoiseGrad(vec3 p, float e)');
+        expect(shader.fragmentShader).not.toContain('#include <normal_fragment_begin>\n}');
+        // viewMatrix, not normalMatrix: the gradient is world-space, and this
+        // is what keeps it correct on rotated instances.
+        expect(shader.fragmentShader).toContain('mat3(viewMatrix) * g');
+      });
+
+      it('modulates roughness so large lit areas do not turn into one sheen', () => {
+        const mat = makeMaterial();
+        const shader = makeFakeShader();
+        mat.onBeforeCompile(shader, undefined as unknown as THREE.WebGLRenderer);
+        expect(shader.fragmentShader).toContain('roughnessFactor = clamp(roughnessFactor');
+      });
+
+      it('bumps the program cache key so the old compiled shader is not reused', () => {
+        const mat = makeMaterial();
+        expect(mat.customProgramCacheKey()).toBe('terrain-material-v2');
+      });
     });
   });
 
@@ -145,7 +210,7 @@ describe('TerrainMaterial', () => {
     function makeFakeShader(): THREE.WebGLProgramParametersWithUniforms {
       return {
         vertexShader: '#include <common>\nvoid main() {\n#include <begin_vertex>\n}',
-        fragmentShader: '#include <common>\nvoid main() {\n#include <color_fragment>\n}',
+        fragmentShader: '#include <common>\nvoid main() {\n#include <color_fragment>\n#include <roughnessmap_fragment>\n#include <normal_fragment_begin>\n}',
         uniforms: {},
       } as unknown as THREE.WebGLProgramParametersWithUniforms;
     }
@@ -181,7 +246,7 @@ describe('TerrainMaterial', () => {
       // A19's own injection still ran — this would fail if attachCSM had
       // replaced onBeforeCompile instead of wrapping it.
       expect(shader.fragmentShader).toContain('float fbm3(vec3 p)');
-      expect(shader.fragmentShader).toContain('diffuseColor.rgb = col * cloudShadow');
+      expect(shader.fragmentShader).toContain('cloudShadow(vWorldPos.xz)');
       // ...and the CSM uniforms it needs got added on top.
       expect(shader.uniforms['CSM_cascades']).toBeDefined();
       expect(shader.uniforms['cameraNear']).toEqual({ value: 0.5 });
