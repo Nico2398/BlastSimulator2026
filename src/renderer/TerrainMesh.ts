@@ -115,7 +115,7 @@ export class TerrainMesh {
   private ncy = 0;
   private ncz = 0;
 
-  constructor(scene: THREE.Scene, grid: VoxelGrid) {
+  constructor(scene: THREE.Scene, grid: VoxelGrid, biomeId?: string) {
     this.scene = scene;
     this.grid = grid;
 
@@ -123,6 +123,10 @@ export class TerrainMesh {
     // need to plumb the landscape handle through just for this.
     this.material = new TerrainMaterial({
       playRect: { minX: 0, minZ: 0, maxX: grid.sizeX, maxZ: grid.sizeZ },
+      // Which surface covers this level can grow at all, and the band of
+      // heights its altitude preferences are measured against.
+      ...(biomeId !== undefined ? { biomeId } : {}),
+      heightRange: [0, grid.sizeY],
     });
     this.material.side = THREE.DoubleSide;
     this.updateChunkGridDims();

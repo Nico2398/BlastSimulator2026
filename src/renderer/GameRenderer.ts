@@ -512,7 +512,7 @@ export class GameRenderer {
     const { scene, sunLight, ambient, fill, csm } = this.sm;
 
     // Terrain mesh (marching cubes)
-    this.terrain = new TerrainMesh(scene, grid);
+    this.terrain = new TerrainMesh(scene, grid, ctx.state?.mineType);
     this.terrain.buildAll();
     this.terrain.sharedMaterial.attachCSM(csm);
 

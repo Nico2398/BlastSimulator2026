@@ -160,9 +160,9 @@ describe('TerrainMaterial', () => {
         const mat = makeMaterial();
         const shader = makeFakeShader();
         mat.onBeforeCompile(shader, undefined as unknown as THREE.WebGLRenderer);
-        expect(shader.fragmentShader).toContain('vec3 warm =');
-        expect(shader.fragmentShader).toContain('vec3 cool =');
-        expect(shader.fragmentShader).toContain('mix(cool, warm');
+        expect(shader.fragmentShader).toContain('vec3(1.13, 0.99, 0.79)'); // warm crest tint
+        expect(shader.fragmentShader).toContain('vec3(0.80, 0.89, 1.06)'); // cool hollow tint
+        expect(shader.fragmentShader).toContain('rockCol = mix('); // the two tints are mixed, not just scaled
       });
 
       it('adds bedding planes that only show on exposed faces', () => {
@@ -194,7 +194,7 @@ describe('TerrainMaterial', () => {
 
       it('bumps the program cache key so the old compiled shader is not reused', () => {
         const mat = makeMaterial();
-        expect(mat.customProgramCacheKey()).toBe('terrain-material-v4');
+        expect(mat.customProgramCacheKey()).toBe('terrain-material-v5');
       });
     });
   });

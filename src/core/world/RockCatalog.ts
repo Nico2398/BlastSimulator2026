@@ -1,3 +1,5 @@
+import { MaterialRecipe } from './SurfaceMaterialCatalog.js';
+
 // BlastSimulator2026 — Rock type catalog
 // 10 fictional rock types spanning hardness tiers 1–5.
 // Real-world basis documented per entry.
@@ -32,6 +34,19 @@ export interface RockType {
   readonly veinStrength: number;
   /** Terrain shader macro-noise contrast, 0-0.6 (#458 T4.1/A19.2 uRockParams.w). */
   readonly contrast: number;
+  /**
+   * Which composition of 3D noise fields builds this rock's surface.
+   *
+   * Every rock used to share one formula and differ only by colour and a few
+   * frequencies, which made them read as the same stone repainted. A rock's
+   * construction is part of what it looks like: a conglomerate is packed
+   * cells, a gneiss is banding dragged sideways, a schist is ridged.
+   */
+  readonly recipe: MaterialRecipe;
+  /** Secondary-field frequency, relative to macroFreq. */
+  readonly freqAlt: number;
+  /** Domain-warp / composition strength. Ignored by the recipes that take neither. */
+  readonly warp: number;
 }
 
 // Fracture threshold formula: tier² × 150 + base
@@ -65,6 +80,9 @@ const ROCKS: readonly RockType[] = [
     // 0.15 -> 0.20 (#458 T8.1) — cruite's macro-noise contrast was the
     // lowest of any rock, compounding the flat look at its original colour.
     contrast: 0.20,
+    recipe: MaterialRecipe.Sum,
+    freqAlt: 3.6,
+    warp: 0.0,
   },
   {
     id: 'sandite',
@@ -83,6 +101,9 @@ const ROCKS: readonly RockType[] = [
     detailFreq: 0.90,
     veinStrength: 0.06,
     contrast: 0.22,
+    recipe: MaterialRecipe.Ridged,
+    freqAlt: 2.8,
+    warp: 0.0,
   },
   {
     id: 'molite',
@@ -101,6 +122,9 @@ const ROCKS: readonly RockType[] = [
     detailFreq: 0.55,
     veinStrength: 0.12,
     contrast: 0.18,
+    recipe: MaterialRecipe.Compose,
+    freqAlt: 0.55,
+    warp: 1.6,
   },
   {
     id: 'grumpite',
@@ -119,6 +143,9 @@ const ROCKS: readonly RockType[] = [
     detailFreq: 0.45,
     veinStrength: 0.16,
     contrast: 0.24,
+    recipe: MaterialRecipe.Speckle,
+    freqAlt: 6.5,
+    warp: 0.0,
   },
   {
     id: 'clunkite',
@@ -137,6 +164,9 @@ const ROCKS: readonly RockType[] = [
     detailFreq: 0.70,
     veinStrength: 0.20,
     contrast: 0.28,
+    recipe: MaterialRecipe.Cell,
+    freqAlt: 1.4,
+    warp: 0.0,
   },
   {
     id: 'stubite',
@@ -155,6 +185,9 @@ const ROCKS: readonly RockType[] = [
     detailFreq: 0.80,
     veinStrength: 0.22,
     contrast: 0.30,
+    recipe: MaterialRecipe.CellEdge,
+    freqAlt: 2.2,
+    warp: 0.0,
   },
   {
     id: 'obstiite',
@@ -173,6 +206,9 @@ const ROCKS: readonly RockType[] = [
     detailFreq: 1.10,
     veinStrength: 0.28,
     contrast: 0.35,
+    recipe: MaterialRecipe.Warp,
+    freqAlt: 0.5,
+    warp: 2.2,
   },
   {
     id: 'gnarlite',
@@ -191,6 +227,9 @@ const ROCKS: readonly RockType[] = [
     detailFreq: 1.00,
     veinStrength: 0.30,
     contrast: 0.38,
+    recipe: MaterialRecipe.Ridged,
+    freqAlt: 3.4,
+    warp: 0.0,
   },
   {
     id: 'absurdite',
@@ -209,6 +248,9 @@ const ROCKS: readonly RockType[] = [
     detailFreq: 1.20,
     veinStrength: 0.35,
     contrast: 0.45,
+    recipe: MaterialRecipe.Speckle,
+    freqAlt: 5.0,
+    warp: 0.0,
   },
   {
     id: 'titanite',
@@ -227,6 +269,9 @@ const ROCKS: readonly RockType[] = [
     detailFreq: 1.40,
     veinStrength: 0.40,
     contrast: 0.50,
+    recipe: MaterialRecipe.Warp,
+    freqAlt: 0.62,
+    warp: 3.0,
   },
 ] as const;
 

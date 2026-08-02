@@ -2796,5 +2796,18 @@
   "loading.preparing": "Preparing…",
   "loading.terrain": "Generating terrain",
   "loading.meshing": "Building the site",
-  "loading.ready": "Ready"
+  "loading.ready": "Ready",
+  "material.dirt": "Dirt",
+  "material.grass": "Grass",
+  "material.moss": "Moss",
+  "material.gravel": "Gravel",
+  "material.scree": "Scree",
+  "material.sand": "Sand",
+  "material.clay": "Clay",
+  "material.mud": "Mud",
+  "material.marble": "Marble",
+  "material.ice": "Ice",
+  "material.snow": "Snow",
+  "material.ash": "Ash",
+  "material.salt": "Salt Crust"
 }

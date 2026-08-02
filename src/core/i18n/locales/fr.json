@@ -2796,5 +2796,18 @@
   "loading.preparing": "Préparation…",
   "loading.terrain": "Génération du terrain",
   "loading.meshing": "Construction du site",
-  "loading.ready": "Prêt"
+  "loading.ready": "Prêt",
+  "material.dirt": "Terre",
+  "material.grass": "Herbe",
+  "material.moss": "Mousse",
+  "material.gravel": "Gravier",
+  "material.scree": "Éboulis",
+  "material.sand": "Sable",
+  "material.clay": "Argile",
+  "material.mud": "Boue",
+  "material.marble": "Marbre",
+  "material.ice": "Glace",
+  "material.snow": "Neige",
+  "material.ash": "Cendre",
+  "material.salt": "Croûte de sel"
 }
