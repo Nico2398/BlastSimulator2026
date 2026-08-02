@@ -23,7 +23,7 @@ function makeMockCanvas() {
 }
 
 // Import after mock setup
-import { CameraController, pitchForHeight } from '../../../src/renderer/CameraController.js';
+import { CameraController } from '../../../src/renderer/CameraController.js';
 
 describe('CameraController', () => {
   let camera: THREE.PerspectiveCamera;
@@ -68,23 +68,24 @@ describe('CameraController', () => {
     expect(countAfter).toBe(0);
   });
 
-  it('keeps the view a sane distance away however far you scroll (#458 T6.1/D13)', () => {
-    // Distance is now a consequence of height and its derived pitch rather
-    // than the thing being scrolled, so this pins the resulting range.
+  it('keeps the orbit distance within its limits however far you scroll (#458 T6.1/D13)', () => {
+    // Simulate wheel events using plain objects (Node.js has no WheelEvent)
     const makeWheel = (deltaY: number) =>
       Object.assign(Object.create({ preventDefault: () => {} }), { deltaY });
 
     for (let i = 0; i < 500; i++) {
       canvas._listeners['wheel']?.forEach((fn) => fn(makeWheel(-1) as unknown as Event));
     }
-    const distIn = camera.position.distanceTo(new THREE.Vector3(camera.position.x, 0, camera.position.z));
+    const distIn = camera.position.distanceTo(target);
     expect(distIn).toBeGreaterThanOrEqual(5);
+    expect(distIn).toBeLessThanOrEqual(1200);
 
     for (let i = 0; i < 1000; i++) {
       canvas._listeners['wheel']?.forEach((fn) => fn(makeWheel(1) as unknown as Event));
     }
-    expect(controller.distance).toBeLessThanOrEqual(1200);
-    expect(controller.distance).toBeGreaterThanOrEqual(5);
+    const distOut = camera.position.distanceTo(target);
+    expect(distOut).toBeGreaterThanOrEqual(5);
+    expect(distOut).toBeLessThanOrEqual(1200);
   });
 
   describe('frameSite', () => {
@@ -128,7 +129,7 @@ describe('CameraController', () => {
     });
   });
 
-  describe('height model', () => {
+  describe('orbit model — orientation and zoom are independent', () => {
     const wheel = (deltaY: number) =>
       Object.assign(Object.create({ preventDefault: () => {} }), { deltaY });
     const scroll = (rig: ReturnType<typeof makeMockCanvas>, deltaY: number, times = 1) => {
@@ -136,9 +137,12 @@ describe('CameraController', () => {
         rig._listeners['wheel']?.forEach((fn) => fn(wheel(deltaY) as unknown as Event));
       }
     };
-    /** Drag with the right button held — pan. Supports both axes. */
-    const dragPan2D = (rig: ReturnType<typeof makeMockCanvas>, steps: number, stepX: number, stepY: number) => {
-      const ev = (x: number, y: number, button = 2) =>
+    /** Drag with a button held. Button 0 orbits, button 2 pans. */
+    const drag = (
+      rig: ReturnType<typeof makeMockCanvas>,
+      button: number, steps: number, stepX: number, stepY: number,
+    ) => {
+      const ev = (x: number, y: number) =>
         Object.assign(Object.create({ preventDefault: () => {} }), { button, clientX: x, clientY: y });
       rig._listeners['mousedown']?.forEach((fn) => fn(ev(0, 0) as unknown as Event));
       for (let i = 1; i <= steps; i++) {
@@ -146,110 +150,116 @@ describe('CameraController', () => {
       }
       rig._listeners['mouseup']?.forEach((fn) => fn(ev(0, 0) as unknown as Event));
     };
-    /** Where the camera's view axis meets the y=0 ground plane — i.e. what it is looking at. */
-    const groundPointOf = (cam: THREE.PerspectiveCamera) => {
-      const dir = new THREE.Vector3();
-      cam.getWorldDirection(dir);
-      return new THREE.Vector3().copy(cam.position).addScaledVector(dir, -cam.position.y / dir.y);
+    /** Pitch above the horizon, in degrees, derived from the camera's placement. */
+    const pitchDeg = (cam: THREE.PerspectiveCamera, tgt: THREE.Vector3) => {
+      const o = cam.position.clone().sub(tgt);
+      return THREE.MathUtils.radToDeg(Math.atan2(o.y, Math.hypot(o.x, o.z)));
+    };
+    /** Yaw around the vertical axis, in degrees. */
+    const yawDeg = (cam: THREE.PerspectiveCamera, tgt: THREE.Vector3) => {
+      const o = cam.position.clone().sub(tgt);
+      return THREE.MathUtils.radToDeg(Math.atan2(o.x, o.z));
     };
 
+    it('left-drag sideways swings the camera around the target', () => {
+      const before = yawDeg(camera, target);
+      const radiusBefore = controller.distance;
+      drag(canvas, 0, 10, 12, 0);
+      expect(yawDeg(camera, target)).not.toBeCloseTo(before, 2);
+      expect(controller.distance).toBeCloseTo(radiusBefore, 5); // orbit, not dolly
+    });
+
+    it('left-drag vertically tilts the camera — pitch is dragged, not derived', () => {
+      const before = pitchDeg(camera, target);
+      drag(canvas, 0, 10, 0, 8);
+      const after = pitchDeg(camera, target);
+      expect(after).not.toBeCloseTo(before, 2);
+      // Dragging down raises the camera toward top-down.
+      expect(after).toBeGreaterThan(before);
+    });
+
+    it('holds its pitch across a full zoom in and out', () => {
+      drag(canvas, 0, 8, 0, 6); // pick a deliberate angle
+      const chosen = pitchDeg(camera, target);
+
+      scroll(canvas, -1, 12);
+      expect(pitchDeg(camera, target)).toBeCloseTo(chosen, 4);
+      scroll(canvas, 1, 20);
+      expect(pitchDeg(camera, target)).toBeCloseTo(chosen, 4);
+    });
+
+    it('holds its yaw across a full zoom in and out', () => {
+      drag(canvas, 0, 8, 15, 0);
+      const chosen = yawDeg(camera, target);
+
+      scroll(canvas, -1, 12);
+      expect(yawDeg(camera, target)).toBeCloseTo(chosen, 4);
+      scroll(canvas, 1, 20);
+      expect(yawDeg(camera, target)).toBeCloseTo(chosen, 4);
+    });
+
+    it('zooming moves along the line to the target and leaves the target where it is', () => {
+      const before = controller.distance;
+      // Where the view meets the ground plane — the point being orbited.
+      const groundPoint = () => {
+        const dir = new THREE.Vector3();
+        camera.getWorldDirection(dir);
+        return new THREE.Vector3().copy(camera.position).addScaledVector(dir, -camera.position.y / dir.y);
+      };
+      const aimBefore = groundPoint();
+
+      scroll(canvas, -1, 5);
+      expect(controller.distance).toBeLessThan(before);
+      const aimAfter = groundPoint();
+      // No forward creep: zoom closes on the same point, it does not fly past it.
+      expect(aimAfter.distanceTo(aimBefore)).toBeLessThan(0.01);
+    });
+
+    it('scrolling out then back in returns to the same distance', () => {
+      const before = controller.distance;
+      scroll(canvas, 1, 6);
+      expect(controller.distance).toBeGreaterThan(before);
+      scroll(canvas, -1, 6);
+      expect(controller.distance).toBeCloseTo(before, 6);
+    });
+
+    it('clamps pitch short of straight down and of the horizon', () => {
+      drag(canvas, 0, 60, 0, 40); // hard toward top-down
+      expect(pitchDeg(camera, target)).toBeLessThanOrEqual(90);
+      expect(camera.position.y).toBeGreaterThan(target.y);
+
+      drag(canvas, 0, 60, 0, -40); // hard toward the horizon
+      expect(pitchDeg(camera, target)).toBeGreaterThan(0); // never dips under the target
+    });
+
     it('panning never lifts the view off its horizontal plane', () => {
-      // The regression this model was built for: panning used to walk the
+      // The regression this pan model was built for: panning used to walk the
       // look-at point up the camera's tilted local up vector, a little on
       // every drag, with only X and Z leashed. The camera ended up stranded
       // in the sky with the ground unreachable.
+      const groundPoint = () => {
+        const dir = new THREE.Vector3();
+        camera.getWorldDirection(dir);
+        return new THREE.Vector3().copy(camera.position).addScaledVector(dir, -camera.position.y / dir.y);
+      };
       const yBefore = camera.position.y;
-      const groundBefore = groundPointOf(camera).y;
+      const aimYBefore = groundPoint().y;
 
-      dragPan2D(canvas, 40, 12, 9);   // drag down-right, hard
-      dragPan2D(canvas, 40, -9, -12); // and back up-left
+      drag(canvas, 2, 40, 12, 9);   // drag down-right, hard
+      drag(canvas, 2, 40, -9, -12); // and back up-left
 
       expect(camera.position.y).toBeCloseTo(yBefore, 6);
-      expect(groundPointOf(camera).y).toBeCloseTo(groundBefore, 6);
+      expect(groundPoint().y).toBeCloseTo(aimYBefore, 6);
     });
 
-    it('scrolling changes camera height rather than orbit radius', () => {
-      const before = controller.cameraHeight;
-      scroll(canvas, -1, 5);
-      expect(controller.cameraHeight).toBeLessThan(before);
-      scroll(canvas, 1, 10);
-      expect(controller.cameraHeight).toBeGreaterThan(before);
-    });
+    it('setOrbit places an exact angle for scripted shots and zoom leaves it alone', () => {
+      controller.setOrbit(45, 30);
+      expect(yawDeg(camera, target)).toBeCloseTo(45, 3);
+      expect(pitchDeg(camera, target)).toBeCloseTo(30, 3);
 
-    it('holds height between HEIGHT_MIN and HEIGHT_MAX however far you scroll', () => {
-      scroll(canvas, -1, 500);
-      expect(controller.cameraHeight).toBeGreaterThanOrEqual(6);
-      expect(camera.position.y).toBeGreaterThan(0);
-
-      scroll(canvas, 1, 1000);
-      expect(controller.cameraHeight).toBeLessThanOrEqual(900);
-      expect(Number.isFinite(camera.position.y)).toBe(true);
-    });
-
-    it('tilts toward top-down when high and toward the horizon when low', () => {
-      scroll(canvas, 1, 400); // climb to the ceiling
-      const high = pitchForHeight(controller.cameraHeight);
-      scroll(canvas, -1, 400); // drop to the floor
-      const low = pitchForHeight(controller.cameraHeight);
-
-      expect(high).toBeGreaterThan(low);
-      expect(THREE.MathUtils.radToDeg(high)).toBeGreaterThan(60); // reads as overhead
-      expect(THREE.MathUtils.radToDeg(low)).toBeLessThan(30);     // reads as a ground-level view
-    });
-
-    it('zooming in flies forward along the view axis, not straight down', () => {
-      const groundBefore = groundPointOf(camera);
-      const heading = new THREE.Vector3();
-      camera.getWorldDirection(heading);
-      heading.y = 0;
-      heading.normalize();
-
-      scroll(canvas, -1, 6); // zoom in
-
-      const groundAfter = groundPointOf(camera);
-      const travel = groundAfter.clone().sub(groundBefore);
-      expect(travel.length()).toBeGreaterThan(0.5);          // it really moved
-      expect(travel.clone().normalize().dot(heading)).toBeGreaterThan(0.9); // and moved forward
-    });
-
-    it('zooming out retreats back along the same axis', () => {
-      const heading = new THREE.Vector3();
-      camera.getWorldDirection(heading);
-      heading.y = 0;
-      heading.normalize();
-
-      const groundBefore = groundPointOf(camera);
-      scroll(canvas, 1, 6); // zoom out
-      const travel = groundPointOf(camera).clone().sub(groundBefore);
-
-      expect(travel.length()).toBeGreaterThan(0.5);
-      expect(travel.clone().normalize().dot(heading)).toBeLessThan(-0.9);
-    });
-
-    it('left-drag rotates around the target without changing height', () => {
-      const heightBefore = controller.cameraHeight;
-      const yBefore = camera.position.y;
-      const ev = (x: number, button = 0) =>
-        Object.assign(Object.create({ preventDefault: () => {} }), { button, clientX: x, clientY: 0 });
-      canvas._listeners['mousedown']?.forEach((fn) => fn(ev(0) as unknown as Event));
-      canvas._listeners['mousemove']?.forEach((fn) => fn(ev(120) as unknown as Event));
-      canvas._listeners['mouseup']?.forEach((fn) => fn(ev(120) as unknown as Event));
-
-      expect(controller.cameraHeight).toBeCloseTo(heightBefore, 6);
-      expect(camera.position.y).toBeCloseTo(yBefore, 6);
-    });
-
-    it('a scripted setOrbit pitch survives until the player touches the camera', () => {
-      controller.setOrbit(45, 80);
-      const scripted = camera.position.clone();
-      expect(scripted.y).toBeGreaterThan(0);
-
-      scroll(canvas, -1, 1); // player input hands control back to the height model
-      const pitchNow = Math.atan2(
-        camera.position.y - 0,
-        Math.hypot(camera.position.x - groundPointOf(camera).x, camera.position.z - groundPointOf(camera).z),
-      );
-      expect(pitchNow).toBeCloseTo(pitchForHeight(controller.cameraHeight), 4);
+      scroll(canvas, -1, 4);
+      expect(yawDeg(camera, target)).toBeCloseTo(45, 3);
+      expect(pitchDeg(camera, target)).toBeCloseTo(30, 3);
     });
   });
 
