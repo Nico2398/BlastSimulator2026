@@ -171,6 +171,112 @@ describe('LandscapeMesh', () => {
     lm.dispose();
   });
 
+  describe('tile meshes never cover the playable rect', () => {
+    // A tile spans 512m while a playable rect is 32-160m, so every rect sits
+    // deep inside its tiles. Before this exclusion the coarse 4m sheet was
+    // emitted straight across the pit at the pre-dig surface height, hiding
+    // everything the voxel mesh did underneath it — a blast carved its crater
+    // and the player saw flat ground.
+    const rect: Rect = { minX: 0, minZ: 0, maxX: 32, maxZ: 32 };
+
+    /** Every triangle of `mesh`, as world-space corner triples. */
+    function triangles(mesh: THREE.Mesh): [number, number][][] {
+      const pos = mesh.geometry.getAttribute('position').array as Float32Array;
+      const idx = mesh.geometry.getIndex()!.array;
+      const out: [number, number][][] = [];
+      for (let i = 0; i < idx.length; i += 3) {
+        out.push([0, 1, 2].map((k) => {
+          const v = idx[i + k]!;
+          return [pos[v * 3]!, pos[v * 3 + 2]!] as [number, number];
+        }));
+      }
+      return out;
+    }
+
+    function insideDepth(x: number, z: number): number {
+      return Math.min(Math.min(x - rect.minX, rect.maxX - x), Math.min(z - rect.minZ, rect.maxZ - z));
+    }
+
+    /** A tile spanning -100..56 on both axes at 4m step — swallows the whole rect. */
+    function tileCoveringRect(compId: number) {
+      return { tile: makeFakeTile(-100, -100, 40, compId), n: 40 };
+    }
+
+    it('emits no triangle that reaches inside the playable rect', () => {
+      const scene = makeScene();
+      const { palette, compId } = makePalette();
+      const { tile, n } = tileCoveringRect(compId);
+      const handle = makeFakeHandle(rect, [tile], n, compId);
+
+      const lm = new LandscapeMesh(scene, makeMaterial());
+      lm.build(handle, palette);
+
+      const tileMesh = scene.children.find(
+        (c) => (c as THREE.Mesh).geometry?.getAttribute('position')?.count === n * n,
+      ) as THREE.Mesh;
+      expect(tileMesh).toBeDefined();
+
+      for (const tri of triangles(tileMesh)) {
+        for (const [x, z] of tri) {
+          expect(insideDepth(x, z)).toBeLessThanOrEqual(0);
+        }
+      }
+      lm.dispose();
+    });
+
+    it('still emits the tile ground outside the rect (the pit is cut out, not the whole tile)', () => {
+      const scene = makeScene();
+      const { palette, compId } = makePalette();
+      const { tile, n } = tileCoveringRect(compId);
+      const handle = makeFakeHandle(rect, [tile], n, compId);
+
+      const lm = new LandscapeMesh(scene, makeMaterial());
+      lm.build(handle, palette);
+
+      const tileMesh = scene.children.find(
+        (c) => (c as THREE.Mesh).geometry?.getAttribute('position')?.count === n * n,
+      ) as THREE.Mesh;
+      const kept = tileMesh.geometry.getIndex()!.count / 6;
+      const total = (n - 1) * (n - 1);
+      expect(kept).toBeGreaterThan(total * 0.8); // only the pit's few quads are gone
+      expect(kept).toBeLessThan(total);          // but some really are gone
+      lm.dispose();
+    });
+
+    it('leaves a tile that never touches the rect completely intact', () => {
+      const scene = makeScene();
+      const { palette, compId } = makePalette();
+      const n = 6;
+      const handle = makeFakeHandle(rect, [makeFakeTile(400, 400, n, compId)], n, compId);
+
+      const lm = new LandscapeMesh(scene, makeMaterial());
+      lm.build(handle, palette);
+
+      const tileMesh = scene.children.find(
+        (c) => (c as THREE.Mesh).geometry?.getAttribute('position')?.count === n * n,
+      ) as THREE.Mesh;
+      expect(tileMesh.geometry.getIndex()!.count).toBe((n - 1) * (n - 1) * 6);
+      lm.dispose();
+    });
+
+    it('drops the tile entirely when every one of its quads is inside the rect', () => {
+      const scene = makeScene();
+      const { palette, compId } = makePalette();
+      const big: Rect = { minX: -1000, minZ: -1000, maxX: 1000, maxZ: 1000 };
+      const n = 4;
+      const handle = makeFakeHandle(big, [makeFakeTile(0, 0, n, compId)], n, compId);
+
+      const lm = new LandscapeMesh(scene, makeMaterial());
+      lm.build(handle, palette);
+
+      const tileMesh = scene.children.find(
+        (c) => (c as THREE.Mesh).geometry?.getAttribute('position')?.count === n * n,
+      );
+      expect(tileMesh).toBeUndefined(); // no geometry left to draw
+      lm.dispose();
+    });
+  });
+
   describe('seam mesh (#458 A16 anti-gap overlap)', () => {
     it('lowers height by exactly OVERLAP_DROP (0.15m) for vertices inside the playable rect', () => {
       const scene = makeScene();

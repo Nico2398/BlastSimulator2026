@@ -70,7 +70,9 @@ export class LandscapeMesh {
     this.dispose();
 
     for (const tile of handle.map.tiles) {
-      const mesh = this.buildTileMesh(tile, handle.map.coarseStep, handle.map.samplesPerTile, palette);
+      const mesh = this.buildTileMesh(
+        tile, handle.map.coarseStep, handle.map.samplesPerTile, palette, handle.playableRect,
+      );
       if (mesh) {
         this.scene.add(mesh);
         this.tileMeshes.push(mesh);
@@ -96,9 +98,29 @@ export class LandscapeMesh {
 
   // ---------- Internal ----------
 
-  /** Indexed grid mesh from one tile's stored samples, smooth-shaded (#458 A16). */
-  private buildTileMesh(tile: LandscapeTile, step: number, n: number, palette: CompositionPalette): THREE.Mesh | null {
+  /**
+   * Indexed grid mesh from one tile's stored samples, smooth-shaded (#458 A16).
+   *
+   * Quads reaching into the playable rect are dropped. A tile spans 512 m
+   * while a playable rect is 32–160 m, so every rect sits deep inside its
+   * tiles — without this the coarse 4 m sheet blankets the whole pit at the
+   * pre-dig surface height and hides everything the voxel mesh does beneath
+   * it, craters included. The seam mesh already bridges from FINE_MARGIN
+   * outside the rect to OVERLAP inside it, so cutting the tiles back to the
+   * rect boundary opens no gap.
+   */
+  private buildTileMesh(
+    tile: LandscapeTile, step: number, n: number, palette: CompositionPalette, rect: Rect,
+  ): THREE.Mesh | null {
     if (tile.heights.length === 0) return null;
+
+    // Most tiles are nowhere near the rect — test the tile's own span once and
+    // skip the per-quad work entirely for those.
+    const tileMaxX = tile.originX + (n - 1) * step;
+    const tileMaxZ = tile.originZ + (n - 1) * step;
+    const touchesRect =
+      tileMaxX > rect.minX && tile.originX < rect.maxX &&
+      tileMaxZ > rect.minZ && tile.originZ < rect.maxZ;
 
     const positions = new Float32Array(n * n * 3);
     const rockA = new Float32Array(n * n);
@@ -125,7 +147,17 @@ export class LandscapeMesh {
 
     const indices: number[] = [];
     for (let row = 0; row < n - 1; row++) {
+      const z0 = tile.originZ + row * step, z1 = z0 + step;
       for (let col = 0; col < n - 1; col++) {
+        if (touchesRect) {
+          const x0 = tile.originX + col * step, x1 = x0 + step;
+          // Any corner inside the rect means this quad overhangs ground the
+          // voxel mesh owns — drop the whole quad rather than let it dip in.
+          const reachesIntoRect =
+            distanceInsideRect(rect, x0, z0) > 0 || distanceInsideRect(rect, x1, z0) > 0 ||
+            distanceInsideRect(rect, x0, z1) > 0 || distanceInsideRect(rect, x1, z1) > 0;
+          if (reachesIntoRect) continue;
+        }
         const i0 = row * n + col;
         const i1 = i0 + 1;
         const i2 = i0 + n;
