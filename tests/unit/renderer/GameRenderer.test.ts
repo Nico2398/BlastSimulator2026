@@ -35,7 +35,8 @@ function makeMockSceneManager() {
     getExtendedBreaks: () => {},
     shaders: new Map(),
   };
-  return { scene, camera, sunLight, ambient, fill, csm, cameraController, renderer: { render: vi.fn() } as unknown };
+  const postPipeline = { aerial: { setHazeColor: vi.fn(), setHeightRef: vi.fn(), setGrade: vi.fn(), update: vi.fn() } };
+  return { scene, camera, sunLight, ambient, fill, csm, cameraController, postPipeline, renderer: { render: vi.fn() } as unknown };
 }
 
 function makeCtx(): MiningContext {
@@ -227,5 +228,55 @@ describe('GameRenderer — camera framing', () => {
 
     renderer.syncFromContext(ctx);
     expect(sm.cameraController.frameSite).not.toHaveBeenCalled();
+  });
+});
+
+describe('GameRenderer — wind and clouds (#458 T7.1/D12)', () => {
+  it('loadGame adds 5 cloud cluster InstancedMeshes and a gradient sky dome to the scene', () => {
+    const sm = makeMockSceneManager();
+    const renderer = new GameRenderer(sm as any);
+    renderer.syncFromContext(makeCtx());
+
+    const cloudMeshes = sm.scene.children.filter((c) => c.name === 'cloud-cluster');
+    expect(cloudMeshes).toHaveLength(5);
+    const dome = sm.scene.children.find((c) => c instanceof THREE.Mesh && c.geometry instanceof THREE.SphereGeometry);
+    expect(dome).toBeDefined();
+  });
+
+  it('update() advances the terrain material cloud-shadow uniforms from their T5.3 inert defaults', () => {
+    const sm = makeMockSceneManager();
+    const renderer = new GameRenderer(sm as any);
+    renderer.syncFromContext(makeCtx());
+
+    const uniforms = renderer.terrain!.sharedMaterial.customUniforms;
+    const offsetBefore = (uniforms['uCloudOffset']!.value as THREE.Vector2).clone();
+
+    for (let i = 0; i < 60; i++) renderer.update(0.1);
+
+    // T5.3 wired uCloudCoverage inert at 0 until T7.1 turned it on — confirm
+    // it's actually live now (update() pushes CloudLayer's coverage in),
+    // not just present.
+    expect(uniforms['uCloudCoverage']!.value).toBeGreaterThan(0);
+    const offsetAfter = uniforms['uCloudOffset']!.value as THREE.Vector2;
+
+    // Wind is never exactly zero-speed after warmup ticks (weather always has
+    // a non-zero target speed, even 'sunny'), so the offset must have moved.
+    expect(offsetAfter.equals(offsetBefore)).toBe(false);
+  });
+
+  it('a weather change reaches CloudLayer — storm raises cloud coverage toward its dense target', async () => {
+    const { createWeatherCycle } = await import('../../../src/core/weather/WeatherCycle.js');
+    const sm = makeMockSceneManager();
+    const renderer = new GameRenderer(sm as any);
+    const ctx = makeCtx();
+    ctx.weatherCycle = createWeatherCycle(ctx.state!.seed);
+    renderer.syncFromContext(ctx);
+
+    const uniforms = renderer.terrain!.sharedMaterial.customUniforms;
+    ctx.weatherCycle.current = 'storm';
+    renderer.syncFromContext(ctx); // pushes the new weather into skybox + clouds
+    for (let i = 0; i < 200; i++) renderer.update(0.05);
+
+    expect(uniforms['uCloudCoverage']!.value as number).toBeGreaterThan(0.9);
   });
 });

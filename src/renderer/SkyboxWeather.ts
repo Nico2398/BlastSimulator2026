@@ -3,15 +3,17 @@
 // Rain produces a falling particle system (tiny cylinders / points).
 // Storm adds rapid flashes (brief white screen flash on DirectionalLight).
 //
-// No actual skybox texture — procedural color sky matching Three.js scene.background.
+// Sky is a large inverted dome (#458 T7.1/D12/A25) rather than a flat
+// scene.background color — skyLow feeds the horizon, skyHigh (previously
+// dormant — nothing read it) feeds the zenith.
 
 import * as THREE from 'three';
 import type { WeatherState } from '../core/weather/WeatherCycle.js';
 
 // ---------- Sky colors per weather state ----------
-// Colors for: scene.background. THREE.Fog was removed in favour of the
-// aerial perspective post-process pass (#458 T5.1/D11); "skyLow" now only
-// feeds scene.background.
+// skyLow feeds the dome's horizon stop and legacy scene.background fallback;
+// skyHigh feeds the dome's zenith stop. THREE.Fog was removed in favour of
+// the aerial perspective post-process pass (#458 T5.1/D11).
 
 interface WeatherColors {
   skyHigh: THREE.Color;  // upper sky
@@ -103,6 +105,33 @@ const STORM_FLASH_INTERVAL_MIN = 3.0;  // seconds between lightning
 const STORM_FLASH_INTERVAL_MAX = 8.0;
 const STORM_FLASH_DURATION = 0.08;     // seconds the flash lasts
 
+// ---------- Gradient sky dome (#458 T7.1/D12/A25) ----------
+// Comfortably bigger than the far plane (6000, #458 T6.1/D13) so the dome
+// never clips into view, and bigger than any camera excursion the pan leash
+// allows — a fixed dome at the world origin never needs to follow the camera.
+const SKY_DOME_RADIUS = 3000;
+const SKY_DOME_SEGMENTS = 16;
+
+const SKY_DOME_VERTEX_SHADER = `
+varying vec3 vWorldPosition;
+void main() {
+  vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+  vWorldPosition = worldPosition.xyz;
+  gl_Position = projectionMatrix * viewMatrix * worldPosition;
+}
+`;
+
+const SKY_DOME_FRAGMENT_SHADER = `
+uniform vec3 uSkyLow;
+uniform vec3 uSkyHigh;
+varying vec3 vWorldPosition;
+void main() {
+  float h = normalize(vWorldPosition).y;
+  float t = smoothstep(-0.05, 0.6, h);
+  gl_FragColor = vec4(mix(uSkyLow, uSkyHigh, t), 1.0);
+}
+`;
+
 // ---------- Main class ----------
 
 export class SkyboxWeather {
@@ -113,8 +142,13 @@ export class SkyboxWeather {
 
   private currentWeather: WeatherState = 'sunny';
   private readonly currentSky = new THREE.Color(WEATHER_COLORS.sunny.skyLow);
+  private readonly currentSkyHigh = new THREE.Color(WEATHER_COLORS.sunny.skyHigh);
   /** False until the first setWeather() call, which snaps instead of lerping. */
   private weatherInitialised = false;
+
+  // Gradient sky dome
+  private readonly skyDome: THREE.Mesh;
+  private readonly skyDomeMaterial: THREE.ShaderMaterial;
 
   // Rain
   private rainPoints: THREE.Points | null = null;
@@ -139,6 +173,27 @@ export class SkyboxWeather {
     this.ambient = ambient;
     this.fill = fill;
 
+    // Gradient sky dome — replaces the flat scene.background color.
+    this.skyDomeMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        uSkyLow: { value: this.currentSky.clone() },
+        uSkyHigh: { value: this.currentSkyHigh.clone() },
+      },
+      vertexShader: SKY_DOME_VERTEX_SHADER,
+      fragmentShader: SKY_DOME_FRAGMENT_SHADER,
+      side: THREE.BackSide,
+      depthWrite: false,
+      fog: false,
+      lights: false,
+    });
+    const domeGeo = new THREE.SphereGeometry(SKY_DOME_RADIUS, SKY_DOME_SEGMENTS, SKY_DOME_SEGMENTS);
+    this.skyDome = new THREE.Mesh(domeGeo, this.skyDomeMaterial);
+    // Rendered first, behind everything real geometry can occlude — matters
+    // for the aerial-perspective/bloom passes reading depth downstream.
+    this.skyDome.renderOrder = -1;
+    this.scene.add(this.skyDome);
+    this.scene.background = null;
+
     // Pre-allocate rain positions
     this.rainPositions = new Float32Array(RAIN_PARTICLE_COUNT * 3);
     this.initRainPositions();
@@ -157,6 +212,9 @@ export class SkyboxWeather {
       this.weatherInitialised = true;
       const colors = WEATHER_COLORS[state];
       this.currentSky.copy(colors.skyLow);
+      this.currentSkyHigh.copy(colors.skyHigh);
+      (this.skyDomeMaterial.uniforms['uSkyLow']!.value as THREE.Color).copy(this.currentSky);
+      (this.skyDomeMaterial.uniforms['uSkyHigh']!.value as THREE.Color).copy(this.currentSkyHigh);
       this.sun.intensity = colors.sunIntensity;
       this.ambient.intensity = colors.ambientIntensity;
       this.fill.intensity = colors.sunIntensity * FILL_INTENSITY_RATIO;
@@ -191,9 +249,12 @@ export class SkyboxWeather {
       : Math.min(RAIN_AREA_MAX, Math.max(RAIN_AREA_MIN, cameraDistance * RAIN_AREA_FACTOR));
     const target = WEATHER_COLORS[this.currentWeather];
 
-    // Lerp sky color
+    // Lerp sky color — dome uniforms are the same THREE.Color objects, so
+    // this write reaches the GPU on the next draw without a clone.
     this.currentSky.lerp(target.skyLow, TRANSITION_SPEED * dt);
-    this.scene.background = this.currentSky.clone();
+    this.currentSkyHigh.lerp(target.skyHigh, TRANSITION_SPEED * dt);
+    (this.skyDomeMaterial.uniforms['uSkyLow']!.value as THREE.Color).copy(this.currentSky);
+    (this.skyDomeMaterial.uniforms['uSkyHigh']!.value as THREE.Color).copy(this.currentSkyHigh);
 
     // Lerp sun / ambient / fill
     this.sun.intensity += (target.sunIntensity - this.sun.intensity) * TRANSITION_SPEED * dt;
@@ -224,6 +285,9 @@ export class SkyboxWeather {
       (this.rainPoints.material as THREE.Material).dispose();
       this.rainPoints = null;
     }
+    this.scene.remove(this.skyDome);
+    this.skyDome.geometry.dispose();
+    this.skyDomeMaterial.dispose();
   }
 
   // ---------- Internal ----------

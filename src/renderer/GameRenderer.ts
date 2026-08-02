@@ -8,6 +8,7 @@ import { ensureLandscape } from '../console/commands/world.js';
 import type { GameState } from '../core/state/GameState.js';
 import { type VoxelGrid, computeVoxelColumnSurfaceY } from '../core/world/VoxelGrid.js';
 import { getBiome } from '../core/world/BiomeCatalog.js';
+import type { WeatherState } from '../core/weather/WeatherCycle.js';
 import { BIOME_GRADES, NEUTRAL_GRADE } from './post/AerialPerspectivePass.js';
 import type { SceneManager } from './SceneManager.js';
 import { TerrainMesh, type DirtyRegion } from './TerrainMesh.js';
@@ -15,6 +16,8 @@ import { BuildingMesh } from './BuildingMesh.js';
 import { VehicleMesh } from './VehicleMesh.js';
 import { CharacterMesh } from './CharacterMesh.js';
 import { SkyboxWeather } from './SkyboxWeather.js';
+import { WindState } from './ambient/WindState.js';
+import { CloudLayer } from './ambient/CloudLayer.js';
 import { FragmentMesh } from './FragmentMesh.js';
 import { BlastEffects } from './BlastEffects.js';
 import { LandscapeMesh } from './terrain/LandscapeMesh.js';
@@ -49,6 +52,8 @@ export class GameRenderer {
   private vehicles: VehicleMesh | null = null;
   private characters: CharacterMesh | null = null;
   private skybox: SkyboxWeather | null = null;
+  private windState: WindState | null = null;
+  private clouds: CloudLayer | null = null;
   private fragments: FragmentMesh | null = null;
   private blastEffects: BlastEffects | null = null;
   private landscape: LandscapeMesh | null = null;
@@ -59,6 +64,8 @@ export class GameRenderer {
   /** Seed of the currently loaded game — used to detect new_game calls. */
   private loadedSeed: number | null = null;
   private lastState: GameState | null = null;
+  /** Current weather, mirrored from syncFromContext() so update()'s per-frame WindState tick has it without re-reading MiningContext. */
+  private lastWeather: WeatherState = 'sunny';
 
   // Track rendered entity IDs to detect additions
   private renderedBuildingIds = new Set<number>();
@@ -167,7 +174,9 @@ export class GameRenderer {
 
     // Sync weather
     if (this.skybox && ctx.weatherCycle) {
+      this.lastWeather = ctx.weatherCycle.current;
       this.skybox.setWeather(ctx.weatherCycle.current);
+      this.clouds?.setWeather(ctx.weatherCycle.current);
     }
 
     // Sync survey confidence overlay
@@ -183,6 +192,20 @@ export class GameRenderer {
     if (this.skybox) {
       this.skybox.update(dt, cam.position.x, cam.position.z, this.sm.cameraController.distance);
       this.sm.postPipeline.aerial.setHazeColor(this.skybox.skyColor);
+    }
+
+    // Wind + clouds (#458 T7.1/D12): one WindState update feeds every ambient
+    // module's drift; CloudLayer's own offset/coverage then drive the
+    // terrain material's cloud-shadow term directly, so visible clouds and
+    // their ground shadows share the exact same scroll — never desynced.
+    if (this.windState && this.clouds) {
+      this.windState.update(dt, this.lastWeather);
+      this.clouds.update(dt, this.windState.vector);
+      const uniforms = this.terrain?.sharedMaterial.customUniforms;
+      if (uniforms) {
+        (uniforms['uCloudOffset']!.value as THREE.Vector2).copy(this.clouds.cloudOffset);
+        uniforms['uCloudCoverage']!.value = this.clouds.cloudCoverage;
+      }
     }
 
     if (this.blastEffects) {
@@ -471,6 +494,13 @@ export class GameRenderer {
     // Weather sky
     this.skybox = new SkyboxWeather(scene, sunLight, ambient, fill);
 
+    // Wind + clouds (#458 T7.1/D12): one WindState per level, seeded so every
+    // ambient module (clouds now, birds/smoke/water/sway in T7.2) leans the
+    // same way. Cloud disc centres on the playable rect, same point
+    // frameCameraOnGrid() frames the camera on.
+    this.windState = new WindState(state.seed);
+    this.clouds = new CloudLayer(scene, state.seed, grid.sizeX / 2, grid.sizeZ / 2);
+
     // Fragments (empty until blast runs) — shares terrain's material so a
     // fresh cut face matches the rock it broke off from (#458 T4.1/D9).
     this.fragments = new FragmentMesh(scene, this.terrain.sharedMaterial);
@@ -546,6 +576,7 @@ export class GameRenderer {
     this.vehicles?.clearAll();
     this.characters?.clearAll();
     this.skybox?.dispose();
+    this.clouds?.dispose();
     this.fragments?.dispose();
     this.blastEffects?.dispose();
     this.landscape?.dispose();
@@ -557,6 +588,8 @@ export class GameRenderer {
     this.vehicles = null;
     this.characters = null;
     this.skybox = null;
+    this.windState = null;
+    this.clouds = null;
     this.fragments = null;
     this.blastEffects = null;
     this.landscape = null;

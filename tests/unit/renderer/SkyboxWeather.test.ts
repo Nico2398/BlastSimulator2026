@@ -41,16 +41,18 @@ describe('SkyboxWeather', () => {
   });
 
   it('update transitions sky color toward target', () => {
-    const { scene, sw } = makeSetup();
+    const { sw } = makeSetup();
+    // #458 T7.1/D12: scene.background is gone (a gradient dome mesh replaces
+    // it — see the new "gradient sky dome" tests below), so this reads the
+    // same lerped color the dome's uSkyLow uniform gets each frame.
+    const brightness = (c: THREE.Color) => (c.r + c.g + c.b) / 3;
+    // Sampled before setWeather: the first weather assignment snaps rather
+    // than lerping, so sampling after it would already be at the storm target.
+    const before = brightness(sw.skyColor);
     sw.setWeather('storm');
-    const initialBrightness = () => {
-      const bg = scene.background as THREE.Color;
-      return bg ? (bg.r + bg.g + bg.b) / 3 : 1;
-    };
-    const before = initialBrightness();
     // Run many frames to let lerp converge
     for (let i = 0; i < 120; i++) sw.update(0.016, 50, 50);
-    const after = initialBrightness();
+    const after = brightness(sw.skyColor);
     // Storm sky should be darker than default sunny sky
     expect(after).toBeLessThan(before);
     sw.dispose();
@@ -104,5 +106,47 @@ describe('SkyboxWeather', () => {
     const before = scene.children.length;
     sw.dispose();
     expect(scene.children.length).toBeLessThan(before);
+  });
+
+  // ── #458 T7.1/D12/A25: gradient sky dome ──
+
+  it('adds a large backside gradient dome to the scene and clears the flat background', () => {
+    const { scene, sw } = makeSetup();
+    const dome = scene.children.find(
+      (c): c is THREE.Mesh => c instanceof THREE.Mesh && c.geometry instanceof THREE.SphereGeometry,
+    );
+    expect(dome).toBeDefined();
+    expect((dome!.material as THREE.ShaderMaterial).side).toBe(THREE.BackSide);
+    // A flat scene.background would double-draw behind the dome for nothing —
+    // the dome is now the only thing painting the sky.
+    expect(scene.background).toBeNull();
+    sw.dispose();
+  });
+
+  it('dome shader uniforms track skyLow/skyHigh — never construct/lights/fog', () => {
+    const { scene, sw } = makeSetup();
+    const dome = scene.children.find(
+      (c): c is THREE.Mesh => c instanceof THREE.Mesh && c.geometry instanceof THREE.SphereGeometry,
+    )!;
+    const mat = dome.material as THREE.ShaderMaterial;
+    expect(mat.fog).toBe(false);
+    expect(mat.lights).toBe(false);
+
+    sw.setWeather('storm'); // snaps — skyLow 0x3a4050, skyHigh 0x2a3040
+    expect((mat.uniforms['uSkyLow']!.value as THREE.Color).getHex()).toBe(0x3a4050);
+    expect((mat.uniforms['uSkyHigh']!.value as THREE.Color).getHex()).toBe(0x2a3040);
+
+    sw.setWeather('sunny');
+    for (let i = 0; i < 2000; i++) sw.update(0.016, 50, 50);
+    expect((mat.uniforms['uSkyLow']!.value as THREE.Color).getHex()).toBe(0x87ceeb);
+    expect((mat.uniforms['uSkyHigh']!.value as THREE.Color).getHex()).toBe(0x4fc3f7);
+    sw.dispose();
+  });
+
+  it('dispose removes the sky dome from the scene', () => {
+    const { scene, sw } = makeSetup();
+    sw.dispose();
+    const dome = scene.children.find((c) => c instanceof THREE.Mesh && c.geometry instanceof THREE.SphereGeometry);
+    expect(dome).toBeUndefined();
   });
 });
