@@ -1,0 +1,22 @@
+{
+  "name": "ambient-life-visual",
+  "description": "Visual verification of ambient life (#458 T7.2/D12): bird flocks circling, chimney smoke over village houses, animated river/lake water, and wind-driven tree/grass sway rendering into the scene without error.",
+  "steps": [
+    {
+      "command": "new_game seed:42",
+      "interaction": [
+        { "type": "command", "command": "new_game seed:42" }
+      ]
+    },
+    {
+      "command": "campaign start level:dusty_hollow",
+      "description": "A real (non-tutorial) level so the landscape zone is big enough to show tree cover, and any villages/rivers within camera range.",
+      "interaction": [
+        { "type": "command", "command": "campaign start level:dusty_hollow" }
+      ]
+    }
+  ],
+  "shots": [
+    { "name": "wide", "yaw": 20, "pitch": 70 }
+  ]
+}

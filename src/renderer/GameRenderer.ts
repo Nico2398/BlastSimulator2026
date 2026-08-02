@@ -18,6 +18,11 @@ import { CharacterMesh } from './CharacterMesh.js';
 import { SkyboxWeather } from './SkyboxWeather.js';
 import { WindState } from './ambient/WindState.js';
 import { CloudLayer } from './ambient/CloudLayer.js';
+import { BirdFlocks } from './ambient/BirdFlocks.js';
+import { ChimneySmoke } from './ambient/ChimneySmoke.js';
+import { WaterSurface } from './ambient/WaterSurface.js';
+import { VegetationSway } from './ambient/VegetationSway.js';
+import { createAmbientUniforms, type AmbientUniforms } from './ambient/AmbientUniforms.js';
 import { FragmentMesh } from './FragmentMesh.js';
 import { BlastEffects } from './BlastEffects.js';
 import { LandscapeMesh } from './terrain/LandscapeMesh.js';
@@ -54,6 +59,12 @@ export class GameRenderer {
   private skybox: SkyboxWeather | null = null;
   private windState: WindState | null = null;
   private clouds: CloudLayer | null = null;
+  private birds: BirdFlocks | null = null;
+  private smoke: ChimneySmoke | null = null;
+  private water: WaterSurface | null = null;
+  private vegetation: VegetationSway | null = null;
+  /** Shared {uTime, uWind} object every ambient shader material references (#458 T7.2/A26) — level-independent, created once. */
+  private readonly ambientUniforms: AmbientUniforms = createAmbientUniforms();
   private fragments: FragmentMesh | null = null;
   private blastEffects: BlastEffects | null = null;
   private landscape: LandscapeMesh | null = null;
@@ -208,6 +219,19 @@ export class GameRenderer {
       }
     }
 
+    // Birds/smoke/water/vegetation (#458 T7.2/D12/A26). Vegetation needs no
+    // per-frame call — its sway lives entirely in the shared ambientUniforms
+    // every tree/grass material already references; updating those two
+    // values here is the whole update.
+    if (this.windState) {
+      const wind = this.windState.vector;
+      this.ambientUniforms.uTime.value += dt;
+      this.ambientUniforms.uWind.value.set(wind.x, wind.z);
+      this.birds?.update(dt);
+      this.smoke?.update(dt, wind, cam.position);
+      this.water?.update(dt, wind);
+    }
+
     if (this.blastEffects) {
       this.blastEffects.update(dt);
     }
@@ -344,6 +368,15 @@ export class GameRenderer {
   private getTerrainSurfaceY(x: number, z: number): number {
     if (!this.lastGrid) return 0;
     return computeVoxelColumnSurfaceY(this.lastGrid, x, z) + 1;
+  }
+
+  /**
+   * A blast fired at (originX, originZ) — scatters any nearby bird flock
+   * (#458 T7.2/D12/A26). Call from main.ts's `emitter.on('blast:started', ...)`
+   * subscription, which already carries the blast origin.
+   */
+  notifyBlastScatter(originX: number, originZ: number): void {
+    this.birds?.onBlast(originX, originZ);
   }
 
   /**
@@ -548,6 +581,25 @@ export class GameRenderer {
     const { aerial } = this.sm.postPipeline;
     aerial.setHeightRef(handle.groundLevelY);
     aerial.setGrade(BIOME_GRADES[biome.id] ?? NEUTRAL_GRADE);
+
+    // Birds/smoke/water/vegetation (#458 T7.2/D12/A26) — rebuilt from the
+    // landscape's own StructureSet every time this runs (a campaign level
+    // swap can call rebuildLandscapeMesh again for the same GameRenderer, so
+    // stale instances from the previous grid must go first or their meshes
+    // pile up in the scene).
+    this.birds?.dispose();
+    this.smoke?.dispose();
+    this.water?.dispose();
+    this.vegetation?.dispose();
+    const centerX = sizeX / 2;
+    const centerZ = sizeZ / 2;
+    this.birds = new BirdFlocks(this.sm.scene, ctx.state.seed, centerX, centerZ);
+    this.smoke = new ChimneySmoke(this.sm.scene, ctx.state.seed, handle.structureSet.villages);
+    this.water = new WaterSurface(this.sm.scene, biome.id, handle.structureSet.rivers, handle.structureSet.landmarks);
+    this.vegetation = new VegetationSway(
+      this.sm.scene, ctx.state.seed, this.ambientUniforms, handle.structureSet.trees,
+      centerX, centerZ, handle.playableRect, (x, z) => handle.sampleColumn(x, z).height,
+    );
   }
 
   /**
@@ -577,6 +629,10 @@ export class GameRenderer {
     this.characters?.clearAll();
     this.skybox?.dispose();
     this.clouds?.dispose();
+    this.birds?.dispose();
+    this.smoke?.dispose();
+    this.water?.dispose();
+    this.vegetation?.dispose();
     this.fragments?.dispose();
     this.blastEffects?.dispose();
     this.landscape?.dispose();
@@ -590,6 +646,10 @@ export class GameRenderer {
     this.skybox = null;
     this.windState = null;
     this.clouds = null;
+    this.birds = null;
+    this.smoke = null;
+    this.water = null;
+    this.vegetation = null;
     this.fragments = null;
     this.blastEffects = null;
     this.landscape = null;

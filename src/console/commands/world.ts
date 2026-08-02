@@ -4,7 +4,7 @@ import type { CommandResult } from '../ConsoleRunner.js';
 import { createGame, buildGameNavGrid, type GameState } from '../../core/state/GameState.js';
 import { getBiome, getAllBiomes } from '../../core/world/BiomeCatalog.js';
 import { generateTerrain, buildTerrainContext } from '../../core/world/TerrainGen.js';
-import { buildStructureSet } from '../../core/world/Structures.js';
+import { buildStructureSet, type StructureSet } from '../../core/world/Structures.js';
 import { buildLandscapeMap, sampleLandscapeColumn, type LandscapeMap } from '../../core/world/LandscapeMap.js';
 import type { Rect } from '../../core/world/WorldGen.js';
 import { getRock } from '../../core/world/RockCatalog.js';
@@ -29,6 +29,8 @@ export interface LandscapeHandle {
   sampleColumn(x: number, z: number): { height: number; biomeId: number; surfCompId: number };
   /** Ground mean world-y (`groundOffset + centerHeight`) — the aerial-perspective pass's height reference for "thick in valleys, thin on peaks" (#458 T5.2/A21). */
   groundLevelY: number;
+  /** Rivers, villages (chimney positions), trees, and landmarks (crater lakes) — the ambient layer's placement data (#458 T7.2/D12/A26). */
+  structureSet: StructureSet;
 }
 
 /** Shared game context for console commands. */
@@ -108,6 +110,7 @@ export function ensureLandscape(
     playableRect: worldGen.playableRect,
     sampleColumn: (x, z) => sampleLandscapeColumn(worldGen, params.climateBias, structureSet, strata, palette, x, z),
     groundLevelY: worldGen.groundOffset + worldGen.centerHeight,
+    structureSet,
   };
   return ctx.landscape;
 }

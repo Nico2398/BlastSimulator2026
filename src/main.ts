@@ -138,6 +138,10 @@ emitter.on('revolt:warning', ({ ticksRemaining }) => {
 emitter.on('terrain:updated', ({ region }) => {
   gameRenderer.remeshTerrainRegion(region);
 });
+// Bird flocks near a blast panic and scatter for a few seconds (#458 T7.2/D12/A26).
+emitter.on('blast:started', ({ originX, originZ }) => {
+  gameRenderer.notifyBlastScatter(originX, originZ);
+});
 
 declare global {
   interface Window {
