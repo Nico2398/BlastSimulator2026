@@ -114,17 +114,39 @@ export function queueResearchTask(
 }
 
 /**
- * Tick the research queue. Decrements head task's ticksRemaining.
- * When ticksRemaining reaches 0: set unlockedTiers[targetType] = targetTier, remove from queue.
+ * A research task cancelled mid-flight because the Research Center enabling it
+ * was destroyed (or otherwise no longer active). The queued cost is refunded
+ * to the caller, who is responsible for crediting it back to cash/finances.
  */
-export function tickResearch(state: BuildingState): void {
+export interface CancelledResearch {
+  targetType: BuildingType;
+  targetTier: 2 | 3;
+  refund: number;
+}
+
+/**
+ * Tick the research queue. If no active Research Center remains for the head
+ * task (the enabling building was destroyed mid-flight, or otherwise
+ * deactivated), the head task is cancelled and removed from the queue, and
+ * its cost is returned for the caller to refund — this check runs every
+ * tick, not just at queue time, so a task loses its enabling building it is
+ * cancelled rather than silently completing. Otherwise, decrement the head
+ * task's ticksRemaining; when it reaches 0, set
+ * unlockedTiers[targetType] = targetTier and remove it from the queue.
+ */
+export function tickResearch(state: BuildingState): CancelledResearch | undefined {
   const task = state.researchQueue[0];
-  if (!task) return;
+  if (!task) return undefined;
+  if (!hasActiveResearchCenter(state)) {
+    state.researchQueue.shift();
+    return { targetType: task.targetType, targetTier: task.targetTier, refund: task.cost };
+  }
   task.ticksRemaining -= 1;
   if (task.ticksRemaining <= 0) {
     state.unlockedTiers[task.targetType] = task.targetTier;
     state.researchQueue.shift();
   }
+  return undefined;
 }
 
 /**

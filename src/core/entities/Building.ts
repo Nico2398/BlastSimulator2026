@@ -361,7 +361,7 @@ export {
 export {
   queueResearchTask, tickResearch, isTierUnlocked, isResearchQueued,
   hasActiveResearchCenter, getUnmetConditions, getQueueBlockCode,
-  type QueueBlockCode,
+  type QueueBlockCode, type CancelledResearch,
 } from './BuildingResearch.js';
 export { getLivingQuartersWellbeingMultiplier } from './BuildingWellbeing.js';
 export {

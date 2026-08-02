@@ -278,6 +278,116 @@ describe('research command — status (#410)', () => {
   });
 });
 
+// ── Research Center — destroyed mid-research cancels + refunds (#461) ────────
+//
+// Reverses the earlier queue-time-only decision (see the removed "research
+// center check is queue-time only" unit-test block): once no active
+// research_center remains, tickResearch cancels the in-flight head task and
+// the tick loop (events.ts tickCommand) must credit the refund to cash and
+// log a 'refund'-category finance transaction.
+
+describe('Research Center — destroyed mid-research cancels + refunds (#461)', () => {
+  it('cancels an in-flight tier-3 task and refunds its exact cost when the sole Research Center is destroyed', () => {
+    const ctx = makeCtx();
+    placeResearchCenter(ctx);
+    const centerId = ctx.state!.buildings.buildings.find((b) => b.type === 'research_center')!.id;
+
+    researchCommand(ctx, ['queue'], { type: 'driving_center', tier: '2' });
+    tickCommand(ctx, ['1'], {}); // completes tier-2 instantly
+
+    researchCommand(ctx, ['queue'], { type: 'driving_center', tier: '3' });
+    const cost = ctx.state!.buildings.researchQueue[0]!.cost;
+    expect(cost).toBeGreaterThan(0);
+
+    tickCommand(ctx, ['5'], {}); // partway through the tier-3 task
+    expect(ctx.state!.buildings.researchQueue).toHaveLength(1);
+    expect(isTierUnlocked(ctx.state!.buildings, 'driving_center', 3)).toBe(false);
+
+    buildCommand(ctx, ['destroy', String(centerId)], {});
+    expect(ctx.state!.buildings.buildings.some((b) => b.type === 'research_center')).toBe(false);
+
+    const cashBefore = ctx.state!.cash;
+    tickCommand(ctx, ['1'], {}); // cancellation tick
+    const cashAfter = ctx.state!.cash;
+
+    expect(ctx.state!.buildings.researchQueue).toHaveLength(0);
+    expect(isTierUnlocked(ctx.state!.buildings, 'driving_center', 3)).toBe(false);
+    expect(cashAfter - cashBefore).toBe(cost);
+
+    const refundTx = ctx.state!.finances.transactions.find((t) => t.category === 'refund');
+    expect(refundTx).toBeDefined();
+    expect(refundTx!.amount).toBe(cost);
+  });
+
+  it('keeps a task progressing to normal completion when one of two Research Centers is destroyed', () => {
+    const ctx = makeCtx();
+    placeResearchCenter(ctx, '10,10');
+    placeResearchCenter(ctx, '50,50');
+    const centerIds = ctx.state!.buildings.buildings
+      .filter((b) => b.type === 'research_center')
+      .map((b) => b.id);
+
+    researchCommand(ctx, ['queue'], { type: 'driving_center', tier: '2' });
+    tickCommand(ctx, ['1'], {});
+    researchCommand(ctx, ['queue'], { type: 'driving_center', tier: '3' });
+
+    buildCommand(ctx, ['destroy', String(centerIds[0])], {});
+    expect(ctx.state!.buildings.buildings.some((b) => b.type === 'research_center')).toBe(true);
+
+    tickCommand(ctx, ['500'], {});
+
+    expect(isTierUnlocked(ctx.state!.buildings, 'driving_center', 3)).toBe(true);
+    expect(ctx.state!.buildings.researchQueue).toHaveLength(0);
+    expect(ctx.state!.finances.transactions.some((t) => t.category === 'refund')).toBe(false);
+  });
+
+  it('cancels and refunds a queued tier-2 (0-tick) task destroyed before the next tick', () => {
+    const ctx = makeCtx();
+    placeResearchCenter(ctx);
+    const centerId = ctx.state!.buildings.buildings.find((b) => b.type === 'research_center')!.id;
+
+    researchCommand(ctx, ['queue'], { type: 'geology_lab', tier: '2' });
+    const cost = ctx.state!.buildings.researchQueue[0]!.cost;
+
+    buildCommand(ctx, ['destroy', String(centerId)], {});
+
+    tickCommand(ctx, ['1'], {});
+
+    expect(ctx.state!.buildings.researchQueue).toHaveLength(0);
+    expect(isTierUnlocked(ctx.state!.buildings, 'geology_lab', 2)).toBe(false);
+
+    const refundTx = ctx.state!.finances.transactions.find((t) => t.category === 'refund');
+    expect(refundTx).toBeDefined();
+    expect(refundTx!.amount).toBe(cost);
+  });
+
+  it('drains multiple queued tasks one cancellation per tick, refunding each, once the center is destroyed', () => {
+    const ctx = makeCtx();
+    placeResearchCenter(ctx);
+    const centerId = ctx.state!.buildings.buildings.find((b) => b.type === 'research_center')!.id;
+
+    researchCommand(ctx, ['queue'], { type: 'driving_center', tier: '2' });
+    const cost1 = ctx.state!.buildings.researchQueue[0]!.cost;
+    researchCommand(ctx, ['queue'], { type: 'blasting_academy', tier: '2' });
+    const cost2 = ctx.state!.buildings.researchQueue[1]!.cost;
+    expect(ctx.state!.buildings.researchQueue).toHaveLength(2);
+
+    buildCommand(ctx, ['destroy', String(centerId)], {});
+
+    const cashBefore = ctx.state!.cash;
+    tickCommand(ctx, ['10'], {});
+    const cashAfter = ctx.state!.cash;
+
+    expect(ctx.state!.buildings.researchQueue).toHaveLength(0);
+    expect(isTierUnlocked(ctx.state!.buildings, 'driving_center', 2)).toBe(false);
+    expect(isTierUnlocked(ctx.state!.buildings, 'blasting_academy', 2)).toBe(false);
+    expect(cashAfter - cashBefore).toBe(cost1 + cost2);
+
+    const refundTxs = ctx.state!.finances.transactions.filter((t) => t.category === 'refund');
+    expect(refundTxs).toHaveLength(2);
+  });
+});
+
 // ── research → tick → unlock end-to-end ───────────────────────────────────────
 
 describe('research → tick → unlock end-to-end (#410, #442)', () => {
