@@ -9,6 +9,7 @@ import { TutorialOverlay } from './ui/TutorialOverlay.js';
 import { TUTORIAL_STEPS } from './ui/tutorialSteps.js';
 import { KeyboardShortcuts } from './ui/KeyboardShortcuts.js';
 import { MainMenu } from './ui/MainMenu.js';
+import { SandboxPanel } from './ui/SandboxPanel.js';
 import { AudioManager } from './audio/AudioManager.js';
 import { AudioHooks } from './audio/AudioHooks.js';
 import { IndexedDBPersistence } from './persistence/IndexedDBPersistence.js';
@@ -89,6 +90,22 @@ mainMenu.setOnTutorial(() => {
   window.__gameConsole('new_game seed:42 size:24');
   window.__gameConsole('campaign start level:tutorial_pit');
   tutorial.start(ctx.state ?? undefined);
+});
+
+// --- Sandbox ---
+const sandboxPanel = new SandboxPanel(uiContainer);
+mainMenu.setOnSandbox(() => { mainMenu.hide(); sandboxPanel.show(); });
+sandboxPanel.setOnBack(() => { mainMenu.show(); });
+sandboxPanel.setOnStart((config) => {
+  const explosives = config.availableExplosives.length > 0
+    ? ` explosives:${config.availableExplosives.join(',')}`
+    : '';
+  window.__gameConsole(
+    `sandbox start biome:${config.biome} seed:${config.seed} size:${config.size}` +
+    ` depth:${config.depth} cash:${config.startingCash} goal:${config.unlockThreshold}` +
+    ` events:${config.eventFreqMultiplier} prices:${config.contractPriceMultiplier}` +
+    ` decay:${config.scoreDecayRate} mixed_rock:${config.mixedRockHardness}${explosives}`,
+  );
 });
 
 // --- Audio ---

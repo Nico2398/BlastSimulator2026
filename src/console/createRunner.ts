@@ -54,6 +54,7 @@ import {
   campaignStartCommand,
   statsCommand,
 } from './commands/campaign.js';
+import { sandboxCommand } from './commands/sandbox.js';
 import { stateCommand } from './commands/state.js';
 import { saveCommand, loadCommand } from './commands/saveload.js';
 import { setupEvents } from '../core/events/index.js';
@@ -220,6 +221,9 @@ export function createRunner(): RunnerWithContext {
     if (sub === 'complete') return campaignCompleteCommand(ctx, rest, named);
     return { success: false, output: `Unknown sub-command: "${sub}". Use: status | start | complete` };
   });
+  runner.register('sandbox', 'Sandbox mode (start biome:<id> seed:<n|random> size:<n> ...)', (args, named) =>
+    sandboxCommand(ctx, args, named),
+  );
   runner.register('stats', 'Show per-level success stats and star rating', (args, named) =>
     statsCommand(ctx, args, named),
   );

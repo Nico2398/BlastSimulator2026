@@ -14,6 +14,7 @@ export type OnStartLevel = (levelId: string) => void;
 export type OnLoad = () => void;
 export type OnSettings = () => void;
 export type OnTutorial = () => void;
+export type OnSandbox = () => void;
 
 export class MainMenu {
   private readonly overlay: HTMLElement;
@@ -24,6 +25,7 @@ export class MainMenu {
   private onLoad?: OnLoad;
   private onSettings?: OnSettings;
   private onTutorial?: OnTutorial;
+  private onSandbox?: OnSandbox;
   /** Campaign last passed to showWorldMap, so a locale switch can redraw it. */
   private lastCampaign: CampaignState | null = null;
   private readonly locale = new LocaleTextRegistry();
@@ -66,11 +68,13 @@ export class MainMenu {
 
     const newBtn = this.makeMenuBtn('menu.new_campaign', 'primary', () => this.onNewCampaign?.(), '', true);
     const tutorialBtn = this.makeMenuBtn('menu.tutorial', 'gold', () => this.onTutorial?.(), '', true);
+    const sandboxBtn = this.makeMenuBtn('menu.sandbox', '', () => this.onSandbox?.(), '', true);
+    sandboxBtn.id = 'bs-menu-sandbox';
     const continueBtn = this.makeMenuBtn('menu.continue', '', () => this.showWorldMap(this.lastCampaign), '', true);
     const loadBtn = this.makeMenuBtn('menu.load', '', () => this.onLoad?.(), '', true);
     const settingsBtn = this.makeMenuBtn('menu.settings', '', () => this.onSettings?.(), '', true);
 
-    this.menuBox.append(newBtn, tutorialBtn, continueBtn, loadBtn, settingsBtn);
+    this.menuBox.append(newBtn, tutorialBtn, sandboxBtn, continueBtn, loadBtn, settingsBtn);
 
     // ── World map box (hidden initially) ──
     this.worldMapBox = document.createElement('div');
@@ -92,6 +96,7 @@ export class MainMenu {
   setOnLoad(fn: OnLoad): void { this.onLoad = fn; }
   setOnSettings(fn: OnSettings): void { this.onSettings = fn; }
   setOnTutorial(fn: OnTutorial): void { this.onTutorial = fn; }
+  setOnSandbox(fn: OnSandbox): void { this.onSandbox = fn; }
 
   show(): void { this.overlay.style.display = 'flex'; }
   hide(): void { this.overlay.style.display = 'none'; }
