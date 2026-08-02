@@ -2791,5 +2791,10 @@
   "sandbox.field.prices": "Contract prices",
   "sandbox.field.decay": "Score decay",
   "sandbox.field.mixed_rock": "Mixed rock hardness",
-  "sandbox.field.explosives": "Available explosives"
+  "sandbox.field.explosives": "Available explosives",
+  "loading.title": "Preparing the site",
+  "loading.preparing": "Preparing…",
+  "loading.terrain": "Generating terrain",
+  "loading.meshing": "Building the site",
+  "loading.ready": "Ready"
 }

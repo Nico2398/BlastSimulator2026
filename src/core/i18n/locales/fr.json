@@ -2791,5 +2791,10 @@
   "sandbox.field.prices": "Prix des contrats",
   "sandbox.field.decay": "Décroissance du score",
   "sandbox.field.mixed_rock": "Duretés de roche mêlées",
-  "sandbox.field.explosives": "Explosifs disponibles"
+  "sandbox.field.explosives": "Explosifs disponibles",
+  "loading.title": "Préparation du site",
+  "loading.preparing": "Préparation…",
+  "loading.terrain": "Génération du terrain",
+  "loading.meshing": "Construction du site",
+  "loading.ready": "Prêt"
 }

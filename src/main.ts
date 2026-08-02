@@ -10,6 +10,8 @@ import { TUTORIAL_STEPS } from './ui/tutorialSteps.js';
 import { KeyboardShortcuts } from './ui/KeyboardShortcuts.js';
 import { MainMenu } from './ui/MainMenu.js';
 import { SandboxPanel } from './ui/SandboxPanel.js';
+import { LoadingScreen } from './ui/LoadingScreen.js';
+import type { CommandResult } from './console/ConsoleRunner.js';
 import { AudioManager } from './audio/AudioManager.js';
 import { AudioHooks } from './audio/AudioHooks.js';
 import { IndexedDBPersistence } from './persistence/IndexedDBPersistence.js';
@@ -66,11 +68,12 @@ mainMenu.setOnNewCampaign(() => {
 });
 mainMenu.setOnStartLevel((levelId) => {
   // Ensure a base GameState (with campaign) exists before starting a level.
-  if (!ctx.state) window.__gameConsole('new_game');
-  window.__gameConsole(`campaign start level:${levelId}`);
-  // First-time players get tutorial guidance once their level is actually
-  // loaded, not while still picking one from the world map.
-  if (!TutorialOverlay.isCompleted()) tutorial.start(ctx.state ?? undefined);
+  const commands = ctx.state ? [] : ['new_game'];
+  void enterLevel([...commands, `campaign start level:${levelId}`]).then(() => {
+    // First-time players get tutorial guidance once their level is actually
+    // loaded, not while still picking one from the world map.
+    if (!TutorialOverlay.isCompleted()) tutorial.start(ctx.state ?? undefined);
+  });
 });
 mainMenu.setOnLoad(() => { saveLoadUI.show(); });
 mainMenu.setOnSettings(() => { uiManager.showPanel('settings'); });
@@ -83,13 +86,30 @@ uiManager.setLanguageChangeHandler(() => {
 });
 mainMenu.show();
 
+// --- Level loading ---
+// Entering a level blocks the main thread for seconds. enterLevel splits that
+// into phases the loading screen can paint between, so the wait reads as a
+// load rather than a hang. Terrain generation and scene meshing are roughly
+// half the cost each, which is why the renderer sync is deferred out of the
+// command and run as its own phase.
+const loadingScreen = new LoadingScreen(uiContainer);
+
+function enterLevel(commands: readonly string[]): Promise<void> {
+  return loadingScreen.runPhases([
+    {
+      labelKey: 'loading.terrain',
+      run: () => { for (const cmd of commands) runGameCommand(cmd, { syncRenderer: false }); },
+    },
+    { labelKey: 'loading.meshing', run: () => { gameRenderer.syncFromContext(ctx); } },
+  ]);
+}
+
 // --- Tutorial ---
 const tutorial = new TutorialOverlay(uiContainer);
 mainMenu.setOnTutorial(() => {
   mainMenu.hide();
-  window.__gameConsole('new_game seed:42 size:24');
-  window.__gameConsole('campaign start level:tutorial_pit');
-  tutorial.start(ctx.state ?? undefined);
+  void enterLevel(['new_game seed:42 size:24', 'campaign start level:tutorial_pit'])
+    .then(() => { tutorial.start(ctx.state ?? undefined); });
 });
 
 // --- Sandbox ---
@@ -100,12 +120,12 @@ sandboxPanel.setOnStart((config) => {
   const explosives = config.availableExplosives.length > 0
     ? ` explosives:${config.availableExplosives.join(',')}`
     : '';
-  window.__gameConsole(
+  void enterLevel([
     `sandbox start biome:${config.biome} seed:${config.seed} size:${config.size}` +
     ` depth:${config.depth} cash:${config.startingCash} goal:${config.unlockThreshold}` +
     ` events:${config.eventFreqMultiplier} prices:${config.contractPriceMultiplier}` +
     ` decay:${config.scoreDecayRate} mixed_rock:${config.mixedRockHardness}${explosives}`,
-  );
+  ]);
 });
 
 // --- Audio ---
@@ -189,11 +209,19 @@ console.log = (...args: unknown[]) => {
   origLog.apply(console, args);
 };
 
-window.__gameConsole = (cmd: string) => {
+/**
+ * Run a console command.
+ *
+ * `syncRenderer: false` runs everything except the scene rebuild, so a level
+ * load can charge the player for generation and meshing as two separate
+ * phases with a painted frame between them (see LoadingScreen). Only the
+ * level-entry paths pass it; every other caller gets the immediate sync.
+ */
+function runGameCommand(cmd: string, opts?: { syncRenderer?: boolean }): CommandResult {
   const result = runCommand({ runner, ctx, emitter }, cmd);
   lastCommandOutput = result.output;
   // Sync the renderer after every command so visual changes appear immediately
-  gameRenderer.syncFromContext(ctx);
+  if (opts?.syncRenderer !== false) gameRenderer.syncFromContext(ctx);
   const cmdName = parseCommand(cmd).command;
 
   // A fresh game replaces whatever the splash screen was showing — the normal
@@ -229,7 +257,9 @@ window.__gameConsole = (cmd: string) => {
   if (ctx.state) uiManager.update(ctx.state, ctx.weatherCycle?.current);
   if (ctx.state) tutorial.onCommandExecuted(ctx.state);
   return result;
-};
+}
+
+window.__gameConsole = (cmd: string) => runGameCommand(cmd);
 
 // --- State extraction bridges (used by scenario tests) ---
 window.__gameState = () => {
