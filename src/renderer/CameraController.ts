@@ -1,37 +1,91 @@
 // BlastSimulator2026 — Camera Controller
-// Orbit/pan/zoom controls for the mine overview camera.
-// - Left-drag: orbit
-// - Right-drag or Middle-drag: pan
-// - Scroll: zoom
-// - Touch: pinch-to-zoom, single-finger orbit
+// Ground-anchored management-game camera for the mine overview.
+// - Left-drag: rotate the view around the point being looked at
+// - Right-drag or Middle-drag: pan, always in a horizontal plane
+// - Scroll: change camera height — see "The height model" below
+// - Touch: pinch to change height, single-finger rotate
 
 import * as THREE from 'three';
 import type { Rect } from '../core/world/WorldGen.js';
 
-// Zoom limits (distance from target), metres. Spans full-grid overview
-// (1200 — enough to pull back on the largest campaign level, 160×160,
-// #458 T6.1/D13) down to drill-hole close-up (5).
-const ZOOM_MIN = 5;
-const ZOOM_MAX = 1200;
-const ZOOM_SPEED = 0.12; // fraction of current distance per scroll tick
+// ---------------------------------------------------------------------------
+// The height model
+//
+// The camera is described by the ground point it looks at, a yaw, and a
+// HEIGHT above that point — not by an orbit radius. Scrolling changes the
+// height, and two things follow from it:
+//
+//   - Pitch is derived from height, not controlled separately. High up the
+//     view tips toward top-down; down low it flattens toward the horizon, so
+//     close-up work is seen from a natural near-ground angle. This is the
+//     usual management-game feel.
+//   - Descending also moves the camera FORWARD along its own view axis, so
+//     zooming reads as flying in toward what you were looking at rather than
+//     riding an elevator straight down.
+//
+// The target's Y never moves on its own: panning slides it across a
+// horizontal plane and zooming slides it along that same plane. An earlier
+// version panned along the camera's local up vector, which has a Y component
+// whenever the camera is tilted — that walked the look-at point up into the
+// sky a little on every drag, and nothing clamped it back down (the pan leash
+// bounds X and Z only). The view ended up stranded above the world with the
+// ground out of reach.
+// ---------------------------------------------------------------------------
+
+/** Camera height above its ground target, metres. Spans a whole 160x160 level down to drill-hole close-up. */
+const HEIGHT_MIN = 6;
+const HEIGHT_MAX = 900;
+/** Fraction of current height gained or lost per scroll tick. */
+const ZOOM_SPEED = 0.12;
+
+/** Pitch above the horizon at HEIGHT_MIN and at HEIGHT_MAX (degrees). */
+const PITCH_LOW_DEG = 16;
+const PITCH_HIGH_DEG = 78;
 
 const ORBIT_SPEED = 0.005; // radians per pixel
 
-// Scales with distance so panning feels consistent at all zoom levels
+// Scales with height so panning feels consistent at every zoom level
 const PAN_SPEED_FACTOR = 0.001;
 
-// Vertical angle limits (phi from vertical) — keep the camera from dipping
-// below the terrain or flipping over the top.
-const POLAR_MIN = 0.08;  // ~5° from horizon (almost horizontal)
-const POLAR_MAX = Math.PI / 2 - 0.05; // ~85° — nearly straight down
-
-// Default framing: orbit distance as a multiple of the site's horizontal
-// span. At FOV 55° this keeps the whole pit on screen with a comfortable
-// margin — too small and the benches run off the edges, too large and the
-// mine shrinks to a distant patch.
+// Default framing: view distance as a multiple of the site's horizontal span.
+// At FOV 55° this keeps the whole pit on screen with a comfortable margin.
 const FRAME_DISTANCE_FACTOR = 1.15;
-/** Default vertical angle — ~45° above the horizon, reads as an overview. */
-const DEFAULT_POLAR = Math.PI / 4;
+
+/** Below this the view direction is too flat to solve a forward dolly against. */
+const MIN_FORWARD_DIP = 1e-3;
+
+/**
+ * Pitch (radians above the horizon) for a given camera height.
+ *
+ * Interpolated in LOG height, because zooming is multiplicative — a constant
+ * fraction per scroll tick. Log space makes each tick advance the tilt by the
+ * same amount, so the tilt sweep feels even across the whole range instead of
+ * spending almost all of it near the top.
+ */
+export function pitchForHeight(height: number): number {
+  const t = THREE.MathUtils.clamp(
+    Math.log(height / HEIGHT_MIN) / Math.log(HEIGHT_MAX / HEIGHT_MIN),
+    0,
+    1,
+  );
+  return THREE.MathUtils.degToRad(PITCH_LOW_DEG + (PITCH_HIGH_DEG - PITCH_LOW_DEG) * t);
+}
+
+/**
+ * Height whose derived pitch puts the target `distance` metres away.
+ *
+ * radius = height / sin(pitch(height)) has height on both sides, so it is
+ * solved by fixed-point iteration. The map contracts across the whole pitch
+ * range, so a couple of dozen passes land well inside float precision.
+ */
+export function heightForViewDistance(distance: number): number {
+  const wanted = Math.max(distance, HEIGHT_MIN);
+  let h = THREE.MathUtils.clamp(wanted * 0.7, HEIGHT_MIN, HEIGHT_MAX);
+  for (let i = 0; i < 24; i++) {
+    h = THREE.MathUtils.clamp(wanted * Math.sin(pitchForHeight(h)), HEIGHT_MIN, HEIGHT_MAX);
+  }
+  return h;
+}
 
 // ---------- Touch helpers ----------
 function touchDistance(a: Touch, b: Touch): number {
@@ -45,18 +99,28 @@ export class CameraController {
   private target: THREE.Vector3;
   private canvas: HTMLElement;
 
-  // Spherical coords relative to target
-  private spherical: THREE.Spherical;
-  private defaultTarget: THREE.Vector3;
-  private defaultSpherical: THREE.Spherical;
-
-  // Pan offset
-  private panOffset: THREE.Vector3 = new THREE.Vector3();
+  /** Camera height above `target`, metres — the single zoom parameter. */
+  private height: number;
+  /** Rotation about the vertical axis, radians. */
+  private yaw: number;
 
   /**
-   * Soft leash on manual panning — the landscape beyond the playable rect is
-   * viewable but not the play focus, so dragging the view shouldn't wander
-   * off into it indefinitely (#458 T6.1/D13). Null until a grid loads.
+   * Explicit pitch for scripted shots (screenshots, scenario multi-angle
+   * captures), which need to name an angle the height model would never pick.
+   * Null in normal play; any player input clears it and hands control back to
+   * the height model. While set, `shotRadius` is the orbit distance.
+   */
+  private pitchOverride: number | null = null;
+  private shotRadius: number;
+
+  private defaultTarget: THREE.Vector3;
+  private defaultHeight: number;
+  private defaultYaw: number;
+
+  /**
+   * Soft leash on manual camera movement — the landscape beyond the playable
+   * rect is viewable but not the play focus, so dragging or zooming shouldn't
+   * wander off into it indefinitely (#458 T6.1/D13). Null until a grid loads.
    * Does not affect `focus`/`frameSite`, which are deliberate programmatic
    * moves (e.g. multi-angle screenshot shots into the landscape zone).
    */
@@ -71,7 +135,8 @@ export class CameraController {
   // Touch state
   private prevTouchDist = 0;
   private prevTouchX = 0;
-  private prevTouchY = 0;
+
+  private _minHeight = -Infinity;
 
   private readonly listeners: [string, EventListener][] = [];
 
@@ -80,14 +145,15 @@ export class CameraController {
     this.target = target.clone();
     this.canvas = canvas;
 
-    // Initialise spherical from current camera position
+    // Derive the height model from wherever the camera already is.
     const offset = camera.position.clone().sub(this.target);
-    this.spherical = new THREE.Spherical().setFromVector3(offset);
-    this.spherical.phi = THREE.MathUtils.clamp(this.spherical.phi, POLAR_MIN, POLAR_MAX);
-    this.spherical.radius = THREE.MathUtils.clamp(this.spherical.radius, ZOOM_MIN, ZOOM_MAX);
+    this.yaw = Math.atan2(offset.x, offset.z);
+    this.height = THREE.MathUtils.clamp(offset.y, HEIGHT_MIN, HEIGHT_MAX);
+    this.shotRadius = Math.max(offset.length(), HEIGHT_MIN);
 
     this.defaultTarget = this.target.clone();
-    this.defaultSpherical = this.spherical.clone();
+    this.defaultHeight = this.height;
+    this.defaultYaw = this.yaw;
 
     this.attach();
     this.apply();
@@ -95,9 +161,14 @@ export class CameraController {
 
   // ---- Public API ----
 
-  /** Current orbit distance (metres) — the zoom level, for effects that need to scale with it (#458 T6.1/D13). */
+  /** Straight-line distance from camera to target, for effects that scale with zoom (#458 T6.1/D13). */
   get distance(): number {
-    return this.spherical.radius;
+    return this.camera.position.distanceTo(this.target);
+  }
+
+  /** Current camera height above its ground target, metres. */
+  get cameraHeight(): number {
+    return this.height;
   }
 
   /** Point the camera looks at (can be updated externally for tracking). */
@@ -110,37 +181,42 @@ export class CameraController {
    * Centre the view on a site and pull back far enough to see all of it.
    *
    * `span` is the largest horizontal extent of the site in world units. The
-   * resulting orbit becomes the camera's new default, so `reset()` and the
+   * resulting framing becomes the camera's new default, so `reset()` and the
    * multi-angle screenshot shots frame the same site.
    */
   frameSite(centerX: number, centerY: number, centerZ: number, span: number): void {
-    this.setTargetAndDistance(centerX, centerY, centerZ, span * FRAME_DISTANCE_FACTOR, false);
-    this.spherical.phi = DEFAULT_POLAR;
+    this.pitchOverride = null;
+    this.target.set(centerX, centerY, centerZ);
+    const viewDistance = Math.max(span * FRAME_DISTANCE_FACTOR, HEIGHT_MIN);
+    this.height = heightForViewDistance(viewDistance);
+    this.shotRadius = viewDistance;
     this.defaultTarget = this.target.clone();
-    this.defaultSpherical = this.spherical.clone();
+    this.defaultHeight = this.height;
+    this.defaultYaw = this.yaw;
     this.apply();
   }
 
   /** Minimum terrain height below target — camera won't go underground. */
   setMinHeight(y: number): void {
-    // Ensure camera position stays above y after apply()
     this._minHeight = y;
     this.apply();
   }
-  private _minHeight = -Infinity;
 
   /**
-   * Move the orbit target and distance directly, without touching yaw/pitch.
+   * Move the view target and distance directly, without touching yaw.
    * Used together with `setOrbit` by scenario multi-angle shots that need to
-   * centre and zoom on a specific point (e.g. a ramp excavation) rather than
-   * the whole-site default framing (#410). Unlike `frameSite`, this is a
-   * one-off move — it does not become the new default for `reset()`.
+   * centre on a specific point (e.g. a ramp excavation) rather than the
+   * whole-site default framing (#410). Unlike `frameSite`, this is a one-off
+   * move — it does not become the new default for `reset()`.
    */
   focus(x: number, y: number, z: number, distance: number): void {
-    this.setTargetAndDistance(x, y, z, distance);
+    this.target.set(x, y, z);
+    this.shotRadius = Math.max(distance, HEIGHT_MIN);
+    this.height = heightForViewDistance(this.shotRadius);
+    this.apply();
   }
 
-  /** Set (or clear, passing null) the playable-rect ± margin bound on manual panning (#458 T6.1/D13). */
+  /** Set (or clear, passing null) the playable-rect ± margin bound on manual camera movement (#458 T6.1/D13). */
   setPanLeash(rect: Rect | null, margin: number): void {
     this.panLeash = rect && {
       minX: rect.minX - margin,
@@ -150,18 +226,29 @@ export class CameraController {
     };
   }
 
-  /** Set absolute yaw (degrees) and pitch (degrees above horizon). */
+  /**
+   * Set absolute yaw and pitch (degrees) for a scripted shot.
+   *
+   * Pitch is normally a function of height; naming one here overrides that
+   * until the next player input, so a capture can hold an angle the height
+   * model would never choose (a near-horizontal pass over a tall level, say).
+   */
   setOrbit(yawDeg: number, pitchDeg: number): void {
-    this.spherical.theta = THREE.MathUtils.degToRad(yawDeg);
-    const phi = THREE.MathUtils.degToRad(90 - pitchDeg);
-    this.spherical.phi = THREE.MathUtils.clamp(phi, POLAR_MIN, POLAR_MAX);
+    this.yaw = THREE.MathUtils.degToRad(yawDeg);
+    this.pitchOverride = THREE.MathUtils.clamp(
+      THREE.MathUtils.degToRad(pitchDeg),
+      THREE.MathUtils.degToRad(1),
+      THREE.MathUtils.degToRad(89),
+    );
     this.apply();
   }
 
   /** Reset camera to default position. */
   reset(): void {
-    this.spherical.copy(this.defaultSpherical);
+    this.pitchOverride = null;
     this.target.copy(this.defaultTarget);
+    this.height = this.defaultHeight;
+    this.yaw = this.defaultYaw;
     this.apply();
   }
 
@@ -198,7 +285,7 @@ export class CameraController {
 
   private onMouseDown = (e: MouseEvent) => {
     if (e.button === 0) {
-      // Left button — orbit
+      // Left button — rotate
       this.isOrbiting = true;
     } else if (e.button === 1 || e.button === 2) {
       // Middle or Right button — pan
@@ -215,7 +302,7 @@ export class CameraController {
     this.prevMouseY = e.clientY;
 
     if (this.isOrbiting) {
-      this.orbit(dx, dy);
+      this.orbit(dx);
     } else if (this.isPanning) {
       this.pan(dx, dy);
     }
@@ -228,13 +315,7 @@ export class CameraController {
 
   private onWheel = (e: WheelEvent) => {
     e.preventDefault();
-    const factor = e.deltaY > 0 ? 1 + ZOOM_SPEED : 1 - ZOOM_SPEED;
-    this.spherical.radius = THREE.MathUtils.clamp(
-      this.spherical.radius * factor,
-      ZOOM_MIN,
-      ZOOM_MAX,
-    );
-    this.apply();
+    this.zoomBy(e.deltaY > 0 ? 1 + ZOOM_SPEED : 1 - ZOOM_SPEED);
   };
 
   // ---- Touch handlers ----
@@ -244,7 +325,6 @@ export class CameraController {
     if (e.touches.length === 1) {
       this.isOrbiting = true;
       this.prevTouchX = e.touches[0]!.clientX;
-      this.prevTouchY = e.touches[0]!.clientY;
     } else if (e.touches.length === 2) {
       this.isOrbiting = false;
       this.prevTouchDist = touchDistance(e.touches[0]!, e.touches[1]!);
@@ -255,20 +335,12 @@ export class CameraController {
     e.preventDefault();
     if (e.touches.length === 1 && this.isOrbiting) {
       const dx = e.touches[0]!.clientX - this.prevTouchX;
-      const dy = e.touches[0]!.clientY - this.prevTouchY;
       this.prevTouchX = e.touches[0]!.clientX;
-      this.prevTouchY = e.touches[0]!.clientY;
-      this.orbit(dx, dy);
+      this.orbit(dx);
     } else if (e.touches.length === 2) {
       const dist = touchDistance(e.touches[0]!, e.touches[1]!);
-      const factor = this.prevTouchDist / dist;
-      this.spherical.radius = THREE.MathUtils.clamp(
-        this.spherical.radius * factor,
-        ZOOM_MIN,
-        ZOOM_MAX,
-      );
+      if (dist > 0 && this.prevTouchDist > 0) this.zoomBy(this.prevTouchDist / dist);
       this.prevTouchDist = dist;
-      this.apply();
     }
   };
 
@@ -278,53 +350,78 @@ export class CameraController {
 
   // ---- Math helpers ----
 
-  /**
-   * Set orbit target + clamp radius to `distance`. Shared by `focus` and
-   * `frameSite` (see their docs for how the two differ). Pass `applyNow:
-   * false` to defer `apply()` when the caller still has more fields to set.
-   */
-  private setTargetAndDistance(x: number, y: number, z: number, distance: number, applyNow = true): void {
-    this.target.set(x, y, z);
-    this.spherical.radius = THREE.MathUtils.clamp(distance, ZOOM_MIN, ZOOM_MAX);
-    if (applyNow) this.apply();
+  /** Ground-plane unit vector pointing away from the camera, toward the target. */
+  private groundForward(): THREE.Vector3 {
+    return new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
   }
 
-  private orbit(dx: number, dy: number): void {
-    this.spherical.theta -= dx * ORBIT_SPEED;
-    this.spherical.phi = THREE.MathUtils.clamp(
-      this.spherical.phi - dy * ORBIT_SPEED,
-      POLAR_MIN,
-      POLAR_MAX,
-    );
+  /** Ground-plane unit vector pointing to the camera's right. */
+  private groundRight(): THREE.Vector3 {
+    return new THREE.Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
+  }
+
+  private clampTargetToLeash(): void {
+    if (!this.panLeash) return;
+    this.target.x = THREE.MathUtils.clamp(this.target.x, this.panLeash.minX, this.panLeash.maxX);
+    this.target.z = THREE.MathUtils.clamp(this.target.z, this.panLeash.minZ, this.panLeash.maxZ);
+  }
+
+  /**
+   * Change camera height by `factor`, carrying the view forward as it drops.
+   *
+   * The camera slides along its own view axis far enough to reach the new
+   * height, and the target takes the horizontal part of that slide — so
+   * zooming in advances on whatever was being looked at instead of sinking
+   * vertically. The target's Y is untouched: movement stays in its plane.
+   */
+  private zoomBy(factor: number): void {
+    this.pitchOverride = null; // player input — back to the height model
+    const previous = this.height;
+    const next = THREE.MathUtils.clamp(previous * factor, HEIGHT_MIN, HEIGHT_MAX);
+    if (next === previous) return;
+
+    const forward = this.target.clone().sub(this.camera.position).normalize();
+    if (forward.y < -MIN_FORWARD_DIP) {
+      // forward.y is negative (the camera looks down), so descending gives a
+      // positive step — forward — and rising gives a negative one — back.
+      const step = (next - previous) / forward.y;
+      this.target.x += forward.x * step;
+      this.target.z += forward.z * step;
+      this.clampTargetToLeash();
+    }
+
+    this.height = next;
+    this.apply();
+  }
+
+  private orbit(dx: number): void {
+    this.pitchOverride = null; // player input — back to the height model
+    // Yaw only. Pitch follows height, so there is no vertical orbit to drag.
+    this.yaw -= dx * ORBIT_SPEED;
     this.apply();
   }
 
   private pan(dx: number, dy: number): void {
-    // Pan in the camera's local XY plane (perpendicular to view direction)
-    const panScale = this.spherical.radius * PAN_SPEED_FACTOR;
-
-    const right = new THREE.Vector3();
-    const up = new THREE.Vector3();
-    this.camera.getWorldDirection(new THREE.Vector3()); // ensure matrix updated
-    right.setFromMatrixColumn(this.camera.matrix, 0);
-    up.setFromMatrixColumn(this.camera.matrix, 1);
-
-    this.panOffset.addScaledVector(right, -dx * panScale);
-    this.panOffset.addScaledVector(up, dy * panScale);
-
-    this.target.add(this.panOffset);
-    if (this.panLeash) {
-      this.target.x = THREE.MathUtils.clamp(this.target.x, this.panLeash.minX, this.panLeash.maxX);
-      this.target.z = THREE.MathUtils.clamp(this.target.z, this.panLeash.minZ, this.panLeash.maxZ);
-    }
-    this.panOffset.set(0, 0, 0);
+    this.pitchOverride = null; // player input — back to the height model
+    // Strictly horizontal: both basis vectors lie in the ground plane, so no
+    // amount of dragging can lift the target off it.
+    const scale = this.height * PAN_SPEED_FACTOR;
+    this.target.addScaledVector(this.groundRight(), -dx * scale);
+    this.target.addScaledVector(this.groundForward(), dy * scale);
+    this.clampTargetToLeash();
     this.apply();
   }
 
   private apply(): void {
-    // Convert spherical back to Cartesian and position camera
-    const offset = new THREE.Vector3().setFromSpherical(this.spherical);
-    const newPos = this.target.clone().add(offset);
+    const pitch = this.pitchOverride ?? pitchForHeight(this.height);
+    const radius = this.pitchOverride !== null ? this.shotRadius : this.height / Math.sin(pitch);
+    const horizontal = radius * Math.cos(pitch);
+
+    const newPos = new THREE.Vector3(
+      this.target.x + horizontal * Math.sin(this.yaw),
+      this.target.y + radius * Math.sin(pitch),
+      this.target.z + horizontal * Math.cos(this.yaw),
+    );
 
     // Clamp camera above minimum height
     if (newPos.y < this._minHeight + 1) {
