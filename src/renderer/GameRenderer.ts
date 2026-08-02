@@ -22,6 +22,8 @@ import { BirdFlocks } from './ambient/BirdFlocks.js';
 import { ChimneySmoke } from './ambient/ChimneySmoke.js';
 import { WaterSurface } from './ambient/WaterSurface.js';
 import { VegetationSway } from './ambient/VegetationSway.js';
+import { DustDevils } from './ambient/DustDevils.js';
+import { Fireflies } from './ambient/Fireflies.js';
 import { createAmbientUniforms, type AmbientUniforms } from './ambient/AmbientUniforms.js';
 import { FragmentMesh } from './FragmentMesh.js';
 import { BlastEffects } from './BlastEffects.js';
@@ -49,6 +51,15 @@ import { boundingBoxXZ, getBlastOriginSurfaceY } from './BlastOriginSampling.js'
  */
 const PAN_LEASH_MARGIN = 80;
 
+/**
+ * Per-biome ambient extras (#458 T7.3, executor's pick, recorded here):
+ * dust devils for the two arid biomes, fireflies for the one humid one.
+ * Neither is universal — GameRenderer only builds the module whose biome
+ * set contains the level's current biome id.
+ */
+const DUST_DEVIL_BIOMES: ReadonlySet<string> = new Set(['desert_badlands', 'red_canyon']);
+const FIREFLY_BIOMES: ReadonlySet<string> = new Set(['tropical_karst']);
+
 export class GameRenderer {
   private readonly sm: SceneManager;
 
@@ -63,6 +74,8 @@ export class GameRenderer {
   private smoke: ChimneySmoke | null = null;
   private water: WaterSurface | null = null;
   private vegetation: VegetationSway | null = null;
+  private dustDevils: DustDevils | null = null;
+  private fireflies: Fireflies | null = null;
   /** Shared {uTime, uWind} object every ambient shader material references (#458 T7.2/A26) — level-independent, created once. */
   private readonly ambientUniforms: AmbientUniforms = createAmbientUniforms();
   private fragments: FragmentMesh | null = null;
@@ -230,6 +243,8 @@ export class GameRenderer {
       this.birds?.update(dt);
       this.smoke?.update(dt, wind, cam.position);
       this.water?.update(dt, wind);
+      this.dustDevils?.update(dt);
+      this.fireflies?.update(dt);
     }
 
     if (this.blastEffects) {
@@ -591,15 +606,26 @@ export class GameRenderer {
     this.smoke?.dispose();
     this.water?.dispose();
     this.vegetation?.dispose();
+    this.dustDevils?.dispose();
+    this.fireflies?.dispose();
     const centerX = sizeX / 2;
     const centerZ = sizeZ / 2;
+    const sampleHeight = (x: number, z: number) => handle.sampleColumn(x, z).height;
     this.birds = new BirdFlocks(this.sm.scene, ctx.state.seed, centerX, centerZ);
     this.smoke = new ChimneySmoke(this.sm.scene, ctx.state.seed, handle.structureSet.villages);
     this.water = new WaterSurface(this.sm.scene, biome.id, handle.structureSet.rivers, handle.structureSet.landmarks);
     this.vegetation = new VegetationSway(
       this.sm.scene, ctx.state.seed, this.ambientUniforms, handle.structureSet.trees,
-      centerX, centerZ, handle.playableRect, (x, z) => handle.sampleColumn(x, z).height,
+      centerX, centerZ, handle.playableRect, sampleHeight,
     );
+    // Per-biome ambient extras (#458 T7.3) — only the module matching this
+    // level's biome gets built; the other stays null.
+    this.dustDevils = DUST_DEVIL_BIOMES.has(biome.id)
+      ? new DustDevils(this.sm.scene, ctx.state.seed, centerX, centerZ, sampleHeight)
+      : null;
+    this.fireflies = FIREFLY_BIOMES.has(biome.id)
+      ? new Fireflies(this.sm.scene, ctx.state.seed, centerX, centerZ, sampleHeight)
+      : null;
   }
 
   /**
@@ -633,6 +659,8 @@ export class GameRenderer {
     this.smoke?.dispose();
     this.water?.dispose();
     this.vegetation?.dispose();
+    this.dustDevils?.dispose();
+    this.fireflies?.dispose();
     this.fragments?.dispose();
     this.blastEffects?.dispose();
     this.landscape?.dispose();
@@ -650,6 +678,8 @@ export class GameRenderer {
     this.smoke = null;
     this.water = null;
     this.vegetation = null;
+    this.dustDevils = null;
+    this.fireflies = null;
     this.fragments = null;
     this.blastEffects = null;
     this.landscape = null;

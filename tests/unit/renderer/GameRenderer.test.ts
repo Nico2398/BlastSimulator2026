@@ -348,3 +348,63 @@ describe('GameRenderer — birds, smoke, water, vegetation (#458 T7.2/D12/A26)',
     expect(grassCountAfterSecond).toBe(1); // still exactly one — the stale mesh was disposed, not left behind
   });
 });
+
+describe('GameRenderer — per-biome ambient extras (#458 T7.3)', () => {
+  async function makeLandscapeCtx(mineType: string): Promise<MiningContext> {
+    const { newGameCommand } = await import('../../../src/console/commands/world.js');
+    const ctx: MiningContext = {
+      state: null, grid: null, landscape: null, softwareTier: 0,
+      tubingState: createTubingState(), emitter: new EventEmitter(),
+    };
+    const result = newGameCommand(ctx, [], { mine_type: mineType, seed: '42', size: '64' });
+    expect(result.success).toBe(true);
+    return ctx;
+  }
+
+  it('builds dust devils, not fireflies, on an arid biome', async () => {
+    const sm = makeMockSceneManager();
+    const renderer = new GameRenderer(sm as any);
+    renderer.syncFromContext(await makeLandscapeCtx('desert_badlands'));
+
+    expect(sm.scene.children.find((c) => c.name === 'dust-devils')).toBeDefined();
+    expect(sm.scene.children.find((c) => c.name === 'fireflies')).toBeUndefined();
+  });
+
+  it('builds fireflies, not dust devils, on the humid tropical biome', async () => {
+    const sm = makeMockSceneManager();
+    const renderer = new GameRenderer(sm as any);
+    renderer.syncFromContext(await makeLandscapeCtx('tropical_karst'));
+
+    expect(sm.scene.children.find((c) => c.name === 'fireflies')).toBeDefined();
+    expect(sm.scene.children.find((c) => c.name === 'dust-devils')).toBeUndefined();
+  });
+
+  it('builds neither extra on a biome outside both sets', async () => {
+    const sm = makeMockSceneManager();
+    const renderer = new GameRenderer(sm as any);
+    renderer.syncFromContext(await makeLandscapeCtx('green_foothills'));
+
+    expect(sm.scene.children.find((c) => c.name === 'dust-devils')).toBeUndefined();
+    expect(sm.scene.children.find((c) => c.name === 'fireflies')).toBeUndefined();
+  });
+
+  it('update() runs dust devils and fireflies without throwing across many frames', async () => {
+    const sm = makeMockSceneManager();
+    const renderer = new GameRenderer(sm as any);
+    renderer.syncFromContext(await makeLandscapeCtx('red_canyon'));
+
+    expect(() => {
+      for (let i = 0; i < 30; i++) renderer.update(0.1);
+    }).not.toThrow();
+  });
+
+  it('swapping from an arid to a non-arid biome disposes the stale dust-devils mesh instead of leaving it behind', async () => {
+    const sm = makeMockSceneManager();
+    const renderer = new GameRenderer(sm as any);
+    renderer.syncFromContext(await makeLandscapeCtx('desert_badlands'));
+    expect(sm.scene.children.find((c) => c.name === 'dust-devils')).toBeDefined();
+
+    renderer.syncFromContext(await makeLandscapeCtx('green_foothills'));
+    expect(sm.scene.children.find((c) => c.name === 'dust-devils')).toBeUndefined();
+  });
+});
