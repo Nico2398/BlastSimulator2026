@@ -4,7 +4,7 @@ import { CompositionPalette } from '../../../src/core/world/VoxelGrid.js';
 import type { LandscapeMap, LandscapeTile } from '../../../src/core/world/LandscapeMap.js';
 import type { Rect } from '../../../src/core/world/WorldGen.js';
 import type { LandscapeHandle } from '../../../src/console/commands/world.js';
-import { LandscapeMesh } from '../../../src/renderer/terrain/LandscapeMesh.js';
+import { LandscapeMesh, seamHeightAt, voxelSurfaceHeight } from '../../../src/renderer/terrain/LandscapeMesh.js';
 
 function makeScene(): THREE.Scene {
   return new THREE.Scene();
@@ -278,33 +278,56 @@ describe('LandscapeMesh', () => {
   });
 
   describe('seam mesh (#458 A16 anti-gap overlap)', () => {
-    it('lowers height by exactly OVERLAP_DROP (0.15m) for vertices inside the playable rect', () => {
+    it('locks seam height to the playable mesh at the rect edge, easing out to the true height', () => {
+      // The two representations quantize differently: the landscape samples a
+      // continuous height, while the voxel grid rounds to a voxel and marching
+      // cubes lands the iso-surface half a voxel below the first air cell.
+      // Left alone the seam floats up to a metre above the playable mesh — a
+      // lip right round the site.
       const scene = makeScene();
       const { palette, compId } = makePalette();
       const rect: Rect = { minX: 0, minZ: 0, maxX: 32, maxZ: 32 };
-      // Flat sampleColumn (height always 50) isolates the overlap-drop effect from any terrain slope.
-      const handle = makeFakeHandle(rect, [], 4, compId, () => ({ height: 50, biomeId: 0, surfCompId: compId }));
+      // A flat, deliberately non-integer height isolates the quantization.
+      const H = 50.4;
+      const handle = makeFakeHandle(rect, [], 4, compId, () => ({ height: H, biomeId: 0, surfCompId: compId }));
 
       const lm = new LandscapeMesh(scene, makeMaterial());
       lm.build(handle, palette);
 
       const seamMesh = scene.children[0] as THREE.Mesh;
       const positions = seamMesh.geometry.getAttribute('position').array as Float32Array;
-      let sawInside = false, sawOutside = false;
+      const matched = voxelSurfaceHeight(H); // 49.5
+
+      let sawInside = false, sawFarOutside = false;
       for (let i = 0; i < positions.length; i += 3) {
         const x = positions[i]!, y = positions[i + 1]!, z = positions[i + 2]!;
-        const insideRect = x > rect.minX && x < rect.maxX && z > rect.minZ && z < rect.maxZ;
-        if (insideRect) {
-          expect(y).toBeCloseTo(50 - 0.15, 5);
+        const dx = Math.min(x - rect.minX, rect.maxX - x);
+        const dz = Math.min(z - rect.minZ, rect.maxZ - z);
+        const insideDepth = Math.min(dx, dz);
+
+        if (insideDepth > 0) {
+          // Inside the rect: sits on the playable surface, dropped clear of it.
+          expect(y).toBeCloseTo(matched - 0.15, 5);
           sawInside = true;
-        } else {
-          expect(y).toBeCloseTo(50, 5);
-          sawOutside = true;
+        } else if (insideDepth <= -24) {
+          // A full margin out: back to the smooth continuous height.
+          expect(y).toBeCloseTo(H, 5);
+          sawFarOutside = true;
         }
+        // Everywhere between is a blend, always within the two bounds.
+        // Positions round-trip through Float32, so allow a float32 ulp.
+        expect(y).toBeGreaterThanOrEqual(matched - 0.15 - 1e-4);
+        expect(y).toBeLessThanOrEqual(H + 1e-4);
       }
-      expect(sawInside).toBe(true); // the 2m overlap strip really is included
-      expect(sawOutside).toBe(true);
+      expect(sawInside).toBe(true);
+      expect(sawFarOutside).toBe(true);
       lm.dispose();
+    });
+
+    it('seamHeightAt meets the voxel surface exactly at the boundary', () => {
+      for (const h of [50.4, 50.5, 49.9, 12.0, 7.25]) {
+        expect(seamHeightAt(h, 0)).toBeCloseTo(voxelSurfaceHeight(h), 6);
+      }
     });
 
     it('never emits a vertex more than OVERLAP + one grid step inside the playable rect', () => {

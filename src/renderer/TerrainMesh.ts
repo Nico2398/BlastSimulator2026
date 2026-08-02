@@ -285,14 +285,25 @@ export class TerrainMesh {
     const rockWeight: number[] = [];
     const ore: number[] = [];
 
+    // March one cell PAST the grid on every side, and one cell before it on the
+    // low side, so the cubes straddling the boundary are emitted too.
+    // `densityAt` reads out of bounds as air, so a straddling cube has solid
+    // corners inside and empty corners outside and marches into a wall face —
+    // which is what seals the playable volume. Stopping at sizeX-1 instead left
+    // the mesh open along its four sides: an unclosed shell you could see
+    // straight into wherever the terrain was cut back, which is exactly what a
+    // blast at the edge of the site did.
     const ox = cx * CHUNK_SIZE, oy = cy * CHUNK_SIZE, oz = cz * CHUNK_SIZE;
-    const xEnd = Math.min(ox + CHUNK_SIZE, this.grid.sizeX - 1);
-    const yEnd = Math.min(oy + CHUNK_SIZE, this.grid.sizeY - 1);
-    const zEnd = Math.min(oz + CHUNK_SIZE, this.grid.sizeZ - 1);
+    const xStart = cx === 0 ? -1 : ox;
+    const yStart = cy === 0 ? -1 : oy;
+    const zStart = cz === 0 ? -1 : oz;
+    const xEnd = Math.min(ox + CHUNK_SIZE, this.grid.sizeX);
+    const yEnd = Math.min(oy + CHUNK_SIZE, this.grid.sizeY);
+    const zEnd = Math.min(oz + CHUNK_SIZE, this.grid.sizeZ);
 
-    for (let z = oz; z < zEnd; z++) {
-      for (let y = oy; y < yEnd; y++) {
-        for (let x = ox; x < xEnd; x++) {
+    for (let z = zStart; z < zEnd; z++) {
+      for (let y = yStart; y < yEnd; y++) {
+        for (let x = xStart; x < xEnd; x++) {
           this.marchCube(x, y, z, positions, rockA, rockB, rockWeight, ore);
         }
       }

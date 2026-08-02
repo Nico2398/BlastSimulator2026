@@ -150,7 +150,16 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     titleKey: 'tutorial.step14.title',
     textKey: 'tutorial.step14',
     highlightTarget: TOOLBAR_TARGET.vehicles,
-    commands: ['vehicle buy debris_hauler', 'vehicle driver 1 1'],
+    // The driver hired one step earlier is employee #4.
+    commands: ['vehicle buy debris_hauler', 'vehicle driver 1 4'],
+    // Assigning a driver does not seat them: it sends them walking to the
+    // vehicle, and ArrivalGate makes them the driver on arrival. That walk
+    // needs the clock, so this step must wait on the simulation — without it
+    // the allowance ran out while the player was still shopping, the clock
+    // held for good, and the driver never took a step. The player saw an
+    // Assign button that did nothing and the tutorial never advanced.
+    tickBudget: 20,
+    waitsOnWork: true,
     captureSnapshot: (state: GameState) => ({
       prevVehicleCount: getVehicles(state).length,
     }),

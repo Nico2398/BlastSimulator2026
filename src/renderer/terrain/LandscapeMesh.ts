@@ -54,6 +54,37 @@ function distanceInsideRect(rect: Rect, x: number, z: number): number {
 }
 
 /**
+ * Where the playable mesh's surface actually sits for a column of this height.
+ *
+ * The two representations quantize differently. The landscape samples a
+ * continuous height; the voxel grid rounds it to a voxel index, fills
+ * everything below as solid, and marching cubes then puts the iso-surface
+ * half a voxel below the first air cell. Left alone the landscape therefore
+ * floats somewhere between zero and one metre above the playable mesh,
+ * varying column by column — a visible lip all the way round the site.
+ */
+export function voxelSurfaceHeight(continuousHeight: number): number {
+  return Math.round(continuousHeight) - 0.5;
+}
+
+/**
+ * Seam vertex height: locked to the playable mesh at the boundary, easing back
+ * to the true continuous height further out.
+ *
+ * Matching the voxel quantization everywhere would stair-step the whole
+ * landscape; keeping the continuous height everywhere reopens the lip. So the
+ * seam agrees exactly where the two meshes actually meet and has the full
+ * FINE_MARGIN to blend back to the smooth surface the distant landscape wants.
+ */
+export function seamHeightAt(continuousHeight: number, insideDepth: number): number {
+  const matched = voxelSurfaceHeight(continuousHeight);
+  // 0 at the rect edge and anywhere inside it, 1 by FINE_MARGIN outside.
+  const blend = Math.min(1, Math.max(0, -insideDepth / FINE_MARGIN));
+  const y = matched + (continuousHeight - matched) * blend;
+  return insideDepth > 0 ? y - OVERLAP_DROP : y;
+}
+
+/**
  * Landscape samples carry one rock (no marching-cubes blend), so both shader
  * rock slots are the same index and the blend weight is 0 — no ore data is
  * tracked in LandscapeMap, so aOre is always "none" (#458 T4.1/A18).
@@ -229,7 +260,7 @@ export class LandscapeMesh {
       const x = worldX(col), z = worldZ(row);
       const sample = sampleColumn(x, z);
       const insideDepth = distanceInsideRect(rect, x, z);
-      const y = insideDepth > 0 ? sample.height - OVERLAP_DROP : sample.height;
+      const y = seamHeightAt(sample.height, insideDepth);
 
       const idx = positions.length / 3;
       positions.push(x, y, z);

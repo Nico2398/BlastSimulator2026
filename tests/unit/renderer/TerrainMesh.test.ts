@@ -56,19 +56,97 @@ describe('TerrainMesh', () => {
     tm.dispose();
   });
 
-  it('buildAll on fully-solid grid adds no meshes (interior surface = none)', () => {
+  it('buildAll on a fully-solid grid seals it into a closed box', () => {
+    // The grid is a finite volume, not an infinite solid: its outer faces are
+    // real surfaces. Emitting nothing here used to leave the mesh an open
+    // shell you could see straight into wherever terrain was cut back at the
+    // site edge.
     const scene = makeScene();
     const grid = new VoxelGrid(4, 4, 4);
-    // Fill completely solid → cubeIndex 255 everywhere → no triangles
     for (let x = 0; x < 4; x++)
       for (let y = 0; y < 4; y++)
         for (let z = 0; z < 4; z++)
           grid.setVoxel(x, y, z, makeSolidVoxel());
     const tm = new TerrainMesh(scene, grid);
     tm.buildAll();
-    // All cubes are 255 (all solid) → no surface triangles
-    expect(scene.children.length).toBe(0);
+
+    expect(scene.children.length).toBeGreaterThan(0);
+
+    // Every one of the six bounding faces must carry geometry.
+    const pos = (scene.children[0] as THREE.Mesh).geometry.getAttribute('position').array as Float32Array;
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity;
+    for (let i = 0; i < pos.length; i += 3) {
+      minX = Math.min(minX, pos[i]!);     maxX = Math.max(maxX, pos[i]!);
+      minY = Math.min(minY, pos[i + 1]!); maxY = Math.max(maxY, pos[i + 1]!);
+      minZ = Math.min(minZ, pos[i + 2]!); maxZ = Math.max(maxZ, pos[i + 2]!);
+    }
+    expect(minX).toBeLessThanOrEqual(-0.5);
+    expect(maxX).toBeGreaterThanOrEqual(3.5);
+    expect(minY).toBeLessThanOrEqual(-0.5);
+    expect(maxY).toBeGreaterThanOrEqual(3.5);
+    expect(minZ).toBeLessThanOrEqual(-0.5);
+    expect(maxZ).toBeGreaterThanOrEqual(3.5);
     tm.dispose();
+  });
+
+  describe('site boundary is sealed', () => {
+    /** Widest X reached by any vertex across every chunk mesh in the scene. */
+    function maxVertexX(scene: THREE.Scene): number {
+      let m = -Infinity;
+      for (const child of scene.children) {
+        const geo = (child as THREE.Mesh).geometry;
+        if (!geo) continue;
+        const pos = geo.getAttribute('position').array as Float32Array;
+        for (let i = 0; i < pos.length; i += 3) m = Math.max(m, pos[i]!);
+      }
+      return m;
+    }
+
+    /** Terrain filled solid below `surfaceY`, air above — a flat site. */
+    function flatSite(size: number, surfaceY: number): VoxelGrid {
+      const grid = new VoxelGrid(size, size, size);
+      for (let x = 0; x < size; x++)
+        for (let y = 0; y < surfaceY; y++)
+          for (let z = 0; z < size; z++)
+            grid.setVoxel(x, y, z, makeSolidVoxel());
+      return grid;
+    }
+
+    it('closes the far X face so the volume is not an open shell', () => {
+      const scene = makeScene();
+      const size = 8;
+      const tm = new TerrainMesh(scene, flatSite(size, 4));
+      tm.buildAll();
+      // The wall is interpolated midway between the last solid voxel and the
+      // empty cell past it, i.e. at size - 0.5.
+      expect(maxVertexX(scene)).toBeGreaterThanOrEqual(size - 0.5 - 1e-4);
+      tm.dispose();
+    });
+
+    it('still closes it after an edge blast cuts terrain away at that face', () => {
+      // The reported defect: blasting at the edge of the site opened a void
+      // between the playable mesh and the landscape, because the mesh had no
+      // face there to cut into — you saw straight through it.
+      const scene = makeScene();
+      const size = 8;
+      const grid = flatSite(size, 4);
+      const tm = new TerrainMesh(scene, grid);
+      tm.buildAll();
+
+      // Blow a hole through the whole depth of the boundary column.
+      for (let y = 0; y < 4; y++) {
+        for (let z = 2; z < 5; z++) {
+          grid.clearVoxel(size - 1, y, z);
+          grid.clearVoxel(size - 2, y, z);
+        }
+      }
+      tm.remeshRegion({ minX: size - 2, minY: 0, minZ: 2, maxX: size - 1, maxY: 3, maxZ: 4 });
+
+      // Geometry must still reach the boundary: the surrounding rock keeps its
+      // wall, so the crater is cut into a solid face rather than into nothing.
+      expect(maxVertexX(scene)).toBeGreaterThanOrEqual(size - 0.5 - 1e-4);
+      tm.dispose();
+    });
   });
 
   it('buildAll generates mesh when there is a solid/air boundary', () => {
