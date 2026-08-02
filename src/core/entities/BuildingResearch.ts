@@ -114,17 +114,31 @@ export function queueResearchTask(
 }
 
 /**
+ * A research task cancelled mid-flight because the Research Center enabling it
+ * was destroyed (or otherwise no longer active). The queued cost is refunded
+ * to the caller, who is responsible for crediting it back to cash/finances.
+ */
+export interface CancelledResearch {
+  targetType: BuildingType;
+  targetTier: 2 | 3;
+  refund: number;
+}
+
+/**
  * Tick the research queue. Decrements head task's ticksRemaining.
  * When ticksRemaining reaches 0: set unlockedTiers[targetType] = targetTier, remove from queue.
+ * TODO: implement cancellation check — if no active research_center remains,
+ * cancel the head task and return a CancelledResearch describing the refund.
  */
-export function tickResearch(state: BuildingState): void {
+export function tickResearch(state: BuildingState): CancelledResearch | undefined {
   const task = state.researchQueue[0];
-  if (!task) return;
+  if (!task) return undefined;
   task.ticksRemaining -= 1;
   if (task.ticksRemaining <= 0) {
     state.unlockedTiers[task.targetType] = task.targetTier;
     state.researchQueue.shift();
   }
+  return undefined;
 }
 
 /**
