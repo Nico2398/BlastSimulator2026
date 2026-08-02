@@ -197,13 +197,17 @@ describe('Vehicle fleet', () => {
   it('tickVehicle advances movement toward target', () => {
     vehicleCommand(ctx, ['buy', 'debris_hauler'], {});
     const v = ctx.state!.vehicles.vehicles[0]!;
-    // Spawned at (16, 16). Set target farther away.
-    v.targetX = 20;
-    v.targetZ = 16;
+    const origX = v.x;
+    // Target set relative to the vehicle's actual spawn cell, same row, pure
+    // +X — not a hardcoded (16,16)/(20,16) pair (#458 T9.1/D15). The new
+    // terrain generator's spawn placement no longer lands exactly on (16,16),
+    // and a hardcoded target off by even one z put the path on a real
+    // diagonal detour instead of the straight line this test means to check.
+    v.targetX = origX + 4;
+    v.targetZ = v.z;
     v.task = 'moving';
     v.state = 'idle';
 
-    const origX = v.x;
     // makeCtx() runs new_game, which builds a NavGrid — tickVehicle routes via
     // Pathfinding.findPath and advances at debris_hauler's own speed (3
     // cells/tick, see VEHICLE_BASE_STATS) rather than a flat 1 cell/tick (#407).
@@ -211,13 +215,13 @@ describe('Vehicle fleet', () => {
 
     tickVehicle(ctx.state!, v);
 
-    // Should have moved debrisHaulerSpeed cells closer to target (20, 16)
+    // Should have moved debrisHaulerSpeed cells closer to target
     if (v.task === 'moving') {
       expect(v.x).toBe(origX + debrisHaulerSpeed);
     }
     // If the vehicle arrived, task becomes 'idle' and x == targetX
     if (v.task === 'idle') {
-      expect(v.x).toBe(20);
+      expect(v.x).toBe(origX + 4);
     }
   });
 
