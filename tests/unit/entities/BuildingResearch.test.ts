@@ -452,10 +452,16 @@ describe('getQueueBlockCode', () => {
   });
 });
 
-// ── Section 5: demolished research_center does not interrupt an in-flight task ──
+// ── Section 5: tickResearch — Research Center destroyed mid-research (#461) ──
+//
+// REVERSES the earlier (queue-time-only) decision: an in-flight task is now
+// cancelled — not silently completed — the moment no active research_center
+// remains. `hasActiveResearchCenter` is the live, per-tick source of truth;
+// there is no latch remembering a past destruction (a re-placed center lets
+// the task resume).
 
-describe('queueResearchTask / tickResearch — research center check is queue-time only', () => {
-  it('a task queued while a research_center exists keeps progressing after the center is removed', () => {
+describe('tickResearch — Research Center destroyed mid-research (#461)', () => {
+  it('cancels an in-flight tier-3 task and refunds its exact cost when the sole active research_center is destroyed', () => {
     const state = freshState();
     placeResearchCenter(state);
 
@@ -465,17 +471,126 @@ describe('queueResearchTask / tickResearch — research center check is queue-ti
 
     const t3 = queueResearchTask(state, 'vehicle_depot', 3);
     expect(t3.success, JSON.stringify(t3)).toBe(true);
-    const ticksNeeded = getResearchTaskDef('vehicle_depot', 3).ticks;
-    expect(ticksNeeded).toBeGreaterThan(0);
+    const def = getResearchTaskDef('vehicle_depot', 3);
+    expect(def.ticks).toBeGreaterThan(1);
 
-    // Demolish the research_center entirely — no active center remains.
-    state.buildings.splice(0, state.buildings.length);
+    // Tick partway through — still in-flight.
+    tickResearch(state);
+    expect(state.researchQueue[0]!.ticksRemaining).toBe(def.ticks - 1);
+
+    // Destroy the sole active research_center.
+    const center = state.buildings.find((b) => b.type === 'research_center')!;
+    center.active = false;
     expect(hasActiveResearchCenter(state)).toBe(false);
 
-    // The in-flight task must still progress and complete on schedule.
-    for (let i = 0; i < ticksNeeded; i++) tickResearch(state);
-    expect(isTierUnlocked(state, 'vehicle_depot', 3)).toBe(true);
+    const result = tickResearch(state);
+    expect(result).toEqual({ targetType: 'vehicle_depot', targetTier: 3, refund: def.cost });
     expect(state.researchQueue).toHaveLength(0);
+    expect(isTierUnlocked(state, 'vehicle_depot', 3)).toBe(false);
+  });
+
+  it('does NOT cancel when a second research_center remains active — ticksRemaining decrements normally', () => {
+    const state = freshState();
+    placeResearchCenter(state, 0, 0);
+    placeResearchCenter(state, 20, 20);
+
+    queueResearchTask(state, 'vehicle_depot', 2);
+    tickResearch(state);
+    queueResearchTask(state, 'vehicle_depot', 3);
+    const before = state.researchQueue[0]!.ticksRemaining;
+
+    // Destroy only one of the two active centers.
+    state.buildings[0]!.active = false;
+    expect(hasActiveResearchCenter(state)).toBe(true);
+
+    const result = tickResearch(state);
+    expect(result).toBeUndefined();
+    expect(state.researchQueue[0]!.ticksRemaining).toBe(before - 1);
+  });
+
+  it('is a live per-tick check, not a latch: re-placing a center before the next tick lets the task survive', () => {
+    const state = freshState();
+    placeResearchCenter(state);
+
+    queueResearchTask(state, 'vehicle_depot', 2);
+    tickResearch(state);
+    queueResearchTask(state, 'vehicle_depot', 3);
+    const before = state.researchQueue[0]!.ticksRemaining;
+
+    // Destroy the only active center...
+    state.buildings[0]!.active = false;
+    expect(hasActiveResearchCenter(state)).toBe(false);
+
+    // ...then place a new one before the next tickResearch call.
+    placeResearchCenter(state, 60, 60);
+    expect(hasActiveResearchCenter(state)).toBe(true);
+
+    const result = tickResearch(state);
+    expect(result).toBeUndefined();
+    expect(state.researchQueue[0]!.ticksRemaining).toBe(before - 1);
+  });
+
+  it('cancels a 0-tick tier-2 task before it can silently complete, when the center is destroyed first', () => {
+    const state = freshState();
+    placeResearchCenter(state);
+
+    const q = queueResearchTask(state, 'driving_center', 2);
+    expect(q.success, JSON.stringify(q)).toBe(true);
+    const def = getResearchTaskDef('driving_center', 2);
+    expect(def.ticks).toBe(0);
+
+    // Destroy the center BEFORE the first tickResearch call.
+    state.buildings[0]!.active = false;
+    expect(hasActiveResearchCenter(state)).toBe(false);
+
+    const result = tickResearch(state);
+    expect(result).toEqual({ targetType: 'driving_center', targetTier: 2, refund: def.cost });
+    expect(state.researchQueue).toHaveLength(0);
+    expect(isTierUnlocked(state, 'driving_center', 2)).toBe(false);
+  });
+
+  it('cancels multiple queued tasks one at a time across successive ticks, never both in one call', () => {
+    const state = freshState();
+    placeResearchCenter(state);
+
+    const q1 = queueResearchTask(state, 'driving_center', 2);
+    const q2 = queueResearchTask(state, 'blasting_academy', 2);
+    expect(q1.success, JSON.stringify(q1)).toBe(true);
+    expect(q2.success, JSON.stringify(q2)).toBe(true);
+    expect(state.researchQueue).toHaveLength(2);
+
+    state.buildings[0]!.active = false;
+    expect(hasActiveResearchCenter(state)).toBe(false);
+
+    const r1 = tickResearch(state);
+    expect(r1).toEqual({
+      targetType: 'driving_center',
+      targetTier: 2,
+      refund: getResearchTaskDef('driving_center', 2).cost,
+    });
+    expect(state.researchQueue).toHaveLength(1);
+    expect(state.researchQueue[0]!.targetType).toBe('blasting_academy');
+
+    const r2 = tickResearch(state);
+    expect(r2).toEqual({
+      targetType: 'blasting_academy',
+      targetTier: 2,
+      refund: getResearchTaskDef('blasting_academy', 2).cost,
+    });
+    expect(state.researchQueue).toHaveLength(0);
+
+    // No crash, no phantom refund, once the queue is empty.
+    expect(() => tickResearch(state)).not.toThrow();
+    expect(tickResearch(state)).toBeUndefined();
+  });
+
+  it('returns undefined on an empty queue regardless of whether an active research_center exists', () => {
+    const withCenter = freshState();
+    placeResearchCenter(withCenter);
+    expect(tickResearch(withCenter)).toBeUndefined();
+
+    const withoutCenter = freshState();
+    expect(tickResearch(withoutCenter)).toBeUndefined();
   });
 });
 

@@ -185,8 +185,17 @@ export function tickCommand(
     }
 
     // 8c-2. Research Center queue — advance the head task's progress each tick,
-    //       unlocking its target tier when it completes.
-    tickResearch(state.buildings);
+    //       unlocking its target tier when it completes. If the enabling
+    //       Research Center was destroyed mid-flight, the task is cancelled
+    //       and its cost refunded instead.
+    const cancelledResearch = tickResearch(state.buildings);
+    if (cancelledResearch) {
+      state.cash += cancelledResearch.refund;
+      addIncome(state.finances, cancelledResearch.refund, 'refund',
+        `Research cancelled: ${cancelledResearch.targetType} T${cancelledResearch.targetTier} (Research Center destroyed)`,
+        state.tickCount);
+      lines.push(`[tick ${state.tickCount}] Research cancelled: ${cancelledResearch.targetType} tier ${cancelledResearch.targetTier} — Research Center destroyed, $${cancelledResearch.refund} refunded.`);
+    }
 
     // 8d. Dispatch remaining pending actions to idle qualified employees.
     // An action requiring a skill nobody on the roster holds is not left to
