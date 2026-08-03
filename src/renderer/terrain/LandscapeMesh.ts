@@ -36,14 +36,36 @@ type SampleFn = (x: number, z: number) => { height: number; biomeId: number; sur
  * Two triangles for one grid quad, alternating which diagonal splits it.
  *
  * Splitting every quad the same way gives the whole sheet a shared diagonal
- * crease direction, and smooth-shaded normals turn that into corduroy running
- * across open ground — the single most obvious artifact on the landscape at
- * its 4m sample spacing. Flipping on parity breaks the run without changing
- * the surface the quad describes.
+ * crease direction; alternating breaks the run. It only matters for the
+ * silhouette now — normals no longer come from the triangles at all (see
+ * heightFieldNormal).
  */
 function pushQuad(indices: number[], i0: number, i1: number, i2: number, i3: number, parity: number): void {
   if ((parity & 1) === 0) indices.push(i0, i2, i1, i1, i2, i3);
   else indices.push(i0, i2, i3, i0, i3, i1);
+}
+
+/**
+ * Normal of a height field from its slope, rather than from the triangles.
+ *
+ * computeVertexNormals() averages the faces meeting at a vertex, and those
+ * faces lie on a regular lattice with a chosen diagonal split. The averaged
+ * normal therefore depends on which way each quad was cut, and that
+ * dependence reads as fine ruled lines across open ground at every zoom —
+ * exactly the artifact the alternating split above was meant to hide and only
+ * turned from corduroy into a weave. Slope owes nothing to the triangulation.
+ *
+ * `dhdx`/`dhdz` are metres of rise per metre travelled; the surface normal of
+ * y = h(x, z) is (-dh/dx, 1, -dh/dz) normalized.
+ */
+function heightFieldNormal(dhdx: number, dhdz: number): [number, number, number] {
+  const len = Math.hypot(dhdx, 1, dhdz);
+  return [-dhdx / len, 1 / len, -dhdz / len];
+}
+
+/** Key for the tile lookup used to read a neighbouring tile's samples. */
+function tileKey(tileX: number, tileZ: number): string {
+  return `${tileX},${tileZ}`;
 }
 
 /** Distance from (x, z) to the nearest edge of rect, measured inward — negative outside. */
@@ -56,31 +78,27 @@ function distanceInsideRect(rect: Rect, x: number, z: number): number {
 /**
  * Where the playable mesh's surface actually sits for a column of this height.
  *
- * The two representations quantize differently. The landscape samples a
- * continuous height; the voxel grid rounds it to a voxel index, fills
- * everything below as solid, and marching cubes then puts the iso-surface
- * half a voxel below the first air cell. Left alone the landscape therefore
- * floats somewhere between zero and one metre above the playable mesh,
- * varying column by column — a visible lip all the way round the site.
+ * Identity, and that is the point. The playable grid used to fill voxels solid
+ * up to a rounded surface, which put its iso-surface half a voxel below the
+ * first air cell and left the landscape floating up to a metre above it; the
+ * landscape had to quantize the same way to meet it. Generation now writes a
+ * fractional density through the surface band (TerrainGen's surfaceDensityAt),
+ * so marching cubes reproduces the continuous height exactly and both
+ * representations read the same number with no correction at all (#458).
  */
 export function voxelSurfaceHeight(continuousHeight: number): number {
-  return Math.round(continuousHeight) - 0.5;
+  return continuousHeight;
 }
 
 /**
- * Seam vertex height: locked to the playable mesh at the boundary, easing back
- * to the true continuous height further out.
+ * Seam vertex height.
  *
- * Matching the voxel quantization everywhere would stair-step the whole
- * landscape; keeping the continuous height everywhere reopens the lip. So the
- * seam agrees exactly where the two meshes actually meet and has the full
- * FINE_MARGIN to blend back to the smooth surface the distant landscape wants.
+ * Both meshes now agree on the continuous height, so the seam simply follows
+ * it. The strip that overlaps the playable rect is still dropped clear of the
+ * mesh that owns that ground, so the two can never z-fight.
  */
 export function seamHeightAt(continuousHeight: number, insideDepth: number): number {
-  const matched = voxelSurfaceHeight(continuousHeight);
-  // 0 at the rect edge and anywhere inside it, 1 by FINE_MARGIN outside.
-  const blend = Math.min(1, Math.max(0, -insideDepth / FINE_MARGIN));
-  const y = matched + (continuousHeight - matched) * blend;
+  const y = voxelSurfaceHeight(continuousHeight);
   return insideDepth > 0 ? y - OVERLAP_DROP : y;
 }
 
@@ -99,6 +117,8 @@ export class LandscapeMesh {
   private readonly material: THREE.Material;
   private readonly tileMeshes: THREE.Mesh[] = [];
   private seamMesh: THREE.Mesh | null = null;
+  /** Tiles by grid index, so a vertex on a tile's edge can read its neighbour's samples for a slope. */
+  private readonly tileIndex = new Map<string, LandscapeTile>();
 
   /** `material` is shared with TerrainMesh and FragmentMesh (D9's "one shared terrain material" — one shader, one draw-state everywhere). */
   constructor(scene: THREE.Scene, material: THREE.Material) {
@@ -113,6 +133,8 @@ export class LandscapeMesh {
 
   build(handle: LandscapeHandle, palette: CompositionPalette): void {
     this.dispose();
+
+    for (const tile of handle.map.tiles) this.tileIndex.set(tileKey(tile.tileX, tile.tileZ), tile);
 
     for (const tile of handle.map.tiles) {
       const mesh = this.buildTileMesh(
@@ -134,6 +156,7 @@ export class LandscapeMesh {
       mesh.geometry.dispose();
     }
     this.tileMeshes.length = 0;
+    this.tileIndex.clear();
     if (this.seamMesh) {
       this.scene.remove(this.seamMesh);
       this.seamMesh.geometry.dispose();
@@ -142,6 +165,30 @@ export class LandscapeMesh {
   }
 
   // ---------- Internal ----------
+
+  /**
+   * One sample's height, addressed by tile-local (row, col) and allowed to run
+   * one node past either end.
+   *
+   * Neighbouring tiles share their edge samples — a tile's last column is the
+   * next tile's first — so col n means the neighbour's col 1, and col -1 means
+   * the previous tile's col n-2. Off the edge of the built map there is no
+   * neighbour, and the index is clamped instead: a one-sided difference at the
+   * very rim of the world, which no camera reaches.
+   */
+  private nodeHeight(tile: LandscapeTile, row: number, col: number, n: number): number {
+    let tx = tile.tileX, tz = tile.tileZ, r = row, c = col;
+    if (c < 0) { tx -= 1; c = n - 2; } else if (c > n - 1) { tx += 1; c = 1; }
+    if (r < 0) { tz -= 1; r = n - 2; } else if (r > n - 1) { tz += 1; r = 1; }
+
+    if (tx === tile.tileX && tz === tile.tileZ) return tile.heights[r * n + c]!;
+    const neighbour = this.tileIndex.get(tileKey(tx, tz));
+    if (neighbour) return neighbour.heights[r * n + c]!;
+
+    const clampedRow = Math.min(n - 1, Math.max(0, row));
+    const clampedCol = Math.min(n - 1, Math.max(0, col));
+    return tile.heights[clampedRow * n + clampedCol]!;
+  }
 
   /**
    * Indexed grid mesh from one tile's stored samples, smooth-shaded (#458 A16).
@@ -168,6 +215,7 @@ export class LandscapeMesh {
       tileMaxZ > rect.minZ && tile.originZ < rect.maxZ;
 
     const positions = new Float32Array(n * n * 3);
+    const normals = new Float32Array(n * n * 3);
     const rockA = new Float32Array(n * n);
     const rockB = new Float32Array(n * n);
     const rockWeight = new Float32Array(n * n); // all zero: single-rock samples (#458 A18)
@@ -183,6 +231,16 @@ export class LandscapeMesh {
         positions[idx * 3] = x;
         positions[idx * 3 + 1] = y;
         positions[idx * 3 + 2] = z;
+
+        // Central differences over the sample spacing, reaching into the
+        // neighbouring tile at a tile edge so the slope — and therefore the
+        // shading — stays continuous from one tile to the next.
+        const dhdx = (this.nodeHeight(tile, row, col + 1, n) - this.nodeHeight(tile, row, col - 1, n)) / (2 * step);
+        const dhdz = (this.nodeHeight(tile, row + 1, col, n) - this.nodeHeight(tile, row - 1, col, n)) / (2 * step);
+        const normal = heightFieldNormal(dhdx, dhdz);
+        normals[idx * 3] = normal[0];
+        normals[idx * 3 + 1] = normal[1];
+        normals[idx * 3 + 2] = normal[2];
 
         const rockIdx = rockIndexFor(palette, tile.surfCompIds[idx]!);
         rockA[idx] = rockIdx;
@@ -218,8 +276,8 @@ export class LandscapeMesh {
     geometry.setAttribute('aRockB', new THREE.BufferAttribute(rockB, 1));
     geometry.setAttribute('aRockWeight', new THREE.BufferAttribute(rockWeight, 1));
     geometry.setAttribute('aOre', new THREE.BufferAttribute(ore, 2));
+    geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
     geometry.setIndex(indices);
-    geometry.computeVertexNormals();
     geometry.computeBoundingSphere();
 
     const mesh = new THREE.Mesh(geometry, this.material);
@@ -242,6 +300,7 @@ export class LandscapeMesh {
     const rows = Math.round((rect.maxZ + FINE_MARGIN - outerMinZ) / FINE_STEP) + 1;
 
     const positions: number[] = [];
+    const normals: number[] = [];
     const rockA: number[] = [];
     const rockB: number[] = [];
     const rockWeight: number[] = [];
@@ -252,6 +311,19 @@ export class LandscapeMesh {
     const worldX = (col: number) => outerMinX + col * FINE_STEP;
     const worldZ = (row: number) => outerMinZ + row * FINE_STEP;
 
+    // Slopes need the neighbouring nodes' heights, and every node is a
+    // neighbour of four others — sampling each one once and reusing it keeps
+    // this to barely more than one sample per vertex.
+    const heightCache = new Map<number, number>();
+    const heightAtNode = (row: number, col: number): number => {
+      const key = (row + 1) * (cols + 2) + (col + 1);
+      const cached = heightCache.get(key);
+      if (cached !== undefined) return cached;
+      const h = sampleColumn(worldX(col), worldZ(row)).height;
+      heightCache.set(key, h);
+      return h;
+    };
+
     const emitVertex = (row: number, col: number): number => {
       const key = row * cols + col;
       const existing = vertexIndex.get(key);
@@ -259,11 +331,20 @@ export class LandscapeMesh {
 
       const x = worldX(col), z = worldZ(row);
       const sample = sampleColumn(x, z);
+      heightCache.set((row + 1) * (cols + 2) + (col + 1), sample.height);
       const insideDepth = distanceInsideRect(rect, x, z);
       const y = seamHeightAt(sample.height, insideDepth);
 
+      // From the sampled height field, not from the dropped seam height: the
+      // OVERLAP_DROP step is a depth-fighting trick, not a slope, and shading
+      // it as one would ring the site with a bright line.
+      const dhdx = (heightAtNode(row, col + 1) - heightAtNode(row, col - 1)) / (2 * FINE_STEP);
+      const dhdz = (heightAtNode(row + 1, col) - heightAtNode(row - 1, col)) / (2 * FINE_STEP);
+      const normal = heightFieldNormal(dhdx, dhdz);
+
       const idx = positions.length / 3;
       positions.push(x, y, z);
+      normals.push(normal[0], normal[1], normal[2]);
       // Single-rock sample: both shader rock slots are the same index, blend
       // weight 0, no ore data tracked by LandscapeMap (#458 A18).
       const rockIdx = rockIndexFor(palette, sample.surfCompId);
@@ -301,8 +382,8 @@ export class LandscapeMesh {
     geometry.setAttribute('aRockB', new THREE.Float32BufferAttribute(rockB, 1));
     geometry.setAttribute('aRockWeight', new THREE.Float32BufferAttribute(rockWeight, 1));
     geometry.setAttribute('aOre', new THREE.Float32BufferAttribute(ore, 2));
+    geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
     geometry.setIndex(indices);
-    geometry.computeVertexNormals();
     geometry.computeBoundingSphere();
 
     const mesh = new THREE.Mesh(geometry, this.material);

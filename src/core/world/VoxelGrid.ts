@@ -192,11 +192,18 @@ export class VoxelGrid {
 
   // ── Direct mutators — hot-path callers (generation, blast) should prefer these ──
 
-  /** Fill a voxel as fully solid with an already-interned composition palette index. */
-  fillVoxel(x: number, y: number, z: number, compId: number, ores?: Record<string, number>): void {
+  /**
+   * Fill a voxel with an already-interned composition palette index.
+   *
+   * `density` defaults to fully solid. Generation passes a fractional value
+   * for the one voxel a column's surface actually passes through, which is
+   * what lets marching cubes place that surface at the continuous terrain
+   * height instead of snapping it to the nearest half-voxel (#458).
+   */
+  fillVoxel(x: number, y: number, z: number, compId: number, ores?: Record<string, number>, density = 1.0): void {
     if (!this.isInBounds(x, y, z)) return;
     const i = this.index(x, y, z);
-    this.density[i] = 1.0;
+    this.density[i] = density;
     this.compId[i] = compId;
     this.fracture[i] = 1.0;
     if (ores && Object.keys(ores).length > 0) this.ores.set(i, { ...ores });

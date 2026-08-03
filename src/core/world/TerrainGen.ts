@@ -6,7 +6,7 @@
 import { VoxelGrid } from './VoxelGrid.js';
 import type { BiomeDef } from './BiomeCatalog.js';
 import { selectBiomeWeights, dominantBiome, biomeShaping } from './BiomeCatalog.js';
-import { createWorldGenContext, sampleSurfaceVoxelY, type WorldGenContext } from './WorldGen.js';
+import { createWorldGenContext, sampleSurfaceHeightY, type WorldGenContext } from './WorldGen.js';
 import { buildStrataProfile, buildMixedHardnessStrata, StrataSampler } from './Strata.js';
 import { OreVeinSampler } from './OreVeins.js';
 
@@ -92,6 +92,32 @@ export function buildTerrainContext(config: TerrainConfig): TerrainContext {
  * scope for T1.3 (no accept criterion calls for it) and would belong to a
  * future landscape-blending task if ever needed.
  */
+/**
+ * Half-width, in voxels, of the band over which density falls from solid to
+ * air across the surface.
+ *
+ * One full voxel either side. A narrower band would need a density below zero
+ * on the air side to keep the crossing linear, and densities are clamped to
+ * [0, 1] — the crossing would then bend and the surface would drift off the
+ * height it is supposed to sit on.
+ */
+const SURFACE_BAND_HALF = 1;
+
+/**
+ * Density for voxel `y` in a column whose surface sits at continuous height
+ * `surfaceH`, chosen so marching cubes puts its iso-surface exactly there.
+ *
+ * Marching cubes finds the 0.5 crossing by interpolating linearly between two
+ * corner densities, so a field that is linear in y with value 0.5 at surfaceH
+ * reproduces surfaceH exactly, fractional part and all. Filling voxels solid
+ * up to a rounded surface instead is what terraced the whole site into 1 m
+ * steps while the landscape beside it stayed smooth (#458).
+ */
+export function surfaceDensityAt(y: number, surfaceH: number): number {
+  const d = 0.5 + (surfaceH - y) / (2 * SURFACE_BAND_HALF);
+  return Math.max(0, Math.min(1, d));
+}
+
 export function generateTerrain(config: TerrainConfig): VoxelGrid {
   const { sizeX, sizeY, sizeZ } = config;
   const grid = new VoxelGrid(sizeX, sizeY, sizeZ);
@@ -99,22 +125,27 @@ export function generateTerrain(config: TerrainConfig): VoxelGrid {
 
   for (let z = 0; z < sizeZ; z++) {
     for (let x = 0; x < sizeX; x++) {
-      const surfaceY = sampleSurfaceVoxelY(worldGen, x, z);
+      const surfaceH = sampleSurfaceHeightY(worldGen, x, z);
+      const surfaceY = Math.round(surfaceH);
       const boundaries = strata.boundariesAt(x, z);
       const inBorder = isInBorderZone(x, z, sizeX, sizeZ, biome.borderWidth);
 
-      for (let y = 0; y < sizeY; y++) {
-        if (y >= surfaceY) {
-          // Above surface = air (default empty voxel)
-          continue;
-        }
+      // Every voxel the surface band reaches, which is one higher than the
+      // last fully solid one — that voxel carries the fractional density
+      // marching cubes interpolates against.
+      const topY = Math.min(sizeY - 1, Math.ceil(surfaceH + SURFACE_BAND_HALF) - 1);
+      for (let y = 0; y <= topY; y++) {
+        const density = surfaceDensityAt(y, surfaceH);
+        if (density <= 0) continue;
 
-        const depth = surfaceY - y;
+        // Depth is still measured from the rounded surface, so which stratum a
+        // voxel belongs to is unchanged by the sub-voxel surface placement.
+        const depth = Math.max(0, surfaceY - y);
         const composition = strata.compositionAt(x, y, z, depth, boundaries);
         const compId = grid.palette.intern(composition);
         const oreDensities = inBorder ? {} : oreVeins.densitiesAt(x, y, z, depth, composition, biome.oreRichness);
 
-        grid.fillVoxel(x, y, z, compId, oreDensities);
+        grid.fillVoxel(x, y, z, compId, oreDensities, density);
       }
     }
   }

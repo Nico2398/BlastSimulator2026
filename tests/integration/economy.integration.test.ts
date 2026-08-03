@@ -552,8 +552,15 @@ describe('Economy', () => {
 
   it('completes the full economy loop: blast, findReachableGroundFragment, haul, store, and deliver against a contract', () => {
     // 1. Blast a small grid so fragments land on the ground.
+    //
+    // Origin (18,19) rather than (10,10): the fragments have to land on ground
+    // the hauler can actually drive to. (10,10) sits up the slope from where a
+    // vehicle spawns, on a different NavGrid bench with no ramp between, so
+    // findReachableGroundFragment correctly returns null there and the test
+    // would be asserting against a fixture the game cannot satisfy. (18,19) is
+    // on the same flat bench as the vehicle spawn and the warehouse.
     const drillResult = drillPlanCommand(ctx as any, ['grid'], {
-      origin: '10,10',
+      origin: '18,19',
       rows: '2',
       cols: '2',
       spacing: '4',

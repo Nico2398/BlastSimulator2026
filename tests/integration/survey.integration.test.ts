@@ -572,14 +572,14 @@ describe('Survey system — seismic building side effects', () => {
 
   it('damages every building within 5 cells when multiple are in range', () => {
     hireSurveyor();
-    // living_quarters T1 is a 3x3 footprint; placed so it doesn't overlap
-    // the survey's own target cell, which the surveyor must be able to walk
-    // to and stand on (#437). Both buildings and the survey centre sit
-    // inside the stretch of NavGrid confirmed on the same bench level as
-    // the surveyor's spawn (#458 T6.1/D14 — see the single-building test
-    // above for why that matters).
-    const b1Result = buildCommand(ctx, ['living_quarters'], { at: '17,15' });
-    const b2Result = buildCommand(ctx, ['management_office'], { at: '21,14' });
+    // Same survey centre as the single-building test above, for the same
+    // reason: the surveyor must actually walk there and stand on it (#437) or
+    // no seismic side effect fires at all, and that route is the one confirmed
+    // to work from the spawn without changing bench level mid-walk
+    // (#458 T6.1/D14). Both buildings are within 5 cells of (19, 14) — 2.2 and
+    // 4.2 — and neither footprint sits on the way.
+    const b1Result = buildCommand(ctx, ['living_quarters'], { at: '21,15' });
+    const b2Result = buildCommand(ctx, ['management_office'], { at: '22,11' });
     expect(b1Result.success).toBe(true);
     expect(b2Result.success).toBe(true);
     const b1 = ctx.state!.buildings.buildings.find(b => b.type === 'living_quarters')!;

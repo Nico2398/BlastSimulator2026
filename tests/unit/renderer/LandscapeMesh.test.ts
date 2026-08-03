@@ -296,7 +296,7 @@ describe('LandscapeMesh', () => {
 
       const seamMesh = scene.children[0] as THREE.Mesh;
       const positions = seamMesh.geometry.getAttribute('position').array as Float32Array;
-      const matched = voxelSurfaceHeight(H); // 49.5
+      const matched = voxelSurfaceHeight(H); // the playable mesh's own surface — now the same 50.4
 
       let sawInside = false, sawFarOutside = false;
       for (let i = 0; i < positions.length; i += 3) {
@@ -397,5 +397,136 @@ describe('LandscapeMesh', () => {
       lmA.dispose();
       lmB.dispose();
     });
+  });
+});
+
+describe('LandscapeMesh — normals come from the height field, not the triangles (#458)', () => {
+  /** Deliberately non-planar: a plane would hide the difference, since every scheme agrees on one. */
+  const bumpy = (row: number, col: number): number => 10 + Math.sin(col * 0.9) * 2 + Math.cos(row * 0.7) * 1.5;
+
+  function makeBumpyTile(n: number, compId: number, step: number): LandscapeTile {
+    const heights = new Float32Array(n * n);
+    for (let row = 0; row < n; row++) {
+      for (let col = 0; col < n; col++) heights[row * n + col] = bumpy(row, col);
+    }
+    return {
+      tileX: 0, tileZ: 0, originX: -1000, originZ: -1000,
+      heights, biomeIds: new Uint8Array(n * n), surfCompIds: new Uint16Array(n * n).fill(compId),
+    };
+  }
+
+  const n = 9;
+  const step = 4;
+
+  function buildBumpy(): { mesh: THREE.Mesh; lm: LandscapeMesh } {
+    const scene = makeScene();
+    const { palette, compId } = makePalette();
+    const rect: Rect = { minX: 0, minZ: 0, maxX: 32, maxZ: 32 };
+    const handle = makeFakeHandle(rect, [makeBumpyTile(n, compId, step)], n, compId);
+    const lm = new LandscapeMesh(scene, makeMaterial());
+    lm.build(handle, palette);
+    const mesh = scene.children.find((c) => (c as THREE.Mesh).geometry?.getAttribute('position')?.count === n * n) as THREE.Mesh;
+    return { mesh, lm };
+  }
+
+  it('matches the analytic slope of the sampled heights at interior vertices', () => {
+    const { mesh, lm } = buildBumpy();
+    const normals = mesh.geometry.getAttribute('normal').array as Float32Array;
+
+    for (const [row, col] of [[3, 3], [4, 5], [5, 2], [2, 6]] as const) {
+      const dhdx = (bumpy(row, col + 1) - bumpy(row, col - 1)) / (2 * step);
+      const dhdz = (bumpy(row + 1, col) - bumpy(row - 1, col)) / (2 * step);
+      const len = Math.hypot(dhdx, 1, dhdz);
+      const idx = (row * n + col) * 3;
+      expect(normals[idx]!).toBeCloseTo(-dhdx / len, 5);
+      expect(normals[idx + 1]!).toBeCloseTo(1 / len, 5);
+      expect(normals[idx + 2]!).toBeCloseTo(-dhdz / len, 5);
+    }
+    lm.dispose();
+  });
+
+  it('emits unit-length, upward normals everywhere', () => {
+    const { mesh, lm } = buildBumpy();
+    const normals = mesh.geometry.getAttribute('normal').array as Float32Array;
+    for (let i = 0; i < normals.length; i += 3) {
+      expect(Math.hypot(normals[i]!, normals[i + 1]!, normals[i + 2]!)).toBeCloseTo(1, 4);
+      expect(normals[i + 1]!).toBeGreaterThan(0);
+    }
+    lm.dispose();
+  });
+
+  it('shades a tile edge from its neighbour, so no line runs along the tile boundary', () => {
+    // A tile knows only its own samples, so face-averaged normals go one-sided
+    // at its edge and the two tiles sharing that edge disagree about the slope
+    // there — a straight ruled line every tileSpan metres, right across open
+    // ground. Reading the neighbour's samples removes the special case.
+    const scene = makeScene();
+    const { palette, compId } = makePalette();
+    const rect: Rect = { minX: 0, minZ: 0, maxX: 32, maxZ: 32 };
+    const span = (n - 1) * step;
+
+    // Two tiles side by side in x, sampling ONE continuous field. The shared
+    // edge is tile A's last column and tile B's first.
+    const field = (x: number, z: number): number => 10 + Math.sin(x * 0.05) * 6 + Math.cos(z * 0.04) * 4;
+    const makeTile = (tileX: number, originX: number): LandscapeTile => {
+      const heights = new Float32Array(n * n);
+      for (let row = 0; row < n; row++) {
+        for (let col = 0; col < n; col++) heights[row * n + col] = field(originX + col * step, -1000 + row * step);
+      }
+      return {
+        tileX, tileZ: 0, originX, originZ: -1000,
+        heights, biomeIds: new Uint8Array(n * n), surfCompIds: new Uint16Array(n * n).fill(compId),
+      };
+    };
+    const handle = makeFakeHandle(rect, [makeTile(0, -1000), makeTile(1, -1000 + span)], n, compId);
+
+    const lm = new LandscapeMesh(scene, makeMaterial());
+    lm.build(handle, palette);
+    const tileMeshes = scene.children.filter(
+      (c) => (c as THREE.Mesh).geometry?.getAttribute('position')?.count === n * n,
+    ) as THREE.Mesh[];
+    expect(tileMeshes).toHaveLength(2);
+
+    const normalAt = (mesh: THREE.Mesh, row: number, col: number) => {
+      const a = mesh.geometry.getAttribute('normal').array as Float32Array;
+      const i = (row * n + col) * 3;
+      return [a[i]!, a[i + 1]!, a[i + 2]!] as const;
+    };
+
+    const row = 4;
+    const edgeX = -1000 + span;
+    const dhdx = (field(edgeX + step, -1000 + row * step) - field(edgeX - step, -1000 + row * step)) / (2 * step);
+    const dhdz = (field(edgeX, -1000 + (row + 1) * step) - field(edgeX, -1000 + (row - 1) * step)) / (2 * step);
+    const len = Math.hypot(dhdx, 1, dhdz);
+
+    // Tile A's last column and tile B's first are the same world position.
+    for (const [mesh, col] of [[tileMeshes[0]!, n - 1], [tileMeshes[1]!, 0]] as const) {
+      const nrm = normalAt(mesh, row, col);
+      expect(nrm[0]).toBeCloseTo(-dhdx / len, 5);
+      expect(nrm[2]).toBeCloseTo(-dhdz / len, 5);
+    }
+    lm.dispose();
+  });
+
+  it('the seam mesh is shaded from the sampled height field too', () => {
+    const scene = makeScene();
+    const { palette, compId } = makePalette();
+    const rect: Rect = { minX: 0, minZ: 0, maxX: 32, maxZ: 32 };
+    // A slope steep enough that a wrong normal is unmistakable.
+    const sample = (x: number, z: number) => ({ height: 20 + x * 0.25 - z * 0.1, biomeId: 0, surfCompId: compId });
+    const handle = makeFakeHandle(rect, [], 4, compId, sample);
+
+    const lm = new LandscapeMesh(scene, makeMaterial());
+    lm.build(handle, palette);
+    const seam = scene.children[0] as THREE.Mesh;
+    const normals = seam.geometry.getAttribute('normal').array as Float32Array;
+
+    const len = Math.hypot(0.25, 1, -0.1);
+    for (let i = 0; i < normals.length; i += 3) {
+      expect(normals[i]!).toBeCloseTo(-0.25 / len, 4);
+      expect(normals[i + 1]!).toBeCloseTo(1 / len, 4);
+      expect(normals[i + 2]!).toBeCloseTo(0.1 / len, 4);
+    }
+    lm.dispose();
   });
 });

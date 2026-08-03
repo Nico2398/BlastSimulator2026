@@ -126,6 +126,20 @@ export function heightToVoxelY(height: number, groundOffset: number, sizeY: numb
   return Math.max(1, Math.min(sizeY - 1, Math.round(height + groundOffset)));
 }
 
+/**
+ * Same shift, without the rounding: the surface's continuous position in
+ * voxel-Y space.
+ *
+ * This is the height the landscape mesher samples, and now also the height
+ * generation asks marching cubes to reproduce. Rounding it first is what put
+ * the playable surface on 1 m terraces while the landscape beside it stayed
+ * smooth — the two representations were reading the same field and then
+ * quantizing it differently (#458).
+ */
+export function heightToVoxelYContinuous(height: number, groundOffset: number, sizeY: number): number {
+  return Math.max(1, Math.min(sizeY - 1, height + groundOffset));
+}
+
 /** Resolves the shaping input to use at a given column — e.g. BiomeCatalog's climate blend. */
 export type ShapingAtFn = (x: number, z: number) => ShapingInput;
 
@@ -171,4 +185,11 @@ export function sampleSurfaceVoxelY(ctx: WorldGenContext, x: number, z: number):
   const raw = sampleBaseHeight(ctx.fields, x, z, ctx.shapingAt(x, z));
   const masked = applyPitMask(raw, ctx.centerHeight, ctx.playableRect, x, z);
   return heightToVoxelY(masked, ctx.groundOffset, ctx.sizeY);
+}
+
+/** Continuous (unrounded) surface Y for column (x, z) — the height the mesh should actually land on. */
+export function sampleSurfaceHeightY(ctx: WorldGenContext, x: number, z: number): number {
+  const raw = sampleBaseHeight(ctx.fields, x, z, ctx.shapingAt(x, z));
+  const masked = applyPitMask(raw, ctx.centerHeight, ctx.playableRect, x, z);
+  return heightToVoxelYContinuous(masked, ctx.groundOffset, ctx.sizeY);
 }

@@ -77,6 +77,31 @@ describe('buildLandscapeMap — boundary agreement (#458 T2.1 accept criterion)'
     }
   });
 
+  it('the surface marching cubes will actually build sits exactly on the landscape height', () => {
+    // The tolerance above is about the two SAMPLERS agreeing. This is about
+    // the two SURFACES agreeing: what the player sees is not the rounded voxel
+    // index but the iso-surface marching cubes interpolates out of the density
+    // field, and that used to land on a half-voxel no matter what the height
+    // underneath it was — the whole site terraced into 1m steps while the
+    // landscape beside it stayed smooth.
+    const isoHeightAt = (x: number, z: number): number => {
+      for (let y = config.sizeY - 1; y > 0; y--) {
+        const below = grid.densityAt(x, y - 1, z);
+        const here = grid.densityAt(x, y, z);
+        if (below >= 0.5 && here < 0.5) return (y - 1) + (0.5 - below) / (here - below);
+      }
+      return 0;
+    };
+
+    const ring: Array<[number, number]> = [
+      [1, 20], [38, 20], [20, 1], [20, 38], [3, 3], [36, 36], [3, 36], [36, 3],
+    ];
+    for (const [x, z] of ring) {
+      const landscapeSample = sampleLandscapeColumn(worldGen, config.climateBias, structureSet, strata, grid.palette, x, z);
+      expect(isoHeightAt(x, z)).toBeCloseTo(landscapeSample.height, 6);
+    }
+  });
+
   it('rock composition matches exactly (same palette id) at the same ring of columns', () => {
     const ring: Array<[number, number]> = [
       [1, 20], [38, 20], [20, 1], [20, 38], [3, 3], [36, 36], [3, 36], [36, 3],
