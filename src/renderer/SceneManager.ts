@@ -33,6 +33,21 @@ const SUN_POSITION = new THREE.Vector3(100, 200, 80);
 const CSM_CASCADES = 3;
 const CSM_MAX_FAR = 1200;
 const CSM_SHADOW_MAP_SIZE = 2048;
+/**
+ * How far, in metres, a surface is pushed along its own normal before being
+ * tested against the shadow map.
+ *
+ * CSM leaves this at zero, which the terrain cannot afford. The playable mesh
+ * is marching cubes on a 1 m lattice, so it carries relief at almost exactly
+ * the size of a shadow texel in the outer cascades; with the sun low, each
+ * ripple shadows itself and the ground is ruled with fine parallel lines
+ * following its contours. Confirmed by elimination — the lines survive with
+ * the surface bump disabled and with the noise recipes untouched, and vanish
+ * entirely when the terrain stops casting shadows at all.
+ */
+const CSM_NORMAL_BIAS = 0.5;
+/** Slight depth offset as well; the normal offset alone still lets grazing faces self-shadow. */
+const CSM_SHADOW_BIAS = -0.0004;
 
 // Ambient fill — prevents hard blacks in shadow areas (cartoon look)
 const AMBIENT_INTENSITY = 0.55;
@@ -120,6 +135,14 @@ export class SceneManager {
       lightIntensity: SUN_INTENSITY,
       camera: this.camera,
     });
+    // Each cascade covers a larger slice of the view at the same map size, so
+    // a texel is wider further out and needs a proportionally larger offset.
+    this.csm.shadowBias = CSM_SHADOW_BIAS;
+    this.csm.lights.forEach((light, i) => {
+      light.shadow.normalBias = CSM_NORMAL_BIAS * (i + 1);
+      light.shadow.bias = CSM_SHADOW_BIAS;
+    });
+
     this.sunLight = new CSMSunLight(this.csm);
 
     this.fill = new THREE.DirectionalLight(FILL_COLOR, FILL_INTENSITY);
