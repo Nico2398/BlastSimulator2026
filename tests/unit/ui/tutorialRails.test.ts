@@ -3,7 +3,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { TutorialRails } from '../../../src/ui/tutorialRails.js';
-import { ALLOWED_CLASS, HIGHLIGHT_CLASS, DEFAULT_TICK_BUDGET } from '../../../src/ui/tutorialGuide.js';
+import { ALLOWED_CLASS, HIGHLIGHT_CLASS, DEFAULT_TICK_BUDGET, WORK_GRACE_TICKS } from '../../../src/ui/tutorialGuide.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
 
@@ -181,6 +181,63 @@ describe('TutorialRails', () => {
     rails.beginStep({ id: 'hire-surveyor' }, null);
     expect(() => rails.updateClock(null)).not.toThrow();
     expect(rails.updateClock(null)).toBe(false);
+  });
+
+  // -- #478: the tutorial hung at "buy a hauler and put the hired driver in
+  // it" because the flat WORK_GRACE_TICKS window held the clock once
+  // vehicle-buy-assign's budget (20 ticks) plus WORK_GRACE_TICKS (40) ran
+  // out, even while the driver was still visibly walking to the vehicle.
+  // A held clock never lets the walk finish, so the hold never lifted.
+
+  it('never permanently holds while outstanding work keeps signature-changing, well past the old budget+grace cutoff', () => {
+    const s = state();
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'vehicle-buy-assign', tickBudget: 20, waitsOnWork: true }, s);
+    const start = s.tickCount;
+
+    for (let i = 1; i <= 20 + 2 * WORK_GRACE_TICKS; i++) {
+      s.tickCount = start + i;
+      // A fresh destination every tick — the driver is provably still
+      // walking toward the vehicle, never stuck.
+      s.employees.employees = [
+        { activeActionId: null, pendingDriverVehicleId: 1, destinationX: i, destinationZ: 0 } as never,
+      ];
+      rails.updateClock(s);
+      if (i > 20 + WORK_GRACE_TICKS) {
+        expect(s.isPaused).toBe(false);
+        expect(rails.clockHeld).toBe(false);
+      }
+    }
+  });
+
+  it('beginStep resets the progress fingerprint, so a new step never inherits a stale one from a held step', () => {
+    const s = state();
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'vehicle-buy-assign', tickBudget: 5, waitsOnWork: true }, s);
+
+    // Same outstanding worker never moves — this step genuinely stalls.
+    const frozenEmployee = {
+      activeActionId: null, pendingDriverVehicleId: 1, destinationX: 9, destinationZ: 0,
+    } as never;
+    s.employees.employees = [frozenEmployee];
+
+    for (let i = 1; i <= 5 + WORK_GRACE_TICKS; i++) {
+      s.tickCount = i;
+      rails.updateClock(s);
+    }
+    expect(rails.clockHeld).toBe(true);
+    expect(s.isPaused).toBe(true);
+
+    // The same stuck worker is still there — only the step changed. A new
+    // step must get its own full budget + grace, not the exhausted one it
+    // inherited from the step that just held.
+    rails.beginStep({ id: 'survey', tickBudget: 5, waitsOnWork: true }, s);
+    expect(s.isPaused).toBe(false);
+
+    const stepStart2 = s.tickCount;
+    s.tickCount = stepStart2 + 5; // exactly the new step's own budget
+    expect(rails.updateClock(s)).toBe(false);
+    expect(s.isPaused).toBe(false);
   });
 
   it('clear() drops the marks and the stage list', () => {
