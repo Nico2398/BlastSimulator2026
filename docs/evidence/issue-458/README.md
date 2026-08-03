@@ -20,3 +20,15 @@ surface lands on its true continuous height and runs into the landscape.
 
 **lines** — before, fine parallel lines follow the ground's contours. After,
 they are gone and the terrain still casts its shadows (visible on the right).
+
+## Second round (`lines2-*`)
+
+The first shadow fix reduced the lines but did not remove them — the
+`lines-after` shot above still shows faint contour ripple, which round two
+traced to the terrain mesh's inverted triangle winding. `lines2-before-*` is
+the shipped first fix (the state with residual lines); `lines2-after-*` is the
+winding fix plus back-face shadow rendering, at the same cameras and in-game
+times. `lines2-after-rim` and `lines2-after-crater` are extra angles of the
+fixed build: the mid-distance slope where the ripple was worst, and a blast
+crater with its fragment pile proving freshly cut faces and debris survived
+the winding flip.

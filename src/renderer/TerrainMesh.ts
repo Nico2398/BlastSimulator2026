@@ -92,12 +92,12 @@ function densityGradientNormal(grid: VoxelGrid, x: number, y: number, z: number)
   // A vertex in a locally uniform region has no gradient to speak of. Falling
   // back to "up" beats emitting a zero normal, which shades black.
   if (len < 1e-6) return [0, 1, 0];
-  // Not negated. The gradient points toward increasing density, i.e. into the
-  // rock, so the outward normal is its negation — but this mesh's triangle
-  // winding is the opposite convention, which is what computeVertexNormals was
-  // producing and what the lighting is set up for. Negating here lit the whole
-  // pit from behind and rendered it black.
-  return [gx / len, gy / len, gz / len];
+  // Negated: the gradient points toward increasing density (into the rock),
+  // and the outward normal is its opposite. An earlier revision returned the
+  // un-negated gradient to match the mesh's then-inverted triangle winding;
+  // marchCube now emits outside-facing triangles as front faces, so the
+  // mathematically correct sign is also the one the renderer expects.
+  return [-gx / len, -gy / len, -gz / len];
 }
 
 function sampleCorner(grid: VoxelGrid, x: number, y: number, z: number): CornerSample {
@@ -172,6 +172,15 @@ export class TerrainMesh {
       heightRange: [0, grid.sizeY],
     });
     this.material.side = THREE.DoubleSide;
+    // Render the shadow map from BACK faces. The classic acne fix for closed
+    // surfaces: the map then stores the underside of the terrain, which sits a
+    // full surface-thickness behind the lit top, so the top can never fail a
+    // depth comparison against itself — no bias large enough to eat contact
+    // shadows is needed. Cast silhouettes are unchanged (same outline from the
+    // sun's point of view). Applies to the landscape and blast fragments too,
+    // since the material is shared; both are closed-enough surfaces for the
+    // same reasoning to hold.
+    this.material.shadowSide = THREE.BackSide;
     this.updateChunkGridDims();
   }
 
@@ -437,9 +446,18 @@ export class TerrainMesh {
     const tris = TRI_TABLE[cubeIndex];
     if (!tris) return;
 
+    // Emitted in REVERSED order relative to TRI_TABLE. This table's order
+    // winds the surface clockwise when seen from outside the rock, which made
+    // every front face point INTO the ground. Nothing looked wrong because the
+    // material is double-sided — but everything that consults winding without
+    // the fragment-stage flip silently broke: the depth prepass (FrontSide)
+    // culled the terrain out of ambient occlusion and aerial haze entirely,
+    // and the shadow normalBias pushed lookups INTO the rock instead of out of
+    // it. Reversing here makes outside-facing mean front-facing, the same
+    // convention the landscape mesh already uses.
     for (let i = 0; i < tris.length; i += 3) {
       const e0 = tris[i]!, e1 = tris[i + 1]!, e2 = tris[i + 2]!;
-      for (const e of [e0, e1, e2]) {
+      for (const e of [e2, e1, e0]) {
         outPos.push(...edgeVerts[e]!);
         outRockA.push(edgeRockA[e]!);
         outRockB.push(edgeRockB[e]!);

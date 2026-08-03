@@ -35,19 +35,19 @@ const CSM_MAX_FAR = 1200;
 const CSM_SHADOW_MAP_SIZE = 2048;
 /**
  * How far, in metres, a surface is pushed along its own normal before being
- * tested against the shadow map.
+ * tested against the shadow map. CSM leaves this at zero.
  *
- * CSM leaves this at zero, which the terrain cannot afford. The playable mesh
- * is marching cubes on a 1 m lattice, so it carries relief at almost exactly
- * the size of a shadow texel in the outer cascades; with the sun low, each
- * ripple shadows itself and the ground is ruled with fine parallel lines
- * following its contours. Confirmed by elimination — the lines survive with
- * the surface bump disabled and with the noise recipes untouched, and vanish
- * entirely when the terrain stops casting shadows at all.
+ * Deliberately small. The terrain used to rule itself with fine acne lines at
+ * its 1 m lattice spacing, and the first fix was to grow these biases until
+ * the lines faded — which only "worked" by pushing the whole depth comparison
+ * so far that contact shadows died with the acne. The real fix is structural:
+ * the terrain material renders its shadow map from back faces
+ * (TerrainMesh.ts), so a surface can never fail a depth test against itself,
+ * and the bias only has to cover sampling noise.
  */
-const CSM_NORMAL_BIAS = 0.5;
-/** Slight depth offset as well; the normal offset alone still lets grazing faces self-shadow. */
-const CSM_SHADOW_BIAS = -0.0004;
+const CSM_NORMAL_BIAS = 0.15;
+/** Depth-space nudge toward the light; tiny, for the same reason as above. */
+const CSM_SHADOW_BIAS = -0.00005;
 
 // Ambient fill — prevents hard blacks in shadow areas (cartoon look)
 const AMBIENT_INTENSITY = 0.55;
