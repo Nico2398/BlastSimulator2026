@@ -47,9 +47,8 @@ export class TutorialRails {
     this.budget = step.tickBudget ?? DEFAULT_TICK_BUDGET;
     this.waitsOnWork = step.waitsOnWork === true;
     this.stepStartTick = state?.tickCount ?? 0;
-    // TODO: implement — progress signature reset happens here once wired up.
-    void this.lastProgressSignature;
-    void this.lastProgressTick;
+    this.lastProgressSignature = null;
+    this.lastProgressTick = this.stepStartTick;
     // Published now rather than when the picker's stage goes live: the picker
     // opens on the click that ends the previous stage, so publishing later
     // would leave that first picker unconstrained.
@@ -109,7 +108,13 @@ export class TutorialRails {
    */
   updateClock(state: GameState | null): boolean {
     if (!state) return this.held;
-    const { hold } = decideClock(state, this.stepStartTick, this.budget, this.waitsOnWork);
+    const decision = decideClock(
+      state, this.stepStartTick, this.budget, this.waitsOnWork,
+      { signature: this.lastProgressSignature, tick: this.lastProgressTick },
+    );
+    this.lastProgressSignature = decision.progressSignature;
+    this.lastProgressTick = decision.lastProgressTick;
+    const { hold } = decision;
 
     if (hold && !state.isPaused) {
       state.isPaused = true;

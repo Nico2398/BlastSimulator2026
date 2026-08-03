@@ -27,9 +27,11 @@ export const HIGHLIGHT_CLASS = 'bs-tutorial-highlight';
 export const DEFAULT_TICK_BUDGET = 10;
 
 /**
- * Extra ticks granted while queued work is outstanding. Pausing with work in
- * flight would deadlock a step whose completion depends on that work finishing,
- * so the clock keeps running — but not forever.
+ * Extra ticks granted after the outstanding work last showed progress. Pausing
+ * with work in flight would deadlock a step whose completion depends on that
+ * work finishing, so the clock keeps running while `workSignature` keeps
+ * changing — but a signature that stops changing (the work stalled) still
+ * gets held once this many ticks have passed since it last moved.
  */
 export const WORK_GRACE_TICKS = 40;
 
@@ -148,11 +150,28 @@ export interface ClockProgress {
 /**
  * Fingerprint of the outstanding work so `decideClock` can tell "still moving"
  * from "stuck" instead of granting a flat grace window from step start.
+ *
+ * Cheap to compute every call (this runs every frame): covers everything
+ * `isWorkInProgress` inspects, generic across every `waitsOnWork` step.
  */
-// TODO: implement
 function workSignature(state: GameState): string {
-  void state;
-  return '';
+  const pendingIds = (state.pendingActions ?? [])
+    .map((a) => a.id)
+    .sort((a, b) => a - b)
+    .join(',');
+
+  const working = state.employees.employees
+    .filter((e) => e.activeActionId !== null || e.pendingDriverVehicleId !== null || e.destinationX !== null)
+    .slice()
+    .sort((a, b) => a.id - b.id)
+    .map((e) => [
+      e.id, e.x, e.z, e.activeActionId, e.pendingDriverVehicleId,
+      e.destinationX, e.destinationZ, e.taskTicksRemaining, e.restTicksRemaining,
+      e.pendingTaskDuration, e.pendingRestDuration,
+    ].join(','))
+    .join(';');
+
+  return `${pendingIds}|${working}`;
 }
 
 /**
@@ -186,6 +205,13 @@ function isWorkInProgress(state: GameState): boolean {
  * world to keep moving. Contract offers, for one, are regenerated on a timer
  * and the oldest is dropped, so a step that asks the player to pick an offer
  * must not let the list churn while they read it.
+ *
+ * The grace period is measured from the outstanding work's last observed
+ * progress, not from step start: `workSignature` fingerprints the work every
+ * call, and the window resets whenever that fingerprint changes. Work that
+ * keeps moving — a driver still walking toward a vehicle — never runs out the
+ * clock; work that genuinely stalls still gets held `WORK_GRACE_TICKS` after
+ * it stopped moving.
  */
 export function decideClock(
   state: GameState,
@@ -194,20 +220,25 @@ export function decideClock(
   waitsOnWork: boolean = false,
   progress: ClockProgress = { signature: null, tick: stepStartTick },
 ): ClockDecision {
-  // TODO: implement — workSignature will replace the flat WORK_GRACE_TICKS
-  // window with a check against `progress` once the fix lands.
-  void workSignature;
-  const spent = Math.max(0, (state.tickCount ?? 0) - stepStartTick);
+  const tickCount = state.tickCount ?? 0;
+  const spent = Math.max(0, tickCount - stepStartTick);
   if (spent < budget) {
     return { hold: false, spent, progressSignature: progress.signature, lastProgressTick: progress.tick };
   }
   if (!waitsOnWork) {
     return { hold: true, spent, progressSignature: progress.signature, lastProgressTick: progress.tick };
   }
-
-  if (isWorkInProgress(state) && spent < budget + WORK_GRACE_TICKS) {
-    return { hold: false, spent, progressSignature: progress.signature, lastProgressTick: progress.tick };
+  if (!isWorkInProgress(state)) {
+    return { hold: true, spent, progressSignature: progress.signature, lastProgressTick: progress.tick };
   }
 
-  return { hold: true, spent, progressSignature: progress.signature, lastProgressTick: progress.tick };
+  const signature = workSignature(state);
+  const changed = progress.signature !== null && signature !== progress.signature;
+  const lastProgressTick = changed ? tickCount : progress.tick;
+  const sinceProgress = tickCount - lastProgressTick;
+
+  if (sinceProgress < WORK_GRACE_TICKS) {
+    return { hold: false, spent, progressSignature: signature, lastProgressTick };
+  }
+  return { hold: true, spent, progressSignature: signature, lastProgressTick };
 }
