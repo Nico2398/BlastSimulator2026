@@ -16,7 +16,7 @@ Two shapes are valid, and they differ in how much of the answer is already known
 | **Intent** | A human filing from the issue form or free-form | Context, Task, Verification, and any Blocked by. The planner derives the files and the tests. |
 | **Complete** | An agent decomposing a feature into atomic tasks | Every section below. The decomposition already knows the file layout, so it states it. |
 
-Both enter the same queue. Intake labels whatever arrives, so a two-line issue typed from a phone is a valid input — where it leaves a choice open, the run defaults it under `agentic-decision-autonomy` rather than bouncing it back.
+Both enter the same queue once `ready` lands on the issue — a two-line issue typed from a phone is still a valid input, and where it leaves a choice open, the run defaults it under `agentic-decision-autonomy` rather than bouncing it back.
 
 ## ▶ PROCEDURE — EXECUTE IN ORDER
 
@@ -24,9 +24,11 @@ Both enter the same queue. Intake labels whatever arrives, so a two-line issue t
 2. Fill every section that shape carries, using the headings below verbatim
 3. Verify the Rules are satisfied
 4. Run through the Checklist
-5. Create the issue with `gh issue create`
+5. Create the issue with `gh issue create`, setting labels yourself:
+   - Human gave no instruction about labels → `--label ready,agent-task`. That is the default, not intake's — a **Complete**-shape issue you authored is ready to run the moment it exists, and intake no longer assigns `ready` on its own.
+   - Human specified labels, or said the issue should wait — `decision-review` for a default to revisit later, or an explicit hold — → follow that instruction instead, and leave `ready` off.
 
-Intake applies `agent-task` and `ready` on its own, and the issue joins the queue in number order. An issue that must **stay out** of the queue is created carrying a lifecycle label of its own — `decision-review` for a default to revisit later — because intake leaves an issue's labels alone once it has one.
+An issue that must **stay out** of the queue is created carrying a lifecycle label of its own instead of `ready` — `decision-review` for a default to revisit later. The issue joins the queue in number order once `ready` is on it, whoever put it there.
 
 ## Issue Body Template
 
@@ -80,3 +82,4 @@ Intake applies `agent-task` and `ready` on its own, and the issue joins the queu
 - [ ] An issue that must stay out of the queue carries its own lifecycle label
 - [ ] Interaction-mode risk assessed → `full-ci` added when the change affects UI, rendering, or interaction
 - [ ] If the issue has `full-ci`, the PR gets `full-ci` when opened
+- [ ] Labels set on creation: `ready,agent-task` unless the human specified otherwise or the issue must stay out of the queue

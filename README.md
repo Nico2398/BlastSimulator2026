@@ -413,12 +413,12 @@ Required secrets: `PAT_TOKEN_COPILOT_AUTOMATION` (both agents — the loop dies 
 
 ### Trigger paths
 
-**Filing an issue is the whole handover.** Intake labels it `agent-task` + `ready` — whether it came from the issue form, the API, or a sentence typed on a phone — and it joins the queue in number order. The run that picks it up plans it, writes the tests, implements them, verifies the channels the change touches, and opens the pull request that closes it. Where the issue leaves a choice open, the run takes the default the specs imply and records it in the PR rather than waiting for an answer.
+**`ready` is the whole handover, and only a human or an authoring agent puts it there.** Intake no longer defaults an unlabelled issue into the queue — filing one is not by itself enough. The "Agent Task" issue form applies `agent-task` + `ready` itself; an agent creating an issue does the same per `agentic-issue-creation` unless told otherwise; a plain issue (the web form's blank option, the API, a sentence typed on a phone) stays out of the queue until `ready` is added by hand. However it arrives, the issue joins the queue in number order once `ready` is on it, and the run that picks it up plans it, writes the tests, implements them, verifies the channels the change touches, and opens the pull request that closes it. Where the issue leaves a choice open, the run takes the default the specs imply and records it in the PR rather than waiting for an answer.
 
 | Trigger | Result |
 |---------|--------|
-| **File an issue** | Labels it, then assigns the oldest unblocked `ready` issue |
-| Add `ready` to an issue | Same — this is also how you resume a `blocked` one, with nothing to dispatch by hand |
+| **File an issue via the "Agent Task" form** | Labels it `agent-task` + `ready`, then assigns the oldest unblocked `ready` issue |
+| Add `ready` to an issue | Same — this is also how you resume a `blocked` one, or opt in a plain/free-form issue, with nothing to dispatch by hand |
 | A merged PR whose body says `Closes #N` | Closes `#N`, then assigns the next `ready` issue the same way |
 | Hourly watchdog | Sweeps stalled runs, and restarts the queue when the pipeline sits idle with issues waiting |
 | Run the **"Pipeline: run the configured agent on the next ready issue"** workflow | Forces the queue forward by hand |
