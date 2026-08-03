@@ -5,7 +5,7 @@
 
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
-import { TerrainMaterial } from '../../../src/renderer/terrain/TerrainMaterial.js';
+import { TerrainMaterial, COVER_BLEND_SKIP_SHARE } from '../../../src/renderer/terrain/TerrainMaterial.js';
 import { getAllRocks } from '../../../src/core/world/RockCatalog.js';
 import { getAllOres } from '../../../src/core/world/OreCatalog.js';
 
@@ -195,6 +195,53 @@ describe('TerrainMaterial', () => {
       it('bumps the program cache key so the old compiled shader is not reused', () => {
         const mat = makeMaterial();
         expect(mat.customProgramCacheKey()).toBe('terrain-material-v5');
+      });
+    });
+
+    describe('cover-blend flat-colour skip for runner-up material (#475)', () => {
+      // The runner-up cover used to always pay a full materialAlbedo() eval
+      // (recipe + noise), even when its blend share was negligible. These pin
+      // the cheap materialFlatColor() stand-in that replaces it once share
+      // exceeds COVER_BLEND_SKIP_SHARE; below the threshold the blend is
+      // skipped entirely and only the winner's colour shows.
+      it('declares materialFlatColor(int i, ...) alongside materialAlbedo', () => {
+        const mat = makeMaterial();
+        const shader = makeFakeShader();
+        mat.onBeforeCompile(shader, undefined as unknown as THREE.WebGLRenderer);
+
+        expect(shader.fragmentShader).toContain('vec3 materialFlatColor(int i');
+      });
+
+      it('the winner material still gets a full materialAlbedo(bestI, ...) evaluation', () => {
+        const mat = makeMaterial();
+        const shader = makeFakeShader();
+        mat.onBeforeCompile(shader, undefined as unknown as THREE.WebGLRenderer);
+
+        expect(shader.fragmentShader).toContain('materialAlbedo(bestI');
+      });
+
+      it('the runner-up cover is shaded via materialFlatColor(secondI, ...), not materialAlbedo', () => {
+        const mat = makeMaterial();
+        const shader = makeFakeShader();
+        mat.onBeforeCompile(shader, undefined as unknown as THREE.WebGLRenderer);
+
+        expect(shader.fragmentShader).toContain('materialFlatColor(secondI');
+      });
+
+      it('no longer unconditionally calls materialAlbedo(secondI, ...) for the runner-up (regression pin)', () => {
+        const mat = makeMaterial();
+        const shader = makeFakeShader();
+        mat.onBeforeCompile(shader, undefined as unknown as THREE.WebGLRenderer);
+
+        expect(shader.fragmentShader).not.toContain('materialAlbedo(secondI');
+      });
+
+      it('gates the runner-up eval on share exceeding the exported COVER_BLEND_SKIP_SHARE constant', () => {
+        const mat = makeMaterial();
+        const shader = makeFakeShader();
+        mat.onBeforeCompile(shader, undefined as unknown as THREE.WebGLRenderer);
+
+        expect(shader.fragmentShader).toContain(`share > ${COVER_BLEND_SKIP_SHARE}`);
       });
     });
   });
