@@ -74,6 +74,21 @@ Five independent channels prove a change works. Each catches what the others mis
 
 **When a channel is genuinely unavailable** (no browser, dev server unreachable, screenshots never written), say so explicitly and mark the work unverified for that channel. Never substitute a state JSON dump for an image you were unable to inspect, and never report PASS for a channel you did not run.
 
+## ▶ Some channels belong to CI, not to your session
+
+A sandbox has no GPU, so anything that loads a level in a browser rasterizes in software: one `new_game` costs minutes, not seconds. The whole-suite browser runs pass 30 minutes there, which is long enough that a session watching one concludes it hung, kills it, and reports a stall that never happened.
+
+| Run | Where |
+|-----|-------|
+| `typecheck`, `test`, `scenarios` (command mode), `build` | Either. CI runs all four on every push and PR. |
+| `screenshot`, one named scenario in interaction mode | Your session — this is the visual channel's working loop. |
+| Whole playability suite (`npm run playtest`) | CI job `Playtest (playability)`. |
+| All scenarios in interaction mode | CI job `Scenarios (interaction mode)` (label the PR `full-ci`). |
+
+Push, then read the CI job — its result *is* the channel's result, and its artifacts carry the FAIL screenshots. Locally, run one named definition you are actively debugging, never the whole suite.
+
+**While any browser-driven run is in flight: change no file** (Vite reloads the page and kills the run with `Execution context was destroyed`, which looks like a game bug and is not), **start no second browser harness**, and **wait for the run's own terminal line**. Slow is not stuck. A run you interrupted produced no result — report the channel as pending CI, never as passed.
+
 ## ▶ Capability Gate
 
 Before acting, check whether the task needs a capability you lack (audio playback, binary analysis, a network the sandbox blocks) or asks you to write outside allowed directories. If so, state the gap and the agent or tool that covers it instead of improvising a workaround. Vision, browser automation, and shell are available — those are not gaps.

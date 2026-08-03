@@ -109,9 +109,11 @@ async function runPlaytest(
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const screenshots = args.includes('--screenshots');
-  const filter = args.find(a => !a.startsWith('--'));
   const portArg = args.indexOf('--port');
   const port = portArg >= 0 ? Number(args[portArg + 1]) : 5173;
+  // Skip the value belonging to --port, or `--port 5199` alone is read as a
+  // playtest name filter and matches nothing.
+  const filter = args.find((a, i) => !a.startsWith('--') && i !== portArg + 1);
 
   const defs = loadPlaytests(filter);
   if (defs.length === 0) {

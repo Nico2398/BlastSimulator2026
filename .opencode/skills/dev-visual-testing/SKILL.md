@@ -28,6 +28,29 @@ Dev server on :5173 (override with `--port` or `VISUAL_TEST_PORT`):
 npm run dev &
 ```
 
+## ▶ What to run here, and what to leave to CI
+
+An agent sandbox has no GPU. Chromium falls back to software rasterization, so
+anything that loads a level in the browser pays for the landscape build and the
+whole terrain re-mesh on the CPU — minutes per `new_game`, not seconds.
+
+| Task | Where |
+|------|-------|
+| Single screenshot (`npm run screenshot`) | Here. Seconds to a minute; this is the channel's core loop. |
+| One named scenario, interaction mode | Here, when you are debugging that scenario. |
+| **All** scenarios in interaction mode | CI (`Scenarios (interaction mode)`, label a PR `full-ci`). Never in a session. |
+| Playability suite | CI (`Playtest (playability)`). See `dev-playability-testing`. |
+
+### ▶ While any browser-driven run is in flight
+
+1. **Do not edit any file in the repo.** Vite watches the tree; a save reloads
+   the page and destroys the Puppeteer execution context mid-run. The failure
+   (`Execution context was destroyed`) looks like a game bug and is not.
+2. **Do not start a second browser harness.** Each launches Chromium; two at
+   once starve each other and both look hung.
+3. **Wait for the run's own terminal line.** Slow is not stuck — a killed run
+   proves nothing, and reporting it as a stall is a false finding.
+
 Browser resolution is automatic, in this order: `--puppeteer-path` > `PUPPETEER_EXECUTABLE_PATH` > `PLAYWRIGHT_BROWSERS_PATH` > Puppeteer's own cache > system Chrome/Chromium > conventional Playwright caches. Both environment variables state operator intent, so they outrank anything auto-discovered — an incidental `/usr/bin/chromium` on a CI runner must not shadow a sandbox-provisioned browser. When nothing resolves, the error names the fix rather than failing opaquely.
 
 ## Taking Screenshots

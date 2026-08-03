@@ -226,3 +226,70 @@ jobs:
       - name: Stop dev server
         if: always()
         run: kill $(lsof -t -i:5173) 2>/dev/null || true
+
+  # The playability channel: plays the game through its own UI with real
+  # clicks. Runs here rather than in an agent's sandbox — it drives headless
+  # Chromium with no GPU, so every landscape build and terrain re-mesh falls
+  # back to software rasterization and the suite takes tens of minutes there.
+  # CI is unattended, so slow is fine; an interactive session is not.
+  playtest:
+    name: "Playtest (playability)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs:
+      - typecheck
+      - test
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Cache npm dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Puppeteer Chrome
+        run: npx puppeteer browsers install chrome
+
+      - name: Build project
+        run: npm run build
+
+      - name: Start dev server
+        run: |
+          npx vite --port 5173 &
+          sleep 5
+          curl -s http://localhost:5173 > /dev/null || (echo "Dev server failed to start" && exit 1)
+
+      - name: Play every playtest definition through the UI
+        run: |
+          if ! npx tsx scripts/playtest.ts --screenshots; then
+            echo ""
+            echo "========================================"
+            echo "A beat could not be completed by clicking. The FAIL screenshot"
+            echo "and the blocking control are in the log above and the artifact."
+            echo "========================================"
+            exit 1
+          fi
+
+      - name: Upload playtest screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playtest-screenshots
+          path: screenshots/
+          if-no-files-found: ignore
+
+      - name: Stop dev server
+        if: always()
+        run: kill $(lsof -t -i:5173) 2>/dev/null || true

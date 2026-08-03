@@ -34,6 +34,39 @@ The browser entry point exposes three bridges beyond `__gameState` and `__uiStat
 
 Implementation: `src/ui/uiActionProbe.ts`.
 
+## ▶ Where to run it: CI, not an agent sandbox
+
+`npm run playtest` drives headless Chromium against the dev server. An agent
+sandbox has no GPU, so Chromium falls back to software rasterization and every
+landscape build, terrain re-mesh and frame is CPU work. One `new_game` in the
+browser takes minutes there, and each beat's setup does one. The full suite has
+run past 30 minutes — long enough that an agent watching it will conclude it
+has hung, kill it, and report a stall that never happened.
+
+CI is unattended, so the same cost is free there. The `playtest` job in
+`.github/workflows/ci.yml` runs every definition on every push and PR and
+uploads the FAIL screenshots as an artifact.
+
+1. **Default: push and read the CI job.** Treat `Playtest (playability)` as the
+   channel's result. Read the failing beat and the uploaded screenshot from the
+   run, exactly as you would locally.
+2. **Run it locally only for one named definition you are actively debugging**,
+   never the whole suite: `npm run playtest -- <name> --screenshots`.
+3. **Never claim the channel passed from a run you interrupted.** A run with no
+   terminal line (`N/N beats reached`, `PLAYTEST PASSED`, or a `FAIL`) produced
+   no result. "It was taking too long" is not a result either — say the channel
+   is pending CI.
+
+### ▶ While any browser-driven run is in flight
+
+1. **Do not edit any file in the repo.** Vite watches the tree; a save reloads
+   the page and destroys the Puppeteer execution context. The run dies with
+   `Execution context was destroyed`, which reads like a game bug and is not.
+2. **Do not start a second browser harness.** Screenshot, scenario and playtest
+   runs each launch Chromium; two at once starve each other and make both look
+   hung.
+3. **Wait for the terminal line before concluding anything.** Slow is not stuck.
+
 ## ▶ PROCEDURE — Prove a flow is playable
 
 1. Start the dev server: `npm run dev &`
