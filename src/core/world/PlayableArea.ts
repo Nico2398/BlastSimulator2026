@@ -91,6 +91,16 @@ export class PlayableArea {
     this.extentHalf = options.extentHalf;
   }
 
+  /**
+   * Hand over an already-built protected set, so the claim path does not
+   * re-trace rivers and re-place villages that something else (the landscape
+   * build) has already computed for this seed. Ignored once the area has
+   * built its own.
+   */
+  adoptStructures(structures: ProtectedStructures): void {
+    if (!this.protectedStructures) this.protectedStructures = structures;
+  }
+
   /** True when the site owns the column at (x, z). */
   contains(x: number, z: number): boolean {
     return this.grid.containsColumn(x, z);

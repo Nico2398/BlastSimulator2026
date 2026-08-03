@@ -234,7 +234,7 @@ export function inspectCommand(
   if (!ctx.grid.isInBounds(x, y, z)) {
     return {
       success: false,
-      output: `Out of bounds: (${x},${y},${z}). Grid is ${ctx.grid.sizeX}x${ctx.grid.sizeY}x${ctx.grid.sizeZ}.`,
+      output: `Off site: (${x},${y},${z}). The site spans (${ctx.grid.minX},${ctx.grid.minZ}) to (${ctx.grid.maxX - 1},${ctx.grid.maxZ - 1}), height ${ctx.grid.sizeY}.`,
     };
   }
 
@@ -274,13 +274,17 @@ export function terrainInfoCommand(
   }
 
   const w = ctx.state.world!;
+  const grid = ctx.grid;
   let solidCount = 0;
   let airCount = 0;
-  for (let x = 0; x < ctx.grid.sizeX; x++) {
-    for (let z = 0; z < ctx.grid.sizeZ; z++) {
-      for (let y = 0; y < ctx.grid.sizeY; y++) {
-        const v = ctx.grid.getVoxel(x, y, z)!;
-        if (v.density > 0) solidCount++;
+  // Walks the live bounding box, not 0..size: the site starts wherever play
+  // has taken it, and columns inside the box it does not own are skipped
+  // rather than counted as air (#473).
+  for (let x = grid.minX; x < grid.maxX; x++) {
+    for (let z = grid.minZ; z < grid.maxZ; z++) {
+      if (!grid.containsColumn(x, z)) continue;
+      for (let y = 0; y < grid.sizeY; y++) {
+        if (grid.densityAt(x, y, z) > 0) solidCount++;
         else airCount++;
       }
     }
@@ -289,7 +293,9 @@ export function terrainInfoCommand(
   return {
     success: true,
     output: [
-      `Grid: ${w.sizeX}x${w.sizeY}x${w.sizeZ}`,
+      `Site: ${w.sizeX}x${w.sizeY}x${w.sizeZ} from (${grid.minX}, ${grid.minZ})`,
+      `Level size: ${w.baseSizeX}x${w.baseSizeZ}`,
+      `Claimed chunks: ${grid.chunkCount}`,
       `Mine type: ${ctx.state.mineType}`,
       `Seed: ${ctx.state.seed}`,
       `Solid voxels: ${solidCount}`,
@@ -347,18 +353,17 @@ export function surveyCommand(
   }
   const [x, z] = coords as [number, number];
 
-  if (x < 0 || x >= ctx.grid.sizeX || z < 0 || z >= ctx.grid.sizeZ) {
+  if (!ctx.grid.containsColumn(x, z)) {
     return {
       success: false,
-      output: `Out of bounds: (${x},${z}). Grid is ${ctx.grid.sizeX}x${ctx.grid.sizeZ}.`,
+      output: `Off site: (${x},${z}). The site spans (${ctx.grid.minX},${ctx.grid.minZ}) to (${ctx.grid.maxX - 1},${ctx.grid.maxZ - 1}).`,
     };
   }
 
   // Find surface (topmost solid voxel)
   let surfaceY = -1;
   for (let y = ctx.grid.sizeY - 1; y >= 0; y--) {
-    const v = ctx.grid.getVoxel(x, y, z)!;
-    if (v.density > 0) {
+    if (ctx.grid.densityAt(x, y, z) > 0) {
       surfaceY = y;
       break;
     }

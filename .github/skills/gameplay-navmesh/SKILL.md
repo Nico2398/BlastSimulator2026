@@ -14,7 +14,7 @@ Employees + vehicles navigate mine surface autonomously, routing around drill ho
 
 ## Navigation Grid
 
-The `NavGrid` is 2D array of `NavCell` mirroring VoxelGrid's X×Z footprint:
+The `NavGrid` is 2D array of `NavCell` covering VoxelGrid's live X×Z **bounding box**. The site grows as the player claims chunks (#473), so the grid carries `originX`/`originZ` alongside `width`/`height`: `cells` is indexed locally (`cells[z - originZ][x - originX]`) while every public query takes world coordinates. Use `cellAt(x, z)` / `setCellAt(x, z, cell)`; never index `cells` with a world coordinate. Columns inside the bounding box the site does not own — the notch a non-rectangular site leaves when its box is squared off — are `void`.
 
 ```typescript
 export type NavCellType =
@@ -96,6 +96,9 @@ NavGrid is **incrementally updated** — full rebuild too expensive.
 | Vehicle parks or departs | Single cell |
 | Drill hole added | Single cell |
 | Ramp built | 1×4 footprint + adjacent cells |
+| Site claims a chunk | Full rebuild over the new bounding box |
+
+A claim is the one trigger that rebuilds rather than patches: the bounding box itself moved, so every cell's index changed. Expansion happens at human speed, which is what makes an O(area) rebuild cheaper than making A* chunk-aware (#473 D7).
 
 Paths crossing updated region → marked stale, re-requested next tick. Paths outside region remain valid.
 

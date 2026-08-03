@@ -652,7 +652,14 @@ export class GameRenderer {
       this.landscape = new LandscapeMesh(this.sm.scene, this.terrain.sharedMaterial);
     }
     this.landscapeHandle = handle;
+    // The landscape's StructureSet already carries every river, village and
+    // landmark for this seed — hand it to the claim path rather than have it
+    // trace them all a second time (#473 D6).
+    ctx.playableArea?.adoptStructures(handle.structureSet);
     this.landscape.build(handle, ctx.grid.palette, this.playableCut(ctx.grid));
+    // Record what we just cut against, so the next terrain:updated only
+    // rebuilds when the site has actually moved since this build.
+    this.siteBoundsChanged(ctx.grid);
 
     // Aerial perspective's haze thickness and per-biome grade — set once per
     // level load, not per frame (#458 T5.2/A21).

@@ -24,6 +24,7 @@ import type { VoxelGrid } from '../../core/world/VoxelGrid.js';
 
 import { requireGame, NO_EMPLOYEES_MSG } from './commandUtils.js';
 import { claimForAction, cellsInRect } from './siteExpansion.js';
+import { DEFAULT_GRID_SIZE } from './world.js';
 
 // The employee command moved to ./employees.ts; re-exported so existing imports
 // and the runner registration keep resolving from here.
@@ -40,7 +41,7 @@ function makeFootprintRegion(x: number, z: number, sizeX: number, sizeZ: number)
  */
 function siteBounds(ctx: GameContext): { width: number; depth: number; originX: number; originZ: number } {
   const grid = ctx.grid;
-  if (!grid) return { width: 64, depth: 64, originX: 0, originZ: 0 };
+  if (!grid) return { width: DEFAULT_GRID_SIZE, depth: DEFAULT_GRID_SIZE, originX: 0, originZ: 0 };
   return { width: grid.sizeX, depth: grid.sizeZ, originX: grid.minX, originZ: grid.minZ };
 }
 

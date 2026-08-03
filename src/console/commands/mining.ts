@@ -77,18 +77,21 @@ export function drillPlanCommand(
     const depth = parseFloat(named['depth'] ?? '8');
     const diameter = parseFloat(named['diameter'] ?? '0.15');
 
+    resetHoleIds();
     const planned = createGridPlan(
       { x: origin[0] ?? 0, z: origin[1] ?? 0 },
       rows, cols, spacing, depth, diameter,
     );
-    const claim = claimForAction(ctx, planned.map(h => ({ x: h.x, z: h.z })), 'drill');
-    if (!claim.ok) return { success: false, output: claim.output! };
 
-    resetHoleIds();
-    ctx.state!.drillHoles = createGridPlan(
-      { x: origin[0] ?? 0, z: origin[1] ?? 0 },
-      rows, cols, spacing, depth, diameter,
-    );
+    // Claim before committing the plan: a grid reaching ground the site
+    // cannot have is refused whole, rather than landing half on the map.
+    const claim = claimForAction(ctx, planned.map(h => ({ x: h.x, z: h.z })), 'drill');
+    if (!claim.ok) {
+      resetHoleIds();
+      return { success: false, output: claim.output! };
+    }
+
+    ctx.state!.drillHoles = planned;
     // Clear stale charges/sequences from previous plan
     ctx.state!.chargesByHole = {};
     ctx.state!.sequenceDelays = {};
