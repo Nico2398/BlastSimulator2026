@@ -43,13 +43,18 @@ browser takes minutes there, and each beat's setup does one. The full suite has
 run past 30 minutes — long enough that an agent watching it will conclude it
 has hung, kill it, and report a stall that never happened.
 
-CI is unattended, so the same cost is free there. The `playtest` job in
-`.github/workflows/ci.yml` runs every definition on every push and PR and
-uploads the FAIL screenshots as an artifact.
+It is not the sandbox alone. Every `page.evaluate` the harness makes waits on
+the render loop, and the terrain material costs ~6.4 s/frame under software
+rasterisation on any machine without a GPU, CI runners included (#475, open).
+That is ~6 s per probe poll and minutes per beat wherever it runs.
 
-1. **Default: push and read the CI job.** Treat `Playtest (playability)` as the
-   channel's result. Read the failing beat and the uploaded screenshot from the
-   run, exactly as you would locally.
+So the `playtest` job in `.github/workflows/ci.yml` is gated behind the
+`full-ci` label, like the interaction-mode scenario job. It runs every
+definition and uploads the FAIL screenshots as an artifact.
+
+1. **Default: label the PR `full-ci`, push, and read the CI job.** Treat
+   `Playtest (playability)` as the channel's result. Read the failing beat and
+   the uploaded screenshot from the run, exactly as you would locally.
 2. **Run it locally only for one named definition you are actively debugging**,
    never the whole suite: `npm run playtest -- <name> --screenshots`.
 3. **Never claim the channel passed from a run you interrupted.** A run with no

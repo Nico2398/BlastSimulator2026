@@ -84,8 +84,10 @@ A sandbox has no GPU, so anything that loads a level in a browser rasterizes in 
 |-----|-------|
 | `typecheck`, `test`, `scenarios` (command mode), `build` | Either. CI runs all four on every push and PR. |
 | `screenshot`, one named scenario in interaction mode | Your session — this is the visual channel's working loop. |
-| Whole playability suite (`npm run playtest`) | CI job `Playtest (playability)`. |
+| Whole playability suite (`npm run playtest`) | CI job `Playtest (playability)` (label the PR `full-ci`). |
 | All scenarios in interaction mode | CI job `Scenarios (interaction mode)` (label the PR `full-ci`). |
+
+Both browser jobs are gated behind the `full-ci` label because the terrain material costs ~6.4 s/frame without a GPU (#475): the harness waits on the render loop for every probe, so one beat costs minutes. Add the label when a change touches a player-facing flow, and read the job.
 
 Push, then read the CI job — its result *is* the channel's result, and its artifacts carry the FAIL screenshots. Locally, run one named definition you are actively debugging, never the whole suite.
 

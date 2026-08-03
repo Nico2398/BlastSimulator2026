@@ -30,16 +30,17 @@ npm run dev &
 
 ## ▶ What to run here, and what to leave to CI
 
-An agent sandbox has no GPU. Chromium falls back to software rasterization, so
-anything that loads a level in the browser pays for the landscape build and the
-whole terrain re-mesh on the CPU — minutes per `new_game`, not seconds.
+No GPU means Chromium rasterises in software, and the terrain material costs
+~6.4 s/frame that way (#475, open) — in a sandbox and on a CI runner alike.
+Anything that waits on frames pays that per frame, so whole browser suites run
+for tens of minutes wherever they run. A single screenshot pays it once.
 
 | Task | Where |
 |------|-------|
 | Single screenshot (`npm run screenshot`) | Here. Seconds to a minute; this is the channel's core loop. |
 | One named scenario, interaction mode | Here, when you are debugging that scenario. |
 | **All** scenarios in interaction mode | CI (`Scenarios (interaction mode)`, label a PR `full-ci`). Never in a session. |
-| Playability suite | CI (`Playtest (playability)`). See `dev-playability-testing`. |
+| Playability suite | CI (`Playtest (playability)`, label a PR `full-ci`). See `dev-playability-testing`. |
 
 ### ▶ While any browser-driven run is in flight
 

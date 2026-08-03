@@ -227,15 +227,30 @@ jobs:
         if: always()
         run: kill $(lsof -t -i:5173) 2>/dev/null || true
 
-  # The playability channel: plays the game through its own UI with real
-  # clicks. Runs here rather than in an agent's sandbox — it drives headless
-  # Chromium with no GPU, so every landscape build and terrain re-mesh falls
-  # back to software rasterization and the suite takes tens of minutes there.
-  # CI is unattended, so slow is fine; an interactive session is not.
+  # The playability channel: plays the game through its own UI with real clicks.
+  #
+  # Gated exactly like scenario-interaction, and for the same reason: every
+  # `page.evaluate` the harness makes waits on the render loop, and the terrain
+  # material costs ~6.4 s/frame under software rasterisation (no GPU on a
+  # runner) — see #475, still open. That is ~6 s per probe poll, several polls
+  # per player action, so a single beat costs minutes and the suite runs past
+  # 45 minutes. Measured identical on main and on a feature branch, so it is
+  # the shader, not any one change.
+  #
+  # Once #475 closes this should move back to running on every push and PR:
+  # playability is the only channel that proves a player can reach a goal by
+  # clicking, and it is worth blocking on when it can finish.
+  #   - Push to main (catches regressions after merge)
+  #   - Schedule (weekly full scan)
+  #   - workflow_dispatch (manual trigger)
+  #   - PRs labeled "full-ci" (opts in for risky changes)
   playtest:
     name: "Playtest (playability)"
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 90
+    if: |
+      github.event_name != 'pull_request' ||
+      contains(github.event.pull_request.labels.*.name, 'full-ci')
     needs:
       - typecheck
       - test
