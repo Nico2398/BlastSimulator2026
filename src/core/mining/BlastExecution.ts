@@ -123,6 +123,9 @@ export interface BlastResult {
   projectileCount: number;
   /** Each fragment's journey from where it broke to where it settled. */
   flights: FragmentFlight[];
+  /** "x,z" of every ground column the blast removed rock from. Anything standing
+   *  on one of these was standing on the blast. */
+  clearedColumns: string[];
 }
 
 // ── Village (for vibration targets) ──
@@ -385,6 +388,7 @@ export function executeBlast(
     clearedRegion,
     destroyedBuildings,
     secondaryBlastEvents,
+    clearedColumns: [...new Set(toClear.map(c => `${c.x},${c.z}`))],
     maxThrowDistance,
     projectileCount,
     flights,
@@ -426,10 +430,22 @@ function throwFractionAt(origin: Vec3, plan: BlastPlan): number {
 /**
  * Build the energy field for a plan and run propagation over it.
  *
+ * Exported so the player's prediction tools run this exact code rather than
+ * their own approximation: a preview that disagrees with what the blast then
+ * does is worse than no preview at all.
+ *
  * Returns null when the blast zone falls entirely outside the ground the site
  * owns — nothing to propagate through.
  */
-function buildBlastEnergyField(
+export function buildPlanEnergyField(plan: BlastPlan, grid: VoxelGrid): EnergyField | null {
+  const holeSurfaceYs: Record<string, number> = {};
+  for (const hole of plan.holes) {
+    holeSurfaceYs[hole.id] = computeVoxelColumnSurfaceY(grid, hole.x, hole.z) + 1;
+  }
+  return buildBlastEnergyField(plan, grid, calculateBlastZone(plan.holes, holeSurfaceYs), holeSurfaceYs);
+}
+
+export function buildBlastEnergyField(
   plan: BlastPlan,
   grid: VoxelGrid,
   bbox: { minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number },

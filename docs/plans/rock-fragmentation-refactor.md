@@ -1,6 +1,7 @@
 # Rock Fragmentation Refactor Plan
 
-Status: **approved design, not yet implemented**.
+Status: **implemented — P0 through P5 complete**. Each phase's record below states what
+landed, how it deviated from the original design, and what the deviation fixed.
 Audience: an implementing agent. This document is self-contained: every algorithm is
 specified in enough detail to implement without re-deriving design decisions. When this
 document and older docs (`BLAST_SYSTEM.md`, skill `gameplay-blast-system`) disagree,
@@ -808,10 +809,13 @@ report shows the furthest throw, and the rating uses distance rather than a spee
    of a hole flung its deepest fragments down and sideways *into* solid rock.
 3. **Playback maths live in core** (`flightPositionAt`, `totalFlightDuration`) rather than
    the renderer, so the arc is unit-testable in Node and the renderer holds no physics.
-4. **Landing damage to employees, vehicles and buildings is NOT implemented.** A6 step 3
-   called for it; `computeBlastEntityDamage` still handles blast-time damage only. Impact
-   damage needs the entity lists threaded into `executeBlast`, which today only receives
-   `buildingState`. Recorded as outstanding rather than half-done — see §11.
+4. **Landing damage was outstanding at the end of P3 and was completed in P5.** It turned
+   out the codebase already had a full impact-damage system (`Damage.processProjections`,
+   keyed on fragment position and kinetic energy) that **nothing ever called** — blasts
+   injured nobody. P3 made both of its inputs meaningful, so wiring it into `blastCommand`
+   was all it needed. Standing *on* the blast is handled separately: `BlastResult` now
+   reports `clearedColumns`, and anyone on one dies regardless of the charge, because the
+   ground is gone. Covered by `blast-flyrock-danger.integration.test.ts`.
 
 **Verified:** `static` clean; `logic` 6947 tests / 247 files; `scenario` 111/111.
 A nine-hole blast resolves ballistics for 1280 fragments in ~90 ms.
@@ -899,7 +903,40 @@ via CI `full-ci`.
 and the settled frame matches authoritative positions (spot-check one fragment via
 state dump vs. pixel position).
 
-### P5 — Balance, report, previews, docs (small)
+### P5 — Balance, report, previews, docs (small) — ✅ DONE
+
+**Landed:**
+- `tests/integration/blast-balance-matrix.integration.test.ts` — 19 guards asserting
+  *relationships*, so retuning constants keeps them meaningful.
+- Previews (`Software.ts`, `SoftwarePreview.ts`) now run the **same** propagation the blast
+  does, via the exported `buildPlanEnergyField`, and the same seeding and velocity maths.
+  They previously ran the legacy 1/r² field and ratio bands — so the player's prediction
+  tools were modelling different rock from the game.
+- The legacy model is **gone**: `calculateEnergyField`, `calculateFragmentation`,
+  `calculateFragmentCount`, `calculateInitialVelocity`, `classifyProjection`,
+  `calculateFreeFace`, the Map-based `propagateEnergy` / `identifyFragmentedVoxels`, and
+  `computeBlastEntityDamage`, plus their now-orphaned constants. `BlastCalc.ts` is down to
+  charge arithmetic and vibration. Their tests were re-pointed at live behaviour rather
+  than deleted (the benchmark, the enhanced integration suite, the preview suite).
+- Skill `gameplay-blast-system` rewritten for this pipeline and synced to the `.github`
+  and `.opencode` mirrors; `validate:context` green.
+- Blast report shows `Furthest throw`.
+
+**Two balance expectations I had wrong, corrected against measurement:**
+1. *"A bigger charge gives a smaller mean fragment"* — false here, and the model is right.
+   A bigger charge reaches further, so it breaks **more** rock at a similar powder factor
+   rather than pulverising the same rock; the extra volume arrives as mid-intensity fringe.
+   Spacing, not charge weight, is the lever that controls fragment size — measured mean
+   0.621 m³ at 2 m spacing vs 0.722 m³ at 6 m, with oversize share 32 % vs 38 %.
+2. *"Tighter spacing breaks more rock"* — also false. Widely spaced holes overlap less and
+   break **more** total volume (294 vs 247 voxels), but coarser, and they throw much
+   further (20.8 m, catastrophic) because each charge has no neighbour to work against.
+   Both are the real-world relationships; the tests now assert them.
+
+**Verified:** `static` clean; `logic` 6904 tests / 248 files; `scenario` 111/111; `build`
+clean; `visual` — preview overlay inspected rendering on charged holes.
+
+### P5 — original plan text (superseded by the record above)
 
 - Tune: `transmissionLoss` per rock, `SEEDS_*`, `IMPACT_*`, rating thresholds. Method:
   a scenario matrix over {undercharged, matched, overcharged} × {1 m, 2 m, 4 m spacing}

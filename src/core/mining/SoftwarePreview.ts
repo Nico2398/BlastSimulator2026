@@ -6,10 +6,9 @@
 import type { BlastPlan } from './BlastPlan.js';
 import type { VoxelGrid, VoxelData } from '../world/VoxelGrid.js';
 import { getDominantRockId } from '../world/VoxelGrid.js';
-import type { Vec3 } from '../math/Vec3.js';
 import { getRock, type RockType } from '../world/RockCatalog.js';
-import { calculateEnergyField } from './BlastCalc.js';
-import { SOLID_VOXEL_DENSITY_THRESHOLD } from '../config/balance.js';
+import { SOLID_VOXEL_DENSITY_THRESHOLD, SEEDS_BASE, SEEDS_PER_INTENSITY, MAX_SEEDS_PER_VOXEL, FRAGMENTATION_MULTIPLIER } from '../config/balance.js';
+import { type EnergyField, effectiveAt, thresholdAt, intensityAt } from './EnergyPropagation.js';
 
 export const PREVIEW_RADIUS = 5;
 
@@ -27,50 +26,56 @@ export function computeHoleContext(plan: BlastPlan, grid: VoxelGrid): HoleContex
 
 export interface VoxelEnergyThreshold {
   rock: RockType;
+  /** Energy the voxel retained — what breaks it. */
   energy: number;
+  /** What its rock can absorb before giving way. */
   threshold: number;
+  /** Total energy through the voxel over its threshold; 1.0 is a clean break. */
+  intensity: number;
 }
 
 /**
- * Shared per-voxel prediction shape: resolve the dominant rock of an
- * already-fetched voxel, then compute the energy field and fracture
- * threshold at `energyPoint`. `energyPoint` is separate from the voxel
- * itself because callers sometimes sample energy at a continuous hole
- * position rather than the voxel center. Returns null when the voxel has
- * no resolvable rock.
+ * Read one voxel's prediction out of the propagated field.
+ *
+ * The field is the same one the blast itself runs on, so a prediction can only
+ * disagree with the result if the player changes the plan — never because the
+ * tools model the rock differently from the game.
+ *
+ * Returns null for voxels with no resolvable rock.
  */
-export function computeEnergyThresholdForVoxel(
+export function readVoxelPrediction(
+  field: EnergyField,
   voxel: VoxelData,
-  energyPoint: Vec3,
-  plan: BlastPlan,
-  ctx: HoleContext,
+  x: number,
+  y: number,
+  z: number,
 ): VoxelEnergyThreshold | null {
-  const dominantRockId = getDominantRockId(voxel.composition);
-  const rock = getRock(dominantRockId);
+  const rock = getRock(getDominantRockId(voxel.composition));
   if (!rock) return null;
-
-  const energy = calculateEnergyField(energyPoint, plan.holes, plan.charges, ctx.holeDepths, ctx.holeSurfaceYs);
-  const threshold = rock.energyAbsorption * voxel.fractureModifier;
-  return { rock, energy, threshold };
+  return {
+    rock,
+    energy: effectiveAt(field, x, y, z),
+    threshold: thresholdAt(field, x, y, z),
+    intensity: intensityAt(field, x, y, z),
+  };
 }
 
 /**
- * Same as {@link computeEnergyThresholdForVoxel}, but fetches the voxel at
- * (vx, vy, vz) first. Returns null when that voxel is empty or has no
- * resolvable rock.
+ * Predicted number of pieces a voxel breaks into, and how big each is.
+ *
+ * Mirrors the seeding rule fragment generation uses, minus its randomness, so
+ * the number shown is the average of what the blast will actually produce.
  */
-export function getVoxelEnergyThreshold(
-  grid: VoxelGrid,
-  vx: number,
-  vy: number,
-  vz: number,
-  energyPoint: Vec3,
-  plan: BlastPlan,
-  ctx: HoleContext,
-): VoxelEnergyThreshold | null {
-  const voxel = grid.getVoxel(vx, vy, vz);
-  if (!voxel || voxel.density <= 0) return null;
-  return computeEnergyThresholdForVoxel(voxel, energyPoint, plan, ctx);
+export function predictFragmentation(intensity: number): { pieces: number; sizeM3: number } {
+  if (intensity < FRAGMENTATION_MULTIPLIER) return { pieces: 0, sizeM3: 1 };
+  const seeds = Math.min(
+    MAX_SEEDS_PER_VOXEL,
+    SEEDS_BASE + SEEDS_PER_INTENSITY * (intensity - FRAGMENTATION_MULTIPLIER),
+  );
+  // Below one seed per voxel the rock joins a neighbouring fragment, so the
+  // piece coming out is larger than the voxel it was measured in.
+  const pieces = Math.max(seeds, 0.01);
+  return { pieces, sizeM3: 1 / pieces };
 }
 
 /** Compute surface Y for each hole by scanning the column from top to bottom. */

@@ -179,9 +179,6 @@ export const ORE_REPORT_ABSURDIUM_FRACTION = 0.3;
 
 // ─── Mining & Blasting ─────────────────────────────────────────────────────────
 
-/** Max fragments generated per voxel during a blast. Caps fragment count for performance. */
-export const MAX_FRAGMENTS_PER_VOXEL = 20;
-
 /** Maximum fragment volume (m³) that can be hauled directly without secondary fragmentation. */
 export const OVERSIZED_FRAGMENT_THRESHOLD = 0.5;
 
@@ -336,38 +333,8 @@ export const COLLAPSE_STAGGER_PER_METRE = 0.04;
 export const THROW_DISTANCE_BAD = 12;
 export const THROW_DISTANCE_CATASTROPHIC = 25;
 
-/** Fragments produced per unit of energy-to-threshold ratio in a broken voxel.
- *  A voxel that just barely broke yields one fragment; one hit twice as hard as it
- *  could take yields more, smaller ones. Superseded once fragment shapes are
- *  generated from the energy field (docs/plans/rock-fragmentation-refactor.md §6/A3). */
-export const FRAGMENTS_PER_ENERGY_RATIO = 2.0;
-
-/** Fragment vertical offset (voxels) so blast fragments settle inside the crater
- *  instead of appearing to float at the pre-blast surface level. Offset ranges from
- *  MIN to MIN+SPREAD, hashed per-fragment across HASH_BUCKETS steps. */
-export const FRAGMENT_CRATER_YOFFSET_MIN = 0.2;
-export const FRAGMENT_CRATER_YOFFSET_SPREAD = 0.3;
-export const FRAGMENT_CRATER_YOFFSET_HASH_BUCKETS = 9;
-
 /** Minimum fragment render height (voxels) above the grid floor. */
 export const FRAGMENT_MIN_RENDER_Y = 0.05;
-
-/** Horizontal render-only jitter radius (metres) applied to every rendered fragment
- *  instance so fragments sharing a source voxel don't render at the exact same
- *  (x,z) — without this, a large blast's fragments read as a regular voxel-lattice
- *  grid instead of settled rubble. Gameplay-significant FragmentData.position is
- *  never mutated; this only offsets the InstancedMesh transform. */
-export const FRAGMENT_RENDER_JITTER_RADIUS = 0.6;
-
-/** How far (metres per m/s of horizontal initial speed) a projected fragment's
- *  rendered instance is displaced from its source voxel along its initial
- *  velocity direction, suggesting the ballistic throw distance without running
- *  full physics on every fragment. */
-export const FRAGMENT_PROJECTION_RENDER_DISTANCE_SCALE = 0.15;
-
-/** Cap (metres) on the projection render-displacement above, so a very high
- *  velocity fragment still renders within the visible blast/crater area. */
-export const FRAGMENT_PROJECTION_RENDER_MAX_DISTANCE = 12;
 
 /** Default minimum search radius (metres) for the expanding-ring terrain-surface
  *  search in getBlastOriginSurfaceY (BlastOriginSampling.ts). A fixed 3m ring only

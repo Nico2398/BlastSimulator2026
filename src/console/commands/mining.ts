@@ -9,6 +9,9 @@ import { setDelay, autoVPattern } from '../../core/mining/Sequence.js';
 import { assembleBlastPlan, validateBlastPlan } from '../../core/mining/BlastPlan.js';
 import { executeBlast } from '../../core/mining/BlastExecution.js';
 import { addBlastFragments, syncLogisticsCapacity } from '../../core/economy/Logistics.js';
+import { processProjections } from '../../core/entities/Damage.js';
+import { killEmployee } from '../../core/entities/Employee.js';
+import { destroyVehicle } from '../../core/entities/Vehicle.js';
 
 import { recordVibration, recordBuildingDestruction } from '../../core/scores/ScoreManager.js';
 import { recordBlastResult, snapshotStats } from '../../core/campaign/SuccessTracker.js';
@@ -276,6 +279,44 @@ export function blastCommand(
   // Update scores based on blast outcome
   if (result.projectionCount > 0) {
     recordVibration(state.scores, result.projectionCount * 0.5);
+  }
+
+  // Standing on the rock when it goes is not survivable, whatever the charge:
+  // the ground is simply not there any more. Evacuating the blast zone first
+  // (see Zone.ts) is the whole point of the safety drill.
+  const blastedColumns = new Set(result.clearedColumns);
+  for (const emp of state.employees.employees) {
+    if (!emp.alive) continue;
+    if (!blastedColumns.has(`${Math.floor(emp.x)},${Math.floor(emp.z)}`)) continue;
+    killEmployee(state.employees, emp.id);
+    state.damage.deathCount++;
+    state.damage.lawsuitPending = true;
+    state.damage.accidents.push({
+      tick: state.tickCount, type: 'death', entityId: emp.id, fragmentId: -1, kineticEnergy: 0,
+    });
+  }
+  for (const veh of [...state.vehicles.vehicles]) {
+    if (!blastedColumns.has(`${Math.floor(veh.x)},${Math.floor(veh.z)}`)) continue;
+    destroyVehicle(state.vehicles, veh.id);
+    state.damage.accidents.push({
+      tick: state.tickCount, type: 'vehicle_destroyed', entityId: veh.id, fragmentId: -1, kineticEnergy: 0,
+    });
+  }
+
+  // Rock that was thrown lands somewhere, and whatever is standing there pays
+  // for it. Fragment positions are where the rock came to rest and its speed is
+  // what it was doing on impact, so this reads the blast's own outcome rather
+  // than guessing at a danger radius.
+  const impacts = processProjections(
+    result.fragments,
+    state.buildings,
+    state.vehicles,
+    state.employees,
+    state.damage,
+    state.tickCount,
+  );
+  if (impacts.length > 0) {
+    syncLogisticsCapacity(state.logistics, getStorageCapacity(state.buildings));
   }
 
   // Track blast in damage state and level stats
