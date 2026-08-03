@@ -127,7 +127,7 @@ export async function executeInteractionActions(
   for (const action of step.interaction) {
     if (action.type === 'screenshot' && enableScreenshots) {
       const ssPath = resolve(outDir, `step-${paddedIdx}-${cmdSlug}-ss${screenshotIndex}.png`);
-      await page.screenshot({ path: ssPath, fullPage: false });
+      await captureFrame(page, ssPath);
       screenshotPaths.push(ssPath);
       console.log(`  Screenshot [${screenshotIndex}]: ${ssPath}`);
       screenshotIndex++;
@@ -180,6 +180,50 @@ export async function executeInteractionActions(
  * @param page - Puppeteer page object.
  * @param frames - Number of animation frames to wait for (default 3).
  */
+/**
+ * Suspend the game's draw loop for a harness that only reads the DOM and
+ * game state (#475).
+ *
+ * Every CDP call waits on the main thread, and the terrain material costs
+ * seconds per frame under software rasterisation — that wait, not the
+ * simulation, is what makes the browser suites take tens of minutes. The
+ * simulation, camera and rAF all keep running; only the draw stops. Capture
+ * through `captureFrame` afterwards so screenshots still show a real frame.
+ *
+ * A no-op against a page that predates the bridge, so a harness pointed at an
+ * older build still works.
+ */
+export async function suspendDrawing(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const w = window as unknown as { __setRenderEnabled?: (enabled: boolean) => void };
+    w.__setRenderEnabled?.(false);
+  });
+}
+
+/** Resume the draw loop suspended by `suspendDrawing`. */
+export async function resumeDrawing(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const w = window as unknown as { __setRenderEnabled?: (enabled: boolean) => void };
+    w.__setRenderEnabled?.(true);
+  });
+}
+
+/**
+ * Screenshot the page, drawing one frame first so the capture shows current
+ * state even when `suspendDrawing` has stopped the loop from drawing.
+ *
+ * Every capture in every harness goes through here — a `page.screenshot` that
+ * skips it would silently save whatever was on the canvas when drawing was
+ * suspended.
+ */
+export async function captureFrame(page: Page, path: string): Promise<void> {
+  await page.evaluate(() => {
+    const w = window as unknown as { __renderFrame?: () => void };
+    w.__renderFrame?.();
+  });
+  await page.screenshot({ path, fullPage: false });
+}
+
 export async function waitOneFrame(page: Page, frames = 3): Promise<void> {
   // Wait for one rAF frame (triggers render loop's next frame)
   await page.evaluate(() => new Promise(r => requestAnimationFrame(r)));

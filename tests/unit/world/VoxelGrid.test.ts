@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { VoxelGrid, getDominantRockId, CompositionPalette } from '../../../src/core/world/VoxelGrid.js';
+import {
+  VoxelGrid,
+  getDominantRockId,
+  CompositionPalette,
+  computeVoxelColumnSurfaceY,
+  setVoxelBoundsReporter,
+  chunkIndexOf,
+  CHUNK_SIZE,
+} from '../../../src/core/world/VoxelGrid.js';
 
 describe('VoxelGrid', () => {
   describe('CELL_SIZE', () => {
@@ -105,6 +113,22 @@ describe('VoxelGrid', () => {
 
   it('getDominantRockId returns empty string for empty composition', () => {
     expect(getDominantRockId({ rocks: [] })).toBe('');
+  });
+});
+
+describe('chunkIndexOf', () => {
+  it('floors toward negative infinity, so a west-of-origin coordinate lands in the chunk before 0', () => {
+    expect(chunkIndexOf(0)).toBe(0);
+    expect(chunkIndexOf(CHUNK_SIZE - 1)).toBe(0);
+    expect(chunkIndexOf(CHUNK_SIZE)).toBe(1);
+    expect(chunkIndexOf(-1)).toBe(-1);
+    expect(chunkIndexOf(-CHUNK_SIZE)).toBe(-1);
+    expect(chunkIndexOf(-CHUNK_SIZE - 1)).toBe(-2);
+  });
+
+  it('ignores the fractional part of a continuous coordinate', () => {
+    expect(chunkIndexOf(17.9)).toBe(1);
+    expect(chunkIndexOf(-0.5)).toBe(-1);
   });
 });
 
@@ -241,6 +265,130 @@ describe('VoxelGrid direct mutators', () => {
     grid.clearVoxel(1, 1, 1);
     expect(grid.fractureAt(1, 1, 1)).toBe(1.0);
     expect(grid.oresAt(1, 1, 1)).toBeUndefined();
+  });
+});
+
+describe('VoxelGrid — chunked storage and signed coordinates (#473 P0)', () => {
+  it('reports the constructor size as the bounding box, even when it does not divide by CHUNK_SIZE', () => {
+    const grid = new VoxelGrid(24, 8, 24);
+    expect(grid.sizeX).toBe(24);
+    expect(grid.sizeZ).toBe(24);
+    expect(grid.minX).toBe(0);
+    expect(grid.minZ).toBe(0);
+    expect(grid.maxX).toBe(24);
+    expect(grid.isInBounds(23, 0, 23)).toBe(true);
+    expect(grid.isInBounds(24, 0, 0)).toBe(false);
+  });
+
+  it('allocates one chunk per CHUNK_SIZE square of the starting site', () => {
+    expect(new VoxelGrid(32, 8, 32).chunkCount).toBe(4);
+    expect(new VoxelGrid(24, 8, 24).chunkCount).toBe(4);
+    expect(new VoxelGrid(16, 8, 16).chunkCount).toBe(1);
+  });
+
+  it('addChunk extends the bounding box westward with negative coordinates', () => {
+    const grid = new VoxelGrid(16, 8, 16);
+    const rect = grid.addChunk(-1, 0);
+    expect(rect).toEqual({ minX: -16, minZ: 0, maxX: 0, maxZ: 16 });
+    expect(grid.minX).toBe(-16);
+    expect(grid.sizeX).toBe(32);
+  });
+
+  it('stores and reads a voxel at a negative coordinate', () => {
+    const grid = new VoxelGrid(16, 8, 16);
+    grid.addChunk(-1, -1);
+    grid.setVoxel(-5, 3, -5, {
+      composition: { rocks: [{ rockId: 'cruite', coefficient: 1 }] },
+      density: 0.75,
+      oreDensities: {},
+      fractureModifier: 1,
+    });
+    expect(grid.densityAt(-5, 3, -5)).toBe(0.75);
+    expect(grid.dominantRockAt(-5, 3, -5)).toBe('cruite');
+  });
+
+  it('addChunk on a partially owned edge chunk promotes it to its full span', () => {
+    const grid = new VoxelGrid(24, 8, 24);
+    expect(grid.isChunkPartial(1, 1)).toBe(true);
+    expect(grid.isInBounds(28, 0, 28)).toBe(false);
+
+    const rect = grid.addChunk(1, 1);
+    expect(rect).toEqual({ minX: 16, minZ: 16, maxX: 32, maxZ: 32 });
+    expect(grid.isChunkPartial(1, 1)).toBe(false);
+    expect(grid.isInBounds(28, 0, 28)).toBe(true);
+  });
+
+  it('addChunk on an already-full chunk reports nothing changed', () => {
+    const grid = new VoxelGrid(32, 8, 32);
+    expect(grid.addChunk(0, 0)).toBeNull();
+  });
+
+  it('a bounding-box column the site does not own reads as air, not as a bounds error', () => {
+    const grid = new VoxelGrid(16, 8, 16);
+    grid.addChunk(1, 1); // an L: (0,0) and (1,1), so (1,0) sits in the box unowned
+    expect(grid.sizeX).toBe(32);
+    expect(grid.containsColumn(20, 4)).toBe(false);
+    expect(grid.densityAt(20, 4, 4)).toBe(0);
+  });
+
+  it('reports out-of-bounds reads to an installed reporter, and nothing else', () => {
+    const grid = new VoxelGrid(16, 8, 16);
+    const misses: Array<[number, number, number]> = [];
+    const previous = setVoxelBoundsReporter((x, y, z) => { misses.push([x, y, z]); });
+    try {
+      grid.densityAt(4, 4, 4);
+      grid.densityAt(-1, 4, 4);
+      grid.densityAt(4, 99, 4);
+    } finally {
+      setVoxelBoundsReporter(previous);
+    }
+    expect(misses).toEqual([[-1, 4, 4], [4, 99, 4]]);
+  });
+});
+
+describe('VoxelGrid — dirty-chunk tracking (#473 D4)', () => {
+  it('marks a chunk dirty on any write', () => {
+    const grid = new VoxelGrid(32, 8, 32);
+    grid.markChunkPristine(0, 0);
+    grid.markChunkPristine(1, 0);
+    grid.clearVoxel(20, 1, 1);
+    expect(grid.isChunkDirty(1, 0)).toBe(true);
+    expect(grid.isChunkDirty(0, 0)).toBe(false);
+  });
+
+  it('markChunkPristine takes a chunk back out of the dirty set', () => {
+    const grid = new VoxelGrid(16, 8, 16);
+    grid.setFractureAt(1, 1, 1, 0.5);
+    expect(grid.isChunkDirty(0, 0)).toBe(true);
+    grid.markChunkPristine(0, 0);
+    expect(grid.dirtyChunks()).toEqual([]);
+  });
+
+  it('markChunkDirty is a no-op for a chunk the site does not own', () => {
+    const grid = new VoxelGrid(16, 8, 16);
+    grid.markChunkPristine(0, 0);
+    grid.markChunkDirty(5, 5);
+    expect(grid.dirtyChunks()).toEqual([]);
+  });
+});
+
+describe('computeVoxelColumnSurfaceY', () => {
+  it('finds the highest solid voxel in a column', () => {
+    const grid = new VoxelGrid(16, 8, 16);
+    grid.fillVoxel(3, 0, 3, 0, undefined, 1);
+    grid.fillVoxel(3, 4, 3, 0, undefined, 1);
+    expect(computeVoxelColumnSurfaceY(grid, 3, 3)).toBe(4);
+  });
+
+  it('returns -1 for a column with nothing solid in it', () => {
+    expect(computeVoxelColumnSurfaceY(new VoxelGrid(16, 8, 16), 3, 3)).toBe(-1);
+  });
+
+  it('clamps to the site edge rather than the origin once the site has grown west', () => {
+    const grid = new VoxelGrid(16, 8, 16);
+    grid.addChunk(-1, 0);
+    grid.fillVoxel(-16, 2, 0, 0, undefined, 1);
+    expect(computeVoxelColumnSurfaceY(grid, -99, 0)).toBe(2);
   });
 });
 

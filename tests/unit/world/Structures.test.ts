@@ -7,6 +7,8 @@ import {
   placeVillages,
   placeForests,
   buildStructureSet,
+  buildProtectedStructures,
+  rectTouchesProtectedStructure,
   applyOverlays,
   buildRiverOverlay,
   buildLandmarkOverlay,
@@ -403,5 +405,79 @@ describe('buildStructureSet', () => {
     const set = buildStructureSet(42, new WorldNoiseFields(42), flatShapingAt, 0.5, TINY_RECT);
     expect(set.overlays.length).toBe(set.rivers.length + set.landmarks.length + set.villages.length);
     expect(Array.isArray(set.trees)).toBe(true);
+  });
+});
+
+// ── Protected structures: the ground a site may never claim (#473 D6) ────────
+
+describe('buildProtectedStructures', () => {
+  it('returns the same rivers, landmarks and villages buildStructureSet does', () => {
+    const full = buildStructureSet(42, new WorldNoiseFields(42), flatShapingAt, 0.5, TINY_RECT, 800);
+    const protectedOnly = buildProtectedStructures(42, new WorldNoiseFields(42), flatShapingAt, TINY_RECT, 800);
+    expect(protectedOnly.rivers).toEqual(full.rivers);
+    expect(protectedOnly.landmarks).toEqual(full.landmarks);
+    expect(protectedOnly.villages).toEqual(full.villages);
+  });
+
+  it('is deterministic for the same seed', () => {
+    const a = buildProtectedStructures(7, new WorldNoiseFields(7), flatShapingAt, TINY_RECT, 800);
+    const b = buildProtectedStructures(7, new WorldNoiseFields(7), flatShapingAt, TINY_RECT, 800);
+    expect(a).toEqual(b);
+  });
+});
+
+describe('rectTouchesProtectedStructure', () => {
+  const emptyStructures = { rivers: [], villages: [], landmarks: [] };
+
+  it('says no when nothing is protected anywhere', () => {
+    expect(rectTouchesProtectedStructure(emptyStructures, { minX: 0, minZ: 0, maxX: 16, maxZ: 16 })).toBe(false);
+  });
+
+  it('vetoes a rect a village pad reaches into', () => {
+    const village: Village = { x: 20, z: 20, radius: 40, houses: [] };
+    expect(rectTouchesProtectedStructure(
+      { ...emptyStructures, villages: [village] },
+      { minX: 0, minZ: 0, maxX: 16, maxZ: 16 },
+    )).toBe(true);
+  });
+
+  it('allows a rect a village pad stops short of', () => {
+    const village: Village = { x: 400, z: 400, radius: 40, houses: [] };
+    expect(rectTouchesProtectedStructure(
+      { ...emptyStructures, villages: [village] },
+      { minX: 0, minZ: 0, maxX: 16, maxZ: 16 },
+    )).toBe(false);
+  });
+
+  it('vetoes a rect a landmark reaches into', () => {
+    const landmark: Landmark = { kind: 'mesa', x: 30, z: 8, radius: 20 };
+    expect(rectTouchesProtectedStructure(
+      { ...emptyStructures, landmarks: [landmark] },
+      { minX: 0, minZ: 0, maxX: 16, maxZ: 16 },
+    )).toBe(true);
+  });
+
+  it('vetoes a rect a river channel crosses, and allows one it passes by', () => {
+    const river: RiverPath = {
+      points: [{ x: 8, z: -50 }, { x: 8, z: 50 }],
+      widths: [6, 6],
+      waterLevels: [0, 0],
+    };
+    const structures = { ...emptyStructures, rivers: [river] };
+    expect(rectTouchesProtectedStructure(structures, { minX: 0, minZ: 0, maxX: 16, maxZ: 16 })).toBe(true);
+    expect(rectTouchesProtectedStructure(structures, { minX: 64, minZ: 0, maxX: 80, maxZ: 16 })).toBe(false);
+  });
+
+  it('keeps a standoff, so a claim never abuts a riverbank exactly', () => {
+    const river: RiverPath = {
+      points: [{ x: 18, z: -50 }, { x: 18, z: 50 }],
+      widths: [1, 1],
+      waterLevels: [0, 0],
+    };
+    // Channel edge sits at x = 17, one metre past the rect — still vetoed.
+    expect(rectTouchesProtectedStructure(
+      { ...emptyStructures, rivers: [river] },
+      { minX: 0, minZ: 0, maxX: 16, maxZ: 16 },
+    )).toBe(true);
   });
 });

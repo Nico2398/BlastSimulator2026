@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
-import { rleEncode, rleDecode, encodeVoxelGrid, decodeVoxelGrid } from '../../../src/core/state/VoxelGridCodec.js';
+import { generateTerrain } from '../../../src/core/world/TerrainGen.js';
+import { bytesToBase64 } from '../../../src/core/state/Base64.js';
+import {
+  rleEncode, rleDecode, encodeVoxelGrid, decodeVoxelGrid,
+  type SerializedVoxels, type SerializedVoxelsV6,
+} from '../../../src/core/state/VoxelGridCodec.js';
 
 describe('rleEncode / rleDecode', () => {
   it('round-trips an empty stream', () => {
@@ -116,10 +121,122 @@ describe('encodeVoxelGrid / decodeVoxelGrid', () => {
     expect(decoded.dominantRockAt(2, 3, 2)).toBe('obstiite');
   });
 
-  it('rejects a payload whose encoded length does not match sizeX*sizeY*sizeZ', () => {
+  it('rejects a payload whose encoded chunk length does not match CHUNK_SIZE*sizeY*CHUNK_SIZE', () => {
     const grid = new VoxelGrid(2, 2, 2);
     const payload = encodeVoxelGrid(grid);
-    const corrupt = { ...payload, sizeX: 100 };
+    const corrupt = { ...payload, sizeY: 100 };
     expect(() => decodeVoxelGrid(corrupt)).toThrow(/corrupt save/i);
   });
+
+  it('preserves an edge chunk clipped to a site whose size is not a multiple of CHUNK_SIZE', () => {
+    const grid = new VoxelGrid(24, 8, 24);
+    const decoded = decodeVoxelGrid(encodeVoxelGrid(grid));
+    expect(decoded.sizeX).toBe(24);
+    expect(decoded.sizeZ).toBe(24);
+    expect(decoded.isInBounds(23, 0, 23)).toBe(true);
+    expect(decoded.isInBounds(24, 0, 0)).toBe(false);
+  });
+
+  it('rejects a payload claiming pristine chunks with no generation datum', () => {
+    const payload: SerializedVoxels = {
+      v: 7, sizeY: 8, palette: [{ rocks: [] }], pristine: [[0, 0, 0, 0, 16, 16]], chunks: [],
+    };
+    expect(() => decodeVoxelGrid(payload)).toThrow(/generation datum/i);
+  });
 });
+
+describe('encodeVoxelGrid dirty-chunk selection (#473 D4)', () => {
+  const gen = { seed: 42, climateBias: [0, 0] as [number, number], sizeX: 32, sizeY: 16, sizeZ: 32 };
+
+  it('stores no voxel data at all for a freshly generated, untouched site', () => {
+    const grid = generateTerrain({ ...gen });
+    const payload = encodeVoxelGrid(grid, gen);
+    expect(payload.chunks).toHaveLength(0);
+    expect(payload.pristine).toHaveLength(4); // 32x32 m over 16 m chunks
+  });
+
+  it('stores only the chunk a blast actually carved', () => {
+    const grid = generateTerrain({ ...gen });
+    grid.clearVoxel(20, 8, 20); // chunk (1, 1)
+    const payload = encodeVoxelGrid(grid, gen);
+    expect(payload.chunks.map(c => [c.cx, c.cz])).toEqual([[1, 1]]);
+    expect(payload.pristine).toHaveLength(3);
+  });
+
+  it('regenerates pristine chunks byte-identically on load', () => {
+    const grid = generateTerrain({ ...gen });
+    grid.clearVoxel(20, 8, 20);
+    const decoded = decodeVoxelGrid(encodeVoxelGrid(grid, gen));
+
+    expect(decoded.densityAt(20, 8, 20)).toBe(0);
+    for (let x = 0; x < 32; x += 3) {
+      for (let z = 0; z < 32; z += 3) {
+        for (let y = 0; y < 16; y += 2) {
+          expect(decoded.densityAt(x, y, z)).toBe(grid.densityAt(x, y, z));
+          expect(decoded.dominantRockAt(x, y, z)).toBe(grid.dominantRockAt(x, y, z));
+        }
+      }
+    }
+  });
+
+  it('stores every chunk when no generation datum is supplied', () => {
+    const grid = generateTerrain({ ...gen });
+    const payload = encodeVoxelGrid(grid);
+    expect(payload.pristine).toHaveLength(0);
+    expect(payload.chunks).toHaveLength(4);
+  });
+});
+
+describe('decodeVoxelGrid — v6 upgrade path (#473 P3)', () => {
+  it('loads a v6 dense payload at the same coordinates, mutations intact', () => {
+    const v6: SerializedVoxelsV6 = {
+      v: 6,
+      sizeX: 4, sizeY: 4, sizeZ: 4,
+      palette: [{ rocks: [] }, { rocks: [{ rockId: 'cruite', coefficient: 1 }] }],
+      density: bytesToBase64(rleEncode(new Uint8Array(denseBytes(4, 4, 4, 8)))),
+      compId: bytesToBase64(rleEncode(new Uint8Array(denseBytes(4, 4, 4, 2)))),
+      fracture: bytesToBase64(rleEncode(fractureOnes(4 * 4 * 4))),
+      ores: [],
+    };
+    const grid = decodeVoxelGrid(v6);
+    expect(grid.sizeX).toBe(4);
+    expect(grid.sizeY).toBe(4);
+    expect(grid.sizeZ).toBe(4);
+    expect(grid.isInBounds(3, 3, 3)).toBe(true);
+    expect(grid.isInBounds(4, 0, 0)).toBe(false);
+    expect(grid.densityAt(1, 1, 1)).toBe(0);
+    expect(grid.fractureAt(1, 1, 1)).toBe(1);
+  });
+
+  it('carries a v6 blast crater through to the chunked grid', () => {
+    const n = 4 * 4 * 4;
+    const density = new Float64Array(n).fill(1);
+    density[1 + 1 * 4 + 1 * 16] = 0; // the crater
+    const compId = new Uint16Array(n).fill(1);
+    const fracture = new Float64Array(n).fill(1);
+
+    const v6: SerializedVoxelsV6 = {
+      v: 6,
+      sizeX: 4, sizeY: 4, sizeZ: 4,
+      palette: [{ rocks: [] }, { rocks: [{ rockId: 'cruite', coefficient: 1 }] }],
+      density: bytesToBase64(rleEncode(new Uint8Array(density.buffer))),
+      compId: bytesToBase64(rleEncode(new Uint8Array(compId.buffer))),
+      fracture: bytesToBase64(rleEncode(new Uint8Array(fracture.buffer))),
+      ores: [],
+    };
+    const grid = decodeVoxelGrid(v6);
+    expect(grid.densityAt(1, 1, 1)).toBe(0);
+    expect(grid.densityAt(2, 1, 1)).toBe(1);
+    expect(grid.dominantRockAt(2, 1, 1)).toBe('cruite');
+  });
+});
+
+/** All-zero raw bytes for a dense sizeX*sizeY*sizeZ array of `bytesPerValue`-wide values. */
+function denseBytes(sizeX: number, sizeY: number, sizeZ: number, bytesPerValue: number): number[] {
+  return new Array(sizeX * sizeY * sizeZ * bytesPerValue).fill(0);
+}
+
+/** Raw bytes of a Float64Array filled with 1.0. */
+function fractureOnes(count: number): Uint8Array {
+  return new Uint8Array(new Float64Array(count).fill(1).buffer);
+}

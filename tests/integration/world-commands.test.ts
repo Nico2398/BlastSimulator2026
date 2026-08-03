@@ -78,10 +78,12 @@ describe('Console — world commands', () => {
       expect(result.output).toContain('Air');
     });
 
-    it('rejects out-of-bounds coordinates', () => {
+    it('rejects a coordinate the site does not own, naming the span it does', () => {
       const result = inspectCommand(ctx, ['100,5,3'], {});
       expect(result.success).toBe(false);
-      expect(result.output).toContain('Out of bounds');
+      expect(result.output).toContain('Off site');
+      // The span, not a size: the site starts wherever play has taken it (#473).
+      expect(result.output).toContain('(0,0) to (31,31)');
     });
 
     it('errors with no game loaded', () => {
@@ -104,10 +106,11 @@ describe('Console — world commands', () => {
       expect(result.output).toMatch(/cruite|sandite|molite/i);
     });
 
-    it('rejects out-of-bounds coordinates', () => {
+    it('rejects a coordinate the site does not own, naming the span it does', () => {
       const result = surveyCommand(ctx, ['100,100'], {});
       expect(result.success).toBe(false);
-      expect(result.output).toContain('Out of bounds');
+      expect(result.output).toContain('Off site');
+      expect(result.output).toContain('(0,0) to (31,31)');
     });
   });
 

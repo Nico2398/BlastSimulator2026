@@ -175,7 +175,14 @@ export function isPlacementBlockedByResearch(
   return !isTierUnlocked(state, type, tier);
 }
 
-/** Place a building at grid coordinates. Returns cost to deduct. */
+/**
+ * Place a building at grid coordinates. Returns cost to deduct.
+ *
+ * `gridSizeX`/`gridSizeZ` are the site's bounding-box dimensions and
+ * `originX`/`originZ` its west/north edges — which are no longer always 0,
+ * since a site that has been claimed westward or northward starts at negative
+ * coordinates (#473).
+ */
 export function placeBuilding(
   state: BuildingState,
   type: BuildingType,
@@ -184,6 +191,8 @@ export function placeBuilding(
   gridSizeX: number,
   gridSizeZ: number,
   tier: BuildingTier = 1,
+  originX: number = 0,
+  originZ: number = 0,
 ): PlaceBuildingResult {
   const def = getBuildingDef(type, tier);
   const { sizeX, sizeZ } = getDefSize(def);
@@ -192,7 +201,7 @@ export function placeBuilding(
     return { success: false, error: `Tier ${tier} ${type} is not researched — research required before placement.` };
   }
 
-  if (x < 0 || z < 0 || x + sizeX > gridSizeX || z + sizeZ > gridSizeZ) {
+  if (x < originX || z < originZ || x + sizeX > originX + gridSizeX || z + sizeZ > originZ + gridSizeZ) {
     return { success: false, error: 'Out of bounds' };
   }
 
@@ -252,6 +261,8 @@ export function moveBuilding(
   newZ: number,
   gridSizeX: number,
   gridSizeZ: number,
+  originX: number = 0,
+  originZ: number = 0,
 ): PlaceBuildingResult {
   const building = state.buildings.find(b => b.id === buildingId);
   if (!building) return { success: false, error: 'Building not found' };
@@ -259,7 +270,7 @@ export function moveBuilding(
   const def = getBuildingDef(building.type, building.tier);
   const { sizeX, sizeZ } = getDefSize(def);
 
-  if (newX < 0 || newZ < 0 || newX + sizeX > gridSizeX || newZ + sizeZ > gridSizeZ) {
+  if (newX < originX || newZ < originZ || newX + sizeX > originX + gridSizeX || newZ + sizeZ > originZ + gridSizeZ) {
     return { success: false, error: 'Out of bounds' };
   }
 

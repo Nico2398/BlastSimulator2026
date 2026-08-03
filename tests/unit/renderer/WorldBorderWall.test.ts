@@ -5,10 +5,17 @@ import * as THREE from 'three';
 import { WorldBorderWall } from '../../../src/renderer/WorldBorderWall.js';
 import type { Rect } from '../../../src/core/world/WorldGen.js';
 
-const RECT: Rect = { minX: 0, minZ: 0, maxX: 64, maxZ: 48 };
+const SITE: Rect = { minX: 0, minZ: 0, maxX: 64, maxZ: 48 };
+/** One protected chunk, isolated, so all four of its sides face claimable ground. */
+const LONE_CHUNK: Rect = { minX: 64, minZ: 0, maxX: 80, maxZ: 16 };
 
-function makeWall(scene: THREE.Scene, minGroundY = 5, maxGroundY = 25): WorldBorderWall {
-  return new WorldBorderWall(scene, { rect: RECT, minGroundY, maxGroundY });
+function makeWall(
+  scene: THREE.Scene,
+  minGroundY = 5,
+  maxGroundY = 25,
+  protectedRects: Rect[] = [LONE_CHUNK],
+): WorldBorderWall {
+  return new WorldBorderWall(scene, { protectedRects, siteRect: SITE, minGroundY, maxGroundY });
 }
 
 function wallMesh(scene: THREE.Scene): THREE.Mesh {
@@ -16,7 +23,7 @@ function wallMesh(scene: THREE.Scene): THREE.Mesh {
 }
 
 describe('WorldBorderWall', () => {
-  it('adds a single mesh standing on all four sides of the rect', () => {
+  it('stands on all four sides of an isolated protected chunk', () => {
     const scene = new THREE.Scene();
     const wall = makeWall(scene);
     const mesh = wallMesh(scene);
@@ -31,10 +38,28 @@ describe('WorldBorderWall', () => {
       minX = Math.min(minX, pos.getX(i)); maxX = Math.max(maxX, pos.getX(i));
       minZ = Math.min(minZ, pos.getZ(i)); maxZ = Math.max(maxZ, pos.getZ(i));
     }
-    expect(minX).toBe(RECT.minX);
-    expect(maxX).toBe(RECT.maxX);
-    expect(minZ).toBe(RECT.minZ);
-    expect(maxZ).toBe(RECT.maxZ);
+    expect(minX).toBe(LONE_CHUNK.minX);
+    expect(maxX).toBe(LONE_CHUNK.maxX);
+    expect(minZ).toBe(LONE_CHUNK.minZ);
+    expect(maxZ).toBe(LONE_CHUNK.maxZ);
+    wall.dispose();
+  });
+
+  it('drops the side two protected chunks share, so a run of them reads as one wall', () => {
+    const scene = new THREE.Scene();
+    const wall = makeWall(scene, 5, 25, [
+      { minX: 64, minZ: 0, maxX: 80, maxZ: 16 },
+      { minX: 80, minZ: 0, maxX: 96, maxZ: 16 },
+    ]);
+    // 8 sides total, minus the two buried against each other.
+    expect(wallMesh(scene).geometry.getAttribute('position').count).toBe(6 * 4);
+    wall.dispose();
+  });
+
+  it('draws nothing when no protected ground borders the site', () => {
+    const scene = new THREE.Scene();
+    const wall = makeWall(scene, 5, 25, []);
+    expect(wallMesh(scene).geometry.getAttribute('position').count).toBe(0);
     wall.dispose();
   });
 
@@ -54,7 +79,7 @@ describe('WorldBorderWall', () => {
     wall.dispose();
   });
 
-  it('does not write depth, so its four panels never fight each other', () => {
+  it('does not write depth, so coplanar panels never fight each other', () => {
     const scene = new THREE.Scene();
     const wall = makeWall(scene);
     const mat = wallMesh(scene).material as THREE.ShaderMaterial;

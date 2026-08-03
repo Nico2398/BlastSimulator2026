@@ -23,15 +23,26 @@ import type { GameState } from '../../core/state/GameState.js';
 import type { VoxelGrid } from '../../core/world/VoxelGrid.js';
 
 import { requireGame, NO_EMPLOYEES_MSG } from './commandUtils.js';
+import { claimForAction, cellsInRect } from './siteExpansion.js';
+import { DEFAULT_GRID_SIZE } from './world.js';
 
 // The employee command moved to ./employees.ts; re-exported so existing imports
 // and the runner registration keep resolving from here.
 export { employeeCommand } from './employees.js';
 
-const GRID_SIZE = 64;
-
 function makeFootprintRegion(x: number, z: number, sizeX: number, sizeZ: number): BlastRegion {
   return { minX: x, maxX: x + sizeX - 1, minZ: z, maxZ: z + sizeZ - 1 };
+}
+
+/**
+ * The site's live bounding box, as `placeBuilding`/`moveBuilding` want it.
+ * Falls back to a 64 m square at the origin only when no grid exists — which
+ * `requireGame` already rules out for every caller here.
+ */
+function siteBounds(ctx: GameContext): { width: number; depth: number; originX: number; originZ: number } {
+  const grid = ctx.grid;
+  if (!grid) return { width: DEFAULT_GRID_SIZE, depth: DEFAULT_GRID_SIZE, originX: 0, originZ: 0 };
+  return { width: grid.sizeX, depth: grid.sizeZ, originX: grid.minX, originZ: grid.minZ };
 }
 
 function patchNavGrid(state: GameState, grid: VoxelGrid, region: BlastRegion): void {
@@ -101,7 +112,11 @@ export function buildCommand(
       const totalCost = oldDef.demolishCost + newDef.constructionCost;
       const { x, z, type: upgradeType } = toUpgrade;
       destroyBuilding(state.buildings, id);
-      const upgradeResult = placeBuilding(state.buildings, upgradeType, x, z, GRID_SIZE, GRID_SIZE, nextTier);
+      const upBounds = siteBounds(ctx);
+      const upgradeResult = placeBuilding(
+        state.buildings, upgradeType, x, z,
+        upBounds.width, upBounds.depth, nextTier, upBounds.originX, upBounds.originZ,
+      );
       if (!upgradeResult.success) {
         return { success: false, output: `Upgrade failed: ${upgradeResult.error}` };
       }
@@ -131,7 +146,17 @@ export function buildCommand(
       const { sizeX, sizeZ } = getDefSize(moveDef);
       const oldX = building.x;
       const oldZ = building.z;
-      const result = moveBuilding(state.buildings, id, toCoords[0]!, toCoords[1]!, GRID_SIZE, GRID_SIZE);
+      const moveClaim = claimForAction(
+        ctx,
+        cellsInRect(toCoords[0]!, toCoords[1]!, toCoords[0]! + sizeX - 1, toCoords[1]! + sizeZ - 1),
+        'move a building',
+      );
+      if (!moveClaim.ok) return { success: false, output: moveClaim.output! };
+      const moveBounds = siteBounds(ctx);
+      const result = moveBuilding(
+        state.buildings, id, toCoords[0]!, toCoords[1]!,
+        moveBounds.width, moveBounds.depth, moveBounds.originX, moveBounds.originZ,
+      );
       if (!result.success) return { success: false, output: result.error! };
       state.cash -= result.cost!;
       addExpense(state.finances, result.cost!, 'construction', `Relocate building #${id}`, state.tickCount);
@@ -164,7 +189,18 @@ export function buildCommand(
       }
       const tierParam = parseInt(named['tier'] ?? '1', 10);
       const tier = ([1, 2, 3].includes(tierParam) ? tierParam : 1) as BuildingTier;
-      const result = placeBuilding(state.buildings, type, atCoords[0]!, atCoords[1]!, GRID_SIZE, GRID_SIZE, tier);
+      const { sizeX: footprintX, sizeZ: footprintZ } = getDefSize(getBuildingDef(type, tier));
+      const placeClaim = claimForAction(
+        ctx,
+        cellsInRect(atCoords[0]!, atCoords[1]!, atCoords[0]! + footprintX - 1, atCoords[1]! + footprintZ - 1),
+        'build',
+      );
+      if (!placeClaim.ok) return { success: false, output: placeClaim.output! };
+      const placeBounds = siteBounds(ctx);
+      const result = placeBuilding(
+        state.buildings, type, atCoords[0]!, atCoords[1]!,
+        placeBounds.width, placeBounds.depth, tier, placeBounds.originX, placeBounds.originZ,
+      );
       if (!result.success) return { success: false, output: result.error! };
       state.cash -= result.cost!;
       addExpense(state.finances, result.cost!, 'construction', `Build ${type} T${tier}`, state.tickCount);

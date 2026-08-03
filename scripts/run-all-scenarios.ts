@@ -31,6 +31,7 @@ import {
 import {
   initBrowser,
   executeInteractionActions,
+  suspendDrawing,
   DEFAULT_STEP_TIMEOUT,
   SCREENSHOT_DIR,
 } from './shared/puppeteer-utils.js';
@@ -89,6 +90,10 @@ async function runBatchInteraction(
         await page.waitForSelector('#game-canvas, canvas', { timeout: 10000 });
         // Main menu starts visible, same as initBrowser() — each scenario's
         // own `new_game` first step tears it down (main.ts console bridge).
+        // Batch mode passes enableScreenshots=false, so nothing here reads
+        // pixels: every step drives the DOM and reads __gameState. Without
+        // this each of those CDP calls waits on a multi-second frame (#475).
+        await suspendDrawing(page);
 
         let failed = false;
         let errorMsg = '';

@@ -30,6 +30,9 @@ export class BlastPlanUI {
   private selectedHoleId: string | null = null;
   private worldSizeX = 40;
   private worldSizeZ = 40;
+  /** West/north edge of the site's bounding box — non-zero once it has grown that way (#473). */
+  private worldOriginX = 0;
+  private worldOriginZ = 0;
   /** Latest state, so the grid picker can draw the site. */
   private lastState: GameState | null = null;
   private statusTimer: ReturnType<typeof setTimeout> | null = null;
@@ -90,6 +93,8 @@ export class BlastPlanUI {
     if (state.world) {
       this.worldSizeX = state.world.sizeX;
       this.worldSizeZ = state.world.sizeZ;
+      this.worldOriginX = state.world.minX;
+      this.worldOriginZ = state.world.minZ;
     }
     const holes = state.drillHoles;
     const charges = state.chargesByHole;
@@ -290,6 +295,8 @@ export class BlastPlanUI {
       mode: 'area',
       worldSizeX: this.worldSizeX,
       worldSizeZ: this.worldSizeZ,
+      worldOriginX: this.worldOriginX,
+      worldOriginZ: this.worldOriginZ,
       title: t('ui.blast.grid_tool'),
       ...(this.lastState ? { tileFill: makeSiteTileFill(this.lastState) } : {}),
       extraFields: [

@@ -18,6 +18,8 @@ import {
   executeInteractionActions,
   waitOneFrame,
   DEFAULT_STEP_TIMEOUT,
+  captureFrame,
+  suspendDrawing,
 } from './shared/puppeteer-utils.js';
 
 const MAX_SCREENSHOT_BYTES = 5 * 1024 * 1024;
@@ -61,6 +63,11 @@ export async function runScenarioInteraction(
     viewport,
   });
 
+  // Interaction steps click the DOM and read game state; only the screenshots
+  // need pixels, and captureFrame draws its own. Without this every CDP call
+  // waits on a multi-second frame (#475).
+  await suspendDrawing(page);
+
   try {
     for (let i = 0; i < steps.length; i++) {
       const step = steps[i]!;
@@ -87,7 +94,7 @@ export async function runScenarioInteraction(
             if (enableScreenshots) {
               await waitOneFrame(page);
               screenshotPath = resolve(outDir, `step-${paddedIdx}-${cmdSlug}.png`);
-              await page.screenshot({ path: screenshotPath, fullPage: false });
+              await captureFrame(page, screenshotPath);
               sizeWarn = checkScreenshotSize(screenshotPath);
               if (sizeWarn) console.warn(`  WARNING: ${sizeWarn}`);
             }
@@ -99,7 +106,7 @@ export async function runScenarioInteraction(
                 await new Promise(r => setTimeout(r, stepInterval));
                 await waitOneFrame(page);
                 const framePath = resolve(outDir, `step-${paddedIdx}-${cmdSlug}-f${f}.png`);
-                await page.screenshot({ path: framePath, fullPage: false });
+                await captureFrame(page, framePath);
                 console.log(`  Frame ${f}: ${framePath} (interval=${stepInterval}ms)`);
                 const fSizeWarn = checkScreenshotSize(framePath);
                 if (fSizeWarn) console.warn(`  WARNING: ${fSizeWarn}`);
@@ -126,7 +133,7 @@ export async function runScenarioInteraction(
                 }, { y: shot.yaw, p: shot.pitch });
                 await waitOneFrame(page);
                 const shotPath = resolve(outDir, `step-${paddedIdx}-${cmdSlug}-${shot.name}.png`);
-                await page.screenshot({ path: shotPath, fullPage: false });
+                await captureFrame(page, shotPath);
                 console.log(`  Shot [${shot.name}]: ${shotPath}`);
                 const sSizeWarn = checkScreenshotSize(shotPath);
                 if (sSizeWarn) console.warn(`  WARNING: ${sSizeWarn}`);

@@ -27,6 +27,7 @@ import type { PuppeteerLaunchOptions } from 'puppeteer';
 import { mkdirSync } from 'fs';
 import { resolve } from 'path';
 import { LAUNCH_ARGS, resolveChromePathOrThrow } from './shared/chrome.js';
+import { captureFrame } from './shared/puppeteer-utils.js';
 
 const SCREENSHOTS_DIR = resolve(process.cwd(), 'screenshots');
 const INIT_WAIT_MS = 3000;
@@ -134,7 +135,7 @@ async function captureScreenshot(options: ScreenshotOptions): Promise<string> {
         const filename = `${options.name}-${timestamp}.png`;
         const filepath = resolve(SCREENSHOTS_DIR, filename);
 
-        await page.screenshot({ path: filepath, fullPage: false });
+        await captureFrame(page, filepath);
         console.log(`Screenshot saved: ${filepath}`);
 
         return filepath;

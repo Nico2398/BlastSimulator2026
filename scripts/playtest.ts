@@ -19,7 +19,7 @@
 import { mkdirSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
 import type { Page } from 'puppeteer';
-import { initBrowser } from './shared/puppeteer-utils.js';
+import { initBrowser, captureFrame, suspendDrawing } from './shared/puppeteer-utils.js';
 import type { PlaytestDef } from './shared/playtest-types.js';
 import { isAllowedSetupCommand } from './shared/playtest-types.js';
 import { PLAYTEST_DIR, loadPlaytests } from './shared/playtest-utils.js';
@@ -91,7 +91,7 @@ async function runPlaytest(
 
       if (screenshots) {
         const shot = resolve(outDir, `FAIL-${String(i).padStart(2, '0')}.png`);
-        await page.screenshot({ path: shot });
+        await captureFrame(page, shot);
         console.error(`        screenshot: ${shot}`);
       }
       // A blocked beat invalidates everything after it — stop here.
@@ -99,7 +99,7 @@ async function runPlaytest(
     }
 
     if (screenshots) {
-      await page.screenshot({ path: resolve(outDir, `beat-${String(i).padStart(2, '0')}.png`) });
+      await captureFrame(page, resolve(outDir, `beat-${String(i).padStart(2, '0')}.png`));
     }
   }
 
@@ -109,9 +109,11 @@ async function runPlaytest(
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const screenshots = args.includes('--screenshots');
-  const filter = args.find(a => !a.startsWith('--'));
   const portArg = args.indexOf('--port');
   const port = portArg >= 0 ? Number(args[portArg + 1]) : 5173;
+  // Skip the value belonging to --port, or `--port 5199` alone is read as a
+  // playtest name filter and matches nothing.
+  const filter = args.find((a, i) => !a.startsWith('--') && i !== portArg + 1);
 
   const defs = loadPlaytests(filter);
   if (defs.length === 0) {
@@ -133,6 +135,9 @@ async function main(): Promise<void> {
         const menu = document.getElementById('bs-main-menu');
         if (menu) (menu as HTMLElement).style.display = 'none';
       });
+      // Nothing here reads pixels except the screenshots, which draw their own
+      // frame. Without this every probe waits on a multi-second frame (#475).
+      await suspendDrawing(page);
 
       const results = await runPlaytest(page, def, screenshots);
       const bad = results.filter(r => !r.passed).length;

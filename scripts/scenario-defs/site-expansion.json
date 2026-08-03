@@ -1,0 +1,168 @@
+{
+  "name": "site-expansion",
+  "description": "The site grows where play goes: drilling, surveying, building and ramping past the starting square each claim the ground under them, and the whole plan still blasts on the enlarged site (#473).",
+  "steps": [
+    {
+      "command": "new_game seed:42 size:32 cash:500000",
+      "timeout": 10,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 size:32 cash:500000"
+        }
+      ]
+    },
+    {
+      "command": "terrain_info",
+      "description": "Baseline: the site is the 32x32 square the level started as.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "terrain_info"
+        }
+      ]
+    },
+    {
+      "command": "drill_plan add x:34 z:10 depth:6",
+      "description": "Two metres past the east edge — claims the chunk under it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan add x:34 z:10 depth:6"
+        }
+      ]
+    },
+    {
+      "command": "drill_plan add x:-4 z:10 depth:6",
+      "description": "West of the origin — the site now has negative coordinates.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan add x:-4 z:10 depth:6"
+        }
+      ]
+    },
+    {
+      "command": "terrain_info",
+      "description": "The site is wider than the level it started as.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "terrain_info"
+        }
+      ]
+    },
+    {
+      "command": "inspect -4,0,10",
+      "description": "Claimed ground is generated, not a hole: this reads as rock, not air.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "inspect -4,0,10"
+        }
+      ]
+    },
+    {
+      "command": "build_ramp origin:30,20 direction:east length:8 depth:6",
+      "description": "A ramp running off the old edge onto claimed ground.",
+      "timeout": 15,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build_ramp origin:30,20 direction:east length:8 depth:6"
+        }
+      ]
+    },
+    {
+      "command": "build management_office at:34,4",
+      "description": "A building standing entirely on ground that did not exist at level start.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build management_office at:34,4"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:boomite amount:5 stemming:2"
+        }
+      ]
+    },
+    {
+      "command": "sequence auto delay_step:25",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sequence auto delay_step:25"
+        }
+      ]
+    },
+    {
+      "command": "blast",
+      "description": "A blast spanning both the original site and ground claimed during play.",
+      "timeout": 15,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "blast"
+        }
+      ]
+    },
+    {
+      "command": "save slot:expanded",
+      "description": "Save v7 stores the claimed set plus only the chunks the blast changed.",
+      "timeout": 15,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "save slot:expanded"
+        }
+      ]
+    },
+    {
+      "command": "load slot:expanded",
+      "description": "The reloaded site keeps the shape play gave it.",
+      "timeout": 15,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "load slot:expanded"
+        }
+      ]
+    },
+    {
+      "command": "terrain_info",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "terrain_info"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    }
+  ],
+  "shots": [
+    {
+      "name": "expanded-site",
+      "yaw": 0,
+      "pitch": 60
+    },
+    {
+      "name": "east-frontier",
+      "yaw": 90,
+      "pitch": 25
+    }
+  ]
+}

@@ -96,15 +96,15 @@ describe('NavGrid patching — building placement', () => {
     expect(nav.cells[5]![7]!.type).toBe('walkable');
   });
 
-  it('does not patch NavGrid when building placement fails (out of bounds)', () => {
+  it('does not patch NavGrid when building placement fails (unreachable ground)', () => {
     const ctx = makeCtx();
     const nav = ctx.state!.navGrid!;
     const prevType = nav.cells[0]![0]!.type;
 
-    // Place at a position well outside the 32×32 grid
+    // Place well outside the 32×32 site, past any chunk touching it (#473 D5)
     const result = buildCommand(ctx, ['management_office'], { at: '100,100' });
     expect(result.success).toBe(false);
-    expect(result.output).toContain('Out of bounds');
+    expect(result.output).toContain('out of bounds');
 
     // NavGrid should be untouched
     expect(nav.cells[0]![0]!.type).toBe(prevType);

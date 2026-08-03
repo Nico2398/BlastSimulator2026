@@ -118,37 +118,71 @@ export function surfaceDensityAt(y: number, surfaceH: number): number {
   return Math.max(0, Math.min(1, d));
 }
 
+/** Fill one column (x, z) of `grid` from the sampling context. Pure in (config, x, z) — see #473 D3. */
+function generateColumn(
+  grid: VoxelGrid,
+  terrain: TerrainContext,
+  config: TerrainConfig,
+  x: number,
+  z: number,
+): void {
+  const { worldGen, biome, strata, oreVeins } = terrain;
+  const { sizeX, sizeY, sizeZ } = config;
+
+  const surfaceH = sampleSurfaceHeightY(worldGen, x, z);
+  const surfaceY = Math.round(surfaceH);
+  const boundaries = strata.boundariesAt(x, z);
+  const inBorder = isInBorderZone(x, z, sizeX, sizeZ, biome.borderWidth);
+
+  // Every voxel the surface band reaches, which is one higher than the
+  // last fully solid one — that voxel carries the fractional density
+  // marching cubes interpolates against.
+  const topY = Math.min(sizeY - 1, Math.ceil(surfaceH + SURFACE_BAND_HALF) - 1);
+  for (let y = 0; y <= topY; y++) {
+    const density = surfaceDensityAt(y, surfaceH);
+    if (density <= 0) continue;
+
+    // Depth is still measured from the rounded surface, so which stratum a
+    // voxel belongs to is unchanged by the sub-voxel surface placement.
+    const depth = Math.max(0, surfaceY - y);
+    const composition = strata.compositionAt(x, y, z, depth, boundaries);
+    const compId = grid.palette.intern(composition);
+    const oreDensities = inBorder ? {} : oreVeins.densitiesAt(x, y, z, depth, composition, biome.oreRichness);
+
+    grid.fillVoxel(x, y, z, compId, oreDensities, density);
+  }
+}
+
+/**
+ * Fill every column of `rect` (max exclusive) into an already-owned region of
+ * `grid` (#473 D3). `config` must be the level's ORIGINAL config — its
+ * sizeX/sizeZ fix the pit mask's rect and the vertical datum, so a chunk
+ * claimed hours into a game generates against the same world the level
+ * started from. `terrain` must be `buildTerrainContext(config)`.
+ *
+ * Callers are responsible for `markChunkPristine` afterwards: the fill writes
+ * through the ordinary mutators, which mark the chunk dirty.
+ */
+export function generateTerrainRegion(
+  grid: VoxelGrid,
+  terrain: TerrainContext,
+  config: TerrainConfig,
+  rect: { minX: number; minZ: number; maxX: number; maxZ: number },
+): void {
+  for (let z = rect.minZ; z < rect.maxZ; z++) {
+    for (let x = rect.minX; x < rect.maxX; x++) {
+      generateColumn(grid, terrain, config, x, z);
+    }
+  }
+}
+
 export function generateTerrain(config: TerrainConfig): VoxelGrid {
   const { sizeX, sizeY, sizeZ } = config;
   const grid = new VoxelGrid(sizeX, sizeY, sizeZ);
-  const { worldGen, biome, strata, oreVeins } = buildTerrainContext(config);
+  const terrain = buildTerrainContext(config);
 
-  for (let z = 0; z < sizeZ; z++) {
-    for (let x = 0; x < sizeX; x++) {
-      const surfaceH = sampleSurfaceHeightY(worldGen, x, z);
-      const surfaceY = Math.round(surfaceH);
-      const boundaries = strata.boundariesAt(x, z);
-      const inBorder = isInBorderZone(x, z, sizeX, sizeZ, biome.borderWidth);
-
-      // Every voxel the surface band reaches, which is one higher than the
-      // last fully solid one — that voxel carries the fractional density
-      // marching cubes interpolates against.
-      const topY = Math.min(sizeY - 1, Math.ceil(surfaceH + SURFACE_BAND_HALF) - 1);
-      for (let y = 0; y <= topY; y++) {
-        const density = surfaceDensityAt(y, surfaceH);
-        if (density <= 0) continue;
-
-        // Depth is still measured from the rounded surface, so which stratum a
-        // voxel belongs to is unchanged by the sub-voxel surface placement.
-        const depth = Math.max(0, surfaceY - y);
-        const composition = strata.compositionAt(x, y, z, depth, boundaries);
-        const compId = grid.palette.intern(composition);
-        const oreDensities = inBorder ? {} : oreVeins.densitiesAt(x, y, z, depth, composition, biome.oreRichness);
-
-        grid.fillVoxel(x, y, z, compId, oreDensities, density);
-      }
-    }
-  }
+  generateTerrainRegion(grid, terrain, config, { minX: 0, minZ: 0, maxX: sizeX, maxZ: sizeZ });
+  for (const { cx, cz } of grid.ownedChunks()) grid.markChunkPristine(cx, cz);
 
   return grid;
 }

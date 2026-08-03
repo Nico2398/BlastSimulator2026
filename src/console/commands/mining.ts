@@ -35,6 +35,7 @@ import { SURVEY_COSTS } from '../../core/config/balance.js';
 import { detectOreReport } from '../../core/events/EventEngine.js';
 import { NavGrid } from '../../core/nav/NavGrid.js';
 import { getStorageCapacity } from '../../core/entities/Building.js';
+import { claimForAction, cellsInRect } from './siteExpansion.js';
 
 // ── Extended context for mining ──
 
@@ -77,10 +78,20 @@ export function drillPlanCommand(
     const diameter = parseFloat(named['diameter'] ?? '0.15');
 
     resetHoleIds();
-    ctx.state!.drillHoles = createGridPlan(
+    const planned = createGridPlan(
       { x: origin[0] ?? 0, z: origin[1] ?? 0 },
       rows, cols, spacing, depth, diameter,
     );
+
+    // Claim before committing the plan: a grid reaching ground the site
+    // cannot have is refused whole, rather than landing half on the map.
+    const claim = claimForAction(ctx, planned.map(h => ({ x: h.x, z: h.z })), 'drill');
+    if (!claim.ok) {
+      resetHoleIds();
+      return { success: false, output: claim.output! };
+    }
+
+    ctx.state!.drillHoles = planned;
     // Clear stale charges/sequences from previous plan
     ctx.state!.chargesByHole = {};
     ctx.state!.sequenceDelays = {};
@@ -107,6 +118,9 @@ export function drillPlanCommand(
     const z = parseFloat(named['z'] ?? named['y'] ?? '0');
     const depth = parseFloat(named['depth'] ?? '8');
     const diameter = parseFloat(named['diameter'] ?? '0.15');
+    const claim = claimForAction(ctx, [{ x, z }], 'drill');
+    if (!claim.ok) return { success: false, output: claim.output! };
+
     const hole = addHole(ctx.state!.drillHoles, x, z, depth, diameter);
     return { success: true, output: `Added hole ${hole.id} at (${x}, ${z}), depth ${depth}m` };
   }
@@ -539,6 +553,10 @@ export function buildRampCommand(
     length = parseInt(named['length'] ?? '10', 10);
   }
 
+  const footprint = rampFootprint(originX, originZ, direction, length);
+  const rampClaim = claimForAction(ctx, cellsInRect(footprint.minX, footprint.minZ, footprint.maxX, footprint.maxZ), 'build a ramp');
+  if (!rampClaim.ok) return { success: false, output: rampClaim.output! };
+
   const result = buildRamp(ctx.grid!, {
     originX, originZ,
     direction, length, targetDepth: depth,
@@ -549,23 +567,32 @@ export function buildRampCommand(
 
   // Patch NavGrid to reflect ramp terrain changes
   if (ctx.state!.navGrid && ctx.grid) {
-    const ox = Math.floor(originX);
-    const oz = Math.floor(originZ);
-    let rampMinX = ox, rampMaxX = ox, rampMinZ = oz, rampMaxZ = oz;
-    if (direction === 'north' || direction === 'south') {
-      rampMinZ = Math.min(oz, direction === 'north' ? oz - length : oz);
-      rampMaxZ = Math.max(oz, direction === 'south' ? oz + length : oz);
-      rampMaxX = ox + RAMP_WIDTH;
-    } else {
-      rampMinX = Math.min(ox, direction === 'west' ? ox - length : ox);
-      rampMaxX = Math.max(ox, direction === 'east' ? ox + length : ox);
-      rampMaxZ = oz + RAMP_WIDTH;
-    }
-    const region = { minX: rampMinX, maxX: rampMaxX, minZ: rampMinZ, maxZ: rampMaxZ };
-    NavGrid.patchNavGrid(ctx.state!.navGrid, ctx.grid, ctx.state!.buildings.buildings, ctx.state!.drillHoles, region);
+    NavGrid.patchNavGrid(ctx.state!.navGrid, ctx.grid, ctx.state!.buildings.buildings, ctx.state!.drillHoles, footprint);
   }
 
   return { success: true, output: result.message };
+}
+
+/** The cells a ramp of `length` cuts through, running `direction` from (originX, originZ). Max inclusive. */
+function rampFootprint(
+  originX: number, originZ: number, direction: RampDirection, length: number,
+): { minX: number; maxX: number; minZ: number; maxZ: number } {
+  const ox = Math.floor(originX);
+  const oz = Math.floor(originZ);
+  if (direction === 'north' || direction === 'south') {
+    return {
+      minX: ox,
+      maxX: ox + RAMP_WIDTH,
+      minZ: Math.min(oz, direction === 'north' ? oz - length : oz),
+      maxZ: Math.max(oz, direction === 'south' ? oz + length : oz),
+    };
+  }
+  return {
+    minX: Math.min(ox, direction === 'west' ? ox - length : ox),
+    maxX: Math.max(ox, direction === 'east' ? ox + length : ox),
+    minZ: oz,
+    maxZ: oz + RAMP_WIDTH,
+  };
 }
 
 // ── Weather commands ──
@@ -718,12 +745,8 @@ export function surveyCommand(
     return { success: false, output: 'Invalid coordinates: x and z must be integers.' };
   }
 
-  if (!ctx.grid!.isInBounds(x, 0, z)) {
-    return {
-      success: false,
-      output: `Out of bounds: (${x}, ${z}). Grid is ${ctx.grid!.sizeX}×${ctx.grid!.sizeZ}.`,
-    };
-  }
+  const claim = claimForAction(ctx, [{ x, z }], 'survey');
+  if (!claim.ok) return { success: false, output: claim.output! };
 
   const result = runSurvey(ctx.state!, { method, centerX: x, centerZ: z });
 

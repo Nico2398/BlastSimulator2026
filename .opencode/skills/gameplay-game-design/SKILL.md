@@ -95,9 +95,23 @@ Each event presents 2-4 decision options with different consequences on scores, 
 
 ## World Generation
 
-- **Interactive zone:** Rocky extraction zone + neutral border
+- **Interactive zone:** the claimed site — a set of 16x16 chunks, not a fixed square
 - **Underground grid:** 3D voxel grid with rock types and ore densities (Simplex noise)
 - **Mine type choice:** Affects rocks, ores, terrain shape, settlements, climate
+
+### The site expands (#473)
+
+A level starts as a square, and grows wherever play takes it. Acting past the edge — drilling, surveying, building, cutting a ramp — claims the chunk under that action and generates it from the seed. The site ends up whatever shape play gives it, and is seemingly unbounded.
+
+Expansion is **never implicit**: a claim answers with success or a refusal the player can read. Three things refuse:
+
+| Refusal | Meaning |
+|---------|---------|
+| `protected_structure` | A village, river or landmark stands there. Inviolable — the only permanent limit in the world, and what the border wall now marks. |
+| `not_adjacent` | The chunk touches no ground the site owns. The site grows outward, one chunk at a time; it does not teleport. |
+| `expansion_disabled` | This site has a fixed boundary. |
+
+Claiming is currently free. A land price per chunk would fit the satire and is an open design question, not a technical one.
 
 ## Material Catalogs
 
@@ -145,6 +159,7 @@ Level 1 unlocked at start → profit threshold unlocks next → star ratings (1-
 - **Multiple slots** with full GameState + campaign progression + metadata
 - **Auto-save** every 2 game minutes in dedicated slot
 - **Cross-session persistence** via IndexedDB
+- **Save size tracks play, not level size** (v7): a save stores the claimed-chunk set plus the voxel data of the chunks play actually changed. Every other chunk is regenerated from the seed on load, which is exact because generation is a pure function of position and seed.
 
 ## Time Management
 
