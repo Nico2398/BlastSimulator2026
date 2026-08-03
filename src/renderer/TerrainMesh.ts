@@ -57,6 +57,49 @@ interface CornerSample {
   oreAmt: number;
 }
 
+/** Density with trilinear interpolation, so the gradient below is continuous. */
+function densityAtSmooth(grid: VoxelGrid, x: number, y: number, z: number): number {
+  const x0 = Math.floor(x), y0 = Math.floor(y), z0 = Math.floor(z);
+  const fx = x - x0, fy = y - y0, fz = z - z0;
+  let acc = 0;
+  for (let k = 0; k < 8; k++) {
+    const dx = k & 1, dy = (k >> 1) & 1, dz = (k >> 2) & 1;
+    const w = (dx ? fx : 1 - fx) * (dy ? fy : 1 - fy) * (dz ? fz : 1 - fz);
+    if (w > 0) acc += w * grid.densityAt(x0 + dx, y0 + dy, z0 + dz);
+  }
+  return acc;
+}
+
+/**
+ * Surface normal from the density field, rather than from the triangles.
+ *
+ * computeVertexNormals() averages the faces meeting at a vertex, and marching
+ * cubes lays those faces on a regular lattice with a fixed diagonal split. The
+ * averaged normals inherit that diagonal, and it reads as fine hatching ruled
+ * across the terrain at the triangle scale — at every zoom, and impossible to
+ * remove in the fragment shader because it is already in the normals before
+ * shading runs.
+ *
+ * An iso-surface's true normal is the negated gradient of the field it is an
+ * iso-surface of, which owes nothing to how the triangles were cut.
+ */
+function densityGradientNormal(grid: VoxelGrid, x: number, y: number, z: number): [number, number, number] {
+  const e = 0.85;
+  const gx = densityAtSmooth(grid, x + e, y, z) - densityAtSmooth(grid, x - e, y, z);
+  const gy = densityAtSmooth(grid, x, y + e, z) - densityAtSmooth(grid, x, y - e, z);
+  const gz = densityAtSmooth(grid, x, y, z + e) - densityAtSmooth(grid, x, y, z - e);
+  const len = Math.hypot(gx, gy, gz);
+  // A vertex in a locally uniform region has no gradient to speak of. Falling
+  // back to "up" beats emitting a zero normal, which shades black.
+  if (len < 1e-6) return [0, 1, 0];
+  // Not negated. The gradient points toward increasing density, i.e. into the
+  // rock, so the outward normal is its negation — but this mesh's triangle
+  // winding is the opposite convention, which is what computeVertexNormals was
+  // producing and what the lighting is set up for. Negating here lit the whole
+  // pit from behind and rendered it black.
+  return [gx / len, gy / len, gz / len];
+}
+
 function sampleCorner(grid: VoxelGrid, x: number, y: number, z: number): CornerSample {
   const density = grid.densityAt(x, y, z);
   const rockId = grid.dominantRockAt(x, y, z);
@@ -324,7 +367,13 @@ export class TerrainMesh {
     geometry.setAttribute('aRockB', new THREE.Float32BufferAttribute(rockB, 1));
     geometry.setAttribute('aRockWeight', new THREE.Float32BufferAttribute(rockWeight, 1));
     geometry.setAttribute('aOre', new THREE.Float32BufferAttribute(ore, 2));
-    geometry.computeVertexNormals();
+    // Normals from the field, not the triangulation — see densityGradientNormal.
+    const normals = new Float32Array(positions.length);
+    for (let i = 0; i < positions.length; i += 3) {
+      const n = densityGradientNormal(this.grid, positions[i]!, positions[i + 1]!, positions[i + 2]!);
+      normals[i] = n[0]; normals[i + 1] = n[1]; normals[i + 2] = n[2];
+    }
+    geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
     geometry.computeBoundingSphere();
 
     const mesh = new THREE.Mesh(geometry, this.material);
