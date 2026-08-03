@@ -16,6 +16,7 @@ import type { BuildingState, Building } from '../entities/Building.js';
 import { createBuildingState } from '../entities/Building.js';
 import { NavGrid } from '../nav/NavGrid.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
+import type { SerializedVoxels } from './VoxelGridCodec.js';
 import type { VehicleState } from '../entities/Vehicle.js';
 import { createVehicleState } from '../entities/Vehicle.js';
 import type { EmployeeState, SkillCategory } from '../entities/Employee.js';
@@ -49,7 +50,7 @@ import type { SitePolicy } from '../entities/SitePolicy.js';
 import { createSitePolicy } from '../entities/SitePolicy.js';
 
 /** Save format version — increment when GameState shape changes. */
-export const SAVE_VERSION = 5;
+export const SAVE_VERSION = 6;
 
 export interface GameConfig {
   seed: number;
@@ -207,8 +208,16 @@ export interface WorldState {
   sizeX: number;
   sizeY: number;
   sizeZ: number;
-  /** The VoxelGrid is NOT stored in JSON — it's regenerated from seed on load. */
+  /** The VoxelGrid is not stored directly — either restored from `voxels` (v6+) or regenerated from seed. */
   gridReady: boolean;
+  /**
+   * Serialized playable voxel data (v6+, #458 T0.3), embedded lazily right
+   * before a save — see saveCommand / SaveLoadUI's getState callback. Absent
+   * on saves from before v6 or on a state that hasn't been saved yet; a
+   * loader falls back to regenerating pristine terrain from the seed in that
+   * case (the pre-v6 behaviour — blast craters/ramps don't survive that path).
+   */
+  voxels?: SerializedVoxels;
 }
 
 export interface SavedBlastPlan {

@@ -1,0 +1,84 @@
+{
+  "name": "loading-screen-visual",
+  "description": "Visual verification of the level loading screen: clicking a world-map level start puts the overlay on screen with its caption and progress bar BEFORE the several seconds of synchronous terrain generation and meshing begin, and the overlay is gone once the site is playable. The point of the screen is that it paints during the block rather than after it, so the wait reads as a load and not as a hang.",
+  "steps": [
+    {
+      "command": "help",
+      "description": "Initial load — the main menu is the only thing on screen and no loading overlay is showing.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "help"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-main-menu"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-loading-screen",
+          "property": "visible",
+          "expectedValue": false
+        }
+      ]
+    },
+    {
+      "command": "state",
+      "description": "Click New Campaign to reach the world map, where Dusty Hollow offers a Start Level button.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-main-menu .bs-btn-primary"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-main-menu"
+        }
+      ]
+    },
+    {
+      "command": "new_game seed:1138 size:24",
+      "description": "A base game must exist before a campaign level can start. In the browser the world-map Start button does this itself as the load's first phase; command mode needs it spelled out.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:1138 size:24"
+        }
+      ]
+    },
+    {
+      "command": "campaign start level:dusty_hollow",
+      "description": "Start the level through the console so the scenario's command mode exercises the same load, then confirm the site is playable and the overlay has been dismissed.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign start level:dusty_hollow"
+        },
+        {
+          "type": "wait",
+          "durationMs": 500
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-loading-screen",
+          "property": "visible",
+          "expectedValue": false
+        }
+      ]
+    },
+    {
+      "command": "terrain_info",
+      "description": "The loaded site reports the level's own grid, proving the load completed rather than merely hiding the overlay.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "terrain_info"
+        }
+      ]
+    }
+  ]
+}

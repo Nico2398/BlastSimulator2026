@@ -1082,6 +1082,59 @@ describe('NavGrid.findNearestReachableCell', () => {
     const distSq = (result.x - 3) ** 2 + (result.z - 3) ** 2;
     expect(distSq).toBe(4);
   });
+
+  // ── #458 T6.1/D14: prefer a same-bench-level cell over the raw nearest ──
+  //
+  // The flood fill this function walks has no notion of bench level — it's a
+  // flat 8-directional walkable/ramp/drill_hole adjacency check, so it calls
+  // a cell "reachable" even when it sits across a bench-level boundary from
+  // the anchor, connected only via Pathfinding.findMultiLevelPath's
+  // ramp-entrance/exit routing. That routing re-picks its cheapest candidate
+  // ramp fresh every tick from the walking agent's continuously-shifting
+  // position, which can flip between near-tied ramps and produce a stable
+  // walk-forward/walk-back loop that never arrives — confirmed via direct
+  // reproduction (a driver frozen retrying a short walk to a freshly bought
+  // vehicle for 150+ ticks). Preferring a same-bench-level candidate
+  // whenever one exists sidesteps multi-level routing for this call
+  // entirely, which matters more now than it used to: bigger levels
+  // (#458 D13) carry far more natural terrain relief than the old ones, so
+  // this kind of boundary comes up far more often.
+
+  it('prefers a same-bench-level cell over the exact target when the target sits on a different bench', () => {
+    // 5×5, entirely walkable and bench 0, except the target cell itself
+    // (4,4), which sits on bench 1. Without the same-level preference, the
+    // exact target always wins (distance 0 to itself) regardless of bench —
+    // exactly the case that let a vehicle spawn on a bench-level boundary
+    // from its driver in the first place.
+    const rows: NavCellType[][] = Array.from({ length: 5 }, () =>
+      Array.from({ length: 5 }, (): NavCellType => 'walkable'));
+    const nav = makeNavGridFromTypes(rows);
+    nav.cells[4]![4]!.benchLevel = 1;
+
+    const result = NavGrid.findNearestReachableCell(nav, 0, 0, 4, 4);
+
+    expect(result).not.toEqual({ x: 4, z: 4 });
+    expect(nav.cells[result.z]![result.x]!.benchLevel).toBe(0);
+  });
+
+  it('never returns a cell on a different bench than the anchor when the anchor itself qualifies as same-level', () => {
+    // Anchor (0,0) sits on bench 0, but every other cell in the grid is
+    // bench 1 — the anchor is always trivially "same level as itself", so
+    // it remains the same-level candidate rather than falling through to a
+    // cross-level pick, even though it's farther from the target than every
+    // other reachable cell.
+    const rows: NavCellType[][] = Array.from({ length: 5 }, () =>
+      Array.from({ length: 5 }, (): NavCellType => 'walkable'));
+    const nav = makeNavGridFromTypes(rows);
+    for (let z = 0; z < 5; z++) {
+      for (let x = 0; x < 5; x++) {
+        if (x !== 0 || z !== 0) nav.cells[z]![x]!.benchLevel = 1;
+      }
+    }
+
+    const result = NavGrid.findNearestReachableCell(nav, 0, 0, 4, 4);
+    expect(nav.cells[result.z]![result.x]!.benchLevel).toBe(0);
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1102,7 +1155,7 @@ describe('NavGrid.computeReachableSet', () => {
     expect(reachable.size).toBe(25);
     for (let z = 0; z < 5; z++) {
       for (let x = 0; x < 5; x++) {
-        expect(reachable.has(`${x},${z}`)).toBe(true);
+        expect(reachable.has(x, z)).toBe(true);
       }
     }
   });
@@ -1121,11 +1174,11 @@ describe('NavGrid.computeReachableSet', () => {
     const reachable = NavGrid.computeReachableSet(nav, 0, 0);
 
     // The pocket cell itself is traversable but walled off by void on all 8 sides.
-    expect(reachable.has('3,3')).toBe(false);
+    expect(reachable.has(3, 3)).toBe(false);
     // The open field outside the ring is fully reachable from the anchor.
-    expect(reachable.has('0,0')).toBe(true);
-    expect(reachable.has('6,6')).toBe(true);
-    expect(reachable.has('1,1')).toBe(true);
+    expect(reachable.has(0, 0)).toBe(true);
+    expect(reachable.has(6, 6)).toBe(true);
+    expect(reachable.has(1, 1)).toBe(true);
   });
 
   it('includes only the pocket when the anchor itself sits inside it', () => {
@@ -1140,7 +1193,8 @@ describe('NavGrid.computeReachableSet', () => {
 
     // The void ring cuts the pocket off from the rest of the (otherwise fully
     // walkable) grid, so flood-filling from inside it finds nothing else.
-    expect(reachable).toEqual(new Set(['3,3']));
+    expect(reachable.size).toBe(1);
+    expect(reachable.has(3, 3)).toBe(true);
   });
 
   it('returns an empty set when the anchor itself sits on a non-traversable cell', () => {
@@ -1170,6 +1224,6 @@ describe('NavGrid.computeReachableSet', () => {
     // implementer extracts one flood-fill both functions share (as the doc
     // comments anticipate), a divergence here means that extraction broke one
     // of them.
-    expect(reachable.has(`${nearest.x},${nearest.z}`)).toBe(true);
+    expect(reachable.has(nearest.x, nearest.z)).toBe(true);
   });
 });

@@ -11,8 +11,14 @@ export interface LevelDef {
   nameKey: string;
   /** i18n key for the level description. */
   descKey: string;
-  /** Mine type preset to use. */
-  mineType: string;
+  /** Biome ID (BiomeCatalog) this level's terrain is biased toward. */
+  biome: string;
+  /**
+   * Bias added to the raw climate fields so this level's own grid lands near
+   * its intended biome's climate centre (#458 T1.2/A6) — authored once per
+   * level, typically the target biome's own climateCenter.
+   */
+  climateBias: readonly [number, number];
   /** Deterministic terrain seed. */
   terrainSeed: number;
   /** Grid dimensions. */
@@ -56,11 +62,12 @@ const LEVELS: readonly LevelDef[] = [
     id: 'tutorial_pit',
     nameKey: 'level.tutorial_pit.name',
     descKey: 'level.tutorial_pit.desc',
-    mineType: 'desert',
+    biome: 'desert_badlands',
+    climateBias: [0.7, -0.6],
     terrainSeed: 42,
-    gridX: 24,
-    gridY: 12,
-    gridZ: 24,
+    gridX: 32,
+    gridY: 20,
+    gridZ: 32,
     // The tutorial scripts every purchase it teaches: four hires ($5,000), a
     // survey (up to $3,000), the scripted consultant ($3,000), a debris_hauler
     // ($25,000) and a freight_warehouse ($15,000) — about $52,000 before the
@@ -85,11 +92,12 @@ const LEVELS: readonly LevelDef[] = [
     id: 'dusty_hollow',
     nameKey: 'level.dusty_hollow.name',
     descKey: 'level.dusty_hollow.desc',
-    mineType: 'desert',
+    biome: 'desert_badlands',
+    climateBias: [0.7, -0.6],
     terrainSeed: 1138,
-    gridX: 40,
-    gridY: 20,
-    gridZ: 40,
+    gridX: 96,
+    gridY: 40,
+    gridZ: 96,
     startingCash: 50000,
     availableExplosives: ['pop_rock', 'boomite', 'krackle'],
     // Unlock threshold: $80k. Reachable in ~10 good blasts.
@@ -109,11 +117,12 @@ const LEVELS: readonly LevelDef[] = [
     id: 'grumpstone_ridge',
     nameKey: 'level.grumpstone_ridge.name',
     descKey: 'level.grumpstone_ridge.desc',
-    mineType: 'mountain',
+    biome: 'alpine_granite',
+    climateBias: [-0.7, 0.1],
     terrainSeed: 2277,
-    gridX: 60,
-    gridY: 30,
-    gridZ: 60,
+    gridX: 128,
+    gridY: 56,
+    gridZ: 128,
     startingCash: 75000,
     availableExplosives: ['pop_rock', 'boomite', 'krackle', 'big_bada_boom', 'shatternite'],
     // Unlock threshold: $250k. Real mountain quarry margins are tighter.
@@ -135,11 +144,12 @@ const LEVELS: readonly LevelDef[] = [
     id: 'treranium_depths',
     nameKey: 'level.treranium_depths.name',
     descKey: 'level.treranium_depths.desc',
-    mineType: 'tropical',
+    biome: 'tropical_karst',
+    climateBias: [0.6, 0.7],
     terrainSeed: 3666,
-    gridX: 80,
-    gridY: 40,
-    gridZ: 80,
+    gridX: 160,
+    gridY: 64,
+    gridZ: 160,
     startingCash: 100000,
     availableExplosives: [
       'pop_rock', 'boomite', 'krackle',

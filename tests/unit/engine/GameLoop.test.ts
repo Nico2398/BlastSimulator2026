@@ -51,7 +51,6 @@ import { getLivingQuartersWellbeingMultiplier } from '../../../src/core/entities
 import {
   NEED_REST_DURATIONS,
   NEED_REST_BUILDING_TYPES,
-  NEED_REST_SEARCH_RADIUS,
   NEED_WARNING_THRESHOLDS,
   NEED_REST_COSTS,
   WORK_DURATION_TICKS,

@@ -97,6 +97,55 @@ describe('TileSelectOverlay — unconstrained', () => {
   });
 });
 
+describe('TileSelectOverlay — canvas grows to keep tiles ≥4px on large levels (#458 T6.1/D13)', () => {
+  it('keeps the base 640×480 canvas for a level that already clears the 4px floor', () => {
+    const { overlay, canvas } = setup();
+    overlay.open({
+      mode: 'point', worldSizeX: WORLD, worldSizeZ: WORLD, title: 'x', onConfirm: () => {},
+    });
+    expect(canvas.width).toBe(CANVAS_W);
+    expect(canvas.height).toBe(CANVAS_H);
+  });
+
+  it('grows the canvas so a 160-tile level still gets ≥4px tiles on both axes', () => {
+    const { overlay, canvas } = setup();
+    const worldSize = 160; // treranium_depths (#458 D13)
+    overlay.open({
+      mode: 'point', worldSizeX: worldSize, worldSizeZ: worldSize, title: 'x', onConfirm: () => {},
+    });
+    // 480 / 160 = 3px — below the floor, so height must grow; 640 / 160 = 4px
+    // exactly, so width stays at the base.
+    expect(canvas.width).toBe(CANVAS_W);
+    expect(canvas.height).toBe(worldSize * 4);
+    expect(canvas.width / worldSize).toBeGreaterThanOrEqual(4);
+    expect(canvas.height / worldSize).toBeGreaterThanOrEqual(4);
+  });
+
+  it('picking still lands on the intended tile after the canvas grows', () => {
+    const { container, overlay, canvas } = setup();
+    const worldSize = 160;
+    const onConfirm = vi.fn<(r: TileSelectResult) => void>();
+    overlay.open({ mode: 'point', worldSizeX: worldSize, worldSizeZ: worldSize, title: 'x', onConfirm });
+    // The grown canvas's on-screen box now matches its new resolution.
+    canvas.getBoundingClientRect = () => ({
+      width: canvas.width, height: canvas.height, top: 0, left: 0,
+      right: canvas.width, bottom: canvas.height, x: 0, y: 0, toJSON: () => ({}),
+    }) as DOMRect;
+
+    const tileW = canvas.width / worldSize;
+    const tileH = canvas.height / worldSize;
+    canvas.dispatchEvent(new MouseEvent('mousedown', {
+      clientX: (100 + 0.5) * tileW, clientY: (140 + 0.5) * tileH, button: 0, bubbles: true,
+    }));
+    canvas.dispatchEvent(new MouseEvent('mouseup', {
+      clientX: (100 + 0.5) * tileW, clientY: (140 + 0.5) * tileH, button: 0, bubbles: true,
+    }));
+    confirmBtn(container).click();
+
+    expect(onConfirm.mock.calls[0]![0]).toMatchObject({ x: 100, z: 140 });
+  });
+});
+
 describe('TileSelectOverlay — required area', () => {
   it('takes the area the tutorial published when the caller gives none', () => {
     setPickerRegion(AREA);

@@ -231,7 +231,7 @@ export function blastCommand(
     return { success: false, output: `Invalid plan:\n${errors.map(e => `  ${e.holeId}: ${e.issue}`).join('\n')}` };
   }
 
-  const result = executeBlast(plan, ctx.grid!, [], undefined, ctx.state!.buildings);
+  const result = executeBlast(plan, ctx.grid!, [], undefined, ctx.state!.buildings, ctx.emitter);
   if (!result) return { success: false, output: 'Blast execution failed.' };
 
   // Store fragment data for renderer (localized remesh + mesh spawning)
@@ -542,7 +542,7 @@ export function buildRampCommand(
   const result = buildRamp(ctx.grid!, {
     originX, originZ,
     direction, length, targetDepth: depth,
-  }, ctx.state!.cash);
+  }, ctx.state!.cash, ctx.emitter);
 
   if (!result.success) return { success: false, output: result.message };
   ctx.state!.cash -= result.cost;

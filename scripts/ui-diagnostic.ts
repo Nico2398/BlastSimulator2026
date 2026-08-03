@@ -191,7 +191,9 @@ async function run() {
   try {
     const page = await browser.newPage();
     await page.setViewport(VIEWPORT);
-    await page.goto(DEV_SERVER_URL, { waitUntil: 'networkidle0' });
+    // See puppeteer-utils.ts's initBrowser() for why this isn't
+    // 'networkidle0' (#458 T5.1 — EffectComposer/OutputPass regression).
+    await page.goto(DEV_SERVER_URL, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('#game-canvas, canvas', { timeout: 10000 });
     await new Promise(r => setTimeout(r, INIT_WAIT_MS));
 

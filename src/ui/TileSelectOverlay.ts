@@ -56,6 +56,14 @@ export interface TileSelectConfig {
 
 const CANVAS_W = 640;
 const CANVAS_H = 480;
+/**
+ * Floor on rendered tile size (#458 T6.1/D13) — at a fixed 640×480 canvas, a
+ * 128 or 160-tile level (grumpstone_ridge, treranium_depths) packs tiles
+ * below 4px on the Z axis, too small to reliably click. The canvas grows
+ * per-open to keep both axes at or above this floor; it only ever grows
+ * (never shrinks below the 640×480 base), so smaller levels are unaffected.
+ */
+const MIN_TILE_PX = 4;
 
 export class TileSelectOverlay {
   private readonly overlay: HTMLElement;
@@ -64,6 +72,9 @@ export class TileSelectOverlay {
   private config: TileSelectConfig | null = null;
   /** Area the selection must stay inside, resolved at open time. */
   private requiredRegion: TileRegion | null = null;
+  /** Actual canvas pixel dimensions for the current open() config (#458 T6.1). */
+  private canvasW = CANVAS_W;
+  private canvasH = CANVAS_H;
 
   // Drag state
   private dragStart: { tx: number; tz: number } | null = null;
@@ -94,6 +105,10 @@ export class TileSelectOverlay {
 
   open(config: TileSelectConfig): void {
     this.config = config;
+    this.canvasW = Math.max(CANVAS_W, config.worldSizeX * MIN_TILE_PX);
+    this.canvasH = Math.max(CANVAS_H, config.worldSizeZ * MIN_TILE_PX);
+    this.canvas.width = this.canvasW;
+    this.canvas.height = this.canvasH;
     // An explicit region wins; otherwise take whatever the tutorial published.
     this.requiredRegion = config.requiredRegion !== undefined
       ? config.requiredRegion
@@ -239,10 +254,10 @@ export class TileSelectOverlay {
   private canvasToTile(e: MouseEvent): { tx: number; tz: number } | null {
     if (!this.config) return null;
     const rect = this.canvas.getBoundingClientRect();
-    const px = (e.clientX - rect.left) * (CANVAS_W / rect.width);
-    const pz = (e.clientY - rect.top) * (CANVAS_H / rect.height);
-    const tx = Math.floor(px / (CANVAS_W / this.config.worldSizeX));
-    const tz = Math.floor(pz / (CANVAS_H / this.config.worldSizeZ));
+    const px = (e.clientX - rect.left) * (this.canvasW / rect.width);
+    const pz = (e.clientY - rect.top) * (this.canvasH / rect.height);
+    const tx = Math.floor(px / (this.canvasW / this.config.worldSizeX));
+    const tz = Math.floor(pz / (this.canvasH / this.config.worldSizeZ));
     if (tx < 0 || tx >= this.config.worldSizeX || tz < 0 || tz >= this.config.worldSizeZ) return null;
 
     // An exact region is a target, not a suggestion. Clamping lets the player
@@ -258,8 +273,8 @@ export class TileSelectOverlay {
 
   private tileToCanvas(tx: number, tz: number): { px: number; pz: number } {
     const c = this.config!;
-    const tileW = CANVAS_W / c.worldSizeX;
-    const tileH = CANVAS_H / c.worldSizeZ;
+    const tileW = this.canvasW / c.worldSizeX;
+    const tileH = this.canvasH / c.worldSizeZ;
     return { px: tx * tileW, pz: tz * tileH };
   }
 
@@ -267,14 +282,14 @@ export class TileSelectOverlay {
     if (!this.config || !this.ctx) return;
     const ctx = this.ctx;
     const c = this.config;
-    const tileW = CANVAS_W / c.worldSizeX;
-    const tileH = CANVAS_H / c.worldSizeZ;
+    const tileW = this.canvasW / c.worldSizeX;
+    const tileH = this.canvasH / c.worldSizeZ;
 
-    ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+    ctx.clearRect(0, 0, this.canvasW, this.canvasH);
 
     // Background
     ctx.fillStyle = '#0c0a06';
-    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+    ctx.fillRect(0, 0, this.canvasW, this.canvasH);
 
     // Site contents, when the caller supplied them — an unshaded grid gives the
     // player nothing to aim at.
@@ -295,13 +310,13 @@ export class TileSelectOverlay {
     for (let x = 0; x <= c.worldSizeX; x++) {
       ctx.beginPath();
       ctx.moveTo(x * tileW, 0);
-      ctx.lineTo(x * tileW, CANVAS_H);
+      ctx.lineTo(x * tileW, this.canvasH);
       ctx.stroke();
     }
     for (let z = 0; z <= c.worldSizeZ; z++) {
       ctx.beginPath();
       ctx.moveTo(0, z * tileH);
-      ctx.lineTo(CANVAS_W, z * tileH);
+      ctx.lineTo(this.canvasW, z * tileH);
       ctx.stroke();
     }
 
@@ -311,13 +326,13 @@ export class TileSelectOverlay {
     for (let x = 0; x <= c.worldSizeX; x += 10) {
       ctx.beginPath();
       ctx.moveTo(x * tileW, 0);
-      ctx.lineTo(x * tileW, CANVAS_H);
+      ctx.lineTo(x * tileW, this.canvasH);
       ctx.stroke();
     }
     for (let z = 0; z <= c.worldSizeZ; z += 10) {
       ctx.beginPath();
       ctx.moveTo(0, z * tileH);
-      ctx.lineTo(CANVAS_W, z * tileH);
+      ctx.lineTo(this.canvasW, z * tileH);
       ctx.stroke();
     }
 
@@ -345,7 +360,7 @@ export class TileSelectOverlay {
       ctx.save();
       // Dim outside by punching the area out of a full-canvas cover.
       ctx.beginPath();
-      ctx.rect(0, 0, CANVAS_W, CANVAS_H);
+      ctx.rect(0, 0, this.canvasW, this.canvasH);
       ctx.rect(rx, rz, rw, rh);
       ctx.fillStyle = 'rgba(6, 4, 2, 0.66)';
       ctx.fill('evenodd');

@@ -274,6 +274,52 @@ describe('Performance Benchmarks', () => {
     });
   });
 
+  // #458 T6.2/D14: PATHFINDING_NODE_BUDGET_CAP was a fixed 500-node cap
+  // regardless of grid size, sized for the old ~64²-and-under levels. D13's
+  // biggest level (treranium_depths) is 160×160, where a single obstacle
+  // sitting directly on an otherwise-optimal cross-map route (a blast
+  // crater, a cluster of cleared 'void' cells) forces a real detour search:
+  // measurement during this task found a 20-cell obstacle on the diagonal
+  // between two far corners explored 6100+ nodes with plain A* — already
+  // past the *scaled* budget, let alone the old flat 500 — which is why the
+  // A* loop also carries a heuristic weight now (see ASTAR_HEURISTIC_WEIGHT
+  // in Pathfinding.ts). Both changes are exercised together here.
+  describe('A* cross-map route on 160×160 grid (#458 T6.2/D14)', () => {
+    it('routes around a 30×30 obstacle straddling the optimal path between far corners', () => {
+      // 160×160, walkable except a 30×30 solid block centred on the diagonal
+      // between the two corners findPath is asked to connect — bigger than
+      // any single blast crater (CRATER_EXCAVATION_MAX_RADIUS=5, ~10-cell
+      // diameter) produces, and still comfortably within the scaled budget.
+      const grid = makeFlatGrid(160, 160, 'walkable');
+      for (let x = 70; x < 100; x++) {
+        for (let z = 70; z < 100; z++) {
+          setCell(grid, x, z, 'blocked');
+        }
+      }
+
+      const result = findPath(grid, {
+        agentId: 1,
+        fromX: 5,
+        fromZ: 5,
+        toX: 155,
+        toZ: 155,
+        avoidVehicles: false,
+      });
+
+      expect(result.found).toBe(true);
+      // The straight-line distance between the corners is ~212 cells; a
+      // direct-line-through-the-block fallback is impossible (every step
+      // through it would hit a blocked cell), so this many waypoints only
+      // happens if A* actually explored around the obstacle.
+      expect(result.waypoints.length).toBeGreaterThan(150);
+      // No waypoint may land inside the obstacle itself.
+      for (const wp of result.waypoints) {
+        const insideBlock = wp.x >= 70 && wp.x < 100 && wp.z >= 70 && wp.z < 100;
+        expect(insideBlock).toBe(false);
+      }
+    });
+  });
+
   describe('Full blast pipeline (~1100 voxels)', () => {
     it('completes energy propagation + fragmentation in under 50ms', () => {
       const { grid, holes, charges, depths, surfaceYs } = setupThousandVoxelBlast();
@@ -390,6 +436,67 @@ describe('Performance Benchmarks', () => {
 
       expect(ctx.state!.levelEndReason).toBe('completed');
       expect(elapsed).toBeLessThan(30000);
+    });
+  });
+
+  // #458 T6.2/D14: treranium_depths (160×64×160, D13's flagship level) is the
+  // size these two commands most need to stay responsive on — hiring and
+  // buying both resolve a spawn point via NavGrid.findNearestReachableCell's
+  // flood fill (now typed-array based), which used to be the most exposed
+  // O(width×height) cost on the grid's biggest configuration.
+  describe('Hire and buy on level 4 (treranium_depths, 160×64×160) (#458 T6.2/D14)', () => {
+    it('hires an employee without a visible stall', async () => {
+      const { makeCampaignCtx } = await import('../../integration/full-level/helpers.js');
+      const { employeeCommand } = await import('../../../src/console/commands/entities.js');
+
+      const ctx = makeCampaignCtx('treranium_depths');
+
+      const start = performance.now();
+      const result = employeeCommand(ctx, ['hire'], { role: 'driller' });
+      const elapsed = performance.now() - start;
+
+      expect(result.success).toBe(true);
+      // "Without a visible stall" — a single frame's worth of budget many
+      // times over, not a tight micro-benchmark.
+      expect(elapsed).toBeLessThan(200);
+    });
+
+    it('buys a vehicle without a visible stall', async () => {
+      const { makeCampaignCtx } = await import('../../integration/full-level/helpers.js');
+      const { vehicleCommand } = await import('../../../src/console/commands/vehicle.js');
+
+      const ctx = makeCampaignCtx('treranium_depths');
+
+      const start = performance.now();
+      const result = vehicleCommand(ctx, ['buy', 'debris_hauler'], { tier: '1' });
+      const elapsed = performance.now() - start;
+
+      expect(result.success).toBe(true);
+      expect(elapsed).toBeLessThan(200);
+    });
+  });
+
+  describe('Blast on level 4 (treranium_depths, 160×64×160) (#458 T6.2/D14)', () => {
+    it('completes drill → charge → sequence → blast within the benchmark budget', async () => {
+      const { makeCampaignCtx } = await import('../../integration/full-level/helpers.js');
+      const { employeeCommand } = await import('../../../src/console/commands/entities.js');
+      const { drillPlanCommand, chargeCommand, sequenceCommand, blastCommand } = await import('../../../src/console/commands/mining.js');
+
+      const ctx = makeCampaignCtx('treranium_depths');
+      employeeCommand(ctx, ['hire'], { role: 'driller' });
+      employeeCommand(ctx, ['assign_skill', '1'], { skill: 'blasting', level: '3' });
+
+      const start = performance.now();
+
+      drillPlanCommand(ctx as any, ['grid'], { origin: '80,80', rows: '3', cols: '3', spacing: '5', depth: '8' });
+      chargeCommand(ctx as any, [], { hole: '*', explosive: 'boomite', amount: '5kg', stemming: '2m' });
+      sequenceCommand(ctx as any, ['auto'], {});
+      const result = blastCommand(ctx as any, [], {});
+
+      const elapsed = performance.now() - start;
+
+      expect(result.success).toBe(true);
+      expect(elapsed).toBeLessThan(2000);
     });
   });
 });

@@ -1,6 +1,6 @@
 // BlastSimulator2026 — Survey types and noise-scaled estimation logic
 
-import { VoxelGrid } from '../world/VoxelGrid.js';
+import { VoxelGrid, computeVoxelColumnSurfaceY } from '../world/VoxelGrid.js';
 import { Random } from '../math/Random.js';
 import {
   SURVEY_BASE_ERROR,
@@ -70,15 +70,6 @@ function roundToEstimateStep(val: number): number {
   return Math.round(val / SURVEY_ESTIMATE_STEP) * SURVEY_ESTIMATE_STEP;
 }
 
-/** Scan top→bottom to find the first solid voxel; return y+1, or 0 if all empty. */
-function getSurfaceY(grid: VoxelGrid, x: number, z: number): number {
-  for (let y = grid.sizeY - 1; y >= 0; y--) {
-    const v = grid.getVoxel(x, y, z);
-    if (v && v.density > 0) return y + 1;
-  }
-  return 0;
-}
-
 /**
  * Average a specific ore's density over the subset of `yLevels` that contain
  * solid voxels. Returns `undefined` if no solid voxels are found.
@@ -97,8 +88,8 @@ function averageSolidOreDensity(
   let sum = 0;
   let count = 0;
   for (let i = start; i < end; i++) {
-    const v = grid.getVoxel(x, yLevels[i]!, z);
-    if (v && v.density > 0) { sum += v.oreDensities[oreId] ?? 0; count++; }
+    const y = yLevels[i]!;
+    if (grid.densityAt(x, y, z) > 0) { sum += grid.oresAt(x, y, z)?.[oreId] ?? 0; count++; }
   }
   return count > 0 ? sum / count : undefined;
 }
@@ -166,7 +157,7 @@ export function estimateSurveyResult(
       // Determine which Y levels to sample
       let yLevels: number[];
       if (method === 'aerial') {
-        const surfaceY = getSurfaceY(grid, x, z);
+        const surfaceY = computeVoxelColumnSurfaceY(grid, x, z) + 1;
         yLevels = [surfaceY, surfaceY - 1].filter(y => y >= 0 && y < grid.sizeY);
       } else {
         yLevels = [];
@@ -176,9 +167,9 @@ export function estimateSurveyResult(
       // Collect ore IDs present in any solid voxel in the sampled range
       const allOreIds = new Set<string>();
       for (const y of yLevels) {
-        const v = grid.getVoxel(x, y, z);
-        if (v && v.density > 0) {
-          for (const oreId of Object.keys(v.oreDensities)) allOreIds.add(oreId);
+        if (grid.densityAt(x, y, z) > 0) {
+          const ores = grid.oresAt(x, y, z);
+          if (ores) for (const oreId of Object.keys(ores)) allOreIds.add(oreId);
         }
       }
       if (allOreIds.size === 0) continue;

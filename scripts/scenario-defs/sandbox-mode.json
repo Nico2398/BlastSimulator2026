@@ -1,0 +1,52 @@
+{
+  "name": "sandbox-mode",
+  "description": "Sandbox mode: a site built from explicit parameters starts from nothing, honours the seed and every setting, and is fully playable through to a blast.",
+  "steps": [
+    {
+      "command": "sandbox start biome:alpine_granite seed:777 size:48 depth:24 cash:250000",
+      "description": "No new_game first — a sandbox site is created from nothing, which is the point of the mode.",
+      "interaction": [
+        { "type": "command", "command": "sandbox start biome:alpine_granite seed:777 size:48 depth:24 cash:250000" }
+      ]
+    },
+    {
+      "command": "terrain_info",
+      "description": "Grid extents, biome and seed should all match what was asked for.",
+      "interaction": [
+        { "type": "command", "command": "terrain_info" }
+      ]
+    },
+    {
+      "command": "drill_plan grid rows:3 cols:3 spacing:4 depth:6 start:20,20",
+      "interaction": [
+        { "type": "command", "command": "drill_plan grid rows:3 cols:3 spacing:4 depth:6 start:20,20" }
+      ]
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "interaction": [
+        { "type": "command", "command": "charge hole:* explosive:boomite amount:5 stemming:2" }
+      ]
+    },
+    {
+      "command": "sequence auto delay_step:25",
+      "interaction": [
+        { "type": "command", "command": "sequence auto delay_step:25" }
+      ]
+    },
+    {
+      "command": "blast",
+      "description": "A sandbox site plays like any other — the blast pipeline runs end to end on it.",
+      "interaction": [
+        { "type": "command", "command": "blast" }
+      ]
+    },
+    {
+      "command": "sandbox start biome:tropical_karst seed:31337 size:64 depth:32 mixed_rock:true",
+      "description": "A second site with different settings, to confirm the mode can be re-entered.",
+      "interaction": [
+        { "type": "command", "command": "sandbox start biome:tropical_karst seed:31337 size:64 depth:32 mixed_rock:true" }
+      ]
+    }
+  ]
+}

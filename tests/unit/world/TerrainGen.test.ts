@@ -1,13 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { generateTerrain, computeComposition, type TerrainConfig } from '../../../src/core/world/TerrainGen.js';
-import { getMinePreset } from '../../../src/core/world/MineType.js';
-import { createNoise3D } from 'simplex-noise';
-import { getAllRocks } from '../../../src/core/world/RockCatalog.js';
+import { generateTerrain, surfaceDensityAt, type TerrainConfig } from '../../../src/core/world/TerrainGen.js';
+import { getBiome } from '../../../src/core/world/BiomeCatalog.js';
 import { getDominantRockId } from '../../../src/core/world/VoxelGrid.js';
 
-function makeConfig(seed: number, presetId = 'desert'): TerrainConfig {
-  const preset = getMinePreset(presetId)!;
-  return { sizeX: 32, sizeY: 32, sizeZ: 32, seed, preset };
+function makeConfig(seed: number, biomeId = 'desert_badlands'): TerrainConfig {
+  const biome = getBiome(biomeId)!;
+  return { sizeX: 32, sizeY: 32, sizeZ: 32, seed, climateBias: biome.climateCenter };
 }
 
 describe('TerrainGen — determinism', () => {
@@ -62,7 +60,7 @@ describe('TerrainGen — structure', () => {
 
   it('ore density distribution roughly matches rock type probabilities over large sample', () => {
     const grid = generateTerrain({
-      ...makeConfig(42, 'mountain'),
+      ...makeConfig(42, 'alpine_granite'),
       sizeX: 64,
       sizeY: 64,
       sizeZ: 64,
@@ -89,21 +87,63 @@ describe('TerrainGen — structure', () => {
   });
 });
 
-describe('computeComposition', () => {
-  it('returns single rock at coefficient 1.0 when only one rock supplied', () => {
-    const rocks = getAllRocks().filter(r => r.id === 'cruite');
-    const noise3d = createNoise3D(() => 0.5);
-    const comp = computeComposition(5, 5, 5, rocks, noise3d);
-    expect(comp.rocks.length).toBe(1);
-    expect(comp.rocks[0]!.rockId).toBe('cruite');
-    expect(comp.rocks[0]!.coefficient).toBe(1.0);
+describe('TerrainGen — sub-voxel surface placement (#458)', () => {
+  it('surfaceDensityAt crosses 0.5 exactly at the continuous surface height', () => {
+    for (const h of [10.0, 10.2, 10.5, 10.75, 7.999]) {
+      expect(surfaceDensityAt(h, h)).toBeCloseTo(0.5, 10);
+    }
   });
 
-  it('coefficients sum to approximately 1.0', () => {
-    const rocks = getAllRocks().slice(0, 4);
-    const noise3d = createNoise3D(() => 0.5);
-    const comp = computeComposition(5, 5, 5, rocks, noise3d);
-    const sum = comp.rocks.reduce((s, r) => s + r.coefficient, 0);
-    expect(sum).toBeCloseTo(1.0, 1);
+  it('is fully solid a voxel below the surface and fully air a voxel above it', () => {
+    const h = 12.3;
+    expect(surfaceDensityAt(h - 1, h)).toBe(1);
+    expect(surfaceDensityAt(h + 1, h)).toBe(0);
+  });
+
+  it('never leaves the [0, 1] range a density is allowed to take', () => {
+    for (const y of [-40, 0, 12, 400]) {
+      const d = surfaceDensityAt(y, 12.3);
+      expect(d).toBeGreaterThanOrEqual(0);
+      expect(d).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('lets marching cubes reproduce a fractional height, not a rounded one', () => {
+    // The interpolation marching cubes actually performs: the 0.5 crossing
+    // between the two corners that bracket the surface.
+    const isoCrossing = (surfaceH: number): number => {
+      const y0 = Math.floor(surfaceH);
+      const d0 = surfaceDensityAt(y0, surfaceH);
+      const d1 = surfaceDensityAt(y0 + 1, surfaceH);
+      return y0 + (0.5 - d0) / (d1 - d0);
+    };
+    for (const h of [10.1, 10.4, 10.6, 10.9, 23.25]) {
+      expect(isoCrossing(h)).toBeCloseTo(h, 6);
+    }
+  });
+
+  it('a generated column carries a fractional density at its surface', () => {
+    // Terraces come from every voxel being 0 or 1: with only those two values
+    // marching cubes can only ever put a surface on a half-voxel.
+    const grid = generateTerrain(makeConfig(42));
+    let fractional = 0;
+    for (let x = 4; x < 28; x++) {
+      for (let z = 4; z < 28; z++) {
+        for (let y = 0; y < 32; y++) {
+          const d = grid.densityAt(x, y, z);
+          if (d > 0.001 && d < 0.999) fractional++;
+        }
+      }
+    }
+    expect(fractional).toBeGreaterThan(0);
+  });
+
+  it('leaves the deep interior fully solid — only the surface band is fractional', () => {
+    const grid = generateTerrain(makeConfig(42));
+    for (let x = 8; x < 24; x += 4) {
+      for (let z = 8; z < 24; z += 4) {
+        expect(grid.densityAt(x, 1, z)).toBe(1);
+      }
+    }
   });
 });

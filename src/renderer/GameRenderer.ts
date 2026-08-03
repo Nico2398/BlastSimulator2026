@@ -4,25 +4,37 @@
 
 import * as THREE from 'three';
 import type { MiningContext } from '../console/commands/mining.js';
+import { ensureLandscape } from '../console/commands/world.js';
 import type { GameState } from '../core/state/GameState.js';
-import type { VoxelGrid } from '../core/world/VoxelGrid.js';
-import { getMinePreset } from '../core/world/MineType.js';
+import { type VoxelGrid, computeVoxelColumnSurfaceY } from '../core/world/VoxelGrid.js';
+import { getBiome } from '../core/world/BiomeCatalog.js';
+import type { WeatherState } from '../core/weather/WeatherCycle.js';
+import { BIOME_GRADES, NEUTRAL_GRADE } from './post/AerialPerspectivePass.js';
 import type { SceneManager } from './SceneManager.js';
-import { TerrainMesh } from './TerrainMesh.js';
+import { TerrainMesh, type DirtyRegion } from './TerrainMesh.js';
 import { BuildingMesh } from './BuildingMesh.js';
 import { VehicleMesh } from './VehicleMesh.js';
 import { CharacterMesh } from './CharacterMesh.js';
 import { SkyboxWeather } from './SkyboxWeather.js';
+import { WindState } from './ambient/WindState.js';
+import { CloudLayer } from './ambient/CloudLayer.js';
+import { BirdFlocks } from './ambient/BirdFlocks.js';
+import { ChimneySmoke } from './ambient/ChimneySmoke.js';
+import { WaterSurface } from './ambient/WaterSurface.js';
+import { VegetationSway } from './ambient/VegetationSway.js';
+import { DustDevils } from './ambient/DustDevils.js';
+import { Fireflies } from './ambient/Fireflies.js';
+import { createAmbientUniforms, type AmbientUniforms } from './ambient/AmbientUniforms.js';
 import { FragmentMesh } from './FragmentMesh.js';
 import { BlastEffects } from './BlastEffects.js';
-import { DistantScenery } from './DistantScenery.js';
+import { LandscapeMesh } from './terrain/LandscapeMesh.js';
+import { WorldBorderWall } from './WorldBorderWall.js';
 import { BlastPlanOverlay } from './BlastPlanOverlay.js';
 import { GhostMesh } from './GhostMesh.js';
 import { syncEntitySets, buildingCenterSurfaceY } from './EntitySync.js';
 import type { SurveyConfidenceOverlayOptions, SurveyConfidencePoint } from './SurveyConfidenceOverlay.js';
 import { isSurveyStale } from '../core/mining/SurveyCalc.js';
 import {
-  SOLID_VOXEL_DENSITY_THRESHOLD,
   BLAST_ORIGIN_SURFACE_SEARCH_MIN_RADIUS,
   BLAST_ORIGIN_SURFACE_SEARCH_MARGIN,
 } from '../core/config/balance.js';
@@ -30,6 +42,24 @@ import { isInZone } from '../core/entities/Zone.js';
 import { assembleBlastPlan } from '../core/mining/BlastPlan.js';
 import { previewHoleDetails } from '../core/mining/Software.js';
 import { boundingBoxXZ, getBlastOriginSurfaceY } from './BlastOriginSampling.js';
+
+/**
+ * How far past the playable rect manual panning may wander (#458 T6.1/D13:
+ * "pan gets a soft leash to the playable rect ± margin"). No exact figure is
+ * specified in the plan (default-and-record); 80m clears the boundary-shading
+ * band (T5.3, ~5m) and reaches nearby landscape structures without letting
+ * the camera drift into the empty far landscape.
+ */
+const PAN_LEASH_MARGIN = 80;
+
+/**
+ * Per-biome ambient extras (#458 T7.3, executor's pick, recorded here):
+ * dust devils for the two arid biomes, fireflies for the one humid one.
+ * Neither is universal — GameRenderer only builds the module whose biome
+ * set contains the level's current biome id.
+ */
+const DUST_DEVIL_BIOMES: ReadonlySet<string> = new Set(['desert_badlands', 'red_canyon']);
+const FIREFLY_BIOMES: ReadonlySet<string> = new Set(['tropical_karst']);
 
 export class GameRenderer {
   private readonly sm: SceneManager;
@@ -39,9 +69,20 @@ export class GameRenderer {
   private vehicles: VehicleMesh | null = null;
   private characters: CharacterMesh | null = null;
   private skybox: SkyboxWeather | null = null;
+  private windState: WindState | null = null;
+  private clouds: CloudLayer | null = null;
+  private birds: BirdFlocks | null = null;
+  private smoke: ChimneySmoke | null = null;
+  private water: WaterSurface | null = null;
+  private vegetation: VegetationSway | null = null;
+  private dustDevils: DustDevils | null = null;
+  private fireflies: Fireflies | null = null;
+  /** Shared {uTime, uWind} object every ambient shader material references (#458 T7.2/A26) — level-independent, created once. */
+  private readonly ambientUniforms: AmbientUniforms = createAmbientUniforms();
   private fragments: FragmentMesh | null = null;
   private blastEffects: BlastEffects | null = null;
-  private scenery: DistantScenery | null = null;
+  private landscape: LandscapeMesh | null = null;
+  private borderWall: WorldBorderWall | null = null;
   private blastOverlay: BlastPlanOverlay | null = null;
   private ghosts: GhostMesh | null = null;
   private lastGrid: VoxelGrid | null = null;
@@ -49,6 +90,8 @@ export class GameRenderer {
   /** Seed of the currently loaded game — used to detect new_game calls. */
   private loadedSeed: number | null = null;
   private lastState: GameState | null = null;
+  /** Current weather, mirrored from syncFromContext() so update()'s per-frame WindState tick has it without re-reading MiningContext. */
+  private lastWeather: WeatherState = 'sunny';
 
   // Track rendered entity IDs to detect additions
   private renderedBuildingIds = new Set<number>();
@@ -78,7 +121,7 @@ export class GameRenderer {
 
     // New game (or first load) — rebuild everything
     if (this.loadedSeed !== ctx.state.seed) {
-      this.loadGame(ctx.state, ctx.grid);
+      this.loadGame(ctx);
       this.loadedSeed = ctx.state.seed;
     }
 
@@ -90,6 +133,10 @@ export class GameRenderer {
       // TerrainMesh holds a grid reference — rebind it so it reads from the new grid
       this.terrain?.setGrid(ctx.grid);
       this.terrain?.buildAll();
+      // A differently-sized grid needs a fresh landscape too — same rebuild
+      // loadGame() does, but this branch fires even when loadGame() didn't
+      // (campaign level swaps grid size while keeping the seed, #458 T3.2).
+      this.rebuildLandscapeMesh(ctx);
       // A campaign level can swap in a differently-sized grid while keeping the
       // seed, so loadGame() never runs. Re-frame or the new site renders as a
       // small off-centre patch of the previous site's view.
@@ -153,7 +200,9 @@ export class GameRenderer {
 
     // Sync weather
     if (this.skybox && ctx.weatherCycle) {
+      this.lastWeather = ctx.weatherCycle.current;
       this.skybox.setWeather(ctx.weatherCycle.current);
+      this.clouds?.setWeather(ctx.weatherCycle.current);
     }
 
     // Sync survey confidence overlay
@@ -167,7 +216,38 @@ export class GameRenderer {
     const cam = this.sm.camera;
 
     if (this.skybox) {
-      this.skybox.update(dt, cam.position.x, cam.position.z);
+      this.skybox.update(dt, cam.position.x, cam.position.z, this.sm.cameraController.distance);
+      this.sm.postPipeline.aerial.setHazeColor(this.skybox.skyColor);
+    }
+
+    // Wind + clouds (#458 T7.1/D12): one WindState update feeds every ambient
+    // module's drift; CloudLayer's own offset/coverage then drive the
+    // terrain material's cloud-shadow term directly, so visible clouds and
+    // their ground shadows share the exact same scroll — never desynced.
+    if (this.windState && this.clouds) {
+      this.windState.update(dt, this.lastWeather);
+      this.clouds.update(dt, this.windState.vector);
+      const uniforms = this.terrain?.sharedMaterial.customUniforms;
+      if (uniforms) {
+        (uniforms['uCloudOffset']!.value as THREE.Vector2).copy(this.clouds.cloudOffset);
+        uniforms['uCloudCoverage']!.value = this.clouds.cloudCoverage;
+      }
+    }
+
+    // Birds/smoke/water/vegetation (#458 T7.2/D12/A26). Vegetation needs no
+    // per-frame call — its sway lives entirely in the shared ambientUniforms
+    // every tree/grass material already references; updating those two
+    // values here is the whole update.
+    if (this.windState) {
+      const wind = this.windState.vector;
+      this.ambientUniforms.uTime.value += dt;
+      this.borderWall?.update(dt, this.sm.cameraController.viewTarget);
+      this.ambientUniforms.uWind.value.set(wind.x, wind.z);
+      this.birds?.update(dt);
+      this.smoke?.update(dt, wind, cam.position);
+      this.water?.update(dt, wind);
+      this.dustDevils?.update(dt);
+      this.fireflies?.update(dt);
     }
 
     if (this.blastEffects) {
@@ -305,13 +385,16 @@ export class GameRenderer {
   /** Find the highest solid-voxel Y at the given (x, z) column. Returns 0 if no grid. */
   private getTerrainSurfaceY(x: number, z: number): number {
     if (!this.lastGrid) return 0;
-    const gx = Math.max(0, Math.min(this.lastGrid.sizeX - 1, Math.floor(x)));
-    const gz = Math.max(0, Math.min(this.lastGrid.sizeZ - 1, Math.floor(z)));
-    for (let y = this.lastGrid.sizeY - 1; y >= 0; y--) {
-      const v = this.lastGrid.getVoxel(gx, y, gz);
-      if (v && v.density >= SOLID_VOXEL_DENSITY_THRESHOLD) return y + 1;
-    }
-    return 0;
+    return computeVoxelColumnSurfaceY(this.lastGrid, x, z) + 1;
+  }
+
+  /**
+   * A blast fired at (originX, originZ) — scatters any nearby bird flock
+   * (#458 T7.2/D12/A26). Call from main.ts's `emitter.on('blast:started', ...)`
+   * subscription, which already carries the blast origin.
+   */
+  notifyBlastScatter(originX: number, originZ: number): void {
+    this.birds?.onBlast(originX, originZ);
   }
 
   /**
@@ -327,14 +410,9 @@ export class GameRenderer {
       this.blastOverlay.hide();
     }
 
-    // Localized terrain remesh: only rebuild chunks containing affected voxels.
-    // Fragment positions tell us exactly which voxels were blasted.
-    if (ctx.lastBlastFragments && ctx.lastBlastFragments.length > 0) {
-      this.terrain.update(ctx.lastBlastFragments);
-    } else {
-      // Fallback: full rebuild (e.g. if fragment data unavailable)
-      this.terrain.buildAll();
-    }
+    // Terrain remesh already happened: executeBlast emits terrain:updated,
+    // which main.ts's subscription turns into rebuildTerrain() synchronously
+    // before this method ever runs (#458 T0.2) — no longer this method's job.
 
     // Spawn fragment meshes for the blasted rock
     if (this.fragments && ctx.lastBlastFragmentData && ctx.lastBlastFragmentData.length > 0) {
@@ -404,10 +482,20 @@ export class GameRenderer {
     });
   }
 
-  /** Force a full terrain rebuild (e.g. after blast modifies voxels). */
+  /** Force a full terrain rebuild — grid identity changes only (new_game, campaign start, load). */
   rebuildTerrain(): void {
     console.log(`[GameRenderer] rebuildTerrain: lastGrid=${this.lastGrid?.id}`);
     this.terrain?.buildAll();
+  }
+
+  /**
+   * Re-mesh only the chunks a terrain:updated region touches (#458 T3.1).
+   * The main.ts subscription calls this for every mutation (blast, drill,
+   * ramp) instead of rebuildTerrain() — a single-voxel drill dig no longer
+   * pays for re-marching chunks its region never touched.
+   */
+  remeshTerrainRegion(region: DirtyRegion): void {
+    this.terrain?.remeshRegion(region);
   }
 
   dispose(): void {
@@ -416,14 +504,17 @@ export class GameRenderer {
 
   // ---------- Internal ----------
 
-  private loadGame(state: GameState, grid: VoxelGrid): void {
+  private loadGame(ctx: MiningContext): void {
+    const state = ctx.state!;
+    const grid = ctx.grid!;
     this.clearAll();
 
-    const { scene, sun, ambient } = this.sm;
+    const { scene, sunLight, ambient, fill, csm } = this.sm;
 
     // Terrain mesh (marching cubes)
-    this.terrain = new TerrainMesh(scene, grid);
+    this.terrain = new TerrainMesh(scene, grid, ctx.state?.mineType);
     this.terrain.buildAll();
+    this.terrain.sharedMaterial.attachCSM(csm);
 
     // Bind the grid before sampling terrain height below — buildings, vehicles,
     // and characters loaded from a save (not just a fresh new_game) need
@@ -452,20 +543,24 @@ export class GameRenderer {
     }
 
     // Weather sky
-    this.skybox = new SkyboxWeather(scene, sun, ambient);
+    this.skybox = new SkyboxWeather(scene, sunLight, ambient, fill);
 
-    // Fragments (empty until blast runs)
-    this.fragments = new FragmentMesh(scene);
+    // Wind + clouds (#458 T7.1/D12): one WindState per level, seeded so every
+    // ambient module (clouds now, birds/smoke/water/sway in T7.2) leans the
+    // same way. Cloud disc centres on the playable rect, same point
+    // frameCameraOnGrid() frames the camera on.
+    this.windState = new WindState(state.seed);
+    this.clouds = new CloudLayer(scene, state.seed, grid.sizeX / 2, grid.sizeZ / 2);
+
+    // Fragments (empty until blast runs) — shares terrain's material so a
+    // fresh cut face matches the rock it broke off from (#458 T4.1/D9).
+    this.fragments = new FragmentMesh(scene, this.terrain.sharedMaterial);
 
     // Blast effects
     this.blastEffects = new BlastEffects(scene, this.sm.camera);
 
-    // Distant scenery
-    const preset = getMinePreset(state.mineType);
-    if (preset) {
-      this.scenery = new DistantScenery(scene);
-      this.scenery.generate(preset, grid.sizeX / 2, grid.sizeZ / 2);
-    }
+    // Landscape zone — real ground continuing past the playable rect (#458 T3.2)
+    this.rebuildLandscapeMesh(ctx);
 
     // Blast plan overlay (hidden until shown)
     this.blastOverlay = new BlastPlanOverlay(scene);
@@ -475,6 +570,77 @@ export class GameRenderer {
 
     // Frame the whole site
     this.frameCameraOnGrid();
+  }
+
+  /**
+   * Build (or rebuild) the landscape mesh for the current grid (#458 T3.2).
+   * Triggers ensureLandscape()'s lazy build — the first real consumer of it
+   * (T2.1 kept it lazy specifically because nothing rendered it yet).
+   * Command-mode scenarios never construct a GameRenderer at all, so this
+   * cost never lands on the fast, frequently-run scenario suite; only the
+   * browser game and interaction-mode/visual harnesses pay it.
+   */
+  private rebuildLandscapeMesh(ctx: MiningContext): void {
+    if (!this.terrain || !ctx.state?.world || !ctx.grid) return;
+    const biome = getBiome(ctx.state.mineType);
+    if (!biome) return;
+
+    const { sizeX, sizeY, sizeZ } = ctx.state.world;
+    const handle = ensureLandscape(ctx, { seed: ctx.state.seed, climateBias: biome.climateCenter, sizeX, sizeY, sizeZ });
+    if (!handle) return;
+
+    if (!this.landscape) {
+      this.landscape = new LandscapeMesh(this.sm.scene, this.terrain.sharedMaterial);
+    }
+    this.landscape.build(handle, ctx.grid.palette);
+
+    // Aerial perspective's haze thickness and per-biome grade — set once per
+    // level load, not per frame (#458 T5.2/A21).
+    const { aerial } = this.sm.postPipeline;
+    aerial.setHeightRef(handle.groundLevelY);
+    aerial.setGrade(BIOME_GRADES[biome.id] ?? NEUTRAL_GRADE);
+
+    // Birds/smoke/water/vegetation (#458 T7.2/D12/A26) — rebuilt from the
+    // landscape's own StructureSet every time this runs (a campaign level
+    // swap can call rebuildLandscapeMesh again for the same GameRenderer, so
+    // stale instances from the previous grid must go first or their meshes
+    // pile up in the scene).
+    // The site edge marker. Sized from the terrain's own height range so it
+    // stands on the ground rather than floating or being buried.
+    if (this.borderWall) this.sm.postPipeline.removeOverlayObject(this.borderWall.object3d);
+    this.borderWall?.dispose();
+    const terrainBounds = this.terrain.getBounds();
+    this.borderWall = new WorldBorderWall(this.sm.scene, {
+      rect: handle.playableRect,
+      minGroundY: terrainBounds?.minY ?? handle.groundLevelY,
+      maxGroundY: terrainBounds?.maxY ?? handle.groundLevelY + 20,
+    });
+    this.sm.postPipeline.addOverlayObject(this.borderWall.object3d);
+
+    this.birds?.dispose();
+    this.smoke?.dispose();
+    this.water?.dispose();
+    this.vegetation?.dispose();
+    this.dustDevils?.dispose();
+    this.fireflies?.dispose();
+    const centerX = sizeX / 2;
+    const centerZ = sizeZ / 2;
+    const sampleHeight = (x: number, z: number) => handle.sampleColumn(x, z).height;
+    this.birds = new BirdFlocks(this.sm.scene, ctx.state.seed, centerX, centerZ);
+    this.smoke = new ChimneySmoke(this.sm.scene, ctx.state.seed, handle.structureSet.villages);
+    this.water = new WaterSurface(this.sm.scene, biome.id, handle.structureSet.rivers, handle.structureSet.landmarks);
+    this.vegetation = new VegetationSway(
+      this.sm.scene, ctx.state.seed, this.ambientUniforms, handle.structureSet.trees,
+      centerX, centerZ, handle.playableRect, sampleHeight,
+    );
+    // Per-biome ambient extras (#458 T7.3) — only the module matching this
+    // level's biome gets built; the other stays null.
+    this.dustDevils = DUST_DEVIL_BIOMES.has(biome.id)
+      ? new DustDevils(this.sm.scene, ctx.state.seed, centerX, centerZ, sampleHeight)
+      : null;
+    this.fireflies = FIREFLY_BIOMES.has(biome.id)
+      ? new Fireflies(this.sm.scene, ctx.state.seed, centerX, centerZ, sampleHeight)
+      : null;
   }
 
   /**
@@ -488,6 +654,13 @@ export class GameRenderer {
     const cz = grid.sizeZ / 2;
     const span = Math.max(grid.sizeX, grid.sizeZ);
     this.sm.cameraController.frameSite(cx, this.getTerrainSurfaceY(cx, cz), cz, span);
+    // Manual panning may wander past the pit rim to glance at nearby
+    // landscape, but not indefinitely — the landscape is viewable, not the
+    // play focus (#458 T6.1/D13).
+    this.sm.cameraController.setPanLeash(
+      { minX: 0, minZ: 0, maxX: grid.sizeX, maxZ: grid.sizeZ },
+      PAN_LEASH_MARGIN,
+    );
   }
 
   private clearAll(): void {
@@ -496,9 +669,18 @@ export class GameRenderer {
     this.vehicles?.clearAll();
     this.characters?.clearAll();
     this.skybox?.dispose();
+    this.clouds?.dispose();
+    if (this.borderWall) this.sm.postPipeline.removeOverlayObject(this.borderWall.object3d);
+    this.borderWall?.dispose();
+    this.birds?.dispose();
+    this.smoke?.dispose();
+    this.water?.dispose();
+    this.vegetation?.dispose();
+    this.dustDevils?.dispose();
+    this.fireflies?.dispose();
     this.fragments?.dispose();
     this.blastEffects?.dispose();
-    this.scenery?.clear();
+    this.landscape?.dispose();
     this.blastOverlay?.dispose();
     this.ghosts?.dispose();
 
@@ -507,9 +689,18 @@ export class GameRenderer {
     this.vehicles = null;
     this.characters = null;
     this.skybox = null;
+    this.borderWall = null;
+    this.windState = null;
+    this.clouds = null;
+    this.birds = null;
+    this.smoke = null;
+    this.water = null;
+    this.vegetation = null;
+    this.dustDevils = null;
+    this.fireflies = null;
     this.fragments = null;
     this.blastEffects = null;
-    this.scenery = null;
+    this.landscape = null;
     this.blastOverlay = null;
     this.ghosts = null;
     this.lastGrid = null;

@@ -7,17 +7,19 @@
 // This is intentionally separate from SaveLoadUI's own numbered slots —
 // those remain reachable through the Save/Load panel and its own backend.
 //
-// The VoxelGrid is not part of the serialized GameState (see the WorldState
-// comment in GameState.ts) — `load` regenerates it from the saved
-// seed/size/mine type, the same way `new_game` builds it. Voxel mutations
-// from blasts fired before the save are not replayed; that mirrors the save
-// system's documented scope rather than adding a new limitation (#408).
+// The VoxelGrid is embedded into `ctx.state.world.voxels` right before saving
+// (#458 T0.3) and restored from there on load, so blast craters, drilled
+// holes, and ramps survive a save/load round trip. A save from before v6 (or
+// one made without a live grid) has no embedded voxels — `load` falls back
+// to regenerating pristine terrain from the saved seed/size/mine type, the
+// same way `new_game` builds it, same as this file's whole history (#408).
 
 import type { GameContext } from './world.js';
-import { regenerateGrid, DEFAULT_GRID_SIZE } from './world.js';
+import { regenerateGrid, restoreGrid, DEFAULT_GRID_SIZE } from './world.js';
 import type { CommandResult } from '../ConsoleRunner.js';
 import { serialize, deserialize } from '../../core/state/SaveLoad.js';
-import { getMinePreset } from '../../core/world/MineType.js';
+import { getBiome } from '../../core/world/BiomeCatalog.js';
+import { encodeVoxelGrid } from '../../core/state/VoxelGridCodec.js';
 
 const DEFAULT_SLOT = 'quicksave';
 
@@ -31,6 +33,9 @@ export function saveCommand(
 ): CommandResult {
   if (!ctx.state) return { success: false, output: 'No game loaded. Use new_game first.' };
   const slot = named['slot'] ?? args[0] ?? DEFAULT_SLOT;
+  if (ctx.grid && ctx.state.world) {
+    ctx.state.world = { ...ctx.state.world, voxels: encodeVoxelGrid(ctx.grid) };
+  }
   quickSaveSlots.set(slot, serialize(ctx.state));
   return { success: true, output: `Saved to slot "${slot}".` };
 }
@@ -45,14 +50,18 @@ export function loadCommand(
   if (!data) return { success: false, output: `No save found in slot "${slot}".` };
 
   const state = deserialize(data);
-  const preset = getMinePreset(state.mineType);
-  if (!preset) return { success: false, output: `Save has unknown mine type "${state.mineType}".` };
+  const biome = getBiome(state.mineType);
+  if (!biome) return { success: false, output: `Save has unknown mine type "${state.mineType}".` };
 
-  const { sizeX, sizeY, sizeZ } = state.world ?? {
-    sizeX: DEFAULT_GRID_SIZE, sizeY: DEFAULT_GRID_SIZE, sizeZ: DEFAULT_GRID_SIZE, gridReady: true,
-  };
   ctx.state = state;
-  regenerateGrid(ctx, { seed: state.seed, preset, sizeX, sizeY, sizeZ });
+  if (state.world?.voxels) {
+    restoreGrid(ctx, state.world.voxels);
+  } else {
+    const { sizeX, sizeY, sizeZ } = state.world ?? {
+      sizeX: DEFAULT_GRID_SIZE, sizeY: DEFAULT_GRID_SIZE, sizeZ: DEFAULT_GRID_SIZE, gridReady: true,
+    };
+    regenerateGrid(ctx, { seed: state.seed, climateBias: biome.climateCenter, sizeX, sizeY, sizeZ });
+  }
 
   return { success: true, output: `Loaded from slot "${slot}".` };
 }

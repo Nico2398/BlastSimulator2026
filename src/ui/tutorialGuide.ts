@@ -136,6 +136,27 @@ export interface ClockDecision {
 }
 
 /**
+ * Whether the simulation still owes the player something it can only deliver
+ * by running.
+ *
+ * A queued or active action is the obvious case, but not the only one: an
+ * employee walking somewhere is work in flight with no action attached. A
+ * driver sent to board a vehicle, in particular, only records
+ * `pendingDriverVehicleId` and a destination — ArrivalGate turns that into an
+ * actual driver once they arrive. Counting only actions made that walk
+ * invisible here, so the clock could be held on an employee mid-stride and
+ * they would never arrive.
+ */
+function isWorkInProgress(state: GameState): boolean {
+  if ((state.pendingActions?.length ?? 0) > 0) return true;
+  return state.employees.employees.some(
+    (e) => e.activeActionId !== null
+      || e.pendingDriverVehicleId !== null
+      || e.destinationX !== null,
+  );
+}
+
+/**
  * Whether the clock has run far enough for this step.
  *
  * Steps that wait on the simulation — a surveyor walking out, ore being hauled
@@ -156,9 +177,7 @@ export function decideClock(
   if (spent < budget) return { hold: false, spent };
   if (!waitsOnWork) return { hold: true, spent };
 
-  const working = (state.pendingActions?.length ?? 0) > 0
-    || state.employees.employees.some(e => e.activeActionId !== null);
-  if (working && spent < budget + WORK_GRACE_TICKS) return { hold: false, spent };
+  if (isWorkInProgress(state) && spent < budget + WORK_GRACE_TICKS) return { hold: false, spent };
 
   return { hold: true, spent };
 }

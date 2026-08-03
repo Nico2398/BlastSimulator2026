@@ -8,7 +8,7 @@ describe('Level definition system (7.1)', () => {
     expect(level!.id).toBe('dusty_hollow');
     expect(level!.nameKey).toBe('level.dusty_hollow.name');
     expect(level!.descKey).toBe('level.dusty_hollow.desc');
-    expect(level!.mineType).toBe('desert');
+    expect(level!.biome).toBe('desert_badlands');
     expect(level!.terrainSeed).toBeGreaterThan(0);
     expect(level!.gridX).toBeGreaterThan(0);
     expect(level!.gridY).toBeGreaterThan(0);
@@ -86,11 +86,11 @@ describe('Level definition system (7.1)', () => {
     expect(level!.id).toBe('tutorial_pit');
     expect(level!.nameKey).toBe('level.tutorial_pit.name');
     expect(level!.descKey).toBe('level.tutorial_pit.desc');
-    expect(level!.mineType).toBe('desert');
+    expect(level!.biome).toBe('desert_badlands');
     expect(level!.terrainSeed).toBe(42);
-    expect(level!.gridX).toBe(24);
-    expect(level!.gridY).toBe(12);
-    expect(level!.gridZ).toBe(24);
+    expect(level!.gridX).toBe(32);
+    expect(level!.gridY).toBe(20);
+    expect(level!.gridZ).toBe(32);
     expect(level!.startingCash).toBe(80000);
     expect(level!.availableExplosives).toContain('pop_rock');
     expect(level!.availableExplosives).toContain('boomite');

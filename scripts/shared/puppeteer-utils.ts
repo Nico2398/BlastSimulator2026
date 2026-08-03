@@ -65,7 +65,14 @@ export async function initBrowser(options: BrowserInitOptions): Promise<BrowserI
   // time spent on clicks, waits, and screenshots (#406).
   const devServerUrl = `http://localhost:${port}/?scenarioMode=1`;
   console.log(`Navigating to ${devServerUrl}...`);
-  await page.goto(devServerUrl, { waitUntil: 'networkidle0' });
+  // 'networkidle0' never resolves once the post-processing composer
+  // (EffectComposer + OutputPass, #458 T5.1) is in the render loop — root
+  // cause not fully pinned down after investigation, but consistently
+  // reproducible and unrelated to any actual pending request (confirmed via
+  // request-tracking: 0 pending at timeout). 'domcontentloaded' plus the
+  // canvas-selector wait immediately below is the real readiness signal
+  // anyway and has proven reliable in every manual repro.
+  await page.goto(devServerUrl, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('#game-canvas, canvas', { timeout: 10000 });
   console.log('Game canvas detected. Waiting for initialization...');
 

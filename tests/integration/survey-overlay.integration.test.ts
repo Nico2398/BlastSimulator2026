@@ -8,7 +8,7 @@ import { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import { Random } from '../../src/core/math/Random.js';
 import { createGame } from '../../src/core/state/GameState.js';
 import { generateTerrain } from '../../src/core/world/TerrainGen.js';
-import { getMinePreset } from '../../src/core/world/MineType.js';
+import { getBiome } from '../../src/core/world/BiomeCatalog.js';
 import { hireEmployee, assignSkill } from '../../src/core/entities/Employee.js';
 import {
   SurveyConfidenceOverlay,
@@ -75,14 +75,14 @@ function makeMultiOreGrid(positions: { x: number; z: number }[]): VoxelGrid {
  * so we get a realistic VoxelGrid with surface geometry.
  */
 function makeTerrainGrid(size = 32, seed = 42): VoxelGrid {
-  const preset = getMinePreset('desert');
-  if (!preset) throw new Error('desert preset not found');
+  const biome = getBiome('desert_badlands');
+  if (!biome) throw new Error('desert_badlands biome not found');
   return generateTerrain({
     sizeX: size,
     sizeY: size,
     sizeZ: size,
     seed,
-    preset,
+    climateBias: biome.climateCenter,
   });
 }
 
@@ -742,7 +742,7 @@ describe('Survey Confidence Overlay — integration (4.11)', () => {
     expect(Math.max(...confidences)).toBeGreaterThan(Math.min(...confidences));
   });
 
-  it('overlay survives TerrainMesh.update re-mesh while visible', () => {
+  it('overlay survives TerrainMesh.remeshRegion re-mesh while visible', () => {
     const scene = makeScene();
     const grid = new VoxelGrid(8, 8, 8);
     // Fill bottom half solid
@@ -774,7 +774,7 @@ describe('Survey Confidence Overlay — integration (4.11)', () => {
 
     // Simulate terrain modification (blast crater) and re-mesh
     for (let y = 0; y < 4; y++) grid.clearVoxel(3, y, 3);
-    tm.update([{ x: 3, y: 0, z: 3 }]);
+    tm.remeshRegion({ minX: 3, minY: 0, minZ: 3, maxX: 3, maxY: 3, maxZ: 3 });
 
     // After re-mesh, the overlay group should still be in the scene
     const groupInSceneAfter = scene.children.find(
@@ -944,10 +944,13 @@ describe('TerrainMesh.getSurveyOverlay — game state integration', () => {
     // Show overlay with the survey data
     overlay.show({ points, opacity: 0.5 });
 
-    // Overlay should be visible and contain mesh children for each point
-    const group = scene.children[1] as THREE.Group; // 0 = terrain mesh, 1 = overlay group
+    // Overlay should be visible and contain mesh children for each point.
+    // Found by type, not a fixed index — buildAll() now adds one Mesh per
+    // non-empty chunk (#458 T3.1), so the overlay's Group is no longer
+    // reliably at scene.children[1].
+    const group = scene.children.find(child => child instanceof THREE.Group) as THREE.Group | undefined;
     expect(group).toBeDefined();
-    expect(group.children.length).toBeGreaterThanOrEqual(points.length);
+    expect(group!.children.length).toBeGreaterThanOrEqual(points.length);
 
     tm.dispose();
   });

@@ -1,159 +1,156 @@
 // BlastSimulator2026 — Procedural terrain generation
-// Uses simplex noise + seeded PRNG to populate a VoxelGrid.
+// Populates a VoxelGrid from the unified world height sampler (WorldGen.ts),
+// a depth-stratified rock profile (Strata.ts) and per-ore anisotropic vein
+// noise (OreVeins.ts).
 
-import { createNoise2D, createNoise3D } from 'simplex-noise';
-import { Random } from '../math/Random.js';
-import { VoxelGrid, type VoxelData, type VoxelRockComposition } from './VoxelGrid.js';
-import { getAllRocks, type RockType } from './RockCatalog.js';
-import type { MinePreset } from './MineType.js';
+import { VoxelGrid } from './VoxelGrid.js';
+import type { BiomeDef } from './BiomeCatalog.js';
+import { selectBiomeWeights, dominantBiome, biomeShaping } from './BiomeCatalog.js';
+import { createWorldGenContext, sampleSurfaceHeightY, type WorldGenContext } from './WorldGen.js';
+import { buildStrataProfile, buildMixedHardnessStrata, StrataSampler } from './Strata.js';
+import { OreVeinSampler } from './OreVeins.js';
 
 export interface TerrainConfig {
   sizeX: number;
   sizeY: number;
   sizeZ: number;
   seed: number;
-  preset: MinePreset;
+  /**
+   * Bias added to the raw climate fields so this grid's own terrain lands
+   * near a specific biome's climate centre (#458 T1.2/A6) — [0, 0] samples
+   * the world's natural, unbiased climate. A level authors this to land its
+   * intended biome; a standalone `new_game biome:X` resolves X's own
+   * climateCenter and passes that directly.
+   */
+  climateBias: readonly [number, number];
+  /**
+   * Interleaves hard/soft rock layers when true: swaps the biome's normal
+   * soft-to-hard strata gradient for alternating ~5 m bands of its softest
+   * and hardest dominant rock (#458 D4/T1.3/A11).
+   */
+  mixedRockHardness?: boolean;
+}
+
+export interface TerrainContext {
+  worldGen: WorldGenContext;
+  biome: BiomeDef;
+  strata: StrataSampler;
+  oreVeins: OreVeinSampler;
+}
+
+/**
+ * Builds everything generateTerrain needs from one config: the world height
+ * sampler, the grid's single dominant biome, and its strata/ore samplers.
+ * Exported (not just internal to generateTerrain) so a caller building the
+ * landscape map alongside the playable grid (#458 T2.1) can reconstruct an
+ * equivalent context from the same config — determinism guarantees it
+ * produces byte-identical sampling to what generateTerrain used internally,
+ * without the two needing to share object references (unlike the palette,
+ * which genuinely must be the same instance — see LandscapeMap.ts).
+ */
+export function buildTerrainContext(config: TerrainConfig): TerrainContext {
+  const { sizeX, sizeY, sizeZ, seed, climateBias, mixedRockHardness } = config;
+
+  const worldGen = createWorldGenContext(seed, sizeX, sizeY, sizeZ, (fields) => (x, z) => {
+    const weights = selectBiomeWeights(fields.temperature(x, z), fields.humidity(x, z), climateBias, 1.0);
+    return weights.map(w => ({ shaping: biomeShaping(w.biome), weight: w.weight }));
+  });
+
+  const centerBiomeWeights = selectBiomeWeights(
+    worldGen.fields.temperature(sizeX / 2, sizeZ / 2),
+    worldGen.fields.humidity(sizeX / 2, sizeZ / 2),
+    climateBias,
+    1.0,
+  );
+  const biome = dominantBiome(centerBiomeWeights);
+
+  const profile = mixedRockHardness
+    ? buildMixedHardnessStrata(biome.dominantRocks)
+    : buildStrataProfile(biome.dominantRocks);
+  const strata = new StrataSampler(seed, profile);
+  const oreVeins = new OreVeinSampler(seed);
+
+  return { worldGen, biome, strata, oreVeins };
 }
 
 /**
  * Generate terrain into a new VoxelGrid.
  * Algorithm:
- *   1. Compute surface height per (x, z) using layered 2D simplex noise
- *   2. Fill voxels below surface with rock (composition from per-rock 3D noise + level bias)
- *   3. Distribute ore veins using separate 3D noise per ore type
+ *   1. Sample surface height per (x, z) from the unified world generator (WorldGen.ts, #458 T1.1),
+ *      climate-blended across biomes (BiomeCatalog.ts, #458 T1.2) — the same sampler the landscape
+ *      heightmap reads from (LandscapeMap.ts, #458 T2.1), so the two representations cannot disagree
+ *      at their shared boundary.
+ *   2. Fill voxels below surface from a depth-stratified rock profile (Strata.ts, #458 T1.3/A11)
+ *   3. Distribute ore veins using per-ore anisotropic noise (OreVeins.ts, #458 T1.3/A12)
  *   4. Clear border zone of ores (neutral zone)
+ *
+ * Height blends every biome's shaping by climate weight, evaluated per
+ * column — a real gradient at a climate transition, not a seam. Rock/ore
+ * generation (steps 2-4) still uses ONE dominant biome for the whole grid
+ * (the highest-weighted biome at the grid's own centre) rather than
+ * blending per column — full per-column biome-blended strata is out of
+ * scope for T1.3 (no accept criterion calls for it) and would belong to a
+ * future landscape-blending task if ever needed.
  */
+/**
+ * Half-width, in voxels, of the band over which density falls from solid to
+ * air across the surface.
+ *
+ * One full voxel either side. A narrower band would need a density below zero
+ * on the air side to keep the crossing linear, and densities are clamped to
+ * [0, 1] — the crossing would then bend and the surface would drift off the
+ * height it is supposed to sit on.
+ */
+const SURFACE_BAND_HALF = 1;
+
+/**
+ * Density for voxel `y` in a column whose surface sits at continuous height
+ * `surfaceH`, chosen so marching cubes puts its iso-surface exactly there.
+ *
+ * Marching cubes finds the 0.5 crossing by interpolating linearly between two
+ * corner densities, so a field that is linear in y with value 0.5 at surfaceH
+ * reproduces surfaceH exactly, fractional part and all. Filling voxels solid
+ * up to a rounded surface instead is what terraced the whole site into 1 m
+ * steps while the landscape beside it stayed smooth (#458).
+ */
+export function surfaceDensityAt(y: number, surfaceH: number): number {
+  const d = 0.5 + (surfaceH - y) / (2 * SURFACE_BAND_HALF);
+  return Math.max(0, Math.min(1, d));
+}
+
 export function generateTerrain(config: TerrainConfig): VoxelGrid {
-  const { sizeX, sizeY, sizeZ, seed, preset } = config;
-  const rng = new Random(seed);
-
-  // simplex-noise uses a PRNG function for seeding
-  const prngFn = () => rng.next();
-  const noise2d = createNoise2D(prngFn);
-  const noise3dRock = createNoise3D(prngFn);
-  const noise3dOre = createNoise3D(prngFn);
-
+  const { sizeX, sizeY, sizeZ } = config;
   const grid = new VoxelGrid(sizeX, sizeY, sizeZ);
-  const rocks = selectRocksByPreset(preset);
+  const { worldGen, biome, strata, oreVeins } = buildTerrainContext(config);
 
   for (let z = 0; z < sizeZ; z++) {
     for (let x = 0; x < sizeX; x++) {
-      const surfaceY = computeSurfaceHeight(x, z, sizeX, sizeZ, sizeY, preset, noise2d);
+      const surfaceH = sampleSurfaceHeightY(worldGen, x, z);
+      const surfaceY = Math.round(surfaceH);
+      const boundaries = strata.boundariesAt(x, z);
+      const inBorder = isInBorderZone(x, z, sizeX, sizeZ, biome.borderWidth);
 
-      for (let y = 0; y < sizeY; y++) {
-        if (y >= surfaceY) {
-          // Above surface = air (default empty voxel)
-          continue;
-        }
+      // Every voxel the surface band reaches, which is one higher than the
+      // last fully solid one — that voxel carries the fractional density
+      // marching cubes interpolates against.
+      const topY = Math.min(sizeY - 1, Math.ceil(surfaceH + SURFACE_BAND_HALF) - 1);
+      for (let y = 0; y <= topY; y++) {
+        const density = surfaceDensityAt(y, surfaceH);
+        if (density <= 0) continue;
 
-        const composition = computeComposition(x, y, z, rocks, noise3dRock);
-        const inBorder = isInBorderZone(x, z, sizeX, sizeZ, preset.borderWidth);
-        const oreDensities = inBorder
-          ? {}
-          : computeOreDensities(x, y, z, rocks, composition, preset.oreRichness, noise3dOre);
+        // Depth is still measured from the rounded surface, so which stratum a
+        // voxel belongs to is unchanged by the sub-voxel surface placement.
+        const depth = Math.max(0, surfaceY - y);
+        const composition = strata.compositionAt(x, y, z, depth, boundaries);
+        const compId = grid.palette.intern(composition);
+        const oreDensities = inBorder ? {} : oreVeins.densitiesAt(x, y, z, depth, composition, biome.oreRichness);
 
-        const voxel: VoxelData = {
-          composition,
-          density: 1.0,
-          oreDensities,
-          fractureModifier: 1.0,
-        };
-        grid.setVoxel(x, y, z, voxel);
+        grid.fillVoxel(x, y, z, compId, oreDensities, density);
       }
     }
   }
 
   return grid;
-}
-
-function computeSurfaceHeight(
-  x: number, z: number,
-  sizeX: number, sizeZ: number, sizeY: number,
-  preset: MinePreset,
-  noise2d: ReturnType<typeof createNoise2D>,
-): number {
-  const nx = x / sizeX;
-  const nz = z / sizeZ;
-
-  // Layered noise: large features + detail
-  const n1 = noise2d(nx * 2, nz * 2) * 0.6;
-  const n2 = noise2d(nx * 5, nz * 5) * 0.3;
-  const n3 = noise2d(nx * 10, nz * 10) * 0.1;
-  const rawNoise = n1 + n2 + n3; // range roughly [-1, 1]
-
-  // Flatten based on preset
-  const flattened = rawNoise * (1 - preset.flatness);
-
-  const baseY = preset.baseElevation * sizeY;
-  const variation = preset.elevationVariation * sizeY;
-  const height = baseY + flattened * variation;
-
-  return Math.max(1, Math.min(sizeY - 1, Math.round(height)));
-}
-
-/** Select and weight rocks based on the preset's dominant rock list. */
-function selectRocksByPreset(preset: MinePreset): RockType[] {
-  const allRocks = getAllRocks();
-  const selected: RockType[] = [];
-  for (const id of preset.dominantRocks) {
-    const rock = allRocks.find(r => r.id === id);
-    if (rock) selected.push(rock);
-  }
-  // Fallback: if no rocks match, use all rocks
-  return selected.length > 0 ? selected : [...allRocks];
-}
-
-/**
- * Compute rock composition for a voxel using per-rock 3D Simplex noise + level bias.
- * For each rock type:
- *   raw[r] = simplex3(x * noiseFreq, y * noiseFreq, z * noiseFreq) + levelBias
- *   coefficient[r] = max(0, raw[r]) / sum(max(0, raw))
- *
- * If all raw values are ≤ 0, falls back to the first rock at coefficient 1.0.
- */
-export function computeComposition(
-  x: number, y: number, z: number,
-  rocks: readonly RockType[],
-  noise3d: ReturnType<typeof createNoise3D>,
-): VoxelRockComposition {
-  const rawValues: number[] = [];
-  const clippedValues: number[] = [];
-  for (const rock of rocks) {
-    const raw = noise3d(x * rock.noiseFreq, y * rock.noiseFreq, z * rock.noiseFreq) + rock.levelBias;
-    rawValues.push(raw);
-    clippedValues.push(Math.max(0, raw));
-  }
-
-  const sum = clippedValues.reduce((a, b) => a + b, 0);
-  const composition: VoxelRockComposition = { rocks: [] };
-
-  if (sum > 0) {
-    for (let i = 0; i < rocks.length; i++) {
-      const coeff = clippedValues[i]! / sum;
-      if (coeff > 0.01) {
-        composition.rocks.push({ rockId: rocks[i]!.id, coefficient: Math.round(coeff * 100) / 100 });
-      }
-    }
-    const finalSum = composition.rocks.reduce((s, r) => s + r.coefficient, 0);
-    if (finalSum > 0 && Math.abs(finalSum - 1.0) > 0.001) {
-      for (const r of composition.rocks) {
-        r.coefficient = Math.round((r.coefficient / finalSum) * 100) / 100;
-      }
-    }
-  }
-
-  // Fallback: all clipped values are ≤ 0 — pick the rock with the highest raw value
-  if (composition.rocks.length === 0 && rocks.length > 0) {
-    let bestIdx = 0;
-    for (let i = 1; i < rocks.length; i++) {
-      if (rawValues[i]! > rawValues[bestIdx]!) {
-        bestIdx = i;
-      }
-    }
-    composition.rocks.push({ rockId: rocks[bestIdx]!.id, coefficient: 1.0 });
-  }
-
-  return composition;
 }
 
 /** Check if a position is in the neutral border zone. */
@@ -164,54 +161,4 @@ function isInBorderZone(
 ): boolean {
   return x < borderWidth || x >= sizeX - borderWidth
     || z < borderWidth || z >= sizeZ - borderWidth;
-}
-
-/**
- * Compute ore densities for a voxel based on the composition and rock catalog.
- * Each rock in the composition contributes its own ore probabilities, weighted
- * by the rock's coefficient. This ensures that even non-dominant rock types
- * contribute ores with their characteristic thresholds.
- */
-function computeOreDensities(
-  x: number, y: number, z: number,
-  rocks: readonly RockType[],
-  composition: VoxelRockComposition,
-  richnessMod: number,
-  noise3d: ReturnType<typeof createNoise3D>,
-): Record<string, number> {
-  const ores: Record<string, number> = {};
-
-  for (const comp of composition.rocks) {
-    const rock = rocks.find(r => r.id === comp.rockId);
-    if (!rock) continue;
-
-    for (const [oreId, probability] of Object.entries(rock.oreProbabilities)) {
-      const oreHash = simpleHash(oreId);
-      const n = noise3d(
-        (x + oreHash) * 0.1,
-        y * 0.12,
-        (z + oreHash * 0.7) * 0.1,
-      );
-      const threshold = 1 - probability * 2;
-      if (n > threshold) {
-        const density = Math.min(1.0, (n - threshold) * richnessMod * 2);
-        if (density > 0.01) {
-          if (!ores[oreId] || density > ores[oreId]) {
-            ores[oreId] = Math.round(density * 100) / 100;
-          }
-        }
-      }
-    }
-  }
-
-  return ores;
-}
-
-/** Simple string hash for noise offset. */
-function simpleHash(s: string): number {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) {
-    h = ((h << 5) - h + s.charCodeAt(i)) | 0;
-  }
-  return Math.abs(h) % 1000;
 }

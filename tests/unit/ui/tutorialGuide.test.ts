@@ -263,6 +263,37 @@ describe('decideClock', () => {
     expect(decideClock(s, 0, DEFAULT_TICK_BUDGET, true).hold).toBe(false);
   });
 
+  it('keeps running while a driver walks to board, which carries no action at all', () => {
+    // The tutorial's vehicle step deadlocked on exactly this. Assigning a
+    // driver only records the intent and a destination — ArrivalGate seats
+    // them once they arrive — so counting actions alone left the walk
+    // invisible, the clock held mid-stride, and the driver never arrived.
+    const s = state();
+    s.tickCount = DEFAULT_TICK_BUDGET + 5;
+    s.employees.employees = [
+      { activeActionId: null, pendingDriverVehicleId: 1, destinationX: 12, destinationZ: 8 } as never,
+    ];
+    expect(decideClock(s, 0, DEFAULT_TICK_BUDGET, true).hold).toBe(false);
+  });
+
+  it('keeps running while an employee walks anywhere on a work-waiting step', () => {
+    const s = state();
+    s.tickCount = DEFAULT_TICK_BUDGET + 5;
+    s.employees.employees = [
+      { activeActionId: null, pendingDriverVehicleId: null, destinationX: 4, destinationZ: 9 } as never,
+    ];
+    expect(decideClock(s, 0, DEFAULT_TICK_BUDGET, true).hold).toBe(false);
+  });
+
+  it('still holds once the walk finishes and nothing else is outstanding', () => {
+    const s = state();
+    s.tickCount = DEFAULT_TICK_BUDGET + 5;
+    s.employees.employees = [
+      { activeActionId: null, pendingDriverVehicleId: null, destinationX: null, destinationZ: null } as never,
+    ];
+    expect(decideClock(s, 0, DEFAULT_TICK_BUDGET, true).hold).toBe(true);
+  });
+
   it('holds a step that only waits on a click, even with work in flight', () => {
     // Contract offers are regenerated on a timer and the oldest is dropped, so
     // letting the clock run while the player picks an offer pulls the row out

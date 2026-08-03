@@ -3,7 +3,7 @@
 
 import { NavGrid } from './NavGrid.js';
 import type { NavCell } from './NavGrid.js';
-import { PATHFINDING_NODE_BUDGET_CAP } from '../config/balance.js';
+import { pathfindingNodeBudget } from '../config/balance.js';
 
 /**
  * Describes a pathfinding request from one grid cell to another.
@@ -63,6 +63,28 @@ const MIN_WALKABLE_COST = 1.0;
  * bound, we consider it optimal enough to skip A* entirely.
  */
 const DIRECT_LINE_TOLERANCE = 1.1;
+
+/**
+ * Heuristic inflation for the A* main loop (#458 T6.2/D14). Any obstacle
+ * sitting directly on the optimal route between two far-apart points — a
+ * blast crater, a cluster of 'void' cells, a cracked outcrop — puts many
+ * detour cells within a hair of the true optimal f-score once the goal is
+ * 100+ cells away, since a short lateral step barely changes an admissible
+ * octile estimate to a distant goal. Plain A* then re-expands that whole
+ * near-tied frontier before it can be sure it found the optimal path: a
+ * 20-cell obstacle directly on a 160×160 cross-map route measured at 6100+
+ * explored nodes with weight 1.0 — nearly double pathfindingNodeBudget's own
+ * scaled cap — and grows worse with obstacle size, well past what any
+ * plausible node budget for this grid size should have to absorb. Inflating
+ * the heuristic (standard weighted-A*, trading a little optimality for a lot
+ * less exploration) cuts that same case to a fraction of the budget; 1.3 was
+ * the smallest weight that kept a 40-cell obstacle — bigger than any single
+ * blast crater or drill-grid clearance produces — within budget in measurement.
+ * Applied to the A* loop's own priority only, never to the direct-line
+ * fast-path's lower-bound check above, which needs the true admissible
+ * heuristic to stay a valid bound.
+ */
+const ASTAR_HEURISTIC_WEIGHT = 1.3;
 
 // ---------------------------------------------------------------------------
 // Internal binary min-heap (generic)
@@ -138,16 +160,40 @@ export function octileHeuristic(ax: number, az: number, bx: number, bz: number):
   return Math.max(dx, dz) + (Math.SQRT2 - 1) * Math.min(dx, dz);
 }
 
-/** Encode a coordinate pair as a single numeric key. */
-const POS_MULT = 100000;
-function encodePos(x: number, z: number): number {
-  return x * POS_MULT + z;
+/** Flat row-major index for a coordinate pair — also the A* scratch arrays' index space. */
+function cellIndex(x: number, z: number, width: number): number {
+  return z * width + x;
 }
-function posX(pos: number): number {
-  return (pos / POS_MULT) | 0;
-}
-function posZ(pos: number): number {
-  return pos % POS_MULT;
+
+// ---------------------------------------------------------------------------
+// A* scratch arrays (#458 T6.2/D14)
+// ---------------------------------------------------------------------------
+//
+// Per-search Map<number, number> allocation was the dominant A* cost once
+// D13's bigger levels (up to 160×160, node budget scaled accordingly — see
+// pathfindingNodeBudget) meant every search could touch thousands of nodes:
+// each Map.set/get is a hash-table operation, and a fresh Map per call
+// discards all of that work as garbage immediately after. Flat typed arrays
+// indexed by cellIndex(x, z, width) replace both gScore and cameFrom with
+// direct array access, and a generation-stamp counter (currentStamp) marks
+// which entries belong to the search in progress — a cell is "touched" iff
+// stampArr[i] === currentStamp — without needing to clear the arrays between
+// searches. Arrays live on module-level scratch, grown (never shrunk) to fit
+// the largest grid seen; small early-game searches reuse the same buffers a
+// later 160×160 search grew.
+let scratchCapacity = 0;
+let gScoreArr = new Float64Array(0);
+let cameFromArr = new Int32Array(0);
+let stampArr = new Int32Array(0);
+let currentStamp = 0;
+
+/** Grow the A* scratch arrays to at least `size` cells. Never shrinks. */
+function ensureScratchCapacity(size: number): void {
+  if (size <= scratchCapacity) return;
+  scratchCapacity = size;
+  gScoreArr = new Float64Array(size);
+  cameFromArr = new Int32Array(size);
+  stampArr = new Int32Array(size); // zero-filled; currentStamp starts at 1 so this never falsely reads as "touched"
 }
 
 /** Clamp a coordinate to the grid bounds. */
@@ -329,7 +375,23 @@ function findMultiLevelPath(grid: NavGrid, request: PathRequest): PathResult {
     return { found: false, waypoints: [], totalCost: 0 };
   }
 
+  // Route-selection stability (#458 T6.1/D14): route1/route2's costs are A*
+  // results from the agent's CURRENT (continuously-shifting, sub-cell)
+  // position, recomputed fresh every tick. When two candidate ramps cost
+  // nearly the same, whichever one is marginally cheaper can flip from tick
+  // to tick as the agent's exact position shifts by fractions of a cell —
+  // producing a stable walk-toward-ramp-A / walk-toward-ramp-B oscillation
+  // that never actually arrives (confirmed via direct reproduction: an
+  // agent frozen retrying between two points for 100+ ticks, this loop
+  // returning a *different* best ramp on each call from the same physical
+  // vicinity). Ties within RAMP_TIE_EPSILON break on the ramp's own grid
+  // position — fixed regardless of the agent's position — so the same
+  // choice keeps winning as the agent approaches, instead of flapping.
+  // Bigger levels (#458 D13) carry far more natural relief than the old
+  // ones, giving agents many more close-cost ramp choices to flap between.
+  const RAMP_TIE_EPSILON = 1.0;
   let bestResult: PathResult | null = null;
+  let bestRampKey = Infinity;
 
   for (const ramp of candidateRamps) {
     // Determine entrance (on start level) and exit (on goal level)
@@ -373,9 +435,17 @@ function findMultiLevelPath(grid: NavGrid, request: PathRequest): PathResult {
 
     // Concatenate route1 → ramp → route2 waypoints with deduplication
     const waypoints = concatPaths(route1, { x: ramp.rampX, z: ramp.rampZ }, route2);
+    const rampKey = ramp.rampX * 100000 + ramp.rampZ;
 
-    if (bestResult === null || totalCost < bestResult.totalCost) {
+    const isClearlyBetter = bestResult === null || totalCost < bestResult.totalCost - RAMP_TIE_EPSILON;
+    const isTiedButStablyPreferred =
+      bestResult !== null &&
+      Math.abs(totalCost - bestResult.totalCost) <= RAMP_TIE_EPSILON &&
+      rampKey < bestRampKey;
+
+    if (isClearlyBetter || isTiedButStablyPreferred) {
       bestResult = { found: true, waypoints, totalCost };
+      bestRampKey = rampKey;
     }
   }
 
@@ -432,12 +502,46 @@ export function findPath(grid: NavGrid, request: PathRequest): PathResult {
     return { found: true, waypoints: [{ x: sx, z: sz }], totalCost: 0 };
   }
 
-  // 4b. Multi-level check: delegate to multi-level routing when levels differ
+  // 5. Ordinary search (direct line + A*) first, regardless of bench level.
+  //    isImpassable only excludes 'blocked'/'void' cells and, optionally,
+  //    vehicle-occupied ones — it never looks at benchLevel, so ordinary A*
+  //    already walks straight across a gentle one-level grade exactly like
+  //    any other terrain. benchLevel bands natural relief far more finely
+  //    than "genuinely blocked" (#458 T6.1/D14 found the bigger, hillier D13
+  //    levels carrying near-constant one-level differences between adjacent
+  //    cells), so gating every differing-level request behind ramp-only
+  //    findMultiLevelPath — as this used to, unconditionally — forced almost
+  //    every walk on those levels through the fragile ramp search, including
+  //    ones ordinary A* could have solved directly. That produced the ramp
+  //    tie-flip oscillation fixed above, and even with that fix, agents whose
+  //    start/goal sat in bench-fragmented terrain (many candidate ramps, none
+  //    close to the direct route) could walk in a stable loop that never
+  //    converges — confirmed via direct reproduction: a surveyor's position
+  //    cycling through the same handful of cells for 20+ ticks while
+  //    findMultiLevelPath kept returning a *found* path every tick, just a
+  //    detour nowhere near the goal.
+  const ordinary = findOrdinaryPath(grid, sx, sz, gx, gz, avoidVehicles);
+  if (ordinary.found) return ordinary;
+
+  // 6. Ordinary search found no connection at all — if start and goal sit on
+  //    different bench levels, a genuine wall (not just relief) may separate
+  //    them, so fall back to ramp-based multi-level routing before giving up.
   if (getBenchLevel(grid, sx, sz) !== getBenchLevel(grid, gx, gz)) {
     return findMultiLevelPath(grid, request);
   }
 
-  // 5. Fast path — try direct line before A* only if it's clearly optimal.
+  return ordinary;
+}
+
+function findOrdinaryPath(
+  grid: NavGrid,
+  sx: number,
+  sz: number,
+  gx: number,
+  gz: number,
+  avoidVehicles: boolean,
+): PathResult {
+  // Fast path — try direct line before A* only if it's clearly optimal.
   //    Compare direct-line cost to heuristic lower bound (octile * MIN_WALKABLE_COST).
   //    If directLine is more than 10% above heuristic, it's suboptimal — use A*.
   const directLine = directLineWalk(grid, sx, sz, gx, gz, avoidVehicles);
@@ -446,38 +550,44 @@ export function findPath(grid: NavGrid, request: PathRequest): PathResult {
     if (directLine.totalCost <= heuristicLowerBound * DIRECT_LINE_TOLERANCE) return directLine;
   }
 
-  // 6. A* main loop
+  // A* main loop — see the scratch-array block above for why gScore/cameFrom
+  // are flat typed arrays keyed by cellIndex rather than per-call Maps.
 
   interface AStarNode {
     key: number; // f = g + h, used by the min-heap
-    pos: number; // encoded position
+    pos: number; // cellIndex(x, z, width)
     g: number;   // gScore at push time (for stale check)
   }
 
+  const width = grid.width;
+  ensureScratchCapacity(width * grid.height);
+  currentStamp++;
+
   const openHeap = new MinHeap<AStarNode>();
-  const gScore = new Map<number, number>();
-  const cameFrom = new Map<number, number>();
   let exploredCount = 0;
 
-  const startPos = encodePos(sx, sz);
-  gScore.set(startPos, 0);
-  const hStart = octileHeuristic(sx, sz, gx, gz);
+  const budget = pathfindingNodeBudget(grid.width, grid.height);
+  const startPos = cellIndex(sx, sz, width);
+  gScoreArr[startPos] = 0;
+  stampArr[startPos] = currentStamp;
+  cameFromArr[startPos] = -1;
+  const hStart = octileHeuristic(sx, sz, gx, gz) * ASTAR_HEURISTIC_WEIGHT;
   openHeap.push({ key: hStart, pos: startPos, g: 0 });
 
-  while (openHeap.size > 0 && exploredCount < PATHFINDING_NODE_BUDGET_CAP) {
+  while (openHeap.size > 0 && exploredCount < budget) {
     const current = openHeap.pop()!;
-    const cx = posX(current.pos);
-    const cz = posZ(current.pos);
+    const cx = current.pos % width;
+    const cz = (current.pos / width) | 0;
 
     // Skip stale entries (re-expanded with outdated gScore)
-    const bestG = gScore.get(current.pos);
-    if (bestG === undefined || current.g !== bestG) continue;
+    const bestG = gScoreArr[current.pos];
+    if (bestG !== current.g) continue;
 
     exploredCount++;
 
     // Goal reached?
     if (cx === gx && cz === gz) {
-      return reconstructPath(cameFrom, gx, gz, gScore);
+      return reconstructPath(gx, gz, width);
     }
 
     // Explore neighbours
@@ -496,13 +606,15 @@ export function findPath(grid: NavGrid, request: PathRequest): PathResult {
       const stepCost = isDiagonal ? neighborCell.moveCost * Math.SQRT2 : neighborCell.moveCost;
       const tentativeG = bestG + stepCost;
 
-      const neighborPos = encodePos(nx, nz);
-      const existingG = gScore.get(neighborPos);
+      const neighborPos = cellIndex(nx, nz, width);
+      const touched = stampArr[neighborPos] === currentStamp;
+      const existingG = touched ? gScoreArr[neighborPos]! : Infinity;
 
-      if (existingG === undefined || tentativeG < existingG) {
-        gScore.set(neighborPos, tentativeG);
-        cameFrom.set(neighborPos, current.pos);
-        const h = octileHeuristic(nx, nz, gx, gz);
+      if (!touched || tentativeG < existingG) {
+        gScoreArr[neighborPos] = tentativeG;
+        stampArr[neighborPos] = currentStamp;
+        cameFromArr[neighborPos] = current.pos;
+        const h = octileHeuristic(nx, nz, gx, gz) * ASTAR_HEURISTIC_WEIGHT;
         openHeap.push({ key: tentativeG + h, pos: neighborPos, g: tentativeG });
       }
     }
@@ -515,27 +627,19 @@ export function findPath(grid: NavGrid, request: PathRequest): PathResult {
   return { found: false, waypoints: [], totalCost: 0 };
 }
 
-/** Reconstruct path by walking cameFrom map backwards from goal to start. */
-function reconstructPath(
-  cameFrom: Map<number, number>,
-  goalX: number,
-  goalZ: number,
-  gScore: Map<number, number>,
-): PathResult {
+/** Reconstruct path by walking the cameFromArr scratch array backwards from goal to start. */
+function reconstructPath(goalX: number, goalZ: number, width: number): PathResult {
   const waypoints: { x: number; z: number }[] = [];
-  let currentPos = encodePos(goalX, goalZ);
+  let idx = cellIndex(goalX, goalZ, width);
+  const totalCost = gScoreArr[idx]!;
 
-  // Walk backwards
-  while (true) {
-    waypoints.push({ x: posX(currentPos), z: posZ(currentPos) });
-    const parentPos = cameFrom.get(currentPos);
-    if (parentPos === undefined) break;
-    currentPos = parentPos;
+  // Walk backwards (-1 marks the start node, which has no parent)
+  while (idx !== -1) {
+    waypoints.push({ x: idx % width, z: (idx / width) | 0 });
+    idx = cameFromArr[idx]!;
   }
 
   waypoints.reverse();
-
-  const totalCost = gScore.get(encodePos(goalX, goalZ)) ?? 0;
 
   return { found: true, waypoints, totalCost };
 }

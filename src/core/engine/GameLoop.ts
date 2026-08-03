@@ -20,7 +20,7 @@ import { tickArrivalGate, type ArrivalGateResult } from './ArrivalGate.js';
 
 // ── Config ──
 
-import { BASE_TICK_MS as _BASE_TICK_MS, VALID_SPEEDS as _VALID_SPEEDS, NEED_REST_DURATIONS, NEED_REST_NO_BUILDING_CAP, NEED_REST_NO_BUILDING_DURATION_MULTIPLIER, NEED_REST_BUILDING_TYPES, NEED_REST_SEARCH_RADIUS, NEED_WARNING_THRESHOLDS, NEED_REST_COSTS, WORK_DURATION_TICKS, SHIFT_SLEEP_DURATION_TICKS, BASE_TASK_DURATION_TICKS } from '../config/balance.js';
+import { BASE_TICK_MS as _BASE_TICK_MS, VALID_SPEEDS as _VALID_SPEEDS, NEED_REST_DURATIONS, NEED_REST_NO_BUILDING_CAP, NEED_REST_NO_BUILDING_DURATION_MULTIPLIER, NEED_REST_BUILDING_TYPES, needRestSearchRadius, NEED_WARNING_THRESHOLDS, NEED_REST_COSTS, WORK_DURATION_TICKS, SHIFT_SLEEP_DURATION_TICKS, BASE_TASK_DURATION_TICKS } from '../config/balance.js';
 
 // Vehicle and employee per-tick movement (NavGrid pathing, stuck-tracking) live
 // in EntityMovementTick.ts (#407 refactor) — re-exported here so GameLoop.ts
@@ -363,7 +363,8 @@ export function tickCollapse(state: GameState, _firedEvents?: FiredEvent[], _emi
 
     if (building) {
       const distSq = (building.x - emp.x) ** 2 + (building.z - emp.z) ** 2;
-      if (distSq <= NEED_REST_SEARCH_RADIUS ** 2) {
+      const searchRadius = needRestSearchRadius(state.world?.sizeX ?? 0);
+      if (distSq <= searchRadius ** 2) {
         const approach = resolveBuildingApproach(state, building, emp.x, emp.z);
         targetX = approach.x;
         targetZ = approach.z;

@@ -24,6 +24,35 @@ const DESERT_ROCKS = ['cruite', 'sandite', 'molite'];
 /** Starting cash comes from the level catalogue, not a copy of it. */
 const TUTORIAL_START_CASH = getLevel('tutorial_pit')!.startingCash;
 
+/**
+ * The tutorial's real guided build area (`REGION.warehouse` in
+ * src/ui/tutorialStages.ts, duplicated here rather than imported — this is
+ * an integration test for core/console behaviour, not a UI dependency).
+ * `canPlaceBuilding` requires an exactly flat footprint (#458 T9.1/D15) —
+ * the terrain generator no longer guarantees a specific hardcoded
+ * coordinate like (16,16) is that flat, so these tests search the tutorial's
+ * own build region for a spot that qualifies rather than assuming one.
+ */
+const WAREHOUSE_REGION = { x1: 2, z1: 2, x2: 9, z2: 9 };
+
+/** First (x, z) within `region` where a `type`/`tier` footprint is flat and clear, or null if none exists. */
+function findBuildableSpot(
+  ctx: ReturnType<typeof makeCampaignCtx>,
+  type: string,
+  tier: number,
+  region: { x1: number; z1: number; x2: number; z2: number },
+): { x: number; z: number } | null {
+  const placementGrid = buildPlacementGrid(ctx.grid!, ctx.state!.buildings);
+  for (let x = region.x1; x <= region.x2; x++) {
+    for (let z = region.z1; z <= region.z2; z++) {
+      if (canPlaceBuilding(placementGrid, type as any, x, z, tier as any).valid) {
+        return { x, z };
+      }
+    }
+  }
+  return null;
+}
+
 describe('Tutorial Level Terrain Coordinates (Issue #333)', () => {
   let ctx: ReturnType<typeof makeCampaignCtx>;
 
@@ -82,36 +111,19 @@ describe('Tutorial Level Terrain Coordinates (Issue #333)', () => {
 
   // ── Test 2: Building placement ────────────────────────────────────────────
 
-  it('building at (16,16) places successfully on flat ground', () => {
+  it('a freight_warehouse places successfully somewhere in the tutorial build area', () => {
     // Arrange: fresh tutorial context
     expect(ctx.grid).not.toBeNull();
     expect(ctx.state!.cash).toBeGreaterThanOrEqual(15000); // freight_warehouse T1 cost
 
-    // ── Flatness verification before placement ──
-    const placementGrid = buildPlacementGrid(ctx.grid!, ctx.state!.buildings);
-    const flatnessCheck = canPlaceBuilding(placementGrid, 'freight_warehouse', 16, 16, 1);
-    // NOTE: This may fail if terrain seed 42 does not produce flat ground at (16,16).
-    // If it fails, record diagnostic info for adjustment.
-    if (!flatnessCheck.valid) {
-      // Collect diagnostic info: surface heights across the footprint
-      const heights: Record<string, number> = {};
-      for (let dx = 0; dx < 4; dx++) {
-        for (let dz = 0; dz < 4; dz++) {
-          const x = 16 + dx;
-          const z = 16 + dz;
-          heights[`(${x},${z})`] = getSurfaceY(ctx.grid!, x, z);
-        }
-      }
-      // Output diagnostic info via the test failure message
-      expect(flatnessCheck).toEqual({
-        valid: true,
-        // If invalid, attach diagnostic as the reason
-        ...(flatnessCheck.valid ? {} : { diagnostic: heights }),
-      });
-    }
+    // The tutorial guides the player to build inside WAREHOUSE_REGION, not at
+    // one specific hardcoded coordinate — a flat 4x4 footprint must exist
+    // somewhere in it (#458 T9.1/D15), not necessarily at (16,16).
+    const spot = findBuildableSpot(ctx, 'freight_warehouse', 1, WAREHOUSE_REGION);
+    expect(spot).not.toBeNull();
 
     // ── Act: place the building ──
-    const result: CommandResult = buildCommand(ctx, ['freight_warehouse'], { at: '16,16' });
+    const result: CommandResult = buildCommand(ctx, ['freight_warehouse'], { at: `${spot!.x},${spot!.z}` });
 
     // Assert: command succeeds
     expect(result.success).toBe(true);
@@ -120,8 +132,8 @@ describe('Tutorial Level Terrain Coordinates (Issue #333)', () => {
     // Building exists in state
     expect(ctx.state!.buildings.buildings.length).toBe(1);
     const building = ctx.state!.buildings.buildings[0]!;
-    expect(building.x).toBe(16);
-    expect(building.z).toBe(16);
+    expect(building.x).toBe(spot!.x);
+    expect(building.z).toBe(spot!.z);
     expect(building.type).toBe('freight_warehouse');
     expect(building.tier).toBe(1);
 
@@ -160,15 +172,22 @@ describe('Tutorial Level Terrain Coordinates (Issue #333)', () => {
 
   // ── Test 4: Surface height uniformity ─────────────────────────────────────
 
-  it('surface height is uniform at building footprint (16,16)', () => {
-    // Inspect all 16 cells of the 4×4 footprint at (16,16) to (19,19)
-    // without placing any building.
+  it('surface height is uniform at a buildable footprint in the tutorial build area', () => {
+    // A flat 4x4 spot must exist somewhere in WAREHOUSE_REGION (#458 T9.1/D15)
+    // — not necessarily at (16,16), which the terrain generator no longer
+    // guarantees is flat. Reuses the same search buildCommand's own
+    // canPlaceBuilding gate would perform.
+    const spot = findBuildableSpot(ctx, 'freight_warehouse', 1, WAREHOUSE_REGION);
+    expect(spot).not.toBeNull();
+    const { x: ox, z: oz } = spot!;
+
+    // Inspect all 16 cells of the found 4×4 footprint.
     const surfaceYValues: number[] = [];
 
     for (let dx = 0; dx < 4; dx++) {
       for (let dz = 0; dz < 4; dz++) {
-        const x = 16 + dx;
-        const z = 16 + dz;
+        const x = ox + dx;
+        const z = oz + dz;
         const sy = getSurfaceY(ctx.grid!, x, z);
         surfaceYValues.push(sy);
 
@@ -184,7 +203,9 @@ describe('Tutorial Level Terrain Coordinates (Issue #333)', () => {
       }
     }
 
-    // All 16 surface heights must be identical for flat building placement
+    // All 16 surface heights must be identical — this is exactly what made
+    // findBuildableSpot pick this spot (canPlaceBuilding requires exact
+    // equality across the footprint), confirmed directly here too.
     const uniqueHeights = new Set(surfaceYValues);
     expect(uniqueHeights.size).toBe(1);
 
