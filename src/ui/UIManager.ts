@@ -2,6 +2,8 @@
 // Orchestrates all UI panels. Wires game console, handles toolbar, drives per-tick updates.
 
 import { injectStyles } from './styles.js';
+import { injectTokens } from './tokens.js';
+import { registerIcons } from './icons.js';
 import { HUD } from './HUD.js';
 import { BlastPlanUI } from './BlastPlanUI.js';
 import { ContractUI } from './ContractUI.js';
@@ -52,6 +54,10 @@ export class UIManager {
 
   constructor(container: HTMLElement) {
     injectStyles();
+    // Redesign foundation (P0): additive token stylesheet + icon registry.
+    // Coexists with the legacy stylesheet until each surface migrates.
+    injectTokens();
+    registerIcons();
 
     // Left column — panels
     const leftCol = document.createElement('div');
