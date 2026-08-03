@@ -48,9 +48,14 @@ describe('RockCatalog config — energyAbsorption (5.2)', () => {
     }
   });
 
-  it('energyAbsorption matches fractureThreshold (initial implementation, refined later)', () => {
-    for (const rock of getAllRocks()) {
-      expect(rock.energyAbsorption, `${rock.id} energyAbsorption should equal fractureThreshold`).toBe(rock.fractureThreshold);
+  it('energyAbsorption rises with hardness tier — harder rock swallows more energy before it breaks', () => {
+    const rocks = [...getAllRocks()].sort((a, b) => a.hardnessTier - b.hardnessTier);
+    for (let i = 1; i < rocks.length; i++) {
+      const prev = rocks[i - 1]!;
+      const curr = rocks[i]!;
+      if (curr.hardnessTier > prev.hardnessTier) {
+        expect(curr.energyAbsorption, `${curr.id} vs ${prev.id}`).toBeGreaterThan(prev.energyAbsorption);
+      }
     }
   });
 });

@@ -255,27 +255,6 @@ export const MAX_PROPAGATION_ITERATIONS = 500;
 /** Energy must reach this multiple of a voxel's threshold to fragment it. */
 export const FRAGMENTATION_MULTIPLIER = 1.0;
 
-/** Scale factor for fragmentation score: F(v) = FRAGMENTATION_SCORE_SCALE * (effectiveEnergy / threshold)
- *  3.0 means a voxel at threshold (ratio=1.0) produces 3 fragments on average.
- *  Real blasting: Kuz-Ram model predicts fragment sizes; this is a gameplay-simplified scale. */
-export const FRAGMENTATION_SCORE_SCALE = 3.0;
-
-/** Maximum total Voronoi seed points before culling lowest-score voxels.
- *  Performance guard to prevent O(n log n) Delaunay from exploding.
- *  Culling logic is in task 5.9 (Bowyer-Watson implementation). */
-export const MAX_VORONOI_POINTS = 2000;
-
-/** Probability (0–1) that a Voronoi cell merges with a face-adjacent neighbour
- *  during the merging pass (task 5.10). 0.35 means ~35% of cells attempt to merge.
- *  The merged shape is the convex hull of both cells' vertices.
- *  Real blasting produces non-convex fragments; merging simulates this naturally. */
-export const MERGE_PROBABILITY = 0.35;
-
-/** Distance (in metres) to deflate collision mesh vertices inward toward centroid.
- *  Creates a small gap between visual and collision meshes to prevent physics catching
- *  on visual edges. 0.05 m = 5 cm for 1 m voxels. */
-export const COLLISION_DEFLATE_AMOUNT = 0.05;
-
 /** Edge length of one voxel in centimetres. Voxels are 1 m³ (see world/VoxelGrid),
  *  so a fragment's size fraction of a voxel converts to cm by this factor —
  *  used by the FragPredict (tier 2) software preview. */
@@ -289,11 +268,6 @@ export const SURFACE_PROXIMITY_DECAY = 0.5;
 export const MAX_PROJECTION_VELOCITY = 80;
 /** Velocity threshold (m/s) below which fragment is classified 'collapse'. */
 export const PROJECTION_VELOCITY_THRESHOLD = 2.0;
-
-/** Velocity threshold (m/s) below which a fragment is considered stationary for sleep detection. */
-export const SLEEP_VELOCITY_THRESHOLD = 0.1;
-/** Number of consecutive ticks a fragment must be below sleep velocity to become 'static'. */
-export const SLEEP_TICKS_REQUIRED = 15;
 
 // ─── Game Loop ──────────────────────────────────────────────────────────────────
 
@@ -794,22 +768,8 @@ export const SEISMIC_SURVEY_DAMAGE_HP = 10;
 
 // ─── Physics ────────────────────────────────────────────────────────────────────
 
-/** Maximum fragments that get full Cannon-es rigid-body simulation. Rest use parabolic fallback. */
-export const PHYSICS_FRAGMENT_CAP = 200;
-
 /** Gravitational acceleration (m/s²). Negative = downward. */
 export const GRAVITY = -9.81;
-
-/** Physics timestep in seconds per step. */
-export const PHYSICS_STEP_DT = 1 / 60;
-/** Maximum physics simulation steps before forced stop. */
-export const PHYSICS_MAX_STEPS = 600;
-/** Speed threshold (m/s) below which a body is considered settled. */
-export const PHYSICS_SETTLE_SPEED = 0.1;
-/** Fraction of bodies that must be settled before sim stops early. */
-export const PHYSICS_SETTLE_FRACTION = 0.95;
-/** Vertical offset above terrain surface for fragment landing position (metres). */
-export const PHYSICS_TERRAIN_CLEARANCE = 1.0;
 
 /** Minimum horizontal overlap ratio (0–1) for a fragment to be considered "supported by" another. */
 export const FRAGMENT_HORIZONTAL_OVERLAP_TOLERANCE = 0.5;

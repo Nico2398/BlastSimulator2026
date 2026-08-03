@@ -181,7 +181,7 @@ export function executeBlast(
         const point = vec3(x, y, z);
         const energy = calculateEnergyField(point, plan.holes, plan.charges, holeDepths, holeSurfaceYs);
         const fractureModifier = grid.fractureAt(x, y, z);
-        const threshold = rock.fractureThreshold * fractureModifier;
+        const threshold = rock.energyAbsorption * fractureModifier;
         const frag = calculateFragmentation(energy, threshold);
 
         if (frag.result === 'fractured') {

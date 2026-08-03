@@ -150,9 +150,9 @@ export interface FragmentData {
   origin: Vec3;
   volume: number;              // m³, = subCellCount × SUB_CELL_VOLUME
   mass: number;                // kg, = volume × mass-weighted rock density
-  rockId: string;              // dominant rock (kept for compat)
+  rockId: string;              // dominant rock (kept for compat, = dominantRockOf(composition))
   composition: VoxelRockComposition;   // NEW: full weighted composition
-  oreDensities: Record<string, number>;
+  oreDensities: Record<string, number>;   // volume-weighted grades, never normalized
   initialVelocity: Vec3;
   isProjection: boolean;       // tier: true = 'projected', false = 'collapse'
   oversized: boolean;          // volume > OVERSIZED_FRAGMENT_THRESHOLD
@@ -349,9 +349,10 @@ Definitions: `SUB = 2` (`SUB_CELL_RESOLUTION`) → each fragmented voxel is spli
 4. **Fragment build.** Per cluster:
    - `volume = subCellCount × SUB_CELL_VOLUME`; `oversized = volume > OVERSIZED_FRAGMENT_THRESHOLD`.
    - `composition` / `oreDensities`: volume-weighted average over the **source voxels**
-     of its sub-cells (port the working helpers `computeAverageRockComposition`,
-     `computeAverageOreComposition` from `src/physics/FragmentSimUtils.ts` into this
-     file before `src/physics/` is deleted — they are correct).
+     of its sub-cells — call `computeAverageRockComposition` /
+     `computeAverageOreDensities` from `src/core/mining/FragmentComposition.ts` (landed
+     in P0), passing one `VoxelContribution` per source voxel whose `weight` is the
+     number of sub-cells the fragment takes from it. `rockId = dominantRockOf(composition)`.
    - `mass = volume × Σ coefficient[r] × rockDef[r].density`.
    - `origin` = mean of sub-cell centres; `halfExtents` = cluster AABB half-extents;
      `shapeSeed = rng.nextInt(0, 2^31)`.
@@ -546,32 +547,51 @@ sites while they still exist in P0–P2).
 Each phase is one PR on its own branch, lands green, and leaves the game playable.
 Run the verification gate channels listed per phase; `static` + `logic` always.
 
-### P0 — Dead-code removal and groundwork (small)
+### P0 — Dead-code removal and groundwork (small) — ✅ DONE
 
-**Delete** (with their tests, D9):
-- Entire `src/physics/` directory: `DelaunayTessellation.ts`, `VoronoiFrag.ts`,
-  `VoronoiMerge.ts`, `FragmentationScoring.ts`, `FragmentSim.ts`,
-  `FragmentSimCollapse.ts`, `FragmentSimPhysics.ts`, `FragmentSimUtils.ts`,
-  `FragmentSimVelocity.ts`, `FragmentSupportGraph.ts`, `FragmentBody.ts`,
-  `PhysicsWorld.ts`, `TerrainBody.ts`, `CollisionHandler.ts`.
-  **Before deleting**, copy these into the new core files as private helpers (they are
-  referenced by later phases): `computeAverageRockComposition`,
-  `computeAverageOreComposition` (from `FragmentSimUtils.ts`) → park them in
-  `src/core/mining/FragmentGeneration.ts` (file can exist with only these + tests until
-  P2). The velocity formulas (`FragmentSimVelocity.ts`) are fully specified in §A4 — no
-  copy needed.
-- `tests/unit/physics/` entirely.
-- Dead spec functions in `BlastCalc.ts`: `propagateEnergy`, `PropagationResult`,
-  `identifyFragmentedVoxels` (they get rewritten on typed arrays in P1;
-  `computeBlastEntityDamage` **stays** — P1 adapts it).
-- cannon-es from `package.json` (+ lockfile via `npm install`).
-- `fractureThreshold` from `RockCatalog.ts` (point legacy call sites at
-  `energyAbsorption`).
+**Deleted** (with their tests, D9):
+- Entire `src/physics/` directory (14 files) and `tests/unit/physics/` (6 files).
+- `tests/integration/blast-physics.test.ts` — not anticipated in this plan; it drove the
+  deleted layer end-to-end. Its blast-level assertions are re-created in P3 against the
+  new authoritative resolution.
+- cannon-es from `package.json` + lockfile.
+- `fractureThreshold` from `RockCatalog.ts`; `energyAbsorption` is now the single field
+  (identical values), and its doc comment states it doubles as the fracture threshold.
+  Call sites updated: `SoftwarePreview.ts:53`, `BlastExecution.ts:184`.
+- Orphaned balance constants: `FRAGMENTATION_SCORE_SCALE`, `MAX_VORONOI_POINTS`,
+  `MERGE_PROBABILITY`, `COLLISION_DEFLATE_AMOUNT`, all six `PHYSICS_*`, both `SLEEP_*`.
+  `GRAVITY` and the §7 keep-list constants stay.
 
-**Verify:** `static`, `logic`, `scenario` (all must stay green — nothing that runs was
-removed). `npm run build`.
-**Acceptance:** `grep -r "cannon" src/ package.json` → no hits;
-`ls src/physics` → gone; all channels green.
+**Ported to core:** `src/core/mining/FragmentComposition.ts` +
+`tests/unit/mining/FragmentComposition.test.ts` (18 tests).
+
+**Deviations from this plan, and why:**
+1. **`propagateEnergy` / `identifyFragmentedVoxels` deletion deferred to P1.** Their
+   ~400 lines of tests in `BlastCalc.test.ts` encode exactly the behaviour P1's
+   typed-array rewrite must reproduce (air blocking, overflow sharing, island
+   detachment). Deleting the functions a phase ahead of their replacement throws that
+   away and forces P1 to re-derive it. P1 replaces them in place and migrates the tests.
+2. **Helpers landed in `FragmentComposition.ts`, not parked in `FragmentGeneration.ts`.**
+   Composition averaging is its own concern with its own tests, and it keeps
+   `FragmentGeneration.ts` free for the A3 algorithm under the 300-line convention.
+3. **The ported averaging math was wrong and is fixed.** The old
+   `computeWeightedAverage` divided each rock's weighted sum by *that rock's own*
+   accumulated weight, so a fragment straddling a cruite voxel and a sandite voxel came
+   out as 100 % cruite **and** 100 % sandite — coefficients summing to 2.0. The core
+   version divides by the total weight across all contributing voxels and normalizes, so
+   that fragment is 50/50. Locked in by the "straddling two strata" test.
+4. **`VoxelOreComposition` (array form) dropped.** Ores stay
+   `Record<string, number>`, matching `FragmentData.oreDensities` — one ore shape in the
+   codebase instead of two. `computeAverageOreDensities` returns the record directly.
+   §5.1 and A3 read accordingly.
+5. **Sources are `VoxelContribution { x, y, z, weight }`**, not seed indices — the
+   seed-index model dies with Voronoi. `weight` is the volume the fragment takes from
+   that voxel, which is exactly what A3's sub-cell clustering produces.
+
+**Verified:** `static` (typecheck clean), `logic` (239 files / 6816 tests green — down
+from 245/7109 purely by deleting the dead layer's own tests), `scenario` (111/111),
+`npm run build` clean. Visual/playability channels not applicable — no runtime behaviour
+changed.
 
 ### P1 — Energy propagation goes live (medium)
 

@@ -50,7 +50,7 @@ export function computeEnergyThresholdForVoxel(
   if (!rock) return null;
 
   const energy = calculateEnergyField(energyPoint, plan.holes, plan.charges, ctx.holeDepths, ctx.holeSurfaceYs);
-  const threshold = rock.fractureThreshold * voxel.fractureModifier;
+  const threshold = rock.energyAbsorption * voxel.fractureModifier;
   return { rock, energy, threshold };
 }
 
