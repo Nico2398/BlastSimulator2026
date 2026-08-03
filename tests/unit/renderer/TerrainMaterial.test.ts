@@ -201,7 +201,9 @@ describe('TerrainMaterial', () => {
     describe('cover-blend flat-colour skip for runner-up material (#475)', () => {
       // The runner-up cover used to always pay a full materialAlbedo() eval
       // (recipe + noise), even when its blend share was negligible. These pin
-      // the cheap materialFlatColor() stand-in that replaces it below share.
+      // the cheap materialFlatColor() stand-in that replaces it once share
+      // exceeds COVER_BLEND_SKIP_SHARE; below the threshold the blend is
+      // skipped entirely and only the winner's colour shows.
       it('declares materialFlatColor(int i, ...) alongside materialAlbedo', () => {
         const mat = makeMaterial();
         const shader = makeFakeShader();
