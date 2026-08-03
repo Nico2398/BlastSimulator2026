@@ -18,7 +18,7 @@ import { IndexedDBPersistence } from './persistence/IndexedDBPersistence.js';
 import { DownloadPersistence } from './persistence/DownloadPersistence.js';
 import { createRunner, runCommand } from './console/createRunner.js';
 import { parseCommand } from './console/ConsoleRunner.js';
-import { regenerateGrid, restoreGrid, DEFAULT_GRID_SIZE } from './console/commands/world.js';
+import { regenerateGrid, restoreGrid, terrainGenDatum, DEFAULT_GRID_SIZE } from './console/commands/world.js';
 import { encodeVoxelGrid } from './core/state/VoxelGridCodec.js';
 import { getBiome } from './core/world/BiomeCatalog.js';
 import { BASE_TICK_MS } from './core/engine/GameLoop.js';
@@ -53,7 +53,7 @@ saveLoadUI.setGetState(() => {
   // never save. SaveLoadUI only sees GameState; it has no idea VoxelGrid or
   // its codec exist, by design.
   if (ctx.state && ctx.grid && ctx.state.world) {
-    ctx.state.world = { ...ctx.state.world, voxels: encodeVoxelGrid(ctx.grid) };
+    ctx.state.world = { ...ctx.state.world, voxels: encodeVoxelGrid(ctx.grid, terrainGenDatum(ctx.state)) };
   }
   return ctx.state;
 });
@@ -170,7 +170,7 @@ emitter.on('revolt:warning', ({ ticksRemaining }) => {
 // separately by syncFromContext()'s own comparison, which runs right after
 // this and does a full rebuildTerrain() with the new grid's real dimensions.
 emitter.on('terrain:updated', ({ region }) => {
-  gameRenderer.remeshTerrainRegion(region);
+  gameRenderer.remeshTerrainRegion(ctx, region);
 });
 // Bird flocks near a blast panic and scatter for a few seconds (#458 T7.2/D12/A26).
 emitter.on('blast:started', ({ originX, originZ }) => {
@@ -191,6 +191,8 @@ declare global {
     __tutorialState: () => { active: boolean; stepIndex: number; stepId: string | null; title: string; total: number; stageIndex: number; stageTotal: number; stageTarget: string | null; clockHeld: boolean };
     __resetTickAccumulator: () => void;
     __setAutoTick: (enabled: boolean) => void;
+    __setRenderEnabled: (enabled: boolean) => void;
+    __renderFrame: () => void;
     __debugGridInfo: () => Record<string, unknown>;
   }
 }
@@ -268,11 +270,14 @@ window.__gameState = () => {
     tickCount: s.tickCount,
     isPaused: s.isPaused,
     mineType: s.mineType,
-    // World dimensions, so a harness can map grid coordinates to the tile
-    // picker without inferring them from a terrain bounding box that blasts and
-    // ramps change underneath it.
+    // The site's live bounding box, so a harness can map grid coordinates to
+    // the tile picker without inferring them from a terrain bounding box that
+    // blasts and ramps change underneath it. Size is a bounding box, not a
+    // size, once the site has grown (#473) — hence the origin alongside it.
     worldSizeX: s.world?.sizeX ?? null,
     worldSizeZ: s.world?.sizeZ ?? null,
+    worldMinX: s.world?.minX ?? null,
+    worldMinZ: s.world?.minZ ?? null,
     drillHoles: s.drillHoles,
     chargesByHole: s.chargesByHole,
     sequenceDelays: s.sequenceDelays,
@@ -340,6 +345,14 @@ window.__resetTickAccumulator = () => { accumulatedGameMs = 0; };
 // for a mode that wants to flip it after load.
 let autoTickEnabled = new URLSearchParams(window.location.search).get('scenarioMode') !== '1';
 window.__setAutoTick = (enabled: boolean) => { autoTickEnabled = enabled; };
+
+// Drawing control for the browser-driven harnesses (#475). They need pixels
+// only at a screenshot, but every CDP call they make waits on the render
+// loop — which the terrain material makes cost seconds per frame in software
+// rasterisation. Suspending the draw and forcing one frame per capture keeps
+// the images identical and stops the suites paying for frames nobody sees.
+window.__setRenderEnabled = (enabled: boolean) => { scene.setDrawingEnabled(enabled); };
+window.__renderFrame = () => { scene.renderFrame(); };
 
 // Debug: expose grid reference info for diagnostics
 window.__debugGridInfo = () => {

@@ -330,35 +330,40 @@ describe('surveyCommand', () => {
     expect(result.success).toBe(false);
   });
 
-  // ── guard: out-of-bounds coordinates ───────────────────────────────────────
+  // ── off-site coordinates: claim or refuse, never a silent no-op (#473 D5) ──
 
-  it('returns success:false mentioning "Out of bounds" for negative x', () => {
+  it('claims the ground west of the site and surveys it', () => {
     const ctx = makeMiningContext();
+    hireSurveyor(ctx);
     const result = surveyCommand(ctx, ['seismic'], { x: '-1', z: '10' });
-    expect(result.success).toBe(false);
-    expect(result.output).toContain('Out of bounds');
+    expect(result.success).toBe(true);
+    expect(ctx.grid!.minX).toBe(-16);
+    expect(ctx.grid!.containsColumn(-1, 10)).toBe(true);
   });
 
-  it('returns success:false mentioning "Out of bounds" for x beyond grid width', () => {
+  it('refuses a survey on ground that touches no part of the site', () => {
     const ctx = makeMiningContext();
-    // makeMiningContext creates a 32×32 grid
+    hireSurveyor(ctx);
+    // makeMiningContext creates a 32×32 site; (100, 10) is four chunks past it.
     const result = surveyCommand(ctx, ['seismic'], { x: '100', z: '10' });
     expect(result.success).toBe(false);
-    expect(result.output).toContain('Out of bounds');
+    expect(result.output).toContain('out of bounds');
+    expect(ctx.grid!.containsColumn(100, 10)).toBe(false);
   });
 
-  it('returns success:false mentioning "Out of bounds" for z beyond grid depth', () => {
+  it('refuses a survey far south of the site', () => {
     const ctx = makeMiningContext();
+    hireSurveyor(ctx);
     const result = surveyCommand(ctx, ['aerial'], { x: '10', z: '200' });
     expect(result.success).toBe(false);
-    expect(result.output).toContain('Out of bounds');
+    expect(result.output).toContain('out of bounds');
   });
 
-  it('does not deduct cash when coordinates are out of bounds', () => {
+  it('does not deduct cash for a survey on ground the site cannot reach', () => {
     const ctx = makeMiningContext();
     hireSurveyor(ctx);
     ctx.state!.cash = 10_000;
-    surveyCommand(ctx, ['seismic'], { x: '-5', z: '5' });
+    surveyCommand(ctx, ['seismic'], { x: '500', z: '5' });
     expect(ctx.state!.cash).toBe(10_000);
   });
 

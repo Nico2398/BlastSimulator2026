@@ -47,9 +47,7 @@ export function findBuildingApproachCell(
       // Ring only — skip the footprint interior (handled by the fallback).
       const onRing = x === minX || x === maxX || z === minZ || z === maxZ;
       if (!onRing) continue;
-      if (x < 0 || z < 0 || x >= navGrid.width || z >= navGrid.height) continue;
-
-      const cell = navGrid.cells[z]?.[x];
+      const cell = navGrid.cellAt(x, z);
       if (!cell || cell.type === 'blocked' || cell.type === 'void') continue;
 
       const distSq = (x - fromX) ** 2 + (z - fromZ) ** 2;

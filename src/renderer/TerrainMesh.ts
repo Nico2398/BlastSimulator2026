@@ -12,7 +12,7 @@
 // (#458 T4.1/D9/A19) — no CPU-side vertex color is computed.
 
 import * as THREE from 'three';
-import type { VoxelGrid } from '../core/world/VoxelGrid.js';
+import { CHUNK_SIZE as VOXEL_CHUNK_SIZE, chunkIndexOf, type VoxelGrid } from '../core/world/VoxelGrid.js';
 import { rockIndexOf } from '../core/world/RockCatalog.js';
 import { oreIndexOf } from '../core/world/OreCatalog.js';
 import { EDGE_TABLE, TRI_TABLE } from './MarchingCubesTables.js';
@@ -24,8 +24,9 @@ export { SurveyConfidenceOverlay, confidenceToColor } from './SurveyConfidenceOv
 export type { SurveyConfidencePoint, SurveyConfidenceOverlayOptions } from './SurveyConfidenceOverlay.js';
 
 // ---------- Constants ----------
-// 16 voxels per chunk side — standard for MC chunk streaming
-const CHUNK_SIZE = 16;
+// One mesh chunk spans one voxel-grid chunk on x/z (#473 D1), so a newly
+// claimed chunk re-marches exactly one mesh.
+const CHUNK_SIZE = VOXEL_CHUNK_SIZE;
 
 // Density ≥ this is considered solid material (0.5 = half-filled)
 const SURFACE_THRESHOLD = 0.5;
@@ -152,11 +153,10 @@ export class TerrainMesh {
   private readonly material: TerrainMaterial;
   private surveyOverlay: SurveyConfidenceOverlay | null = null;
 
-  /** Chunk-grid-index -> its Mesh, or null for a built-but-empty chunk (no triangles). */
+  /** Packed signed chunk coordinate -> its Mesh, or null for a built-but-empty chunk (no triangles). */
   private readonly chunks = new Map<number, THREE.Mesh | null>();
-  private ncx = 0;
+  /** Vertical chunk count. x/z chunk coordinates come from the grid's own claimed set, and are signed. */
   private ncy = 0;
-  private ncz = 0;
 
   constructor(scene: THREE.Scene, grid: VoxelGrid, biomeId?: string) {
     this.scene = scene;
@@ -165,7 +165,7 @@ export class TerrainMesh {
     // Playable rect matches WorldGen's own formula exactly (#458 A19.4) — no
     // need to plumb the landscape handle through just for this.
     this.material = new TerrainMaterial({
-      playRect: { minX: 0, minZ: 0, maxX: grid.sizeX, maxZ: grid.sizeZ },
+      playRect: { minX: grid.minX, minZ: grid.minZ, maxX: grid.maxX, maxZ: grid.maxZ },
       // Which surface covers this level can grow at all, and the band of
       // heights its altitude preferences are measured against.
       ...(biomeId !== undefined ? { biomeId } : {}),
@@ -234,11 +234,9 @@ export class TerrainMesh {
     this.updateChunkGridDims();
 
     let totalVerts = 0;
-    for (let cz = 0; cz < this.ncz; cz++) {
+    for (const { cx, cz } of this.grid.ownedChunks()) {
       for (let cy = 0; cy < this.ncy; cy++) {
-        for (let cx = 0; cx < this.ncx; cx++) {
-          totalVerts += this.rebuildChunk(cx, cy, cz);
-        }
+        totalVerts += this.rebuildChunk(cx, cy, cz);
       }
     }
     console.log(`[TerrainMesh] buildAll: grid=${this.grid.id} chunks=${this.chunks.size} vertices=${totalVerts}`);
@@ -251,17 +249,25 @@ export class TerrainMesh {
    * side only.
    */
   remeshRegion(region: DirtyRegion): void {
-    const cxMin = Math.max(0, Math.floor((region.minX - 1) / CHUNK_SIZE));
-    const cxMax = Math.min(this.ncx - 1, Math.floor(region.maxX / CHUNK_SIZE));
+    // A claim can arrive with the region, so the vertical chunk count and the
+    // material's play rect both have to catch up before anything is marched.
+    this.updateChunkGridDims();
+
+    const cxMin = chunkIndexOf(region.minX - 1);
+    const cxMax = chunkIndexOf(region.maxX);
     const cyMin = Math.max(0, Math.floor((region.minY - 1) / CHUNK_SIZE));
     const cyMax = Math.min(this.ncy - 1, Math.floor(region.maxY / CHUNK_SIZE));
-    const czMin = Math.max(0, Math.floor((region.minZ - 1) / CHUNK_SIZE));
-    const czMax = Math.min(this.ncz - 1, Math.floor(region.maxZ / CHUNK_SIZE));
+    const czMin = chunkIndexOf(region.minZ - 1);
+    const czMax = chunkIndexOf(region.maxZ);
 
     let remeshed = 0;
     for (let cz = czMin; cz <= czMax; cz++) {
       for (let cy = cyMin; cy <= cyMax; cy++) {
         for (let cx = cxMin; cx <= cxMax; cx++) {
+          // Chunks outside the claimed set have no geometry of their own, but
+          // an already-built neighbour may need its sealing wall re-marched,
+          // which the owned-chunk pass below covers.
+          if (!this.grid.hasChunk(cx, cz)) continue;
           this.rebuildChunk(cx, cy, cz);
           remeshed++;
         }
@@ -299,21 +305,28 @@ export class TerrainMesh {
     return this.chunks.get(this.chunkKey(cx, cy, cz)) ?? null;
   }
 
-  /** Chunk grid dimensions for the currently-bound grid — diagnostics and tests. */
+  /**
+   * Chunk grid dimensions for the currently-bound grid — diagnostics and
+   * tests. `ncx`/`ncz` describe the bounding box; the claimed set inside it
+   * may be any shape (#473).
+   */
   get chunkGridDims(): { ncx: number; ncy: number; ncz: number } {
-    return { ncx: this.ncx, ncy: this.ncy, ncz: this.ncz };
+    return {
+      ncx: Math.ceil(this.grid.sizeX / CHUNK_SIZE),
+      ncy: this.ncy,
+      ncz: Math.ceil(this.grid.sizeZ / CHUNK_SIZE),
+    };
   }
 
   // ---------- Internal ----------
 
   private updateChunkGridDims(): void {
-    this.ncx = Math.ceil(this.grid.sizeX / CHUNK_SIZE);
     this.ncy = Math.ceil(this.grid.sizeY / CHUNK_SIZE);
-    this.ncz = Math.ceil(this.grid.sizeZ / CHUNK_SIZE);
   }
 
+  /** Packs a signed (cx, cy, cz) triple into one collision-free key. Range +/-1024 chunks per horizontal axis. */
   private chunkKey(cx: number, cy: number, cz: number): number {
-    return cx + cy * this.ncx + cz * this.ncx * this.ncy;
+    return ((cx + 1024) * 2048 + (cz + 1024)) * 1024 + cy;
   }
 
   private disposeAllChunks(): void {
@@ -349,13 +362,21 @@ export class TerrainMesh {
     // the mesh open along its four sides: an unclosed shell you could see
     // straight into wherever the terrain was cut back, which is exactly what a
     // blast at the edge of the site did.
-    const ox = cx * CHUNK_SIZE, oy = cy * CHUNK_SIZE, oz = cz * CHUNK_SIZE;
-    const xStart = cx === 0 ? -1 : ox;
+    const rect = this.grid.chunkRect(cx, cz);
+    if (!rect) {
+      this.chunks.set(key, null);
+      return 0;
+    }
+    const oy = cy * CHUNK_SIZE;
+    // Extend one cube outward only where no owned chunk lies beyond that
+    // side: an owned neighbour marches those cubes itself, and marching them
+    // twice would emit the interior wall between two claimed chunks.
+    const xStart = this.grid.hasChunk(cx - 1, cz) ? rect.minX : rect.minX - 1;
+    const zStart = this.grid.hasChunk(cx, cz - 1) ? rect.minZ : rect.minZ - 1;
     const yStart = cy === 0 ? -1 : oy;
-    const zStart = cz === 0 ? -1 : oz;
-    const xEnd = Math.min(ox + CHUNK_SIZE, this.grid.sizeX);
+    const xEnd = rect.maxX;
+    const zEnd = rect.maxZ;
     const yEnd = Math.min(oy + CHUNK_SIZE, this.grid.sizeY);
-    const zEnd = Math.min(oz + CHUNK_SIZE, this.grid.sizeZ);
 
     for (let z = zStart; z < zEnd; z++) {
       for (let y = yStart; y < yEnd; y++) {

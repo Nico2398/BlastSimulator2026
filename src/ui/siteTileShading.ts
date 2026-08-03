@@ -54,7 +54,7 @@ export function makeSiteTileFill(state: GameState): (x: number, z: number) => st
     if (holes.has(key)) return COLOR_HOLE;
     if (buildings.has(key)) return COLOR_BUILDING;
 
-    const cell = nav?.cells[z]?.[x];
+    const cell = nav?.cellAt(x, z);
     if (cell?.type === 'ramp') return COLOR_RAMP;
 
     const oreDensity = ore.get(key);

@@ -15,7 +15,7 @@
 // same way `new_game` builds it, same as this file's whole history (#408).
 
 import type { GameContext } from './world.js';
-import { regenerateGrid, restoreGrid, DEFAULT_GRID_SIZE } from './world.js';
+import { regenerateGrid, restoreGrid, terrainGenDatum, DEFAULT_GRID_SIZE } from './world.js';
 import type { CommandResult } from '../ConsoleRunner.js';
 import { serialize, deserialize } from '../../core/state/SaveLoad.js';
 import { getBiome } from '../../core/world/BiomeCatalog.js';
@@ -34,7 +34,7 @@ export function saveCommand(
   if (!ctx.state) return { success: false, output: 'No game loaded. Use new_game first.' };
   const slot = named['slot'] ?? args[0] ?? DEFAULT_SLOT;
   if (ctx.grid && ctx.state.world) {
-    ctx.state.world = { ...ctx.state.world, voxels: encodeVoxelGrid(ctx.grid) };
+    ctx.state.world = { ...ctx.state.world, voxels: encodeVoxelGrid(ctx.grid, terrainGenDatum(ctx.state)) };
   }
   quickSaveSlots.set(slot, serialize(ctx.state));
   return { success: true, output: `Saved to slot "${slot}".` };

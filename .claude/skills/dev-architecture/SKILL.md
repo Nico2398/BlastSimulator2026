@@ -81,7 +81,7 @@ src/
 │   ├── engine/             # GameLoop (tick orchestration), ArrivalGate, EntityMovementTick, TaskDispatch
 │   ├── nav/                # NavGrid, Pathfinding, AgentMovement, BuildingApproach
 │   ├── campaign/           # Level definitions, Campaign progression
-│   ├── world/              # VoxelGrid, TerrainGen, RockCatalog, OreCatalog, MineType
+│   ├── world/              # VoxelGrid, PlayableArea, TerrainGen, RockCatalog, OreCatalog, MineType
 │   ├── mining/             # Survey, DrillPlan, ChargePlan, Sequence, BlastPlan, BlastCalc
 │   ├── economy/            # Finance, Contract, Market, Corruption, HaulingTask
 │   ├── entities/           # Employee, Vehicle, Building, Fragment

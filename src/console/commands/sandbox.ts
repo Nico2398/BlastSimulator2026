@@ -14,7 +14,7 @@ import {
   type SandboxConfig,
 } from '../../core/campaign/Sandbox.js';
 import { getAllBiomes, getBiome } from '../../core/world/BiomeCatalog.js';
-import { createGame } from '../../core/state/GameState.js';
+import { createGame, createWorldState } from '../../core/state/GameState.js';
 import { generateContracts } from '../../core/economy/Contract.js';
 import { Random } from '../../core/math/Random.js';
 import { regenerateGrid } from './world.js';
@@ -84,7 +84,7 @@ export function sandboxCommand(
     startingCash: config.startingCash,
     eventFreqMultiplier: config.eventFreqMultiplier,
   });
-  ctx.state.world = { sizeX: level.gridX, sizeY: level.gridY, sizeZ: level.gridZ, gridReady: true };
+  ctx.state.world = createWorldState(level.gridX, level.gridY, level.gridZ, true);
 
   regenerateGrid(ctx, {
     seed: config.seed,

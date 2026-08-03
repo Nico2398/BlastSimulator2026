@@ -55,6 +55,9 @@ export class SurveyUI {
   private selectedMethod: SurveyMethod = 'seismic';
   private worldSizeX = 40;
   private worldSizeZ = 40;
+  /** West/north edge of the site's bounding box — non-zero once it has grown that way (#473). */
+  private worldOriginX = 0;
+  private worldOriginZ = 0;
   private lastResultCount = -1;
   private lastPendingCount = -1;
   private statusIsTransient = false;
@@ -140,6 +143,8 @@ export class SurveyUI {
     if (state.world) {
       this.worldSizeX = state.world.sizeX;
       this.worldSizeZ = state.world.sizeZ;
+      this.worldOriginX = state.world.minX;
+      this.worldOriginZ = state.world.minZ;
     }
 
     const hasSurveyor = state.employees.employees.some(
@@ -285,13 +290,15 @@ export class SurveyUI {
       mode: 'point',
       worldSizeX: this.worldSizeX,
       worldSizeZ: this.worldSizeZ,
+      worldOriginX: this.worldOriginX,
+      worldOriginZ: this.worldOriginZ,
       title: t('ui.survey.pick_target'),
       // Show the pit and anything already known about it, and start aimed at
       // the middle so the player is never staring at a blank grid.
       ...(this.lastState ? { tileFill: makeSiteTileFill(this.lastState) } : {}),
       initialSelection: {
-        x: Math.floor(this.worldSizeX / 2),
-        z: Math.floor(this.worldSizeZ / 2),
+        x: Math.floor(this.worldOriginX + this.worldSizeX / 2),
+        z: Math.floor(this.worldOriginZ + this.worldSizeZ / 2),
       },
       onConfirm: (result) => {
         this.onSelected?.({ method: this.selectedMethod, targetX: result.x, targetZ: result.z });

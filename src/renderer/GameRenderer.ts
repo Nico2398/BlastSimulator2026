@@ -4,7 +4,7 @@
 
 import * as THREE from 'three';
 import type { MiningContext } from '../console/commands/mining.js';
-import { ensureLandscape } from '../console/commands/world.js';
+import { ensureLandscape, type LandscapeHandle } from '../console/commands/world.js';
 import type { GameState } from '../core/state/GameState.js';
 import { type VoxelGrid, computeVoxelColumnSurfaceY } from '../core/world/VoxelGrid.js';
 import { getBiome } from '../core/world/BiomeCatalog.js';
@@ -27,7 +27,7 @@ import { Fireflies } from './ambient/Fireflies.js';
 import { createAmbientUniforms, type AmbientUniforms } from './ambient/AmbientUniforms.js';
 import { FragmentMesh } from './FragmentMesh.js';
 import { BlastEffects } from './BlastEffects.js';
-import { LandscapeMesh } from './terrain/LandscapeMesh.js';
+import { LandscapeMesh, type PlayableCut } from './terrain/LandscapeMesh.js';
 import { WorldBorderWall } from './WorldBorderWall.js';
 import { BlastPlanOverlay } from './BlastPlanOverlay.js';
 import { GhostMesh } from './GhostMesh.js';
@@ -82,7 +82,11 @@ export class GameRenderer {
   private fragments: FragmentMesh | null = null;
   private blastEffects: BlastEffects | null = null;
   private landscape: LandscapeMesh | null = null;
+  /** Kept so a claim can re-cut the landscape without rebuilding the (expensive) landscape map. */
+  private landscapeHandle: LandscapeHandle | null = null;
   private borderWall: WorldBorderWall | null = null;
+  /** Site bounding box the landscape and border wall were last built against, so a claim can be detected. */
+  private lastCutBounds = '';
   private blastOverlay: BlastPlanOverlay | null = null;
   private ghosts: GhostMesh | null = null;
   private lastGrid: VoxelGrid | null = null;
@@ -347,8 +351,8 @@ export class GameRenderer {
 
         // Surface Y = topmost solid voxel + 1
         let surfaceY = 0;
-        const clampedX = Math.max(0, Math.min(grid.sizeX - 1, Math.floor(x)));
-        const clampedZ = Math.max(0, Math.min(grid.sizeZ - 1, Math.floor(z)));
+        const clampedX = Math.max(grid.minX, Math.min(grid.maxX - 1, Math.floor(x)));
+        const clampedZ = Math.max(grid.minZ, Math.min(grid.maxZ - 1, Math.floor(z)));
         for (let y = grid.sizeY - 1; y >= 0; y--) {
           const voxel = grid.getVoxel(clampedX, y, clampedZ);
           if (voxel && voxel.density > 0) {
@@ -423,8 +427,8 @@ export class GameRenderer {
     if (!this.blastEffects || !ctx.state) return;
 
     // Compute blast origin from fragment centroid or grid centre
-    let ox = this.lastGrid.sizeX / 2;
-    let oz = this.lastGrid.sizeZ / 2;
+    let ox = this.lastGrid.minX + this.lastGrid.sizeX / 2;
+    let oz = this.lastGrid.minZ + this.lastGrid.sizeZ / 2;
     // Size the surface-sample ring to the blast's own footprint (half its
     // bounding-box diagonal + margin), so a large multi-hole blast's crater
     // doesn't swallow the whole sampling ring.
@@ -494,8 +498,72 @@ export class GameRenderer {
    * ramp) instead of rebuildTerrain() — a single-voxel drill dig no longer
    * pays for re-marching chunks its region never touched.
    */
-  remeshTerrainRegion(region: DirtyRegion): void {
+  remeshTerrainRegion(ctx: MiningContext, region: DirtyRegion): void {
     this.terrain?.remeshRegion(region);
+    if (!this.siteBoundsChanged(ctx.grid)) return;
+
+    // A claim moves the site's bounding box: the camera leash has to let the
+    // player follow the ground they just took, the landscape has to stop
+    // covering it, and the wall has to be re-raised on the new frontier.
+    this.refreshPanLeash();
+
+    // A null ctx.landscape means the grid itself was just replaced (new game,
+    // campaign level, load) and rebuildLandscapeMesh is about to run with a
+    // fresh handle. Rebuilding here would cut the new site against the old
+    // level's landscape and then be thrown away.
+    if (!ctx.landscape || !ctx.grid || !this.landscape || !this.landscapeHandle) return;
+
+    this.landscape.build(this.landscapeHandle, ctx.grid.palette, this.playableCut(ctx.grid));
+    this.rebuildBorderWall(ctx);
+  }
+
+  /** True when the site's bounding box differs from the one the landscape and wall were built against. */
+  private siteBoundsChanged(grid: VoxelGrid | null): boolean {
+    const key = grid ? `${grid.minX},${grid.minZ},${grid.maxX},${grid.maxZ},${grid.chunkCount}` : '';
+    if (key === this.lastCutBounds) return false;
+    this.lastCutBounds = key;
+    return true;
+  }
+
+  /** The site's live shape, for the landscape mesher to cut itself against (#473 D8). */
+  private playableCut(grid: VoxelGrid): PlayableCut {
+    return {
+      rect: { minX: grid.minX, minZ: grid.minZ, maxX: grid.maxX, maxZ: grid.maxZ },
+      ownsColumn: (x, z) => grid.containsColumn(x, z),
+    };
+  }
+
+  /**
+   * Raise the containment field on the frontier between claimable ground and
+   * the protected structures beside the site (#473 P4). Nothing is drawn when
+   * no protected chunk borders the site — open ground gets no wall, which is
+   * the whole point of the change.
+   */
+  private rebuildBorderWall(ctx: MiningContext): void {
+    if (this.borderWall) this.sm.postPipeline.removeOverlayObject(this.borderWall.object3d);
+    this.borderWall?.dispose();
+    this.borderWall = null;
+
+    const grid = ctx.grid;
+    const area = ctx.playableArea;
+    if (!grid || !area || !this.terrain) return;
+    // Never trace the world's rivers from a render path just to find out
+    // there is no wall to draw — rebuildLandscapeMesh hands over the set it
+    // already built, and calls this again once it has.
+    if (!area.hasStructures()) return;
+
+    const frontier = area.protectedFrontier();
+    if (frontier.length === 0) return;
+
+    const bounds = this.terrain.getBounds();
+    const groundY = this.landscapeHandle?.groundLevelY ?? 0;
+    this.borderWall = new WorldBorderWall(this.sm.scene, {
+      protectedRects: frontier.map(f => f.rect),
+      siteRect: { minX: grid.minX, minZ: grid.minZ, maxX: grid.maxX, maxZ: grid.maxZ },
+      minGroundY: bounds?.minY ?? groundY,
+      maxGroundY: bounds?.maxY ?? groundY + 20,
+    });
+    this.sm.postPipeline.addOverlayObject(this.borderWall.object3d);
   }
 
   dispose(): void {
@@ -550,7 +618,7 @@ export class GameRenderer {
     // same way. Cloud disc centres on the playable rect, same point
     // frameCameraOnGrid() frames the camera on.
     this.windState = new WindState(state.seed);
-    this.clouds = new CloudLayer(scene, state.seed, grid.sizeX / 2, grid.sizeZ / 2);
+    this.clouds = new CloudLayer(scene, state.seed, grid.minX + grid.sizeX / 2, grid.minZ + grid.sizeZ / 2);
 
     // Fragments (empty until blast runs) — shares terrain's material so a
     // fresh cut face matches the rock it broke off from (#458 T4.1/D9).
@@ -592,7 +660,15 @@ export class GameRenderer {
     if (!this.landscape) {
       this.landscape = new LandscapeMesh(this.sm.scene, this.terrain.sharedMaterial);
     }
-    this.landscape.build(handle, ctx.grid.palette);
+    this.landscapeHandle = handle;
+    // The landscape's StructureSet already carries every river, village and
+    // landmark for this seed — hand it to the claim path rather than have it
+    // trace them all a second time (#473 D6).
+    ctx.playableArea?.adoptStructures(handle.structureSet);
+    this.landscape.build(handle, ctx.grid.palette, this.playableCut(ctx.grid));
+    // Record what we just cut against, so the next terrain:updated only
+    // rebuilds when the site has actually moved since this build.
+    this.siteBoundsChanged(ctx.grid);
 
     // Aerial perspective's haze thickness and per-biome grade — set once per
     // level load, not per frame (#458 T5.2/A21).
@@ -605,17 +681,11 @@ export class GameRenderer {
     // swap can call rebuildLandscapeMesh again for the same GameRenderer, so
     // stale instances from the previous grid must go first or their meshes
     // pile up in the scene).
-    // The site edge marker. Sized from the terrain's own height range so it
-    // stands on the ground rather than floating or being buried.
-    if (this.borderWall) this.sm.postPipeline.removeOverlayObject(this.borderWall.object3d);
-    this.borderWall?.dispose();
-    const terrainBounds = this.terrain.getBounds();
-    this.borderWall = new WorldBorderWall(this.sm.scene, {
-      rect: handle.playableRect,
-      minGroundY: terrainBounds?.minY ?? handle.groundLevelY,
-      maxGroundY: terrainBounds?.maxY ?? handle.groundLevelY + 20,
-    });
-    this.sm.postPipeline.addOverlayObject(this.borderWall.object3d);
+    // The "not here" marker: the frontier between claimable ground and the
+    // generated structures a claim can never take (#473 D6/P4). Sized from
+    // the terrain's own height range so it stands on the ground rather than
+    // floating or being buried.
+    this.rebuildBorderWall(ctx);
 
     this.birds?.dispose();
     this.smoke?.dispose();
@@ -623,8 +693,8 @@ export class GameRenderer {
     this.vegetation?.dispose();
     this.dustDevils?.dispose();
     this.fireflies?.dispose();
-    const centerX = sizeX / 2;
-    const centerZ = sizeZ / 2;
+    const centerX = ctx.grid.minX + ctx.grid.sizeX / 2;
+    const centerZ = ctx.grid.minZ + ctx.grid.sizeZ / 2;
     const sampleHeight = (x: number, z: number) => handle.sampleColumn(x, z).height;
     this.birds = new BirdFlocks(this.sm.scene, ctx.state.seed, centerX, centerZ);
     this.smoke = new ChimneySmoke(this.sm.scene, ctx.state.seed, handle.structureSet.villages);
@@ -650,15 +720,22 @@ export class GameRenderer {
   private frameCameraOnGrid(): void {
     const grid = this.lastGrid;
     if (!grid) return;
-    const cx = grid.sizeX / 2;
-    const cz = grid.sizeZ / 2;
+    const cx = grid.minX + grid.sizeX / 2;
+    const cz = grid.minZ + grid.sizeZ / 2;
     const span = Math.max(grid.sizeX, grid.sizeZ);
     this.sm.cameraController.frameSite(cx, this.getTerrainSurfaceY(cx, cz), cz, span);
     // Manual panning may wander past the pit rim to glance at nearby
     // landscape, but not indefinitely — the landscape is viewable, not the
     // play focus (#458 T6.1/D13).
+    this.refreshPanLeash();
+  }
+
+  /** Re-leash the camera to the site's current bounding box. Cheap; safe to call every remesh. */
+  private refreshPanLeash(): void {
+    const grid = this.lastGrid;
+    if (!grid) return;
     this.sm.cameraController.setPanLeash(
-      { minX: 0, minZ: 0, maxX: grid.sizeX, maxZ: grid.sizeZ },
+      { minX: grid.minX, minZ: grid.minZ, maxX: grid.maxX, maxZ: grid.maxZ },
       PAN_LEASH_MARGIN,
     );
   }
@@ -685,6 +762,8 @@ export class GameRenderer {
     this.ghosts?.dispose();
 
     this.terrain = null;
+    this.landscapeHandle = null;
+    this.lastCutBounds = '';
     this.buildings = null;
     this.vehicles = null;
     this.characters = null;

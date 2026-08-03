@@ -1,9 +1,10 @@
 // BlastSimulator2026 — Console commands for world creation and inspection
 
 import type { CommandResult } from '../ConsoleRunner.js';
-import { createGame, buildGameNavGrid, type GameState } from '../../core/state/GameState.js';
+import { createGame, buildGameNavGrid, syncWorldBounds, createWorldState, type GameState } from '../../core/state/GameState.js';
 import { getBiome, getAllBiomes } from '../../core/world/BiomeCatalog.js';
-import { generateTerrain, buildTerrainContext } from '../../core/world/TerrainGen.js';
+import { generateTerrain, buildTerrainContext, type TerrainConfig } from '../../core/world/TerrainGen.js';
+import { PlayableArea } from '../../core/world/PlayableArea.js';
 import { buildStructureSet, type StructureSet } from '../../core/world/Structures.js';
 import { buildLandscapeMap, sampleLandscapeColumn, type LandscapeMap } from '../../core/world/LandscapeMap.js';
 import type { Rect } from '../../core/world/WorldGen.js';
@@ -12,7 +13,7 @@ import { getOre } from '../../core/world/OreCatalog.js';
 import { getDominantRockId } from '../../core/world/VoxelGrid.js';
 import type { VoxelGrid } from '../../core/world/VoxelGrid.js';
 import { EventEmitter } from '../../core/state/EventEmitter.js';
-import { decodeVoxelGrid, type SerializedVoxels } from '../../core/state/VoxelGridCodec.js';
+import { decodeVoxelGrid, type SerializedVoxels, type SerializedTerrainGen } from '../../core/state/VoxelGridCodec.js';
 
 /**
  * The landscape's coarse tile map plus a reusable fine-grained sampler
@@ -47,8 +48,56 @@ export interface GameContext {
    * the browser game and interaction-mode/visual harnesses pay the cost.
    */
   landscape: LandscapeHandle | null;
+  /**
+   * The site's claimed-chunk set (#473). Owns every expansion: an action past
+   * the site edge asks this to claim the ground first, and takes its refusal
+   * as the answer. Null until a grid exists.
+   */
+  playableArea: PlayableArea | null;
   /** Event emitter for game-over and campaign events. Listeners attached in main.ts/console.ts. */
   emitter: EventEmitter;
+}
+
+/** The terrain config a game's grid was generated from — the datum every later chunk is generated against (#473 D3). */
+export function terrainConfigOf(state: GameState): TerrainConfig | null {
+  if (!state.world) return null;
+  const biome = getBiome(state.mineType);
+  if (!biome) return null;
+  return {
+    seed: state.seed,
+    climateBias: biome.climateCenter,
+    sizeX: state.world.baseSizeX,
+    sizeY: state.world.sizeY,
+    sizeZ: state.world.baseSizeZ,
+  };
+}
+
+/**
+ * The generation datum to embed in a save, so pristine chunks regenerate on
+ * load instead of being stored (#473 D4). Undefined when the state carries no
+ * world or an unknown mine type, which makes `encodeVoxelGrid` fall back to
+ * storing every chunk.
+ */
+export function terrainGenDatum(state: GameState): SerializedTerrainGen | undefined {
+  const config = terrainConfigOf(state);
+  if (!config) return undefined;
+  return {
+    seed: config.seed,
+    climateBias: [config.climateBias[0], config.climateBias[1]],
+    sizeX: config.sizeX,
+    sizeY: config.sizeY,
+    sizeZ: config.sizeZ,
+  };
+}
+
+/** The whole site, as a terrain:updated region. */
+function gridDirtyRegion(grid: VoxelGrid): {
+  minX: number; minY: number; minZ: number; maxX: number; maxY: number; maxZ: number;
+} {
+  return {
+    minX: grid.minX, minY: 0, minZ: grid.minZ,
+    maxX: grid.maxX - 1, maxY: grid.sizeY - 1, maxZ: grid.maxZ - 1,
+  };
 }
 
 /** Grid edge length (voxels) used when a size is not explicitly given. */
@@ -73,12 +122,16 @@ export function regenerateGrid(
 ): void {
   if (!ctx.state) return;
   const { seed, climateBias, sizeX, sizeY, sizeZ, mixedRockHardness } = params;
-  ctx.grid = generateTerrain({ sizeX, sizeY, sizeZ, seed, climateBias, ...(mixedRockHardness !== undefined ? { mixedRockHardness } : {}) });
+  const config: TerrainConfig = {
+    sizeX, sizeY, sizeZ, seed, climateBias,
+    ...(mixedRockHardness !== undefined ? { mixedRockHardness } : {}),
+  };
+  ctx.grid = generateTerrain(config);
   ctx.landscape = null; // stale for the new grid — rebuilt lazily by ensureLandscape() (#458 T2.1)
+  ctx.playableArea = new PlayableArea(ctx.grid, config);
+  syncWorldBounds(ctx.state, ctx.grid);
   buildGameNavGrid(ctx.state, ctx.grid, ctx.state.buildings.buildings, ctx.state.drillHoles);
-  ctx.emitter.emit('terrain:updated', {
-    region: { minX: 0, minY: 0, minZ: 0, maxX: sizeX - 1, maxY: sizeY - 1, maxZ: sizeZ - 1 },
-  });
+  ctx.emitter.emit('terrain:updated', { region: gridDirtyRegion(ctx.grid) });
 }
 
 /**
@@ -126,10 +179,11 @@ export function restoreGrid(ctx: GameContext, voxels: SerializedVoxels): void {
   if (!ctx.state) return;
   ctx.grid = decodeVoxelGrid(voxels);
   ctx.landscape = null; // stale for the restored grid — rebuilt lazily by ensureLandscape() (#458 T2.1)
+  const config = terrainConfigOf(ctx.state);
+  ctx.playableArea = config ? new PlayableArea(ctx.grid, config) : null;
+  syncWorldBounds(ctx.state, ctx.grid);
   buildGameNavGrid(ctx.state, ctx.grid, ctx.state.buildings.buildings, ctx.state.drillHoles);
-  ctx.emitter.emit('terrain:updated', {
-    region: { minX: 0, minY: 0, minZ: 0, maxX: voxels.sizeX - 1, maxY: voxels.sizeY - 1, maxZ: voxels.sizeZ - 1 },
-  });
+  ctx.emitter.emit('terrain:updated', { region: gridDirtyRegion(ctx.grid) });
 }
 
 export function newGameCommand(
@@ -155,7 +209,7 @@ export function newGameCommand(
     seed, mineType,
     ...(named['cash'] ? { startingCash: parseInt(named['cash'], 10) } : {}),
   });
-  ctx.state.world = { sizeX: size, sizeY, sizeZ: size, gridReady: true };
+  ctx.state.world = createWorldState(size, sizeY, size, true);
   regenerateGrid(ctx, { seed, climateBias: biome.climateCenter, sizeX: size, sizeY, sizeZ: size });
 
   return {
@@ -180,7 +234,7 @@ export function inspectCommand(
   if (!ctx.grid.isInBounds(x, y, z)) {
     return {
       success: false,
-      output: `Out of bounds: (${x},${y},${z}). Grid is ${ctx.grid.sizeX}x${ctx.grid.sizeY}x${ctx.grid.sizeZ}.`,
+      output: `Off site: (${x},${y},${z}). The site spans (${ctx.grid.minX},${ctx.grid.minZ}) to (${ctx.grid.maxX - 1},${ctx.grid.maxZ - 1}), height ${ctx.grid.sizeY}.`,
     };
   }
 
@@ -220,13 +274,17 @@ export function terrainInfoCommand(
   }
 
   const w = ctx.state.world!;
+  const grid = ctx.grid;
   let solidCount = 0;
   let airCount = 0;
-  for (let x = 0; x < ctx.grid.sizeX; x++) {
-    for (let z = 0; z < ctx.grid.sizeZ; z++) {
-      for (let y = 0; y < ctx.grid.sizeY; y++) {
-        const v = ctx.grid.getVoxel(x, y, z)!;
-        if (v.density > 0) solidCount++;
+  // Walks the live bounding box, not 0..size: the site starts wherever play
+  // has taken it, and columns inside the box it does not own are skipped
+  // rather than counted as air (#473).
+  for (let x = grid.minX; x < grid.maxX; x++) {
+    for (let z = grid.minZ; z < grid.maxZ; z++) {
+      if (!grid.containsColumn(x, z)) continue;
+      for (let y = 0; y < grid.sizeY; y++) {
+        if (grid.densityAt(x, y, z) > 0) solidCount++;
         else airCount++;
       }
     }
@@ -235,7 +293,9 @@ export function terrainInfoCommand(
   return {
     success: true,
     output: [
-      `Grid: ${w.sizeX}x${w.sizeY}x${w.sizeZ}`,
+      `Site: ${w.sizeX}x${w.sizeY}x${w.sizeZ} from (${grid.minX}, ${grid.minZ})`,
+      `Level size: ${w.baseSizeX}x${w.baseSizeZ}`,
+      `Claimed chunks: ${grid.chunkCount}`,
       `Mine type: ${ctx.state.mineType}`,
       `Seed: ${ctx.state.seed}`,
       `Solid voxels: ${solidCount}`,
@@ -293,18 +353,17 @@ export function surveyCommand(
   }
   const [x, z] = coords as [number, number];
 
-  if (x < 0 || x >= ctx.grid.sizeX || z < 0 || z >= ctx.grid.sizeZ) {
+  if (!ctx.grid.containsColumn(x, z)) {
     return {
       success: false,
-      output: `Out of bounds: (${x},${z}). Grid is ${ctx.grid.sizeX}x${ctx.grid.sizeZ}.`,
+      output: `Off site: (${x},${z}). The site spans (${ctx.grid.minX},${ctx.grid.minZ}) to (${ctx.grid.maxX - 1},${ctx.grid.maxZ - 1}).`,
     };
   }
 
   // Find surface (topmost solid voxel)
   let surfaceY = -1;
   for (let y = ctx.grid.sizeY - 1; y >= 0; y--) {
-    const v = ctx.grid.getVoxel(x, y, z)!;
-    if (v.density > 0) {
+    if (ctx.grid.densityAt(x, y, z) > 0) {
       surfaceY = y;
       break;
     }

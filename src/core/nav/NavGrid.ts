@@ -35,15 +35,67 @@ export interface NavCell {
 export class NavGrid {
   readonly width: number;
   readonly height: number;
+  /**
+   * World x of cell column 0. Non-zero once the site has been claimed
+   * westward (#473 D7) — the navgrid covers the voxel grid's live bounding
+   * box, which no longer has to start at the origin.
+   */
+  readonly originX: number;
+  /** World z of cell row 0. See `originX`. */
+  readonly originZ: number;
   /** Not readonly: patchNavGrid corrects this in place when a patch lowers the grid's tallest column. */
   maxSurfaceY: number;
+  /**
+   * Cells indexed **locally**: `cells[z - originZ][x - originX]`. Prefer
+   * `cellAt`, which takes world coordinates, over indexing this directly.
+   */
   readonly cells: NavCell[][];
 
-  constructor(width: number, height: number, cells: NavCell[][], maxSurfaceY: number = 0) {
+  constructor(
+    width: number,
+    height: number,
+    cells: NavCell[][],
+    maxSurfaceY: number = 0,
+    originX: number = 0,
+    originZ: number = 0,
+  ) {
     this.width = width;
     this.height = height;
+    this.originX = originX;
+    this.originZ = originZ;
     this.maxSurfaceY = maxSurfaceY;
     this.cells = cells;
+  }
+
+  /** East edge of the covered box, exclusive. */
+  get maxX(): number { return this.originX + this.width; }
+  /** South edge of the covered box, exclusive. */
+  get maxZ(): number { return this.originZ + this.height; }
+
+  /** True when world (x, z) falls inside the covered box. */
+  containsCell(x: number, z: number): boolean {
+    return x >= this.originX && x < this.maxX && z >= this.originZ && z < this.maxZ;
+  }
+
+  /** The cell at world (x, z), or undefined outside the covered box. */
+  cellAt(x: number, z: number): NavCell | undefined {
+    return this.cells[z - this.originZ]?.[x - this.originX];
+  }
+
+  /** Overwrite the cell at world (x, z). No-op outside the covered box. */
+  setCellAt(x: number, z: number, cell: NavCell): void {
+    const row = this.cells[z - this.originZ];
+    if (row && x >= this.originX && x < this.maxX) row[x - this.originX] = cell;
+  }
+
+  /** Clamp world x into the covered box. */
+  clampX(x: number): number {
+    return Math.max(this.originX, Math.min(this.maxX - 1, Math.round(x)));
+  }
+
+  /** Clamp world z into the covered box. */
+  clampZ(z: number): number {
+    return Math.max(this.originZ, Math.min(this.maxZ - 1, Math.round(z)));
   }
 
   /**
@@ -62,8 +114,8 @@ export class NavGrid {
    */
   static computeMaxSurfaceY(voxelGrid: VoxelGrid): number {
     let maxY = -1;
-    for (let z = 0; z < voxelGrid.sizeZ; z++) {
-      for (let x = 0; x < voxelGrid.sizeX; x++) {
+    for (let z = voxelGrid.minZ; z < voxelGrid.maxZ; z++) {
+      for (let x = voxelGrid.minX; x < voxelGrid.maxX; x++) {
         const surfaceY = NavGrid.computeSurfaceY(voxelGrid, x, z);
         if (surfaceY > maxY) maxY = surfaceY;
       }
@@ -91,12 +143,21 @@ export class NavGrid {
   ): NavGrid {
     const width = voxelGrid.sizeX;
     const height = voxelGrid.sizeZ;
+    const originX = voxelGrid.minX;
+    const originZ = voxelGrid.minZ;
     const cells: NavCell[][] = [];
     const maxSurfaceY = NavGrid.computeMaxSurfaceY(voxelGrid);
 
-    for (let z = 0; z < height; z++) {
+    for (let z = originZ; z < originZ + height; z++) {
       const row: NavCell[] = [];
-      for (let x = 0; x < width; x++) {
+      for (let x = originX; x < originX + width; x++) {
+        // A column inside the bounding box the site does not actually own —
+        // the notch left when an L-shaped site's box is squared off — is
+        // 'void': nothing walks there, and nothing meshes there either.
+        if (!voxelGrid.containsColumn(x, z)) {
+          row.push(NavGrid.makeCell('void', 0));
+          continue;
+        }
         const surfaceY = NavGrid.computeSurfaceY(voxelGrid, x, z);
         const cellType = NavGrid.classifyCellType(x, z, voxelGrid, buildings, drillHoles, surfaceY);
         const benchLevel = NavGrid.computeBenchLevel(maxSurfaceY, surfaceY);
@@ -105,7 +166,7 @@ export class NavGrid {
       cells.push(row);
     }
 
-    return new NavGrid(width, height, cells, maxSurfaceY);
+    return new NavGrid(width, height, cells, maxSurfaceY, originX, originZ);
   }
 
   /**
@@ -125,10 +186,10 @@ export class NavGrid {
     // and fail the min > max check.
     if (region.minX > region.maxX || region.minZ > region.maxZ) return;
 
-    const minX = Math.max(0, Math.min(navGrid.width - 1, Math.floor(region.minX)));
-    const maxX = Math.max(0, Math.min(navGrid.width - 1, Math.floor(region.maxX)));
-    const minZ = Math.max(0, Math.min(navGrid.height - 1, Math.floor(region.minZ)));
-    const maxZ = Math.max(0, Math.min(navGrid.height - 1, Math.floor(region.maxZ)));
+    const minX = navGrid.clampX(Math.floor(region.minX));
+    const maxX = navGrid.clampX(Math.floor(region.maxX));
+    const minZ = navGrid.clampZ(Math.floor(region.minZ));
+    const maxZ = navGrid.clampZ(Math.floor(region.maxZ));
 
     // Defensive check for regions entirely outside grid bounds after clamping
     if (minX > maxX || minZ > maxZ) return;
@@ -141,10 +202,14 @@ export class NavGrid {
 
     for (let z = minZ; z <= maxZ; z++) {
       for (let x = minX; x <= maxX; x++) {
-        if (navGrid.cells[z]![x]!.benchLevel === 0) mayHaveLoweredThePeak = true;
+        if (navGrid.cellAt(x, z)!.benchLevel === 0) mayHaveLoweredThePeak = true;
+        if (!voxelGrid.containsColumn(x, z)) {
+          navGrid.setCellAt(x, z, NavGrid.makeCell('void', 0));
+          continue;
+        }
         const surfaceY = NavGrid.computeSurfaceY(voxelGrid, x, z);
         const cellType = NavGrid.classifyCellType(x, z, voxelGrid, buildings, drillHoles, surfaceY);
-        navGrid.cells[z]![x] = NavGrid.makeCell(cellType, NavGrid.computeBenchLevel(navGrid.maxSurfaceY, surfaceY));
+        navGrid.setCellAt(x, z, NavGrid.makeCell(cellType, NavGrid.computeBenchLevel(navGrid.maxSurfaceY, surfaceY)));
       }
     }
 

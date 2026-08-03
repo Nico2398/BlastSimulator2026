@@ -67,6 +67,18 @@ export interface Landmark {
   waterLevel?: number;
 }
 
+/**
+ * The structures a site may never claim (#473 D6): rivers, villages and
+ * landmarks. Deliberately excludes trees — a forest is scenery a mine can
+ * clear, and the forest pass is by far the most expensive part of
+ * `buildStructureSet`, which the claim check must not pay for.
+ */
+export interface ProtectedStructures {
+  rivers: RiverPath[];
+  villages: Village[];
+  landmarks: Landmark[];
+}
+
 export interface StructureSet {
   overlays: HeightOverlay[];
   /** Coarse 128m-cell spatial index (packed key) -> overlay indices, in build order. */
@@ -637,6 +649,82 @@ export function placeForests(
  * landmarks, then village pads (fixed order per A13), then forests sampling
  * the final overlaid heights.
  */
+/**
+ * Rivers, landmarks and village pads for one world/level seed, in the fixed
+ * build order A13 requires — everything `buildStructureSet` produces except
+ * the forest pass. Split out so the claim check (#473 D6) can ask what ground
+ * is protected without generating tens of thousands of trees to find out.
+ */
+export function buildProtectedStructures(
+  seed: number,
+  fields: WorldNoiseFields,
+  shapingAt: ShapingAtFn,
+  playableRect: Rect,
+  extentHalf: number = DEFAULT_LANDSCAPE_EXTENT_HALF,
+): ProtectedStructures {
+  const rivers = traceRivers(seed, fields, shapingAt, playableRect, extentHalf);
+  const landmarks = placeLandmarks(seed, fields, shapingAt, playableRect, extentHalf);
+  const villages = placeVillages(seed, fields, shapingAt, playableRect, rivers, extentHalf);
+  return { rivers, landmarks, villages };
+}
+
+/** Shortest distance from (x, z) to an axis-aligned rect. 0 when inside. */
+function pointRectDistance(rect: Rect, x: number, z: number): number {
+  const dx = Math.max(rect.minX - x, 0, x - rect.maxX);
+  const dz = Math.max(rect.minZ - z, 0, z - rect.maxZ);
+  return Math.hypot(dx, dz);
+}
+
+/** Shortest distance from a segment to an axis-aligned rect. 0 when they touch or overlap. */
+function segmentRectDistance(
+  ax: number, az: number, bx: number, bz: number,
+  rect: Rect,
+): number {
+  // Two disjoint convex 2D shapes attain their minimum separation at a vertex
+  // of one of them, so checking the segment's endpoints against the rect and
+  // the rect's corners against the segment is exact, not an approximation.
+  let best = Math.min(pointRectDistance(rect, ax, az), pointRectDistance(rect, bx, bz));
+  if (best === 0) return 0;
+
+  const corners: Array<[number, number]> = [
+    [rect.minX, rect.minZ], [rect.maxX, rect.minZ], [rect.maxX, rect.maxZ], [rect.minX, rect.maxZ],
+  ];
+  const dx = bx - ax, dz = bz - az;
+  const lenSq = dx * dx + dz * dz;
+  for (const [cx, cz] of corners) {
+    let t = lenSq > 0 ? ((cx - ax) * dx + (cz - az) * dz) / lenSq : 0;
+    t = Math.max(0, Math.min(1, t));
+    const d = Math.hypot(cx - (ax + t * dx), cz - (az + t * dz));
+    if (d < best) best = d;
+  }
+  return best;
+}
+
+/** Extra metres of standoff around a protected footprint, so a claim never abuts a village wall or riverbank. */
+const PROTECTED_MARGIN = 4;
+
+/**
+ * True when any river channel, village pad or landmark overlaps `rect`
+ * (max exclusive) — the veto that stops a site claiming generated
+ * structures (#473 D6).
+ */
+export function rectTouchesProtectedStructure(structures: ProtectedStructures, rect: Rect): boolean {
+  for (const village of structures.villages) {
+    if (pointRectDistance(rect, village.x, village.z) < village.radius + PROTECTED_MARGIN) return true;
+  }
+  for (const landmark of structures.landmarks) {
+    if (pointRectDistance(rect, landmark.x, landmark.z) < landmark.radius + PROTECTED_MARGIN) return true;
+  }
+  for (const river of structures.rivers) {
+    for (let i = 0; i < river.points.length - 1; i++) {
+      const p0 = river.points[i]!, p1 = river.points[i + 1]!;
+      const width = Math.max(river.widths[i] ?? 0, river.widths[i + 1] ?? 0);
+      if (segmentRectDistance(p0.x, p0.z, p1.x, p1.z, rect) < width + PROTECTED_MARGIN) return true;
+    }
+  }
+  return false;
+}
+
 export function buildStructureSet(
   seed: number,
   fields: WorldNoiseFields,
@@ -645,9 +733,7 @@ export function buildStructureSet(
   playableRect: Rect,
   extentHalf: number = DEFAULT_LANDSCAPE_EXTENT_HALF,
 ): StructureSet {
-  const rivers = traceRivers(seed, fields, shapingAt, playableRect, extentHalf);
-  const landmarks = placeLandmarks(seed, fields, shapingAt, playableRect, extentHalf);
-  const villages = placeVillages(seed, fields, shapingAt, playableRect, rivers, extentHalf);
+  const { rivers, landmarks, villages } = buildProtectedStructures(seed, fields, shapingAt, playableRect, extentHalf);
 
   const overlays: HeightOverlay[] = [
     ...rivers.map(r => buildRiverOverlay(r)),

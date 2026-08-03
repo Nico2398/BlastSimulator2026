@@ -88,6 +88,8 @@ export class SceneManager {
 
   /** Number of frames rendered since start(). Exposed for diagnostics. */
   frameCount = 0;
+  /** False while a harness has suspended drawing — see `setDrawingEnabled`. */
+  private drawingEnabled = true;
 
   constructor(canvas: HTMLCanvasElement) {
     // --- Scene ---
@@ -169,18 +171,56 @@ export class SceneManager {
       const dt = Math.min((now - lastTime) / 1000, 0.1); // cap at 100ms
       lastTime = now;
       if (onUpdate) onUpdate(dt);
-      // CSM reads the camera's world matrix — refresh it before update() in
-      // case this frame's onUpdate moved the camera (#458 T5.1).
-      this.camera.updateMatrixWorld();
-      this.csm.update();
-      this.postPipeline.aerial.update(this.camera);
-      this.postPipeline.composer.render();
-      // Force GPU to flush — ensures screenshot captures the latest frame
-      const gl = this.renderer.getContext();
-      if (gl) gl.finish();
+      if (this.drawingEnabled) this.drawFrame();
+      // Counts frames the loop served, drawn or not, so a harness that waits
+      // on rAF sees this advance whether or not drawing is suspended.
       this.frameCount++;
     };
     loop();
+  }
+
+  /**
+   * Draw one frame. Split out of the loop so a suspended run can still force
+   * a frame for a screenshot — see `setDrawingEnabled`.
+   */
+  private drawFrame(): void {
+    // CSM reads the camera's world matrix — refresh it before update() in
+    // case this frame's onUpdate moved the camera (#458 T5.1).
+    this.camera.updateMatrixWorld();
+    this.csm.update();
+    this.postPipeline.aerial.update(this.camera);
+    this.postPipeline.composer.render();
+    // Force GPU to flush — ensures screenshot captures the latest frame
+    const gl = this.renderer.getContext();
+    if (gl) gl.finish();
+  }
+
+  /**
+   * Suspend or resume drawing. The loop keeps running either way: `onUpdate`
+   * still fires, rAF still resolves, the simulation still ticks — only the
+   * draw is skipped.
+   *
+   * This exists for the browser-driven harnesses (#475). They read the DOM
+   * and `__gameState`, and need pixels only when capturing a screenshot, but
+   * every CDP call they make waits on the main thread. With the terrain
+   * material costing seconds per frame under software rasterisation, that
+   * wait is the whole cost of those suites — the game's own tick is under 2%
+   * of a frame. Suspending the draw and forcing one via `renderFrame` at each
+   * capture keeps the images identical and stops the harness paying for
+   * frames nobody looks at.
+   */
+  setDrawingEnabled(enabled: boolean): void {
+    this.drawingEnabled = enabled;
+  }
+
+  /** Whether the loop is currently drawing. */
+  get isDrawingEnabled(): boolean {
+    return this.drawingEnabled;
+  }
+
+  /** Draw exactly one frame, even while drawing is suspended. */
+  renderFrame(): void {
+    this.drawFrame();
   }
 
   /** Stop the render loop and release resources. */
