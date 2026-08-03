@@ -82,6 +82,11 @@ export class LoadingScreen {
 
     this.overlay.append(this.titleEl, this.label, bar);
     container.appendChild(this.overlay);
+
+    // The scenario harness asserts visibility on the DOM node itself — the
+    // element is the only handle a Puppeteer-side assert has — so mirror the
+    // getter there.
+    Object.defineProperty(this.overlay, 'visible', { get: () => this.visible });
   }
 
   get visible(): boolean { return this.overlay.style.display !== 'none'; }
