@@ -253,20 +253,15 @@ export class VoxelGrid {
   get chunkCount(): number { return this.chunks.size; }
 
   isInBounds(x: number, y: number, z: number): boolean {
-    if (y < 0 || y >= this.sizeY) return false;
-    const chunk = this.chunkAt(x, z);
-    if (!chunk) return false;
-    return x >= chunk.x0 && x < chunk.x1 && z >= chunk.z0 && z < chunk.z1;
+    return this.ownerOf(x, y, z) !== null;
   }
 
   /** True when the site owns the column at (x, z), regardless of height. */
   containsColumn(x: number, z: number): boolean {
-    const chunk = this.chunkAt(x, z);
-    if (!chunk) return false;
-    return x >= chunk.x0 && x < chunk.x1 && z >= chunk.z0 && z < chunk.z1;
+    return this.ownerOf(x, 0, z) !== null;
   }
 
-  /** The owned chunk covering (x, z), or null. */
+  /** The chunk covering (x, z) if the site has one, or null. Does not check the chunk's owned sub-rect. */
   private chunkAt(x: number, z: number): VoxelChunk | null {
     const key = chunkKey(chunkIndexOf(x), chunkIndexOf(z));
     if (key === this.cacheKey) return this.cacheChunk;
@@ -276,27 +271,34 @@ export class VoxelGrid {
     return chunk;
   }
 
+  /**
+   * The chunk that owns (x, y, z), or null.
+   *
+   * Deliberately returns the chunk rather than a {chunk, index} pair, and
+   * leaves the index to `VoxelGrid.localIndex`: this runs once per corner per
+   * marching-cubes cell, so allocating a wrapper object here would put a
+   * short-lived object on the heap for every voxel the mesher reads.
+   */
+  private ownerOf(x: number, y: number, z: number): VoxelChunk | null {
+    if (y < 0 || y >= this.sizeY) return null;
+    const chunk = this.chunkAt(x, z);
+    if (!chunk) return null;
+    if (x < chunk.x0 || x >= chunk.x1 || z < chunk.z0 || z >= chunk.z1) return null;
+    return chunk;
+  }
+
+  /** Same as `ownerOf`, but reports the miss to the installed bounds reporter (reads only). */
+  private ownerOfRead(x: number, y: number, z: number): VoxelChunk | null {
+    const chunk = this.ownerOf(x, y, z);
+    if (!chunk && outOfBoundsReporter) outOfBoundsReporter(x, y, z);
+    return chunk;
+  }
+
   /** Chunk-local flat index. x fastest, then y, then z — same axis order the dense layout used. */
   private static localIndex(chunk: VoxelChunk, x: number, y: number, z: number, sizeY: number): number {
     const lx = x - chunk.cx * CHUNK_SIZE;
     const lz = z - chunk.cz * CHUNK_SIZE;
     return lx + y * CHUNK_SIZE + lz * CHUNK_SIZE * sizeY;
-  }
-
-  /** Resolve (x, y, z) to its chunk and local index, or null when the site does not own it. */
-  private resolve(x: number, y: number, z: number): { chunk: VoxelChunk; i: number } | null {
-    if (y < 0 || y >= this.sizeY) return null;
-    const chunk = this.chunkAt(x, z);
-    if (!chunk) return null;
-    if (x < chunk.x0 || x >= chunk.x1 || z < chunk.z0 || z >= chunk.z1) return null;
-    return { chunk, i: VoxelGrid.localIndex(chunk, x, y, z, this.sizeY) };
-  }
-
-  /** Same as `resolve`, but reports the miss to the installed bounds reporter (reads only). */
-  private resolveRead(x: number, y: number, z: number): { chunk: VoxelChunk; i: number } | null {
-    const hit = this.resolve(x, y, z);
-    if (!hit && outOfBoundsReporter) outOfBoundsReporter(x, y, z);
-    return hit;
   }
 
   // ── Chunk ownership ──
@@ -432,8 +434,8 @@ export class VoxelGrid {
 
   /** Density in [0, 1]. Coordinates the site does not own read as 0 (air). */
   densityAt(x: number, y: number, z: number): number {
-    const hit = this.resolveRead(x, y, z);
-    return hit ? hit.chunk.density[hit.i]! : 0;
+    const chunk = this.ownerOfRead(x, y, z);
+    return chunk ? chunk.density[VoxelGrid.localIndex(chunk, x, y, z, this.sizeY)]! : 0;
   }
 
   /** True when density >= 0.5 — the shared "solid for meshing/physics" threshold. */
@@ -443,29 +445,29 @@ export class VoxelGrid {
 
   /** Fracture modifier (1.0 = normal, < 1.0 = pre-cracked). Unowned coordinates read as 1.0. */
   fractureAt(x: number, y: number, z: number): number {
-    const hit = this.resolveRead(x, y, z);
-    return hit ? hit.chunk.fracture[hit.i]! : 1.0;
+    const chunk = this.ownerOfRead(x, y, z);
+    return chunk ? chunk.fracture[VoxelGrid.localIndex(chunk, x, y, z, this.sizeY)]! : 1.0;
   }
 
   /** The shared, frozen composition object for this voxel. Treat as immutable. */
   compositionAt(x: number, y: number, z: number): VoxelRockComposition {
-    const hit = this.resolveRead(x, y, z);
-    if (!hit) return this.palette.get(0).comp;
-    return this.palette.get(hit.chunk.compId[hit.i]!).comp;
+    const chunk = this.ownerOfRead(x, y, z);
+    if (!chunk) return this.palette.get(0).comp;
+    return this.palette.get(chunk.compId[VoxelGrid.localIndex(chunk, x, y, z, this.sizeY)]!).comp;
   }
 
   /** Dominant rock ID, precomputed at intern time. '' for air or unowned coordinates. */
   dominantRockAt(x: number, y: number, z: number): string {
-    const hit = this.resolveRead(x, y, z);
-    if (!hit) return '';
-    return this.palette.get(hit.chunk.compId[hit.i]!).dominantRockId;
+    const chunk = this.ownerOfRead(x, y, z);
+    if (!chunk) return '';
+    return this.palette.get(chunk.compId[VoxelGrid.localIndex(chunk, x, y, z, this.sizeY)]!).dominantRockId;
   }
 
   /** Ore densities at this voxel, or undefined if it carries no ore (the common case). */
   oresAt(x: number, y: number, z: number): Record<string, number> | undefined {
-    const hit = this.resolveRead(x, y, z);
-    if (!hit) return undefined;
-    return hit.chunk.ores.get(hit.i);
+    const chunk = this.ownerOfRead(x, y, z);
+    if (!chunk) return undefined;
+    return chunk.ores.get(VoxelGrid.localIndex(chunk, x, y, z, this.sizeY));
   }
 
   // ── Direct mutators — hot-path callers (generation, blast) should prefer these ──
@@ -479,9 +481,9 @@ export class VoxelGrid {
    * height instead of snapping it to the nearest half-voxel (#458).
    */
   fillVoxel(x: number, y: number, z: number, compId: number, ores?: Record<string, number>, density = 1.0): void {
-    const hit = this.resolve(x, y, z);
-    if (!hit) return;
-    const { chunk, i } = hit;
+    const chunk = this.ownerOf(x, y, z);
+    if (!chunk) return;
+    const i = VoxelGrid.localIndex(chunk, x, y, z, this.sizeY);
     chunk.density[i] = density;
     chunk.compId[i] = compId;
     chunk.fracture[i] = 1.0;
@@ -491,18 +493,19 @@ export class VoxelGrid {
   }
 
   setFractureAt(x: number, y: number, z: number, value: number): void {
-    const hit = this.resolve(x, y, z);
-    if (!hit) return;
-    hit.chunk.fracture[hit.i] = value;
-    this.touch(hit.chunk);
+    const chunk = this.ownerOf(x, y, z);
+    if (!chunk) return;
+    chunk.fracture[VoxelGrid.localIndex(chunk, x, y, z, this.sizeY)] = value;
+    this.touch(chunk);
   }
 
   /** Multiply the fracture modifier in place (e.g. cracking a voxel that didn't fully fracture). */
   scaleFractureAt(x: number, y: number, z: number, factor: number): void {
-    const hit = this.resolve(x, y, z);
-    if (!hit) return;
-    hit.chunk.fracture[hit.i] = hit.chunk.fracture[hit.i]! * factor;
-    this.touch(hit.chunk);
+    const chunk = this.ownerOf(x, y, z);
+    if (!chunk) return;
+    const i = VoxelGrid.localIndex(chunk, x, y, z, this.sizeY);
+    chunk.fracture[i] = chunk.fracture[i]! * factor;
+    this.touch(chunk);
   }
 
   // ── Compatibility API — materializes a VoxelData-shaped object per call ──
@@ -515,9 +518,9 @@ export class VoxelGrid {
    * grid — use the direct mutators above, or `setVoxel`, to write.
    */
   getVoxel(x: number, y: number, z: number): VoxelData | undefined {
-    const hit = this.resolveRead(x, y, z);
-    if (!hit) return undefined;
-    const { chunk, i } = hit;
+    const chunk = this.ownerOfRead(x, y, z);
+    if (!chunk) return undefined;
+    const i = VoxelGrid.localIndex(chunk, x, y, z, this.sizeY);
     const ores = chunk.ores.get(i);
     return {
       composition: this.palette.get(chunk.compId[i]!).comp,
@@ -528,9 +531,9 @@ export class VoxelGrid {
   }
 
   setVoxel(x: number, y: number, z: number, voxel: VoxelData): void {
-    const hit = this.resolve(x, y, z);
-    if (!hit) return;
-    const { chunk, i } = hit;
+    const chunk = this.ownerOf(x, y, z);
+    if (!chunk) return;
+    const i = VoxelGrid.localIndex(chunk, x, y, z, this.sizeY);
     chunk.compId[i] = this.palette.intern(voxel.composition);
     chunk.density[i] = voxel.density;
     chunk.fracture[i] = voxel.fractureModifier;
@@ -540,9 +543,9 @@ export class VoxelGrid {
   }
 
   clearVoxel(x: number, y: number, z: number): void {
-    const hit = this.resolve(x, y, z);
-    if (!hit) return;
-    const { chunk, i } = hit;
+    const chunk = this.ownerOf(x, y, z);
+    if (!chunk) return;
+    const i = VoxelGrid.localIndex(chunk, x, y, z, this.sizeY);
     chunk.density[i] = 0;
     chunk.compId[i] = 0;
     chunk.fracture[i] = 1.0;
@@ -646,8 +649,9 @@ export class VoxelGrid {
     cb: (x: number, y: number, z: number, compId: number) => void,
   ): void {
     this.forEachInRegion(min, max, (x, y, z) => {
-      const hit = this.resolve(x, y, z)!;
-      if (hit.chunk.density[hit.i]! > 0) cb(x, y, z, hit.chunk.compId[hit.i]!);
+      const chunk = this.ownerOf(x, y, z)!;
+      const i = VoxelGrid.localIndex(chunk, x, y, z, this.sizeY);
+      if (chunk.density[i]! > 0) cb(x, y, z, chunk.compId[i]!);
     });
   }
 }
