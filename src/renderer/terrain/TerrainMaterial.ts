@@ -59,6 +59,12 @@ const DETAIL_FULL_DISTANCE = 40;   // metres — everything on
 // actually looks from.
 const DETAIL_FADE_DISTANCE = 320;
 
+// A runner-up cover contributing less than this share of the blend is not
+// worth a full material evaluation — see materialFlatColor / the cover-blend
+// skip below (#475). Exported so test-writer can reference it by name;
+// wired into the GLSL by @implementer.
+export const COVER_BLEND_SKIP_SHARE = 0.02;
+
 
 // ---------- A19.2 — uniforms, attributes, varyings ----------
 const SUPPORT_GLSL = /* glsl */`
@@ -134,6 +140,9 @@ vec3 materialAlbedo(int i, vec3 wp, float lod, out float bumpAmt, out float roug
   roughAdj = look.z;
   return mix(uMatColor[i], uMatColorAlt[i], t);
 }
+
+// TODO(#475): materialFlatColor(int i, out float bumpAmt, out float roughAdj)
+// goes here — cheap runner-up stand-in (uniform reads + mix, no evalRecipe).
 `;
 
 const FRAGMENT_COMMON_EXTRA = `
@@ -291,6 +300,8 @@ if (bestI >= 0 && bestW > 0.0) {
   float b1, b2, r1, r2;
   vec3 c1 = materialAlbedo(bestI, vWorldPos, lod, b1, r1);
   vec3 c2 = c1; b2 = b1; r2 = r1;
+  // TODO(#475): skip full materialAlbedo for the runner-up when its share is
+  // below COVER_BLEND_SKIP_SHARE — use materialFlatColor instead.
   if (secondI >= 0) c2 = materialAlbedo(secondI, vWorldPos, lod, b2, r2);
   // Ratio blend, so the crossover between two covers is a gradient whose
   // width follows how close their scores are — never a step.
