@@ -260,6 +260,38 @@ export const SOLID_VOXEL_DENSITY_THRESHOLD = 0.5;
  *  region computation and, expanded further, for TerrainBody's collider-building scope. */
 export const BLAST_ZONE_RADIUS = 5;
 
+// ─── Fragment generation (blast step 3) ────────────────────────────────────────
+
+/** How many pieces each axis of a broken voxel is diced into before fragments are
+ *  clustered out of them. 2 gives 8 sub-cells of 0.125 m³ — fine enough for
+ *  irregular shapes without making a large blast's clustering pass expensive. */
+export const SUB_CELL_RESOLUTION = 2;
+
+/** Seed points a barely-broken voxel contributes, and how many more it adds per
+ *  unit of intensity above its breaking point. Below 1 the base means most gently
+ *  broken voxels contribute none at all, so their rock joins a neighbour's
+ *  fragment — which is exactly how an undercharged blast produces boulders. */
+export const SEEDS_BASE = 0.35;
+export const SEEDS_PER_INTENSITY = 0.8;
+
+/** Ceiling on seeds from a single voxel, so one violently overcharged voxel cannot
+ *  produce arbitrarily fine dust. */
+export const MAX_SEEDS_PER_VOXEL = 8;
+
+/** How far (voxels) a sub-cell will look for a seed to belong to. Rock further than
+ *  this from any seed becomes an orphan lump instead. */
+export const SEED_SEARCH_RADIUS = 3;
+
+/** Largest orphan lump (in sub-cells) before it is split. 64 sub-cells is 8 m³ —
+ *  a boulder well past what any hauler can take, which is the intended failure
+ *  state for a blast that barely broke its rock. */
+export const MAX_ORPHAN_COMPONENT_SUBCELLS = 64;
+
+/** Guard on seeds per blast. Not a balance dial: fragment size must follow from the
+ *  blast alone, so this only exists to stop pathological input from allocating
+ *  without bound. Tripping it yields fewer, larger fragments — never less rock. */
+export const MAX_FRAGMENTS_PER_BLAST = 50000;
+
 /** Fragments produced per unit of energy-to-threshold ratio in a broken voxel.
  *  A voxel that just barely broke yields one fragment; one hit twice as hard as it
  *  could take yields more, smaller ones. Superseded once fragment shapes are

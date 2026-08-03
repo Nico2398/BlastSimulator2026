@@ -717,7 +717,51 @@ animating them is P4.
 **Acceptance:** all scenarios green; crater visible without the hack; energy
 conservation test green.
 
-### P2 — Spec fragment generation (large)
+### P2 — Spec fragment generation (large) — ✅ DONE
+
+**Landed:** `src/core/mining/FragmentGeneration.ts` — sub-cell dicing, intensity-driven
+seeding, nearest-seed clustering, orphan lumps — plus 21 unit tests. `executeBlast` now
+emits clustered fragments carrying real `halfExtents`, composition and ore;
+`FragmentMesh` scales each instance to the fragment's own bounding box. The Delaunay /
+Voronoi / merge machinery this replaces was already deleted in P0, so nothing was ported.
+
+**Deviations and findings:**
+1. **Seeding uses `intensityAt`, per P1's finding 1** — `SEEDS_PER_INTENSITY` replaces the
+   plan's `SEEDS_PER_RATIO`. Measured: mean fragment volume falls 0.655 → 0.450 → 0.385 m³
+   as the charge grows, and the oversized share falls with it. Size is now a readable
+   consequence of the plan, with no budget anywhere in the path.
+2. **Orphan lumps are grown breadth-first, not depth-first.** DFS snaked through the rock
+   and produced stringy fragments whose own centre of mass fell outside them. BFS gives
+   compact lumps. Sub-cells queued past the size cap go back into the pool for their own
+   lump rather than being dropped.
+3. **Render scatter and the crater Y-offset are deleted, not kept as the plan allowed.**
+   Both existed to fake variety and crater-depth for point fragments that all shared a
+   voxel centre. Fragments now have real distinct centroids inside the removed volume, so
+   the fakes are redundant — and keeping them would have fought the real positions P3
+   computes. `FRAGMENT_RENDER_JITTER_RADIUS`, `FRAGMENT_PROJECTION_RENDER_*` and
+   `FRAGMENT_CRATER_YOFFSET_*` are gone.
+4. **Shape variants key off `shapeSeed`, not `id`.** Ids run consecutively, so
+   `id % SHAPE_VARIANTS` cycled the eight shapes in lockstep and produced a visibly
+   repeating pattern across the pile. Random seeds fill buckets unevenly, so
+   `spawnFragments` now falls through to any bucket with room instead of dropping
+   fragments once one variant fills.
+
+**A gameplay bug this exposed, fixed here.** Fragments now carry honest masses (median
+~1 t, boulders past 4 t) where the old model produced arbitrarily-subdivided crumbs.
+`findReachableGroundFragment` picked the *nearest* fragment with no regard for whether it
+could ever be stored, so a hauler was dispatched to a boulder heavier than the whole T1
+warehouse, loaded it, and was turned away at the depot every tick — the fleet deadlocked
+silently and `storedMassKg` never moved. It now skips fragments heavier than the room
+left in storage. Worth noting for a future phase: the "oversized fragments must be broken
+by a Rock Fragmenter first" rule from the design doc is still not enforced anywhere in
+the haul path — haulers will happily take a boulder if the warehouse is big enough.
+
+**Verified:** `static` clean; `logic` 6882 tests / 242 files green; `scenario` 111/111;
+`visual` — a strong blast and a weak one inspected side by side. The strong blast leaves a
+wide muck pile of visibly distinct angular chunks of varying size and proportion under a
+large excavated face; the 2 kg pop_rock blast leaves a small scar and almost no debris.
+
+### P2 — original plan text (superseded by the record above)
 
 - Implement A3 in `src/core/mining/FragmentGeneration.ts`.
 - Extend `FragmentData` per §5.1 (add fields; keep old ones). `origin = position` at

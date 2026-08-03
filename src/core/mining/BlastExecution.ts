@@ -22,7 +22,6 @@ import {
   createEnergyField,
   computeDistanceToAir,
   indexOf,
-  intensityAt,
   overflowAt,
   seedEnergy,
   type BlastBox,
@@ -30,15 +29,14 @@ import {
   type EnergySeed,
 } from './EnergyPropagation.js';
 import { identifyFragmentedVoxels } from './VoxelFragmentation.js';
-import { getRock } from '../world/RockCatalog.js';
+import { generateFragments } from './FragmentGeneration.js';
+import { Random } from '../math/Random.js';
 import { getOre } from '../world/OreCatalog.js';
 import { VoxelGrid, computeVoxelColumnSurfaceY } from '../world/VoxelGrid.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { getBuildingDef, destroyBuilding, type BuildingState, type Building, type BuildingType } from '../entities/Building.js';
 import {
   BLAST_ZONE_RADIUS,
-  MAX_FRAGMENTS_PER_VOXEL,
-  FRAGMENTS_PER_ENERGY_RATIO,
   OVERSIZED_FRAGMENT_THRESHOLD,
   EXPLOSIVE_ENERGY_SCALE,
   PROJECTION_ENERGY_TO_KINETIC,
@@ -64,6 +62,10 @@ export interface FragmentData {
   oreDensities: Record<string, number>;
   initialVelocity: Vec3;
   isProjection: boolean;
+  /** Half-extents of the fragment's bounding box — its rough shape and size. */
+  halfExtents: Vec3;
+  /** Stable per-fragment randomness for render shape variants and tumble. */
+  shapeSeed: number;
 }
 
 // ── Blast Report ──
@@ -185,39 +187,24 @@ export function executeBlast(
   // pre-blast rock, and so the cleared region can be computed in one go).
   const toClear: Array<{ x: number; y: number; z: number }> = [];
 
-  // 4. Turn each broken voxel into fragments.
-  //    Fragment shapes and grouped projectiles arrive in later phases of
-  //    docs/plans/rock-fragmentation-refactor.md; for now each voxel yields
-  //    point fragments whose count follows how hard it was hit.
+  // 4. Carve the broken rock into fragments, then work out what throws each one.
   if (field && fragmentation) {
     const distToAir = computeDistanceToAir(field);
+    const rng = new Random(fragmentSeedFor(plan));
+    const { fragments: generated } = generateFragments(fragmentation, field, grid, rng);
 
-    for (const { x, y, z } of fragmentation.fragmented) {
-      const dominantRockId = grid.dominantRockAt(x, y, z);
-      const rock = getRock(dominantRockId);
-      if (!rock) continue;
+    for (const gen of generated) {
+      const { origin } = gen;
+      const cx = Math.floor(origin.x), cy = Math.floor(origin.y), cz = Math.floor(origin.z);
 
-      const point = vec3(x, y, z);
-      // How hard this voxel was hit relative to its rock: 1.0 is a clean break,
-      // higher means it was pulverised.
-      const intensity = intensityAt(field, x, y, z);
-
-      const voxelVolume = VoxelGrid.CELL_SIZE * VoxelGrid.CELL_SIZE * VoxelGrid.CELL_SIZE;
-      const fragCount = Math.min(
-        MAX_FRAGMENTS_PER_VOXEL,
-        Math.max(1, Math.round(FRAGMENTS_PER_ENERGY_RATIO * intensity)),
-      );
-      const mass = (rock.density * voxelVolume) / fragCount;
-      const ores = grid.oresAt(x, y, z) ?? {};
-
-      const nearestHole = findNearestHole(point, plan.holes);
+      const nearestHole = findNearestHole(origin, plan.holes);
       const nearestSurfaceY = holeSurfaceYs[nearestHole.id] ?? 0;
       const holePos = vec3(nearestHole.x, nearestSurfaceY - nearestHole.depth / 2, nearestHole.z);
 
       // Three things decide whether rock is thrown rather than merely broken.
       //
-      // Only energy that left the voxel can move it — what it absorbed went into
-      // breaking the rock. Only rock near a free face has anywhere to go; rock
+      // Only energy that left the rock can move it — what it absorbed went into
+      // breaking it. Only rock near a free face has anywhere to go; rock
       // confined by its neighbours can do nothing but settle. And stemming is
       // what keeps the gases working on the rock instead of venting up the hole,
       // so an under-stemmed hole is what turns a blast into flyrock.
@@ -229,34 +216,43 @@ export function executeBlast(
       // between a properly stemmed shot and a careless one is a real decision.
       const throwFraction = MIN_THROW_FRACTION + (1 - MIN_THROW_FRACTION) * blowout * blowout;
 
-      const throwEnergy = (overflowAt(field, x, y, z) / fragCount) * throwFraction;
-      const confinement = Math.exp(-(distToAir[indexOf(field, x, y, z)] ?? 0) * SURFACE_PROXIMITY_DECAY);
+      // The fragment carries the overflow of the rock it was carved from, shared
+      // in proportion to how much of each voxel it took.
+      let throwEnergy = 0;
+      for (const source of gen.sources) {
+        throwEnergy += overflowAt(field, source.x, source.y, source.z) * source.weight;
+      }
+      throwEnergy *= throwFraction;
+
+      const confinement = Math.exp(-(distToAir[indexOf(field, cx, cy, cz)] ?? 0) * SURFACE_PROXIMITY_DECAY);
       const speedScale = Math.sqrt(PROJECTION_ENERGY_TO_KINETIC) * confinement;
 
-      for (let i = 0; i < fragCount; i++) {
-        const raw = calculateInitialVelocity(point, holePos, throwEnergy, mass);
-        const vel = clampSpeed(scale(raw, speedScale), MAX_PROJECTION_VELOCITY);
-        const speed = Math.sqrt(vel.x * vel.x + vel.y * vel.y + vel.z * vel.z);
+      const raw = calculateInitialVelocity(origin, holePos, throwEnergy, gen.massKg);
+      const vel = clampSpeed(scale(raw, speedScale), MAX_PROJECTION_VELOCITY);
+      const speed = vecLength(vel);
 
-        fragments.push({
-          id: fragmentIdCounter++,
-          position: point,
-          volume: voxelVolume / fragCount,
-          mass,
-          rockId: dominantRockId,
-          oreDensities: { ...ores },
-          initialVelocity: vel,
-          isProjection: speed > PROJECTION_SPEED_THRESHOLD,
-        });
-      }
+      fragments.push({
+        id: fragmentIdCounter++,
+        position: origin,
+        volume: gen.volumeM3,
+        mass: gen.massKg,
+        rockId: gen.rockId,
+        oreDensities: { ...gen.oreDensities },
+        initialVelocity: vel,
+        isProjection: speed > PROJECTION_SPEED_THRESHOLD,
+        halfExtents: gen.halfExtents,
+        shapeSeed: gen.shapeSeed,
+      });
 
-      if (voxelVolume / fragCount > OVERSIZED_FRAGMENT_THRESHOLD) {
-        oversizedFragments += fragCount;
-      }
+      if (gen.volumeM3 > OVERSIZED_FRAGMENT_THRESHOLD) oversizedFragments++;
+    }
 
-      totalOreValue += calculateOreValue(ores, VoxelGrid.CELL_SIZE);
-      totalRockVolume += voxelVolume;
-
+    // Ore value and rock volume come from the ground that was removed, not from
+    // the fragments, so they stay right however the rock happened to break.
+    for (const { x, y, z } of fragmentation.fragmented) {
+      const ores = grid.oresAt(x, y, z);
+      if (ores) totalOreValue += calculateOreValue(ores, VoxelGrid.CELL_SIZE);
+      totalRockVolume += VoxelGrid.CELL_SIZE ** 3;
       toClear.push({ x, y, z });
       clearedVoxels++;
     }
@@ -409,6 +405,22 @@ export function executeBlast(
 }
 
 // ── Helpers ──
+
+/**
+ * Seed for a blast's fragment randomness, derived from the plan itself so the
+ * same plan on the same terrain always breaks the same way.
+ */
+function fragmentSeedFor(plan: BlastPlan): number {
+  let seed = 2166136261;
+  for (const hole of plan.holes) {
+    const charge = plan.charges[hole.id];
+    seed = Math.imul(seed ^ (hole.x | 0), 16777619);
+    seed = Math.imul(seed ^ (hole.z | 0), 16777619);
+    seed = Math.imul(seed ^ (hole.depth | 0), 16777619);
+    seed = Math.imul(seed ^ Math.round((charge?.amountKg ?? 0) * 10), 16777619);
+  }
+  return Math.abs(seed) % 2147483647;
+}
 
 /** Shorten a velocity to `maxSpeed` without changing its direction. */
 function clampSpeed(v: Vec3, maxSpeed: number): Vec3 {
