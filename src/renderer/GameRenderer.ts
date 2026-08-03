@@ -506,9 +506,14 @@ export class GameRenderer {
     // player follow the ground they just took, the landscape has to stop
     // covering it, and the wall has to be re-raised on the new frontier.
     this.refreshPanLeash();
-    if (this.landscape && this.landscapeHandle && ctx.grid) {
-      this.landscape.build(this.landscapeHandle, ctx.grid.palette, this.playableCut(ctx.grid));
-    }
+
+    // A null ctx.landscape means the grid itself was just replaced (new game,
+    // campaign level, load) and rebuildLandscapeMesh is about to run with a
+    // fresh handle. Rebuilding here would cut the new site against the old
+    // level's landscape and then be thrown away.
+    if (!ctx.landscape || !ctx.grid || !this.landscape || !this.landscapeHandle) return;
+
+    this.landscape.build(this.landscapeHandle, ctx.grid.palette, this.playableCut(ctx.grid));
     this.rebuildBorderWall(ctx);
   }
 
@@ -542,6 +547,10 @@ export class GameRenderer {
     const grid = ctx.grid;
     const area = ctx.playableArea;
     if (!grid || !area || !this.terrain) return;
+    // Never trace the world's rivers from a render path just to find out
+    // there is no wall to draw — rebuildLandscapeMesh hands over the set it
+    // already built, and calls this again once it has.
+    if (!area.hasStructures()) return;
 
     const frontier = area.protectedFrontier();
     if (frontier.length === 0) return;

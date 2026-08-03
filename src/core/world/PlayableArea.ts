@@ -101,6 +101,19 @@ export class PlayableArea {
     if (!this.protectedStructures) this.protectedStructures = structures;
   }
 
+  /**
+   * True when the protected set is already available, so a caller can ask
+   * `protectedFrontier` without triggering the trace.
+   *
+   * Building the set means tracing every river and placing every village for
+   * the seed. That is fine on the claim path — the player just asked for
+   * ground — but not on a render path, where it would block the frame the
+   * level loads on.
+   */
+  hasStructures(): boolean {
+    return this.protectedStructures !== null;
+  }
+
   /** True when the site owns the column at (x, z). */
   contains(x: number, z: number): boolean {
     return this.grid.containsColumn(x, z);
