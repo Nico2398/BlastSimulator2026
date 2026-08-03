@@ -7,6 +7,7 @@
 // Kept apart from TutorialOverlay, which owns the card and the step sequence.
 
 import type { GameState } from '../core/state/GameState.js';
+import type { Employee } from '../core/entities/Employee.js';
 import type { TutorialStage } from './tutorialStages.js';
 
 /** Marks the body while the tutorial holds the rails. */
@@ -148,6 +149,15 @@ export interface ClockProgress {
 }
 
 /**
+ * Whether an employee still has work outstanding: a queued/active action, or
+ * movement in flight with no action attached yet (see `isWorkInProgress`).
+ * Shared by `isWorkInProgress` and `workSignature` so the two stay in sync.
+ */
+function hasOutstandingWork(e: Employee): boolean {
+  return e.activeActionId !== null || e.pendingDriverVehicleId !== null || e.destinationX !== null;
+}
+
+/**
  * Fingerprint of the outstanding work so `decideClock` can tell "still moving"
  * from "stuck" instead of granting a flat grace window from step start.
  *
@@ -161,7 +171,7 @@ function workSignature(state: GameState): string {
     .join(',');
 
   const working = state.employees.employees
-    .filter((e) => e.activeActionId !== null || e.pendingDriverVehicleId !== null || e.destinationX !== null)
+    .filter(hasOutstandingWork)
     .slice()
     .sort((a, b) => a.id - b.id)
     .map((e) => [
@@ -188,11 +198,7 @@ function workSignature(state: GameState): string {
  */
 function isWorkInProgress(state: GameState): boolean {
   if ((state.pendingActions?.length ?? 0) > 0) return true;
-  return state.employees.employees.some(
-    (e) => e.activeActionId !== null
-      || e.pendingDriverVehicleId !== null
-      || e.destinationX !== null,
-  );
+  return state.employees.employees.some(hasOutstandingWork);
 }
 
 /**
