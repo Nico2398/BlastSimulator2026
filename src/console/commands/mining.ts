@@ -50,6 +50,8 @@ export interface MiningContext extends GameContext {
   lastBlastFragmentData?: FragmentData[];
   /** Drill holes from before the last blast — used by renderer for per-hole detonation timing. */
   lastBlastHoles?: import('../../core/mining/DrillPlan.js').DrillHole[];
+  /** Each fragment's journey from where it broke to where it settled — the renderer animates these. */
+  lastBlastFlights?: import('../../core/mining/BlastResolve.js').FragmentFlight[];
 }
 
 function requireGame(ctx: MiningContext): string | null {
@@ -251,6 +253,7 @@ export function blastCommand(
   // Store fragment data for renderer (localized remesh + mesh spawning)
   ctx.lastBlastFragments = result.fragments.map(f => f.position);
   ctx.lastBlastFragmentData = result.fragments;
+  ctx.lastBlastFlights = result.flights;
 
   const state = ctx.state!;
 
@@ -314,6 +317,7 @@ export function blastCommand(
       `Average fragment size: ${result.averageFragmentSize.toFixed(3)} m³`,
       `Oversized fragments: ${result.oversizedFragments}`,
       `Projections: ${result.projectionCount}`,
+      `Furthest throw: ${result.maxThrowDistance.toFixed(1)} m`,
       `Total rock volume: ${result.totalRockVolume.toFixed(1)} m³`,
       `Total ore value: $${result.totalOreValue.toFixed(0)}`,
       ...(result.destroyedBuildings.length > 0

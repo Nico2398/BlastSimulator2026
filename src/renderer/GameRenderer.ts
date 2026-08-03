@@ -27,6 +27,7 @@ import { Fireflies } from './ambient/Fireflies.js';
 import { createAmbientUniforms, type AmbientUniforms } from './ambient/AmbientUniforms.js';
 import { FragmentMesh } from './FragmentMesh.js';
 import { BlastEffects } from './BlastEffects.js';
+import { FragmentAnimator } from './FragmentAnimator.js';
 import { LandscapeMesh, type PlayableCut } from './terrain/LandscapeMesh.js';
 import { WorldBorderWall } from './WorldBorderWall.js';
 import { BlastPlanOverlay } from './BlastPlanOverlay.js';
@@ -80,6 +81,7 @@ export class GameRenderer {
   /** Shared {uTime, uWind} object every ambient shader material references (#458 T7.2/A26) — level-independent, created once. */
   private readonly ambientUniforms: AmbientUniforms = createAmbientUniforms();
   private fragments: FragmentMesh | null = null;
+  private fragmentAnimator: FragmentAnimator | null = null;
   private blastEffects: BlastEffects | null = null;
   private landscape: LandscapeMesh | null = null;
   /** Kept so a claim can re-cut the landscape without rebuilding the (expensive) landscape map. */
@@ -218,6 +220,9 @@ export class GameRenderer {
   /** Per-frame update — call from the render loop. */
   update(dt: number): void {
     const cam = this.sm.camera;
+
+    // Rock still falling from the last blast.
+    this.fragmentAnimator?.update(dt);
 
     if (this.skybox) {
       this.skybox.update(dt, cam.position.x, cam.position.z, this.sm.cameraController.distance);
@@ -418,10 +423,14 @@ export class GameRenderer {
     // which main.ts's subscription turns into rebuildTerrain() synchronously
     // before this method ever runs (#458 T0.2) — no longer this method's job.
 
-    // Spawn fragment meshes for the blasted rock
+    // Spawn fragment meshes for the blasted rock, then play the collapse.
+    // spawnFragments places them where they came to rest; the animator walks
+    // them there from where they broke, so the player sees the face come down
+    // instead of a finished muck pile appearing at the moment of detonation.
     if (this.fragments && ctx.lastBlastFragmentData && ctx.lastBlastFragmentData.length > 0) {
       this.fragments.clearAll();
       this.fragments.spawnFragments(ctx.lastBlastFragmentData);
+      if (ctx.lastBlastFlights) this.fragmentAnimator?.begin(ctx.lastBlastFlights);
     }
 
     if (!this.blastEffects || !ctx.state) return;
@@ -623,6 +632,7 @@ export class GameRenderer {
     // Fragments (empty until blast runs) — shares terrain's material so a
     // fresh cut face matches the rock it broke off from (#458 T4.1/D9).
     this.fragments = new FragmentMesh(scene, this.terrain.sharedMaterial);
+    this.fragmentAnimator = new FragmentAnimator(this.fragments);
 
     // Blast effects
     this.blastEffects = new BlastEffects(scene, this.sm.camera);

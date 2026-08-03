@@ -787,7 +787,61 @@ variety visible — fines near holes, boulders at the blast rim).
 **Acceptance:** fragment size distribution demonstrably responds to charge amount in
 scenarios; volume conservation test green.
 
-### P3 — Velocity, projectiles, authoritative landing (medium)
+### P3 — Velocity, projectiles, authoritative landing (medium) — ✅ DONE
+
+**Landed:** `FragmentVelocity.ts` (free-face direction + stemming-scaled magnitude),
+`ProjectileGrouping.ts` (the capped-body grouping), `BlastResolve.ts` (arc tracing,
+pile stacking, playback maths). 45 new unit tests. `executeBlast` now clears the rock
+*before* resolving landings, so fragments fall into the hole the blast just made.
+`BlastResult` gained `maxThrowDistance`, `projectileCount` and `flights`; the blast
+report shows the furthest throw, and the rating uses distance rather than a speed proxy.
+
+**Deviations:**
+1. **No `DebrisPiles` state, and no `groundFragments` field.** `state.logistics.fragments`
+   already is the fragment registry and is already persisted (serialization is generic
+   JSON over `GameState`). A pile is just the fragments sharing a column, ordered by
+   height — deriving it from positions removes a parallel structure that could drift out
+   of sync, and sidesteps the Map-codec work §5.4 called for. Pile heights are tracked
+   only *during* resolution, where the stacking order is decided.
+2. **Direction is a free-face/gradient blend, replacing the radial-from-hole direction**
+   P1 inherited from the legacy code. Radial was actively wrong: a charge at the bottom
+   of a hole flung its deepest fragments down and sideways *into* solid rock.
+3. **Playback maths live in core** (`flightPositionAt`, `totalFlightDuration`) rather than
+   the renderer, so the arc is unit-testable in Node and the renderer holds no physics.
+4. **Landing damage to employees, vehicles and buildings is NOT implemented.** A6 step 3
+   called for it; `computeBlastEntityDamage` still handles blast-time damage only. Impact
+   damage needs the entity lists threaded into `executeBlast`, which today only receives
+   `buildingState`. Recorded as outstanding rather than half-done — see §11.
+
+**Verified:** `static` clean; `logic` 6947 tests / 247 files; `scenario` 111/111.
+A nine-hole blast resolves ballistics for 1280 fragments in ~90 ms.
+
+### P4 — Cosmetic playback (large, browser-verified) — ✅ DONE
+
+**Landed:** `src/renderer/FragmentAnimator.ts` plus 20 tests (10 for the core playback
+maths, 10 for the animator). `GameRenderer.update` steps it each frame; `onBlast` starts
+it with the blast's flights.
+
+**Deviations:**
+1. **The animator interpolates to the authoritative resting place rather than replaying
+   the launch velocity.** Horizontal motion runs straight from break to rest; the vertical
+   is the parabola connecting those points in the flight's own duration under gravity.
+   Solving for the launch speed this way means the animation *cannot* end anywhere but
+   the fragment's real position — the picture can never drift from game state, however
+   the arc was computed. For a straight drop it reduces to exactly free fall from rest.
+2. **No tumble rotation, squash, or bounce.** Positions animate; orientation is fixed at
+   spawn. Worth adding, but it is polish on top of a collapse that now reads correctly.
+3. **No separate flying-clump instance for grouped projectiles.** Members animate
+   individually along their own paths, which is simpler and costs nothing extra: the
+   instance budget is unchanged and grouping already bounded the ballistics work.
+
+**Verified:** `static`, `logic`, `scenario` all green. `visual` — a frame captured at
+detonation and one after settling: at t=0 the fragments sit high and tightly packed
+inside the rock they broke from; settled, they have dropped and spread with the excavated
+face visible above them. Headless Chrome has no GPU (~6 s/frame), so a true mid-collapse
+frame is not reliably capturable locally — the browser CI job is the place for that.
+
+### P3 — original plan text (superseded by the record above)
 
 - Implement A4 (`FragmentVelocity.ts`), A5 (`ProjectileGrouping.ts`),
   A6 (`BlastResolve.ts`, `DebrisPiles.ts`).

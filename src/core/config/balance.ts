@@ -292,6 +292,50 @@ export const MAX_ORPHAN_COMPONENT_SUBCELLS = 64;
  *  without bound. Tripping it yields fewer, larger fragments — never less rock. */
 export const MAX_FRAGMENTS_PER_BLAST = 50000;
 
+// ─── Fragment throw and landing (blast step 4) ─────────────────────────────────
+
+/** How much a fragment's direction follows the nearest free face rather than the
+ *  energy gradient. Rock leaves by the face it can reach; the gradient alone would
+ *  drive deep fragments further into solid rock. */
+export const FREE_FACE_WEIGHT = 0.65;
+
+/** Most fragments flown as independent bodies. Past this they are grouped, which
+ *  caps the cost of motion without ever changing how the rock broke — grouped
+ *  fragments split back into their own pieces the moment they land. */
+export const MAX_ACTIVE_PROJECTILES = 256;
+
+/** How close (metres) two fragments must be to travel as one projectile. */
+export const PROJECTILE_GROUP_RADIUS = 2.0;
+
+/** Minimum cosine between two fragments' headings for them to fly together —
+ *  0.8 is about a 37 degree cone. */
+export const PROJECTILE_GROUP_DIR_COS = 0.8;
+
+/** Largest relative speed difference (0–1) between fragments flying together. */
+export const PROJECTILE_GROUP_SPEED_TOL = 0.35;
+
+/** Time step (seconds) when following a projectile's arc to the ground, and the
+ *  longest flight worth tracing before setting the rock down where it got to. */
+export const BALLISTIC_SAMPLE_DT = 0.05;
+export const BALLISTIC_MAX_T = 12;
+
+/** How widely a landed projectile's fragments scatter around its impact point,
+ *  scaled by its mass. Without this a grouped projectile would drop its whole
+ *  load on one square metre. */
+export const SPLIT_SCATTER_RADIUS = 0.8;
+
+/** Seconds of delay per metre of height before a collapsing fragment starts to
+ *  fall. Rock low in the face gives way first and the burden follows it down, so
+ *  the collapse ripples upward instead of every piece dropping at once. */
+export const COLLAPSE_STAGGER_PER_METRE = 0.04;
+
+/** How far rock may be thrown (metres) before a blast counts as bad, and as
+ *  catastrophic. Distance rather than speed is what matters to the player: rock
+ *  that lands back in its own muck pile is a good blast however fast it left,
+ *  and rock that clears the pit is a danger to everything around it. */
+export const THROW_DISTANCE_BAD = 12;
+export const THROW_DISTANCE_CATASTROPHIC = 25;
+
 /** Fragments produced per unit of energy-to-threshold ratio in a broken voxel.
  *  A voxel that just barely broke yields one fragment; one hit twice as hard as it
  *  could take yields more, smaller ones. Superseded once fragment shapes are
