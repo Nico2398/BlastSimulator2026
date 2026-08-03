@@ -37,6 +37,8 @@ export class TutorialRails {
   private budget = DEFAULT_TICK_BUDGET;
   private waitsOnWork = false;
   private held = false;
+  private lastProgressSignature: string | null = null;
+  private lastProgressTick = 0;
 
   /** Point the rails at a new step and reset its tick allowance. */
   beginStep(step: RailsStep, state: GameState | null): void {
@@ -45,6 +47,9 @@ export class TutorialRails {
     this.budget = step.tickBudget ?? DEFAULT_TICK_BUDGET;
     this.waitsOnWork = step.waitsOnWork === true;
     this.stepStartTick = state?.tickCount ?? 0;
+    // TODO: implement — progress signature reset happens here once wired up.
+    void this.lastProgressSignature;
+    void this.lastProgressTick;
     // Published now rather than when the picker's stage goes live: the picker
     // opens on the click that ends the previous stage, so publishing later
     // would leave that first picker unconstrained.

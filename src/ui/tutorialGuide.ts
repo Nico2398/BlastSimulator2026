@@ -133,6 +133,26 @@ export interface ClockDecision {
   hold: boolean;
   /** Ticks consumed by the current step so far. */
   spent: number;
+  /** Work signature observed at this decision, carried forward by the caller. */
+  progressSignature: string | null;
+  /** Tick at which the carried-forward signature last changed. */
+  lastProgressTick: number;
+}
+
+/** Tracks the outstanding work's signature and when it last changed. */
+export interface ClockProgress {
+  signature: string | null;
+  tick: number;
+}
+
+/**
+ * Fingerprint of the outstanding work so `decideClock` can tell "still moving"
+ * from "stuck" instead of granting a flat grace window from step start.
+ */
+// TODO: implement
+function workSignature(state: GameState): string {
+  void state;
+  return '';
 }
 
 /**
@@ -172,12 +192,22 @@ export function decideClock(
   stepStartTick: number,
   budget: number = DEFAULT_TICK_BUDGET,
   waitsOnWork: boolean = false,
+  progress: ClockProgress = { signature: null, tick: stepStartTick },
 ): ClockDecision {
+  // TODO: implement — workSignature will replace the flat WORK_GRACE_TICKS
+  // window with a check against `progress` once the fix lands.
+  void workSignature;
   const spent = Math.max(0, (state.tickCount ?? 0) - stepStartTick);
-  if (spent < budget) return { hold: false, spent };
-  if (!waitsOnWork) return { hold: true, spent };
+  if (spent < budget) {
+    return { hold: false, spent, progressSignature: progress.signature, lastProgressTick: progress.tick };
+  }
+  if (!waitsOnWork) {
+    return { hold: true, spent, progressSignature: progress.signature, lastProgressTick: progress.tick };
+  }
 
-  if (isWorkInProgress(state) && spent < budget + WORK_GRACE_TICKS) return { hold: false, spent };
+  if (isWorkInProgress(state) && spent < budget + WORK_GRACE_TICKS) {
+    return { hold: false, spent, progressSignature: progress.signature, lastProgressTick: progress.tick };
+  }
 
-  return { hold: true, spent };
+  return { hold: true, spent, progressSignature: progress.signature, lastProgressTick: progress.tick };
 }
