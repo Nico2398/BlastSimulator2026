@@ -136,42 +136,42 @@ describe('UIManager — locale refresh on language switch (issue #457)', () => {
     vi.restoreAllMocks();
   });
 
-  it('toolbar button captions switch language after clicking FR in Settings', () => {
+  it('tool rail button captions switch language after clicking FR in Settings', () => {
     uiManager = new UIManager(container);
-    const blastToolbarBtn = container.querySelector<HTMLButtonElement>(
-      '.bs-toolbar-btn[data-panel="blast"]',
+    const blastRailBtn = container.querySelector<HTMLButtonElement>(
+      '#bs-toolbar [data-panel="blast"]',
     );
-    expect(blastToolbarBtn?.textContent).toBe('💣 ' + t('ui.toolbar.blast'));
+    expect(blastRailBtn?.textContent).toBe(t('shell.rail.blast'));
 
     clickFrenchButton(container);
 
     expect(getLocale()).toBe('fr');
-    expect(blastToolbarBtn?.textContent).toBe('💣 ' + t('ui.toolbar.blast'));
-    expect(blastToolbarBtn?.textContent).not.toContain('Blast');
+    expect(blastRailBtn?.textContent).toBe(t('shell.rail.blast'));
+    expect(blastRailBtn?.textContent).not.toBe('Blast');
   });
 
-  it('every toolbar button caption switches language, not just one', () => {
+  it('every tool rail button caption switches language, not just one', () => {
     uiManager = new UIManager(container);
     const panelKeys: [string, string][] = [
-      ['blast', 'ui.toolbar.blast'],
-      ['contracts', 'ui.toolbar.contracts'],
-      ['build', 'ui.toolbar.build'],
-      ['vehicles', 'ui.toolbar.vehicles'],
-      ['employees', 'ui.toolbar.employees'],
-      ['survey', 'ui.toolbar.survey'],
-      ['settings', 'ui.toolbar.settings'],
+      ['blast', 'shell.rail.blast'],
+      ['contracts', 'shell.rail.contracts'],
+      ['build', 'shell.rail.build'],
+      ['vehicles', 'shell.rail.vehicles'],
+      ['employees', 'shell.rail.employees'],
+      ['survey', 'shell.rail.survey'],
+      ['settings', 'shell.rail.settings'],
     ];
     const before = panelKeys.map(([panel]) =>
-      container.querySelector<HTMLButtonElement>(`.bs-toolbar-btn[data-panel="${panel}"]`)?.textContent,
+      container.querySelector<HTMLButtonElement>(`#bs-toolbar [data-panel="${panel}"]`)?.textContent,
     );
 
     clickFrenchButton(container);
 
     for (let i = 0; i < panelKeys.length; i++) {
       const [panel, key] = panelKeys[i]!;
-      const btn = container.querySelector<HTMLButtonElement>(`.bs-toolbar-btn[data-panel="${panel}"]`);
-      expect(btn?.textContent, `toolbar button "${panel}" must switch language`).not.toBe(before[i]);
-      expect(btn?.textContent?.endsWith(t(key)), `toolbar button "${panel}" must show the French translation`).toBe(true);
+      const btn = container.querySelector<HTMLButtonElement>(`#bs-toolbar [data-panel="${panel}"]`);
+      expect(btn?.textContent, `tool rail button "${panel}" must switch language`).not.toBe(before[i]);
+      expect(btn?.textContent).toBe(t(key));
     }
   });
 

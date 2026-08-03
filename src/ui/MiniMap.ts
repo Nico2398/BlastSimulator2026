@@ -1,9 +1,10 @@
-// BlastSimulator2026 — Mini-Map (10.10)
+// BlastSimulator2026 — Mini-Map (10.10, chrome redesigned P1)
 // Canvas-based overhead view of the mine: terrain elevation, buildings, vehicles, drill holes.
 // Canvas layer painting lives in ./miniMapLayers.ts; this file owns the DOM panel.
 
 import { t } from '../core/i18n/I18n.js';
 import { LocaleTextRegistry } from './localeText.js';
+import { iconEl } from './icons.js';
 import {
   MAP_SIZE,
   COLOR_ROCK,
@@ -30,33 +31,51 @@ export class MiniMap {
   private readonly canvas: HTMLCanvasElement;
   private readonly ctx2d: CanvasRenderingContext2D;
   private readonly title: HTMLElement;
+  private readonly navToggleBtn: HTMLButtonElement;
   private _navGridVisible: boolean = false;
   private _navGrid: NavGrid | null = null;
   /** Last projection used, so an out-of-band overlay draw lines up with the terrain already painted. */
   private projection: MapProjection = { originX: 0, originZ: 0, scaleX: 1, scaleZ: 1 };
   private readonly locale = new LocaleTextRegistry();
+  private onFocus?: (x: number, z: number) => void;
 
   constructor(container: HTMLElement) {
     this.el = document.createElement('div');
     this.el.id = 'bs-minimap';
-    this.el.classList.add('bs-ui', 'bs-panel');
-    this.el.style.cssText = 'padding:6px;width:fit-content';
+    this.el.classList.add('bs-ui', 'bs-panel', 'bsx-root');
+    this.el.style.cssText = 'padding:0;width:fit-content;overflow:hidden;border-radius:var(--bsx-r-card);background:rgba(16,20,26,.95)';
 
+    const header = document.createElement('div');
+    header.style.cssText = 'display:flex;align-items:center;gap:7px;height:26px;padding:0 8px;border-bottom:1px solid var(--bsx-hairline)';
+    header.appendChild(iconEl('map', 11, 0.55));
     this.title = document.createElement('div');
     this.title.className = 'bs-panel-title';
-    this.title.style.fontSize = '10px';
+    this.title.style.cssText = 'font:700 10px/1 var(--bsx-font-ui);letter-spacing:.1em;color:var(--bsx-text-tinted);margin:0;border:0;padding:0';
     this.locale.bindText(this.title, 'ui.minimap.title');
+    header.appendChild(this.title);
+
+    const layersWrap = document.createElement('div');
+    layersWrap.style.cssText = 'margin-left:auto;display:flex;gap:2px';
+    const navBtn = document.createElement('button');
+    navBtn.style.cssText = 'width:20px;height:18px;display:flex;align-items:center;justify-content:center;border:1px solid transparent;border-radius:3px;background:transparent;color:var(--bsx-text-muted);cursor:pointer;padding:0;pointer-events:all';
+    navBtn.title = t('shell.minimap.nav_tip');
+    navBtn.appendChild(iconEl('layers', 10));
+    navBtn.addEventListener('click', () => this.setNavGridVisible(!this._navGridVisible));
+    layersWrap.appendChild(navBtn);
+    this.navToggleBtn = navBtn;
+    header.appendChild(layersWrap);
 
     this.canvas = document.createElement('canvas');
     this.canvas.width = MAP_SIZE;
     this.canvas.height = MAP_SIZE;
     // Centred: the legend row is wider than the map, so a left-aligned canvas
     // leaves a lopsided gap on the right of the panel.
-    this.canvas.style.cssText = `display:block;margin:0 auto;width:${MAP_SIZE}px;height:${MAP_SIZE}px;cursor:crosshair`;
+    this.canvas.style.cssText = `display:block;margin:6px auto 0;width:${MAP_SIZE}px;height:${MAP_SIZE}px;cursor:pointer`;
     this.locale.bindTitle(this.canvas, 'ui.minimap.title');
+    this.canvas.addEventListener('click', (e) => this.handleClick(e));
 
     const legend = document.createElement('div');
-    legend.style.cssText = `display:flex;gap:6px;margin-top:3px;height:${LEGEND_HEIGHT}px;font-size:9px;align-items:center`;
+    legend.style.cssText = `display:flex;gap:6px;padding:3px 6px 6px;height:${LEGEND_HEIGHT}px;font-size:9px;align-items:center`;
 
     const items: [string, string][] = [
       [COLOR_ROCK, 'ui.minimap.rock'],
@@ -75,8 +94,31 @@ export class MiniMap {
     }
 
     this.ctx2d = this.canvas.getContext('2d')!;
-    this.el.append(this.title, this.canvas, legend);
+    this.el.append(header, this.canvas, legend);
     container.appendChild(this.el);
+    this.syncLayerButton(navBtn);
+  }
+
+  /** Focus the 3D camera on the world point under a minimap click. */
+  private handleClick(e: MouseEvent): void {
+    const rect = this.canvas.getBoundingClientRect();
+    const px = (e.clientX - rect.left) * (MAP_SIZE / rect.width);
+    const pz = (e.clientY - rect.top) * (MAP_SIZE / rect.height);
+    const worldX = this.projection.originX + px / this.projection.scaleX;
+    const worldZ = this.projection.originZ + pz / this.projection.scaleZ;
+    this.onFocus?.(worldX, worldZ);
+  }
+
+  private syncLayerButton(btn: HTMLButtonElement): void {
+    const active = this._navGridVisible;
+    btn.style.borderColor = active ? 'var(--bsx-amber)' : 'transparent';
+    btn.style.color = active ? 'var(--bsx-amber)' : 'var(--bsx-text-muted)';
+    btn.style.background = active ? 'rgba(255,176,46,.12)' : 'transparent';
+  }
+
+  /** Register a handler for clicking the map: called with the world (x, z) under the cursor. */
+  setFocusHandler(cb: (x: number, z: number) => void): void {
+    this.onFocus = cb;
   }
 
   show(): void { this.el.style.display = ''; }
@@ -166,7 +208,10 @@ export class MiniMap {
 
   get navGridVisible(): boolean { return this._navGridVisible; }
 
-  setNavGridVisible(visible: boolean): void { this._navGridVisible = visible; }
+  setNavGridVisible(visible: boolean): void {
+    this._navGridVisible = visible;
+    this.syncLayerButton(this.navToggleBtn);
+  }
 
   setNavGrid(navGrid: NavGrid | null): void { this._navGrid = navGrid; }
 

@@ -140,15 +140,6 @@ describe('MainMenu (12.8)', () => {
     expect(container.querySelector('#bs-main-menu')).toBeNull();
   });
 
-  it('makeReturnToMapButton creates a button with click handler', () => {
-    const cb = vi.fn();
-    const menu = new MainMenu(container);
-    const btn = menu.makeReturnToMapButton(document.body, cb);
-    btn.click();
-    expect(cb).toHaveBeenCalledOnce();
-    menu.dispose();
-  });
-
   it('renders tutorial button with correct text', () => {
     const menu = new MainMenu(container);
     menu.show();

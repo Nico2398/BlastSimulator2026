@@ -295,6 +295,8 @@ const TOKENS_CSS = `
 .bsx-stat-key { font: 600 10px/1 var(--bsx-font-ui); letter-spacing: .12em; color: var(--bsx-text-micro); }
 .bsx-stat-value { font: 600 15px/1 var(--bsx-font-mono); color: var(--bsx-text-primary); }
 
+@keyframes bsx-toast-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
 /* ── reduced motion: drop transforms, keep opacity only ── */
 @media (prefers-reduced-motion: reduce) {
   .bsx-root, .bsx-root * { animation-duration: .001ms !important; transition-duration: .001ms !important; }

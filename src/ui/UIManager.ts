@@ -1,10 +1,9 @@
-// BlastSimulator2026 — UI Manager (10.x)
-// Orchestrates all UI panels. Wires game console, handles toolbar, drives per-tick updates.
+// BlastSimulator2026 — UI Manager (10.x, redesign P1)
+// Orchestrates all UI panels. Wires game console, handles panel routing, drives per-tick updates.
 
 import { injectStyles } from './styles.js';
 import { injectTokens } from './tokens.js';
 import { registerIcons } from './icons.js';
-import { HUD } from './HUD.js';
 import { BlastPlanUI } from './BlastPlanUI.js';
 import { ContractUI } from './ContractUI.js';
 import { BuildMenu } from './BuildMenu.js';
@@ -14,7 +13,11 @@ import { EventDialog } from './EventDialog.js';
 import { SurveyUI } from './SurveyUI.js';
 import { SettingsMenu } from './SettingsMenu.js';
 import { MiniMap } from './MiniMap.js';
-import { t } from '../core/i18n/I18n.js';
+import { TopBar } from './shell/TopBar.js';
+import { ToolRail } from './shell/ToolRail.js';
+import { Toasts } from './shell/Toasts.js';
+import { ActivityLog } from './shell/ActivityLog.js';
+import { NotificationCenter, type NotifyInput } from './notify/NotificationCenter.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { WeatherState } from '../core/weather/WeatherCycle.js';
 
@@ -24,20 +27,12 @@ export type GameConsoleFn = (cmd: string) => CommandResult;
 
 export type PanelName = 'blast' | 'contracts' | 'build' | 'vehicles' | 'employees' | 'survey' | 'settings';
 
-/** Toolbar buttons, in order: panel, icon, i18n key. Shared by buildToolbar()
- *  and refreshLocale() so the captions cannot drift apart. */
-const TOOLBAR_BUTTONS: ReadonlyArray<readonly [PanelName, string, string]> = [
-  ['blast',     '💣 ', 'ui.toolbar.blast'],
-  ['contracts', '📋 ', 'ui.toolbar.contracts'],
-  ['build',     '🏗 ',  'ui.toolbar.build'],
-  ['vehicles',  '🚛 ', 'ui.toolbar.vehicles'],
-  ['employees', '👷 ', 'ui.toolbar.employees'],
-  ['survey',    '🔍 ', 'ui.toolbar.survey'],
-  ['settings',  '⚙️ ',  'ui.toolbar.settings'],
-];
-
 export class UIManager {
-  private readonly hud: HUD;
+  private readonly topBar: TopBar;
+  private readonly toolRail: ToolRail;
+  private readonly toasts: Toasts;
+  private readonly activityLog: ActivityLog;
+  private readonly notificationCenter = new NotificationCenter();
   private readonly blastUI: BlastPlanUI;
   private readonly contractUI: ContractUI;
   private readonly buildMenu: BuildMenu;
@@ -47,10 +42,11 @@ export class UIManager {
   private readonly surveyUI: SurveyUI;
   private readonly settingsMenu: SettingsMenu;
   private readonly miniMap: MiniMap;
-  private readonly toolbar: HTMLElement;
 
   private activePanel: PanelName | null = null;
   private onLanguageChange?: (lang: string) => void;
+  /** Escape-key handlers, most-recently-registered first. Each returns true if it consumed the key. */
+  private readonly escLayers: Array<() => boolean> = [];
 
   constructor(container: HTMLElement) {
     injectStyles();
@@ -59,7 +55,9 @@ export class UIManager {
     injectTokens();
     registerIcons();
 
-    // Left column — panels
+    // Left column — panels (temporary adapter, per the implementation plan:
+    // panel bodies migrate to the new dock chrome surface-by-surface in
+    // P4-P9; P1 only replaces the shell around them).
     const leftCol = document.createElement('div');
     leftCol.id = 'bs-left-col';
     leftCol.style.cssText = 'position:fixed;top:70px;left:8px;z-index:100;display:flex;flex-direction:column;gap:6px;max-height:calc(100vh - 80px);overflow-y:auto;pointer-events:none';
@@ -72,8 +70,16 @@ export class UIManager {
     container.appendChild(leftCol);
     container.appendChild(rightCol);
 
-    // HUD (always visible at top)
-    this.hud = new HUD(container);
+    // Shell
+    this.topBar = new TopBar(container);
+    this.toolRail = new ToolRail(container, (panel) => this.togglePanel(panel));
+    this.toasts = new Toasts(container);
+    this.activityLog = new ActivityLog(container);
+
+    this.topBar.setSpeedChangeHandler((speed) => this.onSpeedChangeCb?.(speed));
+    this.topBar.setTogglePauseHandler(() => this.onTogglePauseCb?.());
+    this.topBar.setNavigateHandler((panel) => this.showPanel(panel));
+    this.topBar.setOpenLogHandler(() => this.activityLog.toggle());
 
     // Panels in left column
     this.blastUI = new BlastPlanUI(leftCol);
@@ -92,11 +98,11 @@ export class UIManager {
     // MiniMap on right
     this.miniMap = new MiniMap(rightCol);
 
-    // Toolbar (right side, vertically centred — layout driven entirely by CSS #bs-toolbar)
-    this.toolbar = document.createElement('div');
-    this.toolbar.id = 'bs-toolbar';
-    container.appendChild(this.toolbar);
-    this.buildToolbar();
+    // Esc cascade: activity log drawer closes before the active panel does.
+    this.escLayers.push(() => {
+      if (this.activityLog.visible) { this.activityLog.hide(); return true; }
+      return false;
+    });
 
     // A language switch inside the settings panel has to re-render every panel
     // already on screen, then let whoever else is listening (main.ts refreshes
@@ -106,6 +112,9 @@ export class UIManager {
       this.onLanguageChange?.(lang);
     });
   }
+
+  private onSpeedChangeCb?: (speed: number) => void;
+  private onTogglePauseCb?: () => void;
 
   setGameConsole(fn: GameConsoleFn): void {
     this.blastUI.setGameConsole(fn);
@@ -119,7 +128,11 @@ export class UIManager {
   }
 
   setSpeedChangeHandler(cb: (speed: number) => void): void {
-    this.hud.setSpeedChangeHandler(cb);
+    this.onSpeedChangeCb = cb;
+  }
+
+  setTogglePauseHandler(cb: () => void): void {
+    this.onTogglePauseCb = cb;
   }
 
   setQuitHandler(cb: () => void): void {
@@ -130,9 +143,51 @@ export class UIManager {
     this.onLanguageChange = cb;
   }
 
+  /** Wire the top bar's Saves button (SaveLoadUI lives in main.ts, not here). */
+  setOpenSavesHandler(cb: () => void): void {
+    this.topBar.setOpenSavesHandler(cb);
+  }
+
+  /** Wire the top bar's Site Map button (MainMenu lives in main.ts, not here). */
+  setSiteMapHandler(cb: () => void): void {
+    this.topBar.setSiteMapHandler(cb);
+  }
+
+  /** Wire the minimap's click-to-focus (main.ts owns the camera + surface-height lookup). */
+  setMapFocusHandler(cb: (x: number, z: number) => void): void {
+    this.miniMap.setFocusHandler(cb);
+  }
+
+  /** Register a notification: appears as a toast now, stays in the activity log. */
+  notify(input: NotifyInput): void {
+    this.notificationCenter.notify(input);
+  }
+
+  /**
+   * Register an Esc-key layer. `checkAndHandle` runs on every Escape press,
+   * most-recently-registered first, and should close itself + return true
+   * only when it is actually open/active. Returns an unregister function.
+   */
+  registerEscLayer(checkAndHandle: () => boolean): () => void {
+    this.escLayers.unshift(checkAndHandle);
+    return () => {
+      const idx = this.escLayers.indexOf(checkAndHandle);
+      if (idx !== -1) this.escLayers.splice(idx, 1);
+    };
+  }
+
+  /** Central Esc handler: popovers/modals/placement/selection close before the active panel does. */
+  handleEscape(): void {
+    for (const layer of this.escLayers) {
+      if (layer()) return;
+    }
+    if (this.activePanel) this.hideAllPanels();
+  }
+
   /** Re-render all owned panels' locale-dependent text after a language change. */
   refreshLocale(): void {
-    this.hud.refreshLocale();
+    this.topBar.refreshLocale();
+    this.toolRail.refreshLocale();
     this.blastUI.refreshLocale();
     this.contractUI.refreshLocale();
     this.buildMenu.refreshLocale();
@@ -142,33 +197,21 @@ export class UIManager {
     this.settingsMenu.refreshLocale();
     this.miniMap.refreshLocale();
     this.eventDialog.refreshLocale();
-
-    // Toolbar captions are baked once at construction.
-    for (const [name, icon, key] of TOOLBAR_BUTTONS) {
-      const btn = this.toolbar.querySelector<HTMLButtonElement>(`.bs-toolbar-btn[data-panel="${name}"]`);
-      if (btn) btn.textContent = icon + t(key);
-    }
   }
 
   /**
    * Show a brief toast notification (game-over warnings, contract expiry, etc.).
-   * Auto-dismisses after 6 seconds.
+   * @deprecated prefer notify({severity, title, body}) — kept so any caller
+   * still passing a single string gets a sensible warn-severity toast.
    */
   showNotification(message: string): void {
-    const el = document.createElement('div');
-    el.className = 'bs-notification';
-    el.textContent = message;
-    document.body.appendChild(el);
-    // Fade out and remove
-    setTimeout(() => {
-      el.style.transition = 'opacity 0.5s';
-      el.style.opacity = '0';
-      setTimeout(() => el.remove(), 500);
-    }, 5500);
+    this.notify({ severity: 'warn', title: message, body: '' });
   }
 
   update(state: GameState, weather?: WeatherState): void {
-    this.hud.update(state, weather);
+    this.topBar.update(state, weather, this.notificationCenter);
+    this.toasts.update(this.notificationCenter);
+    this.activityLog.update(this.notificationCenter);
     // setNavGrid before update() — otherwise the overlay draws against the
     // previous tick's navgrid for one frame after any navgrid change (new
     // game, fresh ramp, blast).
@@ -205,7 +248,7 @@ export class UIManager {
       case 'survey': this.surveyUI.show(); break;
       case 'settings': this.settingsMenu.show(); break;
     }
-    this.syncToolbarActive();
+    this.toolRail.setActive(this.activePanel);
   }
 
   togglePanel(name: PanelName): void {
@@ -214,7 +257,6 @@ export class UIManager {
     } else {
       this.showPanel(name);
     }
-    this.syncToolbarActive();
   }
 
   /** Toggle the NavGrid overlay on the MiniMap. */
@@ -223,7 +265,10 @@ export class UIManager {
   }
 
   dispose(): void {
-    this.hud.dispose();
+    this.topBar.dispose();
+    this.toolRail.dispose();
+    this.toasts.dispose();
+    this.activityLog.dispose();
     this.blastUI.dispose();
     this.contractUI.dispose();
     this.buildMenu.dispose();
@@ -233,13 +278,6 @@ export class UIManager {
     this.surveyUI.dispose();
     this.settingsMenu.dispose();
     this.miniMap.dispose();
-    this.toolbar.remove();
-  }
-
-  private syncToolbarActive(): void {
-    this.toolbar.querySelectorAll<HTMLButtonElement>('.bs-toolbar-btn').forEach(b => {
-      b.classList.toggle('active', b.dataset['panel'] === this.activePanel);
-    });
   }
 
   private hideAllPanels(): void {
@@ -251,22 +289,6 @@ export class UIManager {
     this.employeePanel.hide();
     this.surveyUI.hide();
     this.settingsMenu.hide();
-  }
-
-  private buildToolbar(): void {
-    for (const [name, icon, key] of TOOLBAR_BUTTONS) {
-      const btn = document.createElement('button');
-      btn.className = 'bs-toolbar-btn';
-      btn.textContent = icon + t(key);
-      btn.dataset['panel'] = name;
-      btn.addEventListener('click', () => {
-        this.togglePanel(name);
-        // Sync active state on all toolbar buttons
-        this.toolbar.querySelectorAll<HTMLButtonElement>('.bs-toolbar-btn').forEach(b => {
-          b.classList.toggle('active', b.dataset['panel'] === name && this.activePanel === name);
-        });
-      });
-      this.toolbar.appendChild(btn);
-    }
+    this.toolRail.setActive(null);
   }
 }

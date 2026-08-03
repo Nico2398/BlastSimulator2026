@@ -12,7 +12,12 @@ export interface ShortcutCallbacks {
   setSpeed: (n: number) => void;
   togglePanel: (name: PanelName) => void;
   quickSave: () => void;
-  openSettings: () => void;
+  /**
+   * Esc cascade: close whatever's on top (popover, modal, placement,
+   * selection) before falling back to closing the active panel. Owned by
+   * UIManager.handleEscape — Esc no longer opens Settings directly.
+   */
+  onEscape: () => void;
   /** Toggle the NavGrid overlay on the MiniMap. */
   onToggleNavGrid?: () => void;
 }
@@ -39,6 +44,7 @@ export class KeyboardShortcuts {
         case 'Digit4': callbacks.setSpeed(8); break;
         case 'KeyB': callbacks.togglePanel('blast'); break;
         case 'KeyC': callbacks.togglePanel('contracts'); break;
+        case 'KeyG': callbacks.togglePanel('build'); break;
         case 'KeyV': callbacks.togglePanel('vehicles'); break;
         case 'KeyE': callbacks.togglePanel('employees'); break;
         case 'KeyS': callbacks.togglePanel('survey'); break;
@@ -48,7 +54,7 @@ export class KeyboardShortcuts {
           callbacks.quickSave();
           break;
         case 'Escape':
-          callbacks.openSettings();
+          callbacks.onEscape();
           break;
       }
     };
@@ -72,7 +78,7 @@ export class KeyboardShortcuts {
     const keys = [
       'shortcuts.pause', 'shortcuts.speed',
       'shortcuts.blast', 'shortcuts.contracts',
-      'shortcuts.vehicles', 'shortcuts.employees',
+      'shortcuts.build', 'shortcuts.vehicles', 'shortcuts.employees',
       'shortcuts.survey', 'shortcuts.navgrid',
       'shortcuts.saves', 'shortcuts.settings',
     ] as const;

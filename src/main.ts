@@ -82,7 +82,6 @@ mainMenu.setOnSettings(() => { uiManager.showPanel('settings'); });
 uiManager.setLanguageChangeHandler(() => {
   mainMenu.refreshLocale();
   saveLoadUI.refreshLocale();
-  saveLoadBtn.textContent = '💾 ' + t('ui.toolbar.saves');
 });
 mainMenu.show();
 
@@ -140,25 +139,25 @@ const { runner, ctx, emitter } = createRunner();
 
 // --- Subscribe to game-over emitter events for UI notifications ---
 emitter.on('bankruptcy:triggered', ({ cash }) => {
-  uiManager.showNotification?.(t('notification.bankruptcy_triggered', { cash: Math.floor(cash) }));
+  uiManager.notify({ severity: 'critical', title: t('notification.title.bankruptcy'), body: t('notification.bankruptcy_triggered', { cash: Math.floor(cash) }) });
 });
 emitter.on('bankruptcy:warning', ({ ticksRemaining }) => {
-  uiManager.showNotification?.(t('notification.bankruptcy_warning', { ticksRemaining }));
+  uiManager.notify({ severity: 'warn', title: t('notification.title.bankruptcy'), body: t('notification.bankruptcy_warning', { ticksRemaining }) });
 });
 emitter.on('ecology:shutdown', () => {
-  uiManager.showNotification?.(t('notification.ecology_shutdown'));
+  uiManager.notify({ severity: 'critical', icon: 'rock', title: t('notification.title.ecology'), body: t('notification.ecology_shutdown') });
 });
 emitter.on('ecology:warning', ({ ticksRemaining }) => {
-  uiManager.showNotification?.(t('notification.ecology_warning', { ticksRemaining }));
+  uiManager.notify({ severity: 'warn', icon: 'rock', title: t('notification.title.ecology'), body: t('notification.ecology_warning', { ticksRemaining }) });
 });
 emitter.on('arrest:triggered', () => {
-  uiManager.showNotification?.(t('notification.arrest_triggered'));
+  uiManager.notify({ severity: 'critical', icon: 'gavel', title: t('notification.title.arrest'), body: t('notification.arrest_triggered') });
 });
 emitter.on('revolt:triggered', () => {
-  uiManager.showNotification?.(t('notification.revolt_triggered'));
+  uiManager.notify({ severity: 'critical', icon: 'union', title: t('notification.title.revolt'), body: t('notification.revolt_triggered') });
 });
 emitter.on('revolt:warning', ({ ticksRemaining }) => {
-  uiManager.showNotification?.(t('notification.revolt_warning', { ticksRemaining }));
+  uiManager.notify({ severity: 'warn', icon: 'union', title: t('notification.title.revolt'), body: t('notification.revolt_warning', { ticksRemaining }) });
 });
 // Terrain mesh rebuild is event-driven, not command-name-matched: every voxel
 // mutator (generation, blast, drill, ramp) emits this after mutating the grid
@@ -457,24 +456,17 @@ uiManager.setQuitHandler(() => {
   mainMenu.show();
 });
 
-// Return-to-map button (fixed top bar, visible during gameplay)
-mainMenu.makeReturnToMapButton(uiContainer, () => {
+// Site-map and Saves buttons live in the top bar's right cluster (shell/TopBar.ts) —
+// folded in from two ad-hoc floating buttons that used to collide with the
+// paused/event chip (spec §5 defect).
+uiManager.setSiteMapHandler(() => {
   mainMenu.show();
   mainMenu.showWorldMap(ctx.state?.campaign ?? null);
 });
-
-// Save/Load button (fixed top bar, visible during gameplay). The Settings
-// panel's own Save/Load buttons only fire the bare `save`/`load` console
-// commands — this is the only in-game path to the full slot-list panel
-// (multiple slots, auto-save indicator, export/import), which was previously
-// reachable only from the main menu's "Load" button before a game existed (#408).
-const saveLoadBtn = document.createElement('button');
-saveLoadBtn.id = 'bs-saveload-btn';
-saveLoadBtn.className = 'bs-btn bs-return-map';
-saveLoadBtn.style.cssText = 'position:fixed;top:8px;right:250px;z-index:300;font-size:10px;padding:3px 8px';
-saveLoadBtn.textContent = '💾 ' + t('ui.toolbar.saves');
-saveLoadBtn.addEventListener('click', () => saveLoadUI.show());
-uiContainer.appendChild(saveLoadBtn);
+uiManager.setOpenSavesHandler(() => saveLoadUI.show());
+uiManager.setMapFocusHandler((x, z) => {
+  scene.cameraController.focus(x, gameRenderer.surfaceYAt(x, z), z, 60);
+});
 
 saveLoadUI.setOnLoad((state) => {
   // Restore loaded state into the runner context. A v6+ save carries its
@@ -497,12 +489,20 @@ saveLoadUI.setOnLoad((state) => {
 });
 
 // --- Keyboard Shortcuts ---
+// Toggles between `time pause`/`time resume` — shared by the Space-bar
+// shortcut and the top bar's pause button so both reflect one source of truth.
+function togglePause(): void {
+  window.__gameConsole(ctx.state?.isPaused ? 'time resume' : 'time pause');
+}
+uiManager.setTogglePauseHandler(togglePause);
 new KeyboardShortcuts({
-  togglePause: () => window.__gameConsole('pause'),
-  setSpeed: (n) => window.__gameConsole(`speed ${n}`),
+  togglePause,
+  // Was dispatching the bare `speed ${n}` command, which was never
+  // registered — every keyboard speed change (1-4) silently no-op'd.
+  setSpeed: (n) => window.__gameConsole(`time speed ${n}`),
   togglePanel: (name) => uiManager.togglePanel(name),
   quickSave: () => { if (ctx.state) void saveLoadUI['autoSave'](ctx.state); },
-  openSettings: () => uiManager.togglePanel('settings'),
+  onEscape: () => uiManager.handleEscape(),
   onToggleNavGrid: () => uiManager.toggleNavGridOverlay(),
 });
 

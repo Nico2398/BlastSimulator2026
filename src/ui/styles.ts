@@ -52,61 +52,12 @@ const CSS = `
   padding-bottom: 6px;
 }
 
-/* ─── HUD top bar ─── */
-#bs-hud-top {
-  top: 0; left: 0; right: 0;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  /* Right padding reserves the strip the fixed "Return to Map" button occupies,
-     so the event badge does not slide underneath it when it appears. */
-  padding: 0 215px 0 12px;
-  gap: 14px;
-  background: rgba(6,5,2,0.92);
-  border-bottom: 1px solid rgba(200,160,60,0.2);
-  pointer-events: all;
-  backdrop-filter: blur(6px);
-  box-shadow: 0 2px 12px rgba(0,0,0,0.5);
-  z-index: 150;
-}
-#bs-hud-top .bs-balance {
-  font-size: 17px;
-  font-weight: 800;
-  color: #ffd54f;
-  letter-spacing: 0.02em;
-  white-space: nowrap;
-}
-#bs-hud-top .bs-time {
-  flex: 1;
-  text-align: center;
-  font-size: 12px;
-  color: #a89878;
-  white-space: nowrap;
-}
-#bs-hud-top .bs-speed-btn {
-  cursor: pointer;
-  background: rgba(255,255,255,0.08);
-  border: 1px solid rgba(255,255,255,0.18);
-  border-radius: 4px;
-  padding: 3px 10px;
-  color: #e8e0d0;
-  font-size: 12px;
-  font-family: inherit;
-  transition: background 0.15s;
-  pointer-events: all;
-}
-#bs-hud-top .bs-speed-btn:hover { background: rgba(255,255,255,0.18); }
-#bs-hud-top .bs-speed-btn.bs-speed-paused {
-  background: rgba(220,60,20,0.35);
-  border-color: rgba(255,140,90,0.6);
-  color: #ffcfae;
-  animation: bs-pause-pulse 1.6s ease-in-out infinite;
-}
-@keyframes bs-pause-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
-}
-#bs-hud-top .bs-weather { font-size: 18px; line-height: 1; }
+/* ─── HUD top bar ───
+   Structural styling (#bs-hud-top, .bs-balance, .bs-time, .bs-speed-btn,
+   .bs-weather) now lives inline in shell/TopBar.ts, which owns this surface
+   and reuses these ids/classes only for tutorial-selector compatibility.
+   .bs-event-badge stays here — TopBar's alert pips still apply this class
+   for the same selector-preservation reason, and rely on this rule. */
 .bs-event-badge {
   background: rgba(220,60,20,0.9);
   border-radius: 4px;
@@ -123,76 +74,12 @@ const CSS = `
   0%,100% { opacity: 1; } 50% { opacity: 0.55; }
 }
 
-/* ─── Score bars (top-right, below HUD) ─── */
-#bs-hud-scores {
-  top: 52px;
-  right: 128px;
-  width: 160px;
-}
-.bs-score-row { margin-bottom: 7px; }
-.bs-score-row:last-child { margin-bottom: 0; }
-.bs-score-label {
-  font-size: 10px;
-  color: #9a8868;
-  margin-bottom: 3px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-.bs-score-bar-bg {
-  background: rgba(255,255,255,0.1);
-  border-radius: 4px;
-  height: 6px;
-  overflow: hidden;
-}
-.bs-score-bar-fill {
-  height: 100%;
-  border-radius: 4px;
-  transition: width 0.4s ease;
-}
-.bs-score-wellbeing  .bs-score-bar-fill { background: linear-gradient(90deg, #2e7d32, #66bb6a); }
-.bs-score-safety     .bs-score-bar-fill { background: linear-gradient(90deg, #1565c0, #42a5f5); }
-.bs-score-ecology    .bs-score-bar-fill { background: linear-gradient(90deg, #2e7d32, #81c784); }
-.bs-score-nuisance   .bs-score-bar-fill { background: linear-gradient(90deg, #bf360c, #ff7043); }
-
-/* ─── Toolbar (right side, vertically centered) ─── */
-#bs-toolbar {
-  position: fixed;
-  right: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  z-index: 200;
-  pointer-events: all;
-}
-.bs-toolbar-btn {
-  cursor: pointer;
-  background: rgba(8,6,3,0.88);
-  border: 1px solid rgba(200,160,60,0.3);
-  border-radius: 6px;
-  padding: 8px 14px;
-  color: #b8a888;
-  font-size: 11px;
-  font-family: inherit;
-  font-weight: 600;
-  letter-spacing: 0.03em;
-  width: 108px;
-  text-align: left;
-  pointer-events: all;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
-  backdrop-filter: blur(4px);
-}
-.bs-toolbar-btn:hover {
-  background: rgba(200,160,60,0.18);
-  color: #e8d8b0;
-  border-color: rgba(200,160,60,0.55);
-}
-.bs-toolbar-btn.active {
-  border-color: #ffc840;
-  color: #ffc840;
-  background: rgba(255,200,64,0.12);
-}
+/* ─── Score bars, toolbar ───
+   #bs-hud-scores and #bs-toolbar are now owned by shell/TopBar.ts and
+   shell/ToolRail.ts respectively, styled inline. Both ids are reused only
+   for tutorial-selector compatibility — the old .bs-score-* / .bs-toolbar-btn
+   rules that used to style them are gone with HUD.ts, the component they
+   belonged to. */
 
 /* ─── Panels (left side, below HUD) ─── */
 #bs-blast-panel     { top: 52px; left: 10px; width: 240px; max-height: calc(100vh - 62px); overflow-y: auto; }

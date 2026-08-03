@@ -206,17 +206,6 @@ export class MainMenu {
     this.worldMapBox.appendChild(backBtn);
   }
 
-  /** Show "Return to Map" button in-game. */
-  makeReturnToMapButton(container: HTMLElement, onReturn: () => void): HTMLElement {
-    const btn = document.createElement('button');
-    btn.className = 'bs-btn bs-return-map';
-    btn.style.cssText = 'position:fixed;top:8px;right:140px;z-index:300;font-size:10px;padding:3px 8px';
-    this.locale.bindText(btn, 'menu.return_to_map');
-    btn.addEventListener('click', onReturn);
-    container.appendChild(btn);
-    return btn;
-  }
-
   dispose(): void { this.overlay.remove(); }
 
   /**
