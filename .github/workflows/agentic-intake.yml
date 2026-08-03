@@ -1,10 +1,13 @@
 name: "Pipeline: intake a filed issue"
 
-# The one human input the pipeline takes is a GitHub issue, so filing one must
-# be enough to start a run. Without this workflow the loop had no issue-side
-# entry at all: `auto-assign-next.yml` only fires on a merged pull request and
-# `agentic-trigger.yml` is manual dispatch, so an issue filed while the pipeline
-# sat idle waited for a human to press a button.
+# The one human input the pipeline takes is a GitHub issue, but filing one is
+# not by itself enough to start a run — that would take label assignment out
+# of human hands. A run starts only once `ready` is on the issue: set by a
+# human (by hand, or through the issue form's own `labels:` default) or by an
+# agent authoring the issue per `agentic-issue-creation`. This workflow reacts
+# to that label arriving; `auto-assign-next.yml` only fires on a merged pull
+# request and `agentic-trigger.yml` is manual dispatch, so without this one an
+# issue that already carries `ready` would wait for a human to press a button.
 on:
   issues:
     types: [opened, reopened, labeled]
@@ -13,28 +16,19 @@ permissions:
   issues: write
 
 jobs:
-  # Labelling runs unserialised so it can never be dropped: an issue that fails
-  # to get `ready` is invisible to `agentic-assign` and waits forever.
+  # Filing an issue no longer opts it into the queue by itself — that decision
+  # stays with whoever set `ready`: a human, by hand or through the issue
+  # form's own `labels:` default, or an agent authoring the issue per
+  # `agentic-issue-creation`. This job only tidies stale state and reports
+  # whether `ready` already arrived on the payload; it never applies `ready`.
   label:
-    # `labeled` fires for every label the pipeline applies to an issue —
-    # `in-progress` on assignment, `blocked` on escalation, `done` on merge.
-    # Only `ready` means "this issue wants a run", and it is also how a human
-    # resumes a `blocked` issue: drop `blocked`, add `ready`, and the chain
-    # re-enters here with no workflow to dispatch by hand.
-    if: github.event.action != 'labeled' || github.event.label.name == 'ready'
+    if: github.event.action == 'opened' || github.event.action == 'reopened'
     runs-on: ubuntu-latest
     outputs:
       assignable: ${{ steps.labels.outputs.assignable || 'false' }}
     steps:
-      # A human files an issue from the web form, from a phone, or through the
-      # API, and only the form applies labels. `agentic-assign` selects on
-      # `ready` alone, so an unlabelled issue is invisible to the pipeline
-      # forever. Labelling here is deliberately done with GITHUB_TOKEN: the
-      # label raises no further `issues: labeled` event, so this job cannot
-      # retrigger itself.
       - name: Normalise lifecycle labels
         id: labels
-        if: github.event.action != 'labeled'
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -47,47 +41,36 @@ jobs:
               (context.payload.issue.labels || []).map((l) => (typeof l === 'string' ? l : l.name))
             );
 
-            // Any of these means the issue already has a place in the pipeline's
-            // lifecycle and its labels are somebody else's to move. `decision-review`
-            // is the deliberate case: the pipeline files those without `ready` so
-            // they wait in the backlog instead of entering the queue.
-            const LIFECYCLE = ['ready', 'in-progress', 'blocked', 'done', 'decision-review'];
-
+            // Ensures the two label definitions exist so a human picking them
+            // from the GitHub UI finds them there. Never applied automatically.
             const ensureLabel = async (name, color, description) => {
               await github.rest.issues.createLabel({ owner, repo, name, color, description })
                 .catch(() => {});
             };
+            await ensureLabel('agent-task', '0e8a16', 'Atomic task for the autonomous pipeline');
+            await ensureLabel('ready', '1d76db', 'Waiting in the assignment queue');
 
-            const add = [];
-            if (!on.has('agent-task')) add.push('agent-task');
-
-            // Reopening is a human saying the work is not finished after all, so
-            // it re-enters the queue: `done` comes off and `ready` goes on.
+            // Reopening is a human saying the work is not finished after all.
+            // `done` no longer reflects reality, but re-entering the queue is
+            // still their call: they add `ready` back themselves.
             if (reopened && on.has('done')) {
               await github.rest.issues.removeLabel({ owner, repo, issue_number: n, name: 'done' })
                 .catch(() => {});
               on.delete('done');
+              core.info(`#${n}: reopened, dropped stale done. Add ready to re-enter the queue.`);
             }
 
-            const claimed = LIFECYCLE.filter((l) => on.has(l));
-            if (claimed.length === 0) {
-              add.push('ready');
-            } else {
-              core.info(`#${n}: already carries ${claimed.join(', ')} — leaving lifecycle labels alone.`);
-            }
-
-            if (add.length > 0) {
-              await ensureLabel('agent-task', '0e8a16', 'Atomic task for the autonomous pipeline');
-              await ensureLabel('ready', '1d76db', 'Waiting in the assignment queue');
-              await github.rest.issues.addLabels({ owner, repo, issue_number: n, labels: add });
-              core.info(`#${n}: added ${add.join(', ')}.`);
-            }
-
-            core.setOutput('assignable', on.has('ready') || add.includes('ready') ? 'true' : 'false');
+            // `ready` here means it arrived with the issue itself — the "Agent
+            // Task" form's `labels:` default, or an agent that set it at
+            // creation. Nothing in this step ever adds it.
+            core.setOutput('assignable', on.has('ready') ? 'true' : 'false');
 
   assign:
     needs: label
-    if: github.event.action == 'labeled' || needs.label.outputs.assignable == 'true'
+    # The `labeled` branch is deliberately narrow: only the `ready` label
+    # itself may start a run. Matching on `action == 'labeled'` alone used to
+    # fire this job for *any* label added to *any* issue in the repo.
+    if: (github.event.action == 'labeled' && github.event.label.name == 'ready') || needs.label.outputs.assignable == 'true'
     runs-on: ubuntu-latest
     # Filing a batch of issues in one sitting fires one intake per issue, and
     # single flight lives in the assign action rather than in GitHub: parallel

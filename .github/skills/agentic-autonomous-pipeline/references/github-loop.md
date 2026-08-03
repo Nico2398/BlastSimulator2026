@@ -31,7 +31,7 @@ agentic-intake.yml                          auto-assign-next.yml  agentic-watchd
 
 | Entry | Fires on | Covers |
 |-------|----------|--------|
-| `agentic-intake.yml` | `issues: opened, reopened, labeled` | The only human input. A filed issue starts a run by itself; a `ready` label on a previously `blocked` issue is the whole resume procedure |
+| `agentic-intake.yml` | `issues: opened, reopened, labeled` | The only human input, but filing alone does not start a run — `ready` does, whether it arrives with the issue (the form's own `labels:` default, or an agent authoring the issue per `agentic-issue-creation`) or a human adds it later. A `ready` label on a previously `blocked` issue is the whole resume procedure |
 | `auto-assign-next.yml` | `pull_request: opened, synchronize, closed` | Auto-merge on `READY TO MERGE`, then chain from the merge to the next issue |
 | `agentic-watchdog.yml` | hourly schedule | Sweeps stalled runs, then restarts the queue if the pipeline is idle |
 | `agentic-trigger.yml` | manual dispatch | A human forcing the queue forward |
@@ -42,20 +42,20 @@ Events get lost — GitHub keeps one pending run per concurrency group and drops
 
 | Label | Means | Applied by | Cleared by |
 |-------|-------|-----------|-----------|
-| `agent-task` | The pipeline owns this issue | Intake, or the issue form | — |
-| `ready` | Waiting in the assignment queue | Intake, the issue form, or a human unblocking | `agentic-assign`, on assignment |
+| `agent-task` | The pipeline owns this issue | The issue form, or an agent authoring the issue | — |
+| `ready` | Waiting in the assignment queue | The issue form, an agent authoring the issue, or a human adding it by hand | `agentic-assign`, on assignment |
 | `in-progress` | A run owns it. Single flight reads this label | `agentic-assign` | The merged-PR chain, the run itself when its deliverable is not a diff, `agentic-rescue` when the run ended without finishing, or the watchdog |
 | `blocked` | Halted; a human has to answer something | The run, `agentic-rescue`, or the watchdog | A human, by adding `ready` |
 | `done` | Finished | The merged-PR chain, or a run releasing a non-PR deliverable | — |
 | `decision-review` | A default the run chose, revisit at leisure. Carries no `ready`, so it never enters the queue | The run — see `agentic-decision-autonomy` | A human, by adding `ready` |
 
-Intake labels an issue `agent-task` + `ready` only when it carries none of these. A human filing from the web form, from a phone, or through the API produces different labels each way and often none at all, and `agentic-assign` selects on `ready` alone — an unlabelled issue would otherwise be invisible to the pipeline forever.
+Intake never applies `agent-task` or `ready` itself — that would take label assignment out of the hands of whoever files the issue. `agentic-assign` selects on `ready` alone, so an issue only enters the queue once something puts `ready` on it: the "Agent Task" form's own `labels:` default, an agent following `agentic-issue-creation`, or a human adding it by hand — including to resume a `blocked` issue, or to opt a free-form/API-filed issue in. A human filing without the form and without `ready` gets an issue that sits unlabelled and out of the queue until they choose to add it; that is deliberate, not an oversight.
 
 **An issue is released by whoever finishes it.** A run whose deliverable is a pull request is released by the merge. A run whose deliverable is an answer or an executed command releases its own issue — closes it, labels it `done`, drops `in-progress`. Skipping that leaves single flight deferring behind a run that already succeeded, until the watchdog ages it out and reports it as lost.
 
 ## Two rules keep the loop alive
 
-1. **Comments must be posted with `PAT_TOKEN_COPILOT_AUTOMATION`.** A comment created with `GITHUB_TOKEN` triggers no workflow, so the loop stops silently. The same applies to the PR: one opened with `GITHUB_TOKEN` raises no `pull_request` event, leaving `auto-assign-next.yml` dormant. The inverse is also load-bearing: intake labels with `GITHUB_TOKEN` precisely so its own `ready` label raises no event and the workflow cannot retrigger itself. The rule reaches `git push`, where it has to be enforced differently: `git push` reads no token from the environment, so a step that merely sets `GH_TOKEN` pushes with whatever credential the job's git configuration holds — and after the agent step that is the agent's own GitHub App token, which no `permissions:` block can grant `workflows` to, because there is no such key. A branch differing from `main` on a workflow file is then rejected outright. `agentic-rescue` pushes to an explicitly authenticated URL so the PAT is the credential actually used.
+1. **Comments must be posted with `PAT_TOKEN_COPILOT_AUTOMATION`.** A comment created with `GITHUB_TOKEN` triggers no workflow, so the loop stops silently. The same applies to the PR: one opened with `GITHUB_TOKEN` raises no `pull_request` event, leaving `auto-assign-next.yml` dormant. The inverse is also load-bearing: the `label` job's own housekeeping (ensuring the label definitions exist, dropping a stale `done` on reopen) runs under `GITHUB_TOKEN` precisely so it raises no event the workflow could retrigger on — intake itself never applies `ready`, so this only matters for the labels it does still touch. The rule reaches `git push`, where it has to be enforced differently: `git push` reads no token from the environment, so a step that merely sets `GH_TOKEN` pushes with whatever credential the job's git configuration holds — and after the agent step that is the agent's own GitHub App token, which no `permissions:` block can grant `workflows` to, because there is no such key. A branch differing from `main` on a workflow file is then rejected outright. `agentic-rescue` pushes to an explicitly authenticated URL so the PAT is the credential actually used.
 
    **The agent step needs the PAT stated twice.** `claude-code-action` exports its own `github_token` input into the session environment, overriding the step-level `GH_TOKEN` — so that input is the identity `gh pr create` actually runs under. Left as `GITHUB_TOKEN`, the PR is authored by `github-actions[bot]`, and GitHub creates its `pull_request` workflow runs already parked as `action_required`: "N workflows awaiting approval", no CI, no `auto-assign-next.yml`. Both `claude-code-action` steps in `claude-runner.yml` therefore pass `PAT_TOKEN_COPILOT_AUTOMATION` as `github_token`. `opencode-runner.yml` needs no equivalent — opencode reads `GH_TOKEN` from the step environment and overrides nothing.
 
