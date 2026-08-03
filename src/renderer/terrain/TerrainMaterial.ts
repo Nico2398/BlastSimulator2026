@@ -59,10 +59,12 @@ const DETAIL_FULL_DISTANCE = 40;   // metres — everything on
 // actually looks from.
 const DETAIL_FADE_DISTANCE = 320;
 
-// A runner-up cover contributing less than this share of the blend is not
-// worth a full material evaluation — see materialFlatColor / the cover-blend
-// skip below (#475). Exported so test-writer can reference it by name;
-// wired into the GLSL by @implementer.
+// Minimum blend `share` (see the `share` computation further down — a
+// pow(ratio, 3.0) * 0.5 term, range 0..0.5) a runner-up cover material must
+// reach before its cheap flat-colour contribution (materialFlatColor) is
+// even computed. Below it, the pixel shows the winning material's colour
+// with no blend at all: the difference would be at most
+// share * |c_flat - c1|, imperceptible at that low a weight (#475).
 export const COVER_BLEND_SKIP_SHARE = 0.02;
 
 
@@ -142,9 +144,11 @@ vec3 materialAlbedo(int i, vec3 wp, float lod, out float bumpAmt, out float roug
 }
 
 /**
- * Cheap stand-in for materialAlbedo, used for a runner-up cover whose blend
- * share is too small to be worth a full recipe/noise evaluation — plain
- * uniform reads and a mix, no evalRecipe.
+ * Cheap stand-in for materialAlbedo, used for a runner-up cover once its
+ * blend share clears COVER_BLEND_SKIP_SHARE — large enough a weight that a
+ * cheap approximation is worth computing, in place of the full, expensive
+ * recipe/noise evaluation materialAlbedo would otherwise run. Plain uniform
+ * reads and a mix, no evalRecipe.
  */
 vec3 materialFlatColor(int i, out float bumpAmt, out float roughAdj){
   vec4 look = uMatLook[i];
@@ -309,9 +313,13 @@ if (bestI >= 0 && bestW > 0.0) {
   float b1, b2, r1, r2;
   vec3 c1 = materialAlbedo(bestI, vWorldPos, lod, b1, r1);
   vec3 c2 = c1; b2 = b1; r2 = r1;
-  // A runner-up contributing less than COVER_BLEND_SKIP_SHARE of the blend is
-  // shaded with the cheap materialFlatColor stand-in instead of a full
-  // recipe/noise evaluation — its result is barely visible at that weight.
+  // A runner-up contributing MORE than COVER_BLEND_SKIP_SHARE gets the cheap
+  // materialFlatColor stand-in instead of the full recipe/noise evaluation —
+  // materialAlbedo is now never called for the runner-up at all, which is
+  // the performance win. At or below the threshold the blend is dropped
+  // entirely and c2 stays at its c1 default, so the winner's colour stands
+  // alone; this further "skip" costs nothing extra since the difference at
+  // that low a weight would be sub-perceptual.
   if (secondI >= 0 && share > ${COVER_BLEND_SKIP_SHARE}) c2 = materialFlatColor(secondI, b2, r2);
   // Ratio blend, so the crossover between two covers is a gradient whose
   // width follows how close their scores are — never a step.
