@@ -141,8 +141,17 @@ vec3 materialAlbedo(int i, vec3 wp, float lod, out float bumpAmt, out float roug
   return mix(uMatColor[i], uMatColorAlt[i], t);
 }
 
-// TODO(#475): materialFlatColor(int i, out float bumpAmt, out float roughAdj)
-// goes here — cheap runner-up stand-in (uniform reads + mix, no evalRecipe).
+/**
+ * Cheap stand-in for materialAlbedo, used for a runner-up cover whose blend
+ * share is too small to be worth a full recipe/noise evaluation — plain
+ * uniform reads and a mix, no evalRecipe.
+ */
+vec3 materialFlatColor(int i, out float bumpAmt, out float roughAdj){
+  vec4 look = uMatLook[i];
+  bumpAmt = look.y * 0.5;
+  roughAdj = look.z;
+  return mix(uMatColor[i], uMatColorAlt[i], 0.5);
+}
 `;
 
 const FRAGMENT_COMMON_EXTRA = `
@@ -300,9 +309,10 @@ if (bestI >= 0 && bestW > 0.0) {
   float b1, b2, r1, r2;
   vec3 c1 = materialAlbedo(bestI, vWorldPos, lod, b1, r1);
   vec3 c2 = c1; b2 = b1; r2 = r1;
-  // TODO(#475): skip full materialAlbedo for the runner-up when its share is
-  // below COVER_BLEND_SKIP_SHARE — use materialFlatColor instead.
-  if (secondI >= 0) c2 = materialAlbedo(secondI, vWorldPos, lod, b2, r2);
+  // A runner-up contributing less than COVER_BLEND_SKIP_SHARE of the blend is
+  // shaded with the cheap materialFlatColor stand-in instead of a full
+  // recipe/noise evaluation — its result is barely visible at that weight.
+  if (secondI >= 0 && share > ${COVER_BLEND_SKIP_SHARE}) c2 = materialFlatColor(secondI, b2, r2);
   // Ratio blend, so the crossover between two covers is a gradient whose
   // width follows how close their scores are — never a step.
   coverCol = mix(c1, c2, share);
