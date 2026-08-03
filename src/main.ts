@@ -218,7 +218,12 @@ console.log = (...args: unknown[]) => {
  */
 function runGameCommand(cmd: string, opts?: { syncRenderer?: boolean }): CommandResult {
   const result = runCommand({ runner, ctx, emitter }, cmd);
-  lastCommandOutput = result.output;
+  // Cap what __gameState relays: every harness round-trips this string over
+  // CDP on every step, and an unbounded command output (a `state full` once
+  // shipped 318 MB, #481) turns each of those reads into a protocol timeout.
+  lastCommandOutput = result.output.length > 1_000_000
+    ? `${result.output.slice(0, 1_000_000)}\n…[truncated ${result.output.length - 1_000_000} of ${result.output.length} chars]`
+    : result.output;
   // Sync the renderer after every command so visual changes appear immediately
   if (opts?.syncRenderer !== false) gameRenderer.syncFromContext(ctx);
   const cmdName = parseCommand(cmd).command;
