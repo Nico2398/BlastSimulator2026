@@ -234,7 +234,14 @@ export function decideClock(
 
   const signature = workSignature(state);
   const changed = progress.signature !== null && signature !== progress.signature;
-  const lastProgressTick = changed ? tickCount : progress.tick;
+  // No progress observed yet (first-ever check for this step): anchor the
+  // grace window to when work-checking begins — stepStartTick + budget — not
+  // to progress.tick, which a caller may have left at stepStartTick. Anchoring
+  // there would let the grace window start counting before the budget itself
+  // had even elapsed, silently widening it.
+  const lastProgressTick = progress.signature === null
+    ? Math.max(progress.tick, stepStartTick + budget)
+    : (changed ? tickCount : progress.tick);
   const sinceProgress = tickCount - lastProgressTick;
 
   if (sinceProgress < WORK_GRACE_TICKS) {
