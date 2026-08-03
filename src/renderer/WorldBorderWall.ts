@@ -1,15 +1,16 @@
 // BlastSimulator2026 — World border wall
 //
-// Marks the edge of the playable site. This replaces the shader's old
-// boundary band, which darkened the ground in a 5m strip: that read as a
-// smudge on the terrain rather than as a limit, and it was permanently
-// visible whether or not the player cared where the edge was.
+// Marks the ground the site may never take. The site itself no longer has a
+// fixed edge — it grows wherever the player works (#473) — so a wall around
+// its perimeter would be a wall around nothing. What stays fixed is the
+// generated world: villages, rivers and landmarks, which a claim can never
+// take. The wall stands on the frontier between claimable ground and those,
+// and is now the only thing in the world that says "not here" (#473 D6/P4).
 //
-// The wall is a containment field standing on the site's perimeter. It is
-// invisible in ordinary play and lights up only where the player is actually
-// looking — the glow is a pool centred on the camera's view target, so
-// approaching a corner lights that corner and nothing else. Nobody working in
-// the middle of the pit ever sees it.
+// It is a containment field, invisible in ordinary play, lighting up only
+// where the player is actually looking — the glow is a pool centred on the
+// camera's view target, so walking toward a village lights that stretch and
+// nothing else. Nobody working in the middle of the pit ever sees it.
 
 import * as THREE from 'three';
 import type { Rect } from '../core/world/WorldGen.js';
@@ -102,7 +103,14 @@ void main() {
 `;
 
 export interface WorldBorderWallOptions {
-  rect: Rect;
+  /**
+   * The protected chunks, as world rects. One panel is raised on each of a
+   * rect's sides that faces claimable ground; a rect with no such side
+   * contributes nothing.
+   */
+  protectedRects: Rect[];
+  /** The site's bounding box — sets the glow pool's radius, so it scales with the level. */
+  siteRect: Rect;
   /** Lowest and highest terrain height across the site, in world units. */
   minGroundY: number;
   maxGroundY: number;
@@ -116,7 +124,7 @@ export class WorldBorderWall {
   constructor(scene: THREE.Scene, options: WorldBorderWallOptions) {
     this.scene = scene;
 
-    const { rect } = options;
+    const { protectedRects, siteRect } = options;
     const baseY = options.minGroundY - WALL_SINK;
     const topY = options.maxGroundY + WALL_HEIGHT;
     const span = topY - baseY;
@@ -125,7 +133,7 @@ export class WorldBorderWall {
     // bottom edge.
     const groundFrac = (options.minGroundY - baseY) / span;
 
-    const site = Math.min(rect.maxX - rect.minX, rect.maxZ - rect.minZ);
+    const site = Math.min(siteRect.maxX - siteRect.minX, siteRect.maxZ - siteRect.minZ);
     const glowFar = Math.min(GLOW_FAR_MAX, Math.max(GLOW_FAR_MIN, site * GLOW_SPAN_FRACTION));
 
     this.material = new THREE.ShaderMaterial({
@@ -150,7 +158,7 @@ export class WorldBorderWall {
       side: THREE.DoubleSide,
     });
 
-    this.mesh = new THREE.Mesh(buildWallGeometry(rect, baseY, topY), this.material);
+    this.mesh = new THREE.Mesh(buildWallGeometry(protectedRects, baseY, topY), this.material);
     this.mesh.name = 'world-border-wall';
     this.mesh.renderOrder = 5;
     this.mesh.frustumCulled = false;
@@ -180,18 +188,23 @@ export class WorldBorderWall {
   }
 }
 
-/** Four vertical panels, one per side of the rect, as a single geometry. */
-function buildWallGeometry(rect: Rect, baseY: number, topY: number): THREE.BufferGeometry {
-  const { minX, minZ, maxX, maxZ } = rect;
-  const corners: [number, number][] = [
-    [minX, minZ], [maxX, minZ], [maxX, maxZ], [minX, maxZ],
-  ];
-
+/**
+ * One vertical panel per outward-facing side of each protected rect, merged
+ * into a single geometry.
+ *
+ * Sides shared by two protected rects are dropped: a run of protected chunks
+ * along a river should read as one wall facing the site, not as a grid of
+ * boxes with panels buried inside it.
+ */
+export function buildWallGeometry(rects: readonly Rect[], baseY: number, topY: number): THREE.BufferGeometry {
   const positions: number[] = [];
   const indices: number[] = [];
-  for (let i = 0; i < 4; i++) {
-    const [x0, z0] = corners[i]!;
-    const [x1, z1] = corners[(i + 1) % 4]!;
+
+  const covered = new Set(rects.map(r => `${r.minX},${r.minZ}`));
+  const spanX = (r: Rect) => r.maxX - r.minX;
+  const spanZ = (r: Rect) => r.maxZ - r.minZ;
+
+  const pushPanel = (x0: number, z0: number, x1: number, z1: number): void => {
     const base = positions.length / 3;
     positions.push(
       x0, baseY, z0,
@@ -200,6 +213,17 @@ function buildWallGeometry(rect: Rect, baseY: number, topY: number): THREE.Buffe
       x0, topY, z0,
     );
     indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
+  };
+
+  for (const rect of rects) {
+    const { minX, minZ, maxX, maxZ } = rect;
+    const neighbourAt = (dx: number, dz: number): boolean =>
+      covered.has(`${minX + dx * spanX(rect)},${minZ + dz * spanZ(rect)}`);
+
+    if (!neighbourAt(0, -1)) pushPanel(minX, minZ, maxX, minZ);
+    if (!neighbourAt(0, 1)) pushPanel(minX, maxZ, maxX, maxZ);
+    if (!neighbourAt(-1, 0)) pushPanel(minX, minZ, minX, maxZ);
+    if (!neighbourAt(1, 0)) pushPanel(maxX, minZ, maxX, maxZ);
   }
 
   const geometry = new THREE.BufferGeometry();

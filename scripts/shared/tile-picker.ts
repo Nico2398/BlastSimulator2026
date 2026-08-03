@@ -21,6 +21,9 @@ export interface PickerGeometry {
   h: number;
   sizeX: number;
   sizeZ: number;
+  /** World coordinate of the picker's top-left tile — non-zero once the site has grown west/north (#473). */
+  minX: number;
+  minZ: number;
 }
 
 export interface PickerPoint {
@@ -48,6 +51,8 @@ export function readPickerGeometry(page: Page): Promise<PickerGeometry | null> {
       x: r.x, y: r.y, w: r.width, h: r.height,
       sizeX: (state?.worldSizeX as number | null) ?? 24,
       sizeZ: (state?.worldSizeZ as number | null) ?? 24,
+      minX: (state?.worldMinX as number | null) ?? 0,
+      minZ: (state?.worldMinZ as number | null) ?? 0,
     };
   });
 }
@@ -76,7 +81,7 @@ export function tileToPoint(geo: PickerGeometry, x: number, z: number): PickerPo
   const tileW = geo.w / geo.sizeX;
   const tileH = geo.h / geo.sizeZ;
   return {
-    px: geo.x + (x + 0.5) * tileW,
-    py: geo.y + (z + 0.5) * tileH,
+    px: geo.x + (x - geo.minX + 0.5) * tileW,
+    py: geo.y + (z - geo.minZ + 0.5) * tileH,
   };
 }

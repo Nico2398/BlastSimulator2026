@@ -170,7 +170,7 @@ emitter.on('revolt:warning', ({ ticksRemaining }) => {
 // separately by syncFromContext()'s own comparison, which runs right after
 // this and does a full rebuildTerrain() with the new grid's real dimensions.
 emitter.on('terrain:updated', ({ region }) => {
-  gameRenderer.remeshTerrainRegion(region);
+  gameRenderer.remeshTerrainRegion(ctx, region);
 });
 // Bird flocks near a blast panic and scatter for a few seconds (#458 T7.2/D12/A26).
 emitter.on('blast:started', ({ originX, originZ }) => {
@@ -268,11 +268,14 @@ window.__gameState = () => {
     tickCount: s.tickCount,
     isPaused: s.isPaused,
     mineType: s.mineType,
-    // World dimensions, so a harness can map grid coordinates to the tile
-    // picker without inferring them from a terrain bounding box that blasts and
-    // ramps change underneath it.
+    // The site's live bounding box, so a harness can map grid coordinates to
+    // the tile picker without inferring them from a terrain bounding box that
+    // blasts and ramps change underneath it. Size is a bounding box, not a
+    // size, once the site has grown (#473) — hence the origin alongside it.
     worldSizeX: s.world?.sizeX ?? null,
     worldSizeZ: s.world?.sizeZ ?? null,
+    worldMinX: s.world?.minX ?? null,
+    worldMinZ: s.world?.minZ ?? null,
     drillHoles: s.drillHoles,
     chargesByHole: s.chargesByHole,
     sequenceDelays: s.sequenceDelays,

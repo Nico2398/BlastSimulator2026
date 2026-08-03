@@ -10,8 +10,7 @@ import type { NavGrid } from './NavGrid.js';
 
 /** True when a cell exists, is in bounds, and has finite moveCost (walkable/ramp/drill_hole). */
 export function isTraversableCell(navGrid: NavGrid, x: number, z: number): boolean {
-  if (x < 0 || z < 0 || x >= navGrid.width || z >= navGrid.height) return false;
-  const cell = navGrid.cells[z]?.[x];
+  const cell = navGrid.cellAt(x, z);
   return !!cell && cell.type !== 'blocked' && cell.type !== 'void';
 }
 
@@ -106,7 +105,7 @@ export function findNearestReachableCell(
 
   // 8-directional flood fill from the anchor — same adjacency A* uses.
   const { width, count } = floodFillReachable(navGrid, anchor.x, anchor.z);
-  const anchorLevel = navGrid.cells[anchor.z]?.[anchor.x]?.benchLevel;
+  const anchorLevel = navGrid.cellAt(anchor.x, anchor.z)?.benchLevel;
 
   let best = anchor;
   let bestDistSq = (anchor.x - targetX) ** 2 + (anchor.z - targetZ) ** 2;
@@ -117,14 +116,14 @@ export function findNearestReachableCell(
   // queueArr directly (see the scratch-buffer note on floodFillReachable).
   for (let i = 0; i < count; i++) {
     const idx = queueArr[i]!;
-    const x = idx % width;
-    const z = (idx / width) | 0;
+    const x = navGrid.originX + (idx % width);
+    const z = navGrid.originZ + ((idx / width) | 0);
     const distSq = (x - targetX) ** 2 + (z - targetZ) ** 2;
     if (distSq < bestDistSq) {
       bestDistSq = distSq;
       best = { x, z };
     }
-    if (anchorLevel !== undefined && navGrid.cells[z]?.[x]?.benchLevel === anchorLevel && distSq < bestSameLevelDistSq) {
+    if (anchorLevel !== undefined && navGrid.cellAt(x, z)?.benchLevel === anchorLevel && distSq < bestSameLevelDistSq) {
       bestSameLevelDistSq = distSq;
       bestSameLevel = { x, z };
     }
@@ -160,6 +159,7 @@ export function computeReachableSet(navGrid: NavGrid, anchorX: number, anchorZ: 
   if (!isTraversableCell(navGrid, ax, az)) return EMPTY_REACHABLE_SET;
 
   const { width, height, count } = floodFillReachable(navGrid, ax, az);
+  const { originX, originZ } = navGrid;
   // Independent snapshot: floodFillReachable's next call reuses the shared
   // scratch buffer, so a wrapper aliasing it directly would go stale (or
   // wrong) the moment another reachability query runs before this one is
@@ -169,8 +169,10 @@ export function computeReachableSet(navGrid: NavGrid, anchorX: number, anchorZ: 
 
   return {
     has(x: number, z: number): boolean {
-      if (x < 0 || z < 0 || x >= width || z >= height) return false;
-      return visited[z * width + x] === 1;
+      const lx = x - originX;
+      const lz = z - originZ;
+      if (lx < 0 || lz < 0 || lx >= width || lz >= height) return false;
+      return visited[lz * width + lx] === 1;
     },
     size: count,
   };
@@ -227,19 +229,19 @@ function floodFillReachable(
   for (let i = 0; i < lastFillCount; i++) visitedArr[queueArr[i]!] = 0;
 
   let count = 0;
-  const startIdx = anchorZ * width + anchorX;
+  const startIdx = (anchorZ - navGrid.originZ) * width + (anchorX - navGrid.originX);
   visitedArr[startIdx] = 1;
   queueArr[count++] = startIdx;
 
   for (let head = 0; head < count; head++) {
     const idx = queueArr[head]!;
-    const x = idx % width;
-    const z = (idx / width) | 0;
+    const x = navGrid.originX + (idx % width);
+    const z = navGrid.originZ + ((idx / width) | 0);
     for (const [dx, dz] of NEIGHBOUR_OFFSETS_8) {
       const nx = x + dx;
       const nz = z + dz;
       if (!isTraversableCell(navGrid, nx, nz)) continue;
-      const neighborIdx = nz * width + nx;
+      const neighborIdx = (nz - navGrid.originZ) * width + (nx - navGrid.originX);
       if (visitedArr[neighborIdx]) continue;
       visitedArr[neighborIdx] = 1;
       queueArr[count++] = neighborIdx;

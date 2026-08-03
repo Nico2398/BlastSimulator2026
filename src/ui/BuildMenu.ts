@@ -30,6 +30,9 @@ export class BuildMenu {
   private gameConsole?: GameConsoleFn;
   private worldSizeX = 40;
   private worldSizeZ = 40;
+  /** West/north edge of the site's bounding box — non-zero once it has grown that way (#473). */
+  private worldOriginX = 0;
+  private worldOriginZ = 0;
   /** Latest state, so the placement picker can draw the site. */
   private lastState: GameState | null = null;
   /** Selected placement tier per building type. */
@@ -113,6 +116,8 @@ export class BuildMenu {
     if (state.world) {
       this.worldSizeX = state.world.sizeX;
       this.worldSizeZ = state.world.sizeZ;
+      this.worldOriginX = state.world.minX;
+      this.worldOriginZ = state.world.minZ;
     }
     if (state.cash !== this.lastCash) {
       this.lastCash = state.cash;
@@ -196,6 +201,8 @@ export class BuildMenu {
         mode: 'area',
         worldSizeX: this.worldSizeX,
         worldSizeZ: this.worldSizeZ,
+        worldOriginX: this.worldOriginX,
+        worldOriginZ: this.worldOriginZ,
         title: t('ui.build.ramp'),
         ...(this.lastState ? { tileFill: makeSiteTileFill(this.lastState) } : {}),
         extraFields: [
@@ -281,6 +288,8 @@ export class BuildMenu {
         mode: 'point',
         worldSizeX: this.worldSizeX,
         worldSizeZ: this.worldSizeZ,
+        worldOriginX: this.worldOriginX,
+        worldOriginZ: this.worldOriginZ,
         title: t(`building.${type}.t${tier}.name`),
         ...(this.lastState ? { tileFill: makeSiteTileFill(this.lastState) } : {}),
         onConfirm: (result) => {
@@ -363,6 +372,8 @@ export class BuildMenu {
         mode: 'point',
         worldSizeX: this.worldSizeX,
         worldSizeZ: this.worldSizeZ,
+        worldOriginX: this.worldOriginX,
+        worldOriginZ: this.worldOriginZ,
         title: `${t('ui.build.move')} #${b.id}`,
         ...(this.lastState ? { tileFill: makeSiteTileFill(this.lastState) } : {}),
         onConfirm: (result) => {

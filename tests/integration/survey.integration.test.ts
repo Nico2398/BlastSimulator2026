@@ -299,18 +299,21 @@ describe('Survey system', () => {
     expect(ctx.state!.surveyResults).toHaveLength(0);
   });
 
-  // ── 7. Out-of-bounds coordinates rejected ────────────────────────────────
+  // ── 7. Coordinates the site cannot reach are rejected (#473 D5) ──────────
 
-  it('survey rejects out-of-bounds coordinates', () => {
-    // Grid is 32x32x32, so (100, 100) is out of bounds
+  it('survey rejects coordinates on ground touching no part of the site', () => {
+    // Site is 32x32, so (100, 100) is several chunks past anything claimable.
     const result = surveyCommand(ctx as any, ['seismic'], { x: '100', z: '100' });
     expect(result.success).toBe(false);
     expect(result.output).toMatch(/out of bounds/i);
+    expect(ctx.grid!.containsColumn(100, 100)).toBe(false);
+  });
 
-    // Negative coordinates should also be rejected
+  it('survey just past the west edge claims that ground instead of refusing it', () => {
     const negResult = surveyCommand(ctx as any, ['aerial'], { x: '-5', z: '16' });
-    expect(negResult.success).toBe(false);
-    expect(negResult.output).toMatch(/out of bounds/i);
+    expect(negResult.output).not.toMatch(/out of bounds/i);
+    expect(ctx.grid!.containsColumn(-5, 16)).toBe(true);
+    expect(ctx.grid!.minX).toBe(-16);
   });
 
   // ── 8. Insufficient funds ────────────────────────────────────────────────

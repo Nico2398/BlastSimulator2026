@@ -166,9 +166,7 @@ function hasWaypointSatisfying(
  */
 export function isPathBlocked(state: AgentState, grid: NavGrid, avoidVehicles: boolean): boolean {
   return hasWaypointSatisfying(state, (wp) => {
-    const clampedX = Math.max(0, Math.min(grid.width - 1, Math.floor(wp.x)));
-    const clampedZ = Math.max(0, Math.min(grid.height - 1, Math.floor(wp.z)));
-    const cell = grid.cells[clampedZ]![clampedX]!;
+    const cell = grid.cellAt(grid.clampX(Math.floor(wp.x)), grid.clampZ(Math.floor(wp.z)))!;
 
     if (cell.type === 'blocked' || cell.type === 'void') {
       return true;

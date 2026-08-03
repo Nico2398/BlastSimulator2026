@@ -160,9 +160,21 @@ export function octileHeuristic(ax: number, az: number, bx: number, bz: number):
   return Math.max(dx, dz) + (Math.SQRT2 - 1) * Math.min(dx, dz);
 }
 
-/** Flat row-major index for a coordinate pair — also the A* scratch arrays' index space. */
-function cellIndex(x: number, z: number, width: number): number {
-  return z * width + x;
+/**
+ * Flat row-major index for a WORLD coordinate pair — also the A* scratch
+ * arrays' index space. The grid's origin is subtracted here, so a site that
+ * has grown west or north (#473) indexes from 0 all the same.
+ */
+function cellIndex(grid: NavGrid, x: number, z: number): number {
+  return (z - grid.originZ) * grid.width + (x - grid.originX);
+}
+
+/** Inverse of `cellIndex`: the world coordinates a flat index refers to. */
+function cellCoords(grid: NavGrid, index: number): { x: number; z: number } {
+  return {
+    x: grid.originX + (index % grid.width),
+    z: grid.originZ + ((index / grid.width) | 0),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -196,9 +208,12 @@ function ensureScratchCapacity(size: number): void {
   stampArr = new Int32Array(size); // zero-filled; currentStamp starts at 1 so this never falsely reads as "touched"
 }
 
-/** Clamp a coordinate to the grid bounds. */
-function clampCoord(value: number, max: number): number {
-  return Math.max(0, Math.min(max - 1, Math.floor(value)));
+/** Clamp a world coordinate pair into the grid's covered box. */
+function clampToGrid(grid: NavGrid, x: number, z: number): { x: number; z: number } {
+  return {
+    x: Math.max(grid.originX, Math.min(grid.maxX - 1, Math.floor(x))),
+    z: Math.max(grid.originZ, Math.min(grid.maxZ - 1, Math.floor(z))),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -236,10 +251,9 @@ function directLineWalk(
     const cz = Math.round(z0 + dz * t);
 
     // Clamp to grid bounds
-    const clampedX = clampCoord(cx, grid.width);
-    const clampedZ = clampCoord(cz, grid.height);
+    const { x: clampedX, z: clampedZ } = clampToGrid(grid, cx, cz);
 
-    const cell = grid.cells[clampedZ]![clampedX]!;
+    const cell = grid.cellAt(clampedX, clampedZ)!;
     if (isImpassable(cell, avoidVehicles)) return null;
 
     // Accumulate cost (use octile distance between consecutive steps for accuracy)
@@ -263,17 +277,16 @@ function directLineWalk(
 // ---------------------------------------------------------------------------
 
 export function getBenchLevel(grid: NavGrid, x: number, z: number): number {
-  const cx = clampCoord(x, grid.width);
-  const cz = clampCoord(z, grid.height);
-  return grid.cells[cz]![cx]!.benchLevel;
+  const clamped = clampToGrid(grid, x, z);
+  return grid.cellAt(clamped.x, clamped.z)!.benchLevel;
 }
 
 export function findRampConnections(grid: NavGrid): RampConnection[] {
   const connections: RampConnection[] = [];
 
-  for (let z = 0; z < grid.height; z++) {
-    for (let x = 0; x < grid.width; x++) {
-      const cell = grid.cells[z]![x]!;
+  for (let z = grid.originZ; z < grid.maxZ; z++) {
+    for (let x = grid.originX; x < grid.maxX; x++) {
+      const cell = grid.cellAt(x, z)!;
       if (cell.type !== 'ramp') continue;
 
       // Collect distinct bench levels among walkable neighbours
@@ -282,9 +295,8 @@ export function findRampConnections(grid: NavGrid): RampConnection[] {
       for (const [dx, dz] of NEIGHBOUR_OFFSETS) {
         const nx = x + dx;
         const nz = z + dz;
-        if (nx < 0 || nx >= grid.width || nz < 0 || nz >= grid.height) continue;
-        const neighbor = grid.cells[nz]![nx]!;
-        if (neighbor.type === 'blocked' || neighbor.type === 'void') continue;
+        const neighbor = grid.cellAt(nx, nz);
+        if (!neighbor || neighbor.type === 'blocked' || neighbor.type === 'void') continue;
 
         const level = neighbor.benchLevel;
         // Keep first neighbor per level for determinism
@@ -352,10 +364,9 @@ function concatPaths(
 }
 
 function findMultiLevelPath(grid: NavGrid, request: PathRequest): PathResult {
-  const sx = clampCoord(request.fromX, grid.width);
-  const sz = clampCoord(request.fromZ, grid.height);
-  const gx = clampCoord(request.toX, grid.width);
-  const gz = clampCoord(request.toZ, grid.height);
+  const start = clampToGrid(grid, request.fromX, request.fromZ);
+  const goal = clampToGrid(grid, request.toX, request.toZ);
+  const sx = start.x, sz = start.z, gx = goal.x, gz = goal.z;
   const { avoidVehicles, agentId } = request;
 
   const startLevel = getBenchLevel(grid, sx, sz);
@@ -457,9 +468,8 @@ function getStepCost(grid: NavGrid, ax: number, az: number, bx: number, bz: numb
   const dx = Math.abs(bx - ax);
   const dz = Math.abs(bz - az);
   if (dx > 1 || dz > 1) return Infinity;
-  const cx = clampCoord(bx, grid.width);
-  const cz = clampCoord(bz, grid.height);
-  const cell = grid.cells[cz]![cx]!;
+  const clamped = clampToGrid(grid, bx, bz);
+  const cell = grid.cellAt(clamped.x, clamped.z)!;
   if (dx !== 0 && dz !== 0) return cell.moveCost * Math.SQRT2;
   return cell.moveCost;
 }
@@ -478,21 +488,20 @@ export function findPath(grid: NavGrid, request: PathRequest): PathResult {
   }
 
   // 1. Clamp start and goal to grid bounds
-  const sx = clampCoord(request.fromX, grid.width);
-  const sz = clampCoord(request.fromZ, grid.height);
-  const gx = clampCoord(request.toX, grid.width);
-  const gz = clampCoord(request.toZ, grid.height);
+  const start = clampToGrid(grid, request.fromX, request.fromZ);
+  const goal = clampToGrid(grid, request.toX, request.toZ);
+  const sx = start.x, sz = start.z, gx = goal.x, gz = goal.z;
 
   const { avoidVehicles } = request;
 
   // 2. Start impassable check (must precede start==goal check)
-  const startCell = grid.cells[sz]![sx]!;
+  const startCell = grid.cellAt(sx, sz)!;
   if (isImpassable(startCell, avoidVehicles)) {
     return { found: false, waypoints: [], totalCost: 0 };
   }
 
   // 3. Goal impassable check
-  const goalCell = grid.cells[gz]![gx]!;
+  const goalCell = grid.cellAt(gx, gz)!;
   if (isImpassable(goalCell, avoidVehicles)) {
     return { found: false, waypoints: [], totalCost: 0 };
   }
@@ -559,15 +568,14 @@ function findOrdinaryPath(
     g: number;   // gScore at push time (for stale check)
   }
 
-  const width = grid.width;
-  ensureScratchCapacity(width * grid.height);
+  ensureScratchCapacity(grid.width * grid.height);
   currentStamp++;
 
   const openHeap = new MinHeap<AStarNode>();
   let exploredCount = 0;
 
   const budget = pathfindingNodeBudget(grid.width, grid.height);
-  const startPos = cellIndex(sx, sz, width);
+  const startPos = cellIndex(grid, sx, sz);
   gScoreArr[startPos] = 0;
   stampArr[startPos] = currentStamp;
   cameFromArr[startPos] = -1;
@@ -576,8 +584,7 @@ function findOrdinaryPath(
 
   while (openHeap.size > 0 && exploredCount < budget) {
     const current = openHeap.pop()!;
-    const cx = current.pos % width;
-    const cz = (current.pos / width) | 0;
+    const { x: cx, z: cz } = cellCoords(grid, current.pos);
 
     // Skip stale entries (re-expanded with outdated gScore)
     const bestG = gScoreArr[current.pos];
@@ -587,7 +594,7 @@ function findOrdinaryPath(
 
     // Goal reached?
     if (cx === gx && cz === gz) {
-      return reconstructPath(gx, gz, width);
+      return reconstructPath(grid, gx, gz);
     }
 
     // Explore neighbours
@@ -595,18 +602,15 @@ function findOrdinaryPath(
       const nx = cx + dx;
       const nz = cz + dz;
 
-      // Bounds check
-      if (nx < 0 || nx >= grid.width || nz < 0 || nz >= grid.height) continue;
-
-      const neighborCell = grid.cells[nz]![nx]!;
-      if (isImpassable(neighborCell, avoidVehicles)) continue;
+      const neighborCell = grid.cellAt(nx, nz);
+      if (!neighborCell || isImpassable(neighborCell, avoidVehicles)) continue;
 
       // Move cost
       const isDiagonal = dx !== 0 && dz !== 0;
       const stepCost = isDiagonal ? neighborCell.moveCost * Math.SQRT2 : neighborCell.moveCost;
       const tentativeG = bestG + stepCost;
 
-      const neighborPos = cellIndex(nx, nz, width);
+      const neighborPos = cellIndex(grid, nx, nz);
       const touched = stampArr[neighborPos] === currentStamp;
       const existingG = touched ? gScoreArr[neighborPos]! : Infinity;
 
@@ -628,14 +632,14 @@ function findOrdinaryPath(
 }
 
 /** Reconstruct path by walking the cameFromArr scratch array backwards from goal to start. */
-function reconstructPath(goalX: number, goalZ: number, width: number): PathResult {
+function reconstructPath(grid: NavGrid, goalX: number, goalZ: number): PathResult {
   const waypoints: { x: number; z: number }[] = [];
-  let idx = cellIndex(goalX, goalZ, width);
+  let idx = cellIndex(grid, goalX, goalZ);
   const totalCost = gScoreArr[idx]!;
 
   // Walk backwards (-1 marks the start node, which has no parent)
   while (idx !== -1) {
-    waypoints.push({ x: idx % width, z: (idx / width) | 0 });
+    waypoints.push(cellCoords(grid, idx));
     idx = cameFromArr[idx]!;
   }
 

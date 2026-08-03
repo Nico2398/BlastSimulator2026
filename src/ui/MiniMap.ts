@@ -16,6 +16,9 @@ import {
   drawGridLines,
   drawSurveyedOre,
   drawNavGridOverlay,
+  projectX,
+  projectZ,
+  type MapProjection,
 } from './miniMapLayers.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { NavGrid } from '../core/nav/NavGrid.js';
@@ -29,6 +32,8 @@ export class MiniMap {
   private readonly title: HTMLElement;
   private _navGridVisible: boolean = false;
   private _navGrid: NavGrid | null = null;
+  /** Last projection used, so an out-of-band overlay draw lines up with the terrain already painted. */
+  private projection: MapProjection = { originX: 0, originZ: 0, scaleX: 1, scaleZ: 1 };
   private readonly locale = new LocaleTextRegistry();
 
   constructor(container: HTMLElement) {
@@ -99,20 +104,27 @@ export class MiniMap {
       return;
     }
 
-    const { sizeX, sizeZ } = world;
-    const scaleX = MAP_SIZE / sizeX;
-    const scaleZ = MAP_SIZE / sizeZ;
+    const { sizeX, sizeZ, minX, minZ } = world;
+    // The site's bounding box, not a square at the origin: a site claimed
+    // westward starts at a negative x (#473 P5).
+    const proj: MapProjection = {
+      originX: minX,
+      originZ: minZ,
+      scaleX: MAP_SIZE / sizeX,
+      scaleZ: MAP_SIZE / sizeZ,
+    };
+    this.projection = proj;
 
-    drawTerrain(ctx, state, scaleX, scaleZ);
-    drawGridLines(ctx, sizeX, sizeZ, scaleX, scaleZ);
-    drawSurveyedOre(ctx, state, scaleX, scaleZ);
+    drawTerrain(ctx, state, proj);
+    drawGridLines(ctx, sizeX, sizeZ, proj);
+    drawSurveyedOre(ctx, state, proj);
 
     // Draw buildings
     ctx.fillStyle = COLOR_BUILDING;
     for (const b of state.buildings.buildings) {
       ctx.fillRect(
-        Math.floor(b.x * scaleX) - 2,
-        Math.floor(b.z * scaleZ) - 2,
+        Math.floor(projectX(proj, b.x)) - 2,
+        Math.floor(projectZ(proj, b.z)) - 2,
         4, 4,
       );
     }
@@ -121,8 +133,8 @@ export class MiniMap {
     ctx.fillStyle = COLOR_VEHICLE;
     for (const v of state.vehicles.vehicles) {
       ctx.fillRect(
-        Math.floor(v.x * scaleX) - 1,
-        Math.floor(v.z * scaleZ) - 1,
+        Math.floor(projectX(proj, v.x)) - 1,
+        Math.floor(projectZ(proj, v.z)) - 1,
         3, 3,
       );
     }
@@ -132,7 +144,7 @@ export class MiniMap {
     for (const e of state.employees.employees) {
       if (!e.alive) continue;
       ctx.beginPath();
-      ctx.arc(e.x * scaleX, e.z * scaleZ, 1.6, 0, Math.PI * 2);
+      ctx.arc(projectX(proj, e.x), projectZ(proj, e.z), 1.6, 0, Math.PI * 2);
       ctx.fill();
     }
 
@@ -140,13 +152,13 @@ export class MiniMap {
     ctx.fillStyle = COLOR_HOLE;
     for (const h of state.drillHoles) {
       ctx.beginPath();
-      ctx.arc(h.x * scaleX, h.z * scaleZ, 2, 0, Math.PI * 2);
+      ctx.arc(projectX(proj, h.x), projectZ(proj, h.z), 2, 0, Math.PI * 2);
       ctx.fill();
     }
 
     // Draw NavGrid overlay when visible
     if (this._navGridVisible) {
-      this.drawNavGridOverlay(ctx, scaleX, scaleZ);
+      this.drawNavGridOverlay(ctx, proj.scaleX, proj.scaleZ);
     }
   }
 
@@ -160,8 +172,18 @@ export class MiniMap {
 
   get navGrid(): NavGrid | null { return this._navGrid; }
 
-  /** Paint the NavGrid cell-type overlay for the currently attached grid. */
+  /**
+   * Paint the NavGrid cell-type overlay for the currently attached grid.
+   * The origin comes from the last `update` — a caller supplying only a
+   * scale gets the site's current position, which is the only one that can
+   * line up with the terrain already painted underneath.
+   */
   drawNavGridOverlay(ctx: CanvasRenderingContext2D, scaleX: number, scaleZ: number): void {
-    drawNavGridOverlay(ctx, this._navGrid, scaleX, scaleZ);
+    drawNavGridOverlay(ctx, this._navGrid, {
+      originX: this.projection.originX,
+      originZ: this.projection.originZ,
+      scaleX,
+      scaleZ,
+    });
   }
 }

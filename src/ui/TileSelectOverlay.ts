@@ -35,6 +35,14 @@ export interface TileSelectConfig {
   mode: SelectMode;
   worldSizeX: number;
   worldSizeZ: number;
+  /**
+   * World coordinates of the picker's top-left tile. Non-zero once the site
+   * has been claimed west or north of where it started (#473) — every tile
+   * coordinate this overlay reports and receives is a world coordinate, so a
+   * caller never has to add the offset itself.
+   */
+  worldOriginX?: number;
+  worldOriginZ?: number;
   title: string;
   extraFields?: ExtraField[];
   /**
@@ -256,9 +264,12 @@ export class TileSelectOverlay {
     const rect = this.canvas.getBoundingClientRect();
     const px = (e.clientX - rect.left) * (this.canvasW / rect.width);
     const pz = (e.clientY - rect.top) * (this.canvasH / rect.height);
-    const tx = Math.floor(px / (this.canvasW / this.config.worldSizeX));
-    const tz = Math.floor(pz / (this.canvasH / this.config.worldSizeZ));
-    if (tx < 0 || tx >= this.config.worldSizeX || tz < 0 || tz >= this.config.worldSizeZ) return null;
+    const originX = this.config.worldOriginX ?? 0;
+    const originZ = this.config.worldOriginZ ?? 0;
+    const tx = originX + Math.floor(px / (this.canvasW / this.config.worldSizeX));
+    const tz = originZ + Math.floor(pz / (this.canvasH / this.config.worldSizeZ));
+    if (tx < originX || tx >= originX + this.config.worldSizeX) return null;
+    if (tz < originZ || tz >= originZ + this.config.worldSizeZ) return null;
 
     // An exact region is a target, not a suggestion. Clamping lets the player
     // drag past the corners and still land on it — without this, "exactly this
@@ -275,7 +286,7 @@ export class TileSelectOverlay {
     const c = this.config!;
     const tileW = this.canvasW / c.worldSizeX;
     const tileH = this.canvasH / c.worldSizeZ;
-    return { px: tx * tileW, pz: tz * tileH };
+    return { px: (tx - (c.worldOriginX ?? 0)) * tileW, pz: (tz - (c.worldOriginZ ?? 0)) * tileH };
   }
 
   private render(): void {
@@ -284,6 +295,13 @@ export class TileSelectOverlay {
     const c = this.config;
     const tileW = this.canvasW / c.worldSizeX;
     const tileH = this.canvasH / c.worldSizeZ;
+    const originX = c.worldOriginX ?? 0;
+    const originZ = c.worldOriginZ ?? 0;
+    const endX = originX + c.worldSizeX;
+    const endZ = originZ + c.worldSizeZ;
+    /** Lowest multiple of 10 at or after the picker's west/north edge, so guides land on round world coordinates. */
+    const firstGuideX = Math.ceil(originX / 10) * 10;
+    const firstGuideZ = Math.ceil(originZ / 10) * 10;
 
     ctx.clearRect(0, 0, this.canvasW, this.canvasH);
 
@@ -294,12 +312,13 @@ export class TileSelectOverlay {
     // Site contents, when the caller supplied them — an unshaded grid gives the
     // player nothing to aim at.
     if (c.tileFill) {
-      for (let z = 0; z < c.worldSizeZ; z++) {
-        for (let x = 0; x < c.worldSizeX; x++) {
+      for (let z = originZ; z < endZ; z++) {
+        for (let x = originX; x < endX; x++) {
           const fill = c.tileFill(x, z);
           if (!fill) continue;
           ctx.fillStyle = fill;
-          ctx.fillRect(x * tileW, z * tileH, Math.ceil(tileW), Math.ceil(tileH));
+          const p = this.tileToCanvas(x, z);
+          ctx.fillRect(p.px, p.pz, Math.ceil(tileW), Math.ceil(tileH));
         }
       }
     }
@@ -307,32 +326,36 @@ export class TileSelectOverlay {
     // Grid
     ctx.strokeStyle = 'rgba(200,160,60,0.15)';
     ctx.lineWidth = 0.5;
-    for (let x = 0; x <= c.worldSizeX; x++) {
+    for (let x = originX; x <= endX; x++) {
+      const px = this.tileToCanvas(x, originZ).px;
       ctx.beginPath();
-      ctx.moveTo(x * tileW, 0);
-      ctx.lineTo(x * tileW, this.canvasH);
+      ctx.moveTo(px, 0);
+      ctx.lineTo(px, this.canvasH);
       ctx.stroke();
     }
-    for (let z = 0; z <= c.worldSizeZ; z++) {
+    for (let z = originZ; z <= endZ; z++) {
+      const pz = this.tileToCanvas(originX, z).pz;
       ctx.beginPath();
-      ctx.moveTo(0, z * tileH);
-      ctx.lineTo(this.canvasW, z * tileH);
+      ctx.moveTo(0, pz);
+      ctx.lineTo(this.canvasW, pz);
       ctx.stroke();
     }
 
     // Chunk guides (every 10 tiles)
     ctx.strokeStyle = 'rgba(200,160,60,0.35)';
     ctx.lineWidth = 1;
-    for (let x = 0; x <= c.worldSizeX; x += 10) {
+    for (let x = firstGuideX; x <= endX; x += 10) {
+      const px = this.tileToCanvas(x, originZ).px;
       ctx.beginPath();
-      ctx.moveTo(x * tileW, 0);
-      ctx.lineTo(x * tileW, this.canvasH);
+      ctx.moveTo(px, 0);
+      ctx.lineTo(px, this.canvasH);
       ctx.stroke();
     }
-    for (let z = 0; z <= c.worldSizeZ; z += 10) {
+    for (let z = firstGuideZ; z <= endZ; z += 10) {
+      const pz = this.tileToCanvas(originX, z).pz;
       ctx.beginPath();
-      ctx.moveTo(0, z * tileH);
-      ctx.lineTo(this.canvasW, z * tileH);
+      ctx.moveTo(0, pz);
+      ctx.lineTo(this.canvasW, pz);
       ctx.stroke();
     }
 
@@ -340,20 +363,21 @@ export class TileSelectOverlay {
     ctx.fillStyle = 'rgba(200,160,60,0.6)';
     ctx.font = '10px monospace';
     ctx.textAlign = 'center';
-    for (let x = 0; x <= c.worldSizeX; x += 10) {
-      ctx.fillText(String(x), x * tileW + (x < c.worldSizeX ? tileW * 5 : -4), 10);
+    for (let x = firstGuideX; x <= endX; x += 10) {
+      const px = this.tileToCanvas(x, originZ).px;
+      ctx.fillText(String(x), px + (x < endX ? tileW * 5 : -4), 10);
     }
     ctx.textAlign = 'left';
-    for (let z = 0; z <= c.worldSizeZ; z += 10) {
-      ctx.fillText(String(z), 3, z * tileH + (z < c.worldSizeZ ? tileH * 5 : -3));
+    for (let z = firstGuideZ; z <= endZ; z += 10) {
+      const pz = this.tileToCanvas(originX, z).pz;
+      ctx.fillText(String(z), 3, pz + (z < endZ ? tileH * 5 : -3));
     }
 
     // Required area — everything outside it is dimmed and the area itself is
     // outlined, so "drag here" is visible rather than only stated.
     if (this.requiredRegion) {
       const r = this.requiredRegion;
-      const rx = r.x1 * tileW;
-      const rz = r.z1 * tileH;
+      const { px: rx, pz: rz } = this.tileToCanvas(r.x1, r.z1);
       const rw = (r.x2 - r.x1 + 1) * tileW;
       const rh = (r.z2 - r.z1 + 1) * tileH;
 

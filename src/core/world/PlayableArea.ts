@@ -23,6 +23,17 @@ import type { Rect } from './WorldGen.js';
 export type ClaimRefusalReason =
   /** The chunk overlaps a village, river or landmark — inviolable ground (#473 D6). */
   | 'protected_structure'
+  /**
+   * The chunk shares no edge with the site.
+   *
+   * Not in #473's own refusal list — the issue leaves the question open. A
+   * detached chunk would be an island nothing can walk to: the navgrid covers
+   * the site's bounding box, so the ground between it and the site is 'void',
+   * and every employee, vehicle and haul route would path into it and stop.
+   * Refusing keeps the site one connected worksite while still letting it
+   * grow without limit, one chunk at a time.
+   */
+  | 'not_adjacent'
   /** Expansion is disabled for this site (campaign levels with a fixed boundary). */
   | 'expansion_disabled';
 
@@ -123,6 +134,9 @@ export class PlayableArea {
     if (!this.expansionEnabled) {
       return { claimed: false, chunk: { cx, cz }, reason: 'expansion_disabled' };
     }
+    if (!this.grid.hasChunk(cx, cz) && !this.touchesSite(cx, cz)) {
+      return { claimed: false, chunk: { cx, cz }, reason: 'not_adjacent' };
+    }
     if (rectTouchesProtectedStructure(this.structures(), PlayableArea.chunkRect(cx, cz))) {
       return { claimed: false, chunk: { cx, cz }, reason: 'protected_structure' };
     }
@@ -158,6 +172,14 @@ export class PlayableArea {
       }
     }
     return frontier;
+  }
+
+  /** True when chunk (cx, cz) shares an edge with a chunk the site already owns. */
+  private touchesSite(cx: number, cz: number): boolean {
+    return this.grid.hasChunk(cx - 1, cz)
+      || this.grid.hasChunk(cx + 1, cz)
+      || this.grid.hasChunk(cx, cz - 1)
+      || this.grid.hasChunk(cx, cz + 1);
   }
 
   private generateInto(rect: Rect): void {

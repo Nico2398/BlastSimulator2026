@@ -24,8 +24,12 @@ function makeCtx(): GameContext {
   return ctx;
 }
 
-/** Place an active research_center via the console build command, asserting success. */
-function placeResearchCenter(ctx: GameContext, at = '50,50'): void {
+/**
+ * Place an active research_center via the console build command, asserting
+ * success. Coordinates must sit on the 32x32 site makeCtx creates — building
+ * past its edge is refused rather than silently accepted (#473 D5).
+ */
+function placeResearchCenter(ctx: GameContext, at = '20,20'): void {
   const result = buildCommand(ctx, ['research_center'], { at });
   if (!result.success) {
     throw new Error(`test setup: failed to place research_center: ${result.output}`);
@@ -322,7 +326,7 @@ describe('Research Center — destroyed mid-research cancels + refunds (#461)', 
   it('keeps a task progressing to normal completion when one of two Research Centers is destroyed', () => {
     const ctx = makeCtx();
     placeResearchCenter(ctx, '10,10');
-    placeResearchCenter(ctx, '50,50');
+    placeResearchCenter(ctx, '4,4');
     const centerIds = ctx.state!.buildings.buildings
       .filter((b) => b.type === 'research_center')
       .map((b) => b.id);

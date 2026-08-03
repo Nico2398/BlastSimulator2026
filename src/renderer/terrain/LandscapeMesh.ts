@@ -112,6 +112,25 @@ function rockIndexFor(palette: CompositionPalette, surfCompId: number): number {
   return Math.max(0, rockIndexOf(getDominantRockId(comp)));
 }
 
+/**
+ * The ground the playable mesh owns, which the landscape must not overlap.
+ *
+ * `rect` is the site's live bounding box, and `ownsColumn` its actual claimed
+ * shape (#473 D8) — the two differ once a site has grown into an L, and the
+ * landscape has to keep covering the notch the bounding box squares off.
+ * Both surfaces read the same height sampler, so they agree by construction
+ * wherever they meet.
+ */
+export interface PlayableCut {
+  rect: Rect;
+  ownsColumn(x: number, z: number): boolean;
+}
+
+/** The pre-expansion behaviour: the site is exactly its rect. */
+function rectCut(rect: Rect): PlayableCut {
+  return { rect, ownsColumn: (x, z) => distanceInsideRect(rect, x, z) > 0 };
+}
+
 export class LandscapeMesh {
   private readonly scene: THREE.Scene;
   private readonly material: THREE.Material;
@@ -131,14 +150,20 @@ export class LandscapeMesh {
     return this.tileMeshes.length + (this.seamMesh ? 1 : 0);
   }
 
-  build(handle: LandscapeHandle, palette: CompositionPalette): void {
+  /**
+   * `cut` defaults to the handle's own generation-time rect, for callers with
+   * no live site to cut against (tests, and any level that never expands).
+   */
+  build(handle: LandscapeHandle, palette: CompositionPalette, cut?: PlayableCut): void {
     this.dispose();
+
+    const playable = cut ?? rectCut(handle.playableRect);
 
     for (const tile of handle.map.tiles) this.tileIndex.set(tileKey(tile.tileX, tile.tileZ), tile);
 
     for (const tile of handle.map.tiles) {
       const mesh = this.buildTileMesh(
-        tile, handle.map.coarseStep, handle.map.samplesPerTile, palette, handle.playableRect,
+        tile, handle.map.coarseStep, handle.map.samplesPerTile, palette, playable,
       );
       if (mesh) {
         this.scene.add(mesh);
@@ -146,7 +171,7 @@ export class LandscapeMesh {
       }
     }
 
-    this.seamMesh = this.buildSeamMesh(handle.playableRect, handle.sampleColumn, palette);
+    this.seamMesh = this.buildSeamMesh(playable.rect, handle.sampleColumn, palette);
     if (this.seamMesh) this.scene.add(this.seamMesh);
   }
 
@@ -202,7 +227,7 @@ export class LandscapeMesh {
    * rect boundary opens no gap.
    */
   private buildTileMesh(
-    tile: LandscapeTile, step: number, n: number, palette: CompositionPalette, rect: Rect,
+    tile: LandscapeTile, step: number, n: number, palette: CompositionPalette, playable: PlayableCut,
   ): THREE.Mesh | null {
     if (tile.heights.length === 0) return null;
 
@@ -211,8 +236,8 @@ export class LandscapeMesh {
     const tileMaxX = tile.originX + (n - 1) * step;
     const tileMaxZ = tile.originZ + (n - 1) * step;
     const touchesRect =
-      tileMaxX > rect.minX && tile.originX < rect.maxX &&
-      tileMaxZ > rect.minZ && tile.originZ < rect.maxZ;
+      tileMaxX > playable.rect.minX && tile.originX < playable.rect.maxX &&
+      tileMaxZ > playable.rect.minZ && tile.originZ < playable.rect.maxZ;
 
     const positions = new Float32Array(n * n * 3);
     const normals = new Float32Array(n * n * 3);
@@ -254,12 +279,12 @@ export class LandscapeMesh {
       for (let col = 0; col < n - 1; col++) {
         if (touchesRect) {
           const x0 = tile.originX + col * step, x1 = x0 + step;
-          // Any corner inside the rect means this quad overhangs ground the
+          // Any corner over claimed ground means this quad overhangs what the
           // voxel mesh owns — drop the whole quad rather than let it dip in.
-          const reachesIntoRect =
-            distanceInsideRect(rect, x0, z0) > 0 || distanceInsideRect(rect, x1, z0) > 0 ||
-            distanceInsideRect(rect, x0, z1) > 0 || distanceInsideRect(rect, x1, z1) > 0;
-          if (reachesIntoRect) continue;
+          const reachesIntoSite =
+            playable.ownsColumn(x0, z0) || playable.ownsColumn(x1, z0) ||
+            playable.ownsColumn(x0, z1) || playable.ownsColumn(x1, z1);
+          if (reachesIntoSite) continue;
         }
         const i0 = row * n + col;
         const i1 = i0 + 1;
