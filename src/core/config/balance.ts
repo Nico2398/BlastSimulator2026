@@ -192,6 +192,66 @@ export const PROJECTION_SPEED_THRESHOLD = 15;
 /** Epsilon for blast energy attenuation formula (prevents division by zero). */
 export const BLAST_ENERGY_EPSILON = 4.0;
 
+/** Energy below this (game energy units) is not worth propagating further, and is
+ *  written off as dissipated. Rock absorption thresholds start at 200, so this is
+ *  four orders of magnitude below anything that could fracture a voxel. */
+export const PROPAGATION_ENERGY_EPSILON = 0.01;
+
+/** Fraction of the energy passing through a voxel that is lost to heat and noise
+ *  rather than handed to its neighbours, as
+ *  `BASE + POROSITY_SCALE × porosity`.
+ *  Porous rock damps a shock wave, dense rock carries it: across the catalog's
+ *  porosity range (0.02–0.35) this spans roughly 9%–22% loss per voxel, which is
+ *  what stops energy travelling forever and gives every blast a finite radius. */
+export const TRANSMISSION_LOSS_BASE = 0.08;
+export const TRANSMISSION_LOSS_POROSITY_SCALE = 0.40;
+
+/** Kilograms of explosive that fill one metre of drill hole. Sets how long a
+ *  charge column is, so a bigger charge works on a taller slice of rock instead
+ *  of pushing harder on the same voxel. */
+export const CHARGE_KG_PER_METRE = 2.0;
+
+/** Converts catalog `energyPerKg` into the energy units voxel absorption thresholds
+ *  are written in. The catalog numbers were tuned against an inverse-square field
+ *  whose epsilon amplified them at close range; propagation conserves energy instead,
+ *  so the conversion is explicit. Calibrated so a well-stemmed pattern breaks a
+ *  realistic volume per kilogram (powder factor ≈ 0.3 kg/m³). */
+export const EXPLOSIVE_ENERGY_SCALE = 10.0;
+
+/** Kinetic energy (in joules) that one unit of blast energy imparts to a fragment
+ *  it throws. Absorption thresholds are a balance scale rather than joules, so
+ *  turning leftover energy into a speed needs an explicit conversion — without one
+ *  a one-cubic-metre, two-tonne fragment could never reach a dangerous speed. */
+export const PROJECTION_ENERGY_TO_KINETIC = 39000.0;
+
+/** Share of a fragment's leftover energy that still throws it when its hole is
+ *  perfectly stemmed. Stemming keeps the gases working on the rock instead of
+ *  venting up the hole, so a well-stemmed shot breaks its burden and drops it,
+ *  while an unstemmed one throws it — the difference between a good blast and
+ *  flyrock over the pit. */
+export const MIN_THROW_FRACTION = 0.05;
+
+/** Fraction of its confined absorption threshold that rock at an open face needs
+ *  before it breaks. Unconfined rock can shear and move instead of being crushed
+ *  in place, which is the whole reason a bench blast breaks its burden out to the
+ *  face rather than carving a sealed pocket underground. */
+export const UNCONFINED_THRESHOLD_FACTOR = 0.35;
+
+/** Metres of rock over a voxel before it counts as fully confined. */
+export const CONFINEMENT_FULL_DEPTH = 6.0;
+
+/** How strongly overflow prefers neighbours that are closer to a free face, per
+ *  metre of relief gained. Spread evenly in all directions, a blast is a sphere
+ *  that stalls at a fixed radius no matter how big the charge; real burden fails
+ *  toward the face, which is what lets a bench blast break out to surface and
+ *  what makes an over-buried charge fail to. */
+export const FREE_FACE_BIAS = 2.0;
+
+/** Thickest cap of intact rock (metres) that a blast can lift off an excavation
+ *  it has undermined. Thicker burden bridges the gap and stays standing, which is
+ *  what makes a charge buried too deep fail to break out to surface. */
+export const BURDEN_BREAKOUT_MAX = 4;
+
 /** Density at/above which a voxel is considered solid ground (0–1 scale). */
 export const SOLID_VOXEL_DENSITY_THRESHOLD = 0.5;
 
@@ -200,13 +260,11 @@ export const SOLID_VOXEL_DENSITY_THRESHOLD = 0.5;
  *  region computation and, expanded further, for TerrainBody's collider-building scope. */
 export const BLAST_ZONE_RADIUS = 5;
 
-/** Maximum crater excavation radius (voxels) around the blast center. Guarantees a
- *  visible crater in the terrain mesh even when the energy field doesn't consistently
- *  fracture surface voxels (attenuation + epsilon dampening). */
-export const CRATER_EXCAVATION_MAX_RADIUS = 5;
-
-/** Number of surface voxels cleared per column during the crater excavation pass. */
-export const CRATER_EXCAVATION_DEPTH_VOXELS = 2;
+/** Fragments produced per unit of energy-to-threshold ratio in a broken voxel.
+ *  A voxel that just barely broke yields one fragment; one hit twice as hard as it
+ *  could take yields more, smaller ones. Superseded once fragment shapes are
+ *  generated from the energy field (docs/plans/rock-fragmentation-refactor.md §6/A3). */
+export const FRAGMENTS_PER_ENERGY_RATIO = 2.0;
 
 /** Fragment vertical offset (voxels) so blast fragments settle inside the crater
  *  instead of appearing to float at the pre-blast surface level. Offset ranges from
@@ -254,6 +312,15 @@ export const BLAST_ORIGIN_SURFACE_SEARCH_MARGIN = 3;
 export const MAX_PROPAGATION_ITERATIONS = 500;
 /** Energy must reach this multiple of a voxel's threshold to fragment it. */
 export const FRAGMENTATION_MULTIPLIER = 1.0;
+
+/** Fraction of its threshold a voxel must retain to be cracked without breaking.
+ *  Below this the rock is unaffected; between this and FRAGMENTATION_MULTIPLIER it
+ *  survives the blast but is left weakened. */
+export const CRACKED_VOXEL_ENERGY_RATIO = 0.5;
+
+/** Multiplier applied to a cracked voxel's fracture modifier, so rock that took a
+ *  near-miss gives way more easily to the next blast. */
+export const CRACKED_VOXEL_WEAKENING = 0.7;
 
 /** Edge length of one voxel in centimetres. Voxels are 1 m³ (see world/VoxelGrid),
  *  so a fragment's size fraction of a voxel converts to cm by this factor —

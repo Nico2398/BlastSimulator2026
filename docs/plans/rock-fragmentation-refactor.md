@@ -326,8 +326,9 @@ from local energy (D3). Uses sub-cell clustering ≈ grid-restricted Voronoi.
 Definitions: `SUB = 2` (`SUB_CELL_RESOLUTION`) → each fragmented voxel is split into
 `SUB³ = 8` sub-cells of 0.5 m, sub-cell volume `SUB_CELL_VOLUME = 0.125 m³`.
 
-1. **Seed sampling.** For each fragmented voxel `v` with ratio `r = effective/threshold`
-   (≥ `FRAGMENTATION_MULTIPLIER`):
+1. **Seed sampling.** For each fragmented voxel `v` with `r = intensityAt(field, v)`
+   — total energy through the voxel over its threshold, **not** `effective/threshold`,
+   which P1 showed is pinned at 1.0 for every broken voxel (see the P1 record, finding 1):
    ```
    expected = SEEDS_BASE + SEEDS_PER_RATIO × (r − FRAGMENTATION_MULTIPLIER)
    count    = floor(expected) + (rng.chance(frac(expected)) ? 1 : 0)
@@ -593,7 +594,95 @@ from 245/7109 purely by deleting the dead layer's own tests), `scenario` (111/11
 `npm run build` clean. Visual/playability channels not applicable — no runtime behaviour
 changed.
 
-### P1 — Energy propagation goes live (medium)
+### P1 — Energy propagation goes live (medium) — ✅ DONE
+
+**Landed:** `src/core/mining/EnergyPropagation.ts` (field, damped 18-neighbour
+propagation, charge seeding, distance-to-air, intensity) and
+`src/core/mining/VoxelFragmentation.ts` (break / crack / burden-lift / detach passes),
+both on flat typed arrays. `executeBlast` now runs them instead of the 1/r² field, and
+the forced crater-excavation pass is gone (D7). 43 new unit tests.
+
+**What P1 found that the plan had wrong.** Wiring the spec model up exposed four defects
+in the design itself, not just in the old code. Each is a correction to §6, and the
+later phases inherit them:
+
+1. **`effective/threshold` is a dead signal.** A1 caps absorption at the voxel's
+   threshold, so *every* fragmented voxel retains exactly its threshold and the ratio is
+   pinned at 1.0. A3's `F(v) = SCALE × effectiveEnergy/T(v)` therefore assigns every
+   voxel the identical fragment count — the original spec's step 3 was degenerate for
+   the same reason, and it showed up as fragment counts that were exactly 2× the cleared
+   voxel count no matter how the charge changed. **Use `intensityAt` instead**:
+   `(effective + overflowOut) / threshold`, which counts what passed *through* a voxel.
+   1.0 means "just barely broke"; a voxel beside the charge reads far higher. **A3 must
+   seed from intensity, not from retained energy.**
+2. **Explosive energy needed an explicit unit conversion.** The catalog's `energyPerKg`
+   was tuned against the 1/r² field, whose `+ε` denominator amplified a charge roughly
+   4× at point blank. Conservation-based propagation has no such amplifier, so every
+   blast fell below threshold and broke *nothing*. `EXPLOSIVE_ENERGY_SCALE` (10.0) makes
+   the conversion explicit, calibrated so a stemmed pattern breaks a realistic volume per
+   kilogram (powder factor ≈ 0.3 kg/m³). `PROJECTION_ENERGY_TO_KINETIC` does the same for
+   turning leftover energy into a speed — without it a 2-tonne fragment could never reach
+   a dangerous velocity, and flyrock topped out at 2 m/s.
+3. **An isotropic crushing model can never break out to the surface.** This was the big
+   one. Spreading overflow evenly and requiring every voxel to individually absorb its
+   threshold makes a blast a sphere that dies at a fixed radius: the charge carved a
+   sealed cavity four metres under intact ground and *the surface never moved*, at any
+   charge size — the player's original complaint in a new form. Real blasting does not
+   pulverise its burden, it displaces it toward relief. Three mechanisms now do that
+   work, and A3/A4 should assume all three:
+   - `confinementFactor` — rock near a free face breaks at
+     `UNCONFINED_THRESHOLD_FACTOR` (0.35) of its confined threshold, ramping to full over
+     `CONFINEMENT_FULL_DEPTH` (6 m).
+   - `FREE_FACE_BIAS` (2.0) — overflow prefers neighbours closer to air, so the burden
+     fails *toward* the face instead of equally in all directions.
+   - `liftUnderminedBurden` — a cap of intact rock up to `BURDEN_BREAKOUT_MAX` (4 m) over
+     a broken zone lifts rather than being crushed. Thicker burden still holds, which is
+     what preserves "charge buried too deep fails to break out" as a real, visible
+     failure mode.
+4. **Stemming only ever *added* energy, never suppressed throw.** With `stemmingEfficiency`
+   alone, a well-stemmed blast threw as much rock as a careless one, and the
+   under-stemmed shot actually broke *less* (its charge column was longer, diluting
+   energy per voxel — an inversion). Fixed on both sides: a charge now occupies the
+   length its own mass needs (`CHARGE_KG_PER_METRE`) anchored at the hole bottom, so more
+   explosive means a taller worked column rather than a weaker one; and throw energy is
+   scaled by `MIN_THROW_FRACTION + (1−MIN) × blowout²`. Measured result — same 8 kg
+   charge, varying only stemming: 0 m → 30 m/s and 160 projections (catastrophic);
+   1 m → 22 m/s (bad); 2 m → 11 m/s heave, zero dangerous projections (perfect). That
+   gradient *is* the gameplay loop the brief asked for.
+
+**Other fixes:** a hole drilled below the world floor silently discarded the part of its
+charge that fell outside the grid (a third of the explosive in one test fixture);
+`buildHoleSeeds` now clamps to the floor. Voxel thresholds also honour `fractureModifier`,
+so rock cracked by an earlier blast really is weaker — the plan omitted this and it would
+have silently dropped a shipped feature.
+
+**Scenario/test rebaselines, and why each is honest rather than convenient:**
+- `blast-overcharge.json` charged 8 kg with 2 m stemming — under correct physics that is
+  a *safe* shot, so the scenario no longer matched its own name. Now unstemmed, which is
+  what "overcharge produces flyrock" means when stemming governs throw.
+- The `crater excavation guarantee` suite tested the deleted hack. Replaced with the
+  property that actually matters: the blast must break through to the surface (asserted
+  by counting opened surface voxels), plus a new case proving an over-buried charge
+  does *not*.
+- `navgrid-patching` asserted a blasted column becomes `void`. 12 kg of the strongest
+  explosive does not remove an 18 m column, and even 9×20 kg does not — real benches are
+  5–15 m. Replaced with the real invariant: **patched must equal rebuilt** over the
+  cleared region, which is immune to physics tuning.
+- `NavGrid clearedRegion` asserted the cleared region equalled the searched blast zone.
+  It is now the tight AABB of what actually broke — more correct, and the test asserts
+  containment and that it covers the hole.
+- The tutorial haul test hard-coded fragment id 0 and assumed it carried ore. Ore sits in
+  veins; it now picks an ore-bearing fragment, which is what the test's own comment said
+  it was checking.
+
+**Verified:** `static` clean; `logic` 6861 tests / 241 files green; `scenario` 111/111
+(and the batch went from 175 s to 45 s — typed arrays replacing per-voxel `getVoxel`
+allocation); `visual` — before/after screenshots inspected, showing 9 drill markers on
+unbroken ground becoming a pale excavated rock face with a grey debris pile in it, holes
+consumed, surrounding terrain untouched. Fragments still snap to their rest positions;
+animating them is P4.
+
+### P1 — original plan text (superseded by the record above)
 
 - New `src/core/mining/EnergyPropagation.ts`: A1 + A2 on typed arrays.
   `transmissionLoss` added to `RockCatalog.ts`.
