@@ -74,7 +74,9 @@ Five independent channels prove a change works. Each catches what the others mis
 
 **When a channel is genuinely unavailable** (no browser, dev server unreachable, screenshots never written), say so explicitly and mark the work unverified for that channel. Never substitute a state JSON dump for an image you were unable to inspect, and never report PASS for a channel you did not run.
 
-## ▶ Some channels belong to CI, not to your session
+## ▶ Claude Code only — some channels belong to CI, not to your session
+
+**Deliberately not mirrored into `.github/copilot-instructions.md` or `.opencode/AGENTS.md`.** Entry points are the one layer whose bodies are allowed to diverge — each runtime holds its own, and `validate:context` checks only that all three name the same gates and channels, not that they read alike. This section describes how *this* runtime executes: long-running processes it starts in the background and watches across turns. The other two runtimes drive their harnesses differently, so their authors decide their own wording. Its absence there is intentional; do not sync it.
 
 A sandbox has no GPU, so anything that loads a level in a browser rasterizes in software: one `new_game` costs minutes, not seconds. The whole-suite browser runs pass 30 minutes there, which is long enough that a session watching one concludes it hung, kills it, and reports a stall that never happened.
 

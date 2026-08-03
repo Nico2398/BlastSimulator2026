@@ -14,6 +14,7 @@ paths:
 Skill, agent, command, and rule files are the project's instruction surface. Editing them changes how every future session behaves.
 
 - Body content stays word-for-word identical across `.claude/`, `.github/`, and `.opencode/`. Frontmatter differs per runtime — never copy one runtime's frontmatter schema into another.
+- **Entry points are the exception.** `.claude/CLAUDE.md`, `.github/copilot-instructions.md` and `.opencode/AGENTS.md` are each written for their own runtime, and `validate:context` only checks that all three name the same gates and channels. A section that applies to one runtime only — because it describes how that harness executes — stays in that entry point. Open it with a bold line naming the runtime and stating that its absence elsewhere is intentional, so the next editor does not "fix" the divergence. Anything true of the project rather than the harness belongs in a skill or rule, where it *is* synced.
 - Claude Code frontmatter is not interchangeable with OpenCode's. Agents use `tools` / `disallowedTools` / `skills`; skills and commands use `allowed-tools`. A field from the wrong schema is silently ignored, which quietly removes the restriction you thought you set.
 - One concept per file. Reference other files by name, never by step number or section label.
 - Path-scoped rules belong in `.claude/rules/` with a `paths` list. Always-on project facts belong in `.claude/CLAUDE.md`. Procedures belong in skills.
