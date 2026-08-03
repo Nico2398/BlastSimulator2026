@@ -124,8 +124,10 @@ async function main(): Promise<void> {
 
   try {
     for (const def of defs) {
-      // Each playtest starts from a fresh page so state cannot leak between them.
-      await page.reload({ waitUntil: 'networkidle0' });
+      // Each playtest starts from a fresh page so state cannot leak between
+      // them. See puppeteer-utils.ts's initBrowser() for why this isn't
+      // 'networkidle0' (#458 T5.1 — EffectComposer/OutputPass regression).
+      await page.reload({ waitUntil: 'domcontentloaded' });
       await page.waitForSelector('#game-canvas, canvas', { timeout: 15000 });
       await page.evaluate(() => {
         const menu = document.getElementById('bs-main-menu');

@@ -1,16 +1,22 @@
 // BlastSimulator2026 — Terrain Mesh
-// Converts a VoxelGrid to a Three.js mesh using chunk-based marching cubes.
+// Converts a VoxelGrid to Three.js meshes using chunk-based marching cubes.
+// One BufferGeometry+Mesh per 16^3 chunk (#458 T3.1/D10/A17) — a
+// terrain:updated event re-marches only the chunks its region actually
+// touches, not the whole grid. Full rebuild only happens on grid identity
+// change (buildAll()).
 //
 // Voxels with density >= SURFACE_THRESHOLD are "solid".
-// Each chunk is 16×16×16 voxels.
-// Re-meshing a single 16³ chunk targets < 50ms.
-// Vertex colors are set from the rock type's hex color field.
+// Re-meshing a single 16^3 chunk targets < 50ms.
+// Color comes entirely from TerrainMaterial's shader, driven by the
+// per-vertex aRockA/aRockB/aRockWeight/aOre attributes emitted below
+// (#458 T4.1/D9/A19) — no CPU-side vertex color is computed.
 
 import * as THREE from 'three';
 import type { VoxelGrid } from '../core/world/VoxelGrid.js';
-import { getDominantRockId } from '../core/world/VoxelGrid.js';
+import { rockIndexOf } from '../core/world/RockCatalog.js';
+import { oreIndexOf } from '../core/world/OreCatalog.js';
 import { EDGE_TABLE, TRI_TABLE } from './MarchingCubesTables.js';
-import { sampleRockColor, clearColorSampleCache } from './ProceduralTexture.js';
+import { TerrainMaterial } from './terrain/TerrainMaterial.js';
 import { SurveyConfidenceOverlay } from './SurveyConfidenceOverlay.js';
 
 // Re-export survey overlay types/class so consumers can import from either location.
@@ -23,6 +29,11 @@ const CHUNK_SIZE = 16;
 
 // Density ≥ this is considered solid material (0.5 = half-filled)
 const SURFACE_THRESHOLD = 0.5;
+
+export interface DirtyRegion {
+  minX: number; minY: number; minZ: number;
+  maxX: number; maxY: number; maxZ: number;
+}
 
 // ---------- Edge vertex lookup: for each of 12 cube edges, which 2 corners ----------
 const EDGE_CORNERS: readonly [number, number][] = [
@@ -37,34 +48,100 @@ const CORNER_OFFSETS: readonly [number, number, number][] = [
   [0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1],
 ];
 
-// ---------- Interpolation ----------
-// Uses 3D-coherent procedural color at the interpolated vertex position.
-function interpVertex(
-  p0: [number, number, number], d0: number, rockId0: string,
-  p1: [number, number, number], d1: number, rockId1: string,
-  outPos: number[], outColor: number[],
+/** Per-corner samples used both for the surface threshold and the emitted vertex attributes. */
+interface CornerSample {
+  density: number;
+  rockId: string;
+  /** Highest-density ore id at this corner, or '' if none. */
+  oreId: string;
+  oreAmt: number;
+}
+
+/** Density with trilinear interpolation, so the gradient below is continuous. */
+function densityAtSmooth(grid: VoxelGrid, x: number, y: number, z: number): number {
+  const x0 = Math.floor(x), y0 = Math.floor(y), z0 = Math.floor(z);
+  const fx = x - x0, fy = y - y0, fz = z - z0;
+  let acc = 0;
+  for (let k = 0; k < 8; k++) {
+    const dx = k & 1, dy = (k >> 1) & 1, dz = (k >> 2) & 1;
+    const w = (dx ? fx : 1 - fx) * (dy ? fy : 1 - fy) * (dz ? fz : 1 - fz);
+    if (w > 0) acc += w * grid.densityAt(x0 + dx, y0 + dy, z0 + dz);
+  }
+  return acc;
+}
+
+/**
+ * Surface normal from the density field, rather than from the triangles.
+ *
+ * computeVertexNormals() averages the faces meeting at a vertex, and marching
+ * cubes lays those faces on a regular lattice with a fixed diagonal split. The
+ * averaged normals inherit that diagonal, and it reads as fine hatching ruled
+ * across the terrain at the triangle scale — at every zoom, and impossible to
+ * remove in the fragment shader because it is already in the normals before
+ * shading runs.
+ *
+ * An iso-surface's true normal is the negated gradient of the field it is an
+ * iso-surface of, which owes nothing to how the triangles were cut.
+ */
+function densityGradientNormal(grid: VoxelGrid, x: number, y: number, z: number): [number, number, number] {
+  const e = 0.85;
+  const gx = densityAtSmooth(grid, x + e, y, z) - densityAtSmooth(grid, x - e, y, z);
+  const gy = densityAtSmooth(grid, x, y + e, z) - densityAtSmooth(grid, x, y - e, z);
+  const gz = densityAtSmooth(grid, x, y, z + e) - densityAtSmooth(grid, x, y, z - e);
+  const len = Math.hypot(gx, gy, gz);
+  // A vertex in a locally uniform region has no gradient to speak of. Falling
+  // back to "up" beats emitting a zero normal, which shades black.
+  if (len < 1e-6) return [0, 1, 0];
+  // Negated: the gradient points toward increasing density (into the rock),
+  // and the outward normal is its opposite. An earlier revision returned the
+  // un-negated gradient to match the mesh's then-inverted triangle winding;
+  // marchCube now emits outside-facing triangles as front faces, so the
+  // mathematically correct sign is also the one the renderer expects.
+  return [-gx / len, -gy / len, -gz / len];
+}
+
+function sampleCorner(grid: VoxelGrid, x: number, y: number, z: number): CornerSample {
+  const density = grid.densityAt(x, y, z);
+  const rockId = grid.dominantRockAt(x, y, z);
+  const ores = grid.oresAt(x, y, z);
+  let oreId = '';
+  let oreAmt = 0;
+  if (ores) {
+    for (const [id, amt] of Object.entries(ores)) {
+      if (amt > oreAmt) { oreId = id; oreAmt = amt; }
+    }
+  }
+  return { density, rockId, oreId, oreAmt };
+}
+
+/** Appends one interpolated vertex's position and rock/ore attributes to the output arrays. */
+function emitVertex(
+  p0: readonly [number, number, number], c0: CornerSample,
+  p1: readonly [number, number, number], c1: CornerSample,
+  outPos: number[],
+  outRockA: number[], outRockB: number[], outRockWeight: number[], outOre: number[],
 ): void {
   let t = 0.5;
-  if (Math.abs(d1 - d0) > 1e-6) {
-    t = (SURFACE_THRESHOLD - d0) / (d1 - d0);
+  if (Math.abs(c1.density - c0.density) > 1e-6) {
+    t = (SURFACE_THRESHOLD - c0.density) / (c1.density - c0.density);
   }
   t = Math.max(0, Math.min(1, t));
 
   const vx = p0[0] + t * (p1[0] - p0[0]);
   const vy = p0[1] + t * (p1[1] - p0[1]);
   const vz = p0[2] + t * (p1[2] - p0[2]);
-
   outPos.push(vx, vy, vz);
 
-  // Sample procedural color at the vertex world position.
-  // Blend rock types across boundary based on t for smooth transitions.
-  const c0 = sampleRockColor(rockId0, vx, vy, vz);
-  const c1 = sampleRockColor(rockId1, vx, vy, vz);
-  outColor.push(
-    c0.r + t * (c1.r - c0.r),
-    c0.g + t * (c1.g - c0.g),
-    c0.b + t * (c1.b - c0.b),
-  );
+  // Air corners (rockId === '') inherit the other corner's rock (#458 A18).
+  const rockIdA = c0.rockId || c1.rockId;
+  const rockIdB = c1.rockId || c0.rockId;
+  outRockA.push(Math.max(0, rockIndexOf(rockIdA)));
+  outRockB.push(Math.max(0, rockIndexOf(rockIdB)));
+  outRockWeight.push(t);
+
+  const nearer = t < 0.5 ? c0 : c1;
+  const oreIdx = nearer.oreId ? oreIndexOf(nearer.oreId) : -1;
+  outOre.push(oreIdx, oreIdx >= 0 ? nearer.oreAmt : 0);
 }
 
 // ---------- Main class ----------
@@ -72,26 +149,46 @@ function interpVertex(
 export class TerrainMesh {
   private readonly scene: THREE.Scene;
   private grid: VoxelGrid;
-  private mesh: THREE.Mesh | null = null;
-  private readonly material: THREE.MeshPhongMaterial;
+  private readonly material: TerrainMaterial;
   private surveyOverlay: SurveyConfidenceOverlay | null = null;
 
-  constructor(scene: THREE.Scene, grid: VoxelGrid) {
+  /** Chunk-grid-index -> its Mesh, or null for a built-but-empty chunk (no triangles). */
+  private readonly chunks = new Map<number, THREE.Mesh | null>();
+  private ncx = 0;
+  private ncy = 0;
+  private ncz = 0;
+
+  constructor(scene: THREE.Scene, grid: VoxelGrid, biomeId?: string) {
     this.scene = scene;
     this.grid = grid;
 
-    // Vertex-colored material — no texture needed
-    this.material = new THREE.MeshPhongMaterial({
-      vertexColors: true,
-      shininess: 12,
-      side: THREE.DoubleSide,
+    // Playable rect matches WorldGen's own formula exactly (#458 A19.4) — no
+    // need to plumb the landscape handle through just for this.
+    this.material = new TerrainMaterial({
+      playRect: { minX: 0, minZ: 0, maxX: grid.sizeX, maxZ: grid.sizeZ },
+      // Which surface covers this level can grow at all, and the band of
+      // heights its altitude preferences are measured against.
+      ...(biomeId !== undefined ? { biomeId } : {}),
+      heightRange: [0, grid.sizeY],
     });
+    this.material.side = THREE.DoubleSide;
+    // Render the shadow map from BACK faces. The classic acne fix for closed
+    // surfaces: the map then stores the underside of the terrain, which sits a
+    // full surface-thickness behind the lit top, so the top can never fail a
+    // depth comparison against itself — no bias large enough to eat contact
+    // shadows is needed. Cast silhouettes are unchanged (same outline from the
+    // sun's point of view). Applies to the landscape and blast fragments too,
+    // since the material is shared; both are closed-enough surfaces for the
+    // same reasoning to hold.
+    this.material.shadowSide = THREE.BackSide;
+    this.updateChunkGridDims();
   }
 
-  /** Replace the underlying grid reference (e.g. after campaign start regenerates terrain). */
+  /** Replace the underlying grid reference (e.g. after campaign start regenerates terrain). Caller must follow with buildAll(). */
   setGrid(grid: VoxelGrid): void {
     console.log(`[TerrainMesh] setGrid: old=${this.grid.id} new=${grid.id}`);
     this.grid = grid;
+    this.updateChunkGridDims();
   }
 
   /** ID of the currently-bound VoxelGrid, for diagnostics. */
@@ -99,71 +196,83 @@ export class TerrainMesh {
     return this.grid.id;
   }
 
-  /** Bounding box and vertex count of the current mesh geometry, for diagnostics. Null if unbuilt. */
+  /** The shared terrain material — reused by LandscapeMesh and FragmentMesh so every zone renders with identical shading (#458 T3.2/T4.1/D9). */
+  get sharedMaterial(): TerrainMaterial {
+    return this.material;
+  }
+
+  /** Union bounding box and total vertex count across every built chunk mesh, for diagnostics. Null if nothing is built. */
   getBounds(): {
     minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number;
     vertexCount: number;
   } | null {
-    if (!this.mesh) return null;
-    this.mesh.geometry.computeBoundingBox();
-    const bb = this.mesh.geometry.boundingBox;
-    if (!bb) return null;
+    let box: THREE.Box3 | null = null;
+    let vertexCount = 0;
+    for (const mesh of this.chunks.values()) {
+      if (!mesh) continue;
+      mesh.geometry.computeBoundingBox();
+      const bb = mesh.geometry.boundingBox;
+      if (!bb) continue;
+      box = box ? box.union(bb) : bb.clone();
+      vertexCount += mesh.geometry.attributes['position']!.count;
+    }
+    if (!box) return null;
     return {
-      minX: Math.round(bb.min.x * 100) / 100,
-      maxX: Math.round(bb.max.x * 100) / 100,
-      minY: Math.round(bb.min.y * 100) / 100,
-      maxY: Math.round(bb.max.y * 100) / 100,
-      minZ: Math.round(bb.min.z * 100) / 100,
-      maxZ: Math.round(bb.max.z * 100) / 100,
-      vertexCount: this.mesh.geometry.attributes['position']!.count,
+      minX: Math.round(box.min.x * 100) / 100,
+      maxX: Math.round(box.max.x * 100) / 100,
+      minY: Math.round(box.min.y * 100) / 100,
+      maxY: Math.round(box.max.y * 100) / 100,
+      minZ: Math.round(box.min.z * 100) / 100,
+      maxZ: Math.round(box.max.z * 100) / 100,
+      vertexCount,
     };
   }
 
-  /** Build all chunks from scratch. Call once after grid is populated. */
+  /** Build every chunk from scratch. Call once after grid is populated, or when the grid identity changes. */
   buildAll(): void {
-    // Remove any existing mesh
-    this.removeMesh();
+    this.disposeAllChunks();
+    this.updateChunkGridDims();
 
-    const positions: number[] = [];
-    const colors: number[] = [];
-
-    const cx = Math.ceil(this.grid.sizeX / CHUNK_SIZE);
-    const cy = Math.ceil(this.grid.sizeY / CHUNK_SIZE);
-    const cz = Math.ceil(this.grid.sizeZ / CHUNK_SIZE);
-
-    for (let czIdx = 0; czIdx < cz; czIdx++) {
-      for (let cyIdx = 0; cyIdx < cy; cyIdx++) {
-        for (let cxIdx = 0; cxIdx < cx; cxIdx++) {
-          this.marchChunk(cxIdx, cyIdx, czIdx, positions, colors);
+    let totalVerts = 0;
+    for (let cz = 0; cz < this.ncz; cz++) {
+      for (let cy = 0; cy < this.ncy; cy++) {
+        for (let cx = 0; cx < this.ncx; cx++) {
+          totalVerts += this.rebuildChunk(cx, cy, cz);
         }
       }
     }
-
-    console.log(`[TerrainMesh] buildAll: grid=${this.grid.id} positions=${positions.length}`);
-    if (positions.length === 0) return;
-
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-    geometry.computeVertexNormals();
-    geometry.computeBoundingSphere();
-
-    this.mesh = new THREE.Mesh(geometry, this.material);
-    this.mesh.frustumCulled = true;
-    this.scene.add(this.mesh);
+    console.log(`[TerrainMesh] buildAll: grid=${this.grid.id} chunks=${this.chunks.size} vertices=${totalVerts}`);
   }
 
   /**
-   * Re-mesh the terrain after voxel mutations.
-   * Rebuilds the entire mesh from scratch (simple but correct).
+   * Re-march exactly the chunks a dirty voxel region touches (#458 T3.1/A17).
+   * Marching a cube at (x,y,z) reads corners up to (x+1,y+1,z+1), so a
+   * changed voxel at v affects cubes from v-1 to v — hence the -1 on the min
+   * side only.
    */
-  update(_dirtyPositions: { x: number; y: number; z: number }[]): void {
-    this.buildAll();
+  remeshRegion(region: DirtyRegion): void {
+    const cxMin = Math.max(0, Math.floor((region.minX - 1) / CHUNK_SIZE));
+    const cxMax = Math.min(this.ncx - 1, Math.floor(region.maxX / CHUNK_SIZE));
+    const cyMin = Math.max(0, Math.floor((region.minY - 1) / CHUNK_SIZE));
+    const cyMax = Math.min(this.ncy - 1, Math.floor(region.maxY / CHUNK_SIZE));
+    const czMin = Math.max(0, Math.floor((region.minZ - 1) / CHUNK_SIZE));
+    const czMax = Math.min(this.ncz - 1, Math.floor(region.maxZ / CHUNK_SIZE));
+
+    let remeshed = 0;
+    for (let cz = czMin; cz <= czMax; cz++) {
+      for (let cy = cyMin; cy <= cyMax; cy++) {
+        for (let cx = cxMin; cx <= cxMax; cx++) {
+          this.rebuildChunk(cx, cy, cz);
+          remeshed++;
+        }
+      }
+    }
+    console.log(`[TerrainMesh] remeshRegion: grid=${this.grid.id} chunksRemeshed=${remeshed}`);
   }
 
   /** Remove all terrain meshes from the scene and release geometry. */
   dispose(): void {
-    this.removeMesh();
+    this.disposeAllChunks();
     this.material.dispose();
     this.surveyOverlay?.dispose();
     this.surveyOverlay = null;
@@ -185,105 +294,176 @@ export class TerrainMesh {
     return this.surveyOverlay;
   }
 
-  // ---------- Internal ----------
-
-  /** Remove the current terrain mesh from the scene and release its geometry. */
-  private removeMesh(): void {
-    if (this.mesh) {
-      this.scene.remove(this.mesh);
-      this.mesh.geometry.dispose();
-      this.mesh = null;
-    }
+  /** The Mesh for one chunk, or null if it's empty/unbuilt — diagnostics and dirty-set tests. */
+  getChunkMesh(cx: number, cy: number, cz: number): THREE.Mesh | null {
+    return this.chunks.get(this.chunkKey(cx, cy, cz)) ?? null;
   }
 
-  /** March all cubes within a single CHUNK_SIZE³ region, appending to the shared arrays. */
-  private marchChunk(cx: number, cy: number, cz: number, outPos: number[], outColor: number[]): void {
-    // Clear color cache before each chunk to keep cache size bounded
-    clearColorSampleCache();
+  /** Chunk grid dimensions for the currently-bound grid — diagnostics and tests. */
+  get chunkGridDims(): { ncx: number; ncy: number; ncz: number } {
+    return { ncx: this.ncx, ncy: this.ncy, ncz: this.ncz };
+  }
 
-    const ox = cx * CHUNK_SIZE;
-    const oy = cy * CHUNK_SIZE;
-    const oz = cz * CHUNK_SIZE;
+  // ---------- Internal ----------
 
-    const xEnd = Math.min(ox + CHUNK_SIZE, this.grid.sizeX - 1);
-    const yEnd = Math.min(oy + CHUNK_SIZE, this.grid.sizeY - 1);
-    const zEnd = Math.min(oz + CHUNK_SIZE, this.grid.sizeZ - 1);
+  private updateChunkGridDims(): void {
+    this.ncx = Math.ceil(this.grid.sizeX / CHUNK_SIZE);
+    this.ncy = Math.ceil(this.grid.sizeY / CHUNK_SIZE);
+    this.ncz = Math.ceil(this.grid.sizeZ / CHUNK_SIZE);
+  }
 
-    for (let z = oz; z < zEnd; z++) {
-      for (let y = oy; y < yEnd; y++) {
-        for (let x = ox; x < xEnd; x++) {
-          this.marchCube(x, y, z, outPos, outColor);
+  private chunkKey(cx: number, cy: number, cz: number): number {
+    return cx + cy * this.ncx + cz * this.ncx * this.ncy;
+  }
+
+  private disposeAllChunks(): void {
+    for (const mesh of this.chunks.values()) {
+      if (!mesh) continue;
+      this.scene.remove(mesh);
+      mesh.geometry.dispose();
+    }
+    this.chunks.clear();
+  }
+
+  /** Dispose and re-march one chunk. Returns its vertex count (0 if empty — stored as null, no mesh added). */
+  private rebuildChunk(cx: number, cy: number, cz: number): number {
+    const key = this.chunkKey(cx, cy, cz);
+    const old = this.chunks.get(key);
+    if (old) {
+      this.scene.remove(old);
+      old.geometry.dispose();
+    }
+    this.chunks.delete(key);
+
+    const positions: number[] = [];
+    const rockA: number[] = [];
+    const rockB: number[] = [];
+    const rockWeight: number[] = [];
+    const ore: number[] = [];
+
+    // March one cell PAST the grid on every side, and one cell before it on the
+    // low side, so the cubes straddling the boundary are emitted too.
+    // `densityAt` reads out of bounds as air, so a straddling cube has solid
+    // corners inside and empty corners outside and marches into a wall face —
+    // which is what seals the playable volume. Stopping at sizeX-1 instead left
+    // the mesh open along its four sides: an unclosed shell you could see
+    // straight into wherever the terrain was cut back, which is exactly what a
+    // blast at the edge of the site did.
+    const ox = cx * CHUNK_SIZE, oy = cy * CHUNK_SIZE, oz = cz * CHUNK_SIZE;
+    const xStart = cx === 0 ? -1 : ox;
+    const yStart = cy === 0 ? -1 : oy;
+    const zStart = cz === 0 ? -1 : oz;
+    const xEnd = Math.min(ox + CHUNK_SIZE, this.grid.sizeX);
+    const yEnd = Math.min(oy + CHUNK_SIZE, this.grid.sizeY);
+    const zEnd = Math.min(oz + CHUNK_SIZE, this.grid.sizeZ);
+
+    for (let z = zStart; z < zEnd; z++) {
+      for (let y = yStart; y < yEnd; y++) {
+        for (let x = xStart; x < xEnd; x++) {
+          this.marchCube(x, y, z, positions, rockA, rockB, rockWeight, ore);
         }
       }
     }
+
+    if (positions.length === 0) {
+      this.chunks.set(key, null);
+      return 0;
+    }
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setAttribute('aRockA', new THREE.Float32BufferAttribute(rockA, 1));
+    geometry.setAttribute('aRockB', new THREE.Float32BufferAttribute(rockB, 1));
+    geometry.setAttribute('aRockWeight', new THREE.Float32BufferAttribute(rockWeight, 1));
+    geometry.setAttribute('aOre', new THREE.Float32BufferAttribute(ore, 2));
+    // Normals from the field, not the triangulation — see densityGradientNormal.
+    const normals = new Float32Array(positions.length);
+    for (let i = 0; i < positions.length; i += 3) {
+      const n = densityGradientNormal(this.grid, positions[i]!, positions[i + 1]!, positions[i + 2]!);
+      normals[i] = n[0]; normals[i + 1] = n[1]; normals[i + 2] = n[2];
+    }
+    geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
+    geometry.computeBoundingSphere();
+
+    const mesh = new THREE.Mesh(geometry, this.material);
+    mesh.frustumCulled = true;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    this.scene.add(mesh);
+    this.chunks.set(key, mesh);
+    return positions.length / 3;
   }
 
   private marchCube(
     x: number, y: number, z: number,
-    outPos: number[], outColor: number[],
+    outPos: number[],
+    outRockA: number[], outRockB: number[], outRockWeight: number[], outOre: number[],
   ): void {
-    // Sample density and rock at all 8 corners
-    const densities = new Float32Array(8);
-    const rockIds: string[] = new Array(8);
-
+    const corners: CornerSample[] = new Array(8);
     for (let i = 0; i < 8; i++) {
       const [dx, dy, dz] = CORNER_OFFSETS[i]!;
-      const voxel = this.grid.getVoxel(x + dx, y + dy, z + dz);
-      densities[i] = voxel?.density ?? 0;
-      rockIds[i] = voxel ? getDominantRockId(voxel.composition) : '';
+      corners[i] = sampleCorner(this.grid, x + dx, y + dy, z + dz);
     }
 
-    // Compute cube index
     let cubeIndex = 0;
     for (let i = 0; i < 8; i++) {
-      if (densities[i]! >= SURFACE_THRESHOLD) cubeIndex |= (1 << i);
+      if (corners[i]!.density >= SURFACE_THRESHOLD) cubeIndex |= (1 << i);
     }
-
-    if (cubeIndex === 0 || cubeIndex === 255) return; // All air or all solid
+    if (cubeIndex === 0 || cubeIndex === 255) return; // all air or all solid
 
     const edgeMask = EDGE_TABLE[cubeIndex]!;
     if (!edgeMask) return;
 
-    // Interpolate edge vertices (only the ones needed)
-    const edgeVerts: [number, number, number][] = [];
-    const edgeColors: [number, number, number][] = [];
+    const edgeVerts: [number, number, number][] = new Array(12);
+    const edgeRockA: number[] = new Array(12);
+    const edgeRockB: number[] = new Array(12);
+    const edgeRockWeight: number[] = new Array(12);
+    const edgeOre: [number, number][] = new Array(12);
 
     for (let e = 0; e < 12; e++) {
-      if (!(edgeMask & (1 << e))) {
-        edgeVerts.push([0, 0, 0]);
-        edgeColors.push([0, 0, 0]);
-        continue;
-      }
-      const [c0, c1] = EDGE_CORNERS[e]!;
-      const [dx0, dy0, dz0] = CORNER_OFFSETS[c0]!;
-      const [dx1, dy1, dz1] = CORNER_OFFSETS[c1]!;
+      if (!(edgeMask & (1 << e))) continue;
+      const [c0i, c1i] = EDGE_CORNERS[e]!;
+      const [dx0, dy0, dz0] = CORNER_OFFSETS[c0i]!;
+      const [dx1, dy1, dz1] = CORNER_OFFSETS[c1i]!;
 
       const tempPos: number[] = [];
-      const tempCol: number[] = [];
-      interpVertex(
-        [x + dx0, y + dy0, z + dz0], densities[c0]!, rockIds[c0]!,
-        [x + dx1, y + dy1, z + dz1], densities[c1]!, rockIds[c1]!,
-        tempPos, tempCol,
+      const tempRockA: number[] = [];
+      const tempRockB: number[] = [];
+      const tempRockW: number[] = [];
+      const tempOre: number[] = [];
+      emitVertex(
+        [x + dx0, y + dy0, z + dz0], corners[c0i]!,
+        [x + dx1, y + dy1, z + dz1], corners[c1i]!,
+        tempPos, tempRockA, tempRockB, tempRockW, tempOre,
       );
-      edgeVerts.push([tempPos[0]!, tempPos[1]!, tempPos[2]!]);
-      edgeColors.push([tempCol[0]!, tempCol[1]!, tempCol[2]!]);
+      edgeVerts[e] = [tempPos[0]!, tempPos[1]!, tempPos[2]!];
+      edgeRockA[e] = tempRockA[0]!;
+      edgeRockB[e] = tempRockB[0]!;
+      edgeRockWeight[e] = tempRockW[0]!;
+      edgeOre[e] = [tempOre[0]!, tempOre[1]!];
     }
 
-    // Emit triangles
     const tris = TRI_TABLE[cubeIndex];
     if (!tris) return;
 
+    // Emitted in REVERSED order relative to TRI_TABLE. This table's order
+    // winds the surface clockwise when seen from outside the rock, which made
+    // every front face point INTO the ground. Nothing looked wrong because the
+    // material is double-sided — but everything that consults winding without
+    // the fragment-stage flip silently broke: the depth prepass (FrontSide)
+    // culled the terrain out of ambient occlusion and aerial haze entirely,
+    // and the shadow normalBias pushed lookups INTO the rock instead of out of
+    // it. Reversing here makes outside-facing mean front-facing, the same
+    // convention the landscape mesh already uses.
     for (let i = 0; i < tris.length; i += 3) {
-      const e0 = tris[i]!;
-      const e1 = tris[i + 1]!;
-      const e2 = tris[i + 2]!;
-
-      const v0 = edgeVerts[e0]!;
-      const v1 = edgeVerts[e1]!;
-      const v2 = edgeVerts[e2]!;
-
-      outPos.push(...v0, ...v1, ...v2);
-      outColor.push(...edgeColors[e0]!, ...edgeColors[e1]!, ...edgeColors[e2]!);
+      const e0 = tris[i]!, e1 = tris[i + 1]!, e2 = tris[i + 2]!;
+      for (const e of [e2, e1, e0]) {
+        outPos.push(...edgeVerts[e]!);
+        outRockA.push(edgeRockA[e]!);
+        outRockB.push(edgeRockB[e]!);
+        outRockWeight.push(edgeRockWeight[e]!);
+        outOre.push(...edgeOre[e]!);
+      }
     }
   }
 }

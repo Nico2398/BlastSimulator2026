@@ -1,0 +1,40 @@
+{
+  "name": "wind-clouds-visual",
+  "description": "Visual verification of ambient wind/clouds (#458 T7.1/D12): clouds drift, terrain cloud-shadow patches sweep in sync with them, and a sunny->storm weather transition visibly thickens/darkens the cloud layer.",
+  "steps": [
+    {
+      "command": "new_game seed:42",
+      "interaction": [
+        { "type": "command", "command": "new_game seed:42" }
+      ]
+    },
+    {
+      "command": "campaign start level:dusty_hollow",
+      "description": "A real (non-tutorial) level so the landscape zone + cloud disc are big enough to read clearly.",
+      "interaction": [
+        { "type": "command", "command": "campaign start level:dusty_hollow" }
+      ]
+    },
+    {
+      "command": "time resume",
+      "description": "Frame capture needs the render loop actually ticking dt forward for wind/cloud drift to animate.",
+      "interaction": [
+        { "type": "command", "command": "time resume" }
+      ]
+    },
+    {
+      "command": "weather set sunny",
+      "description": "Baseline: sparse coverage (0.25), clouds should still visibly drift frame to frame.",
+      "interaction": [
+        { "type": "command", "command": "weather set sunny" }
+      ]
+    },
+    {
+      "command": "weather set storm",
+      "description": "Coverage lerps toward 1.0 and cloud material darkens — captured frames should show the layer thickening/darkening over the sequence, not snapping instantly.",
+      "interaction": [
+        { "type": "command", "command": "weather set storm" }
+      ]
+    }
+  ]
+}

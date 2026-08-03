@@ -3,17 +3,21 @@
 // Rain produces a falling particle system (tiny cylinders / points).
 // Storm adds rapid flashes (brief white screen flash on DirectionalLight).
 //
-// No actual skybox texture — procedural color sky matching Three.js scene.background.
+// Sky is a large inverted dome (#458 T7.1/D12/A25) rather than a flat
+// scene.background color — skyLow feeds the horizon, skyHigh (previously
+// dormant — nothing read it) feeds the zenith.
 
 import * as THREE from 'three';
 import type { WeatherState } from '../core/weather/WeatherCycle.js';
 
 // ---------- Sky colors per weather state ----------
-// Colors for: scene.background + scene.fog
+// skyLow feeds the dome's horizon stop and legacy scene.background fallback;
+// skyHigh feeds the dome's zenith stop. THREE.Fog was removed in favour of
+// the aerial perspective post-process pass (#458 T5.1/D11).
 
 interface WeatherColors {
   skyHigh: THREE.Color;  // upper sky
-  skyLow: THREE.Color;   // horizon / fog
+  skyLow: THREE.Color;   // horizon
   sunIntensity: number;  // directional light multiplier
   ambientIntensity: number;
 }
@@ -30,7 +34,17 @@ const WEATHER_COLORS: Record<WeatherState, WeatherColors> = {
 
 // ---------- Rain particle config ----------
 const RAIN_PARTICLE_COUNT = 1500;
-const RAIN_AREA = 80;    // width/depth of rain box
+/**
+ * Width/depth of the rain box. Scales with the camera's orbit distance
+ * (#458 T6.1/D13) — a fixed area sized for the tutorial's close-in camera
+ * read as a tiny, sparse patch once the larger campaign levels' cameras
+ * pull back to frame a 96-160m site; RAIN_AREA_FACTOR keeps the box roughly
+ * matching the visible ground regardless of zoom.
+ */
+const RAIN_AREA_BASE = 80;
+const RAIN_AREA_MIN = 80;
+const RAIN_AREA_MAX = 400;
+const RAIN_AREA_FACTOR = 1.4; // area = clamp(cameraDistance * factor, min, max)
 const RAIN_HEIGHT = 50;  // height rain falls from
 const RAIN_SPEED = 20;   // voxels per second downward
 const RAIN_POINT_SIZE = 1.4;
@@ -73,27 +87,75 @@ function buildRainStreakTexture(): THREE.DataTexture {
 // Lerp factor per second (0.5 = reaches ~63% in 2 seconds)
 const TRANSITION_SPEED = 0.5;
 
+/** Fill stays a fixed fraction of sun intensity — matches the original static 0.3/1.2 ratio (#458 T5.1). */
+const FILL_INTENSITY_RATIO = 0.25;
+
+/**
+ * Anything SkyboxWeather can drive the intensity of — a real DirectionalLight
+ * satisfies this structurally, but so does a proxy over CSM's cascade lights
+ * (#458 T5.1/D11: "give it a setter interface rather than reaching into
+ * sm.sun", since CSM has no single light to hand over directly).
+ */
+export interface SunLightSource {
+  intensity: number;
+}
+
 // ---------- Storm flash ----------
 const STORM_FLASH_INTERVAL_MIN = 3.0;  // seconds between lightning
 const STORM_FLASH_INTERVAL_MAX = 8.0;
 const STORM_FLASH_DURATION = 0.08;     // seconds the flash lasts
 
+// ---------- Gradient sky dome (#458 T7.1/D12/A25) ----------
+// Comfortably bigger than the far plane (6000, #458 T6.1/D13) so the dome
+// never clips into view, and bigger than any camera excursion the pan leash
+// allows — a fixed dome at the world origin never needs to follow the camera.
+const SKY_DOME_RADIUS = 3000;
+const SKY_DOME_SEGMENTS = 16;
+
+const SKY_DOME_VERTEX_SHADER = `
+varying vec3 vWorldPosition;
+void main() {
+  vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+  vWorldPosition = worldPosition.xyz;
+  gl_Position = projectionMatrix * viewMatrix * worldPosition;
+}
+`;
+
+const SKY_DOME_FRAGMENT_SHADER = `
+uniform vec3 uSkyLow;
+uniform vec3 uSkyHigh;
+varying vec3 vWorldPosition;
+void main() {
+  float h = normalize(vWorldPosition).y;
+  float t = smoothstep(-0.05, 0.6, h);
+  gl_FragColor = vec4(mix(uSkyLow, uSkyHigh, t), 1.0);
+}
+`;
+
 // ---------- Main class ----------
 
 export class SkyboxWeather {
   private readonly scene: THREE.Scene;
-  private readonly sun: THREE.DirectionalLight;
+  private readonly sun: SunLightSource;
   private readonly ambient: THREE.AmbientLight;
+  private readonly fill: SunLightSource;
 
   private currentWeather: WeatherState = 'sunny';
   private readonly currentSky = new THREE.Color(WEATHER_COLORS.sunny.skyLow);
+  private readonly currentSkyHigh = new THREE.Color(WEATHER_COLORS.sunny.skyHigh);
   /** False until the first setWeather() call, which snaps instead of lerping. */
   private weatherInitialised = false;
+
+  // Gradient sky dome
+  private readonly skyDome: THREE.Mesh;
+  private readonly skyDomeMaterial: THREE.ShaderMaterial;
 
   // Rain
   private rainPoints: THREE.Points | null = null;
   private readonly rainPositions: Float32Array;
   private rainVisible = false;
+  /** Current rain-box width/depth — rescaled each frame from camera distance (#458 T6.1/D13). */
+  private rainArea = RAIN_AREA_BASE;
 
   // Storm
   private stormFlashTimer = 4.0;
@@ -102,12 +164,35 @@ export class SkyboxWeather {
 
   constructor(
     scene: THREE.Scene,
-    sun: THREE.DirectionalLight,
+    sun: SunLightSource,
     ambient: THREE.AmbientLight,
+    fill: SunLightSource,
   ) {
     this.scene = scene;
     this.sun = sun;
     this.ambient = ambient;
+    this.fill = fill;
+
+    // Gradient sky dome — replaces the flat scene.background color.
+    this.skyDomeMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        uSkyLow: { value: this.currentSky.clone() },
+        uSkyHigh: { value: this.currentSkyHigh.clone() },
+      },
+      vertexShader: SKY_DOME_VERTEX_SHADER,
+      fragmentShader: SKY_DOME_FRAGMENT_SHADER,
+      side: THREE.BackSide,
+      depthWrite: false,
+      fog: false,
+      lights: false,
+    });
+    const domeGeo = new THREE.SphereGeometry(SKY_DOME_RADIUS, SKY_DOME_SEGMENTS, SKY_DOME_SEGMENTS);
+    this.skyDome = new THREE.Mesh(domeGeo, this.skyDomeMaterial);
+    // Rendered first, behind everything real geometry can occlude — matters
+    // for the aerial-perspective/bloom passes reading depth downstream.
+    this.skyDome.renderOrder = -1;
+    this.scene.add(this.skyDome);
+    this.scene.background = null;
 
     // Pre-allocate rain positions
     this.rainPositions = new Float32Array(RAIN_PARTICLE_COUNT * 3);
@@ -127,8 +212,12 @@ export class SkyboxWeather {
       this.weatherInitialised = true;
       const colors = WEATHER_COLORS[state];
       this.currentSky.copy(colors.skyLow);
+      this.currentSkyHigh.copy(colors.skyHigh);
+      (this.skyDomeMaterial.uniforms['uSkyLow']!.value as THREE.Color).copy(this.currentSky);
+      (this.skyDomeMaterial.uniforms['uSkyHigh']!.value as THREE.Color).copy(this.currentSkyHigh);
       this.sun.intensity = colors.sunIntensity;
       this.ambient.intensity = colors.ambientIntensity;
+      this.fill.intensity = colors.sunIntensity * FILL_INTENSITY_RATIO;
     }
 
     const isRaining = state === 'light_rain' || state === 'heavy_rain' || state === 'storm';
@@ -149,21 +238,29 @@ export class SkyboxWeather {
    * @param dt - seconds since last call
    * @param cameraX - camera X position (rain follows camera)
    * @param cameraZ - camera Z position
+   * @param cameraDistance - camera orbit distance, scales the rain box so it
+   *   doesn't read as a sparse patch once the camera pulls back on a larger
+   *   level (#458 T6.1/D13). Omit to keep the base area, so existing test/
+   *   scenario call sites that predate this parameter still work.
    */
-  update(dt: number, cameraX: number, cameraZ: number): void {
+  update(dt: number, cameraX: number, cameraZ: number, cameraDistance?: number): void {
+    this.rainArea = cameraDistance === undefined
+      ? RAIN_AREA_BASE
+      : Math.min(RAIN_AREA_MAX, Math.max(RAIN_AREA_MIN, cameraDistance * RAIN_AREA_FACTOR));
     const target = WEATHER_COLORS[this.currentWeather];
 
-    // Lerp sky color
+    // Lerp sky color — dome uniforms are the same THREE.Color objects, so
+    // this write reaches the GPU on the next draw without a clone.
     this.currentSky.lerp(target.skyLow, TRANSITION_SPEED * dt);
-    this.scene.background = this.currentSky.clone();
+    this.currentSkyHigh.lerp(target.skyHigh, TRANSITION_SPEED * dt);
+    (this.skyDomeMaterial.uniforms['uSkyLow']!.value as THREE.Color).copy(this.currentSky);
+    (this.skyDomeMaterial.uniforms['uSkyHigh']!.value as THREE.Color).copy(this.currentSkyHigh);
 
-    if (this.scene.fog instanceof THREE.Fog) {
-      (this.scene.fog as THREE.Fog).color.copy(this.currentSky);
-    }
-
-    // Lerp sun / ambient
+    // Lerp sun / ambient / fill
     this.sun.intensity += (target.sunIntensity - this.sun.intensity) * TRANSITION_SPEED * dt;
     this.ambient.intensity += (target.ambientIntensity - this.ambient.intensity) * TRANSITION_SPEED * dt;
+    const targetFill = target.sunIntensity * FILL_INTENSITY_RATIO;
+    this.fill.intensity += (targetFill - this.fill.intensity) * TRANSITION_SPEED * dt;
 
     // Rain animation
     if (this.rainVisible) {
@@ -176,6 +273,11 @@ export class SkyboxWeather {
     }
   }
 
+  /** Current lerped sky color — AerialPerspectivePass tints haze to match it each frame (#458 T5.2). */
+  get skyColor(): THREE.Color {
+    return this.currentSky;
+  }
+
   dispose(): void {
     if (this.rainPoints) {
       this.scene.remove(this.rainPoints);
@@ -183,15 +285,18 @@ export class SkyboxWeather {
       (this.rainPoints.material as THREE.Material).dispose();
       this.rainPoints = null;
     }
+    this.scene.remove(this.skyDome);
+    this.skyDome.geometry.dispose();
+    this.skyDomeMaterial.dispose();
   }
 
   // ---------- Internal ----------
 
   private initRainPositions(): void {
     for (let i = 0; i < RAIN_PARTICLE_COUNT; i++) {
-      this.rainPositions[i * 3]     = (Math.random() - 0.5) * RAIN_AREA;
+      this.rainPositions[i * 3]     = (Math.random() - 0.5) * this.rainArea;
       this.rainPositions[i * 3 + 1] = Math.random() * RAIN_HEIGHT;
-      this.rainPositions[i * 3 + 2] = (Math.random() - 0.5) * RAIN_AREA;
+      this.rainPositions[i * 3 + 2] = (Math.random() - 0.5) * this.rainArea;
     }
   }
 
@@ -216,7 +321,7 @@ export class SkyboxWeather {
     if (!this.rainPoints) return;
 
     const drop = RAIN_SPEED * dt;
-    const halfArea = RAIN_AREA / 2;
+    const halfArea = this.rainArea / 2;
 
     for (let i = 0; i < RAIN_PARTICLE_COUNT; i++) {
       const yIdx = i * 3 + 1;
@@ -225,9 +330,9 @@ export class SkyboxWeather {
       if ((this.rainPositions[yIdx] ?? 0) < 0) {
         // Positions are local to the rainPoints mesh (which is translated to cx,cz).
         // Adding cx/cz here would double the offset.
-        this.rainPositions[i * 3]     = (Math.random() - 0.5) * RAIN_AREA;
+        this.rainPositions[i * 3]     = (Math.random() - 0.5) * this.rainArea;
         this.rainPositions[i * 3 + 1] = RAIN_HEIGHT;
-        this.rainPositions[i * 3 + 2] = (Math.random() - 0.5) * RAIN_AREA;
+        this.rainPositions[i * 3 + 2] = (Math.random() - 0.5) * this.rainArea;
       }
     }
 

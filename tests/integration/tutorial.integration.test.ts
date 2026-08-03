@@ -55,7 +55,7 @@ describe('Tutorial flow', () => {
 
     expect(result.success).toBe(true);
     expect(result.output).toContain('tutorial_pit');
-    expect(result.output).toContain('24×12×24');
+    expect(result.output).toContain('32×20×32');
     expect(result.output).toContain(`$${TUTORIAL_START_CASH.toLocaleString('en-US')}`);
 
     // State should reflect the tutorial_pit level config
@@ -63,11 +63,11 @@ describe('Tutorial flow', () => {
     expect(ctx.state!.campaign.activeLevelId).toBe('tutorial_pit');
     expect(ctx.state!.cash).toBe(TUTORIAL_START_CASH);
 
-    // World should be set up with tutorial_pit dimensions (24×12×24)
+    // World should be set up with tutorial_pit dimensions (32×20×32, #458 T6.1/D13)
     expect(ctx.state!.world).not.toBeNull();
-    expect(ctx.state!.world!.sizeX).toBe(24);
-    expect(ctx.state!.world!.sizeY).toBe(12);
-    expect(ctx.state!.world!.sizeZ).toBe(24);
+    expect(ctx.state!.world!.sizeX).toBe(32);
+    expect(ctx.state!.world!.sizeY).toBe(20);
+    expect(ctx.state!.world!.sizeZ).toBe(32);
     expect(ctx.state!.world!.gridReady).toBe(true);
   });
 
@@ -93,15 +93,15 @@ describe('Tutorial flow', () => {
     // Seed from new_game is preserved through the level transition
     expect(ctx.state!.seed).toBe(42);
 
-    // Grid matches tutorial_pit dimensions from Level.ts
-    expect(ctx.grid!.sizeX).toBe(24);
-    expect(ctx.grid!.sizeY).toBe(12);
-    expect(ctx.grid!.sizeZ).toBe(24);
+    // Grid matches tutorial_pit dimensions from Level.ts (#458 T6.1/D13)
+    expect(ctx.grid!.sizeX).toBe(32);
+    expect(ctx.grid!.sizeY).toBe(20);
+    expect(ctx.grid!.sizeZ).toBe(32);
 
     // World state matches
-    expect(ctx.state!.world!.sizeX).toBe(24);
-    expect(ctx.state!.world!.sizeY).toBe(12);
-    expect(ctx.state!.world!.sizeZ).toBe(24);
+    expect(ctx.state!.world!.sizeX).toBe(32);
+    expect(ctx.state!.world!.sizeY).toBe(20);
+    expect(ctx.state!.world!.sizeZ).toBe(32);
     expect(ctx.state!.world!.gridReady).toBe(true);
 
     // Nav grid should be built

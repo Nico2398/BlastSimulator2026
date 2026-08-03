@@ -10,6 +10,7 @@ import {
   type SurveyConfidencePoint,
   type SurveyConfidenceOverlayOptions,
 } from '../../../src/renderer/TerrainMesh.js';
+import { TerrainMaterial } from '../../../src/renderer/terrain/TerrainMaterial.js';
 
 // Minimal mock THREE.Scene — just captures adds/removes
 function makeScene(): THREE.Scene {
@@ -55,19 +56,97 @@ describe('TerrainMesh', () => {
     tm.dispose();
   });
 
-  it('buildAll on fully-solid grid adds no meshes (interior surface = none)', () => {
+  it('buildAll on a fully-solid grid seals it into a closed box', () => {
+    // The grid is a finite volume, not an infinite solid: its outer faces are
+    // real surfaces. Emitting nothing here used to leave the mesh an open
+    // shell you could see straight into wherever terrain was cut back at the
+    // site edge.
     const scene = makeScene();
     const grid = new VoxelGrid(4, 4, 4);
-    // Fill completely solid → cubeIndex 255 everywhere → no triangles
     for (let x = 0; x < 4; x++)
       for (let y = 0; y < 4; y++)
         for (let z = 0; z < 4; z++)
           grid.setVoxel(x, y, z, makeSolidVoxel());
     const tm = new TerrainMesh(scene, grid);
     tm.buildAll();
-    // All cubes are 255 (all solid) → no surface triangles
-    expect(scene.children.length).toBe(0);
+
+    expect(scene.children.length).toBeGreaterThan(0);
+
+    // Every one of the six bounding faces must carry geometry.
+    const pos = (scene.children[0] as THREE.Mesh).geometry.getAttribute('position').array as Float32Array;
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity;
+    for (let i = 0; i < pos.length; i += 3) {
+      minX = Math.min(minX, pos[i]!);     maxX = Math.max(maxX, pos[i]!);
+      minY = Math.min(minY, pos[i + 1]!); maxY = Math.max(maxY, pos[i + 1]!);
+      minZ = Math.min(minZ, pos[i + 2]!); maxZ = Math.max(maxZ, pos[i + 2]!);
+    }
+    expect(minX).toBeLessThanOrEqual(-0.5);
+    expect(maxX).toBeGreaterThanOrEqual(3.5);
+    expect(minY).toBeLessThanOrEqual(-0.5);
+    expect(maxY).toBeGreaterThanOrEqual(3.5);
+    expect(minZ).toBeLessThanOrEqual(-0.5);
+    expect(maxZ).toBeGreaterThanOrEqual(3.5);
     tm.dispose();
+  });
+
+  describe('site boundary is sealed', () => {
+    /** Widest X reached by any vertex across every chunk mesh in the scene. */
+    function maxVertexX(scene: THREE.Scene): number {
+      let m = -Infinity;
+      for (const child of scene.children) {
+        const geo = (child as THREE.Mesh).geometry;
+        if (!geo) continue;
+        const pos = geo.getAttribute('position').array as Float32Array;
+        for (let i = 0; i < pos.length; i += 3) m = Math.max(m, pos[i]!);
+      }
+      return m;
+    }
+
+    /** Terrain filled solid below `surfaceY`, air above — a flat site. */
+    function flatSite(size: number, surfaceY: number): VoxelGrid {
+      const grid = new VoxelGrid(size, size, size);
+      for (let x = 0; x < size; x++)
+        for (let y = 0; y < surfaceY; y++)
+          for (let z = 0; z < size; z++)
+            grid.setVoxel(x, y, z, makeSolidVoxel());
+      return grid;
+    }
+
+    it('closes the far X face so the volume is not an open shell', () => {
+      const scene = makeScene();
+      const size = 8;
+      const tm = new TerrainMesh(scene, flatSite(size, 4));
+      tm.buildAll();
+      // The wall is interpolated midway between the last solid voxel and the
+      // empty cell past it, i.e. at size - 0.5.
+      expect(maxVertexX(scene)).toBeGreaterThanOrEqual(size - 0.5 - 1e-4);
+      tm.dispose();
+    });
+
+    it('still closes it after an edge blast cuts terrain away at that face', () => {
+      // The reported defect: blasting at the edge of the site opened a void
+      // between the playable mesh and the landscape, because the mesh had no
+      // face there to cut into — you saw straight through it.
+      const scene = makeScene();
+      const size = 8;
+      const grid = flatSite(size, 4);
+      const tm = new TerrainMesh(scene, grid);
+      tm.buildAll();
+
+      // Blow a hole through the whole depth of the boundary column.
+      for (let y = 0; y < 4; y++) {
+        for (let z = 2; z < 5; z++) {
+          grid.clearVoxel(size - 1, y, z);
+          grid.clearVoxel(size - 2, y, z);
+        }
+      }
+      tm.remeshRegion({ minX: size - 2, minY: 0, minZ: 2, maxX: size - 1, maxY: 3, maxZ: 4 });
+
+      // Geometry must still reach the boundary: the surrounding rock keeps its
+      // wall, so the crater is cut into a solid face rather than into nothing.
+      expect(maxVertexX(scene)).toBeGreaterThanOrEqual(size - 0.5 - 1e-4);
+      tm.dispose();
+    });
   });
 
   it('buildAll generates mesh when there is a solid/air boundary', () => {
@@ -84,7 +163,22 @@ describe('TerrainMesh', () => {
     tm.dispose();
   });
 
-  it('generated geometry has position and color attributes', () => {
+  it('chunk meshes cast and receive shadows (#458 T5.1/CSM)', () => {
+    const scene = makeScene();
+    const grid = new VoxelGrid(8, 8, 8);
+    for (let x = 0; x < 8; x++)
+      for (let y = 0; y < 4; y++)
+        for (let z = 0; z < 8; z++)
+          grid.setVoxel(x, y, z, makeSolidVoxel());
+    const tm = new TerrainMesh(scene, grid);
+    tm.buildAll();
+    const mesh = scene.children.find(c => c instanceof THREE.Mesh) as THREE.Mesh;
+    expect(mesh.castShadow).toBe(true);
+    expect(mesh.receiveShadow).toBe(true);
+    tm.dispose();
+  });
+
+  it('generated geometry has position and rock/ore attributes, no CPU vertex color (#458 T4.1/A18)', () => {
     const scene = makeScene();
     const grid = new VoxelGrid(8, 8, 8);
     for (let x = 0; x < 8; x++)
@@ -98,35 +192,39 @@ describe('TerrainMesh', () => {
     expect(mesh).toBeDefined();
     const geo = mesh.geometry as THREE.BufferGeometry;
     expect(geo.getAttribute('position')).toBeDefined();
-    expect(geo.getAttribute('color')).toBeDefined();
+    // Color now comes entirely from TerrainMaterial's shader (#458 T4.1/D9).
+    expect(geo.getAttribute('color')).toBeUndefined();
+    expect(geo.getAttribute('aRockA')).toBeDefined();
+    expect(geo.getAttribute('aRockB')).toBeDefined();
+    expect(geo.getAttribute('aRockWeight')).toBeDefined();
+    expect(geo.getAttribute('aOre')).toBeDefined();
+    expect(geo.getAttribute('aOre').itemSize).toBe(2);
+
+    // cruite is the only rock present — both A and B should index it, weight
+    // should be 0 or 1 everywhere (no cross-rock boundary in a single-rock grid).
+    const rockAAttr = geo.getAttribute('aRockA').array as Float32Array;
+    const cruiteIndex = rockAAttr[0]!;
+    for (const v of rockAAttr) expect(v).toBe(cruiteIndex);
     tm.dispose();
   });
 
-  it('update re-meshes affected chunk when voxels are cleared', () => {
+  it('aOreId is -1 and aOreAmt is 0 when no corner carries ore', () => {
     const scene = makeScene();
     const grid = new VoxelGrid(8, 8, 8);
     for (let x = 0; x < 8; x++)
       for (let y = 0; y < 4; y++)
         for (let z = 0; z < 8; z++)
-          grid.setVoxel(x, y, z, makeSolidVoxel());
+          grid.setVoxel(x, y, z, makeSolidVoxel('cruite')); // no ores set
 
     const tm = new TerrainMesh(scene, grid);
     tm.buildAll();
-    const countBefore = scene.children.length;
-
-    // Clear a column of voxels (simulating a blast crater)
-    for (let y = 0; y < 4; y++) {
-      grid.clearVoxel(3, y, 3);
+    const mesh = scene.children[0] as THREE.Mesh;
+    const oreAttr = mesh.geometry.getAttribute('aOre').array as Float32Array;
+    for (let i = 0; i < oreAttr.length; i += 2) {
+      expect(oreAttr[i]).toBe(-1);
+      expect(oreAttr[i + 1]).toBe(0);
     }
-    tm.update([{ x: 3, y: 0, z: 3 }, { x: 3, y: 1, z: 3 }, { x: 3, y: 2, z: 3 }, { x: 3, y: 3, z: 3 }]);
-
-    // There may be same or fewer chunks but geometry should have been rebuilt
-    expect(scene.children.length).toBeGreaterThanOrEqual(0);
-    // We can't easily assert exact counts without knowing the mesh structure
-    // Just verify no crash and valid state
     tm.dispose();
-    expect(scene.children.length).toBe(0);
-    void countBefore; // suppress unused warning
   });
 
   it('re-meshing a 16³ chunk completes in under 200ms', () => {
@@ -146,6 +244,87 @@ describe('TerrainMesh', () => {
     tm.dispose();
   });
 
+  describe('remeshRegion — dirty-set precision (#458 T3.1/A17 accept criterion)', () => {
+    // 3 chunks along X (0..15, 16..31, 32..47), 1 along Y/Z. Solid bottom
+    // half everywhere so every chunk has real geometry to compare identity against.
+    function makeThreeChunkGrid(): VoxelGrid {
+      const grid = new VoxelGrid(48, 16, 16);
+      for (let x = 0; x < 48; x++)
+        for (let y = 0; y < 8; y++)
+          for (let z = 0; z < 16; z++)
+            grid.setVoxel(x, y, z, makeSolidVoxel());
+      return grid;
+    }
+
+    it('a region at a chunk boundary re-marches exactly the touched chunks plus the -1 halo, and no others', () => {
+      const scene = makeScene();
+      const grid = makeThreeChunkGrid();
+      const tm = new TerrainMesh(scene, grid);
+      tm.buildAll();
+      expect(tm.chunkGridDims).toEqual({ ncx: 3, ncy: 1, ncz: 1 });
+
+      const mesh0Before = tm.getChunkMesh(0, 0, 0);
+      const mesh1Before = tm.getChunkMesh(1, 0, 0);
+      const mesh2Before = tm.getChunkMesh(2, 0, 0);
+      expect(mesh0Before).not.toBeNull();
+      expect(mesh1Before).not.toBeNull();
+      expect(mesh2Before).not.toBeNull();
+
+      // Mutate one voxel at x=16 — chunk 1's very first column. The dirty
+      // region's min edge sits exactly on the chunk boundary, so the -1 read
+      // margin (marching a cube at v reads up to v+1, so a change at v
+      // affects cubes from v-1) pulls chunk 0 in too as a halo — this is the
+      // "+halo" the accept criterion names, not an off-by-one.
+      grid.clearVoxel(16, 0, 5);
+      tm.remeshRegion({ minX: 16, minY: 0, minZ: 5, maxX: 16, maxY: 0, maxZ: 5 });
+
+      // Touched: chunk 0 (halo) and chunk 1 (directly) — new mesh instances.
+      expect(tm.getChunkMesh(0, 0, 0)).not.toBe(mesh0Before);
+      expect(tm.getChunkMesh(1, 0, 0)).not.toBe(mesh1Before);
+      // Untouched: chunk 2 — same mesh instance, never disposed or rebuilt.
+      expect(tm.getChunkMesh(2, 0, 0)).toBe(mesh2Before);
+
+      tm.dispose();
+    });
+
+    it('a region entirely inside one chunk, away from its edges, touches only that chunk', () => {
+      const scene = makeScene();
+      const grid = makeThreeChunkGrid();
+      const tm = new TerrainMesh(scene, grid);
+      tm.buildAll();
+
+      const mesh0Before = tm.getChunkMesh(0, 0, 0);
+      const mesh1Before = tm.getChunkMesh(1, 0, 0);
+      const mesh2Before = tm.getChunkMesh(2, 0, 0);
+
+      // x=20..22 sits well inside chunk 1 (16..31), away from both edges.
+      grid.clearVoxel(20, 0, 5);
+      tm.remeshRegion({ minX: 20, minY: 0, minZ: 5, maxX: 22, maxY: 0, maxZ: 5 });
+
+      expect(tm.getChunkMesh(0, 0, 0)).toBe(mesh0Before); // untouched
+      expect(tm.getChunkMesh(1, 0, 0)).not.toBe(mesh1Before); // rebuilt
+      expect(tm.getChunkMesh(2, 0, 0)).toBe(mesh2Before); // untouched
+
+      tm.dispose();
+    });
+
+    it('full rebuild (buildAll) touches every chunk, including ones a prior remeshRegion left untouched', () => {
+      const scene = makeScene();
+      const grid = makeThreeChunkGrid();
+      const tm = new TerrainMesh(scene, grid);
+      tm.buildAll();
+
+      grid.clearVoxel(20, 0, 5);
+      tm.remeshRegion({ minX: 20, minY: 0, minZ: 5, maxX: 20, maxY: 0, maxZ: 5 });
+      const mesh2AfterPartialRemesh = tm.getChunkMesh(2, 0, 0); // untouched by the partial remesh above
+
+      tm.buildAll();
+      expect(tm.getChunkMesh(2, 0, 0)).not.toBe(mesh2AfterPartialRemesh); // full rebuild touches it too
+
+      tm.dispose();
+    });
+  });
+
   it('material uses DoubleSide so terrain is visible from below', () => {
     const scene = makeScene();
     const grid = new VoxelGrid(8, 8, 8);
@@ -158,8 +337,19 @@ describe('TerrainMesh', () => {
     tm.buildAll();
     const mesh = scene.children.find(c => c instanceof THREE.Mesh) as THREE.Mesh;
     expect(mesh).toBeDefined();
-    const mat = mesh.material as THREE.MeshPhongMaterial;
+    const mat = mesh.material as THREE.Material;
     expect(mat.side).toBe(THREE.DoubleSide);
+    tm.dispose();
+  });
+
+  it('sharedMaterial is a TerrainMaterial (#458 T4.1)', () => {
+    // The material no longer keeps a uPlayRect: the site edge is drawn by
+    // WorldBorderWall rather than shaded into the ground here.
+    const scene = makeScene();
+    const grid = new VoxelGrid(8, 12, 20);
+    const tm = new TerrainMesh(scene, grid);
+    expect(tm.sharedMaterial).toBeInstanceOf(TerrainMaterial);
+    expect(tm.sharedMaterial.customUniforms['uPlayRect']).toBeUndefined();
     tm.dispose();
   });
 });

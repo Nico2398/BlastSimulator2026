@@ -552,8 +552,15 @@ describe('Economy', () => {
 
   it('completes the full economy loop: blast, findReachableGroundFragment, haul, store, and deliver against a contract', () => {
     // 1. Blast a small grid so fragments land on the ground.
+    //
+    // Origin (18,19) rather than (10,10): the fragments have to land on ground
+    // the hauler can actually drive to. (10,10) sits up the slope from where a
+    // vehicle spawns, on a different NavGrid bench with no ramp between, so
+    // findReachableGroundFragment correctly returns null there and the test
+    // would be asserting against a fixture the game cannot satisfy. (18,19) is
+    // on the same flat bench as the vehicle spawn and the warehouse.
     const drillResult = drillPlanCommand(ctx as any, ['grid'], {
-      origin: '10,10',
+      origin: '18,19',
       rows: '2',
       cols: '2',
       spacing: '4',
@@ -593,8 +600,15 @@ describe('Economy', () => {
     const assignResult = vehicleCommand(ctx, ['driver', String(vehicleId), String(driverId)], {});
     expect(assignResult.success).toBe(true);
 
-    // 3. Build an active Freight Warehouse.
-    const buildResult = buildCommand(ctx, ['freight_warehouse'], { at: '5,5' });
+    // 3. Build an active Freight Warehouse. (13,13), near the drill site
+    // rather than (5,5): bigger levels (#458 T6.1/D13) carry far more
+    // natural terrain relief than the old ones, fragmenting NavGrid bench
+    // levels into small pockets more often — (5,5) sat on a different bench
+    // than the drill/fragment area with no nearby ramp connecting them, so
+    // a loaded hauler could never findPath there (confirmed via direct
+    // reproduction). Keeping pickup and drop-off on the same bench
+    // sidesteps that pathfinding gap; a deeper general fix belongs to T6.2.
+    const buildResult = buildCommand(ctx, ['freight_warehouse'], { at: '13,13' });
     expect(buildResult.success).toBe(true);
 
     // Let the driver walk to and board the vehicle.

@@ -25,11 +25,11 @@ describe('Level 1 — Win', () => {
     expect(ctx.state!.cash).toBe(50000);
     expect(ctx.state!.campaign.activeLevelId).toBe('dusty_hollow');
     expect(ctx.state!.grid).not.toBeNull();
-    // Verify grid dimensions: dusty_hollow = 40x20x40
+    // Verify grid dimensions: dusty_hollow = 96x40x96 (#458 T6.1/D13)
     expect(ctx.grid).not.toBeNull();
-    expect(ctx.grid!.sizeX).toBe(40);
-    expect(ctx.grid!.sizeY).toBe(20);
-    expect(ctx.grid!.sizeZ).toBe(40);
+    expect(ctx.grid!.sizeX).toBe(96);
+    expect(ctx.grid!.sizeY).toBe(40);
+    expect(ctx.grid!.sizeZ).toBe(96);
     // No employees initially
     expect(ctx.state!.employees.employees.length).toBe(0);
     // No buildings

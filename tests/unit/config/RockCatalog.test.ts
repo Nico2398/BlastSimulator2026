@@ -3,7 +3,7 @@
 // in the config/RockCatalog.ts module.
 
 import { describe, it, expect } from 'vitest';
-import { getRock, getAllRocks } from '../../../src/core/config/RockCatalog.js';
+import { getRock, getAllRocks } from '../../../src/core/world/RockCatalog.js';
 
 // ─── Task 5.2: energyAbsorption per RockDef ──────────────────────────────────
 

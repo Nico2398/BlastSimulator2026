@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { PhysicsWorld } from '../../../src/physics/PhysicsWorld.js';
-import { TerrainBody, findSurfaceY } from '../../../src/physics/TerrainBody.js';
+import { TerrainBody, computeFragmentRegion, findSurfaceY, type TerrainBodyRegion } from '../../../src/physics/TerrainBody.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
+
+/** Region covering the whole 10×10 column extent of makeFlatGrid(). */
+const FULL_REGION: TerrainBodyRegion = { minX: 0, maxX: 9, minZ: 0, maxZ: 9 };
 
 /** Build a flat 10×5×10 grid with the bottom 2 Y layers solid. */
 function makeFlatGrid(): VoxelGrid {
@@ -23,7 +26,7 @@ describe('TerrainBody (8.2)', () => {
 
     const terrain = new TerrainBody(world);
     const grid = makeFlatGrid();
-    terrain.build(grid);
+    terrain.build(grid, FULL_REGION);
 
     // Drop a small sphere from height 5
     const fragHandle = world.addBody('sphere', [0.3, 0.3, 0.3], 1.0, { x: 5, y: 5, z: 5 });
@@ -48,7 +51,7 @@ describe('TerrainBody (8.2)', () => {
 
     const terrain = new TerrainBody(world);
     const grid = makeFlatGrid();
-    terrain.build(grid);
+    terrain.build(grid, FULL_REGION);
 
     // Clear ALL voxels in a column to simulate a crater
     for (let y = 0; y < 5; y++) {
@@ -56,7 +59,7 @@ describe('TerrainBody (8.2)', () => {
     }
 
     // Rebuild terrain after modification
-    terrain.build(grid);
+    terrain.build(grid, FULL_REGION);
 
     // Drop body above cleared column
     const fragHandle = world.addBody('sphere', [0.3, 0.3, 0.3], 1.0, { x: 5.5, y: 5, z: 5.5 });
@@ -80,7 +83,7 @@ describe('TerrainBody (8.2)', () => {
 
     const terrain = new TerrainBody(world);
     const grid = makeFlatGrid(); // 10Ã—10 columns, 2 solid layers â†’ expect â‰¤ 200 bodies
-    terrain.build(grid);
+    terrain.build(grid, FULL_REGION);
 
     // Each column gets up to SURFACE_LAYERS=2 bodies; 10Ã—10=100 columns
     expect(terrain.bodyCount).toBeGreaterThan(0);
@@ -99,5 +102,63 @@ describe('TerrainBody (8.2)', () => {
     // Empty column
     const emptyGrid = new VoxelGrid(5, 5, 5);
     expect(findSurfaceY(emptyGrid, 2, 2)).toBe(-1);
+  });
+
+  // ── #458 T6.2/D14: region-scoped build ──
+
+  it('builds colliders only for columns inside the given region', () => {
+    const world = new PhysicsWorld();
+    world.init();
+
+    const terrain = new TerrainBody(world);
+    const grid = makeFlatGrid();
+    const region: TerrainBodyRegion = { minX: 2, maxX: 4, minZ: 2, maxZ: 4 };
+    terrain.build(grid, region);
+
+    // 3×3 columns × up to SURFACE_LAYERS=2 bodies each — never the whole
+    // 10×10 grid's worth, which the pre-region-scoping build always created.
+    const regionArea = (region.maxX - region.minX + 1) * (region.maxZ - region.minZ + 1);
+    expect(terrain.bodyCount).toBeGreaterThan(0);
+    expect(terrain.bodyCount).toBeLessThanOrEqual(regionArea * 2);
+
+    terrain.dispose();
+    world.clear();
+  });
+
+  it('clamps a region that extends past the grid bounds instead of throwing', () => {
+    const world = new PhysicsWorld();
+    world.init();
+
+    const terrain = new TerrainBody(world);
+    const grid = makeFlatGrid();
+    terrain.build(grid, { minX: -50, maxX: 500, minZ: -50, maxZ: 500 });
+
+    // Clamped back down to the grid's real 10×10 extent.
+    expect(terrain.bodyCount).toBeGreaterThan(0);
+    expect(terrain.bodyCount).toBeLessThanOrEqual(200);
+
+    terrain.dispose();
+    world.clear();
+  });
+
+  it('computeFragmentRegion covers fragment positions plus the blast-zone margin', () => {
+    // Fragments in world metres; VoxelGrid.CELL_SIZE converts back to columns.
+    const region = computeFragmentRegion([
+      { cx: 5 * VoxelGrid.CELL_SIZE, cz: 5 * VoxelGrid.CELL_SIZE },
+      { cx: 7 * VoxelGrid.CELL_SIZE, cz: 8 * VoxelGrid.CELL_SIZE },
+    ]);
+
+    // Bare fragment AABB is columns [5,7]×[5,8]; margin widens it further out
+    // on every side, never inward.
+    expect(region.minX).toBeLessThan(5);
+    expect(region.maxX).toBeGreaterThan(7);
+    expect(region.minZ).toBeLessThan(5);
+    expect(region.maxZ).toBeGreaterThan(8);
+  });
+
+  it('computeFragmentRegion returns an empty region for no fragments', () => {
+    const region = computeFragmentRegion([]);
+    expect(region.maxX).toBeLessThan(region.minX);
+    expect(region.maxZ).toBeLessThan(region.minZ);
   });
 });

@@ -58,7 +58,7 @@ describe('FragmentBody (8.3)', () => {
 
     const grid = makeFloorGrid();
     const terrain = new TerrainBody(world);
-    terrain.build(grid);
+    terrain.build(grid, { minX: 0, maxX: grid.sizeX - 1, minZ: 0, maxZ: grid.sizeZ - 1 });
 
     const fb = new FragmentBody(world);
     const frag = makeFragment(1, 5, 0); // Drops from y=5
@@ -83,7 +83,7 @@ describe('FragmentBody (8.3)', () => {
 
     const grid = makeFloorGrid();
     const terrain = new TerrainBody(world);
-    terrain.build(grid);
+    terrain.build(grid, { minX: 0, maxX: grid.sizeX - 1, minZ: 0, maxZ: grid.sizeZ - 1 });
 
     const fb = new FragmentBody(world);
     const frag = makeFragment(42, 4, 0);

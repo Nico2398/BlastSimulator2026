@@ -82,8 +82,10 @@ async function runBatchInteraction(
         const page = await browser.newPage();
         await page.setViewport({ width: 1280, height: 720 });
 
-        // Navigate to the game (happens once per scenario fresh tab)
-        await page.goto(`http://localhost:${port}`, { waitUntil: 'networkidle0' });
+        // Navigate to the game (happens once per scenario fresh tab). See
+        // puppeteer-utils.ts's initBrowser() for why this isn't
+        // 'networkidle0' (#458 T5.1 — EffectComposer/OutputPass regression).
+        await page.goto(`http://localhost:${port}`, { waitUntil: 'domcontentloaded' });
         await page.waitForSelector('#game-canvas, canvas', { timeout: 10000 });
         // Main menu starts visible, same as initBrowser() — each scenario's
         // own `new_game` first step tears it down (main.ts console bridge).

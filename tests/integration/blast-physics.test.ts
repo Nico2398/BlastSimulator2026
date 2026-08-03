@@ -128,7 +128,7 @@ describe('Blast physics pipeline — integration (8.5)', () => {
     physicsWorld.init();
 
     const terrainBody = new TerrainBody(physicsWorld);
-    terrainBody.build(grid); // Post-blast terrain
+    terrainBody.build(grid, { minX: 0, maxX: grid.sizeX - 1, minZ: 0, maxZ: grid.sizeZ - 1 }); // Post-blast terrain
 
     const fragmentBody = new FragmentBody(physicsWorld);
     fragmentBody.addFragments(projections);
@@ -186,7 +186,7 @@ describe('Blast physics pipeline — integration (8.5)', () => {
     physicsWorld.init();
 
     const terrainBody = new TerrainBody(physicsWorld);
-    terrainBody.build(grid);
+    terrainBody.build(grid, { minX: 0, maxX: grid.sizeX - 1, minZ: 0, maxZ: grid.sizeZ - 1 });
 
     const fragmentBody = new FragmentBody(physicsWorld);
     fragmentBody.addFragments(projections);

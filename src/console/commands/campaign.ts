@@ -7,7 +7,7 @@ import { getAllLevels, getLevel } from '../../core/campaign/Level.js';
 import { getLevelProgress } from '../../core/campaign/Campaign.js';
 import { addIncome } from '../../core/economy/Finance.js';
 import { createGameForLevel } from '../../core/campaign/LevelTransition.js';
-import { getMinePreset } from '../../core/world/MineType.js';
+import { getBiome } from '../../core/world/BiomeCatalog.js';
 import { calculateStarRating } from '../../core/campaign/SuccessTracker.js';
 import { Random } from '../../core/math/Random.js';
 import { generateContracts } from '../../core/economy/Contract.js';
@@ -99,17 +99,18 @@ export function campaignStartCommand(
 
   // Generate terrain
   const level = getLevel(levelId)!;
-  const preset = getMinePreset(level.mineType);
-  if (!preset) {
-    return { success: false, output: `Unknown mine type: ${level.mineType}` };
+  const biome = getBiome(level.biome);
+  if (!biome) {
+    return { success: false, output: `Unknown biome: ${level.biome}` };
   }
   if (ctx.state.world) ctx.state.world.gridReady = true;
   regenerateGrid(ctx, {
     seed: level.terrainSeed,
-    preset,
+    climateBias: level.climateBias,
     sizeX: level.gridX,
     sizeY: level.gridY,
     sizeZ: level.gridZ,
+    mixedRockHardness: level.mixedRockHardness,
   });
 
   // Generate initial contracts so they're available immediately

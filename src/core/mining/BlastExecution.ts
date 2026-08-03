@@ -19,18 +19,18 @@ import {
 } from './BlastCalc.js';
 import { getRock } from '../world/RockCatalog.js';
 import { getOre } from '../world/OreCatalog.js';
-import { getDominantRockId, VoxelGrid, type VoxelData } from '../world/VoxelGrid.js';
+import { VoxelGrid, computeVoxelColumnSurfaceY } from '../world/VoxelGrid.js';
+import type { EventEmitter } from '../state/EventEmitter.js';
 import { getBuildingDef, destroyBuilding, type BuildingState, type Building, type BuildingType } from '../entities/Building.js';
 import {
   SOLID_VOXEL_DENSITY_THRESHOLD,
   CRATER_EXCAVATION_MAX_RADIUS,
   CRATER_EXCAVATION_DEPTH_VOXELS,
+  BLAST_ZONE_RADIUS,
 } from '../config/balance.js';
 
 // ── Config ──
 
-/** Blast zone radius around each hole (voxels). */
-const BLAST_ZONE_RADIUS = 5;
 /** Default ground factor for vibration. */
 const DEFAULT_GROUND_FACTOR = 1.0;
 
@@ -130,6 +130,7 @@ export function executeBlast(
   villages: readonly VillagePosition[],
   groundFactor: number = DEFAULT_GROUND_FACTOR,
   buildingState?: BuildingState,
+  emitter?: EventEmitter,
 ): BlastResult | null {
   // 1. Validate
   const errors = validateBlastPlan(plan);
@@ -139,11 +140,15 @@ export function executeBlast(
   //     are anchored at the actual surface, not hardcoded y=0.
   const holeSurfaceYs: Record<string, number> = {};
   for (const hole of plan.holes) {
-    holeSurfaceYs[hole.id] = getColumnSurfaceY(grid, hole.x, hole.z);
+    holeSurfaceYs[hole.id] = computeVoxelColumnSurfaceY(grid, hole.x, hole.z) + 1;
   }
 
   // 2b. Calculate blast zone bounding box anchored at the surface
   const bbox = calculateBlastZone(plan.holes, holeSurfaceYs);
+
+  const blastCenter = calculateBlastCenter(plan.holes);
+  const originY = Math.max(0, ...Object.values(holeSurfaceYs));
+  emitter?.emit('blast:started', { originX: blastCenter.x, originY, originZ: blastCenter.z });
 
   // 3-4. Process each voxel: energy → fragmentation → fragments
   const fragments: FragmentData[] = [];
@@ -166,22 +171,24 @@ export function executeBlast(
   for (let z = bbox.minZ; z <= bbox.maxZ; z++) {
     for (let y = bbox.minY; y <= bbox.maxY; y++) {
       for (let x = bbox.minX; x <= bbox.maxX; x++) {
-        const voxel = grid.getVoxel(x, y, z);
-        if (!voxel || voxel.density <= 0) continue;
+        const density = grid.densityAt(x, y, z);
+        if (density <= 0) continue;
 
-        const dominantRockId = getDominantRockId(voxel.composition);
+        const dominantRockId = grid.dominantRockAt(x, y, z);
         const rock = getRock(dominantRockId);
         if (!rock) continue;
 
         const point = vec3(x, y, z);
         const energy = calculateEnergyField(point, plan.holes, plan.charges, holeDepths, holeSurfaceYs);
-        const threshold = rock.fractureThreshold * voxel.fractureModifier;
+        const fractureModifier = grid.fractureAt(x, y, z);
+        const threshold = rock.fractureThreshold * fractureModifier;
         const frag = calculateFragmentation(energy, threshold);
 
         if (frag.result === 'fractured') {
           const voxelVolume = VoxelGrid.CELL_SIZE * VoxelGrid.CELL_SIZE * VoxelGrid.CELL_SIZE;
           const fragCount = calculateFragmentCount(voxelVolume, frag.fragmentSizeFraction);
           const mass = (rock.density * voxelVolume) / fragCount;
+          const ores = grid.oresAt(x, y, z) ?? {};
 
           // Find nearest hole for velocity direction (use mid-column as source)
           const nearestHole = findNearestHole(point, plan.holes);
@@ -198,14 +205,14 @@ export function executeBlast(
               volume: voxelVolume / fragCount,
               mass,
               rockId: dominantRockId,
-              oreDensities: { ...voxel.oreDensities },
+              oreDensities: { ...ores },
               initialVelocity: vel,
               isProjection: frag.isProjection || speed > 15,
             });
           }
 
           // Accumulate ore value
-          totalOreValue += calculateOreValue(voxel, VoxelGrid.CELL_SIZE);
+          totalOreValue += calculateOreValue(ores, VoxelGrid.CELL_SIZE);
           totalRockVolume += voxelVolume;
 
           // Check oversized: fragment size > 0.8 voxel is "oversized" (barely fractured, needs secondary blast)
@@ -218,10 +225,7 @@ export function executeBlast(
           clearedVoxels++;
         } else if (frag.result === 'cracked') {
           // Reduce fracture modifier by 30% for future blasts
-          grid.setVoxel(x, y, z, {
-            ...voxel,
-            fractureModifier: voxel.fractureModifier * 0.7,
-          });
+          grid.scaleFractureAt(x, y, z, 0.7);
           crackedVoxels++;
         }
       }
@@ -261,12 +265,10 @@ export function executeBlast(
         // column — regardless of what the energy field already cleared. This ensures
         // a visible crater depression in the terrain mesh.
         for (let sy = grid.sizeY - 1; sy >= 0; sy--) {
-          const v = grid.getVoxel(sx, sy, sz);
-          if (v && v.density >= SOLID_VOXEL_DENSITY_THRESHOLD) {
+          if (grid.densityAt(sx, sy, sz) >= SOLID_VOXEL_DENSITY_THRESHOLD) {
             // Clear this surface voxel and the voxels below, down to the configured depth
             for (let cy = 0; cy < CRATER_EXCAVATION_DEPTH_VOXELS && sy - cy >= 0; cy++) {
-              const target = grid.getVoxel(sx, sy - cy, sz);
-              if (target && target.density >= SOLID_VOXEL_DENSITY_THRESHOLD) {
+              if (grid.densityAt(sx, sy - cy, sz) >= SOLID_VOXEL_DENSITY_THRESHOLD) {
                 grid.clearVoxel(sx, sy - cy, sz);
                 if (!toClear.some(c => c.x === sx && c.y === sy - cy && c.z === sz)) {
                   toClear.push({ x: sx, y: sy - cy, z: sz });
@@ -279,6 +281,22 @@ export function executeBlast(
         }
       }
     }
+  }
+
+  // 5c. Terrain changed — tell subscribers (renderer remesh, navgrid patch
+  //     callers already use clearedRegion directly) the exact voxel AABB that
+  //     changed, covering both the fracture-pass clears and anything the
+  //     crater pass added afterward.
+  if (toClear.length > 0) {
+    const updatedRegion = toClear.reduce(
+      (acc, { x, y, z }) => ({
+        minX: Math.min(acc.minX, x), maxX: Math.max(acc.maxX, x),
+        minY: Math.min(acc.minY, y), maxY: Math.max(acc.maxY, y),
+        minZ: Math.min(acc.minZ, z), maxZ: Math.max(acc.maxZ, z),
+      }),
+      { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity, minZ: Infinity, maxZ: -Infinity },
+    );
+    emitter?.emit('terrain:updated', { region: updatedRegion });
   }
 
   // 5b. Check for building destruction: if any cleared voxel's (x, z) falls
@@ -340,7 +358,6 @@ export function executeBlast(
   const effectiveGroundFactor = groundFactor * (vibModCount > 0 ? vibModSum / vibModCount : 1);
 
   const chargePerDelay = groupChargesByDelay(plan.holes, plan.charges, plan.delays);
-  const blastCenter = calculateBlastCenter(plan.holes);
   const vibrationAtVillages: VillageVibration[] = villages.map(v => {
     const dx = v.position.x - blastCenter.x;
     const dz = v.position.z - blastCenter.z;
@@ -367,6 +384,8 @@ export function executeBlast(
   const maxVibration = vibrationAtVillages.reduce((m, v) => Math.max(m, v.vibration), 0);
   const rating = calculateRating(projectionCount, oversizedFragments, clearedVoxels, maxVibration, fragments.length);
 
+  emitter?.emit('blast:ended', undefined);
+
   return {
     fragments,
     fragmentCount: fragments.length,
@@ -387,17 +406,6 @@ export function executeBlast(
 }
 
 // ── Helpers ──
-
-/** Find the highest solid voxel Y in the column at (x, z). Returns 0 if none found. */
-function getColumnSurfaceY(grid: VoxelGrid, x: number, z: number): number {
-  const gx = Math.max(0, Math.min(grid.sizeX - 1, Math.floor(x)));
-  const gz = Math.max(0, Math.min(grid.sizeZ - 1, Math.floor(z)));
-  for (let y = grid.sizeY - 1; y >= 0; y--) {
-    const v = grid.getVoxel(gx, y, gz);
-    if (v && v.density >= SOLID_VOXEL_DENSITY_THRESHOLD) return y + 1;
-  }
-  return 0;
-}
 
 function calculateBlastZone(
   holes: readonly DrillHole[],
@@ -456,10 +464,10 @@ function calculateBlastCenter(holes: readonly DrillHole[]): { x: number; z: numb
   return { x: sx / holes.length, z: sz / holes.length };
 }
 
-function calculateOreValue(voxel: VoxelData, voxelSize: number): number {
+function calculateOreValue(oreDensities: Record<string, number>, voxelSize: number): number {
   const volume = voxelSize * voxelSize * voxelSize;
   let value = 0;
-  for (const [oreId, density] of Object.entries(voxel.oreDensities)) {
+  for (const [oreId, density] of Object.entries(oreDensities)) {
     const ore = getOre(oreId);
     if (ore && density > 0) {
       // Ore mass = volume × density_fraction × arbitrary ore_density (assume 2500 kg/m³ for ore)

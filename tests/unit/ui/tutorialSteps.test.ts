@@ -409,4 +409,32 @@ describe('tutorialSteps', () => {
       expect(step!.highlightTarget).toBe('#bs-toolbar [data-panel="vehicles"]');
     });
   });
+
+  // ── Steps whose completion the simulation owns ───────────────────────────
+  describe('steps that finish only once the simulation runs', () => {
+    // decideClock holds the clock for good once a step's tick allowance is
+    // spent, unless the step declares it waits on work. A step whose goal
+    // needs the world to keep turning and does NOT declare that will strand
+    // the player: the card never completes and there is nothing left to click.
+    // vehicle-buy-assign did exactly that — assigning a driver sends them
+    // walking to the vehicle, and ArrivalGate only seats them on arrival.
+    const SIMULATION_OWNED = ['survey', 'vehicle-buy-assign', 'haul-debris', 'contract-deliver'];
+
+    for (const id of SIMULATION_OWNED) {
+      it(`"${id}" waits on work and is given a tick allowance`, () => {
+        const step = TUTORIAL_STEPS.find((s) => s.id === id);
+        expect(step, `no tutorial step with id "${id}"`).toBeDefined();
+        expect(step!.waitsOnWork).toBe(true);
+        expect(step!.tickBudget ?? 0).toBeGreaterThan(0);
+      });
+    }
+
+    it('vehicle-buy-assign names a driver who actually holds a driving licence', () => {
+      // The hint command is what a stuck player copies into the console. It
+      // pointed at employee 1 — the surveyor hired in step 2, who has geology
+      // and no licence at all, so the command it suggested could only fail.
+      const step = TUTORIAL_STEPS.find((s) => s.id === 'vehicle-buy-assign')!;
+      expect(step.commands).toContain('vehicle driver 1 4');
+    });
+  });
 });

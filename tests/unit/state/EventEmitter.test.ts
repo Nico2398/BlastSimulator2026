@@ -16,7 +16,7 @@ describe('EventEmitter', () => {
     const handler = vi.fn();
     emitter.on('blast:started', handler);
     emitter.off('blast:started', handler);
-    emitter.emit('blast:started', undefined);
+    emitter.emit('blast:started', { originX: 0, originY: 0, originZ: 0 });
     expect(handler).not.toHaveBeenCalled();
   });
 
@@ -28,7 +28,7 @@ describe('EventEmitter', () => {
     emitter.on('terrain:updated', handler1);
     emitter.on('terrain:updated', handler2);
     emitter.on('terrain:updated', handler3);
-    emitter.emit('terrain:updated', undefined);
+    emitter.emit('terrain:updated', { region: { minX: 0, minY: 0, minZ: 0, maxX: 0, maxY: 0, maxZ: 0 } });
     expect(handler1).toHaveBeenCalledTimes(1);
     expect(handler2).toHaveBeenCalledTimes(1);
     expect(handler3).toHaveBeenCalledTimes(1);
@@ -46,7 +46,7 @@ describe('EventEmitter', () => {
     emitter.on('terrain:updated', kept);
     emitter.on('terrain:updated', removed);
     emitter.off('terrain:updated', removed);
-    emitter.emit('terrain:updated', undefined);
+    emitter.emit('terrain:updated', { region: { minX: 0, minY: 0, minZ: 0, maxX: 0, maxY: 0, maxZ: 0 } });
     expect(kept).toHaveBeenCalledTimes(1);
     expect(removed).not.toHaveBeenCalled();
   });

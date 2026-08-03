@@ -4,7 +4,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { generateTerrain } from '../../../src/core/world/TerrainGen.js';
-import { getMinePreset } from '../../../src/core/world/MineType.js';
+import { getBiome } from '../../../src/core/world/BiomeCatalog.js';
 import {
   estimateSurveyResult,
   type EstimateSurveyParams,
@@ -17,13 +17,13 @@ import type { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
  * desert preset, seed 42, dimensions 24×12×24.
  */
 function makeTutorialTerrain(): VoxelGrid {
-  const preset = getMinePreset('desert');
+  const biome = getBiome('desert_badlands')!;
   return generateTerrain({
     sizeX: 24,
     sizeY: 12,
     sizeZ: 24,
     seed: 42,
-    preset,
+    climateBias: biome.climateCenter,
   });
 }
 

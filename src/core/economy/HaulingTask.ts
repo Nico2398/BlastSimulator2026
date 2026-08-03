@@ -158,7 +158,7 @@ export function findReachableGroundFragment(state: GameState, vehicleId: number)
     if (tracked.state !== 'on_ground') continue;
     const fx = Math.round(tracked.fragment.position.x);
     const fz = Math.round(tracked.fragment.position.z);
-    if (!reachable.has(`${fx},${fz}`)) continue;
+    if (!reachable.has(fx, fz)) continue;
     const distSq = (fx - vehicle.x) ** 2 + (fz - vehicle.z) ** 2;
     if (distSq < bestDistSq) {
       bestDistSq = distSq;

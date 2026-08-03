@@ -11,6 +11,9 @@ export interface OreType {
   readonly rarity: string;
   /** Hex color for UI display and texture tinting. */
   readonly color: string;
+  /** Depth window (metres below surface) an ore vein can appear in — rarer ores sit deeper (#458 T1.3/A12). */
+  readonly depthMin: number;
+  readonly depthMax: number;
 }
 
 const ORES: readonly OreType[] = [
@@ -21,6 +24,7 @@ const ORES: readonly OreType[] = [
     valuePerKg: 2,
     rarity: 'common',
     color: '#8B6914',       // Brown
+    depthMin: 0, depthMax: 10,
   },
   {
     id: 'rustite',
@@ -29,6 +33,7 @@ const ORES: readonly OreType[] = [
     valuePerKg: 8,
     rarity: 'common',
     color: '#B7410E',       // Orange-red
+    depthMin: 0, depthMax: 15,
   },
   {
     id: 'blingite',
@@ -37,6 +42,7 @@ const ORES: readonly OreType[] = [
     valuePerKg: 25,
     rarity: 'uncommon',
     color: '#FFD700',       // Gold
+    depthMin: 5, depthMax: 22,
   },
   {
     id: 'gloomium',
@@ -45,6 +51,7 @@ const ORES: readonly OreType[] = [
     valuePerKg: 60,
     rarity: 'uncommon',
     color: '#4B0082',       // Dark purple
+    depthMin: 8, depthMax: 28,
   },
   {
     id: 'sparkium',
@@ -53,6 +60,7 @@ const ORES: readonly OreType[] = [
     valuePerKg: 150,
     rarity: 'rare',
     color: '#00BFFF',       // Electric blue
+    depthMin: 15, depthMax: 38,
   },
   {
     id: 'craktonite',
@@ -61,6 +69,7 @@ const ORES: readonly OreType[] = [
     valuePerKg: 350,
     rarity: 'rare',
     color: '#32CD32',       // Green
+    depthMin: 18, depthMax: 45,
   },
   {
     id: 'absurdium',
@@ -69,6 +78,7 @@ const ORES: readonly OreType[] = [
     valuePerKg: 800,
     rarity: 'very_rare',
     color: '#FF69B4',       // Pink
+    depthMin: 25, depthMax: 55,
   },
   {
     id: 'treranium',
@@ -77,6 +87,7 @@ const ORES: readonly OreType[] = [
     valuePerKg: 2000,
     rarity: 'legendary',
     color: '#E0B0FF',       // Iridescent / mauve
+    depthMin: 32, depthMax: 999,
   },
 ] as const;
 
@@ -90,4 +101,9 @@ export function getOre(id: string): OreType | undefined {
 /** Get all ore types. */
 export function getAllOres(): readonly OreType[] {
   return ORES;
+}
+
+/** Stable index of an ore id into getAllOres()'s fixed order — the aOre vertex attribute's ore-id component (#458 T3.1/A18). -1 for none/unknown. */
+export function oreIndexOf(id: string): number {
+  return ORES.findIndex(o => o.id === id);
 }

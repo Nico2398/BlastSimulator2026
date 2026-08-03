@@ -72,8 +72,8 @@
         },
         {
           "do": "pickTile",
-          "x": 12,
-          "z": 12
+          "x": 23,
+          "z": 23
         },
         {
           "do": "click",
@@ -117,10 +117,10 @@
         },
         {
           "do": "dragTiles",
-          "x1": 10,
-          "z1": 10,
-          "x2": 14,
-          "z2": 14
+          "x1": 22,
+          "z1": 22,
+          "x2": 26,
+          "z2": 26
         }
       ],
       "expect": {
@@ -133,10 +133,10 @@
       "actions": [
         {
           "do": "dragTiles",
-          "x1": 8,
-          "z1": 8,
-          "x2": 18,
-          "z2": 18
+          "x1": 20,
+          "z1": 20,
+          "x2": 30,
+          "z2": 30
         },
         {
           "do": "click",
@@ -290,13 +290,14 @@
           "selector": "#bs-vehicle-panel .bs-vehicle-assign-btn"
         },
         {
-          "do": "letTimePass",
-          "ticks": 15
+          "do": "awaitTutorialStep",
+          "stepId": "build-storage",
+          "timeoutMs": 30000
         }
       ],
       "expect": {
         "tutorialStep": "build-storage",
-        "note": "A hired driver with no licence makes Assign unreachable — same root cause as the surveyor."
+        "note": "Deliberately does NOT force ticks. Assigning a driver only sends them walking to the vehicle; the tutorial must let its own clock run for them to arrive and board. A `tick` here would pass over exactly the deadlock that stranded players on this card, because the console can advance a clock the player's held HUD cannot."
       }
     },
     {

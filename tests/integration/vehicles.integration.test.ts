@@ -135,16 +135,21 @@ describe('Vehicle fleet', () => {
   it('driverId is null immediately after "vehicle driver" and only set once the employee has walked to the vehicle', () => {
     vehicleCommand(ctx, ['buy', 'debris_hauler'], {});
     const v = ctx.state!.vehicles.vehicles[0]!;
-    // Vehicle spawns at (16, 16) for a 32×32 world (see "move vehicle" test below).
-    expect(v.x).toBe(16);
-    expect(v.z).toBe(16);
+    // Vehicle spawns near (16, 16) — the world centre for a 32×32 world (see
+    // "move vehicle" test below) — snapped to the nearest cell that's both
+    // NavGrid-reachable and on the same bench level as the map's main region
+    // (#458 T6.1/D13: NavGridReachability.findNearestReachableCell), so the
+    // exact tile can shift by a cell or two depending on terrain.
+    expect(Math.abs(v.x - 16)).toBeLessThanOrEqual(1);
+    expect(Math.abs(v.z - 16)).toBeLessThanOrEqual(1);
 
     const eid = hireOne(ctx, 'driver');
     employeeCommand(ctx, ['assign_skill', String(eid)], { skill: 'driving.truck', level: '1' });
     const emp = ctx.state!.employees.employees.find(e => e.id === eid)!;
-    // First-hired employee also spawns at (16, 16) — co-located with the vehicle.
-    expect(emp.x).toBe(16);
-    expect(emp.z).toBe(16);
+    // First-hired employee also spawns via the same reachable-cell snap —
+    // co-located with the vehicle.
+    expect(emp.x).toBe(v.x);
+    expect(emp.z).toBe(v.z);
 
     const result = vehicleCommand(ctx, ['driver', '1', String(eid)], {});
     expect(result.success).toBe(true);
@@ -158,10 +163,12 @@ describe('Vehicle fleet', () => {
 
   it('move vehicle to target coordinates', () => {
     vehicleCommand(ctx, ['buy', 'debris_hauler'], {});
-    // Vehicle spawns at sizeX/2, sizeZ/2 → (16, 16) for a 32x32 world
+    // Vehicle spawns near sizeX/2, sizeZ/2 → (16, 16) for a 32x32 world,
+    // snapped to a reachable, same-bench-level cell (#458 T6.1/D13) — see
+    // the driverId test above for why this isn't pinned to the exact tile.
     const v = ctx.state!.vehicles.vehicles[0]!;
-    expect(v.targetX).toBe(16);
-    expect(v.targetZ).toBe(16);
+    expect(Math.abs(v.targetX - 16)).toBeLessThanOrEqual(1);
+    expect(Math.abs(v.targetZ - 16)).toBeLessThanOrEqual(1);
 
     const result = vehicleCommand(ctx, ['move', '1'], { to: '30,30' });
 
@@ -190,13 +197,17 @@ describe('Vehicle fleet', () => {
   it('tickVehicle advances movement toward target', () => {
     vehicleCommand(ctx, ['buy', 'debris_hauler'], {});
     const v = ctx.state!.vehicles.vehicles[0]!;
-    // Spawned at (16, 16). Set target farther away.
-    v.targetX = 20;
-    v.targetZ = 16;
+    const origX = v.x;
+    // Target set relative to the vehicle's actual spawn cell, same row, pure
+    // +X — not a hardcoded (16,16)/(20,16) pair (#458 T9.1/D15). The new
+    // terrain generator's spawn placement no longer lands exactly on (16,16),
+    // and a hardcoded target off by even one z put the path on a real
+    // diagonal detour instead of the straight line this test means to check.
+    v.targetX = origX + 4;
+    v.targetZ = v.z;
     v.task = 'moving';
     v.state = 'idle';
 
-    const origX = v.x;
     // makeCtx() runs new_game, which builds a NavGrid — tickVehicle routes via
     // Pathfinding.findPath and advances at debris_hauler's own speed (3
     // cells/tick, see VEHICLE_BASE_STATS) rather than a flat 1 cell/tick (#407).
@@ -204,13 +215,13 @@ describe('Vehicle fleet', () => {
 
     tickVehicle(ctx.state!, v);
 
-    // Should have moved debrisHaulerSpeed cells closer to target (20, 16)
+    // Should have moved debrisHaulerSpeed cells closer to target
     if (v.task === 'moving') {
       expect(v.x).toBe(origX + debrisHaulerSpeed);
     }
     // If the vehicle arrived, task becomes 'idle' and x == targetX
     if (v.task === 'idle') {
-      expect(v.x).toBe(20);
+      expect(v.x).toBe(origX + 4);
     }
   });
 

@@ -9,14 +9,18 @@ import { TutorialOverlay } from './ui/TutorialOverlay.js';
 import { TUTORIAL_STEPS } from './ui/tutorialSteps.js';
 import { KeyboardShortcuts } from './ui/KeyboardShortcuts.js';
 import { MainMenu } from './ui/MainMenu.js';
+import { SandboxPanel } from './ui/SandboxPanel.js';
+import { LoadingScreen } from './ui/LoadingScreen.js';
+import type { CommandResult } from './console/ConsoleRunner.js';
 import { AudioManager } from './audio/AudioManager.js';
 import { AudioHooks } from './audio/AudioHooks.js';
 import { IndexedDBPersistence } from './persistence/IndexedDBPersistence.js';
 import { DownloadPersistence } from './persistence/DownloadPersistence.js';
 import { createRunner, runCommand } from './console/createRunner.js';
 import { parseCommand } from './console/ConsoleRunner.js';
-import { regenerateGrid, DEFAULT_GRID_SIZE } from './console/commands/world.js';
-import { getMinePreset } from './core/world/MineType.js';
+import { regenerateGrid, restoreGrid, DEFAULT_GRID_SIZE } from './console/commands/world.js';
+import { encodeVoxelGrid } from './core/state/VoxelGridCodec.js';
+import { getBiome } from './core/world/BiomeCatalog.js';
 import { BASE_TICK_MS } from './core/engine/GameLoop.js';
 import { probeUiActions, probeSelector } from './ui/uiActionProbe.js';
 import { t } from './core/i18n/I18n.js';
@@ -43,7 +47,16 @@ try {
 // --- Save/Load UI ---
 const saveLoadUI = new SaveLoadUI(uiContainer);
 saveLoadUI.setBackend(saveBackend);
-saveLoadUI.setGetState(() => ctx.state);
+saveLoadUI.setGetState(() => {
+  // Embed the current voxel grid right before a save is taken (#458 T0.3) —
+  // encoded lazily here rather than kept live on ctx.state, since most ticks
+  // never save. SaveLoadUI only sees GameState; it has no idea VoxelGrid or
+  // its codec exist, by design.
+  if (ctx.state && ctx.grid && ctx.state.world) {
+    ctx.state.world = { ...ctx.state.world, voxels: encodeVoxelGrid(ctx.grid) };
+  }
+  return ctx.state;
+});
 
 // --- Main Menu ---
 const mainMenu = new MainMenu(uiContainer);
@@ -55,11 +68,12 @@ mainMenu.setOnNewCampaign(() => {
 });
 mainMenu.setOnStartLevel((levelId) => {
   // Ensure a base GameState (with campaign) exists before starting a level.
-  if (!ctx.state) window.__gameConsole('new_game');
-  window.__gameConsole(`campaign start level:${levelId}`);
-  // First-time players get tutorial guidance once their level is actually
-  // loaded, not while still picking one from the world map.
-  if (!TutorialOverlay.isCompleted()) tutorial.start(ctx.state ?? undefined);
+  const commands = ctx.state ? [] : ['new_game'];
+  void enterLevel([...commands, `campaign start level:${levelId}`]).then(() => {
+    // First-time players get tutorial guidance once their level is actually
+    // loaded, not while still picking one from the world map.
+    if (!TutorialOverlay.isCompleted()) tutorial.start(ctx.state ?? undefined);
+  });
 });
 mainMenu.setOnLoad(() => { saveLoadUI.show(); });
 mainMenu.setOnSettings(() => { uiManager.showPanel('settings'); });
@@ -72,13 +86,43 @@ uiManager.setLanguageChangeHandler(() => {
 });
 mainMenu.show();
 
+// --- Level loading ---
+// Entering a level blocks the main thread for seconds. enterLevel splits that
+// into phases the loading screen can paint between, so the wait reads as a
+// load rather than a hang. Terrain generation and scene meshing are roughly
+// half the cost each, which is why the renderer sync is deferred out of the
+// command and run as its own phase.
+const loadingScreen = new LoadingScreen(uiContainer);
+
+function enterLevel(commands: readonly string[]): Promise<void> {
+  return loadingScreen.runPhases([
+    { run: () => { for (const cmd of commands) runGameCommand(cmd, { syncRenderer: false }); } },
+    { run: () => { gameRenderer.syncFromContext(ctx); } },
+  ]);
+}
+
 // --- Tutorial ---
 const tutorial = new TutorialOverlay(uiContainer);
 mainMenu.setOnTutorial(() => {
   mainMenu.hide();
-  window.__gameConsole('new_game seed:42 size:24');
-  window.__gameConsole('campaign start level:tutorial_pit');
-  tutorial.start(ctx.state ?? undefined);
+  void enterLevel(['new_game seed:42 size:24', 'campaign start level:tutorial_pit'])
+    .then(() => { tutorial.start(ctx.state ?? undefined); });
+});
+
+// --- Sandbox ---
+const sandboxPanel = new SandboxPanel(uiContainer);
+mainMenu.setOnSandbox(() => { mainMenu.hide(); sandboxPanel.show(); });
+sandboxPanel.setOnBack(() => { mainMenu.show(); });
+sandboxPanel.setOnStart((config) => {
+  const explosives = config.availableExplosives.length > 0
+    ? ` explosives:${config.availableExplosives.join(',')}`
+    : '';
+  void enterLevel([
+    `sandbox start biome:${config.biome} seed:${config.seed} size:${config.size}` +
+    ` depth:${config.depth} cash:${config.startingCash} goal:${config.unlockThreshold}` +
+    ` events:${config.eventFreqMultiplier} prices:${config.contractPriceMultiplier}` +
+    ` decay:${config.scoreDecayRate} mixed_rock:${config.mixedRockHardness}${explosives}`,
+  ]);
 });
 
 // --- Audio ---
@@ -116,6 +160,22 @@ emitter.on('revolt:triggered', () => {
 emitter.on('revolt:warning', ({ ticksRemaining }) => {
   uiManager.showNotification?.(t('notification.revolt_warning', { ticksRemaining }));
 });
+// Terrain mesh rebuild is event-driven, not command-name-matched: every voxel
+// mutator (generation, blast, drill, ramp) emits this after mutating the grid
+// (#458 T0.2). Runs synchronously inside runCommand(), before onBlast() below
+// ever sees the command result — so onBlast() no longer needs its own remesh.
+// Re-marches only the chunks the region touches (#458 T3.1) rather than the
+// whole grid — a single drill dig no longer pays for a full terrain rebuild.
+// A grid-identity change (new_game, campaign start, load) is handled
+// separately by syncFromContext()'s own comparison, which runs right after
+// this and does a full rebuildTerrain() with the new grid's real dimensions.
+emitter.on('terrain:updated', ({ region }) => {
+  gameRenderer.remeshTerrainRegion(region);
+});
+// Bird flocks near a blast panic and scatter for a few seconds (#458 T7.2/D12/A26).
+emitter.on('blast:started', ({ originX, originZ }) => {
+  gameRenderer.notifyBlastScatter(originX, originZ);
+});
 
 declare global {
   interface Window {
@@ -146,11 +206,19 @@ console.log = (...args: unknown[]) => {
   origLog.apply(console, args);
 };
 
-window.__gameConsole = (cmd: string) => {
+/**
+ * Run a console command.
+ *
+ * `syncRenderer: false` runs everything except the scene rebuild, so a level
+ * load can charge the player for generation and meshing as two separate
+ * phases with a painted frame between them (see LoadingScreen). Only the
+ * level-entry paths pass it; every other caller gets the immediate sync.
+ */
+function runGameCommand(cmd: string, opts?: { syncRenderer?: boolean }): CommandResult {
   const result = runCommand({ runner, ctx, emitter }, cmd);
   lastCommandOutput = result.output;
   // Sync the renderer after every command so visual changes appear immediately
-  gameRenderer.syncFromContext(ctx);
+  if (opts?.syncRenderer !== false) gameRenderer.syncFromContext(ctx);
   const cmdName = parseCommand(cmd).command;
 
   // A fresh game replaces whatever the splash screen was showing — the normal
@@ -161,16 +229,11 @@ window.__gameConsole = (cmd: string) => {
     mainMenu.hide();
   }
 
-  // Trigger blast effects and terrain rebuild after a blast
+  // Trigger blast effects after a blast (terrain remesh already happened via
+  // the terrain:updated subscription above, fired from inside executeBlast).
   if (cmdName === 'blast' && result.success && ctx.state) {
     gameRenderer.onBlast(ctx);
-    // Force full terrain rebuild to ensure mesh reflects voxel changes
-    gameRenderer.rebuildTerrain();
     audioHooks.onBlast(ctx.state.sequenceDelays);
-  }
-  // Rebuild terrain after ramp carving (build_ramp mutates the voxel grid)
-  if (cmdName === 'build_ramp' && result.success && ctx.state) {
-    gameRenderer.rebuildTerrain();
   }
   // Show blast plan overlay during planning commands, and refresh it whenever
   // a preview command runs or software tier changes — otherwise the overlay's
@@ -191,7 +254,9 @@ window.__gameConsole = (cmd: string) => {
   if (ctx.state) uiManager.update(ctx.state, ctx.weatherCycle?.current);
   if (ctx.state) tutorial.onCommandExecuted(ctx.state);
   return result;
-};
+}
+
+window.__gameConsole = (cmd: string) => runGameCommand(cmd);
 
 // --- State extraction bridges (used by scenario tests) ---
 window.__gameState = () => {
@@ -399,17 +464,22 @@ saveLoadBtn.addEventListener('click', () => saveLoadUI.show());
 uiContainer.appendChild(saveLoadBtn);
 
 saveLoadUI.setOnLoad((state) => {
-  // Restore loaded state into the runner context. The VoxelGrid is not part
-  // of the serialized GameState (see the WorldState comment in
-  // GameState.ts), so it must be regenerated here the same way the console
-  // `load` command does — otherwise the scene keeps showing whatever terrain
-  // (e.g. post-blast craters) was on screen before this load (#408).
+  // Restore loaded state into the runner context. A v6+ save carries its
+  // voxel grid embedded in state.world.voxels (#458 T0.3) — restoring from
+  // it preserves blast craters/ramps instead of discarding them. A save
+  // without that payload (pre-v6, or one taken with no grid) falls back to
+  // regenerating pristine terrain from seed, same as the console `load`
+  // command and this codebase's whole prior history here (#408).
   ctx.state = state;
-  const preset = getMinePreset(state.mineType);
-  const { sizeX, sizeY, sizeZ } = state.world ?? {
-    sizeX: DEFAULT_GRID_SIZE, sizeY: DEFAULT_GRID_SIZE, sizeZ: DEFAULT_GRID_SIZE, gridReady: true,
-  };
-  if (preset) regenerateGrid(ctx, { seed: state.seed, preset, sizeX, sizeY, sizeZ });
+  const biome = getBiome(state.mineType);
+  if (state.world?.voxels) {
+    restoreGrid(ctx, state.world.voxels);
+  } else if (biome) {
+    const { sizeX, sizeY, sizeZ } = state.world ?? {
+      sizeX: DEFAULT_GRID_SIZE, sizeY: DEFAULT_GRID_SIZE, sizeZ: DEFAULT_GRID_SIZE, gridReady: true,
+    };
+    regenerateGrid(ctx, { seed: state.seed, climateBias: biome.climateCenter, sizeX, sizeY, sizeZ });
+  }
   gameRenderer.syncFromContext(ctx);
 });
 

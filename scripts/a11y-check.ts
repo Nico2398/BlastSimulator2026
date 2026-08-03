@@ -119,7 +119,9 @@ async function runA11yCheck(port: number, viewport: { width: number; height: num
     await page.setViewport(viewport);
 
     console.log(`Navigating to ${devServerUrl}...`);
-    await page.goto(devServerUrl, { waitUntil: 'networkidle0' });
+    // See puppeteer-utils.ts's initBrowser() for why this isn't
+    // 'networkidle0' (#458 T5.1 — EffectComposer/OutputPass regression).
+    await page.goto(devServerUrl, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('#game-canvas, canvas', { timeout: 10000 });
     await new Promise(r => setTimeout(r, 3000));
 

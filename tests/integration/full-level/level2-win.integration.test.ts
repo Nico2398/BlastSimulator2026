@@ -24,10 +24,10 @@ describe('Level 2 — Win', () => {
     expect(ctx.state!.cash).toBe(75000);
     expect(ctx.state!.campaign.activeLevelId).toBe('grumpstone_ridge');
     expect(ctx.grid).not.toBeNull();
-    // Verify grid dimensions: grumpstone_ridge = 60x30x60
-    expect(ctx.grid!.sizeX).toBe(60);
-    expect(ctx.grid!.sizeY).toBe(30);
-    expect(ctx.grid!.sizeZ).toBe(60);
+    // Verify grid dimensions: grumpstone_ridge = 128x56x128 (#458 T6.1/D13)
+    expect(ctx.grid!.sizeX).toBe(128);
+    expect(ctx.grid!.sizeY).toBe(56);
+    expect(ctx.grid!.sizeZ).toBe(128);
     // Level 1 should be marked as completed
     const statusResult = campaignStatusCommand(ctx, [], {});
     expect(statusResult.success).toBe(true);

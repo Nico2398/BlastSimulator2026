@@ -47,4 +47,15 @@ describe('RockCatalog', () => {
       }
     }
   });
+
+  it('terrain shader params are within their documented ranges (#458 T4.1/A19.2)', () => {
+    for (const rock of getAllRocks()) {
+      expect(rock.macroFreq).toBeGreaterThan(0);
+      expect(rock.detailFreq).toBeGreaterThan(rock.macroFreq); // detail is finer-grained than macro
+      expect(rock.veinStrength).toBeGreaterThanOrEqual(0);
+      expect(rock.veinStrength).toBeLessThanOrEqual(0.5);
+      expect(rock.contrast).toBeGreaterThanOrEqual(0);
+      expect(rock.contrast).toBeLessThanOrEqual(0.6);
+    }
+  });
 });

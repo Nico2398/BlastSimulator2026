@@ -38,11 +38,11 @@ describe('Tutorial Level — Full Walkthrough', () => {
     // startingCash from Level definition
     expect(ctx.state!.cash).toBe(TUTORIAL_START_CASH);
     expect(ctx.state!.campaign.activeLevelId).toBe('tutorial_pit');
-    // Verify grid dimensions: tutorial_pit = 24x12x24
+    // Verify grid dimensions: tutorial_pit = 32x20x32 (#458 T6.1/D13)
     expect(ctx.grid).not.toBeNull();
-    expect(ctx.grid!.sizeX).toBe(24);
-    expect(ctx.grid!.sizeY).toBe(12);
-    expect(ctx.grid!.sizeZ).toBe(24);
+    expect(ctx.grid!.sizeX).toBe(32);
+    expect(ctx.grid!.sizeY).toBe(20);
+    expect(ctx.grid!.sizeZ).toBe(32);
     // No employees initially
     expect(ctx.state!.employees.employees.length).toBe(0);
     // No buildings

@@ -5,8 +5,9 @@ import type { SkillCategory } from '../entities/Employee.js';
 
 /** Map of all game events and their payload types. */
 export interface GameEventMap {
-  'terrain:updated': undefined;
-  'blast:started': undefined;
+  /** Fired after any voxel mutation (generation, blast, drill, ramp) with the affected AABB, inclusive voxel coords. */
+  'terrain:updated': { region: { minX: number; minY: number; minZ: number; maxX: number; maxY: number; maxZ: number } };
+  'blast:started': { originX: number; originY: number; originZ: number };
   'blast:ended': undefined;
   'fragment:created': { count: number };
   'time:tick': { dt: number };

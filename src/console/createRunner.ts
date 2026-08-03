@@ -8,6 +8,7 @@ import {
   newGameCommand,
   inspectCommand,
   terrainInfoCommand,
+  landscapeInfoCommand,
 } from './commands/world.js';
 import {
   type MiningContext,
@@ -53,6 +54,7 @@ import {
   campaignStartCommand,
   statsCommand,
 } from './commands/campaign.js';
+import { sandboxCommand } from './commands/sandbox.js';
 import { stateCommand } from './commands/state.js';
 import { saveCommand, loadCommand } from './commands/saveload.js';
 import { setupEvents } from '../core/events/index.js';
@@ -96,7 +98,7 @@ export function createRunner(): RunnerWithContext {
 
   const emitter = new EventEmitter();
   const runner = new ConsoleRunner();
-  const ctx: MiningContext = { state: null, grid: null, softwareTier: 0, tubingState: createTubingState(), emitter };
+  const ctx: MiningContext = { state: null, grid: null, landscape: null, softwareTier: 0, tubingState: createTubingState(), emitter };
 
   // --- World commands (Phase 2) ---
   runner.register('new_game', 'Create a new game (mine_type:desert seed:42)', (args, named) =>
@@ -107,6 +109,9 @@ export function createRunner(): RunnerWithContext {
   );
   runner.register('terrain_info', 'Show terrain grid info', (args, named) =>
     terrainInfoCommand(ctx, args, named),
+  );
+  runner.register('landscape_info', 'Build (if needed) and show the landscape zone tile count/layout', (args, named) =>
+    landscapeInfoCommand(ctx, args, named),
   );
   runner.register('survey', 'Survey terrain (seismic|core_sample|aerial) x:<X> z:<Z>', (args, named) =>
     surveyCommand(ctx, args, named),
@@ -216,6 +221,9 @@ export function createRunner(): RunnerWithContext {
     if (sub === 'complete') return campaignCompleteCommand(ctx, rest, named);
     return { success: false, output: `Unknown sub-command: "${sub}". Use: status | start | complete` };
   });
+  runner.register('sandbox', 'Sandbox mode (start biome:<id> seed:<n|random> size:<n> ...)', (args, named) =>
+    sandboxCommand(ctx, args, named),
+  );
   runner.register('stats', 'Show per-level success stats and star rating', (args, named) =>
     statsCommand(ctx, args, named),
   );

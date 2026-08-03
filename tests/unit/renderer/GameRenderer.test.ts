@@ -20,10 +20,27 @@ import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 function makeMockSceneManager() {
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera();
-  const sun = new THREE.DirectionalLight();
+  const sunLight = new THREE.DirectionalLight();
+  const fill = new THREE.DirectionalLight();
   const ambient = new THREE.AmbientLight();
-  const cameraController = { setTarget: vi.fn(), frameSite: vi.fn(), update: vi.fn() };
-  return { scene, camera, sun, ambient, cameraController, renderer: { render: vi.fn() } as unknown };
+  const cameraController = { setTarget: vi.fn(), frameSite: vi.fn(), update: vi.fn(), setPanLeash: vi.fn(), distance: 100, viewTarget: new THREE.Vector3() };
+  // Minimal fake CSM — attachCSM() reads .cascades synchronously; the rest
+  // (.camera/.maxFar/.getExtendedBreaks/.shaders) only matter inside
+  // onBeforeCompile, which these Node-only tests never trigger a real
+  // WebGL compile to run (#458 T5.1).
+  const csm = {
+    cascades: 3,
+    maxFar: 1200,
+    camera,
+    getExtendedBreaks: () => {},
+    shaders: new Map(),
+  };
+  const postPipeline = {
+    aerial: { setHazeColor: vi.fn(), setHeightRef: vi.fn(), setGrade: vi.fn(), update: vi.fn() },
+    addOverlayObject: vi.fn(),
+    removeOverlayObject: vi.fn(),
+  };
+  return { scene, camera, sunLight, ambient, fill, csm, cameraController, postPipeline, renderer: { render: vi.fn() } as unknown };
 }
 
 function makeCtx(): MiningContext {
@@ -55,34 +72,23 @@ describe('GameRenderer — diagnostics accessors', () => {
 });
 
 describe('GameRenderer — onBlast()', () => {
-  it('routes to terrain.update() rather than a direct buildAll() call when fragment positions are available', () => {
+  it('no longer remeshes terrain itself — that is driven by the terrain:updated event (#458 T0.2)', () => {
     const renderer = new GameRenderer(makeMockSceneManager() as any);
     const ctx = makeCtx();
     renderer.syncFromContext(ctx);
 
-    const updateSpy = vi.spyOn(renderer.terrain!, 'update');
+    const remeshSpy = vi.spyOn(renderer.terrain!, 'remeshRegion');
+    const buildAllSpy = vi.spyOn(renderer.terrain!, 'buildAll');
     ctx.lastBlastFragments = [{ x: 10, y: 5, z: 10 }];
 
     renderer.onBlast(ctx);
 
-    // TerrainMesh.update() currently rebuilds via buildAll() internally
-    // (documented as "simple but correct"), so buildAll IS invoked — just
-    // not directly by onBlast. This asserts the onBlast routing, not
-    // TerrainMesh's internal remesh strategy.
-    expect(updateSpy).toHaveBeenCalledWith(ctx.lastBlastFragments);
-  });
-
-  it('falls back to a full rebuild when fragment position data is unavailable', () => {
-    const renderer = new GameRenderer(makeMockSceneManager() as any);
-    const ctx = makeCtx();
-    renderer.syncFromContext(ctx);
-
-    const buildAllSpy = vi.spyOn(renderer.terrain!, 'buildAll');
-    ctx.lastBlastFragments = [];
-
-    renderer.onBlast(ctx);
-
-    expect(buildAllSpy).toHaveBeenCalled();
+    // executeBlast emits terrain:updated as part of the blast command itself;
+    // main.ts's subscription calls gameRenderer.remeshTerrainRegion() from
+    // that event (#458 T3.1), before onBlast() ever runs. onBlast() now only
+    // owns fragment meshes and blast effects, not the terrain mesh.
+    expect(remeshSpy).not.toHaveBeenCalled();
+    expect(buildAllSpy).not.toHaveBeenCalled();
   });
 
   it('spawns fragment meshes when full fragment data is available', () => {
@@ -226,5 +232,183 @@ describe('GameRenderer — camera framing', () => {
 
     renderer.syncFromContext(ctx);
     expect(sm.cameraController.frameSite).not.toHaveBeenCalled();
+  });
+});
+
+describe('GameRenderer — wind and clouds (#458 T7.1/D12)', () => {
+  it('loadGame adds 5 cloud cluster InstancedMeshes and a gradient sky dome to the scene', () => {
+    const sm = makeMockSceneManager();
+    const renderer = new GameRenderer(sm as any);
+    renderer.syncFromContext(makeCtx());
+
+    const cloudMeshes = sm.scene.children.filter((c) => c.name === 'cloud-cluster');
+    expect(cloudMeshes).toHaveLength(5);
+    const dome = sm.scene.children.find((c) => c instanceof THREE.Mesh && c.geometry instanceof THREE.SphereGeometry);
+    expect(dome).toBeDefined();
+  });
+
+  it('update() advances the terrain material cloud-shadow uniforms from their T5.3 inert defaults', () => {
+    const sm = makeMockSceneManager();
+    const renderer = new GameRenderer(sm as any);
+    renderer.syncFromContext(makeCtx());
+
+    const uniforms = renderer.terrain!.sharedMaterial.customUniforms;
+    const offsetBefore = (uniforms['uCloudOffset']!.value as THREE.Vector2).clone();
+
+    for (let i = 0; i < 60; i++) renderer.update(0.1);
+
+    // T5.3 wired uCloudCoverage inert at 0 until T7.1 turned it on — confirm
+    // it's actually live now (update() pushes CloudLayer's coverage in),
+    // not just present.
+    expect(uniforms['uCloudCoverage']!.value).toBeGreaterThan(0);
+    const offsetAfter = uniforms['uCloudOffset']!.value as THREE.Vector2;
+
+    // Wind is never exactly zero-speed after warmup ticks (weather always has
+    // a non-zero target speed, even 'sunny'), so the offset must have moved.
+    expect(offsetAfter.equals(offsetBefore)).toBe(false);
+  });
+
+  it('a weather change reaches CloudLayer — storm raises cloud coverage toward its dense target', async () => {
+    const { createWeatherCycle } = await import('../../../src/core/weather/WeatherCycle.js');
+    const sm = makeMockSceneManager();
+    const renderer = new GameRenderer(sm as any);
+    const ctx = makeCtx();
+    ctx.weatherCycle = createWeatherCycle(ctx.state!.seed);
+    renderer.syncFromContext(ctx);
+
+    const uniforms = renderer.terrain!.sharedMaterial.customUniforms;
+    ctx.weatherCycle.current = 'storm';
+    renderer.syncFromContext(ctx); // pushes the new weather into skybox + clouds
+    for (let i = 0; i < 200; i++) renderer.update(0.05);
+
+    expect(uniforms['uCloudCoverage']!.value as number).toBeGreaterThan(0.9);
+  });
+});
+
+describe('GameRenderer — birds, smoke, water, vegetation (#458 T7.2/D12/A26)', () => {
+  // makeCtx()'s hand-built VoxelGrid has no `state.world`, which
+  // rebuildLandscapeMesh requires — these need the real console pipeline
+  // (newGameCommand) to get a real biome + StructureSet (villages/rivers/
+  // trees) landscape actually builds from.
+  async function makeLandscapeCtx(mineType = 'green_foothills'): Promise<MiningContext> {
+    const { newGameCommand } = await import('../../../src/console/commands/world.js');
+    const ctx: MiningContext = {
+      state: null, grid: null, landscape: null, softwareTier: 0,
+      tubingState: createTubingState(), emitter: new EventEmitter(),
+    };
+    const result = newGameCommand(ctx, [], { mine_type: mineType, seed: '42', size: '64' });
+    expect(result.success).toBe(true); // guard: the rest of the test is meaningless if setup itself failed
+    return ctx;
+  }
+
+  it('syncFromContext builds vegetation (and, seed/biome permitting, water) from the real StructureSet', async () => {
+    const sm = makeMockSceneManager();
+    const renderer = new GameRenderer(sm as any);
+    renderer.syncFromContext(await makeLandscapeCtx());
+
+    // Grass is unconditional (the rim band always has some candidates on a
+    // 64-wide grid); trees/water/smoke depend on what this seed's
+    // StructureSet actually placed, so only grass is asserted unconditionally.
+    const grass = sm.scene.children.find((c) => c.name === 'vegetation-grass');
+    expect(grass).toBeDefined();
+  });
+
+  it('update() runs birds/smoke/water without throwing across many frames', async () => {
+    const sm = makeMockSceneManager();
+    const renderer = new GameRenderer(sm as any);
+    renderer.syncFromContext(await makeLandscapeCtx());
+
+    expect(() => {
+      for (let i = 0; i < 30; i++) renderer.update(0.1);
+    }).not.toThrow();
+  });
+
+  it('notifyBlastScatter reaches BirdFlocks without throwing, before and after a game is loaded', async () => {
+    const sm = makeMockSceneManager();
+    const renderer = new GameRenderer(sm as any);
+    expect(() => renderer.notifyBlastScatter(10, 10)).not.toThrow(); // no game loaded yet
+
+    renderer.syncFromContext(await makeLandscapeCtx());
+    expect(() => renderer.notifyBlastScatter(32, 32)).not.toThrow();
+  });
+
+  it('rebuilding the landscape (level swap) disposes the previous ambient meshes instead of accumulating them', async () => {
+    const sm = makeMockSceneManager();
+    const renderer = new GameRenderer(sm as any);
+    const ctx = await makeLandscapeCtx();
+    renderer.syncFromContext(ctx);
+    const grassCountAfterFirst = sm.scene.children.filter((c) => c.name === 'vegetation-grass').length;
+
+    // Same seed, different grid object — takes the "grid changed, same seed"
+    // branch that calls rebuildLandscapeMesh() a second time without going
+    // through loadGame()'s clearAll() first (mirrors a campaign level swap).
+    const { VoxelGrid } = await import('../../../src/core/world/VoxelGrid.js');
+    ctx.grid = new VoxelGrid(64, 64, 64);
+    ctx.landscape = null;
+    renderer.syncFromContext(ctx);
+    const grassCountAfterSecond = sm.scene.children.filter((c) => c.name === 'vegetation-grass').length;
+
+    expect(grassCountAfterFirst).toBe(1);
+    expect(grassCountAfterSecond).toBe(1); // still exactly one — the stale mesh was disposed, not left behind
+  });
+});
+
+describe('GameRenderer — per-biome ambient extras (#458 T7.3)', () => {
+  async function makeLandscapeCtx(mineType: string): Promise<MiningContext> {
+    const { newGameCommand } = await import('../../../src/console/commands/world.js');
+    const ctx: MiningContext = {
+      state: null, grid: null, landscape: null, softwareTier: 0,
+      tubingState: createTubingState(), emitter: new EventEmitter(),
+    };
+    const result = newGameCommand(ctx, [], { mine_type: mineType, seed: '42', size: '64' });
+    expect(result.success).toBe(true);
+    return ctx;
+  }
+
+  it('builds dust devils, not fireflies, on an arid biome', async () => {
+    const sm = makeMockSceneManager();
+    const renderer = new GameRenderer(sm as any);
+    renderer.syncFromContext(await makeLandscapeCtx('desert_badlands'));
+
+    expect(sm.scene.children.find((c) => c.name === 'dust-devils')).toBeDefined();
+    expect(sm.scene.children.find((c) => c.name === 'fireflies')).toBeUndefined();
+  });
+
+  it('builds fireflies, not dust devils, on the humid tropical biome', async () => {
+    const sm = makeMockSceneManager();
+    const renderer = new GameRenderer(sm as any);
+    renderer.syncFromContext(await makeLandscapeCtx('tropical_karst'));
+
+    expect(sm.scene.children.find((c) => c.name === 'fireflies')).toBeDefined();
+    expect(sm.scene.children.find((c) => c.name === 'dust-devils')).toBeUndefined();
+  });
+
+  it('builds neither extra on a biome outside both sets', async () => {
+    const sm = makeMockSceneManager();
+    const renderer = new GameRenderer(sm as any);
+    renderer.syncFromContext(await makeLandscapeCtx('green_foothills'));
+
+    expect(sm.scene.children.find((c) => c.name === 'dust-devils')).toBeUndefined();
+    expect(sm.scene.children.find((c) => c.name === 'fireflies')).toBeUndefined();
+  });
+
+  it('update() runs dust devils and fireflies without throwing across many frames', async () => {
+    const sm = makeMockSceneManager();
+    const renderer = new GameRenderer(sm as any);
+    renderer.syncFromContext(await makeLandscapeCtx('red_canyon'));
+
+    expect(() => {
+      for (let i = 0; i < 30; i++) renderer.update(0.1);
+    }).not.toThrow();
+  });
+
+  it('swapping from an arid to a non-arid biome disposes the stale dust-devils mesh instead of leaving it behind', async () => {
+    const sm = makeMockSceneManager();
+    const renderer = new GameRenderer(sm as any);
+    renderer.syncFromContext(await makeLandscapeCtx('desert_badlands'));
+    expect(sm.scene.children.find((c) => c.name === 'dust-devils')).toBeDefined();
+
+    renderer.syncFromContext(await makeLandscapeCtx('green_foothills'));
+    expect(sm.scene.children.find((c) => c.name === 'dust-devils')).toBeUndefined();
   });
 });

@@ -7,6 +7,7 @@
 
 import { VoxelGrid } from '../core/world/VoxelGrid.js';
 import type { PhysicsWorld, PhysicsBodyId } from './PhysicsWorld.js';
+import { BLAST_ZONE_RADIUS } from '../core/config/balance.js';
 
 // ── Config ──
 
@@ -15,6 +16,21 @@ import type { PhysicsWorld, PhysicsBodyId } from './PhysicsWorld.js';
  * 1 = only the top surface voxel per column. Enough for fragment settling.
  */
 const SURFACE_LAYERS = 2;
+
+// ── Region ──
+
+/**
+ * Column bounds (inclusive, voxel-grid coordinates) `build` creates colliders
+ * within. Physics only ever runs during a blast's fragment settling, so the
+ * caller has a blast AABB in hand — building the other 320k+ columns of a
+ * 160×160 level that no fragment can reach is pure waste (#458 T6.2/D14).
+ */
+export interface TerrainBodyRegion {
+  minX: number;
+  maxX: number;
+  minZ: number;
+  maxZ: number;
+}
 
 // ── TerrainBody ──
 
@@ -34,18 +50,25 @@ export class TerrainBody {
   /**
    * Build (or rebuild) the static terrain colliders from the voxel grid.
    * Previous terrain bodies are removed first.
-   * Only adds surface voxels (top SURFACE_LAYERS solid voxels per column).
+   * Only adds surface voxels (top SURFACE_LAYERS solid voxels per column)
+   * within `region`, clamped to the grid's own bounds — never the whole grid
+   * (#458 T6.2/D14: a level this large makes an unscoped build itself the
+   * bottleneck, long before any fragment settles).
    */
-  build(grid: VoxelGrid): void {
+  build(grid: VoxelGrid, region: TerrainBodyRegion): void {
     this.dispose();
 
-    for (let x = 0; x < grid.sizeX; x++) {
-      for (let z = 0; z < grid.sizeZ; z++) {
+    const minX = Math.max(0, Math.floor(region.minX));
+    const maxX = Math.min(grid.sizeX - 1, Math.ceil(region.maxX));
+    const minZ = Math.max(0, Math.floor(region.minZ));
+    const maxZ = Math.min(grid.sizeZ - 1, Math.ceil(region.maxZ));
+
+    for (let x = minX; x <= maxX; x++) {
+      for (let z = minZ; z <= maxZ; z++) {
         let solidCount = 0;
         // Scan from top to bottom, add SURFACE_LAYERS solid voxels per column
         for (let y = grid.sizeY - 1; y >= 0; y--) {
-          const voxel = grid.getVoxel(x, y, z);
-          if (!voxel || voxel.density <= 0) continue;
+          if (grid.densityAt(x, y, z) <= 0) continue;
 
           const half = VoxelGrid.CELL_SIZE / 2;
           const cx = x * VoxelGrid.CELL_SIZE + half;
@@ -84,13 +107,53 @@ export class TerrainBody {
 // ── Utility ──
 
 /**
+ * Column bounds (voxel-grid coordinates) covering the given fragments' (cx, cz)
+ * world positions, expanded by `2 * BLAST_ZONE_RADIUS` voxels — the same margin
+ * BlastExecution's own cleared-region computation uses, so terrain colliders
+ * cover comfortably more than the fragments themselves can roll or bounce into.
+ * Not clamped to the grid — `TerrainBody.build` does that itself.
+ */
+export function computeFragmentRegion(
+  fragments: ReadonlyArray<{ cx: number; cz: number }>,
+): TerrainBodyRegion {
+  const margin = 2 * BLAST_ZONE_RADIUS;
+
+  if (fragments.length === 0) {
+    return { minX: 0, maxX: -1, minZ: 0, maxZ: -1 };
+  }
+
+  let minX = Infinity, maxX = -Infinity;
+  let minZ = Infinity, maxZ = -Infinity;
+  for (const f of fragments) {
+    const x = Math.floor(f.cx / VoxelGrid.CELL_SIZE);
+    const z = Math.floor(f.cz / VoxelGrid.CELL_SIZE);
+    minX = Math.min(minX, x);
+    maxX = Math.max(maxX, x);
+    minZ = Math.min(minZ, z);
+    maxZ = Math.max(maxZ, z);
+  }
+
+  return {
+    minX: minX - margin,
+    maxX: maxX + margin,
+    minZ: minZ - margin,
+    maxZ: maxZ + margin,
+  };
+}
+
+/**
  * Find the Y coordinate of the topmost solid voxel in a column (x, z).
  * Returns -1 if the entire column is empty.
+ *
+ * Deliberately independent of `computeVoxelColumnSurfaceY` (VoxelGrid.ts):
+ * that helper clamps out-of-bounds (x, z) to the nearest edge column, which
+ * is wrong here — this is used for physics ground-detection on fragments
+ * that can be mid-flight past the grid edge, where "no ground" (-1) is the
+ * correct answer, not the edge column's height.
  */
 export function findSurfaceY(grid: VoxelGrid, x: number, z: number): number {
   for (let y = grid.sizeY - 1; y >= 0; y--) {
-    const v = grid.getVoxel(x, y, z);
-    if (v && v.density > 0) return y;
+    if (grid.densityAt(x, y, z) > 0) return y;
   }
   return -1;
 }

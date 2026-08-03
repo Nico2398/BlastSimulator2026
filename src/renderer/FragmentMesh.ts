@@ -2,7 +2,9 @@
 // Renders blast fragments using InstancedMesh for batched GPU rendering.
 // 8 shape variants × 1 InstancedMesh each = 8 draw calls regardless of fragment count.
 // Fragment mesh size is proportional to fragment volume (cube-root → half-extent).
-// Fragments with high ore density show a gold tint; projections are red-orange.
+// Rock/ore identity is carried per-instance (aRockA/aRockB/aRockWeight/aOre)
+// and shaded by the shared TerrainMaterial, so a fragment's cut face matches
+// the rock it broke off from (#458 T4.1/D9/A18).
 //
 // Performance target: 2000 fragments at 60fps
 // Previous: 2000 individual meshes × material clones → thousands of draw calls
@@ -10,7 +12,8 @@
 
 import * as THREE from 'three';
 import type { FragmentData } from '../core/mining/BlastExecution.js';
-import { sampleRockColor } from './ProceduralTexture.js';
+import { rockIndexOf } from '../core/world/RockCatalog.js';
+import { oreIndexOf } from '../core/world/OreCatalog.js';
 import {
   FRAGMENT_CRATER_YOFFSET_MIN,
   FRAGMENT_CRATER_YOFFSET_SPREAD,
@@ -24,11 +27,6 @@ import { sampleEvenly, computeRenderScatter } from './FragmentRenderSampling.js'
 // Scale: 1 voxel ≈ 1 metre. Fragments are in m³.
 // Real mine fragments: 0.001 m³ (fines) to 2 m³ (oversized blocks)
 const FRAGMENT_SCALE = 0.5;
-
-const ORE_RICH_THRESHOLD = 0.15;
-const ORE_TINT_STRENGTH = 0.25;
-const ORE_GOLD = new THREE.Color(0xffd700);
-const PROJECTION_COLOR = new THREE.Color(0xff4400);
 
 // Maximum fragments rendered simultaneously (performance guard)
 const MAX_RENDERED_FRAGMENTS = 2000;
@@ -70,6 +68,16 @@ interface SlotInfo {
   slotIdx: number;
 }
 
+/** The highest-density ore in a fragment's ore record, or '' if none (#458 T4.1/A18). */
+function dominantOre(oreDensities: Record<string, number>): { id: string; amt: number } {
+  let id = '';
+  let amt = 0;
+  for (const [oreId, density] of Object.entries(oreDensities)) {
+    if (density > amt) { id = oreId; amt = density; }
+  }
+  return { id, amt };
+}
+
 // ---------- Main class ----------
 
 export class FragmentMesh {
@@ -83,19 +91,38 @@ export class FragmentMesh {
   /** slotIdx → fragId for each bucket (to support swap-on-delete) */
   private readonly bucketSlotToFrag: number[][] = [];
 
+  /** Per-shape-variant per-instance rock/ore attributes, shading the shared TerrainMaterial (#458 T4.1/A18). */
+  private readonly instanceRockA: THREE.InstancedBufferAttribute[] = [];
+  private readonly instanceRockB: THREE.InstancedBufferAttribute[] = [];
+  private readonly instanceRockWeight: THREE.InstancedBufferAttribute[] = [];
+  private readonly instanceOre: THREE.InstancedBufferAttribute[] = [];
+
   private static readonly _mtx = new THREE.Matrix4();
-  private static readonly _color = new THREE.Color();
   private static readonly _scale = new THREE.Vector3();
   private static readonly _quat = new THREE.Quaternion();
   private static readonly _pos = new THREE.Vector3();
 
-  constructor(scene: THREE.Scene) {
+  /** `material` is the shared TerrainMaterial (borrowed from TerrainMesh, which owns and disposes it — #458 T4.1/D9). */
+  constructor(scene: THREE.Scene, material: THREE.Material) {
     this.scene = scene;
     const geos = getSharedGeometries();
-    const mat = new THREE.MeshPhongMaterial({ shininess: 10, side: THREE.FrontSide });
 
     for (let i = 0; i < SHAPE_VARIANTS; i++) {
-      const im = new THREE.InstancedMesh(geos[i]!, mat.clone(), BUCKET_CAPACITY);
+      const geo = geos[i]!;
+      const rockA = new THREE.InstancedBufferAttribute(new Float32Array(BUCKET_CAPACITY), 1);
+      const rockB = new THREE.InstancedBufferAttribute(new Float32Array(BUCKET_CAPACITY), 1);
+      const rockWeight = new THREE.InstancedBufferAttribute(new Float32Array(BUCKET_CAPACITY), 1);
+      const ore = new THREE.InstancedBufferAttribute(new Float32Array(BUCKET_CAPACITY * 2), 2);
+      geo.setAttribute('aRockA', rockA);
+      geo.setAttribute('aRockB', rockB);
+      geo.setAttribute('aRockWeight', rockWeight);
+      geo.setAttribute('aOre', ore);
+      this.instanceRockA.push(rockA);
+      this.instanceRockB.push(rockB);
+      this.instanceRockWeight.push(rockWeight);
+      this.instanceOre.push(ore);
+
+      const im = new THREE.InstancedMesh(geo, material, BUCKET_CAPACITY);
       im.count = 0;
       im.frustumCulled = false; // fragments fly around; disable per-instance culling
       scene.add(im);
@@ -154,20 +181,16 @@ export class FragmentMesh {
       );
       im.setMatrixAt(count, FragmentMesh._mtx);
 
-      // Determine color
-      let color: THREE.Color;
-      if (frag.isProjection) {
-        color = PROJECTION_COLOR;
-      } else {
-        color = sampleRockColor(frag.rockId, frag.position.x, frag.position.y, frag.position.z);
-        const oreSum = Object.values(frag.oreDensities).reduce((a, b) => a + b, 0);
-        if (oreSum > ORE_RICH_THRESHOLD) {
-          const t = Math.min(1, (oreSum - ORE_RICH_THRESHOLD) / 0.3) * ORE_TINT_STRENGTH;
-          FragmentMesh._color.copy(color).lerp(ORE_GOLD, t);
-          color = FragmentMesh._color;
-        }
-      }
-      im.setColorAt(count, color);
+      // Rock/ore identity for the shared TerrainMaterial shader — a fragment
+      // is one source voxel, so both rock slots are the same index and the
+      // blend weight is 0 (#458 T4.1/A18).
+      const rockIdx = Math.max(0, rockIndexOf(frag.rockId));
+      this.instanceRockA[meshIdx]!.setX(count, rockIdx);
+      this.instanceRockB[meshIdx]!.setX(count, rockIdx);
+      this.instanceRockWeight[meshIdx]!.setX(count, 0);
+      const { id: oreId, amt: oreAmt } = dominantOre(frag.oreDensities);
+      const oreIdx = oreId ? oreIndexOf(oreId) : -1;
+      this.instanceOre[meshIdx]!.setXY(count, oreIdx, oreIdx >= 0 ? oreAmt : 0);
 
       // Track slot
       this.fragIdToSlot.set(frag.id, { meshIdx, slotIdx: count });
@@ -180,7 +203,10 @@ export class FragmentMesh {
       const im = this.instancedMeshes[i]!;
       im.count = this.bucketCount[i]!;
       if (im.instanceMatrix) im.instanceMatrix.needsUpdate = true;
-      if (im.instanceColor) im.instanceColor.needsUpdate = true;
+      this.instanceRockA[i]!.needsUpdate = true;
+      this.instanceRockB[i]!.needsUpdate = true;
+      this.instanceRockWeight[i]!.needsUpdate = true;
+      this.instanceOre[i]!.needsUpdate = true;
     }
   }
 
@@ -223,10 +249,16 @@ export class FragmentMesh {
       // Swap with the last instance
       im.getMatrixAt(lastIdx, FragmentMesh._mtx);
       im.setMatrixAt(slotIdx, FragmentMesh._mtx);
-      if (im.instanceColor) {
-        im.getColorAt(lastIdx, FragmentMesh._color);
-        im.setColorAt(slotIdx, FragmentMesh._color);
-      }
+
+      const rockA = this.instanceRockA[meshIdx]!;
+      const rockB = this.instanceRockB[meshIdx]!;
+      const rockWeight = this.instanceRockWeight[meshIdx]!;
+      const ore = this.instanceOre[meshIdx]!;
+      rockA.setX(slotIdx, rockA.getX(lastIdx));
+      rockB.setX(slotIdx, rockB.getX(lastIdx));
+      rockWeight.setX(slotIdx, rockWeight.getX(lastIdx));
+      ore.setXY(slotIdx, ore.getX(lastIdx), ore.getY(lastIdx));
+
       const swappedFragId = this.bucketSlotToFrag[meshIdx]![lastIdx]!;
       this.bucketSlotToFrag[meshIdx]![slotIdx] = swappedFragId;
       this.fragIdToSlot.set(swappedFragId, { meshIdx, slotIdx });
@@ -235,7 +267,10 @@ export class FragmentMesh {
     this.bucketCount[meshIdx] = lastIdx;
     im.count = lastIdx;
     im.instanceMatrix.needsUpdate = true;
-    if (im.instanceColor) im.instanceColor.needsUpdate = true;
+    this.instanceRockA[meshIdx]!.needsUpdate = true;
+    this.instanceRockB[meshIdx]!.needsUpdate = true;
+    this.instanceRockWeight[meshIdx]!.needsUpdate = true;
+    this.instanceOre[meshIdx]!.needsUpdate = true;
 
     this.fragIdToSlot.delete(fragmentId);
     this.bucketSlotToFrag[meshIdx]![lastIdx] = -1;
@@ -256,14 +291,12 @@ export class FragmentMesh {
     return this.bucketCount.reduce((a, b) => a + b, 0);
   }
 
-  /** Release instanced mesh resources. */
+  /** Remove instanced meshes from the scene. Geometries are shared (kept alive); material is borrowed from TerrainMesh, which owns and disposes it. */
   dispose(): void {
     this.clearAll();
     for (const im of this.instancedMeshes) {
       this.scene.remove(im);
-      (im.material as THREE.Material).dispose();
     }
     this.instancedMeshes.length = 0;
-    // Shared geometries are intentionally kept alive for reuse
   }
 }

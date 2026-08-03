@@ -6,10 +6,16 @@ import { SAVE_VERSION } from './GameState.js';
 
 /**
  * Serialize a GameState to a JSON string.
- * Handles Set→Array conversion for surveyedPositions.
+ * Handles Set→Array conversion for surveyedPositions, and drops `navGrid`
+ * entirely — it's derived from the voxel grid, buildings, and drill holes,
+ * not save data, and serializing it verbatim silently corrupted every
+ * blocked/void cell's `moveCost: Infinity` into `null` on the way through
+ * JSON (#458 T0.3). `deserialize` always sets it back to `null`; the loader
+ * (regenerateGrid / restoreGrid) rebuilds a real one afterward.
  */
 export function serialize(state: GameState): string {
-  return JSON.stringify(state, (_key, value) => {
+  return JSON.stringify(state, (key, value) => {
+    if (key === 'navGrid') return undefined;
     if (value instanceof Set) return { __type: 'Set', values: [...value] };
     return value as unknown;
   });
@@ -124,6 +130,11 @@ export function deserialize(json: string): GameState {
   if (typeof obj['collectedOre'] !== 'object' || obj['collectedOre'] === null) {
     (obj as Record<string, unknown>)['collectedOre'] = {};
   }
+
+  // v6: navGrid is never part of the JSON (see serialize's replacer) — always
+  // null here, regardless of what an older save happened to carry. The
+  // loader is responsible for rebuilding a real one.
+  (obj as Record<string, unknown>)['navGrid'] = null;
 
   return obj as unknown as GameState;
 }

@@ -37,6 +37,19 @@ function makeCtx(): MiningContext {
 
 beforeEach(() => resetHoleIds());
 
+/**
+ * A cell not covered by any building footprint — passable, but its exact
+ * natural type ('walkable' flat ground vs. a gentle 'ramp') depends on the
+ * terrain generator's relief at that coordinate, not a fixed literal
+ * (#458 T9.1/D15: assert the invariant these tests actually care about —
+ * "not blocked by the footprint" — rather than pinning generator output).
+ */
+function expectPassable(cell: { type: string; moveCost: number }): void {
+  expect(cell.type).not.toBe('blocked');
+  expect(cell.type).not.toBe('void');
+  expect(cell.moveCost).not.toBe(Infinity);
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // NavGrid patching — building placement
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -59,10 +72,10 @@ describe('NavGrid patching — building placement', () => {
     expect(nav.cells[0]![1]!.type).toBe('blocked');
     expect(nav.cells[1]![1]!.type).toBe('blocked');
 
-    // Cells outside the footprint remain walkable
-    expect(nav.cells[2]![0]!.type).toBe('walkable');
-    expect(nav.cells[0]![2]!.type).toBe('walkable');
-    expect(nav.cells[2]![2]!.type).toBe('walkable');
+    // Cells outside the footprint remain passable
+    expectPassable(nav.cells[2]![0]!);
+    expectPassable(nav.cells[0]![2]!);
+    expectPassable(nav.cells[2]![2]!);
   });
 
   it('blocks NavGrid cells for multi-tile buildings at a non-origin location', () => {
@@ -139,12 +152,11 @@ describe('NavGrid patching — building demolition', () => {
     const demolishResult = buildCommand(ctx, ['destroy', String(buildingId)], {});
     expect(demolishResult.success).toBe(true);
 
-    // After demolition, footprint cells revert to walkable
-    expect(nav.cells[0]![0]!.type).toBe('walkable');
-    expect(nav.cells[0]![0]!.moveCost).toBe(1.0);
-    expect(nav.cells[1]![0]!.type).toBe('walkable');
-    expect(nav.cells[0]![1]!.type).toBe('walkable');
-    expect(nav.cells[1]![1]!.type).toBe('walkable');
+    // After demolition, footprint cells revert to passable natural terrain
+    expectPassable(nav.cells[0]![0]!);
+    expectPassable(nav.cells[1]![0]!);
+    expectPassable(nav.cells[0]![1]!);
+    expectPassable(nav.cells[1]![1]!);
   });
 
   it('does not patch NavGrid when destroy fails (unknown building ID)', () => {
@@ -248,12 +260,11 @@ describe('NavGrid patching — building move', () => {
     const moveResult = buildCommand(ctx, ['move', String(buildingId)], { to: '5,5' });
     expect(moveResult.success).toBe(true);
 
-    // Old footprint cells should now be walkable
-    expect(nav.cells[0]![0]!.type).toBe('walkable');
-    expect(nav.cells[0]![0]!.moveCost).toBe(1.0);
-    expect(nav.cells[1]![0]!.type).toBe('walkable');
-    expect(nav.cells[0]![1]!.type).toBe('walkable');
-    expect(nav.cells[1]![1]!.type).toBe('walkable');
+    // Old footprint cells should now be passable natural terrain again
+    expectPassable(nav.cells[0]![0]!);
+    expectPassable(nav.cells[1]![0]!);
+    expectPassable(nav.cells[0]![1]!);
+    expectPassable(nav.cells[1]![1]!);
 
     // New footprint cells should be blocked
     expect(nav.cells[5]![5]!.type).toBe('blocked');

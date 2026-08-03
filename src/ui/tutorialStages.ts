@@ -46,17 +46,29 @@ function pickerStages(pickHintKey: string, region: TileRegion): TutorialStage[] 
 }
 
 /**
- * Where each guided placement belongs, in tiles on the 24×24 tutorial map.
- * Central enough to be obviously "the pit", wide enough not to feel like
- * threading a needle.
+ * Where each guided placement belongs, in tiles on the 32×32 tutorial map
+ * (#458 T6.1/D13). Central enough to be obviously "the pit", wide enough not
+ * to feel like threading a needle — and, critically, clear of the grid's
+ * exact centre (16,16): vehicles always spawn there (VehicleCommand's
+ * baseX/baseZ = sizeX/2), and a drill/blast footprint straddling that point
+ * carves a lower "bench" right under the vehicle, on the far side of a level
+ * change from wherever the driver starts. With no ramp built yet at that
+ * point in the tutorial, NavGrid.findPath's multi-level routing can never
+ * connect them — the driver walks partway, then sits stuck forever (found
+ * via a full-suite regression this same resize introduced, traced to
+ * findMultiLevelPath returning found:false with zero candidate ramps).
+ * On the old 24×24 grid this region (8→18) missed the old centre (12,12) by
+ * enough margin to never trip this; growing the grid without re-centring the
+ * region is what closed that gap. Shifted well off-centre here instead of
+ * re-deriving a new "just barely clears it" offset.
  */
 const REGION = {
-  survey: { x1: 8, z1: 8, x2: 16, z2: 16 },
+  survey: { x1: 18, z1: 18, x2: 28, z2: 28 },
   // Exact, and sized to the grid it produces: the tool derives
-  // cols = round((x2 - x1) / spacing) + 1, so at the default spacing of 5 an
-  // 8→18 span is exactly three holes at 8, 13 and 18. An outline the resulting
-  // holes spilled out of would be telling the player the wrong thing.
-  drill: { x1: 8, z1: 8, x2: 18, z2: 18, exact: true },
+  // cols = round((x2 - x1) / spacing) + 1, so at the default spacing of 5 a
+  // 20→30 span is exactly three holes at 20, 25 and 30. An outline the
+  // resulting holes spilled out of would be telling the player the wrong thing.
+  drill: { x1: 20, z1: 20, x2: 30, z2: 30, exact: true },
   warehouse: { x1: 2, z1: 2, x2: 9, z2: 9 },
   // Beside the pit, not inside it. The blast leaves sloped crater walls that
   // already register as ramp cells, so carving within them removes more than it
