@@ -9,6 +9,7 @@
  */
 
 import puppeteer, { type Page, type PuppeteerLaunchOptions } from 'puppeteer';
+import { captureFrame, suspendDrawing } from './shared/puppeteer-utils.js';
 import { mkdirSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
 import { LAUNCH_ARGS, resolveChromePathOrThrow } from './shared/chrome.js';
@@ -44,7 +45,7 @@ function logResult(r: ButtonResult): void {
 async function screenshot(page: Page, label: string): Promise<void> {
   const idx = String(screenshotIdx++).padStart(2, '0');
   const slug = label.replace(/[^a-z0-9_-]/gi, '_').substring(0, 40);
-  await page.screenshot({ path: resolve(SCREENSHOTS_DIR, `${idx}-${slug}.png`) });
+  await captureFrame(page, resolve(SCREENSHOTS_DIR, `${idx}-${slug}.png`));
 }
 
 // ── Audit all buttons in a panel ──
@@ -194,6 +195,9 @@ async function run() {
     // See puppeteer-utils.ts's initBrowser() for why this isn't
     // 'networkidle0' (#458 T5.1 — EffectComposer/OutputPass regression).
     await page.goto(DEV_SERVER_URL, { waitUntil: 'domcontentloaded' });
+    // Clicks every control and screenshots each one; captureFrame draws the
+    // frames it needs, so the loop between them need not (#475).
+    await suspendDrawing(page);
     await page.waitForSelector('#game-canvas, canvas', { timeout: 10000 });
     await new Promise(r => setTimeout(r, INIT_WAIT_MS));
 

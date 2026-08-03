@@ -191,6 +191,8 @@ declare global {
     __tutorialState: () => { active: boolean; stepIndex: number; stepId: string | null; title: string; total: number; stageIndex: number; stageTotal: number; stageTarget: string | null; clockHeld: boolean };
     __resetTickAccumulator: () => void;
     __setAutoTick: (enabled: boolean) => void;
+    __setRenderEnabled: (enabled: boolean) => void;
+    __renderFrame: () => void;
     __debugGridInfo: () => Record<string, unknown>;
   }
 }
@@ -343,6 +345,14 @@ window.__resetTickAccumulator = () => { accumulatedGameMs = 0; };
 // for a mode that wants to flip it after load.
 let autoTickEnabled = new URLSearchParams(window.location.search).get('scenarioMode') !== '1';
 window.__setAutoTick = (enabled: boolean) => { autoTickEnabled = enabled; };
+
+// Drawing control for the browser-driven harnesses (#475). They need pixels
+// only at a screenshot, but every CDP call they make waits on the render
+// loop — which the terrain material makes cost seconds per frame in software
+// rasterisation. Suspending the draw and forcing one frame per capture keeps
+// the images identical and stops the suites paying for frames nobody sees.
+window.__setRenderEnabled = (enabled: boolean) => { scene.setDrawingEnabled(enabled); };
+window.__renderFrame = () => { scene.renderFrame(); };
 
 // Debug: expose grid reference info for diagnostics
 window.__debugGridInfo = () => {
