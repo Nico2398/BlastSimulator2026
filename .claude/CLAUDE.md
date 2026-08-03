@@ -78,7 +78,9 @@ Five independent channels prove a change works. Each catches what the others mis
 
 **Deliberately not mirrored into `.github/copilot-instructions.md` or `.opencode/AGENTS.md`.** Entry points are the one layer whose bodies are allowed to diverge — each runtime holds its own, and `validate:context` checks only that all three name the same gates and channels, not that they read alike. This section describes how *this* runtime executes: long-running processes it starts in the background and watches across turns. The other two runtimes drive their harnesses differently, so their authors decide their own wording. Its absence there is intentional; do not sync it.
 
-A sandbox has no GPU, so anything that loads a level in a browser rasterizes in software: one `new_game` costs minutes, not seconds. The whole-suite browser runs pass 30 minutes there, which is long enough that a session watching one concludes it hung, kills it, and reports a stall that never happened.
+Without a GPU the terrain material costs ~6 s **per frame** in software rasterisation (#475). Loading a level is cheap — a `new_game` is ~4 s and a campaign start ~16 s. What is expensive is *waiting on frames*: the browser harnesses poll the page over CDP, and every such call waits a full frame, so a single player action costs tens of seconds and a playtest beat costs minutes. Measured on a CI runner, one playtest definition takes 32 minutes. That is long enough that a session watching one concludes it hung, kills it, and reports a stall that never happened.
+
+The game's own simulation is not the cost — turning ticking off changes the frame by 1.7%. Do not go looking for it in world size, navgrid rebuilds, or terrain generation.
 
 | Run | Where |
 |-----|-------|

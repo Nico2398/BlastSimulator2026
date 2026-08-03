@@ -31,9 +31,10 @@ npm run dev &
 ## ▶ What to run here, and what to leave to CI
 
 No GPU means Chromium rasterises in software, and the terrain material costs
-~6.4 s/frame that way (#475, open) — in a sandbox and on a CI runner alike.
-Anything that waits on frames pays that per frame, so whole browser suites run
-for tens of minutes wherever they run. A single screenshot pays it once.
+~6 s/frame that way (#475, open) — in a sandbox and on a CI runner alike. The
+cost is per *frame*, not per level load (a `new_game` is ~4 s) and not the
+simulation (ticking is 1.7% of a frame). So anything that waits on frames in a
+loop runs for tens of minutes, while a single screenshot pays it once.
 
 | Task | Where |
 |------|-------|

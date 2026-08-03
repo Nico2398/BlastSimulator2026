@@ -36,17 +36,20 @@ Implementation: `src/ui/uiActionProbe.ts`.
 
 ## ▶ Where to run it: CI, not an agent sandbox
 
-`npm run playtest` drives headless Chromium against the dev server. An agent
-sandbox has no GPU, so Chromium falls back to software rasterization and every
-landscape build, terrain re-mesh and frame is CPU work. One `new_game` in the
-browser takes minutes there, and each beat's setup does one. The full suite has
-run past 30 minutes — long enough that an agent watching it will conclude it
-has hung, kill it, and report a stall that never happened.
+`npm run playtest` drives headless Chromium against the dev server, and every
+probe it makes (`__probeSelector`, `__uiActions`, `__gameState`) is a CDP call
+that waits for the main thread — that is, a full frame. Without a GPU the
+terrain material costs ~6 s per frame (#475, open), so each poll costs ~6 s,
+each player action several polls, and each beat minutes. Measured on a CI
+runner: 11 m 30 s for "place a living quarters", 32 minutes for one definition
+of three.
 
-It is not the sandbox alone. Every `page.evaluate` the harness makes waits on
-the render loop, and the terrain material costs ~6.4 s/frame under software
-rasterisation on any machine without a GPU, CI runners included (#475, open).
-That is ~6 s per probe poll and minutes per beat wherever it runs.
+Two things this is *not*, both measured, so nobody re-derives them:
+
+- **Not level loading.** A `new_game` is ~4 s and a campaign start ~16 s; the
+  beat that does two full level loads takes 34 s.
+- **Not the simulation.** Turning ticking off changes frame time by 1.7%. It is
+  fragment shading, and it is the same on a CI runner as in a sandbox.
 
 So the `playtest` job in `.github/workflows/ci.yml` is gated behind the
 `full-ci` label, like the interaction-mode scenario job. It runs every
