@@ -18,7 +18,7 @@ import { IndexedDBPersistence } from './persistence/IndexedDBPersistence.js';
 import { DownloadPersistence } from './persistence/DownloadPersistence.js';
 import { createRunner, runCommand } from './console/createRunner.js';
 import { parseCommand } from './console/ConsoleRunner.js';
-import { regenerateGrid, restoreGrid, DEFAULT_GRID_SIZE } from './console/commands/world.js';
+import { regenerateGrid, restoreGrid, terrainGenDatum, DEFAULT_GRID_SIZE } from './console/commands/world.js';
 import { encodeVoxelGrid } from './core/state/VoxelGridCodec.js';
 import { getBiome } from './core/world/BiomeCatalog.js';
 import { BASE_TICK_MS } from './core/engine/GameLoop.js';
@@ -53,7 +53,7 @@ saveLoadUI.setGetState(() => {
   // never save. SaveLoadUI only sees GameState; it has no idea VoxelGrid or
   // its codec exist, by design.
   if (ctx.state && ctx.grid && ctx.state.world) {
-    ctx.state.world = { ...ctx.state.world, voxels: encodeVoxelGrid(ctx.grid) };
+    ctx.state.world = { ...ctx.state.world, voxels: encodeVoxelGrid(ctx.grid, terrainGenDatum(ctx.state)) };
   }
   return ctx.state;
 });

@@ -205,9 +205,26 @@ export interface GameState {
 }
 
 export interface WorldState {
+  /**
+   * Width of the site's live bounding box, NOT an upper bound on x: the site
+   * grows as the player claims chunks (#473), so iterate `minX .. minX+sizeX`
+   * rather than `0 .. sizeX`.
+   */
   sizeX: number;
   sizeY: number;
+  /** Depth of the site's live bounding box. See `sizeX`. */
   sizeZ: number;
+  /** West edge of the bounding box. 0 for a site that has never grown west. */
+  minX: number;
+  /** North edge of the bounding box. 0 for a site that has never grown north. */
+  minZ: number;
+  /**
+   * The level's original width/depth — the generation datum every chunk,
+   * however late it is claimed, is generated against (#473 D3). Unlike
+   * `sizeX`/`sizeZ` these never change.
+   */
+  baseSizeX: number;
+  baseSizeZ: number;
   /** The VoxelGrid is not stored directly — either restored from `voxels` (v6+) or regenerated from seed. */
   gridReady: boolean;
   /**
@@ -224,6 +241,16 @@ export interface SavedBlastPlan {
   drillHoles: DrillHole[];
   chargesByHole: Record<string, HoleCharge>;
   sequenceDelays: Record<string, number>;
+}
+
+/** A world state for a site that starts as the square `sizeX × sizeZ` at the origin, before any expansion (#473). */
+export function createWorldState(sizeX: number, sizeY: number, sizeZ: number, gridReady: boolean): WorldState {
+  return {
+    sizeX, sizeY, sizeZ,
+    minX: 0, minZ: 0,
+    baseSizeX: sizeX, baseSizeZ: sizeZ,
+    gridReady,
+  };
 }
 
 /** Create a fresh GameState from config. */
@@ -288,4 +315,18 @@ export function buildGameNavGrid(
 ): void {
   if (voxelGrid.sizeX <= 0 || voxelGrid.sizeZ <= 0) return;
   state.navGrid = NavGrid.buildNavGrid(voxelGrid, buildings, drillHoles);
+}
+
+/**
+ * Copy the grid's live bounding box onto `state.world`, so everything reading
+ * the state dump (minimap, UI pickers, playtest harness) follows the site as
+ * it grows. `baseSizeX`/`baseSizeZ` are left untouched — they are the
+ * generation datum, not a measurement of the site.
+ */
+export function syncWorldBounds(state: GameState, voxelGrid: VoxelGrid): void {
+  if (!state.world) return;
+  state.world.minX = voxelGrid.minX;
+  state.world.minZ = voxelGrid.minZ;
+  state.world.sizeX = voxelGrid.sizeX;
+  state.world.sizeZ = voxelGrid.sizeZ;
 }
