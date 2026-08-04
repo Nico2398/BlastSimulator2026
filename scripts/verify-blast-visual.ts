@@ -1,16 +1,15 @@
 /**
  * BlastSimulator2026 — visual verification harness for the blast pipeline.
  *
- * Drives the real game in a browser, parks the camera close to the bench at a
- * low angle, and captures matched before/after pairs so the terrain surface can
- * be compared directly rather than inferred. Every shot in a group uses the
- * identical camera, so anything that differs between two images is the game
- * changing, not the view.
+ * Drives the real game in a browser, looks down into the blast site, and
+ * captures matched before/after pairs so the terrain surface can be compared
+ * directly rather than inferred. Every shot in a group uses the identical
+ * camera, so anything that differs between two images is the game changing, not
+ * the view.
  *
- * Also dumps the fragment size and speed spread behind each shot, so the
- * pictures can be checked against the state that produced them. Ground-height
- * profiles come from the headless companion, scripts/verify-blast-profile.ts,
- * which runs the same command sequences without a browser.
+ * Also dumps the muck pile behind each shot — fragment size, launch speed, and
+ * whether any rock came to rest on nothing — so the pictures can be checked
+ * against the state that produced them.
  *
  *   npx tsx scripts/verify-blast-visual.ts
  */
@@ -23,9 +22,20 @@ const OUT = resolve(process.cwd(), 'screenshots/blast-verify');
 const URL = 'http://localhost:5173';
 const CHROME = '/opt/pw-browsers/chromium';
 
-/** Blast site, and where the camera sits to look at it. */
+/**
+ * Blast site, and where the camera sits to look at it.
+ *
+ * The pitch is steep on purpose. A blast digs a pit and fills it with muck, and
+ * from a low angle the crater's own rim hides everything inside it — a shot at
+ * eye level shows undisturbed desert and reads as "nothing happened". Looking
+ * down into the hole is the only way to see the floor of it.
+ *
+ * `__cameraFocus` aims at the *current* ground height, which the blast lowers by
+ * several metres, so a low camera also drops between the before and after shots
+ * and stops framing the same thing. From above that shift barely moves the view.
+ */
 const SITE = { x: 20, z: 20 };
-const CAMERA = { distance: 34, yaw: 0.6, pitch: 0.28 };
+const CAMERA = { distance: 40, yaw: 0.6, pitch: 0.85 };
 
 interface Shot {
   name: string;
@@ -93,7 +103,7 @@ async function capture(page: Page, shot: Shot, group: string): Promise<Record<st
   return { shot: shot.name, ...stats };
 }
 
-/** A heavily charged but properly stemmed pattern: a big pit, no flyrock. */
+/** A 4x4 pattern over the blast site: charge weight and stemming vary per shot. */
 const PATTERN = (kg: string, stem: string, rows = 4, cols = 4, spacing = 3): string[] => [
   `drill_plan grid rows:${rows} cols:${cols} spacing:${spacing} depth:8 start:${SITE.x - 4},${SITE.z - 4}`,
   `charge hole:* explosive:dynatomics amount:${kg} stemming:${stem}`,
@@ -140,23 +150,28 @@ const SETTLED = ['tick 5', 'tick 5', 'tick 5', 'tick 5'];
 
 const GROUPS: Record<string, Shot[]> = {
   // Same camera, same seed, same pattern — the only difference is whether the
-  // charge has gone off. Anything that changes between these two is the blast.
+  // charge has gone off. Anything that changes between these shots is the blast.
+  //
+  // A well-stemmed 3 kg pattern: rated PERFECT, nothing thrown off site, so the
+  // muck stays in the hole it came out of and the collapse is what the picture
+  // shows. A 20 kg overcharge scatters rock to the far corners of the map, which
+  // says nothing about whether the ground came down.
   collapse: [
-    { name: '1-before', commands: ['new_game seed:42', ...PATTERN('20', '3')] },
+    { name: '1-before', commands: ['new_game seed:42', ...PATTERN('3', '2')] },
     // Caught mid-collapse, with the rock still on its way down.
     {
       name: '2-in-flight',
-      commands: ['new_game seed:42', ...PATTERN('20', '3'), 'blast'],
+      commands: ['new_game seed:42', ...PATTERN('3', '2'), 'blast'],
       keepPlayback: true,
     },
-    { name: '3-settled', commands: ['new_game seed:42', ...PATTERN('20', '3'), 'blast', ...SETTLED] },
+    { name: '3-settled', commands: ['new_game seed:42', ...PATTERN('3', '2'), 'blast', ...SETTLED] },
   ],
   // One variable at a time, everything else held fixed.
   setup: [
-    { name: '1-small-charge', commands: ['new_game seed:42', ...PATTERN('3', '3'), 'blast', ...SETTLED] },
-    { name: '2-large-charge', commands: ['new_game seed:42', ...PATTERN('20', '3'), 'blast', ...SETTLED] },
+    { name: '1-small-charge', commands: ['new_game seed:42', ...PATTERN('3', '2'), 'blast', ...SETTLED] },
+    { name: '2-large-charge', commands: ['new_game seed:42', ...PATTERN('20', '2'), 'blast', ...SETTLED] },
     { name: '3-large-unstemmed', commands: ['new_game seed:42', ...PATTERN('20', '0'), 'blast', ...SETTLED] },
-    { name: '4-wide-spacing', commands: ['new_game seed:42', ...PATTERN('20', '3', 3, 3, 6), 'blast', ...SETTLED] },
+    { name: '4-wide-spacing', commands: ['new_game seed:42', ...PATTERN('20', '2', 3, 3, 6), 'blast', ...SETTLED] },
   ],
 };
 
