@@ -14,6 +14,7 @@ import {
   getVehicleDefByTier,
   // ── Task 2.6 — not yet implemented in Vehicle.ts (Red phase) ────────────────
   assignDriver,
+  unassignDriver,
 } from '../../../src/core/entities/Vehicle.js';
 import { Random } from '../../../src/core/math/Random.js';
 import {
@@ -1406,5 +1407,77 @@ describe('assignDriver — error: vehicle already has a driver', () => {
     expect(vehicle.driverId).toBe(originalDriverId);
     // And must definitely not be overwritten with the incoming empId.
     expect(vehicle.driverId).not.toBe(empId);
+  });
+});
+
+// ── unassignDriver — frees a vehicle's driver so it can be reassigned ─────────
+
+describe('unassignDriver — happy path', () => {
+  it('clears driverId and reports success', () => {
+    const { vs, es, vehicleId, empId } = makeDriverFixture('debris_hauler', 'driving.truck');
+    assignDriver(vs, es, vehicleId, empId);
+    const result = unassignDriver(vs, vehicleId);
+    expect(result.success).toBe(true);
+    const vehicle = vs.vehicles.find(v => v.id === vehicleId)!;
+    expect(vehicle.driverId).toBeNull();
+  });
+
+  it('the freed employee can be assigned to a different vehicle afterward', () => {
+    const { vs, es, vehicleId, empId } = makeDriverFixture('debris_hauler', 'driving.truck');
+    assignDriver(vs, es, vehicleId, empId);
+    unassignDriver(vs, vehicleId);
+    const { vehicle: otherVehicle } = purchaseVehicle(vs, 'debris_hauler');
+    const result = assignDriver(vs, es, otherVehicle.id, empId);
+    expect(result.success).toBe(true);
+  });
+});
+
+describe('unassignDriver — error: vehicle not found', () => {
+  it('returns a failure result', () => {
+    const vs = createVehicleState();
+    const result = unassignDriver(vs, 9999);
+    expect(result.success).toBe(false);
+  });
+
+  it('error message names the reason', () => {
+    const vs = createVehicleState();
+    const result = unassignDriver(vs, 9999);
+    expect(result.error).toBe('Vehicle not found');
+  });
+});
+
+describe('unassignDriver — error: vehicle has no driver', () => {
+  it('returns a failure result without touching the vehicle', () => {
+    const vs = createVehicleState();
+    const { vehicle } = purchaseVehicle(vs, 'debris_hauler');
+    const result = unassignDriver(vs, vehicle.id);
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Vehicle has no driver');
+    expect(vehicle.driverId).toBeNull();
+  });
+});
+
+describe('unassignDriver — error: vehicle is mid-haul', () => {
+  it('refuses to unassign and preserves driverId while hauling to a fragment', () => {
+    const { vs, es, vehicleId, empId } = makeDriverFixture('debris_hauler', 'driving.truck');
+    assignDriver(vs, es, vehicleId, empId);
+    const vehicle = vs.vehicles.find(v => v.id === vehicleId)!;
+    vehicle.haulingPhase = 'to_fragment';
+
+    const result = unassignDriver(vs, vehicleId);
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Vehicle is mid-haul');
+    expect(vehicle.driverId).toBe(empId);
+  });
+
+  it('refuses to unassign while hauling to the depot', () => {
+    const { vs, es, vehicleId, empId } = makeDriverFixture('debris_hauler', 'driving.truck');
+    assignDriver(vs, es, vehicleId, empId);
+    const vehicle = vs.vehicles.find(v => v.id === vehicleId)!;
+    vehicle.haulingPhase = 'to_depot';
+
+    const result = unassignDriver(vs, vehicleId);
+    expect(result.success).toBe(false);
+    expect(vehicle.driverId).toBe(empId);
   });
 });

@@ -91,4 +91,44 @@ describe('BuildingMesh', () => {
     expect(bm.count).toBe(1);
     bm.dispose();
   });
+
+  describe('scene picking (P2)', () => {
+    it('pickables() returns one tagged object per building', () => {
+      const scene = new THREE.Scene();
+      const bm = new BuildingMesh(scene);
+      bm.addBuilding(makeBuilding(1, 'management_office'));
+      bm.addBuilding(makeBuilding(2, 'living_quarters'));
+      const pickables = bm.pickables();
+      expect(pickables).toHaveLength(2);
+      expect(pickables.map(o => o.userData['entityId']).sort()).toEqual([1, 2]);
+      expect(pickables.every(o => o.userData['entityKind'] === 'building')).toBe(true);
+      bm.dispose();
+    });
+
+    it('getPosition() returns the building group world position', () => {
+      const scene = new THREE.Scene();
+      const bm = new BuildingMesh(scene);
+      bm.addBuilding(makeBuilding(1, 'management_office', 20, 30));
+      const pos = bm.getPosition(1);
+      expect(pos?.x).toBeCloseTo(21);
+      expect(pos?.z).toBeCloseTo(31);
+      bm.dispose();
+    });
+
+    it('getPosition() returns null for an id that was never added', () => {
+      const scene = new THREE.Scene();
+      const bm = new BuildingMesh(scene);
+      expect(bm.getPosition(999)).toBeNull();
+      bm.dispose();
+    });
+
+    it('removed buildings drop out of pickables()', () => {
+      const scene = new THREE.Scene();
+      const bm = new BuildingMesh(scene);
+      bm.addBuilding(makeBuilding(1, 'management_office'));
+      bm.removeBuilding(1);
+      expect(bm.pickables()).toHaveLength(0);
+      bm.dispose();
+    });
+  });
 });

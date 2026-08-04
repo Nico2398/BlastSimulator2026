@@ -125,6 +125,11 @@ export class FragmentMesh {
       const im = new THREE.InstancedMesh(geo, material, BUCKET_CAPACITY);
       im.count = 0;
       im.frustumCulled = false; // fragments fly around; disable per-instance culling
+      // Tagged for scene picking (P2): one InstancedMesh represents many
+      // fragments, so a raycast hit resolves via (bucketIndex, instanceId) →
+      // fragmentIdAt() rather than a single entityId like other entity kinds.
+      im.userData['entityKind'] = 'fragment';
+      im.userData['bucketIndex'] = i;
       scene.add(im);
       this.instancedMeshes.push(im);
       this.bucketSlotToFrag.push(new Array<number>(BUCKET_CAPACITY).fill(-1));
@@ -289,6 +294,32 @@ export class FragmentMesh {
   /** Get count of currently rendered fragments. */
   get count(): number {
     return this.bucketCount.reduce((a, b) => a + b, 0);
+  }
+
+  /** Root objects raycastable for scene picking — the 8 shape-variant buckets, tagged in the constructor. */
+  pickables(): THREE.Object3D[] {
+    return this.instancedMeshes;
+  }
+
+  /**
+   * Resolve a raycast hit on a fragment bucket (bucketIndex from
+   * `im.userData['bucketIndex']`, instanceId from the Intersection) back to
+   * the fragment id occupying that instance slot. Returns null out of range.
+   */
+  fragmentIdAt(bucketIndex: number, instanceId: number): number | null {
+    const bucket = this.bucketSlotToFrag[bucketIndex];
+    const fragId = bucket?.[instanceId];
+    return fragId === undefined || fragId < 0 ? null : fragId;
+  }
+
+  /** World-space position of a fragment still on the field, or null if it isn't (removed/never spawned). */
+  fragmentPosition(fragmentId: number): THREE.Vector3 | null {
+    const slot = this.fragIdToSlot.get(fragmentId);
+    if (!slot) return null;
+    const im = this.instancedMeshes[slot.meshIdx]!;
+    im.getMatrixAt(slot.slotIdx, FragmentMesh._mtx);
+    FragmentMesh._mtx.decompose(FragmentMesh._pos, FragmentMesh._quat, FragmentMesh._scale);
+    return FragmentMesh._pos.clone();
   }
 
   /** Remove instanced meshes from the scene. Geometries are shared (kept alive); material is borrowed from TerrainMesh, which owns and disposes it. */

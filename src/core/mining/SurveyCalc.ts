@@ -204,6 +204,27 @@ export function isSurveyStale(result: SurveyResult, currentTick: number): boolea
   return currentTick - result.completedTick > SURVEY_STALE_TICKS;
 }
 
+/**
+ * Return the most recently completed survey from `surveys` that contains an
+ * estimate entry for the column at `(x, z)`, or `undefined` if none covers it.
+ * Shared by the post-blast ore report and any UI that needs to show a
+ * column's known estimate (e.g. a terrain hover tag).
+ */
+export function findSurveyForColumn(
+  surveys: readonly SurveyResult[],
+  x: number,
+  z: number,
+): SurveyResult | undefined {
+  const colKey = `${Math.floor(x)},${Math.floor(z)}`;
+  let best: SurveyResult | undefined;
+  for (const survey of surveys) {
+    if (colKey in survey.estimates) {
+      if (!best || survey.completedTick > best.completedTick) best = survey;
+    }
+  }
+  return best;
+}
+
 export { applySeismicSurveyDamage } from './SeismicSurveyDamage.js';
 
 /** Input parameters for {@link runSurvey}. */

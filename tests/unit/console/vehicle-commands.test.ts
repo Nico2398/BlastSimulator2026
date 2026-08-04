@@ -233,7 +233,7 @@ describe('vehicle driver — invalid argument guards', () => {
     const result = vehicleCommand(ctx, ['driver', 'abc', String(employeeId)], {});
 
     expect(result.success).toBe(false);
-    expect(result.output).toBe('Usage: vehicle driver <vehicleId> <employeeId>');
+    expect(result.output).toBe('Usage: vehicle driver <vehicleId> <employeeId|none>');
   });
 
   it('returns usage error when employeeId is not a number', () => {
@@ -243,7 +243,7 @@ describe('vehicle driver — invalid argument guards', () => {
     const result = vehicleCommand(ctx, ['driver', String(vehicleId), 'xyz'], {});
 
     expect(result.success).toBe(false);
-    expect(result.output).toBe('Usage: vehicle driver <vehicleId> <employeeId>');
+    expect(result.output).toBe('Usage: vehicle driver <vehicleId> <employeeId|none>');
   });
 
   it('returns usage error when both arguments are omitted', () => {
@@ -252,7 +252,7 @@ describe('vehicle driver — invalid argument guards', () => {
     const result = vehicleCommand(ctx, ['driver'], {});
 
     expect(result.success).toBe(false);
-    expect(result.output).toBe('Usage: vehicle driver <vehicleId> <employeeId>');
+    expect(result.output).toBe('Usage: vehicle driver <vehicleId> <employeeId|none>');
   });
 });
 
@@ -343,6 +343,53 @@ describe('vehicle driver — domain validation errors', () => {
 
     expect(result.success).toBe(false);
     expect(result.output).toBe('Employee already driving another vehicle');
+  });
+});
+
+// ── vehicle driver <id> none — unassign ──
+
+describe('vehicle driver — unassign with "none"', () => {
+  it('clears the driver and reports success', () => {
+    const ctx = makeCtx();
+    const vehicleId = addTruckVehicle(ctx);
+    const employeeId = addTruckDriver(ctx);
+    vehicleCommand(ctx, ['driver', String(vehicleId), String(employeeId)], {});
+    tickCommand(ctx, ['1'], {});
+
+    const result = vehicleCommand(ctx, ['driver', String(vehicleId), 'none'], {});
+
+    expect(result.success).toBe(true);
+    expect(result.output).toBe(`Vehicle #${vehicleId} driver unassigned.`);
+    expect(ctx.state!.vehicles.vehicles.find(v => v.id === vehicleId)!.driverId).toBeNull();
+  });
+
+  it('the freed employee can board a different vehicle afterward', () => {
+    const ctx = makeCtx();
+    const firstVehicleId = addTruckVehicle(ctx);
+    const secondVehicleId = addTruckVehicle(ctx);
+    const employeeId = addTruckDriver(ctx);
+    vehicleCommand(ctx, ['driver', String(firstVehicleId), String(employeeId)], {});
+    tickCommand(ctx, ['1'], {});
+    vehicleCommand(ctx, ['driver', String(firstVehicleId), 'none'], {});
+
+    const result = vehicleCommand(ctx, ['driver', String(secondVehicleId), String(employeeId)], {});
+
+    expect(result.success).toBe(true);
+  });
+
+  it('returns an error for a non-existent vehicle', () => {
+    const ctx = makeCtx();
+    const result = vehicleCommand(ctx, ['driver', '9999', 'none'], {});
+    expect(result.success).toBe(false);
+    expect(result.output).toBe('Vehicle not found');
+  });
+
+  it('returns an error when the vehicle has no driver', () => {
+    const ctx = makeCtx();
+    const vehicleId = addTruckVehicle(ctx);
+    const result = vehicleCommand(ctx, ['driver', String(vehicleId), 'none'], {});
+    expect(result.success).toBe(false);
+    expect(result.output).toBe('Vehicle has no driver');
   });
 });
 

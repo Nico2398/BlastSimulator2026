@@ -307,6 +307,24 @@ export function assignDriver(
 }
 
 /**
+ * Unassign a vehicle's driver, freeing the employee to be reassigned
+ * elsewhere. Refuses while the vehicle is mid-haul (driving to a fragment or
+ * to the depot with one loaded) so a haul doesn't get orphaned mid-flight.
+ */
+export function unassignDriver(
+  vehicleState: VehicleState,
+  vehicleId: number,
+): { success: boolean; error?: string } {
+  const vehicle = vehicleState.vehicles.find(v => v.id === vehicleId);
+  if (!vehicle) return { success: false, error: 'Vehicle not found' };
+  if (vehicle.driverId === null) return { success: false, error: 'Vehicle has no driver' };
+  if (vehicle.haulingPhase !== null) return { success: false, error: 'Vehicle is mid-haul' };
+
+  vehicle.driverId = null;
+  return { success: true };
+}
+
+/**
  * Returns the loading rate (kg/tick) for a rock_digger, or 0 for any other role.
  *
  * @note Function name intentionally kept as `getExcavatorLoadingRate` for

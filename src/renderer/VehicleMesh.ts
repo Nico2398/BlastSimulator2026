@@ -14,6 +14,7 @@
 import * as THREE from 'three';
 import type { Vehicle, VehicleRole, VehicleTier, VehicleOperationalState } from '../core/entities/Vehicle.js';
 import { waitingQueueOffset, waitingRenderPosition } from './VehicleWaitingQueue.js';
+import { tagPickable } from './Pickable.js';
 
 // ---------- Colors ----------
 const YELLOW = 0xf5c518;   // Caterpillar yellow
@@ -164,6 +165,7 @@ export class VehicleMesh {
     const pool = [...Array.from(this.vehicles.values(), e => e.vehicle), vehicle];
     const [renderX, renderZ] = this.waitingRenderPosition(vehicle, pool);
     group.position.set(renderX, surfaceY, renderZ);
+    tagPickable(group, 'vehicle', vehicle.id);
     this.scene.add(group);
     this.vehicles.set(vehicle.id, { group, vehicle });
   }
@@ -230,6 +232,16 @@ export class VehicleMesh {
 
   get count(): number {
     return this.vehicles.size;
+  }
+
+  /** Root objects raycastable for scene picking — one Group per vehicle, tagged in addVehicle(). */
+  pickables(): THREE.Object3D[] {
+    return Array.from(this.vehicles.values(), e => e.group);
+  }
+
+  /** Current world-space position of a vehicle's root Group, or null if it isn't rendered. */
+  getPosition(id: number): THREE.Vector3 | null {
+    return this.vehicles.get(id)?.group.position.clone() ?? null;
   }
 
   dispose(): void {

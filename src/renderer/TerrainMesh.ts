@@ -305,6 +305,15 @@ export class TerrainMesh {
     return this.chunks.get(this.chunkKey(cx, cy, cz)) ?? null;
   }
 
+  /** Every built (non-empty) chunk mesh — raycast targets for terrain scene picking (P2). */
+  get meshes(): THREE.Mesh[] {
+    const built: THREE.Mesh[] = [];
+    for (const mesh of this.chunks.values()) {
+      if (mesh) built.push(mesh);
+    }
+    return built;
+  }
+
   /**
    * Chunk grid dimensions for the currently-bound grid — diagnostics and
    * tests. `ncx`/`ncz` describe the bounding box; the claimed set inside it

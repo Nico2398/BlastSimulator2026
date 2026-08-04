@@ -79,6 +79,21 @@ export class EmployeePanel {
   hide(): void { this.el.style.display = 'none'; }
   get visible(): boolean { return this.el.style.display !== 'none'; }
 
+  /**
+   * Expand a specific employee's detail row and scroll it into view — the
+   * panel-side half of the scene selection bar's DETAIL/TRAIN actions
+   * (src/ui/shell/SelectionBar.ts), which pick an employee in the 3D scene
+   * and need their row opened here, not just the panel shown.
+   */
+  expandEmployee(id: number): void {
+    this.expanded.add(id);
+    this.lastSignature = ''; // force a rebuild so the row renders expanded
+    if (this.lastState) this.update(this.lastState);
+    // Optional chained on the method itself, not just the element — jsdom
+    // (unit tests) doesn't implement scrollIntoView at all.
+    this.listEl.querySelector<HTMLElement>(`[data-employee-id="${id}"]`)?.scrollIntoView?.({ block: 'nearest' });
+  }
+
   update(state: GameState): void {
     this.lastState = state;
     const { employees } = state.employees;

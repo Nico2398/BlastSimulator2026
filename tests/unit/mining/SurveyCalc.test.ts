@@ -5,7 +5,7 @@ import type { SurveyMethod, SurveyResult } from '../../../src/core/mining/Survey
 // ── Task 4.2 additions ────────────────────────────────────────────────────────
 import { estimateSurveyResult, type EstimateSurveyParams } from '../../../src/core/mining/SurveyCalc.js';
 // ── Task 4.3 additions ────────────────────────────────────────────────────────
-import { isSurveyStale } from '../../../src/core/mining/SurveyCalc.js';
+import { isSurveyStale, findSurveyForColumn } from '../../../src/core/mining/SurveyCalc.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { Random } from '../../../src/core/math/Random.js';
 // ── Task 4.6 additions ────────────────────────────────────────────────────────
@@ -572,6 +572,48 @@ describe('SurveyCalc — isSurveyStale (4.3)', () => {
     // elapsed = 101 - 0 = 101  →  101 > 100  →  stale
     const result = makeResult(0);
     expect(isSurveyStale(result, 101)).toBe(true);
+  });
+});
+
+// ── findSurveyForColumn ────────────────────────────────────────────────────────
+
+describe('SurveyCalc — findSurveyForColumn', () => {
+  function makeColumnResult(id: number, completedTick: number, colKeys: string[]): SurveyResult {
+    const estimates: Record<string, Record<string, number>> = {};
+    for (const key of colKeys) estimates[key] = { grumpite: 0.4 };
+    return { ...BASE_RESULT, id, completedTick, estimates };
+  }
+
+  it('returns the survey covering the column', () => {
+    const survey = makeColumnResult(1, 10, ['12,8']);
+    expect(findSurveyForColumn([survey], 12, 8)).toBe(survey);
+  });
+
+  it('floors fractional coordinates onto the containing tile', () => {
+    const survey = makeColumnResult(1, 10, ['12,8']);
+    expect(findSurveyForColumn([survey], 12.9, 8.4)).toBe(survey);
+  });
+
+  it('returns undefined when no survey covers the column', () => {
+    const survey = makeColumnResult(1, 10, ['12,8']);
+    expect(findSurveyForColumn([survey], 99, 99)).toBeUndefined();
+  });
+
+  it('returns undefined for an empty survey list', () => {
+    expect(findSurveyForColumn([], 12, 8)).toBeUndefined();
+  });
+
+  it('picks the most recently completed survey when several cover the column', () => {
+    const older = makeColumnResult(1, 10, ['12,8']);
+    const newer = makeColumnResult(2, 50, ['12,8']);
+    expect(findSurveyForColumn([older, newer], 12, 8)).toBe(newer);
+    expect(findSurveyForColumn([newer, older], 12, 8)).toBe(newer);
+  });
+
+  it('ignores surveys that cover other columns', () => {
+    const here = makeColumnResult(1, 10, ['12,8']);
+    const elsewhere = makeColumnResult(2, 99, ['3,3']);
+    expect(findSurveyForColumn([elsewhere, here], 12, 8)).toBe(here);
   });
 });
 

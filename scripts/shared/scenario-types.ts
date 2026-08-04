@@ -26,6 +26,13 @@ export type InteractionStepAction =
   // grid — and surface only as "the step did not complete".
   | { type: 'pickTile'; x: number; z: number }
   | { type: 'dragTiles'; x1: number; z1: number; x2: number; z2: number }
+  // Snaps the camera onto a known world point before a raw click/mousemove
+  // targets a scene entity (redesign P2) — there's no picker canvas to
+  // recompute pixels from the way pickTile/dragTiles do, so this pins the
+  // camera instead and callers click the viewport centre. Forces a render
+  // frame afterward (interaction mode suspends drawing — #475 — so neither
+  // the camera's nor the scene's matrixWorld is current until one is drawn).
+  | { type: 'cameraFocus'; x: number; z: number; distance: number }
   | { type: 'keypress'; key: string }
   | { type: 'keydown'; key: string }
   | { type: 'keyup'; key: string }

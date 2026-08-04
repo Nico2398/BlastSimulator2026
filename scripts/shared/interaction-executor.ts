@@ -234,6 +234,16 @@ export async function executeActionOnPage(
         return undefined;
       }, action.command);
       break;
+    case 'cameraFocus':
+      await page.evaluate(({ x, z, distance }: { x: number; z: number; distance: number }) => {
+        (window as any).__cameraFocus(x, z, distance);
+        // Interaction mode suspends the draw loop (#475) — matrixWorld for
+        // both the camera and every entity group is only ever current right
+        // after a real frame, so force one before any click/mousemove that
+        // needs to raycast against the new framing.
+        (window as any).__renderFrame?.();
+      }, { x: action.x, z: action.z, distance: action.distance });
+      break;
     case 'screenshot':
       // Screenshot is handled by the caller, not here
       break;

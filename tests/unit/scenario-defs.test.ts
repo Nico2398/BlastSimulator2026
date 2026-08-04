@@ -12,7 +12,7 @@ const currentDir = dirname(fileURLToPath(import.meta.url));
 
 const KNOWN_INTERACTION_ACTION_TYPES = [
   'click', 'clickSelector', 'mousedown', 'mouseup', 'mousemove',
-  'pickTile', 'dragTiles',
+  'pickTile', 'dragTiles', 'cameraFocus',
   'keypress', 'keydown', 'keyup',
   'scroll', 'wheel',
   'wait', 'waitForSelector', 'type',
@@ -131,6 +131,7 @@ const VISUAL_SCENARIO_NAMES = [
   'survey-seismic-side-effects',
   'survey-stale-handling',
   'tutorial-interactive',
+  'scene-picking-visual',
 ] as const;
 
 /**
@@ -541,6 +542,24 @@ describe('Dual-play scenario steps — data-driven validation', () => {
           if (action.type === 'command') {
             expect(typeof action.command).toBe('string');
             expect(action.command.length).toBeGreaterThan(0);
+          }
+        }
+      }
+    });
+
+    it(`${name} — cameraFocus actions have x, z, and distance`, () => {
+      const scenario = loadScenarioDef(name, SCENARIO_DIR);
+      for (let i = 0; i < scenario.steps.length; i++) {
+        const step = scenario.steps[i];
+        if (typeof step === 'string') continue;
+        const stepObj = step as ScenarioStepDef;
+        if (!stepObj.interaction) continue;
+        for (const action of stepObj.interaction) {
+          if (action.type === 'cameraFocus') {
+            expect(typeof action.x).toBe('number');
+            expect(typeof action.z).toBe('number');
+            expect(typeof action.distance).toBe('number');
+            expect(action.distance).toBeGreaterThan(0);
           }
         }
       }

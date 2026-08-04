@@ -258,4 +258,58 @@ describe('FragmentMesh (InstancedMesh)', () => {
       expect(ore.getY(1)).toBeCloseTo(0.4, 6);
     });
   });
+
+  describe('scene picking (P2)', () => {
+    it('pickables() returns the 8 shape-variant buckets, each tagged with its bucket index', () => {
+      const pickables = fm.pickables();
+      expect(pickables).toHaveLength(SHAPE_VARIANTS);
+      expect(pickables.every(o => o.userData['entityKind'] === 'fragment')).toBe(true);
+      expect(pickables.map(o => o.userData['bucketIndex']).sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+    });
+
+    it('fragmentIdAt() resolves a bucket slot back to the fragment id occupying it', () => {
+      fm.spawnFragments([makeFragment(3), makeFragment(11)]); // both id % 8 === 3, same bucket
+      expect(fm.fragmentIdAt(3, 0)).toBe(3);
+      expect(fm.fragmentIdAt(3, 1)).toBe(11);
+    });
+
+    it('fragmentIdAt() returns null for an empty slot', () => {
+      fm.spawnFragments([makeFragment(3)]);
+      expect(fm.fragmentIdAt(3, 1)).toBeNull();
+    });
+
+    it('fragmentIdAt() tracks a swap-with-last after removal', () => {
+      fm.spawnFragments([makeFragment(0), makeFragment(8), makeFragment(16)]); // all bucket 0
+      fm.removeFragment(8); // vacates slot 1; slot 2 (frag 16) swaps into it
+      expect(fm.fragmentIdAt(0, 1)).toBe(16);
+    });
+
+    it('fragmentPosition() returns the fragment\'s current world position', () => {
+      fm.spawnFragments([makeFragment(2, { position: { x: 5, y: 1, z: -3 } })]);
+      const pos = fm.fragmentPosition(2);
+      const rendered = getInstancePosition(scene.children[2] as THREE.InstancedMesh, 0);
+      expect(pos?.x).toBeCloseTo(rendered.x);
+      expect(pos?.y).toBeCloseTo(rendered.y);
+      expect(pos?.z).toBeCloseTo(rendered.z);
+    });
+
+    it('fragmentPosition() reflects updatePositions()', () => {
+      fm.spawnFragments([makeFragment(2)]);
+      fm.updatePositions(new Map([[2, { x: 40, y: 2, z: -10 }]]));
+      const pos = fm.fragmentPosition(2);
+      expect(pos?.x).toBeCloseTo(40);
+      expect(pos?.y).toBeCloseTo(2);
+      expect(pos?.z).toBeCloseTo(-10);
+    });
+
+    it('fragmentPosition() returns null for a fragment that was never spawned', () => {
+      expect(fm.fragmentPosition(999)).toBeNull();
+    });
+
+    it('fragmentPosition() returns null for a fragment that has been removed', () => {
+      fm.spawnFragments([makeFragment(4)]);
+      fm.removeFragment(4);
+      expect(fm.fragmentPosition(4)).toBeNull();
+    });
+  });
 });

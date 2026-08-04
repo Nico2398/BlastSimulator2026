@@ -976,3 +976,42 @@ describe('EmployeePanel — per-frame rebuild guard', () => {
     container.remove();
   });
 });
+
+describe('EmployeePanel — expandEmployee (scene selection DETAIL/TRAIN, P2)', () => {
+  it('expands the given employee\'s detail row', () => {
+    const { container, panel } = setupPanel();
+    const worker = makeEmployee({ id: 3 });
+    panel.update(withEmployees(makeMockState(), [worker]));
+
+    panel.expandEmployee(3);
+
+    const row = container.querySelector('[data-employee-id="3"]');
+    expect(row?.querySelector('.bs-employee-detail')).not.toBeNull();
+    panel.dispose();
+    container.remove();
+  });
+
+  it('is a no-op-safe call for an id not currently in the roster', () => {
+    const { container, panel } = setupPanel();
+    panel.update(withEmployees(makeMockState(), [makeEmployee({ id: 1 })]));
+    expect(() => panel.expandEmployee(9999)).not.toThrow();
+    panel.dispose();
+    container.remove();
+  });
+
+  it('the expansion survives the next update() (persisted like a manual toggle)', () => {
+    const { container, panel } = setupPanel();
+    const worker = makeEmployee({ id: 4 });
+    const state = withEmployees(makeMockState(), [worker]);
+    panel.update(state);
+
+    panel.expandEmployee(4);
+    worker.morale = 40; // any change that would otherwise be a dynamic-only refresh
+    panel.update(state);
+
+    const row = container.querySelector('[data-employee-id="4"]');
+    expect(row?.querySelector('.bs-employee-detail')).not.toBeNull();
+    panel.dispose();
+    container.remove();
+  });
+});

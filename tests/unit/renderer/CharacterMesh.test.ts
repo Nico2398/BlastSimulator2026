@@ -149,4 +149,35 @@ describe('CharacterMesh', () => {
     expect(scene.children.length).toBe(0);
     cm.dispose();
   });
+
+  describe('scene picking (P2)', () => {
+    it('pickables() returns one tagged object per employee', () => {
+      const scene = new THREE.Scene();
+      const cm = new CharacterMesh(scene);
+      cm.addEmployee(makeEmployee(1));
+      cm.addEmployee(makeEmployee(2));
+      const pickables = cm.pickables();
+      expect(pickables).toHaveLength(2);
+      expect(pickables.map(o => o.userData['entityId']).sort()).toEqual([1, 2]);
+      expect(pickables.every(o => o.userData['entityKind'] === 'employee')).toBe(true);
+      cm.dispose();
+    });
+
+    it('getPosition() returns the employee group world position', () => {
+      const scene = new THREE.Scene();
+      const cm = new CharacterMesh(scene);
+      cm.addEmployee(makeEmployee(1, { x: 9, z: 4 }));
+      const pos = cm.getPosition(1);
+      expect(pos?.x).toBeCloseTo(9);
+      expect(pos?.z).toBeCloseTo(4);
+      cm.dispose();
+    });
+
+    it('getPosition() returns null for an id that was never added', () => {
+      const scene = new THREE.Scene();
+      const cm = new CharacterMesh(scene);
+      expect(cm.getPosition(999)).toBeNull();
+      cm.dispose();
+    });
+  });
 });

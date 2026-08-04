@@ -6,6 +6,7 @@ import {
   purchaseVehicle,
   assignVehicle,
   moveVehicle,
+  unassignDriver,
   getAllVehicleRoles,
   type VehicleRole,
   type VehicleTask,
@@ -115,9 +116,19 @@ export function vehicleCommand(
     }
     case 'driver': {
       const vehicleId = parseInt(args[1] ?? '', 10);
+      if (isNaN(vehicleId)) {
+        return { success: false, output: 'Usage: vehicle driver <vehicleId> <employeeId|none>' };
+      }
+      if (args[2] === 'none') {
+        const result = unassignDriver(state.vehicles, vehicleId);
+        if (!result.success) {
+          return { success: false, output: result.error! };
+        }
+        return { success: true, output: `Vehicle #${vehicleId} driver unassigned.` };
+      }
       const employeeId = parseInt(args[2] ?? '', 10);
-      if (isNaN(vehicleId) || isNaN(employeeId)) {
-        return { success: false, output: 'Usage: vehicle driver <vehicleId> <employeeId>' };
+      if (isNaN(employeeId)) {
+        return { success: false, output: 'Usage: vehicle driver <vehicleId> <employeeId|none>' };
       }
       if (!state.vehicles.vehicles.find(v => v.id === vehicleId)) {
         return { success: false, output: `Vehicle #${vehicleId} not found.` };

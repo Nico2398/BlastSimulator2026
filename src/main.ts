@@ -24,6 +24,10 @@ import { getBiome } from './core/world/BiomeCatalog.js';
 import { BASE_TICK_MS } from './core/engine/GameLoop.js';
 import { probeUiActions, probeSelector } from './ui/uiActionProbe.js';
 import { t } from './core/i18n/I18n.js';
+import { ScenePicking } from './ui/scene/ScenePicking.js';
+import { HoverTag } from './ui/scene/HoverTag.js';
+import { SelectionBar } from './ui/shell/SelectionBar.js';
+import { EntityHighlight } from './renderer/EntityHighlight.js';
 
 // --- 3D Scene ---
 const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
@@ -35,6 +39,15 @@ const gameRenderer = new GameRenderer(scene);
 // --- UI ---
 const uiContainer = document.getElementById('bs-ui-root') ?? document.body;
 const uiManager = new UIManager(uiContainer);
+
+// --- Scene picking: hover tags, click-to-select, selection bar (redesign P2) ---
+// Declared here (with the other core objects) but wired further down, once
+// window.__gameConsole/t()/ctx are ready — same declare-early/wire-when-ready
+// shape the rest of this file already uses for uiManager itself.
+const scenePicking = new ScenePicking(canvas, scene.camera, gameRenderer);
+const entityHighlight = new EntityHighlight(scene.scene);
+const hoverTag = new HoverTag(uiContainer, canvas, scene.camera);
+const selectionBar = new SelectionBar(uiContainer);
 
 // --- Persistence ---
 let saveBackend;
@@ -82,6 +95,7 @@ mainMenu.setOnSettings(() => { uiManager.showPanel('settings'); });
 uiManager.setLanguageChangeHandler(() => {
   mainMenu.refreshLocale();
   saveLoadUI.refreshLocale();
+  selectionBar.refreshLocale();
 });
 mainMenu.show();
 
@@ -468,6 +482,85 @@ uiManager.setMapFocusHandler((x, z) => {
   scene.cameraController.focus(x, gameRenderer.surfaceYAt(x, z), z, 60);
 });
 
+// --- Scene picking wiring (redesign P2) ---
+scenePicking.setHoverChangeHandler((hover) => {
+  if (ctx.state) hoverTag.update(hover, ctx.state);
+});
+scenePicking.setSelectChangeHandler((entity) => {
+  if (entity && ctx.state) {
+    selectionBar.show(entity, ctx.state);
+    const pos = gameRenderer.entityWorldPosition(entity.kind, entity.id);
+    if (pos) entityHighlight.show(pos, entity.kind);
+  } else {
+    selectionBar.hide();
+    entityHighlight.hide();
+  }
+});
+// Esc deselects before falling through to the panel/modal layers beneath it —
+// registered last among the shell's own layers so it's tried first (most
+// recently registered wins, per UIManager.registerEscLayer).
+uiManager.registerEscLayer(() => {
+  if (!scenePicking.selection) return false;
+  scenePicking.clearSelection();
+  return true;
+});
+
+/** Report a failed console command from a selection-bar action as a toast; success is silent (the world visibly changing is the feedback). */
+function reportIfFailed(title: string, result: CommandResult): void {
+  if (!result.success) uiManager.notify({ severity: 'warn', title, body: result.output });
+}
+selectionBar.setActionHandler((action, entity) => {
+  switch (action) {
+    case 'detail':
+    case 'train':
+      uiManager.showEmployeeDetail(entity.id);
+      break;
+    case 'dispatch_here': {
+      // "Here" = wherever the player is currently pointing on the ground —
+      // the live hover state, read at the moment the button is clicked.
+      const terrain = scenePicking.hover?.terrain;
+      if (!terrain) {
+        uiManager.notify({ severity: 'warn', title: t('shell.selection.dispatch_here'), body: t('shell.selection.no_haul_target') });
+        break;
+      }
+      reportIfFailed(t('shell.selection.dispatch_here'), window.__gameConsole(`employee dispatch ${entity.id} x:${terrain.tileX} z:${terrain.tileZ}`));
+      break;
+    }
+    case 'follow':
+    case 'focus': {
+      const pos = gameRenderer.entityWorldPosition(entity.kind, entity.id);
+      if (pos) scene.cameraController.focus(pos.x, pos.y, pos.z, action === 'follow' ? 40 : 20);
+      break;
+    }
+    case 'haul': {
+      // Same live-hover pattern as Dispatch Here: haul whichever fragment the
+      // player is currently pointing at.
+      const hovered = scenePicking.hover?.entity;
+      if (!hovered || hovered.kind !== 'fragment') {
+        uiManager.notify({ severity: 'warn', title: t('shell.selection.haul'), body: t('shell.selection.no_haul_target') });
+        break;
+      }
+      reportIfFailed(t('shell.selection.haul'), window.__gameConsole(`vehicle haul ${entity.id} fragment:${hovered.id}`));
+      break;
+    }
+    case 'unassign':
+      reportIfFailed(t('shell.selection.unassign'), window.__gameConsole(`vehicle driver ${entity.id} none`));
+      break;
+    case 'upgrade':
+      reportIfFailed(t('shell.selection.upgrade'), window.__gameConsole(`build upgrade ${entity.id}`));
+      break;
+    case 'move':
+      // Move needs a tile picker — the in-scene placement layer is P3's job.
+      // Until then this routes to the Build panel's own move flow.
+      uiManager.showPanel('build');
+      break;
+    case 'demolish':
+      reportIfFailed(t('shell.selection.demolish'), window.__gameConsole(`build destroy ${entity.id}`));
+      scenePicking.clearSelection(); // the entity is gone — nothing left to keep selected
+      break;
+  }
+});
+
 saveLoadUI.setOnLoad((state) => {
   // Restore loaded state into the runner context. A v6+ save carries its
   // voxel grid embedded in state.world.voxels (#458 T0.3) — restoring from
@@ -515,6 +608,15 @@ let hadPendingEvent = false;
 
 scene.start((dt) => {
   gameRenderer.update(dt);
+  entityHighlight.update(dt);
+  // Keep the selection ring on a moving vehicle/employee; if the selected
+  // entity is gone (destroyed, hauled away, collected), deselect it —
+  // the select-change handler above then hides the ring and the bar.
+  if (scenePicking.selection) {
+    const pos = gameRenderer.entityWorldPosition(scenePicking.selection.kind, scenePicking.selection.id);
+    if (pos) entityHighlight.setPosition(pos);
+    else scenePicking.clearSelection();
+  }
 
   // Advance game time
   if (ctx.state && !ctx.state.isPaused && autoTickEnabled) {

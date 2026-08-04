@@ -51,6 +51,7 @@ const REGIONS: Array<[string, string]> = [
   ['.bs-tile-select-overlay', 'tile-picker'],
   ['.bs-tutorial-box', 'tutorial'],
   ['#bs-main-menu', 'menu'],
+  ['#bs-selection-bar', 'selection'], // scene selection bar (redesign P2)
 ];
 
 /**

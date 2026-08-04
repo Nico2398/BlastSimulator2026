@@ -386,6 +386,41 @@ export class GameRenderer {
     return this.getTerrainSurfaceY(x, z);
   }
 
+  /**
+   * Every entity root object raycastable for scene picking (P2): buildings,
+   * vehicles, employees, and the 8 fragment shape buckets. Terrain is
+   * raycast separately via `terrain.meshes` — it's a fallback hit, not an
+   * entity, and callers usually want to know when nothing else was hit.
+   */
+  pickables(): THREE.Object3D[] {
+    return [
+      ...(this.buildings?.pickables() ?? []),
+      ...(this.vehicles?.pickables() ?? []),
+      ...(this.characters?.pickables() ?? []),
+      ...(this.fragments?.pickables() ?? []),
+    ];
+  }
+
+  /** Resolve a fragment-bucket raycast hit (bucketIndex, instanceId) to the fragment id occupying that slot. */
+  resolveFragmentId(bucketIndex: number, instanceId: number): number | null {
+    return this.fragments?.fragmentIdAt(bucketIndex, instanceId) ?? null;
+  }
+
+  /**
+   * Current world-space position of a live entity, for hover-tag/highlight
+   * placement. Buildings/vehicles/employees read their Group's position
+   * directly; fragments resolve through their InstancedMesh slot. Null when
+   * the entity isn't currently rendered (removed, or never synced).
+   */
+  entityWorldPosition(kind: 'building' | 'vehicle' | 'employee' | 'fragment', id: number): THREE.Vector3 | null {
+    switch (kind) {
+      case 'building': return this.buildings?.getPosition(id) ?? null;
+      case 'vehicle': return this.vehicles?.getPosition(id) ?? null;
+      case 'employee': return this.characters?.getPosition(id) ?? null;
+      case 'fragment': return this.fragments?.fragmentPosition(id) ?? null;
+    }
+  }
+
   /** Find the highest solid-voxel Y at the given (x, z) column. Returns 0 if no grid. */
   private getTerrainSurfaceY(x: number, z: number): number {
     if (!this.lastGrid) return 0;

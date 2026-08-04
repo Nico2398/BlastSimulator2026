@@ -251,6 +251,12 @@ export class UIManager {
     this.toolRail.setActive(this.activePanel);
   }
 
+  /** Open the Crew panel with a specific employee's row expanded — the DETAIL/TRAIN actions of the scene selection bar (src/ui/shell/SelectionBar.ts). */
+  showEmployeeDetail(id: number): void {
+    this.showPanel('employees');
+    this.employeePanel.expandEmployee(id);
+  }
+
   togglePanel(name: PanelName): void {
     if (this.activePanel === name) {
       this.hideAllPanels();

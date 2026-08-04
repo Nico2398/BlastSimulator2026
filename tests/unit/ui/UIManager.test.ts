@@ -8,6 +8,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { UIManager } from '../../../src/ui/UIManager.js';
 import { MiniMap } from '../../../src/ui/MiniMap.js';
+import { EmployeePanel } from '../../../src/ui/EmployeePanel.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { NavGrid } from '../../../src/core/nav/NavGrid.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
@@ -234,5 +235,37 @@ describe('UIManager — locale refresh on language switch (issue #457)', () => {
     const buildTitle = container.querySelector('#bs-build-panel .bs-panel-title');
     expect(buildTitle?.textContent).toBe(t('ui.build.title'));
     expect(buildTitle?.textContent).not.toBe('Build');
+  });
+});
+
+describe('UIManager — showEmployeeDetail (scene selection DETAIL/TRAIN, P2)', () => {
+  let container: HTMLDivElement;
+  let uiManager: UIManager;
+
+  beforeEach(() => {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+  });
+
+  afterEach(() => {
+    uiManager?.dispose();
+    container.remove();
+    vi.restoreAllMocks();
+  });
+
+  it('opens the Crew panel', () => {
+    uiManager = new UIManager(container);
+    uiManager.showEmployeeDetail(3);
+    const panel = container.querySelector('#bs-employee-panel') as HTMLElement;
+    expect(panel.style.display).not.toBe('none');
+  });
+
+  it('expands the given employee\'s row in the Crew panel', () => {
+    const expandSpy = vi.spyOn(EmployeePanel.prototype, 'expandEmployee');
+    uiManager = new UIManager(container);
+
+    uiManager.showEmployeeDetail(3);
+
+    expect(expandSpy).toHaveBeenCalledWith(3);
   });
 });

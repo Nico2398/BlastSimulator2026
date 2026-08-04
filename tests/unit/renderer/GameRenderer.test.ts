@@ -16,6 +16,8 @@ import { defineZone } from '../../../src/core/entities/Zone.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { createTubingState } from '../../../src/core/mining/Tubing.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
+import { placeBuilding } from '../../../src/core/entities/Building.js';
+import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 
 function makeMockSceneManager() {
   const scene = new THREE.Scene();
@@ -410,5 +412,84 @@ describe('GameRenderer — per-biome ambient extras (#458 T7.3)', () => {
 
     renderer.syncFromContext(await makeLandscapeCtx('green_foothills'));
     expect(sm.scene.children.find((c) => c.name === 'dust-devils')).toBeUndefined();
+  });
+});
+
+describe('GameRenderer — scene picking (P2)', () => {
+  it('pickables() is empty before any game is loaded', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    expect(renderer.pickables()).toEqual([]);
+  });
+
+  // makeCtx()'s grid is a VoxelGrid(32, 16, 32) at the origin — state.world
+  // itself stays null until syncFromContext binds it, so placeBuilding's
+  // bounds args are given directly rather than read from state.world.
+  it('pickables() aggregates buildings, vehicles, and employees after sync', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    const ctx = makeCtx();
+    const { state } = ctx;
+    placeBuilding(state!.buildings, 'management_office', 2, 2, 32, 32, 1, 0, 0);
+    purchaseVehicle(state!.vehicles, 'debris_hauler');
+    hireEmployee(state!.employees, 'driller', new Random(1));
+
+    renderer.syncFromContext(ctx);
+
+    // FragmentMesh always contributes its 8 shape buckets regardless of
+    // whether any fragment was ever spawned (harmless empty raycast
+    // targets), so assert presence rather than an exact kind list.
+    const kinds = new Set(renderer.pickables().map(o => o.userData['entityKind']));
+    expect(kinds.has('building')).toBe(true);
+    expect(kinds.has('vehicle')).toBe(true);
+    expect(kinds.has('employee')).toBe(true);
+  });
+
+  it('entityWorldPosition() resolves a synced building, vehicle, and employee', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    const ctx = makeCtx();
+    const { state } = ctx;
+    const { building } = placeBuilding(state!.buildings, 'management_office', 2, 2, 32, 32, 1, 0, 0) as { building: { id: number } };
+    const { vehicle } = purchaseVehicle(state!.vehicles, 'debris_hauler');
+    const { employee } = hireEmployee(state!.employees, 'driller', new Random(1));
+
+    renderer.syncFromContext(ctx);
+
+    expect(renderer.entityWorldPosition('building', building.id)).not.toBeNull();
+    expect(renderer.entityWorldPosition('vehicle', vehicle.id)).not.toBeNull();
+    expect(renderer.entityWorldPosition('employee', employee.id)).not.toBeNull();
+  });
+
+  it('entityWorldPosition() returns null for an id that was never synced', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    renderer.syncFromContext(makeCtx());
+    expect(renderer.entityWorldPosition('building', 9999)).toBeNull();
+    expect(renderer.entityWorldPosition('vehicle', 9999)).toBeNull();
+    expect(renderer.entityWorldPosition('employee', 9999)).toBeNull();
+    expect(renderer.entityWorldPosition('fragment', 9999)).toBeNull();
+  });
+
+  it('resolveFragmentId() resolves a spawned fragment through its bucket slot', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    const ctx = makeCtx();
+    renderer.syncFromContext(ctx);
+    ctx.lastBlastFragmentData = [{
+      id: 5,
+      position: { x: 10, y: 5, z: 10 },
+      volume: 0.5,
+      mass: 1000,
+      rockId: 'sandite',
+      oreDensities: {},
+      initialVelocity: { x: 0, y: 0, z: 0 },
+      isProjection: false,
+    }];
+    renderer.onBlast(ctx);
+
+    // id 5 % 8 === 5 → bucket 5, first (only) slot in that bucket → slot 0.
+    expect(renderer.resolveFragmentId(5, 0)).toBe(5);
+  });
+
+  it('resolveFragmentId() returns null before any fragments are spawned', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    renderer.syncFromContext(makeCtx());
+    expect(renderer.resolveFragmentId(0, 0)).toBeNull();
   });
 });
