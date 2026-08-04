@@ -1,0 +1,113 @@
+{
+  "name": "blast-workshop-french-visual",
+  "description": "Redesign P4/#28: the Blast Workshop panel (all 5 steps) rendered in French — French strings run noticeably longer than English in several spots (tier names, checklist lines), so this checks for real layout breakage, not just that check-i18n-parity's key-set/value-diff scan passes. Plan origin is (5,5), not (10,10): a 2x2 grid at (10,10) on this same seed hits a pre-existing terrain-remesh crash ('edgeVerts[e] is not iterable') unrelated to French or this panel — reproduces from pure console commands with no UI involved. Filed as a known issue, not fixed here.",
+  "shots": [
+    { "name": "overview", "yaw": 0, "pitch": 45, "target": [5, 5], "distance": 15 }
+  ],
+  "steps": [
+    {
+      "command": "new_game seed:42 size:32",
+      "timeout": 30,
+      "description": "Setup: a fresh site, a complete plan (drilled/charged/sequenced), tier 1 software owned so Preview's Predicted rows have real (partially-locked) data too",
+      "interaction": [
+        { "type": "command", "command": "new_game seed:42 size:32" },
+        { "type": "command", "command": "drill_plan grid origin:5,5 rows:2 cols:2 spacing:3 depth:6" },
+        { "type": "command", "command": "charge hole:* explosive:boomite amount:5kg stemming:2m" },
+        { "type": "command", "command": "sequence auto delay_step:25" },
+        { "type": "command", "command": "buy_software" },
+        { "type": "command", "command": "blast_preview" }
+      ]
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "Switch to French from Settings",
+      "interaction": [
+        { "type": "command", "command": "state" },
+        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"settings\"]" },
+        { "type": "wait", "durationMs": 200 },
+        { "type": "clickSelector", "selector": "#bs-settings-panel [data-lang=\"fr\"]" },
+        { "type": "wait", "durationMs": 200 }
+      ]
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "Drill step in French",
+      "interaction": [
+        { "type": "command", "command": "state" },
+        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"blast\"]" },
+        { "type": "wait", "durationMs": 200 },
+        { "type": "clickSelector", "selector": "#bs-blast-panel [data-step=\"1\"]" },
+        { "type": "wait", "durationMs": 200 },
+        { "type": "screenshot" }
+      ]
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "Charge step in French — product cards and the tubing block are the longest French strings in the whole panel",
+      "interaction": [
+        { "type": "command", "command": "state" },
+        { "type": "clickSelector", "selector": "#bs-blast-panel [data-step=\"2\"]" },
+        { "type": "wait", "durationMs": 200 },
+        { "type": "screenshot" }
+      ]
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "Sequence step in French",
+      "interaction": [
+        { "type": "command", "command": "state" },
+        { "type": "clickSelector", "selector": "#bs-blast-panel [data-step=\"3\"]" },
+        { "type": "wait", "durationMs": 200 },
+        { "type": "screenshot" }
+      ]
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "Preview step in French — tier names run long (Prévision de fragmentation, Cône de risque de projection)",
+      "interaction": [
+        { "type": "command", "command": "state" },
+        { "type": "clickSelector", "selector": "#bs-blast-panel [data-step=\"4\"]" },
+        { "type": "wait", "durationMs": 200 },
+        { "type": "screenshot" }
+      ]
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "Fire step in French",
+      "interaction": [
+        { "type": "command", "command": "state" },
+        { "type": "clickSelector", "selector": "#bs-blast-panel [data-step=\"5\"]" },
+        { "type": "wait", "durationMs": 200 },
+        { "type": "screenshot" }
+      ]
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "PreflightModal in French",
+      "interaction": [
+        { "type": "command", "command": "state" },
+        { "type": "clickSelector", "selector": "#bs-blast-panel [data-action=\"execute\"]" },
+        { "type": "wait", "durationMs": 300 },
+        { "type": "screenshot" }
+      ]
+    },
+    {
+      "command": "blast",
+      "timeout": 30,
+      "description": "BlastReportModal in French",
+      "interaction": [
+        { "type": "command", "command": "state" },
+        { "type": "clickSelector", "selector": "[data-action=\"preflight-detonate\"]" },
+        { "type": "wait", "durationMs": 400 },
+        { "type": "screenshot" }
+      ]
+    }
+  ]
+}

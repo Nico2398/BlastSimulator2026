@@ -45,6 +45,7 @@ export class SettingsMenu {
     const enBtn = document.createElement('button');
     enBtn.className = 'bs-btn';
     enBtn.style.cssText = 'flex:1;padding:3px';
+    enBtn.dataset['lang'] = 'en';
     this.locale.bindText(enBtn, 'ui.settings.english');
     enBtn.addEventListener('click', () => {
       setLocale('en');
@@ -54,6 +55,7 @@ export class SettingsMenu {
     const frBtn = document.createElement('button');
     frBtn.className = 'bs-btn';
     frBtn.style.cssText = 'flex:1;padding:3px';
+    frBtn.dataset['lang'] = 'fr';
     this.locale.bindText(frBtn, 'ui.settings.french');
     frBtn.addEventListener('click', () => {
       setLocale('fr');
