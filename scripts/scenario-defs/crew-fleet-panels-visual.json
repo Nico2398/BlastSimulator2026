@@ -1,0 +1,29 @@
+{
+  "name": "crew-fleet-panels-visual",
+  "description": "Redesign P6: Operations panel's unclaimed-work line, and (once wired in P6-cleanup) the Crew and Fleet panels themselves.",
+  "shots": [
+    { "name": "overview", "yaw": 0, "pitch": 45, "target": [5, 5], "distance": 15 }
+  ],
+  "steps": [
+    {
+      "command": "new_game seed:42 size:32",
+      "timeout": 30,
+      "description": "Setup: hire a driller so the roster is non-empty.",
+      "interaction": [
+        { "type": "command", "command": "new_game seed:42 size:32" },
+        { "type": "command", "command": "employee hire role:driller" }
+      ]
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "Operations panel: real logistics rows plus the new single 'Unclaimed Work' line (count from state.pendingActions, not one row repeated per eligible employee — that per-employee repeat is exactly what #39 removed).",
+      "interaction": [
+        { "type": "command", "command": "state" },
+        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"ops\"]" },
+        { "type": "wait", "durationMs": 300 },
+        { "type": "screenshot" }
+      ]
+    }
+  ]
+}

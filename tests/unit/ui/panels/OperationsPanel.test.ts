@@ -51,6 +51,20 @@ describe('OperationsPanel', () => {
     expect(text).toContain('No incidents on record');
   });
 
+  it('shows a single unclaimed-work line instead of one per eligible employee (#39)', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    state.pendingActions = [
+      { id: 1, type: 'general_work', requiredSkill: null, requiredVehicleRole: null, targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: null },
+      { id: 2, type: 'survey', requiredSkill: 'geology', requiredVehicleRole: null, targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: null },
+      { id: 3, type: 'haul_debris', requiredSkill: null, requiredVehicleRole: 'debris_hauler', targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: 7 },
+    ];
+    panel.update(state);
+    const text = panel.root.textContent ?? '';
+    expect(text).toContain('Unclaimed Work');
+    expect(text).toContain('2 tasks');
+  });
+
   it('renders ore on hand with a computed value from OreCatalog', () => {
     const { panel } = makePanel();
     const state = makeState();

@@ -1,25 +1,38 @@
 // BlastSimulator2026 — Crew panel (redesign P6)
 // Roster cards (avatar, morale, status tags) with an expandable detail per
-// employee: hired/location, needs, current task, skills. Pay/raise, training,
-// dismiss, and hiring land in the next task — this panel is read-only so far.
+// employee: hired/location, needs, current task, skills, pay/raise,
+// training, dismiss. A HIRING section below the roster covers headcount.
 //
 // Single expansion, unlike the old EmployeePanel's multi-expand Set: the
 // design mock keeps exactly one card open at a time (clicking a second one
 // closes the first), so `expandedId` is a lone id rather than a set.
 
 import { t } from '../../core/i18n/I18n.js';
-import { el } from '../dom.js';
+import { el, sectionHeader } from '../dom.js';
 import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import type { GameState } from '../../core/state/GameState.js';
-import type { Employee } from '../../core/entities/Employee.js';
+import type { Employee, EmployeeRole } from '../../core/entities/Employee.js';
+import { HIRING_COSTS, ROLE_STARTING_QUALIFICATION } from '../../core/entities/Employee.js';
 import { computeEmployeeActivity } from '../../core/entities/EmployeeActivity.js';
-import { roleColorHex, getInitials, moraleColor, makeHiredLocationStrip, makeNeedsSection, makeCurrentTaskSection, makeSkillsSection } from '../crewDetailSections.js';
+import { availableTrainingOffers, planTraining } from '../../core/entities/EmployeeTraining.js';
+import {
+  roleColorHex, getInitials, moraleColor, makeHiredLocationStrip, makeNeedsSection,
+  makeCurrentTaskSection, makeSkillsSection, makePaySection, makeTrainingSection, makeDismissSection,
+} from '../crewDetailSections.js';
+import type { ConfirmModalConfig } from './ConfirmModal.js';
+import type { CommandResult } from '../../console/ConsoleRunner.js';
+
+export type GameConsoleFn = (cmd: string) => CommandResult;
+
+const ROLES: EmployeeRole[] = ['driller', 'blaster', 'driver', 'surveyor', 'manager'];
 
 export class CrewPanel {
   private readonly el: HTMLElement;
   private readonly bodyEl: HTMLElement;
   private onCloseCb?: () => void;
+  private gameConsole?: GameConsoleFn;
+  private onConfirmRequestCb?: (config: ConfirmModalConfig) => void;
   private expandedId: number | null = null;
   private lastSignature = '';
   private lastState: GameState | null = null;
@@ -56,6 +69,9 @@ export class CrewPanel {
 
   get root(): HTMLElement { return this.el; }
   setCloseHandler(cb: () => void): void { this.onCloseCb = cb; }
+  setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
+  /** UIManager wires this to its shared ConfirmModal's show() — see ConfirmModal.ts. */
+  setConfirmHandler(cb: (config: ConfirmModalConfig) => void): void { this.onConfirmRequestCb = cb; }
 
   show(): void { this.el.style.display = 'flex'; }
   hide(): void { this.el.style.display = 'none'; }
@@ -86,6 +102,11 @@ export class CrewPanel {
    * drift every tick on their own; including them here would force a full
    * rebuild every tick and drop whatever the player is mid-click on.
    * refreshDynamic() below writes those in place instead.
+   *
+   * Cash is bucketed to affordability, not included as a raw number: a
+   * training fee or hire cost only needs a rebuild when it crosses from
+   * affordable to not (or back), the same way OperationsPanel/legacy
+   * EmployeePanel bucket cash against their own price thresholds.
    */
   private computeSignature(state: GameState): string {
     const rows = state.employees.employees
@@ -94,10 +115,21 @@ export class CrewPanel {
         const quals = e.qualifications.map(q => `${q.category}${q.proficiencyLevel}`).join(',');
         const activity = computeEmployeeActivity(e, state.vehicles.vehicles);
         return `${e.id}:${e.role}:${e.unionized ? 1 : 0}:${e.injured ? 1 : 0}:${e.collapsing ? 1 : 0}`
-          + `:${e.trainingState ? 1 : 0}:${activity.kind}:${e.name}:${quals}`;
+          + `:${e.trainingState ? 1 : 0}:${activity.kind}:${e.name}:${quals}:${this.affordsAnyCourse(e, state) ? 1 : 0}`;
       })
       .join('|');
-    return `${rows}#${this.expandedId ?? '-'}`;
+    const hireAffordable = ROLES.map(r => (state.cash < HIRING_COSTS[r] ? '0' : '1')).join('');
+    const headcounts = ROLES.map(r => state.employees.employees.filter(e => e.alive && e.role === r).length).join(',');
+    const schools = state.buildings.buildings.map(b => `${b.type}${b.tier}`).sort().join(',');
+    return `${rows}#${this.expandedId ?? '-'}#${hireAffordable}#${headcounts}#${schools}`;
+  }
+
+  private affordsAnyCourse(e: Employee, state: GameState): boolean {
+    if (e.trainingState || e.injured) return false;
+    return availableTrainingOffers(state.buildings.buildings).some(({ skill, building }) => {
+      const plan = planTraining(e, skill, building.tier);
+      return plan !== null && state.cash >= plan.fee;
+    });
   }
 
   /** Re-paint values that drift every tick without rebuilding the DOM under an in-flight click. */
@@ -130,11 +162,31 @@ export class CrewPanel {
 
   private render(state: GameState): void {
     const employees = state.employees.employees.filter(e => e.alive);
-    if (employees.length === 0) {
-      this.bodyEl.replaceChildren(el('div', { className: 'bsx-empty', text: t('ui.crew.none') }));
-      return;
-    }
-    this.bodyEl.replaceChildren(...employees.map(e => this.makeRosterCard(e, state)));
+    const cards = employees.length === 0
+      ? [el('div', { className: 'bsx-empty', text: t('ui.crew.none') })]
+      : employees.map(e => this.makeRosterCard(e, state));
+    this.bodyEl.replaceChildren(...cards, sectionHeader(t('ui.crew.hiring')), ...this.makeHiringRows(state));
+  }
+
+  private makeHiringRows(state: GameState): HTMLElement[] {
+    return ROLES.map(role => {
+      const count = state.employees.employees.filter(e => e.alive && e.role === role).length;
+      const row = el('div', { attrs: { style: 'display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid var(--bsx-hairline);border-radius:5px;background:var(--bsx-card)' } });
+      const info = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:3px;flex:1;min-width:0' } });
+      info.append(
+        el('span', { text: t(`role.${role}`), attrs: { style: 'font:600 11px/1 var(--bsx-font-ui)' } }),
+        el('span', {
+          text: t('ui.crew.hire_starts_with', { qual: t(`skill.${ROLE_STARTING_QUALIFICATION[role]}`), count }),
+          attrs: { style: 'font:400 10px/1 var(--bsx-font-ui);color:var(--bsx-text-micro)' },
+        }),
+      );
+      const cost = el('span', { text: `$${HIRING_COSTS[role]}`, className: 'bsx-mono', attrs: { style: 'font-size:11px;font-weight:600;color:var(--bsx-amber)' } });
+      const hireBtn = el('button', { className: 'bsx-btn', text: t('ui.crew.hire') });
+      hireBtn.disabled = state.cash < HIRING_COSTS[role];
+      hireBtn.addEventListener('click', () => this.gameConsole?.(`employee hire role:${role}`));
+      row.append(info, cost, hireBtn);
+      return row;
+    });
   }
 
   private makeRosterCard(e: Employee, state: GameState): HTMLElement {
@@ -181,6 +233,9 @@ export class CrewPanel {
         this.tag(makeNeedsSection(e), 'bs-crew-needs'),
         this.tag(makeCurrentTaskSection(e, state), 'bs-crew-task'),
         this.tag(makeSkillsSection(e), 'bs-crew-skills'),
+        this.tag(makePaySection(e, amount => this.gameConsole?.(`employee raise ${e.id} amount:${amount}`)), 'bs-crew-pay'),
+        this.tag(makeTrainingSection(e, state, (skill, buildingId) => this.gameConsole?.(`employee train ${e.id} skill:${skill} building:${buildingId}`)), 'bs-crew-training'),
+        this.tag(makeDismissSection(e, () => this.requestDismiss(e)), 'bs-crew-dismiss'),
       );
       row.appendChild(detail);
     }
@@ -201,5 +256,20 @@ export class CrewPanel {
       wrap.appendChild(chip);
     }
     return wrap;
+  }
+
+  /**
+   * fireEmployee splices the employee out permanently — there is no severance
+   * payment or reversal — so this always routes through the shared confirm
+   * overlay rather than firing on the first click.
+   */
+  private requestDismiss(e: Employee): void {
+    this.onConfirmRequestCb?.({
+      icon: 'injured',
+      title: t('ui.crew.dismiss_confirm_title'),
+      body: t('ui.crew.dismiss_confirm_body', { name: e.name }),
+      confirmLabel: t('ui.crew.dismiss'),
+      onConfirm: () => this.gameConsole?.(`employee fire ${e.id}`),
+    });
   }
 }

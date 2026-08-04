@@ -153,6 +153,7 @@ export class OperationsPanel {
       oreReport: state.lastOreReport,
       accidents: state.damage.accidents.length,
       injured: state.employees.employees.filter(e => e.injured && e.alive).map(e => e.id),
+      unclaimed: state.pendingActions.filter(a => a.targetEmployeeId === null).length,
       policy: state.sitePolicy.revision,
     });
     if (signature === this.lastSignature) return;
@@ -196,6 +197,11 @@ export class OperationsPanel {
     }
     const cap = state.logistics.storageCapacityKg;
     const storedPct = cap > 0 ? Math.round((state.logistics.storedMassKg / cap) * 100) : 0;
+    // One line for every action nobody has claimed yet, instead of the same
+    // pool action repeating on every eligible idle employee's own row — the
+    // new CrewPanel shows only an employee's own claimed activity, so this is
+    // now the only place an unclaimed action is visible at all (#39).
+    const unclaimed = state.pendingActions.filter(a => a.targetEmployeeId === null).length;
 
     const wrap = el('div');
     wrap.style.cssText = 'display:flex;flex-direction:column;gap:6px';
@@ -203,6 +209,7 @@ export class OperationsPanel {
       this.makeLogisticsRow(t('ui.operations.on_ground'), t('ui.operations.fragment_count', { count: counts.onGround }), t('ui.operations.mass_kg', { kg: Math.round(onGroundKg).toLocaleString('en-US') })),
       this.makeLogisticsRow(t('ui.operations.in_transit'), t('ui.operations.fragment_count', { count: counts.inTransit }), t('ui.operations.mass_kg', { kg: Math.round(inTransitKg).toLocaleString('en-US') })),
       this.makeLogisticsRow(t('ui.operations.stored'), `${Math.round(state.logistics.storedMassKg).toLocaleString('en-US')} / ${cap.toLocaleString('en-US')} kg`, t('ui.operations.storage_pct', { pct: storedPct })),
+      this.makeLogisticsRow(t('ui.operations.unclaimed_work'), t('ui.operations.unclaimed_work_count', { count: unclaimed }), t('ui.operations.unclaimed_work_note')),
     );
     return wrap;
   }

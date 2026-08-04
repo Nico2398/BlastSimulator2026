@@ -5,6 +5,8 @@ import { createGame } from '../../../../src/core/state/GameState.js';
 import type { GameState } from '../../../../src/core/state/GameState.js';
 import type { Employee } from '../../../../src/core/entities/Employee.js';
 import type { Vehicle } from '../../../../src/core/entities/Vehicle.js';
+import type { Building } from '../../../../src/core/entities/Building.js';
+import type { ConfirmModalConfig } from '../../../../src/ui/panels/ConfirmModal.js';
 
 function makeEmployee(overrides: Partial<Employee> = {}): Employee {
   return {
@@ -46,11 +48,16 @@ function makeVehicle(overrides: Partial<Vehicle> = {}): Vehicle {
   };
 }
 
-function makeState(employees: Employee[] = [], vehicles: Vehicle[] = []): GameState {
+function makeBuilding(overrides: Partial<Building> = {}): Building {
+  return { id: 1, type: 'geology_lab', tier: 1, x: 0, z: 0, hp: 100, active: true, ...overrides };
+}
+
+function makeState(employees: Employee[] = [], vehicles: Vehicle[] = [], buildings: Building[] = []): GameState {
   const state = createGame({ seed: 1, mineType: 'desert' });
   state.employees.employees = employees;
   state.employees.nextId = employees.length + 1;
   state.vehicles.vehicles = vehicles;
+  state.buildings.buildings = buildings;
   return state;
 }
 
@@ -211,6 +218,147 @@ describe('CrewPanel', () => {
     panel.update(makeState([makeEmployee({ id: 1, qualifications: [] })]));
     toggle(panel, 1);
     expect(panel.root.querySelector('.bs-crew-skills')!.textContent).toContain('No qualifications yet.');
+  });
+
+  // ── PAY ──
+
+  it('pay section shows a real base/bonus/total breakdown', () => {
+    const { panel } = makePanel();
+    panel.update(makeState([makeEmployee({
+      id: 1, role: 'driller', salary: 570,
+      qualifications: [{ category: 'blasting', proficiencyLevel: 1, xp: 0 }],
+    })]));
+    toggle(panel, 1);
+    const text = panel.root.textContent!;
+    expect(text).toContain('Base $500');
+    expect(text).toContain('+ skills $50');
+    expect(text).toContain('$570/h');
+  });
+
+  it('a raise preset button dispatches employee raise with the real id and amount', () => {
+    const { panel } = makePanel();
+    const calls: string[] = [];
+    panel.setGameConsole(cmd => { calls.push(cmd); return { success: true, output: '' }; });
+    panel.update(makeState([makeEmployee({ id: 3 })]));
+    toggle(panel, 3);
+
+    const raiseBtn = [...panel.root.querySelectorAll('button')].find(b => b.textContent === '+$100')!;
+    raiseBtn.click();
+
+    expect(calls).toContain('employee raise 3 amount:100');
+  });
+
+  // ── TRAINING ──
+
+  it('training section reports no school when none is built', () => {
+    const { panel } = makePanel();
+    panel.update(makeState([makeEmployee({ id: 1 })], [], []));
+    toggle(panel, 1);
+    expect(panel.root.querySelector('.bs-crew-training')?.textContent ?? panel.root.textContent).toContain('No school built yet.');
+  });
+
+  it('training section offers a real course from a built school and dispatches employee train on click', () => {
+    const { panel } = makePanel();
+    const calls: string[] = [];
+    panel.setGameConsole(cmd => { calls.push(cmd); return { success: true, output: '' }; });
+    const state = makeState([makeEmployee({ id: 5 })], [], [makeBuilding({ id: 9, type: 'geology_lab', tier: 1 })]);
+    state.cash = 50000;
+    panel.update(state);
+    toggle(panel, 5);
+
+    expect(panel.root.textContent).toContain('Geology Diploma');
+    const trainBtn = [...panel.root.querySelectorAll('button')].find(b => b.textContent === 'Train')!;
+    expect(trainBtn.disabled).toBe(false);
+    trainBtn.click();
+    expect(calls).toContain('employee train 5 skill:geology building:9');
+  });
+
+  it('training button is disabled when the fee is unaffordable', () => {
+    const { panel } = makePanel();
+    const state = makeState([makeEmployee({ id: 5 })], [], [makeBuilding({ id: 9, type: 'geology_lab', tier: 1 })]);
+    state.cash = 0;
+    panel.update(state);
+    toggle(panel, 5);
+    const trainBtn = [...panel.root.querySelectorAll('button')].find(b => b.textContent === 'Train')!;
+    expect(trainBtn.disabled).toBe(true);
+  });
+
+  it('training section shows in-progress status instead of course offers while training', () => {
+    const { panel } = makePanel();
+    panel.update(makeState([makeEmployee({
+      id: 1, trainingState: { buildingId: 9, skill: 'geology', ticksRemaining: 12, fee: 1000 },
+    })], [], [makeBuilding({ id: 9, type: 'geology_lab' })]));
+    toggle(panel, 1);
+    expect(panel.root.querySelector('.bs-crew-training')!.textContent).toContain('12h left');
+  });
+
+  it('training section is reason-blocked for an injured employee', () => {
+    const { panel } = makePanel();
+    panel.update(makeState([makeEmployee({ id: 1, injured: true })], [], [makeBuilding({ id: 9, type: 'geology_lab' })]));
+    toggle(panel, 1);
+    expect(panel.root.querySelector('.bs-crew-training')!.textContent).toContain('Injured');
+  });
+
+  // ── DISMISS ──
+
+  it('dismiss requests confirmation instead of firing immediately', () => {
+    const { panel } = makePanel();
+    const calls: string[] = [];
+    panel.setGameConsole(cmd => { calls.push(cmd); return { success: true, output: '' }; });
+    let requested: ConfirmModalConfig | null = null;
+    panel.setConfirmHandler(config => { requested = config; });
+    panel.update(makeState([makeEmployee({ id: 4, name: 'Oz Trill' })]));
+    toggle(panel, 4);
+
+    const dismissBtn = [...panel.root.querySelectorAll('button')].find(b => b.textContent === 'Dismiss')!;
+    dismissBtn.click();
+
+    expect(calls).toEqual([]); // not fired yet — only the confirm was requested
+    expect(requested).not.toBeNull();
+    expect(requested!.body).toContain('Oz Trill');
+
+    requested!.onConfirm();
+    expect(calls).toContain('employee fire 4');
+  });
+
+  it('dismiss is disabled with a reason for a unionised employee', () => {
+    const { panel } = makePanel();
+    panel.setConfirmHandler(() => { throw new Error('should not be called'); });
+    panel.update(makeState([makeEmployee({ id: 1, unionized: true })]));
+    toggle(panel, 1);
+    const dismissBtn = [...panel.root.querySelectorAll('button')].find(b => b.textContent === 'Dismiss')!;
+    expect(dismissBtn.disabled).toBe(true);
+    expect(panel.root.textContent).toContain("Unionised");
+  });
+
+  // ── HIRING ──
+
+  it('hiring rows list every role with real cost, starting qualification, and headcount', () => {
+    const { panel } = makePanel();
+    panel.update(makeState([makeEmployee({ id: 1, role: 'driller' })]));
+    const text = panel.root.textContent!;
+    expect(text).toContain('HIRING');
+    expect(text).toContain('$1000');
+    expect(text).toContain('Starts with Blasting ★1 · 1 on roster');
+  });
+
+  it('hire button dispatches employee hire with the real role', () => {
+    const { panel } = makePanel();
+    const calls: string[] = [];
+    panel.setGameConsole(cmd => { calls.push(cmd); return { success: true, output: '' }; });
+    panel.update(makeState([]));
+    const hireBtns = [...panel.root.querySelectorAll('button')].filter(b => b.textContent === 'Hire');
+    hireBtns[0]!.click();
+    expect(calls).toContain('employee hire role:driller');
+  });
+
+  it('hire button is disabled when the role is unaffordable', () => {
+    const { panel } = makePanel();
+    const state = makeState([]);
+    state.cash = 0;
+    panel.update(state);
+    const hireBtns = [...panel.root.querySelectorAll('button')].filter(b => b.textContent === 'Hire');
+    expect(hireBtns.every(b => b.disabled)).toBe(true);
   });
 
   it('refreshLocale() re-renders the title and does not throw', () => {

@@ -5,13 +5,18 @@
 // split this replaces.
 
 import { t } from '../core/i18n/I18n.js';
-import { el, gauge } from './dom.js';
-import type { Employee, EmployeeRole } from '../core/entities/Employee.js';
+import { el, gauge, button, reasonLine } from './dom.js';
+import type { Employee, EmployeeRole, SkillCategory } from '../core/entities/Employee.js';
+import { BASE_SALARIES } from '../core/entities/Employee.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { ActionType } from '../core/state/GameState.js';
 import { computeEmployeeActivity, type EmployeeActivity } from '../core/entities/EmployeeActivity.js';
-import { NEED_THRESHOLDS, MORALE_THRESHOLDS, XP_THRESHOLDS, PROFICIENCY_MULTIPLIERS } from '../core/config/balance.js';
+import { availableTrainingOffers, planTraining, MAX_PROFICIENCY } from '../core/entities/EmployeeTraining.js';
+import { NEED_THRESHOLDS, MORALE_THRESHOLDS, XP_THRESHOLDS, PROFICIENCY_MULTIPLIERS, QUALIFICATION_SALARY_BONUS } from '../core/config/balance.js';
 import { ROLE_COLORS } from '../renderer/CharacterMesh.js';
+
+/** Quick-raise amounts offered in the PAY block — flat $ presets, not derived from any per-role scale. */
+export const RAISE_PRESETS = [50, 100, 250];
 
 /** `0xRRGGBB` (renderer/CharacterMesh.ts) → CSS `#rrggbb`, so the panel avatar matches the in-scene mesh color exactly. */
 export function roleColorHex(role: EmployeeRole): string {
@@ -189,5 +194,107 @@ export function makeSkillsSection(e: Employee): HTMLElement {
 
     wrap.appendChild(well([headRow, xpTrack, effect]));
   }
+  return wrap;
+}
+
+// ── PAY ──
+
+/**
+ * A raise costs nothing upfront — giveRaise only raises the ongoing salary
+ * and immediately lifts morale — so unlike training there is no affordability
+ * gate here; every preset button is always clickable.
+ */
+export function makePaySection(e: Employee, onRaise: (amount: number) => void): HTMLElement {
+  const wrap = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:6px' } });
+  wrap.appendChild(microLabel(t('ui.crew.pay')));
+
+  const base = BASE_SALARIES[e.role];
+  const bonus = e.qualifications.reduce((sum, q) => sum + QUALIFICATION_SALARY_BONUS[q.proficiencyLevel], 0);
+  const breakdownRow = el('div', { className: 'bsx-mono', attrs: { style: 'display:flex;font-size:10px;color:var(--bsx-text-muted)' } });
+  breakdownRow.append(
+    el('span', { text: t('ui.crew.pay_base', { amount: base }) }),
+    el('span', { text: t('ui.crew.pay_bonus', { amount: bonus }), attrs: { style: 'margin-left:8px' } }),
+    el('span', { text: t('ui.crew.pay_total', { amount: e.salary }), attrs: { style: 'margin-left:auto;color:var(--bsx-text-primary);font-weight:600' } }),
+  );
+
+  const raiseRow = el('div', { attrs: { style: 'display:flex;align-items:center;gap:6px' } });
+  raiseRow.appendChild(el('span', { text: t('ui.crew.give_raise'), attrs: { style: 'font:400 10px/1 var(--bsx-font-ui);color:var(--bsx-text-micro)' } }));
+  for (const amount of RAISE_PRESETS) {
+    const btn = button('ghost', t('ui.crew.raise_amount', { amount }));
+    btn.style.cssText = 'height:26px;padding:0 10px;font:600 10px/1 var(--bsx-font-mono)';
+    btn.addEventListener('click', () => onRaise(amount));
+    raiseRow.appendChild(btn);
+  }
+
+  const note = el('span', { text: t('ui.crew.raise_note'), attrs: { style: 'font:400 11px/1.4 var(--bsx-font-ui);color:var(--bsx-text-micro)' } });
+  wrap.appendChild(well([breakdownRow, raiseRow, note]));
+  return wrap;
+}
+
+// ── TRAINING ──
+
+export function makeTrainingSection(e: Employee, state: GameState, onTrain: (skill: SkillCategory, buildingId: number) => void): HTMLElement {
+  const wrap = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:6px' } });
+  wrap.appendChild(microLabel(t('ui.crew.training')));
+
+  if (e.trainingState) {
+    wrap.appendChild(well([el('span', {
+      text: t('ui.crew.training_in_progress', { skill: t(`skill.${e.trainingState.skill}`), n: e.trainingState.ticksRemaining }),
+      attrs: { style: 'font:400 11px/1.4 var(--bsx-font-ui);color:var(--bsx-text-secondary)' },
+    })]));
+    return wrap;
+  }
+
+  const offers = availableTrainingOffers(state.buildings.buildings);
+  if (offers.length === 0) {
+    wrap.appendChild(well([el('span', { text: t('ui.crew.training_no_school'), attrs: { style: 'font:400 11px/1.4 var(--bsx-font-ui);color:var(--bsx-text-micro)' } })]));
+    return wrap;
+  }
+
+  const rows: HTMLElement[] = [];
+  let anyOffered = false;
+  for (const { skill, building } of offers) {
+    const plan = planTraining(e, skill, building.tier);
+    const row = el('div', { attrs: { style: 'display:flex;align-items:center;gap:9px' } });
+    const info = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:3px;flex:1;min-width:0' } });
+
+    if (!plan) {
+      info.append(
+        el('span', { text: t(`course.${skill}`), attrs: { style: 'font:600 11px/1 var(--bsx-font-ui)' } }),
+        el('span', { text: t('ui.crew.training_maxed', { level: t(`proficiency.${MAX_PROFICIENCY}`) }), attrs: { style: 'font:400 10px/1.3 var(--bsx-font-ui);color:var(--bsx-text-micro)' } }),
+      );
+      row.append(info, button('locked', t('ui.crew.train'), { disabled: true }));
+    } else {
+      anyOffered = true;
+      info.append(
+        el('span', { text: `${t(`course.${skill}`)} ${plan.currentLevel}→${plan.targetLevel}`, attrs: { style: 'font:600 11px/1 var(--bsx-font-ui)' } }),
+        el('span', {
+          text: t('ui.crew.training_offer', { school: t(`building.${building.type}.name`), tier: building.tier, fee: plan.fee, ticks: plan.ticks }),
+          attrs: { style: 'font:400 10px/1.3 var(--bsx-font-ui);color:var(--bsx-text-micro)' },
+        }),
+      );
+      const trainBtn = button('warn', t('ui.crew.train'), { disabled: state.cash < plan.fee || e.injured });
+      trainBtn.addEventListener('click', () => onTrain(skill, building.id));
+      row.append(info, trainBtn);
+    }
+    rows.push(row);
+  }
+
+  if (e.injured) rows.push(reasonLine(t('ui.crew.training_injured'), true));
+  else if (!anyOffered) rows.push(reasonLine(t('ui.crew.training_all_maxed', { level: t(`proficiency.${MAX_PROFICIENCY}`) })));
+
+  wrap.appendChild(well(rows));
+  return wrap;
+}
+
+// ── DISMISS ──
+
+export function makeDismissSection(e: Employee, onDismiss: () => void): HTMLElement {
+  const wrap = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:5px' } });
+  const btn = button('danger', t('ui.crew.dismiss'), { disabled: e.unionized });
+  btn.style.width = '100%';
+  if (!e.unionized) btn.addEventListener('click', onDismiss);
+  wrap.appendChild(btn);
+  if (e.unionized) wrap.appendChild(reasonLine(t('ui.crew.dismiss_union_blocked')));
   return wrap;
 }
