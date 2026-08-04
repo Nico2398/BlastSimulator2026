@@ -37,6 +37,7 @@ export const LOCALE_SHARED_VALUE_ALLOWLIST: string[] = [
   'ui.operations.mass_kg', // "{kg} kg"
   'ui.crew.location_coords', // "({x}, {z})"
   'ui.crew.skill_xp', // "{xp} / {next} XP" — XP is the same cognate as ui.employees.xp, just embedded in a format string
+  'ui.fleet.load_kg', // "{kg} / {cap} kg"
 
   // ── Language picker endonyms ──
   'ui.settings.english', // "English"

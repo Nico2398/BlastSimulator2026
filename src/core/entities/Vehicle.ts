@@ -2,7 +2,7 @@
 // Debris haulers, rock diggers, drill rigs, building destroyers, and rock fragmenters.
 // Base stats and tier multipliers live in src/core/config/balance.ts.
 
-import { VEHICLE_BASE_STATS, VEHICLE_TIER_MULTIPLIERS } from '../config/balance.js';
+import { VEHICLE_BASE_STATS, VEHICLE_TIER_MULTIPLIERS, VEHICLE_SCRAP_RESIDUAL_FRACTION } from '../config/balance.js';
 import type { EmployeeState, SkillCategory } from '../entities/Employee.js';
 
 // ── Vehicle roles ──
@@ -233,6 +233,18 @@ export function destroyVehicle(state: VehicleState, vehicleId: number): boolean 
   if (idx < 0) return false;
   state.vehicles.splice(idx, 1);
   return true;
+}
+
+/**
+ * Cash credited back on `vehicle scrap`: a fraction of purchaseCost, scaled by
+ * the vehicle's current hp/maxHp so a wrecked vehicle salvages for less than
+ * a pristine one. Exported so the Fleet panel's scrap confirmation can show
+ * the real number before the player commits, not a guess.
+ */
+export function computeScrapResidualValue(vehicleType: VehicleRole, vehicleTier: VehicleTier, hp: number): number {
+  const def = getVehicleDefByTier(vehicleType, vehicleTier);
+  const hpFraction = def.maxHp > 0 ? Math.max(0, Math.min(1, hp / def.maxHp)) : 0;
+  return Math.round(def.purchaseCost * VEHICLE_SCRAP_RESIDUAL_FRACTION * hpFraction);
 }
 
 /** Calculate total maintenance + fuel costs for all vehicles per tick. */

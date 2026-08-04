@@ -9,7 +9,7 @@ import {
   unassignDriver,
   destroyVehicle,
   getAllVehicleRoles,
-  getVehicleDefByTier,
+  computeScrapResidualValue,
   type VehicleRole,
   type VehicleTask,
   type VehicleTier,
@@ -17,20 +17,8 @@ import {
 import { requestBoardVehicle } from '../../core/entities/VehicleBoarding.js';
 import { requestHaulFragment } from '../../core/economy/HaulingTask.js';
 import { addExpense, addIncome } from '../../core/economy/Finance.js';
-import { SPAWN_RING_SIZE, SPAWN_TILE_SPACING, VEHICLE_SCRAP_RESIDUAL_FRACTION } from '../../core/config/balance.js';
+import { SPAWN_RING_SIZE, SPAWN_TILE_SPACING } from '../../core/config/balance.js';
 import { NavGrid } from '../../core/nav/NavGrid.js';
-
-/**
- * Cash credited back on `vehicle scrap`: a fraction of purchaseCost, scaled by
- * the vehicle's current hp/maxHp so a wrecked vehicle salvages for less than
- * a pristine one. Exported so the Fleet panel's scrap confirmation can show
- * the real number before the player commits, not a guess.
- */
-export function computeScrapResidualValue(vehicleType: VehicleRole, vehicleTier: VehicleTier, hp: number): number {
-  const def = getVehicleDefByTier(vehicleType, vehicleTier);
-  const hpFraction = def.maxHp > 0 ? Math.max(0, Math.min(1, hp / def.maxHp)) : 0;
-  return Math.round(def.purchaseCost * VEHICLE_SCRAP_RESIDUAL_FRACTION * hpFraction);
-}
 
 // ── tier arg parsing ──
 

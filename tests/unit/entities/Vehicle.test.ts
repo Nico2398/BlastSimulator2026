@@ -12,6 +12,7 @@ import {
   getVehicleDef,
   getAllVehicleRoles,
   getVehicleDefByTier,
+  computeScrapResidualValue,
   // ── Task 2.6 — not yet implemented in Vehicle.ts (Red phase) ────────────────
   assignDriver,
   unassignDriver,
@@ -1479,5 +1480,38 @@ describe('unassignDriver — error: vehicle is mid-haul', () => {
     const result = unassignDriver(vs, vehicleId);
     expect(result.success).toBe(false);
     expect(vehicle.driverId).toBe(empId);
+  });
+});
+
+// ── computeScrapResidualValue ────────────────────────────────────────────────
+
+describe('computeScrapResidualValue', () => {
+  it('credits 40% of purchase cost for a vehicle at full HP', () => {
+    const def = getVehicleDefByTier('debris_hauler', 1);
+    expect(computeScrapResidualValue('debris_hauler', 1, def.maxHp)).toBe(Math.round(def.purchaseCost * 0.4));
+  });
+
+  it('scales down with current HP — half HP nets half the full-HP credit', () => {
+    const def = getVehicleDefByTier('debris_hauler', 1);
+    const full = computeScrapResidualValue('debris_hauler', 1, def.maxHp);
+    const half = computeScrapResidualValue('debris_hauler', 1, def.maxHp / 2);
+    expect(half).toBe(Math.round(full / 2));
+  });
+
+  it('returns 0 for a vehicle at 0 HP', () => {
+    expect(computeScrapResidualValue('rock_digger', 1, 0)).toBe(0);
+  });
+
+  it('never exceeds the full-HP credit even if hp is passed above maxHp', () => {
+    const def = getVehicleDefByTier('drill_rig', 2);
+    const atMax = computeScrapResidualValue('drill_rig', 2, def.maxHp);
+    const aboveMax = computeScrapResidualValue('drill_rig', 2, def.maxHp * 2);
+    expect(aboveMax).toBe(atMax);
+  });
+
+  it('scales with tier — a higher tier vehicle scraps for more at the same HP fraction', () => {
+    const tier1 = computeScrapResidualValue('rock_fragmenter', 1, getVehicleDefByTier('rock_fragmenter', 1).maxHp);
+    const tier3 = computeScrapResidualValue('rock_fragmenter', 3, getVehicleDefByTier('rock_fragmenter', 3).maxHp);
+    expect(tier3).toBeGreaterThan(tier1);
   });
 });
