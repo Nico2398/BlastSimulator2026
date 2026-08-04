@@ -82,8 +82,11 @@ const REGION = {
   // Beside the pit, not inside it. The blast leaves sloped crater walls that
   // already register as ramp cells, so carving within them removes more than it
   // adds and the step's "a ramp appeared" check never fires. A haul ramp
-  // belongs on intact ground anyway.
-  ramp: { x1: 2, z1: 2, x2: 5, z2: 20 },
+  // belongs on intact ground anyway. Centred on the tutorial step's own
+  // scripted target (build_ramp start:10,15 end:10,25, tutorialSteps.ts) with
+  // margin either side — west of the (20,20)-(30,30) pit and clear of (16,16)
+  // (x2 stays under it), same off-centre reasoning as the comment above.
+  ramp: { x1: 5, z1: 10, x2: 15, z2: 30 },
 } as const satisfies Record<string, TileRegion>;
 
 /** Open the Crew panel, then hire one role. */
