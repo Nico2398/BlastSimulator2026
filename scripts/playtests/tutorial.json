@@ -138,6 +138,13 @@
       "goal": "lay out the drill grid on the exact coordinates asked for",
       "actions": [
         {
+          "do": "focusTile",
+          "x": 25,
+          "z": 25,
+          "distance": 40,
+          "note": "centres the camera on the 10x10 rectangle's midpoint, clear of the placement strip's docked bar, before dragging its corners"
+        },
+        {
           "do": "dragTiles",
           "x1": 20,
           "z1": 20,
