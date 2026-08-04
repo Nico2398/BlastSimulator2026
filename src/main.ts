@@ -507,21 +507,28 @@ window.__worldToScreen = (x, z) => {
   // raycastSurfaceY, not surfaceYAt: surfaceYAt's voxel-column height can
   // diverge from the rendered mesh enough to throw the projected pixel off
   // the tile — the click raycast then misses the terrain entirely.
-  let y = gameRenderer.raycastSurfaceY(cx, cz) ?? gameRenderer.surfaceYAt(cx, cz);
-  let ndc = scene.cameraController.projectToNDC(cx, y, cz);
+  const startY = gameRenderer.raycastSurfaceY(cx, cz) ?? gameRenderer.surfaceYAt(cx, cz);
+  let candidate = scene.cameraController.projectToNDC(cx, startY, cz);
   // The camera ray through a pixel is never vertical, so on sloped ground —
   // and this game's default camera is ground-level, i.e. steeply angled —
   // the point directly above/below (cx, cz) isn't always the point the
   // camera's own ray would hit when aimed at that pixel. Converge on a pixel
-  // that truly round-trips: re-derive the height from what a click here
-  // would actually hit, and reproject, rather than trust one vertical guess.
-  for (let i = 0; i < 3; i++) {
-    const hit = gameRenderer.raycastTerrainFromNDC(ndc.x, ndc.y, scene.camera);
+  // that truly round-trips: re-derive the height from what a click here would
+  // actually hit, and reproject. Tracks the best candidate seen rather than
+  // trusting the last iteration outright — a fixed-point sequence like this
+  // one isn't guaranteed to improve monotonically, and landing on a worse
+  // guess than the vertical-raycast starting point would be a regression.
+  let best = candidate;
+  let bestError = Infinity;
+  for (let i = 0; i < 5; i++) {
+    const hit = gameRenderer.raycastTerrainFromNDC(candidate.x, candidate.y, scene.camera);
     if (!hit) break;
-    if (Math.abs(hit.x - cx) < 0.05 && Math.abs(hit.z - cz) < 0.05) break;
-    y = hit.y;
-    ndc = scene.cameraController.projectToNDC(cx, y, cz);
+    const error = Math.hypot(hit.x - cx, hit.z - cz);
+    if (error < bestError) { bestError = error; best = candidate; }
+    if (error < 0.05) break;
+    candidate = scene.cameraController.projectToNDC(cx, hit.y, cz);
   }
+  const ndc = best;
   const rect = canvas.getBoundingClientRect();
   return {
     px: rect.left + (ndc.x * 0.5 + 0.5) * rect.width,
