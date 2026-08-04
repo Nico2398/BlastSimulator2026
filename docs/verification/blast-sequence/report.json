@@ -1,0 +1,68 @@
+[
+  {
+    "id": "a-stemmed",
+    "title": "3 kg dynatomics per hole, 2 m stemming, 4x4 at 3 m",
+    "durationS": 0.84,
+    "times": [
+      0,
+      0.1,
+      0.29,
+      0.5,
+      0.84
+    ],
+    "rating": "PERFECT",
+    "throwDistance": "0.0",
+    "cleared": "1631",
+    "muckPile": {
+      "fragments": 3284,
+      "volume": {
+        "min": 0.125,
+        "median": 0.25,
+        "p90": 1,
+        "max": 8
+      },
+      "speed": {
+        "min": 0,
+        "median": 1.746,
+        "p90": 3.256,
+        "max": 5.764
+      },
+      "maxClearance": 0.738,
+      "floating": 0,
+      "highestY": 39.686
+    }
+  },
+  {
+    "id": "b-unstemmed",
+    "title": "20 kg dynatomics per hole, NO stemming, 4x4 at 3 m",
+    "durationS": 16.45,
+    "times": [
+      0,
+      0.1,
+      0.3,
+      0.8,
+      16.45
+    ],
+    "rating": "CATASTROPHIC",
+    "throwDistance": "67.4",
+    "cleared": "2515",
+    "muckPile": {
+      "fragments": 10585,
+      "volume": {
+        "min": 0.125,
+        "median": 0.125,
+        "p90": 0.375,
+        "max": 2
+      },
+      "speed": {
+        "min": 0.079,
+        "median": 34.236,
+        "p90": 80,
+        "max": 80
+      },
+      "maxClearance": 0.725,
+      "floating": 0,
+      "highestY": 43.05
+    }
+  }
+]
