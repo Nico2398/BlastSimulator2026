@@ -49,7 +49,7 @@ export class ToolRail {
         'width:58px', 'height:52px', 'display:flex', 'flex-direction:column',
         'align-items:center', 'justify-content:center', 'gap:5px',
         'border:1px solid transparent', 'border-radius:5px', 'background:transparent',
-        'color:var(--bsx-text-muted)', 'cursor:pointer', 'pointer-events:all', 'position:relative',
+        'color:var(--bsx-text-muted)', 'cursor:pointer', 'position:relative',
       ].join(';');
       btn.appendChild(iconEl(entry.icon, 18));
       const label = document.createElement('span');

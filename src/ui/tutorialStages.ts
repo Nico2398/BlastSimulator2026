@@ -91,7 +91,7 @@ function hireStages(role: string, hintKey: string): TutorialStage[] {
  */
 export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
   'time-speed': [
-    { target: '#bs-hud-top .bs-speed-btn', hintKey: 'tutorial.stage.speed' },
+    { target: '#bs-hud-top .bs-speed-btn button[data-speed]', hintKey: 'tutorial.stage.speed' },
   ],
 
   'hire-surveyor': hireStages('surveyor', 'tutorial.stage.hire_surveyor'),
@@ -192,7 +192,7 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
   ],
 
   'tick-advance': [
-    { target: '#bs-hud-top .bs-speed-btn', hintKey: 'tutorial.stage.let_time_run' },
+    { target: '#bs-hud-top .bs-speed-btn button[data-speed]', hintKey: 'tutorial.stage.let_time_run' },
   ],
 };
 

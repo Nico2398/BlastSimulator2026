@@ -57,7 +57,7 @@ export class MiniMap {
     const layersWrap = document.createElement('div');
     layersWrap.style.cssText = 'margin-left:auto;display:flex;gap:2px';
     const navBtn = document.createElement('button');
-    navBtn.style.cssText = 'width:20px;height:18px;display:flex;align-items:center;justify-content:center;border:1px solid transparent;border-radius:3px;background:transparent;color:var(--bsx-text-muted);cursor:pointer;padding:0;pointer-events:all';
+    navBtn.style.cssText = 'width:20px;height:18px;display:flex;align-items:center;justify-content:center;border:1px solid transparent;border-radius:3px;background:transparent;color:var(--bsx-text-muted);cursor:pointer;padding:0';
     navBtn.title = t('shell.minimap.nav_tip');
     navBtn.appendChild(iconEl('layers', 10));
     navBtn.addEventListener('click', () => this.setNavGridVisible(!this._navGridVisible));

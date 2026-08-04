@@ -359,14 +359,17 @@ describe('TutorialOverlay (12.4)', () => {
       // Create a target element matching the highlight target for step 0
       const target = document.createElement('div');
       target.className = 'bs-speed-btn';
+      const speedBtn = document.createElement('button');
+      speedBtn.dataset['speed'] = '2';
+      target.appendChild(speedBtn);
       const hudTop = document.createElement('div');
       hudTop.id = 'bs-hud-top';
       hudTop.appendChild(target);
       document.body.appendChild(hudTop);
 
       tut.start(createMockState());
-      // Step 0 (time-speed) has highlightTarget '#bs-hud-top .bs-speed-btn'
-      expect(target.classList.contains('bs-tutorial-highlight')).toBe(true);
+      // Step 0 (time-speed) has highlightTarget '#bs-hud-top .bs-speed-btn button[data-speed]'
+      expect(speedBtn.classList.contains('bs-tutorial-highlight')).toBe(true);
       hudTop.remove();
     });
 
@@ -375,13 +378,16 @@ describe('TutorialOverlay (12.4)', () => {
       overlay = tut;
       const target = document.createElement('div');
       target.className = 'bs-speed-btn';
+      const speedBtn = document.createElement('button');
+      speedBtn.dataset['speed'] = '2';
+      target.appendChild(speedBtn);
       const hudTop = document.createElement('div');
       hudTop.id = 'bs-hud-top';
       hudTop.appendChild(target);
       document.body.appendChild(hudTop);
 
       tut.start(createMockState());
-      expect(target.classList.contains('bs-tutorial-highlight')).toBe(true);
+      expect(speedBtn.classList.contains('bs-tutorial-highlight')).toBe(true);
 
       // Advance by completing step 0 (time-speed: increase timeScale)
       const state = createMockState();
@@ -389,7 +395,7 @@ describe('TutorialOverlay (12.4)', () => {
       tut.onCommandExecuted(state);
       // After advancing, highlight should be removed from old element
       // (and new highlight may be applied if new step has target)
-      expect(target.classList.contains('bs-tutorial-highlight')).toBe(false);
+      expect(speedBtn.classList.contains('bs-tutorial-highlight')).toBe(false);
       hudTop.remove();
     });
 
@@ -398,16 +404,19 @@ describe('TutorialOverlay (12.4)', () => {
       overlay = tut;
       const target = document.createElement('div');
       target.className = 'bs-speed-btn';
+      const speedBtn = document.createElement('button');
+      speedBtn.dataset['speed'] = '2';
+      target.appendChild(speedBtn);
       const hudTop = document.createElement('div');
       hudTop.id = 'bs-hud-top';
       hudTop.appendChild(target);
       document.body.appendChild(hudTop);
 
       tut.start(createMockState());
-      expect(target.classList.contains('bs-tutorial-highlight')).toBe(true);
+      expect(speedBtn.classList.contains('bs-tutorial-highlight')).toBe(true);
 
       tut.finish();
-      expect(target.classList.contains('bs-tutorial-highlight')).toBe(false);
+      expect(speedBtn.classList.contains('bs-tutorial-highlight')).toBe(false);
       hudTop.remove();
     });
 
@@ -416,17 +425,20 @@ describe('TutorialOverlay (12.4)', () => {
       overlay = tut;
       const target = document.createElement('div');
       target.className = 'bs-speed-btn';
+      const speedBtn = document.createElement('button');
+      speedBtn.dataset['speed'] = '2';
+      target.appendChild(speedBtn);
       const hudTop = document.createElement('div');
       hudTop.id = 'bs-hud-top';
       hudTop.appendChild(target);
       document.body.appendChild(hudTop);
 
       tut.start(createMockState());
-      expect(target.classList.contains('bs-tutorial-highlight')).toBe(true);
+      expect(speedBtn.classList.contains('bs-tutorial-highlight')).toBe(true);
 
       tut.dispose();
       overlay = null;
-      expect(target.classList.contains('bs-tutorial-highlight')).toBe(false);
+      expect(speedBtn.classList.contains('bs-tutorial-highlight')).toBe(false);
       hudTop.remove();
     });
 

@@ -127,7 +127,7 @@ export class TopBar {
 
     this.weatherBtn = document.createElement('button');
     this.weatherBtn.className = 'bs-weather';
-    this.weatherBtn.style.cssText = 'display:flex;align-items:center;height:32px;padding:0 9px;border:1px solid var(--bsx-hairline-strong);border-radius:4px;background:var(--bsx-well);color:var(--bsx-info-text);cursor:pointer;pointer-events:all';
+    this.weatherBtn.style.cssText = 'display:flex;align-items:center;height:32px;padding:0 9px;border:1px solid var(--bsx-hairline-strong);border-radius:4px;background:var(--bsx-well);color:var(--bsx-info-text);cursor:pointer';
     this.weatherIcon = iconEl('sun', 15);
     this.weatherBtn.appendChild(this.weatherIcon);
     dayWrap.append(dayCol, this.weatherBtn);
@@ -138,7 +138,7 @@ export class TopBar {
     const speedGroup = el('div', { className: 'bs-speed-btn' });
     speedGroup.style.cssText = 'display:flex;height:32px;border:1px solid var(--bsx-hairline-strong);border-radius:4px;overflow:hidden;background:var(--bsx-well)';
     const pauseBtn = document.createElement('button');
-    pauseBtn.style.cssText = 'width:32px;border:0;border-right:1px solid var(--bsx-hairline);background:transparent;color:var(--bsx-text-secondary);cursor:pointer;display:flex;align-items:center;justify-content:center;pointer-events:all';
+    pauseBtn.style.cssText = 'width:32px;border:0;border-right:1px solid var(--bsx-hairline);background:transparent;color:var(--bsx-text-secondary);cursor:pointer;display:flex;align-items:center;justify-content:center';
     pauseBtn.appendChild(iconEl('pause', 12));
     this.locale.bindTitle(pauseBtn, 'shell.topbar.pause_tip');
     pauseBtn.addEventListener('click', () => this.onTogglePause?.());
@@ -147,7 +147,7 @@ export class TopBar {
       const btn = document.createElement('button');
       btn.dataset['speed'] = String(speed);
       btn.textContent = `${speed}×`;
-      btn.style.cssText = 'width:32px;border:0;border-right:1px solid var(--bsx-hairline);background:transparent;color:var(--bsx-text-muted);font:600 11px/1 var(--bsx-font-mono);cursor:pointer;display:flex;align-items:center;justify-content:center;pointer-events:all';
+      btn.style.cssText = 'width:32px;border:0;border-right:1px solid var(--bsx-hairline);background:transparent;color:var(--bsx-text-muted);font:600 11px/1 var(--bsx-font-mono);cursor:pointer;display:flex;align-items:center;justify-content:center';
       btn.addEventListener('click', () => this.onSpeedChange?.(speed));
       speedGroup.appendChild(btn);
       this.speedButtons.push(btn);
@@ -172,7 +172,7 @@ export class TopBar {
     const rightWrap = el('div');
     rightWrap.style.cssText = 'display:flex;flex:0 0 auto;align-items:center;gap:6px;padding:0 12px;border-left:1px solid var(--bsx-hairline)';
     this.logBtn = document.createElement('button');
-    this.logBtn.style.cssText = 'position:relative;width:34px;height:34px;display:flex;align-items:center;justify-content:center;border:1px solid var(--bsx-hairline-strong);border-radius:4px;background:var(--bsx-well);color:var(--bsx-text-secondary);cursor:pointer;pointer-events:all';
+    this.logBtn.style.cssText = 'position:relative;width:34px;height:34px;display:flex;align-items:center;justify-content:center;border:1px solid var(--bsx-hairline-strong);border-radius:4px;background:var(--bsx-well);color:var(--bsx-text-secondary);cursor:pointer';
     this.locale.bindTitle(this.logBtn, 'shell.topbar.log_tip');
     this.logBtn.appendChild(iconEl('bell', 15));
     this.logBadge = el('span');
@@ -182,14 +182,14 @@ export class TopBar {
 
     const savesBtn = document.createElement('button');
     savesBtn.id = 'bs-saveload-btn';
-    savesBtn.style.cssText = 'width:34px;height:34px;display:flex;align-items:center;justify-content:center;border:1px solid var(--bsx-hairline-strong);border-radius:4px;background:var(--bsx-well);color:var(--bsx-text-secondary);cursor:pointer;pointer-events:all';
+    savesBtn.style.cssText = 'width:34px;height:34px;display:flex;align-items:center;justify-content:center;border:1px solid var(--bsx-hairline-strong);border-radius:4px;background:var(--bsx-well);color:var(--bsx-text-secondary);cursor:pointer';
     this.locale.bindTitle(savesBtn, 'shell.topbar.saves_tip');
     savesBtn.appendChild(iconEl('save', 15));
     savesBtn.addEventListener('click', () => this.onOpenSaves?.());
 
     const mapBtn = document.createElement('button');
     mapBtn.className = 'bs-return-map';
-    mapBtn.style.cssText = 'display:flex;align-items:center;gap:7px;height:34px;padding:0 11px;border:1px solid var(--bsx-hairline-strong);border-radius:4px;background:var(--bsx-well);color:var(--bsx-text-secondary);font:600 10px/1 var(--bsx-font-ui);letter-spacing:.1em;cursor:pointer;pointer-events:all';
+    mapBtn.style.cssText = 'display:flex;align-items:center;gap:7px;height:34px;padding:0 11px;border:1px solid var(--bsx-hairline-strong);border-radius:4px;background:var(--bsx-well);color:var(--bsx-text-secondary);font:600 10px/1 var(--bsx-font-ui);letter-spacing:.1em;cursor:pointer';
     mapBtn.appendChild(iconEl('map', 14));
     const mapLabel = el('span');
     this.locale.bindText(mapLabel, 'shell.topbar.site_map');
@@ -254,7 +254,7 @@ export class TopBar {
       const tone = pip.tone === 'critical'
         ? { bg: 'rgba(255,91,76,.14)', border: 'rgba(255,91,76,.45)', fg: 'var(--bsx-critical-text)' }
         : { bg: 'rgba(255,176,46,.12)', border: 'rgba(255,176,46,.36)', fg: 'var(--bsx-amber-hover)' };
-      btn.style.cssText = `display:flex;align-items:center;gap:5px;height:26px;padding:0 8px;border:1px solid ${tone.border};border-radius:4px;background:${tone.bg};color:${tone.fg};cursor:pointer;font:700 10px/1 var(--bsx-font-mono);pointer-events:all;white-space:nowrap`;
+      btn.style.cssText = `display:flex;align-items:center;gap:5px;height:26px;padding:0 8px;border:1px solid ${tone.border};border-radius:4px;background:${tone.bg};color:${tone.fg};cursor:pointer;font:700 10px/1 var(--bsx-font-mono);white-space:nowrap`;
       if (pip.tone === 'critical') btn.style.animation = 'bs-pulse 2.4s ease-in-out infinite';
       btn.title = pip.tip;
       btn.appendChild(iconEl(pip.icon, 12));
