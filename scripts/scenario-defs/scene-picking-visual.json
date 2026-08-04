@@ -40,6 +40,7 @@
       "description": "Click the building — a dashed selection ring appears on the ground and the bottom selection bar shows Upgrade/Move/Demolish",
       "interaction": [
         { "type": "command", "command": "state" },
+        { "type": "cameraFocus", "x": 11, "z": 11, "distance": 15 },
         { "type": "click", "x": 640, "y": 360 },
         { "type": "wait", "durationMs": 300 },
         { "type": "waitForSelector", "selector": "#bs-selection-bar [data-action=\"upgrade\"]" },
@@ -52,6 +53,7 @@
       "description": "Esc deselects — the ring and the selection bar both disappear",
       "interaction": [
         { "type": "command", "command": "state" },
+        { "type": "cameraFocus", "x": 11, "z": 11, "distance": 15 },
         { "type": "keypress", "key": "Escape" },
         { "type": "wait", "durationMs": 200 },
         { "type": "screenshot" }
