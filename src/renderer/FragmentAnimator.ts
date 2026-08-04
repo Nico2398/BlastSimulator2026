@@ -47,6 +47,22 @@ export class FragmentAnimator {
     this.endsAtS = 0;
   }
 
+  /**
+   * Run the collapse to its end at once, putting every fragment on the resting
+   * place the blast chose for it.
+   *
+   * Same end state as letting it play out, reached in one write. A harness that
+   * wants a picture of the settled muck rather than of rock in mid-air uses
+   * this, because the animation clock advances at most a tenth of a second per
+   * frame and a frame without a GPU costs seconds.
+   */
+  finish(): void {
+    if (this.flights.length === 0) return;
+    this.elapsedS = this.endsAtS;
+    this.apply();
+    this.flights = [];
+  }
+
   /** Advance the collapse by `dt` seconds. */
   update(dt: number): void {
     if (this.flights.length === 0) return;

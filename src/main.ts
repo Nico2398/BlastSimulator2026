@@ -186,6 +186,7 @@ declare global {
     __cameraOrbit: (yaw: number, pitch: number) => void;
     __cameraFocus: (x: number, z: number, distance: number) => void;
     __cameraReset: () => void;
+    __skipBlastPlayback: () => void;
     __startTutorial: () => void;
     __uiActions: () => ReturnType<typeof probeUiActions>;
     __probeSelector: (selector: string) => ReturnType<typeof probeSelector>;
@@ -443,6 +444,13 @@ window.__cameraFocus = (x: number, z: number, distance: number) => {
 };
 window.__cameraReset = () => {
   scene.cameraController.reset();
+};
+// Put the collapse straight on its resting place, for shots of the settled muck
+// pile. The animation only walks rock to where the blast already put it, so
+// skipping it changes nothing — and without a GPU it would otherwise take
+// minutes of wall clock to play out (#475).
+window.__skipBlastPlayback = () => {
+  gameRenderer.skipFragmentPlayback();
 };
 
 uiManager.setGameConsole(window.__gameConsole);

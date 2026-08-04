@@ -30,6 +30,8 @@ const CAMERA = { distance: 34, yaw: 0.6, pitch: 0.28 };
 interface Shot {
   name: string;
   commands: string[];
+  /** Leave the collapse playing, for a shot of rock still in the air. */
+  keepPlayback?: boolean;
 }
 
 async function run(page: Page, command: string): Promise<string> {
@@ -75,6 +77,13 @@ async function capture(page: Page, shot: Shot, group: string): Promise<Record<st
   for (const command of shot.commands) {
     await run(page, command);
     await settle(400);
+  }
+  // Without a GPU a frame costs seconds while the collapse advances at most
+  // 0.1 s per frame, so a shot taken straight after the blast catches rock in
+  // mid-air. Putting the playback on its end shows the muck pile the blast
+  // actually produced — the same state a headless run reaches.
+  if (!shot.keepPlayback) {
+    await page.evaluate('window.__skipBlastPlayback && window.__skipBlastPlayback()');
   }
   await aimCamera(page);
   await settle(1200);
@@ -134,7 +143,13 @@ const GROUPS: Record<string, Shot[]> = {
   // charge has gone off. Anything that changes between these two is the blast.
   collapse: [
     { name: '1-before', commands: ['new_game seed:42', ...PATTERN('20', '3')] },
-    { name: '2-after', commands: ['new_game seed:42', ...PATTERN('20', '3'), 'blast', ...SETTLED] },
+    // Caught mid-collapse, with the rock still on its way down.
+    {
+      name: '2-in-flight',
+      commands: ['new_game seed:42', ...PATTERN('20', '3'), 'blast'],
+      keepPlayback: true,
+    },
+    { name: '3-settled', commands: ['new_game seed:42', ...PATTERN('20', '3'), 'blast', ...SETTLED] },
   ],
   // One variable at a time, everything else held fixed.
   setup: [

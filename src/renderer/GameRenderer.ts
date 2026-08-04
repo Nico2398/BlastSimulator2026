@@ -217,6 +217,20 @@ export class GameRenderer {
     );
   }
 
+  /**
+   * Jump the collapse straight to its end, leaving every fragment on the resting
+   * place the blast already chose for it.
+   *
+   * The animation only ever walks rock to a destination core decided, so cutting
+   * it short changes nothing about the game — which is what makes it safe for a
+   * harness to do. Without a GPU a frame costs seconds while the animation clock
+   * advances at most 0.1 s per frame, so a screenshot of a settled muck pile is
+   * otherwise minutes of wall clock away.
+   */
+  skipFragmentPlayback(): void {
+    this.fragmentAnimator?.finish();
+  }
+
   /** Per-frame update — call from the render loop. */
   update(dt: number): void {
     const cam = this.sm.camera;

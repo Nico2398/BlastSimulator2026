@@ -136,6 +136,42 @@ describe('FragmentAnimator', () => {
     expect(animator.isPlaying).toBe(true);
   });
 
+  it('lands everything at once when told to finish', () => {
+    const { mesh, frames } = recorder();
+    const animator = new FragmentAnimator(mesh);
+    const near = flight({ fragmentId: 0, to: { x: 4, y: 3, z: -2 }, durationS: 2 });
+    const far = flight({ fragmentId: 1, to: { x: 9, y: 1, z: 5 }, durationS: 6, delayS: 1 });
+    animator.begin([near, far]);
+
+    animator.finish();
+
+    const last = frames[frames.length - 1]!;
+    expect(last.get(0)).toEqual(near.to);
+    expect(last.get(1)).toEqual(far.to);
+    expect(animator.isPlaying).toBe(false);
+  });
+
+  it('costs nothing per frame after finishing', () => {
+    const { mesh, spy } = recorder();
+    const animator = new FragmentAnimator(mesh);
+    animator.begin([flight()]);
+    animator.finish();
+
+    const calls = spy.mock.calls.length;
+    animator.update(1);
+
+    expect(spy.mock.calls.length).toBe(calls);
+  });
+
+  it('finishing a blast with nothing to animate does nothing', () => {
+    const { mesh, spy } = recorder();
+    const animator = new FragmentAnimator(mesh);
+
+    animator.finish();
+
+    expect(spy).not.toHaveBeenCalled();
+  });
+
   it('drops everything when stopped', () => {
     const { mesh, spy } = recorder();
     const animator = new FragmentAnimator(mesh);
