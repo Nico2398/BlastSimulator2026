@@ -141,7 +141,12 @@ export async function executeActionOnPage(
           const probe = (window as unknown as {
             __probeSelector?: (s: string) => string | null;
           }).__probeSelector;
-          return probe === undefined ? null : probe(sel);
+          if (probe === undefined) return null;
+          // Scroll into view before probing, exactly as page.click will before
+          // clicking: a row below a panel's fold has its centre over the game
+          // canvas until scrolled, and probing that reads as covered-forever.
+          document.querySelector(sel)?.scrollIntoView({ block: 'center', inline: 'nearest' });
+          return probe(sel);
         }, action.selector);
         if (reason === null) break;
         if (Date.now() > deadline) {
