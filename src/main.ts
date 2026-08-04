@@ -207,6 +207,7 @@ declare global {
     __setRenderEnabled: (enabled: boolean) => void;
     __renderFrame: () => void;
     __debugGridInfo: () => Record<string, unknown>;
+    __entityWorldPosition: (kind: 'building' | 'vehicle' | 'employee' | 'fragment', id: number) => { x: number; z: number } | null;
   }
 }
 
@@ -452,6 +453,13 @@ window.__cameraFocus = (x: number, z: number, distance: number) => {
 };
 window.__cameraReset = () => {
   scene.cameraController.reset();
+};
+// Live entity position for harnesses that need to click a scene entity
+// without baking in a guessed world coordinate — a playtest that hires an
+// employee doesn't otherwise know where the game decided to spawn them.
+window.__entityWorldPosition = (kind, id) => {
+  const pos = gameRenderer.entityWorldPosition(kind, id);
+  return pos ? { x: pos.x, z: pos.z } : null;
 };
 
 uiManager.setGameConsole(window.__gameConsole);

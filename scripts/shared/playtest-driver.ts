@@ -180,6 +180,28 @@ export async function runAction(page: Page, action: PlayerAction): Promise<void>
       await page.mouse.up();
       break;
     }
+    case 'clickEntity': {
+      const pos = await page.evaluate(({ kind, id }: { kind: string; id: number }) =>
+        (window as unknown as {
+          __entityWorldPosition: (k: string, i: number) => { x: number; z: number } | null;
+        }).__entityWorldPosition(kind, id), { kind: action.kind, id: action.id });
+      if (!pos) {
+        throw new PlaytestFailure(
+          `no ${action.kind} #${action.id} is on the scene to click`,
+          describeAvailable(await probe(page)),
+        );
+      }
+      await page.evaluate(({ x, z, distance }: { x: number; z: number; distance: number }) => {
+        (window as unknown as { __cameraFocus: (x: number, z: number, d: number) => void }).__cameraFocus(x, z, distance);
+        // Playtests suspend the draw loop like interaction-mode scenarios
+        // (#475) — force a frame so the new camera position and the scene's
+        // entity transforms are current before the click below raycasts.
+        (window as unknown as { __renderFrame?: () => void }).__renderFrame?.();
+      }, { x: pos.x, z: pos.z, distance: action.distance ?? 15 });
+      const viewport = page.viewport();
+      await page.mouse.click((viewport?.width ?? 1280) / 2, (viewport?.height ?? 720) / 2);
+      break;
+    }
     case 'awaitUsable': {
       await requireUsable(page, action.selector, action.timeoutMs ?? DEFAULT_TIMEOUT_MS);
       break;

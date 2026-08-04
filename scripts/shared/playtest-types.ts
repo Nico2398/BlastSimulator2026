@@ -22,6 +22,13 @@ export type PlayerAction =
   | { do: 'pickTile'; x: number; z: number }
   /** Drag a rectangle in the open tile picker, in grid coordinates. */
   | { do: 'dragTiles'; x1: number; z1: number; x2: number; z2: number }
+  /**
+   * Click a live scene entity (redesign P2 — src/ui/scene/ScenePicking.ts)
+   * by kind + id rather than a baked world coordinate: a playtest that just
+   * hired an employee has no static x/z to click, only the id the hire
+   * produced, and the driver looks up its current position itself.
+   */
+  | { do: 'clickEntity'; kind: 'building' | 'vehicle' | 'employee' | 'fragment'; id: number; distance?: number }
   /** Wait for a selector to exist and be usable. */
   | { do: 'awaitUsable'; selector: string; timeoutMs?: number }
   /**

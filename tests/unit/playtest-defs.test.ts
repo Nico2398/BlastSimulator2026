@@ -16,7 +16,7 @@ import {
 import { playtestFiles, loadPlaytestFile } from '../../scripts/shared/playtest-utils.js';
 
 const KNOWN_ACTION_TYPES: ReadonlyArray<PlayerAction['do']> = [
-  'click', 'clickLabel', 'set', 'pickTile', 'dragTiles',
+  'click', 'clickLabel', 'set', 'pickTile', 'dragTiles', 'clickEntity',
   'awaitUsable', 'awaitTutorialStep', 'letTimePass',
 ];
 
