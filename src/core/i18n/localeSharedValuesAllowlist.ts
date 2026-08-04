@@ -30,13 +30,12 @@ export const LOCALE_SHARED_VALUE_ALLOWLIST: string[] = [
 
   // ── Format-only / symbol-only ──
   'hud.speed_x',           // "{speed}×"
-  'ui.employees.task_time', // "{t}t"
   'ui.blast_workshop.drill.diameter', // "Ø"
   'ui.contracts.storage_value', // "{used} / {cap} kg"
   'ui.contracts.delivered_line', // "{delivered} / {total} kg"
   'ui.operations.mass_kg', // "{kg} kg"
   'ui.crew.location_coords', // "({x}, {z})"
-  'ui.crew.skill_xp', // "{xp} / {next} XP" — XP is the same cognate as ui.employees.xp, just embedded in a format string
+  'ui.crew.skill_xp', // "{xp} / {next} XP" — XP is a cognate, embedded in a format string
   'ui.fleet.load_kg', // "{kg} / {cap} kg"
 
   // ── Language picker endonyms ──
@@ -47,15 +46,8 @@ export const LOCALE_SHARED_VALUE_ALLOWLIST: string[] = [
   'hud.scores.nuisance',        // "Nuisance"
   'score.nuisance',             // "Nuisance"
   'need.fatigue',               // "Fatigue"
-  'ui.employees.fatigue',       // "Fatigue"
-  'ui.employees.xp',            // "XP"
-  'ui.employees.base_salary',   // "Base"
-  'ui.employees.skill_bonus',   // "Bonus"
-  'ui.employees.total_salary',  // "Total"
-  'ui.employees.proficiency_4', // "Expert"
   'proficiency.2',              // "Novice"
   'proficiency.4',              // "Expert"
-  'ui.vehicles.type',           // "Type"
   'ui.build.ramp_section',      // "Terrain"
   'ui.settings.audio',          // "Volume"
   'sandbox.field.biome',        // "Biome"
@@ -75,6 +67,6 @@ export const LOCALE_SHARED_VALUE_ALLOWLIST: string[] = [
   'ui.finances.category.mafia', // "Mafia"
   'ui.operations.fragment_count', // "{count} fragments"
   'ui.operations.incidents', // "Incidents"
-  'ui.crew.need_fatigue', // "Fatigue" — same cognate as ui.employees.fatigue/need.fatigue
+  'ui.crew.need_fatigue', // "Fatigue" — same cognate as need.fatigue
   'ui.crew.skill_maxed', // "MAX"
 ];

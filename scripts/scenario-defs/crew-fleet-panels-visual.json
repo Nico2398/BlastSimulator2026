@@ -27,6 +27,28 @@
         { "type": "wait", "durationMs": 300 },
         { "type": "screenshot" }
       ]
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "Crew panel wired into UIManager (P6-cleanup): roster cards render with the driller and driver hired in step 0, under the ui.crew.* namespace.",
+      "interaction": [
+        { "type": "command", "command": "state" },
+        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"employees\"]" },
+        { "type": "wait", "durationMs": 300 },
+        { "type": "screenshot" }
+      ]
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "Fleet panel wired into UIManager (P6-cleanup): vehicle cards render with the hauler and drill rig bought in step 0, under the ui.fleet.* namespace.",
+      "interaction": [
+        { "type": "command", "command": "state" },
+        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"vehicles\"]" },
+        { "type": "wait", "durationMs": 300 },
+        { "type": "screenshot" }
+      ]
     }
   ]
 }
