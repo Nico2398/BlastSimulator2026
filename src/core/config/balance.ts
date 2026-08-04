@@ -5,6 +5,11 @@
 import type { BuildingType } from '../entities/Building.js';
 import type { ResearchCondition } from '../entities/BuildingResearch.js';
 
+// ─── Time ───────────────────────────────────────────────────────────────────────
+
+/** Ticks per in-game day. 1 tick = 1 game-hour (see PAY_CYCLE_TICKS below). Matches TopBar's day/clock math. */
+export const TICKS_PER_DAY = 24;
+
 // ─── Economy ──────────────────────────────────────────────────────────────────
 
 /** Starting cash for a new game ($). Real open-pit mines cost $10M+ to open; scaled down for gameplay. */

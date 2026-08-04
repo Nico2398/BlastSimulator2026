@@ -10,6 +10,7 @@ import { t } from '../../core/i18n/I18n.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import type { GameState } from '../../core/state/GameState.js';
 import type { WeatherState } from '../../core/weather/WeatherCycle.js';
+import { TICKS_PER_DAY } from '../../core/config/balance.js';
 import type { NotificationCenter, AlertPip } from '../notify/NotificationCenter.js';
 import type { PanelName } from '../UIManager.js';
 
@@ -224,8 +225,8 @@ export class TopBar {
     this.trendIcon.style.color = positive ? 'var(--bsx-positive)' : 'var(--bsx-critical-text)';
 
     // Day / clock
-    const day = Math.floor(state.tickCount / 24) + 1;
-    const hour = state.tickCount % 24;
+    const day = Math.floor(state.tickCount / TICKS_PER_DAY) + 1;
+    const hour = state.tickCount % TICKS_PER_DAY;
     this.dayValue.textContent = t('shell.topbar.day', { day });
     this.clockValue.textContent = `${String(hour).padStart(2, '0')}:00`;
 

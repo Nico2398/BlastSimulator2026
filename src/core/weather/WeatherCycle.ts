@@ -3,6 +3,7 @@
 // Uses seeded PRNG for deterministic sequences.
 
 import { Random } from '../math/Random.js';
+import { TICKS_PER_DAY } from '../config/balance.js';
 
 // ── Weather states ──
 
@@ -20,8 +21,8 @@ export const ALL_WEATHER_STATES: readonly WeatherState[] = [
 ];
 
 // ── Duration ranges (in game ticks) ──
-// Real weather patterns last hours to days. Game ticks represent ~15 min each.
-// Sunny: 4-12 ticks (1-3 game-hours). Storm: 2-6 ticks (30min-1.5hrs).
+// 1 tick = 1 game-hour (TICKS_PER_DAY = 24, matches the TopBar day/clock).
+// Sunny: 8-20 ticks (under a day). Storm: 2-6 ticks (a few hours).
 
 const DURATION_RANGES: Record<WeatherState, [min: number, max: number]> = {
   sunny: [8, 20],
@@ -103,6 +104,32 @@ export function setWeather(cycle: WeatherCycleState, state: WeatherState): Weath
   cycle.ticksRemaining = DURATION_RANGES[state][1];
   cycle.history.push(state);
   return cycle;
+}
+
+/**
+ * Deterministic lookahead: the weather on each of the next `n` days.
+ * Simulates forward on a clone of both `cycle` and `rng` — the live cycle
+ * and its rng stream are untouched, so calling this doesn't consume any
+ * randomness the real game loop would otherwise use.
+ *
+ * Returns `n` entries for days 1..n (tomorrow through day+n) — today is
+ * deliberately excluded. A popover showing "today" alongside this outlook
+ * must read `cycle.current` directly rather than treating index 0 of this
+ * result as today, so the two can never disagree.
+ */
+export function forecast(cycle: WeatherCycleState, rng: Random, n = 14): WeatherState[] {
+  const simCycle: WeatherCycleState = {
+    current: cycle.current,
+    ticksRemaining: cycle.ticksRemaining,
+    history: [],
+  };
+  const simRng = rng.clone();
+  const days: WeatherState[] = [];
+  for (let day = 0; day < n; day++) {
+    for (let tick = 0; tick < TICKS_PER_DAY; tick++) advanceWeather(simCycle, simRng);
+    days.push(simCycle.current);
+  }
+  return days;
 }
 
 // ── Helpers ──
