@@ -562,6 +562,44 @@ describe('blastCommand — ore report event wiring', () => {
     expect(ctx.state!.lastOreReport).not.toBeNull();
     expect(ctx.state!.lastOreReport).toEqual(mockedReport);
   });
+
+  // ── GameState.lastBlastReport wiring (redesign P4/§5.A) ───────────────────
+
+  it('leaves state.lastBlastReport null before any blast has been executed', () => {
+    const ctx = makeMiningContext();
+    expect(ctx.state!.lastBlastReport).toBeNull();
+  });
+
+  it('populates state.lastBlastReport with tick, rating, and spent after a blast', () => {
+    const ctx = makeMiningContext();
+    ctx.state!.tickCount = 7;
+
+    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+    chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
+    sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
+
+    const result = blastCommand(ctx, [], {});
+
+    expect(result.success).toBe(true);
+    const report = ctx.state!.lastBlastReport;
+    expect(report).not.toBeNull();
+    expect(report!.tick).toBe(7);
+    expect(report!.spent).toBe(60); // boomite $12/kg × 5kg
+    expect(['perfect', 'good', 'mediocre', 'bad', 'catastrophic']).toContain(report!.rating);
+    expect(report!.clearedVoxels).toBeGreaterThanOrEqual(0);
+  });
+
+  it('sums spent across every charged hole, not just the last one', () => {
+    const ctx = makeMiningContext();
+    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '2', spacing: '3', depth: '8' });
+    chargeCommand(ctx, [], { hole: '*', explosive: 'boomite', amount: '5kg', stemming: '2m' });
+    sequenceCommand(ctx, ['auto'], {});
+
+    const result = blastCommand(ctx, [], {});
+
+    expect(result.success).toBe(true);
+    expect(ctx.state!.lastBlastReport!.spent).toBe(120); // 2 holes × $12/kg × 5kg
+  });
 });
 
 // ── survey mode / ore_report subcommands (issue #412) ──────────────────────

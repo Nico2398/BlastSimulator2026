@@ -7,7 +7,8 @@ import { createGridPlan, addHole, resetHoleIds } from '../../core/mining/DrillPl
 import { createCharge, batchCharge } from '../../core/mining/ChargePlan.js';
 import { setDelay, autoVPattern } from '../../core/mining/Sequence.js';
 import { assembleBlastPlan, validateBlastPlan } from '../../core/mining/BlastPlan.js';
-import { executeBlast } from '../../core/mining/BlastExecution.js';
+import { executeBlast, buildBlastReport } from '../../core/mining/BlastExecution.js';
+import { getExplosive } from '../../core/world/ExplosiveCatalog.js';
 import { addBlastFragments, syncLogisticsCapacity } from '../../core/economy/Logistics.js';
 
 import { recordVibration, recordBuildingDestruction } from '../../core/scores/ScoreManager.js';
@@ -290,6 +291,15 @@ export function blastCommand(
 
   // Store drill holes before clearing (needed by renderer for per-hole detonation timing)
   ctx.lastBlastHoles = [...state.drillHoles];
+
+  // Charge cost, summed before the plan is cleared below — BlastResult has no
+  // notion of money spent, only rock/ore recovered.
+  let spent = 0;
+  for (const charge of Object.values(state.chargesByHole)) {
+    const explosive = getExplosive(charge.explosiveId);
+    if (explosive) spent += explosive.costPerKg * charge.amountKg;
+  }
+  state.lastBlastReport = buildBlastReport(result, state.tickCount, spent);
 
   // Clear drill plan after blast (holes are consumed)
   state.drillHoles = [];

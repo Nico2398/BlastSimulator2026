@@ -6,6 +6,7 @@ import type { DrillHole } from '../mining/DrillPlan.js';
 import type { HoleCharge } from '../mining/ChargePlan.js';
 import type { SurveyResult } from '../mining/SurveyCalc.js';
 import type { BlastOreReport } from '../mining/BlastOreReport.js';
+import type { BlastReport } from '../mining/BlastExecution.js';
 import type { TubingState } from '../mining/Tubing.js';
 import { createTubingState } from '../mining/Tubing.js';
 import type { FinanceState } from '../economy/Finance.js';
@@ -204,6 +205,8 @@ export interface GameState {
   ghostPreviews: GhostPreview[];
   /** Ore report from the most recent blast, or null if no blast has occurred yet. */
   lastOreReport: BlastOreReport | null;
+  /** Structured summary of the most recent blast, for BlastReportModal (redesign P4/§5.A). Null until the first blast. */
+  lastBlastReport: BlastReport | null;
   /** Purchased blast-preview software tier (0 = none, up to MAX_SOFTWARE_TIER). */
   softwareTier: number;
   /** Tubing inventory and installed-hole set, for waterproofing charges against rain. */
@@ -305,6 +308,7 @@ export function createGame(config: GameConfig): GameState {
     nextPendingActionId: 1,
     ghostPreviews: [],
     lastOreReport: null,
+    lastBlastReport: null,
     softwareTier: 0,
     tubingState: createTubingState(),
   };
