@@ -38,6 +38,20 @@ export type PlayerAction =
    * dragTiles, the same way a real player would zoom out to find their spot.
    */
   | { do: 'zoomOut'; ticks?: number }
+  /**
+   * Re-aim the camera at a world tile, the way a real player looks at where
+   * they're about to click before clicking it. Unlike zoomOut (a blind
+   * dolly-back), this sets the camera's *target* to (x, z), so the tile is
+   * guaranteed to land at screen centre — clear of the bottom-docked
+   * placement strip that a target's default screen position can otherwise
+   * end up directly under (title/RESULT/CONFIRM/ESC all catch clicks across
+   * their full bar, not just the buttons, so a click that lands on the strip
+   * never reaches the canvas beneath it). Needed before pickTile/dragTiles
+   * whenever the beat's target tile isn't already clear of every docked
+   * panel, the same instinctive adjustment a player makes without thinking
+   * about it.
+   */
+  | { do: 'focusTile'; x: number; z: number; distance?: number }
   /** Wait for a selector to exist and be usable. */
   | { do: 'awaitUsable'; selector: string; timeoutMs?: number }
   /**

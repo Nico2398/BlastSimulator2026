@@ -71,6 +71,12 @@
           "selector": "#bs-survey-run"
         },
         {
+          "do": "focusTile",
+          "x": 23,
+          "z": 23,
+          "note": "the default ground-level camera already shows tile (23,23), but at that framing its own screen position falls directly under the placement strip's RESULT block, which catches clicks across its whole bar; a real player would look at the spot before clicking it, which is what this does"
+        },
+        {
           "do": "pickTile",
           "x": 23,
           "z": 23

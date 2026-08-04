@@ -219,6 +219,13 @@ export async function runAction(page: Page, action: PlayerAction): Promise<void>
       await page.evaluate(() => (window as unknown as { __renderFrame?: () => void }).__renderFrame?.());
       break;
     }
+    case 'focusTile': {
+      await page.evaluate(({ x, z, distance }: { x: number; z: number; distance: number }) => {
+        (window as unknown as { __cameraFocus: (x: number, z: number, d: number) => void }).__cameraFocus(x, z, distance);
+        (window as unknown as { __renderFrame?: () => void }).__renderFrame?.();
+      }, { x: action.x, z: action.z, distance: action.distance ?? 25 });
+      break;
+    }
     case 'awaitUsable': {
       await requireUsable(page, action.selector, action.timeoutMs ?? DEFAULT_TIMEOUT_MS);
       break;
