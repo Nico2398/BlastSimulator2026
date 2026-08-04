@@ -123,7 +123,7 @@
       ]
     },
     {
-      "command": "survey core_sample x:12 z:12",
+      "command": "survey core_sample x:23 z:23",
       "timeout": 30,
       "description": "Step 2 complete: pick a method, pick a target in the tile picker, dispatch — then the surveyor works it",
       "interaction": [
@@ -138,6 +138,15 @@
         {
           "type": "waitForSelector",
           "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 23,
+          "z": 23
+        },
+        {
+          "type": "wait",
+          "durationMs": 200
         },
         {
           "type": "screenshot"
@@ -482,7 +491,7 @@
       ]
     },
     {
-      "command": "build_ramp start:4,4 end:4,18",
+      "command": "build_ramp start:10,15 end:10,25",
       "timeout": 30,
       "description": "Step 17 complete: ramp carved by dragging a run in the Build panel picker",
       "interaction": [
@@ -500,10 +509,10 @@
         },
         {
           "type": "dragTiles",
-          "x1": 4,
-          "z1": 4,
-          "x2": 4,
-          "z2": 18
+          "x1": 10,
+          "z1": 15,
+          "x2": 10,
+          "z2": 25
         },
         {
           "type": "wait",
