@@ -28,7 +28,7 @@ import {
   type WeatherState,
 } from '../../core/weather/WeatherCycle.js';
 import { Random } from '../../core/math/Random.js';
-import { buyTubing, installTubing, createTubingState } from '../../core/mining/Tubing.js';
+import { buyTubing, installTubing } from '../../core/mining/Tubing.js';
 import type { FragmentData } from '../../core/mining/BlastExecution.js';
 import { runSurvey, SURVEY_METHODS, type SurveyMethod, computeBlastOreReport } from '../../core/mining/SurveyCalc.js';
 import { SURVEY_COSTS } from '../../core/config/balance.js';
@@ -42,8 +42,6 @@ import { claimForAction, cellsInRect } from './siteExpansion.js';
 export interface MiningContext extends GameContext {
   weatherCycle?: ReturnType<typeof createWeatherCycle>;
   rng?: Random;
-  softwareTier: number;
-  tubingState: ReturnType<typeof createTubingState>;
   /** Positions of fragments from the last blast — used by renderer for localized re-mesh. */
   lastBlastFragments?: { x: number; y: number; z: number }[];
   /** Full fragment data from last blast — used by renderer to spawn fragment meshes. */
@@ -382,26 +380,27 @@ export function previewCommand(
   if (err) return { success: false, output: err };
 
   const plan = assembleBlastPlan(ctx.state!.drillHoles, ctx.state!.chargesByHole, ctx.state!.sequenceDelays);
+  const tier = ctx.state!.softwareTier;
   const sub = args[0];
 
   if (sub === 'energy') {
-    const result = previewEnergy(plan, ctx.grid!, ctx.softwareTier);
-    if (!result) return { success: false, output: `Requires software tier 1+ (current: ${ctx.softwareTier})` };
+    const result = previewEnergy(plan, ctx.grid!, tier);
+    if (!result) return { success: false, output: `Requires software tier 1+ (current: ${tier})` };
     return { success: true, output: `Energy preview: ${result.energyMap.size} voxels, max=${result.maxEnergy.toFixed(1)}, min=${result.minEnergy.toFixed(1)}` };
   }
   if (sub === 'fragments') {
-    const result = previewFragments(plan, ctx.grid!, ctx.softwareTier);
-    if (!result) return { success: false, output: `Requires software tier 2+ (current: ${ctx.softwareTier})` };
+    const result = previewFragments(plan, ctx.grid!, tier);
+    if (!result) return { success: false, output: `Requires software tier 2+ (current: ${tier})` };
     return { success: true, output: `Fragment preview: ${result.fracturedCount} fractured, ${result.crackedCount} cracked, ${result.unaffectedCount} unaffected, avg size ${result.avgFragmentSize.toFixed(2)}` };
   }
   if (sub === 'projections') {
-    const result = previewProjections(plan, ctx.grid!, ctx.softwareTier);
-    if (!result) return { success: false, output: `Requires software tier 3+ (current: ${ctx.softwareTier})` };
+    const result = previewProjections(plan, ctx.grid!, tier);
+    if (!result) return { success: false, output: `Requires software tier 3+ (current: ${tier})` };
     return { success: true, output: `Projection preview: ${result.projectionZoneCount} voxels in projection zone` };
   }
   if (sub === 'vibrations') {
-    const result = previewVibrations(plan, [], ctx.softwareTier);
-    if (!result) return { success: false, output: `Requires software tier 4+ (current: ${ctx.softwareTier})` };
+    const result = previewVibrations(plan, [], tier);
+    if (!result) return { success: false, output: `Requires software tier 4+ (current: ${tier})` };
     return { success: true, output: `Vibration preview: max=${result.maxVibration.toFixed(4)}` };
   }
 
@@ -431,10 +430,11 @@ export function blastPreviewCommand(
     return { success: false, output: `Invalid plan:\n${errors.map(e => `  ${e.holeId}: ${e.issue}`).join('\n')}` };
   }
 
-  const energyPreview = previewEnergy(plan, ctx.grid!, ctx.softwareTier);
-  const fragmentPreview = previewFragments(plan, ctx.grid!, ctx.softwareTier);
-  const projectionPreview = previewProjections(plan, ctx.grid!, ctx.softwareTier);
-  const vibrationPreview = previewVibrations(plan, [], ctx.softwareTier);
+  const tier = ctx.state!.softwareTier;
+  const energyPreview = previewEnergy(plan, ctx.grid!, tier);
+  const fragmentPreview = previewFragments(plan, ctx.grid!, tier);
+  const projectionPreview = previewProjections(plan, ctx.grid!, tier);
+  const vibrationPreview = previewVibrations(plan, [], tier);
 
   const lines: string[] = ['=== BLAST PREVIEW ==='];
 
@@ -495,7 +495,7 @@ export function buySoftwareCommand(
   const err = requireGame(ctx);
   if (err) return { success: false, output: err };
 
-  const currentTier = ctx.softwareTier;
+  const currentTier = ctx.state!.softwareTier;
 
   if (named['tier'] !== undefined) {
     const requestedTier = parseInt(named['tier'], 10);
@@ -511,7 +511,7 @@ export function buySoftwareCommand(
   const result = purchaseSoftware(currentTier, ctx.state!.cash);
   if ('error' in result) return { success: false, output: result.error };
   ctx.state!.cash -= result.cost;
-  ctx.softwareTier = result.newTier;
+  ctx.state!.softwareTier = result.newTier;
   return { success: true, output: `Upgraded to software tier ${result.newTier}. Cost: $${result.cost}` };
 }
 
@@ -644,10 +644,10 @@ export function tubingCommand(
 
   if (sub === 'buy') {
     const amount = parseInt(named['amount'] ?? '1', 10);
-    const result = buyTubing(ctx.tubingState, amount, ctx.state!.cash);
+    const result = buyTubing(ctx.state!.tubingState, amount, ctx.state!.cash);
     if (!result.success) return { success: false, output: result.message };
     ctx.state!.cash -= result.cost;
-    return { success: true, output: `${result.message}. Inventory: ${ctx.tubingState.inventory}` };
+    return { success: true, output: `${result.message}. Inventory: ${ctx.state!.tubingState.inventory}` };
   }
 
   if (sub === 'install') {
@@ -655,11 +655,11 @@ export function tubingCommand(
     const holeId = ctx.state!.drillHoles.find(h => h.id === holeSpec)
       ? holeSpec
       : (holeSpec.startsWith('hole_') ? holeSpec : `hole_${holeSpec}`);
-    const result = installTubing(ctx.tubingState, holeId);
+    const result = installTubing(ctx.state!.tubingState, holeId);
     return { success: result.success, output: result.message };
   }
 
-  return { success: true, output: `Tubing inventory: ${ctx.tubingState.inventory}, installed: ${ctx.tubingState.installedHoles.size} holes` };
+  return { success: true, output: `Tubing inventory: ${ctx.state!.tubingState.inventory}, installed: ${ctx.state!.tubingState.installedHoles.size} holes` };
 }
 
 // ── Survey command ──

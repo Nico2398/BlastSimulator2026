@@ -6,7 +6,6 @@ import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { newGameCommand } from '../../../src/console/commands/world.js';
 import { vehicleCommand } from '../../../src/console/commands/vehicle.js';
 import type { MiningContext } from '../../../src/console/commands/mining.js';
-import { createTubingState } from '../../../src/core/mining/Tubing.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import type { Employee } from '../../../src/core/entities/Employee.js';
 import { tickEmployeeMovement } from '../../../src/core/engine/EntityMovementTick.js';
@@ -53,8 +52,6 @@ function makeCtx(): MiningContext {
   const ctx: MiningContext = {
     state: null,
     grid: null,
-    softwareTier: 0,
-    tubingState: createTubingState(),
     emitter: new EventEmitter(),
   };
   newGameCommand(ctx, [], { mine_type: 'desert', seed: '1', size: '32' });

@@ -5,7 +5,6 @@ import { NavGrid } from '../../../src/core/nav/NavGrid.js';
 import type { NavCell, NavCellType } from '../../../src/core/nav/NavGrid.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
-import { createTubingState } from '../../../src/core/mining/Tubing.js';
 
 // ── Helper factories ────────────────────────────────────────────────────────
 
@@ -75,8 +74,6 @@ function makeCtx(state: ReturnType<typeof createGame>): MiningContext {
     state,
     grid: null,
     emitter: new EventEmitter(),
-    softwareTier: 1,
-    tubingState: createTubingState(),
   };
 }
 
@@ -220,8 +217,6 @@ describe('stateCommand — navGrid serialization', () => {
       state: null,
       grid: null,
       emitter: new EventEmitter(),
-      softwareTier: 1,
-      tubingState: createTubingState(),
     };
     const result = stateCommand(ctx, ['full'], {});
     expect(result.success).toBe(false);

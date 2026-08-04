@@ -277,7 +277,7 @@ export class GameRenderer {
    */
   showBlastPlanOverlay(ctx: MiningContext): void {
     if (!this.blastOverlay || !ctx.state) return;
-    const { drillHoles, chargesByHole, sequenceDelays } = ctx.state;
+    const { drillHoles, chargesByHole, sequenceDelays, softwareTier } = ctx.state;
     if (drillHoles.length === 0) { this.blastOverlay.hide(); return; }
 
     const cx = drillHoles.reduce((s, h) => s + h.x, 0) / drillHoles.length;
@@ -289,13 +289,13 @@ export class GameRenderer {
     // fragment-size dots and projection arcs never render — their per-hole
     // fields stay undefined and the overlay's own guards skip them.
     let holeDetails: Record<string, import('../core/mining/Software.js').HolePreviewDetail> = {};
-    if (ctx.softwareTier >= 2 && ctx.grid) {
+    if (softwareTier >= 2 && ctx.grid) {
       const plan = assembleBlastPlan(drillHoles, chargesByHole, sequenceDelays);
-      holeDetails = previewHoleDetails(plan, ctx.grid, ctx.softwareTier);
+      holeDetails = previewHoleDetails(plan, ctx.grid, softwareTier);
     }
 
     this.blastOverlay.show({
-      softwareTier: ctx.softwareTier,
+      softwareTier,
       origin: new THREE.Vector3(cx, originSurfaceY, cz),
       holes: drillHoles.map(h => {
         const hd: import('./BlastPlanOverlay.js').HoleOverlayData = {

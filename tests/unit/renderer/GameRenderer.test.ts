@@ -14,7 +14,6 @@ import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
 import { defineZone } from '../../../src/core/entities/Zone.js';
 import { Random } from '../../../src/core/math/Random.js';
-import { createTubingState } from '../../../src/core/mining/Tubing.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
@@ -51,8 +50,6 @@ function makeCtx(): MiningContext {
   return {
     state,
     grid,
-    softwareTier: 0,
-    tubingState: createTubingState(),
     emitter: new EventEmitter(),
   };
 }
@@ -295,8 +292,8 @@ describe('GameRenderer — birds, smoke, water, vegetation (#458 T7.2/D12/A26)',
   async function makeLandscapeCtx(mineType = 'green_foothills'): Promise<MiningContext> {
     const { newGameCommand } = await import('../../../src/console/commands/world.js');
     const ctx: MiningContext = {
-      state: null, grid: null, landscape: null, softwareTier: 0,
-      tubingState: createTubingState(), emitter: new EventEmitter(),
+      state: null, grid: null, landscape: null,
+      emitter: new EventEmitter(),
     };
     const result = newGameCommand(ctx, [], { mine_type: mineType, seed: '42', size: '64' });
     expect(result.success).toBe(true); // guard: the rest of the test is meaningless if setup itself failed
@@ -359,8 +356,8 @@ describe('GameRenderer — per-biome ambient extras (#458 T7.3)', () => {
   async function makeLandscapeCtx(mineType: string): Promise<MiningContext> {
     const { newGameCommand } = await import('../../../src/console/commands/world.js');
     const ctx: MiningContext = {
-      state: null, grid: null, landscape: null, softwareTier: 0,
-      tubingState: createTubingState(), emitter: new EventEmitter(),
+      state: null, grid: null, landscape: null,
+      emitter: new EventEmitter(),
     };
     const result = newGameCommand(ctx, [], { mine_type: mineType, seed: '42', size: '64' });
     expect(result.success).toBe(true);

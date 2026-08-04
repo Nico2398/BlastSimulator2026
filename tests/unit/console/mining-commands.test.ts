@@ -13,7 +13,6 @@ import {
   sequenceCommand,
   surveyCommand,
 } from '../../../src/console/commands/mining.js';
-import { createTubingState } from '../../../src/core/mining/Tubing.js';
 import { resetHoleIds } from '../../../src/core/mining/DrillPlan.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
 import { Random } from '../../../src/core/math/Random.js';
@@ -25,8 +24,6 @@ function makeMiningContext(): MiningContext {
   const ctx: MiningContext = {
     state: null,
     grid: null,
-    softwareTier: 0,
-    tubingState: createTubingState(),
     emitter: new EventEmitter(),
   };
   newGameCommand(ctx, [], { mine_type: 'desert', seed: '1', size: '32' });
@@ -87,7 +84,7 @@ describe('buy_software tier validation', () => {
     const result = buySoftwareCommand(ctx, [], {});
     expect(result.success).toBe(true);
     expect(result.output).toContain('tier 1');
-    expect(ctx.softwareTier).toBe(1);
+    expect(ctx.state!.softwareTier).toBe(1);
   });
 
   it('tier:1 when at tier 0 succeeds', () => {
@@ -96,7 +93,7 @@ describe('buy_software tier validation', () => {
     const result = buySoftwareCommand(ctx, [], { tier: '1' });
     expect(result.success).toBe(true);
     expect(result.output).toContain('tier 1');
-    expect(ctx.softwareTier).toBe(1);
+    expect(ctx.state!.softwareTier).toBe(1);
   });
 
   it('tier:2 when at tier 0 returns error "Must purchase tier 1 first"', () => {
@@ -118,7 +115,7 @@ describe('buy_software tier validation', () => {
   it('tier:1 when already at tier 1 returns error "Already at tier 1 or higher"', () => {
     const ctx = makeMiningContext();
     ctx.state!.cash = 999_999;
-    ctx.softwareTier = 1;
+    ctx.state!.softwareTier = 1;
     const result = buySoftwareCommand(ctx, [], { tier: '1' });
     expect(result.success).toBe(false);
     expect(result.output).toBe('Already at tier 1 or higher');
@@ -127,7 +124,7 @@ describe('buy_software tier validation', () => {
   it('tier:0 when at tier 1 returns error "Already at tier 0 or higher"', () => {
     const ctx = makeMiningContext();
     ctx.state!.cash = 999_999;
-    ctx.softwareTier = 1;
+    ctx.state!.softwareTier = 1;
     const result = buySoftwareCommand(ctx, [], { tier: '0' });
     expect(result.success).toBe(false);
     expect(result.output).toContain('Already at tier');
@@ -142,7 +139,7 @@ describe('blast_preview', () => {
    * (1 hole, 1 charge, 1 sequence delay). Optionally sets software tier.
    */
   function makePlan(ctx: MiningContext, tier?: number): void {
-    if (tier !== undefined) ctx.softwareTier = tier;
+    if (tier !== undefined) ctx.state!.softwareTier = tier;
     drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
     chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
     sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
@@ -154,8 +151,6 @@ describe('blast_preview', () => {
     const ctx: MiningContext = {
       state: null,
       grid: null,
-      softwareTier: 0,
-      tubingState: createTubingState(),
       emitter: new EventEmitter(),
     };
     const result = blastPreviewCommand(ctx, [], {});
@@ -288,8 +283,6 @@ describe('surveyCommand', () => {
     const ctx: MiningContext = {
       state: null,
       grid: null,
-      softwareTier: 0,
-      tubingState: createTubingState(),
       emitter: new EventEmitter(),
     };
     const result = surveyCommand(ctx, ['seismic'], { x: '10', z: '10' });
@@ -609,8 +602,8 @@ describe('surveyCommand — mode subcommand', () => {
 
   it('requires a loaded game', () => {
     const ctx: MiningContext = {
-      state: null, grid: null, softwareTier: 0,
-      tubingState: createTubingState(), emitter: new EventEmitter(),
+      state: null, grid: null,
+      emitter: new EventEmitter(),
     };
     const result = surveyCommand(ctx, ['mode'], {});
     expect(result.success).toBe(false);
@@ -667,8 +660,8 @@ describe('surveyCommand — ore_report subcommand', () => {
 
   it('requires a loaded game', () => {
     const ctx: MiningContext = {
-      state: null, grid: null, softwareTier: 0,
-      tubingState: createTubingState(), emitter: new EventEmitter(),
+      state: null, grid: null,
+      emitter: new EventEmitter(),
     };
     const result = surveyCommand(ctx, ['ore_report'], {});
     expect(result.success).toBe(false);
@@ -716,8 +709,8 @@ describe('buildRampCommand', () => {
 
   it('requires a loaded game', () => {
     const ctx: MiningContext = {
-      state: null, grid: null, softwareTier: 0,
-      tubingState: createTubingState(), emitter: new EventEmitter(),
+      state: null, grid: null,
+      emitter: new EventEmitter(),
     };
     const result = buildRampCommand(ctx, [], { origin: '0,0', direction: 'south', length: '5' });
     expect(result.success).toBe(false);

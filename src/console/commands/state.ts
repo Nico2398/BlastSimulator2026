@@ -51,7 +51,8 @@ function serializeState(ctx: MiningContext): Record<string, unknown> {
     levelStats: s.levelStats,
     levelEnded: s.levelEnded,
     levelEndReason: s.levelEndReason,
-    softwareTier: ctx.softwareTier,
+    softwareTier: s.softwareTier,
+    tubingState: { inventory: s.tubingState.inventory, installedHoles: [...s.tubingState.installedHoles] },
     navGrid: (() => {
       const ng = s.navGrid;
       if (!ng) return null;
