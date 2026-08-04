@@ -5,6 +5,8 @@ import { createGame } from '../../../src/core/state/GameState.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
 import type { Employee } from '../../../src/core/entities/Employee.js';
 import { SURVEY_COSTS } from '../../../src/core/config/balance.js';
+import type { PlacementKit } from '../../../src/ui/scene/PlacementKit.js';
+import type { PlacementSelection } from '../../../src/ui/scene/PlacementController.js';
 
 function mount(): { container: HTMLDivElement; ui: SurveyUI } {
   const container = document.createElement('div');
@@ -12,6 +14,33 @@ function mount(): { container: HTMLDivElement; ui: SurveyUI } {
   const ui = new SurveyUI(container);
   ui.show();
   return { container, ui };
+}
+
+/**
+ * Stand-in placement kit — the real controller drives clicks/drags on the 3D
+ * canvas, which jsdom cannot render. Captures the confirm handler the panel
+ * registers on arm() so a test can drive it directly, same idea as the old
+ * TileSelectOverlay tests' `tileSelect.open = (cfg) => cfg.onConfirm(...)`.
+ */
+function makeFakeKit(): { kit: PlacementKit; confirm: (sel: PlacementSelection) => void } {
+  let confirmHandler: ((sel: PlacementSelection) => void) | null = null;
+  const controller = {
+    isArmed: false,
+    currentPhase: 'idle',
+    canConfirm: true,
+    selection: null,
+    activeRegion: null,
+    setConfirmHandler: (cb: (sel: PlacementSelection) => void) => { confirmHandler = cb; },
+    setCancelHandler: () => {},
+    setChangeHandler: () => {},
+    arm: () => {},
+  };
+  const overlay = { update: () => {}, clear: () => {}, flashConfirm: () => {} };
+  const strip = { show: () => {}, hide: () => {} };
+  return {
+    kit: { controller, overlay, strip } as unknown as PlacementKit,
+    confirm: (sel) => confirmHandler?.(sel),
+  };
 }
 
 function makeSurveyor(overrides?: Partial<Employee>): Employee {
@@ -101,17 +130,14 @@ describe('SurveyUI', () => {
       ui.setGameConsole(gameConsole);
       ui.update(makeState());
 
-      (container.querySelector('[data-method="seismic"]') as HTMLElement).click();
-      // Drive the picker's confirm directly — the canvas has no 2D context in jsdom.
-      const tileSelect = (ui as unknown as { tileSelect: { open(c: { onConfirm(r: unknown): void }): void } }).tileSelect;
-      let captured: ((r: unknown) => void) | null = null;
-      const origOpen = tileSelect.open.bind(tileSelect);
-      tileSelect.open = (cfg) => { captured = cfg.onConfirm; };
-      (container.querySelector('#bs-survey-run') as HTMLButtonElement).click();
-      tileSelect.open = origOpen;
+      // Drive the placement tool's confirm directly — the real controller
+      // reads clicks/drags off the 3D canvas, which jsdom cannot render.
+      const { kit, confirm } = makeFakeKit();
+      ui.setPlacementKit(kit);
 
-      expect(captured).not.toBeNull();
-      captured!({ x: 12, z: 9, fields: {} });
+      (container.querySelector('[data-method="seismic"]') as HTMLElement).click();
+      (container.querySelector('#bs-survey-run') as HTMLButtonElement).click();
+      confirm({ x1: 12, z1: 9, x2: 12, z2: 9 });
       expect(gameConsole).toHaveBeenCalledWith('survey seismic x:12 z:9');
 
       ui.dispose();
@@ -124,9 +150,10 @@ describe('SurveyUI', () => {
       const seen: unknown[] = [];
       ui.onMethodSelected(sel => seen.push(sel));
 
-      const tileSelect = (ui as unknown as { tileSelect: { open(c: { onConfirm(r: unknown): void }): void } }).tileSelect;
-      tileSelect.open = (cfg) => cfg.onConfirm({ x: 3, z: 4, fields: {} });
+      const { kit, confirm } = makeFakeKit();
+      ui.setPlacementKit(kit);
       (container.querySelector('#bs-survey-run') as HTMLButtonElement).click();
+      confirm({ x1: 3, z1: 4, x2: 3, z2: 4 });
 
       expect(seen).toEqual([{ method: 'seismic', targetX: 3, targetZ: 4 }]);
       ui.dispose();

@@ -18,6 +18,7 @@ import { ToolRail } from './shell/ToolRail.js';
 import { Toasts } from './shell/Toasts.js';
 import { ActivityLog } from './shell/ActivityLog.js';
 import { NotificationCenter, type NotifyInput } from './notify/NotificationCenter.js';
+import type { PlacementKit } from './scene/PlacementKit.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { WeatherState } from '../core/weather/WeatherCycle.js';
 
@@ -125,6 +126,13 @@ export class UIManager {
     this.eventDialog.setGameConsole(fn);
     this.surveyUI.setGameConsole(fn);
     this.settingsMenu.setGameConsole(fn);
+  }
+
+  /** Hands the shared in-scene placement tool (P3) to every panel that arms it. Only one arms it at a time. */
+  setPlacementKit(kit: PlacementKit): void {
+    this.blastUI.setPlacementKit(kit);
+    this.buildMenu.setPlacementKit(kit);
+    this.surveyUI.setPlacementKit(kit);
   }
 
   setSpeedChangeHandler(cb: (speed: number) => void): void {

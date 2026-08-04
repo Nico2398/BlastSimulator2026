@@ -109,6 +109,8 @@ export class ScenePicking {
   private pointerDown = false;
   private downX = 0;
   private downY = 0;
+  /** False while a placement tool (P3) owns the canvas — entity hover/select would otherwise fight it for the same clicks. */
+  private enabled = true;
 
   private onHoverChangeHandler: HoverChangeHandler | null = null;
   private onSelectChangeHandler: SelectChangeHandler | null = null;
@@ -131,6 +133,12 @@ export class ScenePicking {
   setHoverChangeHandler(cb: HoverChangeHandler): void { this.onHoverChangeHandler = cb; }
   setSelectChangeHandler(cb: SelectChangeHandler): void { this.onSelectChangeHandler = cb; }
 
+  /** Suppress hover/select while a placement tool is armed; clears any live hover on disable. */
+  setEnabled(enabled: boolean): void {
+    this.enabled = enabled;
+    if (!enabled) this.clearHover();
+  }
+
   get selection(): EntityPick | null { return this.currentSelection; }
   get hover(): PickResult | null { return this.currentHover; }
 
@@ -151,6 +159,7 @@ export class ScenePicking {
   }
 
   private onMouseMove(e: MouseEvent): void {
+    if (!this.enabled) return;
     if (this.pointerDown) return; // camera is orbiting/panning — no hover during a drag
     const { x, y } = this.ndcFromEvent(e);
     const pick = pickScene(x, y, this.camera, this.renderer, this.raycaster);
@@ -182,6 +191,7 @@ export class ScenePicking {
   }
 
   private onMouseDown(e: MouseEvent): void {
+    if (!this.enabled) return;
     this.pointerDown = true; // suppresses hover during any drag — left orbit, right/middle pan alike
     if (e.button !== 0) return; // only the left button drives selection — right/middle pan the camera
     this.downX = e.clientX;
@@ -189,6 +199,7 @@ export class ScenePicking {
   }
 
   private onMouseUp(e: MouseEvent): void {
+    if (!this.enabled) return;
     this.pointerDown = false;
     if (e.button !== 0) return;
     const dx = e.clientX - this.downX;

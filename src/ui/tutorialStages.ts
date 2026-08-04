@@ -34,7 +34,11 @@ export interface TutorialStage {
   region?: TileRegion;
 }
 
-const PICKER_CANVAS = '.bs-tile-select-canvas';
+// P3 retired the 2D picker: dragging/clicking now happens directly on the
+// game canvas, and it's never gated by the tutorial rail (it's neither a
+// button, select, nor input) — so this is purely the highlight target, not
+// a functional lock the way the old picker canvas was.
+const PICKER_CANVAS = '#game-canvas';
 const PICKER_CONFIRM = '#bs-tile-select-confirm';
 
 /** Pick a tile, then confirm — the shared tail of every placement step. */

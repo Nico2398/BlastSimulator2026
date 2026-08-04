@@ -601,62 +601,11 @@ describe('tutorial_synergy_consultant event keys — en and fr translations diff
 // is expected to fail RED (t() returns the key itself for a missing key).
 // ═══════════════════════════════════════════════════════════════════════════
 
-// ── TileSelectOverlay keys (ui.tile_select.no_selection / confirm / cancel / selected_point / selected_area / drag_hint / pick_hint) ─
-
-const TILE_SELECT_NEW_KEYS = [
-  'ui.tile_select.no_selection',
-  'ui.tile_select.confirm',
-  'ui.tile_select.cancel',
-  'ui.tile_select.drag_hint',
-  'ui.tile_select.pick_hint',
-] as const;
-
-describe('ui.tile_select.* new keys resolve in both locales', () => {
-  for (const locale of LOCALES) {
-    it(`locale ${locale}: all new ui.tile_select.* keys resolve`, () => {
-      setLocale(locale);
-      for (const key of TILE_SELECT_NEW_KEYS) {
-        const result = t(key);
-        expect(result, `key "${key}" must resolve in ${locale}`).not.toBe(key);
-        expect(result.length, `key "${key}" must be non-empty in ${locale}`).toBeGreaterThan(0);
-      }
-    });
-  }
-});
-
-describe('ui.tile_select.* new keys — en and fr translations differ', () => {
-  for (const key of TILE_SELECT_NEW_KEYS) {
-    it(`${key} is translated differently in en vs fr`, () => {
-      setLocale('en');
-      const en = t(key);
-      setLocale('fr');
-      const fr = t(key);
-      expect(en, `${key} must resolve in en`).not.toBe(key);
-      expect(fr, `${key} must resolve in fr`).not.toBe(key);
-      expect(en, `en and fr translations for ${key} must differ`).not.toBe(fr);
-    });
-  }
-});
-
-describe('ui.tile_select.selected_point / selected_area — interpolation', () => {
-  for (const locale of LOCALES) {
-    it(`locale ${locale}: ui.tile_select.selected_point interpolates {x} and {z}`, () => {
-      setLocale(locale);
-      const result = t('ui.tile_select.selected_point', { x: 5, z: 7 });
-      expect(result, 'key must resolve').not.toBe('ui.tile_select.selected_point');
-      expect(result, `"${result}" must contain the x value`).toContain('5');
-      expect(result, `"${result}" must contain the z value`).toContain('7');
-    });
-
-    it(`locale ${locale}: ui.tile_select.selected_area interpolates {x1}/{z1}/{x2}/{z2}`, () => {
-      setLocale(locale);
-      const result = t('ui.tile_select.selected_area', { x1: 2, z1: 2, x2: 6, z2: 5, w: 5, h: 4 });
-      expect(result, 'key must resolve').not.toBe('ui.tile_select.selected_area');
-      expect(result, `"${result}" must contain x1`).toContain('2');
-      expect(result, `"${result}" must contain x2`).toContain('6');
-    });
-  }
-});
+// TileSelectOverlay and its ui.tile_select.{no_selection,confirm,cancel,
+// selected_point,selected_area,drag_hint,pick_hint} keys were retired in P3
+// (in-scene placement replaced the 2D picker) — the coverage that used to
+// live here went with it. ui.tile_select.tiles survives (BlastPlanUI/
+// BuildMenu's result readouts) and is covered by the general key-parity scan.
 
 // ── MainMenu subtitle (menu.subtitle) ──────────────────────────────────────
 

@@ -9,7 +9,7 @@
 
 import type { Page } from 'puppeteer';
 import type { PlayerAction, PlaytestGoal } from './playtest-types.js';
-import { awaitPickerGeometry, tileToPoint, type PickerGeometry } from './tile-picker.js';
+import { awaitPlacementArmed, worldToScreenPoint } from './tile-picker.js';
 
 /** Mirror of src/ui/uiActionProbe.ts UiAction, kept structural to avoid a src import. */
 export interface ProbedAction {
@@ -114,16 +114,16 @@ async function requireUsable(page: Page, selector: string, timeoutMs: number): P
 }
 
 /**
- * Geometry of the open tile picker, with a playtest-shaped diagnosis on miss.
- *
- * The mapping itself lives in `tile-picker.ts` so the scenario channel drives
- * the picker through the same code; only the failure report differs.
+ * Wait for the P3 placement tool to be armed, with a playtest-shaped
+ * diagnosis on miss. The polling itself lives in `tile-picker.ts` so the
+ * scenario channel waits on the same condition; only the failure report
+ * differs.
  */
-async function pickerGeometry(page: Page): Promise<PickerGeometry> {
+async function armedPlacement(page: Page): Promise<void> {
   try {
-    return await awaitPickerGeometry(page, DEFAULT_TIMEOUT_MS);
+    await awaitPlacementArmed(page, DEFAULT_TIMEOUT_MS);
   } catch {
-    throw new PlaytestFailure('no tile picker is open', describeAvailable(await probe(page)));
+    throw new PlaytestFailure('no placement tool is armed', describeAvailable(await probe(page)));
   }
 }
 
@@ -165,15 +165,18 @@ export async function runAction(page: Page, action: PlayerAction): Promise<void>
       break;
     }
     case 'pickTile': {
-      const geo = await pickerGeometry(page);
-      const { px, py } = tileToPoint(geo, action.x, action.z);
+      // P3: a real click on the in-scene placement tool's projected screen
+      // point, not a console-equivalent shortcut — playability's whole point
+      // is that this has to be a click a player could actually make.
+      await armedPlacement(page);
+      const { px, py } = await worldToScreenPoint(page, action.x, action.z);
       await page.mouse.click(px, py);
       break;
     }
     case 'dragTiles': {
-      const geo = await pickerGeometry(page);
-      const from = tileToPoint(geo, action.x1, action.z1);
-      const to = tileToPoint(geo, action.x2, action.z2);
+      await armedPlacement(page);
+      const from = await worldToScreenPoint(page, action.x1, action.z1);
+      const to = await worldToScreenPoint(page, action.x2, action.z2);
       await page.mouse.move(from.px, from.py);
       await page.mouse.down();
       await page.mouse.move(to.px, to.py, { steps: 10 });

@@ -5,9 +5,8 @@ import { t } from '../core/i18n/I18n.js';
 import { LocaleTextRegistry } from './localeText.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { SurveyMethod, SurveyResult } from '../core/mining/SurveyCalc.js';
-import { SURVEY_COSTS, SURVEY_BASE_ERROR } from '../core/config/balance.js';
-import { TileSelectOverlay } from './TileSelectOverlay.js';
-import { makeSiteTileFill } from './siteTileShading.js';
+import { SURVEY_COSTS, SURVEY_BASE_ERROR, SURVEY_COVERAGE_RADIUS } from '../core/config/balance.js';
+import type { PlacementKit } from './scene/PlacementKit.js';
 
 import type { CommandResult } from '../console/ConsoleRunner.js';
 
@@ -49,13 +48,13 @@ export class SurveyUI {
   private readonly runBtn: HTMLButtonElement;
   private readonly statusEl: HTMLElement;
   private readonly resultsEl: HTMLElement;
-  private readonly tileSelect: TileSelectOverlay;
+  private placementKit: PlacementKit | null = null;
   private gameConsole?: GameConsoleFn;
   private onSelected?: (selection: SurveyMethodSelection) => void;
   private selectedMethod: SurveyMethod = 'seismic';
   private worldSizeX = 40;
   private worldSizeZ = 40;
-  /** West/north edge of the site's bounding box — non-zero once it has grown that way (#473). */
+  /** West/north edge of the site's bounding box — non-zero once it has grown that way (#473). Still needed here: the point tool's initial-selection centre. */
   private worldOriginX = 0;
   private worldOriginZ = 0;
   private lastResultCount = -1;
@@ -115,12 +114,11 @@ export class SurveyUI {
     );
     container.appendChild(this.el);
 
-    // Appended to body so the picker escapes the left column's stacking context.
-    this.tileSelect = new TileSelectOverlay(document.body);
     this.buildMethodList();
   }
 
   setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
+  setPlacementKit(kit: PlacementKit): void { this.placementKit = kit; }
 
   /** Re-render locale-dependent text (title, method list, results) after a language change. */
   refreshLocale(): void {
@@ -222,7 +220,6 @@ export class SurveyUI {
   dispose(): void {
     if (this.statusTimer) clearTimeout(this.statusTimer);
     this.el.remove();
-    this.tileSelect.dispose();
   }
 
   // ── Internals ─────────────────────────────────────────────────────────────
@@ -286,26 +283,43 @@ export class SurveyUI {
   }
 
   private pickTargetAndRun(): void {
-    this.tileSelect.open({
-      mode: 'point',
-      worldSizeX: this.worldSizeX,
-      worldSizeZ: this.worldSizeZ,
-      worldOriginX: this.worldOriginX,
-      worldOriginZ: this.worldOriginZ,
-      title: t('ui.survey.pick_target'),
-      // Show the pit and anything already known about it, and start aimed at
-      // the middle so the player is never staring at a blank grid.
-      ...(this.lastState ? { tileFill: makeSiteTileFill(this.lastState) } : {}),
+    const kit = this.placementKit;
+    if (!kit) return;
+    const { controller, overlay, strip } = kit;
+    if (controller.isArmed) { controller.cancel(); return; }
+
+    const radius = SURVEY_COVERAGE_RADIUS[this.selectedMethod];
+    const refresh = (): void => {
+      if (controller.currentPhase === 'idle') { overlay.clear(); strip.hide(); return; }
+      const sel = controller.selection;
+      overlay.update(sel ? { shape: 'point', x: sel.x1, z: sel.z1, tone: 'survey', ...(radius > 0 ? { radius } : {}) } : null);
+      strip.show({
+        icon: 'survey',
+        title: t('ui.survey.pick_target'),
+        subtitle: t(`survey.${this.selectedMethod}`),
+        fields: [],
+        result: sel ? `(${sel.x1}, ${sel.z1}) · $${SURVEY_COSTS[this.selectedMethod].toLocaleString('en-US')}` : '—',
+        confirmEnabled: controller.canConfirm,
+        instruction: t('ui.survey.pick_instruction'),
+      });
+    };
+
+    controller.setConfirmHandler((sel) => {
+      this.onSelected?.({ method: this.selectedMethod, targetX: sel.x1, targetZ: sel.z1 });
+      const cmd = this.gameConsole?.(`survey ${this.selectedMethod} x:${sel.x1} z:${sel.z1}`);
+      this.setTransientStatus(cmd?.success ? t('ui.survey.queued') : (cmd?.output ?? ''));
+      overlay.flashConfirm();
+    });
+    controller.setChangeHandler(refresh);
+    // Show the pit aimed at the middle so the player is never staring at a blank scene.
+    controller.arm({
+      shape: 'point',
       initialSelection: {
         x: Math.floor(this.worldOriginX + this.worldSizeX / 2),
         z: Math.floor(this.worldOriginZ + this.worldSizeZ / 2),
       },
-      onConfirm: (result) => {
-        this.onSelected?.({ method: this.selectedMethod, targetX: result.x, targetZ: result.z });
-        const cmd = this.gameConsole?.(`survey ${this.selectedMethod} x:${result.x} z:${result.z}`);
-        this.setTransientStatus(cmd?.success ? t('ui.survey.queued') : (cmd?.output ?? ''));
-      },
     });
+    refresh();
   }
 
   private renderResults(results: SurveyResult[], pending: number): void {

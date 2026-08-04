@@ -5,8 +5,7 @@ import { LocaleTextRegistry } from './localeText.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { DrillHole } from '../core/mining/DrillPlan.js';
 import type { HoleCharge } from '../core/mining/ChargePlan.js';
-import { TileSelectOverlay } from './TileSelectOverlay.js';
-import { makeSiteTileFill } from './siteTileShading.js';
+import type { PlacementKit } from './scene/PlacementKit.js';
 
 import type { CommandResult } from '../console/ConsoleRunner.js';
 
@@ -25,16 +24,11 @@ export class BlastPlanUI {
   private readonly holeListEl: HTMLElement;
   private readonly chargeForm: HTMLElement;
   private readonly statusEl: HTMLElement;
-  private readonly tileSelect: TileSelectOverlay;
+  private placementKit: PlacementKit | null = null;
+  private gridSpacing = 5;
+  private gridDepth = 6;
   private gameConsole?: GameConsoleFn;
   private selectedHoleId: string | null = null;
-  private worldSizeX = 40;
-  private worldSizeZ = 40;
-  /** West/north edge of the site's bounding box — non-zero once it has grown that way (#473). */
-  private worldOriginX = 0;
-  private worldOriginZ = 0;
-  /** Latest state, so the grid picker can draw the site. */
-  private lastState: GameState | null = null;
   private statusTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly locale = new LocaleTextRegistry();
 
@@ -72,11 +66,10 @@ export class BlastPlanUI {
     this.el.append(title, gridBtn, clearBtn, this.holeListEl, this.chargeForm,
       chargeAllBtn, seqBtn, previewBtn, execBtn, this.statusEl);
     container.appendChild(this.el);
-
-    this.tileSelect = new TileSelectOverlay(document.body);
   }
 
   setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
+  setPlacementKit(kit: PlacementKit): void { this.placementKit = kit; }
 
   /** Re-render locale-dependent text (title, buttons, labels) after a language change. */
   refreshLocale(): void {
@@ -89,13 +82,6 @@ export class BlastPlanUI {
   get visible(): boolean { return this.el.style.display !== 'none'; }
 
   update(state: GameState): void {
-    this.lastState = state;
-    if (state.world) {
-      this.worldSizeX = state.world.sizeX;
-      this.worldSizeZ = state.world.sizeZ;
-      this.worldOriginX = state.world.minX;
-      this.worldOriginZ = state.world.minZ;
-    }
     const holes = state.drillHoles;
     const charges = state.chargesByHole;
     const delays = state.sequenceDelays;
@@ -114,7 +100,7 @@ export class BlastPlanUI {
     }
   }
 
-  dispose(): void { this.el.remove(); this.tileSelect.dispose(); }
+  dispose(): void { this.el.remove(); }
 
   private showStatus(message: string, type: 'success' | 'error'): void {
     if (this.statusTimer) clearTimeout(this.statusTimer);
@@ -291,30 +277,48 @@ export class BlastPlanUI {
   }
 
   private openGridTool(): void {
-    this.tileSelect.open({
-      mode: 'area',
-      worldSizeX: this.worldSizeX,
-      worldSizeZ: this.worldSizeZ,
-      worldOriginX: this.worldOriginX,
-      worldOriginZ: this.worldOriginZ,
-      title: t('ui.blast.grid_tool'),
-      ...(this.lastState ? { tileFill: makeSiteTileFill(this.lastState) } : {}),
-      extraFields: [
-        { id: 'spacing', label: t('ui.blast.grid_spacing'), defaultValue: 5, min: 1, max: 20, step: 1 },
-        { id: 'depth',   label: t('ui.blast.grid_depth'),   defaultValue: 6, min: 1, max: 40, step: 1 },
-      ],
-      onConfirm: (result) => {
-        const x1 = result.x;
-        const z1 = result.z;
-        const x2 = result.x2 ?? x1;
-        const z2 = result.z2 ?? z1;
-        const spacing = result.fields['spacing'] ?? 5;
-        const depth   = result.fields['depth']   ?? 6;
-        const cols = Math.max(1, Math.round((x2 - x1) / spacing) + 1);
-        const rows = Math.max(1, Math.round((z2 - z1) / spacing) + 1);
-        this.gameConsole?.(`drill_plan grid rows:${rows} cols:${cols} spacing:${spacing} depth:${depth} start:${x1},${z1}`);
-      },
+    const kit = this.placementKit;
+    if (!kit) return;
+    const { controller, overlay, strip } = kit;
+
+    // Toggle: re-pressing the armed button is one of the design's three exit paths.
+    if (controller.isArmed) { controller.cancel(); return; }
+
+    const refresh = (): void => {
+      if (controller.currentPhase === 'idle') { overlay.clear(); strip.hide(); return; }
+      const sel = controller.selection;
+      const region = controller.activeRegion;
+      overlay.update(sel ? {
+        shape: 'rect', x1: sel.x1, z1: sel.z1, x2: sel.x2, z2: sel.z2,
+        region: region ? { x1: region.x1, z1: region.z1, x2: region.x2, z2: region.z2 } : null,
+        holeSpacing: this.gridSpacing,
+      } : null);
+
+      const cols = sel ? Math.max(1, Math.round((sel.x2 - sel.x1) / this.gridSpacing) + 1) : 0;
+      const rows = sel ? Math.max(1, Math.round((sel.z2 - sel.z1) / this.gridSpacing) + 1) : 0;
+      strip.show({
+        icon: 'grid',
+        title: t('ui.blast.grid_tool'),
+        subtitle: sel ? `${sel.x2 - sel.x1 + 1} × ${sel.z2 - sel.z1 + 1} ${t('ui.tile_select.tiles')}` : '',
+        fields: [
+          { key: 'spacing', label: t('ui.blast.grid_spacing'), value: this.gridSpacing, format: v => `${v}m`, onDec: () => { this.gridSpacing = Math.max(1, this.gridSpacing - 1); refresh(); }, onInc: () => { this.gridSpacing = Math.min(20, this.gridSpacing + 1); refresh(); } },
+          { key: 'depth', label: t('ui.blast.grid_depth'), value: this.gridDepth, format: v => `${v}m`, onDec: () => { this.gridDepth = Math.max(1, this.gridDepth - 1); refresh(); }, onInc: () => { this.gridDepth = Math.min(40, this.gridDepth + 1); refresh(); } },
+        ],
+        result: sel ? `${cols} × ${rows} ${t('ui.blast.holes')}` : '—',
+        confirmEnabled: controller.canConfirm,
+        instruction: t('ui.blast.grid_instruction'),
+      });
+    };
+
+    controller.setConfirmHandler((sel) => {
+      const cols = Math.max(1, Math.round((sel.x2 - sel.x1) / this.gridSpacing) + 1);
+      const rows = Math.max(1, Math.round((sel.z2 - sel.z1) / this.gridSpacing) + 1);
+      this.gameConsole?.(`drill_plan grid rows:${rows} cols:${cols} spacing:${this.gridSpacing} depth:${this.gridDepth} start:${sel.x1},${sel.z1}`);
+      overlay.flashConfirm();
     });
+    controller.setChangeHandler(refresh);
+    controller.arm({ shape: 'rect' });
+    refresh();
   }
 
   private confirmBlast(): void {

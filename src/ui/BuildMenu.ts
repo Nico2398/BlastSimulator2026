@@ -14,8 +14,7 @@ import {
   type BuildingTier,
   type Building,
 } from '../core/entities/Building.js';
-import { TileSelectOverlay } from './TileSelectOverlay.js';
-import { makeSiteTileFill } from './siteTileShading.js';
+import type { PlacementKit } from './scene/PlacementKit.js';
 
 import type { CommandResult } from '../console/ConsoleRunner.js';
 
@@ -26,14 +25,10 @@ export class BuildMenu {
   private readonly catalogEl: HTMLElement;
   private readonly placedEl: HTMLElement;
   private readonly statusEl: HTMLElement;
-  private readonly tileSelect: TileSelectOverlay;
+  private placementKit: PlacementKit | null = null;
+  private rampDepth = 8;
   private gameConsole?: GameConsoleFn;
-  private worldSizeX = 40;
-  private worldSizeZ = 40;
-  /** West/north edge of the site's bounding box — non-zero once it has grown that way (#473). */
-  private worldOriginX = 0;
-  private worldOriginZ = 0;
-  /** Latest state, so the placement picker can draw the site. */
+  /** Latest state, for tier-unlock checks before arming the placement tool. */
   private lastState: GameState | null = null;
   /** Selected placement tier per building type. */
   private readonly selectedTiers = new Map<BuildingType, BuildingTier>();
@@ -90,12 +85,11 @@ export class BuildMenu {
     );
     container.appendChild(this.el);
 
-    // TileSelectOverlay appended to document.body so it escapes panel stacking context
-    this.tileSelect = new TileSelectOverlay(document.body);
     this.buildCatalog();
   }
 
   setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
+  setPlacementKit(kit: PlacementKit): void { this.placementKit = kit; }
 
   /** Re-render locale-dependent text (catalog, placed list, sections) after a language change. */
   refreshLocale(): void {
@@ -113,12 +107,6 @@ export class BuildMenu {
 
   update(state: GameState): void {
     this.lastState = state;
-    if (state.world) {
-      this.worldSizeX = state.world.sizeX;
-      this.worldSizeZ = state.world.sizeZ;
-      this.worldOriginX = state.world.minX;
-      this.worldOriginZ = state.world.minZ;
-    }
     if (state.cash !== this.lastCash) {
       this.lastCash = state.cash;
       this.refreshCatalogButtons(state.cash);
@@ -142,7 +130,7 @@ export class BuildMenu {
     setTimeout(() => { if (this.statusEl.textContent === msg) this.statusEl.textContent = ''; }, 3000);
   }
 
-  dispose(): void { this.el.remove(); this.tileSelect.dispose(); }
+  dispose(): void { this.el.remove(); }
 
   /**
    * Queue a Research Center task for `type` tier `tier` and report progress.
@@ -196,32 +184,77 @@ export class BuildMenu {
     btn.className = 'bs-btn bs-btn-primary bs-build-ramp-btn';
     btn.style.cssText = 'width:100%';
     this.locale.bindText(btn, 'ui.build.ramp');
-    btn.addEventListener('click', () => {
-      this.tileSelect.open({
-        mode: 'area',
-        worldSizeX: this.worldSizeX,
-        worldSizeZ: this.worldSizeZ,
-        worldOriginX: this.worldOriginX,
-        worldOriginZ: this.worldOriginZ,
-        title: t('ui.build.ramp'),
-        ...(this.lastState ? { tileFill: makeSiteTileFill(this.lastState) } : {}),
-        extraFields: [
-          { id: 'depth', label: t('ui.build.ramp_depth'), defaultValue: 8, min: 1, max: 40, step: 1 },
-        ],
-        onConfirm: (result) => {
-          const x2 = result.x2 ?? result.x;
-          const z2 = result.z2 ?? result.z;
-          const depth = result.fields['depth'] ?? 8;
-          const cmd = this.gameConsole?.(
-            `build_ramp start:${result.x},${result.z} end:${x2},${z2} depth:${depth}`,
-          );
-          this.setStatus(cmd?.success ? t('ui.build.ramp_built') : (cmd?.output ?? ''));
-        },
-      });
-    });
+    btn.addEventListener('click', () => this.armRampTool());
 
     wrap.append(header, btn);
     return wrap;
+  }
+
+  /** Ramps are a line drag (start → end), not a rectangle — the corridor width comes from the vehicle profile, not the drag. */
+  private armRampTool(): void {
+    const kit = this.placementKit;
+    if (!kit) return;
+    const { controller, overlay, strip } = kit;
+    if (controller.isArmed) { controller.cancel(); return; }
+
+    const refresh = (): void => {
+      if (controller.currentPhase === 'idle') { overlay.clear(); strip.hide(); return; }
+      const sel = controller.selection;
+      overlay.update(sel ? { shape: 'line', x1: sel.x1, z1: sel.z1, x2: sel.x2, z2: sel.z2 } : null);
+      const tiles = sel ? Math.round(Math.hypot(sel.x2 - sel.x1, sel.z2 - sel.z1)) + 1 : 0;
+      strip.show({
+        icon: 'down',
+        title: t('ui.build.ramp'),
+        subtitle: '',
+        fields: [
+          { key: 'depth', label: t('ui.build.ramp_depth'), value: this.rampDepth, format: v => `${v}m`, onDec: () => { this.rampDepth = Math.max(1, this.rampDepth - 1); refresh(); }, onInc: () => { this.rampDepth = Math.min(40, this.rampDepth + 1); refresh(); } },
+        ],
+        result: sel ? `${tiles} ${t('ui.tile_select.tiles')}` : '—',
+        confirmEnabled: controller.canConfirm,
+        instruction: t('ui.build.ramp_instruction'),
+      });
+    };
+
+    controller.setConfirmHandler((sel) => {
+      const cmd = this.gameConsole?.(`build_ramp start:${sel.x1},${sel.z1} end:${sel.x2},${sel.z2} depth:${this.rampDepth}`);
+      this.setStatus(cmd?.success ? t('ui.build.ramp_built') : (cmd?.output ?? ''));
+      overlay.flashConfirm();
+    });
+    controller.setChangeHandler(refresh);
+    controller.arm({ shape: 'line' });
+    refresh();
+  }
+
+  /** Point + real footprint ghost, shared by placing a new building and moving an existing one. */
+  private armBuildingPointTool(type: BuildingType, tier: BuildingTier, title: string, onConfirm: (x: number, z: number) => void): void {
+    const kit = this.placementKit;
+    if (!kit) return;
+    const { controller, overlay, strip } = kit;
+    if (controller.isArmed) { controller.cancel(); return; }
+    const def = getBuildingDef(type, tier);
+
+    const refresh = (): void => {
+      if (controller.currentPhase === 'idle') { overlay.clear(); strip.hide(); return; }
+      const sel = controller.selection;
+      overlay.update(sel ? { shape: 'point', x: sel.x1, z: sel.z1, footprintCells: def.footprint } : null);
+      strip.show({
+        icon: 'build',
+        title,
+        subtitle: `$${def.constructionCost.toLocaleString('en-US')}`,
+        fields: [],
+        result: sel ? `(${sel.x1}, ${sel.z1})` : '—',
+        confirmEnabled: controller.canConfirm,
+        instruction: t('ui.build.place_instruction'),
+      });
+    };
+
+    controller.setConfirmHandler((sel) => {
+      onConfirm(sel.x1, sel.z1);
+      overlay.flashConfirm();
+    });
+    controller.setChangeHandler(refresh);
+    controller.arm({ shape: 'point' });
+    refresh();
   }
 
   // ── Catalog (place new buildings) ──────────────────────────────────────────
@@ -284,18 +317,9 @@ export class BuildMenu {
         this.setStatus(t('ui.build.research_required', { tier }));
         return;
       }
-      this.tileSelect.open({
-        mode: 'point',
-        worldSizeX: this.worldSizeX,
-        worldSizeZ: this.worldSizeZ,
-        worldOriginX: this.worldOriginX,
-        worldOriginZ: this.worldOriginZ,
-        title: t(`building.${type}.t${tier}.name`),
-        ...(this.lastState ? { tileFill: makeSiteTileFill(this.lastState) } : {}),
-        onConfirm: (result) => {
-          const cmdResult = this.gameConsole?.(`build ${type} at:${result.x},${result.z} tier:${tier}`);
-          this.setStatus(cmdResult?.success ? t('ui.build.placed') : (cmdResult?.output ?? t('ui.build.invalid_placement')));
-        },
+      this.armBuildingPointTool(type, tier, t(`building.${type}.t${tier}.name`), (x, z) => {
+        const cmdResult = this.gameConsole?.(`build ${type} at:${x},${z} tier:${tier}`);
+        this.setStatus(cmdResult?.success ? t('ui.build.placed') : (cmdResult?.output ?? t('ui.build.invalid_placement')));
       });
     });
 
@@ -368,18 +392,9 @@ export class BuildMenu {
     moveBtn.style.cssText = 'padding:1px 5px;font-size:9px;flex:0 1 auto;white-space:normal;min-width:0';
     moveBtn.textContent = t('ui.build.move');
     moveBtn.addEventListener('click', () => {
-      this.tileSelect.open({
-        mode: 'point',
-        worldSizeX: this.worldSizeX,
-        worldSizeZ: this.worldSizeZ,
-        worldOriginX: this.worldOriginX,
-        worldOriginZ: this.worldOriginZ,
-        title: `${t('ui.build.move')} #${b.id}`,
-        ...(this.lastState ? { tileFill: makeSiteTileFill(this.lastState) } : {}),
-        onConfirm: (result) => {
-          const cmdResult = this.gameConsole?.(`build move ${b.id} to:${result.x},${result.z}`);
-          this.setStatus(cmdResult?.success ? t('ui.build.moved') : (cmdResult?.output ?? ''));
-        },
+      this.armBuildingPointTool(b.type, b.tier, `${t('ui.build.move')} #${b.id}`, (x, z) => {
+        const cmdResult = this.gameConsole?.(`build move ${b.id} to:${x},${z}`);
+        this.setStatus(cmdResult?.success ? t('ui.build.moved') : (cmdResult?.output ?? ''));
       });
     });
 

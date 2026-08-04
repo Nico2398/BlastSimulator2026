@@ -48,7 +48,6 @@ const REGIONS: Array<[string, string]> = [
   // dialog, which shares the class. A modal the probe cannot see is exactly what
   // leaves a harness reporting "everything is covered" with no way forward.
   ['.bs-confirm-overlay:not(#bs-event-dialog)', 'confirm'],
-  ['.bs-tile-select-overlay', 'tile-picker'],
   ['.bs-tutorial-box', 'tutorial'],
   ['#bs-main-menu', 'menu'],
   ['#bs-selection-bar', 'selection'], // scene selection bar (redesign P2)
@@ -73,7 +72,6 @@ const REGION_HINTS: Record<string, string> = {
   survey: '.bs-survey-status',
   blast: '.bs-blast-status',
   build: '#bs-build-panel div[style*="min-height"]',
-  'tile-picker': '.bs-tile-select-info',
   crew: '.bs-training-status',
 };
 

@@ -99,7 +99,7 @@ describe('TutorialRails', () => {
     withBox(btn);
 
     const canvas = document.createElement('div');
-    canvas.className = 'bs-tile-select-canvas';
+    canvas.id = 'game-canvas';
     document.body.appendChild(canvas);
     withBox(canvas);
 

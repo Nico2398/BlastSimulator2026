@@ -28,6 +28,9 @@ import { ScenePicking } from './ui/scene/ScenePicking.js';
 import { HoverTag } from './ui/scene/HoverTag.js';
 import { SelectionBar } from './ui/shell/SelectionBar.js';
 import { EntityHighlight } from './renderer/EntityHighlight.js';
+import { PlacementController } from './ui/scene/PlacementController.js';
+import { ParamStrip } from './ui/scene/ParamStrip.js';
+import { SelectionOverlay } from './renderer/SelectionOverlay.js';
 
 // --- 3D Scene ---
 const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
@@ -48,6 +51,18 @@ const scenePicking = new ScenePicking(canvas, scene.camera, gameRenderer);
 const entityHighlight = new EntityHighlight(scene.scene);
 const hoverTag = new HoverTag(uiContainer, canvas, scene.camera);
 const selectionBar = new SelectionBar(uiContainer);
+
+// --- In-scene placement (redesign P3): the grid-select tool that replaced the 2D tile picker ---
+const placementController = new PlacementController(canvas, scene.camera, gameRenderer, scene.cameraController);
+const selectionOverlay = new SelectionOverlay(scene.scene, (x, z) => gameRenderer.surfaceYAt(x, z));
+const paramStrip = new ParamStrip(uiContainer);
+// Entity hover/select would otherwise fight the placement tool for the same clicks.
+placementController.setArmedStateHandler((armed) => scenePicking.setEnabled(!armed));
+// ParamStrip only renders what it's told; pressing its own CONFIRM/ESC buttons
+// has to reach back into the controller that armed it.
+paramStrip.setConfirmHandler(() => placementController.confirm());
+paramStrip.setCancelHandler(() => placementController.cancel());
+uiManager.setPlacementKit({ controller: placementController, overlay: selectionOverlay, strip: paramStrip });
 
 // --- Persistence ---
 let saveBackend;
@@ -208,6 +223,15 @@ declare global {
     __renderFrame: () => void;
     __debugGridInfo: () => Record<string, unknown>;
     __entityWorldPosition: (kind: 'building' | 'vehicle' | 'employee' | 'fragment', id: number) => { x: number; z: number } | null;
+    /** Scenario-harness hooks for the P3 in-scene placement tool — see PlacementController.paintRect for why this bypasses real pointer events. */
+    __placement: {
+      isArmed: () => boolean;
+      paintRect: (x1: number, z1: number, x2: number, z2: number) => void;
+      confirm: () => void;
+      cancel: () => void;
+    };
+    /** World tile → screen pixel, for the playtest harness's real clicks on the P3 placement canvas (unlike __placement, which scenario-mode uses directly). */
+    __worldToScreen: (x: number, z: number) => { px: number; py: number; onScreen: boolean } | null;
   }
 }
 
@@ -460,6 +484,22 @@ window.__cameraReset = () => {
 window.__entityWorldPosition = (kind, id) => {
   const pos = gameRenderer.entityWorldPosition(kind, id);
   return pos ? { x: pos.x, z: pos.z } : null;
+};
+window.__placement = {
+  isArmed: () => placementController.isArmed,
+  paintRect: (x1, z1, x2, z2) => placementController.paintRect(x1, z1, x2, z2),
+  confirm: () => placementController.confirm(),
+  cancel: () => placementController.cancel(),
+};
+window.__worldToScreen = (x, z) => {
+  const y = gameRenderer.surfaceYAt(x, z);
+  const ndc = scene.cameraController.projectToNDC(x, y, z);
+  const rect = canvas.getBoundingClientRect();
+  return {
+    px: rect.left + (ndc.x * 0.5 + 0.5) * rect.width,
+    py: rect.top + (1 - (ndc.y * 0.5 + 0.5)) * rect.height,
+    onScreen: ndc.z < 1,
+  };
 };
 
 uiManager.setGameConsole(window.__gameConsole);
