@@ -30,6 +30,15 @@ export interface AccidentRecord {
   entityId: number;
   fragmentId: number;
   kineticEnergy: number;
+  /**
+   * Raw building/vehicle type id (e.g. 'living_quarters', 'dumpster'), snapshotted
+   * at the moment of the hit. destroyBuilding/destroyVehicle splice the entity out
+   * of its array, so a later live lookup by entityId can't recover a name for the
+   * *_destroyed variants — mirrors DestroyedBuildingInfo's snapshot in BlastExecution.ts.
+   * Unset for injury/death (employees stay in their array with alive:false, so a live
+   * lookup always works) and for the original seismic_* records predating this field.
+   */
+  entityLabel?: string;
 }
 
 // ── Damage state ──
@@ -111,13 +120,14 @@ function processBuildingHit(
   if (ke < BUILDING_DAMAGE_THRESHOLD) return null;
 
   const dmg = Math.round(ke / 50); // Scale KE to HP damage
+  const entityLabel = b.type;
   b.hp -= dmg;
 
   if (b.hp <= 0) {
     destroyBuilding(state, b.id);
-    return { tick, type: 'building_destroyed', entityId: b.id, fragmentId: frag.id, kineticEnergy: ke };
+    return { tick, type: 'building_destroyed', entityId: b.id, fragmentId: frag.id, kineticEnergy: ke, entityLabel };
   }
-  return { tick, type: 'building_damage', entityId: b.id, fragmentId: frag.id, kineticEnergy: ke };
+  return { tick, type: 'building_damage', entityId: b.id, fragmentId: frag.id, kineticEnergy: ke, entityLabel };
 }
 
 function processVehicleHit(
@@ -130,13 +140,14 @@ function processVehicleHit(
   if (ke < BUILDING_DAMAGE_THRESHOLD) return null;
 
   const dmg = Math.round(ke / 40);
+  const entityLabel = v.type;
   v.hp -= dmg;
 
   if (v.hp <= 0) {
     destroyVehicle(state, v.id);
-    return { tick, type: 'vehicle_destroyed', entityId: v.id, fragmentId: frag.id, kineticEnergy: ke };
+    return { tick, type: 'vehicle_destroyed', entityId: v.id, fragmentId: frag.id, kineticEnergy: ke, entityLabel };
   }
-  return { tick, type: 'vehicle_damage', entityId: v.id, fragmentId: frag.id, kineticEnergy: ke };
+  return { tick, type: 'vehicle_damage', entityId: v.id, fragmentId: frag.id, kineticEnergy: ke, entityLabel };
 }
 
 function processEmployeeHit(

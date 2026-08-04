@@ -48,12 +48,13 @@ export function applySeismicSurveyDamage(
     const dz = cz - centerZ;
     if (Math.sqrt(dx * dx + dz * dz) > SEISMIC_SURVEY_DAMAGE_RADIUS) continue;
 
+    const entityLabel = b.type;
     b.hp -= SEISMIC_SURVEY_DAMAGE_HP;
     if (b.hp <= 0) {
       destroyBuilding(buildings, b.id);
-      accidents.push({ tick, type: 'seismic_destroyed', entityId: b.id, fragmentId: NO_FRAGMENT_ID, kineticEnergy: 0 });
+      accidents.push({ tick, type: 'seismic_destroyed', entityId: b.id, fragmentId: NO_FRAGMENT_ID, kineticEnergy: 0, entityLabel });
     } else {
-      accidents.push({ tick, type: 'seismic_damage', entityId: b.id, fragmentId: NO_FRAGMENT_ID, kineticEnergy: 0 });
+      accidents.push({ tick, type: 'seismic_damage', entityId: b.id, fragmentId: NO_FRAGMENT_ID, kineticEnergy: 0, entityLabel });
     }
   }
 

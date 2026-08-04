@@ -172,9 +172,10 @@ export function contractCommand(
       if (isNaN(id)) return { success: false, output: 'Usage: contract negotiate <id>' };
       const result = negotiateContract(state.contracts, id, 0, rng);
       if (!result) return { success: false, output: `Contract #${id} not found.` };
+      state.contracts.lastNegotiation = { contractId: id, success: result.success, changes: result.changes };
       const lines = [
         result.success ? 'Negotiation SUCCEEDED!' : 'Negotiation FAILED.',
-        ...result.changes.map(c => `  • ${c}`),
+        ...result.changes.map(c => `  • ${c.field} ${c.improved ? 'improved' : 'worsened'} by ${c.pct}%`),
       ];
       return { success: true, output: lines.join('\n') };
     }

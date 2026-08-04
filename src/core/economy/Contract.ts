@@ -34,6 +34,21 @@ export interface Contract {
   expired: boolean;
 }
 
+// ── Negotiation outcome (types live here, not in Negotiation.ts, so
+// ContractState can reference them without a circular import — Negotiation.ts
+// already imports Contract/ContractState from this module) ──
+
+export type NegotiationField = 'price' | 'deadline' | 'penalty';
+
+/** One term negotiation moved, structured rather than prose so the UI can localize it (core stays locale-agnostic). */
+export interface NegotiationChange {
+  field: NegotiationField;
+  /** True when the change favors the player (better price/longer deadline/lower penalty). */
+  improved: boolean;
+  /** Magnitude of the change, 0-100. */
+  pct: number;
+}
+
 // ── Contract state ──
 
 export interface ContractState {
@@ -43,6 +58,8 @@ export interface ContractState {
   nextId: number;
   /** Tick when available contracts were last refreshed. */
   lastRefreshTick: number;
+  /** Outcome of the most recent negotiate attempt, so the panel can show it inline on the right card. Null until the first attempt. */
+  lastNegotiation: { contractId: number; success: boolean; changes: NegotiationChange[] } | null;
 }
 
 export function createContractState(): ContractState {
@@ -52,6 +69,7 @@ export function createContractState(): ContractState {
     completedHistory: [],
     nextId: 1,
     lastRefreshTick: 0,
+    lastNegotiation: null,
   };
 }
 

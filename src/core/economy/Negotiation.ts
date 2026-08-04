@@ -1,7 +1,7 @@
 // BlastSimulator2026 — Contract negotiation system
 // Probabilistic negotiation that can improve or worsen contract terms.
 
-import type { Contract, ContractState } from './Contract.js';
+import type { Contract, ContractState, NegotiationChange } from './Contract.js';
 import { Random } from '../math/Random.js';
 
 // ── Config ──
@@ -19,8 +19,8 @@ const MAX_WORSENING = 0.15;
 
 export interface NegotiationResult {
   success: boolean;
-  /** What changed (human-readable). */
-  changes: string[];
+  /** What changed, structured — core stays locale-agnostic, the UI renders the words. */
+  changes: NegotiationChange[];
   /** The modified contract. */
   contract: Contract;
 }
@@ -43,7 +43,7 @@ export function negotiateContract(
   const successRate = Math.min(0.95, Math.max(0.05, BASE_SUCCESS_RATE + reputation * REPUTATION_FACTOR));
   const isSuccess = rng.chance(successRate);
 
-  const changes: string[] = [];
+  const changes: NegotiationChange[] = [];
 
   if (isSuccess) {
     // Improve 1-2 terms
@@ -52,18 +52,19 @@ export function negotiateContract(
 
     for (let i = 0; i < improvements && i < options.length; i++) {
       const factor = rng.nextFloat(0.05, MAX_IMPROVEMENT);
+      const pct = Math.round(factor * 100);
       switch (options[i]) {
         case 'price':
           contract.pricePerKg *= (1 + factor);
-          changes.push(`Price improved by ${(factor * 100).toFixed(0)}%`);
+          changes.push({ field: 'price', improved: true, pct });
           break;
         case 'deadline':
           contract.deadlineTicks = Math.round(contract.deadlineTicks * (1 + factor));
-          changes.push(`Deadline extended by ${(factor * 100).toFixed(0)}%`);
+          changes.push({ field: 'deadline', improved: true, pct });
           break;
         case 'penalty':
           contract.penaltyAmount = Math.round(contract.penaltyAmount * (1 - factor));
-          changes.push(`Penalty reduced by ${(factor * 100).toFixed(0)}%`);
+          changes.push({ field: 'penalty', improved: true, pct });
           break;
       }
     }
@@ -71,19 +72,20 @@ export function negotiateContract(
     // Worsen 1 term
     const options = shuffleOptions(['price', 'deadline', 'penalty'], rng);
     const factor = rng.nextFloat(0.05, MAX_WORSENING);
+    const pct = Math.round(factor * 100);
 
     switch (options[0]) {
       case 'price':
         contract.pricePerKg *= (1 - factor);
-        changes.push(`Price worsened by ${(factor * 100).toFixed(0)}%`);
+        changes.push({ field: 'price', improved: false, pct });
         break;
       case 'deadline':
         contract.deadlineTicks = Math.max(10, Math.round(contract.deadlineTicks * (1 - factor)));
-        changes.push(`Deadline shortened by ${(factor * 100).toFixed(0)}%`);
+        changes.push({ field: 'deadline', improved: false, pct });
         break;
       case 'penalty':
         contract.penaltyAmount = Math.round(contract.penaltyAmount * (1 + factor));
-        changes.push(`Penalty increased by ${(factor * 100).toFixed(0)}%`);
+        changes.push({ field: 'penalty', improved: false, pct });
         break;
     }
   }
