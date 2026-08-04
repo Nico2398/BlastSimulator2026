@@ -38,7 +38,7 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Agent|Task",
+        "matcher": "Agent|Task|SendMessage|Monitor",
         "hooks": [
           {
             "type": "command",

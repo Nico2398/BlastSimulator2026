@@ -39,11 +39,15 @@ interface HookRun {
 }
 
 /** Runs the PreToolUse guard against a tool-input payload, as Claude Code does. */
-function runGuard(toolInput: unknown, env: Record<string, string> = {}): HookRun {
+function runGuard(
+  toolInput: unknown,
+  env: Record<string, string> = {},
+  toolName = 'Agent'
+): HookRun {
   const payload =
     typeof toolInput === 'string'
       ? toolInput
-      : JSON.stringify({ tool_name: 'Agent', tool_input: toolInput });
+      : JSON.stringify({ tool_name: toolName, tool_input: toolInput });
   try {
     execFileSync(GUARD, {
       input: payload,
@@ -101,6 +105,35 @@ describe('foreground delegation guard', () => {
     );
     expect(result.status).toBe(0);
   });
+
+  // The gap that lost PR #481. Gating on `run_in_background` only covers tools
+  // that have the parameter, and the two that lose a run most easily do not:
+  // `SendMessage` resumes a sub-agent, `Monitor` waits for a condition. The
+  // orchestrator's `Agent` call was foreground and returned cleanly; it was the
+  // SendMessage follow-up, and the Monitor it opened to wait on that, that ended
+  // the turn with a half-finished rebase on the disk and nothing pushed.
+  it('blocks resuming a sub-agent, which has no foreground spelling', () => {
+    const result = runGuard({ agent_id: 'executor', message: 'now push it' }, {}, 'SendMessage');
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain('SendMessage');
+    // Advising `run_in_background: false` here would be advice that cannot be
+    // followed — the parameter does not exist on this tool.
+    expect(result.stderr).not.toContain('Re-issue this call with run_in_background: false');
+    expect(result.stderr).toContain('fresh `Agent` call');
+  });
+
+  it('blocks waiting on a condition that can only come true on a later turn', () => {
+    const result = runGuard({ command: 'test -f done' }, {}, 'Monitor');
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain('Monitor');
+  });
+
+  // Not an oversight. A backgrounded shell is how the visual and playability
+  // channels start `npm run dev`; blocking it would take both channels out. The
+  // run-killer was never the background process, it was ending the turn to wait.
+  it('leaves a backgrounded shell alone so the dev server can still start', () => {
+    expect(runGuard({ command: 'npm run dev', run_in_background: true }, {}, 'Bash').status).toBe(0);
+  });
 });
 
 describe('foreground guard registration', () => {
@@ -119,14 +152,17 @@ describe('foreground guard registration', () => {
     expect(guards.length).toBeGreaterThan(0);
   });
 
-  it('matches both spellings of the delegation tool', () => {
+  // A guard the runtime never invokes is a guard that does not exist, and the
+  // matcher is what decides. `Agent|Task` passed every check in this file while
+  // PR #481's run walked out through `SendMessage` and `Monitor` unopposed.
+  it('matches every tool that can background a delegation', () => {
     const entries = settings().hooks?.PreToolUse ?? [];
     const guards = entries.filter((entry) =>
       (entry.hooks ?? []).some((hook) =>
         (hook.command ?? '').endsWith('require-foreground-agents.sh')
       )
     );
-    for (const tool of ['Agent', 'Task']) {
+    for (const tool of ['Agent', 'Task', 'SendMessage', 'Monitor']) {
       expect(
         guards.some((entry) => new RegExp(entry.matcher ?? '.*').test(tool)),
         `no PreToolUse matcher covers the ${tool} tool`
@@ -142,12 +178,15 @@ describe('foreground guard registration', () => {
 });
 
 describe('a run that settles nothing is retried', () => {
-  it('measures the terminal state of every issue-backed run', () => {
+  it('measures the terminal state of every run, issue-backed or PR-backed', () => {
     for (const name of RUNNERS) {
       const text = workflow(name);
       expect(text, name).toContain('uses: ./.github/actions/agentic-run-state');
       // `always()`: a crashed or failed attempt is the case worth catching.
-      expect(text, name).toMatch(/if: always\(\) && steps\.context\.outputs\.issue != ''/);
+      // Both halves of the condition matter — see the PR-trigger test below.
+      expect(text, name).toMatch(
+        /if: always\(\) && \(steps\.context\.outputs\.issue != '' \|\| steps\.context\.outputs\.pr != ''\)/
+      );
     }
   });
 
@@ -204,6 +243,106 @@ describe('a run that settles nothing is retried', () => {
     expect(text).toContain("issue.state === 'closed'");
     expect(text).toContain("labels.has('blocked')");
     expect(text).toContain('cross-referenced');
+  });
+});
+
+// A `@claude` comment on a PR is the only trigger that carries no issue number,
+// and every net in both runners used to be gated on having one. PR #481 proved
+// what that costs: the session ended its turn waiting on a backgrounded
+// sub-agent, left a half-finished rebase on the runner, and the author's only
+// signal that anything had happened at all was the eye reaction on the comment.
+describe('a run summoned onto a PR has the same net as one summoned onto an issue', () => {
+  const prompt = action('agentic-prompt');
+  const state = action('agentic-run-state');
+  const rescue = action('agentic-rescue');
+
+  it('resolves the PR number, its head branch and the SHA the run started from', () => {
+    expect(prompt).toContain("core.setOutput('pr', pr)");
+    expect(prompt).toContain("core.setOutput('pr_head_ref', prHeadRef)");
+    expect(prompt).toContain("core.setOutput('pr_head_sha', prHeadSha)");
+  });
+
+  it('passes all three to the state check and the rescue in both runners', () => {
+    for (const name of RUNNERS) {
+      const text = workflow(name);
+      for (const output of ['pr', 'pr_head_ref', 'pr_head_sha']) {
+        expect(
+          text.split(`${output}: \${{ steps.context.outputs.${output} }}`).length - 1,
+          `${name}: ${output} must reach the state check, the retry check and the rescue`
+        ).toBe(3);
+      }
+    }
+  });
+
+  it('rescues a PR run as well as an issue run', () => {
+    for (const name of RUNNERS) {
+      const text = workflow(name);
+      const rescueStep = text.slice(text.indexOf('- name: Rescue an unfinished run'));
+      expect(rescueStep, name).toMatch(/steps\.context\.outputs\.pr != ''/);
+    }
+  });
+
+  // Pushing and answering are both real outcomes: "@claude rebase this" wants a
+  // push, "@claude why does X?" wants a comment. Judging on the push alone would
+  // retry every question until the job budget ran out.
+  it('counts a moved head SHA or a posted comment as settling the run', () => {
+    expect(state).toContain('the run pushed its work');
+    expect(state).toContain('the run answered');
+  });
+
+  it('retries a PR run that neither pushed nor spoke', () => {
+    expect(state).toContain('the run neither pushed nor said anything');
+  });
+
+  // The difference from the issue rescue, and the reason this is not one shared
+  // code path: `pipeline/feature-<N>` is a branch nobody has seen, so pushing it
+  // is always safe. A PR branch is live, and force-pushing a half-replayed
+  // history over a reviewed one destroys more than it saves.
+  it('reports a mid-rebase run instead of force-pushing the wreck', () => {
+    const salvage = rescue.slice(
+      rescue.indexOf('- name: Salvage a PR-triggered run'),
+      rescue.indexOf('- name: Push the feature branch')
+    );
+    expect(salvage).toContain('rebase-merge');
+    expect(salvage).toContain('--diff-filter=U');
+    const report = salvage.indexOf('ended in the middle of a');
+    const push = salvage.indexOf('git push --force-with-lease');
+    expect(report).toBeGreaterThan(-1);
+    expect(push, 'the mid-rebase branch must be reported before any push is reached').toBeGreaterThan(
+      report
+    );
+  });
+
+  it('says so on the thread when the run settled nothing at all', () => {
+    expect(rescue).toContain('ended without pushing anything or answering');
+  });
+});
+
+// The workspace the agent inherits is shallow, whatever `fetch-depth` the
+// checkout step asked for. On PR #481 that cost three of eight minutes: every
+// history command insisted a perfectly ordinary branch shared no ancestor with
+// `main`, and the session went looking for a history rewrite that never happened.
+describe('the prompt warns that the workspace is shallow', () => {
+  const prompt = action('agentic-prompt');
+
+  it('names the symptom, not only the fix', () => {
+    expect(prompt).toContain('SHALLOW clone');
+    expect(prompt).toContain('no common');
+  });
+
+  it('gives the command that repairs it', () => {
+    expect(prompt).toContain('git fetch --unshallow origin');
+  });
+
+  it('reaches both runtimes — the prompt output and the PROMPT env var', () => {
+    const preamble = prompt.indexOf('const preamble');
+    const assembled = prompt.indexOf('prompt = preamble');
+    const exported = prompt.indexOf('GITHUB_ENV');
+    expect(preamble).toBeGreaterThan(-1);
+    expect(assembled).toBeGreaterThan(preamble);
+    expect(exported, 'the preamble must be prepended before PROMPT is exported').toBeGreaterThan(
+      assembled
+    );
   });
 });
 

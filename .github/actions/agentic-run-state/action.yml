@@ -15,8 +15,27 @@ inputs:
     description: "Token used to read the issue, its labels and its linked PRs. GITHUB_TOKEN is enough."
     required: true
   issue:
-    description: "Issue number the run was working on. Empty makes every output inert."
+    description: "Issue number the run was working on. Empty when the run was summoned onto a PR."
     required: true
+  pr:
+    description: >
+      Pull request number the run was summoned onto, when there is no issue. A
+      `@claude` comment on a PR is the one trigger that carries no lifecycle
+      label, and it used to make every output here inert — which is how PR #481
+      ended with a half-finished rebase on the runner, no retry, and no rescue.
+    required: false
+    default: ""
+  pr_head_ref:
+    description: "Head branch of `pr`. Used to describe what the attempt left on disk."
+    required: false
+    default: ""
+  pr_head_sha:
+    description: >
+      Head SHA of `pr` when the job started. A PR-triggered run is terminal when
+      it moved that SHA (it pushed) or said something on the thread (it answered
+      or reported a blocker). Neither means it ended holding the work.
+    required: false
+    default: ""
   started_at:
     description: >
       Unix epoch seconds recorded when the job started, used with `budget_minutes`
@@ -61,14 +80,50 @@ runs:
       shell: bash
       env:
         ISSUE: ${{ inputs.issue }}
+        PR_HEAD_REF: ${{ inputs.pr_head_ref }}
       run: |
         set -euo pipefail
+
+        # A rebase, merge or cherry-pick the session walked away from mid-flight
+        # is the single most important thing the next attempt can be told, and
+        # the one thing `git log` will not show it. PR #481's run died exactly
+        # here, with four conflicted files staged and nothing said about them.
+        in_progress() {
+          local dir
+          dir="$(git rev-parse --git-dir)"
+          if [ -d "${dir}/rebase-merge" ] || [ -d "${dir}/rebase-apply" ]; then
+            echo "- ⚠ a REBASE is in progress and was never finished"
+          elif [ -f "${dir}/MERGE_HEAD" ]; then
+            echo "- ⚠ a MERGE is in progress and was never finished"
+          elif [ -f "${dir}/CHERRY_PICK_HEAD" ]; then
+            echo "- ⚠ a CHERRY-PICK is in progress and was never finished"
+          else
+            return 0
+          fi
+          local conflicted
+          conflicted="$(git diff --name-only --diff-filter=U || true)"
+          if [ -n "${conflicted}" ]; then
+            echo "  unresolved paths:"
+            printf '  - %s\n' ${conflicted}
+          fi
+        }
 
         {
           echo "branch_state<<AGENTIC_BRANCH_STATE_EOF"
           if [ -z "${ISSUE}" ]; then
-            echo "(no issue number — nothing to describe)"
+            if [ -n "${PR_HEAD_REF}" ]; then
+              in_progress
+              if git rev-parse --verify --quiet "${PR_HEAD_REF}" >/dev/null; then
+                ahead=$(git rev-list --count "origin/${PR_HEAD_REF}..${PR_HEAD_REF}" 2>/dev/null || echo '?')
+                echo "- ${PR_HEAD_REF}: ${ahead} local commit(s) the remote does not have"
+              else
+                echo "- ${PR_HEAD_REF}: not checked out on this runner"
+              fi
+            else
+              echo "(no issue or PR — nothing to describe)"
+            fi
           else
+            in_progress
             found=0
             for branch in $(git for-each-ref --format='%(refname:short)' "refs/heads/pipeline/*-${ISSUE}"); do
               found=1
@@ -87,6 +142,8 @@ runs:
       uses: actions/github-script@v7
       env:
         ISSUE: ${{ inputs.issue }}
+        PR: ${{ inputs.pr }}
+        PR_HEAD_SHA: ${{ inputs.pr_head_sha }}
         STARTED_AT: ${{ inputs.started_at }}
         BUDGET_MINUTES: ${{ inputs.budget_minutes }}
         MIN_REMAINING_MINUTES: ${{ inputs.min_remaining_minutes }}
@@ -96,6 +153,7 @@ runs:
           const owner = context.repo.owner;
           const repo = context.repo.repo;
           const number = parseInt(process.env.ISSUE || '', 10);
+          const prNumber = parseInt(process.env.PR || '', 10);
 
           const settle = (terminal, retry, reason) => {
             core.setOutput('terminal', terminal ? 'true' : 'false');
@@ -104,11 +162,91 @@ runs:
             core.info(reason);
           };
 
-          // A run triggered from a PR review comment carries no issue. There is
-          // no lifecycle label to leave in a terminal state, so there is nothing
-          // here to judge and nothing to retry.
+          // How much of the job's clock is left. Shared by both verdicts below:
+          // an attempt the job timeout cuts off mid-work is strictly worse than
+          // reporting the run lost, because a cancelled job takes its unpushed
+          // branches with it.
+          const clock = () => {
+            const startedAt = parseInt(process.env.STARTED_AT || '', 10);
+            const budget = parseInt(process.env.BUDGET_MINUTES || '', 10) || 360;
+            const floor = parseInt(process.env.MIN_REMAINING_MINUTES || '', 10) || 75;
+            if (!Number.isInteger(startedAt)) {
+              return { known: false, floor };
+            }
+            const elapsed = Math.round((Date.now() / 1000 - startedAt) / 60);
+            return { known: true, elapsed, budget, remaining: budget - elapsed, floor };
+          };
+
+          // A run summoned onto a PR carries no issue and no lifecycle label, so
+          // none of the issue checks below apply to it. That used to end the
+          // action right here, which left the entire PR-comment path with no
+          // terminal check, no retry and no rescue: PR #481's session ended its
+          // turn waiting on a backgrounded sub-agent, and nothing noticed.
+          //
+          // A PR run is terminal when it left a visible mark on the PR. Two
+          // count, because the trigger covers two kinds of request:
+          //   - it pushed        — the head SHA moved off where the job found it
+          //   - it spoke         — a comment or review landed after the job began
+          // "It spoke" is what keeps a question ("@claude why does X?") from
+          // being retried forever for never having pushed anything.
           if (!Number.isInteger(number)) {
-            settle(true, false, 'No issue number — this run has no lifecycle state to settle.');
+            if (!Number.isInteger(prNumber)) {
+              settle(true, false, 'Neither an issue nor a PR — this run has no state to settle.');
+              return;
+            }
+
+            const startSha = process.env.PR_HEAD_SHA || '';
+            const { data: pull } = await github.rest.pulls.get({
+              owner, repo, pull_number: prNumber
+            });
+            if (startSha && pull.head?.sha && pull.head.sha !== startSha) {
+              settle(
+                true, false,
+                `PR #${prNumber} moved from ${startSha.slice(0, 7)} to ${pull.head.sha.slice(0, 7)} — the run pushed its work.`
+              );
+              return;
+            }
+
+            const since = parseInt(process.env.STARTED_AT || '', 10);
+            let spoke = false;
+            if (Number.isInteger(since)) {
+              const startedIso = new Date(since * 1000).toISOString();
+              const [comments, reviews] = await Promise.all([
+                github.rest.issues.listComments({
+                  owner, repo, issue_number: prNumber, since: startedIso, per_page: 100
+                }),
+                github.rest.pulls.listReviews({
+                  owner, repo, pull_number: prNumber, per_page: 100
+                })
+              ]);
+              spoke =
+                comments.data.some((c) => new Date(c.created_at).getTime() >= since * 1000) ||
+                reviews.data.some((r) => r.submitted_at && new Date(r.submitted_at).getTime() >= since * 1000);
+            }
+            if (spoke) {
+              settle(true, false, `PR #${prNumber} received a comment or review from this run — the run answered.`);
+              return;
+            }
+
+            const c = clock();
+            if (!c.known) {
+              settle(
+                false, false,
+                `PR #${prNumber} is unchanged and no comment was posted — the run did nothing visible. ` +
+                'No start time was supplied, so no retry is scheduled.'
+              );
+              return;
+            }
+            const worthRetrying = c.remaining >= c.floor;
+            settle(
+              false, worthRetrying,
+              `PR #${prNumber} is still at ${(startSha || '(unknown)').slice(0, 7)} and no comment was posted — ` +
+              'the run neither pushed nor said anything. ' +
+              `${c.elapsed}m of the ${c.budget}m budget spent, ${c.remaining}m left; ` +
+              (worthRetrying
+                ? `at least ${c.floor}m is needed for an attempt, so one more will run.`
+                : `an attempt needs ${c.floor}m, so this run is reported lost instead of being cut off mid-work.`)
+            );
             return;
           }
 
@@ -142,31 +280,23 @@ runs:
           }
 
           // Not terminal. Whether that is worth another attempt is a question
-          // about the clock: an attempt that the job timeout cuts off mid-work
-          // is strictly worse than reporting the run lost, because a cancelled
-          // job takes its unpushed branches with it.
-          const startedAt = parseInt(process.env.STARTED_AT || '', 10);
-          const budget = parseInt(process.env.BUDGET_MINUTES || '', 10) || 360;
-          const floor = parseInt(process.env.MIN_REMAINING_MINUTES || '', 10) || 75;
+          // about the clock, answered the same way for both trigger kinds.
+          const c = clock();
+          const verdict =
+            `Issue #${number} has no PR, no \`blocked\` label and is still open — the run did not settle it. `;
 
-          if (!Number.isInteger(startedAt)) {
-            settle(
-              false, false,
-              `Issue #${number} has no PR, no \`blocked\` label and is still open — the run did not settle it. ` +
-              'No start time was supplied, so no retry is scheduled.'
-            );
+          if (!c.known) {
+            settle(false, false, verdict + 'No start time was supplied, so no retry is scheduled.');
             return;
           }
 
-          const elapsed = Math.round((Date.now() / 1000 - startedAt) / 60);
-          const remaining = budget - elapsed;
-          const worthRetrying = remaining >= floor;
+          const worthRetrying = c.remaining >= c.floor;
 
           settle(
             false, worthRetrying,
-            `Issue #${number} has no PR, no \`blocked\` label and is still open — the run did not settle it. ` +
-            `${elapsed}m of the ${budget}m budget spent, ${remaining}m left; ` +
+            verdict +
+            `${c.elapsed}m of the ${c.budget}m budget spent, ${c.remaining}m left; ` +
             (worthRetrying
-              ? `at least ${floor}m is needed for an attempt, so one more will run.`
-              : `an attempt needs ${floor}m, so this run is reported lost instead of being cut off mid-work.`)
+              ? `at least ${c.floor}m is needed for an attempt, so one more will run.`
+              : `an attempt needs ${c.floor}m, so this run is reported lost instead of being cut off mid-work.`)
           );

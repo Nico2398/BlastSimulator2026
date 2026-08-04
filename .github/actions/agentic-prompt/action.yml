@@ -21,6 +21,20 @@ outputs:
   issue:
     description: "Issue number this run resolves, or empty when the trigger was not an issue."
     value: ${{ steps.build.outputs.issue }}
+  pr:
+    description: >
+      Pull request number this run was summoned onto, or empty when the trigger
+      was not a PR. A PR-triggered run carries no issue, so this is the only
+      handle the post-run safety net has on it — see `agentic-run-state`.
+    value: ${{ steps.build.outputs.pr }}
+  pr_head_ref:
+    description: "Head branch of `pr`. The branch a PR-triggered run is expected to push."
+    value: ${{ steps.build.outputs.pr_head_ref }}
+  pr_head_sha:
+    description: >
+      Head SHA of `pr` as it stood when the run started. The post-run check
+      compares against it to answer "did this run push anything?".
+    value: ${{ steps.build.outputs.pr_head_sha }}
   entity:
     description: >
       Single-line reference to what triggered the run ("issue 42", "pr 17",
@@ -41,7 +55,27 @@ runs:
           const event = context.eventName;
           let prompt = '';
           let issue = '';
+          let pr = '';
           let entity = 'manual';
+
+          // The workspace the agent inherits is not the one `actions/checkout`
+          // left behind. The runner's checkout is full (`fetch-depth: 0`), but
+          // the agent action re-fetches at depth 1 before handing over, so
+          // `.git/shallow` ends up pinned at the base branch's tip. Every
+          // history operation then lies in the same direction: `git merge-base`
+          // reports no common ancestor, and a rebase onto `main` tries to
+          // replay the branch's entire history and conflicts on its root
+          // commit. On PR #481 a session spent three of its eight minutes
+          // proving that a normal branch had had its history rewritten. It had
+          // not. This paragraph is cheaper than that investigation.
+          const preamble = [
+            '▶ This workspace is a SHALLOW clone. `.git/shallow` is pinned at the base branch tip, so',
+            '`git merge-base`, `git log A..B` and `git rebase` all report nonsense — typically "no common',
+            'ancestor" between two branches that plainly share one. Before any operation that reads history',
+            '(rebase, merge, cherry-pick, counting commits), run `git fetch --unshallow origin` first; it takes',
+            'a few seconds. `git rev-parse --is-shallow-repository` tells you whether it is still needed.',
+            ''
+          ].join('\n');
 
           if (event === 'workflow_dispatch') {
             const issueNum = (process.env.DISPATCH_ISSUE || '').trim();
@@ -76,6 +110,9 @@ runs:
             if (!isPR && num) {
               issue = String(num);
             }
+            if (isPR && num) {
+              pr = String(num);
+            }
             entity = (isPR ? 'pr ' : 'issue ') + num;
 
             prompt = [
@@ -97,6 +134,9 @@ runs:
             const num = context.payload.pull_request?.number;
             const commentBody = context.payload.comment?.body || '';
             const prBody = context.payload.pull_request?.body || '(No description)';
+            if (num) {
+              pr = String(num);
+            }
             entity = 'pr ' + num;
 
             prompt = [
@@ -118,9 +158,29 @@ runs:
             prompt = 'A user triggered you. Read the context and respond appropriately.';
           }
 
+          // The head ref and the SHA it stood at when this run started. The SHA
+          // is what makes "did the run push anything?" answerable after the
+          // session is over and its VM is gone.
+          let prHeadRef = '';
+          let prHeadSha = '';
+          if (pr) {
+            const { data: target } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: parseInt(pr, 10)
+            });
+            prHeadRef = target.head?.ref || '';
+            prHeadSha = target.head?.sha || '';
+          }
+
+          prompt = preamble + '\n' + prompt;
+
           // OpenCode reads the task from $PROMPT; Claude Code reads the step output.
           const delimiter = 'PROMPT_EOF_' + context.runId;
           fs.appendFileSync(process.env.GITHUB_ENV, 'PROMPT<<' + delimiter + '\n' + prompt + '\n' + delimiter + '\n', 'utf8');
           core.setOutput('prompt', prompt);
           core.setOutput('issue', issue);
+          core.setOutput('pr', pr);
+          core.setOutput('pr_head_ref', prHeadRef);
+          core.setOutput('pr_head_sha', prHeadSha);
           core.setOutput('entity', entity);

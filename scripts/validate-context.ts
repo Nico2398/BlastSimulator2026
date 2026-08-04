@@ -409,8 +409,15 @@ const SETTINGS_HOOKS = [
   {
     script: '.claude/hooks/require-foreground-agents.sh',
     event: 'PreToolUse',
-    /** Tool names the matcher has to cover for the guard to see a delegation. */
-    tools: ['Agent', 'Task'],
+    /**
+     * Tool names the matcher has to cover for the guard to see a delegation.
+     * `SendMessage` and `Monitor` are not spare belt-and-braces: a matcher of
+     * just `Agent|Task` is what lost PR #481. The orchestrator delegated in the
+     * foreground, continued that sub-agent with `SendMessage` — background by
+     * nature, no `run_in_background` to set — then waited on a `Monitor` and
+     * ended its turn. Neither call was ever shown to the guard.
+     */
+    tools: ['Agent', 'Task', 'SendMessage', 'Monitor'],
     why:
       'a frontmatter declaration only registers for agents started through the `Agent` ' +
       'tool, and the orchestrator is entered by `/agentic-run` forking into it — so the ' +
