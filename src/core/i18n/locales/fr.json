@@ -2506,6 +2506,7 @@
   "ui.vehicles.driver": "Conducteur",
   "ui.vehicles.no_qualified": "Aucun employé habilité pour {licence}",
   "ui.vehicles.haul": "Transporter",
+  "ui.confirm.cancel": "Annuler",
   "ui.contracts.deliver": "Livrer",
   "ui.build.ramp_section": "Terrain",
   "ui.build.ramp": "Construire une rampe",

@@ -7,6 +7,7 @@ import { registerIcons } from './icons.js';
 import { BlastWorkshop } from './panels/BlastWorkshop.js';
 import { PreflightModal } from './panels/PreflightModal.js';
 import { BlastReportModal } from './panels/BlastReportModal.js';
+import { ConfirmModal } from './panels/ConfirmModal.js';
 import { ContractsPanel } from './panels/ContractsPanel.js';
 import { FinancesPanel } from './panels/FinancesPanel.js';
 import { OperationsPanel } from './panels/OperationsPanel.js';
@@ -41,6 +42,7 @@ export class UIManager {
   private readonly blastUI: BlastWorkshop;
   private readonly preflightModal: PreflightModal;
   private readonly blastReportModal: BlastReportModal;
+  private readonly confirmModal: ConfirmModal;
   private readonly contractsPanel: ContractsPanel;
   private readonly financesPanel: FinancesPanel;
   private readonly operationsPanel: OperationsPanel;
@@ -98,6 +100,9 @@ export class UIManager {
     this.preflightModal = new PreflightModal(container);
     this.blastUI.setFireRequestedHandler(() => this.preflightModal.show());
     this.blastReportModal = new BlastReportModal(container);
+    // Shared confirm-before-destructive-action overlay — no owner panel of
+    // its own; CrewPanel/FleetPanel (P6) will reach it once they exist.
+    this.confirmModal = new ConfirmModal(container);
     this.contractsPanel = new ContractsPanel(leftCol);
     this.contractsPanel.setCloseHandler(() => this.hideAllPanels());
     this.contractsPanel.setNavigateHandler((panel) => this.showPanel(panel));
@@ -128,6 +133,7 @@ export class UIManager {
     this.escLayers.push(() => {
       if (this.preflightModal.visible) { this.preflightModal.hide(); return true; }
       if (this.blastReportModal.visible) { this.blastReportModal.hide(); return true; }
+      if (this.confirmModal.visible) { this.confirmModal.hide(); return true; }
       return false;
     });
 
@@ -227,6 +233,7 @@ export class UIManager {
     this.blastUI.refreshLocale();
     this.preflightModal.refreshLocale();
     this.blastReportModal.refreshLocale();
+    this.confirmModal.refreshLocale();
     this.contractsPanel.refreshLocale();
     this.financesPanel.refreshLocale();
     this.operationsPanel.refreshLocale();
@@ -332,6 +339,7 @@ export class UIManager {
     this.blastUI.dispose();
     this.preflightModal.dispose();
     this.blastReportModal.dispose();
+    this.confirmModal.dispose();
     this.contractsPanel.dispose();
     this.financesPanel.dispose();
     this.operationsPanel.dispose();
