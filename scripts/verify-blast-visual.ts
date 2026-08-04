@@ -33,9 +33,12 @@ const CHROME = '/opt/pw-browsers/chromium';
  * `__cameraFocus` aims at the *current* ground height, which the blast lowers by
  * several metres, so a low camera also drops between the before and after shots
  * and stops framing the same thing. From above that shift barely moves the view.
+ *
+ * Yaw and pitch are **degrees** above the horizon, not radians — `setOrbit`
+ * converts them itself. Passing radians aims the camera along the ground.
  */
 const SITE = { x: 20, z: 20 };
-const CAMERA = { distance: 40, yaw: 0.6, pitch: 0.85 };
+const CAMERA = { distance: 42, yaw: 35, pitch: 50 };
 
 interface Shot {
   name: string;
