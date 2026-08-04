@@ -75,6 +75,46 @@ describe('blast_plan list', () => {
   });
 });
 
+// ── drill_plan remove ────────────────────────────────────────────────────────
+
+describe('drillPlanCommand — remove subcommand', () => {
+  it('removes the named hole from the plan', () => {
+    const ctx = makeMiningContext();
+    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '2', spacing: '3', depth: '8' });
+    expect(ctx.state!.drillHoles.map(h => h.id)).toEqual(['H1', 'H2']);
+
+    const result = drillPlanCommand(ctx, ['remove'], { hole: 'H1' });
+
+    expect(result.success).toBe(true);
+    expect(ctx.state!.drillHoles.map(h => h.id)).toEqual(['H2']);
+  });
+
+  it('drops the removed hole\'s charge and sequence delay entries', () => {
+    const ctx = makeMiningContext();
+    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+    chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
+    sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '25ms' });
+    expect(ctx.state!.chargesByHole['H1']).toBeDefined();
+    expect(ctx.state!.sequenceDelays['H1']).toBeDefined();
+
+    drillPlanCommand(ctx, ['remove'], { hole: 'H1' });
+
+    expect(ctx.state!.chargesByHole['H1']).toBeUndefined();
+    expect(ctx.state!.sequenceDelays['H1']).toBeUndefined();
+  });
+
+  it('returns success:false and leaves the plan untouched for an unknown hole ID', () => {
+    const ctx = makeMiningContext();
+    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+
+    const result = drillPlanCommand(ctx, ['remove'], { hole: 'H99' });
+
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('not found');
+    expect(ctx.state!.drillHoles.length).toBe(1);
+  });
+});
+
 // ── buy_software tier validation ─────────────────────────────────────────────
 
 describe('buy_software tier validation', () => {

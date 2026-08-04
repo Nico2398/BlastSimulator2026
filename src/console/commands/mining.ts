@@ -3,7 +3,7 @@
 
 import type { CommandResult } from '../ConsoleRunner.js';
 import type { GameContext } from './world.js';
-import { createGridPlan, addHole, resetHoleIds } from '../../core/mining/DrillPlan.js';
+import { createGridPlan, addHole, removeHole, resetHoleIds } from '../../core/mining/DrillPlan.js';
 import { createCharge, batchCharge } from '../../core/mining/ChargePlan.js';
 import { setDelay, autoVPattern } from '../../core/mining/Sequence.js';
 import { assembleBlastPlan, validateBlastPlan } from '../../core/mining/BlastPlan.js';
@@ -124,6 +124,22 @@ export function drillPlanCommand(
     return { success: true, output: `Added hole ${hole.id} at (${x}, ${z}), depth ${depth}m` };
   }
 
+  if (sub === 'remove') {
+    const holeSpec = named['hole'] ?? '';
+    const holeId = ctx.state!.drillHoles.find(h => h.id === holeSpec)
+      ? holeSpec
+      : (holeSpec.startsWith('hole_') ? holeSpec : `hole_${holeSpec}`);
+
+    if (!removeHole(ctx.state!.drillHoles, holeId)) {
+      return { success: false, output: `Hole "${holeId}" not found` };
+    }
+
+    delete ctx.state!.chargesByHole[holeId];
+    delete ctx.state!.sequenceDelays[holeId];
+
+    return { success: true, output: `Removed hole ${holeId}` };
+  }
+
   if (sub === 'show') {
     if (ctx.state!.drillHoles.length === 0) {
       return { success: true, output: 'No drill holes. Use drill_plan grid or drill_plan add.' };
@@ -134,7 +150,7 @@ export function drillPlanCommand(
     return { success: true, output: `Drill plan (${lines.length} holes):\n${lines.join('\n')}` };
   }
 
-  return { success: false, output: 'Usage: drill_plan grid|add|show [options]' };
+  return { success: false, output: 'Usage: drill_plan grid|add|remove|show [options]' };
 }
 
 // ── Charge commands ──

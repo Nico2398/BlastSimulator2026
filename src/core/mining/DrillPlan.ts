@@ -60,6 +60,14 @@ export function addHole(
   return hole;
 }
 
+/** Remove a hole from the plan by ID. Returns true if a hole was removed, false if none matched. */
+export function removeHole(holes: DrillHole[], holeId: string): boolean {
+  const index = holes.findIndex(h => h.id === holeId);
+  if (index === -1) return false;
+  holes.splice(index, 1);
+  return true;
+}
+
 export interface DigVoxelResult {
   success: boolean;
   /** Highest solid Y in the column after digging; -1 if the column is now empty. */
