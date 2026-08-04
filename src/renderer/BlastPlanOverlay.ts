@@ -3,7 +3,9 @@
 
 import * as THREE from 'three';
 import type { DrillHole } from '../core/mining/DrillPlan.js';
+import { holeNumericId } from '../core/mining/DrillPlan.js';
 import type { HoleCharge } from '../core/mining/ChargePlan.js';
+import { tagPickable } from './Pickable.js';
 
 // ---------- Config ----------
 
@@ -65,11 +67,29 @@ export interface BlastPlanOverlayOptions {
 export class BlastPlanOverlay {
   private readonly scene: THREE.Scene;
   private readonly group = new THREE.Group();
+  /** Surface-anchor position per hole (numeric id, see holeNumericId), for scene-picking's entityWorldPosition. */
+  private readonly holePositions = new Map<number, THREE.Vector3>();
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
     this.scene.add(this.group);
     this.group.visible = false;
+  }
+
+  /**
+   * Hole marker meshes raycastable for scene picking (P4). Empty while the
+   * overlay is hidden — Three.js's raycaster only checks an object's own
+   * `.visible`, not an ancestor's, so a hidden-but-uncleared group would
+   * otherwise leave stale holes clickable.
+   */
+  pickables(): THREE.Object3D[] {
+    if (!this.group.visible) return [];
+    return this.group.children.filter(c => c.userData['entityKind'] === 'hole');
+  }
+
+  /** World-space surface position of a hole by its numeric pick id, or null if not currently shown. */
+  getHolePosition(numericId: number): THREE.Vector3 | null {
+    return this.holePositions.get(numericId)?.clone() ?? null;
   }
 
   show(options: BlastPlanOverlayOptions): void {
@@ -108,6 +128,7 @@ export class BlastPlanOverlay {
         disposeGroup(child);
       }
     }
+    this.holePositions.clear();
   }
 
   dispose(): void {
@@ -120,26 +141,28 @@ export class BlastPlanOverlay {
   private addHoleMarker(hd: HoleOverlayData): void {
     const { hole, charge, delayMs, surfaceY: base } = hd;
     const x = hole.x, z = hole.z, depth = hole.depth;
+    const pickId = holeNumericId(hole.id);
+    this.holePositions.set(pickId, new THREE.Vector3(x, base, z));
 
     // Surface cap — wireframe ring at terrain surface (X-ray: depthTest off)
     this.addXrayMesh(
       new THREE.CylinderGeometry(HOLE_RADIUS, HOLE_RADIUS, HOLE_HEIGHT, HOLE_SEGMENTS, 1, true),
-      { color: HOLE_COLOR, wireframe: true, side: THREE.DoubleSide }, 10, x, base + HOLE_HEIGHT / 2, z,
+      { color: HOLE_COLOR, wireframe: true, side: THREE.DoubleSide }, 10, x, base + HOLE_HEIGHT / 2, z, pickId,
     );
     // Underground shaft — translucent cylinder showing full depth
     this.addXrayMesh(
       new THREE.CylinderGeometry(HOLE_RADIUS * 0.5, HOLE_RADIUS * 0.5, depth, HOLE_SEGMENTS),
-      { color: 0xaaaaff, transparent: true, opacity: 0.35, side: THREE.DoubleSide }, 9, x, base - depth / 2, z,
+      { color: 0xaaaaff, transparent: true, opacity: 0.35, side: THREE.DoubleSide }, 9, x, base - depth / 2, z, pickId,
     );
     // Shaft wireframe outline
     this.addXrayMesh(
       new THREE.CylinderGeometry(HOLE_RADIUS * 0.52, HOLE_RADIUS * 0.52, depth, HOLE_SEGMENTS, 1, true),
-      { color: 0x6666cc, wireframe: true }, 11, x, base - depth / 2, z,
+      { color: 0x6666cc, wireframe: true }, 11, x, base - depth / 2, z, pickId,
     );
     // Bottom disc at hole base
     const bottom = this.addXrayMesh(
       new THREE.CircleGeometry(HOLE_RADIUS * 0.5, HOLE_SEGMENTS),
-      { color: 0xff6644, side: THREE.DoubleSide }, 12, x, base - depth, z,
+      { color: 0xff6644, side: THREE.DoubleSide }, 12, x, base - depth, z, pickId,
     );
     bottom.rotation.x = -Math.PI / 2;
 
@@ -151,11 +174,11 @@ export class BlastPlanOverlay {
       const fillH = depth * Math.min(0.9, lvl + 0.2);
       this.addXrayMesh(
         new THREE.CylinderGeometry(HOLE_RADIUS * 0.4, HOLE_RADIUS * 0.4, fillH, HOLE_SEGMENTS),
-        { color: CHARGE_COLORS[ci], transparent: true, opacity: 0.85 }, 13, x, base - depth + fillH / 2, z,
+        { color: CHARGE_COLORS[ci], transparent: true, opacity: 0.85 }, 13, x, base - depth + fillH / 2, z, pickId,
       );
       this.addXrayMesh(
         new THREE.CylinderGeometry(HOLE_RADIUS * 0.7, HOLE_RADIUS * 0.7, HOLE_HEIGHT * 0.9, HOLE_SEGMENTS),
-        { color: CHARGE_COLORS[ci], transparent: true, opacity: 0.8 }, 14, x, base + HOLE_HEIGHT / 2, z,
+        { color: CHARGE_COLORS[ci], transparent: true, opacity: 0.8 }, 14, x, base + HOLE_HEIGHT / 2, z, pickId,
       );
     }
 
@@ -164,19 +187,21 @@ export class BlastPlanOverlay {
       const label = this.makeDelayLabel(delayMs);
       label.renderOrder = 15;
       label.position.set(x, base + HOLE_HEIGHT + LABEL_OFFSET, z);
+      tagPickable(label, 'hole', pickId);
       this.group.add(label);
     }
   }
 
-  /** Helper: create a mesh with depthTest:false (X-ray) and add to group. */
+  /** Helper: create a mesh with depthTest:false (X-ray) and add to group. `pickId`, when given, tags the mesh as that hole for scene picking. */
   private addXrayMesh(
     geo: THREE.BufferGeometry, matOpts: THREE.MeshBasicMaterialParameters,
-    order: number, x: number, y: number, z: number,
+    order: number, x: number, y: number, z: number, pickId?: number,
   ): THREE.Mesh {
     const mat = new THREE.MeshBasicMaterial({ ...matOpts, depthTest: false });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.renderOrder = order;
     mesh.position.set(x, y, z);
+    if (pickId !== undefined) tagPickable(mesh, 'hole', pickId);
     this.group.add(mesh);
     return mesh;
   }

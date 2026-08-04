@@ -22,6 +22,11 @@ const DEFAULT_RADIUS: Record<PickableKind, number> = {
   vehicle: 1.5,
   employee: 0.55,
   fragment: 0.7,
+  // Comfortably outside BlastPlanOverlay's HOLE_RADIUS (0.6) — every other
+  // kind's default sits outside its own visual footprint with a clear gap,
+  // and the marker already has a white wireframe ring at 0.6 that an
+  // equal-radius amber ring would sit flush against instead of surrounding.
+  hole: 1.0,
 };
 
 export class EntityHighlight {

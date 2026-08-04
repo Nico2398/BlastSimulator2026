@@ -17,6 +17,7 @@ import { Random } from '../../../src/core/math/Random.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
+import { addHole, holeNumericId } from '../../../src/core/mining/DrillPlan.js';
 
 function makeMockSceneManager() {
   const scene = new THREE.Scene();
@@ -462,6 +463,48 @@ describe('GameRenderer — scene picking (P2)', () => {
     expect(renderer.entityWorldPosition('vehicle', 9999)).toBeNull();
     expect(renderer.entityWorldPosition('employee', 9999)).toBeNull();
     expect(renderer.entityWorldPosition('fragment', 9999)).toBeNull();
+    expect(renderer.entityWorldPosition('hole', 9999)).toBeNull();
+  });
+
+  it('pickables() includes hole markers, tagged with their numeric hole id, after showBlastPlanOverlay()', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    const ctx = makeCtx();
+    renderer.syncFromContext(ctx);
+    const hole = addHole(ctx.state!.drillHoles, 10, 10, 8, 0.15);
+
+    renderer.showBlastPlanOverlay(ctx);
+
+    const holePicks = renderer.pickables().filter(o => o.userData['entityKind'] === 'hole');
+    expect(holePicks.length).toBeGreaterThan(0);
+    expect(holePicks.map(o => o.userData['entityId'])).toContain(holeNumericId(hole.id));
+  });
+
+  it('entityWorldPosition() resolves a hole shown via showBlastPlanOverlay()', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    const ctx = makeCtx();
+    renderer.syncFromContext(ctx);
+    const hole = addHole(ctx.state!.drillHoles, 10, 10, 8, 0.15);
+
+    renderer.showBlastPlanOverlay(ctx);
+
+    const pos = renderer.entityWorldPosition('hole', holeNumericId(hole.id));
+    expect(pos).not.toBeNull();
+    expect(pos!.x).toBeCloseTo(10);
+    expect(pos!.z).toBeCloseTo(10);
+  });
+
+  it('pickables() drops hole markers once the plan overlay is hidden (empty plan)', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    const ctx = makeCtx();
+    renderer.syncFromContext(ctx);
+    addHole(ctx.state!.drillHoles, 10, 10, 8, 0.15);
+    renderer.showBlastPlanOverlay(ctx);
+    expect(renderer.pickables().some(o => o.userData['entityKind'] === 'hole')).toBe(true);
+
+    ctx.state!.drillHoles = [];
+    renderer.showBlastPlanOverlay(ctx); // empty plan → overlay hides itself
+
+    expect(renderer.pickables().some(o => o.userData['entityKind'] === 'hole')).toBe(false);
   });
 
   it('resolveFragmentId() resolves a spawned fragment through its bucket slot', () => {

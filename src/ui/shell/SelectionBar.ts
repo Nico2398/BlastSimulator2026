@@ -8,6 +8,7 @@ import { el, button } from '../dom.js';
 import { iconEl } from '../icons.js';
 import type { GameState } from '../../core/state/GameState.js';
 import type { EntityPick } from '../scene/ScenePicking.js';
+import { holeNumericId } from '../../core/mining/DrillPlan.js';
 
 export type SelectionAction =
   | 'detail' | 'dispatch_here' | 'train'
@@ -95,6 +96,12 @@ export class SelectionBar {
       }
       case 'fragment':
         return { title: t('shell.hovertag.fragment', { id: entity.id }), sub: '' };
+      case 'hole': {
+        const hole = state.drillHoles.find(h => holeNumericId(h.id) === entity.id);
+        if (!hole) return null;
+        const delay = state.sequenceDelays[hole.id];
+        return { title: hole.id, sub: delay !== undefined ? `${hole.depth}m · +${delay}ms` : `${hole.depth}m` };
+      }
     }
   }
 
@@ -120,6 +127,10 @@ export class SelectionBar {
           button('danger', t('shell.selection.demolish'), { icon: 'trash', dataAction: 'demolish', onClick: () => fire('demolish') }),
         ];
       case 'fragment':
+        return [
+          button('ghost', t('shell.selection.focus'), { icon: 'locate', dataAction: 'focus', onClick: () => fire('focus') }),
+        ];
+      case 'hole':
         return [
           button('ghost', t('shell.selection.focus'), { icon: 'locate', dataAction: 'focus', onClick: () => fire('focus') }),
         ];

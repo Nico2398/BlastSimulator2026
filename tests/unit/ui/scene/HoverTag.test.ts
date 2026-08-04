@@ -7,6 +7,7 @@ import { placeBuilding } from '../../../../src/core/entities/Building.js';
 import { purchaseVehicle } from '../../../../src/core/entities/Vehicle.js';
 import { hireEmployee } from '../../../../src/core/entities/Employee.js';
 import { Random } from '../../../../src/core/math/Random.js';
+import { addHole, holeNumericId } from '../../../../src/core/mining/DrillPlan.js';
 import type { PickResult } from '../../../../src/ui/scene/ScenePicking.js';
 
 function makeState() {
@@ -87,6 +88,36 @@ describe('HoverTag', () => {
     const { tag, root } = makeTag();
     const state = makeState();
     const hover: PickResult = { entity: { kind: 'employee', id: 9999, point: new THREE.Vector3(), distance: 1 }, terrain: null };
+    tag.update(hover, state);
+    expect(root.style.display).toBe('none');
+  });
+
+  it('shows a hole id and depth for an entity hover', () => {
+    const { tag, root } = makeTag();
+    const state = makeState();
+    const hole = addHole(state.drillHoles, 10, 10, 8, 0.15);
+    const hover: PickResult = { entity: { kind: 'hole', id: holeNumericId(hole.id), point: new THREE.Vector3(), distance: 1 }, terrain: null };
+
+    tag.update(hover, state);
+    expect(root.textContent).toContain(hole.id);
+    expect(root.textContent).toContain('8m');
+  });
+
+  it('shows the sequence delay for a hovered hole once it has one', () => {
+    const { tag, root } = makeTag();
+    const state = makeState();
+    const hole = addHole(state.drillHoles, 10, 10, 8, 0.15);
+    state.sequenceDelays[hole.id] = 50;
+    const hover: PickResult = { entity: { kind: 'hole', id: holeNumericId(hole.id), point: new THREE.Vector3(), distance: 1 }, terrain: null };
+
+    tag.update(hover, state);
+    expect(root.textContent).toContain('+50ms');
+  });
+
+  it('hides when the hovered hole no longer exists in state', () => {
+    const { tag, root } = makeTag();
+    const state = makeState();
+    const hover: PickResult = { entity: { kind: 'hole', id: 9999, point: new THREE.Vector3(), distance: 1 }, terrain: null };
     tag.update(hover, state);
     expect(root.style.display).toBe('none');
   });

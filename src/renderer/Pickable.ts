@@ -8,7 +8,7 @@
 
 import * as THREE from 'three';
 
-export type PickableKind = 'building' | 'vehicle' | 'employee' | 'fragment';
+export type PickableKind = 'building' | 'vehicle' | 'employee' | 'fragment' | 'hole';
 
 /** Tag an entity's root Object3D so a raycast hit on it (or a child) resolves back to (kind, id). */
 export function tagPickable(object: THREE.Object3D, kind: PickableKind, id: number): void {

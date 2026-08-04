@@ -425,10 +425,11 @@ export class GameRenderer {
   }
 
   /**
-   * Every entity root object raycastable for scene picking (P2): buildings,
-   * vehicles, employees, and the 8 fragment shape buckets. Terrain is
-   * raycast separately via `terrain.meshes` — it's a fallback hit, not an
-   * entity, and callers usually want to know when nothing else was hit.
+   * Every entity root object raycastable for scene picking (P2/P4): buildings,
+   * vehicles, employees, the 8 fragment shape buckets, and the current blast
+   * plan's drill holes. Terrain is raycast separately via `terrain.meshes` —
+   * it's a fallback hit, not an entity, and callers usually want to know when
+   * nothing else was hit.
    */
   pickables(): THREE.Object3D[] {
     return [
@@ -436,6 +437,7 @@ export class GameRenderer {
       ...(this.vehicles?.pickables() ?? []),
       ...(this.characters?.pickables() ?? []),
       ...(this.fragments?.pickables() ?? []),
+      ...(this.blastOverlay?.pickables() ?? []),
     ];
   }
 
@@ -447,15 +449,17 @@ export class GameRenderer {
   /**
    * Current world-space position of a live entity, for hover-tag/highlight
    * placement. Buildings/vehicles/employees read their Group's position
-   * directly; fragments resolve through their InstancedMesh slot. Null when
-   * the entity isn't currently rendered (removed, or never synced).
+   * directly; fragments resolve through their InstancedMesh slot; holes
+   * resolve through the blast plan overlay's per-hole surface anchor. Null
+   * when the entity isn't currently rendered (removed, or never synced).
    */
-  entityWorldPosition(kind: 'building' | 'vehicle' | 'employee' | 'fragment', id: number): THREE.Vector3 | null {
+  entityWorldPosition(kind: 'building' | 'vehicle' | 'employee' | 'fragment' | 'hole', id: number): THREE.Vector3 | null {
     switch (kind) {
       case 'building': return this.buildings?.getPosition(id) ?? null;
       case 'vehicle': return this.vehicles?.getPosition(id) ?? null;
       case 'employee': return this.characters?.getPosition(id) ?? null;
       case 'fragment': return this.fragments?.fragmentPosition(id) ?? null;
+      case 'hole': return this.blastOverlay?.getHolePosition(id) ?? null;
     }
   }
 

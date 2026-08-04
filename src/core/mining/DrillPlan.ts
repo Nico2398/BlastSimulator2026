@@ -68,6 +68,17 @@ export function removeHole(holes: DrillHole[], holeId: string): boolean {
   return true;
 }
 
+/**
+ * Numeric form of a generated hole ID ("H7" → 7). Scene-picking (renderer/Pickable.ts)
+ * tags every pickable entity with a numeric id regardless of kind; holes are the one
+ * kind whose game-facing ID is a string, so renderer/UI code that needs to resolve a
+ * pick back to a DrillHole matches on this instead. Safe for any ID this module
+ * generates — addHole/createGridPlan always produce "H" + the counter value.
+ */
+export function holeNumericId(holeId: string): number {
+  return parseInt(holeId.slice(1), 10);
+}
+
 export interface DigVoxelResult {
   success: boolean;
   /** Highest solid Y in the column after digging; -1 if the column is now empty. */

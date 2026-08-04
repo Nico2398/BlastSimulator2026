@@ -84,6 +84,14 @@ describe('EntityHighlight', () => {
     highlight.dispose();
   });
 
+  it('shows a ring for a hole selection without throwing', () => {
+    const scene = new THREE.Scene();
+    const highlight = new EntityHighlight(scene);
+    expect(() => highlight.show(new THREE.Vector3(3, 0, 3), 'hole')).not.toThrow();
+    expect(highlight.visible).toBe(true);
+    highlight.dispose();
+  });
+
   it('an explicit radius overrides the per-kind default', () => {
     const scene = new THREE.Scene();
     const highlight = new EntityHighlight(scene);

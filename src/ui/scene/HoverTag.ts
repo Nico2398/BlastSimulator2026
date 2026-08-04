@@ -10,6 +10,7 @@ import { el } from '../dom.js';
 import { iconEl, type IconName } from '../icons.js';
 import type { GameState } from '../../core/state/GameState.js';
 import { findSurveyForColumn, isSurveyStale } from '../../core/mining/SurveyCalc.js';
+import { holeNumericId } from '../../core/mining/DrillPlan.js';
 import type { PickResult } from './ScenePicking.js';
 
 const ROLE_ICON: Record<string, IconName> = {
@@ -115,6 +116,12 @@ export class HoverTag {
       }
       case 'fragment':
         return this.row('rock', t('shell.hovertag.fragment', { id: entity.id }));
+      case 'hole': {
+        const hole = state.drillHoles.find(h => holeNumericId(h.id) === entity.id);
+        if (!hole) return null;
+        const delay = state.sequenceDelays[hole.id];
+        return this.row('blast', hole.id, delay !== undefined ? `${hole.depth}m · +${delay}ms` : `${hole.depth}m`);
+      }
     }
   }
 

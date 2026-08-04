@@ -7,6 +7,7 @@ import { placeBuilding } from '../../../../src/core/entities/Building.js';
 import { purchaseVehicle } from '../../../../src/core/entities/Vehicle.js';
 import { hireEmployee } from '../../../../src/core/entities/Employee.js';
 import { Random } from '../../../../src/core/math/Random.js';
+import { addHole, holeNumericId } from '../../../../src/core/mining/DrillPlan.js';
 import type { EntityPick } from '../../../../src/ui/scene/ScenePicking.js';
 
 function makeState() {
@@ -79,6 +80,37 @@ describe('SelectionBar', () => {
   it('hides when the shown entity no longer exists in state', () => {
     const { bar, root } = makeBar();
     bar.show(entity('employee', 9999), makeState());
+    expect(root.style.display).toBe('none');
+  });
+
+  it('shows hole id, depth, and sequence delay, and the Focus action', () => {
+    const { bar, root } = makeBar();
+    const state = makeState();
+    const hole = addHole(state.drillHoles, 10, 10, 8, 0.15);
+    state.sequenceDelays[hole.id] = 25;
+
+    bar.show(entity('hole', holeNumericId(hole.id)), state);
+    expect(root.style.display).not.toBe('none');
+    expect(root.textContent).toContain(hole.id);
+    expect(root.textContent).toContain('8m');
+    expect(root.textContent).toContain('+25ms');
+    const labels = Array.from(root.querySelectorAll('button')).map(b => b.textContent);
+    expect(labels.some(l => l?.includes('Focus'))).toBe(true);
+  });
+
+  it('shows hole depth with no delay suffix when the hole is not yet sequenced', () => {
+    const { bar, root } = makeBar();
+    const state = makeState();
+    const hole = addHole(state.drillHoles, 10, 10, 8, 0.15);
+
+    bar.show(entity('hole', holeNumericId(hole.id)), state);
+    expect(root.textContent).toContain('8m');
+    expect(root.textContent).not.toContain('ms');
+  });
+
+  it('hides when the shown hole no longer exists in state', () => {
+    const { bar, root } = makeBar();
+    bar.show(entity('hole', 9999), makeState());
     expect(root.style.display).toBe('none');
   });
 
