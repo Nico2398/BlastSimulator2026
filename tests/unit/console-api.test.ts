@@ -13,7 +13,7 @@ const SERIALIZED_FIELDS = [
   'chargesByHole', 'sequenceDelays', 'finances', 'holeCount', 'chargedCount',
   'sequencedCount', 'buildingCount', 'vehicleCount', 'employeeCount',
   'levelEnded', 'levelEndReason', 'bankrupt', 'revolted', 'ecologicalShutdown',
-  'arrested', 'cash', 'profit',
+  'arrested', 'cash', 'profit', 'muckPile',
 ] as const;
 
 describe('console-api', () => {

@@ -21,6 +21,11 @@ import {
   SPLIT_SCATTER_RADIUS,
   COLLAPSE_STAGGER_PER_METRE,
   PROJECTION_SPEED_THRESHOLD,
+  PILE_COLUMN_AREA,
+  RUBBLE_BULKING,
+  MIN_PILE_RISE,
+  PILE_SPILL_STEPS,
+  PILE_REPOSE_STEP,
 } from '../config/balance.js';
 import type { Projectile } from './ProjectileGrouping.js';
 
@@ -116,14 +121,89 @@ class PileHeights {
     return computeVoxelColumnSurfaceY(this.grid, x, z) + 1;
   }
 
-  /** Place a fragment of this size on the column and return the height it rests at. */
-  place(x: number, z: number, volume: number): number {
-    const base = this.surfaceAt(x, z);
-    // Rubble does not stack as a solid block — a cubic metre of rock spread over
-    // a square metre of ground settles to roughly its own height, and loosely.
-    const rise = Math.max(0.1, Math.cbrt(Math.max(volume, 1e-6)));
-    this.heights.set(this.key(x, z), base + rise);
-    return base + rise / 2;
+  /**
+   * Settle a fragment onto the ground and return the height it rests at.
+   *
+   * A column rises by the volume the fragment actually adds to it, swollen by
+   * the air broken rock traps. Raising it by the fragment's own *size* instead
+   * is what turned a blast's muck into a tower: every chip added half a metre
+   * however little rock it carried, so a few hundred of them stacked tens of
+   * metres into the air.
+   *
+   * Volume spreads over whichever is larger, the column or the fragment's own
+   * footprint. Small rock is loose in a square metre of ground; a boulder wider
+   * than that stands on several columns at once, and charging its whole volume
+   * to one of them would perch it metres up in the air.
+   *
+   * Rock will not pile up past its angle of repose either. A column that has
+   * grown well above its neighbours spills into the lowest one nearby, which is
+   * what spreads muck across the floor of the pit instead of stacking it.
+   */
+  place(x: number, z: number, volume: number): { x: number; z: number; y: number } {
+    const column = { x: Math.floor(x), z: Math.floor(z) };
+    const target = this.spillTarget(column.x, column.z);
+    const base = this.surfaceAt(target.x, target.z);
+    const v = Math.max(volume, 0);
+    // v^(2/3) is the footprint of a roughly cubic lump of that volume.
+    const area = Math.max(PILE_COLUMN_AREA, Math.cbrt(v) ** 2);
+    const rise = Math.max(MIN_PILE_RISE, (v / area) * RUBBLE_BULKING);
+    this.heights.set(this.key(target.x, target.z), base + rise);
+
+    // Rock keeps where it sat inside its column, so rolling a column over does
+    // not snap the muck onto a lattice of column centres.
+    return {
+      x: target.x + (x - column.x),
+      z: target.z + (z - column.z),
+      y: base + rise / 2,
+    };
+  }
+
+  /**
+   * The column this fragment actually comes to rest in.
+   *
+   * Rock rolls off a *heap* that has grown past its angle of repose, one column
+   * at a time, and keeps rolling for as long as the muck beside it is lower. A
+   * single hop is not enough: whenever a lot of rock lands on one spot — most of
+   * all against the site boundary, where everything thrown off site is clamped
+   * into the same corner column — one hop leaves it stacking straight up, and
+   * the heap grows into a tower instead of spreading out over the floor.
+   *
+   * Only muck sheds rock. A fragment that lands on ground no other rock has
+   * reached stays exactly where it fell, however steep the terrain beside it —
+   * otherwise flyrock would trickle back down into the pit it was thrown out of,
+   * and where it actually landed is the whole reason flyrock is dangerous.
+   */
+  private spillTarget(startX: number, startZ: number): { x: number; z: number } {
+    let x = startX;
+    let z = startZ;
+
+    for (let step = 0; step < PILE_SPILL_STEPS; step++) {
+      if (!this.heights.has(this.key(x, z))) break;
+      const here = this.surfaceAt(x, z);
+      let bestX = x;
+      let bestZ = z;
+      let bestHeight = here - PILE_REPOSE_STEP;
+
+      for (let dz = -1; dz <= 1; dz++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (dx === 0 && dz === 0) continue;
+          const nx = x + dx, nz = z + dz;
+          if (!this.grid.containsColumn(nx, nz)) continue;
+          const height = this.surfaceAt(nx, nz);
+          if (height < bestHeight) {
+            bestHeight = height;
+            bestX = nx;
+            bestZ = nz;
+          }
+        }
+      }
+
+      if (bestX === x && bestZ === z) break;
+      x = bestX;
+      z = bestZ;
+    }
+
+    return { x, z };
   }
 
   private key(x: number, z: number): number {
@@ -175,9 +255,12 @@ function traceArc(
     previousT = t;
   }
 
-  // Still airborne at the time limit — set it down where it got to.
+  // Still airborne at the time limit. BALLISTIC_MAX_T is set above the longest
+  // flight the speed cap allows, so this is unreachable for a real arc — but if
+  // it is ever reached the rock is put on the ground where it got to rather than
+  // left hanging in the sky.
   return {
-    landing: previous,
+    landing: vec3(previous.x, piles.surfaceAt(previous.x, previous.z), previous.z),
     timeS: previousT,
     impactSpeed: Math.hypot(velocity.x, velocity.y + GRAVITY * previousT, velocity.z),
   };
@@ -243,8 +326,8 @@ export function resolveFragmentLanding(
       const z = Math.min(grid.maxZ - 1, Math.max(grid.minZ, arc.landing.z + dz));
 
       const from = fragment.position;
-      const restY = piles.place(x, z, fragment.volume);
-      const to = vec3(x, restY, z);
+      const rest = piles.place(x, z, fragment.volume);
+      const to = vec3(rest.x, rest.y, rest.z);
 
       fragment.position = to;
       fragment.isProjection = arc.impactSpeed > PROJECTION_SPEED_THRESHOLD;
@@ -270,8 +353,8 @@ export function resolveFragmentLanding(
 
   for (const fragment of collapsing) {
     const from = fragment.position;
-    const restY = piles.place(from.x, from.z, fragment.volume);
-    const to = vec3(from.x, restY, from.z);
+    const rest = piles.place(from.x, from.z, fragment.volume);
+    const to = vec3(rest.x, rest.y, rest.z);
     const drop = Math.max(0, from.y - to.y);
 
     fragment.position = to;

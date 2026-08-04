@@ -24,6 +24,7 @@ import { getBiome } from './core/world/BiomeCatalog.js';
 import { BASE_TICK_MS } from './core/engine/GameLoop.js';
 import { probeUiActions, probeSelector } from './ui/uiActionProbe.js';
 import { t } from './core/i18n/I18n.js';
+import { summariseMuckPile } from './core/mining/MuckPileSummary.js';
 
 // --- 3D Scene ---
 const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
@@ -304,6 +305,9 @@ window.__gameState = () => {
     arrested: s.arrest.arrested,
     cash: s.cash,
     profit: s.levelStats?.totalWealth ?? 0,
+    muckPile: ctx.grid
+      ? summariseMuckPile(s.logistics.fragments.map(f => f.fragment), ctx.grid)
+      : null,
     lastCommandOutput,
     frameCount: scene.frameCount,
     ctxGridId: ctx.grid?.id ?? null,

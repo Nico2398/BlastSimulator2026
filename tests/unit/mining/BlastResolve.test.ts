@@ -111,17 +111,32 @@ describe('BlastResolve — piling up', () => {
   });
 
   it('a bigger fragment raises the pile more than a small one', () => {
+    // Rise comes from the volume a fragment adds, so a boulder stands higher out
+    // of flat ground than a chip does.
     const small = fragment(0, [5, 9, 5], [0, 0, 0], 0.05);
-    const onTopOfSmall = fragment(1, [5, 11, 5], [0, 0, 0], 0.05);
-    resolve([small, onTopOfSmall]);
-    const smallStep = onTopOfSmall.position.y - small.position.y;
+    const big = fragment(1, [15, 9, 15], [0, 0, 0], 2.0);
+    resolve([small, big]);
 
-    const big = fragment(2, [15, 9, 15], [0, 0, 0], 2.0);
-    const onTopOfBig = fragment(3, [15, 11, 15], [0, 0, 0], 0.05);
-    resolve([big, onTopOfBig]);
-    const bigStep = onTopOfBig.position.y - big.position.y;
+    expect(big.position.y).toBeGreaterThan(small.position.y);
+  });
 
-    expect(bigStep).toBeGreaterThan(smallStep);
+  it('raises a column by the rock it holds, not by the number of pieces', () => {
+    // 40 chips of 0.1 m³ is 4 m³ of rock; bulked, that is a few metres of muck.
+    // Raising the column per *piece* instead is what once stacked gravel into a
+    // tower tens of metres tall.
+    const chips = Array.from({ length: 40 }, (_, i) => fragment(i, [10, 8 + i * 0.01, 10], [0, 0, 0], 0.1));
+    resolve(chips, flatGround(40, 4));
+
+    const top = Math.max(...chips.map(f => f.position.y));
+    expect(top - 5).toBeLessThan(8);
+  });
+
+  it('spreads a heap sideways once it passes its angle of repose', () => {
+    const many = Array.from({ length: 60 }, (_, i) => fragment(i, [20, 10 + i * 0.01, 20], [0, 0, 0], 0.3));
+    resolve(many, flatGround(40, 4));
+
+    const columns = new Set(many.map(f => `${Math.floor(f.position.x)},${Math.floor(f.position.z)}`));
+    expect(columns.size).toBeGreaterThan(1);
   });
 
   it('leaves rock in different columns at the same height on flat ground', () => {
@@ -184,6 +199,17 @@ describe('BlastResolve — rock that is thrown', () => {
     expect(flights[0]!.thrown).toBe(true);
     expect(flights[0]!.durationS).toBeGreaterThan(0.5);
     expect(flights[0]!.impactSpeed).toBeGreaterThan(0);
+  });
+
+  it('lands rock fired straight up at the speed cap instead of abandoning it in the sky', () => {
+    // 80 m/s straight up is 16.3 s in the air — longer than the arc tracer used
+    // to follow, which left the fastest rock hanging where it ran out of time.
+    const f = fragment(0, [10, 8, 10], [0, 80, 0]);
+    const grid = flatGround(20, 4);
+    const { flights } = resolveFragmentLanding([f], groupProjectiles([f]), grid);
+
+    expect(flights[0]!.durationS).toBeGreaterThan(16);
+    expect(f.position.y).toBeLessThan(7);
   });
 
   it('never throws rock outside the world', () => {

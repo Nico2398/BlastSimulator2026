@@ -312,9 +312,12 @@ export const PROJECTILE_GROUP_DIR_COS = 0.8;
 export const PROJECTILE_GROUP_SPEED_TOL = 0.35;
 
 /** Time step (seconds) when following a projectile's arc to the ground, and the
- *  longest flight worth tracing before setting the rock down where it got to. */
+ *  longest flight worth tracing before setting the rock down where it got to.
+ *  The limit has to clear the slowest possible flight or fast rock is abandoned
+ *  mid-arc: straight up at MAX_PROJECTION_VELOCITY takes 16.3 s just to come
+ *  back to the height it left, plus the fall into the pit below that. */
 export const BALLISTIC_SAMPLE_DT = 0.05;
-export const BALLISTIC_MAX_T = 12;
+export const BALLISTIC_MAX_T = 30;
 
 /** How widely a landed projectile's fragments scatter around its impact point,
  *  scaled by its mass. Without this a grouped projectile would drop its whole
@@ -325,6 +328,34 @@ export const SPLIT_SCATTER_RADIUS = 0.8;
  *  fall. Rock low in the face gives way first and the burden follows it down, so
  *  the collapse ripples upward instead of every piece dropping at once. */
 export const COLLAPSE_STAGGER_PER_METRE = 0.04;
+
+// ─── Muck Pile ───────────────────────────────────────────────────────────────
+
+/** Ground area (m²) of one pile column — one voxel footprint. A fragment raises
+ *  the column it lands in by the volume it adds spread over this area, never by
+ *  its own diameter: raising it per *piece* stacks a tower out of gravel. */
+export const PILE_COLUMN_AREA = 1.0;
+
+/** Swell factor of blasted rock. Broken rock traps air, so a cubic metre of
+ *  solid rock occupies about this much once it is loose on the ground. */
+export const RUBBLE_BULKING = 1.4;
+
+/** Smallest height (metres) a fragment adds to its column, so that resting rock
+ *  is never buried inside the pile it just landed on. */
+export const MIN_PILE_RISE = 0.05;
+
+/** How many columns a fragment may roll down before it is left where it is, and
+ *  the slope loose rock holds before it rolls at all — 0.7 m per metre is about
+ *  35 degrees, the angle of repose of muck. Rock rolls one column at a time and
+ *  keeps going while the ground beside it is lower, which is what stops a heap
+ *  from growing into a tower where a lot of rock lands on one spot. */
+export const PILE_SPILL_STEPS = 24;
+export const PILE_REPOSE_STEP = 0.7;
+
+/** How far (metres) a settled fragment's underside may sit above the ground
+ *  before it counts as floating. Loose rock perches on the pieces below it, so a
+ *  little clearance is normal; a metre of it is a bug. */
+export const FLOATING_FRAGMENT_CLEARANCE = 1.0;
 
 /** How far rock may be thrown (metres) before a blast counts as bad, and as
  *  catastrophic. Distance rather than speed is what matters to the player: rock

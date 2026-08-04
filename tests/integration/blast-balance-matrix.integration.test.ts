@@ -12,6 +12,7 @@ import { batchCharge } from '../../src/core/mining/ChargePlan.js';
 import { autoVPattern } from '../../src/core/mining/Sequence.js';
 import { assembleBlastPlan } from '../../src/core/mining/BlastPlan.js';
 import { executeBlast, type BlastResult } from '../../src/core/mining/BlastExecution.js';
+import { summariseMuckPile } from '../../src/core/mining/MuckPileSummary.js';
 
 interface Shot {
   rock?: string;
@@ -43,6 +44,11 @@ function bench(rock: string): VoxelGrid {
 }
 
 function fire(shot: Shot): BlastResult {
+  return fireOnto(shot).result;
+}
+
+/** As `fire`, but hands back the ground the rock landed on too. */
+function fireOnto(shot: Shot): { result: BlastResult; grid: VoxelGrid } {
   const {
     rock = 'molite', explosive = 'boomite', kg = 8, stemming = 2,
     spacing = 4, depth = 8, rows = 2, cols = 3,
@@ -58,7 +64,7 @@ function fire(shot: Shot): BlastResult {
 
   const result = executeBlast(plan, grid, []);
   expect(result, 'blast plan was rejected').not.toBeNull();
-  return result!;
+  return { result: result!, grid };
 }
 
 const meanFragmentSize = (r: BlastResult): number =>
@@ -174,6 +180,18 @@ describe('Blast balance — the pipeline stays coherent', () => {
   it('gives every fragment a flight', () => {
     const r = fire({ kg: 8 });
     expect(r.flights.length).toBe(r.fragmentCount);
+  });
+
+  it('leaves no rock hanging in the air, however hard it was thrown', () => {
+    // The one failure the other channels cannot see: a fragment whose resting
+    // place has nothing under it. It reads as a floating boulder on screen and
+    // as a perfectly ordinary blast in every number the report carries.
+    for (const shot of [{ kg: 8 }, { kg: 8, stemming: 0 }, { kg: 20, stemming: 0, explosive: 'dynatomics' }]) {
+      const { result, grid } = fireOnto(shot);
+      const pile = summariseMuckPile(result.fragments, grid);
+
+      expect(pile.floating, `${JSON.stringify(shot)} left ${pile.floating} fragments airborne`).toBe(0);
+    }
   });
 
   it('is reproducible — the same plan on the same rock blasts the same way', () => {
