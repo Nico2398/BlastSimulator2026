@@ -312,6 +312,10 @@
           "selector": "#bs-build-panel [data-build-type=\"freight_warehouse\"] .bs-build-buy-btn"
         },
         {
+          "do": "zoomOut",
+          "note": "the camera is still framed on the blast site from the earlier steps — the warehouse region sits on the opposite side of the map, so it needs to actually be on screen before it can be clicked"
+        },
+        {
           "do": "pickTile",
           "x": 4,
           "z": 4

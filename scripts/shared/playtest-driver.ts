@@ -205,6 +205,20 @@ export async function runAction(page: Page, action: PlayerAction): Promise<void>
       await page.mouse.click((viewport?.width ?? 1280) / 2, (viewport?.height ?? 720) / 2);
       break;
     }
+    case 'zoomOut': {
+      const centerX = (page.viewport()?.width ?? 1280) / 2;
+      const centerY = (page.viewport()?.height ?? 720) / 2;
+      await page.mouse.move(centerX, centerY);
+      // Real wheel events over the canvas — same control a player scrolls,
+      // positive deltaY zooms out per CameraController.onWheel.
+      for (let i = 0; i < (action.ticks ?? 25); i++) {
+        await page.mouse.wheel({ deltaY: 100 });
+      }
+      // Matrices refreshed like clickEntity's camera move above — the
+      // following pickTile/dragTiles raycasts against this new framing.
+      await page.evaluate(() => (window as unknown as { __renderFrame?: () => void }).__renderFrame?.());
+      break;
+    }
     case 'awaitUsable': {
       await requireUsable(page, action.selector, action.timeoutMs ?? DEFAULT_TIMEOUT_MS);
       break;

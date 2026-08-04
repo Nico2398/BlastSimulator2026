@@ -29,6 +29,15 @@ export type PlayerAction =
    * produced, and the driver looks up its current position itself.
    */
   | { do: 'clickEntity'; kind: 'building' | 'vehicle' | 'employee' | 'fragment'; id: number; distance?: number }
+  /**
+   * Scroll the wheel out N ticks (design doc: always available, even while a
+   * placement tool is armed). P3's in-scene picker only accepts a click on a
+   * tile actually on screen — unlike the retired 2D picker, which showed the
+   * whole site regardless of the 3D camera. A beat whose target tile isn't
+   * near wherever the camera last looked needs this before pickTile/
+   * dragTiles, the same way a real player would zoom out to find their spot.
+   */
+  | { do: 'zoomOut'; ticks?: number }
   /** Wait for a selector to exist and be usable. */
   | { do: 'awaitUsable'; selector: string; timeoutMs?: number }
   /**
