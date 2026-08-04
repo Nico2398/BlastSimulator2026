@@ -220,6 +220,20 @@ export async function runAction(page: Page, action: PlayerAction): Promise<void>
             describeAvailable(await probe(page)),
           );
         }
+        // The harness navigates with ?scenarioMode=1, which turns off the
+        // page's own automatic clock (main.ts) so scenario/playtest runs stay
+        // deterministic. A step whose completion depends on time passing — a
+        // driver walking to board a vehicle, queued work resolving — would
+        // otherwise wait here until timeout no matter how long the deadline,
+        // since nothing on the page ever ticks it. Advance one tick per poll,
+        // never a bulk jump: a step that only deadlocks under gradual
+        // progression (the failure mode this action exists to catch) still
+        // fails instead of a single large `tick N` skipping over it. Harmless
+        // when the target step resolves synchronously — the loop exits above
+        // before this ever runs.
+        await page.evaluate(() => (window as unknown as {
+          __gameConsole: (c: string) => unknown;
+        }).__gameConsole('tick 1'));
         await new Promise(r => setTimeout(r, 200));
       }
       break;
