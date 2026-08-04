@@ -56,8 +56,14 @@ const selectionBar = new SelectionBar(uiContainer);
 const placementController = new PlacementController(canvas, scene.camera, gameRenderer, scene.cameraController);
 const selectionOverlay = new SelectionOverlay(scene.scene, (x, z) => gameRenderer.surfaceYAt(x, z));
 const paramStrip = new ParamStrip(uiContainer);
-// Entity hover/select would otherwise fight the placement tool for the same clicks.
-placementController.setArmedStateHandler((armed) => scenePicking.setEnabled(!armed));
+placementController.setArmedStateHandler((armed) => {
+  // Entity hover/select would otherwise fight the placement tool for the same clicks.
+  scenePicking.setEnabled(!armed);
+  // The canvas itself is always on screen, armed or not — tutorialStages.ts's
+  // picker-canvas stage target needs a signal that actually means "the tool
+  // is ready for a tile click now," not "the canvas element exists."
+  document.body.classList.toggle('bs-placement-armed', armed);
+});
 // ParamStrip only renders what it's told; pressing its own CONFIRM/ESC buttons
 // has to reach back into the controller that armed it.
 paramStrip.setConfirmHandler(() => placementController.confirm());
@@ -492,8 +498,14 @@ window.__placement = {
   cancel: () => placementController.cancel(),
 };
 window.__worldToScreen = (x, z) => {
-  const y = gameRenderer.surfaceYAt(x, z);
-  const ndc = scene.cameraController.projectToNDC(x, y, z);
+  // Centre of the tile, not its corner — a ray fired back from a
+  // corner-projected pixel can land on a neighbouring tile instead (surface
+  // height varies fastest near tile edges), same reasoning the retired 2D
+  // picker's tileToPoint centred on for the flat-canvas case.
+  const cx = x + 0.5;
+  const cz = z + 0.5;
+  const y = gameRenderer.surfaceYAt(cx, cz);
+  const ndc = scene.cameraController.projectToNDC(cx, y, cz);
   const rect = canvas.getBoundingClientRect();
   return {
     px: rect.left + (ndc.x * 0.5 + 0.5) * rect.width,

@@ -35,10 +35,15 @@ export interface TutorialStage {
 }
 
 // P3 retired the 2D picker: dragging/clicking now happens directly on the
-// game canvas, and it's never gated by the tutorial rail (it's neither a
-// button, select, nor input) — so this is purely the highlight target, not
-// a functional lock the way the old picker canvas was.
-const PICKER_CANVAS = '#game-canvas';
+// game canvas, which is always on screen whether or not the tool is armed —
+// unlike the old picker canvas, whose mere existence in the DOM meant a
+// picker was actually open. Gated on the body class PlacementController's
+// armed-state handler toggles, so "reachable" still means "ready for a tile
+// click," not just "the canvas element exists." Not a functional lock
+// either way — the canvas is neither a button, select, nor input, so the
+// tutorial rail's CSS block never touched it — purely resolveStageIndex's
+// signal for when to advance past "open the panel" / "press Run".
+const PICKER_CANVAS = 'body.bs-placement-armed #game-canvas';
 const PICKER_CONFIRM = '#bs-tile-select-confirm';
 
 /** Pick a tile, then confirm — the shared tail of every placement step. */

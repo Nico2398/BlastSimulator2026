@@ -43,6 +43,7 @@ function state(): GameState {
 
 beforeEach(() => {
   document.body.innerHTML = '';
+  document.body.className = '';
 });
 
 describe('TutorialRails', () => {
@@ -98,6 +99,7 @@ describe('TutorialRails', () => {
     document.body.appendChild(bar);
     withBox(btn);
 
+    document.body.classList.add('bs-placement-armed');
     const canvas = document.createElement('div');
     canvas.id = 'game-canvas';
     document.body.appendChild(canvas);
