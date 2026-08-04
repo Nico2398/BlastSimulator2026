@@ -98,8 +98,14 @@ async function capture(page: Page, shot: Shot, group: string): Promise<Record<st
   if (!shot.keepPlayback) {
     await page.evaluate('window.__skipBlastPlayback && window.__skipBlastPlayback()');
   }
+  // Aimed twice, either side of the wait. A blast rebuilds the terrain on the
+  // next frame and re-frames the view on the site it has just changed, which
+  // lands *after* the first aim and quietly pulls the camera back — so the
+  // before and after shots stop framing the same thing. The second aim is the
+  // one the screenshot gets.
   await aimCamera(page);
   await settle(1200);
+  await aimCamera(page);
 
   const stats = await probe(page);
   await page.screenshot({ path: resolve(OUT, `${group}-${shot.name}.png`) });

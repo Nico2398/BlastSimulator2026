@@ -118,7 +118,24 @@ watches keep the truest trajectories. **Grouping never changes fragment identity
 **Landing** (`BlastResolve.ts`) traces each arc against the terrain in closed form, longest flights
 last, so rock lands on the pile earlier rock has already built. Everything else drops in place,
 lowest first. Rock is clamped to the world; the terrain is cleared *before* landings resolve, so
-fragments fall into the hole the blast just made.
+fragments fall into the hole the blast just made. `BALLISTIC_MAX_T` must stay above the longest
+flight `MAX_PROJECTION_VELOCITY` allows (straight up at the cap is 16.3 s) — below it, the fastest
+rock is abandoned mid-arc.
+
+**The muck pile** is per ground column, and two rules keep it a pile rather than a tower:
+
+- A column rises by the **volume** a fragment adds, bulked by `RUBBLE_BULKING`, spread over the
+  larger of the column or the fragment's own footprint. Never by the fragment's size — that adds
+  the same height for a chip as for a boulder and stacks gravel into a spire.
+- Muck past its angle of repose (`PILE_REPOSE_STEP`) rolls downhill one column at a time. **Only
+  muck sheds rock.** A fragment landing where no other rock has reached stays exactly where it
+  fell, whatever the terrain beside it does — otherwise flyrock trickles back into the pit it was
+  thrown out of, and where flyrock lands is the whole reason it is dangerous.
+
+`MuckPileSummary.summariseMuckPile` reads the settled pile back: size and speed spread, and how
+much rock rests on nothing. Clearance is per column against **the pile beneath**, not the terrain —
+rock stacked in a heap sits metres above the floor and is resting, not floating. Both state bridges
+expose it as `muckPile`, so a browser harness and a headless run read the same numbers.
 
 ## Damage
 
@@ -145,6 +162,12 @@ straight; the vertical is the parabola joining those points in the flight's own 
 gravity, so **the animation cannot end anywhere but the fragment's authoritative position**. For a
 straight drop it reduces to free fall from rest. Skipping playback entirely is always safe.
 
+**A screenshot taken right after a blast is a screenshot of an animation, not of a muck pile.**
+`SceneManager` caps a frame at 0.1 s of animation time, and a frame costs seconds without a GPU, so
+a collapse takes many minutes of wall clock to finish on screen and rock photographs as if it were
+floating. `FragmentAnimator.finish()` — `window.__skipBlastPlayback()` from a harness — puts every
+fragment on its resting place in one write.
+
 ## Software Upgrades (Prediction Tools)
 
 | Tier | Name | Shows |
@@ -164,6 +187,11 @@ preview — never reintroduce a separate approximation.
 - Balance guards live in `tests/integration/blast-balance-matrix.integration.test.ts`. They assert
   *relationships* (more explosive breaks more; tighter spacing gives finer muck; stemming controls
   throw), so retuning constants keeps them meaningful. Run them after touching any constant.
-- Danger is covered by `tests/integration/blast-flyrock-danger.integration.test.ts`.
+- Danger is covered by `tests/integration/blast-flyrock-danger.integration.test.ts`. Anything that
+  moves landed rock after it comes to rest touches this: pulling flyrock a couple of metres back
+  toward the pit is enough to stop an unstemmed blast hurting the crew beside it.
+- `scripts/verify-blast-visual.ts` photographs a blast before, mid-collapse and settled, and dumps
+  the muck pile behind each shot. Its camera looks *into* the site: a blast digs a hole, and from
+  eye level the crater's rim hides everything in it. `setOrbit` takes **degrees**.
 - Design record, including four defects found in the original spec and why each was changed:
   `docs/plans/rock-fragmentation-refactor.md`.

@@ -957,6 +957,58 @@ deleted symbols (`grep` for each deleted constant name → no hits outside git h
 
 ---
 
+### P6 — What the picture showed, and three defects it found — ✅ DONE
+
+P0–P5 all reported green on `static`, `logic` and `scenario`. Then the blast was actually
+photographed, and the settled muck pile turned out to be a column of rock standing in the
+sky. Every defect below is invisible to a test that checks counts and volumes, and obvious
+in one screenshot.
+
+1. **Pile height grew per fragment, not per cubic metre.** `PileHeights.place` raised a
+   column by `cbrt(volume)` — half a metre for a 0.125 m³ chip, however little rock it
+   carried. Fifty of them built a 25 m tower. Rise now comes from the volume actually
+   added, spread over the larger of the column or the fragment's own footprint
+   (`v^(2/3)`); charging a boulder's whole volume to one square metre perched it metres
+   above the pile in the other direction.
+2. **Nothing spread a heap sideways.** Everything thrown off site is clamped to the
+   boundary, so it all landed in the same corner column and stacked straight up — 170
+   fragments, 45 m. Muck now rolls downhill one column at a time while it stands above its
+   angle of repose. **Only muck sheds rock**: a fragment landing where no other rock has
+   reached stays put, whatever the terrain does beside it. Letting rock roll down *natural*
+   ground pulled flyrock back toward the pit it came out of and made an unstemmed blast
+   stop hurting the crew standing beside it — the flyrock danger suite caught that.
+3. **`traceArc` abandoned rock at 12 s.** Straight up at the 80 m/s cap is 16.3 s in the
+   air. `BALLISTIC_MAX_T` now clears the longest flight the cap allows, and the fallback
+   sets rock on the ground rather than leaving it hanging.
+
+**`MuckPileSummary.ts`** reads the settled pile out of the fragment list — size and speed
+spread, and how much rock rests on nothing. Clearance is measured **per column against the
+pile beneath it**, not against the terrain: rock stacked in a heap legitimately sits metres
+above the floor, so measuring against the ground reports a full muck pile as thousands of
+floating boulders. Both state bridges expose it, so a browser harness and a headless run
+read the same numbers, and the balance matrix now fails if a blast leaves rock airborne.
+
+**Two things about the harness itself, both of which produced convincing wrong pictures:**
+
+- **A screenshot of a blast is a screenshot of an animation.** `SceneManager` caps a frame
+  at 0.1 s of animation time and a frame costs ~6 s without a GPU, so a 16 s collapse needs
+  ~17 minutes of wall clock to finish on screen. Every "settled" shot was rock in mid-air.
+  `FragmentAnimator.finish()` (via `window.__skipBlastPlayback()`) puts the collapse on its
+  end in one write — safe by construction, since playback never decided anything.
+- **`setOrbit` takes degrees.** The harness passed radians, so its "low angle" was 0.85°
+  above the horizon and every shot framed the horizon instead of the pit. A blast digs a
+  hole; the camera has to look **into** it, or the crater's own rim hides the result and
+  undisturbed desert reads as "nothing happened".
+
+**Verified:** `static` clean; `logic` 6924 tests / 250 files; `scenario` 111/111; `build`
+clean; `visual` — 7 shots inspected. Before: intact dune, 16 charged holes. In flight: rock
+airborne on its arcs under a dust plume. Settled: a spread heap of boulders in the crater,
+no tower. 3 kg → 3284 fragments, median 0.25 m³, max speed 5.8 m/s, nothing thrown off
+site. 20 kg → 13 863 fragments, median 0.125 m³, median speed 10.8 m/s, muck field several
+times wider. Same 20 kg unstemmed → median speed 34.2 m/s and rock scattered across the
+pit. Wide spacing → median 0.25 m³, twice the tight-spacing fragment, visibly chunkier
+rock. **`floating: 0` in all seven.**
+
 ## 9. Guardrails for the implementing agent
 
 1. **Core purity** (`.claude/rules/core-purity.md`): everything in §A1–A6 lives in
