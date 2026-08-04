@@ -406,6 +406,13 @@
           "selector": "#bs-build-panel .bs-build-ramp-btn"
         },
         {
+          "do": "focusTile",
+          "x": 4,
+          "z": 11,
+          "distance": 40,
+          "note": "centres the camera on the ramp line's midpoint, clear of the placement strip's docked bar, before dragging its two ends"
+        },
+        {
           "do": "dragTiles",
           "x1": 4,
           "z1": 4,
