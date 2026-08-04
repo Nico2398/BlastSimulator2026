@@ -115,6 +115,34 @@ describe('drillPlanCommand — remove subcommand', () => {
   });
 });
 
+describe('drillPlanCommand — clear subcommand', () => {
+  it('empties holes, charges, and sequence delays', () => {
+    const ctx = makeMiningContext();
+    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '2', spacing: '3', depth: '8' });
+    chargeCommand(ctx, [], { hole: '*', explosive: 'boomite', amount: '5kg', stemming: '2m' });
+    sequenceCommand(ctx, ['auto'], {});
+    expect(ctx.state!.drillHoles.length).toBe(2);
+    expect(Object.keys(ctx.state!.chargesByHole).length).toBe(2);
+    expect(Object.keys(ctx.state!.sequenceDelays).length).toBe(2);
+
+    const result = drillPlanCommand(ctx, ['clear'], {});
+
+    expect(result.success).toBe(true);
+    expect(ctx.state!.drillHoles).toEqual([]);
+    expect(ctx.state!.chargesByHole).toEqual({});
+    expect(ctx.state!.sequenceDelays).toEqual({});
+  });
+
+  it('succeeds as a no-op when the plan is already empty', () => {
+    const ctx = makeMiningContext();
+
+    const result = drillPlanCommand(ctx, ['clear'], {});
+
+    expect(result.success).toBe(true);
+    expect(ctx.state!.drillHoles).toEqual([]);
+  });
+});
+
 // ── buy_software tier validation ─────────────────────────────────────────────
 
 describe('buy_software tier validation', () => {

@@ -32,6 +32,7 @@ export const LOCALE_SHARED_VALUE_ALLOWLIST: string[] = [
   'hud.speed_x',           // "{speed}×"
   'ui.employees.task_time', // "{t}t"
   'ui.blast.edit_hole',     // "✏"
+  'ui.blast_workshop.drill.diameter', // "Ø"
 
   // ── Language picker endonyms ──
   'ui.settings.english', // "English"

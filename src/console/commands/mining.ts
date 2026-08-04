@@ -124,6 +124,14 @@ export function drillPlanCommand(
     return { success: true, output: `Added hole ${hole.id} at (${x}, ${z}), depth ${depth}m` };
   }
 
+  if (sub === 'clear') {
+    const clearedCount = ctx.state!.drillHoles.length;
+    ctx.state!.drillHoles = [];
+    ctx.state!.chargesByHole = {};
+    ctx.state!.sequenceDelays = {};
+    return { success: true, output: `Cleared drill plan (${clearedCount} holes)` };
+  }
+
   if (sub === 'remove') {
     const holeSpec = named['hole'] ?? '';
     const holeId = ctx.state!.drillHoles.find(h => h.id === holeSpec)
@@ -150,7 +158,7 @@ export function drillPlanCommand(
     return { success: true, output: `Drill plan (${lines.length} holes):\n${lines.join('\n')}` };
   }
 
-  return { success: false, output: 'Usage: drill_plan grid|add|remove|show [options]' };
+  return { success: false, output: 'Usage: drill_plan grid|add|remove|clear|show [options]' };
 }
 
 // ── Charge commands ──

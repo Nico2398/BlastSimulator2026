@@ -4,7 +4,7 @@
 import { injectStyles } from './styles.js';
 import { injectTokens } from './tokens.js';
 import { registerIcons } from './icons.js';
-import { BlastPlanUI } from './BlastPlanUI.js';
+import { BlastWorkshop } from './panels/BlastWorkshop.js';
 import { ContractUI } from './ContractUI.js';
 import { BuildMenu } from './BuildMenu.js';
 import { VehiclePanel } from './VehiclePanel.js';
@@ -34,7 +34,7 @@ export class UIManager {
   private readonly toasts: Toasts;
   private readonly activityLog: ActivityLog;
   private readonly notificationCenter = new NotificationCenter();
-  private readonly blastUI: BlastPlanUI;
+  private readonly blastUI: BlastWorkshop;
   private readonly contractUI: ContractUI;
   private readonly buildMenu: BuildMenu;
   private readonly vehiclePanel: VehiclePanel;
@@ -83,7 +83,8 @@ export class UIManager {
     this.topBar.setOpenLogHandler(() => this.activityLog.toggle());
 
     // Panels in left column
-    this.blastUI = new BlastPlanUI(leftCol);
+    this.blastUI = new BlastWorkshop(leftCol);
+    this.blastUI.setCloseHandler(() => this.hideAllPanels());
     this.contractUI = new ContractUI(leftCol);
     this.buildMenu = new BuildMenu(leftCol);
     this.vehiclePanel = new VehiclePanel(leftCol);
@@ -227,7 +228,7 @@ export class UIManager {
     this.miniMap.update(state);
 
     // Update active panel
-    if (this.blastUI.visible) this.blastUI.update(state);
+    if (this.blastUI.visible) this.blastUI.update(state, weather);
     if (this.contractUI.visible) this.contractUI.update(state);
     if (this.buildMenu.visible) this.buildMenu.update(state);
     if (this.vehiclePanel.visible) this.vehiclePanel.update(state);
