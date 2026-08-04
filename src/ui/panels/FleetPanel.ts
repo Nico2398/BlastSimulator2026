@@ -1,19 +1,21 @@
 // BlastSimulator2026 — Fleet panel (redesign P6)
 // Traffic advisory banner, then one card per vehicle: name/id/role, status
 // chip, HP gauge, LOAD gauge (haulers only), driver row or licensed-crew
-// picker, HAUL (reused from the existing eligibility cache), SCRAP (confirm,
-// real residual value). Dealership lands in the next task on the same class.
+// picker, HAUL (haulEligibility.ts), SCRAP (confirm, real residual value).
+// DEALERSHIP below the roster: every role/tier with a real stat-multiplier
+// line from VEHICLE_TIER_MULTIPLIERS, dispatching `vehicle buy`.
 
 import { t } from '../../core/i18n/I18n.js';
-import { el, card, button } from '../dom.js';
+import { el, card, button, sectionHeader } from '../dom.js';
 import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import type { GameState } from '../../core/state/GameState.js';
-import type { Vehicle } from '../../core/entities/Vehicle.js';
-import { computeScrapResidualValue } from '../../core/entities/Vehicle.js';
+import type { Vehicle, VehicleRole, VehicleTier } from '../../core/entities/Vehicle.js';
+import { computeScrapResidualValue, getAllVehicleRoles, getVehicleDefByTier } from '../../core/entities/Vehicle.js';
+import { VEHICLE_TIER_MULTIPLIERS } from '../../core/config/balance.js';
 import { computeTrafficAdvisory } from '../../core/events/EventEngine.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
-import { HaulEligibilityCache, makeHaulButton, refreshHaulButtons } from '../vehicleHaulButton.js';
+import { HaulEligibilityCache, makeHaulButton, refreshHaulButtons } from '../haulEligibility.js';
 import { vehicleDisplayName, makeStatusChip, makeHpGauge, makeLoadGauge, makeDriverRow, makeAssignRow } from '../fleetDetailSections.js';
 import type { ConfirmModalConfig } from './ConfirmModal.js';
 import type { CommandResult } from '../../console/ConsoleRunner.js';
@@ -81,11 +83,13 @@ export class FleetPanel {
     if (signature === this.lastSignature) {
       this.refreshDynamic(state);
       refreshHaulButtons(this.bodyEl, state, this.haulCache, this.dispatch);
+      this.refreshDealershipAffordability(state.cash);
       return;
     }
     this.lastSignature = signature;
     this.render(state);
     refreshHaulButtons(this.bodyEl, state, this.haulCache, this.dispatch);
+    this.refreshDealershipAffordability(state.cash);
   }
 
   refreshLocale(): void {
@@ -159,7 +163,57 @@ export class FleetPanel {
     } else {
       for (const v of vehicles) children.push(this.makeVehicleCard(v, state));
     }
+    children.push(sectionHeader(t('ui.fleet.dealership')), ...this.makeDealershipRows(state.cash));
     this.bodyEl.replaceChildren(...children);
+  }
+
+  // ── Dealership ──
+
+  private makeDealershipRows(cash: number): HTMLElement[] {
+    return getAllVehicleRoles().map(role => {
+      const group = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:5px' } });
+      group.appendChild(el('span', { text: t(`vehicle_type.${role}`), attrs: { style: 'font:600 10px/1 var(--bsx-font-ui);letter-spacing:.1em;color:var(--bsx-text-secondary)' } }));
+      const tiers: VehicleTier[] = [1, 2, 3];
+      for (const tier of tiers) group.appendChild(this.makeTierButton(role, tier, cash));
+      return group;
+    });
+  }
+
+  private makeTierButton(role: VehicleRole, tier: VehicleTier, cash: number): HTMLElement {
+    const def = getVehicleDefByTier(role, tier);
+    const m = VEHICLE_TIER_MULTIPLIERS[tier];
+    const btn = el('button', {
+      className: 'bs-fleet-tier-btn',
+      attrs: { style: 'display:flex;align-items:center;gap:9px;padding:9px 11px;border:1px solid var(--bsx-hairline);border-radius:5px;background:var(--bsx-card);cursor:pointer;text-align:left', 'data-role': role, 'data-tier': String(tier) },
+    });
+    const info = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:3px;flex:1;min-width:0' } });
+    info.append(
+      el('span', { text: t(getVehicleDefByTier(role, tier).nameKey), attrs: { style: 'font:600 11px/1 var(--bsx-font-ui)' } }),
+      el('span', {
+        text: t('ui.fleet.tier_stats', { speed: m.speed.toFixed(1), capacity: m.capacity.toFixed(1), work: m.workRate.toFixed(1) }),
+        className: 'bsx-mono',
+        attrs: { style: 'font-size:10px;color:var(--bsx-text-micro)' },
+      }),
+    );
+    const cost = el('span', { text: `$${def.purchaseCost.toLocaleString('en-US')}`, className: 'bsx-mono', attrs: { style: 'font-size:11px;font-weight:600;color:var(--bsx-amber)' } });
+    btn.append(info, cost);
+    this.setTierButtonAffordable(btn, cash >= def.purchaseCost);
+    btn.addEventListener('click', () => this.gameConsole?.(`vehicle buy ${role} tier:${tier}`));
+    return btn;
+  }
+
+  private setTierButtonAffordable(btn: HTMLButtonElement, affordable: boolean): void {
+    btn.disabled = !affordable;
+    btn.style.opacity = affordable ? '1' : '.45';
+    btn.style.cursor = affordable ? 'pointer' : 'not-allowed';
+  }
+
+  private refreshDealershipAffordability(cash: number): void {
+    this.bodyEl.querySelectorAll<HTMLButtonElement>('.bs-fleet-tier-btn').forEach(btn => {
+      const role = btn.dataset['role'] as VehicleRole;
+      const tier = Number(btn.dataset['tier']) as VehicleTier;
+      this.setTierButtonAffordable(btn, cash >= getVehicleDefByTier(role, tier).purchaseCost);
+    });
   }
 
   private makeVehicleCard(v: Vehicle, state: GameState): HTMLElement {
@@ -188,6 +242,7 @@ export class FleetPanel {
     );
 
     const actions = el('div', { attrs: { style: 'display:flex;gap:6px' } });
+    actions.dataset['haulSlot'] = String(v.id);
     const haulBtn = makeHaulButton(v, this.haulCache, this.dispatch);
     if (haulBtn) actions.appendChild(haulBtn);
     const scrapBtn = button('danger', '', { icon: 'trash' });

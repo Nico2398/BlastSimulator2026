@@ -64,6 +64,12 @@ describe('FleetPanel', () => {
     expect(text).toContain('Debris Hauler');
   });
 
+  it('shows no Haul button for a debris_hauler with nothing reachable to haul (haulEligibility.ts, real eligibility check)', () => {
+    const { panel } = makePanel();
+    panel.update(makeState([makeVehicle({ id: 5, type: 'debris_hauler', driverId: 1 })], [makeEmployee({ id: 1 })]));
+    expect(panel.root.querySelector('.bs-vehicle-haul-btn')).toBeNull();
+  });
+
   it('shows no traffic banner with no jam', () => {
     const { panel } = makePanel();
     panel.update(makeState([makeVehicle()]));
@@ -166,6 +172,48 @@ describe('FleetPanel', () => {
 
     expect(requestedBody).toContain('$10,000');
     expect(calls).toContain('vehicle scrap 4');
+  });
+
+  // ── DEALERSHIP ──
+
+  it('dealership lists every real role with all three tiers', () => {
+    const { panel } = makePanel();
+    panel.update(makeState([]));
+    const buttons = panel.root.querySelectorAll('.bs-fleet-tier-btn');
+    expect(buttons.length).toBe(5 * 3);
+    expect(panel.root.textContent).toContain('DEALERSHIP');
+    expect(panel.root.textContent).toContain('Dumpster on Wheels');
+    expect(panel.root.textContent).toContain('$25,000');
+  });
+
+  it('a tier button shows the real stat-multiplier line and dispatches vehicle buy on click', () => {
+    const { panel } = makePanel();
+    const calls: string[] = [];
+    panel.setGameConsole(cmd => { calls.push(cmd); return { success: true, output: '' }; });
+    const state = makeState([]);
+    state.cash = 500000;
+    panel.update(state);
+
+    const tier2Btn = [...panel.root.querySelectorAll<HTMLButtonElement>('.bs-fleet-tier-btn')]
+      .find(b => b.dataset['role'] === 'debris_hauler' && b.dataset['tier'] === '2')!;
+    expect(tier2Btn.textContent).toContain('1.3');
+    expect(tier2Btn.disabled).toBe(false);
+    tier2Btn.click();
+    expect(calls).toContain('vehicle buy debris_hauler tier:2');
+  });
+
+  it('tier buttons are disabled when unaffordable and re-enable as cash changes without a fleet change', () => {
+    const { panel } = makePanel();
+    const state = makeState([]);
+    state.cash = 0;
+    panel.update(state);
+    const tier1Btn = () => [...panel.root.querySelectorAll<HTMLButtonElement>('.bs-fleet-tier-btn')]
+      .find(b => b.dataset['role'] === 'debris_hauler' && b.dataset['tier'] === '1')!;
+    expect(tier1Btn().disabled).toBe(true);
+
+    state.cash = 100000;
+    panel.update(state);
+    expect(tier1Btn().disabled).toBe(false);
   });
 
   it('refreshLocale() re-renders the title and does not throw', () => {

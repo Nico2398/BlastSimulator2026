@@ -2567,6 +2567,8 @@
   "ui.fleet.scrap": "Scrap",
   "ui.fleet.scrap_confirm_title": "Scrap vehicle?",
   "ui.fleet.scrap_confirm_body": "{name} will be sold for parts for ${amount}. This cannot be undone.",
+  "ui.fleet.dealership": "DEALERSHIP",
+  "ui.fleet.tier_stats": "{speed}× spd · {capacity}× cap · {work}× work",
   "ui.event.title": "Event",
   "ui.event.choose": "Choose your response:",
   "ui.event.dismiss": "Dismiss",

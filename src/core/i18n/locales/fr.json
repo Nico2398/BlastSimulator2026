@@ -2567,6 +2567,8 @@
   "ui.fleet.scrap": "Détruire",
   "ui.fleet.scrap_confirm_title": "Détruire ce véhicule ?",
   "ui.fleet.scrap_confirm_body": "{name} sera vendu pour pièces pour {amount} $. Cette action est irréversible.",
+  "ui.fleet.dealership": "CONCESSION",
+  "ui.fleet.tier_stats": "vit {speed}× · cap {capacity}× · trav {work}×",
   "ui.event.title": "Événement",
   "ui.event.choose": "Choisissez votre réponse :",
   "ui.event.dismiss": "Ignorer",
