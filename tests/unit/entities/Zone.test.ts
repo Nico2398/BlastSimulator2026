@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   clearZone,
   isZoneClear,
+  isInZone,
+  computeDangerZone,
   type ZoneBounds,
 } from '../../../src/core/entities/Zone.js';
 import { createVehicleState, purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
@@ -93,5 +95,26 @@ describe('Zone clearing and evacuation', () => {
     // No casualties — everyone was evacuated
     const casualties = accidents.filter(a => a.type === 'death' || a.type === 'injury');
     expect(casualties.length).toBe(0);
+  });
+});
+
+describe('computeDangerZone', () => {
+  it('returns null for an empty hole list — nothing to bound', () => {
+    expect(computeDangerZone([], 15)).toBeNull();
+  });
+
+  it('pads a single hole\'s position by the margin on every side', () => {
+    expect(computeDangerZone([{ x: 20, z: 20 }], 15)).toEqual({ x1: 5, z1: 5, x2: 35, z2: 35 });
+  });
+
+  it('bounds multiple holes by their min/max, then pads', () => {
+    const holes = [{ x: 10, z: 10 }, { x: 25, z: 12 }, { x: 15, z: 30 }];
+    expect(computeDangerZone(holes, 5)).toEqual({ x1: 5, z1: 5, x2: 30, z2: 35 });
+  });
+
+  it('the result is usable directly with isInZone', () => {
+    const zone = computeDangerZone([{ x: 20, z: 20 }], 15)!;
+    expect(isInZone(20, 20, zone)).toBe(true);
+    expect(isInZone(4, 20, zone)).toBe(false); // just outside the padded box
   });
 });

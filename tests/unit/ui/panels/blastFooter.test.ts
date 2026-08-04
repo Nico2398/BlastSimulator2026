@@ -9,13 +9,21 @@ function makeState() {
   return createGame({ seed: 1, mineType: 'desert' });
 }
 
-function makeFooter(): { footer: BlastFooter; container: HTMLElement; gameConsole: ReturnType<typeof vi.fn> } {
+function makeFooter(): { footer: BlastFooter; container: HTMLElement; fireRequested: ReturnType<typeof vi.fn> } {
   const container = document.createElement('div');
   document.body.appendChild(container);
   const footer = new BlastFooter(container);
-  const gameConsole = vi.fn().mockReturnValue({ success: true, output: '' });
-  footer.setGameConsole(gameConsole);
-  return { footer, container, gameConsole };
+  const fireRequested = vi.fn();
+  footer.setFireRequestedHandler(fireRequested);
+  return { footer, container, fireRequested };
+}
+
+function chargeAndSequence(state: ReturnType<typeof makeState>) {
+  const hole = addHole(state.drillHoles, 10, 10, 8, 0.15);
+  const chargeResult = createCharge('boomite', 5, 2, hole.depth);
+  if ('charge' in chargeResult) state.chargesByHole[hole.id] = chargeResult.charge;
+  state.sequenceDelays[hole.id] = 0;
+  return hole;
 }
 
 beforeEach(() => {
@@ -62,10 +70,7 @@ describe('BlastFooter', () => {
   it('FIRE enables once every hole is charged and sequenced', () => {
     const { footer } = makeFooter();
     const state = makeState();
-    const hole = addHole(state.drillHoles, 10, 10, 8, 0.15);
-    const chargeResult = createCharge('boomite', 5, 2, hole.depth);
-    if ('charge' in chargeResult) state.chargesByHole[hole.id] = chargeResult.charge;
-    state.sequenceDelays[hole.id] = 0;
+    chargeAndSequence(state);
 
     footer.update(state);
 
@@ -73,51 +78,24 @@ describe('BlastFooter', () => {
     expect(fireBtn.disabled).toBe(false);
   });
 
-  it('clicking FIRE while disabled does not open the confirm dialog', () => {
-    const { footer } = makeFooter();
+  it('clicking FIRE while disabled does not request a preflight confirm', () => {
+    const { footer, fireRequested } = makeFooter();
     footer.update(makeState());
 
     (footer.root.querySelector('#bs-blast-fire') as HTMLButtonElement).click();
 
-    expect(document.body.querySelector('.bs-confirm-overlay')).toBeNull();
+    expect(fireRequested).not.toHaveBeenCalled();
   });
 
-  it('clicking FIRE while enabled opens a confirm dialog; Yes dispatches blast', () => {
-    const { footer, gameConsole } = makeFooter();
+  it('clicking FIRE while enabled requests a preflight confirm, without dispatching blast itself', () => {
+    const { footer, fireRequested } = makeFooter();
     const state = makeState();
-    const hole = addHole(state.drillHoles, 10, 10, 8, 0.15);
-    const chargeResult = createCharge('boomite', 5, 2, hole.depth);
-    if ('charge' in chargeResult) state.chargesByHole[hole.id] = chargeResult.charge;
-    state.sequenceDelays[hole.id] = 0;
+    chargeAndSequence(state);
     footer.update(state);
 
     (footer.root.querySelector('#bs-blast-fire') as HTMLButtonElement).click();
-    const overlay = document.body.querySelector('.bs-confirm-overlay');
-    expect(overlay).not.toBeNull();
 
-    const yesBtn = overlay!.querySelector('.bs-btn-danger') as HTMLButtonElement;
-    yesBtn.click();
-
-    expect(gameConsole).toHaveBeenCalledWith('blast');
-    expect(document.body.querySelector('.bs-confirm-overlay')).toBeNull();
-  });
-
-  it('clicking No in the confirm dialog dispatches nothing and closes it', () => {
-    const { footer, gameConsole } = makeFooter();
-    const state = makeState();
-    const hole = addHole(state.drillHoles, 10, 10, 8, 0.15);
-    const chargeResult = createCharge('boomite', 5, 2, hole.depth);
-    if ('charge' in chargeResult) state.chargesByHole[hole.id] = chargeResult.charge;
-    state.sequenceDelays[hole.id] = 0;
-    footer.update(state);
-    (footer.root.querySelector('#bs-blast-fire') as HTMLButtonElement).click();
-
-    const overlay = document.body.querySelector('.bs-confirm-overlay') as HTMLElement;
-    const noBtn = Array.from(overlay.querySelectorAll('button')).find(b => !b.classList.contains('bs-btn-danger')) as HTMLButtonElement;
-    noBtn.click();
-
-    expect(gameConsole).not.toHaveBeenCalled();
-    expect(document.body.querySelector('.bs-confirm-overlay')).toBeNull();
+    expect(fireRequested).toHaveBeenCalledTimes(1);
   });
 
   it('dispose() removes the footer from the DOM', () => {

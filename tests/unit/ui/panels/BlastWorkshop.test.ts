@@ -118,7 +118,7 @@ describe('BlastWorkshop', () => {
     workshop.update(state, 'sunny');
 
     const previewText = workshop.root.textContent ?? '';
-    expect(previewText).toContain('coming soon'); // Preview's stub body stayed visible
+    expect(previewText).toContain('Analysis Suite'); // Preview's own body stayed visible, Preview-specific text
   });
 
   it('reopening the panel resets auto-advance even after a manual tab pick', () => {

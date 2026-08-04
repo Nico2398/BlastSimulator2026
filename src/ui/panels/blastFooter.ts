@@ -1,9 +1,9 @@
 // BlastSimulator2026 — Blast Workshop sticky footer (redesign P4)
 // Shared chrome under every step: PLAN COST / EST. ORE VALUE / MARGIN, then
-// the FIRE button. Fire dispatches `blast` behind a lightweight confirm —
-// the richer PreflightModal (danger-zone occupants, tier-aware predictions)
-// replaces this confirm in a later phase; this is the minimum that keeps the
-// tutorial's blast-confirm step satisfiable in the meantime.
+// the FIRE button. FIRE no longer dispatches `blast` itself or builds its own
+// confirm dialog — it just asks BlastWorkshop (and, above that, UIManager) to
+// open PreflightModal, which owns the real confirm gate and the `blast`
+// dispatch behind DETONATE.
 
 import { t } from '../../core/i18n/I18n.js';
 import { el } from '../dom.js';
@@ -11,12 +11,9 @@ import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import type { GameState } from '../../core/state/GameState.js';
-import type { CommandResult } from '../../console/ConsoleRunner.js';
 import { assembleBlastPlan, validateBlastPlan } from '../../core/mining/BlastPlan.js';
 import { estimateBlastOreValue } from '../../core/mining/BlastValueEstimate.js';
 import { getExplosive } from '../../core/world/ExplosiveCatalog.js';
-
-export type GameConsoleFn = (cmd: string) => CommandResult;
 
 export class BlastFooter {
   private readonly el: HTMLElement;
@@ -25,7 +22,7 @@ export class BlastFooter {
   private readonly marginEl: HTMLElement;
   private readonly fireBtn: HTMLButtonElement;
   private readonly reasonEl: HTMLElement;
-  private gameConsole?: GameConsoleFn;
+  private onFireRequested?: () => void;
   private lastSignature = '';
   private readonly locale = new LocaleTextRegistry();
 
@@ -70,7 +67,7 @@ export class BlastFooter {
     this.fireBtn.style.cssText = 'height:42px;font:800 13px/1 var(--bsx-font-ui);letter-spacing:.2em;gap:9px';
     this.fireBtn.dataset['action'] = 'execute';
     this.fireBtn.append(iconEl('blast', 17), this.locale.bindText(el('span'), 'ui.blast_workshop.footer.fire'));
-    this.fireBtn.addEventListener('click', () => this.confirmFire());
+    this.fireBtn.addEventListener('click', () => { if (!this.fireBtn.disabled) this.onFireRequested?.(); });
 
     this.reasonEl = el('div');
     this.reasonEl.style.cssText = 'display:none;gap:6px;align-items:flex-start';
@@ -81,7 +78,7 @@ export class BlastFooter {
 
   get root(): HTMLElement { return this.el; }
 
-  setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
+  setFireRequestedHandler(cb: () => void): void { this.onFireRequested = cb; }
 
   update(state: GameState): void {
     const plan = assembleBlastPlan(state.drillHoles, state.chargesByHole, state.sequenceDelays);
@@ -127,28 +124,4 @@ export class BlastFooter {
   }
 
   dispose(): void { this.el.remove(); }
-
-  /**
-   * Legacy `.bs-confirm-overlay`/`.bs-btn` classes, not the new `bsx-` system —
-   * matches BlastPlanUI's old confirmBlast() exactly so the tutorial rail's
-   * existing target (`.bs-confirm-overlay:not(#bs-event-dialog) .bs-btn-danger`)
-   * keeps resolving. Interim: the richer PreflightModal (§P4/Fire step) replaces
-   * this whole dialog with a bsx-styled one.
-   */
-  private confirmFire(): void {
-    if (this.fireBtn.disabled) return;
-    const overlay = el('div', { className: 'bs-confirm-overlay' });
-    const box = el('div', { className: 'bs-confirm-box' });
-    const msg = el('p', { text: t('ui.blast_workshop.footer.confirm') });
-    const yesBtn = el('button', { className: 'bs-btn bs-btn-danger', text: t('ui.blast_workshop.footer.confirm_yes') });
-    yesBtn.addEventListener('click', () => {
-      overlay.remove();
-      this.gameConsole?.('blast');
-    });
-    const noBtn = el('button', { className: 'bs-btn', text: t('ui.blast_workshop.footer.confirm_no') });
-    noBtn.addEventListener('click', () => overlay.remove());
-    box.append(msg, yesBtn, noBtn);
-    overlay.appendChild(box);
-    document.body.appendChild(overlay);
-  }
 }

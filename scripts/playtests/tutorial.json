@@ -202,12 +202,16 @@
         },
         {
           "do": "clickLabel",
-          "label": "Fire",
+          "label": "Detonate",
           "region": "confirm"
+        },
+        {
+          "do": "click",
+          "selector": "[data-action=\"report-close\"]"
         }
       ],
       "expect": {
-        "note": "scores step auto-advances, so the tutorial step is checked in the next beat"
+        "note": "Close dismisses BlastReportModal, which auto-opens with the real report right after DETONATE; scores step auto-advances, so the tutorial step is checked in the next beat"
       }
     },
     {

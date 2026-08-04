@@ -5,6 +5,8 @@ import { injectStyles } from './styles.js';
 import { injectTokens } from './tokens.js';
 import { registerIcons } from './icons.js';
 import { BlastWorkshop } from './panels/BlastWorkshop.js';
+import { PreflightModal } from './panels/PreflightModal.js';
+import { BlastReportModal } from './panels/BlastReportModal.js';
 import { ContractUI } from './ContractUI.js';
 import { BuildMenu } from './BuildMenu.js';
 import { VehiclePanel } from './VehiclePanel.js';
@@ -35,6 +37,8 @@ export class UIManager {
   private readonly activityLog: ActivityLog;
   private readonly notificationCenter = new NotificationCenter();
   private readonly blastUI: BlastWorkshop;
+  private readonly preflightModal: PreflightModal;
+  private readonly blastReportModal: BlastReportModal;
   private readonly contractUI: ContractUI;
   private readonly buildMenu: BuildMenu;
   private readonly vehiclePanel: VehiclePanel;
@@ -85,6 +89,11 @@ export class UIManager {
     // Panels in left column
     this.blastUI = new BlastWorkshop(leftCol);
     this.blastUI.setCloseHandler(() => this.hideAllPanels());
+    // Full-screen overlays, not docked panel content — mounted at the root
+    // container like eventDialog, not leftCol.
+    this.preflightModal = new PreflightModal(container);
+    this.blastUI.setFireRequestedHandler(() => this.preflightModal.show());
+    this.blastReportModal = new BlastReportModal(container);
     this.contractUI = new ContractUI(leftCol);
     this.buildMenu = new BuildMenu(leftCol);
     this.vehiclePanel = new VehiclePanel(leftCol);
@@ -105,6 +114,12 @@ export class UIManager {
       if (this.activityLog.visible) { this.activityLog.hide(); return true; }
       return false;
     });
+    // Full-screen modals close before the panel underneath them does.
+    this.escLayers.push(() => {
+      if (this.preflightModal.visible) { this.preflightModal.hide(); return true; }
+      if (this.blastReportModal.visible) { this.blastReportModal.hide(); return true; }
+      return false;
+    });
 
     // A language switch inside the settings panel has to re-render every panel
     // already on screen, then let whoever else is listening (main.ts refreshes
@@ -120,6 +135,7 @@ export class UIManager {
 
   setGameConsole(fn: GameConsoleFn): void {
     this.blastUI.setGameConsole(fn);
+    this.preflightModal.setGameConsole(fn);
     this.contractUI.setGameConsole(fn);
     this.buildMenu.setGameConsole(fn);
     this.vehiclePanel.setGameConsole(fn);
@@ -198,6 +214,8 @@ export class UIManager {
     this.topBar.refreshLocale();
     this.toolRail.refreshLocale();
     this.blastUI.refreshLocale();
+    this.preflightModal.refreshLocale();
+    this.blastReportModal.refreshLocale();
     this.contractUI.refreshLocale();
     this.buildMenu.refreshLocale();
     this.vehiclePanel.refreshLocale();
@@ -229,6 +247,12 @@ export class UIManager {
 
     // Update active panel
     if (this.blastUI.visible) this.blastUI.update(state, weather);
+    // Unconditional, like eventDialog below: each is cheap when not relevant
+    // (PreflightModal no-ops while closed; BlastReportModal no-ops until
+    // lastBlastReport's tick actually changes) and neither's visibility is
+    // tied to blastUI's own, so gating on it here would miss real transitions.
+    this.preflightModal.update(state, weather);
+    this.blastReportModal.update(state);
     if (this.contractUI.visible) this.contractUI.update(state);
     if (this.buildMenu.visible) this.buildMenu.update(state);
     if (this.vehiclePanel.visible) this.vehiclePanel.update(state);
@@ -236,8 +260,13 @@ export class UIManager {
     if (this.surveyUI.visible) this.surveyUI.update(state);
     if (this.settingsMenu.visible) this.settingsMenu.update(state);
 
-    // Event dialog — auto-show when pending event exists, keep open during outcome
-    if (state.events.pendingEvent && !this.eventDialog.visible) {
+    // Event dialog — auto-show when pending event exists, keep open during outcome.
+    // Deferred while BlastReportModal is up: both are auto-triggered (a blast's
+    // scripted follow-up event can land the same tick the report opens), and
+    // eventDialog is mounted after it in the DOM, so it would render on top and
+    // hide the report's own Close button behind it. Re-checked every tick, so
+    // the event opens itself the moment the report is closed.
+    if (state.events.pendingEvent && !this.eventDialog.visible && !this.blastReportModal.visible) {
       this.eventDialog.update(state);
       this.eventDialog.show();
     } else if (this.eventDialog.visible && !this.eventDialog.isShowingOutcome) {
@@ -285,6 +314,8 @@ export class UIManager {
     this.toasts.dispose();
     this.activityLog.dispose();
     this.blastUI.dispose();
+    this.preflightModal.dispose();
+    this.blastReportModal.dispose();
     this.contractUI.dispose();
     this.buildMenu.dispose();
     this.vehiclePanel.dispose();

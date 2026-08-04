@@ -281,6 +281,18 @@ export const COLLISION_DEFLATE_AMOUNT = 0.05;
  *  used by the FragPredict (tier 2) software preview. */
 export const VOXEL_SIZE_CM = 100;
 
+// ─── Danger Zone ──────────────────────────────────────────────────────────────────
+
+/**
+ * Padding (metres) added on every side of a drill plan's hole bounding box to
+ * get a default blast danger zone (Zone.computeDangerZone) — a simplified
+ * stand-in for a true physics-derived exclusion radius (max fragment
+ * projection range depends on charge, rock, and geometry per hole, computed
+ * only after Software preview tier 3). Good enough to warn "these entities
+ * are standing too close," not a guarantee nothing outside it can be hit.
+ */
+export const BLAST_DANGER_MARGIN_M = 15;
+
 // ─── Fragment Velocity Simulation ────────────────────────────────────────────────
 
 /** Decay rate for surface proximity effect based on distance to air voxel. */

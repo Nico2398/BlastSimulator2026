@@ -1,10 +1,11 @@
 // BlastSimulator2026 — Blast Workshop panel (redesign P4)
 // Replaces BlastPlanUI with a 5-step workflow (Drill → Charge → Sequence →
-// Preview → Fire) plus a sticky footer. Drill, Charge, Sequence, and Preview
-// are built to the full design spec (tasks P4/#22-25); Fire's step-specific
-// body is still a placeholder — the tutorial's blast stage doesn't need it,
-// since Fire's own body is separate from the always-visible sticky footer's
-// FIRE button. Task P4/#26 replaces that last stub in place.
+// Preview → Fire) plus a sticky footer, all built to the full design spec
+// (tasks P4/#22-26). Firing is a two-step handoff out of this panel: the
+// footer's FIRE button requests a Preflight confirm (setFireRequestedHandler,
+// wired by UIManager to PreflightModal — a separate top-level overlay, not a
+// child of this panel), and DETONATE there is what actually dispatches
+// `blast`.
 
 import { t } from '../../core/i18n/I18n.js';
 import { el } from '../dom.js';
@@ -137,7 +138,7 @@ export class BlastWorkshop {
     this.chargeStep.setGameConsole(fn);
     this.sequenceStep.setGameConsole(fn);
     this.previewStep.setGameConsole(fn);
-    this.footer.setGameConsole(fn);
+    this.fireStep.setGameConsole(fn);
   }
 
   setPlacementKit(kit: PlacementKit): void {
@@ -145,6 +146,7 @@ export class BlastWorkshop {
   }
 
   setCloseHandler(cb: () => void): void { this.onCloseCb = cb; }
+  setFireRequestedHandler(cb: () => void): void { this.footer.setFireRequestedHandler(cb); }
 
   show(): void {
     this.el.style.display = 'flex';
@@ -166,6 +168,7 @@ export class BlastWorkshop {
     this.chargeStep.update(state, weather);
     this.sequenceStep.update(state);
     this.previewStep.update(state);
+    this.fireStep.update(state, weather);
     this.footer.update(state);
   }
 
@@ -184,6 +187,10 @@ export class BlastWorkshop {
 
   dispose(): void {
     this.drillStep.dispose();
+    this.chargeStep.dispose();
+    this.sequenceStep.dispose();
+    this.previewStep.dispose();
+    this.fireStep.dispose();
     this.footer.dispose();
     this.el.remove();
   }
