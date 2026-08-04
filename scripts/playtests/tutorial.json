@@ -407,17 +407,18 @@
         },
         {
           "do": "focusTile",
-          "x": 4,
-          "z": 11,
+          "x": 10,
+          "z": 20,
           "distance": 40,
           "note": "centres the camera on the ramp line's midpoint, clear of the placement strip's docked bar, before dragging its two ends"
         },
         {
           "do": "dragTiles",
-          "x1": 4,
-          "z1": 4,
-          "x2": 4,
-          "z2": 18
+          "x1": 10,
+          "z1": 15,
+          "x2": 10,
+          "z2": 25,
+          "note": "matches the tutorial's own dynamically-computed hint (CONSOLE EQUIVALENT: build_ramp start:10,15 end:10,25) — the ramp has to land beside the actual pit this run's blast carved at (20,20)-(30,30), not at the old scripted (4,4)-(4,18), which was never adjacent to it and left Confirm permanently disabled"
         },
         {
           "do": "click",
