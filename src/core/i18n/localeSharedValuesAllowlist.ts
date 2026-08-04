@@ -35,6 +35,8 @@ export const LOCALE_SHARED_VALUE_ALLOWLIST: string[] = [
   'ui.contracts.storage_value', // "{used} / {cap} kg"
   'ui.contracts.delivered_line', // "{delivered} / {total} kg"
   'ui.operations.mass_kg', // "{kg} kg"
+  'ui.crew.location_coords', // "({x}, {z})"
+  'ui.crew.skill_xp', // "{xp} / {next} XP" — XP is the same cognate as ui.employees.xp, just embedded in a format string
 
   // ── Language picker endonyms ──
   'ui.settings.english', // "English"
@@ -72,4 +74,6 @@ export const LOCALE_SHARED_VALUE_ALLOWLIST: string[] = [
   'ui.finances.category.mafia', // "Mafia"
   'ui.operations.fragment_count', // "{count} fragments"
   'ui.operations.incidents', // "Incidents"
+  'ui.crew.need_fatigue', // "Fatigue" — same cognate as ui.employees.fatigue/need.fatigue
+  'ui.crew.skill_maxed', // "MAX"
 ];

@@ -784,6 +784,7 @@ export function tickTaskProgress(state: GameState, emp: Employee, emitter?: Even
     completedActionPayload = emp.pendingActionPayload ?? undefined;
     emp.activeActionId = null;
     emp.taskTicksRemaining = null;
+    delete emp.activeTaskTotalTicks;
     emp.activeTaskSkill = null;
     emp.pendingActionType = null;
     emp.pendingActionPayload = null;

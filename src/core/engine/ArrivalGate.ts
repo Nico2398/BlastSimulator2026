@@ -62,6 +62,7 @@ export function tickArrivalGate(state: GameState, emitter?: EventEmitter): Arriv
 
     if (emp.pendingTaskDuration !== null) {
       emp.taskTicksRemaining = emp.pendingTaskDuration;
+      emp.activeTaskTotalTicks = emp.pendingTaskDuration;
       emp.pendingTaskDuration = null;
       // pendingActionType/pendingActionPayload deliberately survive arrival —
       // tickTaskProgress (GameLoop.ts) reads them at actual task completion

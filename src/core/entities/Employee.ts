@@ -110,6 +110,16 @@ export interface Employee {
   /** Ticks remaining on the employee's currently dispatched task, or null if no task is in progress. */
   taskTicksRemaining: number | null;
   /**
+   * Total ticks the in-progress task was assigned at claim (mirrors
+   * taskTicksRemaining's lifecycle: set together on arrival, cleared together
+   * on completion) — the Crew panel's task progress bar needs both the
+   * remaining and the original total to show a real percentage; remaining
+   * alone can only count down. Optional: many existing call sites construct
+   * an Employee directly without it, and old saves predate the field — the
+   * UI omits the progress bar when absent instead of fabricating one.
+   */
+  activeTaskTotalTicks?: number;
+  /**
    * Skill category of the in-progress dispatched task (mirrors taskTicksRemaining
    * lifecycle: set together on claim, cleared together on completion). Null when
    * no task is in progress, or when the in-progress task required no skill.

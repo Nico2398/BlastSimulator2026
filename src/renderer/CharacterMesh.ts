@@ -9,7 +9,9 @@ import type { Employee, EmployeeRole } from '../core/entities/Employee.js';
 import { tagPickable } from './Pickable.js';
 
 // ---------- Role colors (bright, distinct) ----------
-const ROLE_COLORS: Record<EmployeeRole, number> = {
+// Exported for the Crew panel's roster avatars (redesign P6) — same hue as
+// the in-scene character mesh, so a player can match a card to its worker.
+export const ROLE_COLORS: Record<EmployeeRole, number> = {
   driller:  0x2266ff, // blue
   blaster:  0xff4422, // red-orange
   driver:   0xffcc00, // yellow
