@@ -231,6 +231,16 @@ export class GameRenderer {
     this.fragmentAnimator?.finish();
   }
 
+  /** Hold the collapse `t` seconds in, for a harness stepping through it. */
+  seekFragmentPlayback(t: number): void {
+    this.fragmentAnimator?.seek(t);
+  }
+
+  /** How long the last blast's collapse runs for, in seconds. */
+  get fragmentPlaybackDuration(): number {
+    return this.fragmentAnimator?.durationS ?? 0;
+  }
+
   /** Per-frame update — call from the render loop. */
   update(dt: number): void {
     const cam = this.sm.camera;

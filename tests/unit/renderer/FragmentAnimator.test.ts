@@ -136,6 +136,68 @@ describe('FragmentAnimator', () => {
     expect(animator.isPlaying).toBe(true);
   });
 
+  it('shows the collapse at the moment asked for', () => {
+    const { mesh, frames } = recorder();
+    const animator = new FragmentAnimator(mesh);
+    const f = flight({ from: { x: 0, y: 20, z: 0 }, to: { x: 0, y: 0, z: 0 }, durationS: 2 });
+    animator.begin([f]);
+
+    animator.seek(1);
+    const half = frames[frames.length - 1]!.get(0)!;
+
+    expect(half.y).toBeLessThan(20);
+    expect(half.y).toBeGreaterThan(0);
+  });
+
+  it('seeks backward as readily as forward', () => {
+    const { mesh, frames } = recorder();
+    const animator = new FragmentAnimator(mesh);
+    animator.begin([flight({ durationS: 4 })]);
+
+    animator.seek(3);
+    const late = frames[frames.length - 1]!.get(0)!.y;
+    animator.seek(1);
+    const early = frames[frames.length - 1]!.get(0)!.y;
+
+    expect(early).toBeGreaterThan(late);
+  });
+
+  it('clamps a seek to the collapse it is playing', () => {
+    const { mesh, frames } = recorder();
+    const animator = new FragmentAnimator(mesh);
+    const f = flight({ to: { x: 4, y: 3, z: -2 }, durationS: 2 });
+    animator.begin([f]);
+
+    animator.seek(99);
+
+    expect(frames[frames.length - 1]!.get(0)).toEqual(f.to);
+    expect(animator.isPlaying).toBe(false);
+  });
+
+  it('holds a seeked collapse still against the render loop', () => {
+    // A harness stepping through a blast must land on the moments it asked for,
+    // not on whatever the next frame does to them.
+    const { mesh, frames } = recorder();
+    const animator = new FragmentAnimator(mesh);
+    animator.begin([flight({ durationS: 4 })]);
+
+    animator.seek(1);
+    const held = frames[frames.length - 1]!.get(0)!;
+    animator.update(1);
+
+    expect(frames[frames.length - 1]!.get(0)).toEqual(held);
+  });
+
+  it('reports how long the collapse it is playing takes', () => {
+    const { mesh } = recorder();
+    const animator = new FragmentAnimator(mesh);
+
+    expect(animator.durationS).toBe(0);
+    animator.begin([flight({ durationS: 2, delayS: 1.5 })]);
+
+    expect(animator.durationS).toBeCloseTo(3.5, 6);
+  });
+
   it('lands everything at once when told to finish', () => {
     const { mesh, frames } = recorder();
     const animator = new FragmentAnimator(mesh);

@@ -187,6 +187,8 @@ declare global {
     __cameraFocus: (x: number, z: number, distance: number) => void;
     __cameraReset: () => void;
     __skipBlastPlayback: () => void;
+    __seekBlastPlayback: (t: number) => void;
+    __blastPlaybackDuration: () => number;
     __startTutorial: () => void;
     __uiActions: () => ReturnType<typeof probeUiActions>;
     __probeSelector: (selector: string) => ReturnType<typeof probeSelector>;
@@ -452,6 +454,12 @@ window.__cameraReset = () => {
 window.__skipBlastPlayback = () => {
   gameRenderer.skipFragmentPlayback();
 };
+// Hold the collapse at a chosen moment, so a harness can step through it at the
+// spacing the pictures need rather than the spacing the frame rate allows.
+window.__seekBlastPlayback = (t: number) => {
+  gameRenderer.seekFragmentPlayback(t);
+};
+window.__blastPlaybackDuration = () => gameRenderer.fragmentPlaybackDuration;
 
 uiManager.setGameConsole(window.__gameConsole);
 tutorial.setGameConsole(window.__gameConsole);

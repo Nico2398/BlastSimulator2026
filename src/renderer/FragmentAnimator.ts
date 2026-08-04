@@ -14,7 +14,10 @@ import { flightPositionAt, totalFlightDuration } from '../core/mining/BlastResol
 import type { FragmentMesh } from './FragmentMesh.js';
 
 export class FragmentAnimator {
+  /** The collapse still being advanced by the render loop; emptied when it ends. */
   private flights: FragmentFlight[] = [];
+  /** The whole collapse, kept so it can be replayed to any moment. */
+  private source: FragmentFlight[] = [];
   private elapsedS = 0;
   private endsAtS = 0;
   /** Reused across frames so a large blast does not allocate a map per frame. */
@@ -27,12 +30,18 @@ export class FragmentAnimator {
     return this.elapsedS < this.endsAtS;
   }
 
+  /** How long the collapse being played takes, in seconds. */
+  get durationS(): number {
+    return this.endsAtS;
+  }
+
   /**
    * Start playing a blast back. Only fragments that actually moved are
    * animated, so a blast whose rock barely shifted costs nothing.
    */
   begin(flights: readonly FragmentFlight[]): void {
-    this.flights = flights.filter(f => f.durationS > 0 && !samePlace(f));
+    this.source = flights.filter(f => f.durationS > 0 && !samePlace(f));
+    this.flights = this.source.slice();
     this.elapsedS = 0;
     this.endsAtS = totalFlightDuration(this.flights);
     // Put everything at its starting point immediately, or the first frame
@@ -40,9 +49,27 @@ export class FragmentAnimator {
     if (this.flights.length > 0) this.apply();
   }
 
+  /**
+   * Show the collapse exactly `t` seconds in, and hold it there.
+   *
+   * Seeking takes the playback out of the render loop's hands — a sequence of
+   * seeks has to land on the moments it asked for, not on the moments the frame
+   * rate happened to allow. That matters most where frames are slowest: without
+   * a GPU the clock advances a tenth of a second per frame that costs seconds,
+   * so stepping through a collapse in real time is not something a harness can
+   * do. This replays it instead, at whatever spacing the pictures need.
+   */
+  seek(t: number): void {
+    if (this.source.length === 0) return;
+    this.flights = [];
+    this.elapsedS = Math.max(0, Math.min(t, this.endsAtS));
+    this.applyTo(this.source);
+  }
+
   /** Stop animating and leave every fragment where the blast put it. */
   stop(): void {
     this.flights = [];
+    this.source = [];
     this.elapsedS = 0;
     this.endsAtS = 0;
   }
@@ -57,9 +84,9 @@ export class FragmentAnimator {
    * frame and a frame without a GPU costs seconds.
    */
   finish(): void {
-    if (this.flights.length === 0) return;
+    if (this.source.length === 0) return;
     this.elapsedS = this.endsAtS;
-    this.apply();
+    this.applyTo(this.source);
     this.flights = [];
   }
 
@@ -79,8 +106,12 @@ export class FragmentAnimator {
   }
 
   private apply(): void {
+    this.applyTo(this.flights);
+  }
+
+  private applyTo(flights: readonly FragmentFlight[]): void {
     this.positions.clear();
-    for (const flight of this.flights) {
+    for (const flight of flights) {
       this.positions.set(flight.fragmentId, flightPositionAt(flight, this.elapsedS));
     }
     this.fragments.updatePositions(this.positions);
