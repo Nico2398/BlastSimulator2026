@@ -387,6 +387,24 @@ export class GameRenderer {
   }
 
   /**
+   * Exact rendered-mesh height at (x, z), found by raycasting straight down
+   * through the terrain meshes — unlike surfaceYAt's voxel-column lookup,
+   * this matches the smoothed mesh surface a pointer raycast actually hits.
+   * The gap between the two is normally harmless, but the playtest harness's
+   * world-to-screen bridge (window.__worldToScreen, main.ts) projects a
+   * *return* pixel for a real click to land on, and at the shallow viewing
+   * angle a far tile is seen from, even a one-unit height error throws that
+   * pixel off the tile — enough to miss the terrain mesh entirely. Returns
+   * null off the terrain (no grid, or (x, z) outside every chunk).
+   */
+  raycastSurfaceY(x: number, z: number): number | null {
+    if (!this.terrain) return null;
+    const raycaster = new THREE.Raycaster(new THREE.Vector3(x, 10_000, z), new THREE.Vector3(0, -1, 0));
+    const hit = raycaster.intersectObjects(this.terrain.meshes, true)[0];
+    return hit ? hit.point.y : null;
+  }
+
+  /**
    * Every entity root object raycastable for scene picking (P2): buildings,
    * vehicles, employees, and the 8 fragment shape buckets. Terrain is
    * raycast separately via `terrain.meshes` — it's a fallback hit, not an

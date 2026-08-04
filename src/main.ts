@@ -504,7 +504,11 @@ window.__worldToScreen = (x, z) => {
   // picker's tileToPoint centred on for the flat-canvas case.
   const cx = x + 0.5;
   const cz = z + 0.5;
-  const y = gameRenderer.surfaceYAt(cx, cz);
+  // raycastSurfaceY, not surfaceYAt: surfaceYAt's voxel-column height can
+  // diverge from the rendered mesh enough, at a shallow viewing angle, to
+  // throw the projected pixel off the tile — the click raycast then misses
+  // the terrain entirely (see raycastSurfaceY's own comment).
+  const y = gameRenderer.raycastSurfaceY(cx, cz) ?? gameRenderer.surfaceYAt(cx, cz);
   const ndc = scene.cameraController.projectToNDC(cx, y, cz);
   const rect = canvas.getBoundingClientRect();
   return {
