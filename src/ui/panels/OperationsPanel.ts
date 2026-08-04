@@ -1,0 +1,387 @@
+// BlastSimulator2026 — Operations panel (redesign P5)
+// Logistics (fragments + storage), ore on hand, last ore report, incidents
+// (DamageState), and site policy — migrated out of Settings, where it never
+// belonged (a strategic lever buried in an app-settings menu).
+//
+// Deviations from the design mock: tonnes ("21.4 t") become kilograms, matching
+// every other kg-denominated number in this UI (Contracts, Charge) rather than
+// mixing units. The stored row drops the mock's specific warehouse-building
+// name ("The Slightly Bigger Pile (T2)") — correlating stored mass back to a
+// particular placed building isn't data logistics tracks. Incidents resolve
+// real names: employees stay in their array with alive:false so a live lookup
+// always works; buildings/vehicles use the entityLabel type snapshot added in
+// P5-core, since destroyBuilding/destroyVehicle splice the entity out (a plain
+// live lookup after a *_destroyed accident would find nothing).
+
+import { t } from '../../core/i18n/I18n.js';
+import { el, card, sectionHeader, emptyState, chip } from '../dom.js';
+import { iconEl, type IconName } from '../icons.js';
+import { LocaleTextRegistry } from '../localeText.js';
+import { formatMoney } from '../../core/economy/formatMoney.js';
+import { getFragmentCounts } from '../../core/economy/Logistics.js';
+import { getOre } from '../../core/world/OreCatalog.js';
+import type { ShiftMode } from '../../core/entities/SitePolicy.js';
+import type { GameState } from '../../core/state/GameState.js';
+import type { AccidentRecord } from '../../core/entities/Damage.js';
+import type { CommandResult } from '../../console/ConsoleRunner.js';
+
+export type GameConsoleFn = (cmd: string) => CommandResult;
+
+const RECENT_INCIDENTS = 10;
+
+/** Shift modes accepted by `set_policy` (mirrors SettingsMenu.ts's own list — SitePolicy.ts doesn't export one). */
+const SHIFT_MODES: ShiftMode[] = ['shift_8h', 'shift_12h', 'continuous', 'custom'];
+
+const INCIDENT_STYLE: Record<AccidentRecord['type'], { icon: IconName; critical: boolean }> = {
+  injury: { icon: 'injured', critical: false },
+  death: { icon: 'skull', critical: true },
+  building_damage: { icon: 'build', critical: false },
+  building_destroyed: { icon: 'build', critical: true },
+  seismic_damage: { icon: 'build', critical: false },
+  seismic_destroyed: { icon: 'build', critical: true },
+  vehicle_damage: { icon: 'vehicle', critical: false },
+  vehicle_destroyed: { icon: 'vehicle', critical: true },
+};
+
+export class OperationsPanel {
+  private readonly el: HTMLElement;
+  private readonly bodyEl: HTMLElement;
+  private readonly shiftButtons: Record<ShiftMode, HTMLButtonElement>;
+  private readonly hungerInput: HTMLInputElement;
+  private readonly fatigueInput: HTMLInputElement;
+  private readonly policyStatusEl: HTMLElement;
+  private readonly policyCard: HTMLElement;
+  private readonly policyNoteEl: HTMLElement;
+  private gameConsole?: GameConsoleFn;
+  private onCloseCb?: () => void;
+  /** True once the player has touched a policy control — stops sync clobbering (mirrors SettingsMenu's old behavior). */
+  private policyDirty = false;
+  private activeShift: ShiftMode = 'shift_8h';
+  private lastSignature = '';
+  private readonly locale = new LocaleTextRegistry();
+
+  constructor(container: HTMLElement) {
+    this.el = el('div', { className: 'bsx-root', attrs: { id: 'bs-operations-panel' } });
+    this.el.style.cssText = [
+      'flex-direction:column', 'width:372px', 'max-height:100%',
+      'border-radius:8px', 'background:var(--bsx-panel)', 'border:1px solid var(--bsx-hairline-strong)',
+      'box-shadow:0 18px 44px rgba(0,0,0,.55)', 'overflow:hidden', 'pointer-events:all',
+    ].join(';');
+    this.el.style.display = 'none';
+
+    const header = el('div');
+    header.style.cssText = 'flex:0 0 auto;display:flex;align-items:center;gap:10px;height:46px;padding:0 12px;background:#1a2028;border-bottom:1px solid var(--bsx-hairline)';
+    const iconChip = el('div', { children: [iconEl('ops', 15)] });
+    iconChip.style.cssText = 'width:26px;height:26px;border-radius:5px;display:flex;align-items:center;justify-content:center;background:rgba(255,176,46,.14);color:var(--bsx-amber)';
+    const titleEl = this.locale.bindText(
+      el('div', { attrs: { style: 'font:700 12px/1 var(--bsx-font-ui);letter-spacing:.14em;color:var(--bsx-text-primary)' } }),
+      'ui.operations.title',
+    );
+    const closeBtn = el('button', { children: [iconEl('x', 12)] });
+    closeBtn.style.cssText = 'margin-left:auto;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:1px solid var(--bsx-hairline-strong);border-radius:4px;background:transparent;color:var(--bsx-text-muted);cursor:pointer';
+    closeBtn.addEventListener('click', () => this.onCloseCb?.());
+    header.append(iconChip, titleEl, closeBtn);
+
+    this.bodyEl = el('div');
+    this.bodyEl.style.cssText = 'flex:1 1 auto;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px';
+
+    // Site policy controls are built once and reused across re-renders (they
+    // carry live edit state — policyDirty, in-progress input values — that a
+    // signature-gated rebuild must not clobber mid-edit).
+    this.shiftButtons = {} as Record<ShiftMode, HTMLButtonElement>;
+    const shiftRow = el('div', { attrs: { id: 'bs-policy-shift' } });
+    shiftRow.style.cssText = 'display:flex;gap:3px';
+    for (const mode of SHIFT_MODES) {
+      const btn = el('button', { className: 'bsx-mono', attrs: { 'data-shift-mode': mode } });
+      btn.style.cssText = 'flex:1;height:28px;border:0;border-radius:4px;background:transparent;color:var(--bsx-text-secondary);font-size:10px;font-weight:600;cursor:pointer';
+      this.locale.bindText(btn, `ui.policy.${mode}`);
+      btn.addEventListener('click', () => { this.policyDirty = true; this.setActiveShift(mode); });
+      this.shiftButtons[mode] = btn;
+      shiftRow.appendChild(btn);
+    }
+
+    this.hungerInput = this.makeThresholdInput('bs-policy-hunger');
+    this.fatigueInput = this.makeThresholdInput('bs-policy-fatigue');
+    const applyBtn = el('button', { className: 'bsx-btn bsx-btn-primary', attrs: { id: 'bs-policy-apply' } });
+    applyBtn.style.cssText = 'width:100%;height:32px;margin-top:2px';
+    applyBtn.dataset['action'] = 'apply-policy';
+    this.locale.bindText(applyBtn, 'ui.policy.apply');
+    applyBtn.addEventListener('click', () => this.applyPolicy());
+    this.policyStatusEl = el('span', { attrs: { style: 'font:500 10px/1.4 var(--bsx-font-ui);color:var(--bsx-positive);min-height:12px' } });
+
+    const thresholdRow = el('div');
+    thresholdRow.style.cssText = 'display:flex;gap:8px';
+    thresholdRow.append(
+      this.makeThresholdCol('ui.policy.hunger', this.hungerInput),
+      this.makeThresholdCol('ui.policy.fatigue', this.fatigueInput),
+    );
+
+    this.policyNoteEl = el('span', { attrs: { style: 'font:400 10px/1.4 var(--bsx-font-ui);color:var(--bsx-text-micro)' } });
+    this.policyCard = card([
+      this.locale.bindText(el('span', { attrs: { style: 'font:600 10px/1 var(--bsx-font-ui);letter-spacing:.1em;color:var(--bsx-text-micro)' } }), 'ui.policy.shift_mode'),
+      shiftRow,
+      this.policyNoteEl,
+      thresholdRow,
+      applyBtn,
+      this.policyStatusEl,
+    ]);
+    this.setActiveShift(this.activeShift);
+
+    this.el.append(header, this.bodyEl);
+    container.appendChild(this.el);
+  }
+
+  get root(): HTMLElement { return this.el; }
+  setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
+  setCloseHandler(cb: () => void): void { this.onCloseCb = cb; }
+
+  show(): void { this.el.style.display = 'flex'; }
+  hide(): void { this.el.style.display = 'none'; }
+  get visible(): boolean { return this.el.style.display !== 'none'; }
+
+  update(state: GameState): void {
+    if (!this.policyDirty) {
+      this.setActiveShift(state.sitePolicy.shiftMode);
+      this.hungerInput.value = String(state.sitePolicy.hungerRestThreshold);
+      this.fatigueInput.value = String(state.sitePolicy.fatigueRestThreshold);
+    }
+
+    const signature = JSON.stringify({
+      stored: Math.round(state.logistics.storedMassKg), cap: state.logistics.storageCapacityKg,
+      fragCount: state.logistics.fragments.length,
+      ore: state.collectedOre,
+      oreReport: state.lastOreReport,
+      accidents: state.damage.accidents.length,
+      injured: state.employees.employees.filter(e => e.injured && e.alive).map(e => e.id),
+      policy: state.sitePolicy.revision,
+    });
+    if (signature === this.lastSignature) return;
+    this.lastSignature = signature;
+    this.render(state);
+  }
+
+  refreshLocale(): void {
+    this.locale.refresh();
+    this.setActiveShift(this.activeShift);
+    this.lastSignature = '';
+  }
+
+  dispose(): void { this.el.remove(); }
+
+  private render(state: GameState): void {
+    const sections: HTMLElement[] = [
+      sectionHeader(t('ui.operations.logistics')),
+      this.makeLogisticsRows(state),
+      sectionHeader(t('ui.operations.ore_on_hand')),
+      ...this.makeOreRows(state),
+      sectionHeader(t('ui.operations.last_ore_report')),
+      this.makeOreReportCard(state),
+      sectionHeader(t('ui.operations.incidents')),
+      ...this.makeInjuredList(state),
+      ...this.makeIncidentRows(state),
+      sectionHeader(t('ui.policy.title')),
+      this.policyCard,
+    ];
+    this.bodyEl.replaceChildren(...sections);
+  }
+
+  // ── Logistics ──
+
+  private makeLogisticsRows(state: GameState): HTMLElement {
+    const counts = getFragmentCounts(state.logistics);
+    let onGroundKg = 0, inTransitKg = 0;
+    for (const f of state.logistics.fragments) {
+      if (f.state === 'on_ground') onGroundKg += f.fragment.mass;
+      else if (f.state === 'in_transit') inTransitKg += f.fragment.mass;
+    }
+    const cap = state.logistics.storageCapacityKg;
+    const storedPct = cap > 0 ? Math.round((state.logistics.storedMassKg / cap) * 100) : 0;
+
+    const wrap = el('div');
+    wrap.style.cssText = 'display:flex;flex-direction:column;gap:6px';
+    wrap.append(
+      this.makeLogisticsRow(t('ui.operations.on_ground'), t('ui.operations.fragment_count', { count: counts.onGround }), t('ui.operations.mass_kg', { kg: Math.round(onGroundKg).toLocaleString('en-US') })),
+      this.makeLogisticsRow(t('ui.operations.in_transit'), t('ui.operations.fragment_count', { count: counts.inTransit }), t('ui.operations.mass_kg', { kg: Math.round(inTransitKg).toLocaleString('en-US') })),
+      this.makeLogisticsRow(t('ui.operations.stored'), `${Math.round(state.logistics.storedMassKg).toLocaleString('en-US')} / ${cap.toLocaleString('en-US')} kg`, t('ui.operations.storage_pct', { pct: storedPct })),
+    );
+    return wrap;
+  }
+
+  private makeLogisticsRow(label: string, value: string, note: string): HTMLElement {
+    const row = el('div');
+    row.style.cssText = 'display:flex;flex-direction:column;gap:4px;padding:10px 11px;border-radius:5px;background:var(--bsx-well)';
+    const head = el('div');
+    head.style.cssText = 'display:flex;align-items:baseline;gap:8px';
+    head.append(
+      el('span', { text: label, attrs: { style: 'font:500 11px/1 var(--bsx-font-ui);color:var(--bsx-text-secondary)' } }),
+      el('span', { text: value, attrs: { style: 'margin-left:auto;font:600 12px/1 var(--bsx-font-mono)' } }),
+    );
+    row.append(head, el('span', { text: note, attrs: { style: 'font:400 10px/1 var(--bsx-font-ui);color:var(--bsx-text-micro)' } }));
+    return row;
+  }
+
+  // ── Ore on hand ──
+
+  private makeOreRows(state: GameState): HTMLElement[] {
+    const entries = Object.entries(state.collectedOre).filter(([, kg]) => kg > 0.5);
+    if (entries.length === 0) return [emptyState(t('ui.operations.no_ore'))];
+    return entries.map(([oreId, kg]) => {
+      const ore = getOre(oreId);
+      const row = el('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:9px;padding:9px 11px;border:1px solid var(--bsx-hairline);border-radius:5px;background:var(--bsx-card)';
+      const dot = el('span');
+      dot.style.cssText = `width:8px;height:8px;border-radius:2px;background:${ore?.color ?? '#8a94a2'}`;
+      row.append(
+        dot,
+        el('span', { text: ore ? t(ore.nameKey) : oreId, attrs: { style: 'font:600 11px/1 var(--bsx-font-ui)' } }),
+        el('span', { text: `${Math.round(kg).toLocaleString('en-US')} kg`, attrs: { style: 'margin-left:auto;font:500 11px/1 var(--bsx-font-mono);color:var(--bsx-text-secondary)' } }),
+        el('span', { text: `$${formatMoney(kg * (ore?.valuePerKg ?? 0))}`, attrs: { style: 'font:600 11px/1 var(--bsx-font-mono);color:var(--bsx-positive);width:64px;text-align:right' } }),
+      );
+      return row;
+    });
+  }
+
+  // ── Last ore report ──
+
+  private makeOreReportCard(state: GameState): HTMLElement {
+    const report = state.lastOreReport;
+    if (!report || report.estimatedYieldKg <= 0) return emptyState(t('ui.operations.no_ore_report'));
+
+    const pct = Math.round(report.yieldRatio * 100);
+    const breakdown = Object.entries(report.oreYields)
+      .filter(([, kg]) => kg > 0)
+      .map(([oreId, kg]) => `${t(`ore.${oreId}.name`)} ${kg.toFixed(0)} kg`)
+      .join(' · ');
+
+    const headRow = el('div');
+    headRow.style.cssText = 'display:flex;align-items:baseline;gap:8px';
+    headRow.append(
+      el('span', { text: t('ui.blast_workshop.report.ore_report'), attrs: { style: 'font:600 12px/1 var(--bsx-font-ui)' } }),
+      el('span', { text: `${pct}%`, attrs: { style: 'margin-left:auto;font:600 14px/1 var(--bsx-font-mono);color:var(--bsx-ore)' } }),
+    );
+    const detail = el('span', {
+      text: t('ui.blast_workshop.report.ore_detail', { actual: report.totalYieldKg.toFixed(0), estimate: report.estimatedYieldKg.toFixed(0), breakdown }),
+      attrs: { style: 'font:400 11px/1.4 var(--bsx-font-ui);color:var(--bsx-text-secondary)' },
+    });
+
+    const chips: HTMLElement[] = [];
+    if (report.hasTreranium) chips.push(chip(t('ui.operations.has_treranium', { ore: t('ore.treranium.name') }), 'ore'));
+    if (report.absurdiumFraction > 0) {
+      chips.push(chip(t('ui.operations.absurdium_fraction', { pct: Math.round(report.absurdiumFraction * 100), ore: t('ore.absurdium.name') }), 'ore'));
+    }
+    const chipsRow = chips.length > 0 ? el('div', { attrs: { style: 'display:flex;gap:5px;flex-wrap:wrap' }, children: chips }) : null;
+
+    return card([headRow, detail, chipsRow]);
+  }
+
+  // ── Incidents ──
+
+  private makeInjuredList(state: GameState): HTMLElement[] {
+    const injured = state.employees.employees.filter(e => e.injured && e.alive);
+    if (injured.length === 0) return [];
+    const wrap = el('div');
+    wrap.style.cssText = 'display:flex;flex-wrap:wrap;gap:5px';
+    for (const e of injured) {
+      wrap.appendChild(chip(t('ui.operations.injured_chip', { name: e.name }), 'critical'));
+    }
+    return [wrap];
+  }
+
+  private makeIncidentRows(state: GameState): HTMLElement[] {
+    const recent = state.damage.accidents.slice(-RECENT_INCIDENTS).reverse();
+    if (recent.length === 0) return [emptyState(t('ui.operations.no_incidents'))];
+    return recent.map(a => this.makeIncidentRow(a, state));
+  }
+
+  private makeIncidentRow(a: AccidentRecord, state: GameState): HTMLElement {
+    const style = INCIDENT_STYLE[a.type];
+    const color = style.critical ? 'var(--bsx-critical-text)' : 'var(--bsx-amber)';
+    const day = Math.floor(a.tick / 24) + 1;
+
+    const row = el('div');
+    row.style.cssText = 'display:flex;gap:9px;padding:9px 10px;border-radius:4px;background:var(--bsx-well)';
+    row.append(
+      el('div', { attrs: { style: `color:${color};padding-top:1px` }, children: [iconEl(style.icon, 13)] }),
+      el('div', {
+        attrs: { style: 'display:flex;flex-direction:column;gap:3px;flex:1' },
+        children: [
+          el('span', { text: this.incidentText(a, state), attrs: { style: 'font:500 11px/1.3 var(--bsx-font-ui)' } }),
+          el('span', { text: t('ui.operations.day_label', { day }), attrs: { style: 'font:400 11px/1 var(--bsx-font-mono);color:var(--bsx-text-micro)' } }),
+        ],
+      }),
+    );
+    return row;
+  }
+
+  private incidentText(a: AccidentRecord, state: GameState): string {
+    switch (a.type) {
+      case 'injury':
+      case 'death': {
+        const name = state.employees.employees.find(e => e.id === a.entityId)?.name ?? t('ui.operations.incident_unknown_worker');
+        return t(a.type === 'death' ? 'ui.operations.incident_death' : 'ui.operations.incident_injury', { name });
+      }
+      case 'building_damage':
+      case 'building_destroyed': {
+        const building = a.entityLabel ? t(`building.${a.entityLabel}.name`) : t('ui.operations.incident_unknown_building');
+        return t(a.type === 'building_destroyed' ? 'ui.operations.incident_building_destroyed' : 'ui.operations.incident_building_damage', { building });
+      }
+      // Kept distinct from building_damage/destroyed — SeismicSurveyDamage.ts
+      // uses its own accident types specifically so the log doesn't misattribute
+      // a seismic survey's shockwave damage to a blast fragment.
+      case 'seismic_damage':
+      case 'seismic_destroyed': {
+        const building = a.entityLabel ? t(`building.${a.entityLabel}.name`) : t('ui.operations.incident_unknown_building');
+        return t(a.type === 'seismic_destroyed' ? 'ui.operations.incident_seismic_destroyed' : 'ui.operations.incident_seismic_damage', { building });
+      }
+      case 'vehicle_damage':
+      case 'vehicle_destroyed': {
+        const vehicle = a.entityLabel ? t(`vehicle_type.${a.entityLabel}`) : t('ui.operations.incident_unknown_vehicle');
+        return t(a.type === 'vehicle_destroyed' ? 'ui.operations.incident_vehicle_destroyed' : 'ui.operations.incident_vehicle_damage', { vehicle });
+      }
+    }
+  }
+
+  // ── Site policy ──
+
+  private makeThresholdInput(id: string): HTMLInputElement {
+    const input = el('input', { className: 'bs-input', attrs: { id, type: 'number', min: '0', max: '100', step: '5' } }) as HTMLInputElement;
+    input.style.cssText = 'width:100%;height:28px;padding:0 8px;border:1px solid rgba(255,255,255,.1);border-radius:4px;background:var(--bsx-well);color:var(--bsx-text-primary);font:600 11px/1 var(--bsx-font-mono)';
+    input.addEventListener('input', () => { this.policyDirty = true; });
+    return input;
+  }
+
+  private makeThresholdCol(labelKey: string, input: HTMLInputElement): HTMLElement {
+    const col = el('div');
+    col.style.cssText = 'flex:1;display:flex;flex-direction:column;gap:5px';
+    col.append(this.locale.bindText(el('span', { attrs: { style: 'font:600 10px/1 var(--bsx-font-ui);letter-spacing:.1em;color:var(--bsx-text-micro)' } }), labelKey), input);
+    return col;
+  }
+
+  /**
+   * Paints the active pill and the mode's note. Plain t() rather than the
+   * LocaleTextRegistry: registry bindings are for text set once at
+   * construction, and this runs on every pill click — going through
+   * bindText() here would push a new binding on every click, accumulating
+   * forever. refreshLocale() calls this again after a language switch
+   * instead, which re-derives the same text in the new language.
+   */
+  private setActiveShift(mode: ShiftMode): void {
+    this.activeShift = mode;
+    for (const [m, btn] of Object.entries(this.shiftButtons) as [ShiftMode, HTMLButtonElement][]) {
+      const active = m === mode;
+      btn.style.background = active ? 'var(--bsx-amber)' : 'transparent';
+      btn.style.color = active ? 'var(--bsx-text-on-amber)' : 'var(--bsx-text-secondary)';
+    }
+    this.policyNoteEl.textContent = t(`ui.policy.note_${mode}`);
+  }
+
+  private applyPolicy(): void {
+    const result = this.gameConsole?.(
+      `set_policy mode:${this.activeShift}` +
+      ` hunger:${this.hungerInput.value} fatigue:${this.fatigueInput.value}`,
+    );
+    this.policyDirty = false;
+    this.policyStatusEl.textContent = result?.success ? t('ui.policy.applied') : (result?.output ?? '');
+    setTimeout(() => { this.policyStatusEl.textContent = ''; }, 3000);
+  }
+}

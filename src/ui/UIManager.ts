@@ -7,7 +7,9 @@ import { registerIcons } from './icons.js';
 import { BlastWorkshop } from './panels/BlastWorkshop.js';
 import { PreflightModal } from './panels/PreflightModal.js';
 import { BlastReportModal } from './panels/BlastReportModal.js';
-import { ContractUI } from './ContractUI.js';
+import { ContractsPanel } from './panels/ContractsPanel.js';
+import { FinancesPanel } from './panels/FinancesPanel.js';
+import { OperationsPanel } from './panels/OperationsPanel.js';
 import { BuildMenu } from './BuildMenu.js';
 import { VehiclePanel } from './VehiclePanel.js';
 import { EmployeePanel } from './EmployeePanel.js';
@@ -28,7 +30,7 @@ import type { CommandResult } from '../console/ConsoleRunner.js';
 
 export type GameConsoleFn = (cmd: string) => CommandResult;
 
-export type PanelName = 'blast' | 'contracts' | 'build' | 'vehicles' | 'employees' | 'survey' | 'settings';
+export type PanelName = 'blast' | 'contracts' | 'finances' | 'ops' | 'build' | 'vehicles' | 'employees' | 'survey' | 'settings';
 
 export class UIManager {
   private readonly topBar: TopBar;
@@ -39,7 +41,9 @@ export class UIManager {
   private readonly blastUI: BlastWorkshop;
   private readonly preflightModal: PreflightModal;
   private readonly blastReportModal: BlastReportModal;
-  private readonly contractUI: ContractUI;
+  private readonly contractsPanel: ContractsPanel;
+  private readonly financesPanel: FinancesPanel;
+  private readonly operationsPanel: OperationsPanel;
   private readonly buildMenu: BuildMenu;
   private readonly vehiclePanel: VehiclePanel;
   private readonly employeePanel: EmployeePanel;
@@ -94,7 +98,13 @@ export class UIManager {
     this.preflightModal = new PreflightModal(container);
     this.blastUI.setFireRequestedHandler(() => this.preflightModal.show());
     this.blastReportModal = new BlastReportModal(container);
-    this.contractUI = new ContractUI(leftCol);
+    this.contractsPanel = new ContractsPanel(leftCol);
+    this.contractsPanel.setCloseHandler(() => this.hideAllPanels());
+    this.contractsPanel.setNavigateHandler((panel) => this.showPanel(panel));
+    this.financesPanel = new FinancesPanel(leftCol);
+    this.financesPanel.setCloseHandler(() => this.hideAllPanels());
+    this.operationsPanel = new OperationsPanel(leftCol);
+    this.operationsPanel.setCloseHandler(() => this.hideAllPanels());
     this.buildMenu = new BuildMenu(leftCol);
     this.vehiclePanel = new VehiclePanel(leftCol);
     this.employeePanel = new EmployeePanel(leftCol);
@@ -136,7 +146,8 @@ export class UIManager {
   setGameConsole(fn: GameConsoleFn): void {
     this.blastUI.setGameConsole(fn);
     this.preflightModal.setGameConsole(fn);
-    this.contractUI.setGameConsole(fn);
+    this.contractsPanel.setGameConsole(fn);
+    this.operationsPanel.setGameConsole(fn);
     this.buildMenu.setGameConsole(fn);
     this.vehiclePanel.setGameConsole(fn);
     this.employeePanel.setGameConsole(fn);
@@ -216,7 +227,9 @@ export class UIManager {
     this.blastUI.refreshLocale();
     this.preflightModal.refreshLocale();
     this.blastReportModal.refreshLocale();
-    this.contractUI.refreshLocale();
+    this.contractsPanel.refreshLocale();
+    this.financesPanel.refreshLocale();
+    this.operationsPanel.refreshLocale();
     this.buildMenu.refreshLocale();
     this.vehiclePanel.refreshLocale();
     this.employeePanel.refreshLocale();
@@ -253,12 +266,13 @@ export class UIManager {
     // tied to blastUI's own, so gating on it here would miss real transitions.
     this.preflightModal.update(state, weather);
     this.blastReportModal.update(state);
-    if (this.contractUI.visible) this.contractUI.update(state);
+    if (this.contractsPanel.visible) this.contractsPanel.update(state);
+    if (this.financesPanel.visible) this.financesPanel.update(state);
+    if (this.operationsPanel.visible) this.operationsPanel.update(state);
     if (this.buildMenu.visible) this.buildMenu.update(state);
     if (this.vehiclePanel.visible) this.vehiclePanel.update(state);
     if (this.employeePanel.visible) this.employeePanel.update(state);
     if (this.surveyUI.visible) this.surveyUI.update(state);
-    if (this.settingsMenu.visible) this.settingsMenu.update(state);
 
     // Event dialog — auto-show when pending event exists, keep open during outcome.
     // Deferred while BlastReportModal is up: both are auto-triggered (a blast's
@@ -279,7 +293,9 @@ export class UIManager {
     this.activePanel = name;
     switch (name) {
       case 'blast': this.blastUI.show(); break;
-      case 'contracts': this.contractUI.show(); break;
+      case 'contracts': this.contractsPanel.show(); break;
+      case 'finances': this.financesPanel.show(); break;
+      case 'ops': this.operationsPanel.show(); break;
       case 'build': this.buildMenu.show(); break;
       case 'vehicles': this.vehiclePanel.show(); break;
       case 'employees': this.employeePanel.show(); break;
@@ -316,7 +332,9 @@ export class UIManager {
     this.blastUI.dispose();
     this.preflightModal.dispose();
     this.blastReportModal.dispose();
-    this.contractUI.dispose();
+    this.contractsPanel.dispose();
+    this.financesPanel.dispose();
+    this.operationsPanel.dispose();
     this.buildMenu.dispose();
     this.vehiclePanel.dispose();
     this.employeePanel.dispose();
@@ -329,7 +347,9 @@ export class UIManager {
   private hideAllPanels(): void {
     this.activePanel = null;
     this.blastUI.hide();
-    this.contractUI.hide();
+    this.contractsPanel.hide();
+    this.financesPanel.hide();
+    this.operationsPanel.hide();
     this.buildMenu.hide();
     this.vehiclePanel.hide();
     this.employeePanel.hide();

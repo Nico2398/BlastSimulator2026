@@ -410,7 +410,7 @@ window.__debugGridInfo = () => {
 };
 
 window.__uiState = () => {
-  const panels = ['bs-blast-panel', 'bs-contract-panel', 'bs-build-panel',
+  const panels = ['bs-blast-panel', 'bs-contract-panel', 'bs-finances-panel', 'bs-operations-panel', 'bs-build-panel',
     'bs-vehicle-panel', 'bs-employee-panel', 'bs-survey-panel'];
   const panelStates: Record<string, unknown> = {};
   for (const id of panels) {

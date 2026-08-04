@@ -195,7 +195,7 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
   ],
 
   'set-policy': [
-    { target: TOOLBAR_TARGET.settings, hintKey: 'tutorial.stage.open_settings' },
+    { target: TOOLBAR_TARGET.ops, hintKey: 'tutorial.stage.open_ops' },
     {
       target: '#bs-policy-apply',
       hintKey: 'tutorial.stage.policy_apply',

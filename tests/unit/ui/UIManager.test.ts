@@ -191,9 +191,13 @@ describe('UIManager — locale refresh on language switch (issue #457)', () => {
   it('every owned panel with a .bs-panel-title re-renders to a different string after the switch', () => {
     uiManager = new UIManager(container);
     const titleEls = Array.from(container.querySelectorAll('.bs-panel-title'));
-    // Sanity: UIManager owns several titled panels (blast, contracts, build,
-    // vehicles, employees, survey, settings, minimap, event dialog).
-    expect(titleEls.length).toBeGreaterThanOrEqual(8);
+    // Sanity: UIManager owns several titled panels still on the legacy
+    // .bs-panel-title class (build, vehicles, employees, survey, settings,
+    // minimap, event dialog). Blast (P4) and Contracts/Finances/Operations
+    // (P5) migrated to the redesign's own title markup and no longer count
+    // here — each surface-by-surface migration shrinks this number further,
+    // same as it did when Blast moved off .bs-panel-title.
+    expect(titleEls.length).toBeGreaterThanOrEqual(7);
     const before = titleEls.map((el) => el.textContent);
 
     clickFrenchButton(container);

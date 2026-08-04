@@ -141,6 +141,19 @@ describe('TopBar (redesign P1)', () => {
     topBar.dispose();
   });
 
+  it('clicking the balance navigates to the finances panel', () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const topBar = new TopBar(container);
+    const center = new NotificationCenter();
+    topBar.update(makeState(), undefined, center);
+    const nav = vi.fn();
+    topBar.setNavigateHandler(nav);
+    container.querySelector<HTMLButtonElement>('[data-action="open-finances"]')?.click();
+    expect(nav).toHaveBeenCalledWith('finances');
+    topBar.dispose();
+  });
+
   describe('balance formatting', () => {
     it('prints whole dollars with thousands separators', () => {
       expect(formatBalance(75000)).toBe('$75,000');

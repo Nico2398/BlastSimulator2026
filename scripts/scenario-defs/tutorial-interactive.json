@@ -534,11 +534,11 @@
     {
       "command": "set_policy mode:shift_8h",
       "timeout": 30,
-      "description": "Step 19 complete: shift schedule changed in the Settings panel",
+      "description": "Step 19 complete: shift schedule changed in the Operations panel (redesign P5: site policy moved out of Settings)",
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"settings\"]"
+          "selector": "#bs-toolbar [data-panel=\"ops\"]"
         },
         {
           "type": "waitForSelector",

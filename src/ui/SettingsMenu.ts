@@ -3,27 +3,17 @@
 
 import { t, setLocale } from '../core/i18n/I18n.js';
 import { LocaleTextRegistry } from './localeText.js';
-import type { GameState } from '../core/state/GameState.js';
-import type { ShiftMode } from '../core/entities/SitePolicy.js';
 
 import type { CommandResult } from '../console/ConsoleRunner.js';
 
 export type GameConsoleFn = (cmd: string) => CommandResult;
 
-/** Shift modes accepted by `set_policy`. */
-const SHIFT_MODES: ShiftMode[] = ['shift_8h', 'shift_12h', 'continuous', 'custom'];
-
 export class SettingsMenu {
   private readonly el: HTMLElement;
   private readonly statusEl: HTMLElement;
-  private readonly shiftSelect: HTMLSelectElement;
-  private readonly hungerInput: HTMLInputElement;
-  private readonly fatigueInput: HTMLInputElement;
   private gameConsole?: GameConsoleFn;
   private onLanguageChange?: (lang: string) => void;
   private onQuit?: () => void;
-  /** True once the player has touched a policy control — stops sync clobbering. */
-  private policyDirty = false;
   private readonly locale = new LocaleTextRegistry();
 
   constructor(container: HTMLElement) {
@@ -98,50 +88,13 @@ export class SettingsMenu {
     this.locale.bindText(closeBtn, 'ui.settings.close');
     closeBtn.addEventListener('click', () => this.hide());
 
-    // ── Site policy ──
-    // Shift schedule and rest thresholds live here because they are site-wide
-    // settings, and until now there was no way to change them outside the console.
-    const policyHeader = document.createElement('div');
-    policyHeader.className = 'bs-section-header';
-    policyHeader.style.marginTop = '8px';
-    this.locale.bindText(policyHeader, 'ui.policy.title');
-
-    this.shiftSelect = document.createElement('select');
-    this.shiftSelect.className = 'bs-select';
-    this.shiftSelect.id = 'bs-policy-shift';
-    for (const mode of SHIFT_MODES) {
-      const opt = document.createElement('option');
-      opt.value = mode;
-      this.locale.bindText(opt, `ui.policy.${mode}`);
-      this.shiftSelect.appendChild(opt);
-    }
-    this.shiftSelect.addEventListener('change', () => { this.policyDirty = true; });
-
-    this.hungerInput = this.makeThresholdInput('bs-policy-hunger', 30);
-    this.fatigueInput = this.makeThresholdInput('bs-policy-fatigue', 25);
-
-    const applyBtn = document.createElement('button');
-    applyBtn.className = 'bs-btn bs-btn-primary';
-    applyBtn.id = 'bs-policy-apply';
-    applyBtn.style.cssText = 'width:100%;margin-top:6px';
-    this.locale.bindText(applyBtn, 'ui.policy.apply');
-    applyBtn.addEventListener('click', () => {
-      const result = this.gameConsole?.(
-        `set_policy mode:${this.shiftSelect.value}` +
-        ` hunger:${this.hungerInput.value} fatigue:${this.fatigueInput.value}`,
-      );
-      this.policyDirty = false;
-      this.setStatus(result?.success ? t('ui.policy.applied') : (result?.output ?? ''));
-    });
+    const policyMovedNote = document.createElement('div');
+    policyMovedNote.style.cssText = 'font-size:10px;color:#857b6b;margin-top:8px;line-height:1.4';
+    this.locale.bindText(policyMovedNote, 'ui.settings.policy_moved');
 
     this.el.append(
       title, langLabel, langRow, saveBtn, loadBtn, quitBtn,
-      policyHeader,
-      this.makeLabel('ui.policy.shift_mode'), this.shiftSelect,
-      this.makeLabel('ui.policy.hunger'), this.hungerInput,
-      this.makeLabel('ui.policy.fatigue'), this.fatigueInput,
-      applyBtn,
-      this.statusEl, closeBtn,
+      this.statusEl, closeBtn, policyMovedNote,
     );
     container.appendChild(this.el);
   }
@@ -159,35 +112,12 @@ export class SettingsMenu {
   hide(): void { this.el.style.display = 'none'; }
   get visible(): boolean { return this.el.style.display !== 'none'; }
 
-  /** Mirror the live site policy into the controls until the player edits them. */
-  update(state: GameState): void {
-    if (this.policyDirty) return;
-    const policy = state.sitePolicy;
-    if (!policy) return;
-    this.shiftSelect.value = policy.shiftMode;
-    this.hungerInput.value = String(policy.hungerRestThreshold);
-    this.fatigueInput.value = String(policy.fatigueRestThreshold);
-  }
-
   setStatus(msg: string): void {
     this.statusEl.textContent = msg;
     setTimeout(() => { if (this.statusEl.textContent === msg) this.statusEl.textContent = ''; }, 3000);
   }
 
   dispose(): void { this.el.remove(); }
-
-  private makeThresholdInput(id: string, fallback: number): HTMLInputElement {
-    const el = document.createElement('input');
-    el.type = 'number';
-    el.id = id;
-    el.className = 'bs-input';
-    el.min = '0';
-    el.max = '100';
-    el.step = '5';
-    el.value = String(fallback);
-    el.addEventListener('input', () => { this.policyDirty = true; });
-    return el;
-  }
 
   private makeLabel(key: string): HTMLElement {
     const el = document.createElement('div');

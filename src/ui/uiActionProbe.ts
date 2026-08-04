@@ -38,6 +38,8 @@ const REGIONS: Array<[string, string]> = [
   ['#bs-toolbar', 'toolbar'],
   ['#bs-blast-panel', 'blast'],
   ['#bs-contract-panel', 'contracts'],
+  ['#bs-finances-panel', 'finances'],
+  ['#bs-operations-panel', 'ops'],
   ['#bs-build-panel', 'build'],
   ['#bs-vehicle-panel', 'vehicles'],
   ['#bs-employee-panel', 'crew'],

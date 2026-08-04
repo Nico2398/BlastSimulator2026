@@ -464,6 +464,34 @@ async function run() {
     await new Promise(r => setTimeout(r, 200));
 
     // ══════════════════════════════════════════
+    // FINANCES PANEL (redesign P5) — no toolbar entry; opened from the
+    // TopBar balance click, per the implementation plan's own wording.
+    // ══════════════════════════════════════════
+    console.log('\n=== FINANCES PANEL ===');
+    await page.evaluate(() => {
+      (document.querySelector('[data-action="open-finances"]') as HTMLElement | null)?.click();
+    });
+    await new Promise(r => setTimeout(r, 400));
+    await screenshot(page, 'finances-panel');
+    await auditPanelButtons(page, 'bs-finances-panel', 'finances');
+    await page.evaluate(() => {
+      (document.querySelector('[data-action="open-finances"]') as HTMLElement | null)?.click();
+    });
+    await new Promise(r => setTimeout(r, 200));
+
+    // ══════════════════════════════════════════
+    // OPERATIONS PANEL (redesign P5)
+    // ══════════════════════════════════════════
+    console.log('\n=== OPERATIONS PANEL ===');
+    await clickToolbarButton(page, 'ops');
+    await new Promise(r => setTimeout(r, 400));
+    await screenshot(page, 'operations-panel');
+    await auditPanelButtons(page, 'bs-operations-panel', 'ops');
+
+    await clickToolbarButton(page, 'ops');
+    await new Promise(r => setTimeout(r, 200));
+
+    // ══════════════════════════════════════════
     // 10. EVENT DIALOG — trigger via pending event
     // ══════════════════════════════════════════
     console.log('\n=== EVENT DIALOG ===');

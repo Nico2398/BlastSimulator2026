@@ -32,6 +32,9 @@ export const LOCALE_SHARED_VALUE_ALLOWLIST: string[] = [
   'hud.speed_x',           // "{speed}×"
   'ui.employees.task_time', // "{t}t"
   'ui.blast_workshop.drill.diameter', // "Ø"
+  'ui.contracts.storage_value', // "{used} / {cap} kg"
+  'ui.contracts.delivered_line', // "{delivered} / {total} kg"
+  'ui.operations.mass_kg', // "{kg} kg"
 
   // ── Language picker endonyms ──
   'ui.settings.english', // "English"
@@ -61,4 +64,12 @@ export const LOCALE_SHARED_VALUE_ALLOWLIST: string[] = [
   'ui.blast_workshop.report.stat_fragments', // "Fragments"
   'ui.blast_workshop.report.stat_volume', // "Volume"
   'ui.blast_workshop.report.stat_projections', // "Projections"
+  'ui.contracts.total', // "Total"
+  'ui.contracts.max', // "Max"
+  'ui.finances.title', // "Finances"
+  'ui.finances.category.construction', // "Construction"
+  'ui.finances.category.corruption', // "Corruption"
+  'ui.finances.category.mafia', // "Mafia"
+  'ui.operations.fragment_count', // "{count} fragments"
+  'ui.operations.incidents', // "Incidents"
 ];

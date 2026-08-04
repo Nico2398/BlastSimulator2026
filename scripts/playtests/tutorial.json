@@ -438,7 +438,7 @@
       }
     },
     {
-      "goal": "change the site policy from Settings",
+      "goal": "change the site policy from Operations",
       "actions": [
         {
           "do": "awaitTutorialStep",
@@ -446,7 +446,7 @@
         },
         {
           "do": "click",
-          "selector": "#bs-toolbar [data-panel=\"settings\"]"
+          "selector": "#bs-toolbar [data-panel=\"ops\"]"
         },
         {
           "do": "click",

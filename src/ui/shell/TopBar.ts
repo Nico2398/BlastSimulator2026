@@ -58,7 +58,7 @@ export function netPerTick(state: GameState, windowTicks = TREND_WINDOW_TICKS): 
 
 export class TopBar {
   private readonly root: HTMLElement;
-  private readonly balanceWrap: HTMLElement;
+  private readonly balanceWrap: HTMLButtonElement;
   private readonly balanceValue: HTMLElement;
   private readonly trendValue: HTMLElement;
   private readonly trendIcon: HTMLElement;
@@ -96,10 +96,13 @@ export class TopBar {
       'pointer-events:all',
     ].join(';');
 
-    // ── Balance ── (no destination panel yet — Finances lands in P5, so this
-    // is a div, not a button, until there's somewhere for a click to go).
-    this.balanceWrap = document.createElement('div');
-    this.balanceWrap.style.cssText = 'display:flex;flex:0 0 auto;align-items:center;gap:10px;padding:0 16px;border-right:1px solid var(--bsx-hairline)';
+    // ── Balance ── click opens the Finances panel (P5).
+    this.balanceWrap = document.createElement('button');
+    this.balanceWrap.dataset['action'] = 'open-finances';
+    this.balanceWrap.style.cssText = 'display:flex;flex:0 0 auto;align-items:center;gap:10px;padding:0 16px;border:0;border-right:1px solid var(--bsx-hairline);background:transparent;cursor:pointer;font:inherit;text-align:left';
+    this.balanceWrap.addEventListener('click', () => this.onNavigate?.('finances'));
+    this.balanceWrap.addEventListener('mouseenter', () => { this.balanceWrap.style.background = 'rgba(255,255,255,.05)'; });
+    this.balanceWrap.addEventListener('mouseleave', () => { this.balanceWrap.style.background = 'transparent'; });
     this.balanceWrap.appendChild(iconEl('finance', 17));
     const balCol = el('div');
     balCol.style.cssText = 'display:flex;flex-direction:column;gap:2px';

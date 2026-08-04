@@ -134,7 +134,7 @@ async function runA11yCheck(port: number, viewport: { width: number; height: num
     // Reveal every panel. Controls inside a closed panel measure zero-size and
     // would be skipped, leaving most of the UI's text unchecked.
     const panelsShown = await page.evaluate(() => {
-      const ids = ['bs-blast-panel', 'bs-contract-panel', 'bs-build-panel',
+      const ids = ['bs-blast-panel', 'bs-contract-panel', 'bs-finances-panel', 'bs-operations-panel', 'bs-build-panel',
         'bs-vehicle-panel', 'bs-employee-panel', 'bs-survey-panel',
         'bs-selection-bar']; // scene selection bar (redesign P2) — hidden until a scene entity is selected
       let shown = 0;

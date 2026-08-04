@@ -19,6 +19,7 @@ const RAIL_ENTRIES: readonly RailEntry[] = [
   { panel: 'blast', icon: 'blast', labelKey: 'shell.rail.blast' },
   { panel: 'survey', icon: 'survey', labelKey: 'shell.rail.survey' },
   { panel: 'contracts', icon: 'contract', labelKey: 'shell.rail.contracts' },
+  { panel: 'ops', icon: 'ops', labelKey: 'shell.rail.ops' },
   { panel: 'build', icon: 'build', labelKey: 'shell.rail.build' },
   { panel: 'vehicles', icon: 'vehicle', labelKey: 'shell.rail.vehicles' },
   { panel: 'employees', icon: 'crew', labelKey: 'shell.rail.employees' },
