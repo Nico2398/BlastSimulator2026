@@ -49,23 +49,46 @@ const momentsFor = (durationS: number): number[] => [
 interface Scenario {
   id: string;
   title: string;
-  kg: string;
-  stemming: string;
-  rows: number;
-  cols: number;
-  spacing: number;
+  /** Everything up to (not including) the blast itself. */
+  setup: string[];
+  /** Where the camera looks, and from how far. */
+  camera: { x: number; z: number; distance: number; yaw: number; pitch: number };
 }
+
+const bench = (kg: string, stemming: string): string[] => [
+  'new_game seed:42',
+  `drill_plan grid rows:4 cols:4 spacing:3 depth:8 start:${SITE.x - 4},${SITE.z - 4}`,
+  `charge hole:* explosive:dynatomics amount:${kg} stemming:${stemming}`,
+  'sequence auto delay_step:25',
+];
 
 const SCENARIOS: Scenario[] = [
   {
     id: 'a-stemmed',
     title: '3 kg dynatomics per hole, 2 m stemming, 4x4 at 3 m',
-    kg: '3', stemming: '2', rows: 4, cols: 4, spacing: 3,
+    setup: bench('3', '2'),
+    camera: { ...SITE, ...CAMERA },
   },
   {
     id: 'b-unstemmed',
     title: '20 kg dynatomics per hole, NO stemming, 4x4 at 3 m',
-    kg: '20', stemming: '0', rows: 4, cols: 4, spacing: 3,
+    setup: bench('20', '0'),
+    camera: { ...SITE, ...CAMERA },
+  },
+  // The tutorial's own first shot, fired the way the tutorial now teaches it:
+  // box cut dug first, pattern beside it, rock breaking toward the void.
+  {
+    id: 'c-tutorial-boxcut',
+    title: 'Tutorial: 5 kg boomite, 3x3 at 5 m, box cut west of the pattern',
+    setup: [
+      'new_game seed:42 size:24',
+      'campaign start level:tutorial_pit',
+      'build_ramp start:16,19 end:16,31 depth:8',
+      'drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:20,20',
+      'charge hole:* explosive:boomite amount:5 stemming:2',
+      'sequence auto delay_step:25',
+    ],
+    camera: { x: 23, z: 25, distance: 34, yaw: 100, pitch: 42 },
   },
 ];
 
@@ -81,7 +104,7 @@ async function run(page: Page, command: string): Promise<string> {
 }
 
 /** One camera for the whole series, so only the rock moves between shots. */
-async function aimCamera(page: Page): Promise<void> {
+async function aimCamera(page: Page, camera: Scenario['camera']): Promise<void> {
   await page.evaluate((c: { x: number; z: number; d: number; yaw: number; pitch: number }) => {
     const w = window as unknown as {
       __cameraFocus?: (x: number, z: number, d: number) => void;
@@ -89,7 +112,7 @@ async function aimCamera(page: Page): Promise<void> {
     };
     w.__cameraOrbit?.(c.yaw, c.pitch);
     w.__cameraFocus?.(c.x, c.z, c.d);
-  }, { ...SITE, d: CAMERA.distance, yaw: CAMERA.yaw, pitch: CAMERA.pitch });
+  }, { x: camera.x, z: camera.z, d: camera.distance, yaw: camera.yaw, pitch: camera.pitch });
 }
 
 async function playbackDuration(page: Page): Promise<number> {
@@ -110,22 +133,16 @@ async function muckPile(page: Page): Promise<Record<string, unknown>> {
 }
 
 async function shoot(page: Page, scenario: Scenario): Promise<Record<string, unknown>> {
-  await run(page, 'new_game seed:42');
-  await settle(400);
-  await run(page, `drill_plan grid rows:${scenario.rows} cols:${scenario.cols} `
-    + `spacing:${scenario.spacing} depth:8 start:${SITE.x - 4},${SITE.z - 4}`);
-  await settle(400);
-  const charge = await run(page, `charge hole:* explosive:dynatomics `
-    + `amount:${scenario.kg} stemming:${scenario.stemming}`);
-  if (/error/i.test(charge)) throw new Error(`charge rejected: ${charge.split('\n')[0]}`);
-  await settle(400);
-  await run(page, 'sequence auto delay_step:25');
-  await settle(400);
+  for (const command of scenario.setup) {
+    const out = await run(page, command);
+    if (/^Errors?:/im.test(out)) throw new Error(`${command} rejected: ${out.split('\n')[0]}`);
+    await settle(400);
+  }
 
-  await aimCamera(page);
+  await aimCamera(page, scenario.camera);
   const report = await run(page, 'blast');
   await settle(600);
-  await aimCamera(page);
+  await aimCamera(page, scenario.camera);
 
   const durationS = await playbackDuration(page);
   const moments = momentsFor(durationS);
@@ -134,7 +151,7 @@ async function shoot(page: Page, scenario: Scenario): Promise<Record<string, unk
   for (let i = 0; i < moments.length; i++) {
     const t = moments[i]!;
     await seek(page, t);
-    await aimCamera(page);
+    await aimCamera(page, scenario.camera);
     await settle(300);
     await page.screenshot({
       path: resolve(OUT, `${scenario.id}-${i + 1}.jpg`),
