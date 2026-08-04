@@ -32,7 +32,7 @@ import { Random } from '../../core/math/Random.js';
 import { buyTubing, installTubing } from '../../core/mining/Tubing.js';
 import type { FragmentData } from '../../core/mining/BlastExecution.js';
 import { runSurvey, SURVEY_METHODS, type SurveyMethod, computeBlastOreReport } from '../../core/mining/SurveyCalc.js';
-import { SURVEY_COSTS } from '../../core/config/balance.js';
+import { SURVEY_COSTS, VOXEL_SIZE_CM } from '../../core/config/balance.js';
 import { detectOreReport } from '../../core/events/EventEngine.js';
 import { NavGrid } from '../../core/nav/NavGrid.js';
 import { getStorageCapacity } from '../../core/entities/Building.js';
@@ -469,6 +469,28 @@ export function blastPreviewCommand(
   const fragmentPreview = previewFragments(plan, ctx.grid!, tier);
   const projectionPreview = previewProjections(plan, ctx.grid!, tier);
   const vibrationPreview = previewVibrations(plan, [], tier);
+
+  ctx.state!.lastBlastPreview = {
+    tier,
+    energy: energyPreview
+      ? { affectedVoxels: energyPreview.energyMap.size, minEnergy: energyPreview.minEnergy, maxEnergy: energyPreview.maxEnergy }
+      : null,
+    fragments: fragmentPreview
+      ? {
+        fractured: fragmentPreview.fracturedCount, cracked: fragmentPreview.crackedCount, unaffected: fragmentPreview.unaffectedCount,
+        avgFragmentSizeCm: fragmentPreview.avgFragmentSize * VOXEL_SIZE_CM,
+      }
+      : null,
+    projections: projectionPreview
+      ? {
+        projectionZoneVoxels: projectionPreview.projectionZoneCount,
+        collapseFragments: Math.max(0, (fragmentPreview?.fracturedCount ?? 0) + (fragmentPreview?.crackedCount ?? 0) - projectionPreview.projectionZoneCount),
+      }
+      : null,
+    vibrations: vibrationPreview
+      ? { maxVibration: vibrationPreview.maxVibration, affectedVillages: vibrationPreview.villages.length }
+      : null,
+  };
 
   const lines: string[] = ['=== BLAST PREVIEW ==='];
 

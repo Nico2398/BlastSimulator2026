@@ -7,6 +7,7 @@ import type { HoleCharge } from '../mining/ChargePlan.js';
 import type { SurveyResult } from '../mining/SurveyCalc.js';
 import type { BlastOreReport } from '../mining/BlastOreReport.js';
 import type { BlastReport } from '../mining/BlastExecution.js';
+import type { BlastPreviewSummary } from '../mining/Software.js';
 import type { TubingState } from '../mining/Tubing.js';
 import { createTubingState } from '../mining/Tubing.js';
 import type { FinanceState } from '../economy/Finance.js';
@@ -209,6 +210,8 @@ export interface GameState {
   lastBlastReport: BlastReport | null;
   /** Purchased blast-preview software tier (0 = none, up to MAX_SOFTWARE_TIER). */
   softwareTier: number;
+  /** Structured result of the last blast_preview run, for the Preview step (redesign P4/§5). Null until first run. */
+  lastBlastPreview: BlastPreviewSummary | null;
   /** Tubing inventory and installed-hole set, for waterproofing charges against rain. */
   tubingState: TubingState;
 }
@@ -310,6 +313,7 @@ export function createGame(config: GameConfig): GameState {
     lastOreReport: null,
     lastBlastReport: null,
     softwareTier: 0,
+    lastBlastPreview: null,
     tubingState: createTubingState(),
   };
 }

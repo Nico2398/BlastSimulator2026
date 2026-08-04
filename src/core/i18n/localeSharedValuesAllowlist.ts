@@ -54,4 +54,5 @@ export const LOCALE_SHARED_VALUE_ALLOWLIST: string[] = [
   'ui.build.ramp_section',      // "Terrain"
   'ui.settings.audio',          // "Volume"
   'sandbox.field.biome',        // "Biome"
+  'ui.blast_workshop.preview.row_fragments', // "Fragments"
 ];

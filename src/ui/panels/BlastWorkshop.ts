@@ -1,11 +1,10 @@
 // BlastSimulator2026 — Blast Workshop panel (redesign P4)
 // Replaces BlastPlanUI with a 5-step workflow (Drill → Charge → Sequence →
-// Preview → Fire) plus a sticky footer. Drill, Charge, and Sequence are built
-// to the full design spec (tasks P4/#22-24); Preview and Fire's step-specific
-// body are still placeholders — the tutorial's preview/blast stages don't
-// need them (Preview is optional, and Fire's own body is separate from the
-// always-visible sticky footer's FIRE button). Tasks P4/#25-26 replace those
-// last two stubs in place.
+// Preview → Fire) plus a sticky footer. Drill, Charge, Sequence, and Preview
+// are built to the full design spec (tasks P4/#22-25); Fire's step-specific
+// body is still a placeholder — the tutorial's blast stage doesn't need it,
+// since Fire's own body is separate from the always-visible sticky footer's
+// FIRE button. Task P4/#26 replaces that last stub in place.
 
 import { t } from '../../core/i18n/I18n.js';
 import { el } from '../dom.js';
@@ -91,6 +90,7 @@ export class BlastWorkshop {
     for (let n = 1; n <= 5; n++) {
       const step = n as StepId;
       const btn = el('button');
+      btn.dataset['step'] = String(step);
       btn.style.cssText = 'flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;padding:8px 2px 7px;border-radius:5px;cursor:pointer';
       const numEl = el('div', { text: String(step) });
       numEl.style.cssText = 'display:flex;align-items:center;justify-content:center;width:19px;height:19px;border-radius:50%;font:700 10px/1 var(--bsx-font-mono)';
@@ -136,6 +136,7 @@ export class BlastWorkshop {
     this.drillStep.setGameConsole(fn);
     this.chargeStep.setGameConsole(fn);
     this.sequenceStep.setGameConsole(fn);
+    this.previewStep.setGameConsole(fn);
     this.footer.setGameConsole(fn);
   }
 
@@ -164,6 +165,7 @@ export class BlastWorkshop {
     this.drillStep.update(state, weather);
     this.chargeStep.update(state, weather);
     this.sequenceStep.update(state);
+    this.previewStep.update(state);
     this.footer.update(state);
   }
 

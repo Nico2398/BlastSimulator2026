@@ -332,6 +332,105 @@ describe('blast_preview', () => {
   });
 });
 
+// ── blast_preview — state.lastBlastPreview ───────────────────────────────────
+
+describe('blast_preview — state.lastBlastPreview', () => {
+  function makePlan(ctx: MiningContext, tier?: number): void {
+    if (tier !== undefined) ctx.state!.softwareTier = tier;
+    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+    chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
+    sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
+  }
+
+  it('is null before any preview has run', () => {
+    const ctx = makeMiningContext();
+    expect(ctx.state!.lastBlastPreview).toBeNull();
+  });
+
+  it('stays untouched (does not throw) when the guard rejects the run', () => {
+    const ctx = makeMiningContext();
+    blastPreviewCommand(ctx, [], {});
+    expect(ctx.state!.lastBlastPreview).toBeNull();
+  });
+
+  it('tier 0 — every section is null, tier is recorded', () => {
+    const ctx = makeMiningContext();
+    makePlan(ctx);
+
+    blastPreviewCommand(ctx, [], {});
+
+    expect(ctx.state!.lastBlastPreview).toEqual({
+      tier: 0, energy: null, fragments: null, projections: null, vibrations: null,
+    });
+  });
+
+  it('tier 1 — energy populated with real numbers, later sections still null', () => {
+    const ctx = makeMiningContext();
+    makePlan(ctx, 1);
+
+    blastPreviewCommand(ctx, [], {});
+
+    const preview = ctx.state!.lastBlastPreview!;
+    expect(preview.tier).toBe(1);
+    expect(preview.energy).not.toBeNull();
+    expect(preview.energy!.affectedVoxels).toBeGreaterThan(0);
+    expect(preview.energy!.maxEnergy).toBeGreaterThanOrEqual(preview.energy!.minEnergy);
+    expect(preview.fragments).toBeNull();
+    expect(preview.projections).toBeNull();
+    expect(preview.vibrations).toBeNull();
+  });
+
+  it('tier 2 — fragments populated, avgFragmentSizeCm converted from the raw 0-1 fraction', () => {
+    const ctx = makeMiningContext();
+    makePlan(ctx, 2);
+
+    blastPreviewCommand(ctx, [], {});
+
+    const fragments = ctx.state!.lastBlastPreview!.fragments!;
+    expect(fragments.fractured + fragments.cracked + fragments.unaffected).toBeGreaterThan(0);
+    // A fraction of one voxel edge (VOXEL_SIZE_CM=100) never exceeds 100cm.
+    expect(fragments.avgFragmentSizeCm).toBeGreaterThan(0);
+    expect(fragments.avgFragmentSizeCm).toBeLessThanOrEqual(100);
+  });
+
+  it('tier 3 — projections populated with a non-negative collapseFragments', () => {
+    const ctx = makeMiningContext();
+    makePlan(ctx, 3);
+
+    blastPreviewCommand(ctx, [], {});
+
+    const projections = ctx.state!.lastBlastPreview!.projections!;
+    expect(projections.projectionZoneVoxels).toBeGreaterThanOrEqual(0);
+    expect(projections.collapseFragments).toBeGreaterThanOrEqual(0);
+  });
+
+  it('tier 4 — vibrations populated (0 affected villages: none are wired into this command yet)', () => {
+    const ctx = makeMiningContext();
+    makePlan(ctx, 4);
+
+    blastPreviewCommand(ctx, [], {});
+
+    const preview = ctx.state!.lastBlastPreview!;
+    expect(preview.vibrations).not.toBeNull();
+    expect(preview.vibrations!.affectedVillages).toBe(0);
+    expect(preview.fragments).not.toBeNull();
+    expect(preview.projections).not.toBeNull();
+  });
+
+  it('a later run overwrites the earlier snapshot rather than merging it', () => {
+    const ctx = makeMiningContext();
+    makePlan(ctx, 1);
+    blastPreviewCommand(ctx, [], {});
+    expect(ctx.state!.lastBlastPreview!.tier).toBe(1);
+
+    ctx.state!.softwareTier = 4;
+    blastPreviewCommand(ctx, [], {});
+
+    expect(ctx.state!.lastBlastPreview!.tier).toBe(4);
+    expect(ctx.state!.lastBlastPreview!.vibrations).not.toBeNull();
+  });
+});
+
 // ── surveyCommand ─────────────────────────────────────────────────────────────
 
 describe('surveyCommand', () => {
