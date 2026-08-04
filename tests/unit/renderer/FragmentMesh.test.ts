@@ -11,7 +11,7 @@ import { FragmentMesh } from '../../../src/renderer/FragmentMesh.js';
 import { rockIndexOf } from '../../../src/core/world/RockCatalog.js';
 import { oreIndexOf } from '../../../src/core/world/OreCatalog.js';
 
-const SHAPE_VARIANTS = 8;
+const SHAPE_VARIANTS = 24;
 
 /** A cheap stand-in for the shared TerrainMaterial — these tests exercise slot bookkeeping, not shading. */
 function makeMaterial(): THREE.Material {
@@ -126,13 +126,23 @@ describe('FragmentMesh (InstancedMesh)', () => {
     const im = collectInstancedMeshes(scene).find(m => m.count > 0)!;
     const mtx = new THREE.Matrix4();
     im.getMatrixAt(0, mtx);
-    const scale = new THREE.Vector3();
-    mtx.decompose(new THREE.Vector3(), new THREE.Quaternion(), scale);
 
-    // A flat slab must render flat, not as a cube of equivalent volume.
-    expect(scale.x).toBeCloseTo(3.0, 4);
-    expect(scale.y).toBeCloseTo(0.6, 4);
-    expect(scale.z).toBeCloseTo(1.5, 4);
+    // A flat slab must render flat, not as a cube of equivalent volume. The
+    // instance matrix carries rotation and a slight shear as well as the
+    // scale, so read the singular values: the lengths of the images of the
+    // basis vectors approximate the axis extents whatever the orientation.
+    const cols = [
+      Math.hypot(mtx.elements[0]!, mtx.elements[1]!, mtx.elements[2]!),
+      Math.hypot(mtx.elements[4]!, mtx.elements[5]!, mtx.elements[6]!),
+      Math.hypot(mtx.elements[8]!, mtx.elements[9]!, mtx.elements[10]!),
+    ].sort((a, b) => a - b);
+
+    // Shear sits between rotation and scale, so it stretches a column by at
+    // most sqrt(1 + 2·SHEAR_MAX²) ≈ 3% — a flat slab stays flat.
+    expect(cols[0]!).toBeGreaterThan(0.58);
+    expect(cols[0]!).toBeLessThan(0.63);
+    expect(cols[2]!).toBeGreaterThan(2.95);
+    expect(cols[2]!).toBeLessThan(3.1);
   });
 
   it('projection fragments are rendered (isProjection=true)', () => {

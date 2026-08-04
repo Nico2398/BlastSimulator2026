@@ -83,7 +83,35 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   // ── Step 3: hire-driller ──
   createHireStep('hire-driller', 'tutorial.step4.title', 'tutorial.step4', 'driller'),
 
-  // ── Step 4: drill-plan ──
+  // ── Step 4: box-cut ──
+  // Real pits start the way this step does: an access ramp and a starter cut
+  // are dug *before* the first shot, because blasted rock swells and has to
+  // have somewhere to go. Firing into flat ground leaves the fragments sitting
+  // in a stable layout — nothing visibly collapses, and the player learns
+  // nothing about free faces. The cut is dug just west of where the drill
+  // pattern goes, so the first blast breaks toward it.
+  {
+    id: 'box-cut',
+    titleKey: 'tutorial.step_boxcut.title',
+    textKey: 'tutorial.step_boxcut',
+    highlightTarget: TOOLBAR_TARGET.build,
+    commands: ['build_ramp start:16,19 end:16,31 depth:8'],
+    waitsOnWork: true,
+    captureSnapshot: (state: GameState) => ({
+      prevRampCount: state.navGrid
+        ? countNavCellsByType(state.navGrid.cells, 'ramp')
+        : 0,
+    }),
+    isComplete: (state: GameState, snapshot: Record<string, unknown>) => {
+      const prev = snapshot.prevRampCount as number;
+      const current = state.navGrid
+        ? countNavCellsByType(state.navGrid.cells, 'ramp')
+        : 0;
+      return current > prev;
+    },
+  },
+
+  // ── Step 5: drill-plan ──
   createComparisonStep('drill-plan', 'tutorial.step5.title', 'tutorial.step5', (s) => (s.drillHoles ?? []).length, ['drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:20,20'], TOOLBAR_TARGET.blast),
 
   // ── Step 5: charge ──
@@ -198,28 +226,6 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     cash: state.cash,
     contracts: { ...(state.contracts ?? {}) },
   }), '#bs-hud-top .bs-balance'),
-
-  // ── Step 17: build-ramp ──
-  {
-    id: 'build-ramp',
-    titleKey: 'tutorial.step18.title',
-    textKey: 'tutorial.step18',
-    highlightTarget: TOOLBAR_TARGET.build,
-    commands: ['build_ramp start:10,15 end:10,25'],
-    waitsOnWork: true,
-    captureSnapshot: (state: GameState) => ({
-      prevRampCount: state.navGrid
-        ? countNavCellsByType(state.navGrid.cells, 'ramp')
-        : 0,
-    }),
-    isComplete: (state: GameState, snapshot: Record<string, unknown>) => {
-      const prev = snapshot.prevRampCount as number;
-      const current = state.navGrid
-        ? countNavCellsByType(state.navGrid.cells, 'ramp')
-        : 0;
-      return current > prev;
-    },
-  },
 
   // ── Step 18: needs ──
   createAutoAdvanceStep('needs', 'tutorial.step19.title', 'tutorial.step19', (state: GameState) => ({

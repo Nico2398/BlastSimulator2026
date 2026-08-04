@@ -166,7 +166,23 @@ straight drop it reduces to free fall from rest. Skipping playback entirely is a
 `SceneManager` caps a frame at 0.1 s of animation time, and a frame costs seconds without a GPU, so
 a collapse takes many minutes of wall clock to finish on screen and rock photographs as if it were
 floating. `FragmentAnimator.finish()` — `window.__skipBlastPlayback()` from a harness — puts every
-fragment on its resting place in one write.
+fragment on its resting place in one write, and `seek(t)` — `window.__seekBlastPlayback(t)` — holds
+the collapse at an exact moment, so a frame-by-frame series lands on the times it asked for rather
+than the times the frame rate allowed.
+
+**Fragment meshes** (`FragmentMesh.ts`) are instanced: 24 shared geometries, each a unit cube sliced
+by seeded planes into a closed convex "cut stone" (`FragmentGeometry.ts`), scaled per instance to the
+fragment's half-extents, with a seeded orientation and slight shear so instances of one variant read
+as different rocks. The stones are watertight by construction and by test — never go back to
+jittering a box's vertices, whose per-face duplicates tear apart into floating planes. The shear
+lives inside the instance matrix, so position updates must write the translation column only; a
+TRS decompose/recompose silently strips it.
+
+**The whole blast resolves synchronously inside the click**, so the pipeline's cost is a frame the
+player feels. Its hot paths are engineered accordingly — typed-array frontier in propagation, per-
+voxel seed-list caching in fragment generation, a spatial hash in projectile grouping, memoised
+surface queries under the arcs. Profile before and after touching any of them; a 16-hole blast
+budget is ~300 ms.
 
 ## Software Upgrades (Prediction Tools)
 

@@ -1,15 +1,20 @@
 // BlastSimulator2026 — Fragment Meshes (Performance-optimised)
 // Renders blast fragments using InstancedMesh for batched GPU rendering.
-// 8 shape variants × 1 InstancedMesh each = 8 draw calls regardless of fragment count.
+// 24 shape variants × 1 InstancedMesh each = 24 draw calls regardless of count.
 // Each instance is scaled to the fragment's own bounding box, so the size and
 // proportions the blast carved are what the player sees.
 // Rock/ore identity is carried per-instance (aRockA/aRockB/aRockWeight/aOre)
 // and shaded by the shared TerrainMaterial, so a fragment's cut face matches
 // the rock it broke off from (#458 T4.1/D9/A18).
 //
+// The variant geometries are closed cut-stone polyhedra (FragmentGeometry.ts).
+// Each instance also gets a seeded orientation and a slight shear, so two
+// instances of one variant never read as the same rock. The shear lives inside
+// the instance matrix — position updates must preserve it (see updatePositions).
+//
 // Performance target: 2000 fragments at 60fps
 // Previous: 2000 individual meshes × material clones → thousands of draw calls
-// Now:      8 InstancedMesh objects → 8 draw calls for any fragment count
+// Now:      24 InstancedMesh objects → 24 draw calls for any fragment count
 
 import * as THREE from 'three';
 import type { FragmentData } from '../core/mining/BlastExecution.js';
@@ -17,6 +22,7 @@ import { rockIndexOf } from '../core/world/RockCatalog.js';
 import { oreIndexOf } from '../core/world/OreCatalog.js';
 import { FRAGMENT_MIN_RENDER_Y } from '../core/config/balance.js';
 import { sampleEvenly } from './FragmentRenderSampling.js';
+import { buildFragmentGeometries } from './FragmentGeometry.js';
 
 // ---------- Config ----------
 
@@ -29,7 +35,11 @@ const MIN_RENDER_EXTENT = 0.25;
 const MAX_RENDERED_FRAGMENTS = 2000;
 
 // Number of irregular shape variants
-const SHAPE_VARIANTS = 8;
+const SHAPE_VARIANTS = 24;
+
+// How far a fragment's unit shape is skewed by its per-instance shear. Small on
+// purpose: at 0.18 the silhouette changes, the volume barely does.
+const SHEAR_MAX = 0.18;
 
 // Capacity per variant bucket — evenly split; some buckets may have slightly more
 const BUCKET_CAPACITY = Math.ceil(MAX_RENDERED_FRAGMENTS / SHAPE_VARIANTS);
@@ -39,23 +49,14 @@ const BUCKET_CAPACITY = Math.ceil(MAX_RENDERED_FRAGMENTS / SHAPE_VARIANTS);
 let sharedGeometries: THREE.BufferGeometry[] | null = null;
 
 function getSharedGeometries(): THREE.BufferGeometry[] {
-  if (!sharedGeometries) {
-    sharedGeometries = [];
-    for (let i = 0; i < SHAPE_VARIANTS; i++) {
-      const geo = new THREE.BoxGeometry(1, 1, 1, 1, 1, 1);
-      const pos = geo.getAttribute('position') as THREE.BufferAttribute;
-      const jitter = 0.15 + (i % 4) * 0.05;
-      for (let v = 0; v < pos.count; v++) {
-        pos.setX(v, pos.getX(v) + (Math.sin(v * 7 + i * 13) * jitter));
-        pos.setY(v, pos.getY(v) + (Math.sin(v * 11 + i * 7) * jitter));
-        pos.setZ(v, pos.getZ(v) + (Math.sin(v * 13 + i * 5) * jitter));
-      }
-      pos.needsUpdate = true;
-      geo.computeVertexNormals();
-      sharedGeometries.push(geo);
-    }
-  }
+  if (!sharedGeometries) sharedGeometries = buildFragmentGeometries(SHAPE_VARIANTS);
   return sharedGeometries;
+}
+
+/** Deterministic pseudo-random in [0, 1) from a fragment's shape seed. */
+function seedUnit(seed: number, salt: number): number {
+  const x = Math.sin(seed * 127.1 + salt * 311.7) * 43758.5453;
+  return x - Math.floor(x);
 }
 
 // ---------- Per-instance slot tracking ----------
@@ -95,9 +96,12 @@ export class FragmentMesh {
   private readonly instanceOre: THREE.InstancedBufferAttribute[] = [];
 
   private static readonly _mtx = new THREE.Matrix4();
+  private static readonly _shear = new THREE.Matrix4();
   private static readonly _scale = new THREE.Vector3();
   private static readonly _quat = new THREE.Quaternion();
   private static readonly _pos = new THREE.Vector3();
+  private static readonly _euler = new THREE.Euler();
+  private static readonly _unit = new THREE.Vector3(1, 1, 1);
 
   /** `material` is the shared TerrainMaterial (borrowed from TerrainMesh, which owns and disposes it — #458 T4.1/D9). */
   constructor(scene: THREE.Scene, material: THREE.Material) {
@@ -173,16 +177,23 @@ export class FragmentMesh {
         Math.max(MIN_RENDER_EXTENT, frag.halfExtents.y * 2),
         Math.max(MIN_RENDER_EXTENT, frag.halfExtents.z * 2),
       );
-      FragmentMesh._quat.setFromEuler(new THREE.Euler(
-        (frag.shapeSeed * 1.3) % (Math.PI * 2),
-        (frag.shapeSeed * 2.7) % (Math.PI * 2),
-        (frag.shapeSeed * 0.9) % (Math.PI * 2),
+      FragmentMesh._quat.setFromEuler(FragmentMesh._euler.set(
+        seedUnit(frag.shapeSeed, 1) * Math.PI * 2,
+        seedUnit(frag.shapeSeed, 2) * Math.PI * 2,
+        seedUnit(frag.shapeSeed, 3) * Math.PI * 2,
       ));
-      FragmentMesh._mtx.compose(
-        FragmentMesh._pos,
-        FragmentMesh._quat,
-        FragmentMesh._scale,
-      );
+      // A slight seeded shear, so two instances of the same variant stone never
+      // read as identical. It sits *between* rotation and scale (T·R·Shear·S):
+      // applied outside the scale, a slab's long axis would bleed into its thin
+      // one and a flat fragment stopped rendering flat.
+      const shear = FragmentMesh._shear.identity();
+      const e = shear.elements;
+      e[4] = (seedUnit(frag.shapeSeed, 4) * 2 - 1) * SHEAR_MAX;  // x from y
+      e[8] = (seedUnit(frag.shapeSeed, 5) * 2 - 1) * SHEAR_MAX;  // x from z
+      e[9] = (seedUnit(frag.shapeSeed, 6) * 2 - 1) * SHEAR_MAX;  // y from z
+      FragmentMesh._mtx.compose(FragmentMesh._pos, FragmentMesh._quat, FragmentMesh._unit);
+      FragmentMesh._mtx.multiply(shear);
+      FragmentMesh._mtx.scale(FragmentMesh._scale);
       im.setMatrixAt(count, FragmentMesh._mtx);
 
       // Rock/ore identity for the shared TerrainMaterial shader — a fragment
@@ -225,10 +236,10 @@ export class FragmentMesh {
       if (!slot) continue;
       const im = this.instancedMeshes[slot.meshIdx]!;
       im.getMatrixAt(slot.slotIdx, FragmentMesh._mtx);
-      // Decompose, update position, recompose
-      FragmentMesh._mtx.decompose(FragmentMesh._pos, FragmentMesh._quat, FragmentMesh._scale);
-      FragmentMesh._pos.set(pos.x, pos.y, pos.z);
-      FragmentMesh._mtx.compose(FragmentMesh._pos, FragmentMesh._quat, FragmentMesh._scale);
+      // Only the translation column changes. Decomposing to TRS and
+      // recomposing — the old way — silently destroyed the per-instance shear
+      // (TRS cannot represent it), and cost a decompose per fragment per frame.
+      FragmentMesh._mtx.setPosition(pos.x, pos.y, pos.z);
       im.setMatrixAt(slot.slotIdx, FragmentMesh._mtx);
       dirtyBuckets.add(slot.meshIdx);
     }

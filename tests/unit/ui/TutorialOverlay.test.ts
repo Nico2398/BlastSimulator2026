@@ -480,11 +480,12 @@ describe('TutorialOverlay (12.4)', () => {
       tut.setGameConsole(gameConsole);
       tut.start(state);
 
-      // Set to step 8 (scores) so advanceToNextStep goes to step 9 (event-fire-resolve)
-      tut.stepIndex = 8;
+      // Set to the scores step so advanceToNextStep goes to event-fire-resolve
+      // (shifted by one when the box-cut step joined the early tutorial).
+      tut.stepIndex = 9;
       tut.advanceToNextStep();
 
-      expect(tut.stepIndex).toBe(9);
+      expect(tut.stepIndex).toBe(10);
       expect(gameConsole).toHaveBeenCalledWith('tick 3');
     });
 
@@ -497,7 +498,7 @@ describe('TutorialOverlay (12.4)', () => {
       tut.start(state);
 
       // createMockState does not include events → pendingEvent is undefined (== null)
-      tut.stepIndex = 8;
+      tut.stepIndex = 9;
       tut.advanceToNextStep();
 
       expect(gameConsole).toHaveBeenCalledWith('event fire tutorial_synergy_consultant');

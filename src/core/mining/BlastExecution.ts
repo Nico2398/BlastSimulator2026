@@ -212,7 +212,9 @@ export function executeBlast(
         volume: gen.volumeM3,
         mass: gen.massKg,
         rockId: gen.rockId,
-        oreDensities: { ...gen.oreDensities },
+        // generateFragments builds this record fresh per fragment — take
+        // ownership instead of copying it again.
+        oreDensities: gen.oreDensities,
         initialVelocity: velocity,
         isProjection: vecLength(velocity) > PROJECTION_SPEED_THRESHOLD,
         halfExtents: gen.halfExtents,
@@ -250,18 +252,21 @@ export function executeBlast(
     maxThrowDistance = resolved.maxThrowDistance;
   }
 
-  // 4b. Compute cleared region AABB from toClear for navmesh dirty-region update
+  // 4b. Compute cleared region AABB from toClear for navmesh dirty-region
+  //     update. One pass with running bounds — a reduce allocating an object
+  //     per voxel showed up in the blast's frame budget.
+  let regMinX = Infinity, regMaxX = -Infinity, regMinY = Infinity, regMaxY = -Infinity, regMinZ = Infinity, regMaxZ = -Infinity;
+  for (const { x, y, z } of toClear) {
+    if (x < regMinX) regMinX = x;
+    if (x > regMaxX) regMaxX = x;
+    if (y < regMinY) regMinY = y;
+    if (y > regMaxY) regMaxY = y;
+    if (z < regMinZ) regMinZ = z;
+    if (z > regMaxZ) regMaxZ = z;
+  }
   const clearedRegion: BlastRegion = toClear.length === 0
     ? { minX: 0, maxX: -1, minZ: 0, maxZ: -1 }
-    : toClear.reduce(
-        (acc, { x, z }) => ({
-          minX: Math.min(acc.minX, x),
-          maxX: Math.max(acc.maxX, x),
-          minZ: Math.min(acc.minZ, z),
-          maxZ: Math.max(acc.maxZ, z),
-        }),
-        { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity },
-      );
+    : { minX: regMinX, maxX: regMaxX, minZ: regMinZ, maxZ: regMaxZ };
 
   // 5a. The crater is whatever the energy actually broke. There used to be a
   //     forced excavation pass here that carved a fixed-radius pit around the
@@ -274,15 +279,9 @@ export function executeBlast(
   //     changed, covering both the fracture-pass clears and anything the
   //     crater pass added afterward.
   if (toClear.length > 0) {
-    const updatedRegion = toClear.reduce(
-      (acc, { x, y, z }) => ({
-        minX: Math.min(acc.minX, x), maxX: Math.max(acc.maxX, x),
-        minY: Math.min(acc.minY, y), maxY: Math.max(acc.maxY, y),
-        minZ: Math.min(acc.minZ, z), maxZ: Math.max(acc.maxZ, z),
-      }),
-      { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity, minZ: Infinity, maxZ: -Infinity },
-    );
-    emitter?.emit('terrain:updated', { region: updatedRegion });
+    emitter?.emit('terrain:updated', {
+      region: { minX: regMinX, maxX: regMaxX, minY: regMinY, maxY: regMaxY, minZ: regMinZ, maxZ: regMaxZ },
+    });
   }
 
   // 5b. Check for building destruction: if any cleared voxel's (x, z) falls

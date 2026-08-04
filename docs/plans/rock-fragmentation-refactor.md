@@ -34,7 +34,7 @@ stacked debris that haulers/rock-breakers process exactly as today.
 | # | Decision |
 |---|----------|
 | D1 | Drop cannon-es entirely. Cosmetic animation uses closed-form arcs + simple vertical settle. Remove the dependency from `package.json`. |
-| D2 | Renderer keeps the 8-variant instanced-box approach in `FragmentMesh`. No per-fragment hull meshes. Fragments get anisotropic scale from their cluster AABB. |
+| D2 | Renderer draws fragments as a small set of shared instanced geometries. No per-fragment hull meshes. Fragments get anisotropic scale from their cluster AABB. *(Amended in P7: the 8 jittered boxes became 24 plane-cut convex "stones" — the vertex jitter tore boxes open into floating planes, and boxes read as bricks. Same instancing, same budget.)* |
 | D3 | **No fragment-count budget.** Fragment size/count result ONLY from blast parameters (energy vs. rock threshold). A high safety cap exists purely as a pathological-input guard (`MAX_FRAGMENTS_PER_BLAST = 50000`), never as a tuning knob. |
 | D4 | Physics/animation cost is capped by **projectile grouping**: adjacent fragments moving together are grouped into one "projectile" for ballistics/animation (cap `MAX_ACTIVE_PROJECTILES`). A projectile is re-divided into its member fragments when it becomes stationary. Fragment identity, sizes, and inventory are never altered by grouping. |
 | D5 | The spec energy model (iterative voxel propagation) replaces the legacy 1/r² distance field. Single energy model in the codebase. |
@@ -1008,6 +1008,44 @@ site. 20 kg → 13 863 fragments, median 0.125 m³, median speed 10.8 m/s, muck 
 times wider. Same 20 kg unstemmed → median speed 34.2 m/s and rock scattered across the
 pit. Wide spacing → median 0.25 m³, twice the tight-spacing fragment, visibly chunkier
 rock. **`floating: 0` in all seven.**
+
+### P7 — Review findings: open meshes, brick shapes, the freeze, and the box cut — ✅ DONE
+
+Review of the P6 screenshots raised four defects; all four are fixed.
+
+1. **Floating planes in the debris.** The 8 shape variants jittered a
+   `BoxGeometry`'s vertices — but a box's corners are duplicated per face, and
+   displacing each copy independently tore the box open. Replaced by
+   `FragmentGeometry.ts`: 24 variants, each a unit cube sliced by 4–7 seeded
+   planes into a closed convex polyhedron. Watertightness is asserted by test
+   (every directed edge paired with its reverse) — an open mesh cannot ship.
+2. **Fragments read as squares.** Three compounding causes: boxes, no per-cut
+   variety, identical instances. The cut stones give flat fracture faces meeting
+   at irregular edges (the Voronoi look of the original spec, precomputed), each
+   instance keeps its seeded orientation, and a seeded shear (`SHEAR_MAX`) makes
+   two instances of one variant read differently. `updatePositions` had to stop
+   decomposing to TRS — decompose/recompose silently destroyed the shear — and
+   now writes the translation column only, which is also cheaper per frame.
+3. **The blast froze the game.** The whole pipeline resolves synchronously in the
+   click. Profiled at 675 ms for a 16-hole 20 kg blast (14 k fragments), now
+   ~330 ms — 2×. Where it went: `seedEnergy` allocated two Maps per wave (typed
+   arrays + an active list now), `nearestSeed` re-fetched seed lists per sub-cell
+   (cached per voxel, lazily, and read from flat arrays), `groupProjectiles`
+   rescanned the whole blast per group (spatial hash; speeds computed once —
+   `Math.hypot` in a sort comparator was measurable), `PileHeights` recomputed
+   terrain surface per query (memoised; `traceArc` re-queries only on column
+   change), and `executeBlast` built its region AABBs with an object per voxel
+   (running bounds) and defensively copied every fragment's ore record (take
+   ownership). Float-summation order changed in propagation, so fragment counts
+   moved by ~2% — deterministic as ever, just differently rounded.
+4. **The tutorial blasted flat ground.** Real pits open with an access ramp and a
+   box cut dug *before* the first shot, because blasted rock swells and needs a
+   void to fall into; every production blast then breaks toward a free face.
+   The tutorial now teaches exactly that: a new `box-cut` step (after
+   hire-driller, before drill-plan) digs the starter cut with the ramp tool just
+   west of the drill pattern, and the late duplicate ramp step is gone. Measured
+   headless: rock landing in the void 28 → 133 fragments, +64 voxels broken, on
+   the same 5 kg pattern.
 
 ## 9. Guardrails for the implementing agent
 

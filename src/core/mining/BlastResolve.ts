@@ -108,6 +108,8 @@ export function totalFlightDuration(flights: readonly FragmentFlight[]): number 
  */
 class PileHeights {
   private readonly heights = new Map<number, number>();
+  /** Terrain surface per column, computed once — arcs re-query columns heavily. */
+  private readonly terrainBase = new Map<number, number>();
 
   constructor(private readonly grid: VoxelGrid) {}
 
@@ -116,9 +118,13 @@ class PileHeights {
     const key = this.key(x, z);
     const piled = this.heights.get(key);
     if (piled !== undefined) return piled;
+    const cached = this.terrainBase.get(key);
+    if (cached !== undefined) return cached;
     // computeVoxelColumnSurfaceY returns the topmost solid voxel; rock rests on
     // top of it.
-    return computeVoxelColumnSurfaceY(this.grid, x, z) + 1;
+    const base = computeVoxelColumnSurfaceY(this.grid, x, z) + 1;
+    this.terrainBase.set(key, base);
+    return base;
   }
 
   /**
@@ -233,25 +239,40 @@ function traceArc(
     clampZ(origin.z + velocity.z * t),
   );
 
-  let previous = origin;
+  let prevX = origin.x;
+  let prevZ = origin.z;
   let previousT = 0;
 
+  // The ground under the arc only changes when the arc crosses into another
+  // column, so re-query it on column changes rather than every sample — a long
+  // lob otherwise pays hundreds of lookups to cross a handful of columns.
+  let groundCol = -1;
+  let ground = 0;
+
   for (let t = BALLISTIC_SAMPLE_DT; t <= BALLISTIC_MAX_T; t += BALLISTIC_SAMPLE_DT) {
-    const point = at(t);
-    const ground = piles.surfaceAt(point.x, point.z);
-    if (point.y <= ground) {
+    const px = clampX(origin.x + velocity.x * t);
+    const py = origin.y + velocity.y * t + 0.5 * GRAVITY * t * t;
+    const pz = clampZ(origin.z + velocity.z * t);
+
+    const col = (Math.floor(px) + 4096) * 16384 + (Math.floor(pz) + 4096);
+    if (col !== groundCol) {
+      groundCol = col;
+      ground = piles.surfaceAt(px, pz);
+    }
+    if (py <= ground) {
       // One bisection pass to place the impact between the last two samples.
       const mid = (previousT + t) / 2;
       const midPoint = at(mid);
-      const hit = midPoint.y <= piles.surfaceAt(midPoint.x, midPoint.z) ? midPoint : point;
-      const hitT = midPoint.y <= piles.surfaceAt(midPoint.x, midPoint.z) ? mid : t;
+      const midHit = midPoint.y <= piles.surfaceAt(midPoint.x, midPoint.z);
+      const hitT = midHit ? mid : t;
       return {
-        landing: hit,
+        landing: midHit ? midPoint : vec3(px, py, pz),
         timeS: hitT,
         impactSpeed: Math.hypot(velocity.x, velocity.y + GRAVITY * hitT, velocity.z),
       };
     }
-    previous = point;
+    prevX = px;
+    prevZ = pz;
     previousT = t;
   }
 
@@ -260,7 +281,7 @@ function traceArc(
   // it is ever reached the rock is put on the ground where it got to rather than
   // left hanging in the sky.
   return {
-    landing: vec3(previous.x, piles.surfaceAt(previous.x, previous.z), previous.z),
+    landing: vec3(prevX, piles.surfaceAt(prevX, prevZ), prevZ),
     timeS: previousT,
     impactSpeed: Math.hypot(velocity.x, velocity.y + GRAVITY * previousT, velocity.z),
   };

@@ -102,11 +102,50 @@ export function generateFragments(
   const subCellsPerVoxel = SUB ** 3;
   const owner = new Int32Array(voxels.length * subCellsPerVoxel).fill(-1);
 
+  // Seeds flattened into typed arrays: the assignment loop below touches them
+  // for every sub-cell of every broken voxel, and chasing a Vec3 per read was
+  // one of the blast's hottest paths.
+  const seedX = new Float64Array(seeds.length);
+  const seedY = new Float64Array(seeds.length);
+  const seedZ = new Float64Array(seeds.length);
+  for (let i = 0; i < seeds.length; i++) {
+    seedX[i] = seeds[i]!.x;
+    seedY[i] = seeds[i]!.y;
+    seedZ[i] = seeds[i]!.z;
+  }
+
+  // All 64 sub-cells of a voxel search the same shells, so the seed lists per
+  // shell are gathered once per voxel and reused, not re-fetched per sub-cell —
+  // and gathered lazily, because a sub-cell with a seed in its own voxel never
+  // looks at the outer shells at all.
+  const shellSeeds: (number[] | null)[] = new Array(SEED_SEARCH_RADIUS + 1);
+
   for (let vi = 0; vi < voxels.length; vi++) {
     const voxel = voxels[vi]!;
+    shellSeeds.fill(null);
+    const ensureShell = (r: number): number[] => {
+      const cached = shellSeeds[r];
+      if (cached) return cached;
+      const shell = SHELL_OFFSETS[r]!;
+      const list: number[] = [];
+      for (let o = 0; o < shell.length; o += 3) {
+        const indices = seedsByVoxel.get(voxelKeyOf(voxel.x + shell[o]!, voxel.y + shell[o + 1]!, voxel.z + shell[o + 2]!));
+        if (indices) for (const si of indices) list.push(si);
+      }
+      shellSeeds[r] = list;
+      return list;
+    };
+
     for (let s = 0; s < subCellsPerVoxel; s++) {
-      const centre = subCellCentre(voxel, s);
-      owner[vi * subCellsPerVoxel + s] = nearestSeed(centre, voxel, seeds, seedsByVoxel);
+      const sx = s % SUB;
+      const sy = Math.floor(s / SUB) % SUB;
+      const sz = Math.floor(s / (SUB * SUB));
+      owner[vi * subCellsPerVoxel + s] = nearestSeed(
+        voxel.x + (sx + 0.5) * SUB_CELL_SIZE,
+        voxel.y + (sy + 0.5) * SUB_CELL_SIZE,
+        voxel.z + (sz + 0.5) * SUB_CELL_SIZE,
+        ensureShell, seedX, seedY, seedZ,
+      );
     }
   }
 
@@ -180,32 +219,49 @@ function scatterSeeds(voxels: readonly VoxelCoord[], field: EnergyField, rng: Ra
  * Returns -1 when no seed lies within `SEED_SEARCH_RADIUS` — that rock belongs
  * to no fragment yet and is handled as an orphan.
  */
+/**
+ * Voxel offsets making up each search shell, precomputed once. The naive way —
+ * sweeping the whole (2r+1)³ cube and skipping non-shell entries — repeats that
+ * skip for every sub-cell of every broken voxel, millions of times a blast.
+ */
+const SHELL_OFFSETS: ReadonlyArray<readonly number[]> = (() => {
+  const shells: number[][] = [];
+  for (let r = 0; r <= SEED_SEARCH_RADIUS; r++) {
+    const shell: number[] = [];
+    for (let dz = -r; dz <= r; dz++) {
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          if (r > 0 && Math.max(Math.abs(dx), Math.abs(dy), Math.abs(dz)) !== r) continue;
+          shell.push(dx, dy, dz);
+        }
+      }
+    }
+    shells.push(shell);
+  }
+  return shells;
+})();
+
 function nearestSeed(
-  point: Vec3,
-  home: VoxelCoord,
-  seeds: readonly Vec3[],
-  seedsByVoxel: ReadonlyMap<number, number[]>,
+  px: number,
+  py: number,
+  pz: number,
+  ensureShell: (r: number) => readonly number[],
+  seedX: Float64Array,
+  seedY: Float64Array,
+  seedZ: Float64Array,
 ): number {
   let best = -1;
   let bestDist = Infinity;
 
   for (let r = 0; r <= SEED_SEARCH_RADIUS; r++) {
-    for (let dz = -r; dz <= r; dz++) {
-      for (let dy = -r; dy <= r; dy++) {
-        for (let dx = -r; dx <= r; dx++) {
-          // Only the newly reached shell; inner voxels were covered already.
-          if (r > 0 && Math.max(Math.abs(dx), Math.abs(dy), Math.abs(dz)) !== r) continue;
-          const indices = seedsByVoxel.get(voxelKeyOf(home.x + dx, home.y + dy, home.z + dz));
-          if (!indices) continue;
-          for (const si of indices) {
-            const seed = seeds[si]!;
-            const d = (seed.x - point.x) ** 2 + (seed.y - point.y) ** 2 + (seed.z - point.z) ** 2;
-            // Ties go to the lower index so the result never depends on
-            // iteration order.
-            if (d < bestDist || (d === bestDist && si < best)) { bestDist = d; best = si; }
-          }
-        }
-      }
+    for (const si of ensureShell(r)) {
+      const ddx = seedX[si]! - px;
+      const ddy = seedY[si]! - py;
+      const ddz = seedZ[si]! - pz;
+      const d = ddx * ddx + ddy * ddy + ddz * ddz;
+      // Ties go to the lower index so the result never depends on
+      // iteration order.
+      if (d < bestDist || (d === bestDist && si < best)) { bestDist = d; best = si; }
     }
     // A seed one shell out could still be closer than one found on this shell,
     // so only stop once the shell itself is further away than the best hit.
@@ -311,18 +367,22 @@ function buildFragment(
   let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
   const subCellsPerSource = new Map<number, number>();
 
+  const half = SUB_CELL_SIZE / 2;
   for (const slot of slots) {
     const vi = Math.floor(slot / subCellsPerVoxel);
-    const centre = subCellCentre(voxels[vi]!, slot % subCellsPerVoxel);
+    const voxel = voxels[vi]!;
+    const sc = slot % subCellsPerVoxel;
+    const cx = voxel.x + ((sc % SUB) + 0.5) * SUB_CELL_SIZE;
+    const cy = voxel.y + ((Math.floor(sc / SUB) % SUB) + 0.5) * SUB_CELL_SIZE;
+    const cz = voxel.z + (Math.floor(sc / (SUB * SUB)) + 0.5) * SUB_CELL_SIZE;
 
-    sumX += centre.x; sumY += centre.y; sumZ += centre.z;
-    const half = SUB_CELL_SIZE / 2;
-    if (centre.x - half < minX) minX = centre.x - half;
-    if (centre.y - half < minY) minY = centre.y - half;
-    if (centre.z - half < minZ) minZ = centre.z - half;
-    if (centre.x + half > maxX) maxX = centre.x + half;
-    if (centre.y + half > maxY) maxY = centre.y + half;
-    if (centre.z + half > maxZ) maxZ = centre.z + half;
+    sumX += cx; sumY += cy; sumZ += cz;
+    if (cx - half < minX) minX = cx - half;
+    if (cy - half < minY) minY = cy - half;
+    if (cz - half < minZ) minZ = cz - half;
+    if (cx + half > maxX) maxX = cx + half;
+    if (cy + half > maxY) maxY = cy + half;
+    if (cz + half > maxZ) maxZ = cz + half;
 
     subCellsPerSource.set(vi, (subCellsPerSource.get(vi) ?? 0) + 1);
   }
@@ -359,17 +419,6 @@ function buildFragment(
 // ── Small helpers ────────────────────────────────────────────────────────────
 
 /** Centre of sub-cell `s` (0 … SUB³-1) inside a voxel, in world coordinates. */
-function subCellCentre(voxel: VoxelCoord, s: number): Vec3 {
-  const sx = s % SUB;
-  const sy = Math.floor(s / SUB) % SUB;
-  const sz = Math.floor(s / (SUB * SUB));
-  return vec3(
-    voxel.x + (sx + 0.5) * SUB_CELL_SIZE,
-    voxel.y + (sy + 0.5) * SUB_CELL_SIZE,
-    voxel.z + (sz + 0.5) * SUB_CELL_SIZE,
-  );
-}
-
 /**
  * Pack a voxel coordinate into one number for map keys.
  * Offset keeps negative coordinates positive; the span covers any playable site.

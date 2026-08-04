@@ -92,6 +92,7 @@ describe('tutorialSteps', () => {
       'hire-surveyor',
       'survey',
       'hire-driller',
+      'box-cut',
       'drill-plan',
       'charge',
       'sequence',
@@ -106,7 +107,6 @@ describe('tutorialSteps', () => {
       'haul-debris',
       'contract-deliver',
       'finances',
-      'build-ramp',
       'needs',
       'set-policy',
       'tick-advance',
@@ -123,8 +123,8 @@ describe('tutorialSteps', () => {
     // #466 inserts haul-debris at index 15 (between build-storage and
     // contract-deliver), shifting finances/needs up by one from their old
     // 16/18 positions.
-    expect(TUTORIAL_STEPS[8].autoAdvanceMs).toBe(2000);
-    expect(TUTORIAL_STEPS[17].autoAdvanceMs).toBe(2000);
+    expect(TUTORIAL_STEPS[9].autoAdvanceMs).toBe(2000);
+    expect(TUTORIAL_STEPS[18].autoAdvanceMs).toBe(2000);
     expect(TUTORIAL_STEPS[19].autoAdvanceMs).toBe(2000);
   });
 
@@ -162,7 +162,7 @@ describe('tutorialSteps', () => {
 
   // ── 14 (event-fire-resolve) ──────────────────────────────────────────────
   describe('step 9 (event-fire-resolve, index 9)', () => {
-    const step9 = TUTORIAL_STEPS[9];
+    const step9 = TUTORIAL_STEPS[10];
 
     it('drives itself: autoCommands fast-forward and fire the scripted event', () => {
       expect(step9.autoCommands).toEqual(['tick 3', 'event fire tutorial_synergy_consultant']);
@@ -212,7 +212,7 @@ describe('tutorialSteps', () => {
 
   // ── 15 (hire-manager) ────────────────────────────────────────────────────
   describe('step 10 (hire-manager, index 10)', () => {
-    const step10 = TUTORIAL_STEPS[10];
+    const step10 = TUTORIAL_STEPS[11];
 
     it('isComplete returns false when pendingEvent is not null even if manager hired', () => {
       const state = {
@@ -236,7 +236,7 @@ describe('tutorialSteps', () => {
   // ── 13 ───────────────────────────────────────────────────────────────────
   it('steps 9, 18, 20 (1-indexed) have captureSnapshot that returns step-specific data', () => {
     // Step 9 (scores) — captures scores + collectedOre
-    const step9 = TUTORIAL_STEPS[8];
+    const step9 = TUTORIAL_STEPS[9];
     expect(step9.captureSnapshot).toBeDefined();
     const snap9 = step9.captureSnapshot!({
       scores: { wellBeing: 75, safety: 80, ecology: 60, nuisance: 30 },
@@ -246,9 +246,9 @@ describe('tutorialSteps', () => {
     expect(snap9.scores).toBeDefined();
     expect(snap9.collectedOre).toBeDefined();
 
-    // Step 18 (finances, shifted from 17 by the #466 haul-debris insertion at
-    // index 15) — captures cash + contracts
-    const step18 = TUTORIAL_STEPS[17];
+    // Step 19 (finances — shifted by the #466 haul-debris insertion and the
+    // box-cut step, minus the removed late ramp step) — captures cash + contracts
+    const step18 = TUTORIAL_STEPS[18];
     expect(step18.captureSnapshot).toBeDefined();
     const snap18 = step18.captureSnapshot!({
       cash: 100000,
@@ -292,7 +292,7 @@ describe('tutorialSteps', () => {
       'drill-plan', 'charge', 'sequence', 'blast',
       'scores', 'event-fire-resolve', 'hire-manager', 'contract-accept',
       'hire-driver', 'vehicle-buy-assign', 'build-storage', 'haul-debris', 'contract-deliver',
-      'finances', 'build-ramp', 'needs', 'tick-advance',
+      'finances', 'box-cut', 'needs', 'tick-advance',
     ]);
     for (const step of TUTORIAL_STEPS) {
       if (stepsWithTarget.has(step.id)) {
@@ -344,7 +344,7 @@ describe('tutorialSteps', () => {
 
   // ── 19 ───────────────────────────────────────────────────────────────────
   describe('step 7 (blast, index 7)', () => {
-    const blastStep = TUTORIAL_STEPS[7]!;
+    const blastStep = TUTORIAL_STEPS[8]!;
 
     it('completes on a barren blast, not only when ore is found', () => {
       // A legitimate blast that turns up no ore still satisfied the objective:

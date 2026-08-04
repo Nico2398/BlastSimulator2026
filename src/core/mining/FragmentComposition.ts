@@ -28,25 +28,42 @@ export interface VoxelContribution {
  * this a real volume-weighted average: a rock present in only half the source
  * voxels must come out at half strength, not at full strength.
  */
-function accumulateWeighted(
+/**
+ * Weighted rock coefficients across sources. Reads through `compositionAt`
+ * rather than `getVoxel`: the latter materialises a full voxel record per call,
+ * and this runs for every source of every fragment of a blast.
+ */
+function accumulateRocks(
   sources: readonly VoxelContribution[],
   grid: VoxelGrid,
-  extract: (voxel: { composition: VoxelRockComposition; oreDensities: Record<string, number> }) => Array<{ key: string; value: number }>,
+): Map<string, number> {
+  const sums = new Map<string, number>();
+  for (const source of sources) {
+    if (!(source.weight > 0)) continue;
+    const composition = grid.compositionAt(source.x, source.y, source.z);
+    for (const rock of composition.rocks) {
+      sums.set(rock.rockId, (sums.get(rock.rockId) ?? 0) + rock.coefficient * source.weight);
+    }
+  }
+  return sums;
+}
+
+/** Weighted ore densities across sources, plus the weight that carried them. */
+function accumulateOres(
+  sources: readonly VoxelContribution[],
+  grid: VoxelGrid,
 ): { sums: Map<string, number>; totalWeight: number } {
   const sums = new Map<string, number>();
   let totalWeight = 0;
-
   for (const source of sources) {
     if (!(source.weight > 0)) continue;
-    const voxel = grid.getVoxel(source.x, source.y, source.z);
-    if (!voxel) continue;
-
     totalWeight += source.weight;
-    for (const { key, value } of extract(voxel)) {
-      sums.set(key, (sums.get(key) ?? 0) + value * source.weight);
+    const ores = grid.oresAt(source.x, source.y, source.z);
+    if (!ores) continue;
+    for (const oreId in ores) {
+      sums.set(oreId, (sums.get(oreId) ?? 0) + ores[oreId]! * source.weight);
     }
   }
-
   return { sums, totalWeight };
 }
 
@@ -65,7 +82,7 @@ export function computeAverageRockComposition(
   sources: readonly VoxelContribution[],
   grid: VoxelGrid,
 ): VoxelRockComposition {
-  const { sums } = accumulateWeighted(sources, grid, v => v.composition.rocks.map(r => ({ key: r.rockId, value: r.coefficient })));
+  const sums = accumulateRocks(sources, grid);
   if (sums.size === 0) return { rocks: [] };
 
   let total = 0;
@@ -92,7 +109,7 @@ export function computeAverageOreDensities(
   sources: readonly VoxelContribution[],
   grid: VoxelGrid,
 ): Record<string, number> {
-  const { sums, totalWeight } = accumulateWeighted(sources, grid, v => Object.entries(v.oreDensities).map(([oreId, density]) => ({ key: oreId, value: density })));
+  const { sums, totalWeight } = accumulateOres(sources, grid);
   if (sums.size === 0 || totalWeight <= 0) return {};
 
   const result: Record<string, number> = {};

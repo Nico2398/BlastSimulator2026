@@ -10,6 +10,10 @@
 // masses and count are exactly what the blast produced. Grouping decides how
 // many things fly, never how the rock broke.
 //
+// Runs inside the one synchronous frame the whole blast resolves in, over
+// thousands of fragments — so neighbours come from a spatial hash rather than
+// scans, and speeds are computed once per fragment rather than per comparison.
+//
 // Refactor plan: docs/plans/rock-fragmentation-refactor.md §6/A5.
 
 import { vec3, type Vec3 } from '../math/Vec3.js';
@@ -28,6 +32,12 @@ export interface ThrowableFragment {
   initialVelocity: Vec3;
 }
 
+/** A fragment with its speed computed once, so comparisons never recompute it. */
+interface Mover {
+  fragment: ThrowableFragment;
+  speed: number;
+}
+
 export interface Projectile {
   id: number;
   /** Fragments travelling inside this projectile, in ascending id order. */
@@ -37,8 +47,15 @@ export interface Projectile {
   velocity: Vec3;
 }
 
-function speedOf(v: Vec3): number {
-  return Math.hypot(v.x, v.y, v.z);
+/**
+ * Cells of `PROJECTILE_GROUP_RADIUS` metres, so any fragment within grouping
+ * range of a point is in that point's cell or one of its 26 neighbours.
+ */
+function cellKeyOf(x: number, y: number, z: number): number {
+  const r = PROJECTILE_GROUP_RADIUS;
+  // 12 bits per axis, offset positive — collision-free for any world position.
+  return ((Math.floor(x / r) + 2048) * 4096 + (Math.floor(y / r) + 2048)) * 4096
+    + (Math.floor(z / r) + 2048);
 }
 
 /**
@@ -55,55 +72,79 @@ function speedOf(v: Vec3): number {
 export function groupProjectiles(fragments: readonly ThrowableFragment[]): Projectile[] {
   if (fragments.length === 0) return [];
 
-  const order = [...fragments].sort((a, b) => {
-    const d = speedOf(b.initialVelocity) - speedOf(a.initialVelocity);
-    return d !== 0 ? d : a.id - b.id;
+  const order: Mover[] = fragments.map(fragment => {
+    const v = fragment.initialVelocity;
+    return { fragment, speed: Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z) };
   });
+  order.sort((a, b) => (b.speed - a.speed) || (a.fragment.id - b.fragment.id));
 
   if (order.length <= MAX_ACTIVE_PROJECTILES) {
     return order
-      .map((f, i) => makeProjectile(i, [f]))
+      .map((m, i) => makeProjectile(i, [m.fragment]))
       .sort((a, b) => a.memberIds[0]! - b.memberIds[0]!)
       .map((p, i) => ({ ...p, id: i }));
+  }
+
+  // Spatial hash over the *unclaimed* fragments: a seed pulls candidates from
+  // its own cell and the 26 around it instead of rescanning the whole blast.
+  const byCell = new Map<number, Mover[]>();
+  for (const m of order) {
+    const key = cellKeyOf(m.fragment.position.x, m.fragment.position.y, m.fragment.position.z);
+    const cell = byCell.get(key);
+    if (cell) cell.push(m);
+    else byCell.set(key, [m]);
   }
 
   const perGroup = Math.ceil(order.length / MAX_ACTIVE_PROJECTILES);
   const taken = new Set<number>();
   const groups: ThrowableFragment[][] = [];
+  const r = PROJECTILE_GROUP_RADIUS;
 
   for (const seed of order) {
-    if (taken.has(seed.id)) continue;
+    if (taken.has(seed.fragment.id)) continue;
     if (groups.length >= MAX_ACTIVE_PROJECTILES) break;
 
-    taken.add(seed.id);
-    const group = [seed];
-    const seedSpeed = speedOf(seed.initialVelocity);
+    taken.add(seed.fragment.id);
+    const group = [seed.fragment];
+    const p = seed.fragment.position;
 
-    for (const candidate of order) {
-      if (group.length >= perGroup) break;
-      if (taken.has(candidate.id)) continue;
-      if (!isNear(seed, candidate)) continue;
-      if (!isSimilarMotion(seed.initialVelocity, seedSpeed, candidate.initialVelocity)) continue;
-      taken.add(candidate.id);
-      group.push(candidate);
+    // Candidates in deterministic cell order; within a cell they keep the
+    // fastest-first order they were inserted in.
+    outer:
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dz = -1; dz <= 1; dz++) {
+          const cell = byCell.get(cellKeyOf(p.x + dx * r, p.y + dy * r, p.z + dz * r));
+          if (!cell) continue;
+          for (const candidate of cell) {
+            if (group.length >= perGroup) break outer;
+            if (taken.has(candidate.fragment.id)) continue;
+            if (!isNear(seed.fragment, candidate.fragment)) continue;
+            if (!isSimilarMotion(seed.fragment.initialVelocity, seed.speed, candidate.fragment.initialVelocity, candidate.speed)) continue;
+            taken.add(candidate.fragment.id);
+            group.push(candidate.fragment);
+          }
+        }
+      }
     }
 
     groups.push(group);
   }
 
   // The cap is hard: whatever is still loose joins the group it is nearest to,
-  // similar heading or not.
+  // similar heading or not. Group heads are few (≤ the cap), so scanning them
+  // directly is already cheap.
   for (const leftover of order) {
-    if (taken.has(leftover.id)) continue;
+    if (taken.has(leftover.fragment.id)) continue;
     let best = 0;
     let bestDist = Infinity;
     for (let g = 0; g < groups.length; g++) {
       const head = groups[g]![0]!;
-      const d = distanceSq(head.position, leftover.position);
+      const d = distanceSq(head.position, leftover.fragment.position);
       if (d < bestDist) { bestDist = d; best = g; }
     }
-    groups[best]!.push(leftover);
-    taken.add(leftover.id);
+    groups[best]!.push(leftover.fragment);
+    taken.add(leftover.fragment.id);
   }
 
   return groups
@@ -144,8 +185,7 @@ function isNear(a: ThrowableFragment, b: ThrowableFragment): boolean {
   return distanceSq(a.position, b.position) <= PROJECTILE_GROUP_RADIUS ** 2;
 }
 
-function isSimilarMotion(seedVelocity: Vec3, seedSpeed: number, other: Vec3): boolean {
-  const otherSpeed = speedOf(other);
+function isSimilarMotion(seedVelocity: Vec3, seedSpeed: number, other: Vec3, otherSpeed: number): boolean {
   const faster = Math.max(seedSpeed, otherSpeed);
   if (faster <= 0) return true; // both at rest: indistinguishable
   if (Math.abs(seedSpeed - otherSpeed) / faster > PROJECTILE_GROUP_SPEED_TOL) return false;
