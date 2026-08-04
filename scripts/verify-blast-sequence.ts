@@ -28,8 +28,23 @@ const SITE = { x: 20, z: 20 };
 /** Degrees: yaw around the site, pitch above the horizon. Looks into the pit. */
 const CAMERA = { distance: 40, yaw: 35, pitch: 45 };
 
-/** Where in the collapse each shot is taken, as a fraction of its full run. */
-const MOMENTS = [0, 0.08, 0.2, 0.45, 1];
+/**
+ * When each shot is taken, in seconds, for a collapse lasting `durationS`.
+ *
+ * Weighted to the first second and then straight to the end. Even spacing over
+ * the whole run does not work: a violent shot's rock is out of frame in under a
+ * second but its slowest arc keeps the collapse alive for sixteen, so evenly
+ * spaced frames spend three of five pictures on an already-settled pit. What
+ * changes visibly is the burst; what is worth one last frame is where it all
+ * came to rest.
+ */
+const momentsFor = (durationS: number): number[] => [
+  0,
+  Math.min(0.10, durationS * 0.12),
+  Math.min(0.30, durationS * 0.35),
+  Math.min(0.80, durationS * 0.60),
+  durationS,
+];
 
 interface Scenario {
   id: string;
@@ -113,10 +128,11 @@ async function shoot(page: Page, scenario: Scenario): Promise<Record<string, unk
   await aimCamera(page);
 
   const durationS = await playbackDuration(page);
+  const moments = momentsFor(durationS);
   const times: number[] = [];
 
-  for (let i = 0; i < MOMENTS.length; i++) {
-    const t = MOMENTS[i]! * durationS;
+  for (let i = 0; i < moments.length; i++) {
+    const t = moments[i]!;
     await seek(page, t);
     await aimCamera(page);
     await settle(300);
@@ -175,7 +191,8 @@ async function main(): Promise<void> {
   }
 
   writeFileSync(resolve(OUT, 'report.json'), JSON.stringify(report, null, 2));
-  console.log(`\nWrote ${report.length * MOMENTS.length} frames to ${OUT}`);
+  const frames = report.reduce((n, r) => n + (r.times as number[]).length, 0);
+  console.log(`\nWrote ${frames} frames to ${OUT}`);
 }
 
 void main();
