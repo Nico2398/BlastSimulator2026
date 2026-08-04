@@ -419,6 +419,12 @@ const CSS = `
   font-family: 'Segoe UI', system-ui, Arial, sans-serif;
   color: #e8e0d0;
 }
+/* ─── Placement parameter strip (redesign P3) ───
+   Bottom-docked like the tutorial coach card above, so a guided step that
+   arms the placement tool needs the strip pushed clear of the card instead
+   of sitting behind it — same screen edge, same z-stack region. */
+#bs-param-strip { bottom: 18px; }
+body.bs-tutorial-guided #bs-param-strip { bottom: 210px; }
 .bs-tutorial-header {
   display: flex;
   align-items: baseline;

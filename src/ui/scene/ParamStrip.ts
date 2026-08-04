@@ -45,8 +45,13 @@ export class ParamStrip {
   constructor(container: HTMLElement) {
     this.root = el('div', { attrs: { id: 'bs-param-strip' } });
     this.root.className = 'bsx-root';
+    // bottom offset lives in styles.ts, not here: the guided tutorial's coach
+    // card docks at the same screen edge, and an inline style here would beat
+    // that CSS override the same way TopBar's inline pointer-events used to
+    // beat the tutorial rail (#475 session fix) — an external rule can never
+    // win against an inline one, regardless of specificity.
     this.root.style.cssText = [
-      'position:fixed', 'left:50%', 'bottom:18px', 'transform:translateX(-50%)',
+      'position:fixed', 'left:50%', 'transform:translateX(-50%)',
       'z-index:var(--bsx-z-selection-bar, 120)', 'display:none', 'flex-direction:column',
       'align-items:center', 'gap:10px', 'pointer-events:none',
     ].join(';');
