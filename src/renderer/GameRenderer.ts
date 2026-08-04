@@ -390,18 +390,38 @@ export class GameRenderer {
    * Exact rendered-mesh height at (x, z), found by raycasting straight down
    * through the terrain meshes — unlike surfaceYAt's voxel-column lookup,
    * this matches the smoothed mesh surface a pointer raycast actually hits.
-   * The gap between the two is normally harmless, but the playtest harness's
-   * world-to-screen bridge (window.__worldToScreen, main.ts) projects a
-   * *return* pixel for a real click to land on, and at the shallow viewing
-   * angle a far tile is seen from, even a one-unit height error throws that
-   * pixel off the tile — enough to miss the terrain mesh entirely. Returns
-   * null off the terrain (no grid, or (x, z) outside every chunk).
+   * Used as the starting guess for the playtest harness's world-to-screen
+   * bridge (window.__worldToScreen, main.ts) — see raycastTerrainFromNDC for
+   * why a single vertical raycast still isn't the whole fix. Returns null
+   * off the terrain (no grid, or (x, z) outside every chunk).
    */
   raycastSurfaceY(x: number, z: number): number | null {
     if (!this.terrain) return null;
     const raycaster = new THREE.Raycaster(new THREE.Vector3(x, 10_000, z), new THREE.Vector3(0, -1, 0));
     const hit = raycaster.intersectObjects(this.terrain.meshes, true)[0];
     return hit ? hit.point.y : null;
+  }
+
+  /**
+   * Terrain-only hit for a camera ray through NDC (ndcX, ndcY) — the same
+   * raycast a real pointer click resolves via ScenePicking/PlacementController,
+   * without pulling in their entity/hover machinery.
+   *
+   * window.__worldToScreen needs this, not just raycastSurfaceY, because the
+   * camera ray through a screen pixel is never vertical: on sloped ground the
+   * point directly above/below (x, z) is not generally the same point the
+   * camera's own oblique ray would hit when aimed at that pixel. A ground-level
+   * camera (the game's default framing) makes this worse — near-horizontal rays
+   * turn a sub-metre height gap into a many-tile miss. Callers converge on a
+   * pixel that truly round-trips by re-deriving the height from this hit and
+   * reprojecting, rather than trusting one vertical sample.
+   */
+  raycastTerrainFromNDC(ndcX: number, ndcY: number, camera: THREE.Camera): THREE.Vector3 | null {
+    if (!this.terrain) return null;
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera);
+    const hit = raycaster.intersectObjects(this.terrain.meshes, true)[0];
+    return hit ? hit.point.clone() : null;
   }
 
   /**
