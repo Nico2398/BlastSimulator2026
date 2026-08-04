@@ -18,6 +18,7 @@ import {
   WORK_GRACE_TICKS,
 } from '../../../src/ui/tutorialGuide.js';
 import type { TutorialStage } from '../../../src/ui/tutorialStages.js';
+import type { ClockProgress } from '../../../src/ui/tutorialGuide.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
 
@@ -329,5 +330,108 @@ describe('decideClock', () => {
     const s = state();
     s.tickCount = 2;
     expect(decideClock(s, 50, DEFAULT_TICK_BUDGET).spent).toBe(0);
+  });
+
+  // -- #478: a driver walking to board a vehicle progresses with no action
+  // attached at all, only a moving destination. The flat WORK_GRACE_TICKS
+  // window above holds the clock once that budget runs out even though the
+  // walk is still visibly advancing, which deadlocks it forever — a held
+  // clock stops the ticks the walk needs to finish, so the hold never lifts.
+  // These tests thread the previous call's `progressSignature` /
+  // `lastProgressTick` forward as the next call's `progress` argument, the
+  // way `TutorialRails.updateClock` is expected to.
+
+  it('never holds while outstanding work keeps progressing, even well past budget + twice the grace window', () => {
+    const budget = DEFAULT_TICK_BUDGET;
+    let progress: ClockProgress = { signature: null, tick: 0 };
+    for (let tick = 0; tick <= budget + 2 * WORK_GRACE_TICKS; tick++) {
+      const s = state();
+      s.tickCount = tick;
+      // A fresh destination every tick — the walk is provably still moving.
+      s.employees.employees = [
+        { activeActionId: null, pendingDriverVehicleId: null, destinationX: tick, destinationZ: 0 } as never,
+      ];
+      const decision = decideClock(s, 0, budget, true, progress);
+      if (tick > budget + WORK_GRACE_TICKS) {
+        expect(decision.hold).toBe(false);
+      }
+      progress = { signature: decision.progressSignature, tick: decision.lastProgressTick };
+    }
+  });
+
+  it('does not deadlock when work is still progressing past budget+grace, but holds once progress genuinely stalls', () => {
+    const budget = DEFAULT_TICK_BUDGET;
+    const freezeAt = budget + 5;
+    let progress: ClockProgress = { signature: null, tick: 0 };
+    let last: ReturnType<typeof decideClock> | null = null;
+    for (let tick = 0; tick <= freezeAt + WORK_GRACE_TICKS; tick++) {
+      const s = state();
+      s.tickCount = tick;
+      // Moves every tick up to freezeAt, then genuinely stops changing —
+      // simulating a walk that finishes progressing and then gets stuck.
+      const destinationX = tick <= freezeAt ? tick : freezeAt;
+      s.employees.employees = [
+        { activeActionId: null, pendingDriverVehicleId: null, destinationX, destinationZ: 0 } as never,
+      ];
+      const decision = decideClock(s, 0, budget, true, progress);
+      last = decision;
+      if (tick < freezeAt + WORK_GRACE_TICKS) {
+        expect(decision.hold).toBe(false);
+      }
+      progress = { signature: decision.progressSignature, tick: decision.lastProgressTick };
+    }
+    // Grace measured from when staleness began (freezeAt), not from
+    // stepStartTick(0) — it holds only once a full WORK_GRACE_TICKS has
+    // elapsed with no further change.
+    expect(last!.hold).toBe(true);
+  });
+
+  it('treats a differing incoming signature as fresh progress and resets the grace window to now', () => {
+    const s = state();
+    s.tickCount = 200;
+    s.employees.employees = [
+      { activeActionId: null, pendingDriverVehicleId: null, destinationX: 3, destinationZ: 0 } as never,
+    ];
+    const decision = decideClock(
+      s, 0, DEFAULT_TICK_BUDGET, true,
+      { signature: '__not-a-real-signature__', tick: 5 },
+    );
+    expect(decision.hold).toBe(false);
+    expect(decision.lastProgressTick).toBe(200);
+  });
+
+  it('a first-ever check with no progress history behaves exactly like the pre-fix flat grace window', () => {
+    // Regression guard: treating the very first null-signature check as
+    // "just progressed" would widen every existing caller's grace window
+    // and break the flat-grace-cap behavior this asserts.
+    const s = state();
+    s.tickCount = DEFAULT_TICK_BUDGET + WORK_GRACE_TICKS - 1;
+    s.pendingActions = [{ id: 1 } as unknown as GameState['pendingActions'][number]];
+    expect(decideClock(s, 0, DEFAULT_TICK_BUDGET, true).hold).toBe(false);
+
+    const s2 = state();
+    s2.tickCount = DEFAULT_TICK_BUDGET + WORK_GRACE_TICKS;
+    s2.pendingActions = [{ id: 1 } as unknown as GameState['pendingActions'][number]];
+    expect(decideClock(s2, 0, DEFAULT_TICK_BUDGET, true).hold).toBe(true);
+  });
+
+  it('still holds once the walk finishes, even with real progress history threaded through', () => {
+    const s1 = state();
+    s1.tickCount = DEFAULT_TICK_BUDGET + 5;
+    s1.employees.employees = [
+      { activeActionId: null, pendingDriverVehicleId: null, destinationX: 4, destinationZ: 9 } as never,
+    ];
+    const walking = decideClock(s1, 0, DEFAULT_TICK_BUDGET, true, { signature: null, tick: 0 });
+    expect(walking.hold).toBe(false);
+
+    const s2 = state();
+    s2.tickCount = DEFAULT_TICK_BUDGET + 6;
+    s2.employees.employees = [
+      { activeActionId: null, pendingDriverVehicleId: null, destinationX: null, destinationZ: null } as never,
+    ];
+    const arrived = decideClock(s2, 0, DEFAULT_TICK_BUDGET, true, {
+      signature: walking.progressSignature, tick: walking.lastProgressTick,
+    });
+    expect(arrived.hold).toBe(true);
   });
 });

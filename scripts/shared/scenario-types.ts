@@ -33,6 +33,13 @@ export type InteractionStepAction =
   | { type: 'wheel'; deltaX: number; deltaY: number }
   | { type: 'wait'; durationMs: number }
   | { type: 'waitForSelector'; selector: string; timeout?: number }
+  // Waits until the tutorial reaches one of the named steps (or ends), driving
+  // the game's real auto-tick clock for the duration of the wait — the same
+  // bracketing the playtest harness uses — so queued work the step depends on
+  // (a surveyor walking out, a driver boarding) can actually finish. Fixed
+  // `wait` durations cannot express "the tutorial noticed", which is why
+  // tutorial-driven scenarios desynced from the rails (#481). `timeout` is ms.
+  | { type: 'waitForTutorialStep'; stepId: string | string[]; timeout?: number }
   | { type: 'type'; selector: string; text: string; delay?: number }
   | { type: 'assert'; selector?: string; property?: string; expectedValue?: unknown }
   | { type: 'viewport'; width: number; height: number }
