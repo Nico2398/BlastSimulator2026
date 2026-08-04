@@ -1,10 +1,11 @@
 // BlastSimulator2026 — Blast Workshop panel (redesign P4)
 // Replaces BlastPlanUI with a 5-step workflow (Drill → Charge → Sequence →
-// Preview → Fire) plus a sticky footer. Only Drill is built to the full
-// design spec so far (task P4/#22); Charge/Sequence are minimal-but-working
-// stubs so the tutorial's charge/sequence/blast stages keep passing, Preview
-// and Fire's step-specific body are placeholders. Tasks P4/#23-26
-// progressively replace each stub in place.
+// Preview → Fire) plus a sticky footer. Drill, Charge, and Sequence are built
+// to the full design spec (tasks P4/#22-24); Preview and Fire's step-specific
+// body are still placeholders — the tutorial's preview/blast stages don't
+// need them (Preview is optional, and Fire's own body is separate from the
+// always-visible sticky footer's FIRE button). Tasks P4/#25-26 replace those
+// last two stubs in place.
 
 import { t } from '../../core/i18n/I18n.js';
 import { el } from '../dom.js';
@@ -160,7 +161,9 @@ export class BlastWorkshop {
     }
 
     this.renderTabs(state);
-    if (this.activeStep === 1) this.drillStep.update(state, weather);
+    this.drillStep.update(state, weather);
+    this.chargeStep.update(state, weather);
+    this.sequenceStep.update(state);
     this.footer.update(state);
   }
 
