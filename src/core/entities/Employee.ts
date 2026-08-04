@@ -89,6 +89,8 @@ export interface Employee {
   unionized: boolean;
   injured: boolean;
   alive: boolean;
+  /** Tick this employee was hired at, for the Crew panel's "hired since" line. Optional: many existing call sites construct an Employee directly without it, and old saves predate the field — the UI falls back to an "unknown" label when absent. */
+  hiredAtTick?: number;
   /** Grid position. */
   x: number;
   z: number;
@@ -189,6 +191,7 @@ export function hireEmployee(
   rng: Random,
   x: number = 0,
   z: number = 0,
+  tickCount: number = 0,
 ): HireResult {
   const employee: Employee = {
     id: state.nextId++,
@@ -199,6 +202,7 @@ export function hireEmployee(
     unionized: rng.chance(0.3), // 30% chance of being unionized
     injured: false,
     alive: true,
+    hiredAtTick: tickCount,
     x, z,
     // A hire arrives qualified for the job they were hired to do, at Rookie
     // level. Hiring used to grant nothing, which made every role interchangeable

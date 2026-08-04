@@ -4,6 +4,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   detectTrafficJam,
   detectOreReport,
+  computeTrafficAdvisory,
   TRAFFIC_JAM_MIN_VEHICLES,
   TRAFFIC_JAM_MIN_TICKS,
 } from '../../../src/core/events/EventEngine.js';
@@ -450,4 +451,58 @@ describe('EventPool — ore report EventDef registration (Task 4.8)', () => {
       expect(event!.consequences.length).toBe(event!.options.length);
     });
   }
+});
+
+// ── computeTrafficAdvisory ───────────────────────────────────────────────────
+
+describe('EventEngine — computeTrafficAdvisory', () => {
+  beforeEach(() => { _nextId = 1; });
+
+  it('reports nothing with no waiting vehicles', () => {
+    expect(computeTrafficAdvisory([])).toEqual([]);
+  });
+
+  it('reports nothing below MIN_VEHICLES on the same target', () => {
+    const vehicles = [
+      makeWaitingVehicle(10, 10, TRAFFIC_JAM_MIN_TICKS),
+      makeWaitingVehicle(10, 10, TRAFFIC_JAM_MIN_TICKS),
+    ];
+    expect(computeTrafficAdvisory(vehicles)).toEqual([]);
+  });
+
+  it('reports nothing below MIN_TICKS even with enough vehicles', () => {
+    const vehicles = Array.from({ length: TRAFFIC_JAM_MIN_VEHICLES }, () =>
+      makeWaitingVehicle(10, 10, TRAFFIC_JAM_MIN_TICKS - 1));
+    expect(computeTrafficAdvisory(vehicles)).toEqual([]);
+  });
+
+  it('reports a cluster once both thresholds are met', () => {
+    const vehicles = Array.from({ length: TRAFFIC_JAM_MIN_VEHICLES }, () =>
+      makeWaitingVehicle(10, 10, TRAFFIC_JAM_MIN_TICKS));
+    expect(computeTrafficAdvisory(vehicles)).toEqual([{ targetX: 10, targetZ: 10, count: TRAFFIC_JAM_MIN_VEHICLES }]);
+  });
+
+  it('keeps separate targets as separate clusters', () => {
+    const vehicles = [
+      ...Array.from({ length: TRAFFIC_JAM_MIN_VEHICLES }, () => makeWaitingVehicle(10, 10, TRAFFIC_JAM_MIN_TICKS)),
+      ...Array.from({ length: TRAFFIC_JAM_MIN_VEHICLES }, () => makeWaitingVehicle(20, 20, TRAFFIC_JAM_MIN_TICKS)),
+    ];
+    const result = computeTrafficAdvisory(vehicles);
+    expect(result).toHaveLength(2);
+    expect(result.map(r => r.count)).toEqual([TRAFFIC_JAM_MIN_VEHICLES, TRAFFIC_JAM_MIN_VEHICLES]);
+  });
+
+  it('is read-only — never touches EventSystemState, unlike detectTrafficJam', () => {
+    // No EventSystemState is even passed in — this is the whole point: the
+    // banner must work independent of pendingEvent/eventFreqMultiplier gating.
+    const vehicles = Array.from({ length: TRAFFIC_JAM_MIN_VEHICLES }, () =>
+      makeWaitingVehicle(10, 10, TRAFFIC_JAM_MIN_TICKS));
+    expect(() => computeTrafficAdvisory(vehicles)).not.toThrow();
+  });
+
+  it('ignores vehicles not in the waiting state', () => {
+    const vehicles = Array.from({ length: TRAFFIC_JAM_MIN_VEHICLES }, () =>
+      ({ ...makeWaitingVehicle(10, 10, TRAFFIC_JAM_MIN_TICKS), state: 'moving' as const }));
+    expect(computeTrafficAdvisory(vehicles)).toEqual([]);
+  });
 });

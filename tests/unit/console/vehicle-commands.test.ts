@@ -390,3 +390,61 @@ describe('vehicle driver — unassign with "none"', () => {
   });
 });
 
+describe('vehicle scrap', () => {
+  // debris_hauler tier 1: purchaseCost 25,000, maxHp 100 (balance.ts). Fresh
+  // vehicles spawn at full hp, so a fresh scrap is 25,000 × 0.4 (residual
+  // fraction) × 1.0 (hp/maxHp) = 10,000.
+  it('scraps a vehicle, credits residual value, and removes it from the fleet', () => {
+    const ctx = makeCtx();
+    const vehicleId = addTruckVehicle(ctx);
+    const cashBefore = ctx.state!.cash;
+
+    const result = vehicleCommand(ctx, ['scrap', String(vehicleId)], {});
+
+    expect(result.success).toBe(true);
+    expect(result.output).toBe(`Vehicle #${vehicleId} scrapped. Residual value: $10000`);
+    expect(ctx.state!.cash).toBe(cashBefore + 10000);
+    expect(ctx.state!.vehicles.vehicles.find(v => v.id === vehicleId)).toBeUndefined();
+  });
+
+  it('logs the residual value as finance income under the refund category', () => {
+    const ctx = makeCtx();
+    const vehicleId = addTruckVehicle(ctx);
+
+    vehicleCommand(ctx, ['scrap', String(vehicleId)], {});
+
+    const tx = ctx.state!.finances.transactions.at(-1);
+    expect(tx?.type).toBe('income');
+    expect(tx?.category).toBe('refund');
+    expect(tx?.amount).toBe(10000);
+  });
+
+  it('a damaged vehicle scraps for proportionally less', () => {
+    const ctx = makeCtx();
+    const vehicleId = addTruckVehicle(ctx);
+    ctx.state!.vehicles.vehicles.find(v => v.id === vehicleId)!.hp = 50; // half of maxHp 100
+
+    const result = vehicleCommand(ctx, ['scrap', String(vehicleId)], {});
+
+    expect(result.output).toBe(`Vehicle #${vehicleId} scrapped. Residual value: $5000`);
+  });
+
+  it('returns an error for a non-existent vehicle and leaves cash untouched', () => {
+    const ctx = makeCtx();
+    const cashBefore = ctx.state!.cash;
+
+    const result = vehicleCommand(ctx, ['scrap', '9999'], {});
+
+    expect(result.success).toBe(false);
+    expect(result.output).toBe('Vehicle #9999 not found.');
+    expect(ctx.state!.cash).toBe(cashBefore);
+  });
+
+  it('rejects a non-numeric id', () => {
+    const ctx = makeCtx();
+    const result = vehicleCommand(ctx, ['scrap', 'abc'], {});
+    expect(result.success).toBe(false);
+    expect(result.output).toBe('Usage: vehicle scrap <id>');
+  });
+});
+

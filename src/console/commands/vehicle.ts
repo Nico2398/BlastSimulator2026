@@ -7,16 +7,30 @@ import {
   assignVehicle,
   moveVehicle,
   unassignDriver,
+  destroyVehicle,
   getAllVehicleRoles,
+  getVehicleDefByTier,
   type VehicleRole,
   type VehicleTask,
   type VehicleTier,
 } from '../../core/entities/Vehicle.js';
 import { requestBoardVehicle } from '../../core/entities/VehicleBoarding.js';
 import { requestHaulFragment } from '../../core/economy/HaulingTask.js';
-import { addExpense } from '../../core/economy/Finance.js';
-import { SPAWN_RING_SIZE, SPAWN_TILE_SPACING } from '../../core/config/balance.js';
+import { addExpense, addIncome } from '../../core/economy/Finance.js';
+import { SPAWN_RING_SIZE, SPAWN_TILE_SPACING, VEHICLE_SCRAP_RESIDUAL_FRACTION } from '../../core/config/balance.js';
 import { NavGrid } from '../../core/nav/NavGrid.js';
+
+/**
+ * Cash credited back on `vehicle scrap`: a fraction of purchaseCost, scaled by
+ * the vehicle's current hp/maxHp so a wrecked vehicle salvages for less than
+ * a pristine one. Exported so the Fleet panel's scrap confirmation can show
+ * the real number before the player commits, not a guess.
+ */
+export function computeScrapResidualValue(vehicleType: VehicleRole, vehicleTier: VehicleTier, hp: number): number {
+  const def = getVehicleDefByTier(vehicleType, vehicleTier);
+  const hpFraction = def.maxHp > 0 ? Math.max(0, Math.min(1, hp / def.maxHp)) : 0;
+  return Math.round(def.purchaseCost * VEHICLE_SCRAP_RESIDUAL_FRACTION * hpFraction);
+}
 
 // ── tier arg parsing ──
 
@@ -157,7 +171,18 @@ export function vehicleCommand(
       }
       return { success: true, output: `Vehicle #${vehicleId} hauling fragment #${fragmentId}.` };
     }
+    case 'scrap': {
+      const id = parseInt(args[1] ?? named['id'] ?? '', 10);
+      if (isNaN(id)) return { success: false, output: 'Usage: vehicle scrap <id>' };
+      const vehicle = state.vehicles.vehicles.find(v => v.id === id);
+      if (!vehicle) return { success: false, output: `Vehicle #${id} not found.` };
+      const residualValue = computeScrapResidualValue(vehicle.type, vehicle.tier, vehicle.hp);
+      destroyVehicle(state.vehicles, id);
+      state.cash += residualValue;
+      addIncome(state.finances, residualValue, 'refund', `Scrap ${vehicle.type} #${id}`, state.tickCount);
+      return { success: true, output: `Vehicle #${id} scrapped. Residual value: $${residualValue}` };
+    }
     default:
-      return { success: false, output: 'Usage: vehicle (list|buy|assign|move|driver|haul)' };
+      return { success: false, output: 'Usage: vehicle (list|buy|assign|move|driver|haul|scrap)' };
   }
 }

@@ -400,6 +400,14 @@ export const VEHICLE_BASE_STATS = {
   rock_fragmenter:    { workRate: 9,  purchaseCost: 32_000, maintenanceCostPerTick: 4, fuelCostPerTick: 7, capacity: 90,  speed: 2, maxHp: 125 },
 } as const;
 
+/**
+ * Fraction of purchaseCost paid back on `vehicle scrap`, further scaled by the
+ * vehicle's current hp/maxHp — a wrecked vehicle is worth less for parts than
+ * a pristine one. Unlike building demolition (which costs money, tearing a
+ * structure down), scrapping a vehicle sells it for salvage.
+ */
+export const VEHICLE_SCRAP_RESIDUAL_FRACTION = 0.4;
+
 // ─── Employee Skills ───────────────────────────────────────────────────────────
 
 /**

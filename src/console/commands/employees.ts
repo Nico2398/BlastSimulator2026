@@ -37,7 +37,6 @@ export function employeeCommand(
   if (err) return err;
   const state = ctx.state!;
   const sub = args[0] ?? 'list';
-  const rng = new Random(state.seed + state.tickCount);
 
   switch (sub) {
     case 'list': {
@@ -71,7 +70,12 @@ export function employeeCommand(
       const { x: empX, z: empZ } = state.navGrid
         ? NavGrid.findNearestReachableCell(state.navGrid, 0, 0, rawEmpX, rawEmpZ)
         : { x: rawEmpX, z: rawEmpZ };
-      const { employee, hiringCost } = hireEmployee(state.employees, role, rng, empX, empZ);
+      // Seeded on nextId too, not just seed+tickCount: two hires dispatched in
+      // the same tick would otherwise re-seed identically and always pick the
+      // same name pair (this is what the design mock's own CREW fixture data
+      // shows — two "Walt Diggins" hired the same day).
+      const rng = new Random(state.seed + state.tickCount + state.employees.nextId);
+      const { employee, hiringCost } = hireEmployee(state.employees, role, rng, empX, empZ, state.tickCount);
       state.cash -= hiringCost;
       addExpense(state.finances, hiringCost, 'salaries', `Hire ${role}: ${employee.name}`, state.tickCount);
       return { success: true, output: `Hired ${employee.name} (${role}). Cost: $${hiringCost}` };
