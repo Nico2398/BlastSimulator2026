@@ -4,6 +4,11 @@
 // picker, HAUL (haulEligibility.ts), SCRAP (confirm, real residual value).
 // DEALERSHIP below the roster: every role/tier with a real stat-multiplier
 // line from VEHICLE_TIER_MULTIPLIERS, dispatching `vehicle buy`.
+//
+// Root id and the dealership buttons' [data-vtype]/[data-tier] are preserved
+// from the old VehiclePanel so tutorialStages.ts, uiActionProbe.ts, and the
+// tutorial/scenario/playtest defs keep resolving unchanged — same convention
+// ContractsPanel.ts already established for #bs-contract-panel in P5.
 
 import { t } from '../../core/i18n/I18n.js';
 import { el, card, button, sectionHeader } from '../dom.js';
@@ -35,7 +40,7 @@ export class FleetPanel {
   private readonly haulCache = new HaulEligibilityCache();
 
   constructor(container: HTMLElement) {
-    this.el = el('div', { className: 'bsx-root', attrs: { id: 'bs-fleet-panel' } });
+    this.el = el('div', { className: 'bsx-root', attrs: { id: 'bs-vehicle-panel' } });
     this.el.style.cssText = [
       'flex-direction:column', 'width:372px', 'max-height:100%',
       'border-radius:8px', 'background:var(--bsx-panel)', 'border:1px solid var(--bsx-hairline-strong)',
@@ -184,7 +189,7 @@ export class FleetPanel {
     const m = VEHICLE_TIER_MULTIPLIERS[tier];
     const btn = el('button', {
       className: 'bs-fleet-tier-btn',
-      attrs: { style: 'display:flex;align-items:center;gap:9px;padding:9px 11px;border:1px solid var(--bsx-hairline);border-radius:5px;background:var(--bsx-card);cursor:pointer;text-align:left', 'data-role': role, 'data-tier': String(tier) },
+      attrs: { style: 'display:flex;align-items:center;gap:9px;padding:9px 11px;border:1px solid var(--bsx-hairline);border-radius:5px;background:var(--bsx-card);cursor:pointer;text-align:left', 'data-role': role, 'data-tier': String(tier), 'data-vtype': role },
     });
     const info = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:3px;flex:1;min-width:0' } });
     info.append(

@@ -12,8 +12,8 @@ import { ContractsPanel } from './panels/ContractsPanel.js';
 import { FinancesPanel } from './panels/FinancesPanel.js';
 import { OperationsPanel } from './panels/OperationsPanel.js';
 import { BuildMenu } from './BuildMenu.js';
-import { VehiclePanel } from './VehiclePanel.js';
-import { EmployeePanel } from './EmployeePanel.js';
+import { FleetPanel } from './panels/FleetPanel.js';
+import { CrewPanel } from './panels/CrewPanel.js';
 import { EventDialog } from './EventDialog.js';
 import { SurveyUI } from './SurveyUI.js';
 import { SettingsMenu } from './SettingsMenu.js';
@@ -47,8 +47,8 @@ export class UIManager {
   private readonly financesPanel: FinancesPanel;
   private readonly operationsPanel: OperationsPanel;
   private readonly buildMenu: BuildMenu;
-  private readonly vehiclePanel: VehiclePanel;
-  private readonly employeePanel: EmployeePanel;
+  private readonly fleetPanel: FleetPanel;
+  private readonly crewPanel: CrewPanel;
   private readonly eventDialog: EventDialog;
   private readonly surveyUI: SurveyUI;
   private readonly settingsMenu: SettingsMenu;
@@ -111,8 +111,15 @@ export class UIManager {
     this.operationsPanel = new OperationsPanel(leftCol);
     this.operationsPanel.setCloseHandler(() => this.hideAllPanels());
     this.buildMenu = new BuildMenu(leftCol);
-    this.vehiclePanel = new VehiclePanel(leftCol);
-    this.employeePanel = new EmployeePanel(leftCol);
+    this.fleetPanel = new FleetPanel(leftCol);
+    this.fleetPanel.setCloseHandler(() => this.hideAllPanels());
+    // FleetPanel's no-driver warning cross-links to Crew ('crew' is its own
+    // vocabulary — this.showPanel takes the PanelName key, 'employees').
+    this.fleetPanel.setNavigateHandler(() => this.showPanel('employees'));
+    this.fleetPanel.setConfirmHandler(config => this.confirmModal.show(config));
+    this.crewPanel = new CrewPanel(leftCol);
+    this.crewPanel.setCloseHandler(() => this.hideAllPanels());
+    this.crewPanel.setConfirmHandler(config => this.confirmModal.show(config));
     this.surveyUI = new SurveyUI(leftCol);
     // Settings appended to root container so its z-index:10000 beats the main menu (z-index:9999).
     // Inside leftCol's fixed stacking context it would be capped at z:100 relative to root.
@@ -155,8 +162,8 @@ export class UIManager {
     this.contractsPanel.setGameConsole(fn);
     this.operationsPanel.setGameConsole(fn);
     this.buildMenu.setGameConsole(fn);
-    this.vehiclePanel.setGameConsole(fn);
-    this.employeePanel.setGameConsole(fn);
+    this.fleetPanel.setGameConsole(fn);
+    this.crewPanel.setGameConsole(fn);
     this.eventDialog.setGameConsole(fn);
     this.surveyUI.setGameConsole(fn);
     this.settingsMenu.setGameConsole(fn);
@@ -238,8 +245,8 @@ export class UIManager {
     this.financesPanel.refreshLocale();
     this.operationsPanel.refreshLocale();
     this.buildMenu.refreshLocale();
-    this.vehiclePanel.refreshLocale();
-    this.employeePanel.refreshLocale();
+    this.fleetPanel.refreshLocale();
+    this.crewPanel.refreshLocale();
     this.surveyUI.refreshLocale();
     this.settingsMenu.refreshLocale();
     this.miniMap.refreshLocale();
@@ -277,8 +284,8 @@ export class UIManager {
     if (this.financesPanel.visible) this.financesPanel.update(state);
     if (this.operationsPanel.visible) this.operationsPanel.update(state);
     if (this.buildMenu.visible) this.buildMenu.update(state);
-    if (this.vehiclePanel.visible) this.vehiclePanel.update(state);
-    if (this.employeePanel.visible) this.employeePanel.update(state);
+    if (this.fleetPanel.visible) this.fleetPanel.update(state);
+    if (this.crewPanel.visible) this.crewPanel.update(state);
     if (this.surveyUI.visible) this.surveyUI.update(state);
 
     // Event dialog — auto-show when pending event exists, keep open during outcome.
@@ -304,18 +311,18 @@ export class UIManager {
       case 'finances': this.financesPanel.show(); break;
       case 'ops': this.operationsPanel.show(); break;
       case 'build': this.buildMenu.show(); break;
-      case 'vehicles': this.vehiclePanel.show(); break;
-      case 'employees': this.employeePanel.show(); break;
+      case 'vehicles': this.fleetPanel.show(); break;
+      case 'employees': this.crewPanel.show(); break;
       case 'survey': this.surveyUI.show(); break;
       case 'settings': this.settingsMenu.show(); break;
     }
     this.toolRail.setActive(this.activePanel);
   }
 
-  /** Open the Crew panel with a specific employee's row expanded — the DETAIL/TRAIN actions of the scene selection bar (src/ui/shell/SelectionBar.ts). */
+  /** Open the Crew panel with a specific employee's card expanded — the DETAIL/TRAIN actions of the scene selection bar (src/ui/shell/SelectionBar.ts). */
   showEmployeeDetail(id: number): void {
     this.showPanel('employees');
-    this.employeePanel.expandEmployee(id);
+    this.crewPanel.expandEmployee(id);
   }
 
   togglePanel(name: PanelName): void {
@@ -344,8 +351,8 @@ export class UIManager {
     this.financesPanel.dispose();
     this.operationsPanel.dispose();
     this.buildMenu.dispose();
-    this.vehiclePanel.dispose();
-    this.employeePanel.dispose();
+    this.fleetPanel.dispose();
+    this.crewPanel.dispose();
     this.eventDialog.dispose();
     this.surveyUI.dispose();
     this.settingsMenu.dispose();
@@ -359,8 +366,8 @@ export class UIManager {
     this.financesPanel.hide();
     this.operationsPanel.hide();
     this.buildMenu.hide();
-    this.vehiclePanel.hide();
-    this.employeePanel.hide();
+    this.fleetPanel.hide();
+    this.crewPanel.hide();
     this.surveyUI.hide();
     this.settingsMenu.hide();
     this.toolRail.setActive(null);

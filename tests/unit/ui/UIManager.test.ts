@@ -8,7 +8,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { UIManager } from '../../../src/ui/UIManager.js';
 import { MiniMap } from '../../../src/ui/MiniMap.js';
-import { EmployeePanel } from '../../../src/ui/EmployeePanel.js';
+import { CrewPanel } from '../../../src/ui/panels/CrewPanel.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { NavGrid } from '../../../src/core/nav/NavGrid.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
@@ -179,25 +179,26 @@ describe('UIManager — locale refresh on language switch (issue #457)', () => {
   it('the currently shown panel\'s static title switches language', () => {
     uiManager = new UIManager(container);
     uiManager.showPanel('vehicles');
-    const title = container.querySelector('#bs-vehicle-panel .bs-panel-title');
-    expect(title?.textContent).toBe(t('ui.vehicles.title')); // English baseline
+    const fleetPanel = container.querySelector('#bs-vehicle-panel') as HTMLElement;
+    expect(fleetPanel.textContent).toContain(t('ui.fleet.title')); // English baseline
+    expect(t('ui.fleet.title')).toBe('Fleet');
 
     clickFrenchButton(container);
 
-    expect(title?.textContent).toBe(t('ui.vehicles.title'));
-    expect(title?.textContent).not.toBe('Vehicles');
+    expect(fleetPanel.textContent).toContain(t('ui.fleet.title'));
+    expect(fleetPanel.textContent).not.toContain('Fleet');
   });
 
   it('every owned panel with a .bs-panel-title re-renders to a different string after the switch', () => {
     uiManager = new UIManager(container);
     const titleEls = Array.from(container.querySelectorAll('.bs-panel-title'));
     // Sanity: UIManager owns several titled panels still on the legacy
-    // .bs-panel-title class (build, vehicles, employees, survey, settings,
-    // minimap, event dialog). Blast (P4) and Contracts/Finances/Operations
-    // (P5) migrated to the redesign's own title markup and no longer count
-    // here — each surface-by-surface migration shrinks this number further,
-    // same as it did when Blast moved off .bs-panel-title.
-    expect(titleEls.length).toBeGreaterThanOrEqual(7);
+    // .bs-panel-title class (build, survey, settings, minimap, event
+    // dialog). Blast (P4), Contracts/Finances/Operations (P5), and now
+    // Fleet/Crew (P6) migrated to the redesign's own title markup and no
+    // longer count here — each surface-by-surface migration shrinks this
+    // number further, same as it did when Blast moved off .bs-panel-title.
+    expect(titleEls.length).toBeGreaterThanOrEqual(5);
     const before = titleEls.map((el) => el.textContent);
 
     clickFrenchButton(container);
@@ -264,8 +265,8 @@ describe('UIManager — showEmployeeDetail (scene selection DETAIL/TRAIN, P2)', 
     expect(panel.style.display).not.toBe('none');
   });
 
-  it('expands the given employee\'s row in the Crew panel', () => {
-    const expandSpy = vi.spyOn(EmployeePanel.prototype, 'expandEmployee');
+  it('expands the given employee\'s card in the Crew panel', () => {
+    const expandSpy = vi.spyOn(CrewPanel.prototype, 'expandEmployee');
     uiManager = new UIManager(container);
 
     uiManager.showEmployeeDetail(3);

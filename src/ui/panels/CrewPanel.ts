@@ -6,6 +6,14 @@
 // Single expansion, unlike the old EmployeePanel's multi-expand Set: the
 // design mock keeps exactly one card open at a time (clicking a second one
 // closes the first), so `expandedId` is a lone id rather than a set.
+//
+// Root id, the roster toggle's .bs-detail-toggle class, the detail
+// wrapper's .bs-employee-detail class, [data-employee-id], the hire
+// button's [data-role], and the train button's .bs-train-btn/[data-skill]/
+// [data-employee] are all preserved from the old EmployeePanel so
+// tutorialStages.ts, uiActionProbe.ts, and the tutorial/scenario/playtest
+// defs keep resolving unchanged — same convention ContractsPanel.ts already
+// established for #bs-contract-panel in P5.
 
 import { t } from '../../core/i18n/I18n.js';
 import { el, sectionHeader } from '../dom.js';
@@ -39,7 +47,7 @@ export class CrewPanel {
   private readonly locale = new LocaleTextRegistry();
 
   constructor(container: HTMLElement) {
-    this.el = el('div', { className: 'bsx-root', attrs: { id: 'bs-crew-panel' } });
+    this.el = el('div', { className: 'bsx-root', attrs: { id: 'bs-employee-panel' } });
     this.el.style.cssText = [
       'flex-direction:column', 'width:372px', 'max-height:100%',
       'border-radius:8px', 'background:var(--bsx-panel)', 'border:1px solid var(--bsx-hairline-strong)',
@@ -76,6 +84,22 @@ export class CrewPanel {
   show(): void { this.el.style.display = 'flex'; }
   hide(): void { this.el.style.display = 'none'; }
   get visible(): boolean { return this.el.style.display !== 'none'; }
+
+  /**
+   * Expand a specific employee's card and scroll it into view — the
+   * panel-side half of the scene selection bar's DETAIL/TRAIN actions
+   * (src/ui/shell/SelectionBar.ts via UIManager.showEmployeeDetail), which
+   * pick an employee in the 3D scene and need their card opened here, not
+   * just the panel shown.
+   */
+  expandEmployee(id: number): void {
+    this.expandedId = id;
+    this.lastSignature = '';
+    if (this.lastState) this.update(this.lastState);
+    // Optional chained on the method itself, not just the element — jsdom
+    // (unit tests) doesn't implement scrollIntoView at all.
+    this.bodyEl.querySelector<HTMLElement>(`[data-employee-id="${id}"]`)?.scrollIntoView?.({ block: 'nearest' });
+  }
 
   update(state: GameState): void {
     this.lastState = state;
@@ -181,7 +205,7 @@ export class CrewPanel {
         }),
       );
       const cost = el('span', { text: `$${HIRING_COSTS[role]}`, className: 'bsx-mono', attrs: { style: 'font-size:11px;font-weight:600;color:var(--bsx-amber)' } });
-      const hireBtn = el('button', { className: 'bsx-btn', text: t('ui.crew.hire') });
+      const hireBtn = el('button', { className: 'bsx-btn', text: t('ui.crew.hire'), attrs: { 'data-role': role } });
       hireBtn.disabled = state.cash < HIRING_COSTS[role];
       hireBtn.addEventListener('click', () => this.gameConsole?.(`employee hire role:${role}`));
       row.append(info, cost, hireBtn);
@@ -196,7 +220,7 @@ export class CrewPanel {
       expanded ? 'rgba(255,176,46,.4)' : e.collapsing ? 'rgba(255,91,76,.4)' : 'var(--bsx-hairline)'
     };background:${expanded ? 'rgba(255,176,46,.07)' : 'var(--bsx-card)'}`;
 
-    const toggle = el('button', { attrs: { style: 'width:100%;display:flex;align-items:center;gap:10px;padding:10px 11px;border:0;background:transparent;cursor:pointer;text-align:left' } });
+    const toggle = el('button', { className: 'bs-detail-toggle', attrs: { style: 'width:100%;display:flex;align-items:center;gap:10px;padding:10px 11px;border:0;background:transparent;cursor:pointer;text-align:left' } });
     toggle.addEventListener('click', () => {
       this.expandedId = expanded ? null : e.id;
       this.lastSignature = '';
@@ -227,7 +251,7 @@ export class CrewPanel {
     row.appendChild(toggle);
 
     if (expanded) {
-      const detail = el('div', { className: 'bs-crew-detail', attrs: { style: 'padding:0 11px 12px;display:flex;flex-direction:column;gap:11px' } });
+      const detail = el('div', { className: 'bs-crew-detail bs-employee-detail', attrs: { style: 'padding:0 11px 12px;display:flex;flex-direction:column;gap:11px' } });
       detail.append(
         makeHiredLocationStrip(e, state),
         this.tag(makeNeedsSection(e), 'bs-crew-needs'),

@@ -274,6 +274,9 @@ export function makeTrainingSection(e: Employee, state: GameState, onTrain: (ski
         }),
       );
       const trainBtn = button('warn', t('ui.crew.train'), { disabled: state.cash < plan.fee || e.injured });
+      trainBtn.classList.add('bs-train-btn');
+      trainBtn.dataset['skill'] = skill;
+      trainBtn.dataset['employee'] = String(e.id);
       trainBtn.addEventListener('click', () => onTrain(skill, building.id));
       row.append(info, trainBtn);
     }

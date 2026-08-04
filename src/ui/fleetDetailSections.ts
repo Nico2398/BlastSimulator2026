@@ -112,6 +112,7 @@ export function makeAssignRow(v: Vehicle, state: GameState, onAssign: (employeeI
   const select = el('select', { attrs: { style: 'flex:1;height:28px;border-radius:4px;background:var(--bsx-well);color:var(--bsx-text-secondary);border:1px solid var(--bsx-hairline-strong);font-size:10px' } }) as HTMLSelectElement;
   for (const e of eligible) select.appendChild(el('option', { text: e.name, attrs: { value: String(e.id) } }));
   const assignBtn = button('primary', t('ui.fleet.assign'));
+  assignBtn.classList.add('bs-vehicle-assign-btn');
   assignBtn.style.cssText = 'height:28px;padding:0 10px';
   assignBtn.addEventListener('click', () => onAssign(Number(select.value)));
   wrap.append(select, assignBtn);
