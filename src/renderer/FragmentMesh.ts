@@ -1,20 +1,13 @@
 // BlastSimulator2026 — Fragment Meshes (Performance-optimised)
 // Renders blast fragments using InstancedMesh for batched GPU rendering.
-// 24 shape variants × 1 InstancedMesh each = 24 draw calls regardless of count.
-// Each instance is scaled to the fragment's own bounding box, so the size and
-// proportions the blast carved are what the player sees.
-// Rock/ore identity is carried per-instance (aRockA/aRockB/aRockWeight/aOre)
-// and shaded by the shared TerrainMaterial, so a fragment's cut face matches
-// the rock it broke off from (#458 T4.1/D9/A18).
-//
-// The variant geometries are closed cut-stone polyhedra (FragmentGeometry.ts).
-// Each instance also gets a seeded orientation and a slight shear, so two
-// instances of one variant never read as the same rock. The shear lives inside
-// the instance matrix — position updates must preserve it (see updatePositions).
-//
-// Performance target: 2000 fragments at 60fps
-// Previous: 2000 individual meshes × material clones → thousands of draw calls
-// Now:      24 InstancedMesh objects → 24 draw calls for any fragment count
+// 24 shape variants × 1 InstancedMesh each = 24 draw calls regardless of count
+// (was 2000 individual meshes × material clones). Each instance is scaled to
+// the fragment's own bounding box, carries a seeded orientation and slight
+// shear so two instances of one variant never read as the same rock, and
+// shades rock/ore identity (aRockA/aRockB/aRockWeight/aOre) through the
+// shared TerrainMaterial (#458 T4.1/D9/A18). The rotation/shear/tumble-axis
+// math lives in FragmentTransformMath.ts, shared with FragmentAnimator so a
+// settled fragment's transform is bit-identical to its spawn one (#485).
 
 import * as THREE from 'three';
 import type { FragmentData } from '../core/mining/BlastExecution.js';
@@ -23,6 +16,7 @@ import { oreIndexOf } from '../core/world/OreCatalog.js';
 import { FRAGMENT_MIN_RENDER_Y } from '../core/config/balance.js';
 import { sampleEvenly } from './FragmentRenderSampling.js';
 import { buildFragmentGeometries } from './FragmentGeometry.js';
+import { buildBaseTransform, composeInstanceMatrix, type FragmentBaseTransform, type PlainVec3 } from './FragmentTransformMath.js';
 
 // ---------- Config ----------
 
@@ -37,10 +31,6 @@ const MAX_RENDERED_FRAGMENTS = 2000;
 // Number of irregular shape variants
 const SHAPE_VARIANTS = 24;
 
-// How far a fragment's unit shape is skewed by its per-instance shear. Small on
-// purpose: at 0.18 the silhouette changes, the volume barely does.
-const SHEAR_MAX = 0.18;
-
 // Capacity per variant bucket — evenly split; some buckets may have slightly more
 const BUCKET_CAPACITY = Math.ceil(MAX_RENDERED_FRAGMENTS / SHAPE_VARIANTS);
 
@@ -53,17 +43,25 @@ function getSharedGeometries(): THREE.BufferGeometry[] {
   return sharedGeometries;
 }
 
-/** Deterministic pseudo-random in [0, 1) from a fragment's shape seed. */
-function seedUnit(seed: number, salt: number): number {
-  const x = Math.sin(seed * 127.1 + salt * 311.7) * 43758.5453;
-  return x - Math.floor(x);
-}
-
 // ---------- Per-instance slot tracking ----------
 
 interface SlotInfo {
   meshIdx: number;
   slotIdx: number;
+}
+
+/**
+ * Per-instance transform data written by the animator each frame: current
+ * position plus how far it has tumbled and settled since spawn (#485).
+ */
+export interface FragmentInstanceTransform {
+  x: number;
+  y: number;
+  z: number;
+  /** Extra rotation (radians) about the fragment's own seeded tumble axis, on top of its spawn orientation. 0 = untouched. */
+  tumbleAngle: number;
+  /** Multiplier on the fragment's spawn scale. (1,1,1) = untouched. */
+  settleScale: PlainVec3;
 }
 
 /** The highest-density ore in a fragment's ore record, or '' if none (#458 T4.1/A18). */
@@ -88,6 +86,8 @@ export class FragmentMesh {
   private readonly fragIdToSlot = new Map<number, SlotInfo>();
   /** slotIdx → fragId for each bucket (to support swap-on-delete) */
   private readonly bucketSlotToFrag: number[][] = [];
+  /** fragId → the fixed rotation/shear/tumble-axis part of its spawn transform (#485). */
+  private readonly fragBaseTransform = new Map<number, FragmentBaseTransform>();
 
   /** Per-shape-variant per-instance rock/ore attributes, shading the shared TerrainMaterial (#458 T4.1/A18). */
   private readonly instanceRockA: THREE.InstancedBufferAttribute[] = [];
@@ -96,12 +96,12 @@ export class FragmentMesh {
   private readonly instanceOre: THREE.InstancedBufferAttribute[] = [];
 
   private static readonly _mtx = new THREE.Matrix4();
-  private static readonly _shear = new THREE.Matrix4();
   private static readonly _scale = new THREE.Vector3();
-  private static readonly _quat = new THREE.Quaternion();
   private static readonly _pos = new THREE.Vector3();
-  private static readonly _euler = new THREE.Euler();
-  private static readonly _unit = new THREE.Vector3(1, 1, 1);
+  /** Identity settle-scale, reused for the spawn matrix (fragment is at rest, untumbled, unsettled). */
+  private static readonly _unitScale = { x: 1, y: 1, z: 1 };
+  /** Which buckets `updateTransforms` touched this call — reused so a frame with many fragments allocates nothing. */
+  private readonly dirtyBuckets = new Array<boolean>(SHAPE_VARIANTS).fill(false);
 
   /** `material` is the shared TerrainMaterial (borrowed from TerrainMesh, which owns and disposes it — #458 T4.1/D9). */
   constructor(scene: THREE.Scene, material: THREE.Material) {
@@ -132,10 +132,7 @@ export class FragmentMesh {
     }
   }
 
-  /**
-   * The preferred bucket if it has room, otherwise the next one that does.
-   * Returns -1 when every bucket is full.
-   */
+  /** The preferred bucket if it has room, otherwise the next that does; -1 if all full. */
   private pickBucket(preferred: number): number {
     for (let i = 0; i < SHAPE_VARIANTS; i++) {
       const idx = (preferred + i) % SHAPE_VARIANTS;
@@ -155,45 +152,30 @@ export class FragmentMesh {
     const toRender = sampleEvenly(fragments, MAX_RENDERED_FRAGMENTS);
 
     for (const frag of toRender) {
-      // Keyed on the fragment's own shape seed rather than its id: ids run
-      // consecutively, so `id % SHAPE_VARIANTS` marched through the variants in
-      // lockstep and produced a visible repeating pattern across the muck pile.
-      // Shape seeds are random, so buckets do not fill evenly. Falling through
-      // to any bucket with room keeps the full render budget usable instead of
-      // dropping fragments once one variant happens to fill up.
+      // Keyed on the shape seed, not the id — ids run consecutively so
+      // `id % SHAPE_VARIANTS` marched through variants in lockstep, giving a
+      // visible repeating pattern. Falling through to any bucket with room
+      // keeps the full render budget usable once a variant fills up.
       const meshIdx = this.pickBucket(frag.shapeSeed % SHAPE_VARIANTS);
       if (meshIdx < 0) continue; // every bucket full
       const count = this.bucketCount[meshIdx]!;
 
       const im = this.instancedMeshes[meshIdx]!;
 
-      // Each fragment is drawn at the size and proportions it was carved with,
-      // so a slab reads as a slab and a boulder as a boulder. Positions are the
-      // real centroids of the rock that broke, inside the volume the blast just
-      // removed — no crater offset or scatter is needed to fake that any more.
+      // Fragment is drawn at the size/proportions it was carved with, at its
+      // real centroid inside the volume the blast removed.
       FragmentMesh._pos.set(frag.position.x, Math.max(FRAGMENT_MIN_RENDER_Y, frag.position.y), frag.position.z);
       FragmentMesh._scale.set(
         Math.max(MIN_RENDER_EXTENT, frag.halfExtents.x * 2),
         Math.max(MIN_RENDER_EXTENT, frag.halfExtents.y * 2),
         Math.max(MIN_RENDER_EXTENT, frag.halfExtents.z * 2),
       );
-      FragmentMesh._quat.setFromEuler(FragmentMesh._euler.set(
-        seedUnit(frag.shapeSeed, 1) * Math.PI * 2,
-        seedUnit(frag.shapeSeed, 2) * Math.PI * 2,
-        seedUnit(frag.shapeSeed, 3) * Math.PI * 2,
-      ));
-      // A slight seeded shear, so two instances of the same variant stone never
-      // read as identical. It sits *between* rotation and scale (T·R·Shear·S):
-      // applied outside the scale, a slab's long axis would bleed into its thin
-      // one and a flat fragment stopped rendering flat.
-      const shear = FragmentMesh._shear.identity();
-      const e = shear.elements;
-      e[4] = (seedUnit(frag.shapeSeed, 4) * 2 - 1) * SHEAR_MAX;  // x from y
-      e[8] = (seedUnit(frag.shapeSeed, 5) * 2 - 1) * SHEAR_MAX;  // x from z
-      e[9] = (seedUnit(frag.shapeSeed, 6) * 2 - 1) * SHEAR_MAX;  // y from z
-      FragmentMesh._mtx.compose(FragmentMesh._pos, FragmentMesh._quat, FragmentMesh._unit);
-      FragmentMesh._mtx.multiply(shear);
-      FragmentMesh._mtx.scale(FragmentMesh._scale);
+      // Rotation, shear, and size are fixed for the fragment's whole life —
+      // build that part once and keep it, so each frame's update only has to
+      // recompose the cheap tumble/settle part on top (#485).
+      const base = buildBaseTransform(frag.shapeSeed, FragmentMesh._scale);
+      this.fragBaseTransform.set(frag.id, base);
+      composeInstanceMatrix(base, FragmentMesh._pos, 0, FragmentMesh._unitScale, FragmentMesh._mtx);
       im.setMatrixAt(count, FragmentMesh._mtx);
 
       // Rock/ore identity for the shared TerrainMaterial shader — a fragment
@@ -225,26 +207,22 @@ export class FragmentMesh {
     }
   }
 
-  /**
-   * Update fragment positions during physics simulation.
-   * Call on each physics step with the current body positions.
-   */
-  updatePositions(positions: Map<number, { x: number; y: number; z: number }>): void {
-    const dirtyBuckets = new Set<number>();
-    for (const [id, pos] of positions) {
-      const slot = this.fragIdToSlot.get(id);
-      if (!slot) continue;
-      const im = this.instancedMeshes[slot.meshIdx]!;
-      im.getMatrixAt(slot.slotIdx, FragmentMesh._mtx);
-      // Only the translation column changes. Decomposing to TRS and
-      // recomposing — the old way — silently destroyed the per-instance shear
-      // (TRS cannot represent it), and cost a decompose per fragment per frame.
-      FragmentMesh._mtx.setPosition(pos.x, pos.y, pos.z);
-      im.setMatrixAt(slot.slotIdx, FragmentMesh._mtx);
-      dirtyBuckets.add(slot.meshIdx);
+  /** Update fragment position/tumble/settle-scale during collapse playback. */
+  updateTransforms(updates: Map<number, FragmentInstanceTransform>): void {
+    this.dirtyBuckets.fill(false);
+
+    for (const [fragId, transform] of updates) {
+      const slot = this.fragIdToSlot.get(fragId);
+      const base = this.fragBaseTransform.get(fragId);
+      if (!slot || !base) continue;
+
+      composeInstanceMatrix(base, transform, transform.tumbleAngle, transform.settleScale, FragmentMesh._mtx);
+      this.instancedMeshes[slot.meshIdx]!.setMatrixAt(slot.slotIdx, FragmentMesh._mtx);
+      this.dirtyBuckets[slot.meshIdx] = true;
     }
-    for (const idx of dirtyBuckets) {
-      this.instancedMeshes[idx]!.instanceMatrix.needsUpdate = true;
+
+    for (let i = 0; i < SHAPE_VARIANTS; i++) {
+      if (this.dirtyBuckets[i]) this.instancedMeshes[i]!.instanceMatrix.needsUpdate = true;
     }
   }
 
@@ -288,6 +266,7 @@ export class FragmentMesh {
     this.instanceOre[meshIdx]!.needsUpdate = true;
 
     this.fragIdToSlot.delete(fragmentId);
+    this.fragBaseTransform.delete(fragmentId);
     this.bucketSlotToFrag[meshIdx]![lastIdx] = -1;
   }
 
@@ -298,6 +277,7 @@ export class FragmentMesh {
       this.instancedMeshes[i]!.count = 0;
     }
     this.fragIdToSlot.clear();
+    this.fragBaseTransform.clear();
     for (const bucket of this.bucketSlotToFrag) bucket.fill(-1);
   }
 
