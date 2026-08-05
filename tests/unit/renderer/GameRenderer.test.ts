@@ -537,3 +537,104 @@ describe('GameRenderer — scene picking (P2)', () => {
     expect(renderer.resolveFragmentId(0, 0)).toBeNull();
   });
 });
+
+describe('GameRenderer — ambient decoration follows game clock, not wall clock (#490)', () => {
+  it('ambient clock stays at zero while the game starts paused', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    const ctx = makeCtx();
+    ctx.state!.isPaused = true;
+    renderer.syncFromContext(ctx);
+
+    for (let i = 0; i < 5; i++) renderer.update(0.5);
+
+    expect(renderer.ambientClockSeconds).toBe(0);
+  });
+
+  it('ambient clock advances 4x as far at 4x timeScale as at 1x, for the same wall-clock delta', () => {
+    const renderer1 = new GameRenderer(makeMockSceneManager() as any);
+    const ctx1 = makeCtx();
+    ctx1.state!.timeScale = 1;
+    ctx1.state!.isPaused = false;
+    renderer1.syncFromContext(ctx1);
+
+    const renderer4 = new GameRenderer(makeMockSceneManager() as any);
+    const ctx4 = makeCtx();
+    ctx4.state!.timeScale = 4;
+    ctx4.state!.isPaused = false;
+    renderer4.syncFromContext(ctx4);
+
+    for (let i = 0; i < 10; i++) {
+      renderer1.update(0.1);
+      renderer4.update(0.1);
+    }
+
+    expect(renderer4.ambientClockSeconds).toBeCloseTo(renderer1.ambientClockSeconds * 4, 5);
+  });
+
+  it('two half-steps advance the ambient clock exactly as far as one whole step', () => {
+    const rendererA = new GameRenderer(makeMockSceneManager() as any);
+    const ctxA = makeCtx();
+    ctxA.state!.timeScale = 2;
+    ctxA.state!.isPaused = false;
+    rendererA.syncFromContext(ctxA);
+    rendererA.update(0.2);
+
+    const rendererB = new GameRenderer(makeMockSceneManager() as any);
+    const ctxB = makeCtx();
+    ctxB.state!.timeScale = 2;
+    ctxB.state!.isPaused = false;
+    rendererB.syncFromContext(ctxB);
+    rendererB.update(0.1);
+    rendererB.update(0.1);
+
+    expect(rendererA.ambientClockSeconds).toBeCloseTo(rendererB.ambientClockSeconds, 10);
+  });
+
+  it('pausing mid-run freezes the ambient clock; resuming continues without a catch-up jump', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    const ctx = makeCtx();
+    ctx.state!.timeScale = 2;
+    ctx.state!.isPaused = false;
+    renderer.syncFromContext(ctx);
+
+    for (let i = 0; i < 3; i++) renderer.update(0.1);
+    const beforePause = renderer.ambientClockSeconds;
+
+    ctx.state!.isPaused = true;
+    renderer.syncFromContext(ctx);
+    for (let i = 0; i < 5; i++) renderer.update(0.1);
+    expect(renderer.ambientClockSeconds).toBe(beforePause);
+
+    ctx.state!.isPaused = false;
+    renderer.syncFromContext(ctx);
+    renderer.update(0.1);
+
+    expect(renderer.ambientClockSeconds - beforePause).toBeCloseTo(0.1 * 2, 10);
+  });
+
+  it('dt = 0 leaves the ambient clock unchanged', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    const ctx = makeCtx();
+    ctx.state!.timeScale = 3;
+    ctx.state!.isPaused = false;
+    renderer.syncFromContext(ctx);
+
+    renderer.update(0.1);
+    const before = renderer.ambientClockSeconds;
+    renderer.update(0);
+
+    expect(renderer.ambientClockSeconds).toBe(before);
+  });
+
+  it('a capped-but-large per-frame dt at max timeScale scales linearly, no secondary clamp', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    const ctx = makeCtx();
+    ctx.state!.timeScale = 8;
+    ctx.state!.isPaused = false;
+    renderer.syncFromContext(ctx);
+
+    renderer.update(0.1);
+
+    expect(renderer.ambientClockSeconds).toBeCloseTo(0.8, 10);
+  });
+});
