@@ -3,30 +3,44 @@
 // Pure function operating on GameState + VoxelGrid, no side effects.
 
 import type { Vec3 } from '../math/Vec3.js';
-import { vec3 } from '../math/Vec3.js';
+import { length as vecLength } from '../math/Vec3.js';
 import type { DrillHole } from './DrillPlan.js';
 // HoleCharge used via plan.charges values
 import type { BlastPlan } from './BlastPlan.js';
 import { validateBlastPlan } from './BlastPlan.js';
 import {
-  calculateEnergyField,
-  calculateFragmentation,
-  calculateFragmentCount,
-  calculateInitialVelocity,
   calculateVibrations,
   groupChargesByDelay,
   effectiveHoleEnergy,
+  computeInitialEnergy,
+  stemmingFactor,
 } from './BlastCalc.js';
-import { getRock } from '../world/RockCatalog.js';
+import {
+  buildHoleSeeds,
+  clampBoxToGrid,
+  createEnergyField,
+  seedEnergy,
+  type BlastBox,
+  type EnergyField,
+  type EnergySeed,
+} from './EnergyPropagation.js';
+import { identifyFragmentedVoxels } from './VoxelFragmentation.js';
+import { generateFragments } from './FragmentGeneration.js';
+import { computeFragmentVelocity, throwFractionForBlowout } from './FragmentVelocity.js';
+import { groupProjectiles } from './ProjectileGrouping.js';
+import { resolveFragmentLanding, type FragmentFlight } from './BlastResolve.js';
+import { Random } from '../math/Random.js';
 import { getOre } from '../world/OreCatalog.js';
 import { VoxelGrid, computeVoxelColumnSurfaceY } from '../world/VoxelGrid.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { getBuildingDef, destroyBuilding, type BuildingState, type Building, type BuildingType } from '../entities/Building.js';
 import {
-  SOLID_VOXEL_DENSITY_THRESHOLD,
-  CRATER_EXCAVATION_MAX_RADIUS,
-  CRATER_EXCAVATION_DEPTH_VOXELS,
   BLAST_ZONE_RADIUS,
+  OVERSIZED_FRAGMENT_THRESHOLD,
+  EXPLOSIVE_ENERGY_SCALE,
+  PROJECTION_SPEED_THRESHOLD,
+  THROW_DISTANCE_BAD,
+  THROW_DISTANCE_CATASTROPHIC,
 } from '../config/balance.js';
 
 // ── Config ──
@@ -45,6 +59,10 @@ export interface FragmentData {
   oreDensities: Record<string, number>;
   initialVelocity: Vec3;
   isProjection: boolean;
+  /** Half-extents of the fragment's bounding box — its rough shape and size. */
+  halfExtents: Vec3;
+  /** Stable per-fragment randomness for render shape variants and tumble. */
+  shapeSeed: number;
 }
 
 // ── Blast Report ──
@@ -99,6 +117,15 @@ export interface BlastResult {
   clearedRegion: BlastRegion;
   destroyedBuildings: DestroyedBuildingInfo[];
   secondaryBlastEvents: SecondaryBlastEvent[];
+  /** Furthest any fragment was thrown horizontally, in metres. */
+  maxThrowDistance: number;
+  /** How many bodies the thrown rock was flown as (see ProjectileGrouping). */
+  projectileCount: number;
+  /** Each fragment's journey from where it broke to where it settled. */
+  flights: FragmentFlight[];
+  /** "x,z" of every ground column the blast removed rock from. Anything standing
+   *  on one of these was standing on the blast. */
+  clearedColumns: string[];
 }
 
 // ── Village (for vibration targets) ──
@@ -150,153 +177,111 @@ export function executeBlast(
   const originY = Math.max(0, ...Object.values(holeSurfaceYs));
   emitter?.emit('blast:started', { originX: blastCenter.x, originY, originZ: blastCenter.z });
 
-  // 3-4. Process each voxel: energy → fragmentation → fragments
+  // 3. Propagate the charge energy through the rock, then read off what broke.
+  const field = buildBlastEnergyField(plan, grid, bbox, holeSurfaceYs);
+  const fragmentation = field ? identifyFragmentedVoxels(field, grid) : null;
+
   const fragments: FragmentData[] = [];
   let fragmentIdCounter = 0;
   let totalRockVolume = 0;
   let totalOreValue = 0;
   let oversizedFragments = 0;
-  let crackedVoxels = 0;
+  const crackedVoxels = fragmentation?.cracked.length ?? 0;
   let clearedVoxels = 0;
 
-  // Build hole depth lookup
-  const holeDepths: Record<string, number> = {};
-  for (const hole of plan.holes) {
-    holeDepths[hole.id] = hole.depth;
-  }
-
-  // Track which voxels to clear (defer clearing for free-face consistency)
+  // Track which voxels to clear (defer clearing so the whole pass sees the
+  // pre-blast rock, and so the cleared region can be computed in one go).
   const toClear: Array<{ x: number; y: number; z: number }> = [];
 
-  for (let z = bbox.minZ; z <= bbox.maxZ; z++) {
-    for (let y = bbox.minY; y <= bbox.maxY; y++) {
-      for (let x = bbox.minX; x <= bbox.maxX; x++) {
-        const density = grid.densityAt(x, y, z);
-        if (density <= 0) continue;
+  // 4. Carve the broken rock into fragments, then work out what throws each one.
+  let flights: FragmentFlight[] = [];
+  let projectileCount = 0;
+  let maxThrowDistance = 0;
 
-        const dominantRockId = grid.dominantRockAt(x, y, z);
-        const rock = getRock(dominantRockId);
-        if (!rock) continue;
+  if (field && fragmentation) {
+    const rng = new Random(fragmentSeedFor(plan));
+    const { fragments: generated } = generateFragments(fragmentation, field, grid, rng);
 
-        const point = vec3(x, y, z);
-        const energy = calculateEnergyField(point, plan.holes, plan.charges, holeDepths, holeSurfaceYs);
-        const fractureModifier = grid.fractureAt(x, y, z);
-        const threshold = rock.fractureThreshold * fractureModifier;
-        const frag = calculateFragmentation(energy, threshold);
+    for (const gen of generated) {
+      const throwFraction = throwFractionAt(gen.origin, plan);
+      const velocity = computeFragmentVelocity(gen.origin, gen.sources, gen.massKg, field, throwFraction);
 
-        if (frag.result === 'fractured') {
-          const voxelVolume = VoxelGrid.CELL_SIZE * VoxelGrid.CELL_SIZE * VoxelGrid.CELL_SIZE;
-          const fragCount = calculateFragmentCount(voxelVolume, frag.fragmentSizeFraction);
-          const mass = (rock.density * voxelVolume) / fragCount;
-          const ores = grid.oresAt(x, y, z) ?? {};
+      fragments.push({
+        id: fragmentIdCounter++,
+        position: gen.origin,
+        volume: gen.volumeM3,
+        mass: gen.massKg,
+        rockId: gen.rockId,
+        // generateFragments builds this record fresh per fragment — take
+        // ownership instead of copying it again.
+        oreDensities: gen.oreDensities,
+        initialVelocity: velocity,
+        isProjection: vecLength(velocity) > PROJECTION_SPEED_THRESHOLD,
+        halfExtents: gen.halfExtents,
+        shapeSeed: gen.shapeSeed,
+      });
 
-          // Find nearest hole for velocity direction (use mid-column as source)
-          const nearestHole = findNearestHole(point, plan.holes);
-          const nearestSurfaceY = holeSurfaceYs[nearestHole.id] ?? 0;
-          const holePos = vec3(nearestHole.x, nearestSurfaceY - nearestHole.depth / 2, nearestHole.z);
+      if (gen.volumeM3 > OVERSIZED_FRAGMENT_THRESHOLD) oversizedFragments++;
+    }
 
-          for (let i = 0; i < fragCount; i++) {
-            const vel = calculateInitialVelocity(point, holePos, energy / fragCount, mass);
-            const speed = Math.sqrt(vel.x * vel.x + vel.y * vel.y + vel.z * vel.z);
-
-            fragments.push({
-              id: fragmentIdCounter++,
-              position: point,
-              volume: voxelVolume / fragCount,
-              mass,
-              rockId: dominantRockId,
-              oreDensities: { ...ores },
-              initialVelocity: vel,
-              isProjection: frag.isProjection || speed > 15,
-            });
-          }
-
-          // Accumulate ore value
-          totalOreValue += calculateOreValue(ores, VoxelGrid.CELL_SIZE);
-          totalRockVolume += voxelVolume;
-
-          // Check oversized: fragment size > 0.8 voxel is "oversized" (barely fractured, needs secondary blast)
-          // Ratio 1.0-1.3 produces sizes 0.8-1.0 — these are the boulder-like results.
-          if (frag.fragmentSizeFraction > 0.8) {
-            oversizedFragments += fragCount;
-          }
-
-          toClear.push({ x, y, z });
-          clearedVoxels++;
-        } else if (frag.result === 'cracked') {
-          // Reduce fracture modifier by 30% for future blasts
-          grid.scaleFractureAt(x, y, z, 0.7);
-          crackedVoxels++;
-        }
-      }
+    // Ore value and rock volume come from the ground that was removed, not from
+    // the fragments, so they stay right however the rock happened to break.
+    for (const { x, y, z } of fragmentation.fragmented) {
+      const ores = grid.oresAt(x, y, z);
+      if (ores) totalOreValue += calculateOreValue(ores, VoxelGrid.CELL_SIZE);
+      totalRockVolume += VoxelGrid.CELL_SIZE ** 3;
+      toClear.push({ x, y, z });
+      clearedVoxels++;
     }
   }
 
-  // 4b. Compute cleared region AABB from toClear for navmesh dirty-region update
+  // 4b. Clear the rock before working out where the fragments land — they fall
+  //     into the hole the blast just made, not onto the ground it removed.
+  for (const { x, y, z } of toClear) grid.clearVoxel(x, y, z);
+
+  // 4c. Fly the thrown rock, drop the rest, and stack it all where it lands.
+  //     Fragments that travel together are grouped into a capped number of
+  //     projectiles, then split back into their own pieces on impact — motion
+  //     cost is bounded without the blast's own fragmentation being touched.
+  if (fragments.length > 0) {
+    const thrown = fragments.filter(f => f.isProjection);
+    const projectiles = groupProjectiles(thrown);
+    projectileCount = projectiles.length;
+    const resolved = resolveFragmentLanding(fragments, projectiles, grid);
+    flights = resolved.flights;
+    maxThrowDistance = resolved.maxThrowDistance;
+  }
+
+  // 4b. Compute cleared region AABB from toClear for navmesh dirty-region
+  //     update. One pass with running bounds — a reduce allocating an object
+  //     per voxel showed up in the blast's frame budget.
+  let regMinX = Infinity, regMaxX = -Infinity, regMinY = Infinity, regMaxY = -Infinity, regMinZ = Infinity, regMaxZ = -Infinity;
+  for (const { x, y, z } of toClear) {
+    if (x < regMinX) regMinX = x;
+    if (x > regMaxX) regMaxX = x;
+    if (y < regMinY) regMinY = y;
+    if (y > regMaxY) regMaxY = y;
+    if (z < regMinZ) regMinZ = z;
+    if (z > regMaxZ) regMaxZ = z;
+  }
   const clearedRegion: BlastRegion = toClear.length === 0
     ? { minX: 0, maxX: -1, minZ: 0, maxZ: -1 }
-    : toClear.reduce(
-        (acc, { x, z }) => ({
-          minX: Math.min(acc.minX, x),
-          maxX: Math.max(acc.maxX, x),
-          minZ: Math.min(acc.minZ, z),
-          maxZ: Math.max(acc.maxZ, z),
-        }),
-        { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity },
-      );
+    : { minX: regMinX, maxX: regMaxX, minZ: regMinZ, maxZ: regMaxZ };
 
-  // 5. Subtract fractured voxels from terrain
-  for (const { x, y, z } of toClear) {
-    grid.clearVoxel(x, y, z);
-  }
-
-  // 5a. Surface excavation pass: clear the top surface voxels near the blast center
-  //     to ensure a visible crater appears in the terrain mesh. The energy field may
-  //     not consistently fracture surface voxels (attenuation + EPSILON dampening),
-  //     but the visual crater is essential player feedback.
-  if (toClear.length > 0) {
-    const { x: blastCenterX, z: blastCenterZ } = calculateBlastCenter(plan.holes);
-    const excavationRadius = Math.min(CRATER_EXCAVATION_MAX_RADIUS, Math.ceil(plan.holes.length / 2));
-    for (let dx = -excavationRadius; dx <= excavationRadius; dx++) {
-      for (let dz = -excavationRadius; dz <= excavationRadius; dz++) {
-        const sx = Math.floor(blastCenterX + dx);
-        const sz = Math.floor(blastCenterZ + dz);
-        // Always clear the top CRATER_EXCAVATION_DEPTH_VOXELS surface voxels at this
-        // column — regardless of what the energy field already cleared. This ensures
-        // a visible crater depression in the terrain mesh.
-        for (let sy = grid.sizeY - 1; sy >= 0; sy--) {
-          if (grid.densityAt(sx, sy, sz) >= SOLID_VOXEL_DENSITY_THRESHOLD) {
-            // Clear this surface voxel and the voxels below, down to the configured depth
-            for (let cy = 0; cy < CRATER_EXCAVATION_DEPTH_VOXELS && sy - cy >= 0; cy++) {
-              if (grid.densityAt(sx, sy - cy, sz) >= SOLID_VOXEL_DENSITY_THRESHOLD) {
-                grid.clearVoxel(sx, sy - cy, sz);
-                if (!toClear.some(c => c.x === sx && c.y === sy - cy && c.z === sz)) {
-                  toClear.push({ x: sx, y: sy - cy, z: sz });
-                }
-                clearedVoxels++;
-              }
-            }
-            break;
-          }
-        }
-      }
-    }
-  }
+  // 5a. The crater is whatever the energy actually broke. There used to be a
+  //     forced excavation pass here that carved a fixed-radius pit around the
+  //     blast centre so *something* visible happened; propagation now fractures
+  //     the surface on its own, and faking it would hide undercharged plans
+  //     from the player instead of letting them read the result.
 
   // 5c. Terrain changed — tell subscribers (renderer remesh, navgrid patch
   //     callers already use clearedRegion directly) the exact voxel AABB that
   //     changed, covering both the fracture-pass clears and anything the
   //     crater pass added afterward.
   if (toClear.length > 0) {
-    const updatedRegion = toClear.reduce(
-      (acc, { x, y, z }) => ({
-        minX: Math.min(acc.minX, x), maxX: Math.max(acc.maxX, x),
-        minY: Math.min(acc.minY, y), maxY: Math.max(acc.maxY, y),
-        minZ: Math.min(acc.minZ, z), maxZ: Math.max(acc.maxZ, z),
-      }),
-      { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity, minZ: Infinity, maxZ: -Infinity },
-    );
-    emitter?.emit('terrain:updated', { region: updatedRegion });
+    emitter?.emit('terrain:updated', {
+      region: { minX: regMinX, maxX: regMaxX, minY: regMinY, maxY: regMaxY, minZ: regMinZ, maxZ: regMaxZ },
+    });
   }
 
   // 5b. Check for building destruction: if any cleared voxel's (x, z) falls
@@ -382,7 +367,7 @@ export function executeBlast(
   const avgSize = fragments.length > 0 ? totalVolume / fragments.length : 0;
 
   const maxVibration = vibrationAtVillages.reduce((m, v) => Math.max(m, v.vibration), 0);
-  const rating = calculateRating(projectionCount, oversizedFragments, clearedVoxels, maxVibration, fragments.length);
+  const rating = calculateRating(projectionCount, maxThrowDistance, clearedVoxels, maxVibration, fragments.length);
 
   emitter?.emit('blast:ended', undefined);
 
@@ -402,10 +387,98 @@ export function executeBlast(
     clearedRegion,
     destroyedBuildings,
     secondaryBlastEvents,
+    clearedColumns: [...new Set(toClear.map(c => `${c.x},${c.z}`))],
+    maxThrowDistance,
+    projectileCount,
+    flights,
   };
 }
 
 // ── Helpers ──
+
+/**
+ * Seed for a blast's fragment randomness, derived from the plan itself so the
+ * same plan on the same terrain always breaks the same way.
+ */
+function fragmentSeedFor(plan: BlastPlan): number {
+  let seed = 2166136261;
+  for (const hole of plan.holes) {
+    const charge = plan.charges[hole.id];
+    seed = Math.imul(seed ^ (hole.x | 0), 16777619);
+    seed = Math.imul(seed ^ (hole.z | 0), 16777619);
+    seed = Math.imul(seed ^ (hole.depth | 0), 16777619);
+    seed = Math.imul(seed ^ Math.round((charge?.amountKg ?? 0) * 10), 16777619);
+  }
+  return Math.abs(seed) % 2147483647;
+}
+
+/**
+ * How much of a fragment's leftover energy still throws it, from the stemming of
+ * the hole nearest to where it broke.
+ *
+ * Per-hole rather than per-blast, so one carelessly stemmed hole in an otherwise
+ * good pattern throws rock from its own corner instead of spoiling the average.
+ */
+function throwFractionAt(origin: Vec3, plan: BlastPlan): number {
+  const hole = findNearestHole(origin, plan.holes);
+  const charge = plan.charges[hole.id];
+  const blowout = charge ? 1 - stemmingFactor(charge.stemmingM, hole.depth) : 1;
+  return throwFractionForBlowout(blowout);
+}
+
+/**
+ * Build the energy field for a plan and run propagation over it.
+ *
+ * Exported so the player's prediction tools run this exact code rather than
+ * their own approximation: a preview that disagrees with what the blast then
+ * does is worse than no preview at all.
+ *
+ * Returns null when the blast zone falls entirely outside the ground the site
+ * owns — nothing to propagate through.
+ */
+export function buildPlanEnergyField(plan: BlastPlan, grid: VoxelGrid): EnergyField | null {
+  const holeSurfaceYs: Record<string, number> = {};
+  for (const hole of plan.holes) {
+    holeSurfaceYs[hole.id] = computeVoxelColumnSurfaceY(grid, hole.x, hole.z) + 1;
+  }
+  return buildBlastEnergyField(plan, grid, calculateBlastZone(plan.holes, holeSurfaceYs), holeSurfaceYs);
+}
+
+export function buildBlastEnergyField(
+  plan: BlastPlan,
+  grid: VoxelGrid,
+  bbox: { minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number },
+  holeSurfaceYs: Record<string, number>,
+): EnergyField | null {
+  // calculateBlastZone reports an inclusive box; the field's is half-open.
+  const requested: BlastBox = {
+    minX: bbox.minX, minY: bbox.minY, minZ: bbox.minZ,
+    maxX: bbox.maxX + 1, maxY: bbox.maxY + 1, maxZ: bbox.maxZ + 1,
+  };
+  const box = clampBoxToGrid(requested, grid);
+  if (!box) return null;
+
+  const seeds: EnergySeed[] = [];
+  for (const hole of plan.holes) {
+    const charge = plan.charges[hole.id];
+    if (!charge) continue;
+    const energy = computeInitialEnergy(charge, hole.depth) * EXPLOSIVE_ENERGY_SCALE;
+    if (energy <= 0) continue;
+    seeds.push(...buildHoleSeeds(
+      holeSurfaceYs[hole.id] ?? 0,
+      hole.depth,
+      charge.amountKg,
+      energy,
+      Math.floor(hole.x),
+      Math.floor(hole.z),
+      box.minY,
+    ));
+  }
+
+  const field = createEnergyField(grid, box);
+  seedEnergy(field, seeds);
+  return field;
+}
 
 function calculateBlastZone(
   holes: readonly DrillHole[],
@@ -486,7 +559,7 @@ function calculateOreValue(oreDensities: Record<string, number>, voxelSize: numb
  */
 function calculateRating(
   projections: number,
-  _oversized: number,
+  maxThrowDistance: number,
   cleared: number,
   maxVibration: number,
   totalFragments: number,
@@ -495,14 +568,11 @@ function calculateRating(
 
   const projRatio = totalFragments > 0 ? projections / totalFragments : 0;
 
-  // Catastrophic: mass projections or extreme vibration
-  if (projRatio > 0.10 || maxVibration > 50) return 'catastrophic';
-  // Bad: significant projections or moderate vibration
-  if (projRatio > 0.03 || maxVibration > 20) return 'bad';
-  // Mediocre: some projections
+  // How far rock was actually thrown, not just how fast it left: a fragment that
+  // lands back in the muck pile is a good blast, one that clears the pit is not.
+  if (projRatio > 0.10 || maxVibration > 50 || maxThrowDistance > THROW_DISTANCE_CATASTROPHIC) return 'catastrophic';
+  if (projRatio > 0.03 || maxVibration > 20 || maxThrowDistance > THROW_DISTANCE_BAD) return 'bad';
   if (projections > 3) return 'mediocre';
-  // Good: 1-3 projections, some fragmentation happened
   if (projections > 0) return 'good';
-  // Perfect: no projections, no vibration issues, rock was cleared
   return 'perfect';
 }

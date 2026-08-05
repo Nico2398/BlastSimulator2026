@@ -9,9 +9,12 @@ import { VoxelGrid, type VoxelData } from '../../../src/core/world/VoxelGrid.js'
 import { Random } from '../../../src/core/math/Random.js';
 import { estimateSurveyResult, type EstimateSurveyParams } from '../../../src/core/mining/SurveyCalc.js';
 import {
-  propagateEnergy,
-  identifyFragmentedVoxels,
-} from '../../../src/core/mining/BlastCalc.js';
+  buildHoleSeeds,
+  clampBoxToGrid,
+  createEnergyField,
+  seedEnergy,
+} from '../../../src/core/mining/EnergyPropagation.js';
+import { identifyFragmentedVoxels } from '../../../src/core/mining/VoxelFragmentation.js';
 import { processFrame } from '../../../src/core/engine/GameLoop.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import type { DrillHole } from '../../../src/core/mining/DrillPlan.js';
@@ -288,7 +291,7 @@ describe('Performance Benchmarks', () => {
     it('routes around a 30×30 obstacle straddling the optimal path between far corners', () => {
       // 160×160, walkable except a 30×30 solid block centred on the diagonal
       // between the two corners findPath is asked to connect — bigger than
-      // any single blast crater (CRATER_EXCAVATION_MAX_RADIUS=5, ~10-cell
+      // any single blast crater (a blast reaches a few voxels past its holes, ~10-cell
       // diameter) produces, and still comfortably within the scaled budget.
       const grid = makeFlatGrid(160, 160, 'walkable');
       for (let x = 70; x < 100; x++) {
@@ -324,24 +327,29 @@ describe('Performance Benchmarks', () => {
     it('completes energy propagation + fragmentation in under 50ms', () => {
       const { grid, holes, charges, depths, surfaceYs } = setupThousandVoxelBlast();
 
-      // Build initial energy map
-      const initial = new Map<string, number>();
-      for (const hole of holes) {
-        const pos = surfaceYs[hole.id] ?? 10;
-        const key = `${hole.x},${pos - 2},${hole.z}`;
-        const charge = charges[hole.id]!;
-        initial.set(key, charge.amountKg * 1000);
-      }
+      const seeds = holes.flatMap(hole => buildHoleSeeds(
+        surfaceYs[hole.id] ?? 10,
+        depths[hole.id] ?? 8,
+        charges[hole.id]!.amountKg,
+        charges[hole.id]!.amountKg * 1000,
+        Math.floor(hole.x),
+        Math.floor(hole.z),
+      ));
+      const box = clampBoxToGrid(
+        { minX: grid.minX, minY: 0, minZ: grid.minZ, maxX: grid.maxX, maxY: grid.sizeY, maxZ: grid.maxZ },
+        grid,
+      )!;
 
       const start = performance.now();
 
-      const propResult = propagateEnergy(grid, initial);
-      const fragmented = identifyFragmentedVoxels(grid, propResult);
+      const field = createEnergyField(grid, box);
+      seedEnergy(field, seeds);
+      const fragmented = identifyFragmentedVoxels(field, grid);
 
       const elapsed = performance.now() - start;
 
       expect(elapsed).toBeLessThan(50);
-      expect(fragmented.size).toBeGreaterThan(0);
+      expect(fragmented.fragmented.length).toBeGreaterThan(0);
     });
   });
 

@@ -152,10 +152,18 @@ export function findReachableGroundFragment(state: GameState, vehicleId: number)
   const reachable = NavGrid.computeReachableSet(state.navGrid, vehicle.x, vehicle.z);
   if (reachable.size === 0) return null;
 
+  const roomKg = state.logistics.storageCapacityKg - state.logistics.storedMassKg;
+
   let bestId: number | null = null;
   let bestDistSq = Infinity;
   for (const tracked of state.logistics.fragments) {
     if (tracked.state !== 'on_ground') continue;
+    // A fragment heavier than the room left in storage can never be delivered:
+    // the hauler would drive to it, load it, drive to the depot and be turned
+    // away every tick from then on. Blasts throw off boulders far heavier than
+    // an early warehouse holds, so skipping them here is what keeps the fleet
+    // working instead of silently deadlocked on the nearest rock.
+    if (tracked.fragment.mass > roomKg) continue;
     const fx = Math.round(tracked.fragment.position.x);
     const fz = Math.round(tracked.fragment.position.z);
     if (!reachable.has(fx, fz)) continue;

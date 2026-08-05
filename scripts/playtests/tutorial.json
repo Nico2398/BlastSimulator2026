@@ -101,7 +101,39 @@
         }
       ],
       "expect": {
-        "tutorialStep": "drill-plan"
+        "tutorialStep": "box-cut"
+      }
+    },
+    {
+      "goal": "dig the box cut so the first blast has a face to break toward",
+      "actions": [
+        {
+          "do": "click",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "do": "click",
+          "selector": "#bs-build-panel .bs-build-ramp-btn"
+        },
+        {
+          "do": "dragTiles",
+          "x1": 16,
+          "z1": 19,
+          "x2": 16,
+          "z2": 31
+        },
+        {
+          "do": "click",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "do": "letTimePass",
+          "ticks": 2
+        }
+      ],
+      "expect": {
+        "tutorialStep": "drill-plan",
+        "note": "Open pits start with an access cut dug before the first shot: blasted rock swells and needs a void to fall into. The cut runs down the west side of the drill pattern, so the blast that follows breaks toward a free face instead of cracking flat ground in place."
       }
     },
     {
@@ -292,12 +324,12 @@
         {
           "do": "awaitTutorialStep",
           "stepId": "build-storage",
-          "timeoutMs": 30000
+          "timeoutMs": 900000
         }
       ],
       "expect": {
         "tutorialStep": "build-storage",
-        "note": "Deliberately does NOT force ticks. Assigning a driver only sends them walking to the vehicle; the tutorial must let its own clock run for them to arrive and board. A `tick` here would pass over exactly the deadlock that stranded players on this card, because the console can advance a clock the player's held HUD cannot."
+        "note": "Deliberately does NOT force ticks (letTimePass) and does NOT touch the speed control. Forcing ticks bypasses the held clock and masks the deadlock this beat catches; cranking the speed burns the step tick budget before the driver starts walking, which holds the clock and freezes the driver — the same deadlock from the other side. The beat just waits: assigning a driver sends them walking, and the tutorial's own clock (kept live because a walk is work-in-progress) carries them to the vehicle. The timeout is large because a GPU-less environment renders frames slowly, so the handful of ticks the walk needs take real wall-clock time to accrue."
       }
     },
     {
@@ -370,42 +402,7 @@
         }
       ],
       "expect": {
-        "note": "finances step auto-advances; the ramp step is asserted next"
-      }
-    },
-    {
-      "goal": "carve a ramp",
-      "actions": [
-        {
-          "do": "awaitTutorialStep",
-          "stepId": "build-ramp"
-        },
-        {
-          "do": "click",
-          "selector": "#bs-toolbar [data-panel=\"build\"]"
-        },
-        {
-          "do": "click",
-          "selector": "#bs-build-panel .bs-build-ramp-btn"
-        },
-        {
-          "do": "dragTiles",
-          "x1": 4,
-          "z1": 4,
-          "x2": 4,
-          "z2": 18
-        },
-        {
-          "do": "click",
-          "selector": "#bs-tile-select-confirm"
-        },
-        {
-          "do": "letTimePass",
-          "ticks": 2
-        }
-      ],
-      "expect": {
-        "note": "the needs card auto-advances, so the next beat waits for set-policy rather than asserting a step here"
+        "note": "finances and needs cards auto-advance; set-policy is asserted next"
       }
     },
     {

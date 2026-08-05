@@ -1,6 +1,6 @@
 {
   "name": "tutorial-interactive",
-  "description": "Plays the Tutorial Pit the way a first-time player does: every step is driven by a real click on the control the tutorial card points at — speed button, toolbar, hire buttons, blast panel, event choices — and each beat waits for the tutorial's own rails to advance before the next click, mirroring the playtest definition's click path (seismic survey at 23,23; drill grid on the exact 20,20-30,30 rectangle; haul before deliver).",
+  "description": "Plays the Tutorial Pit the way a first-time player does: every step is driven by a real click on the control the tutorial card points at \u2014 speed button, toolbar, hire buttons, blast panel, event choices \u2014 and each beat waits for the tutorial's own rails to advance (waitForTutorialStep) before the next click, mirroring the playtest definition's click path (seismic survey at 23,23; the box cut dug down the west face before the drill grid; drill grid on the exact 20,20-30,30 rectangle; haul before deliver).",
   "shots": [
     {
       "name": "overview",
@@ -28,7 +28,7 @@
     {
       "command": "campaign start level:tutorial_pit",
       "timeout": 30,
-      "description": "Setup: load Tutorial Pit — the level regenerates the terrain at its own size and re-frames the camera",
+      "description": "Setup: load Tutorial Pit \u2014 the level regenerates the terrain at its own size and re-frames the camera",
       "interaction": [
         {
           "type": "command",
@@ -73,7 +73,7 @@
     {
       "command": "state",
       "timeout": 30,
-      "description": "Player follows the glowing Crew button — the tutorial card must not swallow the click",
+      "description": "Player follows the glowing Crew button \u2014 the tutorial card must not swallow the click",
       "interaction": [
         {
           "type": "clickSelector",
@@ -170,7 +170,54 @@
         },
         {
           "type": "waitForTutorialStep",
-          "stepId": "drill-plan"
+          "stepId": "box-cut"
+        }
+      ]
+    },
+    {
+      "command": "build_ramp start:16,19 end:16,31 depth:8",
+      "timeout": 90,
+      "description": "box-cut complete: dig the starter cut down the west face of the drill pattern before the first shot, so the blasted rock has a free face and a void to fall into (real open pits pioneer this access cut first)",
+      "interaction": [
+        {
+          "type": "waitForTutorialStep",
+          "stepId": "box-cut",
+          "timeout": 30000
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel .bs-build-ramp-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 16,
+          "z1": 19,
+          "x2": 16,
+          "z2": 31
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "command",
+          "command": "tick 3"
+        },
+        {
+          "type": "waitForTutorialStep",
+          "stepId": "drill-plan",
+          "timeout": 30000
         }
       ]
     },
@@ -225,7 +272,7 @@
     {
       "command": "charge hole:* explosive:pop_rock amount:3 stemming:2",
       "timeout": 30,
-      "description": "charge complete: Charge All Holes clicked — the panel applies its own form defaults and hole rows turn green",
+      "description": "charge complete: Charge All Holes clicked \u2014 the panel applies its own form defaults and hole rows turn green",
       "interaction": [
         {
           "type": "clickSelector",
@@ -274,7 +321,11 @@
         },
         {
           "type": "waitForTutorialStep",
-          "stepId": ["scores", "event-fire-resolve", "hire-manager"],
+          "stepId": [
+            "scores",
+            "event-fire-resolve",
+            "hire-manager"
+          ],
           "timeout": 60000
         }
       ]
@@ -400,7 +451,7 @@
     {
       "command": "vehicle driver 1 4",
       "timeout": 90,
-      "description": "vehicle-buy-assign complete: Assign clicked, then the tutorial's own clock runs while the driver walks to the vehicle and boards — the #478 deadlock path, exercised for real",
+      "description": "vehicle-buy-assign complete: Assign clicked, then the tutorial's own clock runs while the driver walks to the vehicle and boards \u2014 the #478 deadlock path, exercised for real",
       "interaction": [
         {
           "type": "clickSelector",
@@ -500,62 +551,19 @@
         },
         {
           "type": "waitForTutorialStep",
-          "stepId": ["finances", "build-ramp"],
+          "stepId": [
+            "finances",
+            "needs",
+            "set-policy"
+          ],
           "timeout": 60000
-        }
-      ]
-    },
-    {
-      "command": "build_ramp start:4,4 end:4,18",
-      "timeout": 90,
-      "description": "build-ramp complete: ramp carved by dragging a run inside the step's region (x 2..5, z 2..20) in the Build panel picker",
-      "interaction": [
-        {
-          "type": "waitForTutorialStep",
-          "stepId": "build-ramp",
-          "timeout": 30000
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"build\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-build-panel .bs-build-ramp-btn"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-tile-select-confirm"
-        },
-        {
-          "type": "dragTiles",
-          "x1": 4,
-          "z1": 4,
-          "x2": 4,
-          "z2": 18
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-tile-select-confirm"
-        },
-        {
-          "type": "command",
-          "command": "tick 2"
-        },
-        {
-          "type": "waitForTutorialStep",
-          "stepId": ["needs", "set-policy"],
-          "timeout": 30000
         }
       ]
     },
     {
       "command": "set_policy mode:shift_8h",
       "timeout": 60,
-      "description": "set-policy complete: Apply pressed in the Settings panel — the form mirrors the policy in force, and applying it unchanged still counts",
+      "description": "set-policy complete: Apply pressed in the Settings panel \u2014 the form mirrors the policy in force, and applying it unchanged still counts",
       "interaction": [
         {
           "type": "waitForTutorialStep",
@@ -594,7 +602,10 @@
         },
         {
           "type": "waitForTutorialStep",
-          "stepId": ["victory", "congratulations"],
+          "stepId": [
+            "victory",
+            "congratulations"
+          ],
           "timeout": 30000
         }
       ]

@@ -70,11 +70,11 @@ const REGION = {
   // resulting holes spilled out of would be telling the player the wrong thing.
   drill: { x1: 20, z1: 20, x2: 30, z2: 30, exact: true },
   warehouse: { x1: 2, z1: 2, x2: 9, z2: 9 },
-  // Beside the pit, not inside it. The blast leaves sloped crater walls that
-  // already register as ramp cells, so carving within them removes more than it
-  // adds and the step's "a ramp appeared" check never fires. A haul ramp
-  // belongs on intact ground anyway.
-  ramp: { x1: 2, z1: 2, x2: 5, z2: 20 },
+  // The starter cut runs down the west side of where the drill pattern will
+  // go, on ground that is still intact — the point of the step is that it is
+  // dug *before* anything is blasted, so the first shot has a face to break
+  // toward and a void for the rock to fall into.
+  boxcut: { x1: 15, z1: 18, x2: 19, z2: 32 },
 } as const satisfies Record<string, TileRegion>;
 
 /** Open the Crew panel, then hire one role. */
@@ -176,10 +176,10 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
     },
   ],
 
-  'build-ramp': [
+  'box-cut': [
     { target: TOOLBAR_TARGET.build, hintKey: 'tutorial.stage.open_build' },
     { target: '#bs-build-panel .bs-build-ramp-btn', hintKey: 'tutorial.stage.ramp_tool' },
-    ...pickerStages('tutorial.stage.ramp_area', REGION.ramp),
+    ...pickerStages('tutorial.stage.boxcut_area', REGION.boxcut),
   ],
 
   'set-policy': [

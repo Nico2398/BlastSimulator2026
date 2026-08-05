@@ -1,6 +1,6 @@
 {
   "name": "blast-overcharge",
-  "description": "Chapter 5: Charge at the maximum valid boomite amount (8kg) to trigger flyrock projections and degrade the blast rating from perfect toward mediocre",
+  "description": "Chapter 5: Maximum boomite charge (8kg) in unstemmed holes to trigger flyrock projections and degrade the blast rating away from perfect. Stemming is what keeps a big charge working on the rock instead of throwing it, so an overcharge only turns dangerous once the holes are left unstemmed.",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -21,11 +21,11 @@
       ]
     },
     {
-      "command": "charge hole:* explosive:boomite amount:8 stemming:2",
+      "command": "charge hole:* explosive:boomite amount:8 stemming:0",
       "interaction": [
         {
           "type": "command",
-          "command": "charge hole:* explosive:boomite amount:8 stemming:2"
+          "command": "charge hole:* explosive:boomite amount:8 stemming:0"
         }
       ]
     },

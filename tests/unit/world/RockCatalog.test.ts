@@ -11,7 +11,7 @@ describe('RockCatalog', () => {
     expect(rock!.density).toBeGreaterThan(0);
     expect(rock!.porosity).toBeGreaterThanOrEqual(0);
     expect(rock!.porosity).toBeLessThanOrEqual(1);
-    expect(rock!.fractureThreshold).toBeGreaterThan(0);
+    expect(rock!.energyAbsorption).toBeGreaterThan(0);
     expect(rock!.color).toMatch(/^#[0-9a-fA-F]{6}$/);
   });
 
@@ -37,13 +37,13 @@ describe('RockCatalog', () => {
     }
   });
 
-  it('higher tier rocks have higher fracture thresholds', () => {
+  it('higher tier rocks absorb more energy before fracturing', () => {
     const rocks = [...getAllRocks()].sort((a, b) => a.hardnessTier - b.hardnessTier);
     for (let i = 1; i < rocks.length; i++) {
       const prev = rocks[i - 1]!;
       const curr = rocks[i]!;
       if (curr.hardnessTier > prev.hardnessTier) {
-        expect(curr.fractureThreshold).toBeGreaterThan(prev.fractureThreshold);
+        expect(curr.energyAbsorption).toBeGreaterThan(prev.energyAbsorption);
       }
     }
   });

@@ -951,15 +951,21 @@ describe('executeBlast — clearedRegion', () => {
     expect(result).not.toBeNull();
     expect(result!.clearedRegion).toBeDefined();
 
-    // The blast zone radius is 5. With a single hole at (5,5):
-    //   minX = floor(5 - 5) = 0
-    //   maxX = ceil(5 + 5) = 10
-    //   minZ = floor(5 - 5) = 0
-    //   maxZ = ceil(5 + 5) = 10
-    expect(result!.clearedRegion.minX).toBe(0);
-    expect(result!.clearedRegion.maxX).toBe(10);
-    expect(result!.clearedRegion.minZ).toBe(0);
-    expect(result!.clearedRegion.maxZ).toBe(10);
+    // clearedRegion bounds the voxels the blast actually removed, so the
+    // NavGrid patch touches exactly the ground that changed. That is a tighter
+    // box than the blast zone the energy pass searched (the hole at (5,5) with
+    // BLAST_ZONE_RADIUS 5 spans 0..10), and it must contain the hole itself.
+    const { minX, maxX, minZ, maxZ } = result!.clearedRegion;
+    expect(maxX).toBeGreaterThanOrEqual(minX);
+    expect(maxZ).toBeGreaterThanOrEqual(minZ);
+    expect(minX).toBeGreaterThanOrEqual(0);
+    expect(maxX).toBeLessThanOrEqual(10);
+    expect(minZ).toBeGreaterThanOrEqual(0);
+    expect(maxZ).toBeLessThanOrEqual(10);
+    expect(minX).toBeLessThanOrEqual(5);
+    expect(maxX).toBeGreaterThanOrEqual(5);
+    expect(minZ).toBeLessThanOrEqual(5);
+    expect(maxZ).toBeGreaterThanOrEqual(5);
   });
 
   it('returns a non-null clearedRegion even when no voxels are cleared', () => {

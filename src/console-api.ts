@@ -4,6 +4,7 @@
 import { createRunner, type RunnerWithContext } from './console/createRunner.js';
 import type { CommandResult } from './console/ConsoleRunner.js';
 import type { MiningContext } from './console/commands/mining.js';
+import { summariseMuckPile, type MuckPileSummary } from './core/mining/MuckPileSummary.js';
 
 export { createRunner };
 export type { RunnerWithContext, CommandResult, MiningContext };
@@ -37,6 +38,8 @@ export interface SerializableGameState {
   arrested: boolean;
   cash: number;
   profit: number;
+  /** The rock a blast left on the ground; null before a world exists. */
+  muckPile: MuckPileSummary | null;
 }
 
 /** Serialize ctx.state into the same shape as window.__gameState(). */
@@ -67,5 +70,8 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     arrested: s.arrest.arrested,
     cash: s.cash,
     profit: s.levelStats?.totalWealth ?? 0,
+    muckPile: ctx.grid
+      ? summariseMuckPile(s.logistics.fragments.map(f => f.fragment), ctx.grid)
+      : null,
   };
 }
