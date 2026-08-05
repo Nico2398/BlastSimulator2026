@@ -6,6 +6,7 @@ import {
   forceAdvance,
   setWeather,
   isRaining,
+  forecast,
   ALL_WEATHER_STATES,
   type WeatherState,
 } from '../../../src/core/weather/WeatherCycle.js';
@@ -91,6 +92,59 @@ describe('WeatherCycle', () => {
       setWeather(cycle, state);
       expect(cycle.current).toBe(state);
     }
+  });
+});
+
+describe('forecast', () => {
+  it('is deterministic for a given cycle and rng state', () => {
+    const cycleA = createWeatherCycle(42);
+    const cycleB = createWeatherCycle(42);
+
+    const a = forecast(cycleA, new Random(1), 14);
+    const b = forecast(cycleB, new Random(1), 14);
+
+    expect(a).toEqual(b);
+  });
+
+  it('returns n entries, one per day', () => {
+    const cycle = createWeatherCycle(3);
+    expect(forecast(cycle, new Random(3), 14)).toHaveLength(14);
+    expect(forecast(cycle, new Random(3), 5)).toHaveLength(5);
+  });
+
+  it('every entry is a valid weather state', () => {
+    const cycle = createWeatherCycle(9);
+    for (const day of forecast(cycle, new Random(9), 14)) {
+      expect(ALL_WEATHER_STATES).toContain(day);
+    }
+  });
+
+  it('does not mutate the cycle it was given', () => {
+    const cycle = createWeatherCycle(11);
+    const before = { current: cycle.current, ticksRemaining: cycle.ticksRemaining, history: [...cycle.history] };
+
+    forecast(cycle, new Random(11), 14);
+
+    expect(cycle.current).toBe(before.current);
+    expect(cycle.ticksRemaining).toBe(before.ticksRemaining);
+    expect(cycle.history).toEqual(before.history);
+  });
+
+  it('does not consume the rng it was given', () => {
+    const cycle = createWeatherCycle(17);
+    const rng = new Random(17);
+    const expected = new Random(17).next();
+
+    forecast(cycle, rng, 14);
+
+    expect(rng.next()).toBe(expected);
+  });
+
+  it('a longer horizon extends, rather than reruns, a shorter one', () => {
+    const short = forecast(createWeatherCycle(21), new Random(21), 5);
+    const long = forecast(createWeatherCycle(21), new Random(21), 14);
+
+    expect(long.slice(0, 5)).toEqual(short);
   });
 });
 

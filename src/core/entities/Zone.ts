@@ -89,3 +89,19 @@ export function isZoneClear(
 export function isInZone(x: number, z: number, zone: ZoneBounds): boolean {
   return x >= zone.x1 && x <= zone.x2 && z >= zone.z1 && z <= zone.z2;
 }
+
+/**
+ * Default danger zone for a drill plan: the holes' bounding box, padded by
+ * `marginM` on every side. Null for an empty plan — there is nothing to
+ * define a box from. See BLAST_DANGER_MARGIN_M for why this is a heuristic,
+ * not a physics-derived exclusion radius.
+ */
+export function computeDangerZone(holes: readonly { x: number; z: number }[], marginM: number): ZoneBounds | null {
+  if (holes.length === 0) return null;
+  let x1 = Infinity, z1 = Infinity, x2 = -Infinity, z2 = -Infinity;
+  for (const h of holes) {
+    x1 = Math.min(x1, h.x); z1 = Math.min(z1, h.z);
+    x2 = Math.max(x2, h.x); z2 = Math.max(z2, h.z);
+  }
+  return { x1: x1 - marginM, z1: z1 - marginM, x2: x2 + marginM, z2: z2 + marginM };
+}

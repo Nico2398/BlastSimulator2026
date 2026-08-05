@@ -8,6 +8,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { UIManager } from '../../../src/ui/UIManager.js';
 import { MiniMap } from '../../../src/ui/MiniMap.js';
+import { CrewPanel } from '../../../src/ui/panels/CrewPanel.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { NavGrid } from '../../../src/core/nav/NavGrid.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
@@ -136,63 +137,69 @@ describe('UIManager — locale refresh on language switch (issue #457)', () => {
     vi.restoreAllMocks();
   });
 
-  it('toolbar button captions switch language after clicking FR in Settings', () => {
+  it('tool rail button captions switch language after clicking FR in Settings', () => {
     uiManager = new UIManager(container);
-    const blastToolbarBtn = container.querySelector<HTMLButtonElement>(
-      '.bs-toolbar-btn[data-panel="blast"]',
+    const blastRailBtn = container.querySelector<HTMLButtonElement>(
+      '#bs-toolbar [data-panel="blast"]',
     );
-    expect(blastToolbarBtn?.textContent).toBe('💣 ' + t('ui.toolbar.blast'));
+    expect(blastRailBtn?.textContent).toBe(t('shell.rail.blast'));
 
     clickFrenchButton(container);
 
     expect(getLocale()).toBe('fr');
-    expect(blastToolbarBtn?.textContent).toBe('💣 ' + t('ui.toolbar.blast'));
-    expect(blastToolbarBtn?.textContent).not.toContain('Blast');
+    expect(blastRailBtn?.textContent).toBe(t('shell.rail.blast'));
+    expect(blastRailBtn?.textContent).not.toBe('Blast');
   });
 
-  it('every toolbar button caption switches language, not just one', () => {
+  it('every tool rail button caption switches language, not just one', () => {
     uiManager = new UIManager(container);
     const panelKeys: [string, string][] = [
-      ['blast', 'ui.toolbar.blast'],
-      ['contracts', 'ui.toolbar.contracts'],
-      ['build', 'ui.toolbar.build'],
-      ['vehicles', 'ui.toolbar.vehicles'],
-      ['employees', 'ui.toolbar.employees'],
-      ['survey', 'ui.toolbar.survey'],
-      ['settings', 'ui.toolbar.settings'],
+      ['blast', 'shell.rail.blast'],
+      ['contracts', 'shell.rail.contracts'],
+      ['build', 'shell.rail.build'],
+      ['vehicles', 'shell.rail.vehicles'],
+      ['employees', 'shell.rail.employees'],
+      ['survey', 'shell.rail.survey'],
+      ['settings', 'shell.rail.settings'],
     ];
     const before = panelKeys.map(([panel]) =>
-      container.querySelector<HTMLButtonElement>(`.bs-toolbar-btn[data-panel="${panel}"]`)?.textContent,
+      container.querySelector<HTMLButtonElement>(`#bs-toolbar [data-panel="${panel}"]`)?.textContent,
     );
 
     clickFrenchButton(container);
 
     for (let i = 0; i < panelKeys.length; i++) {
       const [panel, key] = panelKeys[i]!;
-      const btn = container.querySelector<HTMLButtonElement>(`.bs-toolbar-btn[data-panel="${panel}"]`);
-      expect(btn?.textContent, `toolbar button "${panel}" must switch language`).not.toBe(before[i]);
-      expect(btn?.textContent?.endsWith(t(key)), `toolbar button "${panel}" must show the French translation`).toBe(true);
+      const btn = container.querySelector<HTMLButtonElement>(`#bs-toolbar [data-panel="${panel}"]`);
+      expect(btn?.textContent, `tool rail button "${panel}" must switch language`).not.toBe(before[i]);
+      expect(btn?.textContent).toBe(t(key));
     }
   });
 
   it('the currently shown panel\'s static title switches language', () => {
     uiManager = new UIManager(container);
     uiManager.showPanel('vehicles');
-    const title = container.querySelector('#bs-vehicle-panel .bs-panel-title');
-    expect(title?.textContent).toBe(t('ui.vehicles.title')); // English baseline
+    const fleetPanel = container.querySelector('#bs-vehicle-panel') as HTMLElement;
+    expect(fleetPanel.textContent).toContain(t('ui.fleet.title')); // English baseline
+    expect(t('ui.fleet.title')).toBe('Fleet');
 
     clickFrenchButton(container);
 
-    expect(title?.textContent).toBe(t('ui.vehicles.title'));
-    expect(title?.textContent).not.toBe('Vehicles');
+    expect(fleetPanel.textContent).toContain(t('ui.fleet.title'));
+    expect(fleetPanel.textContent).not.toContain('Fleet');
   });
 
   it('every owned panel with a .bs-panel-title re-renders to a different string after the switch', () => {
     uiManager = new UIManager(container);
     const titleEls = Array.from(container.querySelectorAll('.bs-panel-title'));
-    // Sanity: UIManager owns several titled panels (blast, contracts, build,
-    // vehicles, employees, survey, settings, minimap, event dialog).
-    expect(titleEls.length).toBeGreaterThanOrEqual(8);
+    // Sanity: UIManager owns at least one titled panel still on the legacy
+    // .bs-panel-title class (minimap).
+    // Blast (P4), Contracts/Finances/Operations (P5), Fleet/Crew (P6),
+    // Survey (P7), the event modal (P8, EventModal replacing EventDialog),
+    // and Build/Settings (P10) migrated to the redesign's own title markup
+    // and no longer count here — each surface-by-surface migration shrinks
+    // this number further, same as it did when Blast moved off .bs-panel-title.
+    expect(titleEls.length).toBeGreaterThanOrEqual(1);
     const before = titleEls.map((el) => el.textContent);
 
     clickFrenchButton(container);
@@ -216,13 +223,16 @@ describe('UIManager — locale refresh on language switch (issue #457)', () => {
   it('external setLanguageChangeHandler callback does not suppress UIManager\'s own panel refresh', () => {
     uiManager = new UIManager(container);
     uiManager.setLanguageChangeHandler(() => {});
-    const buildTitle = container.querySelector('#bs-build-panel .bs-panel-title');
-    const before = buildTitle?.textContent;
+    // Build (P10) moved off the legacy .bs-panel-title class onto the
+    // shared bsx-root header — its title has no dedicated selector anymore
+    // (same as Fleet/Contracts above), so check the whole panel's text.
+    const buildPanel = container.querySelector('#bs-build-panel') as HTMLElement;
+    expect(buildPanel.textContent).toContain(t('ui.build.title'));
 
     clickFrenchButton(container);
 
-    expect(buildTitle?.textContent).not.toBe(before);
-    expect(buildTitle?.textContent).toBe(t('ui.build.title'));
+    expect(buildPanel.textContent).toContain(t('ui.build.title'));
+    expect(buildPanel.textContent).not.toContain('Build');
   });
 
   it('calling refreshLocale() directly re-renders every owned panel title to the current locale', () => {
@@ -231,8 +241,40 @@ describe('UIManager — locale refresh on language switch (issue #457)', () => {
 
     uiManager.refreshLocale();
 
-    const buildTitle = container.querySelector('#bs-build-panel .bs-panel-title');
-    expect(buildTitle?.textContent).toBe(t('ui.build.title'));
-    expect(buildTitle?.textContent).not.toBe('Build');
+    const buildPanel = container.querySelector('#bs-build-panel') as HTMLElement;
+    expect(buildPanel.textContent).toContain(t('ui.build.title'));
+    expect(buildPanel.textContent).not.toContain('Build');
+  });
+});
+
+describe('UIManager — showEmployeeDetail (scene selection DETAIL/TRAIN, P2)', () => {
+  let container: HTMLDivElement;
+  let uiManager: UIManager;
+
+  beforeEach(() => {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+  });
+
+  afterEach(() => {
+    uiManager?.dispose();
+    container.remove();
+    vi.restoreAllMocks();
+  });
+
+  it('opens the Crew panel', () => {
+    uiManager = new UIManager(container);
+    uiManager.showEmployeeDetail(3);
+    const panel = container.querySelector('#bs-employee-panel') as HTMLElement;
+    expect(panel.style.display).not.toBe('none');
+  });
+
+  it('expands the given employee\'s card in the Crew panel', () => {
+    const expandSpy = vi.spyOn(CrewPanel.prototype, 'expandEmployee');
+    uiManager = new UIManager(container);
+
+    uiManager.showEmployeeDetail(3);
+
+    expect(expandSpy).toHaveBeenCalledWith(3);
   });
 });

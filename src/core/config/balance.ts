@@ -5,6 +5,11 @@
 import type { BuildingType } from '../entities/Building.js';
 import type { ResearchCondition } from '../entities/BuildingResearch.js';
 
+// ─── Time ───────────────────────────────────────────────────────────────────────
+
+/** Ticks per in-game day. 1 tick = 1 game-hour (see PAY_CYCLE_TICKS below). Matches TopBar's day/clock math. */
+export const TICKS_PER_DAY = 24;
+
 // ─── Economy ──────────────────────────────────────────────────────────────────
 
 /** Starting cash for a new game ($). Real open-pit mines cost $10M+ to open; scaled down for gameplay. */
@@ -421,6 +426,18 @@ export const CRACKED_VOXEL_WEAKENING = 0.7;
  *  used by the FragPredict (tier 2) software preview. */
 export const VOXEL_SIZE_CM = 100;
 
+// ─── Danger Zone ──────────────────────────────────────────────────────────────────
+
+/**
+ * Padding (metres) added on every side of a drill plan's hole bounding box to
+ * get a default blast danger zone (Zone.computeDangerZone) — a simplified
+ * stand-in for a true physics-derived exclusion radius (max fragment
+ * projection range depends on charge, rock, and geometry per hole, computed
+ * only after Software preview tier 3). Good enough to warn "these entities
+ * are standing too close," not a guarantee nothing outside it can be hit.
+ */
+export const BLAST_DANGER_MARGIN_M = 15;
+
 // ─── Fragment Velocity Simulation ────────────────────────────────────────────────
 
 /** Decay rate for surface proximity effect based on distance to air voxel. */
@@ -522,6 +539,14 @@ export const VEHICLE_BASE_STATS = {
   /** 9 fragments/tick output; ~90 kg/tick fragmentation throughput. */
   rock_fragmenter:    { workRate: 9,  purchaseCost: 32_000, maintenanceCostPerTick: 4, fuelCostPerTick: 7, capacity: 90,  speed: 2, maxHp: 125 },
 } as const;
+
+/**
+ * Fraction of purchaseCost paid back on `vehicle scrap`, further scaled by the
+ * vehicle's current hp/maxHp — a wrecked vehicle is worth less for parts than
+ * a pristine one. Unlike building demolition (which costs money, tearing a
+ * structure down), scrapping a vehicle sells it for salvage.
+ */
+export const VEHICLE_SCRAP_RESIDUAL_FRACTION = 0.4;
 
 // ─── Employee Skills ───────────────────────────────────────────────────────────
 

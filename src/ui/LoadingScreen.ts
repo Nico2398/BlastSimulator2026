@@ -1,4 +1,4 @@
-// BlastSimulator2026 — Level loading screen
+// BlastSimulator2026 — Level loading screen (redesign P8, strata backdrop)
 //
 // Entering a level runs several seconds of synchronous work — terrain
 // generation, then marching-cubes meshing of both the playable grid and the
@@ -15,6 +15,7 @@
 
 import { t } from '../core/i18n/I18n.js';
 import { QuipBag } from './loadingQuips.js';
+import { iconEl } from './icons.js';
 
 /**
  * Resolve once the browser has presented a frame.
@@ -42,10 +43,85 @@ export interface LoadPhase {
   run: () => void;
 }
 
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+function svgEl<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string, string>): SVGElementTagNameMap[K] {
+  const node = document.createElementNS(SVG_NS, tag) as SVGElementTagNameMap[K];
+  for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+  return node;
+}
+
+/**
+ * Opaque geological cross-section backdrop, matching the design comp's own
+ * construction: 7 wavy horizontal strata bands (drawn back-to-front so each
+ * later band's tone paints over the previous one's lower portion), seam
+ * lines on the boundary between them, scattered ore ellipses, and two dashed
+ * borehole guide lines with depth ticks. It reads as the site's own survey
+ * diagram rather than a render — computed once, since it is decoration, not
+ * gameplay data tied to any particular level.
+ */
+function waveTrace(yTop: number, amp: number, phase: number): string {
+  const pts: string[] = [];
+  for (let x = 0; x <= 1600; x += 64) {
+    const y = yTop
+      + Math.sin((x / 1600) * Math.PI * 3 + phase) * amp
+      + Math.sin((x / 1600) * Math.PI * 6.2 + phase * 1.7) * amp * 0.34;
+    pts.push(`${x},${y.toFixed(1)}`);
+  }
+  return pts.join(' L');
+}
+
+const STRATA_TONES = ['#161c24', '#1b222b', '#202832', '#1c232c', '#171d25', '#13181f', '#0f1318'];
+const DEPTH_TICKS = [214, 300, 386, 472, 558, 644, 730];
+
+function buildStrataBackdrop(): SVGSVGElement {
+  const svg = svgEl('svg', { viewBox: '0 0 1600 900', preserveAspectRatio: 'xMidYMid slice' });
+  svg.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:block';
+  svg.appendChild(svgEl('rect', { x: '0', y: '0', width: '1600', height: '900', fill: '#0d1116' }));
+
+  const bandTraces: string[] = [];
+  STRATA_TONES.forEach((fill, i) => {
+    const trace = waveTrace(212 + i * 96, 20 - i * 1.6, i * 1.9);
+    bandTraces.push(trace);
+    svg.appendChild(svgEl('path', { d: `M${trace} L1600,900 L0,900 Z`, fill }));
+  });
+  for (let i = 1; i < bandTraces.length; i++) {
+    svg.appendChild(svgEl('path', {
+      d: `M${bandTraces[i]}`, fill: 'none', stroke: 'rgba(255,255,255,.05)', 'stroke-width': '1',
+    }));
+  }
+
+  for (let i = 0; i < 16; i++) {
+    const a = i * 2.399;
+    svg.appendChild(svgEl('ellipse', {
+      cx: (240 + ((i * 337) % 1120)).toFixed(0),
+      cy: (430 + Math.sin(a) * 118 + (i % 3) * 26).toFixed(0),
+      rx: (7 + (i % 4) * 3.4).toFixed(1),
+      ry: (3 + (i % 3) * 1.5).toFixed(1),
+      fill: 'rgba(169,140,255,.16)',
+    }));
+  }
+
+  svg.appendChild(svgEl('line', {
+    x1: '1318', y1: '150', x2: '1318', y2: '742',
+    stroke: 'rgba(255,176,46,.16)', 'stroke-width': '1.5', 'stroke-dasharray': '7 6',
+  }));
+  for (const y of DEPTH_TICKS) {
+    svg.appendChild(svgEl('line', { x1: '1306', y1: `${y}`, x2: '1330', y2: `${y}`, stroke: 'rgba(255,176,46,.13)', 'stroke-width': '1.5' }));
+  }
+  svg.appendChild(svgEl('line', {
+    x1: '196', y1: '196', x2: '196', y2: '640',
+    stroke: 'rgba(255,255,255,.05)', 'stroke-width': '1.5', 'stroke-dasharray': '7 6',
+  }));
+
+  return svg;
+}
+
 export class LoadingScreen {
   private readonly overlay: HTMLElement;
   private readonly label: HTMLElement;
   private readonly barFill: HTMLElement;
+  private readonly percentEl: HTMLElement;
   private readonly titleEl: HTMLElement;
   private readonly quips = new QuipBag();
 
@@ -55,32 +131,53 @@ export class LoadingScreen {
     // Above the main menu and the sandbox panel — a load can start from either.
     this.overlay.style.cssText = [
       'position:fixed;inset:0;z-index:10500;display:none',
-      'flex-direction:column;align-items:center;justify-content:center;gap:18px',
-      'background:#060402',
+      'align-items:center;justify-content:center',
+      // overflow before background: jsdom's cssstyle parser silently voids
+      // the whole cssText when a `background` shorthand is followed by an
+      // `overflow` declaration in the same string (reproduced in isolation;
+      // `overflow-then-background` and `background-color` both parse fine).
+      'overflow:hidden;background:#0d1116',
     ].join(';');
+
+    this.overlay.appendChild(buildStrataBackdrop());
+
+    const vignette = document.createElement('div');
+    vignette.style.cssText = 'position:absolute;inset:0;'
+      + 'background:radial-gradient(96% 76% at 50% 44%, rgba(26,32,40,.55), rgba(11,14,19,.92) 74%)';
+    this.overlay.appendChild(vignette);
+
+    const column = document.createElement('div');
+    column.style.cssText = 'position:relative;z-index:1;width:100%;max-width:640px;padding:0 24px;'
+      + 'display:flex;flex-direction:column;align-items:center;gap:18px;text-align:center';
 
     this.titleEl = document.createElement('div');
-    this.titleEl.style.cssText = [
-      'color:#f0b840;font-size:26px;font-family:monospace;letter-spacing:0.04em',
-      'text-shadow:0 0 24px rgba(200,100,0,0.5)',
-    ].join(';');
+    this.titleEl.style.cssText = 'font:900 32px/1.15 var(--bsx-font-ui, sans-serif);letter-spacing:-.02em;color:var(--bsx-text-primary, #f2f4f7)';
 
-    this.label = document.createElement('div');
+    const phaseLine = document.createElement('div');
+    phaseLine.style.cssText = 'display:flex;align-items:center;gap:9px;color:var(--bsx-text-secondary, #c9d1db)';
+    const chev = iconEl('chevR', 10);
+    chev.style.color = 'var(--bsx-text-muted, #8a94a2)';
+    this.label = document.createElement('span');
     this.label.id = 'bs-loading-label';
-    this.label.style.cssText = 'color:#8a7040;font-size:12px;letter-spacing:0.1em;text-transform:uppercase';
+    this.label.style.cssText = 'font:400 13px/1.5 var(--bsx-font-ui, sans-serif)';
+    phaseLine.append(chev, this.label);
 
-    const bar = document.createElement('div');
-    bar.style.cssText = [
-      'width:320px;height:6px;border-radius:3px;overflow:hidden',
-      'background:rgba(255,255,255,0.07);border:1px solid rgba(200,160,60,0.25)',
-    ].join(';');
+    const progressBlock = document.createElement('div');
+    progressBlock.style.cssText = 'width:100%;display:flex;flex-direction:column;gap:8px';
 
+    const track = document.createElement('div');
+    track.style.cssText = 'height:6px;border-radius:3px;overflow:hidden;background:#1b212a';
     this.barFill = document.createElement('div');
     this.barFill.id = 'bs-loading-bar';
-    this.barFill.style.cssText = 'height:100%;width:0%;background:#c08030;transition:width 120ms linear';
-    bar.appendChild(this.barFill);
+    this.barFill.style.cssText = 'height:100%;width:0%;background:var(--bsx-amber, #ffb02e);transition:width 120ms linear';
+    track.appendChild(this.barFill);
 
-    this.overlay.append(this.titleEl, this.label, bar);
+    this.percentEl = document.createElement('div');
+    this.percentEl.style.cssText = 'align-self:flex-end;font:600 12px/1 var(--bsx-font-mono, monospace);color:var(--bsx-text-muted, #8a94a2)';
+
+    progressBlock.append(track, this.percentEl);
+    column.append(this.titleEl, phaseLine, progressBlock);
+    this.overlay.appendChild(column);
     container.appendChild(this.overlay);
 
     // The scenario harness asserts visibility on the DOM node itself — the
@@ -105,8 +202,10 @@ export class LoadingScreen {
 
   /** `caption` is shown verbatim — the quips are not translated strings. */
   setPhase(caption: string, fraction: number): void {
+    const clamped = Math.min(1, Math.max(0, fraction));
     this.label.textContent = caption;
-    this.barFill.style.width = `${Math.round(Math.min(1, Math.max(0, fraction)) * 100)}%`;
+    this.barFill.style.width = `${Math.round(clamped * 100)}%`;
+    this.percentEl.textContent = `${Math.round(clamped * 100)}%`;
   }
 
   /** Next unused quip, so a caller driving its own phases can label them. */

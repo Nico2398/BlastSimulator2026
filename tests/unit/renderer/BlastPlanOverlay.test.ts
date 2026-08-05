@@ -3,11 +3,13 @@
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import { BlastPlanOverlay, type BlastPlanOverlayOptions, type HoleOverlayData } from '../../../src/renderer/BlastPlanOverlay.js';
+import { holeNumericId } from '../../../src/core/mining/DrillPlan.js';
 
 function makeHole(id: string, x: number, z: number): HoleOverlayData {
   return {
     hole: { id, x, z, depth: 5, diameter: 0.1 },
     delayMs: parseInt(id.replace('H', '')) * 50,
+    surfaceY: 8,
     charge: { explosiveId: 'anfo', amountKg: 50, stemmingM: 1.5 },
     predictedFragSizeCm: 20,
     projectionSpeed: 3,
@@ -121,6 +123,68 @@ describe('BlastPlanOverlay', () => {
     for (const ring of rings) {
       expect(ring.position.y).toBeCloseTo(options.origin.y + 0.15, 5);
     }
+    overlay.dispose();
+  });
+
+  it('pickables() returns every hole marker mesh, tagged with its numeric hole id', () => {
+    const scene = new THREE.Scene();
+    const overlay = new BlastPlanOverlay(scene);
+    overlay.show(makeOptions(0, 3));
+
+    const picks = overlay.pickables();
+    expect(picks.length).toBeGreaterThan(0);
+    for (const pick of picks) expect(pick.userData['entityKind']).toBe('hole');
+    const ids = new Set(picks.map(p => p.userData['entityId']));
+    expect(ids).toEqual(new Set([1, 2, 3]));
+    overlay.dispose();
+  });
+
+  it('pickables() is empty before show() is ever called', () => {
+    const scene = new THREE.Scene();
+    const overlay = new BlastPlanOverlay(scene);
+    expect(overlay.pickables()).toEqual([]);
+    overlay.dispose();
+  });
+
+  it('pickables() is empty after hide() — a hidden overlay is not clickable', () => {
+    const scene = new THREE.Scene();
+    const overlay = new BlastPlanOverlay(scene);
+    overlay.show(makeOptions(0, 3));
+    overlay.hide();
+    expect(overlay.pickables()).toEqual([]);
+    overlay.dispose();
+  });
+
+  it('getHolePosition() resolves each hole\'s surface position by numeric id', () => {
+    const scene = new THREE.Scene();
+    const overlay = new BlastPlanOverlay(scene);
+    const options = makeOptions(0, 2);
+    overlay.show(options);
+
+    for (const hd of options.holes) {
+      const pos = overlay.getHolePosition(holeNumericId(hd.hole.id));
+      expect(pos).not.toBeNull();
+      expect(pos!.x).toBeCloseTo(hd.hole.x);
+      expect(pos!.z).toBeCloseTo(hd.hole.z);
+      expect(pos!.y).toBeCloseTo(hd.surfaceY);
+    }
+    overlay.dispose();
+  });
+
+  it('getHolePosition() returns null for an id that was never shown', () => {
+    const scene = new THREE.Scene();
+    const overlay = new BlastPlanOverlay(scene);
+    overlay.show(makeOptions(0, 2));
+    expect(overlay.getHolePosition(999)).toBeNull();
+    overlay.dispose();
+  });
+
+  it('getHolePosition() returns null after clear()', () => {
+    const scene = new THREE.Scene();
+    const overlay = new BlastPlanOverlay(scene);
+    overlay.show(makeOptions(0, 2));
+    overlay.clear();
+    expect(overlay.getHolePosition(1)).toBeNull();
     overlay.dispose();
   });
 

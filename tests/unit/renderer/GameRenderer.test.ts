@@ -14,8 +14,10 @@ import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
 import { defineZone } from '../../../src/core/entities/Zone.js';
 import { Random } from '../../../src/core/math/Random.js';
-import { createTubingState } from '../../../src/core/mining/Tubing.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
+import { placeBuilding } from '../../../src/core/entities/Building.js';
+import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
+import { addHole, holeNumericId } from '../../../src/core/mining/DrillPlan.js';
 
 function makeMockSceneManager() {
   const scene = new THREE.Scene();
@@ -49,8 +51,6 @@ function makeCtx(): MiningContext {
   return {
     state,
     grid,
-    softwareTier: 0,
-    tubingState: createTubingState(),
     emitter: new EventEmitter(),
   };
 }
@@ -295,8 +295,8 @@ describe('GameRenderer — birds, smoke, water, vegetation (#458 T7.2/D12/A26)',
   async function makeLandscapeCtx(mineType = 'green_foothills'): Promise<MiningContext> {
     const { newGameCommand } = await import('../../../src/console/commands/world.js');
     const ctx: MiningContext = {
-      state: null, grid: null, landscape: null, softwareTier: 0,
-      tubingState: createTubingState(), emitter: new EventEmitter(),
+      state: null, grid: null, landscape: null,
+      emitter: new EventEmitter(),
     };
     const result = newGameCommand(ctx, [], { mine_type: mineType, seed: '42', size: '64' });
     expect(result.success).toBe(true); // guard: the rest of the test is meaningless if setup itself failed
@@ -359,8 +359,8 @@ describe('GameRenderer — per-biome ambient extras (#458 T7.3)', () => {
   async function makeLandscapeCtx(mineType: string): Promise<MiningContext> {
     const { newGameCommand } = await import('../../../src/console/commands/world.js');
     const ctx: MiningContext = {
-      state: null, grid: null, landscape: null, softwareTier: 0,
-      tubingState: createTubingState(), emitter: new EventEmitter(),
+      state: null, grid: null, landscape: null,
+      emitter: new EventEmitter(),
     };
     const result = newGameCommand(ctx, [], { mine_type: mineType, seed: '42', size: '64' });
     expect(result.success).toBe(true);
@@ -412,5 +412,128 @@ describe('GameRenderer — per-biome ambient extras (#458 T7.3)', () => {
 
     renderer.syncFromContext(await makeLandscapeCtx('green_foothills'));
     expect(sm.scene.children.find((c) => c.name === 'dust-devils')).toBeUndefined();
+  });
+});
+
+describe('GameRenderer — scene picking (P2)', () => {
+  it('pickables() is empty before any game is loaded', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    expect(renderer.pickables()).toEqual([]);
+  });
+
+  // makeCtx()'s grid is a VoxelGrid(32, 16, 32) at the origin — state.world
+  // itself stays null until syncFromContext binds it, so placeBuilding's
+  // bounds args are given directly rather than read from state.world.
+  it('pickables() aggregates buildings, vehicles, and employees after sync', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    const ctx = makeCtx();
+    const { state } = ctx;
+    placeBuilding(state!.buildings, 'management_office', 2, 2, 32, 32, 1, 0, 0);
+    purchaseVehicle(state!.vehicles, 'debris_hauler');
+    hireEmployee(state!.employees, 'driller', new Random(1));
+
+    renderer.syncFromContext(ctx);
+
+    // FragmentMesh always contributes its 8 shape buckets regardless of
+    // whether any fragment was ever spawned (harmless empty raycast
+    // targets), so assert presence rather than an exact kind list.
+    const kinds = new Set(renderer.pickables().map(o => o.userData['entityKind']));
+    expect(kinds.has('building')).toBe(true);
+    expect(kinds.has('vehicle')).toBe(true);
+    expect(kinds.has('employee')).toBe(true);
+  });
+
+  it('entityWorldPosition() resolves a synced building, vehicle, and employee', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    const ctx = makeCtx();
+    const { state } = ctx;
+    const { building } = placeBuilding(state!.buildings, 'management_office', 2, 2, 32, 32, 1, 0, 0) as { building: { id: number } };
+    const { vehicle } = purchaseVehicle(state!.vehicles, 'debris_hauler');
+    const { employee } = hireEmployee(state!.employees, 'driller', new Random(1));
+
+    renderer.syncFromContext(ctx);
+
+    expect(renderer.entityWorldPosition('building', building.id)).not.toBeNull();
+    expect(renderer.entityWorldPosition('vehicle', vehicle.id)).not.toBeNull();
+    expect(renderer.entityWorldPosition('employee', employee.id)).not.toBeNull();
+  });
+
+  it('entityWorldPosition() returns null for an id that was never synced', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    renderer.syncFromContext(makeCtx());
+    expect(renderer.entityWorldPosition('building', 9999)).toBeNull();
+    expect(renderer.entityWorldPosition('vehicle', 9999)).toBeNull();
+    expect(renderer.entityWorldPosition('employee', 9999)).toBeNull();
+    expect(renderer.entityWorldPosition('fragment', 9999)).toBeNull();
+    expect(renderer.entityWorldPosition('hole', 9999)).toBeNull();
+  });
+
+  it('pickables() includes hole markers, tagged with their numeric hole id, after showBlastPlanOverlay()', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    const ctx = makeCtx();
+    renderer.syncFromContext(ctx);
+    const hole = addHole(ctx.state!.drillHoles, 10, 10, 8, 0.15);
+
+    renderer.showBlastPlanOverlay(ctx);
+
+    const holePicks = renderer.pickables().filter(o => o.userData['entityKind'] === 'hole');
+    expect(holePicks.length).toBeGreaterThan(0);
+    expect(holePicks.map(o => o.userData['entityId'])).toContain(holeNumericId(hole.id));
+  });
+
+  it('entityWorldPosition() resolves a hole shown via showBlastPlanOverlay()', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    const ctx = makeCtx();
+    renderer.syncFromContext(ctx);
+    const hole = addHole(ctx.state!.drillHoles, 10, 10, 8, 0.15);
+
+    renderer.showBlastPlanOverlay(ctx);
+
+    const pos = renderer.entityWorldPosition('hole', holeNumericId(hole.id));
+    expect(pos).not.toBeNull();
+    expect(pos!.x).toBeCloseTo(10);
+    expect(pos!.z).toBeCloseTo(10);
+  });
+
+  it('pickables() drops hole markers once the plan overlay is hidden (empty plan)', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    const ctx = makeCtx();
+    renderer.syncFromContext(ctx);
+    addHole(ctx.state!.drillHoles, 10, 10, 8, 0.15);
+    renderer.showBlastPlanOverlay(ctx);
+    expect(renderer.pickables().some(o => o.userData['entityKind'] === 'hole')).toBe(true);
+
+    ctx.state!.drillHoles = [];
+    renderer.showBlastPlanOverlay(ctx); // empty plan → overlay hides itself
+
+    expect(renderer.pickables().some(o => o.userData['entityKind'] === 'hole')).toBe(false);
+  });
+
+  it('resolveFragmentId() resolves a spawned fragment through its bucket slot', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    const ctx = makeCtx();
+    renderer.syncFromContext(ctx);
+    ctx.lastBlastFragmentData = [{
+      id: 5,
+      position: { x: 10, y: 5, z: 10 },
+      volume: 0.5,
+      mass: 1000,
+      rockId: 'sandite',
+      oreDensities: {},
+      initialVelocity: { x: 0, y: 0, z: 0 },
+      isProjection: false,
+      halfExtents: { x: 0.4, y: 0.4, z: 0.4 },
+      shapeSeed: 5,
+    }];
+    renderer.onBlast(ctx);
+
+    // shapeSeed 5 % 24 === 5 → bucket 5, first (only) slot in that bucket → slot 0.
+    expect(renderer.resolveFragmentId(5, 0)).toBe(5);
+  });
+
+  it('resolveFragmentId() returns null before any fragments are spawned', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    renderer.syncFromContext(makeCtx());
+    expect(renderer.resolveFragmentId(0, 0)).toBeNull();
   });
 });

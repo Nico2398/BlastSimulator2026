@@ -1,11 +1,11 @@
 // BlastSimulator2026 — Console save/load commands
 //
 // A synchronous quick-save round trip through the same serialize/deserialize
-// functions the UI's persisted slots use (SaveLoadUI, IndexedDBPersistence),
+// functions the UI's persisted slots use (SavesModal, IndexedDBPersistence),
 // so console mode and the command-mode scenario harness can exercise
 // save/load deterministically without depending on IndexedDB's async timing.
-// This is intentionally separate from SaveLoadUI's own numbered slots —
-// those remain reachable through the Save/Load panel and its own backend.
+// This is intentionally separate from SavesModal's own numbered slots —
+// those remain reachable through the Saves modal and its own backend.
 //
 // The VoxelGrid is embedded into `ctx.state.world.voxels` right before saving
 // (#458 T0.3) and restored from there on load, so blast craters, drilled

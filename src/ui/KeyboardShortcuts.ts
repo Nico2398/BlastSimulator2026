@@ -2,7 +2,6 @@
 // Registers key bindings for common gameplay actions.
 // Shortcuts panel shown in Settings/Help.
 
-import { t } from '../core/i18n/I18n.js';
 import type { PanelName } from './UIManager.js';
 
 export type GameConsoleFn = (cmd: string) => string;
@@ -12,7 +11,12 @@ export interface ShortcutCallbacks {
   setSpeed: (n: number) => void;
   togglePanel: (name: PanelName) => void;
   quickSave: () => void;
-  openSettings: () => void;
+  /**
+   * Esc cascade: close whatever's on top (popover, modal, placement,
+   * selection) before falling back to closing the active panel. Owned by
+   * UIManager.handleEscape — Esc no longer opens Settings directly.
+   */
+  onEscape: () => void;
   /** Toggle the NavGrid overlay on the MiniMap. */
   onToggleNavGrid?: () => void;
 }
@@ -39,6 +43,7 @@ export class KeyboardShortcuts {
         case 'Digit4': callbacks.setSpeed(8); break;
         case 'KeyB': callbacks.togglePanel('blast'); break;
         case 'KeyC': callbacks.togglePanel('contracts'); break;
+        case 'KeyG': callbacks.togglePanel('build'); break;
         case 'KeyV': callbacks.togglePanel('vehicles'); break;
         case 'KeyE': callbacks.togglePanel('employees'); break;
         case 'KeyS': callbacks.togglePanel('survey'); break;
@@ -48,7 +53,7 @@ export class KeyboardShortcuts {
           callbacks.quickSave();
           break;
         case 'Escape':
-          callbacks.openSettings();
+          callbacks.onEscape();
           break;
       }
     };
@@ -57,34 +62,6 @@ export class KeyboardShortcuts {
   }
 
   setEnabled(enabled: boolean): void { this.enabled = enabled; }
-
-  /** Render a shortcuts help panel element (for use in SettingsMenu). */
-  static makeHelpPanel(): HTMLElement {
-    const el = document.createElement('div');
-    el.style.cssText = 'font-size:10px;color:#a08060;margin-top:8px';
-
-    const title = document.createElement('div');
-    title.style.cssText = 'font-size:11px;color:#d0b090;margin-bottom:4px;font-weight:bold';
-    title.textContent = t('shortcuts.title');
-
-    el.appendChild(title);
-
-    const keys = [
-      'shortcuts.pause', 'shortcuts.speed',
-      'shortcuts.blast', 'shortcuts.contracts',
-      'shortcuts.vehicles', 'shortcuts.employees',
-      'shortcuts.survey', 'shortcuts.navgrid',
-      'shortcuts.saves', 'shortcuts.settings',
-    ] as const;
-
-    for (const key of keys) {
-      const line = document.createElement('div');
-      line.textContent = t(key);
-      el.appendChild(line);
-    }
-
-    return el;
-  }
 
   dispose(): void {
     window.removeEventListener('keydown', this.handler);

@@ -302,7 +302,7 @@
     {
       "command": "blast",
       "timeout": 90,
-      "description": "blast complete: Execute clicked, confirm dialog answered, crater and fragments appear; the scores card then auto-advances into the scripted consultant event",
+      "description": "blast complete: Execute clicked, confirm dialog answered, crater and fragments appear, Blast Report closed; the scores card then auto-advances into the scripted consultant event",
       "interaction": [
         {
           "type": "clickSelector",
@@ -318,6 +318,17 @@
         {
           "type": "clickSelector",
           "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
         },
         {
           "type": "waitForTutorialStep",
@@ -563,7 +574,7 @@
     {
       "command": "set_policy mode:shift_8h",
       "timeout": 60,
-      "description": "set-policy complete: Apply pressed in the Settings panel \u2014 the form mirrors the policy in force, and applying it unchanged still counts",
+      "description": "set-policy complete: Apply pressed in the Operations panel (redesign P5 moved site policy out of Settings) — the form mirrors the policy in force, and applying it unchanged still counts",
       "interaction": [
         {
           "type": "waitForTutorialStep",
@@ -572,7 +583,7 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"settings\"]"
+          "selector": "#bs-toolbar [data-panel=\"ops\"]"
         },
         {
           "type": "waitForSelector",

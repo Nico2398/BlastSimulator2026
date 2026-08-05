@@ -7,7 +7,6 @@ import { newGameCommand } from '../../../src/console/commands/world.js';
 import { vehicleCommand } from '../../../src/console/commands/vehicle.js';
 import { tickCommand } from '../../../src/console/commands/events.js';
 import type { MiningContext } from '../../../src/console/commands/mining.js';
-import { createTubingState } from '../../../src/core/mining/Tubing.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { createEmployeeState, type Employee } from '../../../src/core/entities/Employee.js';
 
@@ -17,8 +16,6 @@ function makeCtx(): MiningContext {
   const ctx: MiningContext = {
     state: null,
     grid: null,
-    softwareTier: 0,
-    tubingState: createTubingState(),
     emitter: new EventEmitter(),
   };
   newGameCommand(ctx, [], { mine_type: 'desert', seed: '1', size: '32' });
@@ -233,7 +230,7 @@ describe('vehicle driver — invalid argument guards', () => {
     const result = vehicleCommand(ctx, ['driver', 'abc', String(employeeId)], {});
 
     expect(result.success).toBe(false);
-    expect(result.output).toBe('Usage: vehicle driver <vehicleId> <employeeId>');
+    expect(result.output).toBe('Usage: vehicle driver <vehicleId> <employeeId|none>');
   });
 
   it('returns usage error when employeeId is not a number', () => {
@@ -243,7 +240,7 @@ describe('vehicle driver — invalid argument guards', () => {
     const result = vehicleCommand(ctx, ['driver', String(vehicleId), 'xyz'], {});
 
     expect(result.success).toBe(false);
-    expect(result.output).toBe('Usage: vehicle driver <vehicleId> <employeeId>');
+    expect(result.output).toBe('Usage: vehicle driver <vehicleId> <employeeId|none>');
   });
 
   it('returns usage error when both arguments are omitted', () => {
@@ -252,7 +249,7 @@ describe('vehicle driver — invalid argument guards', () => {
     const result = vehicleCommand(ctx, ['driver'], {});
 
     expect(result.success).toBe(false);
-    expect(result.output).toBe('Usage: vehicle driver <vehicleId> <employeeId>');
+    expect(result.output).toBe('Usage: vehicle driver <vehicleId> <employeeId|none>');
   });
 });
 
@@ -343,6 +340,111 @@ describe('vehicle driver — domain validation errors', () => {
 
     expect(result.success).toBe(false);
     expect(result.output).toBe('Employee already driving another vehicle');
+  });
+});
+
+// ── vehicle driver <id> none — unassign ──
+
+describe('vehicle driver — unassign with "none"', () => {
+  it('clears the driver and reports success', () => {
+    const ctx = makeCtx();
+    const vehicleId = addTruckVehicle(ctx);
+    const employeeId = addTruckDriver(ctx);
+    vehicleCommand(ctx, ['driver', String(vehicleId), String(employeeId)], {});
+    tickCommand(ctx, ['1'], {});
+
+    const result = vehicleCommand(ctx, ['driver', String(vehicleId), 'none'], {});
+
+    expect(result.success).toBe(true);
+    expect(result.output).toBe(`Vehicle #${vehicleId} driver unassigned.`);
+    expect(ctx.state!.vehicles.vehicles.find(v => v.id === vehicleId)!.driverId).toBeNull();
+  });
+
+  it('the freed employee can board a different vehicle afterward', () => {
+    const ctx = makeCtx();
+    const firstVehicleId = addTruckVehicle(ctx);
+    const secondVehicleId = addTruckVehicle(ctx);
+    const employeeId = addTruckDriver(ctx);
+    vehicleCommand(ctx, ['driver', String(firstVehicleId), String(employeeId)], {});
+    tickCommand(ctx, ['1'], {});
+    vehicleCommand(ctx, ['driver', String(firstVehicleId), 'none'], {});
+
+    const result = vehicleCommand(ctx, ['driver', String(secondVehicleId), String(employeeId)], {});
+
+    expect(result.success).toBe(true);
+  });
+
+  it('returns an error for a non-existent vehicle', () => {
+    const ctx = makeCtx();
+    const result = vehicleCommand(ctx, ['driver', '9999', 'none'], {});
+    expect(result.success).toBe(false);
+    expect(result.output).toBe('Vehicle not found');
+  });
+
+  it('returns an error when the vehicle has no driver', () => {
+    const ctx = makeCtx();
+    const vehicleId = addTruckVehicle(ctx);
+    const result = vehicleCommand(ctx, ['driver', String(vehicleId), 'none'], {});
+    expect(result.success).toBe(false);
+    expect(result.output).toBe('Vehicle has no driver');
+  });
+});
+
+describe('vehicle scrap', () => {
+  // debris_hauler tier 1: purchaseCost 25,000, maxHp 100 (balance.ts). Fresh
+  // vehicles spawn at full hp, so a fresh scrap is 25,000 × 0.4 (residual
+  // fraction) × 1.0 (hp/maxHp) = 10,000.
+  it('scraps a vehicle, credits residual value, and removes it from the fleet', () => {
+    const ctx = makeCtx();
+    const vehicleId = addTruckVehicle(ctx);
+    const cashBefore = ctx.state!.cash;
+
+    const result = vehicleCommand(ctx, ['scrap', String(vehicleId)], {});
+
+    expect(result.success).toBe(true);
+    expect(result.output).toBe(`Vehicle #${vehicleId} scrapped. Residual value: $10000`);
+    expect(ctx.state!.cash).toBe(cashBefore + 10000);
+    expect(ctx.state!.vehicles.vehicles.find(v => v.id === vehicleId)).toBeUndefined();
+  });
+
+  it('logs the residual value as finance income under the refund category', () => {
+    const ctx = makeCtx();
+    const vehicleId = addTruckVehicle(ctx);
+
+    vehicleCommand(ctx, ['scrap', String(vehicleId)], {});
+
+    const tx = ctx.state!.finances.transactions.at(-1);
+    expect(tx?.type).toBe('income');
+    expect(tx?.category).toBe('refund');
+    expect(tx?.amount).toBe(10000);
+  });
+
+  it('a damaged vehicle scraps for proportionally less', () => {
+    const ctx = makeCtx();
+    const vehicleId = addTruckVehicle(ctx);
+    ctx.state!.vehicles.vehicles.find(v => v.id === vehicleId)!.hp = 50; // half of maxHp 100
+
+    const result = vehicleCommand(ctx, ['scrap', String(vehicleId)], {});
+
+    expect(result.output).toBe(`Vehicle #${vehicleId} scrapped. Residual value: $5000`);
+  });
+
+  it('returns an error for a non-existent vehicle and leaves cash untouched', () => {
+    const ctx = makeCtx();
+    const cashBefore = ctx.state!.cash;
+
+    const result = vehicleCommand(ctx, ['scrap', '9999'], {});
+
+    expect(result.success).toBe(false);
+    expect(result.output).toBe('Vehicle #9999 not found.');
+    expect(ctx.state!.cash).toBe(cashBefore);
+  });
+
+  it('rejects a non-numeric id', () => {
+    const ctx = makeCtx();
+    const result = vehicleCommand(ctx, ['scrap', 'abc'], {});
+    expect(result.success).toBe(false);
+    expect(result.output).toBe('Usage: vehicle scrap <id>');
   });
 });
 

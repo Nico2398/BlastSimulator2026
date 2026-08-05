@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import type { Building, BuildingType } from '../core/entities/Building.js';
 import { getBuildingDef, getDefSize } from '../core/entities/Building.js';
+import { tagPickable } from './Pickable.js';
 
 // ---------- Per-type visual config ----------
 
@@ -128,6 +129,7 @@ export class BuildingMesh {
     // Position: grid cell centre in world coords, resting on the terrain surface
     group.position.set(building.x + sizeX / 2, surfaceY, building.z + sizeZ / 2);
 
+    tagPickable(group, 'building', building.id);
     this.scene.add(group);
     this.buildings.set(building.id, group);
   }
@@ -162,6 +164,16 @@ export class BuildingMesh {
 
   get count(): number {
     return this.buildings.size;
+  }
+
+  /** Root objects raycastable for scene picking — one Group per building, tagged in addBuilding(). */
+  pickables(): THREE.Object3D[] {
+    return Array.from(this.buildings.values());
+  }
+
+  /** Current world-space position of a building's root Group, or null if it isn't rendered. */
+  getPosition(id: number): THREE.Vector3 | null {
+    return this.buildings.get(id)?.position.clone() ?? null;
   }
 
   dispose(): void {

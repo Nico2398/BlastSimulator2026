@@ -14,7 +14,6 @@ import {
   sequenceCommand,
   type MiningContext,
 } from '../../../src/console/commands/mining.js';
-import { createTubingState } from '../../../src/core/mining/Tubing.js';
 import { resetHoleIds } from '../../../src/core/mining/DrillPlan.js';
 import { getBuildingDef, getDefSize } from '../../../src/core/entities/Building.js';
 import { NavGrid } from '../../../src/core/nav/NavGrid.js';
@@ -25,8 +24,6 @@ function makeCtx(): MiningContext {
   const ctx: MiningContext = {
     state: null,
     grid: null,
-    softwareTier: 0,
-    tubingState: createTubingState(),
     emitter: new EventEmitter(),
   };
   newGameCommand(ctx, [], { mine_type: 'desert', seed: '1', size: '32' });

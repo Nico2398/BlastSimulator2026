@@ -50,4 +50,11 @@ export class Random {
     const z0 = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
     return mean + stdDev * z0;
   }
+
+  /** Independent copy that continues the same sequence — advancing it never affects the original. */
+  clone(): Random {
+    const copy = new Random(0);
+    copy.state = this.state;
+    return copy;
+  }
 }

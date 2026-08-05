@@ -87,6 +87,15 @@ export class CameraController {
   private prevMouseX = 0;
   private prevMouseY = 0;
 
+  /**
+   * True while a placement tool (P3 grid select) has taken the left button.
+   * Right swaps to orbit for the duration and left is ignored here entirely —
+   * PlacementController reads it directly. Middle stays pan. Design doc §01
+   * "camera remap while armed": silently swapping a camera control without
+   * this is how a player loses their bearings mid-drag.
+   */
+  private armedRemap = false;
+
   // Touch state
   private prevTouchDist = 0;
   private prevTouchX = 0;
@@ -168,6 +177,25 @@ export class CameraController {
     this.setTargetAndDistance(x, y, z, distance);
   }
 
+  /**
+   * Project a world point to normalized device coordinates ([-1, 1] on each
+   * axis; z > 1 means behind the camera). The DOM-side conversion to screen
+   * pixels needs the canvas's live CSS rect, so that half stays with the
+   * caller — same screen↔world split ScenePicking uses in the other
+   * direction. Used by the playtest harness to click a world tile for real
+   * rather than reaching for a console-equivalent shortcut (playability.md).
+   */
+  projectToNDC(x: number, y: number, z: number): THREE.Vector3 {
+    return new THREE.Vector3(x, y, z).project(this.camera);
+  }
+
+  /** Enable/disable the placement-tool button remap (design doc §01). */
+  setArmedRemap(enabled: boolean): void {
+    this.armedRemap = enabled;
+    this.isOrbiting = false;
+    this.isPanning = false;
+  }
+
   /** Set (or clear, passing null) the playable-rect ± margin bound on manual panning (#458 T6.1/D13). */
   setPanLeash(rect: Rect | null, margin: number): void {
     this.panLeash = rect && {
@@ -225,7 +253,13 @@ export class CameraController {
   // ---- Mouse handlers ----
 
   private onMouseDown = (e: MouseEvent) => {
-    if (e.button === 0) {
+    if (this.armedRemap) {
+      // Left is taken by the placement tool — PlacementController handles it,
+      // this controller stays out of the way. Right orbits instead of pans
+      // (temporary swap); middle is unchanged.
+      if (e.button === 2) this.isOrbiting = true;
+      else if (e.button === 1) this.isPanning = true;
+    } else if (e.button === 0) {
       // Left button — orbit
       this.isOrbiting = true;
     } else if (e.button === 1 || e.button === 2) {
@@ -264,6 +298,10 @@ export class CameraController {
   private onTouchStart = (e: TouchEvent) => {
     e.preventDefault();
     if (e.touches.length === 1) {
+      // Single-finger orbit is suspended while armed — same swap as the
+      // mouse's left button, so a placement tool's own touch handling (not
+      // yet implemented) will have the paint gesture to itself.
+      if (this.armedRemap) return;
       this.isOrbiting = true;
       this.prevTouchX = e.touches[0]!.clientX;
       this.prevTouchY = e.touches[0]!.clientY;

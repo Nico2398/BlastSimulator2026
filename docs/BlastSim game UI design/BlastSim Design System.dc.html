@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="crossorigin" />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&amp;family=IBM+Plex+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet" />
+<script src="./icons.js"></script>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:#0b0e12}
+body{font-family:Archivo,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:#ffb02e;text-decoration:none}a:hover{color:#ffc978}
+button{font-family:inherit}
+::-webkit-scrollbar{width:9px}::-webkit-scrollbar-thumb{background:#2b3440;border-radius:9px}
+</style>
+</helmet>
+<div style="min-height:100vh;background:#0b0e12;color:#e6e9ee;padding:44px 40px 90px">
+  <div style="max-width:1140px;margin:0 auto;display:flex;flex-direction:column;gap:52px">
+
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <span style="font:700 10px/1 Archivo,sans-serif;letter-spacing:.3em;color:#ffb02e">BLASTSIMULATOR 2026</span>
+      <span style="font:900 42px/1 Archivo,sans-serif;letter-spacing:-.025em">Interface system</span>
+      <span style="font:400 15px/1.6 Archivo,sans-serif;color:#98a2b0;max-width:640px;text-wrap:pretty">Straight-faced corporate chrome around an absurd business. The interface is quiet, dense and technical; every joke lives in the content it displays. Dark instrument surfaces, one accent, drawn glyphs — no emoji anywhere.</span>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div style="display:flex;align-items:baseline;gap:12px"><span style="font:800 13px/1 Archivo,sans-serif;letter-spacing:.2em">01 · PALETTE</span><span style="flex:1;height:1px;background:rgba(255,255,255,.09)"></span><span style="font:400 11px/1 Archivo,sans-serif;color:#8a94a2">contrast measured against the surface it sits on</span></div>
+      <sc-for list="{{ palettes }}" as="g" hint-placeholder-count="3">
+        <div style="display:flex;flex-direction:column;gap:9px">
+          <span style="font:600 9px/1 Archivo,sans-serif;letter-spacing:.16em;color:#8a94a2">{{ g.group }}</span>
+          <div style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:9px">
+            <sc-for list="{{ g.items }}" as="c" hint-placeholder-count="6">
+              <div style="border-radius:6px;border:1px solid rgba(255,255,255,.08);overflow:hidden">
+                <div style="height:58px;background:{{ c.hex }}"></div>
+                <div style="padding:9px 10px;background:#141920;display:flex;flex-direction:column;gap:3px">
+                  <span style="font:600 10px/1.2 Archivo,sans-serif">{{ c.name }}</span>
+                  <span style="font:400 10px/1 'IBM Plex Mono',monospace;color:#8a94a2">{{ c.hex }}</span>
+                  <span style="font:500 9px/1 'IBM Plex Mono',monospace;color:{{ c.aaColor }}">{{ c.aa }}</span>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-for>
+      <div style="display:flex;gap:10px;padding:13px 15px;border-radius:6px;background:rgba(255,176,46,.07);border:1px solid rgba(255,176,46,.25)">
+        <div style="color:#ffb02e;padding-top:1px"><bs-icon name="warn" size="15"></bs-icon></div>
+        <span style="font:400 12px/1.55 Archivo,sans-serif;color:#c9d1db;flex:1;text-wrap:pretty">Every text colour here clears WCAG AA at 11px on the three opaque surfaces — app #0b0e12, panel #141920, card #1b212a. The fourth surface is the exception that matters: greys that pass on the panel base lose AA once a chip lifts the background under them, so any label sitting on a tinted or translucent surface steps up to #b0b9c4. None of these lean on the "large text" exemption, because the HUD has almost no large text. The only exempt value is the disabled-control grey, which WCAG excludes as an inactive control. Amber is the only accent. Green, red, blue and violet are <em>semantic</em> — money in, danger, water/vehicles, ore/geology — never decorative. Two background colours per screen maximum: #0b0e12 for the app, #141920 for panels. Hazard stripes appear on exactly one thing: an armed blast.</span>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div style="display:flex;align-items:baseline;gap:12px"><span style="font:800 13px/1 Archivo,sans-serif;letter-spacing:.2em">02 · TYPE</span><span style="flex:1;height:1px;background:rgba(255,255,255,.09)"></span><span style="font:400 11px/1 Archivo,sans-serif;color:#8a94a2">Archivo for language · IBM Plex Mono for anything countable</span></div>
+      <div style="display:flex;flex-direction:column;gap:1px;background:rgba(255,255,255,.08);border-radius:6px;overflow:hidden">
+        <sc-for list="{{ type }}" as="t" hint-placeholder-count="8">
+          <div style="display:flex;align-items:center;gap:22px;padding:14px 16px;background:#141920">
+            <span style="width:150px;flex:0 0 150px;font:500 10px/1.4 'IBM Plex Mono',monospace;color:#8a94a2">{{ t.spec }}</span>
+            <span style="flex:1;min-width:0;color:{{ t.color }};font-family:{{ t.family }};font-size:{{ t.size }};font-weight:{{ t.weight }};letter-spacing:{{ t.ls }};line-height:1.1">{{ t.sample }}</span>
+            <span style="font:400 10px/1.4 Archivo,sans-serif;color:#8a94a2;width:180px;flex:0 0 180px;text-align:right">{{ t.use }}</span>
+          </div>
+        </sc-for>
+      </div>
+      <div style="display:flex;gap:10px;padding:13px 15px;border-radius:6px;background:#141920;border:1px solid rgba(255,255,255,.08)">
+        <span style="font:400 12px/1.55 Archivo,sans-serif;color:#c9d1db;flex:1;text-wrap:pretty">Every number a player might compare — money, kilos, hours, percentages, coordinates, delays — is mono with tabular figures, so columns line up and values do not jitter as they change. Prose and labels are Archivo. Minimum size anywhere in the HUD is 10px, and only for all-caps micro-labels with 0.12em+ tracking; body copy never goes below 11px.</span>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div style="display:flex;align-items:baseline;gap:12px"><span style="font:800 13px/1 Archivo,sans-serif;letter-spacing:.2em">03 · SPACE, RADIUS, DEPTH</span><span style="flex:1;height:1px;background:rgba(255,255,255,.09)"></span></div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px">
+        <div style="padding:16px;border-radius:6px;background:#141920;border:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;gap:12px">
+          <span style="font:600 9px/1 Archivo,sans-serif;letter-spacing:.16em;color:#8a94a2">SPACING · 4PX BASE</span>
+          <div style="display:flex;align-items:flex-end;gap:6px">
+            <sc-for list="{{ spacing }}" as="s" hint-placeholder-count="6">
+              <div style="display:flex;flex-direction:column;align-items:center;gap:5px"><div style="width:{{ s.n }}px;height:22px;background:#ffb02e;border-radius:2px"></div><span style="font:500 9px/1 'IBM Plex Mono',monospace;color:#8a94a2">{{ s.n }}</span></div>
+            </sc-for>
+          </div>
+          <span style="font:400 11px/1.5 Archivo,sans-serif;color:#98a2b0">Panel padding 12 · card padding 11 · section gap 12 · row gap 3–4. Density is deliberate: the pit must stay visible.</span>
+        </div>
+        <div style="padding:16px;border-radius:6px;background:#141920;border:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;gap:12px">
+          <span style="font:600 9px/1 Archivo,sans-serif;letter-spacing:.16em;color:#8a94a2">RADIUS</span>
+          <div style="display:flex;gap:9px">
+            <div style="width:46px;height:46px;background:#1b212a;border:1px solid rgba(255,255,255,.12);border-radius:3px;display:flex;align-items:flex-end;justify-content:center;font:500 9px/2 'IBM Plex Mono',monospace;color:#8a94a2">3</div>
+            <div style="width:46px;height:46px;background:#1b212a;border:1px solid rgba(255,255,255,.12);border-radius:4px;display:flex;align-items:flex-end;justify-content:center;font:500 9px/2 'IBM Plex Mono',monospace;color:#8a94a2">4</div>
+            <div style="width:46px;height:46px;background:#1b212a;border:1px solid rgba(255,255,255,.12);border-radius:6px;display:flex;align-items:flex-end;justify-content:center;font:500 9px/2 'IBM Plex Mono',monospace;color:#8a94a2">6</div>
+            <div style="width:46px;height:46px;background:#1b212a;border:1px solid rgba(255,255,255,.12);border-radius:9px;display:flex;align-items:flex-end;justify-content:center;font:500 9px/2 'IBM Plex Mono',monospace;color:#8a94a2">9</div>
+          </div>
+          <span style="font:400 11px/1.5 Archivo,sans-serif;color:#98a2b0">3 chips · 4 controls · 6 cards and panels · 9 modals. Nothing is a pill except the command-bus handle.</span>
+        </div>
+        <div style="padding:16px;border-radius:6px;background:#141920;border:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;gap:9px">
+          <span style="font:600 9px/1 Archivo,sans-serif;letter-spacing:.16em;color:#8a94a2">Z-INDEX</span>
+          <sc-for list="{{ zindex }}" as="z" hint-placeholder-count="7">
+            <div style="display:flex;align-items:baseline;gap:9px"><span style="font:500 10px/1.5 'IBM Plex Mono',monospace;color:#ffb02e;width:46px">{{ z.z }}</span><span style="font:400 11px/1.5 Archivo,sans-serif;color:#98a2b0">{{ z.k }}</span></div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div style="display:flex;align-items:baseline;gap:12px"><span style="font:800 13px/1 Archivo,sans-serif;letter-spacing:.2em">04 · ICONS</span><span style="flex:1;height:1px;background:rgba(255,255,255,.09)"></span><span style="font:400 11px/1 Archivo,sans-serif;color:#8a94a2">24px grid · filled · currentColor · no emoji, ever</span></div>
+      <sc-for list="{{ iconGroups }}" as="g" hint-placeholder-count="5">
+        <div style="display:flex;flex-direction:column;gap:9px">
+          <span style="font:600 9px/1 Archivo,sans-serif;letter-spacing:.16em;color:#8a94a2">{{ g.group }}</span>
+          <div style="display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:8px">
+            <sc-for list="{{ g.names }}" as="n" hint-placeholder-count="10">
+              <div style="display:flex;flex-direction:column;align-items:center;gap:7px;padding:12px 5px;border-radius:5px;background:#141920;border:1px solid rgba(255,255,255,.07)">
+                <span style="color:#ffb02e"><bs-icon name="{{ n }}" size="21"></bs-icon></span>
+                <span style="font:400 8px/1.2 'IBM Plex Mono',monospace;color:#8a94a2;text-align:center;word-break:break-all">{{ n }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div style="display:flex;align-items:baseline;gap:12px"><span style="font:800 13px/1 Archivo,sans-serif;letter-spacing:.2em">05 · STATE INVENTORY</span><span style="flex:1;height:1px;background:rgba(255,255,255,.09)"></span><span style="font:400 11px/1 Archivo,sans-serif;color:#8a94a2">every interactive component ships all eight</span></div>
+
+      <div style="display:flex;flex-direction:column;gap:11px">
+        <span style="font:600 9px/1 Archivo,sans-serif;letter-spacing:.16em;color:#8a94a2">PRIMARY ACTION</span>
+        <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px">
+          <div style="display:flex;flex-direction:column;gap:8px;padding:14px;border-radius:6px;background:#141920;border:1px solid rgba(255,255,255,.07)">
+            <span style="font:600 9px/1 'IBM Plex Mono',monospace;color:#8a94a2">default</span>
+            <button style="height:36px;border:0;border-radius:4px;background:#ffb02e;color:#1a1206;font:800 11px/1 Archivo,sans-serif;letter-spacing:.14em;cursor:pointer">CHARGE ALL</button>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;padding:14px;border-radius:6px;background:#141920;border:1px solid rgba(255,255,255,.07)">
+            <span style="font:600 9px/1 'IBM Plex Mono',monospace;color:#8a94a2">hover · brightness 1.08</span>
+            <button style="height:36px;border:0;border-radius:4px;background:#ffc153;color:#1a1206;font:800 11px/1 Archivo,sans-serif;letter-spacing:.14em;cursor:pointer">CHARGE ALL</button>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;padding:14px;border-radius:6px;background:#141920;border:1px solid rgba(255,255,255,.07)">
+            <span style="font:600 9px/1 'IBM Plex Mono',monospace;color:#8a94a2">active · translateY 1px</span>
+            <button style="height:36px;margin-top:1px;border:0;border-radius:4px;background:#e09a1f;color:#1a1206;font:800 11px/1 Archivo,sans-serif;letter-spacing:.14em;cursor:pointer">CHARGE ALL</button>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;padding:14px;border-radius:6px;background:#141920;border:1px solid rgba(255,255,255,.07)">
+            <span style="font:600 9px/1 'IBM Plex Mono',monospace;color:#8a94a2">disabled + reason</span>
+            <button style="height:36px;border:0;border-radius:4px;background:#2a323d;color:#5b6470;font:800 11px/1 Archivo,sans-serif;letter-spacing:.14em;cursor:not-allowed">CHARGE ALL</button>
+            <div style="display:flex;gap:6px;align-items:flex-start"><div style="color:#ffb02e;padding-top:1px"><bs-icon name="warn" size="11"></bs-icon></div><span style="font:500 10px/1.4 Archivo,sans-serif;color:#ffb02e">No explosive in stock</span></div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;padding:14px;border-radius:6px;background:#141920;border:1px solid rgba(255,255,255,.07)">
+            <span style="font:600 9px/1 'IBM Plex Mono',monospace;color:#8a94a2">warning</span>
+            <button style="height:36px;border:1px solid rgba(255,176,46,.5);border-radius:4px;background:rgba(255,176,46,.12);color:#ffb02e;font:800 11px/1 Archivo,sans-serif;letter-spacing:.14em;cursor:pointer">SOUND THE HORN</button>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;padding:14px;border-radius:6px;background:#141920;border:1px solid rgba(255,255,255,.07)">
+            <span style="font:600 9px/1 'IBM Plex Mono',monospace;color:#8a94a2">critical / destructive</span>
+            <button style="height:36px;border:0;border-radius:4px;background:#ff5b4c;color:#210805;font:800 11px/1 Archivo,sans-serif;letter-spacing:.16em;cursor:pointer">FIRE</button>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;padding:14px;border-radius:6px;background:#141920;border:1px solid rgba(255,255,255,.07)">
+            <span style="font:600 9px/1 'IBM Plex Mono',monospace;color:#8a94a2">locked · research-gated</span>
+            <button style="height:36px;display:flex;align-items:center;justify-content:center;gap:7px;border:1px solid rgba(85,168,255,.45);border-radius:4px;background:transparent;color:#8fc0ff;font:700 11px/1 Archivo,sans-serif;letter-spacing:.11em;cursor:pointer"><bs-icon name="lock" size="12"></bs-icon>QUEUE RESEARCH</button>
+            <span style="font:500 10px/1.4 Archivo,sans-serif;color:#8a94a2">$34,000 · 5 days · needs Research Center T2</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;padding:14px;border-radius:6px;background:#141920;border:1px solid rgba(255,255,255,.07)">
+            <span style="font:600 9px/1 'IBM Plex Mono',monospace;color:#8a94a2">tutorial-highlighted</span>
+            <button style="height:36px;border:0;border-radius:4px;background:#ffb02e;color:#1a1206;font:800 11px/1 Archivo,sans-serif;letter-spacing:.14em;cursor:pointer;box-shadow:0 0 0 3px rgba(255,176,46,.34),0 0 0 8px rgba(255,176,46,.13),0 0 24px rgba(255,176,46,.32)">CHARGE ALL</button>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:11px">
+        <span style="font:600 9px/1 Archivo,sans-serif;letter-spacing:.16em;color:#8a94a2">STATUS CHIPS, GAUGES, PROGRESS</span>
+        <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px">
+          <div style="padding:15px;border-radius:6px;background:#141920;border:1px solid rgba(255,255,255,.07);display:flex;flex-direction:column;gap:10px">
+            <span style="font:600 9px/1 'IBM Plex Mono',monospace;color:#8a94a2">chips</span>
+            <div style="display:flex;flex-wrap:wrap;gap:5px">
+              <sc-for list="{{ chips }}" as="c" hint-placeholder-count="6">
+                <span style="padding:4px 7px;border-radius:3px;font:700 8px/1 Archivo,sans-serif;letter-spacing:.11em;color:{{ c.fg }};background:{{ c.bg }}">{{ c.label }}</span>
+              </sc-for>
+            </div>
+          </div>
+          <div style="padding:15px;border-radius:6px;background:#141920;border:1px solid rgba(255,255,255,.07);display:flex;flex-direction:column;gap:10px">
+            <span style="font:600 9px/1 'IBM Plex Mono',monospace;color:#8a94a2">need gauge · threshold mark at 30</span>
+            <sc-for list="{{ gauges }}" as="g" hint-placeholder-count="3">
+              <div style="display:flex;align-items:center;gap:8px">
+                <span style="font:400 10px/1 Archivo,sans-serif;color:#98a2b0;width:50px">{{ g.k }}</span>
+                <div style="flex:1;height:5px;border-radius:3px;background:#242c36;overflow:hidden;position:relative"><div style="height:100%;background:{{ g.color }};width:{{ g.v }}%"></div><div style="position:absolute;left:30%;top:-2px;bottom:-2px;width:1px;background:rgba(255,255,255,.34)"></div></div>
+                <span style="font:500 10px/1 'IBM Plex Mono',monospace;color:{{ g.color }};width:28px;text-align:right">{{ g.v }}</span>
+              </div>
+            </sc-for>
+          </div>
+          <div style="padding:15px;border-radius:6px;background:#141920;border:1px solid rgba(255,255,255,.07);display:flex;flex-direction:column;gap:10px">
+            <span style="font:600 9px/1 'IBM Plex Mono',monospace;color:#8a94a2">progress · contract urgency</span>
+            <div style="display:flex;flex-direction:column;gap:5px"><div style="height:6px;border-radius:3px;background:#242c36;overflow:hidden"><div style="height:100%;background:#4fc76b;width:68%"></div></div><span style="font:400 10px/1 'IBM Plex Mono',monospace;color:#8a94a2">41 h left — calm</span></div>
+            <div style="display:flex;flex-direction:column;gap:5px"><div style="height:6px;border-radius:3px;background:#242c36;overflow:hidden"><div style="height:100%;background:#ffb02e;width:44%"></div></div><span style="font:400 10px/1 'IBM Plex Mono',monospace;color:#ffb02e">18 h left — warning</span></div>
+            <div style="display:flex;flex-direction:column;gap:5px"><div style="height:6px;border-radius:3px;background:#242c36;overflow:hidden"><div style="height:100%;background:#ff5b4c;width:57%"></div></div><span style="font:400 10px/1 'IBM Plex Mono',monospace;color:#ff5b4c">9 h left — critical</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:11px">
+        <span style="font:600 9px/1 Archivo,sans-serif;letter-spacing:.16em;color:#8a94a2">TOASTS · four severities, stacked, click-through to source, everything lands in the log</span>
+        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
+          <sc-for list="{{ toasts }}" as="t" hint-placeholder-count="4">
+            <div style="display:flex;gap:9px;padding:11px 12px;border-radius:6px;background:#141920;border:1px solid {{ t.border }};border-left:3px solid {{ t.accent }}">
+              <div style="color:{{ t.accent }};padding-top:1px"><bs-icon name="{{ t.icon }}" size="15"></bs-icon></div>
+              <div style="display:flex;flex-direction:column;gap:3px;flex:1">
+                <span style="font:600 12px/1.25 Archivo,sans-serif">{{ t.title }}</span>
+                <span style="font:400 11px/1.4 Archivo,sans-serif;color:#98a2b0;text-wrap:pretty">{{ t.body }}</span>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div style="display:flex;align-items:baseline;gap:12px"><span style="font:800 13px/1 Archivo,sans-serif;letter-spacing:.2em">06 · MOTION</span><span style="flex:1;height:1px;background:rgba(255,255,255,.09)"></span><span style="font:400 11px/1 Archivo,sans-serif;color:#8a94a2">nothing animates that the player is waiting on</span></div>
+      <div style="border-radius:6px;overflow:hidden;border:1px solid rgba(255,255,255,.08)">
+        <div style="display:flex;padding:10px 14px;background:#1a2028;font:700 9px/1 Archivo,sans-serif;letter-spacing:.14em;color:#8a94a2">
+          <span style="width:178px;flex:0 0 178px">ELEMENT</span><span style="width:150px;flex:0 0 150px">TRIGGER</span><span style="flex:1">MOVE</span><span style="width:120px;flex:0 0 120px">DURATION</span><span style="width:150px;flex:0 0 150px">EASING</span>
+        </div>
+        <sc-for list="{{ motion }}" as="m" hint-placeholder-count="12">
+          <div style="display:flex;align-items:flex-start;padding:11px 14px;background:#141920;border-top:1px solid rgba(255,255,255,.05);font:400 11px/1.45 Archivo,sans-serif">
+            <span style="width:178px;flex:0 0 178px;font-weight:600">{{ m.el }}</span>
+            <span style="width:150px;flex:0 0 150px;color:#98a2b0">{{ m.trigger }}</span>
+            <span style="flex:1;color:#98a2b0;padding-right:14px;text-wrap:pretty">{{ m.move }}</span>
+            <span style="width:120px;flex:0 0 120px;font-family:'IBM Plex Mono',monospace;color:#ffb02e">{{ m.dur }}</span>
+            <span style="width:150px;flex:0 0 150px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#8a94a2">{{ m.ease }}</span>
+          </div>
+        </sc-for>
+      </div>
+      <div style="display:flex;gap:10px;padding:13px 15px;border-radius:6px;background:#141920;border:1px solid rgba(255,255,255,.08)">
+        <span style="font:400 12px/1.55 Archivo,sans-serif;color:#c9d1db;flex:1;text-wrap:pretty">Two hard rules. <strong>Per-frame values never transition</strong> — the clock, balance, gauges and countdowns are written in place, because a 200ms tween on a value that changes every frame reads as lag. And <strong>nothing blocks input</strong>: panel and modal entrances are 120–180ms and interactive from frame one. Respect <code style="font-family:'IBM Plex Mono',monospace;color:#ffb02e">prefers-reduced-motion</code> by dropping all transforms and keeping opacity only; the pip pulse becomes a static fill.</span>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div style="display:flex;align-items:baseline;gap:12px"><span style="font:800 13px/1 Archivo,sans-serif;letter-spacing:.2em">07 · WORDS</span><span style="flex:1;height:1px;background:rgba(255,255,255,.09)"></span><span style="font:400 11px/1 Archivo,sans-serif;color:#8a94a2">labels are literal · the comedy is in the nouns</span></div>
+      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px">
+        <div style="display:flex;flex-direction:column;gap:9px;padding:16px;border-radius:6px;background:#141920;border:1px solid rgba(255,255,255,.08)">
+          <span style="font:600 9px/1 Archivo,sans-serif;letter-spacing:.16em;color:#8a94a2">GLOSSARY · ONE WORD PER CONCEPT</span>
+          <sc-for list="{{ glossary }}" as="g" hint-placeholder-count="8">
+            <div style="display:flex;align-items:baseline;gap:10px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+              <span style="font:600 11px/1.3 Archivo,sans-serif;color:#4fc76b;width:104px;flex:0 0 104px">{{ g.use }}</span>
+              <span style="font:400 11px/1.3 Archivo,sans-serif;color:#ff8a7e;width:104px;flex:0 0 104px;text-decoration:line-through">{{ g.avoid }}</span>
+              <span style="font:400 10px/1.4 Archivo,sans-serif;color:#8a94a2;flex:1;text-wrap:pretty">{{ g.why }}</span>
+            </div>
+          </sc-for>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:11px">
+          <sc-for list="{{ tone }}" as="t" hint-placeholder-count="4">
+            <div style="display:flex;flex-direction:column;gap:7px;padding:14px;border-radius:6px;background:#141920;border:1px solid rgba(255,255,255,.08)">
+              <span style="font:600 9px/1 Archivo,sans-serif;letter-spacing:.16em;color:#8a94a2">{{ t.kind }}</span>
+              <span style="font:400 12px/1.5 Archivo,sans-serif;color:#e6e9ee;text-wrap:pretty">{{ t.good }}</span>
+              <div style="display:flex;gap:7px;align-items:flex-start"><div style="color:#ff8a7e;padding-top:2px"><bs-icon name="x" size="10"></bs-icon></div><span style="font:400 11px/1.45 Archivo,sans-serif;color:#8a94a2;text-wrap:pretty">{{ t.bad }}</span></div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;padding:13px 15px;border-radius:6px;background:rgba(85,168,255,.07);border:1px solid rgba(85,168,255,.25)">
+        <div style="color:#55a8ff;padding-top:1px"><bs-icon name="warn" size="15"></bs-icon></div>
+        <span style="font:400 12px/1.55 Archivo,sans-serif;color:#c9d1db;flex:1;text-wrap:pretty">French runs 20–30% longer. Every label in this system is sized for the French string, not the English one: buttons are min-width with 12–15px side padding and never fixed-width, panel rows wrap to two lines rather than truncating, and the panel dock is 396px (up from 260–340) specifically so <em>Entrepôt de fret · 4×4 tuiles</em> fits on one line. Anything that still cannot fit gets a two-line layout, never an ellipsis — a truncated building name is a support ticket.</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1280,&quot;height&quot;:900}}">
+class Component extends DCLogic {
+  renderVals() {
+    const aa = (t, ok) => ({ aa: t, aaColor: ok ? '#4fc76b' : '#8a94a2' });
+    return {
+      palettes: [
+        { group: 'SURFACES', items: [
+          Object.assign({ name: 'App', hex: '#0b0e12' }, aa('base', false)),
+          Object.assign({ name: 'Chrome bar', hex: '#12161c' }, aa('base', false)),
+          Object.assign({ name: 'Panel', hex: '#141920' }, aa('base', false)),
+          Object.assign({ name: 'Card', hex: '#1b212a' }, aa('base', false)),
+          Object.assign({ name: 'Well / inset', hex: '#11161c' }, aa('base', false)),
+          Object.assign({ name: 'Hairline', hex: '#242c36' }, aa('1px borders', false))
+        ] },
+        { group: 'TEXT', items: [
+          Object.assign({ name: 'Primary', hex: '#e6e9ee' }, aa('14.9:1 AAA', true)),
+          Object.assign({ name: 'Secondary', hex: '#c9d1db' }, aa('11.6:1 AAA', true)),
+          Object.assign({ name: 'Muted', hex: '#98a2b0' }, aa('6.7:1 AA', true)),
+          Object.assign({ name: 'Micro-label', hex: '#8a94a2' }, aa('5.8:1 AA · not on chips', true)),
+          Object.assign({ name: 'On tinted surface', hex: '#b0b9c4' }, aa('8.9:1 · 6.6 on chips', true)),
+          Object.assign({ name: 'Disabled control', hex: '#5b6470' }, aa('exempt · inactive', false)),
+          Object.assign({ name: 'On amber', hex: '#1a1206' }, aa('11.2:1 AAA', true))
+        ] },
+        { group: 'SEMANTIC', items: [
+          Object.assign({ name: 'Accent · amber', hex: '#ffb02e' }, aa('9.8:1 AAA', true)),
+          Object.assign({ name: 'Positive · money in', hex: '#4fc76b' }, aa('8.4:1 AAA', true)),
+          Object.assign({ name: 'Critical · danger', hex: '#ff5b4c' }, aa('5.4:1 AA', true)),
+          Object.assign({ name: 'Critical text', hex: '#ff8a7e' }, aa('7.6:1 AAA', true)),
+          Object.assign({ name: 'Info · water, fleet', hex: '#55a8ff' }, aa('7.1:1 AAA', true)),
+          Object.assign({ name: 'Ore · geology, dark path', hex: '#a98cff' }, aa('6.8:1 AA', true))
+        ] }
+      ],
+      type: [
+        { spec: 'Archivo 900 · 42/1 · -.025em', family: 'Archivo,sans-serif', size: '30px', weight: '900', ls: '-.025em', color: '#e6e9ee', sample: 'BLASTSIM 2026', use: 'Menu logo, end screens' },
+        { spec: 'Archivo 800 · 20/1.2', family: 'Archivo,sans-serif', size: '20px', weight: '800', ls: '0', color: '#ffb02e', sample: 'A Wild Consultant Appears', use: 'Event & modal titles' },
+        { spec: 'Archivo 700 · 12/1 · .14em', family: 'Archivo,sans-serif', size: '12px', weight: '700', ls: '.14em', color: '#e6e9ee', sample: 'BLAST WORKSHOP', use: 'Panel titles' },
+        { spec: 'Archivo 600 · 12/1.25', family: 'Archivo,sans-serif', size: '12px', weight: '600', ls: '0', color: '#e6e9ee', sample: 'Institute of Applied Percussion', use: 'Row & card titles' },
+        { spec: 'Archivo 400 · 11/1.45', family: 'Archivo,sans-serif', size: '11px', weight: '400', ls: '0', color: '#c9d1db', sample: 'Stores 20,000 kg of rubble and ore.', use: 'Body, explanations' },
+        { spec: 'Archivo 600 · 9/1 · .14em', family: 'Archivo,sans-serif', size: '9px', weight: '600', ls: '.14em', color: '#8a94a2', sample: 'SECTION LABEL', use: 'Section headers, micro-labels' },
+        { spec: 'Plex Mono 600 · 19/1 · tnum', family: "'IBM Plex Mono',monospace", size: '19px', weight: '600', ls: '-.01em', color: '#ffb02e', sample: '$184,300', use: 'Balance, headline numerics' },
+        { spec: 'Plex Mono 500 · 11/1 · tnum', family: "'IBM Plex Mono',monospace", size: '11px', weight: '500', ls: '0', color: '#98a2b0', sample: '9 × 18 kg · $9.10 / kg · 25 ms', use: 'All countable values' }
+      ],
+      spacing: [4, 8, 12, 16, 20, 24, 32].map((n) => ({ n })),
+      zindex: [
+        { z: '0', k: 'Three.js canvas' }, { z: '100', k: 'Panel dock' }, { z: '120', k: 'Scene selection bar' },
+        { z: '150', k: 'HUD top bar' }, { z: '200', k: 'Tool rail' }, { z: '400', k: 'Coach card' },
+        { z: '500', k: 'Activity log drawer' }, { z: '600', k: 'Modals & confirms' }, { z: '9999 / 10000', k: 'Menu / settings over menu' }
+      ],
+      iconGroups: [
+        { group: 'TOOL RAIL', names: ['blast', 'survey', 'contract', 'ops', 'build', 'vehicle', 'crew', 'finance', 'shady', 'settings'] },
+        { group: 'STATUS', names: ['warn', 'crit', 'lock', 'check', 'x', 'clock', 'union', 'injured', 'collapse', 'training'] },
+        { group: 'CREW & FLEET', names: ['person', 'rest', 'drive', 'skull', 'wrench', 'locate', 'eye', 'edit', 'trash', 'dots'] },
+        { group: 'SITE & RESOURCES', names: ['rock', 'ore', 'water', 'fuel', 'storage', 'hole', 'zone', 'grid', 'layers', 'pick'] },
+        { group: 'EVENTS & WEATHER', names: ['gavel', 'podium', 'fedora', 'bell', 'horn', 'sun', 'cloud', 'rain', 'storm', 'cold'] },
+        { group: 'CONTROLS', names: ['play', 'pause', 'plus', 'minus', 'chev', 'chevR', 'up', 'down', 'save', 'map'] }
+      ],
+      chips: [
+        { label: 'IN ZONE', fg: '#ff8a7e', bg: 'rgba(255,91,76,.14)' },
+        { label: 'TUBED', fg: '#4fc76b', bg: 'rgba(79,199,107,.14)' },
+        { label: 'WET', fg: '#55a8ff', bg: 'rgba(85,168,255,.14)' },
+        { label: 'STUCK · 14 H', fg: '#ffc978', bg: 'rgba(255,176,46,.14)' },
+        { label: 'IDLE', fg: '#98a2b0', bg: 'rgba(255,255,255,.05)' },
+        { label: 'UNION', fg: '#c4aeff', bg: 'rgba(169,140,255,.14)' },
+        { label: 'T3 LOCKED', fg: '#5b6470', bg: 'rgba(255,255,255,.04)' },
+        { label: 'AUTO', fg: '#ffb02e', bg: 'rgba(255,176,46,.2)' }
+      ],
+      gauges: [
+        { k: 'Hunger', v: 44, color: '#ffb02e' }, { k: 'Fatigue', v: 58, color: '#4fc76b' }, { k: 'Social', v: 19, color: '#ff5b4c' }
+      ],
+      toasts: [
+        { icon: 'finance', accent: '#4fc76b', border: 'rgba(79,199,107,.28)', title: 'Contract #7 paid out', body: '+$18,240 — delivered two hours early, bonus included.' },
+        { icon: 'water', accent: '#ffb02e', border: 'rgba(255,176,46,.26)', title: 'Rain is filling your holes', body: 'Three uncovered holes are wet. Tubing is $4 each.' },
+        { icon: 'collapse', accent: '#ff5b4c', border: 'rgba(255,91,76,.3)', title: 'Oz Trill has collapsed', body: 'Fatigue reached 8%. He is no longer productive, or upright.' },
+        { icon: 'training', accent: '#55a8ff', border: 'rgba(85,168,255,.26)', title: 'Training complete', body: 'Marguerite Pell reached Geology ★3.' }
+      ],
+      motion: [
+        { el: 'Panel dock', trigger: 'open / switch', move: 'translateX −12px → 0, opacity 0 → 1', dur: '160 ms', ease: 'cubic-bezier(.2,.8,.3,1)' },
+        { el: 'Panel content', trigger: 'step or tab change', move: 'opacity only — no slide, the header must feel fixed', dur: '90 ms', ease: 'linear' },
+        { el: 'Toast', trigger: 'enqueue', move: 'translateY 10px → 0, opacity 0 → 1; stack reflows', dur: '180 ms', ease: 'cubic-bezier(.2,.8,.3,1)' },
+        { el: 'Toast', trigger: 'auto-dismiss at 6s', move: 'opacity → 0, height → 0', dur: '140 ms', ease: 'ease-in' },
+        { el: 'Modal', trigger: 'open', move: 'scale .975 → 1, opacity 0 → 1; scrim fades over 90ms', dur: '130 ms', ease: 'cubic-bezier(.2,.8,.3,1)' },
+        { el: 'Alert pip · critical', trigger: 'while critical', move: 'opacity 1 ↔ .3 pulse, no scale', dur: '2.4 s loop', ease: 'ease-in-out' },
+        { el: 'Balance · negative', trigger: 'crossing zero', move: 'one 300ms colour shift to red, then static', dur: '300 ms', ease: 'ease-out' },
+        { el: 'Tutorial highlight', trigger: 'step change', move: 'three-ring glow fades in over the new target', dur: '220 ms', ease: 'ease-out' },
+        { el: 'Coach card', trigger: 'step change', move: 'content cross-fades in place; card only moves if it would cover the target', dur: '200 ms', ease: 'cubic-bezier(.2,.8,.3,1)' },
+        { el: 'Hover tag (scene)', trigger: 'raycast enter', move: 'opacity 0 → 1, scale .98 → 1; 60ms delay to stop flicker', dur: '100 ms', ease: 'ease-out' },
+        { el: 'Placement ghost', trigger: 'cursor move', move: 'snaps to tile — no tween, position must equal truth', dur: '0', ease: '—' },
+        { el: 'Danger ring', trigger: 'plan armed', move: 'dashed ring scales .85 → 1 once, then dash offset drifts', dur: '260 ms + loop', ease: 'ease-out / linear' },
+        { el: 'Blast confirm', trigger: 'DETONATE pressed', move: 'modal drops out instantly, 120ms screen shake handled by the renderer', dur: '0 / 120 ms', ease: '—' },
+        { el: 'Gauges & clock', trigger: 'every frame', move: 'written in place, never transitioned', dur: '0', ease: '—' }
+      ],
+      glossary: [
+        { use: 'Crew', avoid: 'Employees', why: 'One word in the rail, the panel title and the tutorial. Fixes today’s Crew/EMPLOYEES split.' },
+        { use: 'Deals', avoid: 'Contracts', why: 'Rail label only — the panel is still titled CONTRACTS, which is the legal noun.' },
+        { use: 'Fire', avoid: 'Blast!, Detonate', why: 'Verb on the button; "detonate" is reserved for the confirm so the two are never mistaken.' },
+        { use: 'Dismiss', avoid: 'Fire (an employee)', why: '"Fire" is taken by explosives. Dismiss is what a company would write anyway.' },
+        { use: 'Product', avoid: 'Explosive type', why: 'Sales language for a bomb. Straight-faced, and shorter in French.' },
+        { use: 'Influence', avoid: 'Corruption level', why: 'The panel never names the crime. The consequences do.' },
+        { use: 'Arrangement', avoid: 'Bribe', why: 'Same reason. The confirm still states the exact cash amount.' },
+        { use: 'Site map', avoid: 'Return to map', why: 'A destination, not an instruction — it reads as a place in both languages.' }
+      ],
+      tone: [
+        { kind: 'CONFIRM · destructive', good: 'Demolition costs $1,400 and returns nothing. Seven employees lose their beds and will sleep where they fall.', bad: '“Are you sure you want to demolish this building?” — states no cost, no consequence, and asks a question the player already answered by clicking.' },
+        { kind: 'DISABLED REASON', good: '2 workers and 1 vehicle are inside the danger zone', bad: '“Cannot blast” — the rule without the fix. Every reason names the thing to change.' },
+        { kind: 'ERROR', good: 'Ground is not flat — the footprint spans a 3 m drop', bad: '“Invalid placement (E_TERRAIN_SLOPE)” — raw console text leaking into the UI, and unlocalisable.' },
+        { kind: 'EMPTY STATE', good: 'No contracts on offer. Buyers appear every few days, usually when you have nothing to sell.', bad: '“No data” — wastes the one moment the game has the player’s full attention.' }
+      ]
+    };
+  }
+}
+
+</script>
+</body>
+</html>

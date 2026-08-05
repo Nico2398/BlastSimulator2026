@@ -48,6 +48,35 @@ export function detectTrafficJam(
   return null;
 }
 
+/** One cell with enough vehicles queued on it to count as a jam. */
+export interface TrafficAdvisory {
+  targetX: number;
+  targetZ: number;
+  count: number;
+}
+
+/**
+ * Read-only view of the same waiting-vehicle clustering detectTrafficJam uses
+ * to decide whether to fire the traffic_jam event — for the Fleet panel's
+ * advisory banner, which must not have detectTrafficJam's side effects
+ * (writing state.pendingEvent, gating on eventFreqMultiplier/an event already
+ * pending). A player should see the cluster forming regardless of whether an
+ * event is currently blocked or paused. Uses the same MIN_VEHICLES/MIN_TICKS
+ * thresholds so the banner and the event agree on what counts as a jam.
+ */
+export function computeTrafficAdvisory(vehicles: readonly Vehicle[]): TrafficAdvisory[] {
+  const waitingByTarget = new Map<string, TrafficAdvisory>();
+  for (const v of vehicles) {
+    if (v.state === 'waiting' && v.waitingTicks >= TRAFFIC_JAM_MIN_TICKS) {
+      const key = `${v.targetX},${v.targetZ}`;
+      const entry = waitingByTarget.get(key);
+      if (entry) entry.count++;
+      else waitingByTarget.set(key, { targetX: v.targetX, targetZ: v.targetZ, count: 1 });
+    }
+  }
+  return [...waitingByTarget.values()].filter(e => e.count >= TRAFFIC_JAM_MIN_VEHICLES);
+}
+
 /**
  * Detects an unqualified task error: fires when at least one pending action
  * has no qualified employee on the roster.

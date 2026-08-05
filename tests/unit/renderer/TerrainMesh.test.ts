@@ -325,6 +325,47 @@ describe('TerrainMesh', () => {
     });
   });
 
+  describe('meshes (P2 — scene picking raycast targets)', () => {
+    it('returns every built chunk mesh', () => {
+      const scene = makeScene();
+      const grid = new VoxelGrid(8, 4, 8);
+      for (let x = 0; x < 8; x++)
+        for (let y = 0; y < 4; y++)
+          for (let z = 0; z < 8; z++)
+            grid.setVoxel(x, y, z, makeSolidVoxel());
+      const tm = new TerrainMesh(scene, grid);
+      tm.buildAll();
+      expect(tm.meshes.length).toBeGreaterThan(0);
+      expect(tm.meshes.every(m => m instanceof THREE.Mesh)).toBe(true);
+      tm.dispose();
+    });
+
+    it('is empty for an all-air grid', () => {
+      const scene = makeScene();
+      const grid = new VoxelGrid(4, 4, 4);
+      const tm = new TerrainMesh(scene, grid);
+      tm.buildAll();
+      expect(tm.meshes).toEqual([]);
+      tm.dispose();
+    });
+
+    it('excludes empty (null) chunks from a partially-solid grid', () => {
+      const scene = makeScene();
+      const grid = new VoxelGrid(32, 4, 8); // 2 chunks wide at CHUNK_SIZE=16, only one populated
+      for (let x = 0; x < 16; x++)
+        for (let y = 0; y < 4; y++)
+          for (let z = 0; z < 8; z++)
+            grid.setVoxel(x, y, z, makeSolidVoxel());
+      const tm = new TerrainMesh(scene, grid);
+      tm.buildAll();
+      // Every returned mesh must actually carry geometry (non-empty chunk).
+      for (const mesh of tm.meshes) {
+        expect(mesh.geometry.attributes['position']!.count).toBeGreaterThan(0);
+      }
+      tm.dispose();
+    });
+  });
+
   it('material uses DoubleSide so terrain is visible from below', () => {
     const scene = makeScene();
     const grid = new VoxelGrid(8, 8, 8);

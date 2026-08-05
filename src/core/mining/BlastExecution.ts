@@ -36,6 +36,7 @@ import type { EventEmitter } from '../state/EventEmitter.js';
 import { getBuildingDef, destroyBuilding, type BuildingState, type Building, type BuildingType } from '../entities/Building.js';
 import {
   BLAST_ZONE_RADIUS,
+  GRAVITY,
   OVERSIZED_FRAGMENT_THRESHOLD,
   EXPLOSIVE_ENERGY_SCALE,
   PROJECTION_SPEED_THRESHOLD,
@@ -126,6 +127,58 @@ export interface BlastResult {
   /** "x,z" of every ground column the blast removed rock from. Anything standing
    *  on one of these was standing on the blast. */
   clearedColumns: string[];
+}
+
+/**
+ * A structured, persisted summary of a completed blast — what
+ * `BlastReportModal` reads (redesign P4/§5.A), replacing the old UI's regex
+ * parse of the `blast` command's text output. Built once, right after
+ * `executeBlast` returns and before the plan is cleared, since `spent`
+ * needs the charge amounts that clearing wipes.
+ */
+export interface BlastReport {
+  /** Tick the blast fired on, for the report's timestamp. */
+  tick: number;
+  rating: BlastRating;
+  clearedVoxels: number;
+  crackedVoxels: number;
+  fragmentCount: number;
+  oversizedFragments: number;
+  totalRockVolume: number;
+  projectionCount: number;
+  /**
+   * Estimated maximum throw distance in metres, from the fastest projected
+   * fragment's launch speed — standard unresisted 45°-launch range
+   * (v² / g), the angle that maximises range and the one already implied by
+   * `calculateInitialVelocity`'s 45° default. An estimate, not a traced
+   * trajectory: real fragments launch at whatever angle the blast geometry
+   * gives them and lose speed to drag, so this is an upper bound a report
+   * card can show next to the count, not a per-fragment prediction.
+   */
+  maxProjectionDistanceM: number;
+  /** Total value of ore actually recovered, per BlastCalc's pricing. */
+  totalOreValue: number;
+  /** Total cost of the charges spent on this blast (kg × explosive $/kg, summed before the plan was cleared). */
+  spent: number;
+  destroyedBuildings: DestroyedBuildingInfo[];
+}
+
+/** Build a BlastReport from a completed BlastResult. `spent` must be computed by the caller before the plan is cleared. */
+export function buildBlastReport(result: BlastResult, tick: number, spent: number): BlastReport {
+  return {
+    tick,
+    rating: result.rating,
+    clearedVoxels: result.clearedVoxels,
+    crackedVoxels: result.crackedVoxels,
+    fragmentCount: result.fragmentCount,
+    oversizedFragments: result.oversizedFragments,
+    totalRockVolume: result.totalRockVolume,
+    projectionCount: result.projectionCount,
+    maxProjectionDistanceM: (result.maxProjectionSpeed * result.maxProjectionSpeed) / Math.abs(GRAVITY),
+    totalOreValue: result.totalOreValue,
+    spent,
+    destroyedBuildings: result.destroyedBuildings,
+  };
 }
 
 // ── Village (for vibration targets) ──

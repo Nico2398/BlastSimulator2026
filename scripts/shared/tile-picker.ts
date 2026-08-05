@@ -85,3 +85,41 @@ export function tileToPoint(geo: PickerGeometry, x: number, z: number): PickerPo
     py: geo.y + (z - geo.minZ + 0.5) * tileH,
   };
 }
+
+/**
+ * P3 in-scene placement (replaces the 2D picker above). Poll until the tool
+ * is armed, so a pickTile/dragTiles action that races the button click it
+ * follows waits instead of acting on nothing.
+ */
+export async function awaitPlacementArmed(page: Page, timeoutMs: number): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const armed = await page.evaluate(() => (window as unknown as {
+      __placement?: { isArmed: () => boolean };
+    }).__placement?.isArmed() ?? false);
+    if (armed) return;
+    if (Date.now() > deadline) throw new Error('no placement tool is armed');
+    await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
+  }
+}
+
+/**
+ * Screen point for world tile (x, z), via the live camera projection —
+ * recomputed on every call, same "never bake pixels" reasoning as the 2D
+ * picker mapping above. Used by the playtest harness so a placement click is
+ * a real page.mouse click, not a call into __placement (that hook is for
+ * scenario mode only — see PlacementController.paintRect).
+ *
+ * @throws when the tile projects off-screen or behind the camera — the
+ *   caller (a playtest def) asked for a tile the player could not see either,
+ *   which is itself the finding.
+ */
+export async function worldToScreenPoint(page: Page, x: number, z: number): Promise<PickerPoint> {
+  const point = await page.evaluate((wx: number, wz: number) => (window as unknown as {
+    __worldToScreen: (x: number, z: number) => { px: number; py: number; onScreen: boolean } | null;
+  }).__worldToScreen(wx, wz), x, z);
+  if (!point || !point.onScreen) {
+    throw new Error(`world tile (${x}, ${z}) is not on screen — frame it with a camera move first`);
+  }
+  return { px: point.px, py: point.py };
+}

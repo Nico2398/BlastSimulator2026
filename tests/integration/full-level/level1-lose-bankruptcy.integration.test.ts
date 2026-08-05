@@ -57,6 +57,10 @@ describe('Level 1 — Lose — Bankruptcy', () => {
     // ticksBelowThreshold may have accumulated some ticks before we hit 100,
     // but should be >= 100 by now
     expect(ctx.state!.bankruptcy.ticksBelowThreshold).toBeGreaterThanOrEqual(100);
+
+    // Verify the level itself ends, with the reason attributed to bankruptcy
+    expect(ctx.state!.levelEnded).toBe(true);
+    expect(ctx.state!.levelEndReason).toBe('bankruptcy');
   });
 
   it('does not trigger bankruptcy when cash recovers above threshold', () => {
@@ -75,5 +79,9 @@ describe('Level 1 — Lose — Bankruptcy', () => {
     // Bankruptcy counter should have been reset
     expect(ctx.state!.bankruptcy.bankrupt).toBe(false);
     expect(ctx.state!.bankruptcy.ticksBelowThreshold).toBe(0);
+
+    // A recovered streak must not have ended the level
+    expect(ctx.state!.levelEnded).toBe(false);
+    expect(ctx.state!.levelEndReason).toBeNull();
   });
 });

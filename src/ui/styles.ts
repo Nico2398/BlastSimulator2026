@@ -52,61 +52,12 @@ const CSS = `
   padding-bottom: 6px;
 }
 
-/* ─── HUD top bar ─── */
-#bs-hud-top {
-  top: 0; left: 0; right: 0;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  /* Right padding reserves the strip the fixed "Return to Map" button occupies,
-     so the event badge does not slide underneath it when it appears. */
-  padding: 0 215px 0 12px;
-  gap: 14px;
-  background: rgba(6,5,2,0.92);
-  border-bottom: 1px solid rgba(200,160,60,0.2);
-  pointer-events: all;
-  backdrop-filter: blur(6px);
-  box-shadow: 0 2px 12px rgba(0,0,0,0.5);
-  z-index: 150;
-}
-#bs-hud-top .bs-balance {
-  font-size: 17px;
-  font-weight: 800;
-  color: #ffd54f;
-  letter-spacing: 0.02em;
-  white-space: nowrap;
-}
-#bs-hud-top .bs-time {
-  flex: 1;
-  text-align: center;
-  font-size: 12px;
-  color: #a89878;
-  white-space: nowrap;
-}
-#bs-hud-top .bs-speed-btn {
-  cursor: pointer;
-  background: rgba(255,255,255,0.08);
-  border: 1px solid rgba(255,255,255,0.18);
-  border-radius: 4px;
-  padding: 3px 10px;
-  color: #e8e0d0;
-  font-size: 12px;
-  font-family: inherit;
-  transition: background 0.15s;
-  pointer-events: all;
-}
-#bs-hud-top .bs-speed-btn:hover { background: rgba(255,255,255,0.18); }
-#bs-hud-top .bs-speed-btn.bs-speed-paused {
-  background: rgba(220,60,20,0.35);
-  border-color: rgba(255,140,90,0.6);
-  color: #ffcfae;
-  animation: bs-pause-pulse 1.6s ease-in-out infinite;
-}
-@keyframes bs-pause-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
-}
-#bs-hud-top .bs-weather { font-size: 18px; line-height: 1; }
+/* ─── HUD top bar ───
+   Structural styling (#bs-hud-top, .bs-balance, .bs-time, .bs-speed-btn,
+   .bs-weather) now lives inline in shell/TopBar.ts, which owns this surface
+   and reuses these ids/classes only for tutorial-selector compatibility.
+   .bs-event-badge stays here — TopBar's alert pips still apply this class
+   for the same selector-preservation reason, and rely on this rule. */
 .bs-event-badge {
   background: rgba(220,60,20,0.9);
   border-radius: 4px;
@@ -123,76 +74,12 @@ const CSS = `
   0%,100% { opacity: 1; } 50% { opacity: 0.55; }
 }
 
-/* ─── Score bars (top-right, below HUD) ─── */
-#bs-hud-scores {
-  top: 52px;
-  right: 128px;
-  width: 160px;
-}
-.bs-score-row { margin-bottom: 7px; }
-.bs-score-row:last-child { margin-bottom: 0; }
-.bs-score-label {
-  font-size: 10px;
-  color: #9a8868;
-  margin-bottom: 3px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-.bs-score-bar-bg {
-  background: rgba(255,255,255,0.1);
-  border-radius: 4px;
-  height: 6px;
-  overflow: hidden;
-}
-.bs-score-bar-fill {
-  height: 100%;
-  border-radius: 4px;
-  transition: width 0.4s ease;
-}
-.bs-score-wellbeing  .bs-score-bar-fill { background: linear-gradient(90deg, #2e7d32, #66bb6a); }
-.bs-score-safety     .bs-score-bar-fill { background: linear-gradient(90deg, #1565c0, #42a5f5); }
-.bs-score-ecology    .bs-score-bar-fill { background: linear-gradient(90deg, #2e7d32, #81c784); }
-.bs-score-nuisance   .bs-score-bar-fill { background: linear-gradient(90deg, #bf360c, #ff7043); }
-
-/* ─── Toolbar (right side, vertically centered) ─── */
-#bs-toolbar {
-  position: fixed;
-  right: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  z-index: 200;
-  pointer-events: all;
-}
-.bs-toolbar-btn {
-  cursor: pointer;
-  background: rgba(8,6,3,0.88);
-  border: 1px solid rgba(200,160,60,0.3);
-  border-radius: 6px;
-  padding: 8px 14px;
-  color: #b8a888;
-  font-size: 11px;
-  font-family: inherit;
-  font-weight: 600;
-  letter-spacing: 0.03em;
-  width: 108px;
-  text-align: left;
-  pointer-events: all;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
-  backdrop-filter: blur(4px);
-}
-.bs-toolbar-btn:hover {
-  background: rgba(200,160,60,0.18);
-  color: #e8d8b0;
-  border-color: rgba(200,160,60,0.55);
-}
-.bs-toolbar-btn.active {
-  border-color: #ffc840;
-  color: #ffc840;
-  background: rgba(255,200,64,0.12);
-}
+/* ─── Score bars, toolbar ───
+   #bs-hud-scores and #bs-toolbar are now owned by shell/TopBar.ts and
+   shell/ToolRail.ts respectively, styled inline. Both ids are reused only
+   for tutorial-selector compatibility — the old .bs-score-* / .bs-toolbar-btn
+   rules that used to style them are gone with HUD.ts, the component they
+   belonged to. */
 
 /* ─── Panels (left side, below HUD) ─── */
 #bs-blast-panel     { top: 52px; left: 10px; width: 240px; max-height: calc(100vh - 62px); overflow-y: auto; }
@@ -287,6 +174,16 @@ const CSS = `
   display: flex;
   align-items: center;
   justify-content: center;
+  /* Base tier for every .bs-confirm-overlay user (ConfirmModal, EventModal,
+     BlastReportModal, PreflightModal, SavesModal) — a literal, not the
+     --bsx-z-modal token: that token is reserved for the one case that has
+     to beat the menu tier (ConfirmModal's own inline override, below), and
+     routing every user of this class through it by mistake once put
+     BlastReportModal's routine post-blast popup ABOVE an already-open
+     SavesModal, blocking clicks on save slots underneath it (CI:
+     save-load-visual). Components needing a higher tier than this
+     (SavesModal already did, for beating the main menu) override z-index
+     inline on their own overlay element instead of raising this shared rule. */
   z-index: 600;
   pointer-events: all;
 }
@@ -439,7 +336,13 @@ const CSS = `
   align-items: center;
   justify-content: center;
   background: rgba(0,0,0,0.7);
-  z-index: 600;
+  /* var(), not the literal 600 this used to be: the pre-redesign z-index
+     scale never anticipated the menu tier's Settings sitting above it (P10)
+     — same class of bug as .bs-confirm-overlay above. An event and a confirm
+     dialog never actually compete for the same pixels (the event's own
+     full-screen overlay blocks the clicks that would raise a confirm), so
+     sharing the tier is safe. */
+  z-index: var(--bsx-z-modal);
   pointer-events: all;
 }
 .bs-event-box {
@@ -487,89 +390,6 @@ const CSS = `
 #bs-minimap { bottom: 10px; right: 10px; width: fit-content; }
 #bs-minimap-canvas { display: block; cursor: crosshair; background: #141e10; border-radius: 4px; }
 
-/* ─── Tile Select Overlay ─── */
-.bs-tile-select-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.82);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 20px;
-  z-index: 700;
-  pointer-events: all;
-  backdrop-filter: blur(2px);
-}
-.bs-tile-select-panel {
-  display: flex;
-  flex-direction: row;
-  align-items: flex-start;
-  gap: 18px;
-  background: rgba(10,8,4,0.95);
-  border: 1px solid rgba(200,160,60,0.4);
-  border-radius: 12px;
-  padding: 20px;
-  box-shadow: 0 12px 60px rgba(0,0,0,0.85);
-  max-width: 95vw;
-  max-height: 95vh;
-}
-.bs-tile-select-canvas {
-  display: block;
-  cursor: crosshair;
-  border-radius: 6px;
-  border: 1px solid rgba(200,160,60,0.25);
-  max-width: 60vw;
-  max-height: 75vh;
-}
-.bs-tile-select-form {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  min-width: 200px;
-  max-width: 240px;
-}
-.bs-tile-select-title {
-  font-weight: 700;
-  font-size: 13px;
-  color: #ffc840;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  border-bottom: 1px solid rgba(200,160,60,0.25);
-  padding-bottom: 8px;
-}
-.bs-tile-select-hint {
-  font-size: 11px;
-  color: #857b6b;
-  line-height: 1.5;
-}
-.bs-tile-select-info {
-  font-size: 11px;
-  color: #b0a888;
-  background: rgba(255,255,255,0.05);
-  border-radius: 4px;
-  padding: 6px 8px;
-  min-height: 32px;
-  line-height: 1.5;
-}
-.bs-tile-select-fields {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.bs-tile-select-field-label {
-  font-size: 10px;
-  color: #908070;
-  margin-bottom: 2px;
-  display: block;
-}
-.bs-tile-select-btns {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: auto;
-}
-.bs-tile-select-btns .bs-btn { width: 100%; }
-
 /* ─── Notification toast ─── */
 .bs-notification {
   position: fixed;
@@ -590,10 +410,15 @@ const CSS = `
   box-shadow: 0 4px 20px rgba(0,0,0,0.7);
 }
 
-/* ─── Tutorial coach mark ───
+/* ─── Tutorial coach mark (redesign P10) ───
    Docked bottom-centre, never modal: the wrapper lets clicks through so the
    player can actually use the control the step is pointing at, and it sits
-   below the event dialog (z 600) so the two never fight for the same pixels. */
+   below the event dialog (z 600) so the two never fight for the same pixels.
+   Kept bottom-docked deliberately (spec §6.17) even though the design comp's
+   coach card floats centred in the scene's free area — the comp's own text
+   for this component says "never covering the highlighted control", which
+   the existing bottom dock already guarantees and a scene-centred card would
+   have to re-derive per step. */
 .bs-tutorial-overlay {
   position: fixed;
   left: 0; right: 0; bottom: 0;
@@ -604,84 +429,70 @@ const CSS = `
   pointer-events: none;
 }
 .bs-tutorial-box {
-  background: rgba(14, 11, 6, 0.95);
-  border: 1px solid rgba(200, 160, 60, 0.55);
-  border-radius: 10px;
-  padding: 12px 16px 14px;
+  background: var(--bsx-panel);
+  border: 1px solid rgba(255,176,46,.4);
+  border-radius: 8px;
   width: 100%;
-  max-width: 560px;
+  max-width: 520px;
   pointer-events: all;
-  box-shadow: 0 8px 40px rgba(0,0,0,0.8);
-  font-family: 'Segoe UI', system-ui, Arial, sans-serif;
-  color: #e8e0d0;
+  box-shadow: 0 16px 44px rgba(0,0,0,.6);
+  overflow: hidden;
+  color: var(--bsx-text-primary);
 }
-.bs-tutorial-header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
+/* ─── Placement parameter strip (redesign P3) ───
+   Bottom-docked like the tutorial coach card above, so a guided step that
+   arms the placement tool needs the strip pushed clear of the card instead
+   of sitting behind it — same screen edge, same z-stack region. */
+#bs-param-strip { bottom: 18px; }
+body.bs-tutorial-guided #bs-param-strip { bottom: var(--bsx-tutorial-card-clearance, 210px); }
+/* Overrides the shared .bs-panel-title (uppercase, gold, bordered) — the
+   coach card's title sits inline with the CLOCK HELD chip and step counter
+   instead of owning its own bordered header row. */
+.bs-tutorial-box .bs-panel-title {
+  font: 700 13px/1 var(--bsx-font-ui);
+  letter-spacing: .02em;
+  text-transform: none;
+  color: var(--bsx-text-primary);
+  border-bottom: 0;
+  margin-bottom: 0;
+  padding-bottom: 0;
 }
-.bs-tutorial-header .bs-panel-title { margin-bottom: 6px; flex: 1; }
 .bs-tutorial-box .bs-panel-text {
-  font-size: 13px;
-  line-height: 1.55;
-  color: #d8c8a8;
-  margin: 0 0 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--bsx-text-secondary);
+  margin: 0;
 }
 .bs-tutorial-progress {
-  font-size: 11px;
-  color: #9a8868;
+  margin-left: auto;
+  font: 500 10px/1 var(--bsx-font-mono);
+  color: var(--bsx-text-micro);
   white-space: nowrap;
-  letter-spacing: 0.04em;
 }
 .bs-tutorial-progress-track {
-  background: rgba(255,255,255,0.1);
-  border-radius: 3px;
-  height: 4px;
+  background: #242c36;
+  height: 3px;
   overflow: hidden;
-  margin-bottom: 10px;
 }
 .bs-tutorial-progress-fill {
   height: 100%;
-  background: #f0b840;
-  border-radius: 3px;
+  background: var(--bsx-amber);
   transition: width 0.3s ease;
 }
 .bs-tutorial-commands-label {
   font-size: 9px;
-  color: #7a6b55;
+  color: var(--bsx-text-micro);
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  margin-bottom: 2px;
 }
 .bs-tutorial-commands {
-  font-family: ui-monospace, 'Consolas', monospace;
+  font-family: var(--bsx-font-mono);
   font-size: 11px;
-  color: #a89060;
-  background: rgba(255,255,255,0.05);
+  color: var(--bsx-text-tinted);
+  background: var(--bsx-well);
   border-radius: 4px;
   padding: 4px 8px;
-  margin-bottom: 10px;
   word-break: break-word;
-}
-.bs-tutorial-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-/* ─── Tutorial step highlight (bright blue pulsating glow) ─── */
-.bs-tutorial-highlight {
-  animation: bs-tutorial-pulse 1.5s ease-in-out infinite !important;
-  box-shadow: 0 0 12px 4px rgba(64, 156, 255, 0.8) !important;
-  border-color: #409cff !important;
-  outline: 2px solid rgba(64, 156, 255, 0.5) !important;
-  outline-offset: 2px !important;
-  transition: box-shadow 0.3s ease !important;
-}
-@keyframes bs-tutorial-pulse {
-  0%, 100% { box-shadow: 0 0 8px 2px rgba(64, 156, 255, 0.6); }
-  50% { box-shadow: 0 0 16px 6px rgba(64, 156, 255, 0.9); }
 }
 
 /* ─── Guided tutorial rails ───
@@ -692,7 +503,9 @@ const CSS = `
    sits outside the panel tree — leaving it live let a player walk out of the
    tutorial mid-step and lose it, which is the whole reason these rails exist.
    Written as "not marked allowed" so a control rendered between two passes of
-   the guide is inert from its first frame rather than briefly live. */
+   the guide is inert from its first frame rather than briefly live.
+   The coach card itself carries no button/select/input (no Skip, no Next, no
+   close — see tutorialOverlayDom.ts), so it needs no exemption from this rule. */
 body.bs-tutorial-guided button:not(.bs-tutorial-allowed),
 body.bs-tutorial-guided select:not(.bs-tutorial-allowed),
 body.bs-tutorial-guided input:not(.bs-tutorial-allowed),
@@ -701,26 +514,48 @@ body.bs-tutorial-guided .bs-detail-toggle:not(.bs-tutorial-allowed) {
   opacity: 0.4;
   filter: saturate(0.3);
 }
-/* The card itself is never blocked — it carries the instructions. */
-body.bs-tutorial-guided .bs-tutorial-box button,
-body.bs-tutorial-guided .bs-tutorial-box select,
-body.bs-tutorial-guided .bs-tutorial-box input {
-  pointer-events: all;
-  opacity: 1;
-  filter: none;
-}
 .bs-tutorial-stage {
-  font-size: 12px;
-  font-weight: 600;
-  color: #7ab8ff;
-  margin: 0 0 8px;
-  line-height: 1.4;
+  font: 600 11px/1.4 var(--bsx-font-ui);
 }
+/* CLOCK HELD chip, inline with the title. */
 .bs-tutorial-paused {
-  font-size: 11px;
-  color: #f0c060;
-  margin: 0 0 8px;
-  line-height: 1.4;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(255,176,46,.16);
+  color: var(--bsx-amber);
+  font: 700 10px/1.4 var(--bsx-font-ui);
+  letter-spacing: .04em;
+}
+
+/* ─── Reduced motion (P10): pip pulse → static ───
+   bs-pulse only animates opacity — no transform — so on its own it would be
+   left running under the "keep opacity" rule. It is special-cased anyway
+   because the spec calls it out by name ("pip pulse → static"): a periodic
+   flash reads as motion to a vestibular-sensitive player even without
+   translate/scale. Freezing at the animation's natural end (opacity 1, its
+   0%/100% value) would render identically to "no alert" ever having played,
+   so this holds the cycle's low point (opacity .55) instead — the frame
+   that actually reads as "this is highlighted" — with no motion.
+   Covers both the class-based use above (.bs-event-badge, the kind:'event'
+   pip) and the same bs-pulse keyframe applied inline by TopBar.ts on every
+   other critical-tone alert pip (ecology/bankruptcy/crew), which carries no
+   class to select — matched below by the inline style text itself, since an
+   !important author rule overrides a non-important inline declaration
+   regardless of selector.
+   Nothing else in this file needs an entry: every other transition here
+   (button/input/build/survey hover, the *-bar-fill widths) is background,
+   border-color, color or width, never transform. The tutorial keyframes are
+   deliberately left alone — that block is being reworked by concurrent work
+   on the tutorial system. */
+@media (prefers-reduced-motion: reduce) {
+  .bs-event-badge,
+  #bs-hud-top button[style*="bs-pulse"] {
+    animation: none !important;
+    opacity: .55 !important;
+  }
 }
 `;
 

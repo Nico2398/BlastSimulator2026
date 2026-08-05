@@ -6,12 +6,11 @@ import { newGameCommand, type GameContext } from '../../src/console/commands/wor
 import { drillPlanCommand, buildRampCommand, type MiningContext } from '../../src/console/commands/mining.js';
 import { buildCommand } from '../../src/console/commands/entities.js';
 import { EventEmitter } from '../../src/core/state/EventEmitter.js';
-import { createTubingState } from '../../src/core/mining/Tubing.js';
 
 function makeCtx(): MiningContext {
   const ctx: MiningContext = {
     state: null, grid: null, landscape: null, playableArea: null,
-    softwareTier: 0, tubingState: createTubingState(), emitter: new EventEmitter(),
+    emitter: new EventEmitter(),
   };
   newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32', cash: '500000' });
   return ctx;

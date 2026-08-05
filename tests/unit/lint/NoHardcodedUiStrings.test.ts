@@ -83,27 +83,30 @@ function scanPlainQuotedAssignments(relPath: string, source: string): Violation[
 }
 
 /**
- * Scans one file for `showNotification(...)` calls whose argument is a
- * literal — quoted or a template literal — that never passes through
- * `t(...)`. Unlike the general textContent/title/innerHTML sweep, this also
- * accepts backtick templates: main.ts's notification strings interpolate a
- * ticks-remaining count (`` `⚠️ Bankruptcy in ${ticksRemaining} ticks.` ``)
- * while still being entirely hardcoded English prose. `${...}` segments are
- * stripped before the English-word check so interpolation alone can't dodge
- * detection.
+ * Scans one file for `.notify({ ..., title: <literal>, body: <literal> })`
+ * calls (the UIManager/NotificationCenter API — replaced the old
+ * `showNotification(string)` call after the redesign's P1 shell) whose
+ * `title:`/`body:` field is a literal — quoted or a template literal — that
+ * never passes through `t(...)`. A field written as `title: t('key')` never
+ * matches the quote-immediately-after-colon pattern, so legitimately
+ * localized calls produce zero violations. `${...}` segments are stripped
+ * before the English-word check so interpolation alone can't dodge detection.
  */
-function scanShowNotificationCalls(relPath: string, source: string): Violation[] {
+function scanNotifyCalls(relPath: string, source: string): Violation[] {
   const violations: Violation[] = [];
   const lines = source.split('\n');
-  const pattern = /showNotification\??\.\(\s*(['"`])((?:(?!\1).)*)\1/;
+  const callPattern = /\.notify\(/;
+  const fieldPattern = /(?:title|body)\s*:\s*(['"`])((?:(?!\1).)*)\1/g;
 
   lines.forEach((lineText, idx) => {
-    const m = pattern.exec(lineText);
-    if (!m) return;
-    const literal = (m[2] ?? '').replace(/\$\{[^}]*\}/g, '');
-    if (lineText.includes('t(')) return; // already routed through i18n
-    if (looksLikeEnglishText(literal)) {
-      violations.push({ file: relPath, line: idx + 1, snippet: lineText.trim() });
+    if (!callPattern.test(lineText)) return;
+    fieldPattern.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = fieldPattern.exec(lineText))) {
+      const literal = (m[2] ?? '').replace(/\$\{[^}]*\}/g, '');
+      if (looksLikeEnglishText(literal)) {
+        violations.push({ file: relPath, line: idx + 1, snippet: lineText.trim() });
+      }
     }
   });
   return violations;
@@ -162,24 +165,24 @@ describe('src/ui/ and src/renderer/ — no hardcoded English UI strings (issue #
 });
 
 describe('src/main.ts — no hardcoded notification strings (issue #457)', () => {
-  it('every showNotification(...) call goes through t()', () => {
+  it('every notify(...) call\'s title/body goes through t()', () => {
     const relPath = 'src/main.ts';
     const source = readFileSync(join(ROOT, relPath), 'utf8');
-    const violations = filterAllowlisted(scanShowNotificationCalls(relPath, source));
+    const violations = filterAllowlisted(scanNotifyCalls(relPath, source));
 
     expect(
       violations,
-      `${violations.length} hardcoded showNotification() string(s) found in src/main.ts:\n${formatViolations(violations)}`,
+      `${violations.length} hardcoded notify() string(s) found in src/main.ts:\n${formatViolations(violations)}`,
     ).toEqual([]);
   });
 
-  it('finds all 7 known hardcoded notification call sites (bankruptcy/ecology/arrest/revolt handlers)', () => {
-    // Pinned count from the issue #457 audit — guards against the scanner
-    // silently stopping to find any of them (e.g. a refactor changing the
-    // call syntax so the regex no longer matches).
+  it('finds all 7 known notification call sites (bankruptcy/ecology/arrest/revolt handlers)', () => {
+    // Pinned count — guards against the scanner silently stopping to find
+    // any of them (e.g. a refactor changing the call syntax so the pattern
+    // no longer matches).
     const relPath = 'src/main.ts';
     const source = readFileSync(join(ROOT, relPath), 'utf8');
-    const allCalls = (source.match(/showNotification\??\.\(/g) ?? []).length;
+    const allCalls = (source.match(/uiManager\.notify\(/g) ?? []).length;
     expect(allCalls).toBeGreaterThanOrEqual(7);
   });
 });

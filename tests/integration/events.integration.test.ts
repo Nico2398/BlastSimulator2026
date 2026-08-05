@@ -25,7 +25,14 @@ import { clearEvents } from '../../src/core/events/EventPool.js';
 import { createRunner } from '../../src/console/createRunner.js';
 import { parseCommand } from '../../src/console/ConsoleRunner.js';
 import { makeCampaignCtx } from './full-level/helpers.js';
-import { MIN_EVENT_INTERVAL_TICKS, MIN_EVENT_INTERVAL_ACTIONS } from '../../src/core/config/balance.js';
+import {
+  MIN_EVENT_INTERVAL_TICKS,
+  MIN_EVENT_INTERVAL_ACTIONS,
+  BANKRUPTCY_GRACE_TICKS,
+  ECOLOGICAL_SHUTDOWN_TICKS,
+  ARREST_EXPOSURE_THRESHOLD,
+  REVOLT_TICKS,
+} from '../../src/core/config/balance.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -198,6 +205,27 @@ describe('Event system', () => {
     expect(consequencesIdx).toBeGreaterThan(resolvedIdx);
     expect(sentenceIdx).toBeGreaterThan(resolvedIdx);
     expect(sentenceIdx).toBeLessThan(consequencesIdx);
+  });
+
+  // ── 3c. event dismiss clears lastOutcome (P8) ──────────────────────────────
+
+  it('event dismiss fails when there is no resolved outcome to dismiss', () => {
+    const result = eventCommand(ctx, ['dismiss'], {});
+
+    expect(result.success).toBe(false);
+    expect(result.output).toBe('No resolved event to dismiss.');
+  });
+
+  it('event dismiss clears lastOutcome after a choose', () => {
+    ctx.state!.events.pendingEvent = { eventId: 'union_coffee_uprising', firedAtTick: ctx.state!.tickCount };
+    eventCommand(ctx, ['choose', '0'], {});
+    expect(ctx.state!.events.lastOutcome).not.toBeNull();
+
+    const result = eventCommand(ctx, ['dismiss'], {});
+
+    expect(result.success).toBe(true);
+    expect(result.output).toBe('Outcome dismissed.');
+    expect(ctx.state!.events.lastOutcome).toBeNull();
   });
 
   // ── 4. tickEventSystem advances timers ─────────────────────────────────────
@@ -675,6 +703,73 @@ describe('Event system', () => {
       // At least MIN_EVENT_INTERVAL_TICKS must elapse between consecutive events
       expect(event2Tick - event1Tick).toBeGreaterThanOrEqual(MIN_EVENT_INTERVAL_TICKS);
       expect(ctx.state!.events.actionCountSinceEvent).toBe(0);
+    });
+  });
+
+  // ── 13. Game-over wiring — levelEndReason set from the 4 defeat trackers (P8) ──
+
+  describe('levelEndReason wiring', () => {
+    it('bankruptcy sets levelEnded + levelEndReason', () => {
+      ctx.state!.cash = 0;
+      ctx.state!.bankruptcy.ticksBelowThreshold = BANKRUPTCY_GRACE_TICKS - 1;
+
+      tickCommand(ctx, ['1'], {});
+
+      expect(ctx.state!.bankruptcy.bankrupt).toBe(true);
+      expect(ctx.state!.levelEnded).toBe(true);
+      expect(ctx.state!.levelEndReason).toBe('bankruptcy');
+    });
+
+    it('ecological shutdown sets levelEnded + levelEndReason', () => {
+      ctx.state!.scores.ecology = 0;
+      ctx.state!.ecological.ticksAtZero = ECOLOGICAL_SHUTDOWN_TICKS - 1;
+
+      tickCommand(ctx, ['1'], {});
+
+      expect(ctx.state!.ecological.shutdown).toBe(true);
+      expect(ctx.state!.levelEnded).toBe(true);
+      expect(ctx.state!.levelEndReason).toBe('ecological_shutdown');
+    });
+
+    it('arrest sets levelEnded + levelEndReason', () => {
+      ctx.state!.mafia.exposureRisk = ARREST_EXPOSURE_THRESHOLD;
+
+      tickCommand(ctx, ['1'], {});
+
+      expect(ctx.state!.arrest.arrested).toBe(true);
+      expect(ctx.state!.levelEnded).toBe(true);
+      expect(ctx.state!.levelEndReason).toBe('arrest');
+    });
+
+    it('worker revolt sets levelEnded + levelEndReason', () => {
+      ctx.state!.scores.wellBeing = 0;
+      ctx.state!.revolt.ticksAtZero = REVOLT_TICKS - 1;
+
+      tickCommand(ctx, ['1'], {});
+
+      expect(ctx.state!.revolt.revolted).toBe(true);
+      expect(ctx.state!.levelEnded).toBe(true);
+      expect(ctx.state!.levelEndReason).toBe('worker_revolt');
+    });
+
+    it('bankruptcy and ecological shutdown triggering on the same tick — bankruptcy wins (checked first)', () => {
+      ctx.state!.cash = 0;
+      ctx.state!.bankruptcy.ticksBelowThreshold = BANKRUPTCY_GRACE_TICKS - 1;
+      ctx.state!.scores.ecology = 0;
+      ctx.state!.ecological.ticksAtZero = ECOLOGICAL_SHUTDOWN_TICKS - 1;
+
+      tickCommand(ctx, ['1'], {});
+
+      expect(ctx.state!.bankruptcy.bankrupt).toBe(true);
+      expect(ctx.state!.ecological.shutdown).toBe(true);
+      expect(ctx.state!.levelEndReason).toBe('bankruptcy');
+    });
+
+    it('no defeat condition met leaves levelEnded false and levelEndReason null', () => {
+      tickCommand(ctx, ['1'], {});
+
+      expect(ctx.state!.levelEnded).toBe(false);
+      expect(ctx.state!.levelEndReason).toBeNull();
     });
   });
 });

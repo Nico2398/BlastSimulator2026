@@ -2,7 +2,7 @@
 // Debris haulers, rock diggers, drill rigs, building destroyers, and rock fragmenters.
 // Base stats and tier multipliers live in src/core/config/balance.ts.
 
-import { VEHICLE_BASE_STATS, VEHICLE_TIER_MULTIPLIERS } from '../config/balance.js';
+import { VEHICLE_BASE_STATS, VEHICLE_TIER_MULTIPLIERS, VEHICLE_SCRAP_RESIDUAL_FRACTION } from '../config/balance.js';
 
 export { ROLE_LICENCE_REQUIRED, canAssignDriver, assignDriver, getExcavatorLoadingRate } from './VehicleDriverAssignment.js';
 
@@ -242,6 +242,18 @@ export function destroyVehicle(state: VehicleState, vehicleId: number): boolean 
   return true;
 }
 
+/**
+ * Cash credited back on `vehicle scrap`: a fraction of purchaseCost, scaled by
+ * the vehicle's current hp/maxHp so a wrecked vehicle salvages for less than
+ * a pristine one. Exported so the Fleet panel's scrap confirmation can show
+ * the real number before the player commits, not a guess.
+ */
+export function computeScrapResidualValue(vehicleType: VehicleRole, vehicleTier: VehicleTier, hp: number): number {
+  const def = getVehicleDefByTier(vehicleType, vehicleTier);
+  const hpFraction = def.maxHp > 0 ? Math.max(0, Math.min(1, hp / def.maxHp)) : 0;
+  return Math.round(def.purchaseCost * VEHICLE_SCRAP_RESIDUAL_FRACTION * hpFraction);
+}
+
 /** Calculate total maintenance + fuel costs for all vehicles per tick. */
 export function getVehicleCostsPerTick(state: VehicleState): number {
   let total = 0;
@@ -253,6 +265,24 @@ export function getVehicleCostsPerTick(state: VehicleState): number {
     }
   }
   return total;
+}
+
+/**
+ * Unassign a vehicle's driver, freeing the employee to be reassigned
+ * elsewhere. Refuses while the vehicle is mid-haul (driving to a fragment or
+ * to the depot with one loaded) so a haul doesn't get orphaned mid-flight.
+ */
+export function unassignDriver(
+  vehicleState: VehicleState,
+  vehicleId: number,
+): { success: boolean; error?: string } {
+  const vehicle = vehicleState.vehicles.find(v => v.id === vehicleId);
+  if (!vehicle) return { success: false, error: 'Vehicle not found' };
+  if (vehicle.driverId === null) return { success: false, error: 'Vehicle has no driver' };
+  if (vehicle.haulingPhase !== null) return { success: false, error: 'Vehicle is mid-haul' };
+
+  vehicle.driverId = null;
+  return { success: true };
 }
 
 // ── Licence mapping / driver assignment / loading rate ──

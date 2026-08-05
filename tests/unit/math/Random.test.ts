@@ -51,3 +51,34 @@ describe('Random — range', () => {
     }
   });
 });
+
+describe('Random — clone', () => {
+  it('a clone continues the same sequence as the original would', () => {
+    const original = new Random(42);
+    original.next();
+    original.next();
+    const clone = original.clone();
+
+    for (let i = 0; i < 50; i++) {
+      expect(clone.next()).toBe(original.next());
+    }
+  });
+
+  it('advancing the clone does not affect the original', () => {
+    const original = new Random(1234);
+    const clone = original.clone();
+    for (let i = 0; i < 20; i++) clone.next();
+
+    const expected = new Random(1234).next();
+    expect(original.next()).toBe(expected);
+  });
+
+  it('advancing the original does not affect an earlier clone', () => {
+    const original = new Random(5678);
+    const clone = original.clone();
+    for (let i = 0; i < 20; i++) original.next();
+
+    const expected = new Random(5678).next();
+    expect(clone.next()).toBe(expected);
+  });
+});

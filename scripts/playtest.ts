@@ -112,8 +112,10 @@ async function main(): Promise<void> {
   const portArg = args.indexOf('--port');
   const port = portArg >= 0 ? Number(args[portArg + 1]) : 5173;
   // Skip the value belonging to --port, or `--port 5199` alone is read as a
-  // playtest name filter and matches nothing.
-  const filter = args.find((a, i) => !a.startsWith('--') && i !== portArg + 1);
+  // playtest name filter and matches nothing. Only when --port is actually
+  // present: portArg defaults to -1, and -1 + 1 === 0 would otherwise exclude
+  // index 0 — exactly where a real name filter sits — every time --port is absent.
+  const filter = args.find((a, i) => !a.startsWith('--') && (portArg === -1 || i !== portArg + 1));
 
   const defs = loadPlaytests(filter);
   if (defs.length === 0) {

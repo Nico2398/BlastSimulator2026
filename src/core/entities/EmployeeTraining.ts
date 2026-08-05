@@ -7,7 +7,7 @@
 
 import type { Employee, EmployeeState, SkillCategory, TrainingState } from './Employee.js';
 import { calculateSalary } from './Employee.js';
-import type { BuildingType, BuildingTier } from './Building.js';
+import type { Building, BuildingType, BuildingTier } from './Building.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import {
   TRAINING_BUILDING_SKILLS,
@@ -40,6 +40,28 @@ export function schoolFor(skill: SkillCategory): BuildingType | null {
     if (trainableSkills(type).includes(skill)) return type;
   }
   return null;
+}
+
+/** One skill a school on site teaches, paired with the building that teaches it. */
+export interface SkillOffer {
+  skill: SkillCategory;
+  building: Building;
+}
+
+/**
+ * Every skill some built school currently teaches, each paired with its best
+ * school on site — a better school teaches the same course faster, so a
+ * lower-tier duplicate of one already built is never worth offering.
+ */
+export function availableTrainingOffers(buildings: readonly Building[]): SkillOffer[] {
+  const best = new Map<SkillCategory, Building>();
+  for (const building of buildings) {
+    for (const skill of trainableSkills(building.type)) {
+      const current = best.get(skill);
+      if (!current || building.tier > current.tier) best.set(skill, building);
+    }
+  }
+  return [...best.entries()].map(([skill, building]) => ({ skill, building }));
 }
 
 /** What a course would cost and grant. */

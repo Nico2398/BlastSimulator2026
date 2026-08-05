@@ -20,6 +20,7 @@
       "actions": [
         { "do": "click", "selector": "#bs-toolbar [data-panel=\"build\"]" },
         { "do": "click", "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn" },
+        { "do": "zoomOut", "note": "the fresh site's default camera is close and ground-level, and does not show tile (5,5) without zooming out first" },
         { "do": "pickTile", "x": 5, "z": 5 },
         { "do": "click", "selector": "#bs-tile-select-confirm" }
       ],

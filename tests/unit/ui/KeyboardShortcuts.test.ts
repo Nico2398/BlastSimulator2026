@@ -16,7 +16,7 @@ describe('KeyboardShortcuts (12.7)', () => {
     setSpeed: ReturnType<typeof vi.fn>;
     togglePanel: ReturnType<typeof vi.fn>;
     quickSave: ReturnType<typeof vi.fn>;
-    openSettings: ReturnType<typeof vi.fn>;
+    onEscape: ReturnType<typeof vi.fn>;
     onToggleNavGrid: ReturnType<typeof vi.fn>;
   };
   let ks: KeyboardShortcuts;
@@ -27,7 +27,7 @@ describe('KeyboardShortcuts (12.7)', () => {
       setSpeed: vi.fn(),
       togglePanel: vi.fn(),
       quickSave: vi.fn(),
-      openSettings: vi.fn(),
+      onEscape: vi.fn(),
       onToggleNavGrid: vi.fn(),
     };
     ks = new KeyboardShortcuts(callbacks);
@@ -75,6 +75,12 @@ describe('KeyboardShortcuts (12.7)', () => {
     ks.dispose();
   });
 
+  it('KeyG toggles build panel', () => {
+    fireKey('KeyG');
+    expect(callbacks.togglePanel).toHaveBeenCalledWith('build');
+    ks.dispose();
+  });
+
   it('KeyN triggers onToggleNavGrid', () => {
     fireKey('KeyN');
     expect(callbacks.onToggleNavGrid).toHaveBeenCalledOnce();
@@ -87,16 +93,16 @@ describe('KeyboardShortcuts (12.7)', () => {
       setSpeed: vi.fn(),
       togglePanel: vi.fn(),
       quickSave: vi.fn(),
-      openSettings: vi.fn(),
+      onEscape: vi.fn(),
     };
     const partialKs = new KeyboardShortcuts(partialCallbacks);
     expect(() => fireKey('KeyN')).not.toThrow();
     partialKs.dispose();
   });
 
-  it('Escape opens settings', () => {
+  it('Escape runs the Esc cascade', () => {
     fireKey('Escape');
-    expect(callbacks.openSettings).toHaveBeenCalledOnce();
+    expect(callbacks.onEscape).toHaveBeenCalledOnce();
     ks.dispose();
   });
 
@@ -113,10 +119,4 @@ describe('KeyboardShortcuts (12.7)', () => {
     expect(callbacks.togglePause).not.toHaveBeenCalled();
   });
 
-  it('makeHelpPanel returns an HTMLElement with shortcut labels', () => {
-    const panel = KeyboardShortcuts.makeHelpPanel();
-    expect(panel).toBeInstanceOf(HTMLElement);
-    expect(panel.children.length).toBeGreaterThan(1);
-    ks.dispose();
-  });
 });

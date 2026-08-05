@@ -3,19 +3,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { MainMenu } from '../../../src/ui/MainMenu.js';
 import { UIManager } from '../../../src/ui/UIManager.js';
 import { t, setLocale, getLocale } from '../../../src/core/i18n/I18n.js';
-import type { CampaignState } from '../../../src/core/campaign/Campaign.js';
-
-function makeCampaign(): CampaignState {
-  return {
-    levels: {
-      dusty_hollow: { unlocked: true, completed: true, bestSessionProfit: 160000 }, // > 80k threshold × 2
-      grumpstone_ridge: { unlocked: true, completed: false, bestSessionProfit: 0 },
-      treranium_depths: { unlocked: false, completed: false, bestSessionProfit: 0 },
-    },
-    currentLevelId: 'dusty_hollow',
-    totalProfit: 160000,
-  };
-}
+import { TUTORIAL_STEPS } from '../../../src/ui/tutorialSteps.js';
+import type { SaveBackend, SaveMeta } from '../../../src/core/state/SaveBackend.js';
 
 describe('MainMenu (12.8)', () => {
   let container: HTMLDivElement;
@@ -45,8 +34,8 @@ describe('MainMenu (12.8)', () => {
     const menu = new MainMenu(container);
     menu.setOnNewCampaign(cb);
     menu.show();
-    // Find the New Campaign button (first primary button)
-    const btn = container.querySelector('.bs-btn-primary') as HTMLButtonElement | null;
+    const btn = Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
+      .find(b => b.textContent?.includes(t('menu.new_campaign')));
     btn?.click();
     expect(cb).toHaveBeenCalledOnce();
     menu.dispose();
@@ -65,88 +54,11 @@ describe('MainMenu (12.8)', () => {
     menu.dispose();
   });
 
-  it('showWorldMap renders level cards', () => {
-    const menu = new MainMenu(container);
-    menu.show();
-    menu.showWorldMap(makeCampaign());
-    // All 3 level names should appear in the rendered output
-    const text = container.textContent ?? '';
-    expect(text).toContain('Dusty Hollow');
-    expect(text).toContain('Grumpstone Ridge');
-    expect(text).toContain('Treranium Depths');
-    menu.dispose();
-  });
-
-  it('showWorldMap shows locked indicator for locked level', () => {
-    const menu = new MainMenu(container);
-    menu.show();
-    menu.showWorldMap(makeCampaign());
-    // Locked level should show 🔒
-    expect(container.textContent).toContain('🔒');
-    menu.dispose();
-  });
-
-  it('showWorldMap excludes tutorial_pit (difficultyTier 0) when campaign state provided', () => {
-    const menu = new MainMenu(container);
-    menu.show();
-    menu.showWorldMap(makeCampaign());
-    const text = container.textContent ?? '';
-    expect(text).not.toContain('Tutorial Pit');
-    expect(text).toContain('Dusty Hollow');
-    expect(text).toContain('Grumpstone Ridge');
-    menu.dispose();
-  });
-
-  it('showWorldMap excludes tutorial_pit with null campaign', () => {
-    const menu = new MainMenu(container);
-    menu.show();
-    menu.showWorldMap(null);
-    const text = container.textContent ?? '';
-    expect(text).not.toContain('Tutorial Pit');
-    expect(text).toContain('Dusty Hollow');
-    menu.dispose();
-  });
-
-  it('showWorldMap shows stars for completed level', () => {
-    const menu = new MainMenu(container);
-    menu.show();
-    menu.showWorldMap(makeCampaign());
-    // Completed level should show star characters
-    expect(container.textContent).toMatch(/★/);
-    menu.dispose();
-  });
-
-  it('calls onStartLevel when level start button clicked', () => {
-    const cb = vi.fn();
-    const menu = new MainMenu(container);
-    menu.setOnStartLevel(cb);
-    menu.show();
-    menu.showWorldMap(makeCampaign());
-    // Find Start/Resume buttons by text content (world map level buttons)
-    const allBtns = Array.from(container.querySelectorAll<HTMLButtonElement>('button'));
-    const startBtns = allBtns.filter(b =>
-      b.textContent?.includes('Start') || b.textContent?.includes('Resume')
-    );
-    expect(startBtns.length).toBeGreaterThan(0);
-    startBtns[0]?.click();
-    expect(cb).toHaveBeenCalledOnce();
-    menu.dispose();
-  });
-
   it('dispose() removes overlay from container', () => {
     const menu = new MainMenu(container);
     menu.show();
     menu.dispose();
     expect(container.querySelector('#bs-main-menu')).toBeNull();
-  });
-
-  it('makeReturnToMapButton creates a button with click handler', () => {
-    const cb = vi.fn();
-    const menu = new MainMenu(container);
-    const btn = menu.makeReturnToMapButton(document.body, cb);
-    btn.click();
-    expect(cb).toHaveBeenCalledOnce();
-    menu.dispose();
   });
 
   it('renders tutorial button with correct text', () => {
@@ -159,16 +71,12 @@ describe('MainMenu (12.8)', () => {
     menu.dispose();
   });
 
-  it('tutorial button has gold accent inline style', () => {
+  it('tutorial button shows a real step-count hint from TUTORIAL_STEPS', () => {
     const menu = new MainMenu(container);
     menu.show();
     const buttons = Array.from(container.querySelectorAll('button'));
-    const tutorialBtn = buttons.find(b => b.textContent?.includes('Tutorial'))!;
-    expect(tutorialBtn.style.color).toBe('rgb(255, 224, 144)');
-    expect(tutorialBtn.style.borderColor).toContain('rgba');
-    expect(tutorialBtn.style.borderColor).toContain('255, 225, 144');
-    expect(tutorialBtn.style.background).toContain('rgba');
-    expect(tutorialBtn.style.background).toContain('255, 225, 144');
+    const tutorialBtn = buttons.find(b => b.textContent?.includes(t('menu.tutorial')))!;
+    expect(tutorialBtn.textContent).toContain(String(TUTORIAL_STEPS.length));
     menu.dispose();
   });
 
@@ -184,15 +92,128 @@ describe('MainMenu (12.8)', () => {
     menu.dispose();
   });
 
-  it('tutorial button is ordered between New Campaign and Continue', () => {
+  it('buttons follow the design order: Continue, New Campaign, Sandbox, Tutorial, Load, Settings', () => {
     const menu = new MainMenu(container);
     menu.show();
     const buttons = Array.from(container.querySelectorAll('button'));
-    const idxCampaign = buttons.findIndex(b => b.textContent?.includes('New Campaign'));
-    const idxTutorial = buttons.findIndex(b => b.textContent?.includes('Tutorial'));
-    const idxContinue = buttons.findIndex(b => b.textContent?.includes('Continue'));
-    expect(idxCampaign).toBeLessThan(idxTutorial);
-    expect(idxTutorial).toBeLessThan(idxContinue);
+    const idxContinue = buttons.findIndex(b => b.textContent?.includes(t('menu.continue')));
+    const idxCampaign = buttons.findIndex(b => b.textContent?.includes(t('menu.new_campaign')));
+    const idxSandbox = buttons.findIndex(b => b.textContent?.includes(t('menu.sandbox')));
+    const idxTutorial = buttons.findIndex(b => b.textContent?.includes(t('menu.tutorial')));
+    const idxLoad = buttons.findIndex(b => b.textContent?.includes(t('menu.load')));
+    const idxSettings = buttons.findIndex(b => b.textContent?.includes(t('menu.settings')));
+    expect(idxContinue).toBeLessThan(idxCampaign);
+    expect(idxCampaign).toBeLessThan(idxSandbox);
+    expect(idxSandbox).toBeLessThan(idxTutorial);
+    expect(idxTutorial).toBeLessThan(idxLoad);
+    expect(idxLoad).toBeLessThan(idxSettings);
+    menu.dispose();
+  });
+});
+
+// ── CONTINUE: live save summary from backend meta (redesign P8) ──────────────
+
+function fakeBackend(saves: SaveMeta[]): SaveBackend {
+  return {
+    save: vi.fn(),
+    load: vi.fn(),
+    delete: vi.fn(),
+    list: vi.fn().mockResolvedValue(saves),
+  };
+}
+
+describe('MainMenu — CONTINUE live save summary (redesign P8)', () => {
+  let container: HTMLDivElement;
+
+  beforeEach(() => {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    setLocale('en');
+  });
+
+  afterEach(() => {
+    setLocale('en');
+  });
+
+  it('CONTINUE stays hidden until a backend is set', () => {
+    const menu = new MainMenu(container);
+    menu.show();
+    const continueBtn = Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
+      .find(b => b.textContent?.includes(t('menu.continue')));
+    expect(continueBtn?.style.display).toBe('none');
+    menu.dispose();
+  });
+
+  it('CONTINUE stays hidden when the backend has no saves', async () => {
+    const menu = new MainMenu(container);
+    menu.setBackend(fakeBackend([]));
+    await new Promise(r => setTimeout(r, 0));
+    menu.show();
+    const continueBtn = Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
+      .find(b => b.textContent?.includes(t('menu.continue')));
+    expect(continueBtn?.style.display).toBe('none');
+    menu.dispose();
+  });
+
+  it('CONTINUE shows the campaign level name and the real campaignSummary for the most recent save', async () => {
+    const menu = new MainMenu(container);
+    menu.setBackend(fakeBackend([
+      { slotId: 'slot_1', name: 'Slot 1', timestamp: 1000, version: 7, campaignSummary: '$40,000 — Day 3', levelId: 'dusty_hollow' },
+      { slotId: 'auto', name: 'Auto', timestamp: 5000, version: 7, campaignSummary: '$184,300 — Day 11', levelId: 'dusty_hollow' },
+    ]));
+    await new Promise(r => setTimeout(r, 0));
+    menu.show();
+
+    const text = container.textContent ?? '';
+    expect(text).toContain(t('level.dusty_hollow.name'));
+    expect(text).toContain('$184,300 — Day 11'); // the newer (timestamp 5000) save, not the older one
+    expect(text).not.toContain('$40,000 — Day 3');
+    menu.dispose();
+  });
+
+  it('CONTINUE falls back to the sandbox label when the most recent save has no levelId', async () => {
+    const menu = new MainMenu(container);
+    menu.setBackend(fakeBackend([
+      { slotId: 'slot_1', name: 'Slot 1', timestamp: 1000, version: 7, campaignSummary: '$9,000 — Day 2', levelId: null },
+    ]));
+    await new Promise(r => setTimeout(r, 0));
+    menu.show();
+
+    const text = container.textContent ?? '';
+    expect(text).toContain(t('menu.sandbox'));
+    menu.dispose();
+  });
+
+  it('clicking CONTINUE routes to onContinue with the most recent save\'s slotId', async () => {
+    const menu = new MainMenu(container);
+    const cb = vi.fn();
+    menu.setOnContinue(cb);
+    menu.setBackend(fakeBackend([
+      { slotId: 'slot_1', name: 'Slot 1', timestamp: 1000, version: 7, campaignSummary: '$9,000 — Day 2', levelId: 'dusty_hollow' },
+      { slotId: 'slot_2', name: 'Slot 2', timestamp: 9000, version: 7, campaignSummary: '$20,000 — Day 5', levelId: 'dusty_hollow' },
+    ]));
+    await new Promise(r => setTimeout(r, 0));
+    menu.show();
+
+    const continueBtn = Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
+      .find(b => b.textContent?.includes(t('menu.continue')))!;
+    continueBtn.click();
+    expect(cb).toHaveBeenCalledWith('slot_2');
+    menu.dispose();
+  });
+
+  it('LOAD button hints the real save count once resolved', async () => {
+    const menu = new MainMenu(container);
+    menu.setBackend(fakeBackend([
+      { slotId: 'slot_1', name: 'Slot 1', timestamp: 1000, version: 7, campaignSummary: '', levelId: null },
+      { slotId: 'slot_2', name: 'Slot 2', timestamp: 2000, version: 7, campaignSummary: '', levelId: null },
+    ]));
+    await new Promise(r => setTimeout(r, 0));
+    menu.show();
+
+    const loadBtn = Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
+      .find(b => b.textContent?.includes(t('menu.load')))!;
+    expect(loadBtn.textContent).toContain('2');
     menu.dispose();
   });
 });
@@ -282,16 +303,19 @@ describe('MainMenu — refreshLocale() wired through UIManager\'s language handl
     frBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   }
 
-  it('main menu title switches to French after Settings → FR, opened via the main menu Settings button', () => {
-    const titleEl = container.querySelector('#bs-main-menu h1');
-    expect(titleEl?.textContent).toBe(t('menu.title')); // English baseline
+  it('main menu tagline switches to French after Settings → FR, opened via the main menu Settings button', () => {
+    // The wordmark itself ("BLASTSIM 2026") is a brand lockup, not translated —
+    // the tagline underneath it is the persistent, locale-bound text.
+    const before = container.textContent ?? '';
+    expect(before).toContain(t('menu.subtitle')); // English baseline
 
     openSettingsFromMainMenu();
     clickFrenchButton();
 
     expect(getLocale()).toBe('fr');
-    expect(titleEl?.textContent).toBe(t('menu.title'));
-    expect(titleEl?.textContent).not.toBe('BlastSimulator2026');
+    const after = container.textContent ?? '';
+    expect(after).toContain(t('menu.subtitle'));
+    expect(after).not.toContain('dig');
   });
 
   it('main menu button labels (New Campaign, Continue, Load, Settings) switch to French', () => {
@@ -306,61 +330,5 @@ describe('MainMenu — refreshLocale() wired through UIManager\'s language handl
     expect(before).not.toEqual(
       Array.from(container.querySelectorAll<HTMLButtonElement>('button')).map((b) => b.textContent),
     );
-  });
-});
-
-// ── menu.level_locked must not bake the English word "on" into a French render (issue #457) ─
-
-describe('MainMenu — level_locked requirement text does not leak English (issue #457)', () => {
-  let container: HTMLDivElement;
-
-  function makeLockedCampaign(): CampaignState {
-    return {
-      levels: {
-        dusty_hollow: { unlocked: true, completed: true, bestSessionProfit: 200000 },
-        grumpstone_ridge: { unlocked: false, completed: false, bestSessionProfit: 0 },
-        treranium_depths: { unlocked: false, completed: false, bestSessionProfit: 0 },
-      },
-      currentLevelId: 'dusty_hollow',
-      totalProfit: 200000,
-    };
-  }
-
-  beforeEach(() => {
-    container = document.createElement('div');
-    document.body.appendChild(container);
-  });
-
-  afterEach(() => {
-    setLocale('en');
-  });
-
-  it('locked-level requirement text in French does not contain the standalone English word "on"', () => {
-    setLocale('fr');
-    const menu = new MainMenu(container);
-    menu.show();
-    menu.showWorldMap(makeLockedCampaign());
-
-    const text = container.textContent ?? '';
-    // MainMenu.ts currently builds the requirement string as
-    // `$X on <level name>` in plain JS before ever reaching t(), so the
-    // English word "on" survives regardless of locale. \b keeps this from
-    // false-positiving on French words that merely contain the substring.
-    expect(text).not.toMatch(/\bon\b/);
-
-    menu.dispose();
-  });
-
-  it('locked-level requirement text in French still names the unlock threshold and the previous level', () => {
-    setLocale('fr');
-    const menu = new MainMenu(container);
-    menu.show();
-    menu.showWorldMap(makeLockedCampaign());
-
-    const text = container.textContent ?? '';
-    expect(text).toContain('250'); // Grumpstone Ridge's unlockThreshold is 250,000
-    expect(text).toContain(t('level.dusty_hollow.name'));
-
-    menu.dispose();
   });
 });

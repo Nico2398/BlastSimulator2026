@@ -108,7 +108,7 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-save-panel"
+          "selector": "#bs-saves-modal"
         }
       ]
     },
@@ -122,7 +122,7 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-save-panel [data-slot=\"slot_1\"] .bs-btn-primary"
+          "selector": "#bs-saves-modal [data-slot=\"slot_1\"] [data-action=\"save-here\"]"
         },
         {
           "type": "wait",
@@ -171,7 +171,7 @@
     },
     {
       "command": "state",
-      "description": "Load back slot 1 by clicking the Save/Load panel's own Load button (SaveLoadUI.ts, main.ts's setOnLoad handler) — not a raw console command — so this step exercises the click-driven path that must regenerate the grid, replacing the post-blast crater above with clean terrain matching the saved state. The command field stays the inert `state` read (rather than `load slot:...`) so command mode does not pre-clear the crater itself and mask a regression in the click path.",
+      "description": "Load back slot 1 by clicking the Saves modal's own Load button (SavesModal.ts, main.ts's setOnLoad handler) — not a raw console command — so this step exercises the click-driven path that must regenerate the grid, replacing the post-blast crater above with clean terrain matching the saved state. The command field stays the inert `state` read (rather than `load slot:...`) so command mode does not pre-clear the crater itself and mask a regression in the click path.",
       "interaction": [
         {
           "type": "command",
@@ -179,7 +179,7 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-save-panel [data-slot=\"slot_1\"] [data-action=\"load\"]"
+          "selector": "#bs-saves-modal [data-slot=\"slot_1\"] [data-action=\"load\"]"
         },
         {
           "type": "wait",

@@ -9,7 +9,7 @@
 
 import type { Page } from 'puppeteer';
 import type { PlayerAction, PlaytestGoal } from './playtest-types.js';
-import { awaitPickerGeometry, tileToPoint, type PickerGeometry } from './tile-picker.js';
+import { awaitPlacementArmed, worldToScreenPoint } from './tile-picker.js';
 
 /** Mirror of src/ui/uiActionProbe.ts UiAction, kept structural to avoid a src import. */
 export interface ProbedAction {
@@ -94,9 +94,17 @@ export function describeAvailable(actions: ProbedAction[]): string {
 
 /** Ask the page directly about one selector, rather than matching probe output. */
 async function blockedReason(page: Page, selector: string): Promise<string | null> {
-  return page.evaluate((sel: string) => (window as unknown as {
-    __probeSelector: (s: string) => string | null;
-  }).__probeSelector(sel), selector) as Promise<string | null>;
+  return page.evaluate((sel: string) => {
+    // Scroll into view before probing, exactly as page.click will before
+    // clicking (interaction-executor.ts's clickSelector does the same, #481):
+    // a row below a panel's fold has its centre over the game canvas until
+    // scrolled, and probing that without scrolling first reads as covered-forever.
+    document.querySelector(sel)?.scrollIntoView({ block: 'center', inline: 'nearest' });
+    const probe = (window as unknown as {
+      __probeSelector: (s: string) => string | null;
+    }).__probeSelector;
+    return probe(sel);
+  }, selector) as Promise<string | null>;
 }
 
 async function requireUsable(page: Page, selector: string, timeoutMs: number): Promise<void> {
@@ -125,16 +133,16 @@ async function requireUsable(page: Page, selector: string, timeoutMs: number): P
 }
 
 /**
- * Geometry of the open tile picker, with a playtest-shaped diagnosis on miss.
- *
- * The mapping itself lives in `tile-picker.ts` so the scenario channel drives
- * the picker through the same code; only the failure report differs.
+ * Wait for the P3 placement tool to be armed, with a playtest-shaped
+ * diagnosis on miss. The polling itself lives in `tile-picker.ts` so the
+ * scenario channel waits on the same condition; only the failure report
+ * differs.
  */
-async function pickerGeometry(page: Page): Promise<PickerGeometry> {
+async function armedPlacement(page: Page): Promise<void> {
   try {
-    return await awaitPickerGeometry(page, DEFAULT_TIMEOUT_MS);
+    await awaitPlacementArmed(page, DEFAULT_TIMEOUT_MS);
   } catch {
-    throw new PlaytestFailure('no tile picker is open', describeAvailable(await probe(page)));
+    throw new PlaytestFailure('no placement tool is armed', describeAvailable(await probe(page)));
   }
 }
 
@@ -176,19 +184,65 @@ export async function runAction(page: Page, action: PlayerAction): Promise<void>
       break;
     }
     case 'pickTile': {
-      const geo = await pickerGeometry(page);
-      const { px, py } = tileToPoint(geo, action.x, action.z);
+      // P3: a real click on the in-scene placement tool's projected screen
+      // point, not a console-equivalent shortcut — playability's whole point
+      // is that this has to be a click a player could actually make.
+      await armedPlacement(page);
+      const { px, py } = await worldToScreenPoint(page, action.x, action.z);
       await page.mouse.click(px, py);
       break;
     }
     case 'dragTiles': {
-      const geo = await pickerGeometry(page);
-      const from = tileToPoint(geo, action.x1, action.z1);
-      const to = tileToPoint(geo, action.x2, action.z2);
+      await armedPlacement(page);
+      const from = await worldToScreenPoint(page, action.x1, action.z1);
+      const to = await worldToScreenPoint(page, action.x2, action.z2);
       await page.mouse.move(from.px, from.py);
       await page.mouse.down();
       await page.mouse.move(to.px, to.py, { steps: 10 });
       await page.mouse.up();
+      break;
+    }
+    case 'clickEntity': {
+      const pos = await page.evaluate(({ kind, id }: { kind: string; id: number }) =>
+        (window as unknown as {
+          __entityWorldPosition: (k: string, i: number) => { x: number; z: number } | null;
+        }).__entityWorldPosition(kind, id), { kind: action.kind, id: action.id });
+      if (!pos) {
+        throw new PlaytestFailure(
+          `no ${action.kind} #${action.id} is on the scene to click`,
+          describeAvailable(await probe(page)),
+        );
+      }
+      await page.evaluate(({ x, z, distance }: { x: number; z: number; distance: number }) => {
+        (window as unknown as { __cameraFocus: (x: number, z: number, d: number) => void }).__cameraFocus(x, z, distance);
+        // Playtests suspend the draw loop like interaction-mode scenarios
+        // (#475) — force a frame so the new camera position and the scene's
+        // entity transforms are current before the click below raycasts.
+        (window as unknown as { __renderFrame?: () => void }).__renderFrame?.();
+      }, { x: pos.x, z: pos.z, distance: action.distance ?? 15 });
+      const viewport = page.viewport();
+      await page.mouse.click((viewport?.width ?? 1280) / 2, (viewport?.height ?? 720) / 2);
+      break;
+    }
+    case 'zoomOut': {
+      const centerX = (page.viewport()?.width ?? 1280) / 2;
+      const centerY = (page.viewport()?.height ?? 720) / 2;
+      await page.mouse.move(centerX, centerY);
+      // Real wheel events over the canvas — same control a player scrolls,
+      // positive deltaY zooms out per CameraController.onWheel.
+      for (let i = 0; i < (action.ticks ?? 25); i++) {
+        await page.mouse.wheel({ deltaY: 100 });
+      }
+      // Matrices refreshed like clickEntity's camera move above — the
+      // following pickTile/dragTiles raycasts against this new framing.
+      await page.evaluate(() => (window as unknown as { __renderFrame?: () => void }).__renderFrame?.());
+      break;
+    }
+    case 'focusTile': {
+      await page.evaluate(({ x, z, distance }: { x: number; z: number; distance: number }) => {
+        (window as unknown as { __cameraFocus: (x: number, z: number, d: number) => void }).__cameraFocus(x, z, distance);
+        (window as unknown as { __renderFrame?: () => void }).__renderFrame?.();
+      }, { x: action.x, z: action.z, distance: action.distance ?? 25 });
       break;
     }
     case 'awaitUsable': {

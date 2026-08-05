@@ -13,7 +13,6 @@ import {
   sequenceCommand,
   surveyCommand,
 } from '../../../src/console/commands/mining.js';
-import { createTubingState } from '../../../src/core/mining/Tubing.js';
 import { resetHoleIds } from '../../../src/core/mining/DrillPlan.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
 import { Random } from '../../../src/core/math/Random.js';
@@ -25,8 +24,6 @@ function makeMiningContext(): MiningContext {
   const ctx: MiningContext = {
     state: null,
     grid: null,
-    softwareTier: 0,
-    tubingState: createTubingState(),
     emitter: new EventEmitter(),
   };
   newGameCommand(ctx, [], { mine_type: 'desert', seed: '1', size: '32' });
@@ -78,6 +75,74 @@ describe('blast_plan list', () => {
   });
 });
 
+// ── drill_plan remove ────────────────────────────────────────────────────────
+
+describe('drillPlanCommand — remove subcommand', () => {
+  it('removes the named hole from the plan', () => {
+    const ctx = makeMiningContext();
+    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '2', spacing: '3', depth: '8' });
+    expect(ctx.state!.drillHoles.map(h => h.id)).toEqual(['H1', 'H2']);
+
+    const result = drillPlanCommand(ctx, ['remove'], { hole: 'H1' });
+
+    expect(result.success).toBe(true);
+    expect(ctx.state!.drillHoles.map(h => h.id)).toEqual(['H2']);
+  });
+
+  it('drops the removed hole\'s charge and sequence delay entries', () => {
+    const ctx = makeMiningContext();
+    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+    chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
+    sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '25ms' });
+    expect(ctx.state!.chargesByHole['H1']).toBeDefined();
+    expect(ctx.state!.sequenceDelays['H1']).toBeDefined();
+
+    drillPlanCommand(ctx, ['remove'], { hole: 'H1' });
+
+    expect(ctx.state!.chargesByHole['H1']).toBeUndefined();
+    expect(ctx.state!.sequenceDelays['H1']).toBeUndefined();
+  });
+
+  it('returns success:false and leaves the plan untouched for an unknown hole ID', () => {
+    const ctx = makeMiningContext();
+    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+
+    const result = drillPlanCommand(ctx, ['remove'], { hole: 'H99' });
+
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('not found');
+    expect(ctx.state!.drillHoles.length).toBe(1);
+  });
+});
+
+describe('drillPlanCommand — clear subcommand', () => {
+  it('empties holes, charges, and sequence delays', () => {
+    const ctx = makeMiningContext();
+    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '2', spacing: '3', depth: '8' });
+    chargeCommand(ctx, [], { hole: '*', explosive: 'boomite', amount: '5kg', stemming: '2m' });
+    sequenceCommand(ctx, ['auto'], {});
+    expect(ctx.state!.drillHoles.length).toBe(2);
+    expect(Object.keys(ctx.state!.chargesByHole).length).toBe(2);
+    expect(Object.keys(ctx.state!.sequenceDelays).length).toBe(2);
+
+    const result = drillPlanCommand(ctx, ['clear'], {});
+
+    expect(result.success).toBe(true);
+    expect(ctx.state!.drillHoles).toEqual([]);
+    expect(ctx.state!.chargesByHole).toEqual({});
+    expect(ctx.state!.sequenceDelays).toEqual({});
+  });
+
+  it('succeeds as a no-op when the plan is already empty', () => {
+    const ctx = makeMiningContext();
+
+    const result = drillPlanCommand(ctx, ['clear'], {});
+
+    expect(result.success).toBe(true);
+    expect(ctx.state!.drillHoles).toEqual([]);
+  });
+});
+
 // ── buy_software tier validation ─────────────────────────────────────────────
 
 describe('buy_software tier validation', () => {
@@ -87,7 +152,7 @@ describe('buy_software tier validation', () => {
     const result = buySoftwareCommand(ctx, [], {});
     expect(result.success).toBe(true);
     expect(result.output).toContain('tier 1');
-    expect(ctx.softwareTier).toBe(1);
+    expect(ctx.state!.softwareTier).toBe(1);
   });
 
   it('tier:1 when at tier 0 succeeds', () => {
@@ -96,7 +161,7 @@ describe('buy_software tier validation', () => {
     const result = buySoftwareCommand(ctx, [], { tier: '1' });
     expect(result.success).toBe(true);
     expect(result.output).toContain('tier 1');
-    expect(ctx.softwareTier).toBe(1);
+    expect(ctx.state!.softwareTier).toBe(1);
   });
 
   it('tier:2 when at tier 0 returns error "Must purchase tier 1 first"', () => {
@@ -118,7 +183,7 @@ describe('buy_software tier validation', () => {
   it('tier:1 when already at tier 1 returns error "Already at tier 1 or higher"', () => {
     const ctx = makeMiningContext();
     ctx.state!.cash = 999_999;
-    ctx.softwareTier = 1;
+    ctx.state!.softwareTier = 1;
     const result = buySoftwareCommand(ctx, [], { tier: '1' });
     expect(result.success).toBe(false);
     expect(result.output).toBe('Already at tier 1 or higher');
@@ -127,7 +192,7 @@ describe('buy_software tier validation', () => {
   it('tier:0 when at tier 1 returns error "Already at tier 0 or higher"', () => {
     const ctx = makeMiningContext();
     ctx.state!.cash = 999_999;
-    ctx.softwareTier = 1;
+    ctx.state!.softwareTier = 1;
     const result = buySoftwareCommand(ctx, [], { tier: '0' });
     expect(result.success).toBe(false);
     expect(result.output).toContain('Already at tier');
@@ -142,7 +207,7 @@ describe('blast_preview', () => {
    * (1 hole, 1 charge, 1 sequence delay). Optionally sets software tier.
    */
   function makePlan(ctx: MiningContext, tier?: number): void {
-    if (tier !== undefined) ctx.softwareTier = tier;
+    if (tier !== undefined) ctx.state!.softwareTier = tier;
     drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
     chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
     sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
@@ -154,8 +219,6 @@ describe('blast_preview', () => {
     const ctx: MiningContext = {
       state: null,
       grid: null,
-      softwareTier: 0,
-      tubingState: createTubingState(),
       emitter: new EventEmitter(),
     };
     const result = blastPreviewCommand(ctx, [], {});
@@ -269,6 +332,105 @@ describe('blast_preview', () => {
   });
 });
 
+// ── blast_preview — state.lastBlastPreview ───────────────────────────────────
+
+describe('blast_preview — state.lastBlastPreview', () => {
+  function makePlan(ctx: MiningContext, tier?: number): void {
+    if (tier !== undefined) ctx.state!.softwareTier = tier;
+    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+    chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
+    sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
+  }
+
+  it('is null before any preview has run', () => {
+    const ctx = makeMiningContext();
+    expect(ctx.state!.lastBlastPreview).toBeNull();
+  });
+
+  it('stays untouched (does not throw) when the guard rejects the run', () => {
+    const ctx = makeMiningContext();
+    blastPreviewCommand(ctx, [], {});
+    expect(ctx.state!.lastBlastPreview).toBeNull();
+  });
+
+  it('tier 0 — every section is null, tier is recorded', () => {
+    const ctx = makeMiningContext();
+    makePlan(ctx);
+
+    blastPreviewCommand(ctx, [], {});
+
+    expect(ctx.state!.lastBlastPreview).toEqual({
+      tier: 0, energy: null, fragments: null, projections: null, vibrations: null,
+    });
+  });
+
+  it('tier 1 — energy populated with real numbers, later sections still null', () => {
+    const ctx = makeMiningContext();
+    makePlan(ctx, 1);
+
+    blastPreviewCommand(ctx, [], {});
+
+    const preview = ctx.state!.lastBlastPreview!;
+    expect(preview.tier).toBe(1);
+    expect(preview.energy).not.toBeNull();
+    expect(preview.energy!.affectedVoxels).toBeGreaterThan(0);
+    expect(preview.energy!.maxEnergy).toBeGreaterThanOrEqual(preview.energy!.minEnergy);
+    expect(preview.fragments).toBeNull();
+    expect(preview.projections).toBeNull();
+    expect(preview.vibrations).toBeNull();
+  });
+
+  it('tier 2 — fragments populated, avgFragmentSizeCm converted from the raw 0-1 fraction', () => {
+    const ctx = makeMiningContext();
+    makePlan(ctx, 2);
+
+    blastPreviewCommand(ctx, [], {});
+
+    const fragments = ctx.state!.lastBlastPreview!.fragments!;
+    expect(fragments.fractured + fragments.cracked + fragments.unaffected).toBeGreaterThan(0);
+    // A fraction of one voxel edge (VOXEL_SIZE_CM=100) never exceeds 100cm.
+    expect(fragments.avgFragmentSizeCm).toBeGreaterThan(0);
+    expect(fragments.avgFragmentSizeCm).toBeLessThanOrEqual(100);
+  });
+
+  it('tier 3 — projections populated with a non-negative collapseFragments', () => {
+    const ctx = makeMiningContext();
+    makePlan(ctx, 3);
+
+    blastPreviewCommand(ctx, [], {});
+
+    const projections = ctx.state!.lastBlastPreview!.projections!;
+    expect(projections.projectionZoneVoxels).toBeGreaterThanOrEqual(0);
+    expect(projections.collapseFragments).toBeGreaterThanOrEqual(0);
+  });
+
+  it('tier 4 — vibrations populated (0 affected villages: none are wired into this command yet)', () => {
+    const ctx = makeMiningContext();
+    makePlan(ctx, 4);
+
+    blastPreviewCommand(ctx, [], {});
+
+    const preview = ctx.state!.lastBlastPreview!;
+    expect(preview.vibrations).not.toBeNull();
+    expect(preview.vibrations!.affectedVillages).toBe(0);
+    expect(preview.fragments).not.toBeNull();
+    expect(preview.projections).not.toBeNull();
+  });
+
+  it('a later run overwrites the earlier snapshot rather than merging it', () => {
+    const ctx = makeMiningContext();
+    makePlan(ctx, 1);
+    blastPreviewCommand(ctx, [], {});
+    expect(ctx.state!.lastBlastPreview!.tier).toBe(1);
+
+    ctx.state!.softwareTier = 4;
+    blastPreviewCommand(ctx, [], {});
+
+    expect(ctx.state!.lastBlastPreview!.tier).toBe(4);
+    expect(ctx.state!.lastBlastPreview!.vibrations).not.toBeNull();
+  });
+});
+
 // ── surveyCommand ─────────────────────────────────────────────────────────────
 
 describe('surveyCommand', () => {
@@ -288,8 +450,6 @@ describe('surveyCommand', () => {
     const ctx: MiningContext = {
       state: null,
       grid: null,
-      softwareTier: 0,
-      tubingState: createTubingState(),
       emitter: new EventEmitter(),
     };
     const result = surveyCommand(ctx, ['seismic'], { x: '10', z: '10' });
@@ -569,6 +729,44 @@ describe('blastCommand — ore report event wiring', () => {
     expect(ctx.state!.lastOreReport).not.toBeNull();
     expect(ctx.state!.lastOreReport).toEqual(mockedReport);
   });
+
+  // ── GameState.lastBlastReport wiring (redesign P4/§5.A) ───────────────────
+
+  it('leaves state.lastBlastReport null before any blast has been executed', () => {
+    const ctx = makeMiningContext();
+    expect(ctx.state!.lastBlastReport).toBeNull();
+  });
+
+  it('populates state.lastBlastReport with tick, rating, and spent after a blast', () => {
+    const ctx = makeMiningContext();
+    ctx.state!.tickCount = 7;
+
+    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+    chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
+    sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
+
+    const result = blastCommand(ctx, [], {});
+
+    expect(result.success).toBe(true);
+    const report = ctx.state!.lastBlastReport;
+    expect(report).not.toBeNull();
+    expect(report!.tick).toBe(7);
+    expect(report!.spent).toBe(60); // boomite $12/kg × 5kg
+    expect(['perfect', 'good', 'mediocre', 'bad', 'catastrophic']).toContain(report!.rating);
+    expect(report!.clearedVoxels).toBeGreaterThanOrEqual(0);
+  });
+
+  it('sums spent across every charged hole, not just the last one', () => {
+    const ctx = makeMiningContext();
+    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '2', spacing: '3', depth: '8' });
+    chargeCommand(ctx, [], { hole: '*', explosive: 'boomite', amount: '5kg', stemming: '2m' });
+    sequenceCommand(ctx, ['auto'], {});
+
+    const result = blastCommand(ctx, [], {});
+
+    expect(result.success).toBe(true);
+    expect(ctx.state!.lastBlastReport!.spent).toBe(120); // 2 holes × $12/kg × 5kg
+  });
 });
 
 // ── survey mode / ore_report subcommands (issue #412) ──────────────────────
@@ -609,8 +807,8 @@ describe('surveyCommand — mode subcommand', () => {
 
   it('requires a loaded game', () => {
     const ctx: MiningContext = {
-      state: null, grid: null, softwareTier: 0,
-      tubingState: createTubingState(), emitter: new EventEmitter(),
+      state: null, grid: null,
+      emitter: new EventEmitter(),
     };
     const result = surveyCommand(ctx, ['mode'], {});
     expect(result.success).toBe(false);
@@ -667,8 +865,8 @@ describe('surveyCommand — ore_report subcommand', () => {
 
   it('requires a loaded game', () => {
     const ctx: MiningContext = {
-      state: null, grid: null, softwareTier: 0,
-      tubingState: createTubingState(), emitter: new EventEmitter(),
+      state: null, grid: null,
+      emitter: new EventEmitter(),
     };
     const result = surveyCommand(ctx, ['ore_report'], {});
     expect(result.success).toBe(false);
@@ -716,8 +914,8 @@ describe('buildRampCommand', () => {
 
   it('requires a loaded game', () => {
     const ctx: MiningContext = {
-      state: null, grid: null, softwareTier: 0,
-      tubingState: createTubingState(), emitter: new EventEmitter(),
+      state: null, grid: null,
+      emitter: new EventEmitter(),
     };
     const result = buildRampCommand(ctx, [], { origin: '0,0', direction: 'south', length: '5' });
     expect(result.success).toBe(false);

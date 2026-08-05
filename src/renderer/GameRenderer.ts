@@ -306,7 +306,7 @@ export class GameRenderer {
    */
   showBlastPlanOverlay(ctx: MiningContext): void {
     if (!this.blastOverlay || !ctx.state) return;
-    const { drillHoles, chargesByHole, sequenceDelays } = ctx.state;
+    const { drillHoles, chargesByHole, sequenceDelays, softwareTier } = ctx.state;
     if (drillHoles.length === 0) { this.blastOverlay.hide(); return; }
 
     const cx = drillHoles.reduce((s, h) => s + h.x, 0) / drillHoles.length;
@@ -318,13 +318,13 @@ export class GameRenderer {
     // fragment-size dots and projection arcs never render — their per-hole
     // fields stay undefined and the overlay's own guards skip them.
     let holeDetails: Record<string, import('../core/mining/Software.js').HolePreviewDetail> = {};
-    if (ctx.softwareTier >= 2 && ctx.grid) {
+    if (softwareTier >= 2 && ctx.grid) {
       const plan = assembleBlastPlan(drillHoles, chargesByHole, sequenceDelays);
-      holeDetails = previewHoleDetails(plan, ctx.grid, ctx.softwareTier);
+      holeDetails = previewHoleDetails(plan, ctx.grid, softwareTier);
     }
 
     this.blastOverlay.show({
-      softwareTier: ctx.softwareTier,
+      softwareTier,
       origin: new THREE.Vector3(cx, originSurfaceY, cz),
       holes: drillHoles.map(h => {
         const hd: import('./BlastPlanOverlay.js').HoleOverlayData = {
@@ -413,6 +413,83 @@ export class GameRenderer {
    */
   surfaceYAt(x: number, z: number): number {
     return this.getTerrainSurfaceY(x, z);
+  }
+
+  /**
+   * Exact rendered-mesh height at (x, z), found by raycasting straight down
+   * through the terrain meshes — unlike surfaceYAt's voxel-column lookup,
+   * this matches the smoothed mesh surface a pointer raycast actually hits.
+   * Used as the starting guess for the playtest harness's world-to-screen
+   * bridge (window.__worldToScreen, main.ts) — see raycastTerrainFromNDC for
+   * why a single vertical raycast still isn't the whole fix. Returns null
+   * off the terrain (no grid, or (x, z) outside every chunk).
+   */
+  raycastSurfaceY(x: number, z: number): number | null {
+    if (!this.terrain) return null;
+    const raycaster = new THREE.Raycaster(new THREE.Vector3(x, 10_000, z), new THREE.Vector3(0, -1, 0));
+    const hit = raycaster.intersectObjects(this.terrain.meshes, true)[0];
+    return hit ? hit.point.y : null;
+  }
+
+  /**
+   * Terrain-only hit for a camera ray through NDC (ndcX, ndcY) — the same
+   * raycast a real pointer click resolves via ScenePicking/PlacementController,
+   * without pulling in their entity/hover machinery.
+   *
+   * window.__worldToScreen needs this, not just raycastSurfaceY, because the
+   * camera ray through a screen pixel is never vertical: on sloped ground the
+   * point directly above/below (x, z) is not generally the same point the
+   * camera's own oblique ray would hit when aimed at that pixel. A ground-level
+   * camera (the game's default framing) makes this worse — near-horizontal rays
+   * turn a sub-metre height gap into a many-tile miss. Callers converge on a
+   * pixel that truly round-trips by re-deriving the height from this hit and
+   * reprojecting, rather than trusting one vertical sample.
+   */
+  raycastTerrainFromNDC(ndcX: number, ndcY: number, camera: THREE.Camera): THREE.Vector3 | null {
+    if (!this.terrain) return null;
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera);
+    const hit = raycaster.intersectObjects(this.terrain.meshes, true)[0];
+    return hit ? hit.point.clone() : null;
+  }
+
+  /**
+   * Every entity root object raycastable for scene picking (P2/P4): buildings,
+   * vehicles, employees, the 8 fragment shape buckets, and the current blast
+   * plan's drill holes. Terrain is raycast separately via `terrain.meshes` —
+   * it's a fallback hit, not an entity, and callers usually want to know when
+   * nothing else was hit.
+   */
+  pickables(): THREE.Object3D[] {
+    return [
+      ...(this.buildings?.pickables() ?? []),
+      ...(this.vehicles?.pickables() ?? []),
+      ...(this.characters?.pickables() ?? []),
+      ...(this.fragments?.pickables() ?? []),
+      ...(this.blastOverlay?.pickables() ?? []),
+    ];
+  }
+
+  /** Resolve a fragment-bucket raycast hit (bucketIndex, instanceId) to the fragment id occupying that slot. */
+  resolveFragmentId(bucketIndex: number, instanceId: number): number | null {
+    return this.fragments?.fragmentIdAt(bucketIndex, instanceId) ?? null;
+  }
+
+  /**
+   * Current world-space position of a live entity, for hover-tag/highlight
+   * placement. Buildings/vehicles/employees read their Group's position
+   * directly; fragments resolve through their InstancedMesh slot; holes
+   * resolve through the blast plan overlay's per-hole surface anchor. Null
+   * when the entity isn't currently rendered (removed, or never synced).
+   */
+  entityWorldPosition(kind: 'building' | 'vehicle' | 'employee' | 'fragment' | 'hole', id: number): THREE.Vector3 | null {
+    switch (kind) {
+      case 'building': return this.buildings?.getPosition(id) ?? null;
+      case 'vehicle': return this.vehicles?.getPosition(id) ?? null;
+      case 'employee': return this.characters?.getPosition(id) ?? null;
+      case 'fragment': return this.fragments?.fragmentPosition(id) ?? null;
+      case 'hole': return this.blastOverlay?.getHolePosition(id) ?? null;
+    }
   }
 
   /** Find the highest solid-voxel Y at the given (x, z) column. Returns 0 if no grid. */

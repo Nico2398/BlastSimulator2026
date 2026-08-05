@@ -1,0 +1,24 @@
+{
+  "name": "survey-panel-visual",
+  "description": "Redesign P7: SurveyPanel wired into UIManager in place of SurveyUI.ts — method cards, PICK TARGET IN SCENE, and a real result render through the actual toolbar click.",
+  "steps": [
+    {
+      "command": "new_game seed:42 size:24",
+      "timeout": 15,
+      "interaction": [
+        { "type": "command", "command": "new_game seed:42 size:24" }
+      ]
+    },
+    {
+      "command": "employee hire role:surveyor",
+      "interaction": [
+        { "type": "command", "command": "employee hire role:surveyor" },
+        { "type": "command", "command": "survey seismic x:12 z:12" },
+        { "type": "command", "command": "tick 20" },
+        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"survey\"]" },
+        { "type": "wait", "durationMs": 300 },
+        { "type": "screenshot" }
+      ]
+    }
+  ]
+}

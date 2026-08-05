@@ -4,11 +4,13 @@
 import { SceneManager } from './renderer/SceneManager.js';
 import { GameRenderer } from './renderer/GameRenderer.js';
 import { UIManager } from './ui/UIManager.js';
-import { SaveLoadUI } from './ui/SaveLoadUI.js';
+import { SavesModal } from './ui/panels/SavesModal.js';
 import { TutorialOverlay } from './ui/TutorialOverlay.js';
 import { TUTORIAL_STEPS } from './ui/tutorialSteps.js';
 import { KeyboardShortcuts } from './ui/KeyboardShortcuts.js';
 import { MainMenu } from './ui/MainMenu.js';
+import { WorldMap } from './ui/screens/WorldMap.js';
+import { LevelEndScreen } from './ui/screens/LevelEndScreen.js';
 import { SandboxPanel } from './ui/SandboxPanel.js';
 import { LoadingScreen } from './ui/LoadingScreen.js';
 import type { CommandResult } from './console/ConsoleRunner.js';
@@ -24,6 +26,15 @@ import { getBiome } from './core/world/BiomeCatalog.js';
 import { BASE_TICK_MS } from './core/engine/GameLoop.js';
 import { probeUiActions, probeSelector } from './ui/uiActionProbe.js';
 import { t } from './core/i18n/I18n.js';
+import { ScenePicking } from './ui/scene/ScenePicking.js';
+import { HoverTag } from './ui/scene/HoverTag.js';
+import { SelectionBar } from './ui/shell/SelectionBar.js';
+import { EntityHighlight } from './renderer/EntityHighlight.js';
+import { PlacementController } from './ui/scene/PlacementController.js';
+import { ParamStrip } from './ui/scene/ParamStrip.js';
+import { SelectionOverlay } from './renderer/SelectionOverlay.js';
+import { createWeatherCycle } from './core/weather/WeatherCycle.js';
+import { Random } from './core/math/Random.js';
 import { summariseMuckPile } from './core/mining/MuckPileSummary.js';
 
 // --- 3D Scene ---
@@ -37,6 +48,33 @@ const gameRenderer = new GameRenderer(scene);
 const uiContainer = document.getElementById('bs-ui-root') ?? document.body;
 const uiManager = new UIManager(uiContainer);
 
+// --- Scene picking: hover tags, click-to-select, selection bar (redesign P2) ---
+// Declared here (with the other core objects) but wired further down, once
+// window.__gameConsole/t()/ctx are ready — same declare-early/wire-when-ready
+// shape the rest of this file already uses for uiManager itself.
+const scenePicking = new ScenePicking(canvas, scene.camera, gameRenderer);
+const entityHighlight = new EntityHighlight(scene.scene);
+const hoverTag = new HoverTag(uiContainer, canvas, scene.camera);
+const selectionBar = new SelectionBar(uiContainer);
+
+// --- In-scene placement (redesign P3): the grid-select tool that replaced the 2D tile picker ---
+const placementController = new PlacementController(canvas, scene.camera, gameRenderer, scene.cameraController);
+const selectionOverlay = new SelectionOverlay(scene.scene, (x, z) => gameRenderer.surfaceYAt(x, z));
+const paramStrip = new ParamStrip(uiContainer);
+placementController.setArmedStateHandler((armed) => {
+  // Entity hover/select would otherwise fight the placement tool for the same clicks.
+  scenePicking.setEnabled(!armed);
+  // The canvas itself is always on screen, armed or not — tutorialStages.ts's
+  // picker-canvas stage target needs a signal that actually means "the tool
+  // is ready for a tile click now," not "the canvas element exists."
+  document.body.classList.toggle('bs-placement-armed', armed);
+});
+// ParamStrip only renders what it's told; pressing its own CONFIRM/ESC buttons
+// has to reach back into the controller that armed it.
+paramStrip.setConfirmHandler(() => placementController.confirm());
+paramStrip.setCancelHandler(() => placementController.cancel());
+uiManager.setPlacementKit({ controller: placementController, overlay: selectionOverlay, strip: paramStrip });
+
 // --- Persistence ---
 let saveBackend;
 try {
@@ -45,13 +83,13 @@ try {
   saveBackend = new DownloadPersistence();
 }
 
-// --- Save/Load UI ---
-const saveLoadUI = new SaveLoadUI(uiContainer);
-saveLoadUI.setBackend(saveBackend);
-saveLoadUI.setGetState(() => {
+// --- Saves Modal (redesign P8) ---
+const savesModal = new SavesModal(uiContainer);
+savesModal.setBackend(saveBackend);
+savesModal.setGetState(() => {
   // Embed the current voxel grid right before a save is taken (#458 T0.3) —
   // encoded lazily here rather than kept live on ctx.state, since most ticks
-  // never save. SaveLoadUI only sees GameState; it has no idea VoxelGrid or
+  // never save. SavesModal only sees GameState; it has no idea VoxelGrid or
   // its codec exist, by design.
   if (ctx.state && ctx.grid && ctx.state.world) {
     ctx.state.world = { ...ctx.state.world, voxels: encodeVoxelGrid(ctx.grid, terrainGenDatum(ctx.state)) };
@@ -61,13 +99,49 @@ saveLoadUI.setGetState(() => {
 
 // --- Main Menu ---
 const mainMenu = new MainMenu(uiContainer);
+mainMenu.setBackend(saveBackend);
 mainMenu.setOnNewCampaign(() => {
   // Show world map so the player can pick a level. The tutorial (if not yet
   // completed) triggers later, once a level is actually entered — starting it
   // here would stack its coach-marks on top of the level-selection cards.
-  mainMenu.showWorldMap(null);
+  mainMenu.hide();
+  worldMap.show(null);
 });
-mainMenu.setOnStartLevel((levelId) => {
+mainMenu.setOnContinue((slotId) => {
+  mainMenu.hide();
+  void savesModal.loadFromSlot(slotId);
+});
+mainMenu.setOnLoad(() => { savesModal.show(); });
+mainMenu.setOnSettings(() => { uiManager.showPanel('settings'); });
+// Settings is reachable from the main menu, so a language switch made there has
+// to redraw the menu sitting underneath the panel as well as the panel itself.
+uiManager.setLanguageChangeHandler(() => {
+  mainMenu.refreshLocale();
+  worldMap.refreshLocale();
+  levelEndScreen.refreshLocale();
+  savesModal.refreshLocale();
+  selectionBar.refreshLocale();
+});
+// Symmetric with the above: a language switch made from the main menu's own
+// EN/FR pills has to reach uiManager's owned tree (settings panel included)
+// and every sibling screen, the same set uiManager's handler refreshes.
+mainMenu.setOnLanguageChange(() => {
+  uiManager.refreshLocale();
+  worldMap.refreshLocale();
+  levelEndScreen.refreshLocale();
+  savesModal.refreshLocale();
+  selectionBar.refreshLocale();
+});
+mainMenu.show();
+
+// --- World Map ("The Portfolio") ---
+const worldMap = new WorldMap(uiContainer);
+worldMap.setOnBack(() => {
+  worldMap.hide();
+  mainMenu.show();
+});
+worldMap.setOnStartLevel((levelId) => {
+  worldMap.hide();
   // Ensure a base GameState (with campaign) exists before starting a level.
   const commands = ctx.state ? [] : ['new_game'];
   void enterLevel([...commands, `campaign start level:${levelId}`]).then(() => {
@@ -76,16 +150,21 @@ mainMenu.setOnStartLevel((levelId) => {
     if (!TutorialOverlay.isCompleted()) tutorial.start(ctx.state ?? undefined);
   });
 });
-mainMenu.setOnLoad(() => { saveLoadUI.show(); });
-mainMenu.setOnSettings(() => { uiManager.showPanel('settings'); });
-// Settings is reachable from the main menu, so a language switch made there has
-// to redraw the menu sitting underneath the panel as well as the panel itself.
-uiManager.setLanguageChangeHandler(() => {
-  mainMenu.refreshLocale();
-  saveLoadUI.refreshLocale();
-  saveLoadBtn.textContent = '💾 ' + t('ui.toolbar.saves');
+
+// --- Level End Screen (redesign P8) ---
+const levelEndScreen = new LevelEndScreen(uiContainer);
+levelEndScreen.setOnReplay((levelId) => {
+  levelEndScreen.hide();
+  void enterLevel([`campaign start level:${levelId}`]);
 });
-mainMenu.show();
+levelEndScreen.setOnContinue((nextLevelId) => {
+  levelEndScreen.hide();
+  void enterLevel([`campaign start level:${nextLevelId}`]);
+});
+levelEndScreen.setOnBackToPortfolio(() => {
+  levelEndScreen.hide();
+  worldMap.show(ctx.state?.campaign ?? null);
+});
 
 // --- Level loading ---
 // Entering a level blocks the main thread for seconds. enterLevel splits that
@@ -109,6 +188,19 @@ mainMenu.setOnTutorial(() => {
   void enterLevel(['new_game seed:42 size:24', 'campaign start level:tutorial_pit'])
     .then(() => { tutorial.start(ctx.state ?? undefined); });
 });
+// Settings' REPLAY TUTORIAL button (10.x): same fresh-tutorial-level entry
+// point as MainMenu's own TUTORIAL button above — the tutorial's steps are
+// tuned to that specific map (tutorialStages.ts's REGION table), not to
+// whatever the player currently has loaded.
+uiManager.setReplayTutorialHandler(() => {
+  void enterLevel(['new_game seed:42 size:24', 'campaign start level:tutorial_pit'])
+    .then(() => { tutorial.start(ctx.state ?? undefined); });
+});
+
+// --- Settings: persistence wiring (redesign P10; audio wired below, once
+// audioMgr exists) ---
+uiManager.setBackend(saveBackend);
+uiManager.setGetState(() => ctx.state);
 
 // --- Sandbox ---
 const sandboxPanel = new SandboxPanel(uiContainer);
@@ -128,6 +220,7 @@ sandboxPanel.setOnStart((config) => {
 
 // --- Audio ---
 const audioMgr = new AudioManager();
+uiManager.setAudioManager(audioMgr);
 const audioHooks = new AudioHooks(audioMgr);
 // Resume AudioContext on first user interaction (browser autoplay policy)
 document.addEventListener('pointerdown', () => {
@@ -141,25 +234,25 @@ const { runner, ctx, emitter } = createRunner();
 
 // --- Subscribe to game-over emitter events for UI notifications ---
 emitter.on('bankruptcy:triggered', ({ cash }) => {
-  uiManager.showNotification?.(t('notification.bankruptcy_triggered', { cash: Math.floor(cash) }));
+  uiManager.notify({ severity: 'critical', title: t('notification.title.bankruptcy'), body: t('notification.bankruptcy_triggered', { cash: Math.floor(cash) }) });
 });
 emitter.on('bankruptcy:warning', ({ ticksRemaining }) => {
-  uiManager.showNotification?.(t('notification.bankruptcy_warning', { ticksRemaining }));
+  uiManager.notify({ severity: 'warn', title: t('notification.title.bankruptcy'), body: t('notification.bankruptcy_warning', { ticksRemaining }) });
 });
 emitter.on('ecology:shutdown', () => {
-  uiManager.showNotification?.(t('notification.ecology_shutdown'));
+  uiManager.notify({ severity: 'critical', icon: 'rock', title: t('notification.title.ecology'), body: t('notification.ecology_shutdown') });
 });
 emitter.on('ecology:warning', ({ ticksRemaining }) => {
-  uiManager.showNotification?.(t('notification.ecology_warning', { ticksRemaining }));
+  uiManager.notify({ severity: 'warn', icon: 'rock', title: t('notification.title.ecology'), body: t('notification.ecology_warning', { ticksRemaining }) });
 });
 emitter.on('arrest:triggered', () => {
-  uiManager.showNotification?.(t('notification.arrest_triggered'));
+  uiManager.notify({ severity: 'critical', icon: 'gavel', title: t('notification.title.arrest'), body: t('notification.arrest_triggered') });
 });
 emitter.on('revolt:triggered', () => {
-  uiManager.showNotification?.(t('notification.revolt_triggered'));
+  uiManager.notify({ severity: 'critical', icon: 'union', title: t('notification.title.revolt'), body: t('notification.revolt_triggered') });
 });
 emitter.on('revolt:warning', ({ ticksRemaining }) => {
-  uiManager.showNotification?.(t('notification.revolt_warning', { ticksRemaining }));
+  uiManager.notify({ severity: 'warn', icon: 'union', title: t('notification.title.revolt'), body: t('notification.revolt_warning', { ticksRemaining }) });
 });
 // Terrain mesh rebuild is event-driven, not command-name-matched: every voxel
 // mutator (generation, blast, drill, ramp) emits this after mutating the grid
@@ -198,6 +291,16 @@ declare global {
     __setRenderEnabled: (enabled: boolean) => void;
     __renderFrame: () => void;
     __debugGridInfo: () => Record<string, unknown>;
+    __entityWorldPosition: (kind: 'building' | 'vehicle' | 'employee' | 'fragment', id: number) => { x: number; z: number } | null;
+    /** Scenario-harness hooks for the P3 in-scene placement tool — see PlacementController.paintRect for why this bypasses real pointer events. */
+    __placement: {
+      isArmed: () => boolean;
+      paintRect: (x1: number, z1: number, x2: number, z2: number) => void;
+      confirm: () => void;
+      cancel: () => void;
+    };
+    /** World tile → screen pixel, for the playtest harness's real clicks on the P3 placement canvas (unlike __placement, which scenario-mode uses directly). */
+    __worldToScreen: (x: number, z: number) => { px: number; py: number; onScreen: boolean } | null;
   }
 }
 
@@ -221,6 +324,7 @@ console.log = (...args: unknown[]) => {
  * level-entry paths pass it; every other caller gets the immediate sync.
  */
 function runGameCommand(cmd: string, opts?: { syncRenderer?: boolean }): CommandResult {
+  const prevState = ctx.state;
   const result = runCommand({ runner, ctx, emitter }, cmd);
   // Cap what __gameState relays: every harness round-trips this string over
   // CDP on every step, and an unbounded command output (a `state full` once
@@ -238,6 +342,20 @@ function runGameCommand(cmd: string, opts?: { syncRenderer?: boolean }): Command
   // scenario harness) bypassed that and left the overlay covering the canvas.
   if (cmdName === 'new_game' && result.success) {
     mainMenu.hide();
+  }
+
+  // (Re)seed the weather cycle whenever ctx.state was replaced with a new
+  // object — new_game, campaign level transitions, sandbox start, and any
+  // future entry point that does the same. Comparing identity rather than
+  // matching command names means this can't miss one. Previously
+  // ctx.weatherCycle only ever got created lazily inside weatherCommand
+  // (the `weather` console command, which nothing player-facing calls), so
+  // outside of manual console/test use the weather popover would have had
+  // nothing real to show, and a second game in the same session would have
+  // kept the first game's weather cycle at the wrong seed.
+  if (ctx.state && ctx.state !== prevState) {
+    ctx.weatherCycle = createWeatherCycle(ctx.state.seed);
+    ctx.rng = new Random(ctx.state.seed + 1000);
   }
 
   // Trigger blast effects after a blast (terrain remesh already happened via
@@ -262,8 +380,19 @@ function runGameCommand(cmd: string, opts?: { syncRenderer?: boolean }): Command
   }
 
   // Update UI after every command
-  if (ctx.state) uiManager.update(ctx.state, ctx.weatherCycle?.current);
+  if (ctx.state) {
+    uiManager.update(ctx.state, ctx.weatherCycle, ctx.rng);
+    // A game exists — reveal HUD chrome unless the player is looking at the
+    // menu on purpose (Quit, or mid-game Site Map). Self-correcting on every
+    // command so no entry point (button, console, scenario harness) can miss it.
+    if (!mainMenu.visible) uiManager.show();
+  }
   if (ctx.state) tutorial.onCommandExecuted(ctx.state);
+  // Deferred while the tutorial overlay is active: its own "victory" step
+  // already waits on this exact state.levelEndReason transition and shows a
+  // brief congratulations card of its own — the real recap takes over once
+  // that finishes, rather than both fighting for the screen at once.
+  if (ctx.state && !tutorial.isActive) levelEndScreen.update(ctx.state);
   return result;
 }
 
@@ -378,7 +507,7 @@ window.__debugGridInfo = () => {
 };
 
 window.__uiState = () => {
-  const panels = ['bs-blast-panel', 'bs-contract-panel', 'bs-build-panel',
+  const panels = ['bs-blast-panel', 'bs-contract-panel', 'bs-finances-panel', 'bs-operations-panel', 'bs-build-panel',
     'bs-vehicle-panel', 'bs-employee-panel', 'bs-survey-panel'];
   const panelStates: Record<string, unknown> = {};
   for (const id of panels) {
@@ -452,6 +581,58 @@ window.__cameraFocus = (x: number, z: number, distance: number) => {
 window.__cameraReset = () => {
   scene.cameraController.reset();
 };
+// Live entity position for harnesses that need to click a scene entity
+// without baking in a guessed world coordinate — a playtest that hires an
+// employee doesn't otherwise know where the game decided to spawn them.
+window.__entityWorldPosition = (kind, id) => {
+  const pos = gameRenderer.entityWorldPosition(kind, id);
+  return pos ? { x: pos.x, z: pos.z } : null;
+};
+window.__placement = {
+  isArmed: () => placementController.isArmed,
+  paintRect: (x1, z1, x2, z2) => placementController.paintRect(x1, z1, x2, z2),
+  confirm: () => placementController.confirm(),
+  cancel: () => placementController.cancel(),
+};
+window.__worldToScreen = (x, z) => {
+  // Centre of the tile, not its corner — a ray fired back from a
+  // corner-projected pixel can land on a neighbouring tile instead (surface
+  // height varies fastest near tile edges), same reasoning the retired 2D
+  // picker's tileToPoint centred on for the flat-canvas case.
+  const cx = x + 0.5;
+  const cz = z + 0.5;
+  // raycastSurfaceY, not surfaceYAt: surfaceYAt's voxel-column height can
+  // diverge from the rendered mesh enough to throw the projected pixel off
+  // the tile — the click raycast then misses the terrain entirely.
+  const startY = gameRenderer.raycastSurfaceY(cx, cz) ?? gameRenderer.surfaceYAt(cx, cz);
+  let candidate = scene.cameraController.projectToNDC(cx, startY, cz);
+  // The camera ray through a pixel is never vertical, so on sloped ground —
+  // and this game's default camera is ground-level, i.e. steeply angled —
+  // the point directly above/below (cx, cz) isn't always the point the
+  // camera's own ray would hit when aimed at that pixel. Converge on a pixel
+  // that truly round-trips: re-derive the height from what a click here would
+  // actually hit, and reproject. Tracks the best candidate seen rather than
+  // trusting the last iteration outright — a fixed-point sequence like this
+  // one isn't guaranteed to improve monotonically, and landing on a worse
+  // guess than the vertical-raycast starting point would be a regression.
+  let best = candidate;
+  let bestError = Infinity;
+  for (let i = 0; i < 5; i++) {
+    const hit = gameRenderer.raycastTerrainFromNDC(candidate.x, candidate.y, scene.camera);
+    if (!hit) break;
+    const error = Math.hypot(hit.x - cx, hit.z - cz);
+    if (error < bestError) { bestError = error; best = candidate; }
+    if (error < 0.05) break;
+    candidate = scene.cameraController.projectToNDC(cx, hit.y, cz);
+  }
+  const ndc = best;
+  const rect = canvas.getBoundingClientRect();
+  return {
+    px: rect.left + (ndc.x * 0.5 + 0.5) * rect.width,
+    py: rect.top + (1 - (ndc.y * 0.5 + 0.5)) * rect.height,
+    onScreen: ndc.z < 1,
+  };
+};
 // Put the collapse straight on its resting place, for shots of the settled muck
 // pile. The animation only walks rock to where the blast already put it, so
 // skipping it changes nothing — and without a GPU it would otherwise take
@@ -480,28 +661,100 @@ uiManager.setSpeedChangeHandler((speed) => {
 });
 uiManager.setQuitHandler(() => {
   mainMenu.show();
+  uiManager.hide();
 });
 
-// Return-to-map button (fixed top bar, visible during gameplay)
-mainMenu.makeReturnToMapButton(uiContainer, () => {
-  mainMenu.show();
-  mainMenu.showWorldMap(ctx.state?.campaign ?? null);
+// Site-map and Saves buttons live in the top bar's right cluster (shell/TopBar.ts) —
+// folded in from two ad-hoc floating buttons that used to collide with the
+// paused/event chip (spec §5 defect).
+uiManager.setSiteMapHandler(() => {
+  worldMap.show(ctx.state?.campaign ?? null);
+});
+uiManager.setOpenSavesHandler(() => savesModal.show());
+uiManager.setMapFocusHandler((x, z) => {
+  scene.cameraController.focus(x, gameRenderer.surfaceYAt(x, z), z, 60);
 });
 
-// Save/Load button (fixed top bar, visible during gameplay). The Settings
-// panel's own Save/Load buttons only fire the bare `save`/`load` console
-// commands — this is the only in-game path to the full slot-list panel
-// (multiple slots, auto-save indicator, export/import), which was previously
-// reachable only from the main menu's "Load" button before a game existed (#408).
-const saveLoadBtn = document.createElement('button');
-saveLoadBtn.id = 'bs-saveload-btn';
-saveLoadBtn.className = 'bs-btn bs-return-map';
-saveLoadBtn.style.cssText = 'position:fixed;top:8px;right:250px;z-index:300;font-size:10px;padding:3px 8px';
-saveLoadBtn.textContent = '💾 ' + t('ui.toolbar.saves');
-saveLoadBtn.addEventListener('click', () => saveLoadUI.show());
-uiContainer.appendChild(saveLoadBtn);
+// --- Scene picking wiring (redesign P2) ---
+scenePicking.setHoverChangeHandler((hover) => {
+  if (ctx.state) hoverTag.update(hover, ctx.state);
+});
+scenePicking.setSelectChangeHandler((entity) => {
+  if (entity && ctx.state) {
+    selectionBar.show(entity, ctx.state);
+    const pos = gameRenderer.entityWorldPosition(entity.kind, entity.id);
+    if (pos) entityHighlight.show(pos, entity.kind);
+  } else {
+    selectionBar.hide();
+    entityHighlight.hide();
+  }
+});
+// Esc deselects before falling through to the panel/modal layers beneath it —
+// registered last among the shell's own layers so it's tried first (most
+// recently registered wins, per UIManager.registerEscLayer).
+uiManager.registerEscLayer(() => {
+  if (!scenePicking.selection) return false;
+  scenePicking.clearSelection();
+  return true;
+});
 
-saveLoadUI.setOnLoad((state) => {
+/** Report a failed console command from a selection-bar action as a toast; success is silent (the world visibly changing is the feedback). */
+function reportIfFailed(title: string, result: CommandResult): void {
+  if (!result.success) uiManager.notify({ severity: 'warn', title, body: result.output });
+}
+selectionBar.setActionHandler((action, entity) => {
+  switch (action) {
+    case 'detail':
+    case 'train':
+      uiManager.showEmployeeDetail(entity.id);
+      break;
+    case 'dispatch_here': {
+      // "Here" = wherever the player is currently pointing on the ground —
+      // the live hover state, read at the moment the button is clicked.
+      const terrain = scenePicking.hover?.terrain;
+      if (!terrain) {
+        uiManager.notify({ severity: 'warn', title: t('shell.selection.dispatch_here'), body: t('shell.selection.no_haul_target') });
+        break;
+      }
+      reportIfFailed(t('shell.selection.dispatch_here'), window.__gameConsole(`employee dispatch ${entity.id} x:${terrain.tileX} z:${terrain.tileZ}`));
+      break;
+    }
+    case 'follow':
+    case 'focus': {
+      const pos = gameRenderer.entityWorldPosition(entity.kind, entity.id);
+      if (pos) scene.cameraController.focus(pos.x, pos.y, pos.z, action === 'follow' ? 40 : 20);
+      break;
+    }
+    case 'haul': {
+      // Same live-hover pattern as Dispatch Here: haul whichever fragment the
+      // player is currently pointing at.
+      const hovered = scenePicking.hover?.entity;
+      if (!hovered || hovered.kind !== 'fragment') {
+        uiManager.notify({ severity: 'warn', title: t('shell.selection.haul'), body: t('shell.selection.no_haul_target') });
+        break;
+      }
+      reportIfFailed(t('shell.selection.haul'), window.__gameConsole(`vehicle haul ${entity.id} fragment:${hovered.id}`));
+      break;
+    }
+    case 'unassign':
+      reportIfFailed(t('shell.selection.unassign'), window.__gameConsole(`vehicle driver ${entity.id} none`));
+      break;
+    case 'upgrade':
+      reportIfFailed(t('shell.selection.upgrade'), window.__gameConsole(`build upgrade ${entity.id}`));
+      break;
+    case 'move':
+      // Move needs a tile picker — the in-scene placement layer is P3's job.
+      // Until then this routes to the Build panel's own move flow.
+      uiManager.showPanel('build');
+      break;
+    case 'demolish':
+      reportIfFailed(t('shell.selection.demolish'), window.__gameConsole(`build destroy ${entity.id}`));
+      scenePicking.clearSelection(); // the entity is gone — nothing left to keep selected
+      break;
+  }
+});
+
+savesModal.setOnLoad((state) => {
   // Restore loaded state into the runner context. A v6+ save carries its
   // voxel grid embedded in state.world.voxels (#458 T0.3) — restoring from
   // it preserves blast craters/ramps instead of discarding them. A save
@@ -522,12 +775,20 @@ saveLoadUI.setOnLoad((state) => {
 });
 
 // --- Keyboard Shortcuts ---
+// Toggles between `time pause`/`time resume` — shared by the Space-bar
+// shortcut and the top bar's pause button so both reflect one source of truth.
+function togglePause(): void {
+  window.__gameConsole(ctx.state?.isPaused ? 'time resume' : 'time pause');
+}
+uiManager.setTogglePauseHandler(togglePause);
 new KeyboardShortcuts({
-  togglePause: () => window.__gameConsole('pause'),
-  setSpeed: (n) => window.__gameConsole(`speed ${n}`),
+  togglePause,
+  // Was dispatching the bare `speed ${n}` command, which was never
+  // registered — every keyboard speed change (1-4) silently no-op'd.
+  setSpeed: (n) => window.__gameConsole(`time speed ${n}`),
   togglePanel: (name) => uiManager.togglePanel(name),
-  quickSave: () => { if (ctx.state) void saveLoadUI['autoSave'](ctx.state); },
-  openSettings: () => uiManager.togglePanel('settings'),
+  quickSave: () => { if (ctx.state) void savesModal['autoSave'](ctx.state); },
+  onEscape: () => uiManager.handleEscape(),
   onToggleNavGrid: () => uiManager.toggleNavGridOverlay(),
 });
 
@@ -540,6 +801,15 @@ let hadPendingEvent = false;
 
 scene.start((dt) => {
   gameRenderer.update(dt);
+  entityHighlight.update(dt);
+  // Keep the selection ring on a moving vehicle/employee; if the selected
+  // entity is gone (destroyed, hauled away, collected), deselect it —
+  // the select-change handler above then hides the ring and the bar.
+  if (scenePicking.selection) {
+    const pos = gameRenderer.entityWorldPosition(scenePicking.selection.kind, scenePicking.selection.id);
+    if (pos) entityHighlight.setPosition(pos);
+    else scenePicking.clearSelection();
+  }
 
   // Advance game time
   if (ctx.state && !ctx.state.isPaused && autoTickEnabled) {
@@ -567,7 +837,9 @@ scene.start((dt) => {
 
   // Update UI from current state on each frame
   if (ctx.state) {
-    uiManager.update(ctx.state, ctx.weatherCycle?.current);
-    saveLoadUI.onTick(ctx.state);
+    uiManager.update(ctx.state, ctx.weatherCycle, ctx.rng);
+    if (!mainMenu.visible) uiManager.show();
+    savesModal.onTick(ctx.state);
   }
+  if (ctx.state && !tutorial.isActive) levelEndScreen.update(ctx.state);
 });

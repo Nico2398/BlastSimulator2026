@@ -20,9 +20,10 @@ import {
   planTraining,
   enrolInTraining,
   tickTraining,
+  availableTrainingOffers,
   MAX_PROFICIENCY,
 } from '../../../src/core/entities/EmployeeTraining.js';
-import type { BuildingType, BuildingTier } from '../../../src/core/entities/Building.js';
+import type { Building, BuildingType, BuildingTier } from '../../../src/core/entities/Building.js';
 
 const SEED = 42;
 
@@ -252,5 +253,44 @@ describe('enrolInTraining — the employee relocates to the training building', 
 
     expect(employee.x).toBe(3);
     expect(employee.z).toBe(3);
+  });
+});
+
+// ── availableTrainingOffers ──────────────────────────────────────────────────
+
+function makeBuilding(overrides: Partial<Building> = {}): Building {
+  return { id: 1, type: 'geology_lab', tier: 1, x: 0, z: 0, hp: 100, active: true, ...overrides };
+}
+
+describe('availableTrainingOffers', () => {
+  it('returns nothing with no buildings', () => {
+    expect(availableTrainingOffers([])).toEqual([]);
+  });
+
+  it('returns nothing when the only building on site teaches nothing', () => {
+    expect(availableTrainingOffers([makeBuilding({ type: 'freight_warehouse' })])).toEqual([]);
+  });
+
+  it('offers every skill a school on site teaches', () => {
+    const offers = availableTrainingOffers([
+      makeBuilding({ id: 1, type: 'geology_lab' }),
+      makeBuilding({ id: 2, type: 'blasting_academy' }),
+    ]);
+    expect(offers).toHaveLength(2);
+    expect(offers.map(o => o.skill).sort()).toEqual(['blasting', 'geology']);
+  });
+
+  it('picks the higher-tier school when two schools teach the same skill', () => {
+    const offers = availableTrainingOffers([
+      makeBuilding({ id: 1, type: 'geology_lab', tier: 1 }),
+      makeBuilding({ id: 2, type: 'geology_lab', tier: 3 }),
+    ]);
+    expect(offers).toHaveLength(1);
+    expect(offers[0]!.building.id).toBe(2);
+  });
+
+  it('a driving_center offers all three licences from one building', () => {
+    const offers = availableTrainingOffers([makeBuilding({ type: 'driving_center' })]);
+    expect(offers.map(o => o.skill).sort()).toEqual(['driving.drill_rig', 'driving.excavator', 'driving.truck']);
   });
 });

@@ -22,6 +22,36 @@ export type PlayerAction =
   | { do: 'pickTile'; x: number; z: number }
   /** Drag a rectangle in the open tile picker, in grid coordinates. */
   | { do: 'dragTiles'; x1: number; z1: number; x2: number; z2: number }
+  /**
+   * Click a live scene entity (redesign P2 — src/ui/scene/ScenePicking.ts)
+   * by kind + id rather than a baked world coordinate: a playtest that just
+   * hired an employee has no static x/z to click, only the id the hire
+   * produced, and the driver looks up its current position itself.
+   */
+  | { do: 'clickEntity'; kind: 'building' | 'vehicle' | 'employee' | 'fragment'; id: number; distance?: number }
+  /**
+   * Scroll the wheel out N ticks (design doc: always available, even while a
+   * placement tool is armed). P3's in-scene picker only accepts a click on a
+   * tile actually on screen — unlike the retired 2D picker, which showed the
+   * whole site regardless of the 3D camera. A beat whose target tile isn't
+   * near wherever the camera last looked needs this before pickTile/
+   * dragTiles, the same way a real player would zoom out to find their spot.
+   */
+  | { do: 'zoomOut'; ticks?: number }
+  /**
+   * Re-aim the camera at a world tile, the way a real player looks at where
+   * they're about to click before clicking it. Unlike zoomOut (a blind
+   * dolly-back), this sets the camera's *target* to (x, z), so the tile is
+   * guaranteed to land at screen centre — clear of the bottom-docked
+   * placement strip that a target's default screen position can otherwise
+   * end up directly under (title/RESULT/CONFIRM/ESC all catch clicks across
+   * their full bar, not just the buttons, so a click that lands on the strip
+   * never reaches the canvas beneath it). Needed before pickTile/dragTiles
+   * whenever the beat's target tile isn't already clear of every docked
+   * panel, the same instinctive adjustment a player makes without thinking
+   * about it.
+   */
+  | { do: 'focusTile'; x: number; z: number; distance?: number }
   /** Wait for a selector to exist and be usable. */
   | { do: 'awaitUsable'; selector: string; timeoutMs?: number }
   /**

@@ -26,12 +26,18 @@ export const LOCALE_SHARED_VALUE_ALLOWLIST: string[] = [
   // ── Brand and version ──
   'game.title',        // "BlastSimulator2026"
   'game.version',      // "v0.1.0"
-  'menu.title',        // "BlastSimulator 2026"
 
   // ── Format-only / symbol-only ──
   'hud.speed_x',           // "{speed}×"
-  'ui.employees.task_time', // "{t}t"
-  'ui.blast.edit_hole',     // "✏"
+  'ui.blast_workshop.drill.diameter', // "Ø"
+  'ui.contracts.storage_value', // "{used} / {cap} kg"
+  'ui.contracts.delivered_line', // "{delivered} / {total} kg"
+  'ui.operations.mass_kg', // "{kg} kg"
+  'ui.crew.location_coords', // "({x}, {z})"
+  'ui.crew.skill_xp', // "{xp} / {next} XP" — XP is a cognate, embedded in a format string
+  'ui.fleet.load_kg', // "{kg} / {cap} kg"
+  'ui.survey.duration_ticks', // "{ticks}t"
+  'ui.survey.radius_cells', // "r {radius}" — radius/rayon both start with r, not a coincidence worth two abbreviations
 
   // ── Language picker endonyms ──
   'ui.settings.english', // "English"
@@ -41,16 +47,37 @@ export const LOCALE_SHARED_VALUE_ALLOWLIST: string[] = [
   'hud.scores.nuisance',        // "Nuisance"
   'score.nuisance',             // "Nuisance"
   'need.fatigue',               // "Fatigue"
-  'ui.employees.fatigue',       // "Fatigue"
-  'ui.employees.xp',            // "XP"
-  'ui.employees.base_salary',   // "Base"
-  'ui.employees.skill_bonus',   // "Bonus"
-  'ui.employees.total_salary',  // "Total"
-  'ui.employees.proficiency_4', // "Expert"
   'proficiency.2',              // "Novice"
   'proficiency.4',              // "Expert"
-  'ui.vehicles.type',           // "Type"
   'ui.build.ramp_section',      // "Terrain"
   'ui.settings.audio',          // "Volume"
+  'ui.settings.audio.ui',       // "Interface"
+  'ui.settings.session',        // "Session"
   'sandbox.field.biome',        // "Biome"
+  'ui.blast_workshop.preview.row_fragments', // "Fragments"
+  'ui.blast_workshop.preflight.stat_charge', // "Charge"
+  'ui.blast_workshop.preflight.predicted_voxels', // "{count} voxels" — technical term, unchanged in French
+  'ui.blast_workshop.preflight.predicted_locked_fragments', // "fragments — T2"
+  'ui.blast_workshop.preflight.predicted_locked_projections', // "projections — T3"
+  'ui.blast_workshop.report.stat_fragments', // "Fragments"
+  'ui.blast_workshop.report.stat_volume', // "Volume"
+  'ui.blast_workshop.report.stat_projections', // "Projections"
+  'ui.contracts.total', // "Total"
+  'ui.contracts.max', // "Max"
+  'ui.finances.title', // "Finances"
+  'ui.finances.category.construction', // "Construction"
+  'ui.finances.category.corruption', // "Corruption"
+  'ui.finances.category.mafia', // "Mafia"
+  'ui.event.category.mafia', // "Mafia" — same cognate as ui.finances.category.mafia
+  'ui.portfolio.back', // "MENU" — identical in French UI convention
+  'ui.portfolio.star_progress', // "{earned} / {total} ★" — format-only, no natural-language content
+  'ui.portfolio.biome.tropical', // "TROPICAL" — true cognate
+  'ui.operations.fragment_count', // "{count} fragments"
+  'ui.operations.incidents', // "Incidents"
+  'ui.crew.need_fatigue', // "Fatigue" — same cognate as need.fatigue
+  'ui.crew.skill_maxed', // "MAX"
+  'ui.saves.auto_chip', // "AUTO" — same cognate as ui.crew.skill_maxed's MAX-style abbreviation
+  'ui.shady.influence_label', // "INFLUENCE"
+  'ui.shady.arrangements_label', // "ARRANGEMENTS"
+  'ui.shady.smuggling_inactive', // "Inactive" — correctly-spelled French (fem. of "inactif", agreeing with "la contrebande")
 ];

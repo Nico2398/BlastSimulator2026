@@ -9,7 +9,8 @@ import { createGridPlan, resetHoleIds } from '../../../src/core/mining/DrillPlan
 import { batchCharge } from '../../../src/core/mining/ChargePlan.js';
 import { autoVPattern } from '../../../src/core/mining/Sequence.js';
 import { assembleBlastPlan } from '../../../src/core/mining/BlastPlan.js';
-import { executeBlast } from '../../../src/core/mining/BlastExecution.js';
+import { executeBlast, buildBlastReport, type BlastResult } from '../../../src/core/mining/BlastExecution.js';
+import { GRAVITY } from '../../../src/core/config/balance.js';
 
 function fillRegion(
   grid: VoxelGrid,
@@ -123,5 +124,78 @@ describe('executeBlast — crater', () => {
     const result = executeBlast(plan, grid, []);
     expect(result).toBeNull();
     expect(grid.getVoxel(5, 5, 5)?.density).toBe(1.0);
+  });
+});
+
+describe('buildBlastReport', () => {
+  it('carries the tick, rating, and per-blast totals straight from the result', () => {
+    const grid = new VoxelGrid(40, 20, 40);
+    fillRegion(grid, 'molite', 5, 25, 0, 10, 5, 25, 'blingite', 0.2);
+    const holes = createGridPlan({ x: 12, z: 12 }, 2, 3, 4, 8, 0.15);
+    const holeIds = holes.map(h => h.id);
+    const holeDepths: Record<string, number> = {};
+    for (const h of holes) holeDepths[h.id] = h.depth;
+    const { charges } = batchCharge(holeIds, holeDepths, 'boomite', 8, 2);
+    const delays = autoVPattern(holes, 25);
+    const plan = assembleBlastPlan(holes, charges, delays);
+
+    const result = executeBlast(plan, grid, []);
+    expect(result).not.toBeNull();
+
+    const report = buildBlastReport(result!, 42, 960);
+    expect(report.tick).toBe(42);
+    expect(report.spent).toBe(960);
+    expect(report.rating).toBe(result!.rating);
+    expect(report.clearedVoxels).toBe(result!.clearedVoxels);
+    expect(report.crackedVoxels).toBe(result!.crackedVoxels);
+    expect(report.fragmentCount).toBe(result!.fragmentCount);
+    expect(report.oversizedFragments).toBe(result!.oversizedFragments);
+    expect(report.totalRockVolume).toBe(result!.totalRockVolume);
+    expect(report.projectionCount).toBe(result!.projectionCount);
+    expect(report.totalOreValue).toBe(result!.totalOreValue);
+    expect(report.destroyedBuildings).toBe(result!.destroyedBuildings);
+  });
+
+  it('estimates max projection distance as the 45°-launch range of the fastest projected fragment', () => {
+    const grid = new VoxelGrid(40, 20, 40);
+    fillRegion(grid, 'molite', 5, 25, 0, 10, 5, 25, 'blingite', 0.2);
+    const holes = createGridPlan({ x: 12, z: 12 }, 2, 3, 4, 8, 0.15);
+    const holeIds = holes.map(h => h.id);
+    const holeDepths: Record<string, number> = {};
+    for (const h of holes) holeDepths[h.id] = h.depth;
+    const { charges } = batchCharge(holeIds, holeDepths, 'boomite', 8, 2);
+    const delays = autoVPattern(holes, 25);
+    const plan = assembleBlastPlan(holes, charges, delays);
+    const result = executeBlast(plan, grid, []);
+    expect(result).not.toBeNull();
+
+    const report = buildBlastReport(result!, 0, 0);
+    const expectedRange = (result!.maxProjectionSpeed * result!.maxProjectionSpeed) / Math.abs(GRAVITY);
+    expect(report.maxProjectionDistanceM).toBeCloseTo(expectedRange, 6);
+  });
+
+  it('reports zero projection distance when nothing was projected', () => {
+    // Hand-built minimal BlastResult rather than a real blast pipeline —
+    // this is testing buildBlastReport's arithmetic in isolation, not
+    // executeBlast's decision about when projection happens.
+    const result: BlastResult = {
+      fragments: [],
+      fragmentCount: 0,
+      averageFragmentSize: 0,
+      oversizedFragments: 0,
+      projectionCount: 0,
+      maxProjectionSpeed: 0,
+      vibrationAtVillages: [],
+      totalRockVolume: 0,
+      totalOreValue: 0,
+      rating: 'mediocre',
+      crackedVoxels: 0,
+      clearedVoxels: 0,
+      clearedRegion: { minX: 0, maxX: 0, minZ: 0, maxZ: 0 },
+      destroyedBuildings: [],
+      secondaryBlastEvents: [],
+    };
+    const report = buildBlastReport(result, 0, 0);
+    expect(report.maxProjectionDistanceM).toBe(0);
   });
 });

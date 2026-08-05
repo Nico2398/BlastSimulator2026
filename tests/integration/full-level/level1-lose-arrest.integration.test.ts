@@ -69,5 +69,12 @@ describe('Level 1 — Lose — Criminal Arrest', () => {
 
     // Verify arrest triggered
     expect(ctx.state!.arrest.arrested).toBe(true);
+
+    // No levelEndReason assertion here: at $8000/tick, 45 ticks of smuggling
+    // income (~$360k) clears dusty_hollow's $80k profit target well before
+    // exposureRisk reaches the arrest threshold, so this scenario legitimately
+    // ends via 'completed', not 'arrest'. The reason-attribution mapping for
+    // arrest is covered in isolation by events.integration.test.ts, where a
+    // primed exposureRisk triggers arrest with no profit accumulation to race.
   });
 });

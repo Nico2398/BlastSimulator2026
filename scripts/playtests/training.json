@@ -46,6 +46,10 @@
           "selector": "#bs-build-panel [data-build-type=\"driving_center\"] .bs-build-buy-btn"
         },
         {
+          "do": "zoomOut",
+          "note": "the fresh site's default camera is close and ground-level, and does not show tile (4,4) without zooming out first"
+        },
+        {
           "do": "pickTile",
           "x": 4,
           "z": 4

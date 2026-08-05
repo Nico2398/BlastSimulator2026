@@ -6,6 +6,10 @@ import type { DrillHole } from '../mining/DrillPlan.js';
 import type { HoleCharge } from '../mining/ChargePlan.js';
 import type { SurveyResult } from '../mining/SurveyCalc.js';
 import type { BlastOreReport } from '../mining/BlastOreReport.js';
+import type { BlastReport } from '../mining/BlastExecution.js';
+import type { BlastPreviewSummary } from '../mining/Software.js';
+import type { TubingState } from '../mining/Tubing.js';
+import { createTubingState } from '../mining/Tubing.js';
 import type { FinanceState } from '../economy/Finance.js';
 import { createFinanceState } from '../economy/Finance.js';
 import type { ContractState } from '../economy/Contract.js';
@@ -50,7 +54,7 @@ import type { SitePolicy } from '../entities/SitePolicy.js';
 import { createSitePolicy } from '../entities/SitePolicy.js';
 
 /** Save format version — increment when GameState shape changes. */
-export const SAVE_VERSION = 6;
+export const SAVE_VERSION = 7;
 
 export interface GameConfig {
   seed: number;
@@ -202,6 +206,14 @@ export interface GameState {
   ghostPreviews: GhostPreview[];
   /** Ore report from the most recent blast, or null if no blast has occurred yet. */
   lastOreReport: BlastOreReport | null;
+  /** Structured summary of the most recent blast, for BlastReportModal (redesign P4/§5.A). Null until the first blast. */
+  lastBlastReport: BlastReport | null;
+  /** Purchased blast-preview software tier (0 = none, up to MAX_SOFTWARE_TIER). */
+  softwareTier: number;
+  /** Structured result of the last blast_preview run, for the Preview step (redesign P4/§5). Null until first run. */
+  lastBlastPreview: BlastPreviewSummary | null;
+  /** Tubing inventory and installed-hole set, for waterproofing charges against rain. */
+  tubingState: TubingState;
 }
 
 export interface WorldState {
@@ -229,7 +241,7 @@ export interface WorldState {
   gridReady: boolean;
   /**
    * Serialized playable voxel data (v6+, #458 T0.3), embedded lazily right
-   * before a save — see saveCommand / SaveLoadUI's getState callback. Absent
+   * before a save — see saveCommand / SavesModal's getState callback. Absent
    * on saves from before v6 or on a state that hasn't been saved yet; a
    * loader falls back to regenerating pristine terrain from the seed in that
    * case (the pre-v6 behaviour — blast craters/ramps don't survive that path).
@@ -299,6 +311,10 @@ export function createGame(config: GameConfig): GameState {
     nextPendingActionId: 1,
     ghostPreviews: [],
     lastOreReport: null,
+    lastBlastReport: null,
+    softwareTier: 0,
+    lastBlastPreview: null,
+    tubingState: createTubingState(),
   };
 }
 

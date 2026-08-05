@@ -357,4 +357,35 @@ describe('waitingQueueOffset / waitingRenderPosition (#411)', () => {
 
     vm.dispose();
   });
+
+  describe('scene picking (P2)', () => {
+    it('pickables() returns one tagged object per vehicle', () => {
+      const scene = new THREE.Scene();
+      const vm = new VehicleMesh(scene);
+      vm.addVehicle(makeVehicle(1, 'debris_hauler'));
+      vm.addVehicle(makeVehicle(2, 'rock_digger', 5, 5));
+      const pickables = vm.pickables();
+      expect(pickables).toHaveLength(2);
+      expect(pickables.map(o => o.userData['entityId']).sort()).toEqual([1, 2]);
+      expect(pickables.every(o => o.userData['entityKind'] === 'vehicle')).toBe(true);
+      vm.dispose();
+    });
+
+    it('getPosition() returns the vehicle group world position', () => {
+      const scene = new THREE.Scene();
+      const vm = new VehicleMesh(scene);
+      vm.addVehicle(makeVehicle(1, 'debris_hauler', 12, 7));
+      const pos = vm.getPosition(1);
+      expect(pos?.x).toBeCloseTo(12);
+      expect(pos?.z).toBeCloseTo(7);
+      vm.dispose();
+    });
+
+    it('getPosition() returns null for an id that was never added', () => {
+      const scene = new THREE.Scene();
+      const vm = new VehicleMesh(scene);
+      expect(vm.getPosition(999)).toBeNull();
+      vm.dispose();
+    });
+  });
 });

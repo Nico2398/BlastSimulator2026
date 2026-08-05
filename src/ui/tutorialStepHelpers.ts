@@ -14,6 +14,7 @@ import type { TutorialStep } from './tutorialSteps.js';
 export const TOOLBAR_TARGET = {
   blast: '#bs-toolbar [data-panel="blast"]',
   contracts: '#bs-toolbar [data-panel="contracts"]',
+  ops: '#bs-toolbar [data-panel="ops"]',
   build: '#bs-toolbar [data-panel="build"]',
   vehicles: '#bs-toolbar [data-panel="vehicles"]',
   employees: '#bs-toolbar [data-panel="employees"]',

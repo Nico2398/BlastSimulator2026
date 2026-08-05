@@ -3,11 +3,12 @@
 
 import type { CommandResult } from '../ConsoleRunner.js';
 import type { GameContext } from './world.js';
-import { createGridPlan, addHole, resetHoleIds } from '../../core/mining/DrillPlan.js';
+import { createGridPlan, addHole, removeHole, resetHoleIds } from '../../core/mining/DrillPlan.js';
 import { createCharge, batchCharge } from '../../core/mining/ChargePlan.js';
 import { setDelay, autoVPattern } from '../../core/mining/Sequence.js';
 import { assembleBlastPlan, validateBlastPlan } from '../../core/mining/BlastPlan.js';
-import { executeBlast } from '../../core/mining/BlastExecution.js';
+import { executeBlast, buildBlastReport } from '../../core/mining/BlastExecution.js';
+import { getExplosive } from '../../core/world/ExplosiveCatalog.js';
 import { addBlastFragments, syncLogisticsCapacity } from '../../core/economy/Logistics.js';
 import { processProjections } from '../../core/entities/Damage.js';
 import { killEmployee } from '../../core/entities/Employee.js';
@@ -31,10 +32,10 @@ import {
   type WeatherState,
 } from '../../core/weather/WeatherCycle.js';
 import { Random } from '../../core/math/Random.js';
-import { buyTubing, installTubing, createTubingState } from '../../core/mining/Tubing.js';
+import { buyTubing, installTubing } from '../../core/mining/Tubing.js';
 import type { FragmentData } from '../../core/mining/BlastExecution.js';
 import { runSurvey, SURVEY_METHODS, type SurveyMethod, computeBlastOreReport } from '../../core/mining/SurveyCalc.js';
-import { SURVEY_COSTS } from '../../core/config/balance.js';
+import { SURVEY_COSTS, VOXEL_SIZE_CM } from '../../core/config/balance.js';
 import { detectOreReport } from '../../core/events/EventEngine.js';
 import { NavGrid } from '../../core/nav/NavGrid.js';
 import { getStorageCapacity } from '../../core/entities/Building.js';
@@ -45,8 +46,6 @@ import { claimForAction, cellsInRect } from './siteExpansion.js';
 export interface MiningContext extends GameContext {
   weatherCycle?: ReturnType<typeof createWeatherCycle>;
   rng?: Random;
-  softwareTier: number;
-  tubingState: ReturnType<typeof createTubingState>;
   /** Positions of fragments from the last blast — used by renderer for localized re-mesh. */
   lastBlastFragments?: { x: number; y: number; z: number }[];
   /** Full fragment data from last blast — used by renderer to spawn fragment meshes. */
@@ -130,6 +129,30 @@ export function drillPlanCommand(
     return { success: true, output: `Added hole ${hole.id} at (${x}, ${z}), depth ${depth}m` };
   }
 
+  if (sub === 'clear') {
+    const clearedCount = ctx.state!.drillHoles.length;
+    ctx.state!.drillHoles = [];
+    ctx.state!.chargesByHole = {};
+    ctx.state!.sequenceDelays = {};
+    return { success: true, output: `Cleared drill plan (${clearedCount} holes)` };
+  }
+
+  if (sub === 'remove') {
+    const holeSpec = named['hole'] ?? '';
+    const holeId = ctx.state!.drillHoles.find(h => h.id === holeSpec)
+      ? holeSpec
+      : (holeSpec.startsWith('hole_') ? holeSpec : `hole_${holeSpec}`);
+
+    if (!removeHole(ctx.state!.drillHoles, holeId)) {
+      return { success: false, output: `Hole "${holeId}" not found` };
+    }
+
+    delete ctx.state!.chargesByHole[holeId];
+    delete ctx.state!.sequenceDelays[holeId];
+
+    return { success: true, output: `Removed hole ${holeId}` };
+  }
+
   if (sub === 'show') {
     if (ctx.state!.drillHoles.length === 0) {
       return { success: true, output: 'No drill holes. Use drill_plan grid or drill_plan add.' };
@@ -140,7 +163,7 @@ export function drillPlanCommand(
     return { success: true, output: `Drill plan (${lines.length} holes):\n${lines.join('\n')}` };
   }
 
-  return { success: false, output: 'Usage: drill_plan grid|add|show [options]' };
+  return { success: false, output: 'Usage: drill_plan grid|add|remove|clear|show [options]' };
 }
 
 // ── Charge commands ──
@@ -337,6 +360,15 @@ export function blastCommand(
   // Store drill holes before clearing (needed by renderer for per-hole detonation timing)
   ctx.lastBlastHoles = [...state.drillHoles];
 
+  // Charge cost, summed before the plan is cleared below — BlastResult has no
+  // notion of money spent, only rock/ore recovered.
+  let spent = 0;
+  for (const charge of Object.values(state.chargesByHole)) {
+    const explosive = getExplosive(charge.explosiveId);
+    if (explosive) spent += explosive.costPerKg * charge.amountKg;
+  }
+  state.lastBlastReport = buildBlastReport(result, state.tickCount, spent);
+
   // Clear drill plan after blast (holes are consumed)
   state.drillHoles = [];
   state.chargesByHole = {};
@@ -427,26 +459,27 @@ export function previewCommand(
   if (err) return { success: false, output: err };
 
   const plan = assembleBlastPlan(ctx.state!.drillHoles, ctx.state!.chargesByHole, ctx.state!.sequenceDelays);
+  const tier = ctx.state!.softwareTier;
   const sub = args[0];
 
   if (sub === 'energy') {
-    const result = previewEnergy(plan, ctx.grid!, ctx.softwareTier);
-    if (!result) return { success: false, output: `Requires software tier 1+ (current: ${ctx.softwareTier})` };
+    const result = previewEnergy(plan, ctx.grid!, tier);
+    if (!result) return { success: false, output: `Requires software tier 1+ (current: ${tier})` };
     return { success: true, output: `Energy preview: ${result.energyMap.size} voxels, max=${result.maxEnergy.toFixed(1)}, min=${result.minEnergy.toFixed(1)}` };
   }
   if (sub === 'fragments') {
-    const result = previewFragments(plan, ctx.grid!, ctx.softwareTier);
-    if (!result) return { success: false, output: `Requires software tier 2+ (current: ${ctx.softwareTier})` };
+    const result = previewFragments(plan, ctx.grid!, tier);
+    if (!result) return { success: false, output: `Requires software tier 2+ (current: ${tier})` };
     return { success: true, output: `Fragment preview: ${result.fracturedCount} fractured, ${result.crackedCount} cracked, ${result.unaffectedCount} unaffected, avg size ${result.avgFragmentSize.toFixed(2)}` };
   }
   if (sub === 'projections') {
-    const result = previewProjections(plan, ctx.grid!, ctx.softwareTier);
-    if (!result) return { success: false, output: `Requires software tier 3+ (current: ${ctx.softwareTier})` };
+    const result = previewProjections(plan, ctx.grid!, tier);
+    if (!result) return { success: false, output: `Requires software tier 3+ (current: ${tier})` };
     return { success: true, output: `Projection preview: ${result.projectionZoneCount} voxels in projection zone` };
   }
   if (sub === 'vibrations') {
-    const result = previewVibrations(plan, [], ctx.softwareTier);
-    if (!result) return { success: false, output: `Requires software tier 4+ (current: ${ctx.softwareTier})` };
+    const result = previewVibrations(plan, [], tier);
+    if (!result) return { success: false, output: `Requires software tier 4+ (current: ${tier})` };
     return { success: true, output: `Vibration preview: max=${result.maxVibration.toFixed(4)}` };
   }
 
@@ -476,10 +509,33 @@ export function blastPreviewCommand(
     return { success: false, output: `Invalid plan:\n${errors.map(e => `  ${e.holeId}: ${e.issue}`).join('\n')}` };
   }
 
-  const energyPreview = previewEnergy(plan, ctx.grid!, ctx.softwareTier);
-  const fragmentPreview = previewFragments(plan, ctx.grid!, ctx.softwareTier);
-  const projectionPreview = previewProjections(plan, ctx.grid!, ctx.softwareTier);
-  const vibrationPreview = previewVibrations(plan, [], ctx.softwareTier);
+  const tier = ctx.state!.softwareTier;
+  const energyPreview = previewEnergy(plan, ctx.grid!, tier);
+  const fragmentPreview = previewFragments(plan, ctx.grid!, tier);
+  const projectionPreview = previewProjections(plan, ctx.grid!, tier);
+  const vibrationPreview = previewVibrations(plan, [], tier);
+
+  ctx.state!.lastBlastPreview = {
+    tier,
+    energy: energyPreview
+      ? { affectedVoxels: energyPreview.energyMap.size, minEnergy: energyPreview.minEnergy, maxEnergy: energyPreview.maxEnergy }
+      : null,
+    fragments: fragmentPreview
+      ? {
+        fractured: fragmentPreview.fracturedCount, cracked: fragmentPreview.crackedCount, unaffected: fragmentPreview.unaffectedCount,
+        avgFragmentSizeCm: fragmentPreview.avgFragmentSize * VOXEL_SIZE_CM,
+      }
+      : null,
+    projections: projectionPreview
+      ? {
+        projectionZoneVoxels: projectionPreview.projectionZoneCount,
+        collapseFragments: Math.max(0, (fragmentPreview?.fracturedCount ?? 0) + (fragmentPreview?.crackedCount ?? 0) - projectionPreview.projectionZoneCount),
+      }
+      : null,
+    vibrations: vibrationPreview
+      ? { maxVibration: vibrationPreview.maxVibration, affectedVillages: vibrationPreview.villages.length }
+      : null,
+  };
 
   const lines: string[] = ['=== BLAST PREVIEW ==='];
 
@@ -540,7 +596,7 @@ export function buySoftwareCommand(
   const err = requireGame(ctx);
   if (err) return { success: false, output: err };
 
-  const currentTier = ctx.softwareTier;
+  const currentTier = ctx.state!.softwareTier;
 
   if (named['tier'] !== undefined) {
     const requestedTier = parseInt(named['tier'], 10);
@@ -556,7 +612,7 @@ export function buySoftwareCommand(
   const result = purchaseSoftware(currentTier, ctx.state!.cash);
   if ('error' in result) return { success: false, output: result.error };
   ctx.state!.cash -= result.cost;
-  ctx.softwareTier = result.newTier;
+  ctx.state!.softwareTier = result.newTier;
   return { success: true, output: `Upgraded to software tier ${result.newTier}. Cost: $${result.cost}` };
 }
 
@@ -689,10 +745,10 @@ export function tubingCommand(
 
   if (sub === 'buy') {
     const amount = parseInt(named['amount'] ?? '1', 10);
-    const result = buyTubing(ctx.tubingState, amount, ctx.state!.cash);
+    const result = buyTubing(ctx.state!.tubingState, amount, ctx.state!.cash);
     if (!result.success) return { success: false, output: result.message };
     ctx.state!.cash -= result.cost;
-    return { success: true, output: `${result.message}. Inventory: ${ctx.tubingState.inventory}` };
+    return { success: true, output: `${result.message}. Inventory: ${ctx.state!.tubingState.inventory}` };
   }
 
   if (sub === 'install') {
@@ -700,11 +756,11 @@ export function tubingCommand(
     const holeId = ctx.state!.drillHoles.find(h => h.id === holeSpec)
       ? holeSpec
       : (holeSpec.startsWith('hole_') ? holeSpec : `hole_${holeSpec}`);
-    const result = installTubing(ctx.tubingState, holeId);
+    const result = installTubing(ctx.state!.tubingState, holeId);
     return { success: result.success, output: result.message };
   }
 
-  return { success: true, output: `Tubing inventory: ${ctx.tubingState.inventory}, installed: ${ctx.tubingState.installedHoles.size} holes` };
+  return { success: true, output: `Tubing inventory: ${ctx.state!.tubingState.inventory}, installed: ${ctx.state!.tubingState.installedHoles.size} holes` };
 }
 
 // ── Survey command ──

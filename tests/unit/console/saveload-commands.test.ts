@@ -8,15 +8,12 @@ import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { newGameCommand } from '../../../src/console/commands/world.js';
 import { saveCommand, loadCommand } from '../../../src/console/commands/saveload.js';
 import type { MiningContext } from '../../../src/console/commands/mining.js';
-import { createTubingState } from '../../../src/core/mining/Tubing.js';
 import { resetHoleIds } from '../../../src/core/mining/DrillPlan.js';
 
 function makeCtx(): MiningContext {
   const ctx: MiningContext = {
     state: null,
     grid: null,
-    softwareTier: 0,
-    tubingState: createTubingState(),
     emitter: new EventEmitter(),
   };
   newGameCommand(ctx, [], { mine_type: 'desert', seed: '1', size: '16' });
@@ -28,8 +25,8 @@ beforeEach(() => resetHoleIds());
 describe('saveCommand', () => {
   it('requires a loaded game', () => {
     const ctx: MiningContext = {
-      state: null, grid: null, softwareTier: 0,
-      tubingState: createTubingState(), emitter: new EventEmitter(),
+      state: null, grid: null,
+      emitter: new EventEmitter(),
     };
     const result = saveCommand(ctx, [], {});
     expect(result.success).toBe(false);

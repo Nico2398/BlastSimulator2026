@@ -38,19 +38,25 @@ const REGIONS: Array<[string, string]> = [
   ['#bs-toolbar', 'toolbar'],
   ['#bs-blast-panel', 'blast'],
   ['#bs-contract-panel', 'contracts'],
+  ['#bs-finances-panel', 'finances'],
+  ['#bs-operations-panel', 'ops'],
   ['#bs-build-panel', 'build'],
   ['#bs-vehicle-panel', 'vehicles'],
   ['#bs-employee-panel', 'crew'],
   ['#bs-survey-panel', 'survey'],
+  ['#bs-shady-panel', 'shady'],
   ['#bs-settings-panel', 'settings'],
   ['#bs-event-dialog', 'event'],
   // Blast confirmation and similar one-off modals. Excluded from the event
   // dialog, which shares the class. A modal the probe cannot see is exactly what
   // leaves a harness reporting "everything is covered" with no way forward.
   ['.bs-confirm-overlay:not(#bs-event-dialog)', 'confirm'],
-  ['.bs-tile-select-overlay', 'tile-picker'],
   ['.bs-tutorial-box', 'tutorial'],
   ['#bs-main-menu', 'menu'],
+  ['#bs-world-map', 'world_map'],
+  ['#bs-level-end-screen', 'level_end'],
+  ['#bs-saves-modal', 'saves'],
+  ['#bs-selection-bar', 'selection'], // scene selection bar (redesign P2)
 ];
 
 /**
@@ -72,7 +78,6 @@ const REGION_HINTS: Record<string, string> = {
   survey: '.bs-survey-status',
   blast: '.bs-blast-status',
   build: '#bs-build-panel div[style*="min-height"]',
-  'tile-picker': '.bs-tile-select-info',
   crew: '.bs-training-status',
 };
 

@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="crossorigin" />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&amp;family=IBM+Plex+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet" />
+<script src="./icons.js"></script>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:#0b0e12}
+body{font-family:Archivo,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:#ffb02e;text-decoration:none}a:hover{color:#ffc978}
+button,input,select{font-family:inherit;color:inherit}
+::-webkit-scrollbar{width:9px}::-webkit-scrollbar-thumb{background:#2b3440;border-radius:9px}
+@keyframes gsFlash{0%{opacity:0}40%{opacity:.85}100%{opacity:0}}
+</style>
+</helmet>
+<div style="min-height:100vh;background:#0b0e12;color:#e6e9ee;padding:44px 40px 90px">
+  <div style="max-width:1240px;margin:0 auto;display:flex;flex-direction:column;gap:52px">
+
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <span style="font:700 10px/1 Archivo,sans-serif;letter-spacing:.3em;color:#ffc840">BLASTSIMULATOR 2026 · PLACEMENT LAYER</span>
+      <span style="font:900 42px/1 Archivo,sans-serif;letter-spacing:-.025em">Grid select, in the scene</span>
+      <span style="font:400 15px/1.6 Archivo,sans-serif;color:#b0b9c4;max-width:700px;text-wrap:pretty">The 640×480 tile picker goes away. You drag on the pit itself, the selection is painted onto the marching-cubes surface, and the only DOM left is a 44px strip of parameters. Everything below also covers the ramp, building and survey pickers, which are the same interaction with a different footprint.</span>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:18px">
+      <div style="display:flex;align-items:baseline;gap:12px"><span style="font:800 13px/1 Archivo,sans-serif;letter-spacing:.2em">01 · STATE MACHINE</span><span style="flex:1;height:1px;background:rgba(255,255,255,.09)"></span><span style="font:400 11px/1 Archivo,sans-serif;color:#8a94a2">one tool, six states, no modal at any point</span></div>
+      <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px">
+        <sc-for list="{{ states }}" as="s" hint-placeholder-count="6">
+          <div style="display:flex;flex-direction:column;gap:10px;padding:15px;border-radius:7px;background:#141920;border:1px solid {{ s.border }}">
+            <div style="display:flex;align-items:center;gap:9px">
+              <span style="display:flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:{{ s.dotBg }};color:{{ s.dotFg }};font:700 10px/1 'IBM Plex Mono',monospace">{{ s.n }}</span>
+              <span style="font:800 12px/1 Archivo,sans-serif;letter-spacing:.14em;color:{{ s.titleColor }}">{{ s.title }}</span>
+            </div>
+            <span style="font:400 12px/1.55 Archivo,sans-serif;color:#c9d1db;text-wrap:pretty">{{ s.body }}</span>
+            <div style="display:flex;flex-direction:column;gap:6px;padding-top:2px">
+              <sc-for list="{{ s.rows }}" as="r" hint-placeholder-count="3">
+                <div style="display:flex;gap:9px;align-items:baseline">
+                  <span style="font:600 10px/1.4 Archivo,sans-serif;letter-spacing:.1em;color:#8a94a2;width:64px;flex:0 0 64px">{{ r.k }}</span>
+                  <span style="font:500 11px/1.45 'IBM Plex Mono',monospace;color:#b0b9c4;flex:1;min-width:0;text-wrap:pretty">{{ r.v }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div style="padding:16px;border-radius:7px;background:#141920;border:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;gap:11px">
+          <span style="font:600 10px/1 Archivo,sans-serif;letter-spacing:.16em;color:#8a94a2">CAMERA REMAP WHILE ARMED</span>
+          <div style="display:flex;flex-direction:column;gap:1px;background:rgba(255,255,255,.07);border-radius:5px;overflow:hidden">
+            <sc-for list="{{ remap }}" as="r" hint-placeholder-count="6">
+              <div style="display:flex;align-items:center;gap:10px;padding:9px 11px;background:#11161c">
+                <span style="min-width:96px;flex:0 0 96px;font:600 10px/1 'IBM Plex Mono',monospace;color:#e6e9ee">{{ r.input }}</span>
+                <span style="font:400 11px/1.4 Archivo,sans-serif;color:#8a94a2;width:104px;flex:0 0 104px">{{ r.normal }}</span>
+                <span style="color:#ffc840"><bs-icon name="chevR" size="11"></bs-icon></span>
+                <span style="font:500 11px/1.4 Archivo,sans-serif;color:#ffc840;flex:1">{{ r.armed }}</span>
+              </div>
+            </sc-for>
+          </div>
+          <span style="font:400 11px/1.5 Archivo,sans-serif;color:#8a94a2;text-wrap:pretty">Only left-drag is taken. Orbit moves to right-drag for the duration, which is why the instruction chip states it explicitly — silently swapping a camera control is how you lose people.</span>
+        </div>
+        <div style="padding:16px;border-radius:7px;background:#141920;border:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;gap:11px">
+          <span style="font:600 10px/1 Archivo,sans-serif;letter-spacing:.16em;color:#8a94a2">TOUCH</span>
+          <div style="display:flex;flex-direction:column;gap:9px">
+            <sc-for list="{{ touch }}" as="r" hint-placeholder-count="4">
+              <div style="display:flex;gap:10px;align-items:flex-start">
+                <span style="color:#7ab8ff;padding-top:1px"><bs-icon name="{{ r.icon }}" size="13"></bs-icon></span>
+                <div style="display:flex;flex-direction:column;gap:3px;flex:1;min-width:0">
+                  <span style="font:600 11px/1.3 Archivo,sans-serif">{{ r.k }}</span>
+                  <span style="font:400 11px/1.45 Archivo,sans-serif;color:#b0b9c4;text-wrap:pretty">{{ r.v }}</span>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:18px">
+      <div style="display:flex;align-items:baseline;gap:12px"><span style="font:800 13px/1 Archivo,sans-serif;letter-spacing:.2em">02 · SELECTION ON TERRAIN</span><span style="flex:1;height:1px;background:rgba(255,255,255,.09)"></span><span style="font:400 11px/1 Archivo,sans-serif;color:#8a94a2">per-tile quads, not a flat decal</span></div>
+      <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px">
+        <sc-for list="{{ scenes }}" as="v" hint-placeholder-count="3">
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div style="border-radius:7px;background:#0f1319;border:1px solid rgba(255,255,255,.08);overflow:hidden;position:relative">
+              <svg viewBox="-200 -70 460 320" style="display:block;width:100%;height:auto">
+                <sc-for list="{{ v.terrain }}" as="c" hint-placeholder-count="140">
+                  <polygon points="{{ c.pts }}" fill="{{ c.fill }}" stroke="{{ c.stroke }}" stroke-width=".5"></polygon>
+                </sc-for>
+                <sc-for list="{{ v.cells }}" as="c" hint-placeholder-count="30">
+                  <polygon points="{{ c.pts }}" fill="{{ c.fill }}" stroke="{{ c.stroke }}" stroke-width="{{ c.sw }}" stroke-dasharray="{{ c.dash }}"></polygon>
+                </sc-for>
+                <sc-for list="{{ v.front }}" as="c" hint-placeholder-count="40">
+                  <polygon points="{{ c.pts }}" fill="{{ c.fill }}" stroke="{{ c.stroke }}" stroke-width=".5"></polygon>
+                </sc-for>
+                <sc-for list="{{ v.xray }}" as="c" hint-placeholder-count="12">
+                  <polygon points="{{ c.pts }}" fill="none" stroke="#ffc840" stroke-width="1" stroke-dasharray="3 3" opacity=".55"></polygon>
+                </sc-for>
+                <sc-for list="{{ v.border }}" as="b" hint-placeholder-count="24">
+                  <line x1="{{ b.x1 }}" y1="{{ b.y1 }}" x2="{{ b.x2 }}" y2="{{ b.y2 }}" stroke="{{ v.borderColor }}" stroke-width="2.4" stroke-linecap="round"></line>
+                </sc-for>
+                <sc-for list="{{ v.holes }}" as="h" hint-placeholder-count="12">
+                  <ellipse cx="{{ h.cx }}" cy="{{ h.cy }}" rx="4.6" ry="2.6" fill="rgba(11,14,18,.75)" stroke="{{ v.borderColor }}" stroke-width="1.6"></ellipse>
+                </sc-for>
+                <sc-for list="{{ v.corners }}" as="k" hint-placeholder-count="8">
+                  <polyline points="{{ k.pts }}" fill="none" stroke="{{ v.borderColor }}" stroke-width="3.4" stroke-linecap="square"></polyline>
+                </sc-for>
+              </svg>
+              <div style="position:absolute;left:10px;top:10px;display:flex;align-items:center;gap:7px;padding:5px 9px;border-radius:4px;background:rgba(9,12,16,.86);border:1px solid rgba(255,255,255,.12)">
+                <span style="font:600 10px/1 Archivo,sans-serif;letter-spacing:.12em;color:{{ v.tagColor }}">{{ v.tag }}</span>
+              </div>
+              <sc-if value="{{ v.readout }}" hint-placeholder-val="{{ null }}">
+                <div style="position:absolute;right:10px;bottom:10px;display:flex;flex-direction:column;gap:3px;padding:7px 10px;border-radius:5px;background:rgba(9,12,16,.92);border:1px solid rgba(255,200,64,.45)">
+                  <span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#ffc840">{{ v.readout }}</span>
+                  <span style="font:400 10px/1 'IBM Plex Mono',monospace;color:#b0b9c4">{{ v.readout2 }}</span>
+                </div>
+              </sc-if>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:5px">
+              <span style="font:700 11px/1 Archivo,sans-serif;letter-spacing:.12em;color:{{ v.tagColor }}">{{ v.title }}</span>
+              <span style="font:400 11px/1.55 Archivo,sans-serif;color:#b0b9c4;text-wrap:pretty">{{ v.caption }}</span>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px">
+        <sc-for list="{{ anatomy }}" as="a" hint-placeholder-count="4">
+          <div style="padding:14px;border-radius:7px;background:#141920;border:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;gap:9px">
+            <svg viewBox="0 0 120 58" style="display:block;width:100%;height:auto">
+              <polygon points="{{ a.pts }}" fill="{{ a.fill }}" stroke="{{ a.stroke }}" stroke-width="{{ a.sw }}" stroke-dasharray="{{ a.dash }}"></polygon>
+              <sc-for list="{{ a.extra }}" as="e" hint-placeholder-count="2">
+                <polyline points="{{ e }}" fill="none" stroke="{{ a.stroke }}" stroke-width="1.6"></polyline>
+              </sc-for>
+            </svg>
+            <span style="font:700 10px/1 Archivo,sans-serif;letter-spacing:.12em;color:{{ a.labelColor }}">{{ a.k }}</span>
+            <span style="font:400 11px/1.5 Archivo,sans-serif;color:#b0b9c4;text-wrap:pretty">{{ a.v }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+      <div style="display:grid;grid-template-columns:340px 1fr;gap:16px;padding:16px;border-radius:7px;background:#141920;border:1px solid rgba(122,184,255,.3)">
+        <div style="border-radius:6px;background:#0f1319;border:1px solid rgba(255,255,255,.08);overflow:hidden;position:relative">
+          <svg viewBox="-200 -60 460 300" style="display:block;width:100%;height:auto">
+            <sc-for list="{{ pinnedTerrain }}" as="c" hint-placeholder-count="140">
+              <polygon points="{{ c.pts }}" fill="{{ c.fill }}" stroke="{{ c.stroke }}" stroke-width=".5"></polygon>
+            </sc-for>
+            <sc-for list="{{ pinnedCells }}" as="c" hint-placeholder-count="30">
+              <polygon points="{{ c.pts }}" fill="{{ c.fill }}" stroke="{{ c.stroke }}" stroke-width="1"></polygon>
+            </sc-for>
+            <sc-for list="{{ pinnedBorder }}" as="b" hint-placeholder-count="24">
+              <line x1="{{ b.x1 }}" y1="{{ b.y1 }}" x2="{{ b.x2 }}" y2="{{ b.y2 }}" stroke="#7ab8ff" stroke-width="2.6" stroke-linecap="round"></line>
+            </sc-for>
+          </svg>
+          <div style="position:absolute;left:10px;top:10px;padding:5px 9px;border-radius:4px;background:rgba(9,12,16,.86);border:1px solid rgba(122,184,255,.45)">
+            <span style="font:600 10px/1 Archivo,sans-serif;letter-spacing:.12em;color:#7ab8ff">TUTORIAL · PINNED</span>
+          </div>
+          <div style="position:absolute;left:10px;right:10px;bottom:10px;display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:5px;background:rgba(9,12,16,.92);border:1px solid rgba(122,184,255,.45)">
+            <span style="color:#7ab8ff"><bs-icon name="grid" size="13"></bs-icon></span>
+            <span style="font:600 11px/1.35 Archivo,sans-serif;color:#e6e9ee;flex:1;text-wrap:pretty">Match this area — 6 × 5 tiles on bench 3</span>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:11px">
+          <span style="font:700 11px/1 Archivo,sans-serif;letter-spacing:.12em;color:#7ab8ff">TUTORIAL PINNING · ON TERRAIN</span>
+          <span style="font:400 12px/1.6 Archivo,sans-serif;color:#c9d1db;text-wrap:pretty">The pinned region is drawn in blue and everything outside it drops to 45% and stops responding to hover — the same rail behaviour <code style="font-family:'IBM Plex Mono',monospace;color:#ffc840">body.bs-tutorial-guided</code> already applies to DOM controls, extended onto the ground. The player can still orbit and zoom freely; only the anchor is constrained.</span>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <sc-for list="{{ pinNotes }}" as="p" hint-placeholder-count="4">
+              <div style="display:flex;gap:9px;align-items:flex-start">
+                <span style="color:{{ p.color }};padding-top:1px"><bs-icon name="{{ p.icon }}" size="12"></bs-icon></span>
+                <span style="font:400 11px/1.5 Archivo,sans-serif;color:#b0b9c4;flex:1;text-wrap:pretty">{{ p.t }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+
+    <div style="display:flex;flex-direction:column;gap:18px">
+      <div style="display:flex;align-items:baseline;gap:12px"><span style="font:800 13px/1 Archivo,sans-serif;letter-spacing:.2em">03 · PARAMETER STRIP</span><span style="flex:1;height:1px;background:rgba(255,255,255,.09)"></span><span style="font:400 11px/1 Archivo,sans-serif;color:#8a94a2">non-modal · 44px tall · never covers the selection</span></div>
+      <div style="display:flex;flex-direction:column;gap:12px;padding:22px;border-radius:8px;background:repeating-linear-gradient(135deg,#181d24 0 13px,#131820 13px 26px);border:1px solid rgba(255,255,255,.08)">
+        <div style="display:flex;align-items:center;gap:10px;align-self:center;padding:6px 12px;border-radius:20px;background:rgba(9,12,16,.9);border:1px solid rgba(255,200,64,.4)">
+          <span style="color:#ffc840"><bs-icon name="grid" size="14"></bs-icon></span>
+          <span style="font:600 11px/1 Archivo,sans-serif;color:#e6e9ee">Drag across the bench to lay out drill holes</span>
+          <span style="width:1px;height:14px;background:rgba(255,255,255,.16)"></span>
+          <span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#b0b9c4">right-drag orbits · Esc cancels</span>
+        </div>
+        <div style="display:flex;align-items:stretch;gap:0;align-self:center;border-radius:7px;background:#141920;border:1px solid rgba(255,200,64,.34);box-shadow:0 14px 38px rgba(0,0,0,.55);overflow:hidden">
+          <div style="display:flex;align-items:center;gap:9px;padding:0 14px;background:rgba(255,200,64,.1);border-right:1px solid rgba(255,255,255,.09)">
+            <span style="color:#ffc840"><bs-icon name="grid" size="15"></bs-icon></span>
+            <div style="display:flex;flex-direction:column;gap:2px;padding:9px 0">
+              <span style="font:700 11px/1 Archivo,sans-serif;letter-spacing:.1em;color:#ffc840">DESIGNATED BLASTING ZONE</span>
+              <span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#b0b9c4">12 × 8 tiles · bench 3</span>
+            </div>
+          </div>
+          <sc-for list="{{ params }}" as="p" hint-placeholder-count="3">
+            <div style="display:flex;flex-direction:column;gap:4px;padding:7px 12px;border-right:1px solid rgba(255,255,255,.07)">
+              <span style="font:600 10px/1 Archivo,sans-serif;letter-spacing:.12em;color:#8a94a2">{{ p.k }}</span>
+              <div style="display:flex;align-items:center;gap:7px">
+                <span style="width:19px;height:19px;display:flex;align-items:center;justify-content:center;border-radius:3px;background:rgba(255,255,255,.07);color:#b0b9c4"><bs-icon name="minus" size="9"></bs-icon></span>
+                <span style="font:600 12px/1 'IBM Plex Mono',monospace;min-width:44px;text-align:center">{{ p.v }}</span>
+                <span style="width:19px;height:19px;display:flex;align-items:center;justify-content:center;border-radius:3px;background:rgba(255,255,255,.07);color:#b0b9c4"><bs-icon name="plus" size="9"></bs-icon></span>
+              </div>
+            </div>
+          </sc-for>
+          <div style="display:flex;flex-direction:column;gap:4px;padding:7px 14px;border-right:1px solid rgba(255,255,255,.07)">
+            <span style="font:600 10px/1 Archivo,sans-serif;letter-spacing:.12em;color:#8a94a2">RESULT</span>
+            <span style="font:600 12px/1 'IBM Plex Mono',monospace;color:#ffc840">4 × 3 holes · $1,474</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:7px;padding:7px 12px">
+            <span style="display:flex;align-items:center;gap:7px;height:30px;padding:0 13px;border-radius:4px;background:#ffc840;color:#1a1206;font:800 11px/1 Archivo,sans-serif;letter-spacing:.12em"><bs-icon name="check" size="12"></bs-icon>CONFIRM</span>
+            <span style="display:flex;align-items:center;height:30px;padding:0 11px;border-radius:4px;border:1px solid rgba(255,255,255,.16);color:#c9d1db;font:600 11px/1 Archivo,sans-serif;letter-spacing:.1em">ESC</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:16px;align-self:center;padding-top:4px">
+          <sc-for list="{{ stripNotes }}" as="n" hint-placeholder-count="3">
+            <div style="display:flex;align-items:center;gap:6px"><span style="width:5px;height:5px;border-radius:50%;background:#ffc840"></span><span style="font:400 11px/1.4 Archivo,sans-serif;color:#b0b9c4">{{ n }}</span></div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:18px">
+      <div style="display:flex;align-items:baseline;gap:12px"><span style="font:800 13px/1 Archivo,sans-serif;letter-spacing:.2em">04 · VARIANTS</span><span style="flex:1;height:1px;background:rgba(255,255,255,.09)"></span><span style="font:400 11px/1 Archivo,sans-serif;color:#8a94a2">same tokens, different footprint</span></div>
+      <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px">
+        <sc-for list="{{ variants }}" as="v" hint-placeholder-count="3">
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div style="border-radius:7px;background:#0f1319;border:1px solid rgba(255,255,255,.08);overflow:hidden;position:relative">
+              <svg viewBox="-200 -70 460 300" style="display:block;width:100%;height:auto">
+                <sc-for list="{{ v.terrain }}" as="c" hint-placeholder-count="140">
+                  <polygon points="{{ c.pts }}" fill="{{ c.fill }}" stroke="{{ c.stroke }}" stroke-width=".5"></polygon>
+                </sc-for>
+                <sc-for list="{{ v.cells }}" as="c" hint-placeholder-count="20">
+                  <polygon points="{{ c.pts }}" fill="{{ c.fill }}" stroke="{{ c.stroke }}" stroke-width="{{ c.sw }}"></polygon>
+                </sc-for>
+                <sc-if value="{{ v.radius }}" hint-placeholder-val="{{ null }}">
+                  <ellipse cx="{{ v.radius.cx }}" cy="{{ v.radius.cy }}" rx="{{ v.radius.rx }}" ry="{{ v.radius.ry }}" fill="rgba(63,208,192,.12)" stroke="#3fd0c0" stroke-width="2" stroke-dasharray="6 4"></ellipse>
+                </sc-if>
+                <sc-if value="{{ v.line }}" hint-placeholder-val="{{ null }}">
+                  <polyline points="{{ v.line }}" fill="none" stroke="#ffc840" stroke-width="3" stroke-linecap="round"></polyline>
+                </sc-if>
+                <sc-for list="{{ v.holes }}" as="h" hint-placeholder-count="6">
+                  <ellipse cx="{{ h.cx }}" cy="{{ h.cy }}" rx="4.4" ry="2.5" fill="rgba(11,14,18,.7)" stroke="{{ v.dotColor }}" stroke-width="1.6"></ellipse>
+                </sc-for>
+              </svg>
+              <div style="position:absolute;left:10px;top:10px;padding:5px 9px;border-radius:4px;background:rgba(9,12,16,.86);border:1px solid rgba(255,255,255,.12)">
+                <span style="font:600 10px/1 Archivo,sans-serif;letter-spacing:.12em;color:{{ v.tagColor }}">{{ v.tag }}</span>
+              </div>
+              <div style="position:absolute;right:10px;bottom:10px;display:flex;align-items:center;gap:7px;padding:6px 10px;border-radius:5px;background:rgba(9,12,16,.92);border:1px solid {{ v.chipBorder }}">
+                <span style="color:{{ v.tagColor }}"><bs-icon name="{{ v.icon }}" size="12"></bs-icon></span>
+                <span style="font:600 11px/1 'IBM Plex Mono',monospace;color:{{ v.tagColor }}">{{ v.readout }}</span>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:5px">
+              <span style="font:700 11px/1 Archivo,sans-serif;letter-spacing:.12em;color:{{ v.tagColor }}">{{ v.title }}</span>
+              <span style="font:400 11px/1.55 Archivo,sans-serif;color:#b0b9c4;text-wrap:pretty">{{ v.caption }}</span>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:18px">
+      <div style="display:flex;align-items:baseline;gap:12px"><span style="font:800 13px/1 Archivo,sans-serif;letter-spacing:.2em">05 · STATE INVENTORY</span><span style="flex:1;height:1px;background:rgba(255,255,255,.09)"></span><span style="font:400 11px/1 Archivo,sans-serif;color:#8a94a2">spec §10.3, per component</span></div>
+      <div style="border-radius:7px;overflow:hidden;border:1px solid rgba(255,255,255,.08)">
+        <div style="display:flex;padding:10px 14px;background:#1a2028;font:700 10px/1 Archivo,sans-serif;letter-spacing:.14em;color:#8a94a2">
+          <span style="width:150px;flex:0 0 150px">COMPONENT</span><span style="flex:1">DEFAULT</span><span style="flex:1">HOVER / ACTIVE</span><span style="flex:1">DISABLED · REASON</span><span style="flex:1">WARNING / CRITICAL</span><span style="flex:1">LOCKED / PINNED</span>
+        </div>
+        <sc-for list="{{ inventory }}" as="i" hint-placeholder-count="6">
+          <div style="display:flex;padding:11px 14px;background:#141920;border-top:1px solid rgba(255,255,255,.05);font:400 11px/1.45 Archivo,sans-serif">
+            <span style="width:150px;flex:0 0 150px;font-weight:600;color:#e6e9ee">{{ i.c }}</span>
+            <span style="flex:1;color:#b0b9c4;padding-right:12px">{{ i.d }}</span>
+            <span style="flex:1;color:#b0b9c4;padding-right:12px">{{ i.h }}</span>
+            <span style="flex:1;color:#b0b9c4;padding-right:12px">{{ i.x }}</span>
+            <span style="flex:1;color:#b0b9c4;padding-right:12px">{{ i.w }}</span>
+            <span style="flex:1;color:#b0b9c4">{{ i.p }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:18px">
+      <div style="display:flex;align-items:baseline;gap:12px"><span style="font:800 13px/1 Archivo,sans-serif;letter-spacing:.2em">06 · TOKENS</span><span style="flex:1;height:1px;background:rgba(255,255,255,.09)"></span><span style="font:400 11px/1 Archivo,sans-serif;color:#8a94a2">shared by all four pickers</span></div>
+      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">
+        <div style="padding:16px;border-radius:7px;background:#141920;border:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;gap:11px">
+          <span style="font:600 10px/1 Archivo,sans-serif;letter-spacing:.16em;color:#8a94a2">COLOUR ROLES</span>
+          <sc-for list="{{ tokens }}" as="t" hint-placeholder-count="5">
+            <div style="display:flex;align-items:center;gap:11px">
+              <span style="width:30px;height:18px;flex:0 0 30px;border-radius:3px;background:{{ t.swatch }};border:1px solid {{ t.hex }}"></span>
+              <span style="font:600 11px/1 'IBM Plex Mono',monospace;color:{{ t.hex }};width:70px;flex:0 0 70px">{{ t.hex }}</span>
+              <span style="font:400 11px/1.45 Archivo,sans-serif;color:#b0b9c4;flex:1;text-wrap:pretty">{{ t.role }}</span>
+            </div>
+          </sc-for>
+          <span style="font:400 11px/1.5 Archivo,sans-serif;color:#8a94a2;text-wrap:pretty">Amber was lightened from #ffb02e to #ffc840 for in-scene use only: on sandy rock the HUD amber loses separation, and the selection has to hold on sand, grey and near-black basalt alike. Blue stays reserved for tutorial pinning — the player never sees the two roles at once except in the pinned state, where the contrast between them is the message.</span>
+        </div>
+        <div style="padding:16px;border-radius:7px;background:#141920;border:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;gap:11px">
+          <span style="font:600 10px/1 Archivo,sans-serif;letter-spacing:.16em;color:#8a94a2">GEOMETRY &amp; MOTION</span>
+          <div style="display:flex;flex-direction:column;gap:1px;background:rgba(255,255,255,.07);border-radius:5px;overflow:hidden">
+            <sc-for list="{{ geo }}" as="g" hint-placeholder-count="7">
+              <div style="display:flex;align-items:baseline;gap:10px;padding:8px 11px;background:#11161c">
+                <span style="font:400 11px/1.4 Archivo,sans-serif;color:#b0b9c4;flex:1">{{ g.k }}</span>
+                <span style="font:600 11px/1.4 'IBM Plex Mono',monospace;color:#ffc840;text-align:right">{{ g.v }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1320,&quot;height&quot;:960}}">
+const TW = 17, TH = 9, HH = 13, NX = 14, NY = 10;
+const iso = (x, y, h) => [((x - y) * TW).toFixed(1), ((x + y) * TH - h * HH).toFixed(1)];
+const quad = (x, y, h) => [iso(x, y, h), iso(x + 1, y, h), iso(x + 1, y + 1, h), iso(x, y + 1, h)].map((p) => p.join(',')).join(' ');
+const faceX = (x, y, h, nh) => [iso(x + 1, y, h), iso(x + 1, y + 1, h), iso(x + 1, y + 1, nh), iso(x + 1, y, nh)].map((p) => p.join(',')).join(' ');
+const faceY = (x, y, h, nh) => [iso(x, y + 1, h), iso(x + 1, y + 1, h), iso(x + 1, y + 1, nh), iso(x, y + 1, nh)].map((p) => p.join(',')).join(' ');
+const centre = (x, y, h) => iso(x + 0.5, y + 0.5, h);
+
+const ROCK = ['#3a3730', '#4a463c', '#5c5647', '#6f6753'];
+const shade = (hex, f) => {
+  const n = parseInt(hex.slice(1), 16);
+  const r = Math.round(((n >> 16) & 255) * f), g = Math.round(((n >> 8) & 255) * f), b = Math.round((n & 255) * f);
+  return 'rgb(' + r + ',' + g + ',' + b + ')';
+};
+
+const HEIGHTS = {
+  bench: (x, y) => (x <= 4 ? 2 : x <= 7 ? 1 : 0),
+  crater: (x, y) => Math.max(0, 2 - Math.round(2.6 * Math.exp(-(((x - 7) * (x - 7)) + ((y - 5) * (y - 5))) / 9))),
+  ridge: (x, y) => (y >= 7 ? 3 : y >= 6 ? 2 : 0),
+  flat: (x, y) => (x >= 10 ? 1 : 0)
+};
+
+function buildTerrain(hf, frontFrom, dim) {
+  const lit = (x, y) => !dim || (x >= dim.x0 && x <= dim.x1 && y >= dim.y0 && y <= dim.y1);
+  const back = [], front = [];
+  const tiles = [];
+  for (let y = 0; y < NY; y++) for (let x = 0; x < NX; x++) tiles.push({ x, y, h: hf(x, y) });
+  tiles.sort((a, b) => (a.x + a.y) - (b.x + b.y) || a.h - b.h);
+  tiles.forEach((t) => {
+    const base = ROCK[Math.min(ROCK.length - 1, t.h)];
+    const bucket = (frontFrom !== undefined && t.y >= frontFrom) ? front : back;
+    const nhx = t.x + 1 < NX ? hf(t.x + 1, t.y) : -1;
+    const nhy = t.y + 1 < NY ? hf(t.x, t.y + 1) : -1;
+    const d = lit(t.x, t.y) ? 1 : 0.45;
+    if (t.h > nhx) bucket.push({ pts: faceX(t.x, t.y, t.h, nhx), fill: shade(base, 0.62 * d), stroke: 'rgba(0,0,0,.25)' });
+    if (t.h > nhy) bucket.push({ pts: faceY(t.x, t.y, t.h, nhy), fill: shade(base, 0.78 * d), stroke: 'rgba(0,0,0,.25)' });
+    bucket.push({ pts: quad(t.x, t.y, t.h), fill: shade(base, d), stroke: 'rgba(0,0,0,.22)' });
+  });
+  return { back, front };
+}
+
+function buildSelection(hf, rect, opts) {
+  const o = opts || {};
+  const inRect = (x, y) => x >= rect.x0 && x <= rect.x1 && y >= rect.y0 && y <= rect.y1;
+  const cells = [], xray = [], border = [], holes = [], corners = [];
+  const invalid = o.invalid || (() => false);
+  const occluded = o.occluded || (() => false);
+  for (let y = rect.y0; y <= rect.y1; y++) for (let x = rect.x0; x <= rect.x1; x++) {
+    const h = hf(x, y), bad = invalid(x, y);
+    if (occluded(x, y)) { xray.push({ pts: quad(x, y, h) }); continue; }
+    cells.push({
+      pts: quad(x, y, h),
+      fill: bad ? 'rgba(255,91,76,.3)' : (o.fill || 'rgba(255,200,64,.26)'),
+      stroke: bad ? 'rgba(255,91,76,.85)' : (o.cellStroke || 'rgba(255,200,64,.5)'),
+      sw: o.cellLines ? '1' : '.6', dash: bad ? '3 2' : '0'
+    });
+  }
+  // border: every tile edge whose neighbour is outside the rectangle, at that tile's own height
+  for (let y = rect.y0; y <= rect.y1; y++) for (let x = rect.x0; x <= rect.x1; x++) {
+    const h = hf(x, y);
+    const seg = (ax, ay, bx, by) => { const A = iso(ax, ay, h), B = iso(bx, by, h); border.push({ x1: A[0], y1: A[1], x2: B[0], y2: B[1] }); };
+    if (!inRect(x, y - 1)) seg(x, y, x + 1, y);
+    if (!inRect(x, y + 1)) seg(x, y + 1, x + 1, y + 1);
+    if (!inRect(x - 1, y)) seg(x, y, x, y + 1);
+    if (!inRect(x + 1, y)) seg(x + 1, y, x + 1, y + 1);
+  }
+  const sp = o.spacing || 3;
+  for (let y = rect.y0; y <= rect.y1; y += sp) for (let x = rect.x0; x <= rect.x1; x += sp) {
+    if (invalid(x, y) || occluded(x, y)) continue;
+    const c = centre(x, y, hf(x, y));
+    holes.push({ cx: c[0], cy: c[1] });
+  }
+  [[rect.x0, rect.y0], [rect.x1, rect.y0], [rect.x0, rect.y1], [rect.x1, rect.y1]].forEach(([cx, cy]) => {
+    const h = hf(cx, cy);
+    const dx = cx === rect.x0 ? 1 : -1, dy = cy === rect.y0 ? 1 : -1;
+    const ox = cx === rect.x0 ? cx : cx + 1, oy = cy === rect.y0 ? cy : cy + 1;
+    const P = [iso(ox + dx * 0.9, oy, h), iso(ox, oy, h), iso(ox, oy + dy * 0.9, h)];
+    corners.push({ pts: P.map((p) => p.join(',')).join(' ') });
+  });
+  return { cells, xray, border, holes, corners };
+}
+
+class Component extends DCLogic {
+  renderVals() {
+    const benchT = buildTerrain(HEIGHTS.bench);
+    const benchS = buildSelection(HEIGHTS.bench, { x0: 2, y0: 3, x1: 9, y1: 7 }, { spacing: 3, cellLines: true });
+    const cratT = buildTerrain(HEIGHTS.crater);
+    const cratS = buildSelection(HEIGHTS.crater, { x0: 4, y0: 2, x1: 10, y1: 7 }, {
+      spacing: 3, invalid: (x, y) => (x >= 8 && x <= 9 && y >= 5 && y <= 6)
+    });
+    const ridgeT = buildTerrain(HEIGHTS.ridge, 6);
+    const ridgeS = buildSelection(HEIGHTS.ridge, { x0: 3, y0: 1, x1: 10, y1: 5 }, {
+      spacing: 3, occluded: (x, y) => y >= 4
+    });
+    const pinT = buildTerrain(HEIGHTS.flat, undefined, { x0: 3, y0: 2, x1: 8, y1: 6 });
+    const pinS = buildSelection(HEIGHTS.flat, { x0: 3, y0: 2, x1: 8, y1: 6 }, {
+      spacing: 3, fill: 'rgba(122,184,255,.24)', cellStroke: 'rgba(122,184,255,.6)'
+    });
+
+    const rampT = buildTerrain(HEIGHTS.bench);
+    const rampCells = buildSelection(HEIGHTS.bench, { x0: 3, y0: 4, x1: 9, y1: 5 }, { spacing: 99 }).cells;
+    const rampA = centre(3, 4, HEIGHTS.bench(3, 4)), rampB = centre(9, 5, HEIGHTS.bench(9, 5));
+
+    const buildT = buildTerrain(HEIGHTS.flat);
+    const buildS = buildSelection(HEIGHTS.flat, { x0: 5, y0: 3, x1: 8, y1: 6 }, { spacing: 99, fill: 'rgba(79,199,107,.26)', cellStroke: 'rgba(79,199,107,.7)' });
+
+    const survT = buildTerrain(HEIGHTS.crater);
+    const survC = centre(7, 5, HEIGHTS.crater(7, 5));
+
+    return {
+      states: [
+        { n: 1, title: 'IDLE', body: 'Nothing armed. The Grid Tool button sits in step 1 of the Blast Workshop with its normal ghost styling.', border: 'rgba(255,255,255,.08)', dotBg: 'rgba(255,255,255,.09)', dotFg: '#b0b9c4', titleColor: '#b0b9c4',
+          rows: [{ k: 'CURSOR', v: 'default' }, { k: 'CAMERA', v: 'left orbit · right pan · wheel zoom' }, { k: 'TERRAIN', v: '—' }] },
+        { n: 2, title: 'ARMED', body: 'Button locks to its active state, a 1px amber inner border traces the viewport, and the instruction chip appears above the parameter strip.', border: 'rgba(255,200,64,.4)', dotBg: '#ffc840', dotFg: '#1a1206', titleColor: '#ffc840',
+          rows: [{ k: 'CURSOR', v: 'crosshair' }, { k: 'CAMERA', v: 'left is TAKEN · right orbits' }, { k: 'TERRAIN', v: 'grid lines fade in at 30%' }, { k: 'EXIT', v: 'Esc · right-click · re-press button' }] },
+        { n: 3, title: 'HOVERING', body: 'The tile under the cursor lifts to a solid amber outline and a tag follows the cursor with its coordinates and whatever the last survey knows about that column.', border: 'rgba(255,200,64,.4)', dotBg: '#ffc840', dotFg: '#1a1206', titleColor: '#ffc840',
+          rows: [{ k: 'TAG', v: '(37, 21) · 6.0 m to bench floor' }, { k: 'ORE', v: 'Grumpite 46% · 78% conf · 12 h old' }, { k: 'STALE', v: 'tag greys out past four days' }] },
+        { n: 4, title: 'DRAGGING', body: 'Left-drag paints the rectangle from the anchor tile. The readout rides 16px below-right of the cursor and updates every tile crossed.', border: 'rgba(255,200,64,.4)', dotBg: '#ffc840', dotFg: '#1a1206', titleColor: '#ffc840',
+          rows: [{ k: 'READOUT', v: '12 × 8 tiles · 4 × 3 holes · 6.0 m' }, { k: 'SNAP', v: 'whole tiles only, no sub-tile drag' }, { k: 'LIMIT', v: 'clamps at world edge, no error state' }] },
+        { n: 5, title: 'SELECTED', body: 'Release keeps the rectangle live and editable. Corner handles appear; re-dragging anywhere starts a fresh rectangle. Nothing is committed yet.', border: 'rgba(255,200,64,.4)', dotBg: '#ffc840', dotFg: '#1a1206', titleColor: '#ffc840',
+          rows: [{ k: 'HANDLES', v: '4 corners, 18px hit target' }, { k: 'LIVE', v: 'spacing change moves hole markers' }, { k: 'STRIP', v: 'readout becomes the parameter strip' }] },
+        { n: 6, title: 'CONFIRMED', body: 'Enter or Confirm. The area flashes once, hole markers harden into the existing 3D drill-hole overlay, and the tool disarms itself.', border: 'rgba(79,199,107,.34)', dotBg: '#4fc76b', dotFg: '#06210d', titleColor: '#4fc76b',
+          rows: [{ k: 'FLASH', v: '220 ms amber sweep along +X' }, { k: 'COMMAND', v: 'drill_plan grid rows: cols: spacing: depth: start:' }, { k: 'THEN', v: 'returns to IDLE, panel shows 9 holes' }] }
+      ],
+      remap: [
+        { input: 'Left drag', normal: 'orbit', armed: 'paint the rectangle' },
+        { input: 'Right drag', normal: 'pan', armed: 'orbit (temporary swap)' },
+        { input: 'Middle drag', normal: 'pan', armed: 'pan (unchanged)' },
+        { input: 'Wheel', normal: 'zoom', armed: 'zoom (unchanged)' },
+        { input: 'Right click', normal: '—', armed: 'cancel, disarm' },
+        { input: 'Esc', normal: 'close panel', armed: 'cancel, disarm (panel stays open)' }
+      ],
+      touch: [
+        { icon: 'grid', k: 'One finger drags the rectangle', v: 'While armed, single-finger orbit is suspended — the same swap as the mouse, and the chip says so.' },
+        { icon: 'layers', k: 'Two fingers orbit and pinch', v: 'Unchanged from normal play, so the camera is never trapped.' },
+        { icon: 'plus', k: 'Tap-tap corners as a fallback', v: 'Tap one corner, tap the opposite one. For anyone who cannot hold a drag across a bench edge.' },
+        { icon: 'locate', k: 'Handles are 44px on touch', v: 'Corner handles grow from 18 to 44px, and the parameter strip gets 44px steppers.' }
+      ],
+      scenes: [
+        { title: 'FLAT BENCH · CLOSE ZOOM', tag: 'SELECTED', tagColor: '#ffc840', borderColor: '#ffc840',
+          terrain: benchT.back, front: [], cells: benchS.cells, xray: [], border: benchS.border, holes: benchS.holes, corners: benchS.corners,
+          readout: '8 × 5 tiles · 3 × 2 holes', readout2: 'spacing 3.0 m · depth 6.0 m',
+          caption: 'Per-tile quads sit on each column top, so the fill steps down the bench face instead of shearing through it. Cell lines only draw in at this zoom; the border stays 2.4px in screen space at every distance so the silhouette never thins out.' },
+        { title: 'CRATER · REJECTED CELLS', tag: '2 TILES REJECTED', tagColor: '#ff8a7e', borderColor: '#ffc840',
+          terrain: cratT.back, front: [], cells: cratS.cells, xray: [], border: cratS.border, holes: cratS.holes, corners: cratS.corners,
+          readout: '7 × 6 tiles · 34 valid', readout2: '2 rejected · building footprint',
+          caption: 'Invalid tiles get a red dashed fill and lose their hole marker, but the amber rectangle border runs straight past them — the silhouette stays a rectangle so you can still read what you drew. The reason lands in the strip, not on the terrain.' },
+        { title: 'RIDGE · OCCLUSION', tag: 'PARTLY HIDDEN', tagColor: '#b0b9c4', borderColor: '#ffc840',
+          terrain: ridgeT.back, front: ridgeT.front, cells: ridgeS.cells, xray: ridgeS.xray, border: [], holes: ridgeS.holes, corners: [],
+          readout: '8 × 5 tiles', readout2: 'x-ray behind the ridge',
+          caption: 'The fill is depth-tested and genuinely disappears behind rock. What survives is a dashed amber outline at 55% drawn on top of everything, so the rectangle reads as continuing rather than as being clipped. Hole markers behind the ridge are suppressed entirely.' }
+      ],
+      anatomy: [
+        { k: 'VALID CELL', v: '26% amber fill, 0.6px border, 1px cell lines under 40 m camera distance.', pts: '4,30 34,15 64,30 34,45', fill: 'rgba(255,200,64,.26)', stroke: 'rgba(255,200,64,.6)', sw: '1.2', dash: '0', extra: [], labelColor: '#ffc840' },
+        { k: 'REJECTED CELL', v: 'Red dashed fill, no hole marker, keeps its place in the rectangle.', pts: '4,30 34,15 64,30 34,45', fill: 'rgba(255,91,76,.3)', stroke: 'rgba(255,91,76,.85)', sw: '1.2', dash: '4 3', extra: [], labelColor: '#ff8a7e' },
+        { k: 'OCCLUDED CELL', v: 'No fill. Dashed outline at 55%, drawn over the terrain that hides it.', pts: '4,30 34,15 64,30 34,45', fill: 'none', stroke: 'rgba(255,200,64,.55)', sw: '1.2', dash: '3 3', extra: [], labelColor: '#b0b9c4' },
+        { k: 'PINNED TARGET', v: 'Tutorial only. Blue fill, everything outside the region dims to 45% and rejects input.', pts: '4,30 34,15 64,30 34,45', fill: 'rgba(122,184,255,.24)', stroke: 'rgba(122,184,255,.7)', sw: '1.2', dash: '0', extra: [], labelColor: '#7ab8ff' }
+      ],
+      params: [{ k: 'SPACING', v: '3.0 m' }, { k: 'DEPTH', v: '6.0 m' }, { k: 'Ø', v: '89 mm' }],
+      stripNotes: [
+        'Docks bottom-centre of the free region — never over the selection or the panel',
+        'Spacing change re-lays the hole markers on the next frame',
+        'Cost updates from the loaded explosive, so the trade is visible before you commit'
+      ],
+      variants: [
+        { title: 'RAMP · LINE DRAG', tag: 'RAMP', tagColor: '#ffc840', chipBorder: 'rgba(255,200,64,.45)', icon: 'down', dotColor: '#ffc840',
+          terrain: rampT.back, cells: rampCells, line: [rampA.join(','), rampB.join(',')].join(' '), radius: null,
+          holes: [{ cx: rampA[0], cy: rampA[1] }, { cx: rampB[0], cy: rampB[1] }],
+          readout: '7 tiles · depth 4.0 m · ~$3,400',
+          caption: 'Drag start to end. The two endpoint rings are draggable after release, and the corridor shows the tiles the ramp will actually carve — width comes from the vehicle profile, not from the drag.' },
+        { title: 'BUILDING · POINT + FOOTPRINT', tag: 'VALID', tagColor: '#4fc76b', chipBorder: 'rgba(79,199,107,.45)', icon: 'check', dotColor: '#4fc76b',
+          terrain: buildT.back, cells: buildS.cells, line: null, radius: null, holes: [],
+          readout: '4 × 4 · Research Center · $25,000',
+          caption: 'The footprint ghost follows the cursor at tile resolution. Green means placeable; red flips the whole footprint and the chip names the single blocking reason. Cost rides in the chip so you never place blind.' },
+        { title: 'SURVEY · POINT + RADIUS', tag: 'SEISMIC', tagColor: '#3fd0c0', chipBorder: 'rgba(63,208,192,.45)', icon: 'survey', dotColor: '#3fd0c0',
+          terrain: survT.back, cells: [], line: null, radius: { cx: survC[0], cy: survC[1], rx: 118, ry: 62 },
+          holes: [{ cx: survC[0], cy: survC[1] }],
+          readout: 'r 20 cells · full depth · $3,000',
+          caption: 'The method\u2019s real radius is drawn on the ground before you commit, which turns aerial-versus-seismic from two numbers in a list into a visible trade. Teal, because this is knowledge rather than an intervention.' }
+      ],
+      pinnedTerrain: pinT.back, pinnedCells: pinS.cells, pinnedBorder: pinS.border,
+      pinNotes: [
+        { icon: 'check', color: '#4fc76b', t: 'Anchor inside the region: the drag proceeds normally, in blue rather than amber.' },
+        { icon: 'x', color: '#ff8a7e', t: 'Anchor outside: no rectangle starts, and the chip flashes once. No error toast — the dim already said it.' },
+        { icon: 'grid', color: '#7ab8ff', t: 'Partial match: cells inside the region fill blue, cells outside stay amber, so the mismatch is visible without a word of copy.' },
+        { icon: 'clock', color: '#8a94a2', t: 'The step\u2019s time budget is held while the tool is armed, so nobody starves mid-drag.' }
+      ],
+      inventory: [
+        { c: 'Grid Tool button', d: 'Ghost button, amber label', h: 'Border lifts to 28% white; active state is a filled amber tint that persists while armed', x: 'No drill rig on site — "Buy or hire a driller first"', w: 'Plan already has 9 holes — "Clear the plan or add to it?"', p: 'Tutorial highlight ring, all other panel controls inert' },
+        { c: 'Instruction chip', d: 'Hidden', h: 'n/a — never interactive', x: 'n/a', w: 'Turns amber-bordered when the drag would exceed 64 tiles', p: 'Copy swaps to "Match the outlined area"' },
+        { c: 'Terrain cell', d: 'Invisible until armed, then 30% grid lines', h: 'Solid amber outline + coord tag', x: 'Out of bounds — cursor shows a slashed circle, no anchor set', w: 'Protected voxel — amber hatch, still selectable but flagged in the strip', p: 'Outside the pinned region: dims to 45%, no hover response' },
+        { c: 'Selection rectangle', d: '26% amber fill, corner accents', h: 'Corner handle grows 18 → 22px', x: 'Zero valid tiles — Confirm disabled, "Every tile in this area is rejected"', w: 'Under 4 valid tiles — "This will not move much rock"', p: 'Blue fill when it matches the pinned region, amber while it does not' },
+        { c: 'Hole marker', d: 'Amber ring on terrain', h: 'Numbered label appears under 30 m camera distance', x: 'Suppressed on rejected and occluded tiles', w: 'Ring turns blue when the column is wet and untubed', p: 'Unchanged' },
+        { c: 'Parameter strip', d: 'Docked bottom-centre, 44px', h: 'Stepper backgrounds lift to 12% white', x: 'Confirm disabled with the blocking reason inline', w: 'Cost exceeds balance — cost turns red, Confirm still allowed', p: 'Spacing and depth locked to the tutorial values, steppers inert' }
+      ],
+      tokens: [
+        { hex: '#ffc840', swatch: 'rgba(255,200,64,.3)', role: 'Player selection — area, line, hole markers, corner accents, confirm' },
+        { hex: '#7ab8ff', swatch: 'rgba(122,184,255,.3)', role: 'Tutorial-pinned target region only. Never used for player intent.' },
+        { hex: '#ff5b4c', swatch: 'rgba(255,91,76,.3)', role: 'Rejected tiles and invalid footprints' },
+        { hex: '#4fc76b', swatch: 'rgba(79,199,107,.3)', role: 'Valid building placement — the one case with a binary yes/no' },
+        { hex: '#3fd0c0', swatch: 'rgba(63,208,192,.3)', role: 'Survey radius and any other knowledge overlay' }
+      ],
+      geo: [
+        { k: 'Rectangle border, screen space', v: '2.4 px' },
+        { k: 'Corner accent length', v: '0.9 tiles' },
+        { k: 'Cell fill opacity', v: '26%' },
+        { k: 'Cell lines appear below', v: '40 m cam' },
+        { k: 'Hole numbers appear below', v: '30 m cam' },
+        { k: 'Hover tile → outline', v: '90 ms' },
+        { k: 'Pinned region · outside dim', v: '45%' },
+        { k: 'Confirm flash sweep', v: '220 ms' },
+        { k: 'Arm / disarm chrome fade', v: '140 ms' }
+      ]
+    };
+  }
+}
+
+</script>
+</body>
+</html>

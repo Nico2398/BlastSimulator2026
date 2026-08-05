@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createGridPlan, addHole, resetHoleIds, digVoxel } from '../../../src/core/mining/DrillPlan.js';
+import { createGridPlan, addHole, removeHole, holeNumericId, resetHoleIds, digVoxel } from '../../../src/core/mining/DrillPlan.js';
 import type { DigVoxelResult } from '../../../src/core/mining/DrillPlan.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import type { VoxelData } from '../../../src/core/world/VoxelGrid.js';
@@ -39,6 +39,46 @@ describe('DrillPlan', () => {
     expect(added.x).toBe(10);
     expect(added.z).toBe(15);
     expect(added.depth).toBe(6);
+  });
+
+  it('removeHole removes the matching hole and returns true', () => {
+    const holes = createGridPlan({ x: 0, z: 0 }, 1, 2, 3, 8, 0.15);
+    const targetId = holes[0]!.id;
+
+    const removed = removeHole(holes, targetId);
+
+    expect(removed).toBe(true);
+    expect(holes.length).toBe(1);
+    expect(holes.find(h => h.id === targetId)).toBeUndefined();
+  });
+
+  it('removeHole returns false and leaves the plan untouched when the ID is unknown', () => {
+    const holes = createGridPlan({ x: 0, z: 0 }, 1, 2, 3, 8, 0.15);
+
+    const removed = removeHole(holes, 'H999');
+
+    expect(removed).toBe(false);
+    expect(holes.length).toBe(2);
+  });
+
+  it('removeHole on an empty plan returns false', () => {
+    const holes: ReturnType<typeof createGridPlan> = [];
+
+    expect(removeHole(holes, 'H1')).toBe(false);
+  });
+
+  it('holeNumericId parses the counter value out of a generated ID', () => {
+    expect(holeNumericId('H1')).toBe(1);
+    expect(holeNumericId('H42')).toBe(42);
+  });
+
+  it('holeNumericId round-trips IDs produced by createGridPlan and addHole', () => {
+    const holes = createGridPlan({ x: 0, z: 0 }, 1, 2, 3, 8, 0.15);
+    const added = addHole(holes, 5, 5, 8, 0.15);
+
+    expect(holeNumericId(holes[0]!.id)).toBe(1);
+    expect(holeNumericId(holes[1]!.id)).toBe(2);
+    expect(holeNumericId(added.id)).toBe(3);
   });
 });
 

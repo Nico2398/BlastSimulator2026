@@ -51,5 +51,9 @@ describe('Level 2 — Lose — Worker Revolt', () => {
     // Verify revolt triggered
     expect(ctx.state!.revolt.revolted).toBe(true);
     expect(ctx.state!.revolt.ticksAtZero).toBeGreaterThanOrEqual(120);
+
+    // Verify the level itself ends, with the reason attributed to the revolt
+    expect(ctx.state!.levelEnded).toBe(true);
+    expect(ctx.state!.levelEndReason).toBe('worker_revolt');
   });
 });

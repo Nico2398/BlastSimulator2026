@@ -83,6 +83,23 @@ export interface VibrationPreview {
   maxVibration: number;
 }
 
+/**
+ * Structured, persisted snapshot of the last `blast_preview` run — what the
+ * Preview step (redesign P4/§5) reads, mirroring how BlastReport serves the
+ * Fire step. Null until the player has run an analysis at least once.
+ * `avgFragmentSizeCm` and `collapseFragments` are pre-converted to the same
+ * real units `previewHoleDetails`/`blastPreviewCommand` already use — the raw
+ * `FragmentPreview.avgFragmentSize` is a 0–1 fraction of a voxel's edge, not
+ * a size on its own.
+ */
+export interface BlastPreviewSummary {
+  tier: number;
+  energy: { affectedVoxels: number; minEnergy: number; maxEnergy: number } | null;
+  fragments: { fractured: number; cracked: number; unaffected: number; avgFragmentSizeCm: number } | null;
+  projections: { projectionZoneVoxels: number; collapseFragments: number } | null;
+  vibrations: { maxVibration: number; affectedVillages: number } | null;
+}
+
 // ── Software state ──
 
 export interface SoftwareState {

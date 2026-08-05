@@ -16,8 +16,8 @@ import {
 import { playtestFiles, loadPlaytestFile } from '../../scripts/shared/playtest-utils.js';
 
 const KNOWN_ACTION_TYPES: ReadonlyArray<PlayerAction['do']> = [
-  'click', 'clickLabel', 'set', 'pickTile', 'dragTiles',
-  'awaitUsable', 'awaitTutorialStep', 'letTimePass',
+  'click', 'clickLabel', 'set', 'pickTile', 'dragTiles', 'clickEntity',
+  'zoomOut', 'focusTile', 'awaitUsable', 'awaitTutorialStep', 'letTimePass',
 ];
 
 /** Actions that carry a selector the driver will look up verbatim. */

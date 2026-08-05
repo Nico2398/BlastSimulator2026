@@ -7,7 +7,7 @@ import type { FinanceState } from '../economy/Finance.js';
 import { addIncome, addExpense } from '../economy/Finance.js';
 import type { EventConsequence } from './EventPool.js';
 import { getEventById } from './EventPool.js';
-import type { EventSystemState } from './EventSystem.js';
+import type { EventSystemState, EventEffect, EventOutcome } from './EventSystem.js';
 import { clearPendingEvent, queueFollowUp } from './EventSystem.js';
 
 // ── Resolution result ──
@@ -67,10 +67,37 @@ export function resolveEvent(
     tick,
   );
 
-  // Clear the pending event
+  // Clear the pending event; record the outcome for the UI to read directly
+  // instead of parsing this function's console-facing effects: string[].
   clearPendingEvent(eventSystem);
+  eventSystem.lastOutcome = buildEventOutcome(result);
 
   return result;
+}
+
+/**
+ * Structured replacement for ResolutionResult.effects's pre-formatted English
+ * sentences ("Gained $500", "safety +8") — built from the same already-
+ * structured cashChange/scoreChanges/corruptionChange/followUpQueued fields,
+ * not by re-parsing the sentences themselves.
+ */
+function buildEventOutcome(result: ResolutionResult): EventOutcome {
+  const effects: EventEffect[] = [];
+
+  if (result.cashChange !== 0) {
+    effects.push({ kind: 'cash', key: 'cash', delta: result.cashChange });
+  }
+  for (const [key, delta] of Object.entries(result.scoreChanges)) {
+    effects.push({ kind: 'score', key, delta: delta as number });
+  }
+  if (result.corruptionChange !== 0) {
+    effects.push({ kind: 'other', key: 'corruption', delta: result.corruptionChange });
+  }
+  if (result.followUpQueued) {
+    effects.push({ kind: 'other', key: 'followUp', delta: 0, textKey: 'ui.event.follow_up_developing' });
+  }
+
+  return { eventId: result.eventId, resultKey: result.resultKey, effects };
 }
 
 function resolveConsequence(

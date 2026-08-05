@@ -131,6 +131,27 @@ export function deserialize(json: string): GameState {
     (obj as Record<string, unknown>)['collectedOre'] = {};
   }
 
+  // v6 → v7: softwareTier/tubingState moved onto GameState from the
+  // console-only MiningContext, so a save from before this had neither.
+  if (typeof obj['softwareTier'] !== 'number') {
+    (obj as Record<string, unknown>)['softwareTier'] = 0;
+  }
+  if (typeof obj['tubingState'] !== 'object' || obj['tubingState'] === null) {
+    (obj as Record<string, unknown>)['tubingState'] = { inventory: 0, installedHoles: new Set<string>() };
+  } else {
+    const tubingRaw = obj['tubingState'] as Record<string, unknown>;
+    const installed = tubingRaw['installedHoles'];
+    if (installed && typeof installed === 'object' && '__type' in (installed as Record<string, unknown>)) {
+      const setData = installed as { __type: string; values: string[] };
+      if (setData.__type === 'Set') tubingRaw['installedHoles'] = new Set(setData.values);
+    } else if (Array.isArray(installed)) {
+      tubingRaw['installedHoles'] = new Set(installed as string[]);
+    } else if (!(installed instanceof Set)) {
+      tubingRaw['installedHoles'] = new Set<string>();
+    }
+    if (typeof tubingRaw['inventory'] !== 'number') tubingRaw['inventory'] = 0;
+  }
+
   // v6: navGrid is never part of the JSON (see serialize's replacer) — always
   // null here, regardless of what an older save happened to carry. The
   // loader is responsible for rebuilding a real one.

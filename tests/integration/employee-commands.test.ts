@@ -353,6 +353,25 @@ describe('Console — employee hire (regression)', () => {
     expect(result.success).toBe(false);
     expect(result.output).toContain('Usage: employee hire role:');
   });
+
+  it('gives two employees hired in the same tick different names (dedup fix)', () => {
+    // Both hires run at tickCount:0 — before the fix, `new Random(state.seed +
+    // state.tickCount)` re-seeded identically for both, so rng.pick() always
+    // returned the same first/last name pair twice in a row.
+    employeeCommand(ctx, ['hire'], { role: 'driller' });
+    employeeCommand(ctx, ['hire'], { role: 'driller' });
+
+    const [first, second] = ctx.state!.employees.employees;
+    expect(first!.name).not.toBe(second!.name);
+  });
+
+  it('stamps hiredAtTick with the current tick', () => {
+    ctx.state!.tickCount = 17;
+
+    employeeCommand(ctx, ['hire'], { role: 'surveyor' });
+
+    expect(ctx.state!.employees.employees[0]!.hiredAtTick).toBe(17);
+  });
 });
 
 // ── employee dispatch ────────────────────────────────────────────────────────

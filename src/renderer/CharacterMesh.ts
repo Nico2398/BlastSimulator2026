@@ -6,9 +6,12 @@
 
 import * as THREE from 'three';
 import type { Employee, EmployeeRole } from '../core/entities/Employee.js';
+import { tagPickable } from './Pickable.js';
 
 // ---------- Role colors (bright, distinct) ----------
-const ROLE_COLORS: Record<EmployeeRole, number> = {
+// Exported for the Crew panel's roster avatars (redesign P6) — same hue as
+// the in-scene character mesh, so a player can match a card to its worker.
+export const ROLE_COLORS: Record<EmployeeRole, number> = {
   driller:  0x2266ff, // blue
   blaster:  0xff4422, // red-orange
   driver:   0xffcc00, // yellow
@@ -74,6 +77,7 @@ export class CharacterMesh {
     group.add(hat);
 
     group.position.set(employee.x, surfaceY, employee.z);
+    tagPickable(group, 'employee', employee.id);
     this.scene.add(group);
     this.characters.set(employee.id, { group, bodyMat, headMat, employee, evacuating: false });
   }
@@ -152,6 +156,16 @@ export class CharacterMesh {
 
   get count(): number {
     return this.characters.size;
+  }
+
+  /** Root objects raycastable for scene picking — one Group per employee, tagged in addEmployee(). */
+  pickables(): THREE.Object3D[] {
+    return Array.from(this.characters.values(), e => e.group);
+  }
+
+  /** Current world-space position of an employee's root Group, or null if it isn't rendered. */
+  getPosition(id: number): THREE.Vector3 | null {
+    return this.characters.get(id)?.group.position.clone() ?? null;
   }
 
   dispose(): void {

@@ -98,6 +98,8 @@ export class FragmentMesh {
   private static readonly _mtx = new THREE.Matrix4();
   private static readonly _scale = new THREE.Vector3();
   private static readonly _pos = new THREE.Vector3();
+  /** Scratch quaternion for Matrix4.decompose in fragmentPosition() — its value is discarded, only position is read. */
+  private static readonly _quat = new THREE.Quaternion();
   /** Identity settle-scale, reused for the spawn matrix (fragment is at rest, untumbled, unsettled). */
   private static readonly _unitScale = { x: 1, y: 1, z: 1 };
   /** Which buckets `updateTransforms` touched this call — reused so a frame with many fragments allocates nothing. */
@@ -126,6 +128,11 @@ export class FragmentMesh {
       const im = new THREE.InstancedMesh(geo, material, BUCKET_CAPACITY);
       im.count = 0;
       im.frustumCulled = false; // fragments fly around; disable per-instance culling
+      // Tagged for scene picking (P2): one InstancedMesh represents many
+      // fragments, so a raycast hit resolves via (bucketIndex, instanceId) →
+      // fragmentIdAt() rather than a single entityId like other entity kinds.
+      im.userData['entityKind'] = 'fragment';
+      im.userData['bucketIndex'] = i;
       scene.add(im);
       this.instancedMeshes.push(im);
       this.bucketSlotToFrag.push(new Array<number>(BUCKET_CAPACITY).fill(-1));
@@ -284,6 +291,32 @@ export class FragmentMesh {
   /** Get count of currently rendered fragments. */
   get count(): number {
     return this.bucketCount.reduce((a, b) => a + b, 0);
+  }
+
+  /** Root objects raycastable for scene picking — the 8 shape-variant buckets, tagged in the constructor. */
+  pickables(): THREE.Object3D[] {
+    return this.instancedMeshes;
+  }
+
+  /**
+   * Resolve a raycast hit on a fragment bucket (bucketIndex from
+   * `im.userData['bucketIndex']`, instanceId from the Intersection) back to
+   * the fragment id occupying that instance slot. Returns null out of range.
+   */
+  fragmentIdAt(bucketIndex: number, instanceId: number): number | null {
+    const bucket = this.bucketSlotToFrag[bucketIndex];
+    const fragId = bucket?.[instanceId];
+    return fragId === undefined || fragId < 0 ? null : fragId;
+  }
+
+  /** World-space position of a fragment still on the field, or null if it isn't (removed/never spawned). */
+  fragmentPosition(fragmentId: number): THREE.Vector3 | null {
+    const slot = this.fragIdToSlot.get(fragmentId);
+    if (!slot) return null;
+    const im = this.instancedMeshes[slot.meshIdx]!;
+    im.getMatrixAt(slot.slotIdx, FragmentMesh._mtx);
+    FragmentMesh._mtx.decompose(FragmentMesh._pos, FragmentMesh._quat, FragmentMesh._scale);
+    return FragmentMesh._pos.clone();
   }
 
   /** Remove instanced meshes from the scene. Geometries are shared (kept alive); material is borrowed from TerrainMesh, which owns and disposes it. */

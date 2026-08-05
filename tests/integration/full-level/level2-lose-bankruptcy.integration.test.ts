@@ -52,5 +52,9 @@ describe('Level 2 — Lose — Bankruptcy', () => {
     // Verify bankruptcy triggered
     expect(ctx.state!.bankruptcy.bankrupt).toBe(true);
     expect(ctx.state!.bankruptcy.ticksBelowThreshold).toBeGreaterThanOrEqual(100);
+
+    // Verify the level itself ends, with the reason attributed to bankruptcy
+    expect(ctx.state!.levelEnded).toBe(true);
+    expect(ctx.state!.levelEndReason).toBe('bankruptcy');
   });
 });

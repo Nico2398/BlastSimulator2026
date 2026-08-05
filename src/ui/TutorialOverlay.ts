@@ -34,6 +34,7 @@ const LAST_STEP_INDEX = TOTAL_TUTORIAL_STEPS - 1;
  */
 export class TutorialOverlay {
   private readonly overlay: HTMLElement;
+  private readonly box: HTMLElement;
   private readonly titleEl: HTMLElement;
   private readonly textEl: HTMLElement;
   private readonly stageEl: HTMLElement;
@@ -55,6 +56,7 @@ export class TutorialOverlay {
   constructor(container: HTMLElement) {
     const els = buildTutorialCard(container);
     this.overlay = els.overlay;
+    this.box = els.box;
     this.titleEl = els.titleEl;
     this.textEl = els.textEl;
     this.stageEl = els.stageEl;
@@ -283,6 +285,7 @@ export class TutorialOverlay {
     const progress = ((this.stepIndex + 1) / TOTAL_TUTORIAL_STEPS) * 100;
     this.progressEl.style.width = `${progress}%`;
 
+    this.updateParamStripClearance();
     this.refreshGuide();
 
     if (step.commands && step.commands.length > 0) {
@@ -293,5 +296,19 @@ export class TutorialOverlay {
       this.commandsLabel.style.display = 'none';
       this.commandsHint.style.display = 'none';
     }
+  }
+
+  /**
+   * The placement param strip has to dock above the coach card, but the
+   * card's height varies with each step's own body text — a fixed offset
+   * undershoots for a long step and the strip's CONFIRM button ends up
+   * rendered underneath the card instead of above it (found via the
+   * box-cut step's four-line body, #482). Measured fresh on every render
+   * so any step's text — however long — gets real clearance, not a value
+   * tuned for whichever step happened to be longest at the time.
+   */
+  private updateParamStripClearance(): void {
+    const clearance = this.box.offsetHeight + 30;
+    document.documentElement.style.setProperty('--bsx-tutorial-card-clearance', `${clearance}px`);
   }
 }

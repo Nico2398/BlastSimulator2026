@@ -107,7 +107,7 @@ describe('FilePersistence', () => {
   it('save and load round-trip', async () => {
     const state = createGame({ seed: 42 });
     const data = serialize(state);
-    await backend.save('slot1', 'My Save', data, 'Level 1 in progress');
+    await backend.save('slot1', 'My Save', data, 'Level 1 in progress', 'dusty_hollow');
 
     const loaded = await backend.load('slot1');
     expect(loaded).not.toBeNull();
@@ -124,8 +124,8 @@ describe('FilePersistence', () => {
   });
 
   it('list returns all saved slots with metadata', async () => {
-    await backend.save('slot1', 'Save A', '{}', 'L1');
-    await backend.save('slot2', 'Save B', '{}', 'L2');
+    await backend.save('slot1', 'Save A', '{}', 'L1', 'dusty_hollow');
+    await backend.save('slot2', 'Save B', '{}', 'L2', 'grumpstone_ridge');
 
     const metas = await backend.list();
     expect(metas).toHaveLength(2);
@@ -134,16 +134,28 @@ describe('FilePersistence', () => {
   });
 
   it('delete removes a save slot', async () => {
-    await backend.save('slot1', 'Temp', '{}', '');
+    await backend.save('slot1', 'Temp', '{}', '', null);
     await backend.delete('slot1');
     const loaded = await backend.load('slot1');
     expect(loaded).toBeNull();
   });
 
   it('metadata includes version', async () => {
-    await backend.save('slot1', 'Test', '{}', '');
+    await backend.save('slot1', 'Test', '{}', '', null);
     const loaded = await backend.load('slot1');
     expect(loaded!.meta.version).toBeDefined();
     expect(typeof loaded!.meta.version).toBe('number');
+  });
+
+  it('metadata preserves the active campaign level id', async () => {
+    await backend.save('slot1', 'Test', '{}', '', 'dusty_hollow');
+    const loaded = await backend.load('slot1');
+    expect(loaded!.meta.levelId).toBe('dusty_hollow');
+  });
+
+  it('metadata records a null level id for a sandbox game', async () => {
+    await backend.save('slot1', 'Test', '{}', '', null);
+    const loaded = await backend.load('slot1');
+    expect(loaded!.meta.levelId).toBeNull();
   });
 });

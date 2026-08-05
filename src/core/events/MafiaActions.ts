@@ -190,4 +190,4 @@ export function isExposed(mafia: MafiaState, rng: Random): boolean {
   return rng.chance(mafia.exposureRisk * 0.05); // 5% of exposure risk per check
 }
 
-export { ACCIDENT_COST, FRAME_COST, SMUGGLE_BASE_INCOME };
+export { ACCIDENT_COST, ACCIDENT_SUCCESS_RATE, FRAME_COST, FRAME_SUCCESS_RATE, FRAME_EVIDENCE_TICKS, SMUGGLE_BASE_INCOME };

@@ -1,0 +1,73 @@
+{
+  "name": "money-surfaces-visual",
+  "description": "Redesign P5: Contracts, Finances, and Operations panels rendered with real state — a blasted plan (spend + fragments + logistics), one negotiated offer, one accepted contract, and a shift-policy change. Plan origin (5,5), not (10,10): see blast-workshop-french-visual.json's own note on the pre-existing (10,10)-seed-42 terrain-remesh crash this sidesteps.",
+  "shots": [
+    { "name": "overview", "yaw": 0, "pitch": 45, "target": [5, 5], "distance": 15 }
+  ],
+  "steps": [
+    {
+      "command": "new_game seed:42 size:32",
+      "timeout": 30,
+      "description": "Setup: a small blasted plan (spend + fragments for Finances/Operations), then two contract offers — one negotiated (left in Offered, for the inline result), one accepted (moved to Active)",
+      "interaction": [
+        { "type": "command", "command": "new_game seed:42 size:32" },
+        { "type": "command", "command": "drill_plan grid origin:5,5 rows:2 cols:2 spacing:3 depth:6" },
+        { "type": "command", "command": "charge hole:* explosive:boomite amount:5kg stemming:2m" },
+        { "type": "command", "command": "sequence auto delay_step:25" },
+        { "type": "command", "command": "blast" },
+        { "type": "wait", "durationMs": 300 },
+        { "type": "clickSelector", "selector": "[data-action=\"report-close\"]" },
+        { "type": "command", "command": "contract list" },
+        { "type": "command", "command": "contract negotiate id:1" },
+        { "type": "command", "command": "contract accept id:2" }
+      ]
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "Contracts panel: storage strip, one active card, offered cards with the negotiate result inline on #1",
+      "interaction": [
+        { "type": "command", "command": "state" },
+        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"contracts\"]" },
+        { "type": "wait", "durationMs": 300 },
+        { "type": "screenshot" }
+      ]
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "Finances panel: real balance/trend/runway, category bars from the blast spend, ledger — opened via the TopBar balance click, not a rail button",
+      "interaction": [
+        { "type": "command", "command": "state" },
+        { "type": "clickSelector", "selector": "[data-action=\"open-finances\"]" },
+        { "type": "wait", "durationMs": 300 },
+        { "type": "screenshot" }
+      ]
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "Operations panel: logistics rows from the blast's fragments, empty ore-on-hand/incidents states, site policy card",
+      "interaction": [
+        { "type": "command", "command": "state" },
+        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"ops\"]" },
+        { "type": "wait", "durationMs": 300 },
+        { "type": "screenshot" }
+      ]
+    },
+    {
+      "command": "set_policy mode:shift_12h",
+      "timeout": 30,
+      "description": "Operations panel: clicking a shift pill and Apply is a real, clickable interaction — pill highlight updates, note text changes, Apply dispatches set_policy",
+      "interaction": [
+        { "type": "command", "command": "set_policy mode:shift_12h" },
+        { "type": "clickSelector", "selector": "#bs-policy-shift [data-shift-mode=\"shift_12h\"]" },
+        { "type": "wait", "durationMs": 150 },
+        { "type": "screenshot" },
+        { "type": "clickSelector", "selector": "#bs-policy-apply" },
+        { "type": "wait", "durationMs": 300 },
+        { "type": "screenshot" }
+      ]
+    }
+  ]
+}

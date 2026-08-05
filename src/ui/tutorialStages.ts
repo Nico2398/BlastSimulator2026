@@ -34,7 +34,16 @@ export interface TutorialStage {
   region?: TileRegion;
 }
 
-const PICKER_CANVAS = '.bs-tile-select-canvas';
+// P3 retired the 2D picker: dragging/clicking now happens directly on the
+// game canvas, which is always on screen whether or not the tool is armed —
+// unlike the old picker canvas, whose mere existence in the DOM meant a
+// picker was actually open. Gated on the body class PlacementController's
+// armed-state handler toggles, so "reachable" still means "ready for a tile
+// click," not just "the canvas element exists." Not a functional lock
+// either way — the canvas is neither a button, select, nor input, so the
+// tutorial rail's CSS block never touched it — purely resolveStageIndex's
+// signal for when to advance past "open the panel" / "press Run".
+const PICKER_CANVAS = 'body.bs-placement-armed #game-canvas';
 const PICKER_CONFIRM = '#bs-tile-select-confirm';
 
 /** Pick a tile, then confirm — the shared tail of every placement step. */
@@ -91,7 +100,7 @@ function hireStages(role: string, hintKey: string): TutorialStage[] {
  */
 export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
   'time-speed': [
-    { target: '#bs-hud-top .bs-speed-btn', hintKey: 'tutorial.stage.speed' },
+    { target: '#bs-hud-top .bs-speed-btn button[data-speed]', hintKey: 'tutorial.stage.speed' },
   ],
 
   'hire-surveyor': hireStages('surveyor', 'tutorial.stage.hire_surveyor'),
@@ -183,7 +192,7 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
   ],
 
   'set-policy': [
-    { target: TOOLBAR_TARGET.settings, hintKey: 'tutorial.stage.open_settings' },
+    { target: TOOLBAR_TARGET.ops, hintKey: 'tutorial.stage.open_ops' },
     {
       target: '#bs-policy-apply',
       hintKey: 'tutorial.stage.policy_apply',
@@ -192,7 +201,7 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
   ],
 
   'tick-advance': [
-    { target: '#bs-hud-top .bs-speed-btn', hintKey: 'tutorial.stage.let_time_run' },
+    { target: '#bs-hud-top .bs-speed-btn button[data-speed]', hintKey: 'tutorial.stage.let_time_run' },
   ],
 };
 
