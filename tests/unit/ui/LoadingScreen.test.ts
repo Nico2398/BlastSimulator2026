@@ -26,6 +26,15 @@ describe('LoadingScreen', () => {
     expect(document.getElementById('bs-loading-screen')).toBeTruthy();
   });
 
+  it('mirrors visibility onto the DOM node for harness-side asserts', () => {
+    const overlay = document.getElementById('bs-loading-screen') as unknown as { visible: boolean };
+    expect(overlay.visible).toBe(false);
+    screen.show();
+    expect(overlay.visible).toBe(true);
+    screen.hide();
+    expect(overlay.visible).toBe(false);
+  });
+
   it('show puts it on screen at zero progress', () => {
     screen.show();
     expect(screen.visible).toBe(true);
