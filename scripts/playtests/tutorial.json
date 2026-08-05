@@ -322,22 +322,14 @@
           "selector": "#bs-vehicle-panel .bs-vehicle-assign-btn"
         },
         {
-          "do": "click",
-          "selector": "#bs-hud-top .bs-speed-btn"
-        },
-        {
-          "do": "click",
-          "selector": "#bs-hud-top .bs-speed-btn"
-        },
-        {
           "do": "awaitTutorialStep",
           "stepId": "build-storage",
-          "timeoutMs": 600000
+          "timeoutMs": 900000
         }
       ],
       "expect": {
         "tutorialStep": "build-storage",
-        "note": "Deliberately does NOT force ticks with `letTimePass` — that would bypass the held clock and mask the deadlock this beat exists to catch. Instead it does what a waiting player does: presses the HUD speed button so the driver's walk to the vehicle plays out faster on the game's own clock. The wait is still generous because a GPU-less environment renders frames slowly, and the walk needs real game ticks to accrue."
+        "note": "Deliberately does NOT force ticks (letTimePass) and does NOT touch the speed control. Forcing ticks bypasses the held clock and masks the deadlock this beat catches; cranking the speed burns the step tick budget before the driver starts walking, which holds the clock and freezes the driver — the same deadlock from the other side. The beat just waits: assigning a driver sends them walking, and the tutorial's own clock (kept live because a walk is work-in-progress) carries them to the vehicle. The timeout is large because a GPU-less environment renders frames slowly, so the handful of ticks the walk needs take real wall-clock time to accrue."
       }
     },
     {
