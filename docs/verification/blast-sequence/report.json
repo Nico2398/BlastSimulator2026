@@ -2,34 +2,34 @@
   {
     "id": "a-stemmed",
     "title": "3 kg dynatomics per hole, 2 m stemming, 4x4 at 3 m",
-    "durationS": 0.84,
+    "durationS": 1.01,
     "times": [
       0,
       0.1,
-      0.29,
-      0.5,
-      0.84
+      0.3,
+      0.61,
+      1.01
     ],
     "rating": "PERFECT",
     "throwDistance": "0.0",
-    "cleared": "1631",
+    "cleared": "1667",
     "muckPile": {
-      "fragments": 3284,
+      "fragments": 3287,
       "volume": {
         "min": 0.125,
         "median": 0.25,
-        "p90": 1,
-        "max": 8
+        "p90": 1.125,
+        "max": 5.375
       },
       "speed": {
         "min": 0,
-        "median": 1.746,
-        "p90": 3.256,
-        "max": 5.764
+        "median": 1.656,
+        "p90": 3.07,
+        "max": 6.902
       },
-      "maxClearance": 0.738,
+      "maxClearance": 0.66,
       "floating": 0,
-      "highestY": 39.686
+      "highestY": 39.872
     }
   },
   {
@@ -44,25 +44,58 @@
       16.45
     ],
     "rating": "CATASTROPHIC",
-    "throwDistance": "67.4",
-    "cleared": "2515",
+    "throwDistance": "66.5",
+    "cleared": "2448",
     "muckPile": {
-      "fragments": 10585,
+      "fragments": 10007,
       "volume": {
         "min": 0.125,
         "median": 0.125,
-        "p90": 0.375,
-        "max": 2
+        "p90": 0.5,
+        "max": 2.125
       },
       "speed": {
-        "min": 0.079,
-        "median": 34.236,
+        "min": 0.071,
+        "median": 32.129,
         "p90": 80,
         "max": 80
       },
-      "maxClearance": 0.725,
+      "maxClearance": 0.563,
       "floating": 0,
-      "highestY": 43.05
+      "highestY": 41.787
+    }
+  },
+  {
+    "id": "c-tutorial-boxcut",
+    "title": "Tutorial: 5 kg boomite, 3x3 at 5 m, box cut west of the pattern",
+    "durationS": 3.5,
+    "times": [
+      0,
+      0.1,
+      0.3,
+      0.8,
+      3.5
+    ],
+    "rating": "BAD",
+    "throwDistance": "20.5",
+    "cleared": "397",
+    "muckPile": {
+      "fragments": 690,
+      "volume": {
+        "min": 0.125,
+        "median": 0.375,
+        "p90": 1.125,
+        "max": 5.25
+      },
+      "speed": {
+        "min": 0,
+        "median": 2.268,
+        "p90": 12.059,
+        "max": 27.832
+      },
+      "maxClearance": 0.348,
+      "floating": 0,
+      "highestY": 12.75
     }
   }
 ]
