@@ -372,7 +372,10 @@ export const FRAGMENT_MIN_RENDER_Y = 0.05;
 /** Fastest a fragment tumbles about its seeded axis while airborne (rad/s). */
 export const TUMBLE_MAX_RATE_RAD_S = Math.PI * 2;
 
-/** How much a fragment's fall speed scales into its tumble rate (0–1). */
+/** Flat multiplier on the (already impact-speed-scaled) tumble rate for a
+ *  fragment that merely dropped rather than was thrown (0–1) — not itself a
+ *  fall-speed term, since impact speed already drives the base rate for both
+ *  thrown and dropped fragments. */
 export const TUMBLE_DROP_FACTOR = 0.12;
 
 /** How long the squash-and-bounce settle plays after a fragment lands (s). */

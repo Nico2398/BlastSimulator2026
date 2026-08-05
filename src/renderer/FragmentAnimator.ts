@@ -22,6 +22,14 @@ import {
 } from '../core/config/balance.js';
 
 /**
+ * Rest transform — untumbled, unsettled. Frozen and shared rather than
+ * allocated per call: tumbleAndSettle() is on the per-frame, per-fragment hot
+ * path (applyTo(), up to ~2000 fragments/frame during a big collapse), and
+ * this is what most calls return (#485 review).
+ */
+const REST_SCALE: Readonly<{ x: number; y: number; z: number }> = Object.freeze({ x: 1, y: 1, z: 1 });
+
+/**
  * How fast a fragment tumbles while it falls, in rad/s (#485). Scales with
  * how hard it was thrown — a fragment that merely dropped barely rotates.
  */
@@ -50,7 +58,6 @@ function tumbleRate(flight: FragmentFlight): number {
 function tumbleAndSettle(flight: FragmentFlight, t: number): { tumbleAngle: number; settleScale: { x: number; y: number; z: number } } {
   const landingT = flight.delayS + flight.durationS;
   const settleEndT = landingT + SETTLE_DURATION_S;
-  const REST_SCALE = { x: 1, y: 1, z: 1 };
 
   if (t < landingT) {
     const airborneS = Math.max(0, t - flight.delayS);

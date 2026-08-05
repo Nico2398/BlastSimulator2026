@@ -20,6 +20,12 @@ import * as THREE from 'three';
 // purpose: at 0.18 the silhouette changes, the volume barely does.
 const SHEAR_MAX = 0.18;
 
+// Matrix4.scale() takes a real THREE.Vector3, not the {x,y,z}-shaped
+// settleScale callers pass in — reused across calls (composeInstanceMatrix is
+// on the per-frame hot path) instead of allocating or `as`-casting the plain
+// object into a class it doesn't structurally satisfy (#485 review).
+const _scaleScratch = new THREE.Vector3();
+
 /** Deterministic pseudo-random in [0, 1) from a fragment's shape seed. */
 export function seedUnit(seed: number, salt: number): number {
   const x = Math.sin(seed * 127.1 + salt * 311.7) * 43758.5453;
@@ -52,6 +58,18 @@ export function spawnShear(shapeSeed: number): THREE.Matrix4 {
 }
 
 /**
+ * Normalizes `v` in place, falling back to `fallback` rather than producing
+ * NaN when `v` is degenerate (near-zero length). Split out from tumbleAxis so
+ * the fallback branch is directly testable without needing to find a shape
+ * seed whose hash coincidentally lands within 1e-8 of the zero vector (#485
+ * review).
+ */
+export function normalizeOrFallback(v: THREE.Vector3, fallback: THREE.Vector3): THREE.Vector3 {
+  if (v.lengthSq() < 1e-8) return fallback;
+  return v.normalize();
+}
+
+/**
  * Seeded axis a fragment tumbles about while it falls. Distinct salts from
  * orientation (1-3) and shear (4-6) so the tumble axis is independent of the
  * fragment's spawn look.
@@ -62,8 +80,7 @@ export function tumbleAxis(shapeSeed: number): THREE.Vector3 {
     seedUnit(shapeSeed, 8) * 2 - 1,
     seedUnit(shapeSeed, 9) * 2 - 1,
   );
-  if (v.lengthSq() < 1e-8) return new THREE.Vector3(0, 1, 0);
-  return v.normalize();
+  return normalizeOrFallback(v, new THREE.Vector3(0, 1, 0));
 }
 
 /** The rotation+shear part of a fragment's spawn transform, and the axis it tumbles about, fixed for the fragment's lifetime. */
@@ -102,6 +119,7 @@ export function composeInstanceMatrix(
 ): void {
   out.makeRotationAxis(base.axis, tumbleAngle);
   out.multiply(base.rs);
-  out.scale(settleScale as THREE.Vector3);
+  _scaleScratch.set(settleScale.x, settleScale.y, settleScale.z);
+  out.scale(_scaleScratch);
   out.setPosition(position.x, position.y, position.z);
 }
