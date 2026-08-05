@@ -59,7 +59,7 @@ export function requestHaulFragment(
   // Intent only — the vehicle does not load until tickHaulingProgress (driven
   // from ArrivalGate.tickArrivalGate) detects arrival. The movement target is
   // set immediately so tickVehicle has somewhere to drive toward each tick.
-  const approach = fragmentApproachCell(tracked.fragment);
+  const approach = fragmentApproachCell(tracked.fragment, state, vehicle.id);
   vehicle.haulingFragmentId = fragmentId;
   vehicle.haulingPhase = 'to_fragment';
   vehicle.haulingDepotBuildingId = depot.id;
@@ -87,7 +87,7 @@ export function tickHaulingProgress(state: GameState, vehicle: Vehicle): void {
       return;
     }
 
-    const approach = fragmentApproachCell(tracked.fragment);
+    const approach = fragmentApproachCell(tracked.fragment, state, vehicle.id);
     vehicle.task = 'moving';
     vehicle.targetX = approach.x;
     vehicle.targetZ = approach.z;
@@ -175,7 +175,7 @@ export function findReachableGroundFragment(state: GameState, vehicleId: number)
     // an early warehouse holds, so skipping them here is what keeps the fleet
     // working instead of silently deadlocked on the nearest rock.
     if (tracked.fragment.mass > roomKg) continue;
-    const { x: fx, z: fz } = fragmentApproachCell(tracked.fragment);
+    const { x: fx, z: fz } = fragmentApproachCell(tracked.fragment, state, vehicleId);
     if (!reachable.has(fx, fz)) continue;
     const distSq = (fx - vehicle.x) ** 2 + (fz - vehicle.z) ** 2;
     if (distSq < bestDistSq) {

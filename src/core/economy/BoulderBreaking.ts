@@ -53,7 +53,7 @@ export function requestBreakBoulder(
   // tickBreakProgress (driven from ArrivalGate.tickArrivalGate) detects
   // arrival. The movement target is set immediately so tickVehicle has
   // somewhere to drive toward each tick.
-  const approach = fragmentApproachCell(tracked.fragment);
+  const approach = fragmentApproachCell(tracked.fragment, state, vehicle.id);
   vehicle.breakFragmentId = fragmentId;
   vehicle.breakPhase = 'to_boulder';
   vehicle.task = 'moving';
@@ -82,7 +82,7 @@ export function tickBreakProgress(state: GameState, vehicle: Vehicle): number | 
     return null;
   }
 
-  const approach = fragmentApproachCell(tracked.fragment);
+  const approach = fragmentApproachCell(tracked.fragment, state, vehicle.id);
   vehicle.task = 'moving';
   vehicle.targetX = approach.x;
   vehicle.targetZ = approach.z;
@@ -165,7 +165,7 @@ export function findReachableOversizedFragment(state: GameState, vehicleId: numb
   for (const tracked of state.logistics.fragments) {
     if (tracked.state !== 'on_ground') continue;
     if (!isOversized(tracked.fragment.volume)) continue;
-    const { x: fx, z: fz } = fragmentApproachCell(tracked.fragment);
+    const { x: fx, z: fz } = fragmentApproachCell(tracked.fragment, state, vehicleId);
     if (!reachable.has(fx, fz)) continue;
     const distSq = (fx - vehicle.x) ** 2 + (fz - vehicle.z) ** 2;
     if (distSq < bestDistSq) {

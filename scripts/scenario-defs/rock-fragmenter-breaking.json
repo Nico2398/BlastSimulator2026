@@ -265,12 +265,12 @@
       ]
     },
     {
-      "command": "vehicle haul 1 fragment:2",
-      "description": "Hauls a resulting sub-fragment with the (still-idle) debris_hauler. In interaction mode, this fragment is on_ground and reachable, so .bs-vehicle-haul-btn renders for vehicle #1 and the same dispatch happens via a real click.",
+      "command": "vehicle haul 1 fragment:64",
+      "description": "Hauls a resulting sub-fragment with the (still-idle) debris_hauler. In interaction mode, this fragment is on_ground and reachable, so .bs-vehicle-haul-btn renders for vehicle #1 and the same dispatch happens via a real click. Fragment id 64 is the first sub-fragment produced by the break at step 20/21 (seed 42, this exact command sequence) — not the stale fragment #2 left over from the original blast, which stays oversized and un-haulable. The scenario step vocabulary has no way to capture an id from a prior step's output, so this is hardcoded; re-derive it (via a 'fragments' step) if any upstream change to blast/break fragment-id assignment shifts it.",
       "interaction": [
         {
           "type": "command",
-          "command": "vehicle haul 1 fragment:2"
+          "command": "vehicle haul 1 fragment:64"
         },
         {
           "type": "waitForSelector",
