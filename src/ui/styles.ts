@@ -174,12 +174,17 @@ const CSS = `
   display: flex;
   align-items: center;
   justify-content: center;
-  /* var(), not a literal: a confirm-before-destructive-action dialog has to
-     beat literally everything, including a menu-tier panel (z-menu-settings)
-     raising one on itself (Settings' RETURN TO MAIN MENU, redesign P10) —
-     found when this was still a hardcoded 600 and the confirm rendered
-     entirely hidden behind the settings panel that requested it. */
-  z-index: var(--bsx-z-modal);
+  /* Base tier for every .bs-confirm-overlay user (ConfirmModal, EventModal,
+     BlastReportModal, PreflightModal, SavesModal) — a literal, not the
+     --bsx-z-modal token: that token is reserved for the one case that has
+     to beat the menu tier (ConfirmModal's own inline override, below), and
+     routing every user of this class through it by mistake once put
+     BlastReportModal's routine post-blast popup ABOVE an already-open
+     SavesModal, blocking clicks on save slots underneath it (CI:
+     save-load-visual). Components needing a higher tier than this
+     (SavesModal already did, for beating the main menu) override z-index
+     inline on their own overlay element instead of raising this shared rule. */
+  z-index: 600;
   pointer-events: all;
 }
 .bs-confirm-box {

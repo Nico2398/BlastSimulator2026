@@ -44,7 +44,7 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-main-menu > div:nth-child(3) > button"
+          "selector": "#bs-world-map-back"
         },
         {
           "type": "wait",

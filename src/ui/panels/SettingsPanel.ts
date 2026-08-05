@@ -96,8 +96,10 @@ export class SettingsPanel {
     // ── Language ──
     const langHeader = sectionHeader('');
     this.locale.bindText(langHeader.querySelector('.bsx-section-label') as HTMLElement, 'ui.settings.language');
-    const enBtn = el('button', { className: 'bsx-menu-lang-pill', attrs: { style: 'flex:1;text-align:center;padding:8px 5px' } });
-    const frBtn = el('button', { className: 'bsx-menu-lang-pill', attrs: { style: 'flex:1;text-align:center;padding:8px 5px' } });
+    // data-lang preserved from the pre-redesign SettingsMenu so scenario defs
+    // (blast-workshop-french-visual) keep resolving these buttons unchanged.
+    const enBtn = el('button', { className: 'bsx-menu-lang-pill', attrs: { style: 'flex:1;text-align:center;padding:8px 5px', 'data-lang': 'en' } });
+    const frBtn = el('button', { className: 'bsx-menu-lang-pill', attrs: { style: 'flex:1;text-align:center;padding:8px 5px', 'data-lang': 'fr' } });
     this.locale.bindText(enBtn, 'ui.settings.english');
     this.locale.bindText(frBtn, 'ui.settings.french');
     const setLangPills = (lang: string) => {

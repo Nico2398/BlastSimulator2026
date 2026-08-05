@@ -42,9 +42,12 @@ export class WorldMap {
     const header = el('div', { attrs: { style: 'display:flex;align-items:center;gap:16px;padding:22px 40px' } });
 
     const backBtn = el('button', {
-      attrs: { style: 'display:flex;align-items:center;gap:8px;height:34px;padding:0 13px;border:1px solid rgba(255,255,255,.12);'
-        + 'border-radius:5px;background:transparent;color:var(--bsx-text-secondary);font:600 10px/1 var(--bsx-font-ui);'
-        + 'letter-spacing:.12em;cursor:pointer;pointer-events:all' },
+      attrs: {
+        id: 'bs-world-map-back',
+        style: 'display:flex;align-items:center;gap:8px;height:34px;padding:0 13px;border:1px solid rgba(255,255,255,.12);'
+          + 'border-radius:5px;background:transparent;color:var(--bsx-text-secondary);font:600 10px/1 var(--bsx-font-ui);'
+          + 'letter-spacing:.12em;cursor:pointer;pointer-events:all',
+      },
       children: [iconEl('chev', 12)],
     });
     const backLabel = el('span', {});

@@ -33,7 +33,7 @@
       "command": "state full",
       "description": "Click FR inside the still-open Settings panel WITHOUT closing it. Core Bug 1 regression: title, English/French buttons, Close button, and toolbar captions must switch to French in place.",
       "interaction": [
-        { "type": "clickSelector", "selector": "#bs-settings-panel > div:nth-child(3) > button:nth-child(2)" }
+        { "type": "clickSelector", "selector": "#bs-settings-panel [data-lang=\"fr\"]" }
       ]
     },
     {

@@ -33,7 +33,17 @@ export class ConfirmModal {
   private onConfirmCb: (() => void) | null = null;
 
   constructor(container: HTMLElement) {
-    this.overlay = el('div', { className: 'bs-confirm-overlay' });
+    this.overlay = el('div', {
+      className: 'bs-confirm-overlay',
+      // Same reasoning as SavesModal's own z-index override: a panel raising
+      // a confirm on itself (Settings' RETURN TO MAIN MENU, P10) needs the
+      // confirm to beat the menu tier it's sitting in — but only THIS
+      // overlay, not every .bs-confirm-overlay user (PreflightModal,
+      // BlastReportModal keep the class's own lower base tier; see the
+      // comment on .bs-confirm-overlay in styles.ts for what raising the
+      // shared rule instead broke).
+      attrs: { style: 'z-index:var(--bsx-z-modal)' },
+    });
     this.overlay.style.display = 'none';
 
     const box = el('div');
