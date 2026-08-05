@@ -100,6 +100,24 @@ describe('NotificationCenter (redesign P1)', () => {
       expect(pips.some(p => p.kind === 'bankruptcy')).toBe(true);
     });
 
+    it('derives a bankruptcy pip as soon as cash drops below the real grace-tick threshold, before going negative', () => {
+      // Bankruptcy.ts starts counting ticksBelowThreshold at cash < BANKRUPTCY_THRESHOLD
+      // ($5,000) — the pip must warn the player from that point, not only once cash < 0.
+      const center = new NotificationCenter();
+      const state = makeState();
+      state.cash = 3000;
+      const pips = center.update(state);
+      expect(pips.some(p => p.kind === 'bankruptcy')).toBe(true);
+    });
+
+    it('does not derive a bankruptcy pip comfortably above the threshold', () => {
+      const center = new NotificationCenter();
+      const state = makeState();
+      state.cash = 10000;
+      const pips = center.update(state);
+      expect(pips.some(p => p.kind === 'bankruptcy')).toBe(false);
+    });
+
     it('derives a crew pip counting collapsed employees', () => {
       const center = new NotificationCenter();
       const state = makeState();

@@ -11,6 +11,7 @@
 
 import type { IconName } from '../icons.js';
 import type { GameState } from '../../core/state/GameState.js';
+import { BANKRUPTCY_THRESHOLD } from '../../core/campaign/Bankruptcy.js';
 
 export type Severity = 'info' | 'positive' | 'warn' | 'critical';
 
@@ -125,10 +126,13 @@ export class NotificationCenter {
       pips.push({ kind: 'event', icon: 'warn', label: 'EVENT', tone: 'critical', tip: 'An event is waiting — the clock is held' });
     }
     if (state.scores.ecology < 20) {
-      pips.push({ kind: 'ecology', icon: 'crit', label: `ECO ${Math.round(state.scores.ecology)}`, tone: 'critical', tip: `Ecology critical (${Math.round(state.scores.ecology)}) — shutdown proceedings below 20` });
+      pips.push({ kind: 'ecology', icon: 'crit', label: `ECO ${Math.round(state.scores.ecology)}`, tone: 'critical', tip: `Ecology critical (${Math.round(state.scores.ecology)}) — shutdown proceedings begin once it hits zero` });
     }
-    if (state.cash < 0) {
-      pips.push({ kind: 'bankruptcy', icon: 'crit', label: 'CASH', tone: 'critical', tip: 'Balance is negative — bankruptcy proceedings may follow' });
+    // Real bankruptcy grace-tick countdown (Bankruptcy.ts) starts the moment cash drops
+    // below BANKRUPTCY_THRESHOLD, not merely once it goes negative — firing this pip only
+    // at cash < 0 left the player with no warning for most of that countdown.
+    if (state.cash < BANKRUPTCY_THRESHOLD) {
+      pips.push({ kind: 'bankruptcy', icon: 'crit', label: 'CASH', tone: 'critical', tip: `Balance is below $${BANKRUPTCY_THRESHOLD.toLocaleString('en-US')} — bankruptcy proceedings may follow` });
     }
     const collapsedCount = state.employees.employees.filter(e => e.alive && e.collapsing).length;
     if (collapsedCount > 0) {
