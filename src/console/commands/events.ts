@@ -5,7 +5,7 @@ import type { GameContext } from './world.js';
 import { t } from '../../core/i18n/I18n.js';
 import { Random } from '../../core/math/Random.js';
 import { getEventById } from '../../core/events/EventPool.js';
-import { tickEventSystem } from '../../core/events/EventSystem.js';
+import { tickEventSystem, clearLastOutcome } from '../../core/events/EventSystem.js';
 import { resolveEvent } from '../../core/events/EventResolver.js';
 import type { EventContext } from '../../core/events/EventPool.js';
 import {
@@ -371,6 +371,14 @@ export function eventCommand(
       // Resume the game after resolving the event (tick pauses on event)
       state.isPaused = false;
       return { success: true, output: lines.join('\n') };
+    }
+
+    case 'dismiss': {
+      if (!state.events.lastOutcome) {
+        return { success: false, output: 'No resolved event to dismiss.' };
+      }
+      clearLastOutcome(state.events);
+      return { success: true, output: 'Outcome dismissed.' };
     }
 
     case 'timers': {

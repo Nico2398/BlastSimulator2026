@@ -146,4 +146,74 @@ describe('Event resolution system', () => {
     expect(result!.cashChange).toBe(200);
     expect(finances.cash).toBe(50200);
   });
+
+  // ── lastOutcome — structured replacement for effects: string[] (P8) ─────
+  // The UI reads state.events.lastOutcome directly instead of parsing the
+  // console's pre-formatted "Gained $500" / "wellBeing +10" sentences.
+
+  it('lastOutcome is set from the same resolution, not left null', () => {
+    const finances = createFinanceState(50000);
+    const scores = createScoreState();
+    const rng = new Random(42);
+
+    resolveEvent(eventSystem, finances, scores, 0, 10, rng);
+
+    expect(eventSystem.lastOutcome).not.toBeNull();
+    expect(eventSystem.lastOutcome!.eventId).toBe('test_resolve');
+    expect(eventSystem.lastOutcome!.resultKey).toBe('event.test_resolve.res0');
+  });
+
+  it('lastOutcome effects include a cash entry with the real delta', () => {
+    const finances = createFinanceState(50000);
+    const scores = createScoreState();
+    const rng = new Random(42);
+
+    resolveEvent(eventSystem, finances, scores, 0, 10, rng);
+
+    expect(eventSystem.lastOutcome!.effects).toContainEqual({ kind: 'cash', key: 'cash', delta: -5000 });
+  });
+
+  it('lastOutcome effects include a score entry per changed score, keyed by the real ScoreState field', () => {
+    const finances = createFinanceState(50000);
+    const scores = createScoreState();
+    const rng = new Random(42);
+
+    resolveEvent(eventSystem, finances, scores, 0, 10, rng);
+
+    expect(eventSystem.lastOutcome!.effects).toContainEqual({ kind: 'score', key: 'wellBeing', delta: 10 });
+  });
+
+  it('lastOutcome omits a cash effect entirely when cashDelta is 0, rather than a zero-delta entry', () => {
+    const finances = createFinanceState(50000);
+    const scores = createScoreState();
+    const rng = new Random(42);
+
+    resolveEvent(eventSystem, finances, scores, 1, 10, rng);
+
+    expect(eventSystem.lastOutcome!.effects.some(e => e.kind === 'cash')).toBe(false);
+  });
+
+  it('lastOutcome includes corruption and a follow-up notice as "other" effects', () => {
+    const finances = createFinanceState(50000);
+    const scores = createScoreState();
+    const rng = new Random(42);
+
+    resolveEvent(eventSystem, finances, scores, 2, 10, rng);
+
+    expect(eventSystem.lastOutcome!.effects).toContainEqual({ kind: 'other', key: 'corruption', delta: 2 });
+    expect(eventSystem.lastOutcome!.effects).toContainEqual({
+      kind: 'other', key: 'followUp', delta: 0, textKey: 'ui.event.follow_up_developing',
+    });
+  });
+
+  it('lastOutcome survives clearPendingEvent — the outcome phase needs it after pendingEvent is gone', () => {
+    const finances = createFinanceState(50000);
+    const scores = createScoreState();
+    const rng = new Random(42);
+
+    resolveEvent(eventSystem, finances, scores, 0, 10, rng);
+
+    expect(eventSystem.pendingEvent).toBeNull();
+    expect(eventSystem.lastOutcome).not.toBeNull();
+  });
 });

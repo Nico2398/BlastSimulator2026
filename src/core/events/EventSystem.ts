@@ -30,6 +30,13 @@ export interface EventSystemState {
   timers: CategoryTimer[];
   /** Currently pending event requiring player decision. */
   pendingEvent: FiredEvent | null;
+  /**
+   * The result of the most recently resolved event, kept around so the UI's
+   * outcome phase has something to read after pendingEvent is cleared. Set by
+   * resolveEvent, cleared by clearLastOutcome (the DISMISS action) — not by
+   * clearPendingEvent, since the outcome must survive past that point.
+   */
+  lastOutcome: EventOutcome | null;
   /** Queue of follow-up events to fire. */
   followUpQueue: string[];
   /** IDs of events that have already fired this level — each fires at most once. */
@@ -47,6 +54,27 @@ export interface FiredEvent {
   firedAtTick: number;
 }
 
+/** What kind of value an EventEffect carries — decides which chip color/format the UI uses. */
+export type EventEffectKind = 'cash' | 'score' | 'other';
+
+/** One structured line of an event's outcome — a UI-agnostic replacement for a pre-formatted English sentence. */
+export interface EventEffect {
+  kind: EventEffectKind;
+  /** 'cash' for the cash effect; a ScoreState key for a score effect; a free-form tag (e.g. 'corruption', 'followUp') for 'other'. */
+  key: string;
+  /** Numeric change, 0 for effects with no magnitude (e.g. a follow-up notice). */
+  delta: number;
+  /** i18n key for effects delta alone can't describe (e.g. "A follow-up situation is developing..."). */
+  textKey?: string;
+}
+
+/** The structured result of the most recently resolved event, read directly by the UI instead of parsing console text. */
+export interface EventOutcome {
+  eventId: string;
+  resultKey: string;
+  effects: EventEffect[];
+}
+
 export function createEventSystemState(eventFreqMultiplier: number = 1): EventSystemState {
   const categories: TimerCategory[] = ['union', 'politics', 'weather', 'mafia', 'lawsuit'];
   return {
@@ -56,6 +84,7 @@ export function createEventSystemState(eventFreqMultiplier: number = 1): EventSy
       baseInterval: BASE_TIMER[cat],
     })),
     pendingEvent: null,
+    lastOutcome: null,
     followUpQueue: [],
     firedEventIds: [],
     lastEventTick: 0,
@@ -130,6 +159,11 @@ export function tickEventSystem(
 /** Clear the pending event (after player resolves it). */
 export function clearPendingEvent(state: EventSystemState): void {
   state.pendingEvent = null;
+}
+
+/** Clear the last resolved event's outcome (the DISMISS action, once the player has read it). */
+export function clearLastOutcome(state: EventSystemState): void {
+  state.lastOutcome = null;
 }
 
 /** Queue a follow-up event. */

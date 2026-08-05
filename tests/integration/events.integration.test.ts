@@ -200,6 +200,27 @@ describe('Event system', () => {
     expect(sentenceIdx).toBeLessThan(consequencesIdx);
   });
 
+  // ── 3c. event dismiss clears lastOutcome (P8) ──────────────────────────────
+
+  it('event dismiss fails when there is no resolved outcome to dismiss', () => {
+    const result = eventCommand(ctx, ['dismiss'], {});
+
+    expect(result.success).toBe(false);
+    expect(result.output).toBe('No resolved event to dismiss.');
+  });
+
+  it('event dismiss clears lastOutcome after a choose', () => {
+    ctx.state!.events.pendingEvent = { eventId: 'union_coffee_uprising', firedAtTick: ctx.state!.tickCount };
+    eventCommand(ctx, ['choose', '0'], {});
+    expect(ctx.state!.events.lastOutcome).not.toBeNull();
+
+    const result = eventCommand(ctx, ['dismiss'], {});
+
+    expect(result.success).toBe(true);
+    expect(result.output).toBe('Outcome dismissed.');
+    expect(ctx.state!.events.lastOutcome).toBeNull();
+  });
+
   // ── 4. tickEventSystem advances timers ─────────────────────────────────────
 
   it('tickEventSystem decrements timer remaining ticks', () => {

@@ -2529,6 +2529,7 @@
   "ui.event.choose": "Choisissez votre réponse :",
   "ui.event.dismiss": "Ignorer",
   "ui.event.outcome": "Résultat :",
+  "ui.event.follow_up_developing": "Une nouvelle situation se prépare en coulisses…",
   "survey.aerial": "Spectroscopie aérienne",
   "survey.core_sample": "Carottage",
   "survey.seismic": "Sondage sismique",

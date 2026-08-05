@@ -4,6 +4,7 @@ import {
   createEventSystemState,
   tickEventSystem,
   clearPendingEvent,
+  clearLastOutcome,
   queueFollowUp,
   selectEvent,
   incrementActionCount,
@@ -405,5 +406,24 @@ describe('Event system engine', () => {
     const fired = tickEventSystem(state, ctx, new Random(42));
     expect(fired).not.toBeNull();
     expect(fired!.eventId).toBe('normal_test');
+  });
+
+  // ── lastOutcome / clearLastOutcome ──
+
+  it('lastOutcome is null in fresh state', () => {
+    const state = createEventSystemState();
+    expect(state.lastOutcome).toBeNull();
+  });
+
+  it('clearLastOutcome clears lastOutcome without touching pendingEvent', () => {
+    const state = createEventSystemState();
+    state.pendingEvent = { eventId: 'test1', firedAtTick: 10 };
+    state.lastOutcome = { eventId: 'prev_event', resultKey: 'event.prev_event.res0', effects: [] };
+
+    clearLastOutcome(state);
+
+    expect(state.lastOutcome).toBeNull();
+    expect(state.pendingEvent).not.toBeNull();
+    expect(state.pendingEvent!.eventId).toBe('test1');
   });
 });
