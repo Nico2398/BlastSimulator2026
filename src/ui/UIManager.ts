@@ -218,7 +218,7 @@ export class UIManager {
     this.onLanguageChange = cb;
   }
 
-  /** Wire the top bar's Saves button (SaveLoadUI lives in main.ts, not here). */
+  /** Wire the top bar's Saves button (SavesModal lives in main.ts, not here). */
   setOpenSavesHandler(cb: () => void): void {
     this.topBar.setOpenSavesHandler(cb);
   }

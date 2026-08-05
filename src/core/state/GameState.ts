@@ -241,7 +241,7 @@ export interface WorldState {
   gridReady: boolean;
   /**
    * Serialized playable voxel data (v6+, #458 T0.3), embedded lazily right
-   * before a save — see saveCommand / SaveLoadUI's getState callback. Absent
+   * before a save — see saveCommand / SavesModal's getState callback. Absent
    * on saves from before v6 or on a state that hasn't been saved yet; a
    * loader falls back to regenerating pristine terrain from the seed in that
    * case (the pre-v6 behaviour — blast craters/ramps don't survive that path).

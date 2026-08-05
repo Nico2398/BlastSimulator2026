@@ -4,7 +4,7 @@
 import { SceneManager } from './renderer/SceneManager.js';
 import { GameRenderer } from './renderer/GameRenderer.js';
 import { UIManager } from './ui/UIManager.js';
-import { SaveLoadUI } from './ui/SaveLoadUI.js';
+import { SavesModal } from './ui/panels/SavesModal.js';
 import { TutorialOverlay } from './ui/TutorialOverlay.js';
 import { TUTORIAL_STEPS } from './ui/tutorialSteps.js';
 import { KeyboardShortcuts } from './ui/KeyboardShortcuts.js';
@@ -83,13 +83,13 @@ try {
   saveBackend = new DownloadPersistence();
 }
 
-// --- Save/Load UI ---
-const saveLoadUI = new SaveLoadUI(uiContainer);
-saveLoadUI.setBackend(saveBackend);
-saveLoadUI.setGetState(() => {
+// --- Saves Modal (redesign P8) ---
+const savesModal = new SavesModal(uiContainer);
+savesModal.setBackend(saveBackend);
+savesModal.setGetState(() => {
   // Embed the current voxel grid right before a save is taken (#458 T0.3) —
   // encoded lazily here rather than kept live on ctx.state, since most ticks
-  // never save. SaveLoadUI only sees GameState; it has no idea VoxelGrid or
+  // never save. SavesModal only sees GameState; it has no idea VoxelGrid or
   // its codec exist, by design.
   if (ctx.state && ctx.grid && ctx.state.world) {
     ctx.state.world = { ...ctx.state.world, voxels: encodeVoxelGrid(ctx.grid, terrainGenDatum(ctx.state)) };
@@ -109,9 +109,9 @@ mainMenu.setOnNewCampaign(() => {
 });
 mainMenu.setOnContinue((slotId) => {
   mainMenu.hide();
-  void saveLoadUI.loadFromSlot(slotId);
+  void savesModal.loadFromSlot(slotId);
 });
-mainMenu.setOnLoad(() => { saveLoadUI.show(); });
+mainMenu.setOnLoad(() => { savesModal.show(); });
 mainMenu.setOnSettings(() => { uiManager.showPanel('settings'); });
 // Settings is reachable from the main menu, so a language switch made there has
 // to redraw the menu sitting underneath the panel as well as the panel itself.
@@ -119,7 +119,7 @@ uiManager.setLanguageChangeHandler(() => {
   mainMenu.refreshLocale();
   worldMap.refreshLocale();
   levelEndScreen.refreshLocale();
-  saveLoadUI.refreshLocale();
+  savesModal.refreshLocale();
   selectionBar.refreshLocale();
 });
 // Symmetric with the above: a language switch made from the main menu's own
@@ -129,7 +129,7 @@ mainMenu.setOnLanguageChange(() => {
   uiManager.refreshLocale();
   worldMap.refreshLocale();
   levelEndScreen.refreshLocale();
-  saveLoadUI.refreshLocale();
+  savesModal.refreshLocale();
   selectionBar.refreshLocale();
 });
 mainMenu.show();
@@ -656,7 +656,7 @@ uiManager.setQuitHandler(() => {
 uiManager.setSiteMapHandler(() => {
   worldMap.show(ctx.state?.campaign ?? null);
 });
-uiManager.setOpenSavesHandler(() => saveLoadUI.show());
+uiManager.setOpenSavesHandler(() => savesModal.show());
 uiManager.setMapFocusHandler((x, z) => {
   scene.cameraController.focus(x, gameRenderer.surfaceYAt(x, z), z, 60);
 });
@@ -740,7 +740,7 @@ selectionBar.setActionHandler((action, entity) => {
   }
 });
 
-saveLoadUI.setOnLoad((state) => {
+savesModal.setOnLoad((state) => {
   // Restore loaded state into the runner context. A v6+ save carries its
   // voxel grid embedded in state.world.voxels (#458 T0.3) — restoring from
   // it preserves blast craters/ramps instead of discarding them. A save
@@ -773,7 +773,7 @@ new KeyboardShortcuts({
   // registered — every keyboard speed change (1-4) silently no-op'd.
   setSpeed: (n) => window.__gameConsole(`time speed ${n}`),
   togglePanel: (name) => uiManager.togglePanel(name),
-  quickSave: () => { if (ctx.state) void saveLoadUI['autoSave'](ctx.state); },
+  quickSave: () => { if (ctx.state) void savesModal['autoSave'](ctx.state); },
   onEscape: () => uiManager.handleEscape(),
   onToggleNavGrid: () => uiManager.toggleNavGridOverlay(),
 });
@@ -825,7 +825,7 @@ scene.start((dt) => {
   if (ctx.state) {
     uiManager.update(ctx.state, ctx.weatherCycle, ctx.rng);
     if (!mainMenu.visible) uiManager.show();
-    saveLoadUI.onTick(ctx.state);
+    savesModal.onTick(ctx.state);
   }
   if (ctx.state && !tutorial.isActive) levelEndScreen.update(ctx.state);
 });

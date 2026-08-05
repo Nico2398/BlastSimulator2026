@@ -75,4 +75,5 @@ export const LOCALE_SHARED_VALUE_ALLOWLIST: string[] = [
   'ui.operations.incidents', // "Incidents"
   'ui.crew.need_fatigue', // "Fatigue" — same cognate as need.fatigue
   'ui.crew.skill_maxed', // "MAX"
+  'ui.saves.auto_chip', // "AUTO" — same cognate as ui.crew.skill_maxed's MAX-style abbreviation
 ];

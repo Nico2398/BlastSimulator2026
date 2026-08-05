@@ -54,6 +54,7 @@ const REGIONS: Array<[string, string]> = [
   ['#bs-main-menu', 'menu'],
   ['#bs-world-map', 'world_map'],
   ['#bs-level-end-screen', 'level_end'],
+  ['#bs-saves-modal', 'saves'],
   ['#bs-selection-bar', 'selection'], // scene selection bar (redesign P2)
 ];
 
