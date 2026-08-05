@@ -101,12 +101,8 @@
     },
     {
       "command": "vehicle buy debris_hauler",
-      "description": "Vehicle #1 — a real click on the tier-1 debris_hauler buy button.",
+      "description": "Vehicle #1 — a real click on the tier-1 debris_hauler buy button. Click is the sole purchase action in interaction mode (the top-level `command` covers command mode) — combining both double-buys (#484).",
       "interaction": [
-        {
-          "type": "command",
-          "command": "vehicle buy debris_hauler"
-        },
         {
           "type": "waitForSelector",
           "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
@@ -185,12 +181,8 @@
     },
     {
       "command": "vehicle buy rock_fragmenter",
-      "description": "Vehicle #2 — a real click on the tier-1 rock_fragmenter buy button.",
+      "description": "Vehicle #2 — a real click on the tier-1 rock_fragmenter buy button. Click is the sole purchase action in interaction mode (the top-level `command` covers command mode) — combining both double-buys (#484).",
       "interaction": [
-        {
-          "type": "command",
-          "command": "vehicle buy rock_fragmenter"
-        },
         {
           "type": "waitForSelector",
           "selector": "#bs-vehicle-panel [data-vtype=\"rock_fragmenter\"][data-tier=\"1\"]"
