@@ -1,8 +1,9 @@
 // FragmentMesh — unit tests (InstancedMesh-based renderer)
 //
-// The renderer now uses 8 InstancedMesh objects (one per shape variant)
-// for batched GPU rendering — 8 draw calls for any fragment count.
-// Tests verify count tracking, position updates, removal, and capping.
+// The renderer uses SHAPE_VARIANTS InstancedMesh objects (one per shape
+// variant) for batched GPU rendering — one draw call per variant regardless
+// of fragment count. Tests verify count tracking, position updates, removal,
+// and capping.
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as THREE from 'three';
@@ -277,32 +278,40 @@ describe('FragmentMesh (InstancedMesh)', () => {
   });
 
   describe('scene picking (P2)', () => {
-    it('pickables() returns the 8 shape-variant buckets, each tagged with its bucket index', () => {
+    it('pickables() returns the 24 shape-variant buckets, each tagged with its bucket index', () => {
       const pickables = fm.pickables();
       expect(pickables).toHaveLength(SHAPE_VARIANTS);
       expect(pickables.every(o => o.userData['entityKind'] === 'fragment')).toBe(true);
-      expect(pickables.map(o => o.userData['bucketIndex']).sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+      expect(pickables.map(o => o.userData['bucketIndex']).sort((a, b) => a - b))
+        .toEqual(Array.from({ length: SHAPE_VARIANTS }, (_, i) => i));
     });
 
     it('fragmentIdAt() resolves a bucket slot back to the fragment id occupying it', () => {
-      fm.spawnFragments([makeFragment(3), makeFragment(11)]); // both id % 8 === 3, same bucket
+      // Explicit matching shapeSeed forces both into bucket 3 — bucket assignment
+      // is shapeSeed % SHAPE_VARIANTS, not id-derived, so two ids alone don't collide.
+      fm.spawnFragments([makeFragment(3, { shapeSeed: 3 }), makeFragment(11, { shapeSeed: 3 })]);
       expect(fm.fragmentIdAt(3, 0)).toBe(3);
       expect(fm.fragmentIdAt(3, 1)).toBe(11);
     });
 
     it('fragmentIdAt() returns null for an empty slot', () => {
-      fm.spawnFragments([makeFragment(3)]);
+      fm.spawnFragments([makeFragment(3, { shapeSeed: 3 })]);
       expect(fm.fragmentIdAt(3, 1)).toBeNull();
     });
 
     it('fragmentIdAt() tracks a swap-with-last after removal', () => {
-      fm.spawnFragments([makeFragment(0), makeFragment(8), makeFragment(16)]); // all bucket 0
+      fm.spawnFragments([
+        makeFragment(0, { shapeSeed: 0 }),
+        makeFragment(8, { shapeSeed: 0 }),
+        makeFragment(16, { shapeSeed: 0 }),
+      ]); // all bucket 0
       fm.removeFragment(8); // vacates slot 1; slot 2 (frag 16) swaps into it
       expect(fm.fragmentIdAt(0, 1)).toBe(16);
     });
 
     it('fragmentPosition() returns the fragment\'s current world position', () => {
-      fm.spawnFragments([makeFragment(2, { position: { x: 5, y: 1, z: -3 } })]);
+      // Explicit shapeSeed pins the fragment to bucket 2, matching scene.children[2] below.
+      fm.spawnFragments([makeFragment(2, { position: { x: 5, y: 1, z: -3 }, shapeSeed: 2 })]);
       const pos = fm.fragmentPosition(2);
       const rendered = getInstancePosition(scene.children[2] as THREE.InstancedMesh, 0);
       expect(pos?.x).toBeCloseTo(rendered.x);

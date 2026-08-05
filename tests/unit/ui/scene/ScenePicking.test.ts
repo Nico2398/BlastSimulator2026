@@ -104,6 +104,7 @@ describe('pickScene', () => {
     fm.spawnFragments([{
       id: 12, position: { x: 5, y: 0.5, z: 5 }, volume: 4, mass: 1000,
       rockId: 'sandite', oreDensities: {}, initialVelocity: { x: 0, y: 0, z: 0 }, isProjection: false,
+      halfExtents: { x: 0.4, y: 0.4, z: 0.4 }, shapeSeed: 12,
     }]);
     const camera = makeTopDownCamera(5, 5);
     const renderer = makeFakeRenderer({ pickables: fm.pickables(), fragments: fm });

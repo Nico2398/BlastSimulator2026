@@ -522,10 +522,12 @@ describe('GameRenderer — scene picking (P2)', () => {
       oreDensities: {},
       initialVelocity: { x: 0, y: 0, z: 0 },
       isProjection: false,
+      halfExtents: { x: 0.4, y: 0.4, z: 0.4 },
+      shapeSeed: 5,
     }];
     renderer.onBlast(ctx);
 
-    // id 5 % 8 === 5 → bucket 5, first (only) slot in that bucket → slot 0.
+    // shapeSeed 5 % 24 === 5 → bucket 5, first (only) slot in that bucket → slot 0.
     expect(renderer.resolveFragmentId(5, 0)).toBe(5);
   });
 
