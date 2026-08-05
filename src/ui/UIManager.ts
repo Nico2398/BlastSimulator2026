@@ -25,7 +25,8 @@ import { ActivityLog } from './shell/ActivityLog.js';
 import { NotificationCenter, type NotifyInput } from './notify/NotificationCenter.js';
 import type { PlacementKit } from './scene/PlacementKit.js';
 import type { GameState } from '../core/state/GameState.js';
-import type { WeatherState } from '../core/weather/WeatherCycle.js';
+import type { WeatherCycleState } from '../core/weather/WeatherCycle.js';
+import type { Random } from '../core/math/Random.js';
 
 import type { CommandResult } from '../console/ConsoleRunner.js';
 
@@ -262,8 +263,9 @@ export class UIManager {
     this.notify({ severity: 'warn', title: message, body: '' });
   }
 
-  update(state: GameState, weather?: WeatherState): void {
-    this.topBar.update(state, weather, this.notificationCenter);
+  update(state: GameState, weatherCycle?: WeatherCycleState, rng?: Random): void {
+    const weather = weatherCycle?.current;
+    this.topBar.update(state, weatherCycle, rng, this.notificationCenter);
     this.toasts.update(this.notificationCenter);
     this.activityLog.update(this.notificationCenter);
     // setNavGrid before update() — otherwise the overlay draws against the

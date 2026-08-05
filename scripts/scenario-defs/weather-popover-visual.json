@@ -1,0 +1,23 @@
+{
+  "name": "weather-popover-visual",
+  "description": "Redesign P7: the weather popover on the TopBar chip — current weather + effect, 14-day outlook strip, reliability bands, advisory line.",
+  "steps": [
+    {
+      "command": "new_game seed:42 size:24",
+      "timeout": 15,
+      "interaction": [
+        { "type": "command", "command": "new_game seed:42 size:24" }
+      ]
+    },
+    {
+      "command": "weather set storm",
+      "description": "A rainy state gives the popover's effect line and advisory something real to say, and the outlook strip mixed icons to render.",
+      "interaction": [
+        { "type": "command", "command": "weather set storm" },
+        { "type": "clickSelector", "selector": ".bs-weather" },
+        { "type": "wait", "durationMs": 300 },
+        { "type": "screenshot" }
+      ]
+    }
+  ]
+}

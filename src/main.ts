@@ -31,6 +31,8 @@ import { EntityHighlight } from './renderer/EntityHighlight.js';
 import { PlacementController } from './ui/scene/PlacementController.js';
 import { ParamStrip } from './ui/scene/ParamStrip.js';
 import { SelectionOverlay } from './renderer/SelectionOverlay.js';
+import { createWeatherCycle } from './core/weather/WeatherCycle.js';
+import { Random } from './core/math/Random.js';
 
 // --- 3D Scene ---
 const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
@@ -261,6 +263,7 @@ console.log = (...args: unknown[]) => {
  * level-entry paths pass it; every other caller gets the immediate sync.
  */
 function runGameCommand(cmd: string, opts?: { syncRenderer?: boolean }): CommandResult {
+  const prevState = ctx.state;
   const result = runCommand({ runner, ctx, emitter }, cmd);
   lastCommandOutput = result.output;
   // Sync the renderer after every command so visual changes appear immediately
@@ -273,6 +276,20 @@ function runGameCommand(cmd: string, opts?: { syncRenderer?: boolean }): Command
   // scenario harness) bypassed that and left the overlay covering the canvas.
   if (cmdName === 'new_game' && result.success) {
     mainMenu.hide();
+  }
+
+  // (Re)seed the weather cycle whenever ctx.state was replaced with a new
+  // object — new_game, campaign level transitions, sandbox start, and any
+  // future entry point that does the same. Comparing identity rather than
+  // matching command names means this can't miss one. Previously
+  // ctx.weatherCycle only ever got created lazily inside weatherCommand
+  // (the `weather` console command, which nothing player-facing calls), so
+  // outside of manual console/test use the weather popover would have had
+  // nothing real to show, and a second game in the same session would have
+  // kept the first game's weather cycle at the wrong seed.
+  if (ctx.state && ctx.state !== prevState) {
+    ctx.weatherCycle = createWeatherCycle(ctx.state.seed);
+    ctx.rng = new Random(ctx.state.seed + 1000);
   }
 
   // Trigger blast effects after a blast (terrain remesh already happened via
@@ -297,7 +314,7 @@ function runGameCommand(cmd: string, opts?: { syncRenderer?: boolean }): Command
   }
 
   // Update UI after every command
-  if (ctx.state) uiManager.update(ctx.state, ctx.weatherCycle?.current);
+  if (ctx.state) uiManager.update(ctx.state, ctx.weatherCycle, ctx.rng);
   if (ctx.state) tutorial.onCommandExecuted(ctx.state);
   return result;
 }
@@ -727,7 +744,7 @@ scene.start((dt) => {
 
   // Update UI from current state on each frame
   if (ctx.state) {
-    uiManager.update(ctx.state, ctx.weatherCycle?.current);
+    uiManager.update(ctx.state, ctx.weatherCycle, ctx.rng);
     saveLoadUI.onTick(ctx.state);
   }
 });

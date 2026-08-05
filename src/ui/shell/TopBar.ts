@@ -5,14 +5,28 @@
 // (spec §5 defect: they collided with the paused/event chip).
 
 import { iconEl } from '../icons.js';
-import { el } from '../dom.js';
+import { el, sectionHeader } from '../dom.js';
 import { t } from '../../core/i18n/I18n.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import type { GameState } from '../../core/state/GameState.js';
-import type { WeatherState } from '../../core/weather/WeatherCycle.js';
+import { forecast, rainIntensity, type WeatherState, type WeatherCycleState } from '../../core/weather/WeatherCycle.js';
+import { computeWeatherAdvisory, type WeatherAdvisory } from '../../core/weather/WeatherAdvisory.js';
+import type { Random } from '../../core/math/Random.js';
 import { TICKS_PER_DAY } from '../../core/config/balance.js';
 import type { NotificationCenter, AlertPip } from '../notify/NotificationCenter.js';
 import type { PanelName } from '../UIManager.js';
+
+const FORECAST_DAYS = 14;
+/** Forecast reliability tiers — color-coded, never opacity-encoded (a11y). */
+const OUTLOOK_TIERS: { maxDay: number; color: string }[] = [
+  { maxDay: 5, color: 'var(--bsx-positive)' },
+  { maxDay: 10, color: 'var(--bsx-amber)' },
+  { maxDay: 14, color: 'var(--bsx-text-disabled)' },
+];
+
+function tierColorForDay(dayIndex1Based: number): string {
+  return OUTLOOK_TIERS.find(tier => dayIndex1Based <= tier.maxDay)?.color ?? 'var(--bsx-text-disabled)';
+}
 
 const WEATHER_ICON: Record<WeatherState, string> = {
   sunny: 'sun',
@@ -67,6 +81,8 @@ export class TopBar {
   private readonly clockValue: HTMLElement;
   private readonly weatherIcon: HTMLElement;
   private readonly weatherBtn: HTMLButtonElement;
+  private readonly weatherPopoverEl: HTMLElement;
+  private weatherWrapEl!: HTMLElement;
   private readonly speedButtons: HTMLButtonElement[] = [];
   private readonly pauseChip: HTMLElement;
   private readonly alertPipsEl: HTMLElement;
@@ -83,6 +99,10 @@ export class TopBar {
   private onSiteMap?: () => void;
 
   private lastWeather: WeatherState = 'sunny';
+  private lastWeatherCycle: WeatherCycleState | undefined;
+  private lastRng: Random | undefined;
+  private lastState: GameState | undefined;
+  private weatherPopoverOpen = false;
   private currentSpeed = 1;
   private isPaused = false;
 
@@ -129,12 +149,25 @@ export class TopBar {
     this.clockValue.style.cssText = 'font-size:14px;font-weight:500';
     dayCol.append(this.dayValue, this.clockValue);
 
+    const weatherWrap = el('div');
+    weatherWrap.style.cssText = 'position:relative;display:flex';
     this.weatherBtn = document.createElement('button');
     this.weatherBtn.className = 'bs-weather';
-    this.weatherBtn.style.cssText = 'display:flex;align-items:center;height:32px;padding:0 9px;border:1px solid var(--bsx-hairline-strong);border-radius:4px;background:var(--bsx-well);color:var(--bsx-info-text);cursor:pointer';
+    this.weatherBtn.style.cssText = 'display:flex;align-items:center;gap:6px;height:32px;padding:0 9px;border:1px solid var(--bsx-hairline-strong);border-radius:4px;background:var(--bsx-well);color:var(--bsx-info-text);cursor:pointer';
     this.weatherIcon = iconEl('sun', 15);
-    this.weatherBtn.appendChild(this.weatherIcon);
-    dayWrap.append(dayCol, this.weatherBtn);
+    this.weatherBtn.append(this.weatherIcon, iconEl('chev', 10));
+    this.weatherBtn.addEventListener('click', (e) => { e.stopPropagation(); this.toggleWeatherPopover(); });
+    this.weatherPopoverEl = el('div');
+    // display kept out of this cssText string: a shorthand `border` combined
+    // with a var() breaks jsdom's CSS parser for the whole string (not a real
+    // browser issue) — set separately below so tests can rely on it.
+    this.weatherPopoverEl.style.cssText = 'position:absolute;left:0;top:42px;width:340px;z-index:var(--bsx-z-popover);border-radius:7px;background:#141920;border:1px solid var(--bsx-hairline-strong);box-shadow:0 18px 44px rgba(0,0,0,.6);overflow:hidden';
+    this.weatherPopoverEl.style.display = 'none';
+    weatherWrap.append(this.weatherBtn, this.weatherPopoverEl);
+    dayWrap.append(dayCol, weatherWrap);
+
+    this.weatherWrapEl = weatherWrap;
+    document.addEventListener('click', this.onDocumentClick);
 
     // ── Speed + pause ──
     const speedWrap = el('div');
@@ -213,7 +246,11 @@ export class TopBar {
   setOpenSavesHandler(cb: () => void): void { this.onOpenSaves = cb; }
   setSiteMapHandler(cb: () => void): void { this.onSiteMap = cb; }
 
-  update(state: GameState, weather: WeatherState | undefined, center: NotificationCenter): void {
+  update(state: GameState, weatherCycle: WeatherCycleState | undefined, rng: Random | undefined, center: NotificationCenter): void {
+    const weather = weatherCycle?.current;
+    this.lastState = state;
+    this.lastWeatherCycle = weatherCycle;
+    this.lastRng = rng;
     // Balance + trend
     this.balanceValue.textContent = formatBalance(state.cash);
     this.balanceValue.style.color = state.cash < 0 ? 'var(--bsx-critical-text)' : 'var(--bsx-amber)';
@@ -236,6 +273,7 @@ export class TopBar {
       this.weatherIcon.setAttribute('name', WEATHER_ICON[weather] ?? 'sun');
       this.weatherBtn.title = t(`hud.weather.${weather}`);
     }
+    if (this.weatherPopoverOpen) this.renderWeatherPopover();
 
     // Speed / pause
     if (state.timeScale !== this.currentSpeed || state.isPaused !== this.isPaused) {
@@ -277,6 +315,137 @@ export class TopBar {
     this.logBadge.style.display = unread > 0 ? 'flex' : 'none';
   }
 
+  // ── Weather popover ──
+
+  private readonly onDocumentClick = (e: MouseEvent): void => {
+    if (!this.weatherPopoverOpen) return;
+    if (this.weatherWrapEl.contains(e.target as Node)) return;
+    this.closeWeatherPopover();
+  };
+
+  private toggleWeatherPopover(): void {
+    if (this.weatherPopoverOpen) this.closeWeatherPopover();
+    else this.openWeatherPopover();
+  }
+
+  private openWeatherPopover(): void {
+    this.weatherPopoverOpen = true;
+    this.weatherPopoverEl.style.display = 'block';
+    this.renderWeatherPopover();
+  }
+
+  private closeWeatherPopover(): void {
+    this.weatherPopoverOpen = false;
+    this.weatherPopoverEl.style.display = 'none';
+  }
+
+  /**
+   * forecast() and computeWeatherAdvisory() are cheap (a few hundred
+   * arithmetic steps) — recomputing on every render while the popover is
+   * open, rather than caching, keeps this in step with update() without a
+   * second invalidation path to get wrong.
+   */
+  private renderWeatherPopover(): void {
+    const state = this.lastState;
+    const cycle = this.lastWeatherCycle;
+    const rng = this.lastRng;
+    if (!state || !cycle || !rng) {
+      this.weatherPopoverEl.replaceChildren(el('div', {
+        text: t('ui.weather.no_data'),
+        attrs: { style: 'padding:16px;font:400 11px/1.4 var(--bsx-font-ui);color:var(--bsx-text-muted)' },
+      }));
+      return;
+    }
+
+    const days = forecast(cycle, rng, FORECAST_DAYS);
+    const advisory = computeWeatherAdvisory(state, cycle.current, days);
+    const today = Math.floor(state.tickCount / TICKS_PER_DAY) + 1;
+
+    const header = el('div', { attrs: { style: 'display:flex;align-items:center;gap:9px;padding:12px 13px;border-bottom:1px solid var(--bsx-hairline)' } });
+    header.append(
+      el('div', { attrs: { style: 'color:var(--bsx-info)' }, children: [iconEl(WEATHER_ICON[cycle.current] ?? 'sun', 17)] }),
+      el('div', {
+        attrs: { style: 'display:flex;flex-direction:column;gap:3px;flex:1;min-width:0' },
+        children: [
+          el('span', { text: t(`hud.weather.${cycle.current}`), attrs: { style: 'font:700 12px/1 var(--bsx-font-ui);letter-spacing:.1em' } }),
+          el('span', { text: t(`ui.weather.effect.${cycle.current}`), attrs: { style: 'font:400 10px/1.4 var(--bsx-font-ui);color:var(--bsx-text-muted)' } }),
+        ],
+      }),
+    );
+
+    const body = el('div', { attrs: { style: 'padding:12px 13px;display:flex;flex-direction:column;gap:9px' } });
+    body.appendChild(sectionHeader(t('ui.weather.outlook')));
+
+    const strip = el('div', { attrs: { style: 'display:flex;gap:2px' } });
+    days.forEach((dayWeather, i) => {
+      const dayNum = today + i + 1;
+      const color = tierColorForDay(i + 1);
+      const wetPct = Math.round(rainIntensity(dayWeather) * 100);
+      const cell = el('div', {
+        attrs: {
+          style: `flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;padding:7px 1px;border:1px solid ${color};border-radius:4px;background:color-mix(in srgb, ${color} 12%, transparent)`,
+          title: `${t('shell.topbar.day', { day: dayNum })}: ${t(`hud.weather.${dayWeather}`)}`,
+        },
+      });
+      cell.append(
+        el('span', { text: String(dayNum), className: 'bsx-mono', attrs: { style: `font-size:10px;color:${color}` } }),
+        el('div', { attrs: { style: 'color:var(--bsx-text-secondary)' }, children: [iconEl(WEATHER_ICON[dayWeather] ?? 'sun', 16)] }),
+        el('div', {
+          attrs: { style: 'width:14px;height:3px;border-radius:2px;background:rgba(255,255,255,.09);overflow:hidden' },
+          children: [el('div', { attrs: { style: `height:100%;background:var(--bsx-info);width:${wetPct}%` } })],
+        }),
+      );
+      strip.appendChild(cell);
+    });
+    body.appendChild(strip);
+
+    const bandsRow = el('div', { attrs: { style: 'display:flex;align-items:center;gap:14px' } });
+    const bands: [string, string][] = [
+      [t('ui.weather.band_reliable'), 'var(--bsx-positive)'],
+      [t('ui.weather.band_indicative'), 'var(--bsx-amber)'],
+      [t('ui.weather.band_guesswork'), 'var(--bsx-text-disabled)'],
+    ];
+    for (const [label, color] of bands) {
+      bandsRow.appendChild(el('div', {
+        attrs: { style: 'display:flex;align-items:baseline;gap:5px' },
+        children: [
+          el('span', { text: label, attrs: { style: `font:600 10px/1 var(--bsx-font-ui);letter-spacing:.1em;color:${color}` } }),
+        ],
+      }));
+    }
+    bandsRow.appendChild(el('span', {
+      attrs: { style: 'margin-left:auto;display:flex;align-items:center;gap:5px' },
+      children: [
+        el('span', { attrs: { style: 'width:14px;height:3px;border-radius:2px;background:var(--bsx-info)' } }),
+        el('span', { text: t('ui.weather.flood_risk'), attrs: { style: 'font:500 10px/1 var(--bsx-font-ui);letter-spacing:.08em;color:var(--bsx-text-micro)' } }),
+      ],
+    }));
+    body.appendChild(bandsRow);
+
+    body.appendChild(el('div', {
+      attrs: { style: 'display:flex;gap:9px;padding:10px 11px;border-radius:5px;background:rgba(85,168,255,.07);border:1px solid rgba(85,168,255,.24)' },
+      children: [
+        el('div', { attrs: { style: 'color:var(--bsx-info);padding-top:1px' }, children: [iconEl('water', 14)] }),
+        el('span', { text: this.advisoryText(advisory), attrs: { style: 'font:400 11px/1.45 var(--bsx-font-ui);color:var(--bsx-text-secondary);flex:1' } }),
+      ],
+    }));
+
+    this.weatherPopoverEl.replaceChildren(header, body);
+  }
+
+  private advisoryText(advisory: WeatherAdvisory): string {
+    switch (advisory.kind) {
+      case 'clear':
+        return t('ui.weather.advisory_clear');
+      case 'wet':
+        return advisory.daysUntilChange !== null
+          ? t('ui.weather.advisory_wet_clearing', { uncovered: advisory.uncoveredHoles, days: advisory.daysUntilChange })
+          : t('ui.weather.advisory_wet_indefinite', { uncovered: advisory.uncoveredHoles });
+      case 'rain_incoming':
+        return t('ui.weather.advisory_rain_incoming', { days: advisory.daysUntilChange ?? 0, duration: advisory.consecutiveWetDays });
+    }
+  }
+
   private lastScoreSig = '';
   private updateScores(state: GameState): void {
     const scores = [
@@ -313,7 +482,11 @@ export class TopBar {
     this.locale.refresh();
     this.weatherBtn.title = t(`hud.weather.${this.lastWeather}`);
     this.lastScoreSig = '';
+    if (this.weatherPopoverOpen) this.renderWeatherPopover();
   }
 
-  dispose(): void { this.root.remove(); }
+  dispose(): void {
+    document.removeEventListener('click', this.onDocumentClick);
+    this.root.remove();
+  }
 }
