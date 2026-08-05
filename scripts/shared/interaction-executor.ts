@@ -9,8 +9,9 @@
  */
 
 import type { Page, KeyInput } from 'puppeteer';
-import type { InteractionStepAction } from './scenario-types.js';
+import type { InteractionStepAction, ScenarioStepDef } from './scenario-types.js';
 import { awaitPlacementArmed } from './tile-picker.js';
+import { isAllowedSetupCommand, SETUP_COMMAND_ALLOWLIST, TIME_COMMAND_ALLOWLIST } from './playtest-types.js';
 
 /** How long a tile-space action waits for its picker to open. */
 const PICKER_TIMEOUT_MS = 5000;
@@ -107,6 +108,35 @@ function describeReason(r: UnclickableReport): string {
 }
 
 /**
+ * Whether `action` (already known to be a `command`) may run inside `step`,
+ * given the step's role (issue #479). Returns a message naming the step and
+ * the reason when it may not; `null` when it is fine.
+ *
+ * A player step may not reach the console at all — a click that was awkward
+ * is a playability finding, not license to type it instead. A setup step may
+ * still run a command, but only one `isAllowedSetupCommand` admits: the same
+ * allowlist the playtest harness uses to bootstrap a world, reused rather
+ * than reinvented so there is exactly one place that decides what counts as
+ * "setup" instead of two that can drift apart. A step with no role is
+ * unconstrained — see {@link ScenarioStepRole}.
+ */
+export function checkStepActionAllowed(
+  step: ScenarioStepDef,
+  action: InteractionStepAction & { type: 'command' },
+): string | null {
+  const label = step.description ?? step.command;
+  if (step.role === 'player') {
+    return `step "${label}" is player-marked but its interaction runs console command `
+      + `"${action.command}" — player steps must be completed by clicking, not a console command.`;
+  }
+  if (step.role === 'setup' && !isAllowedSetupCommand(action.command)) {
+    return `step "${label}" is setup-marked but runs console command "${action.command}", `
+      + `which is not on the setup allowlist (${[...SETUP_COMMAND_ALLOWLIST, ...TIME_COMMAND_ALLOWLIST].join(', ')}).`;
+  }
+  return null;
+}
+
+/**
  * Executes a single interaction action on the given Puppeteer page.
  * Handles all supported action types: click, mousedown, mouseup, mousemove,
  * keypress, keydown, keyup, scroll, wheel, wait, waitForSelector, type,
@@ -114,10 +144,13 @@ function describeReason(r: UnclickableReport): string {
  *
  * @param page - Puppeteer page object.
  * @param action - The interaction action to execute.
+ * @param step - The step `action` belongs to, so a `command` action can be
+ *   checked against the step's role (issue #479).
  */
 export async function executeActionOnPage(
   page: Page,
   action: InteractionStepAction,
+  step: ScenarioStepDef,
 ): Promise<void> {
   switch (action.type) {
     case 'click': {
@@ -291,7 +324,9 @@ export async function executeActionOnPage(
     case 'viewport':
       await page.setViewport({ width: action.width, height: action.height });
       break;
-    case 'command':
+    case 'command': {
+      const violation = checkStepActionAllowed(step, action);
+      if (violation !== null) throw new Error(violation);
       await page.evaluate((cmd: string) => {
         if (typeof (window as any).__gameConsole === 'function') {
           return (window as any).__gameConsole(cmd);
@@ -299,6 +334,7 @@ export async function executeActionOnPage(
         return undefined;
       }, action.command);
       break;
+    }
     case 'cameraFocus':
       await page.evaluate(({ x, z, distance }: { x: number; z: number; distance: number }) => {
         (window as any).__cameraFocus(x, z, distance);

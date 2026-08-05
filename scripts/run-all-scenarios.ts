@@ -35,6 +35,7 @@ import {
   DEFAULT_STEP_TIMEOUT,
   SCREENSHOT_DIR,
 } from './shared/puppeteer-utils.js';
+import { describeStepFailure } from './scenario-interaction-runner.js';
 
 const DEV_SERVER_PORT = 5173;
 
@@ -146,7 +147,7 @@ async function runBatchInteraction(
             ]);
           } catch (err: unknown) {
             failed = true;
-            errorMsg = err instanceof Error ? err.message : String(err);
+            errorMsg = describeStepFailure(step, err);
             break;
           }
         }

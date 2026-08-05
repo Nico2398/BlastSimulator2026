@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import type { ScenarioDef, ScenarioStepDef } from '../../scripts/shared/scenario-types.js';
 import { loadScenarioDef, SCENARIO_DIR } from '../../scripts/shared/scenario-utils.js';
 import { getAllVehicleRoles } from '../../src/core/entities/Vehicle.js';
+import { checkStepActionAllowed } from '../../scripts/shared/interaction-executor.js';
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 
@@ -666,4 +667,92 @@ describe('UI-driven scenarios click real controls', () => {
       }
     });
   }
+});
+
+// ──────────────────────────────────────────────
+// 13. Step role, when present, is a recognized value (issue #479)
+// ──────────────────────────────────────────────
+describe('Step role field is a recognized value when present', () => {
+  for (const name of ALL_SCENARIO_NAMES) {
+    it(`${name} — every step's role, if set, is "player" or "setup"`, () => {
+      const scenario = loadScenarioDef(name, SCENARIO_DIR);
+      for (let i = 0; i < scenario.steps.length; i++) {
+        const step = scenario.steps[i] as ScenarioStepDef;
+        if (step.role === undefined) continue;
+        expect(
+          ['player', 'setup'],
+          `step[${i}] role "${step.role}" must be "player" or "setup"`,
+        ).toContain(step.role);
+      }
+    });
+  }
+});
+
+// ──────────────────────────────────────────────
+// 14. Role-marked steps never reach the console for anything but an
+// allowlisted setup command (issue #479). A step with no role tag predates
+// the distinction and is unconstrained — true of every definition here
+// except the pilot conversion, tutorial-interactive.json.
+// ──────────────────────────────────────────────
+describe('Role-marked steps obey checkStepActionAllowed (issue #479)', () => {
+  for (const name of ALL_SCENARIO_NAMES) {
+    it(`${name} — no role-marked step's interaction runs a disallowed console command`, () => {
+      const scenario = loadScenarioDef(name, SCENARIO_DIR);
+      const violations: string[] = [];
+      for (const step of scenario.steps as ScenarioStepDef[]) {
+        if (step.role === undefined) continue;
+        for (const action of step.interaction ?? []) {
+          if (action.type !== 'command') continue;
+          const violation = checkStepActionAllowed(step, action);
+          if (violation !== null) violations.push(violation);
+        }
+      }
+      expect(violations).toEqual([]);
+    });
+  }
+
+  it('a player-marked step carrying a command action is rejected, naming the step', () => {
+    const step: ScenarioStepDef = {
+      command: 'vehicle driver 1 4',
+      description: 'vehicle-buy-assign complete',
+      role: 'player',
+      interaction: [{ type: 'command', command: 'vehicle driver 1 4' }],
+    };
+    const violation = checkStepActionAllowed(step, { type: 'command', command: 'vehicle driver 1 4' });
+    expect(violation).not.toBeNull();
+    expect(violation).toContain('vehicle-buy-assign complete');
+    expect(violation).toContain('vehicle driver 1 4');
+  });
+
+  it('a setup-marked step may still use an allowlisted command', () => {
+    const step: ScenarioStepDef = {
+      command: 'tick 6',
+      role: 'setup',
+      interaction: [{ type: 'command', command: 'tick 6' }],
+    };
+    expect(checkStepActionAllowed(step, { type: 'command', command: 'tick 6' })).toBeNull();
+    expect(checkStepActionAllowed(step, { type: 'command', command: 'new_game seed:1' })).toBeNull();
+  });
+
+  it('a setup-marked step is rejected for a command outside the allowlist', () => {
+    const cheat = 'employee assign_skill 1 skill:geology level:3';
+    const step: ScenarioStepDef = {
+      command: cheat,
+      role: 'setup',
+      interaction: [{ type: 'command', command: cheat }],
+    };
+    const violation = checkStepActionAllowed(step, { type: 'command', command: cheat });
+    expect(violation).not.toBeNull();
+    expect(violation).toContain(cheat);
+  });
+
+  it('a step with no role tag is unconstrained (predates the distinction)', () => {
+    const step: ScenarioStepDef = {
+      command: 'build freight_warehouse at:4,4',
+      interaction: [{ type: 'command', command: 'build freight_warehouse at:4,4' }],
+    };
+    expect(checkStepActionAllowed(
+      step, { type: 'command', command: 'build freight_warehouse at:4,4' },
+    )).toBeNull();
+  });
 });

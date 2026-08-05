@@ -34,6 +34,23 @@ export interface ShotDef {
   distance?: number;
 }
 
+/**
+ * Turns a raw step error into a report line. A player-marked step's failure
+ * is the mechanism working (issue #479) — it means no click could finish
+ * what the step asked, the same conclusion `npm run playtest` reaches — so
+ * it is called out rather than left to read like any other broken step.
+ * `err`'s own message already names the blocking control the way
+ * `describeUnclickable` (interaction-executor.ts) reports it; this only adds
+ * the step-level framing on top.
+ */
+export function describeStepFailure(step: ScenarioStepDef, err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err);
+  const label = step.description ?? step.command;
+  return step.role === 'player'
+    ? `player step "${label}" did not complete: ${raw}`
+    : raw;
+}
+
 function checkScreenshotSize(filepath: string): string | undefined {
   try {
     const size = statSync(filepath).size;
@@ -163,7 +180,7 @@ export async function runScenarioInteraction(
           timeoutPromise,
         ]);
       } catch (err: unknown) {
-        const errorMsg = err instanceof Error ? err.message : String(err);
+        const errorMsg = describeStepFailure(step, err);
         console.error(`  ERROR: ${errorMsg}`);
         results.push({
           step: i,
@@ -175,10 +192,15 @@ export async function runScenarioInteraction(
           statePath: '',
           error: errorMsg,
         });
-        if (timedOut) {
-          console.error('  Step timed out. Skipping remaining steps.');
-          break;
-        }
+        // Stop at the first failed step, timeout or not. A step that did not
+        // complete leaves the game in a state later steps never asked for —
+        // continuing past it, as this used to, produced cascading unrelated
+        // failures and (scenario-test.ts always exiting 0 regardless) a run
+        // that reported success no matter what this loop actually did.
+        console.error(timedOut
+          ? '  Step timed out. Stopping — a step must complete to prove anything.'
+          : '  Step failed. Stopping — a step must complete to prove anything.');
+        break;
       }
     }
 

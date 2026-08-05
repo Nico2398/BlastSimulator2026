@@ -109,22 +109,32 @@ if (mode === 'command') {
   }
 }
 
+/**
+ * A resolved run reports each step's outcome in `results`, not by rejecting —
+ * so exiting 0 whenever the promise merely *resolves* reports success on a
+ * run that failed partway through. Checked here so a local
+ * `npm run scenario -- ...` reflects the same pass/fail its own step log shows.
+ */
+function exitForResults(results: StepResult[]): never {
+  const failed = results.filter(r => r.error !== undefined);
+  if (failed.length > 0) {
+    console.error(`\nScenario FAILED — ${failed.length}/${results.length} step(s) errored.`);
+    process.exit(1);
+  }
+  console.log('\nScenario complete.');
+  process.exit(0);
+}
+
 if (mode === 'command') {
   runScenarioCommand(name, steps)
-    .then(() => {
-      console.log('\nScenario complete.');
-      process.exit(0);
-    })
+    .then(exitForResults)
     .catch(err => {
       console.error('Scenario failed:', err);
       process.exit(1);
     });
 } else {
   runScenarioInteraction(name, steps, shots, port, puppeteerPath, frames, intervalMs, viewport, screenshots, SCREENSHOT_DIR)
-    .then(() => {
-      console.log('\nScenario complete.');
-      process.exit(0);
-    })
+    .then(exitForResults)
     .catch(err => {
       console.error('Scenario failed:', err);
       process.exit(1);

@@ -54,6 +54,19 @@ export type InteractionStepAction =
   | { type: 'screenshot' };
 
 /**
+ * Whether a step's `interaction` models something the player must do by
+ * clicking, or setup/observation the harness may still drive by console
+ * command.
+ *
+ * Omitted means the step predates this distinction and is unconstrained —
+ * true of every scenario except the pilot conversion (tutorial-interactive.json,
+ * issue #479). A step opts in by setting this explicitly; nothing infers it
+ * from the step's command, because inference is exactly the kind of
+ * convention a future edit can quietly violate.
+ */
+export type ScenarioStepRole = 'player' | 'setup';
+
+/**
  * Object form of a scenario step with command and optional interaction array.
  */
 export interface ScenarioStepDef {
@@ -63,6 +76,8 @@ export interface ScenarioStepDef {
   frames?: number;
   interval?: number;
   interaction?: InteractionStepAction[];
+  /** See {@link ScenarioStepRole}. */
+  role?: ScenarioStepRole;
 }
 
 /**

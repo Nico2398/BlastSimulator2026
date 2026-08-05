@@ -1,6 +1,6 @@
 {
   "name": "tutorial-interactive",
-  "description": "Plays the Tutorial Pit the way a first-time player does: every step is driven by a real click on the control the tutorial card points at \u2014 speed button, toolbar, hire buttons, blast panel, event choices \u2014 and each beat waits for the tutorial's own rails to advance (waitForTutorialStep) before the next click, mirroring the playtest definition's click path (seismic survey at 23,23; the box cut dug down the west face before the drill grid; drill grid on the exact 20,20-30,30 rectangle; haul before deliver).",
+  "description": "Plays the Tutorial Pit the way a first-time player does: every step is driven by a real click on the control the tutorial card points at — speed button, toolbar, hire buttons, blast panel, event choices — and each beat waits for the tutorial's own rails to advance (waitForTutorialStep) before the next click, mirroring the playtest definition's click path (seismic survey at 23,23; the box cut dug down the west face before the drill grid; drill grid on the exact 20,20-30,30 rectangle; haul before deliver). Every tutorial-facing step is role-marked 'player' or 'setup' (issue #479): a player step's interaction may not fall back to a console command, so a step that cannot actually be clicked fails the scenario instead of passing on a typed shortcut.",
   "shots": [
     {
       "name": "overview",
@@ -18,6 +18,7 @@
       "command": "new_game seed:42 size:24",
       "timeout": 30,
       "description": "Setup: the Tutorial menu button creates this exact game before starting the level (main.ts setOnTutorial)",
+      "role": "setup",
       "interaction": [
         {
           "type": "command",
@@ -28,7 +29,8 @@
     {
       "command": "campaign start level:tutorial_pit",
       "timeout": 30,
-      "description": "Setup: load Tutorial Pit \u2014 the level regenerates the terrain at its own size and re-frames the camera",
+      "description": "Setup: load Tutorial Pit — the level regenerates the terrain at its own size and re-frames the camera",
+      "role": "setup",
       "interaction": [
         {
           "type": "command",
@@ -40,6 +42,7 @@
       "command": "tutorial_start",
       "timeout": 30,
       "description": "Step time-speed: coach mark docked bottom-centre, speed button glowing, mine still visible",
+      "role": "setup",
       "interaction": [
         {
           "type": "command",
@@ -59,6 +62,7 @@
       "command": "time speed:2",
       "timeout": 30,
       "description": "time-speed complete: real click on the speed button cycles 1x to 2x, card advances to Hire Surveyor",
+      "role": "player",
       "interaction": [
         {
           "type": "clickSelector",
@@ -73,7 +77,8 @@
     {
       "command": "state",
       "timeout": 30,
-      "description": "Player follows the glowing Crew button \u2014 the tutorial card must not swallow the click",
+      "description": "Player follows the glowing Crew button — the tutorial card must not swallow the click",
+      "role": "player",
       "interaction": [
         {
           "type": "clickSelector",
@@ -89,6 +94,7 @@
       "command": "employee hire role:surveyor",
       "timeout": 30,
       "description": "hire-surveyor complete: Hire clicked in the crew panel, surveyor appears on site",
+      "role": "player",
       "interaction": [
         {
           "type": "clickSelector",
@@ -103,7 +109,7 @@
     {
       "command": "employee assign_skill 1 skill:geology level:3",
       "timeout": 30,
-      "description": "Raise the surveyor's geology so the seismic survey returns usable estimates",
+      "description": "Test-only bootstrap, not a tutorial stage: hiring already grants Rookie geology (ROLE_STARTING_QUALIFICATION in Employee.ts, same for the UI hire button and this console command), so this only raises the level for tighter survey estimates. No role tag — there is no UI control for this and none should exist; the player-facing way to raise a skill is `employee train` at a training building, which this scenario does not need. Command mode keeps running it unchanged; interaction mode keeps it as an unmarked (legacy) command step.",
       "interaction": [
         {
           "type": "command",
@@ -114,7 +120,8 @@
     {
       "command": "survey seismic x:23 z:23",
       "timeout": 90,
-      "description": "survey complete: seismic (the method the card names), target picked inside the step's outlined region (18..28), dispatched, and the surveyor walks out and works it",
+      "description": "survey complete: seismic (the method the card names), target picked inside the step's outlined region (18..28), dispatched, and the surveyor walks out and works it. waitForTutorialStep drives the real clock for the walk — no scripted `tick` needed once a click starts it.",
+      "role": "player",
       "interaction": [
         {
           "type": "clickSelector",
@@ -145,10 +152,6 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
-          "type": "command",
-          "command": "tick 15"
-        },
-        {
           "type": "waitForTutorialStep",
           "stepId": "hire-driller",
           "timeout": 60000
@@ -159,6 +162,7 @@
       "command": "employee hire role:driller",
       "timeout": 30,
       "description": "hire-driller complete: driller hired through the crew panel",
+      "role": "player",
       "interaction": [
         {
           "type": "clickSelector",
@@ -177,7 +181,8 @@
     {
       "command": "build_ramp start:16,19 end:16,31 depth:8",
       "timeout": 90,
-      "description": "box-cut complete: dig the starter cut down the west face of the drill pattern before the first shot, so the blasted rock has a free face and a void to fall into (real open pits pioneer this access cut first)",
+      "description": "box-cut complete: dig the starter cut down the west face of the drill pattern before the first shot, so the blasted rock has a free face and a void to fall into (real open pits pioneer this access cut first). waitForTutorialStep drives the real clock — no scripted `tick` needed.",
+      "role": "player",
       "interaction": [
         {
           "type": "waitForTutorialStep",
@@ -211,10 +216,6 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
-          "type": "command",
-          "command": "tick 3"
-        },
-        {
           "type": "waitForTutorialStep",
           "stepId": "drill-plan",
           "timeout": 30000
@@ -224,7 +225,7 @@
     {
       "command": "employee assign_skill 2 skill:blasting level:3",
       "timeout": 30,
-      "description": "Give the driller blasting proficiency",
+      "description": "Test-only bootstrap, not a tutorial stage — see the geology assign_skill step above for why this stays an unmarked (legacy) command step in interaction mode too.",
       "interaction": [
         {
           "type": "command",
@@ -236,6 +237,7 @@
       "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:6 start:20,20",
       "timeout": 60,
       "description": "drill-plan complete: grid tool dragged over the exact 20,20-30,30 rectangle the card asks for (spacing 5 makes 3x3 holes), confirmed",
+      "role": "player",
       "interaction": [
         {
           "type": "clickSelector",
@@ -272,7 +274,8 @@
     {
       "command": "charge hole:* explosive:pop_rock amount:3 stemming:2",
       "timeout": 30,
-      "description": "charge complete: Charge All Holes clicked \u2014 the panel applies its own form defaults and hole rows turn green",
+      "description": "charge complete: Charge All Holes clicked — the panel applies its own form defaults and hole rows turn green",
+      "role": "player",
       "interaction": [
         {
           "type": "clickSelector",
@@ -288,6 +291,7 @@
       "command": "sequence auto",
       "timeout": 30,
       "description": "sequence complete: Auto Sequence clicked, delay labels appear on every hole",
+      "role": "player",
       "interaction": [
         {
           "type": "clickSelector",
@@ -303,6 +307,7 @@
       "command": "blast",
       "timeout": 90,
       "description": "blast complete: Execute clicked, confirm dialog answered, crater and fragments appear, Blast Report closed; the scores card then auto-advances into the scripted consultant event",
+      "role": "player",
       "interaction": [
         {
           "type": "clickSelector",
@@ -345,6 +350,7 @@
       "command": "event choose 0",
       "timeout": 60,
       "description": "event-fire-resolve complete: the consultant dialog is answered through its own buttons, outcome read, then dismissed",
+      "role": "player",
       "interaction": [
         {
           "type": "waitForSelector",
@@ -376,6 +382,7 @@
       "command": "employee hire role:manager",
       "timeout": 30,
       "description": "hire-manager complete: manager hired now that the event is resolved",
+      "role": "player",
       "interaction": [
         {
           "type": "clickSelector",
@@ -395,6 +402,7 @@
       "command": "contract accept 1",
       "timeout": 30,
       "description": "contract-accept complete: Accept clicked on the first offer in the Contracts panel",
+      "role": "player",
       "interaction": [
         {
           "type": "clickSelector",
@@ -414,6 +422,7 @@
       "command": "employee hire role:driver",
       "timeout": 30,
       "description": "hire-driver complete: driver hired through the crew panel",
+      "role": "player",
       "interaction": [
         {
           "type": "clickSelector",
@@ -432,7 +441,7 @@
     {
       "command": "employee assign_skill 4 skill:driving.truck level:3",
       "timeout": 30,
-      "description": "Qualify the driver for trucks so command mode's explicit driver assignment also succeeds",
+      "description": "Test-only bootstrap, not a tutorial stage — see the geology assign_skill step above; hiring already grants Rookie driving.truck, this only raises the level. Kept for command mode, which needs it for its own explicit `vehicle driver 1 4` to succeed identically.",
       "interaction": [
         {
           "type": "command",
@@ -444,6 +453,7 @@
       "command": "vehicle buy debris_hauler",
       "timeout": 30,
       "description": "vehicle-buy-assign, first half: Vehicles panel open, tier-1 hauler bought and placed on the terrain surface",
+      "role": "player",
       "interaction": [
         {
           "type": "clickSelector",
@@ -462,7 +472,8 @@
     {
       "command": "vehicle driver 1 4",
       "timeout": 90,
-      "description": "vehicle-buy-assign complete: Assign clicked, then the tutorial's own clock runs while the driver walks to the vehicle and boards \u2014 the #478 deadlock path, exercised for real",
+      "description": "vehicle-buy-assign complete: Assign clicked, then the tutorial's own clock runs while the driver walks to the vehicle and boards — the #478 deadlock path, exercised for real",
+      "role": "player",
       "interaction": [
         {
           "type": "clickSelector",
@@ -479,6 +490,7 @@
       "command": "build freight_warehouse at:4,4",
       "timeout": 60,
       "description": "build-storage complete: warehouse placed by clicking a tile inside the step's region (2..9) in the Build panel picker",
+      "role": "player",
       "interaction": [
         {
           "type": "clickSelector",
@@ -513,7 +525,8 @@
     {
       "command": "vehicle haul 1 fragment:1",
       "timeout": 90,
-      "description": "haul-debris complete: the Vehicles panel's Haul button sends the hauler to a reachable fragment, and stored mass grows once it unloads at the warehouse",
+      "description": "haul-debris complete: the Vehicles panel's Haul button sends the hauler to a reachable fragment, and stored mass grows once it unloads at the warehouse. waitForTutorialStep drives the real clock for the haul — no scripted `tick` needed.",
+      "role": "player",
       "interaction": [
         {
           "type": "clickSelector",
@@ -529,10 +542,6 @@
           "selector": "#bs-vehicle-panel .bs-vehicle-haul-btn"
         },
         {
-          "type": "command",
-          "command": "tick 20"
-        },
-        {
           "type": "waitForTutorialStep",
           "stepId": "contract-deliver",
           "timeout": 60000
@@ -543,6 +552,7 @@
       "command": "contract deliver 1 amount:5000",
       "timeout": 90,
       "description": "contract-deliver complete: Deliver clicked with the panel's own pre-filled remaining amount, finishing the contract accepted earlier; the finances card then auto-advances",
+      "role": "player",
       "interaction": [
         {
           "type": "clickSelector",
@@ -575,6 +585,7 @@
       "command": "set_policy mode:shift_8h",
       "timeout": 60,
       "description": "set-policy complete: Apply pressed in the Operations panel (redesign P5 moved site policy out of Settings) — the form mirrors the policy in force, and applying it unchanged still counts",
+      "role": "player",
       "interaction": [
         {
           "type": "waitForTutorialStep",
@@ -605,12 +616,9 @@
     {
       "command": "tick 6",
       "timeout": 60,
-      "description": "tick-advance complete: clock advances more than 5 ticks, reaching the closing victory card",
+      "description": "tick-advance complete: the tutorial's own clock runs — the whole point of this step — until tickCount has advanced more than 5, reaching the closing victory card. No click and no scripted `tick`: mirrors the playtest's own beat, which is `letTimePass` only.",
+      "role": "player",
       "interaction": [
-        {
-          "type": "command",
-          "command": "tick 6"
-        },
         {
           "type": "waitForTutorialStep",
           "stepId": [
@@ -624,7 +632,8 @@
     {
       "command": "campaign complete",
       "timeout": 30,
-      "description": "victory complete: level ends, card shows Tutorial Complete",
+      "description": "victory complete: level ends, card shows Tutorial Complete. Forces the transition so the scenario ends deterministically rather than waiting out the profit-threshold win check; not a player action — `campaign` is on the reused setup allowlist.",
+      "role": "setup",
       "interaction": [
         {
           "type": "command",
@@ -640,6 +649,7 @@
       "command": "campaign status",
       "timeout": 30,
       "description": "Final: the congratulations card dismisses itself and the game is unpaused",
+      "role": "setup",
       "interaction": [
         {
           "type": "command",
