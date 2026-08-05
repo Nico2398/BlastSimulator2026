@@ -1,21 +1,17 @@
-// BlastSimulator2026 — Main Menu and World Map Screen (redesign P8)
-// Main menu reskinned to the Screens design comp: wordmark, CONTINUE with a
-// live save summary, five secondary buttons, an EN/FR toggle, version, and a
-// flavor ticker. World map ("the Portfolio") is unchanged in this pass — it
-// still renders inline via showWorldMap(), same as before the reskin; its own
-// rebuild is a separate, later piece of P8.
+// BlastSimulator2026 — Main Menu screen (redesign P8)
+// Wordmark, CONTINUE with a live save summary, five secondary buttons, an
+// EN/FR toggle, version, and a flavor ticker. The World Map ("the Portfolio")
+// used to render inline here — it's now its own sibling screen, WorldMap.ts.
 
 import { t, setLocale, getLocale } from '../core/i18n/I18n.js';
 import { LocaleTextRegistry } from './localeText.js';
 import { el } from './dom.js';
 import { iconEl, type IconName } from './icons.js';
-import type { CampaignState } from '../core/campaign/Campaign.js';
-import { getAllLevels, getLevel } from '../core/campaign/Level.js';
+import { getLevel } from '../core/campaign/Level.js';
 import type { SaveBackend, SaveMeta } from '../core/state/SaveBackend.js';
 import { TUTORIAL_STEPS } from './tutorialSteps.js';
 
 export type OnNewCampaign = () => void;
-export type OnStartLevel = (levelId: string) => void;
 export type OnContinue = (slotId: string) => void;
 export type OnLoad = () => void;
 export type OnSettings = () => void;
@@ -28,8 +24,6 @@ const APP_VERSION = '0.1.0';
 
 export class MainMenu {
   private readonly overlay: HTMLElement;
-  private readonly menuBox: HTMLElement;
-  private readonly worldMapBox: HTMLElement;
   private readonly continueBtn: HTMLElement;
   private readonly continueSummaryEl: HTMLElement;
   private readonly loadHintEl: HTMLElement;
@@ -38,7 +32,6 @@ export class MainMenu {
   private readonly tickerEl: HTMLElement;
 
   private onNewCampaign?: OnNewCampaign;
-  private onStartLevel?: OnStartLevel;
   private onContinue?: OnContinue;
   private onLoad?: OnLoad;
   private onSettings?: OnSettings;
@@ -52,8 +45,6 @@ export class MainMenu {
   private tickerTimer: ReturnType<typeof setInterval> | null = null;
   private tickerIndex = 0;
 
-  /** Campaign last passed to showWorldMap, so a locale switch can redraw it. */
-  private lastCampaign: CampaignState | null = null;
   private readonly locale = new LocaleTextRegistry();
 
   constructor(container: HTMLElement) {
@@ -68,7 +59,7 @@ export class MainMenu {
     const body = el('div', { attrs: { style: 'flex:1;display:flex;align-items:center;padding-left:76px' } });
 
     // ── Menu box: wordmark + button column + locale/version row ──
-    this.menuBox = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:26px;width:520px' } });
+    const menuBox = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:26px;width:520px' } });
 
     const wordmark = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:9px' } });
     const wordmarkRow = el('div', { attrs: { style: 'display:flex;align-items:flex-end;gap:11px' } });
@@ -124,19 +115,8 @@ export class MainMenu {
     this.locale.bindText(versionEl, 'ui.menu.version', { version: APP_VERSION });
     localeRow.append(langGroup, versionEl);
 
-    this.menuBox.append(wordmark, buttonCol, localeRow);
-
-    // ── World map box (hidden initially) ──
-    this.worldMapBox = document.createElement('div');
-    this.worldMapBox.style.cssText = [
-      'display:none;flex-direction:column;gap:8px;min-width:340px;max-width:520px',
-      'background:rgba(8,6,3,0.85);border:1px solid rgba(200,160,60,0.25)',
-      'border-radius:12px;padding:20px 24px',
-      'box-shadow:0 8px 40px rgba(0,0,0,0.6)',
-      'max-height:80vh;overflow-y:auto',
-    ].join(';');
-
-    body.append(this.menuBox, this.worldMapBox);
+    menuBox.append(wordmark, buttonCol, localeRow);
+    body.append(menuBox);
 
     // ── Bottom ticker ──
     const ticker = el('div', { attrs: {
@@ -157,7 +137,6 @@ export class MainMenu {
   }
 
   setOnNewCampaign(fn: OnNewCampaign): void { this.onNewCampaign = fn; }
-  setOnStartLevel(fn: OnStartLevel): void { this.onStartLevel = fn; }
   setOnContinue(fn: OnContinue): void { this.onContinue = fn; }
   setOnLoad(fn: OnLoad): void { this.onLoad = fn; }
   setOnSettings(fn: OnSettings): void { this.onSettings = fn; }
@@ -175,112 +154,13 @@ export class MainMenu {
   }
   get visible(): boolean { return this.overlay.style.display !== 'none'; }
 
-  /** Re-render locale-dependent text (title, subtitle, menu/world-map buttons) after a language change. */
+  /** Re-render locale-dependent text (wordmark tagline, buttons, ticker) after a language change. */
   refreshLocale(): void {
     this.locale.refresh();
     this.updateLangPills();
     this.updateContinueButton();
     this.updateLoadHint();
     this.updateTickerText();
-    // The world map is built once per open, so redraw it when it is on screen.
-    if (this.worldMapBox.style.display !== 'none') this.showWorldMap(this.lastCampaign);
-  }
-
-  /** Show the world map with campaign progress. */
-  showWorldMap(campaign: CampaignState | null): void {
-    this.lastCampaign = campaign;
-    this.menuBox.style.display = 'none';
-    this.worldMapBox.style.display = 'flex';
-    this.worldMapBox.innerHTML = '';
-
-    const mapTitle = document.createElement('div');
-    mapTitle.style.cssText = [
-      'font-weight:700;font-size:12px;letter-spacing:0.06em;text-transform:uppercase',
-      'color:#ffc840;margin-bottom:4px;border-bottom:1px solid rgba(200,160,60,0.25)',
-      'padding-bottom:8px',
-    ].join(';');
-    mapTitle.textContent = t('menu.world_map');
-
-    this.worldMapBox.appendChild(mapTitle);
-
-    const levels = getAllLevels().filter(l => l.difficultyTier > 0);
-    for (const lvl of levels) {
-      const prog = campaign?.levels[lvl.id];
-      const unlocked = prog?.unlocked ?? (lvl.difficultyTier === 1);
-      const completed = prog?.completed ?? false;
-      const profit = prog?.bestSessionProfit ?? 0;
-
-      const card = document.createElement('div');
-      card.style.cssText = [
-        'padding:12px 14px;border-radius:8px;',
-        'border:1px solid ',
-        unlocked ? 'rgba(200,160,60,0.2);background:rgba(255,255,255,0.03)' : 'rgba(80,60,30,0.2);background:transparent;opacity:0.55',
-      ].join('');
-
-      const nameRow = document.createElement('div');
-      nameRow.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:4px';
-
-      const name = document.createElement('div');
-      name.style.cssText = 'font-size:14px;color:#d0b060;font-weight:700';
-      name.textContent = t(lvl.nameKey);
-
-      const stars = document.createElement('div');
-      stars.style.cssText = 'font-size:14px';
-      stars.textContent = completed
-        ? this.starsForProfit(profit, lvl.unlockThreshold)
-        : (unlocked ? '☆☆☆' : '🔒');
-
-      nameRow.append(name, stars);
-
-      const desc = document.createElement('div');
-      desc.style.cssText = 'font-size:11px;color:#6a5030;margin:2px 0 4px';
-      desc.textContent = t(lvl.descKey);
-
-      const difficulty = document.createElement('div');
-      difficulty.style.cssText = 'font-size:11px;color:#8a7040';
-      difficulty.textContent = '⛏'.repeat(lvl.difficultyTier);
-
-      card.append(nameRow, desc, difficulty);
-
-      if (!unlocked) {
-        const req = document.createElement('div');
-        req.style.cssText = 'font-size:10px;color:#503820;margin-top:6px';
-        const prevLevel = levels[levels.indexOf(lvl) - 1];
-        // The threshold and the previous level are separate params: baking the
-        // whole phrase into one leaked the English word "on" into every locale.
-        req.textContent = prevLevel
-          ? t('menu.level_locked', {
-              threshold: `$${lvl.unlockThreshold.toLocaleString('en-US')}`,
-              level: t(prevLevel.nameKey),
-            })
-          : '';
-        card.appendChild(req);
-      } else {
-        const btnRow = document.createElement('div');
-        btnRow.style.cssText = 'display:flex;gap:6px;margin-top:8px';
-
-        const startBtn = document.createElement('button');
-        startBtn.className = 'bs-btn bs-btn-primary';
-        startBtn.style.cssText = 'flex:1;font-size:12px;padding:6px 10px';
-        startBtn.textContent = completed ? t('menu.level_resume') : t('menu.level_start');
-        startBtn.addEventListener('click', () => {
-          this.hide();
-          this.onStartLevel?.(lvl.id);
-        });
-
-        btnRow.appendChild(startBtn);
-        card.appendChild(btnRow);
-      }
-
-      this.worldMapBox.appendChild(card);
-    }
-
-    const backBtn = this.makeMenuBtn('ui.back', '', () => {
-      this.worldMapBox.style.display = 'none';
-      this.menuBox.style.display = 'flex';
-    }, '← ');
-    backBtn.style.marginTop = '4px';
-    this.worldMapBox.appendChild(backBtn);
   }
 
   dispose(): void {
@@ -295,33 +175,6 @@ export class MainMenu {
     const btn = el('button', { className: 'bsx-menu-btn', children: [iconEl(icon, 16), label, hint] });
     btn.addEventListener('click', onClick);
     return { el: btn, hintEl: hint };
-  }
-
-  /**
-   * @param persistent Register the caption with the locale registry. Only for
-   *   buttons that live as long as the menu — world-map buttons are rebuilt by
-   *   showWorldMap() on every refresh, so registering them would pile up
-   *   bindings pointing at discarded nodes.
-   */
-  private makeMenuBtn(
-    key: string,
-    variant: 'primary' | 'gold' | '',
-    onClick: () => void,
-    prefix = '',
-    persistent = false,
-  ): HTMLButtonElement {
-    const btn = document.createElement('button');
-    btn.className = `bs-btn${variant === 'primary' ? ' bs-btn-primary' : ''}`;
-    btn.style.cssText = 'width:100%;padding:10px 16px;font-size:13px;font-weight:600;text-align:left;pointer-events:all';
-    if (persistent) this.locale.bindText(btn, key, undefined, prefix);
-    else btn.textContent = prefix + t(key);
-    if (variant === 'gold') {
-      btn.style.color = '#ffe090';
-      btn.style.borderColor = 'rgba(255,225,144,0.4)';
-      btn.style.background = 'rgba(255,225,144,0.08)';
-    }
-    btn.addEventListener('click', onClick);
-    return btn;
   }
 
   private switchLanguage(lang: 'en' | 'fr'): void {
@@ -378,12 +231,5 @@ export class MainMenu {
   private updateTickerText(): void {
     const keys = ['ui.menu.ticker_1', 'ui.menu.ticker_2', 'ui.menu.ticker_3'];
     this.tickerEl.textContent = t(keys[this.tickerIndex % keys.length]!);
-  }
-
-  private starsForProfit(profit: number, threshold: number): string {
-    if (profit >= threshold * 2) return '★★★';
-    if (profit >= threshold) return '★★☆';
-    if (profit >= threshold * 0.5) return '★☆☆';
-    return '☆☆☆';
   }
 }

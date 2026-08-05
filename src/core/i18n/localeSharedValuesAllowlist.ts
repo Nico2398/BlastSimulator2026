@@ -68,6 +68,9 @@ export const LOCALE_SHARED_VALUE_ALLOWLIST: string[] = [
   'ui.finances.category.corruption', // "Corruption"
   'ui.finances.category.mafia', // "Mafia"
   'ui.event.category.mafia', // "Mafia" — same cognate as ui.finances.category.mafia
+  'ui.portfolio.back', // "MENU" — identical in French UI convention
+  'ui.portfolio.star_progress', // "{earned} / {total} ★" — format-only, no natural-language content
+  'ui.portfolio.biome.tropical', // "TROPICAL" — true cognate
   'ui.operations.fragment_count', // "{count} fragments"
   'ui.operations.incidents', // "Incidents"
   'ui.crew.need_fatigue', // "Fatigue" — same cognate as need.fatigue

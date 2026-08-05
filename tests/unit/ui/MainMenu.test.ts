@@ -3,21 +3,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { MainMenu } from '../../../src/ui/MainMenu.js';
 import { UIManager } from '../../../src/ui/UIManager.js';
 import { t, setLocale, getLocale } from '../../../src/core/i18n/I18n.js';
-import type { CampaignState } from '../../../src/core/campaign/Campaign.js';
 import { TUTORIAL_STEPS } from '../../../src/ui/tutorialSteps.js';
 import type { SaveBackend, SaveMeta } from '../../../src/core/state/SaveBackend.js';
-
-function makeCampaign(): CampaignState {
-  return {
-    levels: {
-      dusty_hollow: { unlocked: true, completed: true, bestSessionProfit: 160000 }, // > 80k threshold × 2
-      grumpstone_ridge: { unlocked: true, completed: false, bestSessionProfit: 0 },
-      treranium_depths: { unlocked: false, completed: false, bestSessionProfit: 0 },
-    },
-    currentLevelId: 'dusty_hollow',
-    totalProfit: 160000,
-  };
-}
 
 describe('MainMenu (12.8)', () => {
   let container: HTMLDivElement;
@@ -63,74 +50,6 @@ describe('MainMenu (12.8)', () => {
     const buttons = Array.from(container.querySelectorAll('button'));
     const settingsBtn = buttons.find(b => b.textContent?.toLowerCase().includes('setting'));
     settingsBtn?.click();
-    expect(cb).toHaveBeenCalledOnce();
-    menu.dispose();
-  });
-
-  it('showWorldMap renders level cards', () => {
-    const menu = new MainMenu(container);
-    menu.show();
-    menu.showWorldMap(makeCampaign());
-    // All 3 level names should appear in the rendered output
-    const text = container.textContent ?? '';
-    expect(text).toContain('Dusty Hollow');
-    expect(text).toContain('Grumpstone Ridge');
-    expect(text).toContain('Treranium Depths');
-    menu.dispose();
-  });
-
-  it('showWorldMap shows locked indicator for locked level', () => {
-    const menu = new MainMenu(container);
-    menu.show();
-    menu.showWorldMap(makeCampaign());
-    // Locked level should show 🔒
-    expect(container.textContent).toContain('🔒');
-    menu.dispose();
-  });
-
-  it('showWorldMap excludes tutorial_pit (difficultyTier 0) when campaign state provided', () => {
-    const menu = new MainMenu(container);
-    menu.show();
-    menu.showWorldMap(makeCampaign());
-    const text = container.textContent ?? '';
-    expect(text).not.toContain('Tutorial Pit');
-    expect(text).toContain('Dusty Hollow');
-    expect(text).toContain('Grumpstone Ridge');
-    menu.dispose();
-  });
-
-  it('showWorldMap excludes tutorial_pit with null campaign', () => {
-    const menu = new MainMenu(container);
-    menu.show();
-    menu.showWorldMap(null);
-    const text = container.textContent ?? '';
-    expect(text).not.toContain('Tutorial Pit');
-    expect(text).toContain('Dusty Hollow');
-    menu.dispose();
-  });
-
-  it('showWorldMap shows stars for completed level', () => {
-    const menu = new MainMenu(container);
-    menu.show();
-    menu.showWorldMap(makeCampaign());
-    // Completed level should show star characters
-    expect(container.textContent).toMatch(/★/);
-    menu.dispose();
-  });
-
-  it('calls onStartLevel when level start button clicked', () => {
-    const cb = vi.fn();
-    const menu = new MainMenu(container);
-    menu.setOnStartLevel(cb);
-    menu.show();
-    menu.showWorldMap(makeCampaign());
-    // Find Start/Resume buttons by text content (world map level buttons)
-    const allBtns = Array.from(container.querySelectorAll<HTMLButtonElement>('button'));
-    const startBtns = allBtns.filter(b =>
-      b.textContent?.includes('Start') || b.textContent?.includes('Resume')
-    );
-    expect(startBtns.length).toBeGreaterThan(0);
-    startBtns[0]?.click();
     expect(cb).toHaveBeenCalledOnce();
     menu.dispose();
   });
@@ -411,61 +330,5 @@ describe('MainMenu — refreshLocale() wired through UIManager\'s language handl
     expect(before).not.toEqual(
       Array.from(container.querySelectorAll<HTMLButtonElement>('button')).map((b) => b.textContent),
     );
-  });
-});
-
-// ── menu.level_locked must not bake the English word "on" into a French render (issue #457) ─
-
-describe('MainMenu — level_locked requirement text does not leak English (issue #457)', () => {
-  let container: HTMLDivElement;
-
-  function makeLockedCampaign(): CampaignState {
-    return {
-      levels: {
-        dusty_hollow: { unlocked: true, completed: true, bestSessionProfit: 200000 },
-        grumpstone_ridge: { unlocked: false, completed: false, bestSessionProfit: 0 },
-        treranium_depths: { unlocked: false, completed: false, bestSessionProfit: 0 },
-      },
-      currentLevelId: 'dusty_hollow',
-      totalProfit: 200000,
-    };
-  }
-
-  beforeEach(() => {
-    container = document.createElement('div');
-    document.body.appendChild(container);
-  });
-
-  afterEach(() => {
-    setLocale('en');
-  });
-
-  it('locked-level requirement text in French does not contain the standalone English word "on"', () => {
-    setLocale('fr');
-    const menu = new MainMenu(container);
-    menu.show();
-    menu.showWorldMap(makeLockedCampaign());
-
-    const text = container.textContent ?? '';
-    // MainMenu.ts currently builds the requirement string as
-    // `$X on <level name>` in plain JS before ever reaching t(), so the
-    // English word "on" survives regardless of locale. \b keeps this from
-    // false-positiving on French words that merely contain the substring.
-    expect(text).not.toMatch(/\bon\b/);
-
-    menu.dispose();
-  });
-
-  it('locked-level requirement text in French still names the unlock threshold and the previous level', () => {
-    setLocale('fr');
-    const menu = new MainMenu(container);
-    menu.show();
-    menu.showWorldMap(makeLockedCampaign());
-
-    const text = container.textContent ?? '';
-    expect(text).toContain('250'); // Grumpstone Ridge's unlockThreshold is 250,000
-    expect(text).toContain(t('level.dusty_hollow.name'));
-
-    menu.dispose();
   });
 });

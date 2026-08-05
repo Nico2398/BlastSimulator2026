@@ -9,6 +9,7 @@ import { TutorialOverlay } from './ui/TutorialOverlay.js';
 import { TUTORIAL_STEPS } from './ui/tutorialSteps.js';
 import { KeyboardShortcuts } from './ui/KeyboardShortcuts.js';
 import { MainMenu } from './ui/MainMenu.js';
+import { WorldMap } from './ui/screens/WorldMap.js';
 import { SandboxPanel } from './ui/SandboxPanel.js';
 import { LoadingScreen } from './ui/LoadingScreen.js';
 import type { CommandResult } from './console/ConsoleRunner.js';
@@ -102,16 +103,8 @@ mainMenu.setOnNewCampaign(() => {
   // Show world map so the player can pick a level. The tutorial (if not yet
   // completed) triggers later, once a level is actually entered — starting it
   // here would stack its coach-marks on top of the level-selection cards.
-  mainMenu.showWorldMap(null);
-});
-mainMenu.setOnStartLevel((levelId) => {
-  // Ensure a base GameState (with campaign) exists before starting a level.
-  const commands = ctx.state ? [] : ['new_game'];
-  void enterLevel([...commands, `campaign start level:${levelId}`]).then(() => {
-    // First-time players get tutorial guidance once their level is actually
-    // loaded, not while still picking one from the world map.
-    if (!TutorialOverlay.isCompleted()) tutorial.start(ctx.state ?? undefined);
-  });
+  mainMenu.hide();
+  worldMap.show(null);
 });
 mainMenu.setOnContinue((slotId) => {
   mainMenu.hide();
@@ -123,6 +116,7 @@ mainMenu.setOnSettings(() => { uiManager.showPanel('settings'); });
 // to redraw the menu sitting underneath the panel as well as the panel itself.
 uiManager.setLanguageChangeHandler(() => {
   mainMenu.refreshLocale();
+  worldMap.refreshLocale();
   saveLoadUI.refreshLocale();
   selectionBar.refreshLocale();
 });
@@ -131,10 +125,28 @@ uiManager.setLanguageChangeHandler(() => {
 // and every sibling screen, the same set uiManager's handler refreshes.
 mainMenu.setOnLanguageChange(() => {
   uiManager.refreshLocale();
+  worldMap.refreshLocale();
   saveLoadUI.refreshLocale();
   selectionBar.refreshLocale();
 });
 mainMenu.show();
+
+// --- World Map ("The Portfolio") ---
+const worldMap = new WorldMap(uiContainer);
+worldMap.setOnBack(() => {
+  worldMap.hide();
+  mainMenu.show();
+});
+worldMap.setOnStartLevel((levelId) => {
+  worldMap.hide();
+  // Ensure a base GameState (with campaign) exists before starting a level.
+  const commands = ctx.state ? [] : ['new_game'];
+  void enterLevel([...commands, `campaign start level:${levelId}`]).then(() => {
+    // First-time players get tutorial guidance once their level is actually
+    // loaded, not while still picking one from the world map.
+    if (!TutorialOverlay.isCompleted()) tutorial.start(ctx.state ?? undefined);
+  });
+});
 
 // --- Level loading ---
 // Entering a level blocks the main thread for seconds. enterLevel splits that
@@ -619,8 +631,7 @@ uiManager.setQuitHandler(() => {
 // folded in from two ad-hoc floating buttons that used to collide with the
 // paused/event chip (spec §5 defect).
 uiManager.setSiteMapHandler(() => {
-  mainMenu.show();
-  mainMenu.showWorldMap(ctx.state?.campaign ?? null);
+  worldMap.show(ctx.state?.campaign ?? null);
 });
 uiManager.setOpenSavesHandler(() => saveLoadUI.show());
 uiManager.setMapFocusHandler((x, z) => {
