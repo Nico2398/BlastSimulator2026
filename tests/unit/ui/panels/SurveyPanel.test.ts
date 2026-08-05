@@ -91,7 +91,7 @@ describe('SurveyPanel', () => {
   it('clicking a method card selects it', () => {
     const { panel } = makePanel();
     panel.update(makeState());
-    const aerialCard = panel.root.querySelector<HTMLButtonElement>('[data-method="aerial"]')!;
+    const aerialCard = panel.root.querySelector<HTMLElement>('[data-method="aerial"]')!;
     aerialCard.click();
     expect(panel.root.querySelector('[data-method="aerial"]')!.classList.contains('selected')).toBe(true);
   });

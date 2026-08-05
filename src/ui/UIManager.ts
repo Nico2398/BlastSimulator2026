@@ -15,7 +15,7 @@ import { BuildMenu } from './BuildMenu.js';
 import { FleetPanel } from './panels/FleetPanel.js';
 import { CrewPanel } from './panels/CrewPanel.js';
 import { EventDialog } from './EventDialog.js';
-import { SurveyUI } from './SurveyUI.js';
+import { SurveyPanel } from './panels/SurveyPanel.js';
 import { SettingsMenu } from './SettingsMenu.js';
 import { MiniMap } from './MiniMap.js';
 import { TopBar } from './shell/TopBar.js';
@@ -51,7 +51,7 @@ export class UIManager {
   private readonly fleetPanel: FleetPanel;
   private readonly crewPanel: CrewPanel;
   private readonly eventDialog: EventDialog;
-  private readonly surveyUI: SurveyUI;
+  private readonly surveyPanel: SurveyPanel;
   private readonly settingsMenu: SettingsMenu;
   private readonly miniMap: MiniMap;
 
@@ -121,7 +121,8 @@ export class UIManager {
     this.crewPanel = new CrewPanel(leftCol);
     this.crewPanel.setCloseHandler(() => this.hideAllPanels());
     this.crewPanel.setConfirmHandler(config => this.confirmModal.show(config));
-    this.surveyUI = new SurveyUI(leftCol);
+    this.surveyPanel = new SurveyPanel(leftCol);
+    this.surveyPanel.setCloseHandler(() => this.hideAllPanels());
     // Settings appended to root container so its z-index:10000 beats the main menu (z-index:9999).
     // Inside leftCol's fixed stacking context it would be capped at z:100 relative to root.
     this.settingsMenu = new SettingsMenu(container);
@@ -166,7 +167,7 @@ export class UIManager {
     this.fleetPanel.setGameConsole(fn);
     this.crewPanel.setGameConsole(fn);
     this.eventDialog.setGameConsole(fn);
-    this.surveyUI.setGameConsole(fn);
+    this.surveyPanel.setGameConsole(fn);
     this.settingsMenu.setGameConsole(fn);
   }
 
@@ -174,7 +175,7 @@ export class UIManager {
   setPlacementKit(kit: PlacementKit): void {
     this.blastUI.setPlacementKit(kit);
     this.buildMenu.setPlacementKit(kit);
-    this.surveyUI.setPlacementKit(kit);
+    this.surveyPanel.setPlacementKit(kit);
   }
 
   setSpeedChangeHandler(cb: (speed: number) => void): void {
@@ -248,7 +249,7 @@ export class UIManager {
     this.buildMenu.refreshLocale();
     this.fleetPanel.refreshLocale();
     this.crewPanel.refreshLocale();
-    this.surveyUI.refreshLocale();
+    this.surveyPanel.refreshLocale();
     this.settingsMenu.refreshLocale();
     this.miniMap.refreshLocale();
     this.eventDialog.refreshLocale();
@@ -288,7 +289,7 @@ export class UIManager {
     if (this.buildMenu.visible) this.buildMenu.update(state);
     if (this.fleetPanel.visible) this.fleetPanel.update(state);
     if (this.crewPanel.visible) this.crewPanel.update(state);
-    if (this.surveyUI.visible) this.surveyUI.update(state);
+    if (this.surveyPanel.visible) this.surveyPanel.update(state);
 
     // Event dialog — auto-show when pending event exists, keep open during outcome.
     // Deferred while BlastReportModal is up: both are auto-triggered (a blast's
@@ -315,7 +316,7 @@ export class UIManager {
       case 'build': this.buildMenu.show(); break;
       case 'vehicles': this.fleetPanel.show(); break;
       case 'employees': this.crewPanel.show(); break;
-      case 'survey': this.surveyUI.show(); break;
+      case 'survey': this.surveyPanel.show(); break;
       case 'settings': this.settingsMenu.show(); break;
     }
     this.toolRail.setActive(this.activePanel);
@@ -356,7 +357,7 @@ export class UIManager {
     this.fleetPanel.dispose();
     this.crewPanel.dispose();
     this.eventDialog.dispose();
-    this.surveyUI.dispose();
+    this.surveyPanel.dispose();
     this.settingsMenu.dispose();
     this.miniMap.dispose();
   }
@@ -370,7 +371,7 @@ export class UIManager {
     this.buildMenu.hide();
     this.fleetPanel.hide();
     this.crewPanel.hide();
-    this.surveyUI.hide();
+    this.surveyPanel.hide();
     this.settingsMenu.hide();
     this.toolRail.setActive(null);
   }

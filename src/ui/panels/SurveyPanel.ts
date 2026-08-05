@@ -224,7 +224,14 @@ export class SurveyPanel {
     const accuracy = Math.round((1 - SURVEY_BASE_ERROR[method]) * 100);
     const selected = method === this.selectedMethod;
 
-    const row = el('button', {
+    // A real <button> here gets blocked by the tutorial rails' CSS
+    // (body.bs-tutorial-guided button:not(.bs-tutorial-allowed) { pointer-
+    // events: none }) whenever this isn't the rails' current highlighted
+    // stage — which it usually isn't, since seismic is pre-selected and
+    // resolveStageIndex's "last reachable wins" skips straight to the Run
+    // button. A plain div with a click listener isn't covered by that CSS
+    // selector at all, matching the old SurveyUI.ts's own element choice here.
+    const row = el('div', {
       className: 'bs-survey-method',
       attrs: {
         style: `display:flex;flex-direction:column;gap:7px;padding:10px 11px;border:1px solid ${selected ? 'var(--bsx-info)' : 'var(--bsx-hairline)'};border-radius:5px;background:${selected ? 'rgba(85,168,255,.08)' : 'var(--bsx-card)'};cursor:pointer;text-align:left`,

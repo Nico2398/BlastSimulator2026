@@ -1,7 +1,7 @@
 // BlastSimulator2026 — Placement parameter strip (redesign P3)
 // The 44px non-modal strip docked bottom-centre while a placement tool is
 // armed: instruction chip above it, then title/steppers/RESULT/CONFIRM/ESC.
-// Caller (Drill step/BuildMenu/SurveyUI) owns the parameters and result
+// Caller (Drill step/BuildMenu/SurveyPanel) owns the parameters and result
 // text — this only renders whatever config it's handed, same signature-gated
 // rebuild convention as the rest of src/ui/.
 
