@@ -15,7 +15,7 @@ const KNOWN_INTERACTION_ACTION_TYPES = [
   'pickTile', 'dragTiles', 'cameraFocus',
   'keypress', 'keydown', 'keyup',
   'scroll', 'wheel',
-  'wait', 'waitForSelector', 'type',
+  'wait', 'waitForSelector', 'waitForTutorialStep', 'type',
   'assert', 'viewport', 'command', 'screenshot',
 ] as const;
 
@@ -494,6 +494,26 @@ describe('Dual-play scenario steps — data-driven validation', () => {
           if (action.type === 'waitForSelector') {
             expect(typeof action.selector).toBe('string');
             expect(action.selector.length).toBeGreaterThan(0);
+          }
+        }
+      }
+    });
+
+    it(`${name} — waitForTutorialStep actions name at least one step id`, () => {
+      const scenario = loadScenarioDef(name, SCENARIO_DIR);
+      for (let i = 0; i < scenario.steps.length; i++) {
+        const step = scenario.steps[i];
+        if (typeof step === 'string') continue;
+        const stepObj = step as ScenarioStepDef;
+        if (!stepObj.interaction) continue;
+        for (const action of stepObj.interaction) {
+          if (action.type === 'waitForTutorialStep') {
+            const ids = Array.isArray(action.stepId) ? action.stepId : [action.stepId];
+            expect(ids.length, `step[${i}] stepId must not be empty`).toBeGreaterThan(0);
+            for (const id of ids) {
+              expect(typeof id, `step[${i}] stepId entries must be strings`).toBe('string');
+              expect(id.length, `step[${i}] stepId entries must be non-empty`).toBeGreaterThan(0);
+            }
           }
         }
       }

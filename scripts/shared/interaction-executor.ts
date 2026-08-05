@@ -127,7 +127,35 @@ export async function executeActionOnPage(
     }
     case 'clickSelector': {
       const btn = BUTTON_MAP[action.button ?? 'left'] ?? 'left';
-      await page.waitForSelector(action.selector, { timeout: action.timeout ?? 5000 });
+      const timeoutMs = action.timeout ?? 5000;
+      await page.waitForSelector(action.selector, { timeout: timeoutMs });
+      // Wait until the page's own probe calls the control usable, the same
+      // gate the playtest driver clicks through. waitForSelector alone is not
+      // enough: panels pre-exist hidden, and the tutorial rails mark a control
+      // allowed only on the guide's next 250ms pass — a machine-speed click in
+      // that gap lands on `pointer-events: none` and falls through silently,
+      // because page.click does not throw for it (#481).
+      const deadline = Date.now() + timeoutMs;
+      for (;;) {
+        const reason = await page.evaluate((sel: string) => {
+          const probe = (window as unknown as {
+            __probeSelector?: (s: string) => string | null;
+          }).__probeSelector;
+          if (probe === undefined) return null;
+          // Scroll into view before probing, exactly as page.click will before
+          // clicking: a row below a panel's fold has its centre over the game
+          // canvas until scrolled, and probing that reads as covered-forever.
+          document.querySelector(sel)?.scrollIntoView({ block: 'center', inline: 'nearest' });
+          return probe(sel);
+        }, action.selector);
+        if (reason === null) break;
+        if (Date.now() > deadline) {
+          throw new Error(
+            `clickSelector "${action.selector}" failed: ${describeUnclickable(await inspectSelector(page, action.selector))}`,
+          );
+        }
+        await new Promise((r) => setTimeout(r, 150));
+      }
       try {
         await page.click(action.selector, { button: btn });
       } catch (err) {
@@ -201,6 +229,42 @@ export async function executeActionOnPage(
     case 'waitForSelector':
       await page.waitForSelector(action.selector, { timeout: action.timeout ?? 10000 });
       break;
+    case 'waitForTutorialStep': {
+      const wanted = Array.isArray(action.stepId) ? action.stepId : [action.stepId];
+      const deadline = Date.now() + (action.timeout ?? 30000);
+      // Drive the real rAF-driven, isPaused-gated clock for this wait only —
+      // the tutorial's own completion checks and any queued work (walking,
+      // surveying, hauling) need time to pass, and scenarioMode has switched
+      // the auto-tick off. Restored on the way out so every other action keeps
+      // the deterministic scripted-tick clock.
+      const setAutoTick = (enabled: boolean) => page.evaluate((on: boolean) => {
+        (window as unknown as { __setAutoTick?: (e: boolean) => void }).__setAutoTick?.(on);
+      }, enabled);
+      await setAutoTick(true);
+      try {
+        for (;;) {
+          const st = await page.evaluate(() => {
+            const fn = (window as unknown as {
+              __tutorialState?: () => { active: boolean; stepId: string | null; stageTarget: string | null };
+            }).__tutorialState;
+            return fn === undefined ? null : fn();
+          });
+          // Tutorial gone (finished or never started) — nothing left to wait on.
+          if (st === null || !st.active) break;
+          if (st.stepId !== null && wanted.includes(st.stepId)) break;
+          if (Date.now() > deadline) {
+            throw new Error(
+              `waitForTutorialStep: tutorial never reached ${wanted.map(s => `"${s}"`).join(' or ')}`
+              + ` — it is on "${st.stepId}", live control ${st.stageTarget ?? 'none'}`,
+            );
+          }
+          await new Promise((r) => setTimeout(r, 200));
+        }
+      } finally {
+        await setAutoTick(false);
+      }
+      break;
+    }
     case 'type':
       await page.type(action.selector, action.text, {
         ...(action.delay !== undefined ? { delay: action.delay } : {}),

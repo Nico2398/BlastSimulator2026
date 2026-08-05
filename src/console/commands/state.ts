@@ -5,8 +5,38 @@ import type { CommandResult } from '../ConsoleRunner.js';
 import type { MiningContext } from './mining.js';
 
 /**
+ * Fragments serialized verbatim before the rest collapse into counts. A
+ * late-level site tracks hundreds of thousands of on-ground fragments (five
+ * level-3 blasts left 603k), and dumping them all made `state full` a 318 MB
+ * string that hung every harness evaluate downstream (#481).
+ */
+const MAX_SERIALIZED_FRAGMENTS = 200;
+
+/** The logistics block with its unbounded fragment list summarized. */
+function serializeLogistics(logistics: {
+  fragments: { state: string }[];
+  storageCapacityKg: number;
+  storedMassKg: number;
+}): Record<string, unknown> {
+  const byState: Record<string, number> = {};
+  for (const f of logistics.fragments) {
+    byState[f.state] = (byState[f.state] ?? 0) + 1;
+  }
+  return {
+    storageCapacityKg: logistics.storageCapacityKg,
+    storedMassKg: logistics.storedMassKg,
+    fragmentCount: logistics.fragments.length,
+    fragmentCountsByState: byState,
+    fragments: logistics.fragments.slice(0, MAX_SERIALIZED_FRAGMENTS),
+    // Never truncate silently — a dump that reads as complete must be complete.
+    fragmentsTruncated: Math.max(0, logistics.fragments.length - MAX_SERIALIZED_FRAGMENTS),
+  };
+}
+
+/**
  * Serialize the MiningContext into a JSON-safe object.
- * Sets are converted to arrays. Omits the VoxelGrid (too large).
+ * Sets are converted to arrays. Omits the VoxelGrid (too large) and caps the
+ * logistics fragment list (unbounded — see serializeLogistics).
  */
 function serializeState(ctx: MiningContext): Record<string, unknown> {
   if (!ctx.state) return {};
@@ -28,7 +58,7 @@ function serializeState(ctx: MiningContext): Record<string, unknown> {
     savedPlans: s.savedPlans,
     finances: s.finances,
     contracts: s.contracts,
-    logistics: s.logistics,
+    logistics: serializeLogistics(s.logistics),
     buildings: s.buildings,
     vehicles: s.vehicles,
     employees: s.employees,
