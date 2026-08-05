@@ -367,6 +367,23 @@ export const THROW_DISTANCE_CATASTROPHIC = 25;
 /** Minimum fragment render height (voxels) above the grid floor. */
 export const FRAGMENT_MIN_RENDER_Y = 0.05;
 
+// ─── Fragment Tumble and Settle (renderer playback, #485) ───────────────────
+
+/** Fastest a fragment tumbles about its seeded axis while airborne (rad/s). */
+export const TUMBLE_MAX_RATE_RAD_S = Math.PI * 2;
+
+/** How much a fragment's fall speed scales into its tumble rate (0–1). */
+export const TUMBLE_DROP_FACTOR = 0.12;
+
+/** How long the squash-and-bounce settle plays after a fragment lands (s). */
+export const SETTLE_DURATION_S = 0.35;
+
+/** Peak scale deviation from 1.0 during the landing squash. */
+export const SETTLE_SQUASH_MAGNITUDE = 0.15;
+
+/** Number of decaying bounce oscillations in the settle animation. */
+export const SETTLE_BOUNCE_OSCILLATIONS = 2;
+
 /** Default minimum search radius (metres) for the expanding-ring terrain-surface
  *  search in getBlastOriginSurfaceY (BlastOriginSampling.ts). A fixed 3m ring only
  *  clears a small blast's own crater; the search widens by this step until it

@@ -23,6 +23,7 @@ import { oreIndexOf } from '../core/world/OreCatalog.js';
 import { FRAGMENT_MIN_RENDER_Y } from '../core/config/balance.js';
 import { sampleEvenly } from './FragmentRenderSampling.js';
 import { buildFragmentGeometries } from './FragmentGeometry.js';
+import type { FragmentBaseTransform } from './FragmentTransformMath.js';
 
 // ---------- Config ----------
 
@@ -66,6 +67,20 @@ interface SlotInfo {
   slotIdx: number;
 }
 
+/**
+ * Per-instance transform data written by the animator each frame: current
+ * position plus how far it has tumbled and settled since spawn (#485).
+ */
+export interface FragmentInstanceTransform {
+  x: number;
+  y: number;
+  z: number;
+  /** Extra rotation (radians) about the fragment's own seeded tumble axis, on top of its spawn orientation. 0 = untouched. */
+  tumbleAngle: number;
+  /** Multiplier on the fragment's spawn scale. (1,1,1) = untouched. */
+  settleScale: { x: number; y: number; z: number };
+}
+
 /** The highest-density ore in a fragment's ore record, or '' if none (#458 T4.1/A18). */
 function dominantOre(oreDensities: Record<string, number>): { id: string; amt: number } {
   let id = '';
@@ -88,6 +103,8 @@ export class FragmentMesh {
   private readonly fragIdToSlot = new Map<number, SlotInfo>();
   /** slotIdx → fragId for each bucket (to support swap-on-delete) */
   private readonly bucketSlotToFrag: number[][] = [];
+  /** fragId → the fixed rotation/shear/tumble-axis part of its spawn transform (#485). */
+  private readonly fragBaseTransform = new Map<number, FragmentBaseTransform>();
 
   /** Per-shape-variant per-instance rock/ore attributes, shading the shared TerrainMaterial (#458 T4.1/A18). */
   private readonly instanceRockA: THREE.InstancedBufferAttribute[] = [];
@@ -226,26 +243,15 @@ export class FragmentMesh {
   }
 
   /**
-   * Update fragment positions during physics simulation.
-   * Call on each physics step with the current body positions.
+   * Update fragment position, tumble, and settle-scale during collapse
+   * playback. Call each frame with the animator's current transforms.
    */
-  updatePositions(positions: Map<number, { x: number; y: number; z: number }>): void {
-    const dirtyBuckets = new Set<number>();
-    for (const [id, pos] of positions) {
-      const slot = this.fragIdToSlot.get(id);
-      if (!slot) continue;
-      const im = this.instancedMeshes[slot.meshIdx]!;
-      im.getMatrixAt(slot.slotIdx, FragmentMesh._mtx);
-      // Only the translation column changes. Decomposing to TRS and
-      // recomposing — the old way — silently destroyed the per-instance shear
-      // (TRS cannot represent it), and cost a decompose per fragment per frame.
-      FragmentMesh._mtx.setPosition(pos.x, pos.y, pos.z);
-      im.setMatrixAt(slot.slotIdx, FragmentMesh._mtx);
-      dirtyBuckets.add(slot.meshIdx);
-    }
-    for (const idx of dirtyBuckets) {
-      this.instancedMeshes[idx]!.instanceMatrix.needsUpdate = true;
-    }
+  updateTransforms(_updates: Map<number, FragmentInstanceTransform>): void {
+    // TODO: implement — replaces updatePositions; look up each fragment's
+    // fragBaseTransform (rotation/shear/tumble axis) and recompose via
+    // FragmentTransformMath.composeInstanceMatrix.
+    void this.fragBaseTransform;
+    throw new Error('not implemented');
   }
 
   /**

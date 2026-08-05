@@ -11,7 +11,20 @@
 
 import type { FragmentFlight } from '../core/mining/BlastResolve.js';
 import { flightPositionAt, totalFlightDuration } from '../core/mining/BlastResolve.js';
-import type { FragmentMesh } from './FragmentMesh.js';
+import type { FragmentMesh, FragmentInstanceTransform } from './FragmentMesh.js';
+
+/** How fast a fragment tumbles while it falls, in rad/s (#485). */
+function tumbleRate(_flight: FragmentFlight): number {
+  return undefined as unknown as number;
+}
+
+/** Tumble angle and settle-squash scale for a flight at time `t` (#485). */
+function tumbleAndSettle(_flight: FragmentFlight, _t: number): { tumbleAngle: number; settleScale: { x: number; y: number; z: number } } {
+  // TODO(impl): derive tumbleAngle from tumbleRate(_flight) integrated over
+  // airborne time, and settleScale from the post-landing squash-and-bounce.
+  tumbleRate(_flight);
+  return undefined as unknown as { tumbleAngle: number; settleScale: { x: number; y: number; z: number } };
+}
 
 export class FragmentAnimator {
   /** The collapse still being advanced by the render loop; emptied when it ends. */
@@ -21,7 +34,7 @@ export class FragmentAnimator {
   private elapsedS = 0;
   private endsAtS = 0;
   /** Reused across frames so a large blast does not allocate a map per frame. */
-  private readonly positions = new Map<number, { x: number; y: number; z: number }>();
+  private readonly transforms = new Map<number, FragmentInstanceTransform>();
 
   constructor(private readonly fragments: FragmentMesh) {}
 
@@ -43,6 +56,8 @@ export class FragmentAnimator {
     this.source = flights.filter(f => f.durationS > 0 && !samePlace(f));
     this.flights = this.source.slice();
     this.elapsedS = 0;
+    // TODO(impl): endsAtS must include SETTLE_DURATION_S so playback holds
+    // through the landing squash-and-bounce instead of ending on impact.
     this.endsAtS = totalFlightDuration(this.flights);
     // Put everything at its starting point immediately, or the first frame
     // would show the finished pile before the collapse begins.
@@ -110,11 +125,13 @@ export class FragmentAnimator {
   }
 
   private applyTo(flights: readonly FragmentFlight[]): void {
-    this.positions.clear();
+    this.transforms.clear();
     for (const flight of flights) {
-      this.positions.set(flight.fragmentId, flightPositionAt(flight, this.elapsedS));
+      const pos = flightPositionAt(flight, this.elapsedS);
+      const { tumbleAngle, settleScale } = tumbleAndSettle(flight, this.elapsedS);
+      this.transforms.set(flight.fragmentId, { x: pos.x, y: pos.y, z: pos.z, tumbleAngle, settleScale });
     }
-    this.fragments.updatePositions(this.positions);
+    this.fragments.updateTransforms(this.transforms);
   }
 }
 
