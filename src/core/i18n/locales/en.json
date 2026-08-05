@@ -2448,6 +2448,7 @@
   "ui.vehicles.driver": "Driver",
   "ui.vehicles.no_qualified": "No crew licensed for {licence}",
   "ui.vehicles.haul": "Haul",
+  "ui.vehicles.break": "Break",
   "ui.contracts.deliver": "Deliver",
   "ui.contracts.deliver_amount": "Kilograms to deliver",
   "ui.build.ramp_section": "Terrain",

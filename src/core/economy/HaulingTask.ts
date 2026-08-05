@@ -10,7 +10,9 @@ import { findNearestActiveBuildingOfType, getBuildingDef, type Building } from '
 import { findBuildingApproachCell } from '../nav/BuildingApproach.js';
 import { tickVehicle, tickVehicleTaskState } from '../engine/EntityMovementTick.js';
 import { pickupFragment, deliverToDepot } from './Logistics.js';
-import { NavGrid } from '../nav/NavGrid.js';
+import { isOversized } from '../mining/BlastCalc.js';
+import { fragmentApproachCell } from './FragmentApproach.js';
+import { findRequestVehicle, driveTowardFragment, findNearestReachableFragment } from './FragmentTaskLifecycle.js';
 
 /**
  * True when `vehicle` is a debris_hauler with a driver assigned and no
@@ -37,8 +39,9 @@ export function requestHaulFragment(
   vehicleId: number,
   fragmentId: number,
 ): { success: boolean; error?: string } {
-  const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId);
-  if (!vehicle) return { success: false, error: 'Vehicle not found' };
+  const found = findRequestVehicle(state, vehicleId);
+  if (!found.success) return found;
+  const vehicle = found.vehicle;
   if (vehicle.type !== 'debris_hauler') return { success: false, error: 'Vehicle is not a debris hauler' };
   if (vehicle.driverId === null) return { success: false, error: 'Vehicle has no driver' };
   if (vehicle.haulingPhase !== null) return { success: false, error: 'Vehicle is already hauling' };
@@ -47,6 +50,9 @@ export function requestHaulFragment(
     f => f.fragment.id === fragmentId && f.state === 'on_ground',
   );
   if (!tracked) return { success: false, error: 'Fragment not found or not on the ground' };
+  if (isOversized(tracked.fragment.volume)) {
+    return { success: false, error: 'Fragment is oversized and needs a Rock Fragmenter first' };
+  }
 
   const depot = findNearestActiveBuildingOfType(state.buildings, 'freight_warehouse', vehicle.x, vehicle.z);
   if (!depot) return { success: false, error: 'No active freight warehouse available' };
@@ -54,11 +60,12 @@ export function requestHaulFragment(
   // Intent only — the vehicle does not load until tickHaulingProgress (driven
   // from ArrivalGate.tickArrivalGate) detects arrival. The movement target is
   // set immediately so tickVehicle has somewhere to drive toward each tick.
+  const approach = fragmentApproachCell(tracked.fragment, state, vehicle.id);
   vehicle.haulingFragmentId = fragmentId;
   vehicle.haulingPhase = 'to_fragment';
   vehicle.haulingDepotBuildingId = depot.id;
-  vehicle.targetX = Math.round(tracked.fragment.position.x);
-  vehicle.targetZ = Math.round(tracked.fragment.position.z);
+  vehicle.targetX = approach.x;
+  vehicle.targetZ = approach.z;
 
   return { success: true };
 }
@@ -81,12 +88,9 @@ export function tickHaulingProgress(state: GameState, vehicle: Vehicle): void {
       return;
     }
 
-    vehicle.task = 'moving';
-    vehicle.targetX = Math.round(tracked.fragment.position.x);
-    vehicle.targetZ = Math.round(tracked.fragment.position.z);
-    tickVehicle(state, vehicle);
+    const arrived = driveTowardFragment(state, vehicle, tracked.fragment);
 
-    if (vehicle.x === vehicle.targetX && vehicle.z === vehicle.targetZ) {
+    if (arrived) {
       const loaded = pickupFragment(state.logistics, vehicle.haulingFragmentId!, String(vehicle.id));
       if (loaded) {
         vehicle.payloadKg = tracked.fragment.mass;
@@ -147,34 +151,22 @@ export function tickHaulingProgress(state: GameState, vehicle: Vehicle): void {
 export function findReachableGroundFragment(state: GameState, vehicleId: number): number | null {
   const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId);
   if (!isHaulEligibleVehicle(vehicle)) return null;
-  if (!state.navGrid) return null;
-
-  const reachable = NavGrid.computeReachableSet(state.navGrid, vehicle.x, vehicle.z);
-  if (reachable.size === 0) return null;
 
   const roomKg = state.logistics.storageCapacityKg - state.logistics.storedMassKg;
 
-  let bestId: number | null = null;
-  let bestDistSq = Infinity;
-  for (const tracked of state.logistics.fragments) {
-    if (tracked.state !== 'on_ground') continue;
+  return findNearestReachableFragment(state, vehicleId, vehicle.x, vehicle.z, tracked => {
+    // An oversized fragment can never be hauled until a Rock Fragmenter
+    // breaks it into sub-fragments first (#484) — offering it here would
+    // dispatch a hauler that requestHaulFragment immediately rejects.
+    if (isOversized(tracked.fragment.volume)) return false;
     // A fragment heavier than the room left in storage can never be delivered:
     // the hauler would drive to it, load it, drive to the depot and be turned
     // away every tick from then on. Blasts throw off boulders far heavier than
     // an early warehouse holds, so skipping them here is what keeps the fleet
     // working instead of silently deadlocked on the nearest rock.
-    if (tracked.fragment.mass > roomKg) continue;
-    const fx = Math.round(tracked.fragment.position.x);
-    const fz = Math.round(tracked.fragment.position.z);
-    if (!reachable.has(fx, fz)) continue;
-    const distSq = (fx - vehicle.x) ** 2 + (fz - vehicle.z) ** 2;
-    if (distSq < bestDistSq) {
-      bestDistSq = distSq;
-      bestId = tracked.fragment.id;
-    }
-  }
-
-  return bestId;
+    if (tracked.fragment.mass > roomKg) return false;
+    return true;
+  });
 }
 
 /**

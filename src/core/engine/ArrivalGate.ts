@@ -10,6 +10,7 @@ import type { Employee } from '../entities/Employee.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { assignDriver } from '../entities/Vehicle.js';
 import { tickHaulingProgress } from '../economy/HaulingTask.js';
+import { tickBreakProgress } from '../economy/BoulderBreaking.js';
 
 /** Summary of what the arrival gate started/cancelled on this tick. */
 export interface ArrivalGateResult {
@@ -91,6 +92,25 @@ export function tickArrivalGate(state: GameState, emitter?: EventEmitter): Arriv
       if (tracked?.state === 'stored') {
         emitter?.emit('vehicle:haul_delivered', { vehicleId: vehicle.id, fragmentId: prevFragmentId });
       }
+    }
+  }
+
+  for (const vehicle of state.vehicles.vehicles) {
+    if (vehicle.breakPhase === null) continue;
+
+    // tickBreakProgress only returns the original fragment's id on the tick
+    // it actually splits the boulder — mirror the haul loop above by
+    // detecting that (rather than threading an emitter into the tick
+    // function itself) and deriving the produced piece ids from what
+    // appeared in logistics.fragments during this call.
+    const beforeIds = new Set(state.logistics.fragments.map(f => f.fragment.id));
+    const vehicleId = vehicle.id;
+    const splitFragmentId = tickBreakProgress(state, vehicle);
+    if (splitFragmentId !== null) {
+      const pieceIds = state.logistics.fragments
+        .filter(f => !beforeIds.has(f.fragment.id))
+        .map(f => f.fragment.id);
+      emitter?.emit('vehicle:boulder_broken', { vehicleId, fragmentId: splitFragmentId, pieceIds });
     }
   }
 

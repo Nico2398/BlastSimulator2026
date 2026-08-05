@@ -34,11 +34,14 @@ function setupPanel(): { container: HTMLDivElement; panel: VehiclePanel } {
 
 const SEED = 42;
 
+// Default volume sits under OVERSIZED_FRAGMENT_THRESHOLD (0.5 m³, see
+// BoulderFragmentation.ts) so these haul-button fixtures stay haulable and
+// eligible for findReachableGroundFragment (#484 excludes oversized ones).
 function makeFragment(id: number, x: number, z: number, mass = 1000): FragmentData {
   return {
     id,
     position: { x, y: 0, z },
-    volume: 1.0,
+    volume: 0.3,
     mass,
     rockId: 'cruite',
     oreDensities: {},
