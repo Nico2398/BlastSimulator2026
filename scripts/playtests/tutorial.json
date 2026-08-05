@@ -324,12 +324,12 @@
         {
           "do": "awaitTutorialStep",
           "stepId": "build-storage",
-          "timeoutMs": 30000
+          "timeoutMs": 300000
         }
       ],
       "expect": {
         "tutorialStep": "build-storage",
-        "note": "Deliberately does NOT force ticks. Assigning a driver only sends them walking to the vehicle; the tutorial must let its own clock run for them to arrive and board. A `tick` here would pass over exactly the deadlock that stranded players on this card, because the console can advance a clock the player's held HUD cannot."
+        "note": "Deliberately does NOT force ticks. Assigning a driver only sends them walking to the vehicle; the tutorial must let its own clock run for them to arrive and board. A `tick` here would pass over exactly the deadlock that stranded players on this card. The wait is generous because the walk needs game *ticks*, and a GPU-less environment accrues them at roughly one per minute of wall clock (0.1 s of game time per multi-second frame)."
       }
     },
     {
