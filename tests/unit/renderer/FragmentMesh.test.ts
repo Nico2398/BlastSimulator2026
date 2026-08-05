@@ -154,9 +154,9 @@ describe('FragmentMesh (InstancedMesh)', () => {
     expect(im.count).toBe(1);
   });
 
-  it('updatePositions changes instance matrix position', () => {
+  it('updateTransforms changes instance matrix position', () => {
     fm.spawnFragments([makeFragment(0)]);
-    fm.updatePositions(new Map([[0, { x: 10, y: 20, z: 30 }]]));
+    fm.updateTransforms(new Map([[0, { x: 10, y: 20, z: 30, tumbleAngle: 0, settleScale: { x: 1, y: 1, z: 1 } }]]));
 
     // Extract position from the instanced matrix
     const im = scene.children[0] as THREE.InstancedMesh;
@@ -319,9 +319,9 @@ describe('FragmentMesh (InstancedMesh)', () => {
       expect(pos?.z).toBeCloseTo(rendered.z);
     });
 
-    it('fragmentPosition() reflects updatePositions()', () => {
+    it('fragmentPosition() reflects updateTransforms()', () => {
       fm.spawnFragments([makeFragment(2)]);
-      fm.updatePositions(new Map([[2, { x: 40, y: 2, z: -10 }]]));
+      fm.updateTransforms(new Map([[2, { x: 40, y: 2, z: -10, tumbleAngle: 0, settleScale: { x: 1, y: 1, z: 1 } }]]));
       const pos = fm.fragmentPosition(2);
       expect(pos?.x).toBeCloseTo(40);
       expect(pos?.y).toBeCloseTo(2);

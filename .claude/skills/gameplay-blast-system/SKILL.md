@@ -162,6 +162,15 @@ straight; the vertical is the parabola joining those points in the flight's own 
 gravity, so **the animation cannot end anywhere but the fragment's authoritative position**. For a
 straight drop it reduces to free fall from rest. Skipping playback entirely is always safe.
 
+While airborne a fragment also tumbles about its own seeded axis, at a rate scaled by how hard it
+was thrown (`impactSpeed` against `MAX_PROJECTION_VELOCITY`; a mere drop barely rotates —
+`TUMBLE_DROP_FACTOR`, `TUMBLE_MAX_RATE_RAD_S`). On landing it eases the tumble back to exactly its
+untumbled spawn orientation while its scale does a damped squash-and-stretch bounce
+(`SETTLE_DURATION_S`, `SETTLE_SQUASH_MAGNITUDE`, `SETTLE_BOUNCE_OSCILLATIONS`), then snaps to the
+identity transform rather than approaching it asymptotically. This math (`FragmentTransformMath.ts`)
+is a pure function of `(flight, t)`, so a seek and a run of per-frame updates landing on the same `t`
+agree, and `finish()` puts every fragment at exactly the untumbled, unsettled rest transform.
+
 **A screenshot taken right after a blast is a screenshot of an animation, not of a muck pile.**
 `SceneManager` caps a frame at 0.1 s of animation time, and a frame costs seconds without a GPU, so
 a collapse takes many minutes of wall clock to finish on screen and rock photographs as if it were
@@ -174,9 +183,12 @@ than the times the frame rate allowed.
 by seeded planes into a closed convex "cut stone" (`FragmentGeometry.ts`), scaled per instance to the
 fragment's half-extents, with a seeded orientation and slight shear so instances of one variant read
 as different rocks. The stones are watertight by construction and by test — never go back to
-jittering a box's vertices, whose per-face duplicates tear apart into floating planes. The shear
-lives inside the instance matrix, so position updates must write the translation column only; a
-TRS decompose/recompose silently strips it.
+jittering a box's vertices, whose per-face duplicates tear apart into floating planes. The
+rotation/shear/scale part of a fragment's spawn transform never changes over its life and is built
+once (`buildBaseTransform`); each frame's `updateTransforms` recomposes only the cheap part —
+position, tumble rotation, settle scale — on top of it (`composeInstanceMatrix`), so a settled
+fragment's matrix is bit-identical to its spawn one. Never decompose/recompose the instance matrix
+as TRS — the shear does not survive that round trip.
 
 **The whole blast resolves synchronously inside the click**, so the pipeline's cost is a frame the
 player feels. Its hot paths are engineered accordingly — typed-array frontier in propagation, per-

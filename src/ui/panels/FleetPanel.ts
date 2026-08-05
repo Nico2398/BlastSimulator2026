@@ -1,7 +1,8 @@
 // BlastSimulator2026 — Fleet panel (redesign P6)
 // Traffic advisory banner, then one card per vehicle: name/id/role, status
 // chip, HP gauge, LOAD gauge (haulers only), driver row or licensed-crew
-// picker, HAUL (haulEligibility.ts), SCRAP (confirm, real residual value).
+// picker, HAUL (haulEligibility.ts), BREAK (breakEligibility.ts, #484),
+// SCRAP (confirm, real residual value).
 // DEALERSHIP below the roster: every role/tier with a real stat-multiplier
 // line from VEHICLE_TIER_MULTIPLIERS, dispatching `vehicle buy`.
 //
@@ -21,6 +22,7 @@ import { VEHICLE_TIER_MULTIPLIERS } from '../../core/config/balance.js';
 import { computeTrafficAdvisory } from '../../core/events/EventEngine.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import { HaulEligibilityCache, makeHaulButton, refreshHaulButtons } from '../haulEligibility.js';
+import { BreakEligibilityCache, makeBreakButton, refreshBreakButtons } from '../breakEligibility.js';
 import { vehicleDisplayName, makeStatusChip, makeHpGauge, makeLoadGauge, makeDriverRow, makeAssignRow } from '../fleetDetailSections.js';
 import type { ConfirmModalConfig } from './ConfirmModal.js';
 import type { CommandResult } from '../../console/ConsoleRunner.js';
@@ -38,6 +40,7 @@ export class FleetPanel {
   private lastState: GameState | null = null;
   private readonly locale = new LocaleTextRegistry();
   private readonly haulCache = new HaulEligibilityCache();
+  private readonly breakCache = new BreakEligibilityCache();
 
   constructor(container: HTMLElement) {
     this.el = el('div', { className: 'bsx-root', attrs: { id: 'bs-vehicle-panel' } });
@@ -83,17 +86,20 @@ export class FleetPanel {
     // Reachable-fragment eligibility only changes once per game tick, not
     // once per rendered frame (mirrors VehiclePanel.ts's own comment).
     this.haulCache.refresh(state);
+    this.breakCache.refresh(state);
 
     const signature = this.computeSignature(state);
     if (signature === this.lastSignature) {
       this.refreshDynamic(state);
       refreshHaulButtons(this.bodyEl, state, this.haulCache, this.dispatch);
+      refreshBreakButtons(this.bodyEl, state, this.breakCache, this.dispatch);
       this.refreshDealershipAffordability(state.cash);
       return;
     }
     this.lastSignature = signature;
     this.render(state);
     refreshHaulButtons(this.bodyEl, state, this.haulCache, this.dispatch);
+    refreshBreakButtons(this.bodyEl, state, this.breakCache, this.dispatch);
     this.refreshDealershipAffordability(state.cash);
   }
 
@@ -248,8 +254,11 @@ export class FleetPanel {
 
     const actions = el('div', { attrs: { style: 'display:flex;gap:6px' } });
     actions.dataset['haulSlot'] = String(v.id);
+    actions.dataset['breakSlot'] = String(v.id);
     const haulBtn = makeHaulButton(v, this.haulCache, this.dispatch);
     if (haulBtn) actions.appendChild(haulBtn);
+    const breakBtn = makeBreakButton(v, this.breakCache, this.dispatch);
+    if (breakBtn) actions.appendChild(breakBtn);
     const scrapBtn = button('danger', '', { icon: 'trash' });
     scrapBtn.style.cssText = 'width:34px;height:28px;padding:0';
     scrapBtn.title = t('ui.fleet.scrap');

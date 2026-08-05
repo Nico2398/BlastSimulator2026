@@ -37,6 +37,7 @@ export interface GameEventMap {
   'vehicle:driver_boarded': { employeeId: number; vehicleId: number };
   'vehicle:haul_loaded': { vehicleId: number; fragmentId: number };
   'vehicle:haul_delivered': { vehicleId: number; fragmentId: number };
+  'vehicle:boulder_broken': { vehicleId: number; fragmentId: number; pieceIds: number[] };
 }
 
 type EventHandler<T> = (data: T) => void;

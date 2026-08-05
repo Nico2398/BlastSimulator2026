@@ -11,7 +11,76 @@
 
 import type { FragmentFlight } from '../core/mining/BlastResolve.js';
 import { flightPositionAt, totalFlightDuration } from '../core/mining/BlastResolve.js';
-import type { FragmentMesh } from './FragmentMesh.js';
+import type { FragmentMesh, FragmentInstanceTransform } from './FragmentMesh.js';
+import type { PlainVec3 } from './FragmentTransformMath.js';
+import {
+  MAX_PROJECTION_VELOCITY,
+  TUMBLE_MAX_RATE_RAD_S,
+  TUMBLE_DROP_FACTOR,
+  SETTLE_DURATION_S,
+  SETTLE_SQUASH_MAGNITUDE,
+  SETTLE_BOUNCE_OSCILLATIONS,
+} from '../core/config/balance.js';
+
+/**
+ * Rest transform — untumbled, unsettled. Frozen and shared rather than
+ * allocated per call: tumbleAndSettle() is on the per-frame, per-fragment hot
+ * path (applyTo(), up to ~2000 fragments/frame during a big collapse), and
+ * this is what most calls return (#485 review).
+ */
+const REST_SCALE: Readonly<PlainVec3> = Object.freeze({ x: 1, y: 1, z: 1 });
+
+/**
+ * How fast a fragment tumbles while it falls, in rad/s (#485). Scales with
+ * how hard it was thrown — a fragment that merely dropped barely rotates.
+ */
+function tumbleRate(flight: FragmentFlight): number {
+  const speedFrac = Math.max(0, Math.min(1, flight.impactSpeed / MAX_PROJECTION_VELOCITY));
+  const rate = TUMBLE_MAX_RATE_RAD_S * speedFrac;
+  return flight.thrown ? rate : rate * TUMBLE_DROP_FACTOR;
+}
+
+/**
+ * Tumble angle and settle-squash scale for a flight at time `t` (#485).
+ *
+ * Pure function of (flight, t) — a seek and a run of per-frame updates that
+ * land on the same `t` must produce the same result, and fragments landing
+ * at the same instant must not interfere with each other.
+ *
+ * Three phases:
+ *  - airborne: tumbleAngle accumulates at tumbleRate() from the moment the
+ *    fragment actually starts moving (after its delay); settleScale is rest.
+ *  - settling: a short window after landing where tumbleAngle eases back down
+ *    to exactly 0 (resting orientation is the untumbled spawn orientation)
+ *    and settleScale does a damped squash-and-stretch bounce that starts and
+ *    ends at (1,1,1).
+ *  - settled: exactly the identity transform, snapped rather than asymptotic.
+ */
+function tumbleAndSettle(flight: FragmentFlight, t: number): { tumbleAngle: number; settleScale: PlainVec3 } {
+  const landingT = flight.delayS + flight.durationS;
+  const settleEndT = landingT + SETTLE_DURATION_S;
+
+  if (t < landingT) {
+    const airborneS = Math.max(0, t - flight.delayS);
+    return { tumbleAngle: tumbleRate(flight) * airborneS, settleScale: REST_SCALE };
+  }
+
+  if (t < settleEndT) {
+    const settleT = t - landingT;
+    const envelope = 1 - settleT / SETTLE_DURATION_S;
+    const landingAngle = tumbleRate(flight) * flight.durationS;
+    const squash = SETTLE_SQUASH_MAGNITUDE * envelope
+      * Math.sin((settleT / SETTLE_DURATION_S) * SETTLE_BOUNCE_OSCILLATIONS * Math.PI);
+    return {
+      tumbleAngle: landingAngle * envelope,
+      // Squash on y, a matching stretch on x/z, so it reads as compressing
+      // into the landing rather than just shrinking.
+      settleScale: { x: 1 + squash * 0.5, y: 1 - squash, z: 1 + squash * 0.5 },
+    };
+  }
+
+  return { tumbleAngle: 0, settleScale: REST_SCALE };
+}
 
 export class FragmentAnimator {
   /** The collapse still being advanced by the render loop; emptied when it ends. */
@@ -21,7 +90,7 @@ export class FragmentAnimator {
   private elapsedS = 0;
   private endsAtS = 0;
   /** Reused across frames so a large blast does not allocate a map per frame. */
-  private readonly positions = new Map<number, { x: number; y: number; z: number }>();
+  private readonly transforms = new Map<number, FragmentInstanceTransform>();
 
   constructor(private readonly fragments: FragmentMesh) {}
 
@@ -43,7 +112,10 @@ export class FragmentAnimator {
     this.source = flights.filter(f => f.durationS > 0 && !samePlace(f));
     this.flights = this.source.slice();
     this.elapsedS = 0;
-    this.endsAtS = totalFlightDuration(this.flights);
+    // Playback holds through the landing squash-and-bounce, not just to
+    // impact, so idle-detection (isPlaying / update()'s final write) waits
+    // for every fragment to have fully settled.
+    this.endsAtS = this.flights.length > 0 ? totalFlightDuration(this.flights) + SETTLE_DURATION_S : 0;
     // Put everything at its starting point immediately, or the first frame
     // would show the finished pile before the collapse begins.
     if (this.flights.length > 0) this.apply();
@@ -110,11 +182,13 @@ export class FragmentAnimator {
   }
 
   private applyTo(flights: readonly FragmentFlight[]): void {
-    this.positions.clear();
+    this.transforms.clear();
     for (const flight of flights) {
-      this.positions.set(flight.fragmentId, flightPositionAt(flight, this.elapsedS));
+      const pos = flightPositionAt(flight, this.elapsedS);
+      const { tumbleAngle, settleScale } = tumbleAndSettle(flight, this.elapsedS);
+      this.transforms.set(flight.fragmentId, { x: pos.x, y: pos.y, z: pos.z, tumbleAngle, settleScale });
     }
-    this.fragments.updatePositions(this.positions);
+    this.fragments.updateTransforms(this.transforms);
   }
 }
 

@@ -1,0 +1,303 @@
+{
+  "name": "rock-fragmenter-breaking",
+  "description": "Chapter 5/2 (#484): an undercharged blast leaves an oversized boulder a debris_hauler must refuse; a crewed rock_fragmenter drives to it, breaks it via 'vehicle break', and a resulting sub-fragment is then hauled and stored — both through console commands and real Vehicles-panel clicks (buy, driver assign, .bs-vehicle-haul-btn, .bs-vehicle-break-btn).",
+  "steps": [
+    {
+      "command": "new_game seed:42 cash:100000",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 cash:100000"
+        }
+      ]
+    },
+    {
+      "command": "drill_plan grid rows:2 cols:2 spacing:5 depth:8 start:18,19",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:2 cols:2 spacing:5 depth:8 start:18,19"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:2 stemming:2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:boomite amount:2 stemming:2"
+        }
+      ]
+    },
+    {
+      "command": "sequence auto delay_step:25",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sequence auto delay_step:25"
+        }
+      ]
+    },
+    {
+      "command": "blast",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "blast"
+        }
+      ]
+    },
+    {
+      "command": "fragments",
+      "description": "Undercharged 2kg boomite at wide 5m spacing (mirrors blast-undercharge.json) reliably leaves a couple of oversized fragments (volume > OVERSIZED_FRAGMENT_THRESHOLD) among the ground fragments — this step's output exposes their ids.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "fragments"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:driver",
+      "description": "Employee #1 — will be crewed onto the debris_hauler.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:driver"
+        }
+      ]
+    },
+    {
+      "command": "employee assign_skill 1 skill:driving.truck level:5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 1 skill:driving.truck level:5"
+        }
+      ]
+    },
+    {
+      "command": "vehicle list",
+      "description": "Opens the Vehicles panel via a real UI click so every later buy/driver/haul/break button click below targets a panel that is already on-screen (#411 pattern).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle list"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        }
+      ]
+    },
+    {
+      "command": "vehicle buy debris_hauler",
+      "description": "Vehicle #1 — a real click on the tier-1 debris_hauler buy button. Click is the sole purchase action in interaction mode (the top-level `command` covers command mode) — combining both double-buys (#484).",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+        }
+      ]
+    },
+    {
+      "command": "vehicle driver 1 1",
+      "description": "Only one licensed (driving.truck) crew member is eligible, so the driver <select> already defaults to employee #1 — the assign button click alone boards them.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 1 1"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "description": "Lets the driver walk to and board the hauler.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "vehicle haul 1 fragment:1",
+      "description": "Must be refused: fragment #1 is oversized. No .bs-vehicle-haul-btn exists to click for it in interaction mode — the eligibility cache (findReachableGroundFragment) excludes oversized fragments outright, so the button never renders for this boulder; the command-mode attempt is what proves the rejection.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle haul 1 fragment:1"
+        }
+      ]
+    },
+    {
+      "command": "fragments",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "fragments"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:driver",
+      "description": "Employee #2 — will be crewed onto the rock_fragmenter.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee hire role:driver"
+        }
+      ]
+    },
+    {
+      "command": "employee assign_skill 2 skill:driving.excavator level:5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 2 skill:driving.excavator level:5"
+        }
+      ]
+    },
+    {
+      "command": "vehicle buy rock_fragmenter",
+      "description": "Vehicle #2 — a real click on the tier-1 rock_fragmenter buy button. Click is the sole purchase action in interaction mode (the top-level `command` covers command mode) — combining both double-buys (#484).",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"rock_fragmenter\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"rock_fragmenter\"][data-tier=\"1\"]"
+        }
+      ]
+    },
+    {
+      "command": "vehicle driver 2 2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 2 2"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-vehicle-id=\"2\"] .bs-vehicle-assign-btn"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-vehicle-id=\"2\"] .bs-vehicle-assign-btn"
+        }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "description": "Lets the second driver walk to and board the rock_fragmenter.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "vehicle break 2 fragment:1",
+      "description": "Sets break intent only — the fragmenter must still drive to the boulder before breaking it. Command mode dispatches directly. In interaction mode, a reachable oversized fragment makes .bs-vehicle-break-btn render for vehicle #2, and the request is dispatched by a real click on that button — the button's own handler picks the fragment id (the eligibility cache's best reachable oversized fragment, which is fragment #1, the only oversized boulder on the ground) and calls the exact same console command the click handler in breakEligibility.ts fires.",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "[data-vehicle-id=\"2\"] .bs-vehicle-break-btn",
+          "timeout": 5000
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-vehicle-id=\"2\"] .bs-vehicle-break-btn"
+        }
+      ]
+    },
+    {
+      "command": "tick 30",
+      "description": "Padding: the fragmenter drives to the boulder's approach cell and breaks it on arrival.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 30"
+        }
+      ]
+    },
+    {
+      "command": "fragments",
+      "description": "Fragment #1 should now be gone from logistics, replaced by haulable sub-fragments (each under OVERSIZED_FRAGMENT_THRESHOLD) whose total volume matches the original boulder.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "fragments"
+        }
+      ]
+    },
+    {
+      "command": "build freight_warehouse at:13,13",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build freight_warehouse at:13,13"
+        }
+      ]
+    },
+    {
+      "command": "vehicle haul 1 fragment:64",
+      "description": "Hauls a resulting sub-fragment with the (still-idle) debris_hauler. Command mode dispatches the hardcoded fragment:64 directly — the first sub-fragment produced by the break at step 20/21 (seed 42, this exact command sequence), not the stale fragment #2 left over from the original blast, which stays oversized and un-haulable; the scenario step vocabulary has no way to capture an id from a prior step's output, so this is hardcoded, and needs re-deriving (via a 'fragments' step) if any upstream change to blast/break fragment-id assignment shifts it. In interaction mode, this fragment is on_ground and reachable, so .bs-vehicle-haul-btn renders for vehicle #1, and the request is dispatched by a real click on that button — the button's own handler picks the fragment id (the eligibility cache's nearest reachable on-ground fragment) and calls the exact same console command the click handler in haulEligibility.ts fires.",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "[data-vehicle-id=\"1\"] .bs-vehicle-haul-btn",
+          "timeout": 5000
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-vehicle-id=\"1\"] .bs-vehicle-haul-btn"
+        }
+      ]
+    },
+    {
+      "command": "tick 30",
+      "description": "Padding: the hauler drives to the piece, loads it, drives to the warehouse, and delivers it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 30"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "description": "Final assertion point: logistics.storedMassKg must have grown by exactly the hauled piece's mass.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    }
+  ]
+}

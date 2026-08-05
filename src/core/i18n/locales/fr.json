@@ -2615,6 +2615,7 @@
   "ui.survey.confidence_pct": "{pct}% de confiance",
   "ui.vehicles.haul": "Transporter",
   "ui.confirm.cancel": "Annuler",
+  "ui.vehicles.break": "Casser",
   "ui.contracts.deliver": "Livrer",
   "ui.build.ramp_section": "Terrain",
   "ui.build.ramp": "Construire une rampe",

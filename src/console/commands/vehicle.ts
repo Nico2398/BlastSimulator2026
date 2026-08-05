@@ -16,6 +16,7 @@ import {
 } from '../../core/entities/Vehicle.js';
 import { requestBoardVehicle } from '../../core/entities/VehicleBoarding.js';
 import { requestHaulFragment } from '../../core/economy/HaulingTask.js';
+import { requestBreakBoulder } from '../../core/economy/BoulderBreaking.js';
 import { addExpense, addIncome } from '../../core/economy/Finance.js';
 import { SPAWN_RING_SIZE, SPAWN_TILE_SPACING } from '../../core/config/balance.js';
 import { NavGrid } from '../../core/nav/NavGrid.js';
@@ -170,7 +171,22 @@ export function vehicleCommand(
       addIncome(state.finances, residualValue, 'refund', `Scrap ${vehicle.type} #${id}`, state.tickCount);
       return { success: true, output: `Vehicle #${id} scrapped. Residual value: $${residualValue}` };
     }
+    case 'break': {
+      const vehicleId = parseInt(args[1] ?? '', 10);
+      const fragmentId = parseInt(named['fragment'] ?? '', 10);
+      if (isNaN(vehicleId) || isNaN(fragmentId)) {
+        return { success: false, output: 'Usage: vehicle break <vehicleId> fragment:<fragmentId>' };
+      }
+      // Sets intent only — the vehicle must physically drive to the boulder
+      // before breaking it — resolved by ArrivalGate.tickArrivalGate/
+      // tickBreakProgress each tick (#484).
+      const result = requestBreakBoulder(state, vehicleId, fragmentId);
+      if (!result.success) {
+        return { success: false, output: result.error! };
+      }
+      return { success: true, output: `Vehicle #${vehicleId} breaking fragment #${fragmentId}.` };
+    }
     default:
-      return { success: false, output: 'Usage: vehicle (list|buy|assign|move|driver|haul|scrap)' };
+      return { success: false, output: 'Usage: vehicle (list|buy|assign|move|driver|haul|scrap|break)' };
   }
 }
