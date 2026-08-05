@@ -424,7 +424,7 @@ const CSS = `
    arms the placement tool needs the strip pushed clear of the card instead
    of sitting behind it — same screen edge, same z-stack region. */
 #bs-param-strip { bottom: 18px; }
-body.bs-tutorial-guided #bs-param-strip { bottom: 210px; }
+body.bs-tutorial-guided #bs-param-strip { bottom: var(--bsx-tutorial-card-clearance, 210px); }
 .bs-tutorial-header {
   display: flex;
   align-items: baseline;
