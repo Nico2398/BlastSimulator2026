@@ -47,5 +47,9 @@ describe('Level 3 — Lose — Ecological Disaster', () => {
     expect(ctx.state!.ecological.shutdown).toBe(true);
     // ticksAtZero should be >= 150 (ECOLOGICAL_SHUTDOWN_TICKS)
     expect(ctx.state!.ecological.ticksAtZero).toBeGreaterThanOrEqual(150);
+
+    // Verify the level itself ends, with the reason attributed to ecology
+    expect(ctx.state!.levelEnded).toBe(true);
+    expect(ctx.state!.levelEndReason).toBe('ecological_shutdown');
   });
 });
