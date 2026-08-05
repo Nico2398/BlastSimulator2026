@@ -193,7 +193,8 @@ export class SaveLoadUI {
     }
   }
 
-  private async loadFromSlot(slotId: string): Promise<void> {
+  /** Public: also used by MainMenu's CONTINUE button to resume the most recent save directly. */
+  async loadFromSlot(slotId: string): Promise<void> {
     if (!this.backend || !this.onLoad) return;
     try {
       const slot = await this.backend.load(slotId);

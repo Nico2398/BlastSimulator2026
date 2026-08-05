@@ -4,6 +4,8 @@ import { MainMenu } from '../../../src/ui/MainMenu.js';
 import { UIManager } from '../../../src/ui/UIManager.js';
 import { t, setLocale, getLocale } from '../../../src/core/i18n/I18n.js';
 import type { CampaignState } from '../../../src/core/campaign/Campaign.js';
+import { TUTORIAL_STEPS } from '../../../src/ui/tutorialSteps.js';
+import type { SaveBackend, SaveMeta } from '../../../src/core/state/SaveBackend.js';
 
 function makeCampaign(): CampaignState {
   return {
@@ -45,8 +47,8 @@ describe('MainMenu (12.8)', () => {
     const menu = new MainMenu(container);
     menu.setOnNewCampaign(cb);
     menu.show();
-    // Find the New Campaign button (first primary button)
-    const btn = container.querySelector('.bs-btn-primary') as HTMLButtonElement | null;
+    const btn = Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
+      .find(b => b.textContent?.includes(t('menu.new_campaign')));
     btn?.click();
     expect(cb).toHaveBeenCalledOnce();
     menu.dispose();
@@ -150,16 +152,12 @@ describe('MainMenu (12.8)', () => {
     menu.dispose();
   });
 
-  it('tutorial button has gold accent inline style', () => {
+  it('tutorial button shows a real step-count hint from TUTORIAL_STEPS', () => {
     const menu = new MainMenu(container);
     menu.show();
     const buttons = Array.from(container.querySelectorAll('button'));
-    const tutorialBtn = buttons.find(b => b.textContent?.includes('Tutorial'))!;
-    expect(tutorialBtn.style.color).toBe('rgb(255, 224, 144)');
-    expect(tutorialBtn.style.borderColor).toContain('rgba');
-    expect(tutorialBtn.style.borderColor).toContain('255, 225, 144');
-    expect(tutorialBtn.style.background).toContain('rgba');
-    expect(tutorialBtn.style.background).toContain('255, 225, 144');
+    const tutorialBtn = buttons.find(b => b.textContent?.includes(t('menu.tutorial')))!;
+    expect(tutorialBtn.textContent).toContain(String(TUTORIAL_STEPS.length));
     menu.dispose();
   });
 
@@ -175,15 +173,128 @@ describe('MainMenu (12.8)', () => {
     menu.dispose();
   });
 
-  it('tutorial button is ordered between New Campaign and Continue', () => {
+  it('buttons follow the design order: Continue, New Campaign, Sandbox, Tutorial, Load, Settings', () => {
     const menu = new MainMenu(container);
     menu.show();
     const buttons = Array.from(container.querySelectorAll('button'));
-    const idxCampaign = buttons.findIndex(b => b.textContent?.includes('New Campaign'));
-    const idxTutorial = buttons.findIndex(b => b.textContent?.includes('Tutorial'));
-    const idxContinue = buttons.findIndex(b => b.textContent?.includes('Continue'));
-    expect(idxCampaign).toBeLessThan(idxTutorial);
-    expect(idxTutorial).toBeLessThan(idxContinue);
+    const idxContinue = buttons.findIndex(b => b.textContent?.includes(t('menu.continue')));
+    const idxCampaign = buttons.findIndex(b => b.textContent?.includes(t('menu.new_campaign')));
+    const idxSandbox = buttons.findIndex(b => b.textContent?.includes(t('menu.sandbox')));
+    const idxTutorial = buttons.findIndex(b => b.textContent?.includes(t('menu.tutorial')));
+    const idxLoad = buttons.findIndex(b => b.textContent?.includes(t('menu.load')));
+    const idxSettings = buttons.findIndex(b => b.textContent?.includes(t('menu.settings')));
+    expect(idxContinue).toBeLessThan(idxCampaign);
+    expect(idxCampaign).toBeLessThan(idxSandbox);
+    expect(idxSandbox).toBeLessThan(idxTutorial);
+    expect(idxTutorial).toBeLessThan(idxLoad);
+    expect(idxLoad).toBeLessThan(idxSettings);
+    menu.dispose();
+  });
+});
+
+// ── CONTINUE: live save summary from backend meta (redesign P8) ──────────────
+
+function fakeBackend(saves: SaveMeta[]): SaveBackend {
+  return {
+    save: vi.fn(),
+    load: vi.fn(),
+    delete: vi.fn(),
+    list: vi.fn().mockResolvedValue(saves),
+  };
+}
+
+describe('MainMenu — CONTINUE live save summary (redesign P8)', () => {
+  let container: HTMLDivElement;
+
+  beforeEach(() => {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    setLocale('en');
+  });
+
+  afterEach(() => {
+    setLocale('en');
+  });
+
+  it('CONTINUE stays hidden until a backend is set', () => {
+    const menu = new MainMenu(container);
+    menu.show();
+    const continueBtn = Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
+      .find(b => b.textContent?.includes(t('menu.continue')));
+    expect(continueBtn?.style.display).toBe('none');
+    menu.dispose();
+  });
+
+  it('CONTINUE stays hidden when the backend has no saves', async () => {
+    const menu = new MainMenu(container);
+    menu.setBackend(fakeBackend([]));
+    await new Promise(r => setTimeout(r, 0));
+    menu.show();
+    const continueBtn = Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
+      .find(b => b.textContent?.includes(t('menu.continue')));
+    expect(continueBtn?.style.display).toBe('none');
+    menu.dispose();
+  });
+
+  it('CONTINUE shows the campaign level name and the real campaignSummary for the most recent save', async () => {
+    const menu = new MainMenu(container);
+    menu.setBackend(fakeBackend([
+      { slotId: 'slot_1', name: 'Slot 1', timestamp: 1000, version: 7, campaignSummary: '$40,000 — Day 3', levelId: 'dusty_hollow' },
+      { slotId: 'auto', name: 'Auto', timestamp: 5000, version: 7, campaignSummary: '$184,300 — Day 11', levelId: 'dusty_hollow' },
+    ]));
+    await new Promise(r => setTimeout(r, 0));
+    menu.show();
+
+    const text = container.textContent ?? '';
+    expect(text).toContain(t('level.dusty_hollow.name'));
+    expect(text).toContain('$184,300 — Day 11'); // the newer (timestamp 5000) save, not the older one
+    expect(text).not.toContain('$40,000 — Day 3');
+    menu.dispose();
+  });
+
+  it('CONTINUE falls back to the sandbox label when the most recent save has no levelId', async () => {
+    const menu = new MainMenu(container);
+    menu.setBackend(fakeBackend([
+      { slotId: 'slot_1', name: 'Slot 1', timestamp: 1000, version: 7, campaignSummary: '$9,000 — Day 2', levelId: null },
+    ]));
+    await new Promise(r => setTimeout(r, 0));
+    menu.show();
+
+    const text = container.textContent ?? '';
+    expect(text).toContain(t('menu.sandbox'));
+    menu.dispose();
+  });
+
+  it('clicking CONTINUE routes to onContinue with the most recent save\'s slotId', async () => {
+    const menu = new MainMenu(container);
+    const cb = vi.fn();
+    menu.setOnContinue(cb);
+    menu.setBackend(fakeBackend([
+      { slotId: 'slot_1', name: 'Slot 1', timestamp: 1000, version: 7, campaignSummary: '$9,000 — Day 2', levelId: 'dusty_hollow' },
+      { slotId: 'slot_2', name: 'Slot 2', timestamp: 9000, version: 7, campaignSummary: '$20,000 — Day 5', levelId: 'dusty_hollow' },
+    ]));
+    await new Promise(r => setTimeout(r, 0));
+    menu.show();
+
+    const continueBtn = Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
+      .find(b => b.textContent?.includes(t('menu.continue')))!;
+    continueBtn.click();
+    expect(cb).toHaveBeenCalledWith('slot_2');
+    menu.dispose();
+  });
+
+  it('LOAD button hints the real save count once resolved', async () => {
+    const menu = new MainMenu(container);
+    menu.setBackend(fakeBackend([
+      { slotId: 'slot_1', name: 'Slot 1', timestamp: 1000, version: 7, campaignSummary: '', levelId: null },
+      { slotId: 'slot_2', name: 'Slot 2', timestamp: 2000, version: 7, campaignSummary: '', levelId: null },
+    ]));
+    await new Promise(r => setTimeout(r, 0));
+    menu.show();
+
+    const loadBtn = Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
+      .find(b => b.textContent?.includes(t('menu.load')))!;
+    expect(loadBtn.textContent).toContain('2');
     menu.dispose();
   });
 });
@@ -273,16 +384,19 @@ describe('MainMenu — refreshLocale() wired through UIManager\'s language handl
     frBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   }
 
-  it('main menu title switches to French after Settings → FR, opened via the main menu Settings button', () => {
-    const titleEl = container.querySelector('#bs-main-menu h1');
-    expect(titleEl?.textContent).toBe(t('menu.title')); // English baseline
+  it('main menu tagline switches to French after Settings → FR, opened via the main menu Settings button', () => {
+    // The wordmark itself ("BLASTSIM 2026") is a brand lockup, not translated —
+    // the tagline underneath it is the persistent, locale-bound text.
+    const before = container.textContent ?? '';
+    expect(before).toContain(t('menu.subtitle')); // English baseline
 
     openSettingsFromMainMenu();
     clickFrenchButton();
 
     expect(getLocale()).toBe('fr');
-    expect(titleEl?.textContent).toBe(t('menu.title'));
-    expect(titleEl?.textContent).not.toBe('BlastSimulator2026');
+    const after = container.textContent ?? '';
+    expect(after).toContain(t('menu.subtitle'));
+    expect(after).not.toContain('dig');
   });
 
   it('main menu button labels (New Campaign, Continue, Load, Settings) switch to French', () => {

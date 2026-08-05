@@ -295,6 +295,52 @@ const TOKENS_CSS = `
 .bsx-stat-key { font: 600 10px/1 var(--bsx-font-ui); letter-spacing: .12em; color: var(--bsx-text-micro); }
 .bsx-stat-value { font: 600 15px/1 var(--bsx-font-mono); color: var(--bsx-text-primary); }
 
+/* ── main menu buttons (icon + label + hint row) ── */
+.bsx-menu-btn {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  height: 44px;
+  padding: 0 18px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 6px;
+  background: rgba(20,25,32,.72);
+  color: var(--bsx-text-secondary);
+  cursor: pointer;
+  text-align: left;
+  pointer-events: all;
+  transition: background .12s, border-color .12s, color .12s;
+}
+.bsx-menu-btn:hover { border-color: var(--bsx-amber); color: var(--bsx-amber); background: rgba(255,176,46,.08); }
+.bsx-menu-btn-continue {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  height: 56px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--bsx-amber);
+  color: var(--bsx-text-on-amber);
+  cursor: pointer;
+  text-align: left;
+  pointer-events: all;
+  transition: filter .12s;
+}
+.bsx-menu-btn-continue:hover { filter: brightness(1.08); }
+.bsx-menu-lang-pill {
+  padding: 5px 10px;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--bsx-text-muted);
+  font: 700 9px/1 var(--bsx-font-ui);
+  letter-spacing: .14em;
+  border: 0;
+  cursor: pointer;
+  pointer-events: all;
+}
+.bsx-menu-lang-pill.active { background: var(--bsx-amber); color: var(--bsx-text-on-amber); }
+
 @keyframes bsx-toast-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 
 /* ── reduced motion: drop transforms, keep opacity only ── */

@@ -78,5 +78,11 @@ export class ToolRail {
   }
 
   refreshLocale(): void { this.locale.refresh(); }
+
+  /** Hidden pre-game (redesign P8) — this is HUD chrome, nothing to show before a level exists. */
+  show(): void { this.el.style.display = 'flex'; }
+  hide(): void { this.el.style.display = 'none'; }
+  get visible(): boolean { return this.el.style.display !== 'none'; }
+
   dispose(): void { this.el.remove(); }
 }

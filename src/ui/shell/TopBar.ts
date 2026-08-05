@@ -485,6 +485,11 @@ export class TopBar {
     if (this.weatherPopoverOpen) this.renderWeatherPopover();
   }
 
+  /** Hidden pre-game (redesign P8) — this is HUD chrome, nothing to show before a level exists. */
+  show(): void { this.root.style.display = 'flex'; }
+  hide(): void { this.root.style.display = 'none'; }
+  get visible(): boolean { return this.root.style.display !== 'none'; }
+
   dispose(): void {
     document.removeEventListener('click', this.onDocumentClick);
     this.root.remove();

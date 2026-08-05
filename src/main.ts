@@ -96,6 +96,7 @@ saveLoadUI.setGetState(() => {
 
 // --- Main Menu ---
 const mainMenu = new MainMenu(uiContainer);
+mainMenu.setBackend(saveBackend);
 mainMenu.setOnNewCampaign(() => {
   // Show world map so the player can pick a level. The tutorial (if not yet
   // completed) triggers later, once a level is actually entered — starting it
@@ -111,12 +112,24 @@ mainMenu.setOnStartLevel((levelId) => {
     if (!TutorialOverlay.isCompleted()) tutorial.start(ctx.state ?? undefined);
   });
 });
+mainMenu.setOnContinue((slotId) => {
+  mainMenu.hide();
+  void saveLoadUI.loadFromSlot(slotId);
+});
 mainMenu.setOnLoad(() => { saveLoadUI.show(); });
 mainMenu.setOnSettings(() => { uiManager.showPanel('settings'); });
 // Settings is reachable from the main menu, so a language switch made there has
 // to redraw the menu sitting underneath the panel as well as the panel itself.
 uiManager.setLanguageChangeHandler(() => {
   mainMenu.refreshLocale();
+  saveLoadUI.refreshLocale();
+  selectionBar.refreshLocale();
+});
+// Symmetric with the above: a language switch made from the main menu's own
+// EN/FR pills has to reach uiManager's owned tree (settings panel included)
+// and every sibling screen, the same set uiManager's handler refreshes.
+mainMenu.setOnLanguageChange(() => {
+  uiManager.refreshLocale();
   saveLoadUI.refreshLocale();
   selectionBar.refreshLocale();
 });
@@ -319,7 +332,13 @@ function runGameCommand(cmd: string, opts?: { syncRenderer?: boolean }): Command
   }
 
   // Update UI after every command
-  if (ctx.state) uiManager.update(ctx.state, ctx.weatherCycle, ctx.rng);
+  if (ctx.state) {
+    uiManager.update(ctx.state, ctx.weatherCycle, ctx.rng);
+    // A game exists — reveal HUD chrome unless the player is looking at the
+    // menu on purpose (Quit, or mid-game Site Map). Self-correcting on every
+    // command so no entry point (button, console, scenario harness) can miss it.
+    if (!mainMenu.visible) uiManager.show();
+  }
   if (ctx.state) tutorial.onCommandExecuted(ctx.state);
   return result;
 }
@@ -573,6 +592,7 @@ uiManager.setSpeedChangeHandler((speed) => {
 });
 uiManager.setQuitHandler(() => {
   mainMenu.show();
+  uiManager.hide();
 });
 
 // Site-map and Saves buttons live in the top bar's right cluster (shell/TopBar.ts) —
@@ -750,6 +770,7 @@ scene.start((dt) => {
   // Update UI from current state on each frame
   if (ctx.state) {
     uiManager.update(ctx.state, ctx.weatherCycle, ctx.rng);
+    if (!mainMenu.visible) uiManager.show();
     saveLoadUI.onTick(ctx.state);
   }
 });

@@ -153,10 +153,34 @@ export class UIManager {
       this.refreshLocale();
       this.onLanguageChange?.(lang);
     });
+
+    // TopBar/ToolRail/Toasts/MiniMap are HUD chrome — nothing to show before a
+    // game exists. Previously nothing ever hid them; they were only ever masked
+    // by MainMenu's own opaque backdrop, which the redesign's translucent menu
+    // no longer provides (#ui-implementation-plan.md P8, "fix the leak").
+    this.hide();
   }
 
   private onSpeedChangeCb?: (speed: number) => void;
   private onTogglePauseCb?: () => void;
+
+  /** Reveal HUD chrome once a game exists. Idempotent — safe to call every frame/command. */
+  show(): void {
+    this.topBar.show();
+    this.toolRail.show();
+    this.toasts.show();
+    this.miniMap.show();
+  }
+
+  /** Hide HUD chrome — pre-game, and whenever the player returns to the main menu for good (Quit). */
+  hide(): void {
+    this.topBar.hide();
+    this.toolRail.hide();
+    this.toasts.hide();
+    this.miniMap.hide();
+  }
+
+  get visible(): boolean { return this.topBar.visible; }
 
   setGameConsole(fn: GameConsoleFn): void {
     this.blastUI.setGameConsole(fn);
