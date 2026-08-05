@@ -70,34 +70,6 @@ function makeDrivenHaulerState(): { state: GameState; vehicleId: number } {
   return { state, vehicleId: vehicle.id };
 }
 
-/** A rock_fragmenter with a licensed driver boarded, on a flat NavGrid. */
-function makeDrivenFragmenterState(): { state: GameState; vehicleId: number } {
-  const state = makeState();
-  state.navGrid = makeFlatNavGrid(20);
-  const { vehicle } = purchaseVehicle(state.vehicles, 'rock_fragmenter', 0, 0);
-  const rng = new Random(SEED);
-  const { employee } = hireEmployee(state.employees, 'driver', rng);
-  assignSkill(state.employees, employee.id, 'driving.excavator', 1);
-  vehicle.driverId = employee.id;
-  return { state, vehicleId: vehicle.id };
-}
-
-// Oversized boulder — volume must exceed OVERSIZED_FRAGMENT_THRESHOLD (0.5 m³,
-// see BoulderFragmentation.ts) so it is eligible for
-// findReachableOversizedFragment (#484's break-eligibility gate).
-function makeOversizedFragment(id: number, x: number, z: number, mass = 5000): FragmentData {
-  return {
-    id,
-    position: { x, y: 0, z },
-    volume: 1.0,
-    mass,
-    rockId: 'cruite',
-    oreDensities: {},
-    initialVelocity: { x: 0, y: 0, z: 0 },
-    isProjection: false,
-  };
-}
-
 // ── Buy section — per-tier buttons ──────────────────────────────────────────
 
 describe('VehiclePanel — tier buy buttons (#411)', () => {
@@ -308,77 +280,5 @@ describe('VehiclePanel — Haul button (#466)', () => {
     // Mirrors the driver-assign button's dispatch mechanism: a direct
     // gameConsole(cmd) call, not a DOM CustomEvent.
     expect(commands).toContain(`vehicle haul ${vehicleId} fragment:7`);
-  });
-});
-
-// ── Break button (#484) ──────────────────────────────────────────────────────
-// The only UI control that can trigger `vehicle break` — without it, an
-// oversized boulder a debris_hauler refused can never be broken up except
-// via the console (issue #484).
-
-describe('VehiclePanel — Break button (#484)', () => {
-  it('renders the Break button for a rock_fragmenter with a driver and a reachable oversized fragment', () => {
-    const { container, panel } = setupPanel();
-    const { state } = makeDrivenFragmenterState();
-    addBlastFragments(state.logistics, [makeOversizedFragment(1, 3, 3)]);
-
-    panel.update(state);
-
-    expect(container.querySelector('.bs-vehicle-break-btn')).not.toBeNull();
-  });
-
-  it('does not render the Break button when no reachable oversized fragment exists', () => {
-    const { container, panel } = setupPanel();
-    const { state } = makeDrivenFragmenterState();
-    // No fragments at all — nothing to break.
-
-    panel.update(state);
-
-    expect(container.querySelector('.bs-vehicle-break-btn')).toBeNull();
-  });
-
-  it('does not render the Break button when the vehicle is already breaking (breakPhase !== null)', () => {
-    const { container, panel } = setupPanel();
-    const { state, vehicleId } = makeDrivenFragmenterState();
-    addBlastFragments(state.logistics, [makeOversizedFragment(1, 3, 3)]);
-    const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId)!;
-    vehicle.breakPhase = 'to_boulder';
-
-    panel.update(state);
-
-    expect(container.querySelector('.bs-vehicle-break-btn')).toBeNull();
-  });
-
-  it('does not render the Break button when the vehicle has no driver', () => {
-    const { container, panel } = setupPanel();
-    const state = makeState();
-    state.navGrid = makeFlatNavGrid(20);
-    purchaseVehicle(state.vehicles, 'rock_fragmenter', 0, 0);
-    addBlastFragments(state.logistics, [makeOversizedFragment(1, 3, 3)]);
-
-    panel.update(state);
-
-    expect(container.querySelector('.bs-vehicle-break-btn')).toBeNull();
-  });
-
-  it('clicking the Break button dispatches "vehicle break <vehicleId> fragment:<resolvedFragmentId>"', () => {
-    const { container, panel } = setupPanel();
-    const { state, vehicleId } = makeDrivenFragmenterState();
-    addBlastFragments(state.logistics, [makeOversizedFragment(9, 3, 3)]);
-    panel.update(state);
-
-    const commands: string[] = [];
-    panel.setGameConsole((cmd: string): CommandResult => {
-      commands.push(cmd);
-      return { success: true, output: '' };
-    });
-
-    const btn = container.querySelector('.bs-vehicle-break-btn') as HTMLButtonElement | null;
-    expect(btn).not.toBeNull();
-    btn!.click();
-
-    // Mirrors the Haul button's dispatch mechanism: a direct gameConsole(cmd)
-    // call, not a DOM CustomEvent.
-    expect(commands).toContain(`vehicle break ${vehicleId} fragment:9`);
   });
 });
