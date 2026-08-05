@@ -322,14 +322,22 @@
           "selector": "#bs-vehicle-panel .bs-vehicle-assign-btn"
         },
         {
+          "do": "click",
+          "selector": "#bs-hud-top .bs-speed-btn"
+        },
+        {
+          "do": "click",
+          "selector": "#bs-hud-top .bs-speed-btn"
+        },
+        {
           "do": "awaitTutorialStep",
           "stepId": "build-storage",
-          "timeoutMs": 300000
+          "timeoutMs": 600000
         }
       ],
       "expect": {
         "tutorialStep": "build-storage",
-        "note": "Deliberately does NOT force ticks. Assigning a driver only sends them walking to the vehicle; the tutorial must let its own clock run for them to arrive and board. A `tick` here would pass over exactly the deadlock that stranded players on this card. The wait is generous because the walk needs game *ticks*, and a GPU-less environment accrues them at roughly one per minute of wall clock (0.1 s of game time per multi-second frame)."
+        "note": "Deliberately does NOT force ticks with `letTimePass` — that would bypass the held clock and mask the deadlock this beat exists to catch. Instead it does what a waiting player does: presses the HUD speed button so the driver's walk to the vehicle plays out faster on the game's own clock. The wait is still generous because a GPU-less environment renders frames slowly, and the walk needs real game ticks to accrue."
       }
     },
     {
