@@ -16,7 +16,7 @@ Two shapes are valid, and they differ in how much of the answer is already known
 | **Intent** | A human filing from the issue form or free-form | Context, Task, Verification, and any Blocked by. The planner derives the files and the tests. |
 | **Complete** | An agent decomposing a feature into atomic tasks | Every section below. The decomposition already knows the file layout, so it states it. |
 
-Both enter the same queue once `ready` lands on the issue — a two-line issue typed from a phone is still a valid input, and where it leaves a choice open, the run defaults it under `agentic-decision-autonomy` rather than bouncing it back.
+Both enter the same queue once `ready` lands on the issue — a two-line issue typed from a phone is still a valid input, and where it leaves a choice open, the run defaults it under `agentic-decision-autonomy` rather than bouncing it back. Entering the queue is not being picked up: runs start only on a manual dispatch of `agentic-trigger.yml` or from a merged pipeline pull request.
 
 ## ▶ PROCEDURE — EXECUTE IN ORDER
 
@@ -25,7 +25,7 @@ Both enter the same queue once `ready` lands on the issue — a two-line issue t
 3. Verify the Rules are satisfied
 4. Run through the Checklist
 5. Create the issue with `gh issue create`, setting labels yourself:
-   - Human gave no instruction about labels → `--label ready,agent-task`. That is the default, not intake's — a **Complete**-shape issue you authored is ready to run the moment it exists, and intake no longer assigns `ready` on its own.
+   - Human gave no instruction about labels → `--label ready,agent-task`. `ready` means eligible, not started: it places the issue in the queue, where it waits until a human dispatches `agentic-trigger.yml` or a merged pipeline PR chains to it. Creating an issue never starts a run.
    - Human specified labels, or said the issue should wait — `decision-review` for a default to revisit later, or an explicit hold — → follow that instruction instead, and leave `ready` off.
 
 An issue that must **stay out** of the queue is created carrying a lifecycle label of its own instead of `ready` — `decision-review` for a default to revisit later. The issue joins the queue in number order once `ready` is on it, whoever put it there.

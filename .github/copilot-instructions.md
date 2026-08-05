@@ -71,7 +71,7 @@ Five independent channels prove a change works. Each catches what the others mis
 
 ## ▶ Autonomous pipeline sessions
 
-The project takes one human input: a GitHub issue. Filing one does not by itself start a run — label assignment stays with the filer. A run starts once `ready` is on the issue (the issue form's own default, an agent authoring the issue per `agentic-issue-creation`, or a human adding it by hand); the queue then assigns it and carries it to a merged pull request or to a stated blocker. A run always leaves its issue in a terminal state; an issue left holding `in-progress` stalls every assignment behind it.
+The project takes one human input: a GitHub issue. Filing one starts nothing, and neither does labelling it. `ready` means the issue is **eligible** — it joins the queue and waits there. A run starts in exactly two ways, and no others: a human dispatching `agentic-trigger.yml`, or a merged pipeline pull request chaining to the next `ready` issue. Nothing on a schedule and no issue event ever starts a session. Once started, a run carries its issue to a merged pull request or to a stated blocker, and always leaves it in a terminal state; an issue left holding `in-progress` stalls every assignment behind it.
 
 A session started by the autonomous pipeline — a GitHub Actions run woken by the configured agent mention in a pipeline assignment comment — is not an ordinary session. Its first action is to run as the orchestrator: classify the task, then delegate every step to specialists. Never implement a pipeline-assigned task directly, and never explore the codebase before the task has been classified. The `/agentic-run` command carries that mandate; the system around it is described in `agentic-autonomous-pipeline`.
 
