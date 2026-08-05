@@ -58,7 +58,11 @@ export class ConfirmModal {
     this.cancelBtn.dataset['action'] = 'confirm-cancel';
     this.cancelBtn.addEventListener('click', () => this.hide());
 
-    this.confirmBtn = el('button', { className: 'bsx-btn bsx-btn-danger-solid' });
+    // bs-btn-danger alongside the bsx- token classes: PreflightModal's
+    // detonate button carries it too, so the tutorial rails' blast-confirm
+    // target (.bs-confirm-overlay .bs-btn-danger, tutorialStages.ts) matches
+    // consistently across every .bs-confirm-overlay-based modal.
+    this.confirmBtn = el('button', { className: 'bsx-btn bsx-btn-danger-solid bs-btn-danger' });
     this.confirmBtn.style.cssText = 'flex:1.4;height:38px';
     this.confirmBtn.dataset['action'] = 'confirm-yes';
     this.confirmBtn.addEventListener('click', () => this.confirm());

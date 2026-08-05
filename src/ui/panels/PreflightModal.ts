@@ -84,7 +84,12 @@ export class PreflightModal {
     this.locale.bindText(cancelBtn, 'ui.blast_workshop.preflight.cancel');
     cancelBtn.addEventListener('click', () => this.hide());
 
-    this.detonateBtn = el('button', { className: 'bsx-btn bsx-btn-danger-solid' });
+    // bs-btn-danger (legacy class, alongside the bsx- token classes): the
+    // tutorial rails' blast-confirm stage target (tutorialStages.ts) and
+    // tutorial-interactive.json's blast step both still match on it — without
+    // it here, the rails' target selector matches nothing and this button
+    // stays pointer-events:none-blocked for the whole guided tutorial.
+    this.detonateBtn = el('button', { className: 'bsx-btn bsx-btn-danger-solid bs-btn-danger' });
     this.detonateBtn.style.cssText = 'flex:1.6;height:40px;gap:9px;font:800 12px/1 var(--bsx-font-ui);letter-spacing:.2em';
     this.detonateBtn.dataset['action'] = 'preflight-detonate';
     this.detonateBtn.append(iconEl('blast', 16), this.locale.bindText(el('span'), 'ui.blast_workshop.preflight.detonate'));
