@@ -685,3 +685,18 @@ export function computeVoxelColumnSurfaceY(grid: VoxelGrid, x: number, z: number
   }
   return -1;
 }
+
+/**
+ * Continuous height of the topmost solid-to-air crossing at column (x, z),
+ * in the same datum as heightToVoxelYContinuous. Mirrors
+ * computeVoxelColumnSurfaceY's top-down scan and clamp-to-edge-column
+ * behaviour, but returns the fractional crossing height (via densityAt
+ * interpolation between the topmost solid voxel and the one above it),
+ * matching what TerrainMesh's marching cubes actually renders at that
+ * column right now, pre- or post-blast. Returns 0 for a column with no
+ * solid voxel at all.
+ */
+export function computeVoxelColumnSurfaceHeight(_grid: VoxelGrid, _x: number, _z: number): number {
+  // TODO: implement
+  return 0;
+}

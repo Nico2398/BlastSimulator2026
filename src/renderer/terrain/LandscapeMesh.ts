@@ -124,11 +124,69 @@ function rockIndexFor(palette: CompositionPalette, surfCompId: number): number {
 export interface PlayableCut {
   rect: Rect;
   ownsColumn(x: number, z: number): boolean;
+  /** Live surface height at (x, z), when known — used at the claim boundary
+   *  so the landscape's edge matches whatever the playable mesh currently
+   *  renders there. Falls back to the theoretical WorldGen height when absent. */
+  boundaryHeightAt?(x: number, z: number): number;
 }
 
 /** The pre-expansion behaviour: the site is exactly its rect. */
 function rectCut(rect: Rect): PlayableCut {
   return { rect, ownsColumn: (x, z) => distanceInsideRect(rect, x, z) > 0 };
+}
+
+/**
+ * Two-rock blend for one sample, replacing rockIndexFor's collapse to a
+ * single dominant index. `rockA`/`rockB` are shader rock-catalog indices;
+ * `weight` is the blend fraction toward `rockB` (0 = pure rockA).
+ *
+ * TODO: implement — read the top two coefficients out of the composition
+ * at surfCompId instead of only the dominant one.
+ */
+export function rockBlendFor(_palette: CompositionPalette, _surfCompId: number): { rockA: number; rockB: number; weight: number } {
+  // TODO: implement
+  return { rockA: 0, rockB: 0, weight: 0 };
+}
+
+/**
+ * Classifies one coarse-tile quad (given by its two opposite corners)
+ * against the live claim boundary: fully outside the playable rect (kept
+ * as-is), fully inside it (dropped — the voxel mesh owns that ground), or
+ * straddling the boundary (needs clipping/subdivision via buildBoundaryQuad
+ * instead of being emitted whole).
+ *
+ * TODO: implement — replace buildTileMesh's current binary
+ * drop-if-any-corner-inside test with this three-way classification.
+ */
+export function classifyQuad(_playable: PlayableCut, _x0: number, _z0: number, _x1: number, _z1: number): 'outside' | 'inside' | 'boundary' {
+  // TODO: implement
+  return 'outside';
+}
+
+/**
+ * Emits the clipped/subdivided geometry for one boundary quad (a coarse-tile
+ * quad classifyQuad marked 'boundary') into the given output arrays, sampled
+ * at fine resolution against the live claim edge so it meets the playable
+ * mesh with no overlap and no gap.
+ *
+ * TODO: implement — replace the fixed OVERLAP/OVERLAP_DROP seam-mesh
+ * strategy for this quad with an exact clip against `playable.ownsColumn`
+ * (and `playable.boundaryHeightAt` where available).
+ */
+export function buildBoundaryQuad(
+  _positions: number[],
+  _normals: number[],
+  _rockA: number[],
+  _rockB: number[],
+  _rockWeight: number[],
+  _ore: number[],
+  _indices: number[],
+  _x0: number, _z0: number, _x1: number, _z1: number,
+  _sampleColumn: SampleFn,
+  _palette: CompositionPalette,
+  _playable: PlayableCut,
+): void {
+  // TODO: implement
 }
 
 export class LandscapeMesh {
