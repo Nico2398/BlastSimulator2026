@@ -52,6 +52,8 @@ const REGIONS: Array<[string, string]> = [
   ['.bs-confirm-overlay:not(#bs-event-dialog)', 'confirm'],
   ['.bs-tutorial-box', 'tutorial'],
   ['#bs-main-menu', 'menu'],
+  ['#bs-world-map', 'world_map'],
+  ['#bs-level-end-screen', 'level_end'],
   ['#bs-selection-bar', 'selection'], // scene selection bar (redesign P2)
 ];
 

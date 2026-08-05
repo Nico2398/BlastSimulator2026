@@ -14,7 +14,7 @@ import { OperationsPanel } from './panels/OperationsPanel.js';
 import { BuildMenu } from './BuildMenu.js';
 import { FleetPanel } from './panels/FleetPanel.js';
 import { CrewPanel } from './panels/CrewPanel.js';
-import { EventDialog } from './EventDialog.js';
+import { EventModal } from './panels/EventModal.js';
 import { SurveyPanel } from './panels/SurveyPanel.js';
 import { SettingsMenu } from './SettingsMenu.js';
 import { MiniMap } from './MiniMap.js';
@@ -50,7 +50,7 @@ export class UIManager {
   private readonly buildMenu: BuildMenu;
   private readonly fleetPanel: FleetPanel;
   private readonly crewPanel: CrewPanel;
-  private readonly eventDialog: EventDialog;
+  private readonly eventModal: EventModal;
   private readonly surveyPanel: SurveyPanel;
   private readonly settingsMenu: SettingsMenu;
   private readonly miniMap: MiniMap;
@@ -97,7 +97,7 @@ export class UIManager {
     this.blastUI = new BlastWorkshop(leftCol);
     this.blastUI.setCloseHandler(() => this.hideAllPanels());
     // Full-screen overlays, not docked panel content — mounted at the root
-    // container like eventDialog, not leftCol.
+    // container like eventModal, not leftCol.
     this.preflightModal = new PreflightModal(container);
     this.blastUI.setFireRequestedHandler(() => this.preflightModal.show());
     this.blastReportModal = new BlastReportModal(container);
@@ -127,8 +127,8 @@ export class UIManager {
     // Inside leftCol's fixed stacking context it would be capped at z:100 relative to root.
     this.settingsMenu = new SettingsMenu(container);
 
-    // Event dialog (modal, appended to container)
-    this.eventDialog = new EventDialog(container);
+    // Event modal (redesign P8, supersedes EventDialog.ts), appended to container
+    this.eventModal = new EventModal(container);
 
     // MiniMap on right
     this.miniMap = new MiniMap(rightCol);
@@ -190,7 +190,7 @@ export class UIManager {
     this.buildMenu.setGameConsole(fn);
     this.fleetPanel.setGameConsole(fn);
     this.crewPanel.setGameConsole(fn);
-    this.eventDialog.setGameConsole(fn);
+    this.eventModal.setGameConsole(fn);
     this.surveyPanel.setGameConsole(fn);
     this.settingsMenu.setGameConsole(fn);
   }
@@ -276,7 +276,7 @@ export class UIManager {
     this.surveyPanel.refreshLocale();
     this.settingsMenu.refreshLocale();
     this.miniMap.refreshLocale();
-    this.eventDialog.refreshLocale();
+    this.eventModal.refreshLocale();
   }
 
   /**
@@ -301,7 +301,7 @@ export class UIManager {
 
     // Update active panel
     if (this.blastUI.visible) this.blastUI.update(state, weather);
-    // Unconditional, like eventDialog below: each is cheap when not relevant
+    // Unconditional, like eventModal below: each is cheap when not relevant
     // (PreflightModal no-ops while closed; BlastReportModal no-ops until
     // lastBlastReport's tick actually changes) and neither's visibility is
     // tied to blastUI's own, so gating on it here would miss real transitions.
@@ -315,17 +315,15 @@ export class UIManager {
     if (this.crewPanel.visible) this.crewPanel.update(state);
     if (this.surveyPanel.visible) this.surveyPanel.update(state);
 
-    // Event dialog — auto-show when pending event exists, keep open during outcome.
-    // Deferred while BlastReportModal is up: both are auto-triggered (a blast's
-    // scripted follow-up event can land the same tick the report opens), and
-    // eventDialog is mounted after it in the DOM, so it would render on top and
-    // hide the report's own Close button behind it. Re-checked every tick, so
-    // the event opens itself the moment the report is closed.
-    if (state.events.pendingEvent && !this.eventDialog.visible && !this.blastReportModal.visible) {
-      this.eventDialog.update(state);
-      this.eventDialog.show();
-    } else if (this.eventDialog.visible && !this.eventDialog.isShowingOutcome) {
-      this.eventDialog.update(state);
+    // Event modal — owns its own show/hide from state.events (unlike the
+    // panels above). Deferred while BlastReportModal is up: both are
+    // auto-triggered (a blast's scripted follow-up event can land the same
+    // tick the report opens), and eventModal is mounted after it in the DOM,
+    // so it would render on top and hide the report's own Close button
+    // behind it. Re-checked every tick, so the event opens itself the moment
+    // the report is closed.
+    if (this.eventModal.visible || !this.blastReportModal.visible) {
+      this.eventModal.update(state);
     }
   }
 
@@ -380,7 +378,7 @@ export class UIManager {
     this.buildMenu.dispose();
     this.fleetPanel.dispose();
     this.crewPanel.dispose();
-    this.eventDialog.dispose();
+    this.eventModal.dispose();
     this.surveyPanel.dispose();
     this.settingsMenu.dispose();
     this.miniMap.dispose();

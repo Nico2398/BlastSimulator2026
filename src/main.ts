@@ -10,6 +10,7 @@ import { TUTORIAL_STEPS } from './ui/tutorialSteps.js';
 import { KeyboardShortcuts } from './ui/KeyboardShortcuts.js';
 import { MainMenu } from './ui/MainMenu.js';
 import { WorldMap } from './ui/screens/WorldMap.js';
+import { LevelEndScreen } from './ui/screens/LevelEndScreen.js';
 import { SandboxPanel } from './ui/SandboxPanel.js';
 import { LoadingScreen } from './ui/LoadingScreen.js';
 import type { CommandResult } from './console/ConsoleRunner.js';
@@ -117,6 +118,7 @@ mainMenu.setOnSettings(() => { uiManager.showPanel('settings'); });
 uiManager.setLanguageChangeHandler(() => {
   mainMenu.refreshLocale();
   worldMap.refreshLocale();
+  levelEndScreen.refreshLocale();
   saveLoadUI.refreshLocale();
   selectionBar.refreshLocale();
 });
@@ -126,6 +128,7 @@ uiManager.setLanguageChangeHandler(() => {
 mainMenu.setOnLanguageChange(() => {
   uiManager.refreshLocale();
   worldMap.refreshLocale();
+  levelEndScreen.refreshLocale();
   saveLoadUI.refreshLocale();
   selectionBar.refreshLocale();
 });
@@ -146,6 +149,21 @@ worldMap.setOnStartLevel((levelId) => {
     // loaded, not while still picking one from the world map.
     if (!TutorialOverlay.isCompleted()) tutorial.start(ctx.state ?? undefined);
   });
+});
+
+// --- Level End Screen (redesign P8) ---
+const levelEndScreen = new LevelEndScreen(uiContainer);
+levelEndScreen.setOnReplay((levelId) => {
+  levelEndScreen.hide();
+  void enterLevel([`campaign start level:${levelId}`]);
+});
+levelEndScreen.setOnContinue((nextLevelId) => {
+  levelEndScreen.hide();
+  void enterLevel([`campaign start level:${nextLevelId}`]);
+});
+levelEndScreen.setOnBackToPortfolio(() => {
+  levelEndScreen.hide();
+  worldMap.show(ctx.state?.campaign ?? null);
 });
 
 // --- Level loading ---
@@ -356,6 +374,11 @@ function runGameCommand(cmd: string, opts?: { syncRenderer?: boolean }): Command
     if (!mainMenu.visible) uiManager.show();
   }
   if (ctx.state) tutorial.onCommandExecuted(ctx.state);
+  // Deferred while the tutorial overlay is active: its own "victory" step
+  // already waits on this exact state.levelEndReason transition and shows a
+  // brief congratulations card of its own — the real recap takes over once
+  // that finishes, rather than both fighting for the screen at once.
+  if (ctx.state && !tutorial.isActive) levelEndScreen.update(ctx.state);
   return result;
 }
 
@@ -804,4 +827,5 @@ scene.start((dt) => {
     if (!mainMenu.visible) uiManager.show();
     saveLoadUI.onTick(ctx.state);
   }
+  if (ctx.state && !tutorial.isActive) levelEndScreen.update(ctx.state);
 });

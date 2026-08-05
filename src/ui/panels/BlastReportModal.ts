@@ -1,7 +1,7 @@
 // BlastSimulator2026 — Blast Report Modal (redesign P4/§5.C)
 // Shows state.lastBlastReport (built in blastCommand, task P4/#17) right
 // after a blast resolves. Visibility is derived from state, not manually
-// toggled — the same pattern EventDialog already uses for its own pendingEvent:
+// toggled — the same pattern EventModal already uses for its own pendingEvent:
 // a report whose tick differs from the last one shown means a new blast just
 // happened, so the modal opens itself on the very next update() tick, right
 // after PreflightModal's DETONATE dispatches `blast` and closes itself.
