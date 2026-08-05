@@ -144,7 +144,7 @@ export function makeCurrentTaskSection(e: Employee, state: GameState): HTMLEleme
   const children: HTMLElement[] = [headRow];
   if (activity.ticksRemaining !== null && activity.totalTicks !== null && activity.totalTicks > 0) {
     const pct = Math.round((1 - activity.ticksRemaining / activity.totalTicks) * 100);
-    const track = el('div', { attrs: { style: 'height:4px;border-radius:2px;background:#242c36;overflow:hidden' } });
+    const track = el('div', { attrs: { style: 'height:4px;border-radius:2px;overflow:hidden;background:#242c36' } });
     track.appendChild(el('div', { attrs: { style: `height:100%;background:var(--bsx-amber);width:${Math.max(0, Math.min(100, pct))}%` } }));
     children.push(track);
   }
@@ -183,7 +183,7 @@ export function makeSkillsSection(e: Employee): HTMLElement {
       const next = XP_THRESHOLDS[(q.proficiencyLevel + 1) as 2 | 3 | 4 | 5];
       xpPct = next > current ? Math.max(0, Math.min(100, Math.round(((q.xp - current) / (next - current)) * 100))) : 0;
     }
-    const xpTrack = el('div', { attrs: { style: 'height:3px;border-radius:2px;background:#242c36;overflow:hidden' } });
+    const xpTrack = el('div', { attrs: { style: 'height:3px;border-radius:2px;overflow:hidden;background:#242c36' } });
     xpTrack.appendChild(el('div', { attrs: { style: `height:100%;background:var(--bsx-ore);width:${xpPct}%` } }));
 
     const effect = el('span', {

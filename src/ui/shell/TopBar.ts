@@ -391,7 +391,7 @@ export class TopBar {
         el('span', { text: String(dayNum), className: 'bsx-mono', attrs: { style: `font-size:10px;color:${color}` } }),
         el('div', { attrs: { style: 'color:var(--bsx-text-secondary)' }, children: [iconEl(WEATHER_ICON[dayWeather] ?? 'sun', 16)] }),
         el('div', {
-          attrs: { style: 'width:14px;height:3px;border-radius:2px;background:rgba(255,255,255,.09);overflow:hidden' },
+          attrs: { style: 'width:14px;height:3px;border-radius:2px;overflow:hidden;background:rgba(255,255,255,.09)' },
           children: [el('div', { attrs: { style: `height:100%;background:var(--bsx-info);width:${wetPct}%` } })],
         }),
       );
@@ -469,7 +469,7 @@ export class TopBar {
       row.appendChild(el('span', { text: s.abbr, attrs: { style: 'font:700 10px/1 var(--bsx-font-ui);letter-spacing:.1em;color:var(--bsx-text-micro)' } }));
       row.appendChild(el('span', { className: 'bsx-mono', text: String(value), attrs: { style: `font-size:10px;color:${color}` } }));
       const track = el('div');
-      track.style.cssText = 'height:4px;border-radius:3px;background:#242c36;overflow:hidden';
+      track.style.cssText = 'height:4px;border-radius:3px;overflow:hidden;background:#242c36';
       const fill = el('div');
       fill.style.cssText = `height:100%;border-radius:3px;background:${color};width:${value}%`;
       track.appendChild(fill);

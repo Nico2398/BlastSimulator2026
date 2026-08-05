@@ -236,7 +236,7 @@ export class CrewPanel {
     );
 
     const moraleFill = el('div', { className: 'bs-crew-morale-fill', attrs: { style: `height:100%;background:${moraleColor(e.morale)};width:${e.morale}%` } });
-    const moraleTrack = el('div', { attrs: { style: 'width:44px;height:4px;border-radius:2px;background:#242c36;overflow:hidden' }, children: [moraleFill] });
+    const moraleTrack = el('div', { attrs: { style: 'width:44px;height:4px;border-radius:2px;overflow:hidden;background:#242c36' }, children: [moraleFill] });
     const moraleValue = el('span', { className: 'bs-crew-morale-value bsx-mono', text: `${Math.round(e.morale)}%`, attrs: { style: `font-size:11px;color:${moraleColor(e.morale)}` } });
 
     const roleLine = el('div', { attrs: { style: 'display:flex;align-items:center;gap:7px' } });

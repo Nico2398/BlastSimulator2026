@@ -62,7 +62,7 @@ export class WorldMap {
     const progressBlock = el('div', { attrs: { style: 'display:flex;align-items:center;gap:10px;margin-left:auto' } });
     const progressLabel = el('span', { attrs: { style: 'font:600 9px/1 var(--bsx-font-ui);letter-spacing:.14em;color:var(--bsx-text-muted)' } });
     this.locale.bindText(progressLabel, 'ui.portfolio.campaign_label');
-    const progressTrack = el('div', { attrs: { style: 'width:150px;height:5px;border-radius:3px;background:#242c36;overflow:hidden' } });
+    const progressTrack = el('div', { attrs: { style: 'width:150px;height:5px;border-radius:3px;overflow:hidden;background:#242c36' } });
     this.starProgressBarFill = el('div', { attrs: { style: 'height:100%;width:0%;background:var(--bsx-amber)' } });
     progressTrack.appendChild(this.starProgressBarFill);
     this.starProgressEl = el('span', { attrs: { style: 'font:600 11px/1 var(--bsx-font-mono);color:var(--bsx-amber)' } });
