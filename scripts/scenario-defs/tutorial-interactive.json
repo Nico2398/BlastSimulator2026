@@ -1,6 +1,6 @@
 {
   "name": "tutorial-interactive",
-  "description": "Plays the Tutorial Pit the way a first-time player does: every step is driven by a real click on the control the tutorial card points at — speed button, toolbar, hire buttons, blast panel, event choices — so each screenshot shows the coach mark, the highlighted target and the panel together.",
+  "description": "Plays the Tutorial Pit the way a first-time player does: every step is driven by a real click on the control the tutorial card points at — speed button, toolbar, hire buttons, blast panel, event choices — so each screenshot shows the coach mark, the highlighted target and the panel together. Steps that wait on the simulation (survey run, box cut dug, driver walking, debris hauled) advance the clock with an explicit `tick`, because `?scenarioMode=1` turns off the real-time auto-tick and a wall-clock `wait` never moves the sim.",
   "shots": [
     {
       "name": "overview",
@@ -28,7 +28,7 @@
     {
       "command": "campaign start level:tutorial_pit",
       "timeout": 30,
-      "description": "Setup: load Tutorial Pit — camera must re-frame onto the smaller 24x24 grid",
+      "description": "Setup: load Tutorial Pit — camera must re-frame onto the smaller grid",
       "interaction": [
         {
           "type": "command",
@@ -62,14 +62,14 @@
         },
         {
           "type": "wait",
-          "durationMs": 400
+          "durationMs": 300
         }
       ]
     },
     {
-      "command": "state",
+      "command": "employee hire role:surveyor",
       "timeout": 30,
-      "description": "Player follows the glowing Crew button — the tutorial card must not swallow the click",
+      "description": "Step 1 (Hire Surveyor): follow the glowing Crew button, then Hire in the crew panel — the card must not swallow the click",
       "interaction": [
         {
           "type": "clickSelector",
@@ -78,32 +78,14 @@
         {
           "type": "waitForSelector",
           "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
-        }
-      ]
-    },
-    {
-      "command": "employee hire role:surveyor",
-      "timeout": 30,
-      "description": "Step 1 complete: Hire clicked in the crew panel, surveyor appears on site",
-      "interaction": [
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
         },
         {
           "type": "wait",
-          "durationMs": 400
-        }
-      ]
-    },
-    {
-      "command": "employee assign_skill 1 skill:geology level:3",
-      "timeout": 30,
-      "description": "Give the surveyor geology so the seismic survey returns usable estimates",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "employee assign_skill 1 skill:geology level:3"
+          "durationMs": 300
         }
       ]
     },
@@ -123,13 +105,13 @@
       ]
     },
     {
-      "command": "survey core_sample x:12 z:12",
-      "timeout": 30,
-      "description": "Step 2 complete: pick a method, pick a target in the tile picker, dispatch — then the surveyor works it",
+      "command": "survey seismic x:23 z:23",
+      "timeout": 60,
+      "description": "Step 2 complete: pick seismic (the method the card names), pick a target inside the survey region with the tile picker, dispatch — then advance the clock so the surveyor walks out and completes it",
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-survey-panel [data-method=\"core_sample\"]"
+          "selector": "#bs-survey-panel [data-method=\"seismic\"]"
         },
         {
           "type": "clickSelector",
@@ -138,6 +120,11 @@
         {
           "type": "waitForSelector",
           "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 23,
+          "z": 23
         },
         {
           "type": "screenshot"
@@ -152,14 +139,14 @@
         },
         {
           "type": "wait",
-          "durationMs": 800
+          "durationMs": 600
         }
       ]
     },
     {
       "command": "employee hire role:driller",
       "timeout": 30,
-      "description": "Step 3 complete: driller hired through the crew panel",
+      "description": "Step 3 (Hire Driller): driller hired through the crew panel",
       "interaction": [
         {
           "type": "clickSelector",
@@ -171,33 +158,44 @@
         },
         {
           "type": "wait",
-          "durationMs": 400
+          "durationMs": 300
         }
       ]
     },
     {
-      "command": "employee assign_skill 2 skill:blasting level:3",
-      "timeout": 30,
-      "description": "Give the driller blasting proficiency",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "employee assign_skill 2 skill:blasting level:3"
-        }
-      ]
-    },
-    {
-      "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:8,8",
-      "timeout": 30,
-      "description": "Step 4 complete: Blast panel open, 9 holes with X-ray shafts drawn on the bench",
+      "command": "build_ramp start:16,19 end:16,31 depth:8",
+      "timeout": 60,
+      "description": "Step 4 (Box Cut): open Build, pick the ramp tool, drag the starter cut down the west side of the pattern, confirm — then let the cut get dug. Real pits dig this void before the first shot so the blasted rock has somewhere to fall.",
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel .bs-build-ramp-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 16,
+          "z1": 19,
+          "x2": 16,
+          "z2": 31
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         },
         {
           "type": "command",
-          "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:8,8"
+          "command": "tick 3"
         },
         {
           "type": "wait",
@@ -206,9 +204,43 @@
       ]
     },
     {
-      "command": "charge hole:* explosive:pop_rock amount:3 stemming:2",
+      "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:20,20",
       "timeout": 30,
-      "description": "Step 5 complete: Charge All Holes clicked — the panel applies its own form defaults (pop_rock 3kg) and hole rows turn green",
+      "description": "Step 5 (Drill Plan): open Blast, pick the grid tool, drag the exact 20,20→30,30 rectangle the card asks for, confirm — 9 holes with X-ray shafts on the bench",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 20,
+          "z1": 20,
+          "x2": 30,
+          "z2": 30
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "wait",
+          "durationMs": 400
+        }
+      ]
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "timeout": 30,
+      "description": "Step 6 (Charge): Charge All Holes clicked — the panel applies its own form defaults and hole rows turn green",
       "interaction": [
         {
           "type": "clickSelector",
@@ -216,14 +248,14 @@
         },
         {
           "type": "wait",
-          "durationMs": 400
+          "durationMs": 300
         }
       ]
     },
     {
-      "command": "sequence auto",
+      "command": "sequence auto delay_step:25",
       "timeout": 30,
-      "description": "Step 6 complete: Auto Sequence clicked, delay labels appear on every hole",
+      "description": "Step 7 (Sequence): Auto Sequence clicked, delay labels appear on every hole",
       "interaction": [
         {
           "type": "clickSelector",
@@ -231,14 +263,14 @@
         },
         {
           "type": "wait",
-          "durationMs": 400
+          "durationMs": 300
         }
       ]
     },
     {
       "command": "blast",
       "timeout": 60,
-      "description": "Step 7 complete: Execute clicked, confirm dialog answered, crater and fragments appear",
+      "description": "Step 8 (Blast): Execute clicked, confirm dialog answered, crater and fragments appear — rock breaking toward the box cut",
       "interaction": [
         {
           "type": "clickSelector",
@@ -246,14 +278,14 @@
         },
         {
           "type": "waitForSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
+          "selector": ".bs-confirm-overlay:not(#bs-event-dialog) .bs-btn-danger"
         },
         {
           "type": "screenshot"
         },
         {
           "type": "clickSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
+          "selector": ".bs-confirm-overlay:not(#bs-event-dialog) .bs-btn-danger"
         },
         {
           "type": "wait",
@@ -264,7 +296,7 @@
     {
       "command": "scores",
       "timeout": 30,
-      "description": "Step 8 (Scores Overview): score bars moved by the blast, card auto-advances after 2s",
+      "description": "Step 9 (Scores Overview): score bars moved by the blast, card auto-advances",
       "interaction": [
         {
           "type": "command",
@@ -279,7 +311,7 @@
     {
       "command": "tick 1",
       "timeout": 60,
-      "description": "Step 9 (Events): the tutorial fires the scripted consultant event; dialog must be readable, not covered by the card",
+      "description": "Step 10 (Events): the tutorial fires the scripted consultant event itself when the step opens; wait for the dialog to appear",
       "interaction": [
         {
           "type": "command",
@@ -320,7 +352,7 @@
     {
       "command": "employee hire role:manager",
       "timeout": 30,
-      "description": "Step 10 complete: manager hired now that the event is resolved",
+      "description": "Step 11 (Hire Manager): manager hired now that the event is resolved",
       "interaction": [
         {
           "type": "clickSelector",
@@ -332,14 +364,14 @@
         },
         {
           "type": "wait",
-          "durationMs": 400
+          "durationMs": 300
         }
       ]
     },
     {
       "command": "contract accept 1",
       "timeout": 30,
-      "description": "Step 11 complete: Accept clicked on the first offer in the Contracts panel",
+      "description": "Step 12 (Accept Contract): Accept clicked on the first offer in the Contracts panel",
       "interaction": [
         {
           "type": "clickSelector",
@@ -351,14 +383,14 @@
         },
         {
           "type": "wait",
-          "durationMs": 400
+          "durationMs": 300
         }
       ]
     },
     {
       "command": "employee hire role:driver",
       "timeout": 30,
-      "description": "Step 12 complete: driver hired through the crew panel",
+      "description": "Step 13 (Hire Driver): driver hired through the crew panel",
       "interaction": [
         {
           "type": "clickSelector",
@@ -370,48 +402,45 @@
         },
         {
           "type": "wait",
-          "durationMs": 400
-        }
-      ]
-    },
-    {
-      "command": "employee assign_skill 4 skill:driving.truck level:3",
-      "timeout": 30,
-      "description": "Qualify the driver for trucks",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "employee assign_skill 4 skill:driving.truck level:3"
+          "durationMs": 300
         }
       ]
     },
     {
       "command": "vehicle buy debris_hauler",
       "timeout": 30,
-      "description": "Step 13: Vehicles panel open, hauler bought and placed on the terrain surface",
+      "description": "Step 14a (Buy Hauler): Vehicles panel open, hauler bought and placed on the terrain surface",
       "interaction": [
         {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
         },
         {
-          "type": "command",
-          "command": "vehicle buy debris_hauler"
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel .bs-vehicle-assign-btn"
         },
         {
           "type": "wait",
-          "durationMs": 400
+          "durationMs": 300
         }
       ]
     },
     {
       "command": "vehicle driver 1 4",
-      "timeout": 30,
-      "description": "Step 13 complete: driver picked and assigned from the Vehicles panel",
+      "timeout": 60,
+      "description": "Step 14b (Assign Driver): driver assigned from the Vehicles panel, then the clock advances so the driver walks to the hauler and boards it",
       "interaction": [
         {
           "type": "clickSelector",
           "selector": "#bs-vehicle-panel .bs-vehicle-assign-btn"
+        },
+        {
+          "type": "command",
+          "command": "tick 30"
         },
         {
           "type": "wait",
@@ -422,7 +451,7 @@
     {
       "command": "build freight_warehouse at:4,4",
       "timeout": 30,
-      "description": "Step 14 complete: warehouse placed by clicking a tile in the Build panel picker",
+      "description": "Step 15 (Build Storage): warehouse placed by picking a tile inside the build region in the Build panel picker",
       "interaction": [
         {
           "type": "clickSelector",
@@ -442,10 +471,6 @@
           "z": 4
         },
         {
-          "type": "wait",
-          "durationMs": 200
-        },
-        {
           "type": "clickSelector",
           "selector": "#bs-tile-select-confirm"
         },
@@ -456,9 +481,36 @@
       ]
     },
     {
+      "command": "vehicle haul 1 fragment:1",
+      "timeout": 90,
+      "description": "Step 16 (Haul Debris): the Vehicles panel's Haul button dispatches the hauler at the blasted rock; advance the clock so it drives out, loads, and returns to the depot — stored mass rising is what advances the card",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel .bs-vehicle-haul-btn"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-vehicle-haul-btn"
+        },
+        {
+          "type": "command",
+          "command": "tick 40"
+        },
+        {
+          "type": "wait",
+          "durationMs": 500
+        }
+      ]
+    },
+    {
       "command": "contract deliver 1 amount:5000",
-      "timeout": 30,
-      "description": "Step 15 complete: deliver against the contract accepted at step 12. The step advances on completedHistory growing, so the delivery has to finish a contract — do not accept a second offer first, which puts an empty contract's Deliver button first in the panel and delivers against stock that was never hauled.",
+      "timeout": 60,
+      "description": "Step 17 (Deliver Contract): deliver the hauled stock against the contract accepted at step 12",
       "interaction": [
         {
           "type": "clickSelector",
@@ -476,56 +528,34 @@
           "selector": "#bs-contract-panel .bs-contract-deliver"
         },
         {
+          "type": "command",
+          "command": "tick 5"
+        },
+        {
           "type": "wait",
-          "durationMs": 2000
+          "durationMs": 800
         }
       ]
     },
     {
-      "command": "build_ramp start:4,4 end:4,18",
+      "command": "state",
       "timeout": 30,
-      "description": "Step 17 complete: ramp carved by dragging a run in the Build panel picker",
+      "description": "Steps 18-19 (Finances, Needs): both cards auto-advance on their own timer once delivery lands — give them wall-clock time to pass before the next click",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"build\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-build-panel .bs-build-ramp-btn"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-tile-select-confirm"
-        },
-        {
-          "type": "dragTiles",
-          "x1": 4,
-          "z1": 4,
-          "x2": 4,
-          "z2": 18
+          "type": "command",
+          "command": "state"
         },
         {
           "type": "wait",
-          "durationMs": 200
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-tile-select-confirm"
-        },
-        {
-          "type": "wait",
-          "durationMs": 2500
+          "durationMs": 8000
         }
       ]
     },
     {
       "command": "set_policy mode:shift_8h",
       "timeout": 30,
-      "description": "Step 19 complete: shift schedule changed in the Settings panel",
+      "description": "Step 20 (Set Policy): shift schedule changed from the Settings panel",
       "interaction": [
         {
           "type": "clickSelector",
@@ -533,14 +563,10 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-policy-shift"
+          "selector": "#bs-policy-apply"
         },
         {
           "type": "screenshot"
-        },
-        {
-          "type": "command",
-          "command": "set_policy mode:shift_8h"
         },
         {
           "type": "clickSelector",
@@ -548,14 +574,14 @@
         },
         {
           "type": "wait",
-          "durationMs": 600
+          "durationMs": 500
         }
       ]
     },
     {
       "command": "tick 6",
       "timeout": 60,
-      "description": "Step 20 complete: clock advances more than 5 ticks",
+      "description": "Step 21 (Let Time Run): advance the clock more than 5 ticks so production ticks over",
       "interaction": [
         {
           "type": "command",
@@ -570,7 +596,7 @@
     {
       "command": "campaign complete",
       "timeout": 30,
-      "description": "Step 21 complete: level ends, card shows Tutorial Complete",
+      "description": "Step 22 complete: level ends, card shows Tutorial Complete",
       "interaction": [
         {
           "type": "command",
@@ -593,7 +619,7 @@
         },
         {
           "type": "wait",
-          "durationMs": 4500
+          "durationMs": 2000
         }
       ]
     }
