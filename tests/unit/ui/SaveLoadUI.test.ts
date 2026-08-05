@@ -10,8 +10,8 @@ function makeBackend(): SaveBackend & { store: Map<string, { meta: SaveMeta; dat
   const store = new Map<string, { meta: SaveMeta; data: string }>();
   return {
     store,
-    async save(slotId, name, data, summary) {
-      store.set(slotId, { meta: { slotId, name, timestamp: Date.now(), campaignSummary: summary }, data });
+    async save(slotId, name, data, summary, levelId) {
+      store.set(slotId, { meta: { slotId, name, timestamp: Date.now(), version: 1, campaignSummary: summary, levelId }, data });
     },
     async load(slotId) {
       const entry = store.get(slotId);

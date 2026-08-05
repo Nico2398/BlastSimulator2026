@@ -10,6 +10,8 @@ export interface SaveMeta {
   version: number;
   /** Snapshot of campaign progress for the save list UI. */
   campaignSummary: string;
+  /** The active campaign level at save time, or null for a sandbox game. */
+  levelId: string | null;
 }
 
 /** A saved slot with metadata and serialized game state. */
@@ -24,7 +26,7 @@ export interface SaveSlot {
  */
 export interface SaveBackend {
   /** Save serialized state to a slot. */
-  save(slotId: string, name: string, data: string, campaignSummary: string): Promise<void>;
+  save(slotId: string, name: string, data: string, campaignSummary: string, levelId: string | null): Promise<void>;
 
   /** Load a saved slot by ID. Returns null if not found. */
   load(slotId: string): Promise<SaveSlot | null>;

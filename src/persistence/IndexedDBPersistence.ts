@@ -27,13 +27,14 @@ function txn(db: IDBDatabase, mode: IDBTransactionMode): IDBObjectStore {
 }
 
 export class IndexedDBPersistence implements SaveBackend {
-  async save(slotId: string, name: string, data: string, campaignSummary: string): Promise<void> {
+  async save(slotId: string, name: string, data: string, campaignSummary: string, levelId: string | null): Promise<void> {
     const meta: SaveMeta = {
       slotId,
       name,
       timestamp: Date.now(),
       version: SAVE_VERSION,
       campaignSummary,
+      levelId,
     };
     const slot: SaveSlot = { meta, data };
     const db = await openDB();

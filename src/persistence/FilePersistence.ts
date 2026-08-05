@@ -22,13 +22,14 @@ export class FilePersistence implements SaveBackend {
     return path.join(this.dir, `${safe}.json`);
   }
 
-  async save(slotId: string, name: string, data: string, campaignSummary: string): Promise<void> {
+  async save(slotId: string, name: string, data: string, campaignSummary: string, levelId: string | null): Promise<void> {
     const meta: SaveMeta = {
       slotId,
       name,
       timestamp: Date.now(),
       version: SAVE_VERSION,
       campaignSummary,
+      levelId,
     };
     const slot: SaveSlot = { meta, data };
     fs.writeFileSync(this.slotPath(slotId), JSON.stringify(slot), 'utf-8');
