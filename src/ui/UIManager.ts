@@ -16,6 +16,7 @@ import { FleetPanel } from './panels/FleetPanel.js';
 import { CrewPanel } from './panels/CrewPanel.js';
 import { EventModal } from './panels/EventModal.js';
 import { SurveyPanel } from './panels/SurveyPanel.js';
+import { ShadyPanel } from './panels/ShadyPanel.js';
 import { SettingsMenu } from './SettingsMenu.js';
 import { MiniMap } from './MiniMap.js';
 import { TopBar } from './shell/TopBar.js';
@@ -24,6 +25,7 @@ import { Toasts } from './shell/Toasts.js';
 import { ActivityLog } from './shell/ActivityLog.js';
 import { NotificationCenter, type NotifyInput } from './notify/NotificationCenter.js';
 import type { PlacementKit } from './scene/PlacementKit.js';
+import { t } from '../core/i18n/I18n.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { WeatherCycleState } from '../core/weather/WeatherCycle.js';
 import type { Random } from '../core/math/Random.js';
@@ -32,7 +34,7 @@ import type { CommandResult } from '../console/ConsoleRunner.js';
 
 export type GameConsoleFn = (cmd: string) => CommandResult;
 
-export type PanelName = 'blast' | 'contracts' | 'finances' | 'ops' | 'build' | 'vehicles' | 'employees' | 'survey' | 'settings';
+export type PanelName = 'blast' | 'contracts' | 'finances' | 'ops' | 'build' | 'vehicles' | 'employees' | 'survey' | 'shady' | 'settings';
 
 export class UIManager {
   private readonly topBar: TopBar;
@@ -52,11 +54,14 @@ export class UIManager {
   private readonly crewPanel: CrewPanel;
   private readonly eventModal: EventModal;
   private readonly surveyPanel: SurveyPanel;
+  private readonly shadyPanel: ShadyPanel;
   private readonly settingsMenu: SettingsMenu;
   private readonly miniMap: MiniMap;
 
   private activePanel: PanelName | null = null;
   private onLanguageChange?: (lang: string) => void;
+  /** One-shot guard for the "A new contact" toast — fires once, the moment the rail icon itself reveals. */
+  private shadyRevealed = false;
   /** Escape-key handlers, most-recently-registered first. Each returns true if it consumed the key. */
   private readonly escLayers: Array<() => boolean> = [];
 
@@ -123,6 +128,9 @@ export class UIManager {
     this.crewPanel.setConfirmHandler(config => this.confirmModal.show(config));
     this.surveyPanel = new SurveyPanel(leftCol);
     this.surveyPanel.setCloseHandler(() => this.hideAllPanels());
+    this.shadyPanel = new ShadyPanel(leftCol);
+    this.shadyPanel.setCloseHandler(() => this.hideAllPanels());
+    this.shadyPanel.setConfirmHandler(config => this.confirmModal.show(config));
     // Settings appended to root container so its z-index:10000 beats the main menu (z-index:9999).
     // Inside leftCol's fixed stacking context it would be capped at z:100 relative to root.
     this.settingsMenu = new SettingsMenu(container);
@@ -192,6 +200,7 @@ export class UIManager {
     this.crewPanel.setGameConsole(fn);
     this.eventModal.setGameConsole(fn);
     this.surveyPanel.setGameConsole(fn);
+    this.shadyPanel.setGameConsole(fn);
     this.settingsMenu.setGameConsole(fn);
   }
 
@@ -274,6 +283,7 @@ export class UIManager {
     this.fleetPanel.refreshLocale();
     this.crewPanel.refreshLocale();
     this.surveyPanel.refreshLocale();
+    this.shadyPanel.refreshLocale();
     this.settingsMenu.refreshLocale();
     this.miniMap.refreshLocale();
     this.eventModal.refreshLocale();
@@ -298,6 +308,18 @@ export class UIManager {
     // game, fresh ramp, blast).
     this.miniMap.setNavGrid(state.navGrid ?? null);
     this.miniMap.update(state);
+    this.toolRail.update(state);
+
+    // Fires once, the same tick the rail icon itself reveals — never before
+    // (nothing to open yet) and never again (the guard latches).
+    if (!this.shadyRevealed && (state.corruption.level > 0 || state.corruption.mafiaUnlocked)) {
+      this.shadyRevealed = true;
+      this.notify({
+        severity: 'warn', icon: 'shady',
+        title: t('ui.shady.reveal_title'), body: t('ui.shady.reveal_body'),
+        cta: t('ui.shady.reveal_cta'), onCta: () => this.showPanel('shady'),
+      });
+    }
 
     // Update active panel
     if (this.blastUI.visible) this.blastUI.update(state, weather);
@@ -314,6 +336,7 @@ export class UIManager {
     if (this.fleetPanel.visible) this.fleetPanel.update(state);
     if (this.crewPanel.visible) this.crewPanel.update(state);
     if (this.surveyPanel.visible) this.surveyPanel.update(state);
+    if (this.shadyPanel.visible) this.shadyPanel.update(state);
 
     // Event modal — owns its own show/hide from state.events (unlike the
     // panels above). Deferred while BlastReportModal is up: both are
@@ -339,6 +362,7 @@ export class UIManager {
       case 'vehicles': this.fleetPanel.show(); break;
       case 'employees': this.crewPanel.show(); break;
       case 'survey': this.surveyPanel.show(); break;
+      case 'shady': this.shadyPanel.show(); break;
       case 'settings': this.settingsMenu.show(); break;
     }
     this.toolRail.setActive(this.activePanel);
@@ -380,6 +404,7 @@ export class UIManager {
     this.crewPanel.dispose();
     this.eventModal.dispose();
     this.surveyPanel.dispose();
+    this.shadyPanel.dispose();
     this.settingsMenu.dispose();
     this.miniMap.dispose();
   }
@@ -394,6 +419,7 @@ export class UIManager {
     this.fleetPanel.hide();
     this.crewPanel.hide();
     this.surveyPanel.hide();
+    this.shadyPanel.hide();
     this.settingsMenu.hide();
     this.toolRail.setActive(null);
   }

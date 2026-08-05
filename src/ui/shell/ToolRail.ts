@@ -6,11 +6,15 @@
 import { iconEl, type IconName } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import type { PanelName } from '../UIManager.js';
+import type { GameState } from '../../core/state/GameState.js';
 
 interface RailEntry {
   readonly panel: PanelName;
   readonly icon: IconName;
-  readonly labelKey: string;
+  /** Omitted for the unlabeled shady entry — design: no label, no tooltip, no record of what it is. */
+  readonly labelKey?: string;
+  /** Starts hidden; ToolRail.update() reveals it once the condition is met and never hides it again. */
+  readonly revealWhen?: (state: GameState) => boolean;
 }
 
 // Rail label follows the redesign glossary (Crew, not Employees; Fleet, not
@@ -23,6 +27,8 @@ const RAIL_ENTRIES: readonly RailEntry[] = [
   { panel: 'build', icon: 'build', labelKey: 'shell.rail.build' },
   { panel: 'vehicles', icon: 'vehicle', labelKey: 'shell.rail.vehicles' },
   { panel: 'employees', icon: 'crew', labelKey: 'shell.rail.employees' },
+  // No label, no tooltip: the player notices it only once it's there.
+  { panel: 'shady', icon: 'shady', revealWhen: (s) => s.corruption.level > 0 || s.corruption.mafiaUnlocked },
   { panel: 'settings', icon: 'settings', labelKey: 'shell.rail.settings' },
 ];
 
@@ -52,11 +58,14 @@ export class ToolRail {
         'border:1px solid transparent', 'border-radius:5px', 'background:transparent',
         'color:var(--bsx-text-muted)', 'cursor:pointer', 'position:relative',
       ].join(';');
+      if (entry.revealWhen) btn.style.display = 'none';
       btn.appendChild(iconEl(entry.icon, 18));
-      const label = document.createElement('span');
-      label.style.cssText = 'font:700 9px/1 var(--bsx-font-ui);letter-spacing:.06em';
-      this.locale.bindText(label, entry.labelKey);
-      btn.appendChild(label);
+      if (entry.labelKey) {
+        const label = document.createElement('span');
+        label.style.cssText = 'font:700 9px/1 var(--bsx-font-ui);letter-spacing:.06em';
+        this.locale.bindText(label, entry.labelKey);
+        btn.appendChild(label);
+      }
       btn.addEventListener('click', () => onSelect(entry.panel));
       btn.addEventListener('mouseenter', () => { if (this.activePanel !== entry.panel) btn.style.background = 'rgba(255,255,255,.07)'; });
       btn.addEventListener('mouseleave', () => { if (this.activePanel !== entry.panel) btn.style.background = 'transparent'; });
@@ -64,6 +73,15 @@ export class ToolRail {
     }
 
     container.appendChild(this.el);
+  }
+
+  /** Reveal any gated rail entry (currently just 'shady') once its condition is met. Never re-hides. */
+  update(state: GameState): void {
+    for (const entry of RAIL_ENTRIES) {
+      if (!entry.revealWhen || !entry.revealWhen(state)) continue;
+      const btn = this.el.querySelector<HTMLButtonElement>(`button[data-panel="${entry.panel}"]`);
+      if (btn && btn.style.display === 'none') btn.style.display = 'flex';
+    }
   }
 
   /** Highlight the active rail entry (or none) and translate its title tooltip. */

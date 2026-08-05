@@ -76,4 +76,7 @@ export const LOCALE_SHARED_VALUE_ALLOWLIST: string[] = [
   'ui.crew.need_fatigue', // "Fatigue" — same cognate as need.fatigue
   'ui.crew.skill_maxed', // "MAX"
   'ui.saves.auto_chip', // "AUTO" — same cognate as ui.crew.skill_maxed's MAX-style abbreviation
+  'ui.shady.influence_label', // "INFLUENCE"
+  'ui.shady.arrangements_label', // "ARRANGEMENTS"
+  'ui.shady.smuggling_inactive', // "Inactive" — correctly-spelled French (fem. of "inactif", agreeing with "la contrebande")
 ];
