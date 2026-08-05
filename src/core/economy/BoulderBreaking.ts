@@ -12,8 +12,8 @@ import type { Vehicle } from '../entities/Vehicle.js';
 import type { FragmentData } from '../mining/BlastExecution.js';
 import { isOversized, fragmentBoulder, type Boulder } from '../mining/BlastCalc.js';
 import { fragmentApproachCell } from './FragmentApproach.js';
-import { tickVehicle, tickVehicleTaskState } from '../engine/EntityMovementTick.js';
-import { NavGrid } from '../nav/NavGrid.js';
+import { findRequestVehicle, driveTowardFragment, findNearestReachableFragment } from './FragmentTaskLifecycle.js';
+import { tickVehicleTaskState } from '../engine/EntityMovementTick.js';
 import { Random } from '../math/Random.js';
 import { scale, vec3, ZERO } from '../math/Vec3.js';
 
@@ -37,8 +37,9 @@ export function requestBreakBoulder(
   vehicleId: number,
   fragmentId: number,
 ): { success: boolean; error?: string } {
-  const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId);
-  if (!vehicle) return { success: false, error: 'Vehicle not found' };
+  const found = findRequestVehicle(state, vehicleId);
+  if (!found.success) return found;
+  const vehicle = found.vehicle;
   if (vehicle.type !== 'rock_fragmenter') return { success: false, error: 'Vehicle is not a rock fragmenter' };
   if (vehicle.driverId === null) return { success: false, error: 'Vehicle has no driver' };
   if (vehicle.breakPhase !== null) return { success: false, error: 'Vehicle is already breaking a fragment' };
@@ -82,13 +83,8 @@ export function tickBreakProgress(state: GameState, vehicle: Vehicle): number | 
     return null;
   }
 
-  const approach = fragmentApproachCell(tracked.fragment, state, vehicle.id);
-  vehicle.task = 'moving';
-  vehicle.targetX = approach.x;
-  vehicle.targetZ = approach.z;
-  tickVehicle(state, vehicle);
-
-  if (vehicle.x !== vehicle.targetX || vehicle.z !== vehicle.targetZ) {
+  const arrived = driveTowardFragment(state, vehicle, tracked.fragment);
+  if (!arrived) {
     tickVehicleTaskState(vehicle);
     return null;
   }
@@ -155,26 +151,14 @@ export function tickBreakProgress(state: GameState, vehicle: Vehicle): number | 
 export function findReachableOversizedFragment(state: GameState, vehicleId: number): number | null {
   const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId);
   if (!isBreakEligibleVehicle(vehicle)) return null;
-  if (!state.navGrid) return null;
 
-  const reachable = NavGrid.computeReachableSet(state.navGrid, vehicle.x, vehicle.z);
-  if (reachable.size === 0) return null;
-
-  let bestId: number | null = null;
-  let bestDistSq = Infinity;
-  for (const tracked of state.logistics.fragments) {
-    if (tracked.state !== 'on_ground') continue;
-    if (!isOversized(tracked.fragment.volume)) continue;
-    const { x: fx, z: fz } = fragmentApproachCell(tracked.fragment, state, vehicleId);
-    if (!reachable.has(fx, fz)) continue;
-    const distSq = (fx - vehicle.x) ** 2 + (fz - vehicle.z) ** 2;
-    if (distSq < bestDistSq) {
-      bestDistSq = distSq;
-      bestId = tracked.fragment.id;
-    }
-  }
-
-  return bestId;
+  return findNearestReachableFragment(
+    state,
+    vehicleId,
+    vehicle.x,
+    vehicle.z,
+    tracked => isOversized(tracked.fragment.volume),
+  );
 }
 
 /**
