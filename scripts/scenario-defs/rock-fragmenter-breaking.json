@@ -222,16 +222,16 @@
     },
     {
       "command": "vehicle break 2 fragment:1",
-      "description": "Sets break intent only — the fragmenter must still drive to the boulder before breaking it. In interaction mode, a reachable oversized fragment now makes .bs-vehicle-break-btn render for vehicle #2, so the same dispatch happens via a real click.",
+      "description": "Sets break intent only — the fragmenter must still drive to the boulder before breaking it. Command mode dispatches directly. In interaction mode, a reachable oversized fragment makes .bs-vehicle-break-btn render for vehicle #2, and the request is dispatched by a real click on that button — the button's own handler picks the fragment id (the eligibility cache's best reachable oversized fragment, which is fragment #1, the only oversized boulder on the ground) and calls the exact same console command the click handler in vehicleBreakButton.ts fires.",
       "interaction": [
-        {
-          "type": "command",
-          "command": "vehicle break 2 fragment:1"
-        },
         {
           "type": "waitForSelector",
           "selector": ".bs-vehicle-col[data-vehicle-id=\"2\"] .bs-vehicle-break-btn",
-          "timeout": 2000
+          "timeout": 5000
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-vehicle-col[data-vehicle-id=\"2\"] .bs-vehicle-break-btn"
         }
       ]
     },
@@ -266,16 +266,16 @@
     },
     {
       "command": "vehicle haul 1 fragment:64",
-      "description": "Hauls a resulting sub-fragment with the (still-idle) debris_hauler. In interaction mode, this fragment is on_ground and reachable, so .bs-vehicle-haul-btn renders for vehicle #1 and the same dispatch happens via a real click. Fragment id 64 is the first sub-fragment produced by the break at step 20/21 (seed 42, this exact command sequence) — not the stale fragment #2 left over from the original blast, which stays oversized and un-haulable. The scenario step vocabulary has no way to capture an id from a prior step's output, so this is hardcoded; re-derive it (via a 'fragments' step) if any upstream change to blast/break fragment-id assignment shifts it.",
+      "description": "Hauls a resulting sub-fragment with the (still-idle) debris_hauler. Command mode dispatches the hardcoded fragment:64 directly — the first sub-fragment produced by the break at step 20/21 (seed 42, this exact command sequence), not the stale fragment #2 left over from the original blast, which stays oversized and un-haulable; the scenario step vocabulary has no way to capture an id from a prior step's output, so this is hardcoded, and needs re-deriving (via a 'fragments' step) if any upstream change to blast/break fragment-id assignment shifts it. In interaction mode, this fragment is on_ground and reachable, so .bs-vehicle-haul-btn renders for vehicle #1, and the request is dispatched by a real click on that button — the button's own handler picks the fragment id (the eligibility cache's nearest reachable on-ground fragment) and calls the exact same console command the click handler in vehicleHaulButton.ts fires.",
       "interaction": [
-        {
-          "type": "command",
-          "command": "vehicle haul 1 fragment:64"
-        },
         {
           "type": "waitForSelector",
           "selector": ".bs-vehicle-col[data-vehicle-id=\"1\"] .bs-vehicle-haul-btn",
-          "timeout": 2000
+          "timeout": 5000
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-vehicle-col[data-vehicle-id=\"1\"] .bs-vehicle-haul-btn"
         }
       ]
     },
