@@ -15,7 +15,7 @@ import { fragmentApproachCell } from './FragmentApproach.js';
 import { tickVehicle, tickVehicleTaskState } from '../engine/EntityMovementTick.js';
 import { NavGrid } from '../nav/NavGrid.js';
 import { Random } from '../math/Random.js';
-import { scale, ZERO } from '../math/Vec3.js';
+import { scale, vec3, ZERO } from '../math/Vec3.js';
 
 /**
  * True when `vehicle` is a rock_fragmenter with a driver assigned and no
@@ -110,10 +110,21 @@ export function tickBreakProgress(state: GameState, vehicle: Vehicle): number | 
   }
 
   const originalId = tracked.fragment.id;
+  // Computed before the splice below (and against the original fragment's own
+  // id) so a sub-fragment id can never collide with the boulder just removed
+  // or with any other fragment still tracked in logistics — computing this
+  // after the splice would let ids restart low and collide with unrelated
+  // on_ground fragments in a large field.
+  let nextId = Math.max(highestFragmentId(state), originalId) + 1;
   const idx = state.logistics.fragments.indexOf(tracked);
   if (idx >= 0) state.logistics.fragments.splice(idx, 1);
 
-  let nextId = highestFragmentId(state) + 1;
+  // Fixture/parent fragments built by hand (e.g. in tests) may omit
+  // halfExtents even though FragmentData declares it required — fall back to
+  // a cube approximation from the parent's own volume rather than crash.
+  const parentHalfExtents = tracked.fragment.halfExtents
+    ?? vec3(Math.cbrt(boulder.volume) / 2, Math.cbrt(boulder.volume) / 2, Math.cbrt(boulder.volume) / 2);
+
   for (const piece of result.fragments) {
     const factor = Math.cbrt(piece.volume / boulder.volume);
     const newFragment: FragmentData = {
@@ -125,7 +136,7 @@ export function tickBreakProgress(state: GameState, vehicle: Vehicle): number | 
       oreDensities: piece.oreDensities,
       initialVelocity: ZERO,
       isProjection: false,
-      halfExtents: scale(tracked.fragment.halfExtents, factor),
+      halfExtents: scale(parentHalfExtents, factor),
       shapeSeed: rng.nextInt(0, 0x7fffffff),
     };
     state.logistics.fragments.push({ fragment: newFragment, state: 'on_ground', vehicleId: null });

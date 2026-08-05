@@ -120,6 +120,13 @@ describe('Blast → oversized boulder → break in place (#484)', () => {
     expect(assignFragmenter.success).toBe(true);
     for (let i = 0; i < 10; i++) tickCommand(ctx, ['1'], {});
 
+    // The undercharged, wide-spacing blast leaves a whole rubble field (#484
+    // only breaks the ONE targeted boulder), so "the resulting pieces" must
+    // be scoped to fragments that did not exist before the split — every
+    // other on_ground fragment already sitting in the field, oversized or
+    // not, is unrelated and must not be swept into this check.
+    const idsBeforeBreak = new Set(ctx.state!.logistics.fragments.map(f => f.fragment.id));
+
     const breakResult = vehicleCommand(ctx, ['break', String(fragmenterId)], { fragment: String(oversizedId) });
     expect(breakResult.success).toBe(true);
 
@@ -130,7 +137,9 @@ describe('Blast → oversized boulder → break in place (#484)', () => {
     }
     expect(ctx.state!.logistics.fragments.some(f => f.fragment.id === oversizedId)).toBe(false);
 
-    const pieces = ctx.state!.logistics.fragments.filter(f => f.state === 'on_ground');
+    const pieces = ctx.state!.logistics.fragments.filter(
+      f => f.state === 'on_ground' && !idsBeforeBreak.has(f.fragment.id),
+    );
     expect(pieces.length).toBeGreaterThan(0);
 
     let totalVolume = 0;

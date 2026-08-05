@@ -22,11 +22,15 @@ import { OVERSIZED_FRAGMENT_THRESHOLD } from '../../../src/core/mining/BlastCalc
 const SEED = 42;
 const GRID = 64;
 
+// Default volume sits under OVERSIZED_FRAGMENT_THRESHOLD (0.5 m³, see
+// BoulderFragmentation.ts) so plain haul-path fixtures stay haulable by
+// default; tests that specifically exercise the oversized gate (#484)
+// override `.volume` explicitly against the real constant.
 function makeFragment(id: number, x: number, z: number, mass = 1000): FragmentData {
   return {
     id,
     position: { x, y: 0, z },
-    volume: 1.0,
+    volume: 0.3,
     mass,
     rockId: 'cruite',
     oreDensities: {},
