@@ -184,9 +184,6 @@ export const ORE_REPORT_ABSURDIUM_FRACTION = 0.3;
 
 // ─── Mining & Blasting ─────────────────────────────────────────────────────────
 
-/** Max fragments generated per voxel during a blast. Caps fragment count for performance. */
-export const MAX_FRAGMENTS_PER_VOXEL = 20;
-
 /** Maximum fragment volume (m³) that can be hauled directly without secondary fragmentation. */
 export const OVERSIZED_FRAGMENT_THRESHOLD = 0.5;
 
@@ -197,6 +194,66 @@ export const PROJECTION_SPEED_THRESHOLD = 15;
 /** Epsilon for blast energy attenuation formula (prevents division by zero). */
 export const BLAST_ENERGY_EPSILON = 4.0;
 
+/** Energy below this (game energy units) is not worth propagating further, and is
+ *  written off as dissipated. Rock absorption thresholds start at 200, so this is
+ *  four orders of magnitude below anything that could fracture a voxel. */
+export const PROPAGATION_ENERGY_EPSILON = 0.01;
+
+/** Fraction of the energy passing through a voxel that is lost to heat and noise
+ *  rather than handed to its neighbours, as
+ *  `BASE + POROSITY_SCALE × porosity`.
+ *  Porous rock damps a shock wave, dense rock carries it: across the catalog's
+ *  porosity range (0.02–0.35) this spans roughly 9%–22% loss per voxel, which is
+ *  what stops energy travelling forever and gives every blast a finite radius. */
+export const TRANSMISSION_LOSS_BASE = 0.08;
+export const TRANSMISSION_LOSS_POROSITY_SCALE = 0.40;
+
+/** Kilograms of explosive that fill one metre of drill hole. Sets how long a
+ *  charge column is, so a bigger charge works on a taller slice of rock instead
+ *  of pushing harder on the same voxel. */
+export const CHARGE_KG_PER_METRE = 2.0;
+
+/** Converts catalog `energyPerKg` into the energy units voxel absorption thresholds
+ *  are written in. The catalog numbers were tuned against an inverse-square field
+ *  whose epsilon amplified them at close range; propagation conserves energy instead,
+ *  so the conversion is explicit. Calibrated so a well-stemmed pattern breaks a
+ *  realistic volume per kilogram (powder factor ≈ 0.3 kg/m³). */
+export const EXPLOSIVE_ENERGY_SCALE = 10.0;
+
+/** Kinetic energy (in joules) that one unit of blast energy imparts to a fragment
+ *  it throws. Absorption thresholds are a balance scale rather than joules, so
+ *  turning leftover energy into a speed needs an explicit conversion — without one
+ *  a one-cubic-metre, two-tonne fragment could never reach a dangerous speed. */
+export const PROJECTION_ENERGY_TO_KINETIC = 39000.0;
+
+/** Share of a fragment's leftover energy that still throws it when its hole is
+ *  perfectly stemmed. Stemming keeps the gases working on the rock instead of
+ *  venting up the hole, so a well-stemmed shot breaks its burden and drops it,
+ *  while an unstemmed one throws it — the difference between a good blast and
+ *  flyrock over the pit. */
+export const MIN_THROW_FRACTION = 0.05;
+
+/** Fraction of its confined absorption threshold that rock at an open face needs
+ *  before it breaks. Unconfined rock can shear and move instead of being crushed
+ *  in place, which is the whole reason a bench blast breaks its burden out to the
+ *  face rather than carving a sealed pocket underground. */
+export const UNCONFINED_THRESHOLD_FACTOR = 0.35;
+
+/** Metres of rock over a voxel before it counts as fully confined. */
+export const CONFINEMENT_FULL_DEPTH = 6.0;
+
+/** How strongly overflow prefers neighbours that are closer to a free face, per
+ *  metre of relief gained. Spread evenly in all directions, a blast is a sphere
+ *  that stalls at a fixed radius no matter how big the charge; real burden fails
+ *  toward the face, which is what lets a bench blast break out to surface and
+ *  what makes an over-buried charge fail to. */
+export const FREE_FACE_BIAS = 2.0;
+
+/** Thickest cap of intact rock (metres) that a blast can lift off an excavation
+ *  it has undermined. Thicker burden bridges the gap and stays standing, which is
+ *  what makes a charge buried too deep fail to break out to surface. */
+export const BURDEN_BREAKOUT_MAX = 4;
+
 /** Density at/above which a voxel is considered solid ground (0–1 scale). */
 export const SOLID_VOXEL_DENSITY_THRESHOLD = 0.5;
 
@@ -205,40 +262,115 @@ export const SOLID_VOXEL_DENSITY_THRESHOLD = 0.5;
  *  region computation and, expanded further, for TerrainBody's collider-building scope. */
 export const BLAST_ZONE_RADIUS = 5;
 
-/** Maximum crater excavation radius (voxels) around the blast center. Guarantees a
- *  visible crater in the terrain mesh even when the energy field doesn't consistently
- *  fracture surface voxels (attenuation + epsilon dampening). */
-export const CRATER_EXCAVATION_MAX_RADIUS = 5;
+// ─── Fragment generation (blast step 3) ────────────────────────────────────────
 
-/** Number of surface voxels cleared per column during the crater excavation pass. */
-export const CRATER_EXCAVATION_DEPTH_VOXELS = 2;
+/** How many pieces each axis of a broken voxel is diced into before fragments are
+ *  clustered out of them. 2 gives 8 sub-cells of 0.125 m³ — fine enough for
+ *  irregular shapes without making a large blast's clustering pass expensive. */
+export const SUB_CELL_RESOLUTION = 2;
 
-/** Fragment vertical offset (voxels) so blast fragments settle inside the crater
- *  instead of appearing to float at the pre-blast surface level. Offset ranges from
- *  MIN to MIN+SPREAD, hashed per-fragment across HASH_BUCKETS steps. */
-export const FRAGMENT_CRATER_YOFFSET_MIN = 0.2;
-export const FRAGMENT_CRATER_YOFFSET_SPREAD = 0.3;
-export const FRAGMENT_CRATER_YOFFSET_HASH_BUCKETS = 9;
+/** Seed points a barely-broken voxel contributes, and how many more it adds per
+ *  unit of intensity above its breaking point. Below 1 the base means most gently
+ *  broken voxels contribute none at all, so their rock joins a neighbour's
+ *  fragment — which is exactly how an undercharged blast produces boulders. */
+export const SEEDS_BASE = 0.35;
+export const SEEDS_PER_INTENSITY = 0.8;
+
+/** Ceiling on seeds from a single voxel, so one violently overcharged voxel cannot
+ *  produce arbitrarily fine dust. */
+export const MAX_SEEDS_PER_VOXEL = 8;
+
+/** How far (voxels) a sub-cell will look for a seed to belong to. Rock further than
+ *  this from any seed becomes an orphan lump instead. */
+export const SEED_SEARCH_RADIUS = 3;
+
+/** Largest orphan lump (in sub-cells) before it is split. 64 sub-cells is 8 m³ —
+ *  a boulder well past what any hauler can take, which is the intended failure
+ *  state for a blast that barely broke its rock. */
+export const MAX_ORPHAN_COMPONENT_SUBCELLS = 64;
+
+/** Guard on seeds per blast. Not a balance dial: fragment size must follow from the
+ *  blast alone, so this only exists to stop pathological input from allocating
+ *  without bound. Tripping it yields fewer, larger fragments — never less rock. */
+export const MAX_FRAGMENTS_PER_BLAST = 50000;
+
+// ─── Fragment throw and landing (blast step 4) ─────────────────────────────────
+
+/** How much a fragment's direction follows the nearest free face rather than the
+ *  energy gradient. Rock leaves by the face it can reach; the gradient alone would
+ *  drive deep fragments further into solid rock. */
+export const FREE_FACE_WEIGHT = 0.65;
+
+/** Most fragments flown as independent bodies. Past this they are grouped, which
+ *  caps the cost of motion without ever changing how the rock broke — grouped
+ *  fragments split back into their own pieces the moment they land. */
+export const MAX_ACTIVE_PROJECTILES = 256;
+
+/** How close (metres) two fragments must be to travel as one projectile. */
+export const PROJECTILE_GROUP_RADIUS = 2.0;
+
+/** Minimum cosine between two fragments' headings for them to fly together —
+ *  0.8 is about a 37 degree cone. */
+export const PROJECTILE_GROUP_DIR_COS = 0.8;
+
+/** Largest relative speed difference (0–1) between fragments flying together. */
+export const PROJECTILE_GROUP_SPEED_TOL = 0.35;
+
+/** Time step (seconds) when following a projectile's arc to the ground, and the
+ *  longest flight worth tracing before setting the rock down where it got to.
+ *  The limit has to clear the slowest possible flight or fast rock is abandoned
+ *  mid-arc: straight up at MAX_PROJECTION_VELOCITY takes 16.3 s just to come
+ *  back to the height it left, plus the fall into the pit below that. */
+export const BALLISTIC_SAMPLE_DT = 0.05;
+export const BALLISTIC_MAX_T = 30;
+
+/** How widely a landed projectile's fragments scatter around its impact point,
+ *  scaled by its mass. Without this a grouped projectile would drop its whole
+ *  load on one square metre. */
+export const SPLIT_SCATTER_RADIUS = 0.8;
+
+/** Seconds of delay per metre of height before a collapsing fragment starts to
+ *  fall. Rock low in the face gives way first and the burden follows it down, so
+ *  the collapse ripples upward instead of every piece dropping at once. */
+export const COLLAPSE_STAGGER_PER_METRE = 0.04;
+
+// ─── Muck Pile ───────────────────────────────────────────────────────────────
+
+/** Ground area (m²) of one pile column — one voxel footprint. A fragment raises
+ *  the column it lands in by the volume it adds spread over this area, never by
+ *  its own diameter: raising it per *piece* stacks a tower out of gravel. */
+export const PILE_COLUMN_AREA = 1.0;
+
+/** Swell factor of blasted rock. Broken rock traps air, so a cubic metre of
+ *  solid rock occupies about this much once it is loose on the ground. */
+export const RUBBLE_BULKING = 1.4;
+
+/** Smallest height (metres) a fragment adds to its column, so that resting rock
+ *  is never buried inside the pile it just landed on. */
+export const MIN_PILE_RISE = 0.05;
+
+/** How many columns a fragment may roll down before it is left where it is, and
+ *  the slope loose rock holds before it rolls at all — 0.7 m per metre is about
+ *  35 degrees, the angle of repose of muck. Rock rolls one column at a time and
+ *  keeps going while the ground beside it is lower, which is what stops a heap
+ *  from growing into a tower where a lot of rock lands on one spot. */
+export const PILE_SPILL_STEPS = 24;
+export const PILE_REPOSE_STEP = 0.7;
+
+/** How far (metres) a settled fragment's underside may sit above the ground
+ *  before it counts as floating. Loose rock perches on the pieces below it, so a
+ *  little clearance is normal; a metre of it is a bug. */
+export const FLOATING_FRAGMENT_CLEARANCE = 1.0;
+
+/** How far rock may be thrown (metres) before a blast counts as bad, and as
+ *  catastrophic. Distance rather than speed is what matters to the player: rock
+ *  that lands back in its own muck pile is a good blast however fast it left,
+ *  and rock that clears the pit is a danger to everything around it. */
+export const THROW_DISTANCE_BAD = 12;
+export const THROW_DISTANCE_CATASTROPHIC = 25;
 
 /** Minimum fragment render height (voxels) above the grid floor. */
 export const FRAGMENT_MIN_RENDER_Y = 0.05;
-
-/** Horizontal render-only jitter radius (metres) applied to every rendered fragment
- *  instance so fragments sharing a source voxel don't render at the exact same
- *  (x,z) — without this, a large blast's fragments read as a regular voxel-lattice
- *  grid instead of settled rubble. Gameplay-significant FragmentData.position is
- *  never mutated; this only offsets the InstancedMesh transform. */
-export const FRAGMENT_RENDER_JITTER_RADIUS = 0.6;
-
-/** How far (metres per m/s of horizontal initial speed) a projected fragment's
- *  rendered instance is displaced from its source voxel along its initial
- *  velocity direction, suggesting the ballistic throw distance without running
- *  full physics on every fragment. */
-export const FRAGMENT_PROJECTION_RENDER_DISTANCE_SCALE = 0.15;
-
-/** Cap (metres) on the projection render-displacement above, so a very high
- *  velocity fragment still renders within the visible blast/crater area. */
-export const FRAGMENT_PROJECTION_RENDER_MAX_DISTANCE = 12;
 
 /** Default minimum search radius (metres) for the expanding-ring terrain-surface
  *  search in getBlastOriginSurfaceY (BlastOriginSampling.ts). A fixed 3m ring only
@@ -260,26 +392,14 @@ export const MAX_PROPAGATION_ITERATIONS = 500;
 /** Energy must reach this multiple of a voxel's threshold to fragment it. */
 export const FRAGMENTATION_MULTIPLIER = 1.0;
 
-/** Scale factor for fragmentation score: F(v) = FRAGMENTATION_SCORE_SCALE * (effectiveEnergy / threshold)
- *  3.0 means a voxel at threshold (ratio=1.0) produces 3 fragments on average.
- *  Real blasting: Kuz-Ram model predicts fragment sizes; this is a gameplay-simplified scale. */
-export const FRAGMENTATION_SCORE_SCALE = 3.0;
+/** Fraction of its threshold a voxel must retain to be cracked without breaking.
+ *  Below this the rock is unaffected; between this and FRAGMENTATION_MULTIPLIER it
+ *  survives the blast but is left weakened. */
+export const CRACKED_VOXEL_ENERGY_RATIO = 0.5;
 
-/** Maximum total Voronoi seed points before culling lowest-score voxels.
- *  Performance guard to prevent O(n log n) Delaunay from exploding.
- *  Culling logic is in task 5.9 (Bowyer-Watson implementation). */
-export const MAX_VORONOI_POINTS = 2000;
-
-/** Probability (0–1) that a Voronoi cell merges with a face-adjacent neighbour
- *  during the merging pass (task 5.10). 0.35 means ~35% of cells attempt to merge.
- *  The merged shape is the convex hull of both cells' vertices.
- *  Real blasting produces non-convex fragments; merging simulates this naturally. */
-export const MERGE_PROBABILITY = 0.35;
-
-/** Distance (in metres) to deflate collision mesh vertices inward toward centroid.
- *  Creates a small gap between visual and collision meshes to prevent physics catching
- *  on visual edges. 0.05 m = 5 cm for 1 m voxels. */
-export const COLLISION_DEFLATE_AMOUNT = 0.05;
+/** Multiplier applied to a cracked voxel's fracture modifier, so rock that took a
+ *  near-miss gives way more easily to the next blast. */
+export const CRACKED_VOXEL_WEAKENING = 0.7;
 
 /** Edge length of one voxel in centimetres. Voxels are 1 m³ (see world/VoxelGrid),
  *  so a fragment's size fraction of a voxel converts to cm by this factor —
@@ -306,11 +426,6 @@ export const SURFACE_PROXIMITY_DECAY = 0.5;
 export const MAX_PROJECTION_VELOCITY = 80;
 /** Velocity threshold (m/s) below which fragment is classified 'collapse'. */
 export const PROJECTION_VELOCITY_THRESHOLD = 2.0;
-
-/** Velocity threshold (m/s) below which a fragment is considered stationary for sleep detection. */
-export const SLEEP_VELOCITY_THRESHOLD = 0.1;
-/** Number of consecutive ticks a fragment must be below sleep velocity to become 'static'. */
-export const SLEEP_TICKS_REQUIRED = 15;
 
 // ─── Game Loop ──────────────────────────────────────────────────────────────────
 
@@ -819,22 +934,8 @@ export const SEISMIC_SURVEY_DAMAGE_HP = 10;
 
 // ─── Physics ────────────────────────────────────────────────────────────────────
 
-/** Maximum fragments that get full Cannon-es rigid-body simulation. Rest use parabolic fallback. */
-export const PHYSICS_FRAGMENT_CAP = 200;
-
 /** Gravitational acceleration (m/s²). Negative = downward. */
 export const GRAVITY = -9.81;
-
-/** Physics timestep in seconds per step. */
-export const PHYSICS_STEP_DT = 1 / 60;
-/** Maximum physics simulation steps before forced stop. */
-export const PHYSICS_MAX_STEPS = 600;
-/** Speed threshold (m/s) below which a body is considered settled. */
-export const PHYSICS_SETTLE_SPEED = 0.1;
-/** Fraction of bodies that must be settled before sim stops early. */
-export const PHYSICS_SETTLE_FRACTION = 0.95;
-/** Vertical offset above terrain surface for fragment landing position (metres). */
-export const PHYSICS_TERRAIN_CLEARANCE = 1.0;
 
 /** Minimum horizontal overlap ratio (0–1) for a fragment to be considered "supported by" another. */
 export const FRAGMENT_HORIZONTAL_OVERLAP_TOLERANCE = 0.5;

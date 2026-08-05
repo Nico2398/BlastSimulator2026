@@ -1,14 +1,7 @@
 // BlastSimulator2026 — Fragment render sampling helpers
-// Split out of FragmentMesh.ts (file-size convention) — these are pure,
-// render-only helpers that pick which fragments to draw and where to draw
-// them, without touching gameplay-significant FragmentData.
-
-import type { FragmentData } from '../core/mining/BlastExecution.js';
-import {
-  FRAGMENT_RENDER_JITTER_RADIUS,
-  FRAGMENT_PROJECTION_RENDER_DISTANCE_SCALE,
-  FRAGMENT_PROJECTION_RENDER_MAX_DISTANCE,
-} from '../core/config/balance.js';
+// Split out of FragmentMesh.ts (file-size convention) — pure, render-only
+// helpers that pick which fragments to draw when a blast produces more than
+// the instance budget, without touching gameplay-significant FragmentData.
 
 /** Deterministic 0..1 hash of an integer seed — not gameplay randomness, just
  *  per-fragment render variety (kept stable across re-renders of the same id). */
@@ -39,32 +32,4 @@ export function sampleEvenly<T>(items: readonly T[], max: number): T[] {
     sampled[i] = items[idx]!;
   }
   return sampled;
-}
-
-/**
- * Render-only (x, z) offset for a fragment's InstancedMesh transform.
- * Does not touch `FragmentData.position`, which gameplay logic (debris hauler
- * travel, projection impact damage) still reads unmodified.
- */
-export function computeRenderScatter(frag: FragmentData): { x: number; z: number } {
-  const jx = (hash01(frag.id * 2 + 1) - 0.5) * 2 * FRAGMENT_RENDER_JITTER_RADIUS;
-  const jz = (hash01(frag.id * 2 + 2) - 0.5) * 2 * FRAGMENT_RENDER_JITTER_RADIUS;
-  let x = frag.position.x + jx;
-  let z = frag.position.z + jz;
-
-  if (frag.isProjection) {
-    const vx = frag.initialVelocity.x;
-    const vz = frag.initialVelocity.z;
-    const horizSpeed = Math.hypot(vx, vz);
-    if (horizSpeed > 1e-6) {
-      const dist = Math.min(
-        FRAGMENT_PROJECTION_RENDER_MAX_DISTANCE,
-        horizSpeed * FRAGMENT_PROJECTION_RENDER_DISTANCE_SCALE,
-      );
-      x += (vx / horizSpeed) * dist;
-      z += (vz / horizSpeed) * dist;
-    }
-  }
-
-  return { x, z };
 }

@@ -211,7 +211,14 @@ describe('Tutorial Level — Contract Delivery', () => {
     const collectedOreBeforeHaul = Object.values(ctx.state!.collectedOre).reduce((s, v) => s + v, 0);
     expect(ctx.state!.logistics.storedMassKg).toBe(0);
 
-    haulFragmentToStorage(vehicleId, 0);
+    // Haul a fragment that actually carries ore. Ore sits in veins, so only
+    // some of a blast's fragments hold any — which one that is depends on where
+    // the veins run, not on anything this test is asserting.
+    const oreBearing = ctx.state!.logistics.fragments
+      .find(f => Object.values(f.fragment.oreDensities).some(d => d > 0));
+    expect(oreBearing, 'blast produced no ore-bearing fragment to haul').toBeDefined();
+
+    haulFragmentToStorage(vehicleId, oreBearing!.fragment.id);
 
     // Storage now holds the hauled fragment's mass.
     expect(ctx.state!.logistics.storedMassKg).toBeGreaterThan(0);

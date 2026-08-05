@@ -132,7 +132,7 @@ describe('tutorial stage table', () => {
     // is the bug this whole table exists to fix.
     for (const stepId of [
       'hire-surveyor', 'survey', 'drill-plan', 'blast', 'contract-accept',
-      'vehicle-buy-assign', 'build-storage', 'haul-debris', 'build-ramp', 'set-policy',
+      'vehicle-buy-assign', 'build-storage', 'haul-debris', 'box-cut', 'set-policy',
     ]) {
       expect(TUTORIAL_STAGES[stepId]!.length, `${stepId} should be multi-stage`)
         .toBeGreaterThan(1);

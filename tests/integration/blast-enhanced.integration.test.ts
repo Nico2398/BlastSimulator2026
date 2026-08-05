@@ -13,14 +13,17 @@ import { executeBlast } from '../../src/core/mining/BlastExecution.js';
 import type { VillagePosition } from '../../src/core/mining/BlastExecution.js';
 import {
   computeThreshold,
-  propagateEnergy,
-  identifyFragmentedVoxels,
-  calculateFragmentation,
-  calculateInitialVelocity,
-  classifyProjection,
   calculateHoleEnergy,
   computeInitialEnergy,
 } from '../../src/core/mining/BlastCalc.js';
+import {
+  createEnergyField,
+  seedEnergy,
+  effectiveAt,
+  overflowAt,
+  intensityAt,
+} from '../../src/core/mining/EnergyPropagation.js';
+import { identifyFragmentedVoxels } from '../../src/core/mining/VoxelFragmentation.js';
 import { vec3 } from '../../src/core/math/Vec3.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
@@ -119,40 +122,26 @@ describe('Blast enhanced', () => {
 
   // ── 2. Energy propagation ─────────────────────────────────────────────────
 
-  it('energy propagates through rock decreasing with distance', () => {
-    const grid = new VoxelGrid(10, 5, 10);
-    fillRegion(grid, 'cruite', 0, 9, 0, 4, 0, 9);
+  it('energy propagates through rock, decreasing with distance', () => {
+    const grid = new VoxelGrid(15, 15, 15);
+    fillRegion(grid, 'cruite', 0, 14, 0, 14, 0, 14);
 
-    // Calculate hole energy for a single boomite 8kg charge
     const holeEnergy = calculateHoleEnergy({ explosiveId: 'boomite', amountKg: 8, stemmingM: 2 });
-    expect(holeEnergy).toBe(340 * 8); // 2720
+    expect(holeEnergy).toBe(340 * 8);
 
-    // Inject large energy at the centre voxel (3× the single-hole energy)
-    const initialEnergy = new Map<string, number>();
-    initialEnergy.set('5,1,5', holeEnergy * 3);
-    const result = propagateEnergy(grid, initialEnergy);
+    const field = createEnergyField(grid, {
+      minX: 0, minY: 0, minZ: 0, maxX: 15, maxY: 15, maxZ: 15,
+    });
+    seedEnergy(field, [{ x: 7, y: 7, z: 7, energy: holeEnergy * 30 }]);
 
-    // Energy should have spread to multiple voxels
-    expect(result.effectiveEnergy.size).toBeGreaterThan(0);
+    // The charged voxel is saturated at cruite's absorption, and the energy it
+    // could not hold has moved outward.
+    expect(effectiveAt(field, 7, 7, 7)).toBeGreaterThan(0);
+    expect(overflowAt(field, 7, 7, 7)).toBeGreaterThan(0);
+    expect(effectiveAt(field, 9, 7, 7)).toBeGreaterThan(effectiveAt(field, 13, 7, 7));
 
-    // The source voxel should be saturated (cruite threshold = 200)
-    expect(result.effectiveEnergy.has('5,1,5')).toBe(true);
-    expect(result.effectiveEnergy.get('5,1,5')).toBeCloseTo(200, 0);
-
-    // At least some neighbours should have received energy
-    const neighbours = ['6,1,5', '4,1,5', '5,1,6', '5,1,4'];
-    const hasNeighbour = neighbours.some(nk => result.effectiveEnergy.has(nk));
-    expect(hasNeighbour).toBe(true);
-
-    // Overflow should have been generated (energy that spilled past neighbours)
-    expect(result.generatedOverflow.size).toBeGreaterThan(0);
-
-    // identifyFragmentedVoxels should find the source voxel and its neighbours
-    const fragmented = identifyFragmentedVoxels(grid, result);
-    expect(fragmented.has('5,1,5')).toBe(true);
-    // At least one neighbour should also be fragmented
-    const fragmentedNeighbours = neighbours.filter(nk => fragmented.has(nk));
-    expect(fragmentedNeighbours.length).toBeGreaterThan(0);
+    const fragmentation = identifyFragmentedVoxels(field, grid);
+    expect(fragmentation.fragmented.length).toBeGreaterThan(1);
   });
 
   // ── 3. Mixed-rock blast ───────────────────────────────────────────────────
@@ -289,59 +278,22 @@ describe('Blast enhanced', () => {
 
   // ── 9. Fragmentation classification ───────────────────────────────────────
 
-  it('calculateFragmentation classifies based on energy ratio', () => {
-    // ratio >= 4 → isProjection = true
-    const proj = calculateFragmentation(2000, 500);
-    expect(proj.isProjection).toBe(true);
-    expect(proj.result).toBe('fractured');
-    expect(proj.energyRatio).toBeCloseTo(4, 1);
+  it('rates how hard rock was hit by the energy that passed through it', () => {
+    const grid = new VoxelGrid(15, 15, 15);
+    fillRegion(grid, 'cruite', 0, 14, 0, 14, 0, 14);
 
-    // ratio < 0.5 → unaffected
-    const unaffected = calculateFragmentation(100, 500);
-    expect(unaffected.result).toBe('unaffected');
-    expect(unaffected.isProjection).toBe(false);
+    const field = createEnergyField(grid, {
+      minX: 0, minY: 0, minZ: 0, maxX: 15, maxY: 15, maxZ: 15,
+    });
+    seedEnergy(field, [{ x: 7, y: 7, z: 7, energy: 200 * 400 }]);
 
-    // 0.5 <= ratio < 1.0 → cracked
-    const cracked = calculateFragmentation(300, 500);
-    expect(cracked.result).toBe('cracked');
-    expect(cracked.isProjection).toBe(false);
-
-    // 1.0 <= ratio < 2.0 → fractured, not projected
-    const fractured = calculateFragmentation(750, 500);
-    expect(fractured.result).toBe('fractured');
-    expect(fractured.isProjection).toBe(false);
-    expect(fractured.fragmentSizeFraction).toBeGreaterThan(0.3);
-
-    // ratio 0 → still unaffected
-    const zero = calculateFragmentation(0, 500);
-    expect(zero.result).toBe('unaffected');
-
-    // threshold 0 → unaffected (no rock = no fracture possible)
-    const noThreshold = calculateFragmentation(1000, 0);
-    expect(noThreshold.result).toBe('unaffected');
-
-    // --- calculateInitialVelocity ---
-
-    // Fragment at (6,1,6) with hole at (5,1,5): direction should be (1,0,1) normalised
-    const vel = calculateInitialVelocity(vec3(6, 1, 6), vec3(5, 1, 5), 1000, 10);
-    expect(vel.x).toBeGreaterThan(0);
-    expect(vel.z).toBeGreaterThan(0);
-    // Speed: sqrt(2 * 1000 / 10) = sqrt(200) ≈ 14.14
-    const speed = Math.sqrt(vel.x * vel.x + vel.y * vel.y + vel.z * vel.z);
-    expect(speed).toBeCloseTo(14.14, 0);
-
-    // --- classifyProjection ---
-
-    // Speed > PROJECTION_SPEED_THRESHOLD (15) → projection
-    expect(classifyProjection(20, 2)).toBe(true);
-    // Energy ratio >= 4 → projection (even with low speed)
-    expect(classifyProjection(10, 5)).toBe(true);
-    // Neither → not a projection
-    expect(classifyProjection(10, 2)).toBe(false);
-    expect(classifyProjection(0, 0)).toBe(false);
+    // Retained energy alone cannot tell these apart — absorption stops at the
+    // threshold, so every broken voxel reads exactly 1.0. Intensity counts what
+    // passed through, so rock beside the charge reads far higher than rock at
+    // the edge of the break.
+    expect(intensityAt(field, 7, 7, 7)).toBeGreaterThan(intensityAt(field, 10, 7, 7));
+    expect(intensityAt(field, 7, 7, 7)).toBeGreaterThan(1);
   });
-
-  // ── 10. Terrain clearing ──────────────────────────────────────────────────
 
   it('blast clears terrain voxels around charge', () => {
     const grid = new VoxelGrid(30, 15, 30);

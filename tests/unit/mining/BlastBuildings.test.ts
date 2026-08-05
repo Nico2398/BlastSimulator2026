@@ -35,7 +35,7 @@ import {
 
 /**
  * Fill a rectangular region of the VoxelGrid with solid cruite rock.
- * cruite: hardnessTier 1, fractureThreshold 200 — softest rock; easy to blast.
+ * cruite: hardnessTier 1, energyAbsorption 200 — softest rock; easy to blast.
  */
 function fillRegion(
   grid: VoxelGrid,
@@ -57,7 +57,7 @@ function fillRegion(
 /**
  * Build a fully-charged, sequenced BlastPlan from a set of DrillHoles.
  * Uses dynatomics (1300 energy/kg × 5 kg = 6500 raw energy) — more than
- * enough to fracture cruite (fractureThreshold 200) anywhere in the blast zone.
+ * enough to fracture cruite (energyAbsorption 200) anywhere in the blast zone.
  */
 function makeBlastPlan(holes: DrillHole[]) {
   const holeIds = holes.map(h => h.id);

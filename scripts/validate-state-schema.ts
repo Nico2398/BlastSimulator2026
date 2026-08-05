@@ -78,6 +78,7 @@ export const GAME_STATE_SCHEMA: Schema = {
   arrested: { type: 'boolean', description: 'Loss condition' },
   cash: { type: 'number' },
   profit: { type: 'number', description: 'Total wealth accumulated this level' },
+  muckPile: { type: 'object', optional: true, description: 'Fragment size, speed and clearance spread after a blast' },
 };
 
 /** UI state schema — mirrors window.__uiState() in src/main.ts. */

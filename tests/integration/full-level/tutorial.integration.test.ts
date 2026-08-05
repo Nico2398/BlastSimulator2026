@@ -187,12 +187,13 @@ describe('Tutorial Level — Full Walkthrough', () => {
     // these are the exact two primitives HaulingTask.tickHaulingProgress
     // calls internally on arrival.
     const groundFragments = ctx.state!.logistics.fragments.filter(f => f.state === 'on_ground');
-    let stored = 0;
     for (const f of groundFragments) {
-      if (stored >= 500) break;
-      pickupFragment(ctx.state!.logistics, f.fragment.id, 'vehicle-test');
+      if (ctx.state!.logistics.storedMassKg >= 500) break;
+      // A blast throws off boulders heavier than an early warehouse holds, and
+      // pickupFragment turns those away — so count what actually landed in
+      // storage rather than what was attempted.
+      if (!pickupFragment(ctx.state!.logistics, f.fragment.id, 'vehicle-test')) continue;
       deliverToDepot(ctx.state!.logistics, f.fragment.id, ctx.state!.collectedOre);
-      stored += f.fragment.mass;
     }
     expect(ctx.state!.logistics.storedMassKg).toBeGreaterThanOrEqual(500);
 

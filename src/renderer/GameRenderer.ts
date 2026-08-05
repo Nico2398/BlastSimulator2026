@@ -27,6 +27,7 @@ import { Fireflies } from './ambient/Fireflies.js';
 import { createAmbientUniforms, type AmbientUniforms } from './ambient/AmbientUniforms.js';
 import { FragmentMesh } from './FragmentMesh.js';
 import { BlastEffects } from './BlastEffects.js';
+import { FragmentAnimator } from './FragmentAnimator.js';
 import { LandscapeMesh, type PlayableCut } from './terrain/LandscapeMesh.js';
 import { WorldBorderWall } from './WorldBorderWall.js';
 import { BlastPlanOverlay } from './BlastPlanOverlay.js';
@@ -80,6 +81,7 @@ export class GameRenderer {
   /** Shared {uTime, uWind} object every ambient shader material references (#458 T7.2/A26) — level-independent, created once. */
   private readonly ambientUniforms: AmbientUniforms = createAmbientUniforms();
   private fragments: FragmentMesh | null = null;
+  private fragmentAnimator: FragmentAnimator | null = null;
   private blastEffects: BlastEffects | null = null;
   private landscape: LandscapeMesh | null = null;
   /** Kept so a claim can re-cut the landscape without rebuilding the (expensive) landscape map. */
@@ -215,9 +217,36 @@ export class GameRenderer {
     );
   }
 
+  /**
+   * Jump the collapse straight to its end, leaving every fragment on the resting
+   * place the blast already chose for it.
+   *
+   * The animation only ever walks rock to a destination core decided, so cutting
+   * it short changes nothing about the game — which is what makes it safe for a
+   * harness to do. Without a GPU a frame costs seconds while the animation clock
+   * advances at most 0.1 s per frame, so a screenshot of a settled muck pile is
+   * otherwise minutes of wall clock away.
+   */
+  skipFragmentPlayback(): void {
+    this.fragmentAnimator?.finish();
+  }
+
+  /** Hold the collapse `t` seconds in, for a harness stepping through it. */
+  seekFragmentPlayback(t: number): void {
+    this.fragmentAnimator?.seek(t);
+  }
+
+  /** How long the last blast's collapse runs for, in seconds. */
+  get fragmentPlaybackDuration(): number {
+    return this.fragmentAnimator?.durationS ?? 0;
+  }
+
   /** Per-frame update — call from the render loop. */
   update(dt: number): void {
     const cam = this.sm.camera;
+
+    // Rock still falling from the last blast.
+    this.fragmentAnimator?.update(dt);
 
     if (this.skybox) {
       this.skybox.update(dt, cam.position.x, cam.position.z, this.sm.cameraController.distance);
@@ -495,10 +524,14 @@ export class GameRenderer {
     // which main.ts's subscription turns into rebuildTerrain() synchronously
     // before this method ever runs (#458 T0.2) — no longer this method's job.
 
-    // Spawn fragment meshes for the blasted rock
+    // Spawn fragment meshes for the blasted rock, then play the collapse.
+    // spawnFragments places them where they came to rest; the animator walks
+    // them there from where they broke, so the player sees the face come down
+    // instead of a finished muck pile appearing at the moment of detonation.
     if (this.fragments && ctx.lastBlastFragmentData && ctx.lastBlastFragmentData.length > 0) {
       this.fragments.clearAll();
       this.fragments.spawnFragments(ctx.lastBlastFragmentData);
+      if (ctx.lastBlastFlights) this.fragmentAnimator?.begin(ctx.lastBlastFlights);
     }
 
     if (!this.blastEffects || !ctx.state) return;
@@ -700,6 +733,7 @@ export class GameRenderer {
     // Fragments (empty until blast runs) — shares terrain's material so a
     // fresh cut face matches the rock it broke off from (#458 T4.1/D9).
     this.fragments = new FragmentMesh(scene, this.terrain.sharedMaterial);
+    this.fragmentAnimator = new FragmentAnimator(this.fragments);
 
     // Blast effects
     this.blastEffects = new BlastEffects(scene, this.sm.camera);

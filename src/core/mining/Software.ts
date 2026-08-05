@@ -6,21 +6,44 @@ import { formatMoney } from '../economy/formatMoney.js';
 import type { BlastPlan } from './BlastPlan.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 import type { VillagePosition } from './BlastExecution.js';
-import { vec3 } from '../math/Vec3.js';
-import { VOXEL_SIZE_CM, MAX_PROJECTION_VELOCITY } from '../config/balance.js';
+import { vec3, length } from '../math/Vec3.js';
 import {
-  calculateEnergyField,
-  calculateFragmentation,
+  VOXEL_SIZE_CM,
+  FRAGMENTATION_MULTIPLIER,
+  CRACKED_VOXEL_ENERGY_RATIO,
+  PROJECTION_SPEED_THRESHOLD,
+} from '../config/balance.js';
+import {
   calculateVibrations,
   groupChargesByDelay,
+  stemmingFactor,
 } from './BlastCalc.js';
+import { buildPlanEnergyField } from './BlastExecution.js';
+import { effectiveAt } from './EnergyPropagation.js';
+import { computeFragmentVelocity, throwFractionForBlowout } from './FragmentVelocity.js';
 import {
   computeHoleContext,
-  computeEnergyThresholdForVoxel,
-  getVoxelEnergyThreshold,
+  readVoxelPrediction,
+  predictFragmentation,
   getBlastBBox,
   forEachBBoxVoxel,
 } from './SoftwarePreview.js';
+
+/**
+ * Stemming of the hole nearest a point, as the share of leftover energy that
+ * still throws rock there — the same rule the blast applies.
+ */
+function throwFractionAtHole(plan: BlastPlan, x: number, z: number): number {
+  let nearest = plan.holes[0];
+  let bestDist = Infinity;
+  for (const hole of plan.holes) {
+    const d = (hole.x - x) ** 2 + (hole.z - z) ** 2;
+    if (d < bestDist) { bestDist = d; nearest = hole; }
+  }
+  if (!nearest) return 1;
+  const charge = plan.charges[nearest.id];
+  return throwFractionForBlowout(charge ? 1 - stemmingFactor(charge.stemmingM, nearest.depth) : 1);
+}
 
 // ── Config ──
 
@@ -113,15 +136,17 @@ export function previewEnergy(
 ): EnergyPreview | null {
   if (softwareTier < 1) return null;
 
-  const ctx = computeHoleContext(plan, grid);
+  const field = buildPlanEnergyField(plan, grid);
+  if (!field) return { energyMap: new Map(), maxEnergy: 0, minEnergy: 0 };
 
+  const ctx = computeHoleContext(plan, grid);
   const bbox = getBlastBBox(plan, ctx);
   const energyMap = new Map<string, number>();
   let maxEnergy = 0;
   let minEnergy = Infinity;
 
   forEachBBoxVoxel(grid, bbox, (x, y, z) => {
-    const energy = calculateEnergyField(vec3(x, y, z), plan.holes, plan.charges, ctx.holeDepths, ctx.holeSurfaceYs);
+    const energy = effectiveAt(field, x, y, z);
     if (energy > 0) {
       energyMap.set(`${x},${y},${z}`, energy);
       maxEnergy = Math.max(maxEnergy, energy);
@@ -140,22 +165,22 @@ export function previewFragments(
 ): FragmentPreview | null {
   if (softwareTier < 2) return null;
 
-  const ctx = computeHoleContext(plan, grid);
+  const field = buildPlanEnergyField(plan, grid);
+  if (!field) return { fracturedCount: 0, crackedCount: 0, unaffectedCount: 0, avgFragmentSize: 1 };
 
+  const ctx = computeHoleContext(plan, grid);
   const bbox = getBlastBBox(plan, ctx);
   let fractured = 0, cracked = 0, unaffected = 0;
   let totalFragSize = 0;
 
   forEachBBoxVoxel(grid, bbox, (x, y, z, voxel) => {
-    const vet = computeEnergyThresholdForVoxel(voxel, vec3(x, y, z), plan, ctx);
-    if (!vet) return;
+    const vet = readVoxelPrediction(field, voxel, x, y, z);
+    if (!vet || vet.threshold <= 0) return;
 
-    const frag = calculateFragmentation(vet.energy, vet.threshold);
-
-    if (frag.result === 'fractured') {
+    if (vet.energy >= FRAGMENTATION_MULTIPLIER * vet.threshold) {
       fractured++;
-      totalFragSize += frag.fragmentSizeFraction;
-    } else if (frag.result === 'cracked') {
+      totalFragSize += predictFragmentation(vet.intensity).sizeM3;
+    } else if (vet.energy >= CRACKED_VOXEL_ENERGY_RATIO * vet.threshold) {
       cracked++;
     } else {
       unaffected++;
@@ -178,19 +203,28 @@ export function previewProjections(
 ): ProjectionPreview | null {
   if (softwareTier < 3) return null;
 
-  const ctx = computeHoleContext(plan, grid);
+  const field = buildPlanEnergyField(plan, grid);
+  if (!field) return { projectionZoneCount: 0, projectionZonePositions: [] };
 
+  const ctx = computeHoleContext(plan, grid);
   const bbox = getBlastBBox(plan, ctx);
   const positions: Array<{ x: number; y: number; z: number }> = [];
 
   forEachBBoxVoxel(grid, bbox, (x, y, z, voxel) => {
-    const vet = computeEnergyThresholdForVoxel(voxel, vec3(x, y, z), plan, ctx);
-    if (!vet) return;
+    const vet = readVoxelPrediction(field, voxel, x, y, z);
+    if (!vet || vet.threshold <= 0) return;
 
-    const ratio = vet.threshold > 0 ? vet.energy / vet.threshold : 0;
-    if (ratio >= 4.0) {
-      positions.push({ x, y, z });
-    }
+    // Rock is only thrown if it broke, has leftover energy behind it, and has a
+    // face to leave by — the same three conditions the blast itself applies.
+    if (vet.energy < FRAGMENTATION_MULTIPLIER * vet.threshold) return;
+    const velocity = computeFragmentVelocity(
+      vec3(x, y, z),
+      [{ x, y, z, weight: 1 }],
+      vet.rock.density,
+      field,
+      throwFractionAtHole(plan, x, z),
+    );
+    if (length(velocity) > PROJECTION_SPEED_THRESHOLD) positions.push({ x, y, z });
   });
 
   return { projectionZoneCount: positions.length, projectionZonePositions: positions };
@@ -219,6 +253,8 @@ export function previewHoleDetails(
   const result: Record<string, HolePreviewDetail> = {};
   if (softwareTier < 2) return result;
 
+  const field = buildPlanEnergyField(plan, grid);
+  if (!field) return result;
   const ctx = computeHoleContext(plan, grid);
 
   for (const hole of plan.holes) {
@@ -229,22 +265,27 @@ export function previewHoleDetails(
     const gx = Math.max(0, Math.min(grid.sizeX - 1, Math.floor(hole.x)));
     const gz = Math.max(0, Math.min(grid.sizeZ - 1, Math.floor(hole.z)));
     const gy = Math.max(0, Math.min(grid.sizeY - 1, surfaceY - 1));
-    const point = vec3(hole.x, surfaceY, hole.z);
-    const vet = getVoxelEnergyThreshold(grid, gx, gy, gz, point, plan, ctx);
+    const voxel = grid.getVoxel(gx, gy, gz);
+    if (!voxel || voxel.density <= 0) continue;
+    const vet = readVoxelPrediction(field, voxel, gx, gy, gz);
     if (!vet) continue;
 
-    const frag = calculateFragmentation(vet.energy, vet.threshold);
-
+    const predicted = predictFragmentation(vet.intensity);
     const detail: HolePreviewDetail = {
-      fragSizeCm: frag.fragmentSizeFraction * VOXEL_SIZE_CM,
+      // Edge length of the predicted piece, so a bigger number reads as coarser rock.
+      fragSizeCm: Math.cbrt(predicted.sizeM3) * VOXEL_SIZE_CM,
     };
 
-    if (softwareTier >= 3 && frag.isProjection) {
-      const overflow = Math.max(0, vet.energy - vet.threshold);
-      detail.projectionSpeedMs = Math.min(
-        MAX_PROJECTION_VELOCITY,
-        Math.sqrt((2 * overflow) / Math.max(vet.rock.density, 1)),
+    if (softwareTier >= 3) {
+      const velocity = computeFragmentVelocity(
+        vec3(gx, gy, gz),
+        [{ x: gx, y: gy, z: gz, weight: 1 }],
+        vet.rock.density,
+        field,
+        throwFractionForBlowout(1 - stemmingFactor(charge.stemmingM, hole.depth)),
       );
+      const speed = length(velocity);
+      if (speed > PROJECTION_SPEED_THRESHOLD) detail.projectionSpeedMs = speed;
     }
 
     result[hole.id] = detail;

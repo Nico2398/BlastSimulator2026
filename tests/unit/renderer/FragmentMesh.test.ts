@@ -11,7 +11,7 @@ import { FragmentMesh } from '../../../src/renderer/FragmentMesh.js';
 import { rockIndexOf } from '../../../src/core/world/RockCatalog.js';
 import { oreIndexOf } from '../../../src/core/world/OreCatalog.js';
 
-const SHAPE_VARIANTS = 8;
+const SHAPE_VARIANTS = 24;
 
 /** A cheap stand-in for the shared TerrainMaterial — these tests exercise slot bookkeeping, not shading. */
 function makeMaterial(): THREE.Material {
@@ -28,6 +28,8 @@ function makeFragment(id: number, overrides: Partial<FragmentData> = {}): Fragme
     oreDensities: {},
     initialVelocity: { x: 0, y: 5, z: 0 },
     isProjection: false,
+    halfExtents: { x: 0.4, y: 0.4, z: 0.4 },
+    shapeSeed: id * 2654435761 % 2147483647,
     ...overrides,
   };
 }
@@ -39,6 +41,11 @@ function getInstancePosition(im: THREE.InstancedMesh, index: number): THREE.Vect
   const pos = new THREE.Vector3();
   pos.setFromMatrixPosition(mtx);
   return pos;
+}
+
+/** Every InstancedMesh bucket in the scene. */
+function collectInstancedMeshes(scene: THREE.Scene): THREE.InstancedMesh[] {
+  return scene.children.filter((c): c is THREE.InstancedMesh => (c as THREE.InstancedMesh).isInstancedMesh === true);
 }
 
 /** Collect the rendered position of every instance across every shape bucket in the scene. */
@@ -91,26 +98,51 @@ describe('FragmentMesh (InstancedMesh)', () => {
     expect(fm.count).toBe(8);
   });
 
-  it('spawnFragments displaces fragments downward so they sit inside the crater', () => {
+  it('draws a fragment where the rock it was carved from actually was', () => {
     fm.spawnFragments([makeFragment(0, { position: { x: 5, y: 10, z: 5 } })]);
 
-    const im = scene.children[0] as THREE.InstancedMesh;
+    const im = collectInstancedMeshes(scene).find(m => m.count > 0)!;
     const pos = getInstancePosition(im, 0);
 
-    // Rendered Y must be below the fragment's raw source position (crater offset),
-    // but never pushed below the render floor.
-    expect(pos.y).toBeLessThan(10);
-    expect(pos.y).toBeGreaterThanOrEqual(9.4);
+    // The blast has already removed the rock at this point, so the fragment
+    // belongs at its own centroid — no crater offset or scatter to fake it.
+    expect(pos.x).toBeCloseTo(5, 5);
+    expect(pos.y).toBeCloseTo(10, 5);
+    expect(pos.z).toBeCloseTo(5, 5);
   });
 
-  it('spawnFragments clamps the render height to the minimum floor near y=0', () => {
-    fm.spawnFragments([makeFragment(0, { position: { x: 5, y: 0.1, z: 5 } })]);
+  it('clamps the render height to the minimum floor near y=0', () => {
+    fm.spawnFragments([makeFragment(0, { position: { x: 5, y: 0.01, z: 5 } })]);
 
-    const im = scene.children[0] as THREE.InstancedMesh;
+    const im = collectInstancedMeshes(scene).find(m => m.count > 0)!;
     const pos = getInstancePosition(im, 0);
 
-    // A fragment near the floor must be clamped to the render floor, not pushed to/below 0.
     expect(pos.y).toBeCloseTo(0.05, 5);
+  });
+
+  it('scales each instance to the fragment own bounding box', () => {
+    fm.spawnFragments([makeFragment(0, { halfExtents: { x: 1.5, y: 0.3, z: 0.75 } })]);
+
+    const im = collectInstancedMeshes(scene).find(m => m.count > 0)!;
+    const mtx = new THREE.Matrix4();
+    im.getMatrixAt(0, mtx);
+
+    // A flat slab must render flat, not as a cube of equivalent volume. The
+    // instance matrix carries rotation and a slight shear as well as the
+    // scale, so read the singular values: the lengths of the images of the
+    // basis vectors approximate the axis extents whatever the orientation.
+    const cols = [
+      Math.hypot(mtx.elements[0]!, mtx.elements[1]!, mtx.elements[2]!),
+      Math.hypot(mtx.elements[4]!, mtx.elements[5]!, mtx.elements[6]!),
+      Math.hypot(mtx.elements[8]!, mtx.elements[9]!, mtx.elements[10]!),
+    ].sort((a, b) => a - b);
+
+    // Shear sits between rotation and scale, so it stretches a column by at
+    // most sqrt(1 + 2·SHEAR_MAX²) ≈ 3% — a flat slab stays flat.
+    expect(cols[0]!).toBeGreaterThan(0.58);
+    expect(cols[0]!).toBeLessThan(0.63);
+    expect(cols[2]!).toBeGreaterThan(2.95);
+    expect(cols[2]!).toBeLessThan(3.1);
   });
 
   it('projection fragments are rendered (isProjection=true)', () => {
@@ -187,31 +219,15 @@ describe('FragmentMesh (InstancedMesh)', () => {
     expect(Math.max(...xs)).toBeGreaterThan(15000);
   });
 
-  it('scatters rendered (x, z) around the source voxel instead of stacking every fragment at the exact same point', () => {
-    // All fragments share the same source voxel (as multiple fragments from
-    // one voxel do) — without render-only jitter they'd render at identical
-    // (x, z), reading as a regular lattice instead of settled rubble.
-    const frags = Array.from({ length: 20 }, (_, i) =>
-      makeFragment(i, { position: { x: 5, y: 0.5, z: 5 } }));
+  it('spreads fragments across the shape variants rather than marching through them in order', () => {
+    // Fragment ids run consecutively, so keying the variant off the id alone
+    // cycled through the eight shapes in lockstep and produced a visibly
+    // repeating pattern across the muck pile.
+    const frags = Array.from({ length: 64 }, (_, i) => makeFragment(i));
     fm.spawnFragments(frags);
 
-    const xz = new Set(collectInstancePositions(scene).map(p => `${p.x.toFixed(3)},${p.z.toFixed(3)}`));
-    expect(xz.size).toBeGreaterThan(1);
-  });
-
-  it('displaces projected fragments along their initial velocity direction', () => {
-    fm.spawnFragments([makeFragment(0, {
-      position: { x: 5, y: 0.5, z: 5 },
-      isProjection: true,
-      initialVelocity: { x: 20, y: 5, z: 0 },
-    })]);
-
-    const im = scene.children[0] as THREE.InstancedMesh;
-    const pos = getInstancePosition(im, 0);
-
-    // Positive x velocity must displace the rendered fragment further in +x
-    // than jitter alone (jitter radius is well under a metre).
-    expect(pos.x).toBeGreaterThan(6);
+    const used = collectInstancedMeshes(scene).filter(m => m.count > 0).length;
+    expect(used).toBeGreaterThan(1);
   });
 
   describe('per-instance rock/ore attributes (#458 T4.1/A18)', () => {
@@ -241,13 +257,14 @@ describe('FragmentMesh (InstancedMesh)', () => {
     });
 
     it('removeFragment swaps rock/ore attributes along with the matrix (swap-with-last)', () => {
-      // Same bucket (id % 8 === 0), distinct rocks so the swap is observable.
+      // A shared shape seed puts all three in one bucket, so the swap is
+      // observable; distinct rocks make it visible which one moved.
       fm.spawnFragments([
-        makeFragment(0, { rockId: 'cruite' }),
-        makeFragment(8, { rockId: 'molite' }),
-        makeFragment(16, { rockId: 'titanite', oreDensities: { treranium: 0.4 } }),
+        makeFragment(0, { rockId: 'cruite', shapeSeed: 8 }),
+        makeFragment(8, { rockId: 'molite', shapeSeed: 8 }),
+        makeFragment(16, { rockId: 'titanite', oreDensities: { treranium: 0.4 }, shapeSeed: 8 }),
       ]);
-      const im = scene.children[0] as THREE.InstancedMesh;
+      const im = collectInstancedMeshes(scene).find(m => m.count > 0)!;
 
       fm.removeFragment(8); // vacates slot 1; slot 2 (titanite/treranium) swaps into it
 

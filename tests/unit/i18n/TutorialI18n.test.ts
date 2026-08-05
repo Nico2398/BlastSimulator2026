@@ -20,12 +20,17 @@ function generateAllTutorialKeys(): string[] {
     'tutorial.next',
     'tutorial.progress',
   ];
+  // Step 18 (the late ramp step) was replaced by the box-cut step, which sits
+  // early in the flow and has its own named key.
   for (let i = 1; i <= 23; i++) {
+    if (i === 18) continue;
     keys.push(`tutorial.step${i}`);
   }
   for (let i = 1; i <= 23; i++) {
+    if (i === 18) continue;
     keys.push(`tutorial.step${i}.title`);
   }
+  keys.push('tutorial.step_boxcut', 'tutorial.step_boxcut.title', 'tutorial.stage.boxcut_area');
   keys.push(
     'tutorial.done',
     'tutorial.complete_title',

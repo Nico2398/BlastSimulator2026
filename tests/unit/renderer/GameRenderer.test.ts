@@ -106,6 +106,8 @@ describe('GameRenderer — onBlast()', () => {
       oreDensities: {},
       initialVelocity: { x: 0, y: 0, z: 0 },
       isProjection: false,
+      halfExtents: { x: 0.4, y: 0.4, z: 0.4 },
+      shapeSeed: 3,
     }];
 
     renderer.onBlast(ctx);

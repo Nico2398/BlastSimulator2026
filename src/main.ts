@@ -33,6 +33,7 @@ import { ParamStrip } from './ui/scene/ParamStrip.js';
 import { SelectionOverlay } from './renderer/SelectionOverlay.js';
 import { createWeatherCycle } from './core/weather/WeatherCycle.js';
 import { Random } from './core/math/Random.js';
+import { summariseMuckPile } from './core/mining/MuckPileSummary.js';
 
 // --- 3D Scene ---
 const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
@@ -234,6 +235,9 @@ declare global {
     __cameraOrbit: (yaw: number, pitch: number) => void;
     __cameraFocus: (x: number, z: number, distance: number) => void;
     __cameraReset: () => void;
+    __skipBlastPlayback: () => void;
+    __seekBlastPlayback: (t: number) => void;
+    __blastPlaybackDuration: () => number;
     __startTutorial: () => void;
     __uiActions: () => ReturnType<typeof probeUiActions>;
     __probeSelector: (selector: string) => ReturnType<typeof probeSelector>;
@@ -389,6 +393,9 @@ window.__gameState = () => {
     arrested: s.arrest.arrested,
     cash: s.cash,
     profit: s.levelStats?.totalWealth ?? 0,
+    muckPile: ctx.grid
+      ? summariseMuckPile(s.logistics.fragments.map(f => f.fragment), ctx.grid)
+      : null,
     lastCommandOutput,
     frameCount: scene.frameCount,
     ctxGridId: ctx.grid?.id ?? null,
@@ -577,6 +584,19 @@ window.__worldToScreen = (x, z) => {
     onScreen: ndc.z < 1,
   };
 };
+// Put the collapse straight on its resting place, for shots of the settled muck
+// pile. The animation only walks rock to where the blast already put it, so
+// skipping it changes nothing — and without a GPU it would otherwise take
+// minutes of wall clock to play out (#475).
+window.__skipBlastPlayback = () => {
+  gameRenderer.skipFragmentPlayback();
+};
+// Hold the collapse at a chosen moment, so a harness can step through it at the
+// spacing the pictures need rather than the spacing the frame rate allows.
+window.__seekBlastPlayback = (t: number) => {
+  gameRenderer.seekFragmentPlayback(t);
+};
+window.__blastPlaybackDuration = () => gameRenderer.fragmentPlaybackDuration;
 
 uiManager.setGameConsole(window.__gameConsole);
 tutorial.setGameConsole(window.__gameConsole);

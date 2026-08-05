@@ -86,7 +86,16 @@ async function runBatchInteraction(
         // Navigate to the game (happens once per scenario fresh tab). See
         // puppeteer-utils.ts's initBrowser() for why this isn't
         // 'networkidle0' (#458 T5.1 — EffectComposer/OutputPass regression).
-        await page.goto(`http://localhost:${port}`, { waitUntil: 'domcontentloaded' });
+        //
+        // `?scenarioMode=1` is essential, not optional: it stops main.ts's own
+        // real-time auto-tick loop so only the scenario's scripted `tick N`
+        // advances simulation time. Without it the render loop keeps ticking
+        // between scripted clicks, and a UI panel rebuilt by that ticking gets
+        // detached out from under an in-flight click (#406) — which silently
+        // dropped the tutorial-interactive surveyor hire and left the whole
+        // tutorial stalled. Every other interaction harness (initBrowser,
+        // scenario-test) already navigates with it; this batch runner did not.
+        await page.goto(`http://localhost:${port}/?scenarioMode=1`, { waitUntil: 'domcontentloaded' });
         await page.waitForSelector('#game-canvas, canvas', { timeout: 10000 });
         // Main menu starts visible, same as initBrowser() — each scenario's
         // own `new_game` first step tears it down (main.ts console bridge).
