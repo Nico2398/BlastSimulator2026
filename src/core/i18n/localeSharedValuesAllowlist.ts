@@ -37,6 +37,8 @@ export const LOCALE_SHARED_VALUE_ALLOWLIST: string[] = [
   'ui.crew.location_coords', // "({x}, {z})"
   'ui.crew.skill_xp', // "{xp} / {next} XP" — XP is a cognate, embedded in a format string
   'ui.fleet.load_kg', // "{kg} / {cap} kg"
+  'ui.survey.duration_ticks', // "{ticks}t"
+  'ui.survey.radius_cells', // "r {radius}" — radius/rayon both start with r, not a coincidence worth two abbreviations
 
   // ── Language picker endonyms ──
   'ui.settings.english', // "English"
