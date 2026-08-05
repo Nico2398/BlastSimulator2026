@@ -15,6 +15,9 @@ import { addBlastFragments } from '../../../src/core/economy/Logistics.js';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 import { requestHaulFragment, tickHaulingProgress, findReachableGroundFragment } from '../../../src/core/economy/HaulingTask.js';
 import { NavGrid, type NavCell, type NavCellType } from '../../../src/core/nav/NavGrid.js';
+import { requestBreakBoulder } from '../../../src/core/economy/BoulderBreaking.js';
+import { fragmentApproachCell } from '../../../src/core/economy/FragmentApproach.js';
+import { OVERSIZED_FRAGMENT_THRESHOLD } from '../../../src/core/mining/BlastCalc.js';
 
 const SEED = 42;
 const GRID = 64;
@@ -385,5 +388,109 @@ describe('findReachableGroundFragment — selection', () => {
     state.logistics.fragments[0]!.state = 'in_transit';
 
     expect(findReachableGroundFragment(state, vehicle.id)).toBeNull();
+  });
+});
+
+// ── requestHaulFragment — oversized fragment rejection (#484) ──────────────
+//
+// An oversized boulder must be broken by a Rock Fragmenter before it can be
+// hauled — a debris_hauler must refuse it outright. isOversized is strictly
+// `>` the threshold (BoulderFragmentation.ts), so a fragment exactly at the
+// threshold must still be haulable — an inverted `>=` comparison here would
+// silently strand every threshold-sized fragment.
+
+describe('requestHaulFragment — oversized fragment rejection (#484)', () => {
+  it('rejects an on_ground fragment whose volume exceeds the oversized threshold', () => {
+    const state = createGame({ seed: SEED });
+    placeWarehouse(state, 10, 10);
+    const vehicle = makeDrivenHauler(state, 0, 0);
+    const oversized = makeFragment(1, 5, 5);
+    oversized.volume = OVERSIZED_FRAGMENT_THRESHOLD + 0.01;
+    addBlastFragments(state.logistics, [oversized]);
+
+    const result = requestHaulFragment(state, vehicle.id, 1);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBeDefined();
+    expect(state.logistics.fragments[0]!.state).toBe('on_ground');
+  });
+
+  it('accepts a fragment exactly at the oversized threshold (isOversized must be strictly >, not >=)', () => {
+    const state = createGame({ seed: SEED });
+    const warehouse = placeWarehouse(state, 10, 10);
+    const vehicle = makeDrivenHauler(state, 0, 0);
+    const atThreshold = makeFragment(1, 5, 5);
+    atThreshold.volume = OVERSIZED_FRAGMENT_THRESHOLD;
+    addBlastFragments(state.logistics, [atThreshold]);
+
+    const result = requestHaulFragment(state, vehicle.id, 1);
+
+    expect(result.success).toBe(true);
+    expect(result.error).toBeUndefined();
+    expect(vehicle.haulingDepotBuildingId).toBe(warehouse.id);
+  });
+});
+
+// ── findReachableGroundFragment — oversized exclusion (#484) ───────────────
+
+describe('findReachableGroundFragment — oversized exclusion (#484)', () => {
+  it('never returns an oversized fragment even when it is nearest and reachable, picking the next reachable non-oversized one instead', () => {
+    const state = createGame({ seed: SEED });
+    state.navGrid = makeFlatNavGrid(20);
+    const vehicle = makeDrivenHauler(state, 0, 0);
+    const oversizedNear = makeFragment(1, 2, 2); // nearest by distance
+    oversizedNear.volume = OVERSIZED_FRAGMENT_THRESHOLD + 0.5;
+    const haulableFar = makeFragment(2, 5, 5); // farther, but haulable
+    haulableFar.volume = OVERSIZED_FRAGMENT_THRESHOLD;
+    addBlastFragments(state.logistics, [oversizedNear, haulableFar]);
+
+    expect(findReachableGroundFragment(state, vehicle.id)).toBe(2);
+  });
+
+  it('returns null when the only reachable on-ground fragment is oversized', () => {
+    const state = createGame({ seed: SEED });
+    state.navGrid = makeFlatNavGrid(20);
+    const vehicle = makeDrivenHauler(state, 0, 0);
+    const oversized = makeFragment(1, 3, 3);
+    oversized.volume = OVERSIZED_FRAGMENT_THRESHOLD + 1;
+    addBlastFragments(state.logistics, [oversized]);
+
+    expect(findReachableGroundFragment(state, vehicle.id)).toBeNull();
+  });
+});
+
+// ── fragmentApproachCell — shared approach resolution (#484) ───────────────
+//
+// Hauling and breaking dispatch different vehicle roles at the same fragment
+// position, but both must resolve to the identical NavGrid approach cell —
+// otherwise a hauler and a fragmenter sent to the same boulder would park in
+// different places.
+
+describe('fragmentApproachCell — shared between hauling and breaking (#484)', () => {
+  it('haul and break resolve the same approach cell for equivalent fragments at the same position', () => {
+    const haulState = createGame({ seed: SEED });
+    placeWarehouse(haulState, 10, 10);
+    const haulVehicle = makeDrivenHauler(haulState, 0, 0);
+    const haulFragment = makeFragment(1, 6, 9);
+    haulFragment.volume = OVERSIZED_FRAGMENT_THRESHOLD; // at threshold: haulable
+    addBlastFragments(haulState.logistics, [haulFragment]);
+    requestHaulFragment(haulState, haulVehicle.id, 1);
+
+    const breakState = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { vehicle: breakVehicle } = purchaseVehicle(breakState.vehicles, 'rock_fragmenter', 0, 0);
+    const { employee } = hireEmployee(breakState.employees, 'driver', rng);
+    assignSkill(breakState.employees, employee.id, 'driving.excavator', 1);
+    breakVehicle.driverId = employee.id;
+    const breakFragment = makeFragment(1, 6, 9);
+    breakFragment.volume = OVERSIZED_FRAGMENT_THRESHOLD + 0.5; // oversized: breakable
+    addBlastFragments(breakState.logistics, [breakFragment]);
+    requestBreakBoulder(breakState, breakVehicle.id, 1);
+
+    const expected = fragmentApproachCell(haulFragment);
+    expect(haulVehicle.targetX).toBe(expected.x);
+    expect(haulVehicle.targetZ).toBe(expected.z);
+    expect(breakVehicle.targetX).toBe(expected.x);
+    expect(breakVehicle.targetZ).toBe(expected.z);
   });
 });
