@@ -201,7 +201,8 @@ describe('FragmentAnimator', () => {
     expect(animator.durationS).toBe(0);
     animator.begin([flight({ durationS: 2, delayS: 1.5 })]);
 
-    expect(animator.durationS).toBeCloseTo(3.5, 6);
+    // Idle is measured against settle completion, not landing (#485).
+    expect(animator.durationS).toBeCloseTo(1.5 + 2 + SETTLE_DURATION_S, 6);
   });
 
   it('lands everything at once when told to finish', () => {
