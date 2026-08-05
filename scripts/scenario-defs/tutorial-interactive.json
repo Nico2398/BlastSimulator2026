@@ -255,7 +255,7 @@
     {
       "command": "blast",
       "timeout": 90,
-      "description": "blast complete: Execute clicked, confirm dialog answered, crater and fragments appear; the scores card then auto-advances into the scripted consultant event",
+      "description": "blast complete: Execute clicked, confirm dialog answered, crater and fragments appear, Blast Report closed; the scores card then auto-advances into the scripted consultant event",
       "interaction": [
         {
           "type": "clickSelector",
@@ -271,6 +271,17 @@
         {
           "type": "clickSelector",
           "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
         },
         {
           "type": "waitForTutorialStep",
