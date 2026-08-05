@@ -188,6 +188,19 @@ mainMenu.setOnTutorial(() => {
   void enterLevel(['new_game seed:42 size:24', 'campaign start level:tutorial_pit'])
     .then(() => { tutorial.start(ctx.state ?? undefined); });
 });
+// Settings' REPLAY TUTORIAL button (10.x): same fresh-tutorial-level entry
+// point as MainMenu's own TUTORIAL button above — the tutorial's steps are
+// tuned to that specific map (tutorialStages.ts's REGION table), not to
+// whatever the player currently has loaded.
+uiManager.setReplayTutorialHandler(() => {
+  void enterLevel(['new_game seed:42 size:24', 'campaign start level:tutorial_pit'])
+    .then(() => { tutorial.start(ctx.state ?? undefined); });
+});
+
+// --- Settings: persistence wiring (redesign P10; audio wired below, once
+// audioMgr exists) ---
+uiManager.setBackend(saveBackend);
+uiManager.setGetState(() => ctx.state);
 
 // --- Sandbox ---
 const sandboxPanel = new SandboxPanel(uiContainer);
@@ -207,6 +220,7 @@ sandboxPanel.setOnStart((config) => {
 
 // --- Audio ---
 const audioMgr = new AudioManager();
+uiManager.setAudioManager(audioMgr);
 const audioHooks = new AudioHooks(audioMgr);
 // Resume AudioContext on first user interaction (browser autoplay policy)
 document.addEventListener('pointerdown', () => {

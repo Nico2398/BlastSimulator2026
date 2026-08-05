@@ -26,7 +26,6 @@ export const LOCALE_SHARED_VALUE_ALLOWLIST: string[] = [
   // ── Brand and version ──
   'game.title',        // "BlastSimulator2026"
   'game.version',      // "v0.1.0"
-  'menu.title',        // "BlastSimulator 2026"
 
   // ── Format-only / symbol-only ──
   'hud.speed_x',           // "{speed}×"
@@ -52,6 +51,8 @@ export const LOCALE_SHARED_VALUE_ALLOWLIST: string[] = [
   'proficiency.4',              // "Expert"
   'ui.build.ramp_section',      // "Terrain"
   'ui.settings.audio',          // "Volume"
+  'ui.settings.audio.ui',       // "Interface"
+  'ui.settings.session',        // "Session"
   'sandbox.field.biome',        // "Biome"
   'ui.blast_workshop.preview.row_fragments', // "Fragments"
   'ui.blast_workshop.preflight.stat_charge', // "Charge"

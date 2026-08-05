@@ -1,8 +1,34 @@
-// BlastSimulator2026 — Build Menu UI (CH1.7)
-// Shows building catalog with tier selection; clicking enters placement mode.
-// Also lists placed buildings with Move, Upgrade, and Demolish actions.
+// BlastSimulator2026 — Build panel (CH1.7, redesign P10)
+// Catalog of buildable types with tier selection; clicking arms the shared
+// placement tool. Also lists placed buildings with Move, Upgrade, Queue
+// Research, and Demolish actions. Terrain ramps (carved, not a building)
+// get their own small section between the two lists.
+//
+// Root id, the catalog rows' `data-build-type`, the buy button's
+// `.bs-build-buy-btn`, and the ramp button's `.bs-build-ramp-btn` are
+// preserved from the pre-redesign panel so tutorialStages.ts keeps
+// resolving `#bs-build-panel [data-build-type="freight_warehouse"]
+// .bs-build-buy-btn` and `#bs-build-panel .bs-build-ramp-btn` unchanged —
+// same convention ContractsPanel.ts established for #bs-contract-panel in
+// P5. `.bs-build-tier-sel` (catalog tier `<select>`), `.bs-build-placed-row`
+// + `data-building-id` (placed rows), and `.bs-build-move-btn`
+// /`.bs-build-upgrade-btn`/`.bs-build-research-btn`/`.bs-build-demolish-btn`
+// (placed-row actions) are additionally load-bearing — playtests and
+// scenario defs (research-center-gate, building-tier-system-visual) and
+// BuildMenu.test.ts (#462, placed-row layout) all click or assert on them
+// directly, so they carry over unchanged too.
+//
+// This was the one panel the P0-P9 redesign never reached — still the
+// pre-redesign `.bs-ui`/`.bs-panel` dark/gold chrome with a plain text
+// title and a bottom Close button. This pass is chrome-only: same catalog
+// logic, same placed-row logic, same ramp tool, same research-queue
+// handling, just rebuilt onto the shared `bsx-root` docked-panel
+// convention (46px header with icon chip + title + close button,
+// scrollable body) that every other panel already uses.
 
 import { t } from '../core/i18n/I18n.js';
+import { el, button, emptyState } from './dom.js';
+import { iconEl } from './icons.js';
 import { LocaleTextRegistry } from './localeText.js';
 import type { GameState } from '../core/state/GameState.js';
 import {
@@ -22,12 +48,14 @@ export type GameConsoleFn = (cmd: string) => CommandResult;
 
 export class BuildMenu {
   private readonly el: HTMLElement;
+  private readonly bodyEl: HTMLElement;
   private readonly catalogEl: HTMLElement;
   private readonly placedEl: HTMLElement;
   private readonly statusEl: HTMLElement;
   private placementKit: PlacementKit | null = null;
   private rampDepth = 8;
   private gameConsole?: GameConsoleFn;
+  private onCloseCb?: () => void;
   /** Latest state, for tier-unlock checks before arming the placement tool. */
   private lastState: GameState | null = null;
   /** Selected placement tier per building type. */
@@ -48,46 +76,57 @@ export class BuildMenu {
   private readonly locale = new LocaleTextRegistry();
 
   constructor(container: HTMLElement) {
-    this.el = document.createElement('div');
-    this.el.id = 'bs-build-panel';
-    this.el.classList.add('bs-ui', 'bs-panel');
+    this.el = el('div', { className: 'bsx-root', attrs: { id: 'bs-build-panel' } });
+    this.el.style.cssText = [
+      'flex-direction:column', 'width:372px', 'max-height:100%',
+      'border-radius:8px', 'background:var(--bsx-panel)', 'border:1px solid var(--bsx-hairline-strong)',
+      'box-shadow:0 18px 44px rgba(0,0,0,.55)', 'overflow:hidden', 'pointer-events:all',
+    ].join(';');
     this.el.style.display = 'none';
 
-    const title = document.createElement('div');
-    title.className = 'bs-panel-title';
-    this.locale.bindText(title, 'ui.build.title');
-
-    this.catalogEl = document.createElement('div');
-    this.catalogEl.id = 'bs-build-catalog';
-
-    const placedTitle = document.createElement('div');
-    placedTitle.style.cssText =
-      'font-size:10px;color:#c0a060;margin-top:8px;font-weight:bold;' +
-      'text-transform:uppercase;letter-spacing:0.05em';
-    this.locale.bindText(placedTitle, 'ui.build.placed_buildings');
-
-    this.placedEl = document.createElement('div');
-    this.placedEl.id = 'bs-build-placed';
-
-    this.statusEl = document.createElement('div');
-    this.statusEl.style.cssText = 'font-size:10px;color:#a08060;margin-top:6px;min-height:14px';
-
-    const closeBtn = document.createElement('button');
-    closeBtn.className = 'bs-btn';
-    closeBtn.style.cssText = 'width:100%;margin-top:6px';
-    this.locale.bindText(closeBtn, 'ui.build.close');
-    closeBtn.addEventListener('click', () => this.hide());
-
-    this.el.append(
-      title, this.catalogEl,
-      this.makeRampSection(),
-      placedTitle, this.placedEl, this.statusEl, closeBtn,
+    const header = el('div');
+    header.style.cssText = 'flex:0 0 auto;display:flex;align-items:center;gap:10px;height:46px;padding:0 12px;background:#1a2028;border-bottom:1px solid var(--bsx-hairline)';
+    const iconChip = el('div', { children: [iconEl('build', 15)] });
+    iconChip.style.cssText = 'width:26px;height:26px;border-radius:5px;display:flex;align-items:center;justify-content:center;background:rgba(255,176,46,.14);color:var(--bsx-amber)';
+    const titleEl = this.locale.bindText(
+      el('div', { attrs: { style: 'font:700 12px/1 var(--bsx-font-ui);letter-spacing:.14em;color:var(--bsx-text-primary)' } }),
+      'ui.build.title',
     );
+    const closeBtn = el('button', { children: [iconEl('x', 12)] });
+    closeBtn.style.cssText = 'margin-left:auto;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:1px solid var(--bsx-hairline-strong);border-radius:4px;background:transparent;color:var(--bsx-text-muted);cursor:pointer';
+    closeBtn.addEventListener('click', () => this.onCloseCb?.());
+    header.append(iconChip, titleEl, closeBtn);
+
+    this.bodyEl = el('div');
+    this.bodyEl.style.cssText = 'flex:1 1 auto;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px';
+
+    this.catalogEl = el('div');
+    this.catalogEl.id = 'bs-build-catalog';
+    this.catalogEl.style.cssText = 'display:flex;flex-direction:column;gap:8px';
+
+    this.placedEl = el('div');
+    this.placedEl.id = 'bs-build-placed';
+    this.placedEl.style.cssText = 'display:flex;flex-direction:column;gap:6px';
+
+    this.statusEl = el('div', {
+      attrs: { style: 'font:400 10px/1.4 var(--bsx-font-ui);color:var(--bsx-text-micro);min-height:14px' },
+    });
+
+    this.bodyEl.append(
+      this.catalogEl,
+      this.makeRampSection(),
+      this.sectionLabel('ui.build.placed_buildings'),
+      this.placedEl,
+      this.statusEl,
+    );
+    this.el.append(header, this.bodyEl);
     container.appendChild(this.el);
 
     this.buildCatalog();
   }
 
+  get root(): HTMLElement { return this.el; }
+  setCloseHandler(cb: () => void): void { this.onCloseCb = cb; }
   setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
   setPlacementKit(kit: PlacementKit): void { this.placementKit = kit; }
 
@@ -101,7 +140,7 @@ export class BuildMenu {
     this.refreshPlacedList(this.lastState?.buildings.buildings ?? []);
   }
 
-  show(): void { this.el.style.display = ''; }
+  show(): void { this.el.style.display = 'flex'; }
   hide(): void { this.el.style.display = 'none'; }
   get visible(): boolean { return this.el.style.display !== 'none'; }
 
@@ -166,6 +205,15 @@ export class BuildMenu {
     usage: 'ui.build.research_queue_failed',
   };
 
+  // ── Section headers (bsx-section look, static text bound for locale refresh) ──
+
+  private sectionLabel(key: string): HTMLElement {
+    const wrap = el('div', { className: 'bsx-section' });
+    const label = this.locale.bindText(el('span', { className: 'bsx-section-label' }), key);
+    wrap.append(label, el('span', { className: 'bsx-section-rule' }));
+    return wrap;
+  }
+
   // ── Ramp (carved terrain, not a building) ─────────────────────────────────
 
   /**
@@ -173,20 +221,15 @@ export class BuildMenu {
    * they need their own control: drag the run from the upper bench to the lower.
    */
   private makeRampSection(): HTMLElement {
-    const wrap = document.createElement('div');
+    const wrap = el('div');
+    wrap.style.cssText = 'display:flex;flex-direction:column;gap:6px';
 
-    const header = document.createElement('div');
-    header.className = 'bs-section-header';
-    header.style.marginTop = '8px';
-    this.locale.bindText(header, 'ui.build.ramp_section');
-
-    const btn = document.createElement('button');
-    btn.className = 'bs-btn bs-btn-primary bs-build-ramp-btn';
+    const btn = el('button', { className: 'bsx-btn bsx-btn-primary bs-build-ramp-btn' });
     btn.style.cssText = 'width:100%';
     this.locale.bindText(btn, 'ui.build.ramp');
     btn.addEventListener('click', () => this.armRampTool());
 
-    wrap.append(header, btn);
+    wrap.append(this.sectionLabel('ui.build.ramp_section'), btn);
     return wrap;
   }
 
@@ -260,44 +303,42 @@ export class BuildMenu {
   // ── Catalog (place new buildings) ──────────────────────────────────────────
 
   private buildCatalog(): void {
-    this.catalogEl.innerHTML = '';
-    for (const type of getAllBuildingTypes()) {
-      this.catalogEl.appendChild(this.makeCatalogRow(type));
-    }
+    this.catalogEl.replaceChildren(...getAllBuildingTypes().map((type) => this.makeCatalogRow(type)));
   }
 
   private makeCatalogRow(type: BuildingType): HTMLElement {
-    const row = document.createElement('div');
-    row.className = 'bs-build-row';
+    const row = el('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:9px 10px;border:1px solid var(--bsx-hairline);border-radius:6px;background:var(--bsx-card)';
     row.dataset['buildType'] = type;
 
-    const info = document.createElement('div');
+    const iconChip = el('div', { children: [iconEl('build', 13)] });
+    iconChip.style.cssText = 'flex:0 0 auto;width:24px;height:24px;border-radius:4px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.06);color:var(--bsx-amber)';
+
     // A basis rather than pure flex:1 — with a nowrap action button the name
     // column collapsed to nothing and the label overflowed across the controls.
-    info.style.cssText = 'flex:1 1 50%;min-width:0;overflow-wrap:break-word';
+    const info = el('div');
+    info.style.cssText = 'flex:1 1 40%;min-width:0;overflow-wrap:break-word;display:flex;flex-direction:column;gap:2px';
 
-    const nameEl = document.createElement('div');
-    nameEl.style.cssText = 'font-size:11px;color:#d0b090;font-weight:bold';
-    nameEl.textContent = t(`building.${type}.name`);
+    const nameEl = el('span', {
+      text: t(`building.${type}.name`),
+      attrs: { style: 'font:600 11px/1.3 var(--bsx-font-ui);color:var(--bsx-text-primary)' },
+    });
 
-    const costEl = document.createElement('div');
-    costEl.className = 'bs-build-cost';
-    // nowrap: the French format puts the currency symbol after the amount, so
-    // "12000 $" broke across two lines and pushed the row out of shape.
-    costEl.style.cssText = 'font-size:10px;color:#a08060;white-space:nowrap';
-    this.updateCostDisplay(costEl, type, 1);
+    const costEl = el('span', {
+      className: 'bsx-mono',
+      // nowrap: the French format puts the currency symbol after the amount, so
+      // "12000 $" broke across two lines and pushed the row out of shape.
+      attrs: { style: 'font:500 10px/1 var(--bsx-font-mono);color:var(--bsx-text-micro);white-space:nowrap' },
+    });
+    this.updateCostDisplay(costEl, type, this.selectedTiers.get(type) ?? 1);
     info.append(nameEl, costEl);
 
     // Tier selector
-    const tierSel = document.createElement('select');
-    tierSel.className = 'bs-input bs-build-tier-sel';
-    tierSel.style.cssText = 'font-size:10px;width:48px;padding:1px 2px;margin-right:4px';
+    const tierSel = el('select', { className: 'bs-build-tier-sel' });
+    tierSel.style.cssText = 'flex:0 0 auto;font:600 10px/1 var(--bsx-font-mono);width:44px;padding:4px 2px;border-radius:4px;border:1px solid var(--bsx-hairline-strong);background:var(--bsx-well);color:var(--bsx-text-secondary)';
     tierSel.title = t('ui.build.select_tier');
     for (const tier of [1, 2, 3] as BuildingTier[]) {
-      const opt = document.createElement('option');
-      opt.value = String(tier);
-      opt.textContent = `T${tier}`;
-      tierSel.appendChild(opt);
+      tierSel.appendChild(el('option', { text: `T${tier}`, attrs: { value: String(tier) } }));
     }
     tierSel.value = String(this.selectedTiers.get(type) ?? 1);
     tierSel.addEventListener('change', () => {
@@ -307,70 +348,63 @@ export class BuildMenu {
       this.refreshCatalogButtons(this.lastCash);
     });
 
-    const placeBtn = document.createElement('button');
-    placeBtn.className = 'bs-btn bs-btn-primary bs-build-buy-btn';
-    placeBtn.style.cssText = 'padding:2px 8px;font-size:10px;white-space:normal;line-height:1.25;flex:0 1 auto;min-width:0';
-    placeBtn.textContent = t('ui.build.place');
-    placeBtn.addEventListener('click', () => {
-      const tier = (this.selectedTiers.get(type) ?? 1) as BuildingTier;
-      if (tier > 1 && this.lastState && !isTierUnlocked(this.lastState.buildings, type, tier)) {
-        this.setStatus(t('ui.build.research_required', { tier }));
-        return;
-      }
-      this.armBuildingPointTool(type, tier, t(`building.${type}.t${tier}.name`), (x, z) => {
-        const cmdResult = this.gameConsole?.(`build ${type} at:${x},${z} tier:${tier}`);
-        this.setStatus(cmdResult?.success ? t('ui.build.placed') : (cmdResult?.output ?? t('ui.build.invalid_placement')));
-      });
+    const placeBtn = button('primary', t('ui.build.place'), {
+      onClick: () => {
+        const tier = (this.selectedTiers.get(type) ?? 1) as BuildingTier;
+        if (tier > 1 && this.lastState && !isTierUnlocked(this.lastState.buildings, type, tier)) {
+          this.setStatus(t('ui.build.research_required', { tier }));
+          return;
+        }
+        this.armBuildingPointTool(type, tier, t(`building.${type}.t${tier}.name`), (x, z) => {
+          const cmdResult = this.gameConsole?.(`build ${type} at:${x},${z} tier:${tier}`);
+          this.setStatus(cmdResult?.success ? t('ui.build.placed') : (cmdResult?.output ?? t('ui.build.invalid_placement')));
+        });
+      },
     });
+    placeBtn.classList.add('bs-build-buy-btn');
+    placeBtn.style.cssText = 'flex:0 1 auto;min-width:0;height:auto;padding:6px 9px;font-size:9px;white-space:normal;line-height:1.25';
 
-    const researchBtn = document.createElement('button');
-    researchBtn.className = 'bs-btn bs-build-research-btn';
-    researchBtn.style.cssText = 'padding:2px 6px;font-size:10px;white-space:normal;line-height:1.25;flex:0 1 auto;min-width:0;display:none';
-    researchBtn.textContent = t('ui.build.queue_research_button');
-    researchBtn.addEventListener('click', () => {
-      const tier = (this.selectedTiers.get(type) ?? 1) as BuildingTier;
-      this.queueResearch(type, tier);
+    const researchBtn = button('locked', t('ui.build.queue_research_button'), {
+      onClick: () => {
+        const tier = (this.selectedTiers.get(type) ?? 1) as BuildingTier;
+        this.queueResearch(type, tier);
+      },
     });
+    researchBtn.classList.add('bs-build-research-btn');
+    researchBtn.style.cssText = 'flex:0 1 auto;min-width:0;height:auto;padding:6px 8px;font-size:9px;white-space:normal;line-height:1.2;display:none';
 
-    row.append(info, tierSel, placeBtn, researchBtn);
+    row.append(iconChip, info, tierSel, placeBtn, researchBtn);
     return row;
   }
 
-  private updateCostDisplay(el: HTMLElement, type: BuildingType, tier: BuildingTier): void {
+  private updateCostDisplay(target: HTMLElement, type: BuildingType, tier: BuildingTier): void {
     const def = getBuildingDef(type, tier);
-    el.textContent = t('ui.build.cost', { cost: String(def.constructionCost) });
+    target.textContent = t('ui.build.cost', { cost: String(def.constructionCost) });
   }
 
   private refreshCatalogButtons(cash: number): void {
-    const rows = this.catalogEl.querySelectorAll<HTMLElement>('.bs-build-row');
-    rows.forEach((row) => {
+    for (const row of Array.from(this.catalogEl.children) as HTMLElement[]) {
       const type = row.dataset['buildType'] as BuildingType | undefined;
-      if (!type) return;
+      if (!type) continue;
       const tier = (this.selectedTiers.get(type) ?? 1) as BuildingTier;
       const def = getBuildingDef(type, tier);
       const locked = tier > 1 && !!this.lastState && !isTierUnlocked(this.lastState.buildings, type, tier);
       const queued = locked && !!this.lastState && isResearchQueued(this.lastState.buildings, type, tier);
-      const btn = row.querySelector('.bs-build-buy-btn') as HTMLButtonElement | null;
+      const btn = row.querySelector<HTMLButtonElement>('.bs-build-buy-btn');
       if (btn) btn.disabled = cash < def.constructionCost || locked;
-      const researchBtn = row.querySelector('.bs-build-research-btn') as HTMLButtonElement | null;
+      const researchBtn = row.querySelector<HTMLButtonElement>('.bs-build-research-btn');
       if (researchBtn) researchBtn.style.display = locked && !queued ? '' : 'none';
-    });
+    }
   }
 
   // ── Placed buildings list ──────────────────────────────────────────────────
 
   private refreshPlacedList(buildings: Building[]): void {
-    this.placedEl.innerHTML = '';
     if (buildings.length === 0) {
-      const empty = document.createElement('div');
-      empty.style.cssText = 'font-size:10px;color:#806040;padding:2px 0';
-      empty.textContent = t('ui.build.none_placed');
-      this.placedEl.appendChild(empty);
+      this.placedEl.replaceChildren(emptyState(t('ui.build.none_placed')));
       return;
     }
-    for (const b of buildings) {
-      this.placedEl.appendChild(this.makePlacedRow(b));
-    }
+    this.placedEl.replaceChildren(...buildings.map((b) => this.makePlacedRow(b)));
   }
 
   private makePlacedRow(b: Building): HTMLElement {
@@ -379,17 +413,17 @@ export class BuildMenu {
     row.className = 'bs-build-placed-row';
     row.dataset['buildingId'] = String(b.id);
     row.style.cssText =
-      'display:flex;align-items:center;gap:4px;padding:2px 0;' +
-      'border-bottom:1px solid rgba(200,160,60,0.1)';
+      'display:flex;align-items:center;gap:4px;padding:7px 8px;' +
+      'border:1px solid var(--bsx-hairline);border-radius:6px;background:var(--bsx-card)';
 
     const info = document.createElement('div');
-    info.style.cssText = 'flex:1 1 50%;min-width:0;font-size:10px;color:#c0a060;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+    info.style.cssText = 'flex:1 1 50%;min-width:0;font-size:10px;color:var(--bsx-text-tinted);overflow-wrap:break-word';
     info.title = `${b.type} T${b.tier} at (${b.x},${b.z})`;
     info.textContent = `#${b.id} ${t(`building.${b.type}.t${b.tier}.name`)} (${b.x},${b.z})`;
 
     const moveBtn = document.createElement('button');
-    moveBtn.className = 'bs-btn bs-build-move-btn';
-    moveBtn.style.cssText = 'padding:1px 5px;font-size:9px;flex:0 1 auto;white-space:normal;min-width:0';
+    moveBtn.className = 'bsx-btn bs-build-move-btn';
+    moveBtn.style.cssText = 'padding:1px 5px;font-size:9px;flex:0 1 auto;white-space:normal;min-width:0;height:auto';
     moveBtn.textContent = t('ui.build.move');
     moveBtn.addEventListener('click', () => {
       this.armBuildingPointTool(b.type, b.tier, `${t('ui.build.move')} #${b.id}`, (x, z) => {
@@ -403,8 +437,8 @@ export class BuildMenu {
     const nextQueued = nextTier !== null && nextLocked && !!this.lastState && isResearchQueued(this.lastState.buildings, b.type, nextTier);
 
     const upgradeBtn = document.createElement('button');
-    upgradeBtn.className = 'bs-btn bs-btn-primary bs-build-upgrade-btn';
-    upgradeBtn.style.cssText = 'padding:1px 5px;font-size:9px;flex:0 1 auto;white-space:normal;min-width:0';
+    upgradeBtn.className = 'bsx-btn bsx-btn-primary bs-build-upgrade-btn';
+    upgradeBtn.style.cssText = 'padding:1px 5px;font-size:9px;flex:0 1 auto;white-space:normal;min-width:0;height:auto';
     upgradeBtn.textContent = t('ui.build.upgrade');
     upgradeBtn.disabled = nextTier === null;
     if (nextTier !== null) {
@@ -421,8 +455,8 @@ export class BuildMenu {
     });
 
     const researchBtn = document.createElement('button');
-    researchBtn.className = 'bs-btn bs-build-research-btn';
-    researchBtn.style.cssText = 'padding:1px 5px;font-size:9px;flex:0 1 auto;white-space:normal;min-width:0';
+    researchBtn.className = 'bsx-btn bsx-btn-locked bs-build-research-btn';
+    researchBtn.style.cssText = 'padding:1px 5px;font-size:9px;flex:0 1 auto;white-space:normal;min-width:0;height:auto';
     researchBtn.textContent = t('ui.build.queue_research_button');
     researchBtn.style.display = nextTier !== null && nextLocked && !nextQueued ? '' : 'none';
     researchBtn.addEventListener('click', () => {
@@ -430,8 +464,8 @@ export class BuildMenu {
     });
 
     const demolishBtn = document.createElement('button');
-    demolishBtn.className = 'bs-btn bs-build-demolish-btn';
-    demolishBtn.style.cssText = 'padding:1px 5px;font-size:9px;color:#ff6644;flex:0 1 auto;white-space:normal;min-width:0';
+    demolishBtn.className = 'bsx-btn bsx-btn-danger bs-build-demolish-btn';
+    demolishBtn.style.cssText = 'padding:1px 5px;font-size:9px;flex:0 1 auto;white-space:normal;min-width:0;height:auto';
     demolishBtn.textContent = t('ui.build.demolish');
     demolishBtn.title = `$${def.demolishCost}`;
     demolishBtn.addEventListener('click', () => {

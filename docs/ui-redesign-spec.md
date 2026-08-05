@@ -32,79 +32,30 @@ Satirical open-pit mine management game — *Theme Hospital meets capitalism*. T
 
 ---
 
-## 3. Current screen inventory (what exists today, with observed defects)
+## 3. Current screen inventory — superseded by the finished redesign
 
-Read this as "the before picture". Every surface below was screenshotted and inspected.
+This section originally read as "the before picture": every pre-redesign surface (`MainMenu.ts`'s bare button stack, `BlastPlanUI.ts`, `ContractUI.ts`, `EmployeePanel.ts`, `SettingsMenu.ts`'s app-only cog wheel, `TileSelectOverlay.ts`'s full-screen 2D picker, and the rest) with its observed defects, one subsection per surface. Phases P0–P10 of `docs/ui-implementation-plan.md` closed every defect it listed. The old text is no longer accurate — rather than rewrite 16 subsections to describe the new screens in the same before/after-defect prose (redundant with §6, which already specifies each target surface, and now describes what is actually built rather than a target), this section instead maps old → new so anything still linking to it by name finds its way.
 
-### 3.1 Main menu (`MainMenu.ts`)
-Full-screen near-black overlay. Monospace amber title "BlastSimulator 2026", uppercase subtitle. Vertical button stack: **New Campaign** (primary), **Tutorial** (gold), **Continue**, **Load**, **Settings**. No visuals besides text — no logo art, no background scene, no version, no credits.
-- "Continue" just opens the world map (with last known campaign, possibly null → empty map).
-- Defect: the in-game HUD chrome (Saves button, speed button, Return to Map, score bars, minimap) exists *behind* the opaque menu and is partially visible around it in some states; the HUD is not hidden pre-game, it's merely covered.
+| Old surface (§3.x, pre-redesign) | Replaced by | Notes |
+|---|---|---|
+| §3.1 `MainMenu.ts` bare button stack | `src/ui/MainMenu.ts` (rebuilt) | §6.1 |
+| §3.2 World map card list | `src/ui/screens/WorldMap.ts` | §6.2; real `calculateStarRating` breakdown now shown |
+| §3.3 In-game shell (top bar, floating buttons, toolbar, minimap) | `src/ui/shell/TopBar.ts`, `ToolRail.ts`, `Toasts.ts`, `ActivityLog.ts`, `MiniMap.ts` (docked panel host: `UIManager.ts`) | §6.3, §6.10; floating Saves/Return-to-Map buttons folded into TopBar's right cluster |
+| §3.4 `BlastPlanUI.ts` | `src/ui/panels/BlastWorkshop.ts` + `PreflightModal.ts` + `BlastReportModal.ts` | §6.4 |
+| §3.5 `ContractUI.ts` | `src/ui/panels/ContractsPanel.ts` | §6.5 |
+| §3.6 `BuildMenu.ts` (pre-redesign chrome) | `src/ui/BuildMenu.ts` (P10: rebuilt onto the shared `bsx-root` docked-panel convention; load-bearing tutorial selectors preserved) | §6.6 |
+| §3.7 `TileSelectOverlay.ts` full-screen 2D picker | Retired (P3) — placement happens in the 3D scene: `src/ui/scene/PlacementController.ts`, `ParamStrip.ts`; the picker survives only as the tutorial-pinned fallback | §6.9 |
+| §3.8 `VehiclePanel.ts` | `src/ui/panels/FleetPanel.ts` + `fleetDetailSections.ts` | §6.7 |
+| §3.9 `EmployeePanel.ts` | `src/ui/panels/CrewPanel.ts` + `crewDetailSections.ts` | §6.8; raise-button bug and duplicate-name bug both fixed (§5, core items D/J) |
+| §3.10 `SurveyUI.ts` | `src/ui/panels/SurveyPanel.ts` | §6.9 (weather popover), coverage/staleness now shown |
+| §3.11 `SettingsMenu.ts` | `src/ui/panels/SettingsPanel.ts` (P10) | §6.15; site policy moved to `OperationsPanel.ts` (§6.13); real `AudioManager` volume sliders (master/effects/ambient/ui); keyboard reference mounted (was dead code); REPLAY TUTORIAL, SAVE & LOAD, RETURN TO MAIN MENU (autosave-age-aware confirm) added |
+| §3.12 `SaveLoadUI.ts` | `src/ui/panels/SavesModal.ts` (P8) | §6.16; confirms on delete, real level/summary shown |
+| §3.13 `EventDialog.ts` | `src/ui/panels/EventModal.ts` (P8) | §6.11; structured `effects` (§5 core item A), category identity, no more console-text parsing |
+| §3.14 `TutorialOverlay.ts` (bottom-docked card) | Re-skinned in place (P10) — same file, `src/ui/TutorialOverlay.ts`; DOM rebuilt in `tutorialOverlayDom.ts` | §6.17; rails, tick budget and every `highlightTarget`/stage selector unchanged (audited clean, zero stale selectors found); highlight class repointed from the pre-redesign pulsing `bs-tutorial-highlight` to the design system's static three-ring `bsx-highlight` (P0 had ported the token, nothing pointed the rails at it until now) |
+| §3.15 Toasts + no game-over screen | `src/ui/notify/NotificationCenter.ts`, `Toasts.ts`, `ActivityLog.ts` (severity, icons, log) + `src/ui/screens/LevelEndScreen.ts` (P8, new) | §6.11 |
+| §3.16 3D scene, camera-only | Scene selection/hover/placement added (P2/P3) — `src/ui/scene/`; picking, hover tags, selection action bar | §6.9 |
 
-### 3.2 World map (inside main menu overlay)
-Card list of the 3 levels: name, satirical description, difficulty as repeated ⛏ glyphs, star slots (☆☆☆/★★☆ by best profit vs threshold), lock state with "Locked — requires $X on <level>" line, **Start Level / Resume** button on unlocked cards, **← Back**.
-- Defects: it's a text list, not a "world map"; ⛏ renders as tofu on some systems; stars barely visible (low contrast); no per-level stats (best profit, star breakdown from `calculateStarRating` — profit/safety/ecology passes — exist in core but are shown nowhere here).
-
-### 3.3 In-game shell
-- **Top bar** (full-width, 44px): balance (gold, red when negative, e.g. `-$76,500`), centered `Day 1 — 00:00` (tick = 1 in-game hour, 24/day), red `⚠ Event!` badge when an event is pending, weather emoji with tooltip, speed button (`1×`→`2×`→`4×`→`8×` cycle; shows `Paused` state).
-- **Floating top-right, separate from the bar:** `💾 Saves` button and `Return to Map` button (created ad-hoc in `main.ts`). Defect: the `Paused` speed button and the event badge visually collide/overlap these floating buttons.
-- **Scores panel** top-right below bar: four labeled bars (WELL-BEING, SAFETY, ECOLOGY, NUISANCE), no numbers, no trend, no explanation of what moves them.
-- **Toolbar** right edge, vertically centered: 7 buttons — 💣 Blast, 📋 Contracts, 🏗 Build, 🚛 Vehicles, 👷 Crew, 🔍 Survey, ⚙️ Settings. Toggle behavior, one panel at a time, active state highlighted. Defect: toolbar says "Crew", the panel it opens is titled "EMPLOYEES".
-- **Minimap** bottom-right (`MiniMap.ts`): 2D canvas top-down — terrain elevation shading, chunk grid, surveyed-ore dots, buildings (orange), vehicles, crew (cyan dots), drill holes (purple), optional NavGrid overlay (toggled ONLY by keyboard `N`, no button). Legend row (Rock/Ore/Building/Hole/Crew). Defects: cursor is a crosshair but the canvas is **not clickable** (no camera focus, no ping); no camera-frustum indicator; tiny (160px); title "MAP".
-- **Left column**: all panels open here, fixed width ~260–340px, full-height scroll.
-
-### 3.4 Blast panel (`BlastPlanUI.ts`) — title "BLAST PLAN"
-Buttons: **Grid Tool** (opens tile picker in area mode with spacing+depth fields), **Clear All**, hole list rows (`H1 boomite 5kg +25ms` + tiny edit button each), **Charge All Holes**, **Auto Sequence**, **Preview**, **BLAST!** (opens a yes/no confirm overlay). Per-hole edit opens an inline charge form: explosive `<select>` (8 raw ids, e.g. `big_bada_boom`), amount kg, stemming m, Apply.
-- Blast result surfaces as a 1-line status ("Blasted N voxels — rating", or "No rock moved — check charges"); the full blast report (rating, cleared/cracked voxels, fragment count, oversized count, projections, rock volume, ore value, destroyed buildings) exists only as console text and is thrown away.
-- Defects: explosive names are raw ids, no cost/kg, no max-charge, no water-sensitivity, no rock-tier requirement shown (all exist in `ExplosiveCatalog`); "Preview" fires `preview energy` and shows *nothing in the panel* (only the 3D overlay tint changes, and only if software tier ≥1 — tier is not purchasable in UI at all); no per-hole delay editing (auto V-pattern only); no plan save/load/validate; no zone-evacuation status; no cost estimate for the blast.
-
-### 3.5 Contracts panel (`ContractUI.ts`)
-AVAILABLE list: description ("Supply dirtite (bulk)"), `320kg @ $2.04/kg — 55t deadline`, buttons **Accept / Negotiate / Decline**. ACTIVE list: description, progress line `{pct}% — {remaining}t`, green progress bar, amount input + **Deliver** button.
-- Defects: penalty and early-completion bonus are never shown (both exist on `Contract`); material type not shown as a chip/icon; negotiate gives no feedback in the panel (result only in console; negotiation ignores the manager skill — passes 0); completed-contract history (`contracts.completedHistory`) shown nowhere; no link between "what's in storage" and "what this contract needs" (the #1 question when delivering); expiry warnings only via console text.
-
-### 3.6 Build panel (`BuildMenu.ts`)
-Catalog: 9 rows (Driving Center $12000, Blasting Academy $15000, Management Office $8000, Geology Lab $12000, Research Center $25000, Living Quarters $10000, Explosive Warehouse $20000, Freight Warehouse $15000, Vehicle Depot $18000) each with tier `<select>` (T1/T2/T3), **Place** button ("Click terrain to place" — actually opens the 2D tile picker, not terrain clicking), **Queue Research** button when the selected tier is locked. TERRAIN section: **Build Ramp** (area picker + depth field). PLACED BUILDINGS list: `#id name (x,z)` + **Move / Upgrade / Queue Research / Demolish**.
-- Defects: rows overflow the panel (Demolish clipped off-panel); placed names truncated (`#1 The Pile …`); research progress invisible (queued research is only "the button disappeared" — remaining ticks/cost live in `research status` console output); building HP not shown (console `build list` shows it); capacity/effects (beds, storage kg, taught skills, upkeep/tick) never shown; no tier-name flavor visible until placed; upgrade shows cost only as a hover tooltip; demolish has a cost but no confirm.
-
-### 3.7 Tile picker overlay (`TileSelectOverlay.ts`) — shared by Build/Ramp/Blast-grid/Survey
-Full-screen modal: 640×480 canvas grid with axis labels, chunk lines, colored squares for buildings (orange) and holes (blue); form column with title, hint, selection readout, extra numeric fields (depth/spacing), **Confirm/Cancel**. Supports point and drag-area modes, plus tutorial-pinned regions (dim outside, outlined target).
-- Defects: no terrain elevation, ore, or navgrid shading (mostly a uniform blue-grey grid → player aims blind); it fully hides the 3D scene it is choosing a location in; per-tile hover coordinate readout only after click; fields have no explanations. This overlay is the biggest single UX gap — placement should happen *in the 3D scene* (see §6.9).
-
-### 3.8 Vehicles panel (`VehiclePanel.ts`)
-Fleet rows: `#1 Dumpster on Wheels`, `Status: idle | HP: 100`, Driver row (select of licensed, unoccupied crew + **Assign**, or "No crew licensed for driving.drill_rig", or driver name once boarded), **Haul** button (appears only when: debris hauler + driver aboard + reachable ground fragment; auto-picks best fragment), **Scrap** (red). BUY section grouped by role with 3 tier buttons each (`Dumpster on Wheels ($25000)` … `The Atomizer ($128000)`), disabled when unaffordable.
-- Defects: no tier stats shown at purchase (speed/capacity/work rate/maintenance all exist in defs); no payload/load bar; no hauling-phase indicator (to-fragment/to-depot); no waiting/stuck/traffic status (`waitingTicks`, `isMoveStuck` exist); no way to locate a vehicle in the scene; scrap has no confirm and shows no refund; driver can't be unassigned; "Haul" hides instead of explaining when ineligible; role names only appear as tier-1 names in group headers.
-
-### 3.9 Employees panel (`EmployeePanel.ts` + detail/training sections) — toolbar "Crew"
-Roster rows: name (bold), `role | Morale: 60% [Union]` + ⚠ if injured, **Raise**, **Fire** (disabled for unionized with tooltip), `▼ details` expander. Expanded detail: skills with star ratings + XP bar (`geology ★☆☆☆☆`), need bars Hunger/Fatigue/Break with numeric + color thresholds, ACTIVE task (`#12 (survey)`) + up to 5 pending pool actions + overflow count, salary breakdown (base + per-skill bonus = total), modifier tags (High morale/Collapsing/Injured), training badge (`Training: geology (12t)`), TRAINING section: per-available-course row `geology 1→2 · $4000 · 32t` + **Train** button + status line (no school / injured / all maxed / hint). HIRE section: 5 roles with fixed costs (driller $1000, blaster $1500, driver $800, surveyor $1200, manager $2000) + **Hire** buttons.
-- Defects: **Raise button is dead** — it sends `employee raise id:N` without `amount:` and the command rejects it (usage error, silently discarded). **All same-tick hires get the same name** (RNG seeded with `seed+tickCount` → four "Walt Diggins" in one screenshot). No portraits/role color chips. No task progress (`taskTicksRemaining` exists). Pool actions listed under *every* qualified employee's queue (reads as duplicates). No locate-in-scene. No hire preview (what quals a role starts with). Union/injured/collapsing states are plain text tags. Needs of *collapsed* employees are only visible if you expand each row — no roster-level alarm. Fire has no confirm and no severance info.
-
-### 3.10 Survey panel (`SurveyUI.ts`)
-METHOD list (Core Sample $800 · accuracy 95%, Seismic $3,000 · 85% [default selected], Aerial $1,500 · 75%), **Choose Target & Survey** (opens point picker centered on map), status line (why Run is disabled: no surveyor / not enough cash / N in progress), RESULTS: last 4 surveys — `method (x,z) — confidence 78%` + top-4 ore bars with %.
-- Defects: coverage radius/depth per method not shown (seismic 20-cell full depth vs aerial 30-cell surface — the actual tradeoff); results are the last 4 only, older surveys unreachable; no map/scene link from a result (numbers, no place); staleness (results expire after 100 ticks / blasts) never surfaced; `showSurveyResult` (terrain-click readout) is dead code — no scene click exists; seismic building damage (−10 HP within 5 cells) never warned.
-
-### 3.11 Settings panel (`SettingsMenu.ts`)
-Language (English/Français), **Save Game** / **Load Game** (bare quicksave slot, not the slot panel), **Return to Menu** (red), SITE POLICY section: shift schedule select (8h/12h/continuous/custom), "Send to eat below" (hunger threshold), "Send to rest below" (fatigue), **Apply Policy**, Close.
-- Defects: gameplay policy (a strategic lever) is buried inside app settings; no audio controls at all (an `AudioManager` with ambient/blast/UI/weather channels exists — no volume/mute anywhere); no graphics/quality options; opens from the main menu too where policy controls are meaningless (no game yet); keyboard shortcut list exists as a static helper (`KeyboardShortcuts.makeHelpPanel`) but is **never mounted anywhere**.
-
-### 3.12 Save/Load panel (`SaveLoadUI.ts`)
-Modal-ish left panel: Auto-Save row (name+date, summary `$50,000 — Day 1`, Load), 5 numbered slots (Save/Load/✕ delete), **Export Save (.json)**, **Import Save (.json)**, Close. Auto-saves every 2 game-minutes. Opened from menu "Load" or in-game 💾 Saves button.
-- Defects: no screenshots/thumbnails, no campaign level in summary, no confirm on overwrite/delete/load-overwriting-progress, F5 quick-save writes to the *auto* slot silently.
-
-### 3.13 Event dialog (`EventDialog.ts`)
-Auto-opens on pending event (game auto-pauses): header EVENT, gold title ("A Wild Consultant Appears!"), satirical body, CHOOSE YOUR RESPONSE + 2–4 option buttons (label includes cost when the writer put it there), then outcome phase: headline + "Outcome:" effect list parsed *from console text*, **Dismiss**.
-- Defects: options don't show structured consequences/risk hints; outcome is parsed from English console output (fragile, unlocalized); no event history/log after dismiss; no category identity (union vs mafia vs weather all look identical); HUD badge is text-only.
-
-### 3.14 Tutorial (`TutorialOverlay.ts`, 23 steps)
-Bottom-docked card: step title, body, gold "do this now" hint line (from rails), step counter `1 / 24`-style, progress bar, optional console-command hints, PAUSED chip when the clock is held. Rails: everything inert except the one highlighted control (glow), tick budget per step.
-- Works; the redesign must re-skin without breaking rail selectors (§2.5/2.6).
-
-### 3.15 Toasts (`UIManager.showNotification`)
-Single fixed toast, 6s auto-dismiss. Used ONLY for game-over-ish warnings via emitter events: bankruptcy warning/triggered, ecology warning/shutdown, arrest, revolt warning/triggered.
-- Defects: one slot (new toast replaces old), no icons/severity, no log, and **no game-over screen exists at all** — on `levelEnded` the sim stops but the UI just sits there with a toast that already faded.
-
-### 3.16 3D scene (render-only today)
-Renders: marching-cubes terrain with procedural rock textures + surface ore tints; box-style buildings; vehicles; minion characters (role-colored, injured tint); weather skybox + effects; distant scenery; blast plan overlay (hole markers with X-ray shafts, charge color coding, delay labels; richer preview tint with software tiers); ghost previews for pending actions (pulsing translucent blue mesh at target); post-blast physics fragments; blast effects (dust, flash, shake); survey confidence overlay (heatmap on surveyed region); vehicle waiting-queue offsets.
-**Interaction: none.** Camera only — left-drag orbit, right/middle-drag pan, wheel zoom, touch orbit/pinch (`CameraController`). No raycast picking, no hover, no selection, no context menus, no entity labels/billboards, no click-to-survey. `__cameraFocus/__cameraOrbit/__cameraReset` bridges exist for tests but no UI exposes "focus on X".
+Corruption/mafia (`src/ui/panels/ShadyPanel.ts`, reveal wired through `ToolRail.ts`) and the Finances/Operations split (`FinancesPanel.ts`, `OperationsPanel.ts`) didn't exist pre-redesign at all — see §6.12–§6.14.
 
 ---
 

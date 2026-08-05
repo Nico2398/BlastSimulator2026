@@ -243,7 +243,7 @@ export class SurveyPanel {
     const head = el('div', { attrs: { style: 'display:flex;align-items:center;gap:8px;width:100%' } });
     head.append(
       iconEl('survey', 14),
-      el('span', { text: t(`survey.${method}`), attrs: { style: 'font:600 12px/1 var(--bsx-font-ui)' } }),
+      el('span', { text: t(`survey.${method}`), attrs: { style: 'font:600 12px/1 var(--bsx-font-ui);color:var(--bsx-text-primary)' } }),
       el('span', { text: `$${SURVEY_COSTS[method].toLocaleString('en-US')}`, className: 'bsx-mono', attrs: { style: 'margin-left:auto;font-size:11px;font-weight:600;color:var(--bsx-amber)' } }),
     );
 

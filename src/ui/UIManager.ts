@@ -17,7 +17,7 @@ import { CrewPanel } from './panels/CrewPanel.js';
 import { EventModal } from './panels/EventModal.js';
 import { SurveyPanel } from './panels/SurveyPanel.js';
 import { ShadyPanel } from './panels/ShadyPanel.js';
-import { SettingsMenu } from './SettingsMenu.js';
+import { SettingsPanel } from './panels/SettingsPanel.js';
 import { MiniMap } from './MiniMap.js';
 import { TopBar } from './shell/TopBar.js';
 import { ToolRail } from './shell/ToolRail.js';
@@ -29,6 +29,8 @@ import { t } from '../core/i18n/I18n.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { WeatherCycleState } from '../core/weather/WeatherCycle.js';
 import type { Random } from '../core/math/Random.js';
+import type { AudioManager } from '../audio/AudioManager.js';
+import type { SaveBackend } from '../core/state/SaveBackend.js';
 
 import type { CommandResult } from '../console/ConsoleRunner.js';
 
@@ -55,7 +57,7 @@ export class UIManager {
   private readonly eventModal: EventModal;
   private readonly surveyPanel: SurveyPanel;
   private readonly shadyPanel: ShadyPanel;
-  private readonly settingsMenu: SettingsMenu;
+  private readonly settingsPanel: SettingsPanel;
   private readonly miniMap: MiniMap;
 
   private activePanel: PanelName | null = null;
@@ -117,6 +119,7 @@ export class UIManager {
     this.operationsPanel = new OperationsPanel(leftCol);
     this.operationsPanel.setCloseHandler(() => this.hideAllPanels());
     this.buildMenu = new BuildMenu(leftCol);
+    this.buildMenu.setCloseHandler(() => this.hideAllPanels());
     this.fleetPanel = new FleetPanel(leftCol);
     this.fleetPanel.setCloseHandler(() => this.hideAllPanels());
     // FleetPanel's no-driver warning cross-links to Crew ('crew' is its own
@@ -133,7 +136,9 @@ export class UIManager {
     this.shadyPanel.setConfirmHandler(config => this.confirmModal.show(config));
     // Settings appended to root container so its z-index:10000 beats the main menu (z-index:9999).
     // Inside leftCol's fixed stacking context it would be capped at z:100 relative to root.
-    this.settingsMenu = new SettingsMenu(container);
+    this.settingsPanel = new SettingsPanel(container);
+    this.settingsPanel.setCloseHandler(() => this.hideAllPanels());
+    this.settingsPanel.setConfirmHandler(config => this.confirmModal.show(config));
 
     // Event modal (redesign P8, supersedes EventDialog.ts), appended to container
     this.eventModal = new EventModal(container);
@@ -157,7 +162,7 @@ export class UIManager {
     // A language switch inside the settings panel has to re-render every panel
     // already on screen, then let whoever else is listening (main.ts refreshes
     // the main menu behind the panel) react.
-    this.settingsMenu.setLanguageChangeHandler((lang) => {
+    this.settingsPanel.setLanguageChangeHandler((lang) => {
       this.refreshLocale();
       this.onLanguageChange?.(lang);
     });
@@ -201,7 +206,6 @@ export class UIManager {
     this.eventModal.setGameConsole(fn);
     this.surveyPanel.setGameConsole(fn);
     this.shadyPanel.setGameConsole(fn);
-    this.settingsMenu.setGameConsole(fn);
   }
 
   /** Hands the shared in-scene placement tool (P3) to every panel that arms it. Only one arms it at a time. */
@@ -219,17 +223,37 @@ export class UIManager {
     this.onTogglePauseCb = cb;
   }
 
+  /** Return-to-main-menu, requested from Settings' own confirm-gated button. */
   setQuitHandler(cb: () => void): void {
-    this.settingsMenu.setQuitHandler(cb);
+    this.settingsPanel.setReturnToMenuHandler(cb);
   }
 
   setLanguageChangeHandler(cb: (lang: string) => void): void {
     this.onLanguageChange = cb;
   }
 
-  /** Wire the top bar's Saves button (SavesModal lives in main.ts, not here). */
+  /** Wire the top bar's Saves button and Settings' SAVE & LOAD button (SavesModal lives in main.ts, not here). */
   setOpenSavesHandler(cb: () => void): void {
     this.topBar.setOpenSavesHandler(cb);
+    this.settingsPanel.setOpenSavesHandler(cb);
+  }
+
+  /** Wire Settings' REPLAY TUTORIAL button (TutorialOverlay lives in main.ts, not here). */
+  setReplayTutorialHandler(cb: () => void): void {
+    this.settingsPanel.setReplayTutorialHandler(cb);
+  }
+
+  setAudioManager(mgr: AudioManager): void {
+    this.settingsPanel.setAudioManager(mgr);
+  }
+
+  /** Wire Settings' autosave-age-aware return-to-menu confirm (persistence lives in main.ts, not here). */
+  setBackend(backend: SaveBackend): void {
+    this.settingsPanel.setBackend(backend);
+  }
+
+  setGetState(fn: () => GameState | null): void {
+    this.settingsPanel.setGetState(fn);
   }
 
   /** Wire the top bar's Site Map button (MainMenu lives in main.ts, not here). */
@@ -284,7 +308,7 @@ export class UIManager {
     this.crewPanel.refreshLocale();
     this.surveyPanel.refreshLocale();
     this.shadyPanel.refreshLocale();
-    this.settingsMenu.refreshLocale();
+    this.settingsPanel.refreshLocale();
     this.miniMap.refreshLocale();
     this.eventModal.refreshLocale();
   }
@@ -337,6 +361,10 @@ export class UIManager {
     if (this.crewPanel.visible) this.crewPanel.update(state);
     if (this.surveyPanel.visible) this.surveyPanel.update(state);
     if (this.shadyPanel.visible) this.shadyPanel.update(state);
+    // Cheap (one display toggle) and not tied to visibility — the session
+    // section has to be fresh the instant the player opens the panel, not
+    // one tick later, and this panel doesn't rebuild anything else per tick.
+    this.settingsPanel.update(state);
 
     // Event modal — owns its own show/hide from state.events (unlike the
     // panels above). Deferred while BlastReportModal is up: both are
@@ -363,7 +391,7 @@ export class UIManager {
       case 'employees': this.crewPanel.show(); break;
       case 'survey': this.surveyPanel.show(); break;
       case 'shady': this.shadyPanel.show(); break;
-      case 'settings': this.settingsMenu.show(); break;
+      case 'settings': this.settingsPanel.show(); break;
     }
     this.toolRail.setActive(this.activePanel);
   }
@@ -405,7 +433,7 @@ export class UIManager {
     this.eventModal.dispose();
     this.surveyPanel.dispose();
     this.shadyPanel.dispose();
-    this.settingsMenu.dispose();
+    this.settingsPanel.dispose();
     this.miniMap.dispose();
   }
 
@@ -420,7 +448,7 @@ export class UIManager {
     this.crewPanel.hide();
     this.surveyPanel.hide();
     this.shadyPanel.hide();
-    this.settingsMenu.hide();
+    this.settingsPanel.hide();
     this.toolRail.setActive(null);
   }
 }

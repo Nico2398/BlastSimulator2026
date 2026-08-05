@@ -192,14 +192,14 @@ describe('UIManager — locale refresh on language switch (issue #457)', () => {
   it('every owned panel with a .bs-panel-title re-renders to a different string after the switch', () => {
     uiManager = new UIManager(container);
     const titleEls = Array.from(container.querySelectorAll('.bs-panel-title'));
-    // Sanity: UIManager owns several titled panels still on the legacy
-    // .bs-panel-title class (build, settings, minimap).
+    // Sanity: UIManager owns at least one titled panel still on the legacy
+    // .bs-panel-title class (minimap).
     // Blast (P4), Contracts/Finances/Operations (P5), Fleet/Crew (P6),
-    // Survey (P7), and now the event modal (P8, EventModal replacing
-    // EventDialog) migrated to the redesign's own title markup and no
-    // longer count here — each surface-by-surface migration shrinks this
-    // number further, same as it did when Blast moved off .bs-panel-title.
-    expect(titleEls.length).toBeGreaterThanOrEqual(3);
+    // Survey (P7), the event modal (P8, EventModal replacing EventDialog),
+    // and Build/Settings (P10) migrated to the redesign's own title markup
+    // and no longer count here — each surface-by-surface migration shrinks
+    // this number further, same as it did when Blast moved off .bs-panel-title.
+    expect(titleEls.length).toBeGreaterThanOrEqual(1);
     const before = titleEls.map((el) => el.textContent);
 
     clickFrenchButton(container);
@@ -223,13 +223,16 @@ describe('UIManager — locale refresh on language switch (issue #457)', () => {
   it('external setLanguageChangeHandler callback does not suppress UIManager\'s own panel refresh', () => {
     uiManager = new UIManager(container);
     uiManager.setLanguageChangeHandler(() => {});
-    const buildTitle = container.querySelector('#bs-build-panel .bs-panel-title');
-    const before = buildTitle?.textContent;
+    // Build (P10) moved off the legacy .bs-panel-title class onto the
+    // shared bsx-root header — its title has no dedicated selector anymore
+    // (same as Fleet/Contracts above), so check the whole panel's text.
+    const buildPanel = container.querySelector('#bs-build-panel') as HTMLElement;
+    expect(buildPanel.textContent).toContain(t('ui.build.title'));
 
     clickFrenchButton(container);
 
-    expect(buildTitle?.textContent).not.toBe(before);
-    expect(buildTitle?.textContent).toBe(t('ui.build.title'));
+    expect(buildPanel.textContent).toContain(t('ui.build.title'));
+    expect(buildPanel.textContent).not.toContain('Build');
   });
 
   it('calling refreshLocale() directly re-renders every owned panel title to the current locale', () => {
@@ -238,9 +241,9 @@ describe('UIManager — locale refresh on language switch (issue #457)', () => {
 
     uiManager.refreshLocale();
 
-    const buildTitle = container.querySelector('#bs-build-panel .bs-panel-title');
-    expect(buildTitle?.textContent).toBe(t('ui.build.title'));
-    expect(buildTitle?.textContent).not.toBe('Build');
+    const buildPanel = container.querySelector('#bs-build-panel') as HTMLElement;
+    expect(buildPanel.textContent).toContain(t('ui.build.title'));
+    expect(buildPanel.textContent).not.toContain('Build');
   });
 });
 

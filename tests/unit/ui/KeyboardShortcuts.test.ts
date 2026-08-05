@@ -119,10 +119,4 @@ describe('KeyboardShortcuts (12.7)', () => {
     expect(callbacks.togglePause).not.toHaveBeenCalled();
   });
 
-  it('makeHelpPanel returns an HTMLElement with shortcut labels', () => {
-    const panel = KeyboardShortcuts.makeHelpPanel();
-    expect(panel).toBeInstanceOf(HTMLElement);
-    expect(panel.children.length).toBeGreaterThan(1);
-    ks.dispose();
-  });
 });

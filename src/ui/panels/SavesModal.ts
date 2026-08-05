@@ -21,11 +21,11 @@ import { getLevel } from '../../core/campaign/Level.js';
 export type OnLoadCallback = (state: GameState) => void;
 export type GetStateCallback = () => GameState | null;
 
-const AUTO_SAVE_SLOT = 'auto';
+export const AUTO_SAVE_SLOT = 'auto';
 const THUMB_STYLE = 'width:58px;height:40px;border-radius:4px;flex:0 0 auto;'
   + 'background:repeating-linear-gradient(135deg,#2a3038 0 6px,#1d232b 6px 12px)';
 
-function relativeTime(timestampMs: number): string {
+export function relativeTime(timestampMs: number): string {
   const minutes = Math.floor((Date.now() - timestampMs) / 60000);
   if (minutes < 1) return t('ui.saves.ago_now');
   if (minutes < 60) return t('ui.saves.ago_minutes', { n: minutes });

@@ -174,7 +174,12 @@ const CSS = `
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 600;
+  /* var(), not a literal: a confirm-before-destructive-action dialog has to
+     beat literally everything, including a menu-tier panel (z-menu-settings)
+     raising one on itself (Settings' RETURN TO MAIN MENU, redesign P10) —
+     found when this was still a hardcoded 600 and the confirm rendered
+     entirely hidden behind the settings panel that requested it. */
+  z-index: var(--bsx-z-modal);
   pointer-events: all;
 }
 .bs-confirm-box {
@@ -326,7 +331,13 @@ const CSS = `
   align-items: center;
   justify-content: center;
   background: rgba(0,0,0,0.7);
-  z-index: 600;
+  /* var(), not the literal 600 this used to be: the pre-redesign z-index
+     scale never anticipated the menu tier's Settings sitting above it (P10)
+     — same class of bug as .bs-confirm-overlay above. An event and a confirm
+     dialog never actually compete for the same pixels (the event's own
+     full-screen overlay blocks the clicks that would raise a confirm), so
+     sharing the tier is safe. */
+  z-index: var(--bsx-z-modal);
   pointer-events: all;
 }
 .bs-event-box {
@@ -394,10 +405,15 @@ const CSS = `
   box-shadow: 0 4px 20px rgba(0,0,0,0.7);
 }
 
-/* ─── Tutorial coach mark ───
+/* ─── Tutorial coach mark (redesign P10) ───
    Docked bottom-centre, never modal: the wrapper lets clicks through so the
    player can actually use the control the step is pointing at, and it sits
-   below the event dialog (z 600) so the two never fight for the same pixels. */
+   below the event dialog (z 600) so the two never fight for the same pixels.
+   Kept bottom-docked deliberately (spec §6.17) even though the design comp's
+   coach card floats centred in the scene's free area — the comp's own text
+   for this component says "never covering the highlighted control", which
+   the existing bottom dock already guarantees and a scene-centred card would
+   have to re-derive per step. */
 .bs-tutorial-overlay {
   position: fixed;
   left: 0; right: 0; bottom: 0;
@@ -408,16 +424,15 @@ const CSS = `
   pointer-events: none;
 }
 .bs-tutorial-box {
-  background: rgba(14, 11, 6, 0.95);
-  border: 1px solid rgba(200, 160, 60, 0.55);
-  border-radius: 10px;
-  padding: 12px 16px 14px;
+  background: var(--bsx-panel);
+  border: 1px solid rgba(255,176,46,.4);
+  border-radius: 8px;
   width: 100%;
-  max-width: 560px;
+  max-width: 520px;
   pointer-events: all;
-  box-shadow: 0 8px 40px rgba(0,0,0,0.8);
-  font-family: 'Segoe UI', system-ui, Arial, sans-serif;
-  color: #e8e0d0;
+  box-shadow: 0 16px 44px rgba(0,0,0,.6);
+  overflow: hidden;
+  color: var(--bsx-text-primary);
 }
 /* ─── Placement parameter strip (redesign P3) ───
    Bottom-docked like the tutorial coach card above, so a guided step that
@@ -425,73 +440,54 @@ const CSS = `
    of sitting behind it — same screen edge, same z-stack region. */
 #bs-param-strip { bottom: 18px; }
 body.bs-tutorial-guided #bs-param-strip { bottom: var(--bsx-tutorial-card-clearance, 210px); }
-.bs-tutorial-header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
+/* Overrides the shared .bs-panel-title (uppercase, gold, bordered) — the
+   coach card's title sits inline with the CLOCK HELD chip and step counter
+   instead of owning its own bordered header row. */
+.bs-tutorial-box .bs-panel-title {
+  font: 700 13px/1 var(--bsx-font-ui);
+  letter-spacing: .02em;
+  text-transform: none;
+  color: var(--bsx-text-primary);
+  border-bottom: 0;
+  margin-bottom: 0;
+  padding-bottom: 0;
 }
-.bs-tutorial-header .bs-panel-title { margin-bottom: 6px; flex: 1; }
 .bs-tutorial-box .bs-panel-text {
-  font-size: 13px;
-  line-height: 1.55;
-  color: #d8c8a8;
-  margin: 0 0 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--bsx-text-secondary);
+  margin: 0;
 }
 .bs-tutorial-progress {
-  font-size: 11px;
-  color: #9a8868;
+  margin-left: auto;
+  font: 500 10px/1 var(--bsx-font-mono);
+  color: var(--bsx-text-micro);
   white-space: nowrap;
-  letter-spacing: 0.04em;
 }
 .bs-tutorial-progress-track {
-  background: rgba(255,255,255,0.1);
-  border-radius: 3px;
-  height: 4px;
+  background: #242c36;
+  height: 3px;
   overflow: hidden;
-  margin-bottom: 10px;
 }
 .bs-tutorial-progress-fill {
   height: 100%;
-  background: #f0b840;
-  border-radius: 3px;
+  background: var(--bsx-amber);
   transition: width 0.3s ease;
 }
 .bs-tutorial-commands-label {
   font-size: 9px;
-  color: #7a6b55;
+  color: var(--bsx-text-micro);
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  margin-bottom: 2px;
 }
 .bs-tutorial-commands {
-  font-family: ui-monospace, 'Consolas', monospace;
+  font-family: var(--bsx-font-mono);
   font-size: 11px;
-  color: #a89060;
-  background: rgba(255,255,255,0.05);
+  color: var(--bsx-text-tinted);
+  background: var(--bsx-well);
   border-radius: 4px;
   padding: 4px 8px;
-  margin-bottom: 10px;
   word-break: break-word;
-}
-.bs-tutorial-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-/* ─── Tutorial step highlight (bright blue pulsating glow) ─── */
-.bs-tutorial-highlight {
-  animation: bs-tutorial-pulse 1.5s ease-in-out infinite !important;
-  box-shadow: 0 0 12px 4px rgba(64, 156, 255, 0.8) !important;
-  border-color: #409cff !important;
-  outline: 2px solid rgba(64, 156, 255, 0.5) !important;
-  outline-offset: 2px !important;
-  transition: box-shadow 0.3s ease !important;
-}
-@keyframes bs-tutorial-pulse {
-  0%, 100% { box-shadow: 0 0 8px 2px rgba(64, 156, 255, 0.6); }
-  50% { box-shadow: 0 0 16px 6px rgba(64, 156, 255, 0.9); }
 }
 
 /* ─── Guided tutorial rails ───
@@ -502,7 +498,9 @@ body.bs-tutorial-guided #bs-param-strip { bottom: var(--bsx-tutorial-card-cleara
    sits outside the panel tree — leaving it live let a player walk out of the
    tutorial mid-step and lose it, which is the whole reason these rails exist.
    Written as "not marked allowed" so a control rendered between two passes of
-   the guide is inert from its first frame rather than briefly live. */
+   the guide is inert from its first frame rather than briefly live.
+   The coach card itself carries no button/select/input (no Skip, no Next, no
+   close — see tutorialOverlayDom.ts), so it needs no exemption from this rule. */
 body.bs-tutorial-guided button:not(.bs-tutorial-allowed),
 body.bs-tutorial-guided select:not(.bs-tutorial-allowed),
 body.bs-tutorial-guided input:not(.bs-tutorial-allowed),
@@ -511,26 +509,48 @@ body.bs-tutorial-guided .bs-detail-toggle:not(.bs-tutorial-allowed) {
   opacity: 0.4;
   filter: saturate(0.3);
 }
-/* The card itself is never blocked — it carries the instructions. */
-body.bs-tutorial-guided .bs-tutorial-box button,
-body.bs-tutorial-guided .bs-tutorial-box select,
-body.bs-tutorial-guided .bs-tutorial-box input {
-  pointer-events: all;
-  opacity: 1;
-  filter: none;
-}
 .bs-tutorial-stage {
-  font-size: 12px;
-  font-weight: 600;
-  color: #7ab8ff;
-  margin: 0 0 8px;
-  line-height: 1.4;
+  font: 600 11px/1.4 var(--bsx-font-ui);
 }
+/* CLOCK HELD chip, inline with the title. */
 .bs-tutorial-paused {
-  font-size: 11px;
-  color: #f0c060;
-  margin: 0 0 8px;
-  line-height: 1.4;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(255,176,46,.16);
+  color: var(--bsx-amber);
+  font: 700 10px/1.4 var(--bsx-font-ui);
+  letter-spacing: .04em;
+}
+
+/* ─── Reduced motion (P10): pip pulse → static ───
+   bs-pulse only animates opacity — no transform — so on its own it would be
+   left running under the "keep opacity" rule. It is special-cased anyway
+   because the spec calls it out by name ("pip pulse → static"): a periodic
+   flash reads as motion to a vestibular-sensitive player even without
+   translate/scale. Freezing at the animation's natural end (opacity 1, its
+   0%/100% value) would render identically to "no alert" ever having played,
+   so this holds the cycle's low point (opacity .55) instead — the frame
+   that actually reads as "this is highlighted" — with no motion.
+   Covers both the class-based use above (.bs-event-badge, the kind:'event'
+   pip) and the same bs-pulse keyframe applied inline by TopBar.ts on every
+   other critical-tone alert pip (ecology/bankruptcy/crew), which carries no
+   class to select — matched below by the inline style text itself, since an
+   !important author rule overrides a non-important inline declaration
+   regardless of selector.
+   Nothing else in this file needs an entry: every other transition here
+   (button/input/build/survey hover, the *-bar-fill widths) is background,
+   border-color, color or width, never transform. The tutorial keyframes are
+   deliberately left alone — that block is being reworked by concurrent work
+   on the tutorial system. */
+@media (prefers-reduced-motion: reduce) {
+  .bs-event-badge,
+  #bs-hud-top button[style*="bs-pulse"] {
+    animation: none !important;
+    opacity: .55 !important;
+  }
 }
 `;
 

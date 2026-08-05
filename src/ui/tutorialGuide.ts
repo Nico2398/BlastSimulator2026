@@ -14,8 +14,16 @@ import type { TutorialStage } from './tutorialStages.js';
 export const GUIDED_CLASS = 'bs-tutorial-guided';
 /** Marks the controls the player is allowed to use right now. */
 export const ALLOWED_CLASS = 'bs-tutorial-allowed';
-/** Marks the one control the step is pointing at. */
-export const HIGHLIGHT_CLASS = 'bs-tutorial-highlight';
+/**
+ * Marks the one control the step is pointing at.
+ *
+ * `bsx-highlight` (redesign P0, `src/ui/tokens.ts`) is the static three-ring
+ * glow the design system specifies. The pre-redesign class this replaced,
+ * `bs-tutorial-highlight`, pulsed — a leftover from before P0 ported the
+ * design system's own (non-pulsing) highlight token; P10 finally points the
+ * rails at it.
+ */
+export const HIGHLIGHT_CLASS = 'bsx-highlight';
 
 /**
  * Ticks a step may consume before the clock is held.

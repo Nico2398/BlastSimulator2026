@@ -369,7 +369,7 @@ describe('TutorialOverlay (12.4)', () => {
 
       tut.start(createMockState());
       // Step 0 (time-speed) has highlightTarget '#bs-hud-top .bs-speed-btn button[data-speed]'
-      expect(speedBtn.classList.contains('bs-tutorial-highlight')).toBe(true);
+      expect(speedBtn.classList.contains('bsx-highlight')).toBe(true);
       hudTop.remove();
     });
 
@@ -387,7 +387,7 @@ describe('TutorialOverlay (12.4)', () => {
       document.body.appendChild(hudTop);
 
       tut.start(createMockState());
-      expect(speedBtn.classList.contains('bs-tutorial-highlight')).toBe(true);
+      expect(speedBtn.classList.contains('bsx-highlight')).toBe(true);
 
       // Advance by completing step 0 (time-speed: increase timeScale)
       const state = createMockState();
@@ -395,7 +395,7 @@ describe('TutorialOverlay (12.4)', () => {
       tut.onCommandExecuted(state);
       // After advancing, highlight should be removed from old element
       // (and new highlight may be applied if new step has target)
-      expect(speedBtn.classList.contains('bs-tutorial-highlight')).toBe(false);
+      expect(speedBtn.classList.contains('bsx-highlight')).toBe(false);
       hudTop.remove();
     });
 
@@ -413,10 +413,10 @@ describe('TutorialOverlay (12.4)', () => {
       document.body.appendChild(hudTop);
 
       tut.start(createMockState());
-      expect(speedBtn.classList.contains('bs-tutorial-highlight')).toBe(true);
+      expect(speedBtn.classList.contains('bsx-highlight')).toBe(true);
 
       tut.finish();
-      expect(speedBtn.classList.contains('bs-tutorial-highlight')).toBe(false);
+      expect(speedBtn.classList.contains('bsx-highlight')).toBe(false);
       hudTop.remove();
     });
 
@@ -434,11 +434,11 @@ describe('TutorialOverlay (12.4)', () => {
       document.body.appendChild(hudTop);
 
       tut.start(createMockState());
-      expect(speedBtn.classList.contains('bs-tutorial-highlight')).toBe(true);
+      expect(speedBtn.classList.contains('bsx-highlight')).toBe(true);
 
       tut.dispose();
       overlay = null;
-      expect(speedBtn.classList.contains('bs-tutorial-highlight')).toBe(false);
+      expect(speedBtn.classList.contains('bsx-highlight')).toBe(false);
       hudTop.remove();
     });
 

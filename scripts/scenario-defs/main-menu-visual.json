@@ -26,7 +26,7 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-main-menu .bs-btn-primary"
+          "selector": "#bs-main-menu #bs-menu-new-campaign"
         },
         {
           "type": "wait",

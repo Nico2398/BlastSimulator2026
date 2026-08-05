@@ -93,6 +93,12 @@ export class MainMenu {
     });
 
     const newCampaignBtn = this.makeMenuButton('blast', 'menu.new_campaign', () => this.onNewCampaign?.());
+    // Stable id (same convention as bs-menu-sandbox below) — scenario defs
+    // click this to reach the world map; `.bsx-menu-btn` alone is shared by
+    // every menu button and would resolve to whichever renders first in DOM
+    // order (#471 CI: main-menu-visual/loading-screen-visual both timed out
+    // on the pre-redesign `.bs-btn-primary` selector this replaces).
+    newCampaignBtn.el.id = 'bs-menu-new-campaign';
     const sandboxBtn = this.makeMenuButton('wrench', 'menu.sandbox', () => this.onSandbox?.());
     sandboxBtn.el.id = 'bs-menu-sandbox';
     const tutorialBtn = this.makeMenuButton('training', 'menu.tutorial', () => this.onTutorial?.());

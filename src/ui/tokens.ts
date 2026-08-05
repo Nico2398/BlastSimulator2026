@@ -72,9 +72,15 @@ const TOKENS_CSS = `
   --bsx-z-hovertag: 320;
   --bsx-z-coach: 400;
   --bsx-z-log: 500;
-  --bsx-z-modal: 600;
   --bsx-z-menu: 9999;
   --bsx-z-menu-settings: 10000;
+  /* A confirm-before-destructive-action dialog has to beat literally
+     everything, including Settings raising one on itself (RETURN TO MAIN
+     MENU, redesign P10) — Settings sits at z-menu-settings specifically to
+     beat the main menu behind it, which put it above the modal tier's
+     original 600 until this was found: the confirm dialog rendered, but
+     entirely hidden behind the panel that requested it. */
+  --bsx-z-modal: 10500;
 
   /* ── type ── */
   --bsx-font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
@@ -343,9 +349,21 @@ const TOKENS_CSS = `
 
 @keyframes bsx-toast-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 
-/* ── reduced motion: drop transforms, keep opacity only ── */
+/* ── reduced motion (P10): drop transform-based motion, keep opacity ──
+   Vestibular-trigger guidance is about movement (translate/scale/rotate),
+   not fades, so this only collapses transform-carrying motion — everything
+   else in this file (the background/border-color/color/filter/width
+   transitions above) is left running at its normal duration.
+   bsx-toast-in mixes both: the override below keeps its opacity fade at the
+   same .18s and drops only the translateY slide-in.
+   .bsx-btn:active's transform: translateY(1px) has no entry here — the
+   .bsx-btn transition list above only covers background/border-color/color/
+   filter, so the transform already snaps instantly with no motion to drop.
+   A new transform transition/animation added under .bsx-root needs its own
+   override here; collapsing every duration blanket-style (the old rule)
+   also killed pure-opacity fades, which is the bug this replaces. */
 @media (prefers-reduced-motion: reduce) {
-  .bsx-root, .bsx-root * { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+  @keyframes bsx-toast-in { from { opacity: 0; } to { opacity: 1; } }
 }
 `;
 
