@@ -22,6 +22,18 @@ export const DEFAULT_STEP_TIMEOUT = 60;
 export const SCREENSHOT_DIR = resolve(import.meta.dirname ?? process.cwd(), '..', '..', 'screenshots');
 
 /**
+ * Pause after a UI-mutating action so the next frame's `uiManager.update` runs
+ * before the following action depends on it. 200 ms is the floor at which the
+ * surveyor-hire race clears locally; 300 ms leaves margin for a slower CI
+ * runner. Only the actions below pay it — reads and explicit waits already
+ * block, and commands run synchronously in the game, not the DOM.
+ */
+const INTERACTION_SETTLE_MS = 300;
+const SETTLE_AFTER = new Set([
+  'click', 'clickSelector', 'pickTile', 'dragTiles', 'mousedown', 'mouseup', 'type',
+]);
+
+/**
  * Browser initialization options.
  */
 export interface BrowserInitOptions {
@@ -133,6 +145,17 @@ export async function executeInteractionActions(
       screenshotIndex++;
     } else if (action.type !== 'screenshot') {
       await executeActionOnPage(page, action);
+      // A click that mutates the DOM — opening a panel, then clicking a control
+      // inside it — needs the panel's next-frame `uiManager.update` to run
+      // before the following action reads or clicks that control. The playtest
+      // driver settles after every action for exactly this; the interaction
+      // scenarios did not, so a hire button clicked in the same beat its panel
+      // opened fired against a not-yet-live control and the click was lost
+      // (the tutorial-interactive surveyor hire, which stalled the whole run).
+      // Only the mutating actions pay it; reads and explicit waits do not.
+      if (SETTLE_AFTER.has(action.type)) {
+        await new Promise(r => setTimeout(r, INTERACTION_SETTLE_MS));
+      }
     }
   }
 
