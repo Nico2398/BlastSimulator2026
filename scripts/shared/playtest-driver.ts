@@ -94,9 +94,17 @@ export function describeAvailable(actions: ProbedAction[]): string {
 
 /** Ask the page directly about one selector, rather than matching probe output. */
 async function blockedReason(page: Page, selector: string): Promise<string | null> {
-  return page.evaluate((sel: string) => (window as unknown as {
-    __probeSelector: (s: string) => string | null;
-  }).__probeSelector(sel), selector) as Promise<string | null>;
+  return page.evaluate((sel: string) => {
+    // Scroll into view before probing, exactly as page.click will before
+    // clicking (interaction-executor.ts's clickSelector does the same, #481):
+    // a row below a panel's fold has its centre over the game canvas until
+    // scrolled, and probing that without scrolling first reads as covered-forever.
+    document.querySelector(sel)?.scrollIntoView({ block: 'center', inline: 'nearest' });
+    const probe = (window as unknown as {
+      __probeSelector: (s: string) => string | null;
+    }).__probeSelector;
+    return probe(sel);
+  }, selector) as Promise<string | null>;
 }
 
 async function requireUsable(page: Page, selector: string, timeoutMs: number): Promise<void> {
