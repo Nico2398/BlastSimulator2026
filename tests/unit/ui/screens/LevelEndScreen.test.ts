@@ -5,6 +5,7 @@ import { createGame } from '../../../../src/core/state/GameState.js';
 import type { GameState } from '../../../../src/core/state/GameState.js';
 import type { LevelStats } from '../../../../src/core/campaign/SuccessTracker.js';
 import { setLocale } from '../../../../src/core/i18n/I18n.js';
+import { TICKS_PER_DAY } from '../../../../src/core/config/balance.js';
 
 function mount(): { container: HTMLDivElement; screen: LevelEndScreen } {
   const container = document.createElement('div');
@@ -18,6 +19,16 @@ function stateAtLevelEnd(overrides: Partial<LevelStats> = {}, levelId = 'dusty_h
   s.levelEnded = true;
   s.levelEndReason = 'completed';
   Object.assign(s.levelStats, overrides);
+  return s;
+}
+
+type DefeatReason = 'bankruptcy' | 'arrest' | 'ecological_shutdown' | 'worker_revolt';
+
+function stateAtDefeat(reason: DefeatReason, levelId = 'dusty_hollow'): GameState {
+  const s = createGame({ seed: 42, mineType: 'desert' });
+  s.campaign.activeLevelId = levelId;
+  s.levelEnded = true;
+  s.levelEndReason = reason;
   return s;
 }
 
@@ -38,12 +49,22 @@ describe('LevelEndScreen', () => {
     container.remove();
   });
 
-  it('stays hidden for a non-completed levelEndReason', () => {
+  it('stays hidden while levelEndReason is null', () => {
     const { screen } = mount();
     const state = stateAtLevelEnd(THREE_STAR);
-    state.levelEndReason = 'bankruptcy';
+    state.levelEndReason = null;
+    state.levelEnded = false;
     screen.update(state);
     expect(screen.visible).toBe(false);
+    screen.dispose();
+  });
+
+  it('shows the defeat layout, not the victory layout, for a loss reason', () => {
+    const { container, screen } = mount();
+    screen.update(stateAtDefeat('bankruptcy'));
+    expect(screen.visible).toBe(true);
+    // Victory-only copy must not appear on a defeat render.
+    expect(container.querySelector('#bs-level-end-screen')!.textContent).not.toContain('TARGET REACHED');
     screen.dispose();
   });
 
@@ -234,5 +255,162 @@ describe('LevelEndScreen', () => {
     screen.dispose();
     expect(container.querySelector('#bs-level-end-screen')).toBeNull();
     container.remove();
+  });
+
+  describe('defeat variants', () => {
+    it('each of the 4 loss reasons renders a distinct title', () => {
+      const reasons: DefeatReason[] = ['bankruptcy', 'arrest', 'ecological_shutdown', 'worker_revolt'];
+      const titles = new Set<string>();
+      for (const reason of reasons) {
+        const { container, screen } = mount();
+        screen.update(stateAtDefeat(reason));
+        titles.add(container.querySelector('#bs-level-end-screen')!.textContent!.slice(0, 40));
+        screen.dispose();
+        container.remove();
+      }
+      expect(titles.size).toBe(4);
+    });
+
+    it('bankruptcy: stat grid shows the real cash balance and the real salaries-paid total from the ledger', () => {
+      const { container, screen } = mount();
+      const state = stateAtDefeat('bankruptcy');
+      state.cash = -12345;
+      state.finances.transactions.push(
+        { tick: 1, amount: 4000, type: 'expense', category: 'salaries', description: 'payroll' },
+        { tick: 2, amount: 1500, type: 'expense', category: 'salaries', description: 'payroll' },
+        { tick: 3, amount: 999, type: 'expense', category: 'fuel', description: 'diesel' }, // must not be summed in
+      );
+      screen.update(state);
+
+      const text = container.querySelector('#bs-level-end-screen')!.textContent!;
+      expect(text).toContain('12,345'); // final balance (negative)
+      expect(text).toContain('5,500'); // salaries only: 4000 + 1500, excludes the fuel expense
+      screen.dispose();
+    });
+
+    it('arrest: stat grid shows exposureRisk as a percentage and the real corruption attempt count', () => {
+      const { container, screen } = mount();
+      const state = stateAtDefeat('arrest');
+      state.mafia.exposureRisk = 0.9;
+      state.corruption.level = 4;
+      state.corruption.attempts.push(
+        { tick: 1, target: 'judge', cost: 50000, success: false },
+        { tick: 2, target: 'inspector', cost: 8000, success: true },
+      );
+      screen.update(state);
+
+      const text = container.querySelector('#bs-level-end-screen')!.textContent!;
+      expect(text).toContain('90%');
+      expect(text).toContain('2'); // arrangements made
+      expect(text).toContain('4'); // corruption level
+      screen.dispose();
+    });
+
+    it('ecological_shutdown: stat grid sums real fines-category transactions only', () => {
+      const { container, screen } = mount();
+      const state = stateAtDefeat('ecological_shutdown');
+      state.scores.ecology = 0;
+      state.finances.transactions.push(
+        { tick: 1, amount: 20000, type: 'expense', category: 'fines', description: 'eco fine' },
+        { tick: 2, amount: 5000, type: 'expense', category: 'fines', description: 'eco fine' },
+        { tick: 3, amount: 999, type: 'expense', category: 'salaries', description: 'payroll' }, // must not be summed in
+      );
+      screen.update(state);
+
+      const text = container.querySelector('#bs-level-end-screen')!.textContent!;
+      expect(text).toContain('25,000'); // fines only: 20000 + 5000
+      screen.dispose();
+    });
+
+    it('worker_revolt: stat grid shows the real site policy shift mode label', () => {
+      const { container, screen } = mount();
+      const state = stateAtDefeat('worker_revolt');
+      state.scores.wellBeing = 0;
+      state.sitePolicy.shiftMode = 'continuous';
+      screen.update(state);
+
+      const text = container.querySelector('#bs-level-end-screen')!.textContent!;
+      expect(text).toContain('Continuous');
+      screen.dispose();
+    });
+
+    it('worker_revolt body names the real day count dynamically, not a fixed mockup day', () => {
+      const { container, screen } = mount();
+      const state = stateAtDefeat('worker_revolt');
+      state.tickCount = 5 * TICKS_PER_DAY; // day 6 (1-indexed, matching the victory recap's day formula)
+      screen.update(state);
+
+      expect(container.querySelector('#bs-level-end-screen')!.textContent).toContain('day 6');
+      screen.dispose();
+    });
+
+    it('RETRY routes to onReplay with the level that just ended', () => {
+      const { container, screen } = mount();
+      let replayedId: string | null = null;
+      screen.setOnReplay(id => { replayedId = id; });
+      screen.update(stateAtDefeat('bankruptcy', 'grumpstone_ridge'));
+
+      const retry = Array.from(container.querySelectorAll('#bs-level-end-screen button'))
+        .find(b => b.textContent?.includes('RETRY')) as HTMLButtonElement;
+      retry.click();
+      expect(replayedId).toBe('grumpstone_ridge');
+      screen.dispose();
+    });
+
+    it('BACK TO PORTFOLIO routes to onBackToPortfolio regardless of level position', () => {
+      const { container, screen } = mount();
+      let backCalled = false;
+      screen.setOnBackToPortfolio(() => { backCalled = true; });
+      // Not the last level — unlike the victory screen, defeat always offers a portfolio exit.
+      screen.update(stateAtDefeat('arrest', 'dusty_hollow'));
+
+      const back = Array.from(container.querySelectorAll('#bs-level-end-screen button'))
+        .find(b => b.textContent?.includes('BACK TO PORTFOLIO')) as HTMLButtonElement;
+      back.click();
+      expect(backCalled).toBe(true);
+      screen.dispose();
+    });
+
+    it('does not rebuild a defeat render on a second update() call for the same reason (idempotent)', () => {
+      const { container, screen } = mount();
+      const state = stateAtDefeat('ecological_shutdown');
+      screen.update(state);
+      const first = container.querySelector('#bs-level-end-screen')!.textContent;
+
+      state.scores.ecology = 99; // a naive re-render would pick this up
+      screen.update(state);
+      expect(container.querySelector('#bs-level-end-screen')!.textContent).toBe(first);
+      screen.dispose();
+    });
+
+    it('a locale refresh while a defeat screen is showing re-renders the title in the new language', () => {
+      const { container, screen } = mount();
+      screen.update(stateAtDefeat('bankruptcy'));
+      expect(container.querySelector('#bs-level-end-screen')!.textContent).toContain('THE BANK HAS NOTICED');
+
+      setLocale('fr');
+      screen.refreshLocale();
+
+      expect(container.querySelector('#bs-level-end-screen')!.textContent).toContain('LA BANQUE A REMARQUÉ');
+      screen.dispose();
+    });
+
+    it('switching from a defeat reason to a fresh completed level shows the victory layout, not stale defeat content', () => {
+      const { container, screen } = mount();
+      screen.update(stateAtDefeat('worker_revolt', 'dusty_hollow'));
+      expect(container.querySelector('#bs-level-end-screen')!.textContent).toContain('THE CREW HAS WALKED OUT');
+
+      const midState = stateAtDefeat('worker_revolt', 'dusty_hollow');
+      midState.levelEndReason = null;
+      midState.levelEnded = false;
+      screen.update(midState);
+      expect(screen.visible).toBe(false);
+
+      screen.update(stateAtLevelEnd(THREE_STAR, 'grumpstone_ridge'));
+      const text = container.querySelector('#bs-level-end-screen')!.textContent!;
+      expect(text).toContain('TARGET REACHED');
+      expect(text).not.toContain('THE CREW HAS WALKED OUT');
+      screen.dispose();
+    });
   });
 });
