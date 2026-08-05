@@ -4,7 +4,15 @@ import { CompositionPalette } from '../../../src/core/world/VoxelGrid.js';
 import type { LandscapeMap, LandscapeTile } from '../../../src/core/world/LandscapeMap.js';
 import type { Rect } from '../../../src/core/world/WorldGen.js';
 import type { LandscapeHandle } from '../../../src/console/commands/world.js';
-import { LandscapeMesh, seamHeightAt, voxelSurfaceHeight } from '../../../src/renderer/terrain/LandscapeMesh.js';
+import {
+  LandscapeMesh,
+  rockBlendFor,
+  classifyQuad,
+  buildBoundaryQuad,
+  type PlayableCut,
+} from '../../../src/renderer/terrain/LandscapeMesh.js';
+import { rockIndexOf } from '../../../src/core/world/RockCatalog.js';
+import { getAllBiomes } from '../../../src/core/world/BiomeCatalog.js';
 
 function makeScene(): THREE.Scene {
   return new THREE.Scene();
@@ -45,7 +53,7 @@ function makeFakeHandle(
 }
 
 describe('LandscapeMesh', () => {
-  it('builds one Mesh per non-empty tile plus a seam mesh, all added to the scene', () => {
+  it('builds one Mesh per non-empty tile, with no separate seam mesh (#491)', () => {
     const scene = makeScene();
     const { palette, compId } = makePalette();
     const rect: Rect = { minX: 0, minZ: 0, maxX: 32, maxZ: 32 };
@@ -59,8 +67,8 @@ describe('LandscapeMesh', () => {
     const lm = new LandscapeMesh(scene, makeMaterial());
     lm.build(handle, palette);
 
-    expect(lm.meshCount).toBe(3); // 2 tiles + 1 seam
-    expect(scene.children.length).toBe(3);
+    expect(lm.meshCount).toBe(2); // 2 tiles, no seam mesh (#491 removes the seam design)
+    expect(scene.children.length).toBe(2);
     lm.dispose();
   });
 
@@ -74,7 +82,8 @@ describe('LandscapeMesh', () => {
     const lm = new LandscapeMesh(scene, makeMaterial());
     lm.build(handle, palette);
 
-    expect(lm.meshCount).toBe(1); // seam mesh only
+    expect(lm.meshCount).toBe(0); // no tile geometry, and no seam mesh to fall back on (#491)
+    expect(scene.children.length).toBe(0);
     lm.dispose();
   });
 
@@ -119,7 +128,7 @@ describe('LandscapeMesh', () => {
     lm.dispose();
   });
 
-  it('tile and seam meshes cast and receive shadows (#458 T5.1/CSM)', () => {
+  it('tile meshes cast and receive shadows (#458 T5.1/CSM)', () => {
     const scene = makeScene();
     const { palette, compId } = makePalette();
     const rect: Rect = { minX: 0, minZ: 0, maxX: 32, maxZ: 32 };
@@ -171,7 +180,7 @@ describe('LandscapeMesh', () => {
     lm.dispose();
   });
 
-  describe('tile meshes never cover the playable rect', () => {
+  describe('tile meshes never fully cover the playable claim', () => {
     // A tile spans 512m while a playable rect is 32-160m, so every rect sits
     // deep inside its tiles. Before this exclusion the coarse 4m sheet was
     // emitted straight across the pit at the pre-dig surface height, hiding
@@ -202,7 +211,12 @@ describe('LandscapeMesh', () => {
       return { tile: makeFakeTile(-100, -100, 40, compId), n: 40 };
     }
 
-    it('emits no triangle that reaches inside the playable rect', () => {
+    it('never emits a vertex more than one coarse step inside the claim (fine subdivision stays within its own boundary quad)', () => {
+      // Under the fixed design a coarse quad classified 'inside' (every corner
+      // owned) is dropped whole, but a 'boundary' quad's fine subdivision keeps
+      // any fine cell with at least one unowned corner — so geometry can still
+      // reach up to one coarse-tile step (4m, the default coarseStep here) past
+      // the claim edge, never further.
       const scene = makeScene();
       const { palette, compId } = makePalette();
       const { tile, n } = tileCoveringRect(compId);
@@ -218,7 +232,7 @@ describe('LandscapeMesh', () => {
 
       for (const tri of triangles(tileMesh)) {
         for (const [x, z] of tri) {
-          expect(insideDepth(x, z)).toBeLessThanOrEqual(0);
+          expect(insideDepth(x, z)).toBeLessThanOrEqual(4 + 1e-6);
         }
       }
       lm.dispose();
@@ -259,7 +273,7 @@ describe('LandscapeMesh', () => {
       lm.dispose();
     });
 
-    it('drops the tile entirely when every one of its quads is inside the rect', () => {
+    it('drops the tile entirely when every one of its quads is inside the rect (no double coverage of the claim)', () => {
       const scene = makeScene();
       const { palette, compId } = makePalette();
       const big: Rect = { minX: -1000, minZ: -1000, maxX: 1000, maxZ: 1000 };
@@ -277,126 +291,290 @@ describe('LandscapeMesh', () => {
     });
   });
 
-  describe('seam mesh (#458 A16 anti-gap overlap)', () => {
-    it('locks seam height to the playable mesh at the rect edge, easing out to the true height', () => {
-      // The two representations quantize differently: the landscape samples a
-      // continuous height, while the voxel grid rounds to a voxel and marching
-      // cubes lands the iso-surface half a voxel below the first air cell.
-      // Left alone the seam floats up to a metre above the playable mesh — a
-      // lip right round the site.
+  describe('no landscape vertex sits above the sampled height field (#491)', () => {
+    it('every emitted vertex matches a linear ground-truth field exactly, at every (x,z) it emits (interior and flat-edge nodes both interpolate exactly for a linear field)', () => {
       const scene = makeScene();
       const { palette, compId } = makePalette();
-      const rect: Rect = { minX: 0, minZ: 0, maxX: 32, maxZ: 32 };
-      // A flat, deliberately non-integer height isolates the quantization.
-      const H = 50.4;
-      const handle = makeFakeHandle(rect, [], 4, compId, () => ({ height: H, biomeId: 0, surfCompId: compId }));
-
-      const lm = new LandscapeMesh(scene, makeMaterial());
-      lm.build(handle, palette);
-
-      const seamMesh = scene.children[0] as THREE.Mesh;
-      const positions = seamMesh.geometry.getAttribute('position').array as Float32Array;
-      const matched = voxelSurfaceHeight(H); // the playable mesh's own surface — now the same 50.4
-
-      let sawInside = false, sawFarOutside = false;
-      for (let i = 0; i < positions.length; i += 3) {
-        const x = positions[i]!, y = positions[i + 1]!, z = positions[i + 2]!;
-        const dx = Math.min(x - rect.minX, rect.maxX - x);
-        const dz = Math.min(z - rect.minZ, rect.maxZ - z);
-        const insideDepth = Math.min(dx, dz);
-
-        if (insideDepth > 0) {
-          // Inside the rect: sits on the playable surface, dropped clear of it.
-          expect(y).toBeCloseTo(matched - 0.15, 5);
-          sawInside = true;
-        } else if (insideDepth <= -24) {
-          // A full margin out: back to the smooth continuous height.
-          expect(y).toBeCloseTo(H, 5);
-          sawFarOutside = true;
+      const field = (x: number, z: number) => 10 + 0.5 * x + 0.3 * z;
+      const rect: Rect = { minX: 0, minZ: 0, maxX: 20, maxZ: 20 };
+      const n = 9;
+      const tile = makeFakeTile(-20, -20, n, compId);
+      for (let row = 0; row < n; row++) {
+        for (let col = 0; col < n; col++) {
+          const x = tile.originX + col * 4; // default coarseStep in makeFakeHandle
+          const z = tile.originZ + row * 4;
+          tile.heights[row * n + col] = field(x, z);
         }
-        // Everywhere between is a blend, always within the two bounds.
-        // Positions round-trip through Float32, so allow a float32 ulp.
-        expect(y).toBeGreaterThanOrEqual(matched - 0.15 - 1e-4);
-        expect(y).toBeLessThanOrEqual(H + 1e-4);
       }
-      expect(sawInside).toBe(true);
-      expect(sawFarOutside).toBe(true);
-      lm.dispose();
-    });
-
-    it('seamHeightAt meets the voxel surface exactly at the boundary', () => {
-      for (const h of [50.4, 50.5, 49.9, 12.0, 7.25]) {
-        expect(seamHeightAt(h, 0)).toBeCloseTo(voxelSurfaceHeight(h), 6);
-      }
-    });
-
-    it('never emits a vertex more than OVERLAP + one grid step inside the playable rect', () => {
-      // A quad is included if ANY of its 4 corners is within OVERLAP — so an
-      // included quad's deepest corner can be up to OVERLAP + FINE_STEP in
-      // the worst case (the quantization slack of a discrete grid, not a
-      // bug: the playable mesh already fully covers that ground regardless).
-      const scene = makeScene();
-      const { palette, compId } = makePalette();
-      const rect: Rect = { minX: 0, minZ: 0, maxX: 32, maxZ: 32 };
-      const handle = makeFakeHandle(rect, [], 4, compId, () => ({ height: 50, biomeId: 0, surfCompId: compId }));
+      const handle = makeFakeHandle(rect, [tile], n, compId, (x, z) => ({ height: field(x, z), biomeId: 0, surfCompId: compId }));
 
       const lm = new LandscapeMesh(scene, makeMaterial());
       lm.build(handle, palette);
+      expect(scene.children.length).toBeGreaterThan(0);
 
-      const seamMesh = scene.children[0] as THREE.Mesh;
-      const positions = seamMesh.geometry.getAttribute('position').array as Float32Array;
-      for (let i = 0; i < positions.length; i += 3) {
-        const x = positions[i]!, z = positions[i + 2]!;
-        const dx = Math.min(x - rect.minX, rect.maxX - x);
-        const dz = Math.min(z - rect.minZ, rect.maxZ - z);
-        const insideDepth = Math.min(dx, dz);
-        expect(insideDepth).toBeLessThanOrEqual(2 + 1 + 1e-9);
+      for (const child of scene.children) {
+        const mesh = child as THREE.Mesh;
+        const pos = mesh.geometry.getAttribute('position').array as Float32Array;
+        for (let i = 0; i < pos.length; i += 3) {
+          const x = pos[i]!, y = pos[i + 1]!, z = pos[i + 2]!;
+          expect(y).toBeCloseTo(field(x, z), 4);
+        }
       }
       lm.dispose();
     });
+  });
 
-    it('reaches at least FINE_MARGIN (24m) outside the playable rect', () => {
-      const scene = makeScene();
+  describe('pit/landscape junction continuity via PlayableCut.boundaryHeightAt (#491)', () => {
+    function makeJunctionHandle(theoreticalHeight: number) {
       const { palette, compId } = makePalette();
-      const rect: Rect = { minX: 0, minZ: 0, maxX: 32, maxZ: 32 };
-      const handle = makeFakeHandle(rect, [], 4, compId, () => ({ height: 50, biomeId: 0, surfCompId: compId }));
+      const n = 9;
+      const tile = makeFakeTile(0, -1000, n, compId, theoreticalHeight);
+      const rect: Rect = { minX: 16, minZ: -1000, maxX: 1000, maxZ: 1000 };
+      const handle = makeFakeHandle(rect, [tile], n, compId, () => ({ height: theoreticalHeight, biomeId: 0, surfCompId: compId }));
+      return { handle, palette, rect };
+    }
+
+    /** Height of the emitted vertex nearest the claim edge (largest x still < 16). */
+    function closestUnownedVertexHeight(scene: THREE.Scene): number {
+      let bestX = -Infinity;
+      let bestY = NaN;
+      for (const child of scene.children) {
+        const mesh = child as THREE.Mesh;
+        const pos = mesh.geometry.getAttribute('position')?.array as Float32Array | undefined;
+        if (!pos) continue;
+        for (let i = 0; i < pos.length; i += 3) {
+          const x = pos[i]!;
+          if (x < 16 && x > bestX) { bestX = x; bestY = pos[i + 1]!; }
+        }
+      }
+      return bestY;
+    }
+
+    it('before a blast: boundary nodes track the live pre-dig height supplied by boundaryHeightAt', () => {
+      const scene = makeScene();
+      const { handle, palette, rect } = makeJunctionHandle(50);
+      const playable: PlayableCut = { rect, ownsColumn: (x) => x >= 16, boundaryHeightAt: () => 50 };
 
       const lm = new LandscapeMesh(scene, makeMaterial());
-      lm.build(handle, palette);
-
-      const seamMesh = scene.children[0] as THREE.Mesh;
-      const positions = seamMesh.geometry.getAttribute('position').array as Float32Array;
-      let minX = Infinity, maxX = -Infinity;
-      for (let i = 0; i < positions.length; i += 3) {
-        minX = Math.min(minX, positions[i]!);
-        maxX = Math.max(maxX, positions[i]!);
-      }
-      expect(minX).toBeLessThanOrEqual(rect.minX - 24);
-      expect(maxX).toBeGreaterThanOrEqual(rect.maxX + 24);
+      lm.build(handle, palette, playable);
+      expect(closestUnownedVertexHeight(scene)).toBeCloseTo(50, 1);
       lm.dispose();
     });
 
-    it('is deterministic for the same handle and palette', () => {
-      const { palette, compId } = makePalette();
-      const rect: Rect = { minX: 0, minZ: 0, maxX: 32, maxZ: 32 };
-      const handle = makeFakeHandle(rect, [], 4, compId);
+    it('after a blast: boundary nodes track the lower live height, not the stale WorldGen height (#491)', () => {
+      const scene = makeScene();
+      const { handle, palette, rect } = makeJunctionHandle(50); // sampleColumn/WorldGen still reports the theoretical pre-dig 50
+      const playable: PlayableCut = { rect, ownsColumn: (x) => x >= 16, boundaryHeightAt: () => 44 }; // TerrainMesh currently renders a dug crater at 44
 
-      const sceneA = makeScene();
-      const lmA = new LandscapeMesh(sceneA, makeMaterial());
-      lmA.build(handle, palette);
-      const meshA = sceneA.children[0] as THREE.Mesh; // only the seam mesh — tiles is []
-
-      const sceneB = makeScene();
-      const lmB = new LandscapeMesh(sceneB, makeMaterial());
-      lmB.build(handle, palette);
-      const meshB = sceneB.children[0] as THREE.Mesh;
-
-      expect(Array.from(meshA.geometry.getAttribute('position').array))
-        .toEqual(Array.from(meshB.geometry.getAttribute('position').array));
-
-      lmA.dispose();
-      lmB.dispose();
+      const lm = new LandscapeMesh(scene, makeMaterial());
+      lm.build(handle, palette, playable);
+      const y = closestUnownedVertexHeight(scene);
+      expect(y).toBeCloseTo(44, 1);
+      expect(Math.abs(y - 50)).toBeGreaterThan(2); // must not have fallen back to the theoretical height
+      lm.dispose();
     });
+  });
+});
+
+describe('rockBlendFor (#491)', () => {
+  it('single-rock composition: weight 0, rockA === rockB, matching the dominant rock index', () => {
+    const palette = new CompositionPalette();
+    const compId = palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+
+    const result = rockBlendFor(palette, compId);
+    expect(result.rockA).toBe(result.rockB);
+    expect(result.weight).toBe(0);
+    expect(result.rockA).toBe(Math.max(0, rockIndexOf('cruite')));
+  });
+
+  it('two-rock composition: dominant sorts to rockA, runner-up to rockB, weight is the runner-up fraction', () => {
+    const palette = new CompositionPalette();
+    const compId = palette.intern({ rocks: [{ rockId: 'sandite', coefficient: 0.65 }, { rockId: 'molite', coefficient: 0.35 }] });
+
+    const result = rockBlendFor(palette, compId);
+    expect(result.rockA).toBe(Math.max(0, rockIndexOf('sandite')));
+    expect(result.rockB).toBe(Math.max(0, rockIndexOf('molite')));
+    expect(result.weight).toBeCloseTo(0.35, 5);
+  });
+
+  it('sorts by coefficient magnitude, not input array order', () => {
+    const palette = new CompositionPalette();
+    // Deliberately entered with the smaller coefficient first — the palette
+    // itself re-sorts entries by rockId, not coefficient, so rockBlendFor must
+    // do its own magnitude sort rather than trusting array order.
+    const compId = palette.intern({ rocks: [{ rockId: 'molite', coefficient: 0.2 }, { rockId: 'sandite', coefficient: 0.8 }] });
+
+    const result = rockBlendFor(palette, compId);
+    expect(result.rockA).toBe(Math.max(0, rockIndexOf('sandite')));
+    expect(result.rockB).toBe(Math.max(0, rockIndexOf('molite')));
+    expect(result.weight).toBeCloseTo(0.2, 5);
+  });
+
+  it('air composition (palette index 0) resolves without throwing, weight 0', () => {
+    const palette = new CompositionPalette();
+    expect(() => rockBlendFor(palette, 0)).not.toThrow();
+    const result = rockBlendFor(palette, 0);
+    expect(result.weight).toBe(0);
+    expect(result.rockA).toBe(result.rockB);
+  });
+});
+
+describe('classifyQuad (#491)', () => {
+  function cut(owns: (x: number, z: number) => boolean): PlayableCut {
+    return { rect: { minX: 0, minZ: 0, maxX: 100, maxZ: 100 }, ownsColumn: owns };
+  }
+
+  it('outside: all four corners unowned', () => {
+    const playable = cut(() => false);
+    expect(classifyQuad(playable, 0, 0, 4, 4)).toBe('outside');
+  });
+
+  it('inside: all four corners owned', () => {
+    const playable = cut(() => true);
+    expect(classifyQuad(playable, 0, 0, 4, 4)).toBe('inside');
+  });
+
+  it('boundary: exactly one corner owned', () => {
+    const playable = cut((x, z) => x === 4 && z === 4);
+    expect(classifyQuad(playable, 0, 0, 4, 4)).toBe('boundary');
+  });
+
+  it('boundary: exactly three corners owned', () => {
+    const playable = cut((x, z) => !(x === 0 && z === 0));
+    expect(classifyQuad(playable, 0, 0, 4, 4)).toBe('boundary');
+  });
+
+  it('boundary: one full side owned (two adjacent corners)', () => {
+    const playable = cut((x) => x === 4);
+    expect(classifyQuad(playable, 0, 0, 4, 4)).toBe('boundary');
+  });
+
+  it('boundary: two diagonally-opposite corners owned', () => {
+    const playable = cut((x, z) => (x === 0 && z === 0) || (x === 4 && z === 4));
+    expect(classifyQuad(playable, 0, 0, 4, 4)).toBe('boundary');
+  });
+});
+
+describe('buildBoundaryQuad (#491)', () => {
+  const SUBDIV = 4; // documented fine-cell subdivision factor for a boundary quad
+
+  /** Deliberately non-linear in x: a flat-edge interpolation reads measurably different from the true sampled height. */
+  function makeSample(compId: number) {
+    return (x: number, z: number) => ({ height: x * x + z, biomeId: 0, surfCompId: compId });
+  }
+
+  function run(playable: PlayableCut, palette: CompositionPalette, compId: number) {
+    const positions: number[] = [];
+    const normals: number[] = [];
+    const rockA: number[] = [];
+    const rockB: number[] = [];
+    const rockWeight: number[] = [];
+    const ore: number[] = [];
+    const indices: number[] = [];
+    buildBoundaryQuad(
+      positions, normals, rockA, rockB, rockWeight, ore, indices,
+      0, 0, 4, 4,
+      makeSample(compId), palette, playable,
+    );
+    return { positions, normals, rockA, rockB, rockWeight, ore, indices };
+  }
+
+  function verticesAt(positions: number[], normals: number[], x: number, z: number) {
+    const out: { y: number; nx: number; ny: number; nz: number }[] = [];
+    for (let i = 0; i < positions.length; i += 3) {
+      if (Math.abs(positions[i]! - x) < 1e-6 && Math.abs(positions[i + 2]! - z) < 1e-6) {
+        out.push({ y: positions[i + 1]!, nx: normals[i]!, ny: normals[i + 1]!, nz: normals[i + 2]! });
+      }
+    }
+    return out;
+  }
+
+  function heightsAt(positions: number[], x: number, z: number): number[] {
+    const out: number[] = [];
+    for (let i = 0; i < positions.length; i += 3) {
+      if (Math.abs(positions[i]! - x) < 1e-6 && Math.abs(positions[i + 2]! - z) < 1e-6) out.push(positions[i + 1]!);
+    }
+    return out;
+  }
+
+  it('emits geometry for a boundary quad (coherent triangle list, non-empty)', () => {
+    const { palette, compId } = makePalette();
+    const playable: PlayableCut = { rect: { minX: 2, minZ: -100, maxX: 100, maxZ: 100 }, ownsColumn: (x) => x >= 2 };
+
+    const { indices, positions } = run(playable, palette, compId);
+    expect(indices.length).toBeGreaterThan(0);
+    expect(indices.length % 3).toBe(0);
+    expect(positions.length / 3).toBeGreaterThan(0);
+  });
+
+  it("flat-edge rule: nodes on a parent side interpolate linearly between that side's two coarse corners, not the true sampled height", () => {
+    const { palette, compId } = makePalette();
+    // Whole quad outside the claim so every fine cell survives — isolates the
+    // flat-edge behaviour from the keep/drop rule.
+    const playable: PlayableCut = { rect: { minX: 1000, minZ: 1000, maxX: 2000, maxZ: 2000 }, ownsColumn: () => false };
+    const { positions } = run(playable, palette, compId);
+
+    const sample = makeSample(compId);
+    const h00 = sample(0, 0).height; // 0
+    const h40 = sample(4, 0).height; // 16
+    const expectedEdge = h00 + (2 / 4) * (h40 - h00); // 8, linear interpolation
+    const trueSampled = sample(2, 0).height; // 4
+    expect(expectedEdge).not.toBeCloseTo(trueSampled, 3); // the field really is non-linear here
+
+    const edgeHeights = heightsAt(positions, 2, 0);
+    expect(edgeHeights.length).toBeGreaterThan(0);
+    for (const h of edgeHeights) expect(h).toBeCloseTo(expectedEdge, 4);
+  });
+
+  it('interior nodes get the true sampled height and a height-field normal (not a flat-edge interpolation)', () => {
+    const { palette, compId } = makePalette();
+    const playable: PlayableCut = { rect: { minX: 1000, minZ: 1000, maxX: 2000, maxZ: 2000 }, ownsColumn: () => false };
+    const { positions, normals } = run(playable, palette, compId);
+
+    const sample = makeSample(compId);
+    const trueSampled = sample(2, 2).height; // interior node (2,2) => 4 + 2 = 6
+    const verts = verticesAt(positions, normals, 2, 2);
+    expect(verts.length).toBeGreaterThan(0);
+
+    // Analytic gradient of height = x^2 + z at (2, 2): dhdx = 2x = 4, dhdz = 1.
+    const dhdx = 4, dhdz = 1;
+    const len = Math.hypot(dhdx, 1, dhdz);
+    for (const v of verts) {
+      expect(v.y).toBeCloseTo(trueSampled, 4);
+      expect(v.nx).toBeCloseTo(-dhdx / len, 3);
+      expect(v.ny).toBeCloseTo(1 / len, 3);
+      expect(v.nz).toBeCloseTo(-dhdz / len, 3);
+    }
+  });
+
+  it('keeps a fine cell only when at least one of its four corners is unowned', () => {
+    const { palette, compId } = makePalette();
+    // Top-right quadrant (x>=2 && z>=2) is owned by the claim — exactly the 4
+    // innermost fine cells (of SUBDIV*SUBDIV=16) have every corner owned and
+    // must be dropped; the other 12 keep at least one unowned corner.
+    const playable: PlayableCut = {
+      rect: { minX: 2, minZ: 2, maxX: 100, maxZ: 100 },
+      ownsColumn: (x, z) => x >= 2 && z >= 2,
+    };
+    const { indices } = run(playable, palette, compId);
+    const totalCells = SUBDIV * SUBDIV;
+    const fullyOwnedCells = 4;
+    const keptCells = totalCells - fullyOwnedCells;
+    expect(indices.length).toBe(keptCells * 6); // 2 triangles (6 indices) per kept cell
+  });
+
+  it('array lengths stay coherent: one rockA/rockB/rockWeight per vertex, two entries per vertex in ore', () => {
+    const { palette, compId } = makePalette();
+    const playable: PlayableCut = { rect: { minX: 1000, minZ: 1000, maxX: 2000, maxZ: 2000 }, ownsColumn: () => false };
+    const { positions, normals, rockA, rockB, rockWeight, ore } = run(playable, palette, compId);
+
+    const vertexCount = positions.length / 3;
+    expect(vertexCount).toBeGreaterThan(0);
+    expect(normals.length).toBe(positions.length);
+    expect(rockA.length).toBe(vertexCount);
+    expect(rockB.length).toBe(vertexCount);
+    expect(rockWeight.length).toBe(vertexCount);
+    expect(ore.length).toBe(vertexCount * 2);
   });
 });
 
@@ -487,6 +665,11 @@ describe('LandscapeMesh — normals come from the height field, not the triangle
     ) as THREE.Mesh[];
     expect(tileMeshes).toHaveLength(2);
 
+    const positionAt = (mesh: THREE.Mesh, row: number, col: number) => {
+      const a = mesh.geometry.getAttribute('position').array as Float32Array;
+      const i = (row * n + col) * 3;
+      return [a[i]!, a[i + 1]!, a[i + 2]!] as const;
+    };
     const normalAt = (mesh: THREE.Mesh, row: number, col: number) => {
       const a = mesh.geometry.getAttribute('normal').array as Float32Array;
       const i = (row * n + col) * 3;
@@ -499,7 +682,13 @@ describe('LandscapeMesh — normals come from the height field, not the triangle
     const dhdz = (field(edgeX, -1000 + (row + 1) * step) - field(edgeX, -1000 + (row - 1) * step)) / (2 * step);
     const len = Math.hypot(dhdx, 1, dhdz);
 
-    // Tile A's last column and tile B's first are the same world position.
+    // Tile A's last column and tile B's first are the same world position:
+    // exact position match (#491 regression) and exact normal match.
+    const [posA, posB] = [positionAt(tileMeshes[0]!, row, n - 1), positionAt(tileMeshes[1]!, row, 0)];
+    expect(posB[0]).toBeCloseTo(posA[0], 6);
+    expect(posB[1]).toBeCloseTo(posA[1], 6);
+    expect(posB[2]).toBeCloseTo(posA[2], 6);
+
     for (const [mesh, col] of [[tileMeshes[0]!, n - 1], [tileMeshes[1]!, 0]] as const) {
       const nrm = normalAt(mesh, row, col);
       expect(nrm[0]).toBeCloseTo(-dhdx / len, 5);
@@ -507,26 +696,47 @@ describe('LandscapeMesh — normals come from the height field, not the triangle
     }
     lm.dispose();
   });
+});
 
-  it('the seam mesh is shaded from the sampled height field too', () => {
-    const scene = makeScene();
-    const { palette, compId } = makePalette();
-    const rect: Rect = { minX: 0, minZ: 0, maxX: 32, maxZ: 32 };
-    // A slope steep enough that a wrong normal is unmistakable.
-    const sample = (x: number, z: number) => ({ height: 20 + x * 0.25 - z * 0.1, biomeId: 0, surfCompId: compId });
-    const handle = makeFakeHandle(rect, [], 4, compId, sample);
+describe('LandscapeMesh — per-biome coverage (#491)', () => {
+  for (const biome of getAllBiomes()) {
+    it(`${biome.id}: build() produces a continuous, blended surface with no double coverage of the claim`, () => {
+      const scene = makeScene();
+      const palette = new CompositionPalette();
+      const [primary, secondary] = biome.dominantRocks;
+      const compId = palette.intern({
+        rocks: secondary
+          ? [{ rockId: primary!, coefficient: 0.7 }, { rockId: secondary, coefficient: 0.3 }]
+          : [{ rockId: primary!, coefficient: 1 }],
+      });
+      const n = 6;
+      const rect: Rect = { minX: 0, minZ: 0, maxX: 20, maxZ: 20 };
+      const tile = makeFakeTile(-40, -40, n, compId, 12);
+      const handle = makeFakeHandle(rect, [tile], n, compId);
 
-    const lm = new LandscapeMesh(scene, makeMaterial());
-    lm.build(handle, palette);
-    const seam = scene.children[0] as THREE.Mesh;
-    const normals = seam.geometry.getAttribute('normal').array as Float32Array;
+      const lm = new LandscapeMesh(scene, makeMaterial());
+      lm.build(handle, palette);
 
-    const len = Math.hypot(0.25, 1, -0.1);
-    for (let i = 0; i < normals.length; i += 3) {
-      expect(normals[i]!).toBeCloseTo(-0.25 / len, 4);
-      expect(normals[i + 1]!).toBeCloseTo(1 / len, 4);
-      expect(normals[i + 2]!).toBeCloseTo(0.1 / len, 4);
-    }
-    lm.dispose();
-  });
+      expect(lm.meshCount).toBe(1);
+      const mesh = scene.children[0] as THREE.Mesh;
+      const geo = mesh.geometry;
+      const rockAArr = geo.getAttribute('aRockA').array as Float32Array;
+      const rockBArr = geo.getAttribute('aRockB').array as Float32Array;
+      const weightArr = geo.getAttribute('aRockWeight').array as Float32Array;
+
+      for (let i = 0; i < weightArr.length; i++) {
+        expect(weightArr[i]).toBeGreaterThanOrEqual(0);
+        expect(weightArr[i]).toBeLessThanOrEqual(1);
+      }
+
+      if (secondary) {
+        expect(rockAArr[0]).not.toBe(rockBArr[0]);
+        expect(weightArr[0]).toBeCloseTo(0.3, 5);
+      } else {
+        expect(rockAArr[0]).toBe(rockBArr[0]);
+        expect(weightArr[0]).toBe(0);
+      }
+      lm.dispose();
+    });
+  }
 });

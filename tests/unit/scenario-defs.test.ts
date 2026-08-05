@@ -132,6 +132,7 @@ const VISUAL_SCENARIO_NAMES = [
   'survey-stale-handling',
   'tutorial-interactive',
   'scene-picking-visual',
+  'landscape-continuity-visual',
 ] as const;
 
 /**

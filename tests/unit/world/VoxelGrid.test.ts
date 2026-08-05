@@ -4,6 +4,7 @@ import {
   getDominantRockId,
   CompositionPalette,
   computeVoxelColumnSurfaceY,
+  computeVoxelColumnSurfaceHeight,
   setVoxelBoundsReporter,
   chunkIndexOf,
   CHUNK_SIZE,
@@ -389,6 +390,38 @@ describe('computeVoxelColumnSurfaceY', () => {
     grid.addChunk(-1, 0);
     grid.fillVoxel(-16, 2, 0, 0, undefined, 1);
     expect(computeVoxelColumnSurfaceY(grid, -99, 0)).toBe(2);
+  });
+});
+
+describe('computeVoxelColumnSurfaceHeight (#491)', () => {
+  it('matches computeVoxelColumnSurfaceY\'s column, at the half-voxel crossing for a clean solid-to-air boundary', () => {
+    const grid = new VoxelGrid(16, 8, 16);
+    grid.fillVoxel(3, 0, 3, 0, undefined, 1);
+    grid.fillVoxel(3, 4, 3, 0, undefined, 1); // topmost solid at y=4; y=5 stays air (density 0)
+    expect(computeVoxelColumnSurfaceY(grid, 3, 3)).toBe(4);
+    // t = (0.5 - 1.0) / (0.0 - 1.0) = 0.5 -> crossing at y=4.5, exactly the
+    // same half-voxel offset TerrainMesh's marching cubes places there.
+    expect(computeVoxelColumnSurfaceHeight(grid, 3, 3)).toBeCloseTo(4.5, 6);
+  });
+
+  it('interpolates a fractional (non-half) crossing height when the voxel above the topmost solid one is partially filled', () => {
+    const grid = new VoxelGrid(16, 8, 16);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    grid.fillVoxel(3, 4, 3, compId, undefined, 1.0);
+    grid.fillVoxel(3, 5, 3, compId, undefined, 0.3);
+    // t = (0.5 - 1.0) / (0.3 - 1.0) = 5/7 -> crossing at y = 4 + 5/7.
+    expect(computeVoxelColumnSurfaceHeight(grid, 3, 3)).toBeCloseTo(4 + 5 / 7, 6);
+  });
+
+  it('clamps to the site edge rather than the origin once the site has grown west, like computeVoxelColumnSurfaceY', () => {
+    const grid = new VoxelGrid(16, 8, 16);
+    grid.addChunk(-1, 0);
+    grid.fillVoxel(-16, 2, 0, 0, undefined, 1);
+    expect(computeVoxelColumnSurfaceHeight(grid, -99, 0)).toBeCloseTo(2.5, 6);
+  });
+
+  it('returns 0 for a column with no solid voxel at all', () => {
+    expect(computeVoxelColumnSurfaceHeight(new VoxelGrid(16, 8, 16), 3, 3)).toBe(0);
   });
 });
 
