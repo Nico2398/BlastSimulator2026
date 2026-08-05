@@ -11,6 +11,12 @@ import { findBuildingApproachCell } from '../nav/BuildingApproach.js';
 import { tickVehicle, tickVehicleTaskState } from '../engine/EntityMovementTick.js';
 import { pickupFragment, deliverToDepot } from './Logistics.js';
 import { NavGrid } from '../nav/NavGrid.js';
+import { isOversized } from '../mining/BlastCalc.js';
+
+// TODO(#484): isOversized will gate requestHaulFragment/findReachableGroundFragment
+// against oversized fragments — referenced here only to keep the import live
+// until that logic lands (noUnusedLocals).
+void isOversized;
 
 /**
  * True when `vehicle` is a debris_hauler with a driver assigned and no
@@ -47,6 +53,7 @@ export function requestHaulFragment(
     f => f.fragment.id === fragmentId && f.state === 'on_ground',
   );
   if (!tracked) return { success: false, error: 'Fragment not found or not on the ground' };
+  // TODO(#484): reject oversized fragments here
 
   const depot = findNearestActiveBuildingOfType(state.buildings, 'freight_warehouse', vehicle.x, vehicle.z);
   if (!depot) return { success: false, error: 'No active freight warehouse available' };
@@ -156,6 +163,7 @@ export function findReachableGroundFragment(state: GameState, vehicleId: number)
 
   let bestId: number | null = null;
   let bestDistSq = Infinity;
+  // TODO(#484): reject oversized fragments here
   for (const tracked of state.logistics.fragments) {
     if (tracked.state !== 'on_ground') continue;
     // A fragment heavier than the room left in storage can never be delivered:

@@ -10,6 +10,7 @@ import type { Employee } from '../entities/Employee.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { assignDriver } from '../entities/Vehicle.js';
 import { tickHaulingProgress } from '../economy/HaulingTask.js';
+import { tickBreakProgress } from '../economy/BoulderBreaking.js';
 
 /** Summary of what the arrival gate started/cancelled on this tick. */
 export interface ArrivalGateResult {
@@ -92,6 +93,14 @@ export function tickArrivalGate(state: GameState, emitter?: EventEmitter): Arriv
         emitter?.emit('vehicle:haul_delivered', { vehicleId: vehicle.id, fragmentId: prevFragmentId });
       }
     }
+  }
+
+  for (const vehicle of state.vehicles.vehicles) {
+    if (vehicle.breakPhase === null) continue;
+
+    // TODO(#484): tickBreakProgress currently throws 'not implemented' — this
+    // wiring mirrors the hauling tick call above, ready for the implementer.
+    tickBreakProgress(state, vehicle);
   }
 
   return result;

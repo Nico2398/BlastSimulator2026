@@ -7,6 +7,7 @@ import type { GameState } from '../core/state/GameState.js';
 import type { Vehicle, VehicleRole, VehicleTier } from '../core/entities/Vehicle.js';
 import { getAllVehicleRoles, getVehicleDefByTier, ROLE_LICENCE_REQUIRED } from '../core/entities/Vehicle.js';
 import { HaulEligibilityCache, makeHaulButton, refreshHaulButtons } from './vehicleHaulButton.js';
+import { BreakEligibilityCache, makeBreakButton, refreshBreakButtons } from './vehicleBreakButton.js';
 
 const VEHICLE_TIERS: VehicleTier[] = [1, 2, 3];
 
@@ -26,6 +27,8 @@ export class VehiclePanel {
   private readonly locale = new LocaleTextRegistry();
   /** Per-tick cache of each vehicle's best reachable haul fragment — see vehicleHaulButton.ts. */
   private readonly haulCache = new HaulEligibilityCache();
+  /** Per-tick cache of each vehicle's best reachable oversized fragment — see vehicleBreakButton.ts. */
+  private readonly breakCache = new BreakEligibilityCache();
 
   constructor(container: HTMLElement) {
     this.el = document.createElement('div');
@@ -93,6 +96,7 @@ export class VehiclePanel {
     // once per rendered frame — refresh() below is a no-op except on the
     // first update() call for a given state.tickCount.
     this.haulCache.refresh(state);
+    this.breakCache.refresh(state);
 
     // Rebuilt only when the fleet changes: this list holds a driver <select>,
     // and a per-frame rebuild would discard the player's choice mid-interaction.
@@ -103,6 +107,7 @@ export class VehiclePanel {
     if (signature === this.lastSignature) {
       this.refreshTierButtons(state.cash);
       refreshHaulButtons(this.listEl, state, this.haulCache, this.dispatch);
+      refreshBreakButtons(this.listEl, state, this.breakCache, this.dispatch);
       return;
     }
     this.lastSignature = signature;
@@ -122,6 +127,7 @@ export class VehiclePanel {
 
     this.refreshTierButtons(state.cash);
     refreshHaulButtons(this.listEl, state, this.haulCache, this.dispatch);
+    refreshBreakButtons(this.listEl, state, this.breakCache, this.dispatch);
   }
 
   dispose(): void { this.el.remove(); }
@@ -152,6 +158,8 @@ export class VehiclePanel {
     col.append(info, status, this.makeDriverRow(v, state));
     const haulBtn = makeHaulButton(v, this.haulCache, this.dispatch);
     if (haulBtn) col.appendChild(haulBtn);
+    const breakBtn = makeBreakButton(v, this.breakCache, this.dispatch);
+    if (breakBtn) col.appendChild(breakBtn);
     row.append(col, scrapBtn);
     return row;
   }
