@@ -44,12 +44,20 @@
         {
           "type": "command",
           "command": "blast"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
         }
       ]
     },
     {
       "command": "fragments",
-      "description": "Undercharged 2kg boomite at wide 5m spacing (mirrors blast-undercharge.json) reliably leaves a couple of oversized fragments (volume > OVERSIZED_FRAGMENT_THRESHOLD) among the ground fragments — this step's output exposes their ids.",
+      "description": "Undercharged 2kg boomite at wide 5m spacing (mirrors blast-undercharge.json) reliably leaves a couple of oversized fragments (volume > OVERSIZED_FRAGMENT_THRESHOLD) among the ground fragments — this step's output exposes their ids. Interaction mode's blast step above also dismisses the Blast Report modal (data-action=\"report-close\") that the blast command opens — otherwise its .bs-confirm-overlay backdrop blocks every later click (#484's original scenario had the same gap; command mode never surfaced it since there's no DOM to click against).",
       "interaction": [
         {
           "type": "command",
