@@ -1,0 +1,72 @@
+{
+  "name": "ambient-timescale-sync",
+  "description": "Ambient decoration (birds, vegetation sway, chimney smoke, water, clouds, dust devils, fireflies, wind) must advance on state.timeScale/isPaused, not raw wall-clock frame delta (#490). Dumps window.__gameState().ambientClockSeconds around speed changes and a pause/resume cycle. Command mode has no renderer, so ambientClockSeconds is null/absent in those step dumps by design — this scenario is meaningful only in interaction mode (`--mode interaction`), where the render loop's own rAF actually drives GameRenderer.update().",
+  "steps": [
+    {
+      "command": "new_game seed:42",
+      "interaction": [
+        { "type": "command", "command": "new_game seed:42" }
+      ]
+    },
+    {
+      "command": "time speed 1",
+      "description": "1x speed baseline.",
+      "interaction": [
+        { "type": "command", "command": "time speed 1" }
+      ]
+    },
+    {
+      "command": "state full",
+      "description": "Let some wall-clock time pass at 1x before capturing ambientClockSeconds.",
+      "interaction": [
+        { "type": "wait", "durationMs": 1000 },
+        { "type": "command", "command": "state full" }
+      ]
+    },
+    {
+      "command": "time speed 4",
+      "description": "Switch to 4x — same wall-clock wait below should now advance the ambient clock roughly 4x as far per second.",
+      "interaction": [
+        { "type": "command", "command": "time speed 4" }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        { "type": "wait", "durationMs": 1000 },
+        { "type": "command", "command": "state full" }
+      ]
+    },
+    {
+      "command": "time pause",
+      "description": "Pausing must freeze ambientClockSeconds even though wall-clock time keeps passing.",
+      "interaction": [
+        { "type": "command", "command": "time pause" }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        { "type": "wait", "durationMs": 1000 },
+        { "type": "command", "command": "state full" }
+      ]
+    },
+    {
+      "command": "time resume",
+      "description": "Resuming continues the ambient clock from where it froze — no catch-up jump for the time spent paused.",
+      "interaction": [
+        { "type": "command", "command": "time resume" }
+      ]
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        { "type": "wait", "durationMs": 1000 },
+        { "type": "command", "command": "state full" }
+      ]
+    }
+  ],
+  "shots": [
+    { "name": "overview", "yaw": 20, "pitch": 60 }
+  ]
+}

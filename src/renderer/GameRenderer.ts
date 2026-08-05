@@ -241,8 +241,22 @@ export class GameRenderer {
     return this.fragmentAnimator?.durationS ?? 0;
   }
 
+  /** Ambient shader clock, in game-time seconds — advances at state.timeScale, frozen while paused (#490). */
+  get ambientClockSeconds(): number {
+    return this.ambientUniforms.uTime.value;
+  }
+
   /** Per-frame update — call from the render loop. */
   update(dt: number): void {
+    // Ambient decoration (wind, clouds, birds, smoke, water, dust devils, fireflies,
+    // vegetation sway via ambientUniforms.uTime) runs on game time: it scales with
+    // state.timeScale and freezes with state.isPaused, so speeding up or pausing the
+    // sim speeds up or freezes the decoration by the same factor. Everything else in
+    // this method (fragment collapse playback, skybox, blast effects, characters,
+    // ghosts, border wall, vehicles) is deliberately real-time and stays on raw dt.
+    const gameDt = this.lastState && !this.lastState.isPaused
+      ? dt * this.lastState.timeScale
+      : 0;
     const cam = this.sm.camera;
 
     // Rock still falling from the last blast.
@@ -258,8 +272,8 @@ export class GameRenderer {
     // terrain material's cloud-shadow term directly, so visible clouds and
     // their ground shadows share the exact same scroll — never desynced.
     if (this.windState && this.clouds) {
-      this.windState.update(dt, this.lastWeather);
-      this.clouds.update(dt, this.windState.vector);
+      this.windState.update(gameDt, this.lastWeather);
+      this.clouds.update(gameDt, this.windState.vector);
       const uniforms = this.terrain?.sharedMaterial.customUniforms;
       if (uniforms) {
         (uniforms['uCloudOffset']!.value as THREE.Vector2).copy(this.clouds.cloudOffset);
@@ -273,14 +287,14 @@ export class GameRenderer {
     // values here is the whole update.
     if (this.windState) {
       const wind = this.windState.vector;
-      this.ambientUniforms.uTime.value += dt;
+      this.ambientUniforms.uTime.value += gameDt;
       this.borderWall?.update(dt, this.sm.cameraController.viewTarget);
       this.ambientUniforms.uWind.value.set(wind.x, wind.z);
-      this.birds?.update(dt);
-      this.smoke?.update(dt, wind, cam.position);
-      this.water?.update(dt, wind);
-      this.dustDevils?.update(dt);
-      this.fireflies?.update(dt);
+      this.birds?.update(gameDt);
+      this.smoke?.update(gameDt, wind, cam.position);
+      this.water?.update(gameDt, wind);
+      this.dustDevils?.update(gameDt);
+      this.fireflies?.update(gameDt);
     }
 
     if (this.blastEffects) {
