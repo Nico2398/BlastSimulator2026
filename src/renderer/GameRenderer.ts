@@ -241,8 +241,14 @@ export class GameRenderer {
     return this.fragmentAnimator?.durationS ?? 0;
   }
 
+  /** Ambient shader clock, in game-time seconds — advances at state.timeScale, frozen while paused (#490). */
+  get ambientClockSeconds(): number {
+    throw new Error('not implemented');
+  }
+
   /** Per-frame update — call from the render loop. */
   update(dt: number): void {
+    // TODO(#490): derive gameDt from state.timeScale/isPaused and feed ambient modules — see issue #490
     const cam = this.sm.camera;
 
     // Rock still falling from the last blast.
