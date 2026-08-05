@@ -12,6 +12,7 @@
 import type { FragmentFlight } from '../core/mining/BlastResolve.js';
 import { flightPositionAt, totalFlightDuration } from '../core/mining/BlastResolve.js';
 import type { FragmentMesh, FragmentInstanceTransform } from './FragmentMesh.js';
+import type { PlainVec3 } from './FragmentTransformMath.js';
 import {
   MAX_PROJECTION_VELOCITY,
   TUMBLE_MAX_RATE_RAD_S,
@@ -27,7 +28,7 @@ import {
  * path (applyTo(), up to ~2000 fragments/frame during a big collapse), and
  * this is what most calls return (#485 review).
  */
-const REST_SCALE: Readonly<{ x: number; y: number; z: number }> = Object.freeze({ x: 1, y: 1, z: 1 });
+const REST_SCALE: Readonly<PlainVec3> = Object.freeze({ x: 1, y: 1, z: 1 });
 
 /**
  * How fast a fragment tumbles while it falls, in rad/s (#485). Scales with
@@ -55,7 +56,7 @@ function tumbleRate(flight: FragmentFlight): number {
  *    ends at (1,1,1).
  *  - settled: exactly the identity transform, snapped rather than asymptotic.
  */
-function tumbleAndSettle(flight: FragmentFlight, t: number): { tumbleAngle: number; settleScale: { x: number; y: number; z: number } } {
+function tumbleAndSettle(flight: FragmentFlight, t: number): { tumbleAngle: number; settleScale: PlainVec3 } {
   const landingT = flight.delayS + flight.durationS;
   const settleEndT = landingT + SETTLE_DURATION_S;
 

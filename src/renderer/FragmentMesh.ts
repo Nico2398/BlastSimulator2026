@@ -16,7 +16,7 @@ import { oreIndexOf } from '../core/world/OreCatalog.js';
 import { FRAGMENT_MIN_RENDER_Y } from '../core/config/balance.js';
 import { sampleEvenly } from './FragmentRenderSampling.js';
 import { buildFragmentGeometries } from './FragmentGeometry.js';
-import { buildBaseTransform, composeInstanceMatrix, type FragmentBaseTransform } from './FragmentTransformMath.js';
+import { buildBaseTransform, composeInstanceMatrix, type FragmentBaseTransform, type PlainVec3 } from './FragmentTransformMath.js';
 
 // ---------- Config ----------
 
@@ -61,7 +61,7 @@ export interface FragmentInstanceTransform {
   /** Extra rotation (radians) about the fragment's own seeded tumble axis, on top of its spawn orientation. 0 = untouched. */
   tumbleAngle: number;
   /** Multiplier on the fragment's spawn scale. (1,1,1) = untouched. */
-  settleScale: { x: number; y: number; z: number };
+  settleScale: PlainVec3;
 }
 
 /** The highest-density ore in a fragment's ore record, or '' if none (#458 T4.1/A18). */

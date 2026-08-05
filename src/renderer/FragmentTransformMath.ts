@@ -20,6 +20,13 @@ import * as THREE from 'three';
 // purpose: at 0.18 the silhouette changes, the volume barely does.
 const SHEAR_MAX = 0.18;
 
+/**
+ * A plain {x,y,z} — not a THREE.Vector3 — for a position or scale crossing
+ * the per-frame animation hot path, where callers pass data straight out of
+ * a FragmentFlight/transform record without constructing a Three.js object.
+ */
+export type PlainVec3 = { x: number; y: number; z: number };
+
 // Matrix4.scale() takes a real THREE.Vector3, not the {x,y,z}-shaped
 // settleScale callers pass in — reused across calls (composeInstanceMatrix is
 // on the per-frame hot path) instead of allocating or `as`-casting the plain
@@ -112,9 +119,9 @@ export function buildBaseTransform(shapeSeed: number, scale: THREE.Vector3): Fra
  */
 export function composeInstanceMatrix(
   base: FragmentBaseTransform,
-  position: { x: number; y: number; z: number },
+  position: PlainVec3,
   tumbleAngle: number,
-  settleScale: { x: number; y: number; z: number },
+  settleScale: PlainVec3,
   out: THREE.Matrix4,
 ): void {
   out.makeRotationAxis(base.axis, tumbleAngle);
