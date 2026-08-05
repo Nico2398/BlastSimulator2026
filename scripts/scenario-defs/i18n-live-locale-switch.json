@@ -25,7 +25,7 @@
       "command": "state full",
       "description": "Open the Settings panel via the toolbar — English baseline, panel now open.",
       "interaction": [
-        { "type": "clickSelector", "selector": ".bs-toolbar-btn[data-panel=\"settings\"]" },
+        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"settings\"]" },
         { "type": "waitForSelector", "selector": "#bs-settings-panel" }
       ]
     },
@@ -40,7 +40,7 @@
       "command": "state full",
       "description": "Open the Build menu (Settings auto-hides via the toolbar's mutual-exclusion) — panel opened fresh while locale is already French, confirming the switch persists beyond the panel that triggered it.",
       "interaction": [
-        { "type": "clickSelector", "selector": ".bs-toolbar-btn[data-panel=\"build\"]" },
+        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"build\"]" },
         { "type": "waitForSelector", "selector": "#bs-build-panel, .bs-build-panel" }
       ]
     },
