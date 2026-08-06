@@ -9,7 +9,8 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -18,7 +19,8 @@
           "type": "command",
           "command": "campaign start level:dusty_hollow"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "time resume",
@@ -27,16 +29,26 @@
           "type": "command",
           "command": "time resume"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "employee hire role:surveyor",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:surveyor"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "employee assign_skill 1 skill:geology level:5",
@@ -45,16 +57,22 @@
           "type": "command",
           "command": "employee assign_skill 1 skill:geology level:5"
         }
-      ]
+      ],
+      "description": "Test-only bootstrap, not a player action: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts, same for the UI hire button and this console command), so this only raises the level for the scenario's needs. No role tag -- there is no UI control for this and none should exist; the player-facing way to raise a skill is `employee train` at a training building. Command mode keeps running it unchanged; interaction mode keeps it as an unmarked (legacy) command step."
     },
     {
       "command": "employee hire role:driver",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driver"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "employee assign_skill 2 skill:driving level:3",
@@ -63,7 +81,8 @@
           "type": "command",
           "command": "employee assign_skill 2 skill:driving level:3"
         }
-      ]
+      ],
+      "description": "Test-only bootstrap — see the assign_skill step above for why this stays an unmarked (legacy) command step in interaction mode too."
     },
     {
       "command": "employee list",
@@ -72,16 +91,38 @@
           "type": "command",
           "command": "employee list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "build living_quarters at:22,20",
       "interaction": [
         {
-          "type": "command",
-          "command": "build living_quarters at:22,20"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 22,
+          "z": 20
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "build list",
@@ -90,7 +131,8 @@
           "type": "command",
           "command": "build list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -99,16 +141,42 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "survey seismic x:20 z:20",
       "interaction": [
         {
-          "type": "command",
-          "command": "survey seismic x:20 z:20"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"survey\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-panel [data-method=\"seismic\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-run"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 20,
+          "z": 20
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "state full",
@@ -117,7 +185,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 19",
@@ -126,16 +195,33 @@
           "type": "command",
           "command": "tick 19"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "awaitUsable",
+          "selector": "#bs-event-dialog .bs-event-choice"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-event-dialog .bs-event-choice"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-event-dialog .bs-event-dismiss"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-event-dialog .bs-event-dismiss"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "tick 4",
@@ -144,16 +230,33 @@
           "type": "command",
           "command": "tick 4"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "awaitUsable",
+          "selector": "#bs-event-dialog .bs-event-choice"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-event-dialog .bs-event-choice"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-event-dialog .bs-event-dismiss"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-event-dialog .bs-event-dismiss"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "tick 4",
@@ -162,16 +265,33 @@
           "type": "command",
           "command": "tick 4"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "awaitUsable",
+          "selector": "#bs-event-dialog .bs-event-choice"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-event-dialog .bs-event-choice"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-event-dialog .bs-event-dismiss"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-event-dialog .bs-event-dismiss"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "tick 4",
@@ -180,16 +300,33 @@
           "type": "command",
           "command": "tick 4"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "awaitUsable",
+          "selector": "#bs-event-dialog .bs-event-choice"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-event-dialog .bs-event-choice"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-event-dialog .bs-event-dismiss"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-event-dialog .bs-event-dismiss"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "survey show",
@@ -198,7 +335,8 @@
           "type": "command",
           "command": "survey show"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -207,7 +345,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 8",
@@ -216,16 +355,33 @@
           "type": "command",
           "command": "tick 8"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "awaitUsable",
+          "selector": "#bs-event-dialog .bs-event-choice"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-event-dialog .bs-event-choice"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-event-dialog .bs-event-dismiss"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-event-dialog .bs-event-dismiss"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "tick 8",
@@ -234,16 +390,33 @@
           "type": "command",
           "command": "tick 8"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "awaitUsable",
+          "selector": "#bs-event-dialog .bs-event-choice"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-event-dialog .bs-event-choice"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-event-dialog .bs-event-dismiss"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-event-dialog .bs-event-dismiss"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "tick 8",
@@ -252,16 +425,33 @@
           "type": "command",
           "command": "tick 8"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "awaitUsable",
+          "selector": "#bs-event-dialog .bs-event-choice"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-event-dialog .bs-event-choice"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-event-dialog .bs-event-dismiss"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-event-dialog .bs-event-dismiss"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "tick 8",
@@ -270,16 +460,33 @@
           "type": "command",
           "command": "tick 8"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "awaitUsable",
+          "selector": "#bs-event-dialog .bs-event-choice"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-event-dialog .bs-event-choice"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-event-dialog .bs-event-dismiss"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-event-dialog .bs-event-dismiss"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "survey show",
@@ -288,7 +495,8 @@
           "type": "command",
           "command": "survey show"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "build list",
@@ -297,7 +505,8 @@
           "type": "command",
           "command": "build list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -306,7 +515,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "stats",
@@ -315,7 +525,8 @@
           "type": "command",
           "command": "stats"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "scores",
@@ -324,7 +535,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ],
   "shots": [
