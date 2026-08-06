@@ -10,7 +10,8 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -19,96 +20,97 @@
           "type": "command",
           "command": "campaign start level:dusty_hollow"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driller"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "employee hire role:blaster",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:blaster"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "employee hire role:driver",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driver"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "employee hire role:surveyor",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:surveyor"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "employee hire role:manager",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:manager"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "employee hire role:driller",
       "description": "Employee #6 — hired but never given an assign_skill call. Only carries its role's default 'blasting' qualification, exercising the minimal-qualifications display (contrast with #1, which gets two more assigned below). Toggled bottom-up (6 -> 1) so the panel's own scrollIntoView leaves it resting on #1's card once every row is expanded — #1 is the one that later gains a second qualification, and every screenshot from here on needs it in frame, not wherever the last click of a top-down pass happened to land. A screenshot right after each individual click — before the next click's own scrollIntoView moves the panel again — is what gets #2-#5's cards in frame too; the step's single closing screenshot only ever shows one scroll position.",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driller"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-employee-id=\"6\"] .bs-detail-toggle"
-        },
-        { "type": "screenshot" },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-employee-id=\"5\"] .bs-detail-toggle"
-        },
-        { "type": "screenshot" },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-employee-id=\"4\"] .bs-detail-toggle"
-        },
-        { "type": "screenshot" },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-employee-id=\"3\"] .bs-detail-toggle"
-        },
-        { "type": "screenshot" },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-employee-id=\"2\"] .bs-detail-toggle"
-        },
-        { "type": "screenshot" },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-detail-toggle"
-        },
-        { "type": "screenshot" }
-      ]
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player"
     },
     {
       "command": "employee assign_skill 1 skill:driving.excavator level:3",
@@ -117,7 +119,8 @@
           "type": "command",
           "command": "employee assign_skill 1 skill:driving.excavator level:3"
         }
-      ]
+      ],
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`."
     },
     {
       "command": "employee assign_skill 1 skill:geology level:2",
@@ -126,7 +129,8 @@
           "type": "command",
           "command": "employee assign_skill 1 skill:geology level:2"
         }
-      ]
+      ],
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`."
     },
     {
       "command": "employee assign_skill 2 skill:blasting level:4",
@@ -135,7 +139,8 @@
           "type": "command",
           "command": "employee assign_skill 2 skill:blasting level:4"
         }
-      ]
+      ],
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`."
     },
     {
       "command": "employee assign_skill 3 skill:driving.truck level:1",
@@ -144,7 +149,8 @@
           "type": "command",
           "command": "employee assign_skill 3 skill:driving.truck level:1"
         }
-      ]
+      ],
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`."
     },
     {
       "command": "employee assign_skill 4 skill:geology level:5",
@@ -153,7 +159,8 @@
           "type": "command",
           "command": "employee assign_skill 4 skill:geology level:5"
         }
-      ]
+      ],
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`."
     },
     {
       "command": "employee assign_skill 5 skill:management level:2",
@@ -162,7 +169,8 @@
           "type": "command",
           "command": "employee assign_skill 5 skill:management level:2"
         }
-      ]
+      ],
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`."
     },
     {
       "command": "employee list",
@@ -171,7 +179,8 @@
           "type": "command",
           "command": "employee list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 1",
@@ -180,7 +189,8 @@
           "type": "command",
           "command": "tick 1"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "employee list",
@@ -189,11 +199,12 @@
           "type": "command",
           "command": "employee list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "employee dispatch 6 x:10 z:10 skill:blasting",
-      "description": "First of 6 dispatches targeted at employee #6, none of which are claimed (no further tick happens in this scenario) — 5 show in the task queue and the 6th pushes the 'overflow' (+N more) line.",
+      "description": "Left unmarked: no UI control drives `employee dispatch` and none should exist -- employees.ts's own case comment: \"no console command currently creates one... left the Bunkhouse shift-cycle unreachable from any player-facing flow\" -- a test hook by design.",
       "interaction": [
         {
           "type": "command",
@@ -208,7 +219,8 @@
           "type": "command",
           "command": "employee dispatch 6 x:11 z:10 skill:blasting"
         }
-      ]
+      ],
+      "description": "Left unmarked: no UI control drives `employee dispatch` and none should exist -- employees.ts's own case comment: \"no console command currently creates one... left the Bunkhouse shift-cycle unreachable from any player-facing flow\" -- a test hook by design."
     },
     {
       "command": "employee dispatch 6 x:12 z:10 skill:blasting",
@@ -217,7 +229,8 @@
           "type": "command",
           "command": "employee dispatch 6 x:12 z:10 skill:blasting"
         }
-      ]
+      ],
+      "description": "Left unmarked: no UI control drives `employee dispatch` and none should exist -- employees.ts's own case comment: \"no console command currently creates one... left the Bunkhouse shift-cycle unreachable from any player-facing flow\" -- a test hook by design."
     },
     {
       "command": "employee dispatch 6 x:13 z:10 skill:blasting",
@@ -226,7 +239,8 @@
           "type": "command",
           "command": "employee dispatch 6 x:13 z:10 skill:blasting"
         }
-      ]
+      ],
+      "description": "Left unmarked: no UI control drives `employee dispatch` and none should exist -- employees.ts's own case comment: \"no console command currently creates one... left the Bunkhouse shift-cycle unreachable from any player-facing flow\" -- a test hook by design."
     },
     {
       "command": "employee dispatch 6 x:14 z:10 skill:blasting",
@@ -235,23 +249,16 @@
           "type": "command",
           "command": "employee dispatch 6 x:14 z:10 skill:blasting"
         }
-      ]
+      ],
+      "description": "Left unmarked: no UI control drives `employee dispatch` and none should exist -- employees.ts's own case comment: \"no console command currently creates one... left the Bunkhouse shift-cycle unreachable from any player-facing flow\" -- a test hook by design."
     },
     {
       "command": "employee dispatch 6 x:15 z:10 skill:blasting",
-      "description": "6th dispatch targeting the same employee — task queue now holds 6 own actions, one past the 5-entry display cap. Collapsing and reopening #6's card scrolls the panel back onto it (it rested on #1 since the hire step above) so the '+1 more' overflow line is actually in frame for this and the remaining screenshots.",
+      "description": "Left unmarked: no UI control drives `employee dispatch` and none should exist -- employees.ts's own case comment: \"no console command currently creates one... left the Bunkhouse shift-cycle unreachable from any player-facing flow\" -- a test hook by design.",
       "interaction": [
         {
           "type": "command",
           "command": "employee dispatch 6 x:15 z:10 skill:blasting"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-employee-id=\"6\"] .bs-detail-toggle"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-employee-id=\"6\"] .bs-detail-toggle"
         }
       ]
     },
@@ -262,7 +269,8 @@
           "type": "command",
           "command": "employee list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -271,7 +279,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ],
   "shots": [

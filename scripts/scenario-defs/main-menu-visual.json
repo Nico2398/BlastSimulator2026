@@ -14,16 +14,13 @@
           "type": "waitForSelector",
           "selector": "#bs-main-menu"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state",
       "description": "Click New Campaign: reveals the world map with 3 level cards. Dusty Hollow (tier 1) is unlocked with a Start button; Grumpstone Ridge and Treranium Depths are locked, showing the lock icon and the profit threshold required on the prior level. No game exists yet, so 'state' is the paired command (it fails gracefully with 'No game loaded' — this step is UI-only, the command exists only to satisfy the command/interaction pairing convention).",
       "interaction": [
-        {
-          "type": "command",
-          "command": "state"
-        },
         {
           "type": "clickSelector",
           "selector": "#bs-main-menu #bs-menu-new-campaign"
@@ -32,16 +29,13 @@
           "type": "wait",
           "durationMs": 300
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "state",
       "description": "Click Back on the world map: returns to the main menu button list, confirming the round trip does not leave stray DOM behind.",
       "interaction": [
-        {
-          "type": "command",
-          "command": "state"
-        },
         {
           "type": "clickSelector",
           "selector": "#bs-world-map-back"
@@ -50,7 +44,8 @@
           "type": "wait",
           "durationMs": 300
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "new_game seed:42",
@@ -60,7 +55,8 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -69,7 +65,8 @@
           "type": "command",
           "command": "campaign start level:dusty_hollow"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "time resume",
@@ -78,7 +75,8 @@
           "type": "command",
           "command": "time resume"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "tick 5",
@@ -87,7 +85,8 @@
           "type": "command",
           "command": "tick 5"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -96,7 +95,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "scores",
@@ -105,7 +105,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "finances",
@@ -114,7 +115,8 @@
           "type": "command",
           "command": "finances"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "campaign status",
@@ -123,7 +125,8 @@
           "type": "command",
           "command": "campaign status"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -132,7 +135,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ],
   "shots": [

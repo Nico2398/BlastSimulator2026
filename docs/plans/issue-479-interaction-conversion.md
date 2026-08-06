@@ -313,6 +313,51 @@ here for a follow-up issue.
     `building-tier-system-visual`'s fully-formed hand conversion — a stray
     click bolted onto an otherwise-plain step is noise, not signal worth
     keeping.
+20. **`SavesModal.saveToSlot()` never calls `hide()`** (unlike
+    `loadFromSlot()`, which does) — after a real UI save, the modal stays
+    open, and its `.bs-confirm-overlay` tier covers the toolbar underneath,
+    blocking the next click. `save-load-visual`'s pre-existing hand content
+    (the `#bs-saveload-btn`/`#bs-saves-modal` flow preserved from before
+    #479 — see below) never closed the modal after saving either, so this
+    had apparently never been exercised end-to-end in a real browser before
+    this conversion. **Not fixed as a UI bug** — closing the modal is a
+    reasonable thing for a scenario to do explicitly (a player would
+    typically close it themselves too), so the scenario step now clicks the
+    close button rather than changing `SavesModal.ts`. Found the close
+    button has no stable class/id (`#bs-saves-modal > div > div:first-child
+    button`, positional) — worth a `data-action="close"` if this selector
+    ever needs reuse elsewhere.
+21. **Bootstrapping via console `sandbox start` (not `new_game`/`campaign
+    start`) leaves `#bs-toolbar` at zero size** — confirmed by
+    `sandbox-mode.json`'s first interaction-mode run failing on exactly
+    that. Whether the real Sandbox Mode UI flow (`SandboxPanel.ts`'s
+    `#bs-sandbox-start` button) triggers some UI transition the console
+    bootstrap skips is unverified. **Not investigated further** — the whole
+    file's blast pipeline (drill/charge/sequence/blast) left unmarked as a
+    result, since none of it is reachable by a click given how this
+    scenario bootstraps. A real Sandbox Mode UI conversion (filling
+    `SandboxPanel.ts`'s form fields for real) is future work, not this
+    batch's scope.
+22. **`weather` mixes a read (bare) and mutations (`set`/`advance`) under
+    one top-level token**, the same shape `blast_plan` already has a
+    warning about — `isObservationCommand` checks only the top-level token
+    before the subcommand, so adding `'weather'` to `OBSERVATION_COMMANDS`
+    to cover the read case would also silently permit `weather set`/
+    `weather advance` under an `observe` role. **Not fixed** — a real fix
+    needs a subcommand-aware read/mutate split (like `OBSERVATION_SUBCOMMANDS`,
+    but inverted: subcommands that ARE mutations under an otherwise-readable
+    top token), which touches the shared gating function, not one scenario.
+    Left `weather` (bare) unmarked rather than force-fit a role. Separately,
+    confirmed **no UI sets weather at all** — grepping `src/ui` for
+    `gameConsole?.(\`weather` returns zero hits — so every `weather set X`
+    stays unmarked for a real reason, not a conversion gap.
+23. **Real scenario bug found and fixed**: `weather-flood.json`'s `weather
+    heavy_rain` step was missing the `set` keyword — `weatherCommand`
+    (mining.ts) only recognizes `advance`/`set` as args[0]; anything else,
+    including a bare weather-state name, falls through to "return current
+    weather" and changes nothing. The flood test never actually set
+    heavy_rain in any prior run of this file (command mode included) —
+    corrected to `weather set heavy_rain`.
 
 _(Add new findings here as you hit them. Number sequentially.)_
 
@@ -336,7 +381,7 @@ for f in sorted(os.listdir(d)):
 EOF
 ```
 
-### ✅ Done (90)
+### ✅ Done (108)
 - tutorial-interactive, vehicle-purchase-visual, contract-panel-visual, event-dialog-visual
 - Batch 1 (14): ambient-life-visual, weather-popover-visual, wind-clouds-visual,
   survey-panel-visual, loading-screen-visual, scene-picking-visual, nav-cell-types-visual,
@@ -367,8 +412,13 @@ EOF
   needs-proactive-queue-visual, needs-replenishment-visual, needs-shift-cycle-visual,
   nav-dynamic-updates-visual, nav-move-costs-visual, nav-path-following-visual,
   nav-pathfinding-visual, nav-ramp-routing-visual, site-expansion
+- Batch 6 (18): employee-skill-progression-visual, employee-skills-visual,
+  employee-training, contract-negotiation, economy-display-visual, economy-full-loop,
+  hauling-gate, maintenance-cost-drain, scores-display-visual, time-management-visual,
+  safety-projection-visual, core-loop-visual, i18n-display-visual, main-menu-visual,
+  save-load-visual, sandbox-mode, weather-display-visual, weather-flood
 
-All 90 interaction-verified in a real browser (each batch re-verified as one
+All 108 interaction-verified in a real browser (each batch re-verified as one
 batch run at the end to catch cross-file regressions). Batch 2 also fixed a
 real game bug (Finding #12, BlastReportModal) found only by actually running
 the clicks — command mode never would have caught it, since it never touches
@@ -383,7 +433,18 @@ hand-written clicks (role-tagged only, not regenerated, per the
 silently discards any `new_game ... cash:N` override (Finding #17), that
 `vehicle move`/`vehicle assign` have no UI path at all (Finding #18), and
 dropped a pre-existing decorative click that was silently buying an
-unrecorded vehicle during a supposedly read-only step (Finding #19).
+unrecorded vehicle during a supposedly read-only step (Finding #19). Batch 6
+found a real UI bug (Finding #20 — SavesModal never closes itself after a
+save, unlike after a load) worked around at the scenario level, discovered
+that console-driven `sandbox start` leaves the toolbar unusable (Finding
+#21), found a gating gap around mixed read/mutate top-level tokens like
+`weather` (Finding #22, not fixed — the fix belongs in the shared gate, not
+one scenario), and fixed a real scenario bug (Finding #23 — `weather-flood`
+never actually set heavy_rain due to a missing `set` keyword). Also caught,
+before this session's earlier gap: **typecheck had not been run since Batch
+3** — CI flagged it on the Batch 5 push, which turned out to be a GitHub
+Actions infrastructure outage, not a real type error, but the miss itself
+is real. `npm run typecheck` is now part of every batch's verification.
 
 **Caution for whoever resumes:** `blast-visual-full` was inspected early in
 Batch 2 but its actual conversion was skipped in the first pass — it slipped
@@ -396,15 +457,7 @@ for `"role"` in the file) before crossing it off.
 ### Batch 3 — survey-* — ✅ COMPLETE (13 files, see Done list above)
 ### Batch 4 — building-* — ✅ COMPLETE (12 files, see Done list above)
 ### Batch 5 — vehicle-* / needs-* / nav-* — ✅ COMPLETE (22 files, see Done list above)
-
-### Batch 6 — employee/economy/misc (18)
-⬜ employee-skill-progression-visual · ⬜ employee-skills-visual ·
-⬜ employee-training · ⬜ contract-negotiation · ⬜ economy-display-visual ·
-⬜ economy-full-loop · ⬜ hauling-gate · ⬜ maintenance-cost-drain ·
-⬜ scores-display-visual · ⬜ time-management-visual ·
-⬜ safety-projection-visual · ⬜ core-loop-visual · ⬜ i18n-display-visual ·
-⬜ main-menu-visual · ⬜ save-load-visual · ⬜ sandbox-mode ·
-⬜ weather-display-visual · ⬜ weather-flood
+### Batch 6 — employee/economy/misc — ✅ COMPLETE (18 files, see Done list above)
 
 ### Batch 7 — big playthroughs, do last (14)
 ⬜ tutorial-playthrough · ⬜ level1-lose-arrest · ⬜ level1-lose-bankruptcy ·
@@ -414,7 +467,7 @@ for `"role"` in the file) before crossing it off.
 ⬜ level2-playthrough-bankruptcy · ⬜ level2-playthrough-win ·
 ⬜ level3-playthrough-ecology · ⬜ level3-playthrough-win
 
-32 total remaining across batches 6-7.
+14 total remaining: batch 7 only (the big playthroughs).
 
 ## Session log
 
@@ -493,3 +546,27 @@ got and whether main was merged recently.
   production bug this time. Full sweep green (typecheck, schema tests,
   command mode). 90/122 total converted. Next: Batch 6 (employee/economy/
   misc, 18 files).
+- 2026-08-06 — Pushed Batch 5 commit (42e4ab4). CI flagged red on
+  `TypeScript type check` and `chain-next-task` for that push — turned out
+  to be a GitHub Actions infrastructure outage (`Failed to resolve action
+  download info: Service Unavailable`, before any checkout step), not a
+  real type error; `npm run typecheck` passed clean locally, confirmed via
+  job logs, posted a PR comment explaining it. The real finding: I hadn't
+  run `npm run typecheck` locally since Batch 3 — added it to every batch's
+  verification from here on. Batch 6 (18 files: employee/economy/misc)
+  converted, including two pre-existing hand-authored real-UI flows
+  (`main-menu-visual`'s New Campaign/back navigation,
+  `save-load-visual`'s save/load modal) found and preserved rather than
+  regenerated, per the `blast-visual-full`/`building-tier-system-visual`
+  caution. First interaction-mode run: 16/18 pass, 2 fail —
+  `save-load-visual` (SavesModal never closes itself after a save, Finding
+  #20, a real UI bug worked around at the scenario level) and
+  `sandbox-mode` (console `sandbox start` leaves the toolbar at zero size,
+  Finding #21, left the file's blast pipeline unmarked as a result). Also
+  found a gating gap (Finding #22 — `weather` mixes a read and mutations
+  under one top-level token, same shape as the existing `blast_plan`
+  warning; not fixed, belongs in the shared gate) and a real scenario bug
+  (Finding #23 — `weather-flood` never actually set heavy_rain, missing
+  `set` keyword; fixed). Re-verified 18/18 in a real browser after fixes.
+  Full sweep green (typecheck, schema tests, command mode). 108/122 total
+  converted — only Batch 7 (14 big playthroughs) remains. Next: Batch 7.

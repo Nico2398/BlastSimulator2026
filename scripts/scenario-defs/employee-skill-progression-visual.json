@@ -10,7 +10,8 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -19,47 +20,50 @@
           "type": "command",
           "command": "campaign start level:dusty_hollow"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "employee hire role:blaster",
       "description": "Employee A (#1) — will be dispatched to real blasting work below.",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:blaster"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "employee hire role:driver",
       "description": "Employee B (#2) — holds a different skill (driving.truck), so the second dispatch later has nobody else on the roster able to claim it, which is what keeps its ghost preview alive.",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driver"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "employee assign_skill 1 skill:blasting level:1",
-      "description": "Explicit level-1 assignment for #1, opening both roster rows so every later checkpoint screenshot shows the detail panel already expanded.",
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
       "interaction": [
         {
           "type": "command",
           "command": "employee assign_skill 1 skill:blasting level:1"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-detail-toggle"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-employee-id=\"2\"] .bs-detail-toggle"
         }
       ]
     },
@@ -70,7 +74,8 @@
           "type": "command",
           "command": "employee assign_skill 2 skill:driving.truck level:1"
         }
-      ]
+      ],
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`."
     },
     {
       "command": "employee list",
@@ -79,11 +84,12 @@
           "type": "command",
           "command": "employee list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "employee dispatch 1 x:20 z:20 skill:blasting",
-      "description": "Dispatches employee A to a real blasting-required task — the first pending action this scenario creates.",
+      "description": "Left unmarked: no UI control drives `employee dispatch` and none should exist -- employees.ts's own case comment: \"no console command currently creates one... left the Bunkhouse shift-cycle unreachable from any player-facing flow\" -- a test hook by design.",
       "interaction": [
         {
           "type": "command",
@@ -99,11 +105,12 @@
           "type": "command",
           "command": "tick 1"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "employee dispatch 1 x:25 z:22 skill:blasting",
-      "description": "Second blasting-required dispatch, pinned to the same (now busy) employee A. Nobody else on the roster holds 'blasting', so this action cannot be claimed until A frees up — it stays in the pending-action pool with a ghost preview rendered at (25, 22).",
+      "description": "Left unmarked: no UI control drives `employee dispatch` and none should exist -- employees.ts's own case comment: \"no console command currently creates one... left the Bunkhouse shift-cycle unreachable from any player-facing flow\" -- a test hook by design.",
       "interaction": [
         {
           "type": "command",
@@ -119,7 +126,8 @@
           "type": "command",
           "command": "employee list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 10",
@@ -129,7 +137,8 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "employee list",
@@ -138,7 +147,8 @@
           "type": "command",
           "command": "employee list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 60",
@@ -148,7 +158,8 @@
           "type": "command",
           "command": "tick 60"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "employee list",
@@ -157,7 +168,8 @@
           "type": "command",
           "command": "employee list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 150",
@@ -167,11 +179,12 @@
           "type": "command",
           "command": "tick 150"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
-      "description": "Resolves the auto-pause event from the step above so ticking can resume — otherwise every further 'tick N' command refuses to advance and the full-screen event modal covers the final-state screenshot.",
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
       "interaction": [
         {
           "type": "command",
@@ -187,7 +200,8 @@
           "type": "command",
           "command": "tick 96"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "employee list",
@@ -196,7 +210,8 @@
           "type": "command",
           "command": "employee list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -205,7 +220,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ],
   "shots": [

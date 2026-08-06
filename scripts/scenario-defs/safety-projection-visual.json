@@ -10,7 +10,8 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -19,7 +20,8 @@
           "type": "command",
           "command": "campaign start level:dusty_hollow"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "time resume",
@@ -28,7 +30,8 @@
           "type": "command",
           "command": "time resume"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "zone status",
@@ -37,7 +40,8 @@
           "type": "command",
           "command": "zone status"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "zone clear x1:5 y1:5 x2:35 y2:35",
@@ -46,7 +50,8 @@
           "type": "command",
           "command": "zone clear x1:5 y1:5 x2:35 y2:35"
         }
-      ]
+      ],
+      "description": "Left unmarked: Fire.ts's Sound the Horn button (`[data-action=\"sound-horn\"]`) sends `zone clear` using its own auto-computed `currentZone`, not player-typed coordinates -- whether that computed zone matches this scenario's explicit x1:5 y1:5 x2:35 y2:35 rectangle is unverified. Left as a command rather than risk a click that lands on a different-shaped zone than the scenario expects."
     },
     {
       "command": "zone status",
@@ -55,29 +60,74 @@
           "type": "command",
           "command": "zone status"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "build freight_warehouse at:35,25",
       "interaction": [
         {
-          "type": "command",
-          "command": "build freight_warehouse at:35,25"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"freight_warehouse\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 35,
+          "z": 25
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:20,20",
       "interaction": [
         {
-          "type": "command",
-          "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:20,20"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 20,
+          "z1": 20,
+          "x2": 30,
+          "z2": 30
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "charge hole:* explosive:boomite amount:8 stemming:1",
-      "description": "boomite's valid range is [1-8kg] (src/core/world/ExplosiveCatalog.ts) — amount:10 was out of range and made every hole error out with 'Missing charge', so blast_preview/preview projections/blast all ran against an uncharged, invalid plan. 8kg (boomite's own max) plus 1m stemming is still the maximum overcharge this explosive supports.",
+      "description": "Left unmarked: this amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no click path to an exact non-default value -- Finding #10's class, Charge All is the only commit, at whatever the steppers currently show.",
       "interaction": [
         {
           "type": "command",
@@ -92,44 +142,77 @@
           "type": "command",
           "command": "sequence auto delay_step:10"
         }
-      ]
+      ],
+      "description": "Left unmarked: delay_step:10ms doesn't match the Sequence panel's default (25ms). The stepper that changes it (Sequence.ts's dstepMs, +/-5ms per click) has never been click-tested in this conversion --  unlike the ramp tool's single-field #bs-param-strip, the Sequence tab shares DOM space with other blast steps whose tab-visibility isn't verified here, so left as a command rather than guessing at an unproven selector."
     },
     {
       "command": "buy_software tier:1",
       "description": "preview projections requires software tier 3+ (default tier is 0) — unlock sequentially so the projection preview actually computes instead of printing a lock message",
       "interaction": [
         {
-          "type": "command",
-          "command": "buy_software tier:1"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"4\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-tier=\"1\"] [data-action=\"buy-tier\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-tier=\"1\"] [data-action=\"buy-tier\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "buy_software tier:2",
       "interaction": [
         {
-          "type": "command",
-          "command": "buy_software tier:2"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"4\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-tier=\"2\"] [data-action=\"buy-tier\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-tier=\"2\"] [data-action=\"buy-tier\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "buy_software tier:3",
       "interaction": [
         {
-          "type": "command",
-          "command": "buy_software tier:3"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"4\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-tier=\"3\"] [data-action=\"buy-tier\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-tier=\"3\"] [data-action=\"buy-tier\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "blast_preview",
       "interaction": [
         {
-          "type": "command",
-          "command": "blast_preview"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"4\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"run-analysis\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "preview projections",
@@ -138,7 +221,8 @@
           "type": "command",
           "command": "preview projections"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "blast",
@@ -147,10 +231,27 @@
       "interval": 50,
       "interaction": [
         {
-          "type": "command",
-          "command": "blast"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "fragments",
@@ -159,7 +260,8 @@
           "type": "command",
           "command": "fragments"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "build list",
@@ -168,7 +270,8 @@
           "type": "command",
           "command": "build list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "scores",
@@ -177,7 +280,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -186,7 +290,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ],
   "shots": [

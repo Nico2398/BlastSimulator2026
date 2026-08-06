@@ -10,7 +10,8 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -19,7 +20,8 @@
           "type": "command",
           "command": "campaign start level:dusty_hollow"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "time resume",
@@ -28,7 +30,8 @@
           "type": "command",
           "command": "time resume"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "tick 10",
@@ -37,7 +40,8 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -46,7 +50,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "tick 10",
@@ -55,7 +60,8 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -64,7 +70,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "finances",
@@ -73,7 +80,8 @@
           "type": "command",
           "command": "finances"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "scores",
@@ -82,11 +90,12 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "save slot:quicksave",
-      "description": "Quick-save the current run through the console save command, exercising the same serialize path the Save/Load panel's slot buttons use.",
+      "description": "Left unmarked: \"quicksave\" isn't a real UI slot -- SavesModal.ts only exposes 'auto' and numbered 'slot_N' (SAVE_SLOT_COUNT) slots. The real UI flow is demonstrated for real below (steps 10/11/16, clicking #bs-saveload-btn and a numbered slot), just under a different slot name than this console-only quicksave.",
       "interaction": [
         {
           "type": "command",
@@ -99,10 +108,6 @@
       "description": "Open the Save/Load panel (multiple slots, auto-save row, export/import, slot metadata) via its top-bar button.",
       "interaction": [
         {
-          "type": "command",
-          "command": "state"
-        },
-        {
           "type": "clickSelector",
           "selector": "#bs-saveload-btn"
         },
@@ -110,16 +115,13 @@
           "type": "waitForSelector",
           "selector": "#bs-saves-modal"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "state",
-      "description": "Save into numbered slot 1 through the panel's own Save button, populating its metadata (date, level, cash) for the slot list screenshot.",
+      "description": "SavesModal.ts's saveToSlot() re-renders the slot list but never calls hide() (unlike loadFromSlot(), which does) -- the modal stays open after a save and its .bs-confirm-overlay tier covers the toolbar underneath, blocking the next step's click. Closes it explicitly via the header's close button.",
       "interaction": [
-        {
-          "type": "command",
-          "command": "state"
-        },
         {
           "type": "clickSelector",
           "selector": "#bs-saves-modal [data-slot=\"slot_1\"] [data-action=\"save-here\"]"
@@ -127,36 +129,66 @@
         {
           "type": "wait",
           "durationMs": 300
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-saves-modal > div > div:first-child button"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "drill_plan grid rows:2 cols:2 spacing:3 depth:4 start:15,15",
       "description": "Drill a small plan after slot 1 was saved, so the blast below craters terrain the saved slot does not know about.",
       "interaction": [
         {
-          "type": "command",
-          "command": "drill_plan grid rows:2 cols:2 spacing:3 depth:4 start:15,15"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 15,
+          "z1": 15,
+          "x2": 18,
+          "z2": 18
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
       "interaction": [
         {
-          "type": "command",
-          "command": "charge hole:* explosive:boomite amount:5 stemming:2"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "sequence auto delay_step:25",
       "interaction": [
         {
-          "type": "command",
-          "command": "sequence auto delay_step:25"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "blast",
@@ -164,18 +196,39 @@
       "timeout": 15,
       "interaction": [
         {
-          "type": "command",
-          "command": "blast"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "state",
       "description": "Load back slot 1 by clicking the Saves modal's own Load button (SavesModal.ts, main.ts's setOnLoad handler) — not a raw console command — so this step exercises the click-driven path that must regenerate the grid, replacing the post-blast crater above with clean terrain matching the saved state. The command field stays the inert `state` read (rather than `load slot:...`) so command mode does not pre-clear the crater itself and mask a regression in the click path.",
       "interaction": [
         {
-          "type": "command",
-          "command": "state"
+          "type": "clickSelector",
+          "selector": "#bs-saveload-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-saves-modal"
         },
         {
           "type": "clickSelector",
@@ -185,7 +238,8 @@
           "type": "wait",
           "durationMs": 300
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "campaign status",
@@ -194,7 +248,8 @@
           "type": "command",
           "command": "campaign status"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -203,7 +258,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ],
   "shots": [

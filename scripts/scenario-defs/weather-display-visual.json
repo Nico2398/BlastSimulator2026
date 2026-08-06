@@ -10,7 +10,8 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -19,7 +20,8 @@
           "type": "command",
           "command": "campaign start level:dusty_hollow"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "time resume",
@@ -28,11 +30,12 @@
           "type": "command",
           "command": "time resume"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "weather",
-      "description": "Initial weather is always sunny (see WeatherCycle.createWeatherCycle).",
+      "description": "Left unmarked: bare `weather` is read-only (mining.ts's weatherCommand falls through to \"return current weather\" for any unrecognized subcommand) but isn't in interaction-executor.ts's OBSERVATION_COMMANDS -- adding the top-level token there would also silently permit `weather set`/`weather advance` for an observe-marked step, since isObservationCommand checks only the top token before the subcommand (the same class of mistake Finding #2's blast_plan note warns about). Fixing that needs a real mutate-vs-read-by-subcommand check, not a one-line list edit -- out of scope for a scenario conversion, left unmarked instead of force-fitting a role that doesn't quite hold.",
       "interaction": [
         {
           "type": "command",
@@ -42,7 +45,7 @@
     },
     {
       "command": "weather set cloudy",
-      "description": "`weather advance` transitions probabilistically and cannot guarantee any specific state or full-cycle order — `weather set <state>` forces it deterministically so every state in the cycle actually renders once (#408).",
+      "description": "Left unmarked: no UI sets weather at all -- grepping src/ui for gameConsole?.(`weather finds zero call sites. This is a real gap, not a conversion shortfall: nothing lets a player change the weather, only `weather set` from the console/scenario harness.",
       "interaction": [
         {
           "type": "command",
@@ -57,7 +60,8 @@
           "type": "command",
           "command": "weather"
         }
-      ]
+      ],
+      "description": "Left unmarked: bare `weather` is read-only (mining.ts's weatherCommand falls through to \"return current weather\" for any unrecognized subcommand) but isn't in interaction-executor.ts's OBSERVATION_COMMANDS -- adding the top-level token there would also silently permit `weather set`/`weather advance` for an observe-marked step, since isObservationCommand checks only the top token before the subcommand (the same class of mistake Finding #2's blast_plan note warns about). Fixing that needs a real mutate-vs-read-by-subcommand check, not a one-line list edit -- out of scope for a scenario conversion, left unmarked instead of force-fitting a role that doesn't quite hold."
     },
     {
       "command": "weather set light_rain",
@@ -66,7 +70,8 @@
           "type": "command",
           "command": "weather set light_rain"
         }
-      ]
+      ],
+      "description": "Left unmarked: no UI sets weather at all -- grepping src/ui for gameConsole?.(`weather finds zero call sites. This is a real gap, not a conversion shortfall: nothing lets a player change the weather, only `weather set` from the console/scenario harness."
     },
     {
       "command": "weather",
@@ -75,7 +80,8 @@
           "type": "command",
           "command": "weather"
         }
-      ]
+      ],
+      "description": "Left unmarked: bare `weather` is read-only (mining.ts's weatherCommand falls through to \"return current weather\" for any unrecognized subcommand) but isn't in interaction-executor.ts's OBSERVATION_COMMANDS -- adding the top-level token there would also silently permit `weather set`/`weather advance` for an observe-marked step, since isObservationCommand checks only the top token before the subcommand (the same class of mistake Finding #2's blast_plan note warns about). Fixing that needs a real mutate-vs-read-by-subcommand check, not a one-line list edit -- out of scope for a scenario conversion, left unmarked instead of force-fitting a role that doesn't quite hold."
     },
     {
       "command": "weather set heavy_rain",
@@ -84,7 +90,8 @@
           "type": "command",
           "command": "weather set heavy_rain"
         }
-      ]
+      ],
+      "description": "Left unmarked: no UI sets weather at all -- grepping src/ui for gameConsole?.(`weather finds zero call sites. This is a real gap, not a conversion shortfall: nothing lets a player change the weather, only `weather set` from the console/scenario harness."
     },
     {
       "command": "weather",
@@ -93,7 +100,8 @@
           "type": "command",
           "command": "weather"
         }
-      ]
+      ],
+      "description": "Left unmarked: bare `weather` is read-only (mining.ts's weatherCommand falls through to \"return current weather\" for any unrecognized subcommand) but isn't in interaction-executor.ts's OBSERVATION_COMMANDS -- adding the top-level token there would also silently permit `weather set`/`weather advance` for an observe-marked step, since isObservationCommand checks only the top token before the subcommand (the same class of mistake Finding #2's blast_plan note warns about). Fixing that needs a real mutate-vs-read-by-subcommand check, not a one-line list edit -- out of scope for a scenario conversion, left unmarked instead of force-fitting a role that doesn't quite hold."
     },
     {
       "command": "weather set storm",
@@ -102,7 +110,8 @@
           "type": "command",
           "command": "weather set storm"
         }
-      ]
+      ],
+      "description": "Left unmarked: no UI sets weather at all -- grepping src/ui for gameConsole?.(`weather finds zero call sites. This is a real gap, not a conversion shortfall: nothing lets a player change the weather, only `weather set` from the console/scenario harness."
     },
     {
       "command": "weather",
@@ -111,7 +120,8 @@
           "type": "command",
           "command": "weather"
         }
-      ]
+      ],
+      "description": "Left unmarked: bare `weather` is read-only (mining.ts's weatherCommand falls through to \"return current weather\" for any unrecognized subcommand) but isn't in interaction-executor.ts's OBSERVATION_COMMANDS -- adding the top-level token there would also silently permit `weather set`/`weather advance` for an observe-marked step, since isObservationCommand checks only the top token before the subcommand (the same class of mistake Finding #2's blast_plan note warns about). Fixing that needs a real mutate-vs-read-by-subcommand check, not a one-line list edit -- out of scope for a scenario conversion, left unmarked instead of force-fitting a role that doesn't quite hold."
     },
     {
       "command": "weather set heat_wave",
@@ -120,7 +130,8 @@
           "type": "command",
           "command": "weather set heat_wave"
         }
-      ]
+      ],
+      "description": "Left unmarked: no UI sets weather at all -- grepping src/ui for gameConsole?.(`weather finds zero call sites. This is a real gap, not a conversion shortfall: nothing lets a player change the weather, only `weather set` from the console/scenario harness."
     },
     {
       "command": "weather",
@@ -129,7 +140,8 @@
           "type": "command",
           "command": "weather"
         }
-      ]
+      ],
+      "description": "Left unmarked: bare `weather` is read-only (mining.ts's weatherCommand falls through to \"return current weather\" for any unrecognized subcommand) but isn't in interaction-executor.ts's OBSERVATION_COMMANDS -- adding the top-level token there would also silently permit `weather set`/`weather advance` for an observe-marked step, since isObservationCommand checks only the top token before the subcommand (the same class of mistake Finding #2's blast_plan note warns about). Fixing that needs a real mutate-vs-read-by-subcommand check, not a one-line list edit -- out of scope for a scenario conversion, left unmarked instead of force-fitting a role that doesn't quite hold."
     },
     {
       "command": "weather set cold_snap",
@@ -138,7 +150,8 @@
           "type": "command",
           "command": "weather set cold_snap"
         }
-      ]
+      ],
+      "description": "Left unmarked: no UI sets weather at all -- grepping src/ui for gameConsole?.(`weather finds zero call sites. This is a real gap, not a conversion shortfall: nothing lets a player change the weather, only `weather set` from the console/scenario harness."
     },
     {
       "command": "weather",
@@ -147,7 +160,8 @@
           "type": "command",
           "command": "weather"
         }
-      ]
+      ],
+      "description": "Left unmarked: bare `weather` is read-only (mining.ts's weatherCommand falls through to \"return current weather\" for any unrecognized subcommand) but isn't in interaction-executor.ts's OBSERVATION_COMMANDS -- adding the top-level token there would also silently permit `weather set`/`weather advance` for an observe-marked step, since isObservationCommand checks only the top token before the subcommand (the same class of mistake Finding #2's blast_plan note warns about). Fixing that needs a real mutate-vs-read-by-subcommand check, not a one-line list edit -- out of scope for a scenario conversion, left unmarked instead of force-fitting a role that doesn't quite hold."
     },
     {
       "command": "state full",
@@ -156,7 +170,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ],
   "shots": [

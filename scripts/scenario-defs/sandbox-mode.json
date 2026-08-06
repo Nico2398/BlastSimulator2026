@@ -4,48 +4,73 @@
   "steps": [
     {
       "command": "sandbox start biome:alpine_granite seed:777 size:48 depth:24 cash:250000",
-      "description": "No new_game first — a sandbox site is created from nothing, which is the point of the mode.",
+      "description": "Left unmarked (legacy/unconstrained): Sandbox Mode has a real form-based panel (SandboxPanel.ts, #bs-sandbox-start plus per-field inputs like #bs-sandbox-biome/#bs-sandbox-seed/#bs-sandbox-size), not a single click like new_game -- filling every field and confirming the resulting command matches this scenario's exact params is unverified here and out of scope for this batch; a real future conversion, not a no-UI finding.",
       "interaction": [
-        { "type": "command", "command": "sandbox start biome:alpine_granite seed:777 size:48 depth:24 cash:250000" }
+        {
+          "type": "command",
+          "command": "sandbox start biome:alpine_granite seed:777 size:48 depth:24 cash:250000"
+        }
       ]
     },
     {
       "command": "terrain_info",
       "description": "Grid extents, biome and seed should all match what was asked for.",
       "interaction": [
-        { "type": "command", "command": "terrain_info" }
-      ]
+        {
+          "type": "command",
+          "command": "terrain_info"
+        }
+      ],
+      "role": "observe"
     },
     {
       "command": "drill_plan grid rows:3 cols:3 spacing:4 depth:6 start:20,20",
       "interaction": [
-        { "type": "command", "command": "drill_plan grid rows:3 cols:3 spacing:4 depth:6 start:20,20" }
-      ]
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:3 cols:3 spacing:4 depth:6 start:20,20"
+        }
+      ],
+      "description": "Left unmarked: bootstrapping via console `sandbox start` (not `new_game`/`campaign start`) leaves #bs-toolbar with zero size -- confirmed by the first interaction-mode run failing here with exactly that. Whether the real Sandbox Mode panel flow (SandboxPanel.ts's #bs-sandbox-start) triggers a UI transition console bootstrap skips is unverified; left as a command rather than guess at a fix for a UI path this batch never drives for real (see SANDBOX_START_DESC above)."
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
       "interaction": [
-        { "type": "command", "command": "charge hole:* explosive:boomite amount:5 stemming:2" }
-      ]
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:boomite amount:5 stemming:2"
+        }
+      ],
+      "description": "Left unmarked: bootstrapping via console `sandbox start` (not `new_game`/`campaign start`) leaves #bs-toolbar with zero size -- confirmed by the first interaction-mode run failing here with exactly that. Whether the real Sandbox Mode panel flow (SandboxPanel.ts's #bs-sandbox-start) triggers a UI transition console bootstrap skips is unverified; left as a command rather than guess at a fix for a UI path this batch never drives for real (see SANDBOX_START_DESC above)."
     },
     {
       "command": "sequence auto delay_step:25",
       "interaction": [
-        { "type": "command", "command": "sequence auto delay_step:25" }
-      ]
+        {
+          "type": "command",
+          "command": "sequence auto delay_step:25"
+        }
+      ],
+      "description": "Left unmarked: bootstrapping via console `sandbox start` (not `new_game`/`campaign start`) leaves #bs-toolbar with zero size -- confirmed by the first interaction-mode run failing here with exactly that. Whether the real Sandbox Mode panel flow (SandboxPanel.ts's #bs-sandbox-start) triggers a UI transition console bootstrap skips is unverified; left as a command rather than guess at a fix for a UI path this batch never drives for real (see SANDBOX_START_DESC above)."
     },
     {
       "command": "blast",
-      "description": "A sandbox site plays like any other — the blast pipeline runs end to end on it.",
+      "description": "Left unmarked: bootstrapping via console `sandbox start` (not `new_game`/`campaign start`) leaves #bs-toolbar with zero size -- confirmed by the first interaction-mode run failing here with exactly that. Whether the real Sandbox Mode panel flow (SandboxPanel.ts's #bs-sandbox-start) triggers a UI transition console bootstrap skips is unverified; left as a command rather than guess at a fix for a UI path this batch never drives for real (see SANDBOX_START_DESC above).",
       "interaction": [
-        { "type": "command", "command": "blast" }
+        {
+          "type": "command",
+          "command": "blast"
+        }
       ]
     },
     {
       "command": "sandbox start biome:tropical_karst seed:31337 size:64 depth:32 mixed_rock:true",
-      "description": "A second site with different settings, to confirm the mode can be re-entered.",
+      "description": "Left unmarked (legacy/unconstrained): Sandbox Mode has a real form-based panel (SandboxPanel.ts, #bs-sandbox-start plus per-field inputs like #bs-sandbox-biome/#bs-sandbox-seed/#bs-sandbox-size), not a single click like new_game -- filling every field and confirming the resulting command matches this scenario's exact params is unverified here and out of scope for this batch; a real future conversion, not a no-UI finding.",
       "interaction": [
-        { "type": "command", "command": "sandbox start biome:tropical_karst seed:31337 size:64 depth:32 mixed_rock:true" }
+        {
+          "type": "command",
+          "command": "sandbox start biome:tropical_karst seed:31337 size:64 depth:32 mixed_rock:true"
+        }
       ]
     }
   ]
