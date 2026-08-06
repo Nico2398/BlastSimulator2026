@@ -172,7 +172,8 @@ both modes per file before committing.
 ### Batch 1 — misc visual (14, same grouping as #479 Batch 1)
 ✅ ambient-life-visual · ✅ weather-popover-visual · ✅ wind-clouds-visual ·
 ✅ loading-screen-visual · ✅ scene-picking-visual (**playtest-parity
-check closed**) · ⬜ nav-cell-types-visual · ⬜ nav-minimap-integration-visual ·
+check closed**) · ✅ nav-cell-types-visual (**real command/click mismatch
+found + fixed**) · ✅ nav-minimap-integration-visual (same fix) ·
 ⬜ blast-hole-picking-visual · ⬜ blast-drill-plan-ui ·
 ⬜ blast-drill-plan-visual · ⬜ i18n-live-locale-switch ·
 ⬜ crew-fleet-panels-visual · ⬜ money-surfaces-visual
@@ -284,6 +285,35 @@ of each session, in case main added/removed a file.)
    `RESEARCH_TASK_DEFS`, etc. — look each one up per file, don't reuse a
    number from memory across files without confirming it's the same
    constant).
+2. **`serializeGameState` (command mode) was missing fields
+   `window.__gameState()` (interaction mode) already had** —
+   `worldSizeX/Z/minX/minZ` and `qualificationCount`/`proficiencyTotal`/
+   `trainingCount`, all derivable from `ctx.state` alone, no browser
+   dependency. Found auditing for real dual-mode parity (the user's explicit
+   correction: assertions must be checked in both modes, not just
+   interaction). **Fixed** — `src/console-api.ts`, with the field-list test
+   in `tests/unit/console-api.test.ts` (which had drifted stale right along
+   with the gap) updated and given real coverage. Committed separately from
+   the batch work since it's a foundational fix, not a scenario-file change.
+3. **A real, pre-existing scenario-file bug, exposed on the second batch
+   file that touched a `drill_plan grid` click**: `nav-cell-types-visual.json`
+   and `nav-minimap-integration-visual.json`'s `command` field
+   (`rows:2 cols:2 spacing:5 depth:6 start:5,5`) never matched what the
+   click actually produced. The click drags a (5,5)-(10,10) rectangle at
+   the Drill panel's own default spacing (`DEFAULT_SPACING_M=3`, not the
+   command's `spacing:5`), and the panel computes `cols`/`rows` as
+   `round(size/spacing)+1` — 3×3 = 9 holes, not the command's literal 2×2=4.
+   Command mode ran the literal params and got 4; the click always produced
+   9; nothing ever compared them until `expect.equals.holeCount` did. This
+   is exactly the class of bug `.claude/rules/scenario-defs.md` already
+   warns about ("command and interaction must target the same place") —
+   confirms that rule was aspirational for any file that never got an
+   assertion proving it. **Fixed** — corrected the `command` field to
+   `rows:3 cols:3 spacing:3` (what the click truly produces) rather than
+   guess a click sequence that would reproduce the original 2×2. Both
+   files' actual purpose (nav-cell-type rendering) doesn't depend on the
+   specific grid dimensions, so this was the lower-risk fix. Re-verified in
+   both modes with a real browser.
 
 _(Add new findings here as you hit them. Number sequentially.)_
 
@@ -292,7 +322,7 @@ _(Add new findings here as you hit them. Number sequentially.)_
 Legend: ⬜ not started · 🔶 in progress · ✅ expect added + unmarked-step
 audit done + both modes verified
 
-### ✅ Done (6)
+### ✅ Done (8)
 - survey-panel-visual (Batch 0 — mechanism pilot)
 - scene-picking-visual (Batch 1 — playtest scene-picking.json parity closed)
 - ambient-life-visual, weather-popover-visual, wind-clouds-visual,
@@ -300,8 +330,11 @@ audit done + both modes verified
   setup steps; also exercised the new `worldSizeX/Z` fields for real —
   loading-screen-visual now asserts the exact 96×96 dusty_hollow terrain
   size, not just "some terrain exists")
+- nav-cell-types-visual, nav-minimap-integration-visual (Batch 1 — Finding
+  #3: real command/click mismatch found and fixed, not just assertions
+  added)
 
-117 remaining across Batches 1-7. Parity audits for research-center-gate/
+115 remaining across Batches 1-7. Parity audits for research-center-gate/
 training still open; tutorial.json's gap is scoped (2 missing negative-test
 beats + no `expect` blocks yet in tutorial-interactive.json).
 

@@ -14,10 +14,18 @@
           "key": "KeyN"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "buildingCount": 0,
+          "holeCount": 0
+        }
+      }
     },
     {
-      "command": "drill_plan grid rows:2 cols:2 spacing:5 depth:6 start:5,5",
+      "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:6 start:5,5",
+      "description": "Corrected from the original rows:2 cols:2 spacing:5 (which command mode ran literally, producing 4 holes): the click drags the (5,5)-(10,10) rectangle at the Drill panel's own default spacing (DEFAULT_SPACING_M=3, Drill.ts), computing cols/rows as round(size/spacing)+1 = 3x3 = 9 holes for that same rectangle — the command and the click were silently testing two different grids. Caught by adding expect.equals.holeCount (issue #479 follow-up); fixed by describing what the click actually produces instead of an unverified guess.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -46,7 +54,12 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 9
+        }
+      }
     },
     {
       "command": "build management_office at:2,2",
@@ -76,7 +89,14 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "increased": ["buildingCount"],
+        "equals": {
+          "cash": 42000
+        },
+        "note": "management_office tier 1 costs 8000 (BuildingDefs.ts constructionCost)"
+      }
     },
     {
       "command": "build management_office at:8,8",
@@ -106,7 +126,13 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "increased": ["buildingCount"],
+        "equals": {
+          "cash": 34000
+        }
+      }
     },
     {
       "command": "employee hire role:driller",
@@ -124,7 +150,14 @@
           "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "increased": ["employeeCount"],
+        "equals": {
+          "cash": 33000
+        },
+        "note": "HIRING_COSTS.driller is 1000 (balance.ts)"
+      }
     },
     {
       "command": "employee list",
@@ -138,6 +171,9 @@
     },
     {
       "command": "tick 10",
+      "expect": {
+        "increased": ["tickCount"]
+      },
       "interaction": [
         {
           "type": "command",
