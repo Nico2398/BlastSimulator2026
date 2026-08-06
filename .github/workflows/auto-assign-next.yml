@@ -10,10 +10,13 @@ on:
   # it stays open — the watchdog skips issues that have a linked PR.
   # `agentic-auto-merge` is idempotent, so re-evaluating costs nothing.
   #
-  # This is the fast path and not the guarantee: these events never fire at all
+  # This is the fast path and not the guarantee. These events never fire at all
   # for a PR authored by `github-actions[bot]`, whose runs are parked as
-  # `action_required`. agentic-auto-merge.yml covers that case on triggers no
-  # account can gate.
+  # `action_required` — and none of them fires when CI finishes, which on this
+  # repository is the moment the PR becomes mergeable at all. Every one of them
+  # therefore runs while the checks are still in flight, and the action reports
+  # the PR as pending rather than holding a runner open for it.
+  # agentic-auto-merge.yml, on `workflow_run`, is what comes back afterwards.
   pull_request:
     types: [opened, synchronize, reopened, edited, ready_for_review, closed]
 

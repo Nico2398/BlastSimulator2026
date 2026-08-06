@@ -178,11 +178,10 @@ describe('auto-merge does not depend on the PR author', () => {
     expect(triggers).not.toContain('cron:');
   });
 
-  it('keeps the standalone auto-merge workflow manual-only', () => {
+  it('keeps the standalone auto-merge workflow reachable by hand', () => {
     const sweep = workflow('agentic-auto-merge.yml');
     const triggers = sweep.slice(sweep.indexOf('\non:'), sweep.indexOf('\npermissions:'));
     expect(triggers).toContain('workflow_dispatch:');
-    expect(triggers.replace('workflow_dispatch:', '')).not.toMatch(/^\s{2}\w+.*:$/m);
   });
 
   // The author may appear in a log line or a comment — it is worth reporting.
@@ -247,6 +246,13 @@ describe('enabling auto-merge actually reaches GitHub', () => {
   });
 });
 
+// PR #499 was verified on every channel, marked, and green — and stayed open.
+// `main` requires no status check, so GitHub refuses native auto-merge outright
+// (`Pull request is in unstable status`) and the action always falls through to
+// merging the PR itself. That fallback read `unstable` as "wait", so it polled
+// for its whole 10-minute budget while the `full-ci` browser jobs still had 35
+// minutes to run, then declared the PR stuck. Nothing swept it again, because
+// no `pull_request` event fires when checks finish.
 describe('deciding whether to merge a PR auto-merge refused', () => {
   // Lifted out of the composite action's inline script, as above.
   const source = readFileSync(
@@ -259,22 +265,239 @@ describe('deciding whether to merge a PR auto-merge refused', () => {
 
   const mergeVerdict = new Function(
     `${source.slice(start, end + '\n          };'.length)} return mergeVerdict;`
-  )() as (state: string) => string;
+  )() as (
+    state: string,
+    checks: { pending: number; failed: number; total: number }
+  ) => string;
 
-  it('merges only on `clean`, the state auto-merge would have waited for', () => {
-    expect(mergeVerdict('clean')).toBe('merge');
+  const allReported = { pending: 0, failed: 0, total: 3 };
+  const running = { pending: 1, failed: 0, total: 3 };
+  const red = { pending: 0, failed: 1, total: 3 };
+  const nothingYet = { pending: 0, failed: 0, total: 0 };
+
+  it('merges once every run on the head has reported and none failed', () => {
+    expect(mergeVerdict('clean', allReported)).toBe('merge');
   });
 
-  // The arming step runs seconds after the PR was opened, while GitHub is still
-  // computing mergeability and the checks have not reported. Reading that as
-  // "not mergeable" is how a PR opened and armed in one job never merges.
-  it.each(['unknown', 'unstable', 'blocked', 'has_hooks'])('waits out `%s`', (state) => {
-    expect(mergeVerdict(state)).toBe('wait');
-  });
+  // `unknown` is only "GitHub has not finished computing mergeability". It used
+  // to be polled out; the merge call answers it directly instead, so a state
+  // that says nothing about CI no longer stops a PR whose runs are all green.
+  it.each(['unknown', 'unstable', 'blocked', 'has_hooks'])(
+    'lets the merge call settle `%s` rather than polling it out',
+    (state) => {
+      expect(mergeVerdict(state, allReported)).toBe('merge');
+    }
+  );
 
-  // Neither resolves on its own, so waiting only burns the budget.
+  // The regression #499 died on: a state no amount of waiting resolves inside
+  // one job, because what it is waiting for is a browser job with half an hour
+  // left. The CI-completion sweep is what comes back for it.
+  it.each(['unstable', 'blocked', 'unknown', 'clean'])(
+    'defers `%s` to the CI-completion sweep while a run is still going',
+    (state) => {
+      expect(mergeVerdict(state, running)).toBe('pending');
+    }
+  );
+
+  // Absence of evidence is not a pass. A PR read in the second before its CI
+  // run is created has nothing failing and nothing running, and merging on that
+  // ships code no channel ever saw.
+  it.each(['clean', 'unknown', 'unstable'])(
+    'refuses to read `%s` with no run at all as a green head',
+    (state) => {
+      expect(mergeVerdict(state, nothingYet)).toBe('pending');
+    }
+  );
+
+  it.each(['unstable', 'blocked', 'unknown', 'clean'])(
+    'gives up immediately on `%s` once a run has failed',
+    (state) => {
+      expect(mergeVerdict(state, red)).toBe('stuck');
+    }
+  );
+
+  // Neither resolves on its own, so deferring them only defers a dead end.
   it.each(['dirty', 'behind'])('gives up immediately on `%s`', (state) => {
-    expect(mergeVerdict(state)).toBe('stuck');
+    expect(mergeVerdict(state, allReported)).toBe('stuck');
+    expect(mergeVerdict(state, running)).toBe('stuck');
+  });
+
+  // A PR waiting on CI is the normal state of a PR the pipeline just opened.
+  // Failing the step for it would cry wolf on every single run.
+  it('reports a PR waiting on its runs separately from one that is stuck', () => {
+    expect(source).toContain("core.setOutput('pending'");
+    expect(source).toMatch(/if \(verdict === 'pending'\) \{/);
+    const failure = source.slice(source.indexOf('if (unarmed.length > 0)'));
+    expect(failure).not.toContain('pending.length');
+  });
+});
+
+// #499's head replayed from the three workflow runs GitHub actually recorded
+// against `b2483b6`, at the two moments that decided its fate. Ids, paths and
+// conclusions are the real ones; only `status` moves between the two cases,
+// because that is the only thing that moved between 01:30 and 02:15.
+describe("reading #499's head the way the action now reads it", () => {
+  const source = readFileSync(
+    join(ROOT, '.github/actions/agentic-auto-merge/action.yml'), 'utf8'
+  );
+  const start = source.indexOf('const RUN_FAILURES');
+  const end = source.indexOf('\n          };', source.indexOf('const checkState'));
+  expect(start).toBeGreaterThan(-1);
+  expect(end).toBeGreaterThan(start);
+
+  const verdictStart = source.indexOf('const mergeVerdict');
+  const mergeVerdict = new Function(
+    `${source.slice(verdictStart, source.indexOf('\n          };', verdictStart) + '\n          };'.length)} return mergeVerdict;`
+  )() as (state: string, checks: Checks) => string;
+
+  interface Checks { pending: number; failed: number; total: number }
+  interface Run { id: number; path: string; workflow_id: number; status: string; conclusion: string | null }
+
+  const buildCheckState = (runId: number, ownWorkflowRef: string) =>
+    new Function(
+      'context',
+      'process',
+      `${source.slice(start, end + '\n          };'.length)} return checkState;`
+    )(
+      { runId },
+      { env: { GITHUB_WORKFLOW_REF: ownWorkflowRef } }
+    ) as (runs: Run[]) => Checks;
+
+  const CI = { id: 31062936274, path: '.github/workflows/ci.yml', workflow_id: 254203664 };
+  const REVIEW = { id: 31062936235, path: '.github/workflows/claude-code-review.yml', workflow_id: 320501354 };
+  const CHAIN = { id: 31062936200, path: '.github/workflows/auto-assign-next.yml', workflow_id: 255968026 };
+
+  // 01:30:50 — the sweep runs inside `chain-next-task` itself, seconds after
+  // the PR opened. CI has 45 minutes left to run.
+  it('defers instead of burning ten minutes and calling the PR stuck', () => {
+    const checkState = buildCheckState(
+      CHAIN.id,
+      `Nico2398/BlastSimulator2026/.github/workflows/auto-assign-next.yml@refs/heads/main`
+    );
+
+    const checks = checkState([
+      { ...CI, status: 'in_progress', conclusion: null },
+      { ...REVIEW, status: 'completed', conclusion: 'skipped' },
+      { ...CHAIN, status: 'in_progress', conclusion: null },
+    ]);
+
+    // Its own run is not counted — that is the self-wait that would strand
+    // every PR — and `skipped` is not a failure.
+    expect(checks).toEqual({ pending: 1, failed: 0, total: 2 });
+    expect(mergeVerdict('unstable', checks)).toBe('pending');
+  });
+
+  // 02:15:20 — CI completes, which is now itself the event that runs the sweep.
+  it('merges #499 on the CI-completion sweep', () => {
+    const checkState = buildCheckState(
+      99999999999,
+      `Nico2398/BlastSimulator2026/.github/workflows/agentic-auto-merge.yml@refs/heads/main`
+    );
+
+    const checks = checkState([
+      { ...CI, status: 'completed', conclusion: 'success' },
+      { ...REVIEW, status: 'completed', conclusion: 'skipped' },
+      { ...CHAIN, status: 'completed', conclusion: 'success' },
+    ]);
+
+    expect(checks).toEqual({ pending: 0, failed: 0, total: 3 });
+    expect(mergeVerdict('clean', checks)).toBe('merge');
+  });
+
+  // `cancel-in-progress` is on the CI workflow, so a superseded run sits on the
+  // same head. Counting it would read a live green PR as permanently failed.
+  it('reads a superseded CI run as replaced, not as a failure', () => {
+    const checkState = buildCheckState(0, '');
+
+    const checks = checkState([
+      { ...CI, id: CI.id - 1, status: 'completed', conclusion: 'cancelled' },
+      { ...CI, status: 'completed', conclusion: 'success' },
+    ]);
+
+    expect(checks).toEqual({ pending: 0, failed: 0, total: 1 });
+    expect(mergeVerdict('clean', checks)).toBe('merge');
+  });
+
+  it('still calls a genuinely failed CI run stuck', () => {
+    const checkState = buildCheckState(0, '');
+
+    const checks = checkState([
+      { ...CI, status: 'completed', conclusion: 'failure' },
+      { ...REVIEW, status: 'completed', conclusion: 'skipped' },
+    ]);
+
+    expect(checks).toEqual({ pending: 0, failed: 1, total: 2 });
+    expect(mergeVerdict('unstable', checks)).toBe('stuck');
+  });
+});
+
+// Every wait in this action was a guess at something an event already reports.
+// A sleeping runner is also the one state that cannot say what it is waiting
+// for, which is how #499's ten minutes of identical log lines ended in a wrong
+// verdict rather than a useful one.
+describe('the auto-merge path holds no timer', () => {
+  const source = readFileSync(
+    join(ROOT, '.github/actions/agentic-auto-merge/action.yml'), 'utf8'
+  );
+
+  it('never sleeps, polls, or reads the clock', () => {
+    expect(source).not.toContain('setTimeout');
+    expect(source).not.toContain('setInterval');
+    expect(source).not.toContain('Date.now');
+    expect(source).not.toMatch(/settle/i);
+  });
+
+  // A sleep in the workflow around it would be the same mechanism moved one
+  // file out.
+  it.each(['agentic-auto-merge.yml', 'auto-assign-next.yml'])(
+    '%s waits on no clock either',
+    (name) => {
+      expect(workflow(name)).not.toMatch(/^\s*(run:\s*)?sleep\s/m);
+    }
+  );
+
+  // The merge request is the authority on whether a PR merges. Asking GitHub
+  // is what replaced polling until it looked like the answer was yes.
+  it('asks GitHub to merge rather than predicting that it would', () => {
+    expect(source).toContain('github.rest.pulls.merge(');
+    const attempt = source.slice(source.indexOf("if (verdict === 'stuck')"));
+    expect(attempt).toContain('github.rest.pulls.merge(');
+  });
+});
+
+// The other half of the same failure: knowing that `unstable` means "come back
+// later" is worthless without an event that brings the sweep back. CI finishing
+// raises no `pull_request` event, so before this trigger existed the last word
+// on a PR was always spoken while its checks were still running.
+describe('the sweep that runs when the checks come in', () => {
+  const sweep = workflow('agentic-auto-merge.yml');
+  const triggers = sweep.slice(sweep.indexOf('\non:'), sweep.indexOf('\npermissions:'));
+
+  it('re-evaluates the PR when CI completes', () => {
+    expect(triggers).toMatch(/workflow_run:\s*\n\s*workflows:\s*\["CI"\]/);
+    expect(triggers).toMatch(/types:\s*\[completed\]/);
+  });
+
+  // `workflows:` matches on the workflow's `name:`, not its filename, so a
+  // rename in ci.yml silently unhooks the only path that merges anything.
+  it('names the CI workflow as CI declares itself', () => {
+    const declared = /^name:\s*(.+)$/m.exec(workflow('ci.yml'))?.[1].trim();
+    expect(declared).toBe('CI');
+  });
+
+  it('sweeps the branch CI reported on, not every open PR', () => {
+    expect(sweep).toContain('head: ${{ github.event.workflow_run.head_branch }}');
+  });
+
+  // A red CI run has nothing to merge, and sweeping it only restates a red
+  // check as a red workflow.
+  it('skips the sweep when CI failed', () => {
+    expect(sweep).toContain("github.event.workflow_run.conclusion == 'success'");
+  });
+
+  it('stays off a clock', () => {
+    expect(triggers).not.toContain('schedule:');
+    expect(triggers).not.toContain('cron:');
   });
 });
 

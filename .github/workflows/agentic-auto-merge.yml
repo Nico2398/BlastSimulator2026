@@ -1,17 +1,29 @@
 name: "Pipeline: enable auto-merge on an agent PR"
 
-# The manual handle on the mechanism the runners arm for themselves.
+# The event that says "the checks are in", plus the manual handle on the
+# mechanism the runners arm for themselves.
 #
-# Auto-merge is armed twice on the normal path, both times by an event: the
-# runner's own `Arm auto-merge on the PR this run opened` step, in the same job
-# that created the PR, and `auto-assign-next.yml` on `pull_request`. Neither
-# reaches a PR whose run was cancelled mid-flight, and the `pull_request` path
-# does not fire at all for a PR authored by `github-actions[bot]` — GitHub
-# parks those runs as `action_required` and never executes them.
+# Auto-merge is armed on the normal path by the runner's own `Arm auto-merge on
+# the PR this run opened` step, in the same job that created the PR, and by
+# `auto-assign-next.yml` on `pull_request`. Both fire while CI is still running,
+# and neither reaches a PR whose run was cancelled mid-flight; the
+# `pull_request` path does not fire at all for a PR authored by
+# `github-actions[bot]`, whose runs GitHub parks as `action_required`.
 #
-# This workflow exists for that leftover, and for a PR left stranded by an older
-# run. It is deliberately dispatch-only: nothing here runs on a clock.
+# `main` requires no status check, so GitHub refuses native auto-merge outright
+# — `Pull request is in unstable status`, because with nothing required to wait
+# for there is nothing for auto-merge to do — and the action merges the PR
+# itself once it reads `clean`. That makes "CI has finished" the moment the
+# merge becomes possible, and no `pull_request` event fires then. PR #499 was
+# the PR that proved it: green on every channel, marked, and still open, because
+# the only sweep it ever got ran 40 minutes before its last check reported.
+#
+# Hence the `workflow_run` trigger. It is still not a clock: it reacts to CI
+# finishing on one branch, and evaluates the PR opened from that branch.
 on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
   workflow_dispatch:
     inputs:
       pr:
@@ -26,7 +38,11 @@ permissions:
 
 jobs:
   arm:
-    if: vars.AGENTIC_AUTO_MERGE_ENABLED == 'true'
+    # A CI run that failed leaves nothing to merge, and sweeping it would only
+    # restate a red check as a red workflow.
+    if: >-
+      vars.AGENTIC_AUTO_MERGE_ENABLED == 'true' &&
+      (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -37,12 +53,16 @@ jobs:
       # The PAT, not GITHUB_TOKEN: releasing a parked workflow run needs
       # `actions: write`, and a merge performed by the PAT raises the
       # `pull_request: closed` event that auto-assign-next.yml chains from.
+      # On dispatch: the PR the human named, or every open one. On CI
+      # completion: the PR opened from the branch CI just reported on — the
+      # inputs are mutually exclusive by trigger, so both can be passed.
       - name: Enable auto-merge on marked PRs
         id: merge
         uses: ./.github/actions/agentic-auto-merge
         with:
           token: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
           pr: ${{ inputs.pr }}
+          head: ${{ github.event.workflow_run.head_branch }}
 
       # `always()`: the sweep fails the job when a marked PR ends unarmed, and
       # that is precisely the run whose numbers are worth printing.
@@ -53,6 +73,9 @@ jobs:
             echo "Auto-merge covers PR(s): ${{ steps.merge.outputs.enabled }}."
           else
             echo "No open PR carried READY TO MERGE in a mergeable state."
+          fi
+          if [ -n "${{ steps.merge.outputs.pending }}" ]; then
+            echo "Waiting on checks, re-swept when CI reports: ${{ steps.merge.outputs.pending }}."
           fi
           if [ -n "${{ steps.merge.outputs.unarmed }}" ]; then
             echo "Still neither armed nor merged: ${{ steps.merge.outputs.unarmed }}."
