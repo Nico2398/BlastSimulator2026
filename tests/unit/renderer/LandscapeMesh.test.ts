@@ -453,16 +453,23 @@ describe('LandscapeMesh', () => {
      * restricted to genuine INTERIOR boundary-quad nodes.
      *
      * buildBoundaryQuad's flat-edge rule (see LandscapeMesh.ts) routes every node
-     * on a boundary quad's Z-perimeter (row===0 or row===subdiv, i.e. z a multiple
-     * of coarseStep away from the tile's own origin) through coarse-corner
-     * interpolation ALWAYS — never through boundaryHeightAt — regardless of live
-     * grid state, specifically to avoid T-junction cracks against the neighbouring
-     * unsubdivided coarse quad. Only interior fine nodes (row strictly between 0
-     * and subdiv) are ever routed through boundaryHeightAt. A helper that doesn't
-     * exclude perimeter rows can land on a flat-edge (theoretical-height) vertex
-     * that happens to share the same x as a closer interior one, and its result
-     * would then depend on geometry emission order rather than on whether
-     * boundaryHeightAt is actually honored — so filter to interior rows only.
+     * on a boundary quad's perimeter — the Z-perimeter (row===0 or row===subdiv)
+     * AND, independently, the X-perimeter (col===0 or col===subdiv) — through
+     * coarse-corner interpolation ALWAYS — never through boundaryHeightAt —
+     * regardless of live grid state, specifically to avoid T-junction cracks
+     * against the neighbouring unsubdivided coarse quad. Only nodes strictly
+     * interior on BOTH axes (row strictly between 0 and subdiv, AND col strictly
+     * between 0 and subdiv) are ever routed through boundaryHeightAt. A helper
+     * that doesn't exclude perimeter rows can land on a flat-edge (theoretical-
+     * height) vertex that happens to share the same x as a closer interior one,
+     * and its result would then depend on geometry emission order rather than on
+     * whether boundaryHeightAt is actually honored — so filter to interior rows.
+     * This helper filters only the Z-perimeter, not the X-perimeter; that is
+     * safe for the two tests below because this fixture's PlayableCut.ownsColumn
+     * depends only on x, so an X-perimeter node here still carries a height
+     * consistent with what boundaryHeightAt would report, and doesn't produce a
+     * false pass — but it means this helper is not a general-purpose "interior
+     * boundary node" filter for fixtures where ownership varies with z too.
      */
     function closestUnownedVertexHeight(scene: THREE.Scene, originZ: number, coarseStep: number): number {
       let bestX = -Infinity;
@@ -596,7 +603,12 @@ describe('buildBoundaryQuad (#491)', () => {
     return (x: number, z: number) => ({ height: x * x + z, biomeId: 0, surfCompId: compId });
   }
 
-  function run(playable: PlayableCut, palette: CompositionPalette, compId: number) {
+  /** Deliberately non-linear in z (mirror of makeSample): isolates the onXEdge flat-edge branch, which interpolates along z. */
+  function makeSampleZ(compId: number) {
+    return (x: number, z: number) => ({ height: x + z * z, biomeId: 0, surfCompId: compId });
+  }
+
+  function run(playable: PlayableCut, palette: CompositionPalette, compId: number, sample = makeSample(compId)) {
     const positions: number[] = [];
     const normals: number[] = [];
     const rockA: number[] = [];
@@ -607,7 +619,7 @@ describe('buildBoundaryQuad (#491)', () => {
     buildBoundaryQuad(
       positions, normals, rockA, rockB, rockWeight, ore, indices,
       0, 0, 4, 4,
-      makeSample(compId), palette, playable,
+      sample, palette, playable,
     );
     return { positions, normals, rockA, rockB, rockWeight, ore, indices };
   }
@@ -655,6 +667,27 @@ describe('buildBoundaryQuad (#491)', () => {
     expect(expectedEdge).not.toBeCloseTo(trueSampled, 3); // the field really is non-linear here
 
     const edgeHeights = heightsAt(positions, 2, 0);
+    expect(edgeHeights.length).toBeGreaterThan(0);
+    for (const h of edgeHeights) expect(h).toBeCloseTo(expectedEdge, 4);
+  });
+
+  it("flat-edge rule (onXEdge): nodes on a parent left/right side interpolate linearly between that side's two coarse corners, not the true sampled height", () => {
+    const { palette, compId } = makePalette();
+    // Whole quad outside the claim so every fine cell survives — isolates the
+    // flat-edge behaviour from the keep/drop rule. Uses a field non-linear in z
+    // (mirroring the onZEdge test's field non-linear in x) so a bug that swapped
+    // which pair of corners feeds this branch would show up as a wrong value.
+    const playable: PlayableCut = { rect: { minX: 1000, minZ: 1000, maxX: 2000, maxZ: 2000 }, ownsColumn: () => false };
+    const sample = makeSampleZ(compId);
+    const { positions } = run(playable, palette, compId, sample);
+
+    const h00 = sample(0, 0).height; // 0
+    const h04 = sample(0, 4).height; // 16
+    const expectedEdge = h00 + (2 / 4) * (h04 - h00); // 8, linear interpolation along z at x=0
+    const trueSampled = sample(0, 2).height; // 4
+    expect(expectedEdge).not.toBeCloseTo(trueSampled, 3); // the field really is non-linear here
+
+    const edgeHeights = heightsAt(positions, 0, 2);
     expect(edgeHeights.length).toBeGreaterThan(0);
     for (const h of edgeHeights) expect(h).toBeCloseTo(expectedEdge, 4);
   });

@@ -74,21 +74,6 @@ function distanceInsideRect(rect: Rect, x: number, z: number): number {
 }
 
 /**
- * Where the playable mesh's surface actually sits for a column of this height.
- *
- * Identity, and that is the point. The playable grid used to fill voxels solid
- * up to a rounded surface, which put its iso-surface half a voxel below the
- * first air cell and left the landscape floating up to a metre above it; the
- * landscape had to quantize the same way to meet it. Generation now writes a
- * fractional density through the surface band (TerrainGen's surfaceDensityAt),
- * so marching cubes reproduces the continuous height exactly and both
- * representations read the same number with no correction at all (#458).
- */
-export function voxelSurfaceHeight(continuousHeight: number): number {
-  return continuousHeight;
-}
-
-/**
  * The ground the playable mesh owns, which the landscape must not overlap.
  *
  * `rect` is the site's live bounding box, and `ownsColumn` its actual claimed
