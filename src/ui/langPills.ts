@@ -15,7 +15,7 @@ import type { Locale } from '../core/i18n/I18n.js';
  * Toggle the `active` class on an EN/FR pill pair to match `active`.
  * Pure DOM update — reads only its arguments, no i18n/global state access.
  */
-export function syncLangPills(_enPill: HTMLElement, _frPill: HTMLElement, _active: Locale): void {
-  // TODO: implement
-  return undefined;
+export function syncLangPills(enPill: HTMLElement, frPill: HTMLElement, active: Locale): void {
+  enPill.classList.toggle('active', active === 'en');
+  frPill.classList.toggle('active', active === 'fr');
 }

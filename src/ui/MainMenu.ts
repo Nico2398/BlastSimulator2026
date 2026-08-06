@@ -5,6 +5,7 @@
 
 import { t, setLocale, getLocale } from '../core/i18n/I18n.js';
 import { LocaleTextRegistry } from './localeText.js';
+import { syncLangPills } from './langPills.js';
 import { el } from './dom.js';
 import { iconEl, type IconName } from './icons.js';
 import { getLevel } from '../core/campaign/Level.js';
@@ -124,6 +125,11 @@ export class MainMenu {
     menuBox.append(wordmark, buttonCol, localeRow);
     body.append(menuBox);
 
+    // Fresh page load starts at getLocale()'s default ('en', or a returning
+    // player's persisted locale) — show the matching pill active immediately
+    // instead of leaving both unselected until the player clicks one.
+    this.updateLangPills();
+
     // ── Bottom ticker ──
     const ticker = el('div', { attrs: {
       style: 'height:34px;padding:0 76px;display:flex;align-items:center;gap:9px;white-space:nowrap;'
@@ -190,9 +196,7 @@ export class MainMenu {
   }
 
   private updateLangPills(): void {
-    const active = getLocale();
-    this.enPill.classList.toggle('active', active === 'en');
-    this.frPill.classList.toggle('active', active === 'fr');
+    syncLangPills(this.enPill, this.frPill, getLocale());
   }
 
   private async refreshContinueSummary(): Promise<void> {
