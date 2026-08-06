@@ -317,14 +317,19 @@ export class TutorialOverlay {
     this.updateParamStripClearance();
     this.refreshGuide();
 
-    if (step.commands && step.commands.length > 0) {
-      this.commandsLabel.style.display = '';
-      this.commandsHint.style.display = '';
-      this.commandsHint.textContent = step.commands.join(', ');
-    } else {
-      this.commandsLabel.style.display = 'none';
-      this.commandsHint.style.display = 'none';
-    }
+    // The console equivalent stays off the card.
+    //
+    // It reads as an instruction, and the ones that carry coordinates —
+    // `build_ramp start:16,19 end:16,31`, `drill_plan ... start:20,20` — read
+    // as coordinates the player is expected to reproduce by hand. There is no
+    // control in the game that takes a typed tile, so a player who tried was
+    // stuck (#489: "expects the player to use the exact coordinates that are
+    // just printed out... this is impossible to do"). The scene outline is the
+    // hint now; `commands` stays on the step as documentation of what the step
+    // is equivalent to.
+    this.commandsLabel.style.display = 'none';
+    this.commandsHint.style.display = 'none';
+    this.commandsHint.textContent = '';
   }
 
   /**

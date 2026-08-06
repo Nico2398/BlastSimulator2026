@@ -312,24 +312,45 @@ describe('TutorialOverlay (12.4)', () => {
       expect(tut.isActive).toBe(true);
     });
 
-    it('shows commands hint element when step has commands array', () => {
+    it('never puts the console equivalent on the card, on any step (#489)', () => {
+      // The console line reads as an instruction, and the ones carrying tile
+      // coordinates read as coordinates the player must reproduce by hand —
+      // which no control in the game accepts. The scene outline is the hint.
       const tut = new TutorialOverlay(container);
       overlay = tut;
       tut.start(createMockState());
 
       const hintEl = container.querySelector('.bs-tutorial-commands') as HTMLElement;
+      const labelEl = container.querySelector('.bs-tutorial-commands-label') as HTMLElement;
       expect(hintEl).not.toBeNull();
 
-      // Step 0 (time-speed) has no commands → hint is hidden
-      expect(hintEl.style.display).toBe('none');
+      for (let i = 0; i < TUTORIAL_STEPS.length; i++) {
+        // `as any` needed to set private stepIndex and call private render()
+        (tut as any).stepIndex = i;
+        (tut as any).render();
+        expect(hintEl.style.display, `step ${TUTORIAL_STEPS[i]!.id} shows a console hint`).toBe('none');
+        expect(labelEl.style.display).toBe('none');
+        expect(hintEl.textContent).toBe('');
+      }
+    });
 
-      // Advance to step 2 (survey), whose hint is the real console command
-      // `as any` needed to set private stepIndex and call private render()
-      (tut as any).stepIndex = 2;
-      (tut as any).render();
+    it('no step card text anywhere prints raw tile coordinates (#489)', () => {
+      const tut = new TutorialOverlay(container);
+      overlay = tut;
+      tut.start(createMockState());
 
-      expect(hintEl.style.display).not.toBe('none');
-      expect(hintEl.textContent).toBe('survey seismic x:23 z:23');
+      const textEl = container.querySelector('.bs-panel-text') as HTMLElement;
+      const stageEl = container.querySelector('.bs-tutorial-stage') as HTMLElement;
+      // "(12, 8)" / "16,19" — a pair of numbers the player is expected to aim at.
+      const COORD_PAIR = /\(?\d+\s*,\s*\d+\)?/;
+
+      for (let i = 0; i < TUTORIAL_STEPS.length; i++) {
+        (tut as any).stepIndex = i;
+        (tut as any).render();
+        const id = TUTORIAL_STEPS[i]!.id;
+        expect(COORD_PAIR.test(textEl.textContent ?? ''), `step ${id} body prints coordinates`).toBe(false);
+        expect(COORD_PAIR.test(stageEl.textContent ?? ''), `step ${id} instruction prints coordinates`).toBe(false);
+      }
     });
 
     it('never executes a step hint on the player behalf', () => {

@@ -1,34 +1,29 @@
 name: "Pipeline: intake a filed issue"
 
-# The one human input the pipeline takes is a GitHub issue, but filing one is
-# not by itself enough to start a run — that would take label assignment out
-# of human hands. A run starts only once `ready` is on the issue: set by a
-# human (by hand, or through the issue form's own `labels:` default) or by an
-# agent authoring the issue per `agentic-issue-creation`. This workflow reacts
-# to that label arriving; `auto-assign-next.yml` only fires on a merged pull
-# request and `agentic-trigger.yml` is manual dispatch, so without this one an
-# issue that already carries `ready` would wait for a human to press a button.
+# Filing an issue records work; it never starts a run. Exactly two mechanisms
+# start an autonomous session, and both are deliberate acts:
+#
+#   - `agentic-trigger.yml` — a human dispatching the workflow by hand.
+#   - `auto-assign-next.yml` — a merged pipeline pull request chaining to the
+#     next `ready` issue.
+#
+# This workflow assigns nothing. It exists only to keep the lifecycle labels
+# usable by hand: it makes sure the label definitions exist so a human can pick
+# them from the GitHub UI, and it drops a stale `done` from a reopened issue.
+# An issue carrying `ready` waits in the queue until one of the two mechanisms
+# above reaches it — filing it, labelling it, or reopening it does not.
 on:
   issues:
-    types: [opened, reopened, labeled]
+    types: [opened, reopened]
 
 permissions:
   issues: write
 
 jobs:
-  # Filing an issue no longer opts it into the queue by itself — that decision
-  # stays with whoever set `ready`: a human, by hand or through the issue
-  # form's own `labels:` default, or an agent authoring the issue per
-  # `agentic-issue-creation`. This job only tidies stale state and reports
-  # whether `ready` already arrived on the payload; it never applies `ready`.
   label:
-    if: github.event.action == 'opened' || github.event.action == 'reopened'
     runs-on: ubuntu-latest
-    outputs:
-      assignable: ${{ steps.labels.outputs.assignable || 'false' }}
     steps:
       - name: Normalise lifecycle labels
-        id: labels
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -57,55 +52,11 @@ jobs:
               await github.rest.issues.removeLabel({ owner, repo, issue_number: n, name: 'done' })
                 .catch(() => {});
               on.delete('done');
-              core.info(`#${n}: reopened, dropped stale done. Add ready to re-enter the queue.`);
+              core.info(`#${n}: reopened, dropped stale done.`);
             }
 
-            // `ready` here means it arrived with the issue itself — the "Agent
-            // Task" form's `labels:` default, or an agent that set it at
-            // creation. Nothing in this step ever adds it.
-            core.setOutput('assignable', on.has('ready') ? 'true' : 'false');
-
-  assign:
-    needs: label
-    # The `labeled` branch is deliberately narrow: only the `ready` label
-    # itself may start a run. Matching on `action == 'labeled'` alone used to
-    # fire this job for *any* label added to *any* issue in the repo.
-    if: (github.event.action == 'labeled' && github.event.label.name == 'ready') || needs.label.outputs.assignable == 'true'
-    runs-on: ubuntu-latest
-    # Filing a batch of issues in one sitting fires one intake per issue, and
-    # single flight lives in the assign action rather than in GitHub: parallel
-    # intakes each read the `in-progress` list before any of them writes to it,
-    # and every one of them assigns. The runners then serialise, GitHub keeps
-    # one pending run per concurrency group and drops the rest, and the extra
-    # issues sit `in-progress` with no session behind them until the watchdog
-    # calls them stalled. Serialising the assignment itself is what makes the
-    # single-flight check mean anything. Labelling stays outside this group, so
-    # a dropped run here costs an assignment, never an issue's `ready` label —
-    # and the hourly sweep picks the queue back up regardless.
-    concurrency:
-      group: agentic-assignment
-      cancel-in-progress: false
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-
-      # Single flight lives in the action: when a run is already live this defers
-      # and assigns nothing. It also picks the oldest `ready` issue rather than
-      # this one, so filing an issue joins the queue instead of jumping it.
-      - name: Assign the next ready issue
-        id: assign
-        uses: ./.github/actions/agentic-assign
-        with:
-          token: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
-          agent: ${{ vars.AGENTIC_AGENT }}
-          reason: issue #${{ github.event.issue.number }} entered the queue
-
-      - name: Report
-        run: |
-          if [ -n "${{ steps.assign.outputs.issue }}" ]; then
-            echo "Assigned issue #${{ steps.assign.outputs.issue }} to ${{ steps.assign.outputs.mention }}."
-          else
-            echo "Nothing assigned — see the assign step for the reason."
-          fi
+            core.info(
+              on.has('ready')
+                ? `#${n}: carries ready and waits in the queue. Dispatch "Pipeline: run the configured agent on the next ready issue" to start it, or let a merged pipeline PR chain to it.`
+                : `#${n}: no ready label, so it is not in the queue.`
+            );

@@ -146,6 +146,34 @@ async function armedPlacement(page: Page): Promise<void> {
   }
 }
 
+/**
+ * Fail unless the game canvas is the topmost element at a screen point.
+ *
+ * A tile click is only a player action if the player's cursor can actually
+ * reach the terrain there. The docked placement strip and the tutorial card
+ * both float over the lower third of the scene, and a click that lands on one
+ * of them does nothing at all — which is exactly what was reported as "the
+ * highlighted square does not respond to clicks" (#489). The harness used to
+ * miss it because its definitions moved the camera first; now an obscured tile
+ * fails here and names the element that caught the click.
+ */
+async function requireCanvasAt(page: Page, px: number, py: number, tile: string): Promise<void> {
+  const blocker = await page.evaluate(({ x, y }: { x: number; y: number }) => {
+    const top = document.elementFromPoint(x, y) as HTMLElement | null;
+    if (!top) return 'nothing (the point is off the viewport)';
+    if (top.id === 'game-canvas') return null;
+    const id = top.id ? `#${top.id}` : '';
+    const cls = typeof top.className === 'string' && top.className ? `.${top.className.trim().split(/\s+/).join('.')}` : '';
+    return `<${top.tagName.toLowerCase()}${id}${cls}>`;
+  }, { x: px, y: py });
+  if (blocker === null) return;
+  throw new PlaytestFailure(
+    `tile ${tile} cannot be clicked — ${blocker} covers it at (${Math.round(px)}, ${Math.round(py)})`,
+    'A tile the player is told to click must not sit under a docked panel, strip or card.'
+    + ' Move the UI, or frame the camera on the target when the tool arms.',
+  );
+}
+
 /** Run one player action, throwing PlaytestFailure with a diagnosis on failure. */
 export async function runAction(page: Page, action: PlayerAction): Promise<void> {
   switch (action.do) {
@@ -189,6 +217,7 @@ export async function runAction(page: Page, action: PlayerAction): Promise<void>
       // is that this has to be a click a player could actually make.
       await armedPlacement(page);
       const { px, py } = await worldToScreenPoint(page, action.x, action.z);
+      await requireCanvasAt(page, px, py, `(${action.x}, ${action.z})`);
       await page.mouse.click(px, py);
       break;
     }
@@ -196,6 +225,8 @@ export async function runAction(page: Page, action: PlayerAction): Promise<void>
       await armedPlacement(page);
       const from = await worldToScreenPoint(page, action.x1, action.z1);
       const to = await worldToScreenPoint(page, action.x2, action.z2);
+      await requireCanvasAt(page, from.px, from.py, `(${action.x1}, ${action.z1})`);
+      await requireCanvasAt(page, to.px, to.py, `(${action.x2}, ${action.z2})`);
       await page.mouse.move(from.px, from.py);
       await page.mouse.down();
       await page.mouse.move(to.px, to.py, { steps: 10 });
