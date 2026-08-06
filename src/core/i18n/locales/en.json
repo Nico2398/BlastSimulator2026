@@ -3060,7 +3060,7 @@
   "ui.menu.ticker_1": "Village newsletter calls the noise 'ongoing'",
   "ui.menu.ticker_2": "A regulator has scheduled a visit he will not attend",
   "ui.menu.ticker_3": "Head office describes morale as 'a work in progress'",
-  "sandbox.title": "Sandbox Setup",
+  "sandbox.title": "Sandbox Configuration",
   "sandbox.blurb": "Build your own site. Note the seed down and the same settings will rebuild exactly the same map.",
   "sandbox.start": "Start Sandbox",
   "sandbox.randomize": "Roll a new seed",

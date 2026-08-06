@@ -4,8 +4,9 @@
 // Three independent checks over the raw locale JSON, not `t()`:
 //   1. Key-set parity — en.json and fr.json declare exactly the same keys.
 //      This is expected to already hold (both files are documented as
-//      key-complete at 3231 keys each); it is pinned here as a regression
-//      guard, not a new requirement.
+//      key-complete at 3219 keys each, after the issue #492 orphan-key
+//      removal); it is pinned here as a regression guard, not a new
+//      requirement.
 //   2. Self-reference — no value equals its own dotted key path, the classic
 //      "t() fell back to the key name" bug. Expected to already hold.
 //   3. EN/FR value parity — no fr.json value is byte-identical to the
@@ -43,9 +44,13 @@ describe('en.json / fr.json — key-set parity', () => {
     expect(missing, `keys present in fr.json but missing from en.json:\n${missing.join('\n')}`).toEqual([]);
   });
 
-  it('both locale files declare exactly 3231 keys (documented key-complete baseline)', () => {
-    expect(Object.keys(en).length).toBe(3231);
-    expect(Object.keys(fr).length).toBe(3231);
+  it('both locale files declare exactly the same key count, pinned to the current key-complete baseline', () => {
+    // Baseline is 3219 (down from 3231): 12 dead/orphaned keys were removed
+    // as part of the issue #492 glossary sweep — see ORPHAN_KEYS in
+    // src/core/i18n/glossary.ts. Update this baseline only alongside a
+    // deliberate key addition/removal, not silently.
+    expect(Object.keys(en).length).toBe(Object.keys(fr).length);
+    expect(Object.keys(en).length).toBe(3219);
   });
 });
 
