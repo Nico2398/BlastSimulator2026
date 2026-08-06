@@ -10,7 +10,12 @@
           "command": "new_game seed:42"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -21,7 +26,11 @@
           "command": "campaign start level:dusty_hollow"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "increased": ["worldSizeX"],
+        "note": "dusty_hollow's terrain (96) replaces the sandbox default (64) — DEFAULT_GRID_SIZE, world.ts"
+      }
     },
     {
       "command": "time resume",

@@ -51,7 +51,14 @@
           "command": "new_game seed:1138 size:24"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "buildingCount": 0,
+          "worldSizeX": 24
+        }
+      }
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -72,7 +79,14 @@
           "expectedValue": false
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "increased": ["worldSizeX"],
+        "equals": {
+          "cash": 50000
+        },
+        "note": "24 (the seed-1138 base game) replaced by dusty_hollow's own 96x96 terrain (Level.ts gridX/gridZ)"
+      }
     },
     {
       "command": "terrain_info",
@@ -83,7 +97,14 @@
           "command": "terrain_info"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "worldSizeX": 96,
+          "worldSizeZ": 96
+        },
+        "note": "exact match to dusty_hollow's gridX/gridZ (Level.ts) — proves the level's own terrain generated at the right size, not merely that some terrain exists"
+      }
     }
   ]
 }

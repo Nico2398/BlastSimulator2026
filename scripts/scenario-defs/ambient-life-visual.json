@@ -10,7 +10,14 @@
           "command": "new_game seed:42"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 0,
+          "employeeCount": 0,
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -21,7 +28,14 @@
           "command": "campaign start level:dusty_hollow"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        },
+        "increased": ["worldSizeX"],
+        "note": "dusty_hollow's own startingCash (Level.ts) is 50000, same as the sandbox default; worldSizeX increased confirms the level's own (larger) terrain actually replaced the sandbox one"
+      }
     }
   ],
   "shots": [

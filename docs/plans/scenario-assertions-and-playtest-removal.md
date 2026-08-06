@@ -170,8 +170,8 @@ both modes per file before committing.
 `survey-panel-visual.json`.
 
 ### Batch 1 — misc visual (14, same grouping as #479 Batch 1)
-⬜ ambient-life-visual · ⬜ weather-popover-visual · ⬜ wind-clouds-visual ·
-⬜ loading-screen-visual · ✅ scene-picking-visual (**playtest-parity
+✅ ambient-life-visual · ✅ weather-popover-visual · ✅ wind-clouds-visual ·
+✅ loading-screen-visual · ✅ scene-picking-visual (**playtest-parity
 check closed**) · ⬜ nav-cell-types-visual · ⬜ nav-minimap-integration-visual ·
 ⬜ blast-hole-picking-visual · ⬜ blast-drill-plan-ui ·
 ⬜ blast-drill-plan-visual · ⬜ i18n-live-locale-switch ·
@@ -292,11 +292,16 @@ _(Add new findings here as you hit them. Number sequentially.)_
 Legend: ⬜ not started · 🔶 in progress · ✅ expect added + unmarked-step
 audit done + both modes verified
 
-### ✅ Done (2)
+### ✅ Done (6)
 - survey-panel-visual (Batch 0 — mechanism pilot)
 - scene-picking-visual (Batch 1 — playtest scene-picking.json parity closed)
+- ambient-life-visual, weather-popover-visual, wind-clouds-visual,
+  loading-screen-visual (Batch 1 — baseline `equals`/`increased` on
+  setup steps; also exercised the new `worldSizeX/Z` fields for real —
+  loading-screen-visual now asserts the exact 96×96 dusty_hollow terrain
+  size, not just "some terrain exists")
 
-121 remaining across Batches 1-7. Parity audits for research-center-gate/
+117 remaining across Batches 1-7. Parity audits for research-center-gate/
 training still open; tutorial.json's gap is scoped (2 missing negative-test
 beats + no `expect` blocks yet in tutorial-interactive.json).
 
