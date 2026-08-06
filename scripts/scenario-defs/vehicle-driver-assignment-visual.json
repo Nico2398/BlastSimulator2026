@@ -10,7 +10,8 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -19,25 +20,44 @@
           "type": "command",
           "command": "campaign start level:dusty_hollow"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "vehicle buy debris_hauler",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle buy debris_hauler"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "employee hire role:driver",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driver"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "employee assign_skill 1 skill:driving.truck level:1",
@@ -46,7 +66,8 @@
           "type": "command",
           "command": "employee assign_skill 1 skill:driving.truck level:1"
         }
-      ]
+      ],
+      "description": "Left unmarked: no UI control drives this exact command and none should exist -- hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`."
     },
     {
       "command": "vehicle list",
@@ -55,21 +76,27 @@
         {
           "type": "command",
           "command": "vehicle list"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "vehicle driver 1 1",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle driver 1 1"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "tick 5",
@@ -78,7 +105,8 @@
           "type": "command",
           "command": "tick 5"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "vehicle list",
@@ -87,16 +115,26 @@
           "type": "command",
           "command": "vehicle list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "employee hire role:blaster",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:blaster"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "vehicle driver 1 2",
@@ -105,7 +143,8 @@
           "type": "command",
           "command": "vehicle driver 1 2"
         }
-      ]
+      ],
+      "description": "Left unmarked: vehicle #1 already has a driver, so FleetPanel shows only an Unassign control here, not the assign picker -- and even that picker would never have listed employee #2 (a blaster has no driving.truck licence). Confirmed by the console command itself failing with \"Employee lacks licence for this role\": genuinely unreachable by a click, not a conversion gap."
     },
     {
       "command": "tick 5",
@@ -114,7 +153,8 @@
           "type": "command",
           "command": "tick 5"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "vehicle list",
@@ -123,7 +163,8 @@
           "type": "command",
           "command": "vehicle list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -132,7 +173,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ],
   "shots": [

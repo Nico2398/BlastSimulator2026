@@ -10,24 +10,26 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driller"
-        },
-        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"employees\"]"
         },
         {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
           "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-detail-toggle"
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "needs",
@@ -36,7 +38,8 @@
           "type": "command",
           "command": "needs"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 10",
@@ -45,7 +48,8 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "needs",
@@ -54,7 +58,8 @@
           "type": "command",
           "command": "needs"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 20",
@@ -63,7 +68,8 @@
           "type": "command",
           "command": "tick 20"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "needs",
@@ -72,7 +78,8 @@
           "type": "command",
           "command": "needs"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 50",
@@ -81,7 +88,8 @@
           "type": "command",
           "command": "tick 50"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "needs",
@@ -90,7 +98,8 @@
           "type": "command",
           "command": "needs"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 80",
@@ -99,7 +108,8 @@
           "type": "command",
           "command": "tick 80"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "needs",
@@ -108,7 +118,8 @@
           "type": "command",
           "command": "needs"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -117,7 +128,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ],
   "shots": [

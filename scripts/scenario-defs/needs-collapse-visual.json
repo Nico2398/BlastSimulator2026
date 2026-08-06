@@ -1,6 +1,6 @@
 {
   "name": "needs-collapse-visual",
-  "description": "Visual check of collapse state: dispatch an employee to work so need gauges drain at the working rate and no rest can be claimed, drive fatigue below the collapse threshold (\u22645), verify the employee is flagged COLLAPSING in state and rendered with the collapsing row style, then build living_quarters and advance ticks to confirm rest recovery and a return to normal task dispatch",
+  "description": "Visual check of collapse state: dispatch an employee to work so need gauges drain at the working rate and no rest can be claimed, drive fatigue below the collapse threshold (≤5), verify the employee is flagged COLLAPSING in state and rendered with the collapsing row style, then build living_quarters and advance ticks to confirm rest recovery and a return to normal task dispatch",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -10,37 +10,40 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driller"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "employee hire role:blaster",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:blaster"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-detail-toggle"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-employee-id=\"2\"] .bs-detail-toggle"
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "employee dispatch 1 x:10 z:10",
@@ -49,7 +52,8 @@
           "type": "command",
           "command": "employee dispatch 1 x:10 z:10"
         }
-      ]
+      ],
+      "description": "Left unmarked: no UI control drives this exact command and none should exist -- employees.ts's own `dispatch` case comment: \"no console command currently creates one... which left the Bunkhouse shift-cycle unreachable from any player-facing flow\" -- a test hook by design, same class as `employee assign_skill`."
     },
     {
       "command": "needs",
@@ -58,7 +62,8 @@
           "type": "command",
           "command": "needs"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 45",
@@ -67,7 +72,8 @@
           "type": "command",
           "command": "tick 45"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "needs",
@@ -76,7 +82,8 @@
           "type": "command",
           "command": "needs"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 5",
@@ -85,7 +92,8 @@
           "type": "command",
           "command": "tick 5"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "employee list",
@@ -94,7 +102,8 @@
           "type": "command",
           "command": "employee list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "needs",
@@ -103,7 +112,8 @@
           "type": "command",
           "command": "needs"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "employee list",
@@ -112,7 +122,8 @@
           "type": "command",
           "command": "employee list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "needs",
@@ -121,7 +132,8 @@
           "type": "command",
           "command": "needs"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 200",
@@ -130,7 +142,8 @@
           "type": "command",
           "command": "tick 200"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -139,7 +152,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "employee list",
@@ -148,7 +162,8 @@
           "type": "command",
           "command": "employee list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "needs",
@@ -157,7 +172,8 @@
           "type": "command",
           "command": "needs"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 50",
@@ -166,7 +182,8 @@
           "type": "command",
           "command": "tick 50"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "employee list",
@@ -175,7 +192,8 @@
           "type": "command",
           "command": "employee list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "needs",
@@ -184,16 +202,38 @@
           "type": "command",
           "command": "needs"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "build living_quarters at:15,15",
       "interaction": [
         {
-          "type": "command",
-          "command": "build living_quarters at:15,15"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 15,
+          "z": 15
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "tick 20",
@@ -202,7 +242,8 @@
           "type": "command",
           "command": "tick 20"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "employee list",
@@ -211,7 +252,8 @@
           "type": "command",
           "command": "employee list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "needs",
@@ -220,7 +262,8 @@
           "type": "command",
           "command": "needs"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 30",
@@ -229,7 +272,8 @@
           "type": "command",
           "command": "tick 30"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "employee list",
@@ -238,7 +282,8 @@
           "type": "command",
           "command": "employee list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "needs",
@@ -247,7 +292,8 @@
           "type": "command",
           "command": "needs"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -256,7 +302,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ],
   "shots": [

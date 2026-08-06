@@ -10,24 +10,26 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driller"
-        },
-        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"employees\"]"
         },
         {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
           "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-detail-toggle"
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "employee dispatch 1 x:10 z:10",
@@ -36,7 +38,8 @@
           "type": "command",
           "command": "employee dispatch 1 x:10 z:10"
         }
-      ]
+      ],
+      "description": "Left unmarked: no UI control drives this exact command and none should exist -- employees.ts's own `dispatch` case comment: \"no console command currently creates one... which left the Bunkhouse shift-cycle unreachable from any player-facing flow\" -- a test hook by design, same class as `employee assign_skill`."
     },
     {
       "command": "tick 40",
@@ -45,7 +48,8 @@
           "type": "command",
           "command": "tick 40"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "needs",
@@ -54,7 +58,8 @@
           "type": "command",
           "command": "needs"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -63,17 +68,39 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "build living_quarters at:15,15",
       "description": "Placed away from the (10,10) dispatch target (#437) — building on top of the employee's own tile made that cell permanently NavGrid-blocked with the employee still standing on it, so every later rest/collapse routing failed to path out and the employee got stuck COLLAPSING at 0/0/0 needs forever instead of demonstrating the queued-rest recovery this scenario is about.",
       "interaction": [
         {
-          "type": "command",
-          "command": "build living_quarters at:15,15"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 15,
+          "z": 15
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "needs",
@@ -82,7 +109,8 @@
           "type": "command",
           "command": "needs"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 80",
@@ -91,7 +119,8 @@
           "type": "command",
           "command": "tick 80"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "needs",
@@ -100,7 +129,8 @@
           "type": "command",
           "command": "needs"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -109,7 +139,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 20",
@@ -118,7 +149,8 @@
           "type": "command",
           "command": "tick 20"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "needs",
@@ -127,7 +159,8 @@
           "type": "command",
           "command": "needs"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -136,7 +169,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 30",
@@ -145,7 +179,8 @@
           "type": "command",
           "command": "tick 30"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "needs",
@@ -154,7 +189,8 @@
           "type": "command",
           "command": "needs"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -163,7 +199,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ],
   "shots": [

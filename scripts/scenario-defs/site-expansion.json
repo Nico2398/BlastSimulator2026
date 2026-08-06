@@ -10,7 +10,8 @@
           "type": "command",
           "command": "new_game seed:42 size:32 cash:500000"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "terrain_info",
@@ -20,11 +21,12 @@
           "type": "command",
           "command": "terrain_info"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "drill_plan add x:34 z:10 depth:6",
-      "description": "Two metres past the east edge — claims the chunk under it.",
+      "description": "Left unmarked: this coordinate sits outside the site's original bounds, and the scenario's whole point is that placing here triggers auto-expansion (terrain_info's Site line grows 32x32x32 -> 64x32x32). Whether the 3D tile picker can raycast a still-unexpanded region reliably enough for pickTile to land is unverified and risky to guess at -- left as a command rather than gambling a batch run on an edge case none of the other 67 converted files needed.",
       "interaction": [
         {
           "type": "command",
@@ -34,7 +36,7 @@
     },
     {
       "command": "drill_plan add x:-4 z:10 depth:6",
-      "description": "West of the origin — the site now has negative coordinates.",
+      "description": "Left unmarked: this coordinate sits outside the site's original bounds, and the scenario's whole point is that placing here triggers auto-expansion (terrain_info's Site line grows 32x32x32 -> 64x32x32). Whether the 3D tile picker can raycast a still-unexpanded region reliably enough for pickTile to land is unverified and risky to guess at -- left as a command rather than gambling a batch run on an edge case none of the other 67 converted files needed.",
       "interaction": [
         {
           "type": "command",
@@ -50,7 +52,8 @@
           "type": "command",
           "command": "terrain_info"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "inspect -4,0,10",
@@ -60,11 +63,12 @@
           "type": "command",
           "command": "inspect -4,0,10"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "build_ramp origin:30,20 direction:east length:8 depth:6",
-      "description": "A ramp running off the old edge onto claimed ground.",
+      "description": "Left unmarked: this coordinate sits outside the site's original bounds, and the scenario's whole point is that placing here triggers auto-expansion (terrain_info's Site line grows 32x32x32 -> 64x32x32). Whether the 3D tile picker can raycast a still-unexpanded region reliably enough for pickTile to land is unverified and risky to guess at -- left as a command rather than gambling a batch run on an edge case none of the other 67 converted files needed.",
       "timeout": 15,
       "interaction": [
         {
@@ -75,7 +79,7 @@
     },
     {
       "command": "build management_office at:34,4",
-      "description": "A building standing entirely on ground that did not exist at level start.",
+      "description": "Left unmarked: this coordinate sits outside the site's original bounds, and the scenario's whole point is that placing here triggers auto-expansion (terrain_info's Site line grows 32x32x32 -> 64x32x32). Whether the 3D tile picker can raycast a still-unexpanded region reliably enough for pickTile to land is unverified and risky to guess at -- left as a command rather than gambling a batch run on an edge case none of the other 67 converted files needed.",
       "interaction": [
         {
           "type": "command",
@@ -87,19 +91,25 @@
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
       "interaction": [
         {
-          "type": "command",
-          "command": "charge hole:* explosive:boomite amount:5 stemming:2"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "sequence auto delay_step:25",
       "interaction": [
         {
-          "type": "command",
-          "command": "sequence auto delay_step:25"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "blast",
@@ -107,14 +117,31 @@
       "timeout": 15,
       "interaction": [
         {
-          "type": "command",
-          "command": "blast"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "save slot:expanded",
-      "description": "Save v7 stores the claimed set plus only the chunks the blast changed.",
+      "description": "Left unmarked: save/load UI is out of scope for this batch -- see save-load-visual.json (Batch 6) for the real control.",
       "timeout": 15,
       "interaction": [
         {
@@ -125,7 +152,7 @@
     },
     {
       "command": "load slot:expanded",
-      "description": "The reloaded site keeps the shape play gave it.",
+      "description": "Left unmarked: save/load UI is out of scope for this batch -- see save-load-visual.json (Batch 6) for the real control.",
       "timeout": 15,
       "interaction": [
         {
@@ -141,7 +168,8 @@
           "type": "command",
           "command": "terrain_info"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -150,7 +178,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ],
   "shots": [

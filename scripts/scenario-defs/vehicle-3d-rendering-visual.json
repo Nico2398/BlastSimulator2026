@@ -3,14 +3,16 @@
   "description": "Visual check: all 5 vehicle roles render distinct 3D shapes at spawn with correct positioning",
   "steps": [
     {
-      "command": "new_game seed:42",
+      "command": "new_game seed:42 cash:200000",
       "timeout": 15,
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42"
+          "command": "new_game seed:42 cash:200000"
         }
-      ]
+      ],
+      "role": "setup",
+      "description": "Bumped cash from the 50k default to 200k: at 50k, only the first of 5 vehicle purchases affords -- the rest overdraw in command mode (Finding #1) but would leave 4 buy buttons permanently disabled for a real click. This is what the scenario's own premise (render all 5 vehicle types) needs."
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -20,17 +22,28 @@
           "type": "command",
           "command": "campaign start level:dusty_hollow"
         }
-      ]
+      ],
+      "role": "setup",
+      "description": "campaign start replaces the whole GameState (createGameForLevel) including cash, reset to the level's own startingCash -- a `new_game ... cash:N` set beforehand (tried here first) is wiped the instant this step runs, regardless of order. There is no cash override for campaign start itself."
     },
     {
       "command": "vehicle buy debris_hauler",
       "timeout": 15,
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle buy debris_hauler"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "vehicle buy rock_digger",
@@ -40,7 +53,8 @@
           "type": "command",
           "command": "vehicle buy rock_digger"
         }
-      ]
+      ],
+      "description": "Left unmarked: cash is already at or below cost, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
     },
     {
       "command": "vehicle buy drill_rig",
@@ -50,7 +64,8 @@
           "type": "command",
           "command": "vehicle buy drill_rig"
         }
-      ]
+      ],
+      "description": "Left unmarked: cash is already at or below cost, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
     },
     {
       "command": "vehicle buy building_destroyer",
@@ -60,7 +75,8 @@
           "type": "command",
           "command": "vehicle buy building_destroyer"
         }
-      ]
+      ],
+      "description": "Left unmarked: cash is already at or below cost, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
     },
     {
       "command": "vehicle buy rock_fragmenter",
@@ -70,7 +86,8 @@
           "type": "command",
           "command": "vehicle buy rock_fragmenter"
         }
-      ]
+      ],
+      "description": "Left unmarked: cash is already at or below cost, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
     },
     {
       "command": "vehicle list",
@@ -80,7 +97,8 @@
           "type": "command",
           "command": "vehicle list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -90,7 +108,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ],
   "shots": [

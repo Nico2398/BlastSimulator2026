@@ -10,7 +10,8 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -19,16 +20,26 @@
           "type": "command",
           "command": "campaign start level:dusty_hollow"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "vehicle buy debris_hauler",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle buy debris_hauler"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "vehicle list",
@@ -37,11 +48,12 @@
           "type": "command",
           "command": "vehicle list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "vehicle move 1 to:2,2",
-      "description": "Target far enough from spawn that tick 5 below (speed 3/tick = 15 cells) doesn't cover the whole distance in one batch — the old to:25,25 target was close enough that the vehicle arrived and reset to idle within the same tick command, so the moving-state shot never captured the blue in-transit marker (#411).",
+      "description": "Left unmarked: no UI control drives this exact command and none should exist -- FleetPanel.ts only wires vehicle buy/driver/scrap to the console (grep confirms no `vehicle move`/`vehicle assign` call site anywhere in src/ui) -- vehicles move autonomously via task/haul assignment, never by a player teleporting one to a raw x,z.",
       "interaction": [
         {
           "type": "command",
@@ -56,7 +68,8 @@
           "type": "command",
           "command": "vehicle list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 5",
@@ -65,7 +78,8 @@
           "type": "command",
           "command": "tick 5"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "vehicle list",
@@ -74,7 +88,8 @@
           "type": "command",
           "command": "vehicle list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "vehicle assign 1 task:transport",
@@ -83,7 +98,8 @@
           "type": "command",
           "command": "vehicle assign 1 task:transport"
         }
-      ]
+      ],
+      "description": "Left unmarked: no UI control drives this exact command and none should exist -- FleetPanel.ts only wires vehicle buy/driver/scrap to the console (grep confirms no `vehicle move`/`vehicle assign` call site anywhere in src/ui) -- vehicles move autonomously via task/haul assignment, never by a player teleporting one to a raw x,z."
     },
     {
       "command": "vehicle list",
@@ -92,7 +108,8 @@
           "type": "command",
           "command": "vehicle list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 3",
@@ -101,7 +118,8 @@
           "type": "command",
           "command": "tick 3"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "vehicle list",
@@ -110,7 +128,8 @@
           "type": "command",
           "command": "vehicle list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -119,7 +138,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ],
   "shots": [

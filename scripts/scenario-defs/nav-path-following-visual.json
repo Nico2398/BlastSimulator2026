@@ -9,25 +9,40 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driller"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driller"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "employee list",
@@ -36,11 +51,12 @@
           "type": "command",
           "command": "employee list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "employee dispatch 1 x:0 z:0",
-      "description": "Send employee #1 walking toward the far corner — a 3-building wall placed below will completely seal that corner off, with no detour around it.",
+      "description": "Left unmarked: no UI control drives this exact command and none should exist -- employees.ts's own `dispatch` case comment: \"no console command currently creates one... which left the Bunkhouse shift-cycle unreachable from any player-facing flow\" -- a test hook by design, same class as `employee assign_skill`.",
       "interaction": [
         {
           "type": "command",
@@ -56,37 +72,93 @@
           "type": "command",
           "command": "tick 19"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "build management_office at:2,0",
       "description": "First wall segment: seals the east side of the (0,0) corner (x:2-3, z:0-1).",
       "interaction": [
         {
-          "type": "command",
-          "command": "build management_office at:2,0"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"management_office\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 2,
+          "z": 0
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "build management_office at:0,2",
       "description": "Second wall segment: seals the south side of the (0,0) corner (x:0-1, z:2-3).",
       "interaction": [
         {
-          "type": "command",
-          "command": "build management_office at:0,2"
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"management_office\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 0,
+          "z": 2
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "build management_office at:2,2",
       "description": "Third wall segment: fills the diagonal corner gap (x:2-3, z:2-3) so no 8-directional diagonal move can slip past the wall.",
       "interaction": [
         {
-          "type": "command",
-          "command": "build management_office at:2,2"
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"management_office\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 2,
+          "z": 2
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "tick 5",
@@ -96,7 +168,8 @@
           "type": "command",
           "command": "tick 5"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "state full",
@@ -105,7 +178,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 10",
@@ -114,35 +188,51 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "build destroy 1",
       "interaction": [
         {
-          "type": "command",
-          "command": "build destroy 1"
+          "type": "waitForSelector",
+          "selector": "#bs-build-panel [data-building-id=\"1\"] .bs-build-demolish-btn"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-building-id=\"1\"] .bs-build-demolish-btn"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "build destroy 2",
       "interaction": [
         {
-          "type": "command",
-          "command": "build destroy 2"
+          "type": "waitForSelector",
+          "selector": "#bs-build-panel [data-building-id=\"2\"] .bs-build-demolish-btn"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-building-id=\"2\"] .bs-build-demolish-btn"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "build destroy 3",
       "description": "Demolish all three wall segments — the previously stuck agent should be able to resume movement once the corner is fully open again.",
       "interaction": [
         {
-          "type": "command",
-          "command": "build destroy 3"
+          "type": "waitForSelector",
+          "selector": "#bs-build-panel [data-building-id=\"3\"] .bs-build-demolish-btn"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-building-id=\"3\"] .bs-build-demolish-btn"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "tick 15",
@@ -152,7 +242,8 @@
           "type": "command",
           "command": "tick 15"
         }
-      ]
+      ],
+      "role": "setup"
     }
   ],
   "shots": [

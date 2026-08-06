@@ -9,16 +9,40 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "drill_plan grid rows:1 cols:1 spacing:1 depth:6 start:10,10",
       "interaction": [
         {
-          "type": "command",
-          "command": "drill_plan grid rows:1 cols:1 spacing:1 depth:6 start:10,10"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 10,
+          "z1": 10,
+          "x2": 10,
+          "z2": 10
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "charge hole:H1 explosive:boomite amount:8kg stemming:2m",
@@ -27,16 +51,18 @@
           "type": "command",
           "command": "charge hole:H1 explosive:boomite amount:8kg stemming:2m"
         }
-      ]
+      ],
+      "description": "Left unmarked: Charge.ts's own header comment says per-hole charging isn't a UI feature -- Charge All (all holes, one shared amount/stemming) is the only commit. `charge hole:H1 ...` (one specific hole) has no click path at all (Finding #10's class)."
     },
     {
       "command": "sequence auto",
       "interaction": [
         {
-          "type": "command",
-          "command": "sequence auto"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "state full",
@@ -45,16 +71,34 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "blast",
       "interaction": [
         {
-          "type": "command",
-          "command": "blast"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "state full",
@@ -63,17 +107,27 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "vehicle buy debris_hauler",
       "description": "Purchase a vehicle and send it across the grid — its position should advance tick by tick via the NavGrid-aware pathfinding stepper.",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle buy debris_hauler"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "vehicle move 1 to:15,15",
@@ -82,7 +136,8 @@
           "type": "command",
           "command": "vehicle move 1 to:15,15"
         }
-      ]
+      ],
+      "description": "Left unmarked: no UI control drives this exact command and none should exist -- FleetPanel.ts only wires vehicle buy/driver/scrap to the console (grep confirms no `vehicle move`/`vehicle assign` call site anywhere in src/ui) -- vehicles move autonomously via task/haul assignment, never by a player teleporting one to a raw x,z."
     },
     {
       "command": "tick 5",
@@ -91,7 +146,8 @@
           "type": "command",
           "command": "tick 5"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "state full",
@@ -101,7 +157,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ],
   "shots": [

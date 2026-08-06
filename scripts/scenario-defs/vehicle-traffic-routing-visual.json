@@ -3,14 +3,16 @@
   "description": "Visual check: multiple vehicles on shared navmesh cause congestion with waiting state and traffic jam alert",
   "steps": [
     {
-      "command": "new_game seed:42",
+      "command": "new_game seed:42 cash:150000",
       "timeout": 10,
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42"
+          "command": "new_game seed:42 cash:150000"
         }
-      ]
+      ],
+      "role": "setup",
+      "description": "Bumped cash from the 50k default to 150k -- same reasoning as vehicle-traffic: all 4 debris_haulers need to exist for the routing test."
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -19,43 +21,87 @@
           "type": "command",
           "command": "campaign start level:dusty_hollow"
         }
-      ]
+      ],
+      "role": "setup",
+      "description": "campaign start replaces the whole GameState including cash, reset to the level's own startingCash -- a `new_game ... cash:N` override does not survive this step (tried, reverted; see vehicle-3d-rendering-visual for the same finding)."
     },
     {
       "command": "employee hire role:driver",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driver"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "employee hire role:driver",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driver"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "employee hire role:driver",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driver"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "employee hire role:driver",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driver"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
-      ]
+      ],
+      "role": "player"
+    },
+    {
+      "command": "vehicle buy debris_hauler",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+        }
+      ],
+      "role": "player"
     },
     {
       "command": "vehicle buy debris_hauler",
@@ -64,7 +110,8 @@
           "type": "command",
           "command": "vehicle buy debris_hauler"
         }
-      ]
+      ],
+      "description": "Left unmarked: cash is already at or below cost, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
     },
     {
       "command": "vehicle buy debris_hauler",
@@ -73,7 +120,8 @@
           "type": "command",
           "command": "vehicle buy debris_hauler"
         }
-      ]
+      ],
+      "description": "Left unmarked: cash is already at or below cost, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
     },
     {
       "command": "vehicle buy debris_hauler",
@@ -82,16 +130,8 @@
           "type": "command",
           "command": "vehicle buy debris_hauler"
         }
-      ]
-    },
-    {
-      "command": "vehicle buy debris_hauler",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "vehicle buy debris_hauler"
-        }
-      ]
+      ],
+      "description": "Left unmarked: cash is already at or below cost, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
     },
     {
       "command": "vehicle list",
@@ -100,11 +140,12 @@
           "type": "command",
           "command": "vehicle list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "vehicle move 1 to:37,33",
-      "description": "All 4 haulers converge on the same target cell — detectTrafficJam groups waiting vehicles by shared targetX/targetZ (#411), so a common destination is what actually lets TRAFFIC_JAM_MIN_VEHICLES be reached, not just visually adjacent-but-different targets. Spawns are staggered (issue 1's fix) so the 4 approach from distinct tiles and queue behind whichever one claims the cell first, instead of spawning fused.",
+      "description": "Left unmarked: no UI control drives this exact command and none should exist -- FleetPanel.ts only wires vehicle buy/driver/scrap to the console (grep confirms no `vehicle move`/`vehicle assign` call site anywhere in src/ui) -- vehicles move autonomously via task/haul assignment, never by a player teleporting one to a raw x,z.",
       "interaction": [
         {
           "type": "command",
@@ -119,7 +160,8 @@
           "type": "command",
           "command": "vehicle move 2 to:37,33"
         }
-      ]
+      ],
+      "description": "Left unmarked: no UI control drives this exact command and none should exist -- FleetPanel.ts only wires vehicle buy/driver/scrap to the console (grep confirms no `vehicle move`/`vehicle assign` call site anywhere in src/ui) -- vehicles move autonomously via task/haul assignment, never by a player teleporting one to a raw x,z."
     },
     {
       "command": "vehicle move 3 to:37,33",
@@ -128,7 +170,8 @@
           "type": "command",
           "command": "vehicle move 3 to:37,33"
         }
-      ]
+      ],
+      "description": "Left unmarked: no UI control drives this exact command and none should exist -- FleetPanel.ts only wires vehicle buy/driver/scrap to the console (grep confirms no `vehicle move`/`vehicle assign` call site anywhere in src/ui) -- vehicles move autonomously via task/haul assignment, never by a player teleporting one to a raw x,z."
     },
     {
       "command": "vehicle move 4 to:37,33",
@@ -137,7 +180,8 @@
           "type": "command",
           "command": "vehicle move 4 to:37,33"
         }
-      ]
+      ],
+      "description": "Left unmarked: no UI control drives this exact command and none should exist -- FleetPanel.ts only wires vehicle buy/driver/scrap to the console (grep confirms no `vehicle move`/`vehicle assign` call site anywhere in src/ui) -- vehicles move autonomously via task/haul assignment, never by a player teleporting one to a raw x,z."
     },
     {
       "command": "tick 6",
@@ -147,7 +191,8 @@
           "type": "command",
           "command": "tick 6"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "vehicle list",
@@ -156,7 +201,8 @@
           "type": "command",
           "command": "vehicle list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 16",
@@ -166,7 +212,8 @@
           "type": "command",
           "command": "tick 16"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "vehicle list",
@@ -175,7 +222,8 @@
           "type": "command",
           "command": "vehicle list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -184,7 +232,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ],
   "shots": [

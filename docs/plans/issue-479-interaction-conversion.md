@@ -282,6 +282,37 @@ here for a follow-up issue.
     `locked` (tier not yet unlocked), never on cash, so a queue attempt that
     fails for insufficient funds is still a real, clickable player action —
     only the *build* buy button carries the funds guard.
+17. **`campaign start` replaces the whole `GameState`** (`createGameForLevel`
+    in `campaign.ts`), including cash reset to the level's own
+    `startingCash` — a `new_game ... cash:N` override set beforehand is
+    wiped the instant `campaign start` runs, with no param on `campaign
+    start` itself to set cash differently. Tried bumping cash on 4 Batch 5
+    files to make an otherwise cash-blocked `vehicle buy` sequence fully
+    clickable (mirroring how Batch 4 fixed `building-menu-visual` — except
+    building-menu-visual never calls `campaign start`, so *that* fix stuck);
+    all 4 failed their first interaction-mode run on exactly the same
+    disabled button as before the "fix," because campaign start had already
+    thrown the override away. Reverted to leaving the unaffordable buys
+    unmarked (Finding #1/#16's class) instead. **Lesson: check whether a
+    file calls `campaign start` before trying a cash-override fix — the
+    override is a no-op whenever it does.**
+18. **`vehicle move`/`vehicle assign` have no UI at all** (confirmed by
+    grepping `src/ui` for `gameConsole?.(` — only `vehicle buy`/`driver`/
+    `scrap` are wired; FleetPanel never calls `move` or `assign`). Vehicles
+    reach a destination through task/haul assignment, not a player typing
+    coordinates. Left unmarked everywhere across Batch 5 (vehicle-traffic*,
+    nav-*) rather than invented a click path that doesn't exist.
+19. **A pre-existing decorative click can silently mutate state a step's own
+    `command` doesn't mention.** `vehicle-purchase-tier-ui-visual`'s step 3
+    (`vehicle list`, meant to be read-only) carried a leftover
+    `clickSelector` on a *different* vehicle's tier-2 buy button —
+    vehicle buy purchases immediately on click (no confirm step, unlike
+    buildings), so every interaction-mode run before this fix silently
+    bought an extra, unrecorded vehicle during what looked like an
+    observation step. Dropped rather than preserved, unlike
+    `building-tier-system-visual`'s fully-formed hand conversion — a stray
+    click bolted onto an otherwise-plain step is noise, not signal worth
+    keeping.
 
 _(Add new findings here as you hit them. Number sequentially.)_
 
@@ -305,7 +336,7 @@ for f in sorted(os.listdir(d)):
 EOF
 ```
 
-### ✅ Done (68)
+### ✅ Done (90)
 - tutorial-interactive, vehicle-purchase-visual, contract-panel-visual, event-dialog-visual
 - Batch 1 (14): ambient-life-visual, weather-popover-visual, wind-clouds-visual,
   survey-panel-visual, loading-screen-visual, scene-picking-visual, nav-cell-types-visual,
@@ -329,8 +360,15 @@ EOF
   building-research-progression-visual, building-research-visual,
   building-tier-system-visual, building-training-visual, building-vehicle-depot-visual,
   building-warehouse-visual
+- Batch 5 (22): vehicle-3d-rendering-visual, vehicle-driver-assignment-visual,
+  vehicle-purchase-tier-ui-visual, vehicle-roles-panel-visual, vehicle-task-states-visual,
+  vehicle-traffic, vehicle-traffic-routing-visual, needs-collapse-visual, needs-cost-visual,
+  needs-cycle, needs-drain-visual, needs-gauges-visual, needs-morale-visual,
+  needs-proactive-queue-visual, needs-replenishment-visual, needs-shift-cycle-visual,
+  nav-dynamic-updates-visual, nav-move-costs-visual, nav-path-following-visual,
+  nav-pathfinding-visual, nav-ramp-routing-visual, site-expansion
 
-All 68 interaction-verified in a real browser (each batch re-verified as one
+All 90 interaction-verified in a real browser (each batch re-verified as one
 batch run at the end to catch cross-file regressions). Batch 2 also fixed a
 real game bug (Finding #12, BlastReportModal) found only by actually running
 the clicks — command mode never would have caught it, since it never touches
@@ -341,7 +379,11 @@ Batch 4 caught two more disabled-button cases (Finding #16 — `build`'s buy
 button also disables on insufficient funds, generalizing Finding #1 beyond
 `vehicle buy`) and reused `building-tier-system-visual`'s pre-existing
 hand-written clicks (role-tagged only, not regenerated, per the
-`blast-visual-full` caution below).
+`blast-visual-full` caution below). Batch 5 found that `campaign start`
+silently discards any `new_game ... cash:N` override (Finding #17), that
+`vehicle move`/`vehicle assign` have no UI path at all (Finding #18), and
+dropped a pre-existing decorative click that was silently buying an
+unrecorded vehicle during a supposedly read-only step (Finding #19).
 
 **Caution for whoever resumes:** `blast-visual-full` was inspected early in
 Batch 2 but its actual conversion was skipped in the first pass — it slipped
@@ -353,18 +395,7 @@ for `"role"` in the file) before crossing it off.
 ### Batch 2 — blast-* — ✅ COMPLETE (25 files, see Done list above + blast-execution-visual)
 ### Batch 3 — survey-* — ✅ COMPLETE (13 files, see Done list above)
 ### Batch 4 — building-* — ✅ COMPLETE (12 files, see Done list above)
-
-### Batch 5 — vehicle-* / needs-* / nav-* (22)
-⬜ vehicle-3d-rendering-visual · ⬜ vehicle-driver-assignment-visual ·
-⬜ vehicle-purchase-tier-ui-visual · ⬜ vehicle-roles-panel-visual ·
-⬜ vehicle-task-states-visual · ⬜ vehicle-traffic ·
-⬜ vehicle-traffic-routing-visual · ⬜ needs-collapse-visual ·
-⬜ needs-cost-visual · ⬜ needs-cycle · ⬜ needs-drain-visual ·
-⬜ needs-gauges-visual · ⬜ needs-morale-visual ·
-⬜ needs-proactive-queue-visual · ⬜ needs-replenishment-visual ·
-⬜ needs-shift-cycle-visual · ⬜ nav-dynamic-updates-visual ·
-⬜ nav-move-costs-visual · ⬜ nav-path-following-visual ·
-⬜ nav-pathfinding-visual · ⬜ nav-ramp-routing-visual · ⬜ site-expansion
+### Batch 5 — vehicle-* / needs-* / nav-* — ✅ COMPLETE (22 files, see Done list above)
 
 ### Batch 6 — employee/economy/misc (18)
 ⬜ employee-skill-progression-visual · ⬜ employee-skills-visual ·
@@ -383,7 +414,7 @@ for `"role"` in the file) before crossing it off.
 ⬜ level2-playthrough-bankruptcy · ⬜ level2-playthrough-win ·
 ⬜ level3-playthrough-ecology · ⬜ level3-playthrough-win
 
-54 total remaining across batches 5-7.
+32 total remaining across batches 6-7.
 
 ## Session log
 
@@ -441,3 +472,24 @@ got and whether main was merged recently.
   a real browser. No production bug this time either. Full sweep green
   (typecheck, schema tests, command mode). Next: Batch 5 (vehicle-*/needs-*/
   nav-*, 22 files).
+- 2026-08-06 — Pushed Batch 4 commit (931d5df), confirmed clean, no main
+  drift. Batch 5 (22 files: vehicle-*/needs-*/nav-*/site-expansion)
+  converted. Tried fixing 4 cash-blocked vehicle-buy sequences by bumping
+  `new_game`'s `cash:N` param (same fix that worked for building-menu-visual
+  in Batch 4) — first interaction-mode run: 16/22 pass, 6 fail, and all 4
+  "fixed" files failed anyway on the exact same disabled button. Root cause
+  (Finding #17): `campaign start` replaces the whole GameState, resetting
+  cash to the level's own `startingCash` with no override param — it
+  silently discards whatever `new_game` set. Reverted to leaving those buys
+  unmarked (Finding #1/#16's class) instead. Also fixed two self-inflicted
+  bugs: a toggle-close from reopening an already-open panel
+  (`nav-path-following-visual`, Finding #3's class) and a missing panel-open
+  before a click (`site-expansion`'s charge-all). Also found and dropped a
+  latent bug in pre-existing hand content (Finding #19 —
+  `vehicle-purchase-tier-ui-visual` had a stray decorative click silently
+  buying an unrecorded vehicle during what looked like a read-only step) and
+  documented that `vehicle move`/`vehicle assign` have no UI path at all
+  (Finding #18). Re-verified 22/22 in a real browser after all fixes. No
+  production bug this time. Full sweep green (typecheck, schema tests,
+  command mode). 90/122 total converted. Next: Batch 6 (employee/economy/
+  misc, 18 files).

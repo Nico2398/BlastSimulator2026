@@ -10,50 +10,54 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driller"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "employee hire role:blaster",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:blaster"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "employee hire role:driver",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driver"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-detail-toggle"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-employee-id=\"2\"] .bs-detail-toggle"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-employee-id=\"3\"] .bs-detail-toggle"
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "needs",
@@ -62,7 +66,8 @@
           "type": "command",
           "command": "needs"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "employee list",
@@ -71,7 +76,8 @@
           "type": "command",
           "command": "employee list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 5",
@@ -80,7 +86,8 @@
           "type": "command",
           "command": "tick 5"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "needs",
@@ -89,7 +96,8 @@
           "type": "command",
           "command": "needs"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 15",
@@ -98,7 +106,8 @@
           "type": "command",
           "command": "tick 15"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "needs",
@@ -107,7 +116,8 @@
           "type": "command",
           "command": "needs"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 30",
@@ -116,7 +126,8 @@
           "type": "command",
           "command": "tick 30"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "needs",
@@ -125,7 +136,8 @@
           "type": "command",
           "command": "needs"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 50",
@@ -134,7 +146,8 @@
           "type": "command",
           "command": "tick 50"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "needs",
@@ -143,7 +156,8 @@
           "type": "command",
           "command": "needs"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -152,7 +166,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ],
   "shots": [

@@ -10,24 +10,26 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driller"
-        },
-        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"employees\"]"
         },
         {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
           "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-detail-toggle"
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "employee list",
@@ -36,7 +38,8 @@
           "type": "command",
           "command": "employee list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "scores",
@@ -45,7 +48,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 100",
@@ -54,7 +58,8 @@
           "type": "command",
           "command": "tick 100"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "needs",
@@ -63,7 +68,8 @@
           "type": "command",
           "command": "needs"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "employee list",
@@ -72,7 +78,8 @@
           "type": "command",
           "command": "employee list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "scores",
@@ -81,7 +88,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 150",
@@ -90,7 +98,8 @@
           "type": "command",
           "command": "tick 150"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "needs",
@@ -99,7 +108,8 @@
           "type": "command",
           "command": "needs"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "employee list",
@@ -108,7 +118,8 @@
           "type": "command",
           "command": "employee list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "scores",
@@ -117,7 +128,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 200",
@@ -126,7 +138,8 @@
           "type": "command",
           "command": "tick 200"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "needs",
@@ -135,7 +148,8 @@
           "type": "command",
           "command": "needs"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "employee list",
@@ -144,7 +158,8 @@
           "type": "command",
           "command": "employee list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "scores",
@@ -153,7 +168,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -162,7 +178,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ],
   "shots": [

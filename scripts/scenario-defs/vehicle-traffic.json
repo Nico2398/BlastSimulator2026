@@ -3,13 +3,15 @@
   "description": "Chapter 2: Add 4 haulers with drivers on narrow ramp and verify TrafficJamEvent triggers",
   "steps": [
     {
-      "command": "new_game seed:42",
+      "command": "new_game seed:42 cash:150000",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42"
+          "command": "new_game seed:42 cash:150000"
         }
-      ]
+      ],
+      "role": "setup",
+      "description": "Bumped cash from the 50k default to 150k: 4 drivers ($3200) + 4 debris_haulers ($100000) overdraws command mode past the 3rd/4th buy, which is required for the traffic-jam test itself (4 vehicles converging on one tile)."
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -18,7 +20,9 @@
           "type": "command",
           "command": "campaign start level:dusty_hollow"
         }
-      ]
+      ],
+      "role": "setup",
+      "description": "campaign start replaces the whole GameState including cash, reset to the level's own startingCash -- a `new_game ... cash:N` override does not survive this step (tried, reverted; see vehicle-3d-rendering-visual for the same finding)."
     },
     {
       "command": "time resume",
@@ -27,43 +31,86 @@
           "type": "command",
           "command": "time resume"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "employee hire role:driver",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driver"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "employee hire role:driver",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driver"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "employee hire role:driver",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driver"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "employee hire role:driver",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driver"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
-      ]
+      ],
+      "role": "player"
+    },
+    {
+      "command": "vehicle buy debris_hauler",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+        }
+      ],
+      "role": "player"
     },
     {
       "command": "vehicle buy debris_hauler",
@@ -72,7 +119,8 @@
           "type": "command",
           "command": "vehicle buy debris_hauler"
         }
-      ]
+      ],
+      "description": "Left unmarked: cash is already at or below cost, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
     },
     {
       "command": "vehicle buy debris_hauler",
@@ -81,7 +129,8 @@
           "type": "command",
           "command": "vehicle buy debris_hauler"
         }
-      ]
+      ],
+      "description": "Left unmarked: cash is already at or below cost, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
     },
     {
       "command": "vehicle buy debris_hauler",
@@ -90,16 +139,8 @@
           "type": "command",
           "command": "vehicle buy debris_hauler"
         }
-      ]
-    },
-    {
-      "command": "vehicle buy debris_hauler",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "vehicle buy debris_hauler"
-        }
-      ]
+      ],
+      "description": "Left unmarked: cash is already at or below cost, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
     },
     {
       "command": "vehicle move 2 to:21,20",
@@ -108,7 +149,8 @@
           "type": "command",
           "command": "vehicle move 2 to:21,20"
         }
-      ]
+      ],
+      "description": "Left unmarked: no UI control drives this exact command and none should exist -- FleetPanel.ts only wires vehicle buy/driver/scrap to the console (grep confirms no `vehicle move`/`vehicle assign` call site anywhere in src/ui) -- vehicles move autonomously via task/haul assignment, never by a player teleporting one to a raw x,z."
     },
     {
       "command": "vehicle move 3 to:20,21",
@@ -117,7 +159,8 @@
           "type": "command",
           "command": "vehicle move 3 to:20,21"
         }
-      ]
+      ],
+      "description": "Left unmarked: no UI control drives this exact command and none should exist -- FleetPanel.ts only wires vehicle buy/driver/scrap to the console (grep confirms no `vehicle move`/`vehicle assign` call site anywhere in src/ui) -- vehicles move autonomously via task/haul assignment, never by a player teleporting one to a raw x,z."
     },
     {
       "command": "vehicle move 4 to:19,20",
@@ -126,7 +169,8 @@
           "type": "command",
           "command": "vehicle move 4 to:19,20"
         }
-      ]
+      ],
+      "description": "Left unmarked: no UI control drives this exact command and none should exist -- FleetPanel.ts only wires vehicle buy/driver/scrap to the console (grep confirms no `vehicle move`/`vehicle assign` call site anywhere in src/ui) -- vehicles move autonomously via task/haul assignment, never by a player teleporting one to a raw x,z."
     },
     {
       "command": "tick 5",
@@ -135,7 +179,8 @@
           "type": "command",
           "command": "tick 5"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "vehicle move 2 to:20,20",
@@ -144,7 +189,8 @@
           "type": "command",
           "command": "vehicle move 2 to:20,20"
         }
-      ]
+      ],
+      "description": "Left unmarked: no UI control drives this exact command and none should exist -- FleetPanel.ts only wires vehicle buy/driver/scrap to the console (grep confirms no `vehicle move`/`vehicle assign` call site anywhere in src/ui) -- vehicles move autonomously via task/haul assignment, never by a player teleporting one to a raw x,z."
     },
     {
       "command": "vehicle move 3 to:20,20",
@@ -153,7 +199,8 @@
           "type": "command",
           "command": "vehicle move 3 to:20,20"
         }
-      ]
+      ],
+      "description": "Left unmarked: no UI control drives this exact command and none should exist -- FleetPanel.ts only wires vehicle buy/driver/scrap to the console (grep confirms no `vehicle move`/`vehicle assign` call site anywhere in src/ui) -- vehicles move autonomously via task/haul assignment, never by a player teleporting one to a raw x,z."
     },
     {
       "command": "vehicle move 4 to:20,20",
@@ -162,7 +209,8 @@
           "type": "command",
           "command": "vehicle move 4 to:20,20"
         }
-      ]
+      ],
+      "description": "Left unmarked: no UI control drives this exact command and none should exist -- FleetPanel.ts only wires vehicle buy/driver/scrap to the console (grep confirms no `vehicle move`/`vehicle assign` call site anywhere in src/ui) -- vehicles move autonomously via task/haul assignment, never by a player teleporting one to a raw x,z."
     },
     {
       "command": "vehicle list",
@@ -171,7 +219,8 @@
           "type": "command",
           "command": "vehicle list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 20",
@@ -180,7 +229,8 @@
           "type": "command",
           "command": "tick 20"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "state full",
@@ -189,7 +239,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ]
 }
