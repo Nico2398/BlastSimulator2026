@@ -14,6 +14,13 @@ export interface TutorialCardElements {
   textEl: HTMLElement;
   stageEl: HTMLElement;
   pausedEl: HTMLElement;
+  /**
+   * The "CLOCK HELD" chip's own text node, inside `pausedEl`. `pausedEl`
+   * carries the tooltip (`title`) for the same string; this is the visible
+   * label. Exposed separately so a locale refresh can update both without
+   * tearing down and rebuilding the chip.
+   */
+  pausedChipEl: HTMLElement;
   stepCounter: HTMLElement;
   progressEl: HTMLElement;
   commandsLabel: HTMLElement;
@@ -74,7 +81,8 @@ export function buildTutorialCard(container: HTMLElement): TutorialCardElements 
     attrs: { style: 'display:none', title: t('tutorial.clock_held') },
   });
   pausedEl.appendChild(iconEl('pause', 8));
-  pausedEl.appendChild(el('span', { text: t('tutorial.clock_held_chip') }));
+  const pausedChipEl = el('span', { text: t('tutorial.clock_held_chip') });
+  pausedEl.appendChild(pausedChipEl);
 
   const stepCounter = document.createElement('div');
   stepCounter.className = 'bs-tutorial-progress';
@@ -121,7 +129,7 @@ export function buildTutorialCard(container: HTMLElement): TutorialCardElements 
   container.appendChild(overlay);
 
   return {
-    overlay, box, titleEl, textEl, stageEl, pausedEl, stepCounter,
+    overlay, box, titleEl, textEl, stageEl, pausedEl, pausedChipEl, stepCounter,
     progressEl, commandsLabel, commandsHint,
   };
 }

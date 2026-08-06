@@ -39,6 +39,7 @@ export class TutorialOverlay {
   private readonly textEl: HTMLElement;
   private readonly stageEl: HTMLElement;
   private readonly pausedEl: HTMLElement;
+  private readonly pausedChipEl: HTMLElement;
   private readonly stepCounter: HTMLElement;
   private readonly progressEl: HTMLElement;
   private readonly commandsLabel: HTMLElement;
@@ -61,6 +62,7 @@ export class TutorialOverlay {
     this.textEl = els.textEl;
     this.stageEl = els.stageEl;
     this.pausedEl = els.pausedEl;
+    this.pausedChipEl = els.pausedChipEl;
     this.stepCounter = els.stepCounter;
     this.progressEl = els.progressEl;
     this.commandsLabel = els.commandsLabel;
@@ -103,6 +105,29 @@ export class TutorialOverlay {
 
   setGameConsole(fn: (cmd: string) => CommandResult): void {
     this.gameConsole = fn;
+  }
+
+  /**
+   * Re-apply every piece of card text — step title/body, the "CLOCK HELD"
+   * chip and its tooltip, the console-hint label, and the current stage
+   * line — against whichever locale is active right now.
+   *
+   * Every other panel that owns construction-time text exposes this same
+   * method and gets it called from a language-change handler (see
+   * `LocaleTextRegistry` in `localeText.ts` and `UIManager.refreshLocale()`
+   * for the established pattern). TutorialOverlay currently has none of
+   * that wiring: this stub is the missing piece of contract, and its call
+   * site still needs to be added wherever the app's language-change
+   * handlers live (see `main.ts`).
+   *
+   * TODO: implement.
+   */
+  refreshLocale(): void {
+    // TODO: implement — re-apply t() to titleEl/textEl (current step),
+    // pausedEl.title + pausedChipEl.textContent ('tutorial.clock_held' /
+    // '_chip'), commandsLabel ('tutorial.console_hint'), and re-run
+    // refreshGuide() for the stage line.
+    void this.pausedChipEl; // referenced here only to keep the stub type-valid until implemented
   }
 
   dispose(): void {
