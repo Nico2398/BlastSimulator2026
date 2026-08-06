@@ -89,6 +89,24 @@ deleted, not after.
    diff is readable as one thing at a time. In practice most files need
    both, and that's fine — just don't pad unrelated changes into a
    file you're only asserting.
+10. **Every `drill_plan grid` step gets an `expect.equals.holeCount` check,
+    no exceptions, and check it BEFORE trusting the file's declared
+    `command`.** Finding #4: the click's actual grid shape depends on the
+    placement strip's *current* spacing value (persists across grid
+    operations, only changes via `data-field="spacing"
+    .bsx-stepper-btn:first-child`/`:last-child` clicks — default
+    `DEFAULT_SPACING_M=3`, Drill.ts), not the command field's declared
+    `spacing:N`. Compute `cols = round((x2-x1)/spacing)+1`, `rows =
+    round((z2-z1)/spacing)+1` by hand against whatever spacing the strip is
+    *actually* at for that step (carrying over the previous grid step's
+    final value in the same file, not resetting to 3), or just run it and
+    read the real dump — then either add stepper clicks to reach the
+    declared spacing (preserves the file's original intent — prefer this)
+    or correct the command field to match reality (only when the exact
+    grid shape doesn't matter for that file's purpose, e.g. pure rendering
+    checks). Never leave a `drill_plan grid` step without this check on the
+    theory that the original #479 interaction-mode pass already proved it
+    — that pass never compared hole counts either.
 
 ## Mechanism (built, tested, proven — do not redesign)
 
@@ -174,8 +192,9 @@ both modes per file before committing.
 ✅ loading-screen-visual · ✅ scene-picking-visual (**playtest-parity
 check closed**) · ✅ nav-cell-types-visual (**real command/click mismatch
 found + fixed**) · ✅ nav-minimap-integration-visual (same fix) ·
-⬜ blast-hole-picking-visual · ⬜ blast-drill-plan-ui ·
-⬜ blast-drill-plan-visual · ⬜ i18n-live-locale-switch ·
+✅ blast-hole-picking-visual · ✅ blast-drill-plan-ui (**Finding #4: real
+spacing-stepper gap found + fixed at the root, ParamStrip.ts**) ·
+✅ blast-drill-plan-visual (same fix) · ⬜ i18n-live-locale-switch ·
 ⬜ crew-fleet-panels-visual · ⬜ money-surfaces-visual
 
 ### Batch 2 — blast-* (25)
@@ -315,6 +334,39 @@ of each session, in case main added/removed a file.)
    specific grid dimensions, so this was the lower-risk fix. Re-verified in
    both modes with a real browser.
 
+4. **Finding #3 generalizes: the drill grid tool's spacing/depth steppers had
+   no selector at all, not just a mismatched default.** `blast-drill-plan-
+   ui.json` and `blast-drill-plan-visual.json` both declare an explicit
+   `spacing:5`/`spacing:8` that the click could never reach — the only way
+   to change spacing before dragging is the placement strip's own +/-
+   stepper (`ParamStrip.ts`), which had no `data-field`/id distinguishing
+   "the spacing stepper" from "the depth stepper," only bare
+   `.bsx-stepper-btn` buttons in document order. **Fixed at the root**:
+   added `data-field="<key>"` to each field's wrapper in `ParamStrip.ts`
+   (one line, no behavior change, costs nothing) — a real, contained gap
+   in scriptability, not a workaround. `#bs-param-strip [data-field="spacing"]
+   .bsx-stepper-btn:last-child` now reaches it. Both files' grid steps now
+   click the stepper the right number of times to reach their declared
+   spacing before dragging (2 clicks 3→5; blast-drill-plan-ui's *second*
+   grid needed 3 more clicks 5→8, since the panel's spacing value persists
+   across grid operations within a session — nothing resets it, so the
+   second grid's stepper count is relative to the first grid's ending
+   value, not the 3m default). Verified in both modes with a real browser:
+   `expect.equals.holeCount` now matches each command's declared rows×cols
+   exactly, not merely "some holes exist."
+
+   **This is very likely NOT limited to these 2 files.** Any scenario using
+   `drill_plan grid` with `spacing` ≠ 3 (the panel default) via a bare
+   `dragTiles` — with no stepper clicks — was silently drilling a
+   different-shaped grid than its `command` field claims, invisibly, since
+   nothing ever compared declared vs. actual hole count before `expect`
+   existed. `blast-basic.json` (Batch 2, `spacing:4`) is a near-certain hit
+   by the same hand computation; check **every** `drill_plan grid` step in
+   Batches 2-7 for this exact class of bug — don't assume "it already
+   passed the original #479 interaction-mode verification" means the grid
+   shape was ever actually correct, since that verification never checked
+   hole count either.
+
 _(Add new findings here as you hit them. Number sequentially.)_
 
 ## Status table
@@ -322,7 +374,7 @@ _(Add new findings here as you hit them. Number sequentially.)_
 Legend: ⬜ not started · 🔶 in progress · ✅ expect added + unmarked-step
 audit done + both modes verified
 
-### ✅ Done (8)
+### ✅ Done (11)
 - survey-panel-visual (Batch 0 — mechanism pilot)
 - scene-picking-visual (Batch 1 — playtest scene-picking.json parity closed)
 - ambient-life-visual, weather-popover-visual, wind-clouds-visual,
@@ -333,10 +385,17 @@ audit done + both modes verified
 - nav-cell-types-visual, nav-minimap-integration-visual (Batch 1 — Finding
   #3: real command/click mismatch found and fixed, not just assertions
   added)
+- blast-hole-picking-visual, blast-drill-plan-ui, blast-drill-plan-visual
+  (Batch 1 — Finding #4: the drill grid spacing stepper had no selector at
+  all; fixed at the root in `ParamStrip.ts`, both files' grids now reach
+  their declared exact spacing before dragging)
 
-115 remaining across Batches 1-7. Parity audits for research-center-gate/
+112 remaining across Batches 1-7. Parity audits for research-center-gate/
 training still open; tutorial.json's gap is scoped (2 missing negative-test
-beats + no `expect` blocks yet in tutorial-interactive.json).
+beats + no `expect` blocks yet in tutorial-interactive.json). **Ground rule
+#10 (new): every remaining `drill_plan grid` step in Batches 2-7 needs a
+hand-check against the real panel spacing state, not just an `expect` bolt-
+on — Finding #4 is very likely not limited to the 2 files found so far.**
 
 ## Session log
 

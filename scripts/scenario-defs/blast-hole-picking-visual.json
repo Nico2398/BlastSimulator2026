@@ -24,7 +24,13 @@
           "command": "new_game seed:42 size:32"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "holeCount": 0
+        }
+      }
     },
     {
       "command": "drill_plan grid origin:10,10 rows:1 cols:1 spacing:3 depth:8",
@@ -58,7 +64,12 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 1
+        }
+      }
     },
     {
       "command": "state",
@@ -92,7 +103,11 @@
           "type": "screenshot"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "usable": "#bs-selection-bar [data-action=\"focus\"]",
+        "note": "waitForSelector above only proved the button exists; usable proves it is genuinely clickable"
+      }
     },
     {
       "command": "state",
@@ -121,7 +136,11 @@
           "type": "screenshot"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "blocked": "#bs-selection-bar [data-action=\"focus\"]",
+        "note": "Esc hides the selection bar entirely, same invariant as scene-picking-visual.json's building Esc-deselect check"
+      }
     }
   ]
 }
