@@ -332,3 +332,48 @@ describe('MainMenu — refreshLocale() wired through UIManager\'s language handl
     );
   });
 });
+
+// ── Language pill initial state (#492 section 2) ─────────────────────────────
+// Bug: updateLangPills() toggles the `active` class correctly, but is only
+// ever called from refreshLocale() — never from the constructor. A fresh
+// MainMenu shows neither pill selected even though the game already has a
+// current locale (default 'en', or whatever setLocale() left it at).
+
+describe('MainMenu — language pill initial state (#492 section 2)', () => {
+  let container: HTMLDivElement;
+
+  beforeEach(() => {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    setLocale('en');
+  });
+
+  afterEach(() => {
+    setLocale('en');
+  });
+
+  function langPills(root: ParentNode): { enPill: HTMLButtonElement; frPill: HTMLButtonElement } {
+    const pills = Array.from(root.querySelectorAll<HTMLButtonElement>('.bsx-menu-lang-pill'));
+    const enPill = pills.find((p) => p.textContent === 'EN');
+    const frPill = pills.find((p) => p.textContent === 'FR');
+    if (!enPill || !frPill) throw new Error('MainMenu language pills not found');
+    return { enPill, frPill };
+  }
+
+  it('EN pill is active on construction when the locale defaults to en', () => {
+    const menu = new MainMenu(container);
+    const { enPill, frPill } = langPills(container);
+    expect(enPill.classList.contains('active')).toBe(true);
+    expect(frPill.classList.contains('active')).toBe(false);
+    menu.dispose();
+  });
+
+  it('FR pill is active on construction when the locale is already fr — initial state tracks the real current locale, not hardcoded EN', () => {
+    setLocale('fr');
+    const menu = new MainMenu(container);
+    const { enPill, frPill } = langPills(container);
+    expect(frPill.classList.contains('active')).toBe(true);
+    expect(enPill.classList.contains('active')).toBe(false);
+    menu.dispose();
+  });
+});

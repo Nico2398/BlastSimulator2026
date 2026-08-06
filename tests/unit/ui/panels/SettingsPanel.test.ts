@@ -356,3 +356,52 @@ describe('SettingsPanel', () => {
     expect(container.querySelector('#bs-settings-panel')).toBeNull();
   });
 });
+
+// ── Language pill initial state and sync (#492 section 2) ────────────────────
+// SettingsPanel's own EN/FR pill pair sets its initial `active` class through
+// a constructor-local closure (setLangPills(getLocale())), so construction
+// already tracks the real locale. What's broken is refreshLocale() -> its
+// private updateLangPills() is currently a no-op stub, so the pills go stale
+// the moment the locale changes anywhere else (e.g. from MainMenu's own
+// toggle) while this panel instance is still alive.
+
+describe('SettingsPanel — language pill initial state and sync (#492 section 2)', () => {
+  afterEach(() => { setLocale('en'); });
+
+  function langPills(panel: SettingsPanel): { enPill: HTMLButtonElement; frPill: HTMLButtonElement } {
+    const enPill = panel.root.querySelector<HTMLButtonElement>('[data-lang="en"]');
+    const frPill = panel.root.querySelector<HTMLButtonElement>('[data-lang="fr"]');
+    if (!enPill || !frPill) throw new Error('SettingsPanel language pills not found');
+    return { enPill, frPill };
+  }
+
+  it('EN pill is active on construction when the locale defaults to en', () => {
+    const { panel } = mount();
+    const { enPill, frPill } = langPills(panel);
+    expect(enPill.classList.contains('active')).toBe(true);
+    expect(frPill.classList.contains('active')).toBe(false);
+    panel.dispose();
+  });
+
+  it('FR pill is active on construction when the locale is already fr — initial state tracks the real current locale, not hardcoded EN', () => {
+    setLocale('fr');
+    const { panel } = mount();
+    const { enPill, frPill } = langPills(panel);
+    expect(frPill.classList.contains('active')).toBe(true);
+    expect(enPill.classList.contains('active')).toBe(false);
+    panel.dispose();
+  });
+
+  it('stays in sync with a locale change made elsewhere once refreshLocale() runs', () => {
+    const { panel } = mount();
+    // Locale changed by some other code path (e.g. MainMenu's own toggle),
+    // then this already-open panel is told to refresh.
+    setLocale('fr');
+    panel.refreshLocale();
+
+    const { enPill, frPill } = langPills(panel);
+    expect(frPill.classList.contains('active')).toBe(true);
+    expect(enPill.classList.contains('active')).toBe(false);
+    panel.dispose();
+  });
+});
