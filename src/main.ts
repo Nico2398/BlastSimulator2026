@@ -121,6 +121,7 @@ uiManager.setLanguageChangeHandler(() => {
   levelEndScreen.refreshLocale();
   savesModal.refreshLocale();
   selectionBar.refreshLocale();
+  tutorial.refreshLocale();
 });
 // Symmetric with the above: a language switch made from the main menu's own
 // EN/FR pills has to reach uiManager's owned tree (settings panel included)
@@ -131,6 +132,7 @@ mainMenu.setOnLanguageChange(() => {
   levelEndScreen.refreshLocale();
   savesModal.refreshLocale();
   selectionBar.refreshLocale();
+  tutorial.refreshLocale();
 });
 mainMenu.show();
 

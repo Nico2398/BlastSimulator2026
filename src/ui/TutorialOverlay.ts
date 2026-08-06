@@ -119,15 +119,15 @@ export class TutorialOverlay {
    * that wiring: this stub is the missing piece of contract, and its call
    * site still needs to be added wherever the app's language-change
    * handlers live (see `main.ts`).
-   *
-   * TODO: implement.
    */
   refreshLocale(): void {
-    // TODO: implement — re-apply t() to titleEl/textEl (current step),
-    // pausedEl.title + pausedChipEl.textContent ('tutorial.clock_held' /
-    // '_chip'), commandsLabel ('tutorial.console_hint'), and re-run
-    // refreshGuide() for the stage line.
-    void this.pausedChipEl; // referenced here only to keep the stub type-valid until implemented
+    this.pausedEl.title = t('tutorial.clock_held');
+    this.pausedChipEl.textContent = t('tutorial.clock_held_chip');
+    this.commandsLabel.textContent = t('tutorial.console_hint');
+    // Re-derives title/body/step-counter/commands-hint for the currently
+    // displayed step and re-runs the guide's stage-line lookup — the same
+    // translation lookups render() already performs on every step change.
+    this.render();
   }
 
   dispose(): void {
