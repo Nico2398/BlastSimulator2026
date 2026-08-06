@@ -144,7 +144,7 @@
       }
     },
     {
-      "goal": "the grid tool refuses a drag outside the outlined area",
+      "goal": "the grid tool refuses to confirm until the player picks",
       "actions": [
         {
           "do": "click",
@@ -153,18 +153,11 @@
         {
           "do": "click",
           "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
-        },
-        {
-          "do": "dragTiles",
-          "x1": 2,
-          "z1": 2,
-          "x2": 6,
-          "z2": 6
         }
       ],
       "expect": {
         "blocked": "#bs-tile-select-confirm",
-        "note": "Well outside the outlined square, so no selection starts and Confirm stays dead. Inside the outline the grid snaps to the asked-for rectangle instead of demanding the player reproduce its corners - the next beat covers that side."
+        "note": "Armed but nothing picked: Confirm stays dead and the strip says why. Whether a click outside the outlined area is refused is asserted in tests/unit/ui/PlacementController.guided.test.ts instead - naming a far-off tile here only tested whether that tile happened to be under an open panel, which is a different question and the one the occlusion guard already answers."
       }
     },
     {
