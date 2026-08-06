@@ -14,15 +14,16 @@
       }
     },
     {
-      "goal": "raise the game speed with the speed button",
+      "goal": "raise the game speed with the exact button the tutorial highlights",
       "actions": [
         {
           "do": "click",
-          "selector": "#bs-hud-top .bs-speed-btn"
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"2\"]"
         }
       ],
       "expect": {
-        "tutorialStep": "hire-surveyor"
+        "tutorialStep": "hire-surveyor",
+        "note": "Clicks 2x by selector, not the speed group centre. Clicking the group let the harness land on a different button than the one the tutorial glowed, which is how a highlight pointing at 1x - a speed the game already runs at, so pressing it changes nothing and the step can never complete - survived (#489)."
       }
     },
     {
@@ -71,15 +72,14 @@
           "selector": "#bs-survey-run"
         },
         {
-          "do": "focusTile",
-          "x": 23,
-          "z": 23,
-          "note": "the default ground-level camera already shows tile (23,23), but at that framing its own screen position falls directly under the placement strip's RESULT block, which catches clicks across its whole bar; a real player would look at the spot before clicking it, which is what this does"
-        },
-        {
           "do": "pickTile",
           "x": 23,
           "z": 23
+        },
+        {
+          "do": "awaitUsable",
+          "selector": "#bs-tile-select-confirm",
+          "note": "The reported failure: the click on the highlighted tile produced no selection and Confirm never became usable. Asserted here rather than inferred from the step advancing."
         },
         {
           "do": "click",
@@ -91,7 +91,8 @@
         }
       ],
       "expect": {
-        "tutorialStep": "hire-driller"
+        "tutorialStep": "hire-driller",
+        "note": "No camera move of its own any more. Arming a guided placement frames its region, so the target tile is on screen and clear of the docked strip without the harness arranging it - which is the only way this beat tests the path the player mouse actually takes."
       }
     },
     {
@@ -143,7 +144,7 @@
       }
     },
     {
-      "goal": "the grid tool refuses a rectangle that is not the one asked for",
+      "goal": "the grid tool refuses a drag outside the outlined area",
       "actions": [
         {
           "do": "click",
@@ -155,33 +156,31 @@
         },
         {
           "do": "dragTiles",
-          "x1": 22,
-          "z1": 22,
-          "x2": 26,
-          "z2": 26
+          "x1": 2,
+          "z1": 2,
+          "x2": 6,
+          "z2": 6
         }
       ],
       "expect": {
         "blocked": "#bs-tile-select-confirm",
-        "note": "Inside the outlined square but not equal to it. The tutorial asks for exact coordinates, so Confirm must stay dead — otherwise the step teaches one layout and accepts another."
+        "note": "Well outside the outlined square, so no selection starts and Confirm stays dead. Inside the outline the grid snaps to the asked-for rectangle instead of demanding the player reproduce its corners - the next beat covers that side."
       }
     },
     {
-      "goal": "lay out the drill grid on the exact coordinates asked for",
+      "goal": "a drag inside the outlined square snaps to the exact grid the step asks for",
       "actions": [
         {
-          "do": "focusTile",
-          "x": 25,
-          "z": 25,
-          "distance": 40,
-          "note": "centres the camera on the 10x10 rectangle's midpoint, clear of the placement strip's docked bar, before dragging its corners"
+          "do": "dragTiles",
+          "x1": 22,
+          "z1": 22,
+          "x2": 26,
+          "z2": 26,
+          "note": "Deliberately not the outlined corners. A player cannot land a 3D pick on an exact tile, so the picker snaps any drag inside the area onto the region."
         },
         {
-          "do": "dragTiles",
-          "x1": 20,
-          "z1": 20,
-          "x2": 30,
-          "z2": 30
+          "do": "awaitUsable",
+          "selector": "#bs-tile-select-confirm"
         },
         {
           "do": "click",
@@ -361,13 +360,10 @@
           "selector": "#bs-build-panel [data-build-type=\"freight_warehouse\"] .bs-build-buy-btn"
         },
         {
-          "do": "zoomOut",
-          "note": "the camera is still framed on the blast site from the earlier steps — the warehouse region sits on the opposite side of the map, so it needs to actually be on screen before it can be clicked"
-        },
-        {
           "do": "pickTile",
           "x": 4,
-          "z": 4
+          "z": 4,
+          "note": "On screen because arming the build tool frames the guided region; the beat no longer zooms out for itself."
         },
         {
           "do": "click",

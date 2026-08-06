@@ -40,7 +40,7 @@ import {
   type BuildingTier,
   type Building,
 } from '../core/entities/Building.js';
-import type { PlacementKit } from './scene/PlacementKit.js';
+import { placementRefusalReason, type PlacementKit } from './scene/PlacementKit.js';
 
 import type { CommandResult } from '../console/ConsoleRunner.js';
 
@@ -254,6 +254,7 @@ export class BuildMenu {
         ],
         result: sel ? `${tiles} ${t('ui.tile_select.tiles')}` : '—',
         confirmEnabled: controller.canConfirm,
+        confirmDisabledReason: placementRefusalReason(controller),
         instruction: t('ui.build.ramp_instruction'),
       });
     };
@@ -287,6 +288,7 @@ export class BuildMenu {
         fields: [],
         result: sel ? `(${sel.x1}, ${sel.z1})` : '—',
         confirmEnabled: controller.canConfirm,
+        confirmDisabledReason: placementRefusalReason(controller),
         instruction: t('ui.build.place_instruction'),
       });
     };

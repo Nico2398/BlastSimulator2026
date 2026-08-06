@@ -12,7 +12,7 @@ import type { WeatherState } from '../../../core/weather/WeatherCycle.js';
 import type { DrillHole } from '../../../core/mining/DrillPlan.js';
 import { hasTubing } from '../../../core/mining/Tubing.js';
 import { wetHoles } from '../../../core/mining/WetHoles.js';
-import type { PlacementKit } from '../../scene/PlacementKit.js';
+import { placementRefusalReason, type PlacementKit } from '../../scene/PlacementKit.js';
 import type { CommandResult } from '../../../console/ConsoleRunner.js';
 
 export type GameConsoleFn = (cmd: string) => CommandResult;
@@ -249,6 +249,7 @@ export class DrillStep {
         ],
         result: sel ? `${cols} × ${rows} ${t('ui.blast_workshop.drill.holes_section')}` : '—',
         confirmEnabled: controller.canConfirm,
+        confirmDisabledReason: placementRefusalReason(controller),
         instruction: t('ui.blast_workshop.drill.grid_tool_hint'),
       });
     };
@@ -286,6 +287,7 @@ export class DrillStep {
         ],
         result: sel ? '1' : '—',
         confirmEnabled: controller.canConfirm,
+        confirmDisabledReason: placementRefusalReason(controller),
         instruction: t('ui.blast_workshop.drill.add_hole_hint'),
       });
     };

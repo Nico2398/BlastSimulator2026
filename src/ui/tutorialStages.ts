@@ -46,6 +46,20 @@ export interface TutorialStage {
 const PICKER_CANVAS = 'body.bs-placement-armed #game-canvas';
 const PICKER_CONFIRM = '#bs-tile-select-confirm';
 
+/**
+ * The 2× speed button, not "the first speed button in the group".
+ *
+ * `button[data-speed]` matched 1×, which is the speed the game already runs
+ * at — so the glow sat on a control that could not complete the step it was
+ * pointing at, and step 1 of the tutorial was unfinishable for anyone who
+ * clicked exactly what they were told to (#489). The playtest missed it by
+ * clicking the group's centre, which lands on 2×.
+ */
+const SPEED_UP_BUTTON = '#bs-hud-top .bs-speed-btn button[data-speed="2"]';
+
+/** 4× for the "let time run" step, which the player reaches already at 2×: a control that is already in the state it asks for teaches nothing. */
+const SPEED_FASTER_BUTTON = '#bs-hud-top .bs-speed-btn button[data-speed="4"]';
+
 /** Pick a tile, then confirm — the shared tail of every placement step. */
 function pickerStages(pickHintKey: string, region: TileRegion): TutorialStage[] {
   return [
@@ -71,19 +85,33 @@ function pickerStages(pickHintKey: string, region: TileRegion): TutorialStage[] 
  * region is what closed that gap. Shifted well off-centre here instead of
  * re-deriving a new "just barely clears it" offset.
  */
+/**
+ * Every guided placement is `exact`, so the step lands on the placement it is
+ * teaching rather than on wherever the player's drag happened to finish (#489:
+ * "the tutorial allow to create many different ramps... it should be told and
+ * forced to place buildings or any element where expected"). Exact does not
+ * mean fussy: the picker snaps any click inside the region's live margin onto
+ * these corners, so the player aims at a drawn outline and cannot miss.
+ */
 const REGION = {
-  survey: { x1: 18, z1: 18, x2: 28, z2: 28 },
-  // Exact, and sized to the grid it produces: the tool derives
+  // One tile, because a survey is a point pick. Sits inside the old 18→28
+  // suggestion area, so nothing downstream of the survey moves.
+  survey: { x1: 23, z1: 23, x2: 23, z2: 23, exact: true },
+  // Sized to the grid it produces: the tool derives
   // cols = round((x2 - x1) / spacing) + 1, so at the default spacing of 5 a
   // 20→30 span is exactly three holes at 20, 25 and 30. An outline the
   // resulting holes spilled out of would be telling the player the wrong thing.
   drill: { x1: 20, z1: 20, x2: 30, z2: 30, exact: true },
-  warehouse: { x1: 2, z1: 2, x2: 9, z2: 9 },
+  // One tile: the warehouse is placed by its origin corner, and the footprint
+  // ghost shows the rest. (4,4) is the tile the playtest has always used and
+  // the level's flat north-west corner.
+  warehouse: { x1: 4, z1: 4, x2: 4, z2: 4, exact: true },
   // The starter cut runs down the west side of where the drill pattern will
   // go, on ground that is still intact — the point of the step is that it is
   // dug *before* anything is blasted, so the first shot has a face to break
-  // toward and a void for the rock to fall into.
-  boxcut: { x1: 15, z1: 18, x2: 19, z2: 32 },
+  // toward and a void for the rock to fall into. One line, not a corridor of
+  // candidate lines: the console hint names this exact ramp.
+  boxcut: { x1: 16, z1: 19, x2: 16, z2: 31, exact: true },
 } as const satisfies Record<string, TileRegion>;
 
 /** Open the Crew panel, then hire one role. */
@@ -100,7 +128,7 @@ function hireStages(role: string, hintKey: string): TutorialStage[] {
  */
 export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
   'time-speed': [
-    { target: '#bs-hud-top .bs-speed-btn button[data-speed]', hintKey: 'tutorial.stage.speed' },
+    { target: SPEED_UP_BUTTON, hintKey: 'tutorial.stage.speed' },
   ],
 
   'hire-surveyor': hireStages('surveyor', 'tutorial.stage.hire_surveyor'),
@@ -201,7 +229,7 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
   ],
 
   'tick-advance': [
-    { target: '#bs-hud-top .bs-speed-btn button[data-speed]', hintKey: 'tutorial.stage.let_time_run' },
+    { target: SPEED_FASTER_BUTTON, hintKey: 'tutorial.stage.let_time_run' },
   ],
 };
 

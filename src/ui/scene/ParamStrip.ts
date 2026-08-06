@@ -28,8 +28,14 @@ export interface ParamStripConfig {
   /** RESULT turns red (cost exceeds balance) but Confirm stays clickable — the trade is visible, not blocked. */
   resultWarn?: boolean;
   confirmEnabled: boolean;
-  /** Shown as a reason line under the strip when Confirm is disabled. */
-  confirmDisabledReason?: string;
+  /**
+   * Shown as a reason line under the strip when Confirm is disabled.
+   *
+   * Rendered, not just hung on the button's `title`: a tooltip needs a hover a
+   * player has no reason to attempt, so before #489 every refusal this strip
+   * knew about reached the screen as nothing at all.
+   */
+  confirmDisabledReason?: string | undefined;
   /** Chip text above the strip while armed, e.g. "Drag across the bench to lay out drill holes". */
   instruction: string;
 }
@@ -38,6 +44,7 @@ export class ParamStrip {
   private readonly root: HTMLElement;
   private readonly chip: HTMLElement;
   private readonly bar: HTMLElement;
+  private readonly reasonEl: HTMLElement;
   private onConfirmHandler: (() => void) | null = null;
   private onCancelHandler: (() => void) | null = null;
   private lastSignature = '';
@@ -70,7 +77,19 @@ export class ParamStrip {
       'pointer-events:all', 'height:44px',
     ].join(';');
 
-    this.root.append(this.chip, this.bar);
+    this.reasonEl = el('div', { attrs: { id: 'bs-param-strip-reason' } });
+    this.reasonEl.style.cssText = [
+      'display:none', 'padding:5px 12px', 'border-radius:5px',
+      'background:rgba(255,106,90,.16)', 'border:1px solid rgba(255,106,90,.5)',
+      'color:var(--bsx-critical-text,#ff8a7e)', 'font:600 11px/1.3 var(--bsx-font-ui)',
+      'max-width:520px', 'text-align:center', 'pointer-events:none',
+    ].join(';');
+
+    // Above the bar, not below it: the strip is bottom-docked and the tutorial
+    // coach card sits directly under it, so a line appended below is drawn
+    // half-behind the card — which is how a reason that exists can still fail
+    // to reach the player.
+    this.root.append(this.chip, this.reasonEl, this.bar);
     container.appendChild(this.root);
   }
 
@@ -147,6 +166,10 @@ export class ParamStrip {
     actions.append(confirmBtn, escBtn);
 
     this.bar.replaceChildren(titleBlock, ...fieldEls, resultBlock, actions);
+
+    const reason = !config.confirmEnabled ? config.confirmDisabledReason : undefined;
+    this.reasonEl.textContent = reason ?? '';
+    this.reasonEl.style.display = reason ? 'block' : 'none';
   }
 
   dispose(): void { this.root.remove(); }

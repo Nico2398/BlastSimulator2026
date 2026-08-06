@@ -33,6 +33,7 @@ import { EntityHighlight } from './renderer/EntityHighlight.js';
 import { PlacementController } from './ui/scene/PlacementController.js';
 import { ParamStrip } from './ui/scene/ParamStrip.js';
 import { SelectionOverlay } from './renderer/SelectionOverlay.js';
+import { regionCenter, regionSpan, type TileRegion } from './ui/tutorialPickerRegion.js';
 import { createWeatherCycle } from './core/weather/WeatherCycle.js';
 import { Random } from './core/math/Random.js';
 import { summariseMuckPile } from './core/mining/MuckPileSummary.js';
@@ -57,6 +58,16 @@ const entityHighlight = new EntityHighlight(scene.scene);
 const hoverTag = new HoverTag(uiContainer, canvas, scene.camera);
 const selectionBar = new SelectionBar(uiContainer);
 
+/**
+ * How far back the camera sits to frame a guided placement region.
+ *
+ * Scales with the region so a single tile is not framed from orbit and a
+ * 13-tile ramp corridor is not framed half off-screen; the floor keeps the
+ * target above the bottom-docked strip and tutorial card either way.
+ */
+const placementFramingDistance = (region: TileRegion): number =>
+  Math.max(26, regionSpan(region) * 3.5);
+
 // --- In-scene placement (redesign P3): the grid-select tool that replaced the 2D tile picker ---
 const placementController = new PlacementController(canvas, scene.camera, gameRenderer, scene.cameraController);
 const selectionOverlay = new SelectionOverlay(scene.scene, (x, z) => gameRenderer.surfaceYAt(x, z));
@@ -68,6 +79,24 @@ placementController.setArmedStateHandler((armed) => {
   // picker-canvas stage target needs a signal that actually means "the tool
   // is ready for a tile click now," not "the canvas element exists."
   document.body.classList.toggle('bs-placement-armed', armed);
+
+  const region = armed ? placementController.activeRegion : null;
+  selectionOverlay.setRegion(region);
+  // Frame the target before the player looks for it. A guided region can open
+  // off-screen, or low enough that the docked strip and the tutorial card cover
+  // it — clicks there land on DOM instead of the terrain and the tile "does not
+  // respond" (#489). Both playtest and scenario definitions used to paper over
+  // this with their own camera moves, which is exactly the path a player's
+  // mouse does not take.
+  if (region) {
+    const { x, z } = regionCenter(region);
+    scene.cameraController.focus(x, gameRenderer.surfaceYAt(x, z), z, placementFramingDistance(region));
+  }
+});
+// Kept separate from the panels' own change handlers: which panel armed the
+// tool must not decide whether the guided region and the refused tile are drawn.
+placementController.setFeedbackHandler(() => {
+  selectionOverlay.setBlockedTile(placementController.refusedTile);
 });
 // ParamStrip only renders what it's told; pressing its own CONFIRM/ESC buttons
 // has to reach back into the controller that armed it.

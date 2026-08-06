@@ -5,6 +5,8 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { TutorialRails } from '../../../src/ui/tutorialRails.js';
 import { ALLOWED_CLASS, HIGHLIGHT_CLASS, DEFAULT_TICK_BUDGET, WORK_GRACE_TICKS } from '../../../src/ui/tutorialGuide.js';
 import { createGame } from '../../../src/core/state/GameState.js';
+import { getPickerRegion } from '../../../src/ui/tutorialPickerRegion.js';
+import { stagesFor } from '../../../src/ui/tutorialStages.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
 
 function withBox(el: HTMLElement): HTMLElement {
@@ -253,5 +255,65 @@ describe('TutorialRails', () => {
     expect(open.classList.contains(HIGHLIGHT_CLASS)).toBe(false);
     expect(rails.progress.total).toBe(0);
     expect(rails.clockHeld).toBe(false);
+  });
+});
+
+describe('the region a step publishes is the region the picker enforces (#489)', () => {
+  it('publishes the step region on beginStep, before the picker opens', () => {
+    // The picker opens on the click that *ends* the previous stage, so the
+    // region has to be up before then or that first picker is unconstrained.
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'survey' }, state());
+
+    const published = getPickerRegion();
+    const stageRegion = stagesFor('survey').find(s => s.region)!.region!;
+    expect(published).toEqual(stageRegion);
+  });
+
+  it.each(['survey', 'drill-plan', 'box-cut', 'build-storage'])(
+    '%s publishes exactly what its picker stage draws',
+    (stepId) => {
+      const rails = new TutorialRails();
+      rails.beginStep({ id: stepId }, state());
+      expect(getPickerRegion()).toEqual(stagesFor(stepId).find(s => s.region)!.region!);
+    },
+  );
+
+  it('lifts the region on a step that places nothing', () => {
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'survey' }, state());
+    rails.beginStep({ id: 'charge' }, state());
+    expect(getPickerRegion()).toBeNull();
+  });
+
+  it('lifts the region when the tutorial ends', () => {
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'survey' }, state());
+    rails.clear();
+    expect(getPickerRegion()).toBeNull();
+  });
+});
+
+describe('a stage whose control is missing or blocked is detected (#489)', () => {
+  it('reports the target it is waiting on, so a blocked step can be named', () => {
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'hire-surveyor' }, state());
+
+    // Nothing rendered: the rails fall back to the first stage and still say
+    // which control the player is stuck on.
+    const view = rails.refresh();
+    expect(view.stageTarget).toBe(stagesFor('hire-surveyor')[0]!.target);
+    expect(document.querySelector(`.${HIGHLIGHT_CLASS}`)).toBeNull();
+  });
+
+  it('advances to the later stage the moment its control becomes reachable', () => {
+    const open = toolbarCrew();
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'hire-surveyor' }, state());
+    expect(rails.refresh().stageIndex).toBe(0);
+    expect(open.classList.contains(HIGHLIGHT_CLASS)).toBe(true);
+
+    hireSurveyor();
+    expect(rails.refresh().stageIndex).toBe(1);
   });
 });
