@@ -5,7 +5,9 @@
 import enLocale from './locales/en.json' assert { type: 'json' };
 import frLocale from './locales/fr.json' assert { type: 'json' };
 
-type Locale = 'en' | 'fr';
+// Exported so UI code (e.g. shared language-pill helpers) can type against
+// the same locale union instead of re-declaring 'en' | 'fr' locally.
+export type Locale = 'en' | 'fr';
 type Params = Record<string, string | number>;
 type LocaleData = Record<string, string>;
 

@@ -204,9 +204,22 @@ export class SettingsPanel {
   hide(): void { this.el.style.display = 'none'; }
   get visible(): boolean { return this.el.style.display !== 'none'; }
 
-  refreshLocale(): void { this.locale.refresh(); }
+  refreshLocale(): void { this.locale.refresh(); this.updateLangPills(); }
 
   dispose(): void { this.el.remove(); }
+
+  // TODO: implement — wire to replace the constructor-local setLangPills
+  // closure (langRow above) so both construction and refreshLocale() go
+  // through one method, using the shared syncLangPills() helper from
+  // '../langPills.js'. See #492 section 2.
+  private updateLangPills(): void {
+    // TODO: implement — replace the langRow closure's setLangPills(getLocale())
+    // call above with this, and call it here too, so refreshLocale() (which
+    // already calls this method below) keeps the pills in sync after a
+    // locale change made elsewhere (e.g. MainMenu's toggle) while this panel
+    // was already constructed.
+    return undefined;
+  }
 
   private audioRow(channel: 'master' | AudioCategory, labelKey: string): HTMLElement {
     const label = el('span', { attrs: { style: 'font:400 11px/1 var(--bsx-font-ui);color:var(--bsx-text-secondary);width:74px;flex:0 0 74px' } });
