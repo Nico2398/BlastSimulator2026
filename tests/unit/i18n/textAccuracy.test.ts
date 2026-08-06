@@ -11,8 +11,8 @@
 //   - tutorial.step2 / step4 / step11 / step13 (fr): "Emboutez" (to
 //     dent/stamp) where "Embauchez" (to hire) is meant.
 //
-// Expected RED on this branch for every case below — none of these defects
-// has been fixed yet.
+// Every case below is fixed and green; this suite guards against a
+// regression reintroducing any of these defects.
 
 import { describe, it, expect } from 'vitest';
 import enLocale from '../../../src/core/i18n/locales/en.json' assert { type: 'json' };

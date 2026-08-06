@@ -15,13 +15,11 @@
 // concepts gets "exactly one FR name in use everywhere", and forbidden
 // wordings are exactly the wordings glossary.ts says must go.
 //
-// Expected RED on this branch: en.json/fr.json still contain "Emboutez",
-// "géomètre", "géologue", "Gestionnaire", "responsable", "Conducteur",
-// "conducteur", "étude sismique", "Employee panel", "Vehicle(s) panel",
-// "Blast Plan", "Construire", "Bâtir", "Deals", "Setup", "Réglages" in
-// various keys — see the per-concept `note` field in glossary.ts for exactly
-// which keys. The implementer's fix is to rename every hit to the concept's
-// canonical wording.
+// Verifies that every GLOSSARY concept's forbidden synonyms are fully swept
+// from both locale files: a full scan of every key, not just the
+// `relevantKeys` sample glossary.ts lists as a starting point. Per-concept
+// rationale and exact key-by-key history of what was renamed lives in the
+// `note` field of each GLOSSARY entry in glossary.ts.
 
 import { describe, it, expect } from 'vitest';
 import enLocale from '../../../src/core/i18n/locales/en.json' assert { type: 'json' };
@@ -34,11 +32,50 @@ const LOCALE_DATA: Record<'en' | 'fr', Record<string, string>> = {
   fr: frLocale as Record<string, string>,
 };
 
-/** Every key in `locale` whose value contains `term` as a substring. */
-function findHits(locale: 'en' | 'fr', term: string): string[] {
+// ── Narrow, documented exemptions ──────────────────────────────────────────
+//
+// A handful of (concept, locale, synonym) hits are legitimate: the matched
+// substring is not actually naming the glossary concept in that key. Each
+// entry here is scoped to specific keys only — never a blanket exemption for
+// the synonym itself — so it cannot silently swallow a real regression
+// elsewhere in the file.
+//
+// - role_manager / fr / "responsable" & "Responsable": in these two event
+//   resolution lines "responsable" is the plain adjective "responsible" (as
+//   in "the responsible choice"), not a naming of the Manager role — compare
+//   the concept's own canonical noun form "Gérant". Restored from a prior
+//   overcorrection to "vertueux" that changed the sentence's meaning (issue
+//   #492 review, section 1). glossary.ts's role_manager note documents
+//   "responsable" as forbidden specifically as a synonym for the role noun;
+//   it does not claim every occurrence of the word in the file names the
+//   role, and these two keys are event flavour text, not a role label.
+const EXEMPT_HITS: ReadonlyArray<{ concept: string; locale: 'en' | 'fr'; synonym: string; keys: string[] }> = [
+  {
+    concept: 'role_manager',
+    locale: 'fr',
+    synonym: 'responsable',
+    keys: ['event.mafia_drug_lab.res0', 'event.weather_pit_fish.res1'],
+  },
+  {
+    concept: 'role_manager',
+    locale: 'fr',
+    synonym: 'Responsable',
+    keys: ['event.mafia_drug_lab.res0', 'event.weather_pit_fish.res1'],
+  },
+];
+
+function exemptedKeys(concept: string, locale: 'en' | 'fr', synonym: string): string[] {
+  return EXEMPT_HITS.filter((e) => e.concept === concept && e.locale === locale && e.synonym === synonym).flatMap(
+    (e) => e.keys,
+  );
+}
+
+/** Every key in `locale` whose value contains `term` as a substring, minus documented exemptions. */
+function findHits(locale: 'en' | 'fr', term: string, concept: string): string[] {
   const data = LOCALE_DATA[locale];
+  const exempt = new Set(exemptedKeys(concept, locale, term));
   return Object.entries(data)
-    .filter(([, value]) => value.includes(term))
+    .filter(([key, value]) => value.includes(term) && !exempt.has(key))
     .map(([key]) => key)
     .sort();
 }
@@ -52,7 +89,7 @@ describe('GLOSSARY — forbidden synonyms swept from every key, not just relevan
       describe(`concept "${entry.concept}" — ${locale}.json`, () => {
         for (const synonym of localeTerm.forbiddenSynonyms) {
           it(`no ${locale}.json value contains forbidden synonym "${synonym}" (canonical: "${localeTerm.canonical}")`, () => {
-            const hits = findHits(locale, synonym);
+            const hits = findHits(locale, synonym, entry.concept);
             expect(
               hits,
               `${hits.length} key(s) in ${locale}.json still use forbidden synonym "${synonym}" for ` +

@@ -8,6 +8,7 @@ import { TUTORIAL_STEPS, TOTAL_TUTORIAL_STEPS } from './tutorialSteps.js';
 import { buildTutorialCard } from './tutorialOverlayDom.js';
 import { GUIDED_CLASS } from './tutorialGuide.js';
 import { TutorialRails } from './tutorialRails.js';
+import type { LocaleTextRegistry } from './localeText.js';
 
 /**
  * How often (ms) the guide re-reads the DOM.
@@ -44,6 +45,7 @@ export class TutorialOverlay {
   private readonly progressEl: HTMLElement;
   private readonly commandsLabel: HTMLElement;
   private readonly commandsHint: HTMLElement;
+  private readonly locale: LocaleTextRegistry;
   private _active = false;
   private _executingCommands = false;
   private stepIndex = 0;
@@ -63,10 +65,14 @@ export class TutorialOverlay {
     this.stageEl = els.stageEl;
     this.pausedEl = els.pausedEl;
     this.pausedChipEl = els.pausedChipEl;
+    // Its text is owned by `this.locale` now (bound in buildTutorialCard()); kept as
+    // a field only so direct DOM introspection (tests, debugging) can still reach it.
+    void this.pausedChipEl;
     this.stepCounter = els.stepCounter;
     this.progressEl = els.progressEl;
     this.commandsLabel = els.commandsLabel;
     this.commandsHint = els.commandsHint;
+    this.locale = els.locale;
   }
 
   start(state?: GameState): void {
@@ -115,15 +121,13 @@ export class TutorialOverlay {
    * Every other panel that owns construction-time text exposes this same
    * method and gets it called from a language-change handler (see
    * `LocaleTextRegistry` in `localeText.ts` and `UIManager.refreshLocale()`
-   * for the established pattern). TutorialOverlay currently has none of
-   * that wiring: this stub is the missing piece of contract, and its call
-   * site still needs to be added wherever the app's language-change
-   * handlers live (see `main.ts`).
+   * for the established pattern). TutorialOverlay follows the same pattern:
+   * `this.locale` holds the bindings for its construction-time text, and
+   * `main.ts` calls `tutorial.refreshLocale()` from both of its
+   * language-change fan-out sites.
    */
   refreshLocale(): void {
-    this.pausedEl.title = t('tutorial.clock_held');
-    this.pausedChipEl.textContent = t('tutorial.clock_held_chip');
-    this.commandsLabel.textContent = t('tutorial.console_hint');
+    this.locale.refresh();
     // Re-derives title/body/step-counter/commands-hint for the currently
     // displayed step and re-runs the guide's stage-line lookup — the same
     // translation lookups render() already performs on every step change.
