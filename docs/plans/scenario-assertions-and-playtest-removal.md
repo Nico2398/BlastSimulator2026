@@ -107,6 +107,14 @@ deleted, not after.
     checks). Never leave a `drill_plan grid` step without this check on the
     theory that the original #479 interaction-mode pass already proved it
     — that pass never compared hole counts either.
+11. **`cash` does not move across drill → charge → sequence → blast**,
+    confirmed against real dumps in both `money-surfaces-visual.json` and
+    `blast-basic.json` — explosive/drilling cost is not reflected in the
+    `cash`/`finances.cash` field in this build. Don't keep re-discovering
+    this per file: assert `holeCount`/`chargedCount`/`sequencedCount`
+    through the pipeline, not `cash`, for these steps. `cash` assertions
+    belong on `build`/`vehicle buy`/`employee hire` steps, where it
+    genuinely does move.
 
 ## Mechanism (built, tested, proven — do not redesign)
 
