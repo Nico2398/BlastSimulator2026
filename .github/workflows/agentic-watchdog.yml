@@ -13,10 +13,9 @@ jobs:
   sweep:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
+      # No checkout: the sweep is `actions/github-script` and reads nothing from
+      # the workspace. The composite action that needed one was the idle-queue
+      # restart, which this workflow no longer performs.
 
       # A run that dies without labelling the issue `blocked` — OOM, a hung
       # tool call, the job timeout, a revoked token — leaves the issue
@@ -118,31 +117,15 @@ jobs:
 
             core.info(`Swept ${swept} stalled issue(s).`);
 
-      # Every other entry into the queue is an event: a merged PR, a filed issue,
-      # a `ready` label. Events get lost — GitHub keeps one pending run per
-      # concurrency group and drops the next, a webhook can be missed, a run can
-      # end its turn without chaining. Each of those leaves ready issues waiting
-      # on an idle pipeline with nothing scheduled to notice.
+      # The sweep above is the whole of this workflow: it reports lost runs and
+      # releases the issues they were holding. It deliberately does NOT restart
+      # the queue.
       #
-      # This is the one mechanism that runs on a clock rather than an event, so
-      # it is where the queue gets its floor: at worst the pipeline restarts
-      # itself within the hour. `agentic-assign` defers on its own when a run is
-      # live, so a healthy pipeline sees a no-op here.
-      - name: Restart an idle queue
-        id: assign
-        if: vars.AGENTIC_AUTO_ASSIGN_ENABLED == 'true'
-        uses: ./.github/actions/agentic-assign
-        with:
-          token: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
-          agent: ${{ vars.AGENTIC_AGENT }}
-          reason: hourly watchdog sweep found the pipeline idle
-
+      # A clock-driven restart would start agent sessions nobody asked for —
+      # every hour, for as long as any `ready` issue exists. Starting a run is a
+      # deliberate act, and there are exactly two: a human dispatching
+      # `agentic-trigger.yml`, or a merged pipeline pull request chaining
+      # through `auto-assign-next.yml`. An idle queue is therefore an idle
+      # queue, and stays one until somebody asks for the next run.
       - name: Report
-        run: |
-          if [ "${{ vars.AGENTIC_AUTO_ASSIGN_ENABLED }}" != "true" ]; then
-            echo 'Auto-assign is disabled (AGENTIC_AUTO_ASSIGN_ENABLED is not "true").'
-          elif [ -n "${{ steps.assign.outputs.issue }}" ]; then
-            echo "Restarted the queue on issue #${{ steps.assign.outputs.issue }}."
-          else
-            echo "Queue not restarted — see the assign step for the reason."
-          fi
+        run: echo 'Sweep complete. This workflow never assigns — start a run with the manual trigger, or let a merged pipeline PR chain to the next issue.'
