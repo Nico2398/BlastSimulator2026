@@ -7,11 +7,26 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { createRunner, serializeGameState } from '../../src/console-api.js';
 import type { MiningContext } from '../../src/console-api.js';
 
-/** Field set window.__gameState() emits — keep in lockstep with src/main.ts. */
+/**
+ * Field set window.__gameState() emits, restricted to the state-derived
+ * subset serializeGameState can also produce — keep in lockstep with
+ * src/main.ts. window.__gameState() emits more than this (lastCommandOutput,
+ * frameCount, ctxGridId, consoleLogs, gridSample, gridCrossSection): those
+ * are browser/render-only and have no command-mode equivalent, by design —
+ * not a gap to close, since a scenario's expect never asserts on them.
+ * Everything below this comment line up to now WAS missing from
+ * serializeGameState until this field-parity fix: worldSizeX/Z/minX/minZ and
+ * qualificationCount/proficiencyTotal/trainingCount are all derivable from
+ * ctx.state alone, so a scenario step's expect.equals/increased on any of
+ * them used to be checkable in interaction mode only — command mode had no
+ * way to report them at all, silently failing any such assertion there.
+ */
 const SERIALIZED_FIELDS = [
-  'seed', 'time', 'tickCount', 'isPaused', 'mineType', 'drillHoles',
-  'chargesByHole', 'sequenceDelays', 'finances', 'holeCount', 'chargedCount',
+  'seed', 'time', 'tickCount', 'isPaused', 'mineType',
+  'worldSizeX', 'worldSizeZ', 'worldMinX', 'worldMinZ',
+  'drillHoles', 'chargesByHole', 'sequenceDelays', 'finances', 'holeCount', 'chargedCount',
   'sequencedCount', 'buildingCount', 'vehicleCount', 'employeeCount',
+  'qualificationCount', 'proficiencyTotal', 'trainingCount',
   'levelEnded', 'levelEndReason', 'bankrupt', 'revolted', 'ecologicalShutdown',
   'arrested', 'cash', 'profit', 'muckPile',
 ] as const;
@@ -83,6 +98,39 @@ describe('console-api', () => {
 
       expect(state.finances.cash).toBe(state.cash);
       expect(state.cash).toBeGreaterThan(0);
+    });
+
+    it('reports zero qualifications/proficiency/training for a fresh game with no employees', () => {
+      runner.runner.run('new_game mine_type:desert seed:42');
+      const state = serializeGameState(runner.ctx as MiningContext)!;
+
+      expect(state.qualificationCount).toBe(0);
+      expect(state.proficiencyTotal).toBe(0);
+      expect(state.trainingCount).toBe(0);
+    });
+
+    it('counts qualifications and proficiency across the roster once employees are hired', () => {
+      runner.runner.run('new_game mine_type:desert seed:42');
+      runner.runner.run('employee hire role:driller');
+
+      const state = serializeGameState(runner.ctx as MiningContext)!;
+
+      // Hiring grants the role's starting qualification(s) at proficiency 1
+      // (ROLE_STARTING_QUALIFICATION, Employee.ts) — a driller starts with at
+      // least one, so this is real coverage, not a vacuous zero-vs-zero check.
+      expect(state.employeeCount).toBe(1);
+      expect(state.qualificationCount).toBeGreaterThan(0);
+      expect(state.proficiencyTotal).toBeGreaterThan(0);
+    });
+
+    it('reports the world bounding box once a game exists', () => {
+      runner.runner.run('new_game mine_type:desert seed:42');
+      const state = serializeGameState(runner.ctx as MiningContext)!;
+
+      expect(state.worldSizeX).not.toBeNull();
+      expect(state.worldSizeZ).not.toBeNull();
+      expect(typeof state.worldMinX).toBe('number');
+      expect(typeof state.worldMinZ).toBe('number');
     });
 
     it('tracks drill holes added after creation', () => {

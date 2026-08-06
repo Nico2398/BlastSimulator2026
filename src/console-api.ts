@@ -20,6 +20,11 @@ export interface SerializableGameState {
   tickCount: number;
   isPaused: boolean;
   mineType: string;
+  /** The site's live bounding box (#473 — a bounding box, not a fixed size, once the site has grown). */
+  worldSizeX: number | null;
+  worldSizeZ: number | null;
+  worldMinX: number | null;
+  worldMinZ: number | null;
   drillHoles: unknown[];
   chargesByHole: Record<string, unknown>;
   sequenceDelays: Record<string, unknown>;
@@ -30,6 +35,10 @@ export interface SerializableGameState {
   buildingCount: number;
   vehicleCount: number;
   employeeCount: number;
+  /** Qualifications the roster holds — proves a skill was actually obtained, not just clicked at. */
+  qualificationCount: number;
+  proficiencyTotal: number;
+  trainingCount: number;
   levelEnded: boolean;
   levelEndReason: string | null;
   bankrupt: boolean;
@@ -52,6 +61,10 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     tickCount: s.tickCount,
     isPaused: s.isPaused,
     mineType: s.mineType,
+    worldSizeX: s.world?.sizeX ?? null,
+    worldSizeZ: s.world?.sizeZ ?? null,
+    worldMinX: s.world?.minX ?? null,
+    worldMinZ: s.world?.minZ ?? null,
     drillHoles: s.drillHoles,
     chargesByHole: s.chargesByHole as Record<string, unknown>,
     sequenceDelays: s.sequenceDelays as Record<string, unknown>,
@@ -62,6 +75,11 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     buildingCount: s.buildings.buildings.length,
     vehicleCount: s.vehicles.vehicles.length,
     employeeCount: s.employees.employees.length,
+    qualificationCount: s.employees.employees
+      .reduce((n, e) => n + e.qualifications.length, 0),
+    proficiencyTotal: s.employees.employees
+      .reduce((n, e) => n + e.qualifications.reduce((m, q) => m + q.proficiencyLevel, 0), 0),
+    trainingCount: s.employees.employees.filter(e => e.trainingState !== null).length,
     levelEnded: s.levelEnded,
     levelEndReason: s.levelEndReason,
     bankrupt: s.bankruptcy.bankrupt,
