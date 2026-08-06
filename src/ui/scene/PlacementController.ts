@@ -11,7 +11,9 @@ import * as THREE from 'three';
 import type { GameRenderer } from '../../renderer/GameRenderer.js';
 import type { CameraController } from '../../renderer/CameraController.js';
 import { pickScene } from './ScenePicking.js';
-import { getPickerRegion, regionAccepts, regionContains, type TileRegion } from '../tutorialPickerRegion.js';
+import {
+  getPickerRegion, regionAccepts, regionContains, liveArea, type TileRegion,
+} from '../tutorialPickerRegion.js';
 
 export type PlacementShape = 'rect' | 'line' | 'point';
 export type PlacementPhase = 'idle' | 'armed' | 'hovering' | 'dragging' | 'selected' | 'confirmed';
@@ -52,9 +54,14 @@ export class PlacementController {
   private anchor: { x: number; z: number } | null = null;
   private current: { x: number; z: number } | null = null;
 
+  /** Tile the pointer is over that the active region refuses, or null. Drives the red cell and the strip's reason line. */
+  private blockedTile: { x: number; z: number } | null = null;
+
   private onConfirmHandler: PlacementConfirmHandler | null = null;
   private onCancelHandler: (() => void) | null = null;
   private onChangeHandler: PlacementChangeHandler | null = null;
+  /** Set once by main.ts and never replaced, unlike onChangeHandler — the region/blocked-tile drawing must not depend on which panel armed the tool. */
+  private onFeedbackHandler: PlacementChangeHandler | null = null;
   /** Set once by main.ts, never overwritten by a panel arming its own tool — unlike onChangeHandler, which each panel replaces with its own strip refresh. Fires on every arm()/disarm() so ScenePicking can step aside while a placement tool owns the canvas. */
   private onArmedStateHandler: ((armed: boolean) => void) | null = null;
 
@@ -81,6 +88,8 @@ export class PlacementController {
   /** Fires on every phase/selection change — the DOM strip and renderer redraw off this instead of polling every frame. */
   setChangeHandler(cb: PlacementChangeHandler): void { this.onChangeHandler = cb; }
   setArmedStateHandler(cb: (armed: boolean) => void): void { this.onArmedStateHandler = cb; }
+  /** Fires alongside every change, for the scene-level feedback main.ts owns (region outline, refused tile). */
+  setFeedbackHandler(cb: PlacementChangeHandler): void { this.onFeedbackHandler = cb; }
 
   get currentPhase(): PlacementPhase { return this.phase; }
   get currentShape(): PlacementShape { return this.shape; }
@@ -89,10 +98,20 @@ export class PlacementController {
   get hoveredTile(): { x: number; z: number } | null { return this.hoverTile; }
   /** The region the current step pins the selection to, or null when unconstrained. Read by the overlay to dim outside tiles. */
   get activeRegion(): TileRegion | null { return this.region; }
+  /** Tile the pointer is over that the region refuses, or null. The overlay marks it red and the strip explains it. */
+  get refusedTile(): { x: number; z: number } | null { return this.blockedTile; }
 
   /** The live selection, or null before an anchor exists. */
   get selection(): PlacementSelection | null {
     if (!this.anchor) return null;
+    // An exact region *is* the answer, so any live pick resolves to it rather
+    // than to whatever the player's drag covered. Reproducing a rectangle
+    // corner-for-corner from a 3D pick is not something a player can do, and
+    // asking them to was how the drill step became impossible to finish (#489).
+    if (this.region?.exact) {
+      const r = this.region;
+      return { x1: r.x1, z1: r.z1, x2: r.x2, z2: r.z2 };
+    }
     const cur = this.current ?? this.anchor;
     if (this.shape === 'rect') {
       return {
@@ -116,7 +135,17 @@ export class PlacementController {
     this.shape = config.shape;
     this.region = getPickerRegion();
     this.hoverTile = null;
-    this.anchor = config.initialSelection ? { x: config.initialSelection.x, z: config.initialSelection.z } : null;
+    this.blockedTile = null;
+    // A guided step drops the pre-fill entirely. The survey panel pre-fills the
+    // middle of the map, which sits outside every guided region — so the strip
+    // opened showing a tile the step would never accept and a Confirm that was
+    // dead before the player had touched anything (#489). Clamping it into the
+    // region would fix that and skip the pick the step is teaching; leaving it
+    // out puts the player on the click the card is asking for, with the region
+    // drawn under their cursor and a visible reason on Confirm until they make it.
+    this.anchor = config.initialSelection && !this.region
+      ? { x: config.initialSelection.x, z: config.initialSelection.z }
+      : null;
     this.current = this.anchor;
     this.phase = 'armed';
     this.cameraController.setArmedRemap(true);
@@ -128,6 +157,7 @@ export class PlacementController {
   disarm(): void {
     this.phase = 'idle';
     this.hoverTile = null;
+    this.blockedTile = null;
     this.anchor = null;
     this.current = null;
     this.region = null;
@@ -181,9 +211,17 @@ export class PlacementController {
     return { x: pick.terrain.tileX, z: pick.terrain.tileZ };
   }
 
-  /** Whether a tile responds to hover/anchor — inside the pinned region when one is active, per "stops responding to hover" outside it. */
+  /**
+   * Whether a tile responds to hover/anchor.
+   *
+   * Measured against the region's live area rather than the region itself: an
+   * exact region snaps anyway, so the extra margin costs nothing and spares the
+   * player a pixel-perfect pick on a single tile.
+   */
   private isLive(tile: { x: number; z: number }): boolean {
-    return !this.region || regionContains(this.region, tile.x, tile.z);
+    if (!this.region) return true;
+    const live = liveArea(this.region);
+    return regionContains(live, tile.x, tile.z);
   }
 
   private onMouseMove(e: MouseEvent): void {
@@ -197,6 +235,9 @@ export class PlacementController {
 
     this.hoverTile = tile;
     const live = tile !== null && this.isLive(tile);
+    // Out-of-bounds reads as refused rather than as nothing at all: the overlay
+    // paints this tile red and the strip says why.
+    this.blockedTile = tile !== null && !live ? tile : null;
     if (this.phase === 'armed' && live) this.phase = 'hovering';
     else if (this.phase === 'hovering' && !live) this.phase = 'armed';
     this.notify();
@@ -206,7 +247,14 @@ export class PlacementController {
     if (e.button !== 0) return;
     if (this.phase === 'idle' || this.phase === 'confirmed') return;
     const tile = this.tileUnderCursor(e);
-    if (!tile || !this.isLive(tile)) return; // anchor outside the pinned region: no rectangle starts
+    if (!tile || !this.isLive(tile)) {
+      // Anchor outside the pinned region: no rectangle starts, but the refusal
+      // is shown. Returning in silence here is what made the terrain look dead.
+      this.blockedTile = tile;
+      this.notify();
+      return;
+    }
+    this.blockedTile = null;
 
     if (this.shape === 'point') {
       this.anchor = tile;
@@ -244,7 +292,10 @@ export class PlacementController {
     else if (e.key === 'Enter' && this.phase === 'selected') this.confirm();
   }
 
-  private notify(): void { this.onChangeHandler?.(); }
+  private notify(): void {
+    this.onChangeHandler?.();
+    this.onFeedbackHandler?.();
+  }
 
   dispose(): void {
     this.canvas.removeEventListener('mousemove', this.handleMouseMove);

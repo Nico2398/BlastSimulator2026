@@ -16,13 +16,45 @@ export interface TileRegion {
   x2: number;
   z2: number;
   /**
-   * When set, the selection must be this rectangle and nothing else — being
-   * inside it is not enough. Used where the step is teaching a specific layout
-   * rather than a general area, so the outline is the answer rather than a
-   * suggestion. The picker clamps to the rectangle in this mode, so a player who
-   * overshoots the corners lands on it instead of missing by a tile.
+   * When set, the selection *is* this rectangle — the player does not have to
+   * reproduce it. Any click or drag that lands in the live area snaps to these
+   * corners, so a guided step lands on the one placement it is teaching rather
+   * than on whatever the player's drag happened to cover (#489: "the player has
+   * too much freedom in the tutorial").
    */
   exact?: boolean;
+}
+
+/**
+ * Tiles of slack around an exact region in which the pointer still responds.
+ *
+ * An exact region is often a single tile or a one-tile-wide line, and asking a
+ * player to land a 3D pick on that is asking them to thread a needle. The
+ * snapping above means precision buys nothing anyway, so the live area is the
+ * region grown by this much and every click inside it produces the same answer.
+ */
+export const EXACT_LIVE_MARGIN = 3;
+
+/** The area the pointer responds in: the region itself, grown when it is exact. */
+export function liveArea(region: TileRegion): TileRegion {
+  if (!region.exact) return { x1: region.x1, z1: region.z1, x2: region.x2, z2: region.z2 };
+  return {
+    x1: region.x1 - EXACT_LIVE_MARGIN, z1: region.z1 - EXACT_LIVE_MARGIN,
+    x2: region.x2 + EXACT_LIVE_MARGIN, z2: region.z2 + EXACT_LIVE_MARGIN,
+  };
+}
+
+/** Centre tile of a region, for framing the camera on it. */
+export function regionCenter(region: TileRegion): { x: number; z: number } {
+  return {
+    x: Math.round((region.x1 + region.x2) / 2),
+    z: Math.round((region.z1 + region.z2) / 2),
+  };
+}
+
+/** Widest side of a region in tiles — how far back the camera has to sit to show it. */
+export function regionSpan(region: TileRegion): number {
+  return Math.max(region.x2 - region.x1, region.z2 - region.z1) + 1;
 }
 
 let active: TileRegion | null = null;

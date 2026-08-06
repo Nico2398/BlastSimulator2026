@@ -93,20 +93,44 @@ describe('tutorial stage table', () => {
     }
   });
 
-  it('the stage that asks for an exact selection names the coordinates', () => {
-    // "Drag a rectangle over the middle of the map" is not an answer when only
-    // one rectangle will be accepted. Checked on the stage that asks for the
-    // selection — the Confirm stage that follows it just says "Press Confirm".
+  it('no picker stage instruction prints tile coordinates (#489)', () => {
+    // Naming the corners was the old answer to "which rectangle?", and it made
+    // the step impossible: there is no control that takes a typed tile, so a
+    // player reading "(20, 20) to (30, 30)" had numbers and nothing to do with
+    // them. The region is drawn in the scene and the picker snaps to it, so the
+    // instruction points at the outline instead.
     for (const { stepId, stage } of ALL_STAGES) {
-      if (!stage.region?.exact || !stage.target.includes('canvas')) continue;
-      const text = messages[stage.hintKey] ?? '';
-      for (const token of ['{x1}', '{z1}', '{x2}', '{z2}']) {
+      if (!stage.region) continue;
+      for (const [loc, table] of [['en', messages], ['fr', messagesFr]] as const) {
+        const text = table[stage.hintKey] ?? '';
+        for (const token of ['{x1}', '{z1}', '{x2}', '{z2}']) {
+          expect(text.includes(token), `${stepId} (${loc}): instruction still prints ${token}`).toBe(false);
+        }
         expect(
-          text.includes(token),
-          `${stepId}: exact stage hint must name ${token}`,
-        ).toBe(true);
+          /\(?\d+\s*,\s*\d+\)?/.test(text),
+          `${stepId} (${loc}): instruction still prints a coordinate pair`,
+        ).toBe(false);
       }
-      expect(messagesFr[stage.hintKey] ?? '').toContain('{x1}');
+    }
+  });
+
+  it('every guided placement pins an exact answer (#489)', () => {
+    // "The player has too much freedom in the tutorial": a region that merely
+    // bounds the placement lets the step end in a layout it never taught.
+    for (const { stepId, stage } of ALL_STAGES) {
+      if (!stage.region) continue;
+      expect(stage.region.exact, `${stepId}: guided placement accepts more than the one it teaches`).toBe(true);
+    }
+  });
+
+  it('the speed stages point at a speed the game is not already running at', () => {
+    // `button[data-speed]` matched 1×, the speed the game starts on — pressing
+    // exactly what was highlighted changed nothing and the step never completed.
+    for (const stepId of ['time-speed', 'tick-advance']) {
+      const target = TUTORIAL_STAGES[stepId]![0]!.target;
+      expect(target, `${stepId} highlights whichever speed button comes first`).toMatch(/data-speed="\d+"/);
+      const speed = Number(/data-speed="(\d+)"/.exec(target)![1]);
+      expect(speed, `${stepId} points at ${speed}×`).toBeGreaterThan(1);
     }
   });
 

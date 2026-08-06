@@ -1,6 +1,6 @@
 {
   "name": "tutorial-interactive",
-  "description": "Plays the Tutorial Pit the way a first-time player does: every step is driven by a real click on the control the tutorial card points at \u2014 speed button, toolbar, hire buttons, blast panel, event choices \u2014 and each beat waits for the tutorial's own rails to advance (waitForTutorialStep) before the next click, mirroring the playtest definition's click path (seismic survey at 23,23; the box cut dug down the west face before the drill grid; drill grid on the exact 20,20-30,30 rectangle; haul before deliver).",
+  "description": "Plays the Tutorial Pit the way a first-time player does: every step is driven by a real click on the control the tutorial card points at — speed button, toolbar, hire buttons, blast panel, event choices — and each beat waits for the tutorial's own rails to advance (waitForTutorialStep) before the next click, mirroring the playtest definition's click path (seismic survey at 23,23; the box cut dug down the west face before the drill grid; drill grid on the exact 20,20-30,30 rectangle; haul before deliver).",
   "shots": [
     {
       "name": "overview",
@@ -28,7 +28,7 @@
     {
       "command": "campaign start level:tutorial_pit",
       "timeout": 30,
-      "description": "Setup: load Tutorial Pit \u2014 the level regenerates the terrain at its own size and re-frames the camera",
+      "description": "Setup: load Tutorial Pit — the level regenerates the terrain at its own size and re-frames the camera",
       "interaction": [
         {
           "type": "command",
@@ -62,7 +62,7 @@
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-hud-top .bs-speed-btn"
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"2\"]"
         },
         {
           "type": "waitForTutorialStep",
@@ -73,7 +73,7 @@
     {
       "command": "state",
       "timeout": 30,
-      "description": "Player follows the glowing Crew button \u2014 the tutorial card must not swallow the click",
+      "description": "Player follows the glowing Crew button — the tutorial card must not swallow the click",
       "interaction": [
         {
           "type": "clickSelector",
@@ -114,7 +114,7 @@
     {
       "command": "survey seismic x:23 z:23",
       "timeout": 90,
-      "description": "survey complete: seismic (the method the card names), target picked inside the step's outlined region (18..28), dispatched, and the surveyor walks out and works it",
+      "description": "survey complete: seismic (the method the card names), target picked on the step's outlined tile (23,23), which the picker snaps to, dispatched, and the surveyor walks out and works it",
       "interaction": [
         {
           "type": "clickSelector",
@@ -235,7 +235,7 @@
     {
       "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:6 start:20,20",
       "timeout": 60,
-      "description": "drill-plan complete: grid tool dragged over the exact 20,20-30,30 rectangle the card asks for (spacing 5 makes 3x3 holes), confirmed",
+      "description": "drill-plan complete: grid tool dragged inside the outlined area, which snaps to the 20,20-30,30 rectangle the card asks for (spacing 5 makes 3x3 holes), confirmed",
       "interaction": [
         {
           "type": "clickSelector",
@@ -272,7 +272,7 @@
     {
       "command": "charge hole:* explosive:pop_rock amount:3 stemming:2",
       "timeout": 30,
-      "description": "charge complete: Charge All Holes clicked \u2014 the panel applies its own form defaults and hole rows turn green",
+      "description": "charge complete: Charge All Holes clicked — the panel applies its own form defaults and hole rows turn green",
       "interaction": [
         {
           "type": "clickSelector",
@@ -462,7 +462,7 @@
     {
       "command": "vehicle driver 1 4",
       "timeout": 90,
-      "description": "vehicle-buy-assign complete: Assign clicked, then the tutorial's own clock runs while the driver walks to the vehicle and boards \u2014 the #478 deadlock path, exercised for real",
+      "description": "vehicle-buy-assign complete: Assign clicked, then the tutorial's own clock runs while the driver walks to the vehicle and boards — the #478 deadlock path, exercised for real",
       "interaction": [
         {
           "type": "clickSelector",
@@ -476,9 +476,9 @@
       ]
     },
     {
-      "command": "build freight_warehouse at:4,4",
+      "command": "build freight_warehouse at:6,6",
       "timeout": 60,
-      "description": "build-storage complete: warehouse placed by clicking a tile inside the step's region (2..9) in the Build panel picker",
+      "description": "build-storage complete: warehouse placed by clicking the step's outlined tile (6,6) in the Build panel picker",
       "interaction": [
         {
           "type": "clickSelector",
@@ -494,8 +494,8 @@
         },
         {
           "type": "pickTile",
-          "x": 4,
-          "z": 4
+          "x": 6,
+          "z": 6
         },
         {
           "type": "screenshot"

@@ -22,7 +22,7 @@ import {
   SURVEY_COSTS, SURVEY_BASE_ERROR, SURVEY_COVERAGE_RADIUS, SURVEY_DURATION_TICKS,
   SEISMIC_SURVEY_DAMAGE_RADIUS, SEISMIC_SURVEY_DAMAGE_HP,
 } from '../../core/config/balance.js';
-import type { PlacementKit } from '../scene/PlacementKit.js';
+import { placementRefusalReason, type PlacementKit } from '../scene/PlacementKit.js';
 import type { CommandResult } from '../../console/ConsoleRunner.js';
 
 export type GameConsoleFn = (cmd: string) => CommandResult;
@@ -298,6 +298,7 @@ export class SurveyPanel {
         fields: [],
         result: sel ? `(${sel.x1}, ${sel.z1}) · $${SURVEY_COSTS[this.selectedMethod].toLocaleString('en-US')}` : '—',
         confirmEnabled: controller.canConfirm,
+        confirmDisabledReason: placementRefusalReason(controller),
         instruction: t('ui.survey.pick_instruction'),
       });
     };

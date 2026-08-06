@@ -19,13 +19,18 @@ const COLOR_SELECTION = 0xffc840;
 const COLOR_PINNED = 0x7ab8ff;
 const COLOR_BUILDING_VALID = 0x4fc76b;
 const COLOR_SURVEY = 0x3fd0c0;
+/** Tile the pointer is over but the step will not accept — #489's "blocked without clear visual indication". */
+const COLOR_BLOCKED = 0xff6a5a;
 
 const CELL_FILL_OPACITY = 0.26;
+/** The guidance region is a backdrop for the selection drawn on top of it, so it sits lighter. */
+const REGION_FILL_OPACITY = 0.2;
 const Y_OFFSET = 0.06; // lifted off the terrain to avoid z-fighting
 const HOLE_RING_SEGMENTS = 16;
 const HOLE_RING_RADIUS = 0.28;
 const CORNER_LEN = 0.9; // tiles, per design doc geometry tokens
 const CONFIRM_FLASH_MS = 220;
+const BEACON_HEIGHT = 14; // world units above the region's centre
 
 export type OverlayShape = 'rect' | 'line' | 'point';
 
@@ -57,18 +62,84 @@ export interface OverlayPointUpdate {
 
 export type OverlayUpdate = OverlayCellsUpdate | OverlayLineUpdate | OverlayPointUpdate;
 
+/** Inclusive tile rectangle a guided step pins the placement to. */
+export interface OverlayRegion { x1: number; z1: number; x2: number; z2: number }
+
 export class SelectionOverlay {
   private readonly scene: THREE.Scene;
   private readonly group: THREE.Group;
+  /**
+   * The area a guided step pins the placement to, drawn from the moment the
+   * tool arms and independent of any selection.
+   *
+   * Before #489 the region existed only as a blue tint on cells the player had
+   * *already* selected, which meant it was invisible until after the click it
+   * was supposed to guide — and never visible at all for the point and line
+   * tools, which drew no cells. A player told to "click the highlighted tile"
+   * saw nothing highlighted, clicked, and was refused without a reason.
+   */
+  private readonly regionGroup: THREE.Group;
   private readonly surfaceYAt: (x: number, z: number) => number;
   private flashUntil = 0;
+  private region: OverlayRegion | null = null;
+  private blockedTile: { x: number; z: number } | null = null;
 
   constructor(scene: THREE.Scene, surfaceYAt: (x: number, z: number) => number) {
     this.scene = scene;
     this.surfaceYAt = surfaceYAt;
     this.group = new THREE.Group();
     this.group.name = 'placement-selection-overlay';
+    this.regionGroup = new THREE.Group();
+    this.regionGroup.name = 'placement-region-overlay';
     this.scene.add(this.group);
+    this.scene.add(this.regionGroup);
+  }
+
+  /**
+   * Draw (or clear) the guided target area. Persistent: unlike `update`, this
+   * survives every selection change until the tool disarms.
+   */
+  setRegion(region: OverlayRegion | null): void {
+    this.region = region ? { ...region } : null;
+    this.blockedTile = null;
+    this.rebuildRegion();
+  }
+
+  /**
+   * Mark the tile the pointer is over as refused, or clear the mark.
+   *
+   * Silence was the whole complaint: outside the region a click produced no
+   * selection, no hover, and no message, so the terrain read as broken rather
+   * than as out of bounds.
+   */
+  setBlockedTile(tile: { x: number; z: number } | null): void {
+    const same = (this.blockedTile === null && tile === null)
+      || (this.blockedTile !== null && tile !== null
+        && this.blockedTile.x === tile.x && this.blockedTile.z === tile.z);
+    if (same) return;
+    this.blockedTile = tile ? { x: tile.x, z: tile.z } : null;
+    this.rebuildRegion();
+  }
+
+  private rebuildRegion(): void {
+    for (const child of [...this.regionGroup.children]) {
+      this.regionGroup.remove(child);
+      disposeObject(child);
+    }
+    const r = this.region;
+    if (r) {
+      for (let z = r.z1; z <= r.z2; z++) {
+        for (let x = r.x1; x <= r.x2; x++) {
+          this.regionGroup.add(this.makeCell(x, z, COLOR_PINNED, false, REGION_FILL_OPACITY));
+        }
+      }
+      this.regionGroup.add(this.makeBorder(r.x1, r.z1, r.x2, r.z2, COLOR_PINNED));
+      this.regionGroup.add(...this.makeCorners(r.x1, r.z1, r.x2, r.z2, COLOR_PINNED));
+      this.regionGroup.add(this.makeBeacon(r));
+    }
+    if (this.blockedTile) {
+      this.regionGroup.add(this.makeCell(this.blockedTile.x, this.blockedTile.z, COLOR_BLOCKED, false, 0.4));
+    }
   }
 
   /** Rebuild the overlay for the current placement state. Call from PlacementController's onChange, not per-frame. */
@@ -87,7 +158,11 @@ export class SelectionOverlay {
     this.flashUntil = performance.now() + CONFIRM_FLASH_MS;
   }
 
-  clear(): void { this.clearChildren(); }
+  /** Take everything off: the selection and the guided region both. Called when the tool goes idle. */
+  clear(): void {
+    this.clearChildren();
+    this.setRegion(null);
+  }
 
   private clearChildren(): void {
     for (const child of [...this.group.children]) {
@@ -152,13 +227,13 @@ export class SelectionOverlay {
     }
   }
 
-  private makeCell(x: number, z: number, color: number, flashing: boolean): THREE.Mesh {
+  private makeCell(x: number, z: number, color: number, flashing: boolean, opacity = CELL_FILL_OPACITY): THREE.Mesh {
     const y = this.surfaceYAt(x, z) + Y_OFFSET;
     const geometry = new THREE.PlaneGeometry(1, 1);
     const material = new THREE.MeshBasicMaterial({
       color,
       transparent: true,
-      opacity: flashing ? 0.6 : CELL_FILL_OPACITY,
+      opacity: flashing ? 0.6 : opacity,
       side: THREE.DoubleSide,
       depthWrite: false,
     });
@@ -198,6 +273,28 @@ export class SelectionOverlay {
     });
   }
 
+  /**
+   * A vertical mast over the region's centre.
+   *
+   * A one-tile target — which is what the survey and warehouse steps pin —
+   * covers a handful of pixels from the game's low, shallow camera, and a flat
+   * tint on the ground is easy to read as terrain. The mast is the part the
+   * player's eye finds; the outline underneath is what tells them how big the
+   * target is.
+   */
+  private makeBeacon(r: OverlayRegion): THREE.Object3D {
+    const cx = (r.x1 + r.x2) / 2 + 0.5;
+    const cz = (r.z1 + r.z2) / 2 + 0.5;
+    const base = this.surfaceYAt(Math.round(cx), Math.round(cz)) + Y_OFFSET;
+    const geometry = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(cx, base, cz),
+      new THREE.Vector3(cx, base + BEACON_HEIGHT, cz),
+    ]);
+    return new THREE.Line(geometry, new THREE.LineBasicMaterial({
+      color: COLOR_PINNED, transparent: true, opacity: 0.9,
+    }));
+  }
+
   private makeHoleMarker(x: number, z: number): THREE.Object3D {
     const y = this.surfaceYAt(x, z) + Y_OFFSET + 0.005;
     const points: THREE.Vector3[] = [];
@@ -211,7 +308,9 @@ export class SelectionOverlay {
 
   dispose(): void {
     this.clearChildren();
+    this.setRegion(null);
     this.scene.remove(this.group);
+    this.scene.remove(this.regionGroup);
   }
 }
 
