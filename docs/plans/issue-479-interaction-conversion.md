@@ -246,6 +246,23 @@ here for a follow-up issue.
     step during an earlier off-by-one mistake. **After any index/mapping
     correction, re-dump and re-read the full file — don't trust that a
     role-only fix was sufficient.**
+15. **`event choose N` is only a safe `player` click when it directly
+    follows `event fire`** (deterministic — a specific event WILL be
+    showing). Following a bare `tick`, whether an event is pending is a
+    random roll — this precedent already existed in `event-dialog-visual.json`
+    ("follows a bare tick... deliberately left unmarked") but I didn't
+    carry it into the Batch 3 converter script and force-clicked every
+    `event choose 0` regardless of what preceded it. Self-inflicted: 12/13
+    Batch 3 files failed interaction mode on the very first `event choose 0`
+    (`"#bs-event-dialog .bs-event-choice" never became usable: it is not in
+    the DOM at all`) because none of the survey files ever call `event
+    fire` — every one of their `event choose 0` steps follows a bare tick.
+    **Fixed**: the converter now tracks whether the immediately preceding
+    command was `event fire`, and only emits a real click in that case;
+    otherwise the step stays unmarked with the "random roll" description.
+    Re-verified 13/13 in a real browser after the fix. Caution for later
+    batches (economy/misc, playthroughs): grep a candidate file for `event
+    choose` and confirm what precedes each one before assuming it converts.
 
 _(Add new findings here as you hit them. Number sequentially.)_
 
@@ -269,7 +286,7 @@ for f in sorted(os.listdir(d)):
 EOF
 ```
 
-### ✅ Done (43)
+### ✅ Done (56)
 - tutorial-interactive, vehicle-purchase-visual, contract-panel-visual, event-dialog-visual
 - Batch 1 (14): ambient-life-visual, weather-popover-visual, wind-clouds-visual,
   survey-panel-visual, loading-screen-visual, scene-picking-visual, nav-cell-types-visual,
@@ -284,12 +301,18 @@ EOF
   blast-sequence-step-visual, blast-fire-step-visual, multi-deck-blast, presplit-wall,
   vibration-budget, collapse-recovery, rock-fragmenter-breaking, ramp-navigation,
   blast-execution-visual
+- Batch 3 (13): survey-confidence-display, survey-confidence-overlay, survey-execution,
+  survey-method-selection, survey-ore-vein-visibility, survey-overlay-lifecycle,
+  survey-post-blast-ore-report, survey-result-visualization, survey-seismic-side-effects,
+  survey-stale-handling, survey-then-blast, survey-then-blast-playthrough, skill-progression
 
-All 43 interaction-verified in a real browser (each individually, and Batch 2
-re-verified as one 24-file batch run at the end to catch cross-file
-regressions). Batch 2 also fixed a real game bug (Finding #12,
-BlastReportModal) found only by actually running the clicks — command mode
-never would have caught it, since it never touches the modal.
+All 56 interaction-verified in a real browser (each batch re-verified as one
+batch run at the end to catch cross-file regressions). Batch 2 also fixed a
+real game bug (Finding #12, BlastReportModal) found only by actually running
+the clicks — command mode never would have caught it, since it never touches
+the modal. Batch 3 caught a self-inflicted conversion bug (Finding #15 —
+`event choose` force-clicked even when it followed a bare `tick`, not
+`event fire`) on the first real-browser run; fixed and re-verified 13/13.
 
 **Caution for whoever resumes:** `blast-visual-full` was inspected early in
 Batch 2 but its actual conversion was skipped in the first pass — it slipped
@@ -299,14 +322,7 @@ alone as proof a file was converted; cross-check the status table (or grep
 for `"role"` in the file) before crossing it off.
 
 ### Batch 2 — blast-* — ✅ COMPLETE (25 files, see Done list above + blast-execution-visual)
-
-### Batch 3 — survey-* (13)
-⬜ survey-confidence-display · ⬜ survey-confidence-overlay ·
-⬜ survey-execution · ⬜ survey-method-selection ·
-⬜ survey-ore-vein-visibility · ⬜ survey-overlay-lifecycle ·
-⬜ survey-post-blast-ore-report · ⬜ survey-result-visualization ·
-⬜ survey-seismic-side-effects · ⬜ survey-stale-handling ·
-⬜ survey-then-blast · ⬜ survey-then-blast-playthrough · ⬜ skill-progression
+### Batch 3 — survey-* — ✅ COMPLETE (13 files, see Done list above)
 
 ### Batch 4 — building-* (12)
 ⬜ building-destruction-visual · ⬜ building-lifecycle ·
@@ -345,7 +361,7 @@ for `"role"` in the file) before crossing it off.
 ⬜ level2-playthrough-bankruptcy · ⬜ level2-playthrough-win ·
 ⬜ level3-playthrough-ecology · ⬜ level3-playthrough-win
 
-104 total remaining across batches 2-7.
+66 total remaining across batches 4-7.
 
 ## Session log
 
@@ -375,3 +391,14 @@ got and whether main was merged recently.
   caution note above the Done list) — caught and fixed before commit.
   Full sweep green (typecheck, 283 files/8038 tests, 124/124 command
   mode). Next: Batch 3 (survey-*, 13 files).
+- 2026-08-06 — Pushed Batch 2 commit (3fad0a2), confirmed clean, no main
+  drift to merge. Batch 3 (13 files: survey-*, skill-progression) converted.
+  First interaction-mode run was 1/13 pass, 12/13 fail — Finding #15: the
+  converter force-clicked every `event choose 0` regardless of whether it
+  followed `event fire` (deterministic) or a bare `tick` (random roll, no
+  guaranteed dialog) — precedent for the distinction already existed in
+  event-dialog-visual.json but wasn't carried into the Batch 3 script.
+  Fixed (event-fire-preceded only), re-ran, 13/13 pass in a real browser.
+  No production bug this time — a pure conversion-script bug, caught by the
+  interaction channel exactly as designed. Full sweep still green
+  (typecheck, schema tests). Next: Batch 4 (building-*, 12 files).

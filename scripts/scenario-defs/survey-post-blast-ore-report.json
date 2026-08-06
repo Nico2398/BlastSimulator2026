@@ -148,26 +148,11 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "awaitUsable",
-          "selector": "#bs-event-dialog .bs-event-choice"
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-event-dialog .bs-event-choice"
-        },
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-event-dialog .bs-event-dismiss"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-event-dialog .bs-event-dismiss"
+          "type": "command",
+          "command": "event choose 0"
         }
       ],
-      "role": "player"
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
     },
     {
       "command": "tick 8",
@@ -183,26 +168,11 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "awaitUsable",
-          "selector": "#bs-event-dialog .bs-event-choice"
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-event-dialog .bs-event-choice"
-        },
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-event-dialog .bs-event-dismiss"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-event-dialog .bs-event-dismiss"
+          "type": "command",
+          "command": "event choose 0"
         }
       ],
-      "role": "player"
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
     },
     {
       "command": "tick 8",
@@ -218,26 +188,11 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "awaitUsable",
-          "selector": "#bs-event-dialog .bs-event-choice"
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-event-dialog .bs-event-choice"
-        },
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-event-dialog .bs-event-dismiss"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-event-dialog .bs-event-dismiss"
+          "type": "command",
+          "command": "event choose 0"
         }
       ],
-      "role": "player"
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
     },
     {
       "command": "tick 8",
@@ -253,26 +208,11 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "awaitUsable",
-          "selector": "#bs-event-dialog .bs-event-choice"
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-event-dialog .bs-event-choice"
-        },
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-event-dialog .bs-event-dismiss"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-event-dialog .bs-event-dismiss"
+          "type": "command",
+          "command": "event choose 0"
         }
       ],
-      "role": "player"
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
     },
     {
       "command": "survey show",
@@ -358,26 +298,11 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "awaitUsable",
-          "selector": "#bs-event-dialog .bs-event-choice"
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-event-dialog .bs-event-choice"
-        },
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-event-dialog .bs-event-dismiss"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-event-dialog .bs-event-dismiss"
+          "type": "command",
+          "command": "event choose 0"
         }
       ],
-      "role": "player"
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
     },
     {
       "command": "tick 8",
@@ -393,26 +318,11 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "awaitUsable",
-          "selector": "#bs-event-dialog .bs-event-choice"
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-event-dialog .bs-event-choice"
-        },
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-event-dialog .bs-event-dismiss"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-event-dialog .bs-event-dismiss"
+          "type": "command",
+          "command": "event choose 0"
         }
       ],
-      "role": "player"
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
     },
     {
       "command": "tick 8",
@@ -428,26 +338,11 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "awaitUsable",
-          "selector": "#bs-event-dialog .bs-event-choice"
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-event-dialog .bs-event-choice"
-        },
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-event-dialog .bs-event-dismiss"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-event-dialog .bs-event-dismiss"
+          "type": "command",
+          "command": "event choose 0"
         }
       ],
-      "role": "player"
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
     },
     {
       "command": "tick 8",
@@ -463,26 +358,11 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "awaitUsable",
-          "selector": "#bs-event-dialog .bs-event-choice"
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-event-dialog .bs-event-choice"
-        },
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-event-dialog .bs-event-dismiss"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-event-dialog .bs-event-dismiss"
+          "type": "command",
+          "command": "event choose 0"
         }
       ],
-      "role": "player"
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
     },
     {
       "command": "survey show",
