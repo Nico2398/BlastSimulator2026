@@ -10,16 +10,38 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "build research_center at:5,5",
       "interaction": [
         {
-          "type": "command",
-          "command": "build research_center at:5,5"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 5,
+          "z": 5
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "build list",
@@ -28,11 +50,12 @@
           "type": "command",
           "command": "build list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "build research_center at:15,5 tier:2",
-      "description": "Rejected — tier 2 has not been researched yet.",
+      "description": "Left unmarked: at this point the button is genuinely disabled (tier not yet researched / affordable, or the target id doesn't exist), so a real player could not click it either -- this step deliberately demonstrates the rejection command mode shows via the same disabled-button rule that gates the UI. Not converted to a click; the console command reproduces the same no-op the disabled button would.",
       "interaction": [
         {
           "type": "command",
@@ -47,27 +70,48 @@
           "type": "command",
           "command": "build list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "research queue type:research_center tier:2",
       "description": "Tier-2 (first upgrade) is cost-only — no duration, no conditions.",
       "interaction": [
         {
-          "type": "command",
-          "command": "research queue type:research_center tier:2"
+          "type": "set",
+          "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-tier-sel",
+          "value": "2"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-research-btn"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-research-btn"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "research queue type:research_center tier:3",
       "description": "Rejected (conditions_not_met) — tier-3's own condition (tier-2 research completed) is not yet satisfied: tier-2 is only queued, not yet processed by a tick. Demonstrates the conditions gate before the flow below completes tier-2 and queues tier-3 successfully.",
       "interaction": [
         {
-          "type": "command",
-          "command": "research queue type:research_center tier:3"
+          "type": "set",
+          "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-tier-sel",
+          "value": "3"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-research-btn"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-research-btn"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "research status",
@@ -76,7 +120,8 @@
           "type": "command",
           "command": "research status"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 1",
@@ -86,7 +131,8 @@
           "type": "command",
           "command": "tick 1"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "research status",
@@ -95,11 +141,12 @@
           "type": "command",
           "command": "research status"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "build research_center at:15,5 tier:2",
-      "description": "Now succeeds — tier 2 was just researched.",
+      "description": "Left unmarked: cash is already at or below this building's cost at this point in the scenario, so the Build panel's buy button is disabled (BuildMenu.ts: `btn.disabled = cash < def.constructionCost || locked`) and a real player could not click it -- but the console `build` command has no funds guard and drives cash negative anyway (Finding #1's class, previously only confirmed for `vehicle buy`; this generalizes it to plain `build` too). Found by the interaction channel: command mode passes this step silently by overdrawing, something no click can do.",
       "interaction": [
         {
           "type": "command",
@@ -114,17 +161,28 @@
           "type": "command",
           "command": "build list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "research queue type:research_center tier:3",
       "description": "Now succeeds — tier-3's condition (tier-2 research completed) is satisfied. This task carries real duration (50 ticks), unlike the cost-only tier-2 task above.",
       "interaction": [
         {
-          "type": "command",
-          "command": "research queue type:research_center tier:3"
+          "type": "set",
+          "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-tier-sel",
+          "value": "3"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-research-btn"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-research-btn"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "research status",
@@ -133,7 +191,8 @@
           "type": "command",
           "command": "research status"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 10",
@@ -142,7 +201,8 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "research status",
@@ -152,7 +212,8 @@
           "type": "command",
           "command": "research status"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 40",
@@ -161,7 +222,8 @@
           "type": "command",
           "command": "tick 40"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "research status",
@@ -171,11 +233,12 @@
           "type": "command",
           "command": "research status"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "build research_center at:25,5 tier:3",
-      "description": "Now succeeds — tier 3 was just researched.",
+      "description": "Left unmarked: at this point the button is genuinely disabled (tier not yet researched / affordable, or the target id doesn't exist), so a real player could not click it either -- this step deliberately demonstrates the rejection command mode shows via the same disabled-button rule that gates the UI. Not converted to a click; the console command reproduces the same no-op the disabled button would.",
       "interaction": [
         {
           "type": "command",
@@ -190,7 +253,8 @@
           "type": "command",
           "command": "build list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "scores",
@@ -199,7 +263,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -208,7 +273,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ],
   "shots": [

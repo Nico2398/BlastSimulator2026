@@ -263,6 +263,25 @@ here for a follow-up issue.
     Re-verified 13/13 in a real browser after the fix. Caution for later
     batches (economy/misc, playthroughs): grep a candidate file for `event
     choose` and confirm what precedes each one before assuming it converts.
+16. **`build`'s buy button disables on insufficient funds even though the
+    console `build` command has no funds guard** — Finding #1 previously
+    established this only for `vehicle buy`; Batch 4 confirms it generalizes
+    to plain `build` too (`BuildMenu.ts`: `btn.disabled = cash <
+    def.constructionCost || locked`). Two Batch 4 files ran a `build` step
+    while cash was already at or below the building's cost — command mode
+    passed by overdrawing cash negative (no guard), but the real button was
+    disabled, so the first interaction-mode run failed both with `element is
+    disabled`: `building-menu-visual` (6 buildings bought back-to-back from a
+    $50k start, the 5th/6th overdraw) and `building-research-progression-visual`
+    (a $60k T2 research_center bought with $19,985 on hand). **Not fixed** —
+    same call as Finding #1: a cash-guard change touches every scenario that
+    builds/buys/hires while short on cash, needs its own change and
+    verification pass. Both steps left unmarked (command) instead, matching
+    what the disabled button would actually do. Note for research-queue
+    clicks specifically: the "Queue Research" button only disables on
+    `locked` (tier not yet unlocked), never on cash, so a queue attempt that
+    fails for insufficient funds is still a real, clickable player action —
+    only the *build* buy button carries the funds guard.
 
 _(Add new findings here as you hit them. Number sequentially.)_
 
@@ -286,7 +305,7 @@ for f in sorted(os.listdir(d)):
 EOF
 ```
 
-### ✅ Done (56)
+### ✅ Done (68)
 - tutorial-interactive, vehicle-purchase-visual, contract-panel-visual, event-dialog-visual
 - Batch 1 (14): ambient-life-visual, weather-popover-visual, wind-clouds-visual,
   survey-panel-visual, loading-screen-visual, scene-picking-visual, nav-cell-types-visual,
@@ -305,14 +324,24 @@ EOF
   survey-method-selection, survey-ore-vein-visibility, survey-overlay-lifecycle,
   survey-post-blast-ore-report, survey-result-visualization, survey-seismic-side-effects,
   survey-stale-handling, survey-then-blast, survey-then-blast-playthrough, skill-progression
+- Batch 4 (12): building-destruction-visual, building-lifecycle, building-living-visual,
+  building-menu-visual, building-placement-visual, building-ramp-visual,
+  building-research-progression-visual, building-research-visual,
+  building-tier-system-visual, building-training-visual, building-vehicle-depot-visual,
+  building-warehouse-visual
 
-All 56 interaction-verified in a real browser (each batch re-verified as one
+All 68 interaction-verified in a real browser (each batch re-verified as one
 batch run at the end to catch cross-file regressions). Batch 2 also fixed a
 real game bug (Finding #12, BlastReportModal) found only by actually running
 the clicks — command mode never would have caught it, since it never touches
 the modal. Batch 3 caught a self-inflicted conversion bug (Finding #15 —
 `event choose` force-clicked even when it followed a bare `tick`, not
 `event fire`) on the first real-browser run; fixed and re-verified 13/13.
+Batch 4 caught two more disabled-button cases (Finding #16 — `build`'s buy
+button also disables on insufficient funds, generalizing Finding #1 beyond
+`vehicle buy`) and reused `building-tier-system-visual`'s pre-existing
+hand-written clicks (role-tagged only, not regenerated, per the
+`blast-visual-full` caution below).
 
 **Caution for whoever resumes:** `blast-visual-full` was inspected early in
 Batch 2 but its actual conversion was skipped in the first pass — it slipped
@@ -323,14 +352,7 @@ for `"role"` in the file) before crossing it off.
 
 ### Batch 2 — blast-* — ✅ COMPLETE (25 files, see Done list above + blast-execution-visual)
 ### Batch 3 — survey-* — ✅ COMPLETE (13 files, see Done list above)
-
-### Batch 4 — building-* (12)
-⬜ building-destruction-visual · ⬜ building-lifecycle ·
-⬜ building-living-visual · ⬜ building-menu-visual ·
-⬜ building-placement-visual · ⬜ building-ramp-visual ·
-⬜ building-research-progression-visual · ⬜ building-research-visual ·
-⬜ building-tier-system-visual · ⬜ building-training-visual ·
-⬜ building-vehicle-depot-visual · ⬜ building-warehouse-visual
+### Batch 4 — building-* — ✅ COMPLETE (12 files, see Done list above)
 
 ### Batch 5 — vehicle-* / needs-* / nav-* (22)
 ⬜ vehicle-3d-rendering-visual · ⬜ vehicle-driver-assignment-visual ·
@@ -361,7 +383,7 @@ for `"role"` in the file) before crossing it off.
 ⬜ level2-playthrough-bankruptcy · ⬜ level2-playthrough-win ·
 ⬜ level3-playthrough-ecology · ⬜ level3-playthrough-win
 
-66 total remaining across batches 4-7.
+54 total remaining across batches 5-7.
 
 ## Session log
 
@@ -402,3 +424,20 @@ got and whether main was merged recently.
   No production bug this time — a pure conversion-script bug, caught by the
   interaction channel exactly as designed. Full sweep still green
   (typecheck, schema tests). Next: Batch 4 (building-*, 12 files).
+- 2026-08-06 — Pushed Batch 3 fix (001479c), confirmed clean, no main drift.
+  Batch 4 (12 files: building-*) converted. Needed real per-step judgment,
+  not a blanket pattern: read every build/research state dump from an
+  existing full-suite command-mode run to tell "button disabled" (must stay
+  a command) from "button enabled, command just fails" (still a valid
+  click) before deciding a role — a build blocked by an unresearched tier is
+  the former, a Queue Research click that fails on prerequisites or funds is
+  the latter (its button never disables on either). `building-tier-system-visual`
+  turned out to already be hand-converted with real clicks pre-#479 (like
+  `survey-panel-visual`) — role-tagged only, interaction untouched, per the
+  `blast-visual-full` caution. First interaction-mode run: 10/12 pass, 2
+  fail, both `element is disabled` on a `build` buy button — Finding #16
+  (generalizes Finding #1's cash-guard gap from `vehicle buy` to plain
+  `build`). Fixed by leaving those 2 steps as commands, re-verified 12/12 in
+  a real browser. No production bug this time either. Full sweep green
+  (typecheck, schema tests, command mode). Next: Batch 5 (vehicle-*/needs-*/
+  nav-*, 22 files).

@@ -10,7 +10,8 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "build types",
@@ -19,7 +20,8 @@
           "type": "command",
           "command": "build types"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "build list",
@@ -28,43 +30,116 @@
           "type": "command",
           "command": "build list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "build living_quarters at:5,5",
       "interaction": [
         {
-          "type": "command",
-          "command": "build living_quarters at:5,5"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 5,
+          "z": 5
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "build management_office at:10,5",
       "interaction": [
         {
-          "type": "command",
-          "command": "build management_office at:10,5"
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"management_office\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 10,
+          "z": 5
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "build driving_center at:15,5",
       "interaction": [
         {
-          "type": "command",
-          "command": "build driving_center at:15,5"
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"driving_center\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 15,
+          "z": 5
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "build explosive_warehouse at:20,5",
       "interaction": [
         {
-          "type": "command",
-          "command": "build explosive_warehouse at:20,5"
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"explosive_warehouse\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 20,
+          "z": 5
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "build freight_warehouse at:5,10",
@@ -73,7 +148,8 @@
           "type": "command",
           "command": "build freight_warehouse at:5,10"
         }
-      ]
+      ],
+      "description": "Left unmarked: cash is already at or below this building's cost at this point in the scenario, so the Build panel's buy button is disabled (BuildMenu.ts: `btn.disabled = cash < def.constructionCost || locked`) and a real player could not click it -- but the console `build` command has no funds guard and drives cash negative anyway (Finding #1's class, previously only confirmed for `vehicle buy`; this generalizes it to plain `build` too). Found by the interaction channel: command mode passes this step silently by overdrawing, something no click can do."
     },
     {
       "command": "build vehicle_depot at:10,10",
@@ -82,7 +158,8 @@
           "type": "command",
           "command": "build vehicle_depot at:10,10"
         }
-      ]
+      ],
+      "description": "Left unmarked: cash is already at or below this building's cost at this point in the scenario, so the Build panel's buy button is disabled (BuildMenu.ts: `btn.disabled = cash < def.constructionCost || locked`) and a real player could not click it -- but the console `build` command has no funds guard and drives cash negative anyway (Finding #1's class, previously only confirmed for `vehicle buy`; this generalizes it to plain `build` too). Found by the interaction channel: command mode passes this step silently by overdrawing, something no click can do."
     },
     {
       "command": "build list",
@@ -91,7 +168,8 @@
           "type": "command",
           "command": "build list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "scores",
@@ -100,7 +178,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -109,7 +188,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ],
   "shots": [

@@ -10,25 +10,77 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "build_ramp origin:5,15 direction:south length:10 depth:8",
       "interaction": [
         {
-          "type": "command",
-          "command": "build_ramp origin:5,15 direction:south length:10 depth:8"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel .bs-build-ramp-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 5,
+          "z1": 15,
+          "x2": 5,
+          "z2": 25
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "build_ramp origin:20,15 direction:east length:8 depth:6",
       "interaction": [
         {
-          "type": "command",
-          "command": "build_ramp origin:20,15 direction:east length:8 depth:6"
+          "type": "clickSelector",
+          "selector": "#bs-build-panel .bs-build-ramp-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 20,
+          "z1": 15,
+          "x2": 28,
+          "z2": 15
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "description": "Ramp depth defaults to 8m and only moves via the strip's -/+ stepper (#bs-param-strip .bsx-stepper-btn, the only field this tool shows) -- two decrements land on the scenario's depth:6."
     },
     {
       "command": "inspect 5,20,0",
@@ -37,7 +89,8 @@
           "type": "command",
           "command": "inspect 5,20,0"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "inspect 20,15,0",
@@ -46,7 +99,8 @@
           "type": "command",
           "command": "inspect 20,15,0"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -55,7 +109,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ],
   "shots": [
@@ -68,21 +123,30 @@
       "name": "ramp-closeup",
       "yaw": 90,
       "pitch": 60,
-      "target": [5, 20],
+      "target": [
+        5,
+        20
+      ],
       "distance": 18
     },
     {
       "name": "birdseye",
       "yaw": 0,
       "pitch": 80,
-      "target": [24, 15],
+      "target": [
+        24,
+        15
+      ],
       "distance": 17
     },
     {
       "name": "angled",
       "yaw": 135,
       "pitch": 30,
-      "target": [16, 20],
+      "target": [
+        16,
+        20
+      ],
       "distance": 22
     }
   ]
