@@ -60,6 +60,14 @@
       ]
     },
     {
+      "command": "state",
+      "description": "Close the Save/Load modal opened above via its own close button before continuing — its .bs-confirm-overlay backdrop otherwise stays on top of the page and blocks every later click (toolbar/Settings recheck, tutorial start), the same class of gap documented in rock-fragmenter-breaking.json for the Blast Report modal. SavesModal's header is a plain div (not a <header> element), and its close button is the only button in the modal without a data-action attribute (slot buttons all carry save-here/load/delete) — :not([data-action]) is what actually isolates it.",
+      "interaction": [
+        { "type": "command", "command": "state" },
+        { "type": "clickSelector", "selector": "#bs-saves-modal button:not([data-action])" }
+      ]
+    },
+    {
       "command": "time pause",
       "description": "Issue #492 section 3 extension: pause so a fired event's CLOCK HELD chip is visible, then fire the tutorial consultant event (its 3 options carry no risky/probabilistic hints, so its only bsx-chip-warn is the CLOCK HELD chip itself — see TutorialEvents.ts). EventModal.clockChip is built with a raw t() call at construction and never registered with the panel's own LocaleTextRegistry (bug 3 of #492 section 3): this must read the French translation, not the English text baked in when the app booted.",
       "interaction": [
