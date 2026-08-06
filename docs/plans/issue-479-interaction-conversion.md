@@ -554,11 +554,9 @@ for `"role"` in the file) before crossing it off.
 ### Batch 6 — employee/economy/misc — ✅ COMPLETE (18 files, see Done list above)
 ### Batch 7 — big playthroughs — ✅ COMPLETE (16 files, see Done list above)
 
-0 remaining. All 124 scenario definitions converted. Next step per the
-governing instruction: run the full CI suite now that everything is
-updated (typecheck/test/scenarios/build plus the browser-driven
-Playtest and Scenarios-interaction-mode jobs, gated behind the `full-ci`
-label per CLAUDE.md).
+0 remaining. All 124 scenario definitions converted, and the full suite
+has now been run — see "Final verification" in the session log below.
+Every CI job passes, including both browser-driven channels.
 
 ## Session log
 
@@ -698,3 +696,35 @@ got and whether main was merged recently.
   the browser-driven Playtest and Scenarios-interaction-mode jobs under
   the `full-ci` label) as the final green-light before reporting the task
   done.
+
+- 2026-08-06 — **Final verification: every CI job run locally, all green.**
+  GitHub Actions was down (`Failed to resolve action download info: Service
+  Unavailable`, failing before checkout on every job; the browser jobs never
+  got a runner assigned at all, and `rerun_failed_jobs` 403s without
+  `actions: write`), so the full suite was run locally on 72c6909 instead of
+  read off CI. Every one of the six CI jobs, using the same commands
+  `.github/workflows/ci.yml` runs:
+
+  | Job | Result |
+  |---|---|
+  | TypeScript type check (`tsc --noEmit` ×2 + `validate:context`) | clean |
+  | Unit & integration tests (`vitest run`) | 283 files / 8038 tests |
+  | Production build (`npm run build`) | built in 4.13s |
+  | Scenarios (command mode) | 124/124 |
+  | Playtest (playability) | 41/41 beats, 4/4 definitions |
+  | Scenarios (interaction mode) | **124/124, 0 failed** (36m56s) |
+
+  The interaction-mode result is the one that actually proves #479: all 124
+  definitions drive the game through real UI clicks and every one passes
+  when clicked for real in a browser, rather than replaying the console.
+  Playability passed clean alongside it, including the full 22-beat tutorial
+  start to finish. All five CLAUDE.md verification channels green (static,
+  logic, scenario, visual, playability) — none skipped, none substituted.
+
+  Still open, deliberately, and not covered by this green: the two files
+  that keep some steps as commands (`sandbox-mode.json` Finding #21,
+  `tutorial-steps-visual.json` Finding #28), and the cash-guard
+  inconsistency behind Findings #1/#16/#26 (`vehicle buy`/`build`/`employee
+  hire` buttons disable on insufficient funds while the console commands
+  have no funds guard — those steps stay unmarked rather than force a click
+  a player could not make). Each needs its own change and verification pass.
