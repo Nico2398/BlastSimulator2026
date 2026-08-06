@@ -147,7 +147,7 @@ scripts/playtests/*.json until every row below is CLOSED**:
 |---|---|---|---|
 | `tutorial.json` (22 beats) | `tutorial-interactive.json` (29 steps) | Near-total overlap already — same click path, same `waitForTutorialStep` gating. Missing: (a) no `expect` blocks at all yet (needs `tutorialStep`/`increased` added per step, mirroring each beat); (b) the "grid tool refuses a rectangle that is not the one asked for" negative-test beat (`blocked: "#bs-tile-select-confirm"` after dragging a *wrong* rectangle) has no equivalent step at all; (c) the "leaving for the world map is blocked mid-tutorial" (`blocked: ".bs-return-map"`) check likewise. | ⬜ open |
 | `research-center-gate.json` (7 beats) | none yet — closest is `building-research-visual.json`/`building-research-progression-visual.json`, not yet inspected for this specific rejection case | Need to confirm one of them (or a new addition) proves: Queue Research clicked with no Research Center on site is rejected on-screen (cash/buildingCount unchanged), the identical click succeeds once a Research Center exists, and the tier-2 unlock is real (`usable` on the tier-2 buy button, `set` on the tier selector). | ⬜ open, not yet inspected |
-| `scene-picking.json` (5 beats) | `scene-picking-visual.json`, not yet inspected in full | Need to confirm it clicks an employee *in the 3D scene* (`clickEntity`) rather than a panel row, opens the DETAIL action, and proves the close button *blocks* the DETAIL action afterward. | ⬜ open, not yet inspected |
+| `scene-picking.json` (5 beats) | `scene-picking-visual.json` | Was building-only (raw `click`/`mousemove` pixel coords, no employee coverage at all) — a real gap, not just missing assertions. **Closed**: extended the file with 4 new steps (hire driller, `clickEntity` employee id:1, click DETAIL, click close) using `expect.usable`/`expect.blocked`, plus `expect` added to all 4 pre-existing building-picking steps (`equals`/`increased` on the build, `usable`/`blocked` on the selection-bar Esc-deselect pair). Verified 1/1 in both modes with a real browser. | ✅ closed |
 | `training.json` (7 beats) | `employee-training.json`, not yet inspected in full | Need to confirm it proves both licences no role hires with (`driving.excavator`) and a promotion (`driving.truck` above Rookie) via real clicks + `usable`/`equals`/`increased`, not console shortcuts. | ⬜ open, not yet inspected |
 
 Do the parity audit for the remaining 3 rows once the main batch pass
@@ -171,8 +171,8 @@ both modes per file before committing.
 
 ### Batch 1 — misc visual (14, same grouping as #479 Batch 1)
 ⬜ ambient-life-visual · ⬜ weather-popover-visual · ⬜ wind-clouds-visual ·
-⬜ loading-screen-visual · ⬜ scene-picking-visual (**+ playtest-parity
-check**) · ⬜ nav-cell-types-visual · ⬜ nav-minimap-integration-visual ·
+⬜ loading-screen-visual · ✅ scene-picking-visual (**playtest-parity
+check closed**) · ⬜ nav-cell-types-visual · ⬜ nav-minimap-integration-visual ·
 ⬜ blast-hole-picking-visual · ⬜ blast-drill-plan-ui ·
 ⬜ blast-drill-plan-visual · ⬜ i18n-live-locale-switch ·
 ⬜ crew-fleet-panels-visual · ⬜ money-surfaces-visual
@@ -292,11 +292,11 @@ _(Add new findings here as you hit them. Number sequentially.)_
 Legend: ⬜ not started · 🔶 in progress · ✅ expect added + unmarked-step
 audit done + both modes verified
 
-### ✅ Done (1)
+### ✅ Done (2)
 - survey-panel-visual (Batch 0 — mechanism pilot)
+- scene-picking-visual (Batch 1 — playtest scene-picking.json parity closed)
 
-122 remaining across Batches 1-7 (Batch 3 excludes survey-panel-visual,
-already done). Parity audits for research-center-gate/scene-picking/
+121 remaining across Batches 1-7. Parity audits for research-center-gate/
 training still open; tutorial.json's gap is scoped (2 missing negative-test
 beats + no `expect` blocks yet in tutorial-interactive.json).
 

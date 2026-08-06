@@ -1,6 +1,6 @@
 {
   "name": "scene-picking-visual",
-  "description": "Redesign P2: hovering and clicking scene entities (raycaster over terrain + entity meshes). Hover a placed building — the debounced hover tag should show its name and HP; click it — a selection ring should appear on the ground and the bottom selection bar should show Upgrade/Move/Demolish; Esc deselects — both disappear; hovering bare terrain shows tile coordinates and 'no survey data'.",
+  "description": "Redesign P2: hovering and clicking scene entities (raycaster over terrain + entity meshes). Hover a placed building — the debounced hover tag should show its name and HP; click it — a selection ring should appear on the ground and the bottom selection bar should show Upgrade/Move/Demolish; Esc deselects — both disappear; hovering bare terrain shows tile coordinates and 'no survey data'. Also covers the employee side of the same picker (parity with the retired playtest 'scene-picking' definition): selecting a hired employee by clicking them in the 3D scene (clickEntity, not a panel row) and opening their crew detail via the selection bar's DETAIL action.",
   "shots": [
     {
       "name": "overview",
@@ -29,7 +29,14 @@
           "command": "new_game seed:42 size:32"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 0,
+          "employeeCount": 0,
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "build management_office at:10,10 tier:1",
@@ -61,7 +68,14 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "increased": ["buildingCount"],
+        "equals": {
+          "cash": 42000
+        },
+        "note": "management_office tier 1 costs 8000 (BuildingDefs.ts constructionCost)"
+      }
     },
     {
       "command": "state",
@@ -125,7 +139,11 @@
           "type": "screenshot"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "usable": "#bs-selection-bar [data-action=\"upgrade\"]",
+        "note": "waitForSelector above only proved the button exists in the DOM; usable proves it is genuinely clickable, not covered/hidden"
+      }
     },
     {
       "command": "state",
@@ -154,7 +172,11 @@
           "type": "screenshot"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "blocked": "#bs-selection-bar [data-action=\"upgrade\"]",
+        "note": "Esc hides the selection bar entirely, so its buttons must no longer be reachable"
+      }
     },
     {
       "command": "state",
@@ -185,6 +207,103 @@
         }
       ],
       "role": "observe"
+    },
+    {
+      "command": "employee hire role:driller",
+      "timeout": 30,
+      "description": "Setup for the employee side of the picker: hire a driller (parity with the retired playtest 'scene-picking' definition)",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "increased": ["employeeCount"],
+        "equals": {
+          "cash": 41000
+        },
+        "note": "HIRING_COSTS.driller is 1000 (balance.ts); cash was 42000 after the management_office purchase above"
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "Click the hired driller in the 3D scene (clickEntity by kind+id, not a panel row) — the selection bar should show Detail/Dispatch Here/Train for this employee",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state"
+        },
+        {
+          "type": "clickEntity",
+          "kind": "employee",
+          "id": 1
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "usable": "#bs-selection-bar [data-action=\"detail\"]",
+        "note": "a dashed selection ring should appear on the ground and the bottom selection bar should show Detail/Dispatch Here/Train for the clicked employee"
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "Open the crew detail from the selection bar's DETAIL action — must expand this exact employee's row, not just bring the panel to the front",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-selection-bar [data-action=\"detail\"]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "usable": "#bs-employee-panel [data-employee-id=\"1\"] .bs-employee-detail",
+        "note": "DETAIL must open the Crew panel with this exact employee's row expanded"
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "Close the selection bar — its own close (x) button is the only one of the bar's buttons without a data-action",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-selection-bar button:not([data-action])"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "blocked": "#bs-selection-bar [data-action=\"detail\"]",
+        "note": "closing the selection bar must make its actions unreachable again, same invariant as the Esc-deselects building check above"
+      }
     }
   ]
 }
