@@ -1,8 +1,11 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import { TutorialOverlay } from '../../../src/ui/TutorialOverlay.js';
 import { TUTORIAL_STEPS, TOTAL_TUTORIAL_STEPS } from '../../../src/ui/tutorialSteps.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
+import { setLocale } from '../../../src/core/i18n/I18n.js';
 
 function createMockState(): GameState {
   return {
@@ -54,6 +57,7 @@ describe('TutorialOverlay (12.4)', () => {
     if (container.parentNode) {
       container.parentNode.removeChild(container);
     }
+    setLocale('en');
   });
 
   describe('construction', () => {
@@ -652,6 +656,76 @@ describe('TutorialOverlay (12.4)', () => {
       expect(TutorialOverlay.isCompleted()).toBe(true);
 
       vi.useRealTimers();
+    });
+  });
+
+  describe('refreshLocale() (issue #492 section 3 — "clock held" text survives a language switch)', () => {
+    it('re-applies the CLOCK HELD tooltip (pausedEl.title) to the active locale', () => {
+      const tut = new TutorialOverlay(container) as unknown as { pausedEl: HTMLElement };
+      overlay = tut as unknown as TutorialOverlay;
+
+      // Baked in English at construction time.
+      expect(tut.pausedEl.title).toBe(
+        'Time is paused until you do this — the tutorial holds the clock so the site cannot drift ahead of you.',
+      );
+
+      setLocale('fr');
+      (overlay as TutorialOverlay).refreshLocale();
+
+      expect(tut.pausedEl.title).toBe(
+        "Le temps est en pause jusqu'à cette action — le tutoriel retient l'horloge pour que le site ne prenne pas d'avance sur vous.",
+      );
+    });
+
+    it('re-applies the CLOCK HELD chip label (pausedChipEl.textContent) to the active locale', () => {
+      const tut = new TutorialOverlay(container) as unknown as { pausedChipEl: HTMLElement };
+      overlay = tut as unknown as TutorialOverlay;
+
+      expect(tut.pausedChipEl.textContent).toBe('CLOCK HELD');
+
+      setLocale('fr');
+      (overlay as TutorialOverlay).refreshLocale();
+
+      expect(tut.pausedChipEl.textContent).toBe('HORLOGE EN PAUSE');
+    });
+
+    it('re-applies the current step title/text in the new locale', () => {
+      const tut = new TutorialOverlay(container);
+      overlay = tut;
+      const state = createMockState();
+      tut.start(state); // step 0 ('tutorial.step1.title' / 'tutorial.step1'), rendered in EN
+
+      const titleEl = container.querySelector('.bs-panel-title') as HTMLElement;
+      const textEl = container.querySelector('.bs-panel-text') as HTMLElement;
+      expect(titleEl.textContent).toBe('Game Speed');
+
+      setLocale('fr');
+      tut.refreshLocale();
+
+      expect(titleEl.textContent).toBe('Vitesse de Jeu');
+      expect(textEl.textContent).toBe(
+        'Utilisez les contrôles de vitesse sur la gauche de la barre du haut pour accélérer le jeu. Essayez la vitesse 2× ou 4× !',
+      );
+    });
+
+    it('re-applies the console-hint label ("Console equivalent" / "Équivalent console")', () => {
+      const tut = new TutorialOverlay(container);
+      overlay = tut;
+
+      const label = container.querySelector('.bs-tutorial-commands-label') as HTMLElement;
+      expect(label.textContent).toBe('Console equivalent');
+
+      setLocale('fr');
+      tut.refreshLocale();
+
+      expect(label.textContent).toBe('Équivalent console');
+    });
+
+    it('is a no-op-safe call when the tutorial has not been started (no gameState yet)', () => {
+      const tut = new TutorialOverlay(container);
+      overlay = tut;
+      setLocale('fr');
+      expect(() => tut.refreshLocale()).not.toThrow();
     });
   });
 });

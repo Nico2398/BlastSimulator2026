@@ -1,6 +1,6 @@
 {
   "name": "i18n-live-locale-switch",
-  "description": "Regression test for issue #457 Bug 1: switching locale while a panel is already open must re-render that panel's static text (title, buttons, toolbar captions) in place, without the panel being closed and reopened. Also verifies a fired event renders fully in French when the locale is already French.",
+  "description": "Regression test for issue #457 Bug 1: switching locale while a panel is already open must re-render that panel's static text (title, buttons, toolbar captions) in place, without the panel being closed and reopened. Also verifies a fired event renders fully in French when the locale is already French. Extended for issue #492 section 3: after the locale switch, opens the tutorial and the Crew panel together (panels open, tutorial up) and asserts the tutorial coach card's CLOCK HELD tooltip/chip and EventModal's CLOCK HELD chip — both built with a raw t() call at construction time, before the switch happens — read French, not the English baked in at app boot; also asserts the Settings panel's active-language pill matches the current locale. Locale is switched once, before tutorial_start rather than literally mid-step, because the tutorial's own rails (src/ui/tutorialGuide.ts) make every button except the current step's target inert — including the Settings toggle — so a real player cannot open Settings once the coach card is up; EventModal is exempt from that gate (it's a `.bs-confirm-overlay` modal), which is why its own CLOCK HELD chip is checked with an event fired while the tutorial card is not yet started.",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -57,6 +57,87 @@
       "interaction": [
         { "type": "command", "command": "event choose 0" },
         { "type": "clickSelector", "selector": "#bs-saveload-btn" }
+      ]
+    },
+    {
+      "command": "time pause",
+      "description": "Issue #492 section 3 extension: pause so a fired event's CLOCK HELD chip is visible, then fire the tutorial consultant event (its 3 options carry no risky/probabilistic hints, so its only bsx-chip-warn is the CLOCK HELD chip itself — see TutorialEvents.ts). EventModal.clockChip is built with a raw t() call at construction and never registered with the panel's own LocaleTextRegistry (bug 3 of #492 section 3): this must read the French translation, not the English text baked in when the app booted.",
+      "interaction": [
+        { "type": "command", "command": "time pause" }
+      ]
+    },
+    {
+      "command": "event fire tutorial_synergy_consultant",
+      "description": "CLOCK HELD chip must read the French translation of ui.event.clock_held ('HORLOGE ARRÊTÉE'), not the English text EventModal's constructor baked in at app boot.",
+      "interaction": [
+        { "type": "command", "command": "event fire tutorial_synergy_consultant" },
+        {
+          "type": "assert",
+          "selector": "#bs-event-dialog .bsx-chip-warn",
+          "property": "textContent",
+          "expectedValue": "HORLOGE ARRÊTÉE"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "description": "Dismiss the consultant dialog and resume the clock before moving on.",
+      "interaction": [
+        { "type": "command", "command": "event choose 0" },
+        { "type": "command", "command": "time resume" }
+      ]
+    },
+    {
+      "command": "state full",
+      "description": "Reopen Settings and confirm the active-language pill matches the current locale (French) — syncLangPills toggles the `active` class onto whichever pill matches the live locale.",
+      "interaction": [
+        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"settings\"]" },
+        { "type": "waitForSelector", "selector": "#bs-settings-panel" },
+        { "type": "assert", "selector": "#bs-settings-panel [data-lang=\"fr\"].active" }
+      ]
+    },
+    {
+      "command": "tutorial_start",
+      "description": "Start the tutorial while locale is already French. TutorialOverlay is constructed once at app boot (always in English, before the player can switch locale) — its coach card must not still be showing the English text baked in at construction. Bug 1 of #492 section 3: pausedEl.title and pausedChipEl.textContent are only ever set at construction, never re-applied by TutorialOverlay.refreshLocale() (a no-op stub) or reached by main.ts's language-change fan-out.",
+      "interaction": [
+        { "type": "command", "command": "tutorial_start" },
+        { "type": "waitForSelector", "selector": "#bs-tutorial-overlay" },
+        { "type": "waitForTutorialStep", "stepId": "time-speed" },
+        {
+          "type": "assert",
+          "selector": ".bs-tutorial-box .bs-panel-title",
+          "property": "textContent",
+          "expectedValue": "Vitesse de Jeu"
+        },
+        {
+          "type": "assert",
+          "selector": ".bs-tutorial-paused",
+          "property": "title",
+          "expectedValue": "Le temps est en pause jusqu'à cette action — le tutoriel retient l'horloge pour que le site ne prenne pas d'avance sur vous."
+        },
+        {
+          "type": "assert",
+          "selector": ".bs-tutorial-paused",
+          "property": "textContent",
+          "expectedValue": "HORLOGE EN PAUSE"
+        }
+      ]
+    },
+    {
+      "command": "time speed:2",
+      "description": "Advance past the time-speed step (its own target, always reachable) so the Crew panel — the hire-surveyor step's rails target — becomes clickable, proving a panel can be opened mid-tutorial while the locale switch made earlier is still in effect.",
+      "interaction": [
+        { "type": "clickSelector", "selector": "#bs-hud-top .bs-speed-btn" },
+        { "type": "waitForTutorialStep", "stepId": "hire-surveyor" }
+      ]
+    },
+    {
+      "command": "state full",
+      "description": "Open the Crew panel — a second panel, open at the same time as the tutorial card. CrewPanel's title is already registered with its own LocaleTextRegistry (unlike EventModal's clockChip), so this is a locked-in green check confirming a second panel keeps reading French while the tutorial overlay is up alongside it, not just the panel that made the switch.",
+      "interaction": [
+        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"employees\"]" },
+        { "type": "waitForSelector", "selector": "#bs-employee-panel [data-role=\"surveyor\"]" },
+        { "type": "assert", "selector": "#bs-employee-panel" }
       ]
     }
   ]

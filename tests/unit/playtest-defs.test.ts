@@ -77,7 +77,9 @@ describe.each(FILES)('%s', (file) => {
       const checkable = e.tutorialStep !== undefined
         || (e.increased?.length ?? 0) > 0
         || e.equals !== undefined
-        || e.usable !== undefined;
+        || e.usable !== undefined
+        || e.textEquals !== undefined
+        || e.titleEquals !== undefined;
       // A `note`-only expectation is deliberate for beats whose step
       // auto-advances; the following beat carries the assertion.
       expect(
@@ -120,6 +122,20 @@ describe.each(FILES)('%s', (file) => {
         for (const c of coords) {
           expect(Number.isInteger(c), `beat[${i}] tile coordinate ${c} is not an integer`).toBe(true);
           expect(c, `beat[${i}] tile coordinate is negative`).toBeGreaterThanOrEqual(0);
+        }
+      }
+    });
+  });
+
+  it('textEquals/titleEquals entries name a non-empty selector and a string expectation', () => {
+    def.beats.forEach((beat: PlaytestBeat, i: number) => {
+      const e = beat.expect;
+      if (!e) return;
+      for (const [field, map] of [['textEquals', e.textEquals], ['titleEquals', e.titleEquals]] as const) {
+        if (!map) continue;
+        for (const [selector, expected] of Object.entries(map)) {
+          expect(selector.length, `beat[${i}] ${field} selector is empty`).toBeGreaterThan(0);
+          expect(typeof expected, `beat[${i}] ${field}["${selector}"] expected value must be a string`).toBe('string');
         }
       }
     });
@@ -171,12 +187,19 @@ describe.each(FILES)('%s', (file) => {
     expect(offenders).toEqual([]);
   });
 
-  it('only the first beat sets up a world', () => {
+  it('only the first beat creates or replaces the world (new_game/campaign)', () => {
+    // tutorial_start is deliberately not in this list (#492 section 3):
+    // unlike new_game/campaign, it does not discard state earlier beats
+    // proved — it only flips the tutorial overlay on — so a definition that
+    // needs a beat of real player action (e.g. switching the UI language,
+    // only reachable before the tutorial's rails make Settings inert)
+    // between "campaign start" and "tutorial_start" is not smuggling a reset,
+    // it is sequencing one. See tutorial-fr.json.
     def.beats.forEach((beat: PlaytestBeat, i: number) => {
       if (i === 0) return;
       const resets = (beat.setup ?? []).filter(c => {
         const token = c.trim().split(/\s+/)[0] ?? '';
-        return token === 'new_game' || token === 'campaign' || token === 'tutorial_start';
+        return token === 'new_game' || token === 'campaign';
       });
       expect(
         resets,

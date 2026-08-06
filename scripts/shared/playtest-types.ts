@@ -83,6 +83,20 @@ export interface PlaytestGoal {
    * player press the wrong thing is the defect.
    */
   blocked?: string;
+  /**
+   * DOM `textContent` that must exactly match, keyed by CSS selector. Fails if
+   * a selector is absent from the DOM or its text differs. Added for #492
+   * section 3: `equals` only reads the numeric/state `__gameState()` dump, so
+   * it cannot prove a rendered string followed a locale switch — some panel
+   * text (a tooltip, a chip label) is applied once at construction and never
+   * re-applied on a language change, which no other goal field can catch.
+   */
+  textEquals?: Record<string, string>;
+  /**
+   * DOM `title` attribute (tooltip) that must exactly match, keyed by CSS
+   * selector. Same rationale and failure shape as `textEquals`.
+   */
+  titleEquals?: Record<string, string>;
   /** Free-text note shown in the report. */
   note?: string;
 }

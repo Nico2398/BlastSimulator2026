@@ -1,0 +1,64 @@
+{
+  "name": "tutorial-fr",
+  "description": "Regression test for issue #492 section 3: plays the opening of the Tutorial Pit with the UI language switched to French before the tutorial starts, and fails if English text is still showing at any checked tutorial step. A sibling of tutorial.json rather than an addition to it — playtest-defs.test.ts's own 'only the first beat sets up a world' rule forbids a second new_game/campaign/tutorial_start reset partway through one file, and switching the language is only reachable by clicking the Settings toggle before the tutorial's rails make every other control inert (src/ui/tutorialGuide.ts) — so the switch has to be the very first thing this file does, not a mid-run action the way a full second EN/FR comparison run would need. Covers a narrower slice than tutorial.json (through hire-surveyor, not the full 24-step path) because completing the whole tutorial a second time proves nothing further about locale: every step already renders its title/body through a live t() call in TutorialOverlay.render(), so the same string is not at risk of going stale by step 20 in a way step 1 would not already show — the actual bug is text several elements bake in once at construction (TutorialOverlay's pausedEl/pausedChipEl, EventModal's clockChip) and never re-apply on a language switch, which happens once, up front, in beat 0.",
+  "beats": [
+    {
+      "goal": "start a fresh Tutorial Pit and switch the UI language to French before the tutorial begins",
+      "setup": [
+        "new_game seed:43 size:24",
+        "campaign start level:tutorial_pit"
+      ],
+      "actions": [
+        { "do": "click", "selector": "#bs-toolbar [data-panel=\"settings\"]" },
+        { "do": "click", "selector": "#bs-settings-panel [data-lang=\"fr\"]" }
+      ],
+      "expect": {
+        "usable": "#bs-settings-panel [data-lang=\"fr\"]",
+        "note": "Settings is reachable here because the tutorial has not started yet — once it has, src/ui/tutorialGuide.ts's rails make every button but the current step's own target inert, including the Settings toggle, so a player cannot switch language mid-tutorial at all. That is why the switch has to happen before tutorial_start, not mid-run."
+      }
+    },
+    {
+      "goal": "close Settings and start the tutorial — the coach card must open already in French, not the English baked in when TutorialOverlay was constructed at page load",
+      "setup": [
+        "tutorial_start"
+      ],
+      "actions": [
+        { "do": "click", "selector": "#bs-toolbar [data-panel=\"settings\"]" }
+      ],
+      "expect": {
+        "tutorialStep": "time-speed",
+        "textEquals": {
+          ".bs-tutorial-box .bs-panel-title": "Vitesse de Jeu",
+          ".bs-tutorial-paused": "HORLOGE EN PAUSE"
+        },
+        "titleEquals": {
+          ".bs-tutorial-paused": "Le temps est en pause jusqu'à cette action — le tutoriel retient l'horloge pour que le site ne prenne pas d'avance sur vous."
+        },
+        "note": "The two CLOCK HELD checks are the actual bug (#492 section 3, bug 1): pausedEl.title and pausedChipEl.textContent are only ever set once, in buildTutorialCard (src/ui/tutorialOverlayDom.ts), at app boot — always in English, since the player cannot have switched locale before the page has loaded. TutorialOverlay.refreshLocale() is a no-op stub and main.ts's language-change handlers do not call it, so these two strings stay English forever once the fix is missing, regardless of when or how often the locale is switched afterward."
+      }
+    },
+    {
+      "goal": "raise the game speed with the speed button — the card must advance to Hire Surveyor, still in French",
+      "actions": [
+        { "do": "click", "selector": "#bs-hud-top .bs-speed-btn" }
+      ],
+      "expect": {
+        "tutorialStep": "hire-surveyor",
+        "textEquals": {
+          ".bs-tutorial-box .bs-panel-title": "Embaucher Prospecteur"
+        },
+        "note": "This step's title/body is read live through t() in TutorialOverlay.render() on every step change, so it was never at risk the way the CLOCK HELD chip was — kept as a locked-in regression check that the live-per-step rendering the rest of the tutorial relies on keeps working in French, not just at step 0."
+      }
+    },
+    {
+      "goal": "open the Crew panel (the hire-surveyor step's own rails target) and confirm a second panel, open alongside the tutorial card, also reads French",
+      "actions": [
+        { "do": "click", "selector": "#bs-toolbar [data-panel=\"employees\"]" }
+      ],
+      "expect": {
+        "usable": "#bs-employee-panel [data-role=\"surveyor\"]",
+        "note": "CrewPanel's own title is registered with its LocaleTextRegistry (unlike EventModal's clockChip), so it already reads French here — this beat only proves a panel opened mid-tutorial does not fight the coach card, which the earlier tutorial-interactive.json scenario already exercises for English; French text content in a second panel is covered directly by the i18n-live-locale-switch.json scenario definition, not duplicated as textEquals here to keep this file focused on beats a real player would take next."
+      }
+    }
+  ]
+}
