@@ -11,7 +11,12 @@
           "command": "new_game seed:42"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -21,7 +26,10 @@
           "command": "campaign start level:dusty_hollow"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "increased": ["worldSizeX"]
+      }
     },
     {
       "command": "time resume",
@@ -46,7 +54,10 @@
           "selector": "#bs-settings-panel"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "usable": "#bs-settings-panel [data-lang=\"fr\"]"
+      }
     },
     {
       "command": "state full",
@@ -57,7 +68,11 @@
           "selector": "#bs-settings-panel [data-lang=\"fr\"]"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "usable": "#bs-settings-panel",
+        "note": "the panel itself must still be usable (not torn down/rebuilt broken) after switching locale in place — the actual French text is verified visually via screenshot, not state, since expect has no text-content field"
+      }
     },
     {
       "command": "state full",
@@ -72,7 +87,11 @@
           "selector": "#bs-build-panel, .bs-build-panel"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "blocked": "#bs-settings-panel [data-lang=\"fr\"]",
+        "note": "toolbar panels are mutually exclusive — opening Build must hide Settings"
+      }
     },
     {
       "command": "event fire union_coffee_uprising",

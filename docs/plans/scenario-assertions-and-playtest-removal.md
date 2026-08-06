@@ -194,8 +194,10 @@ check closed**) · ✅ nav-cell-types-visual (**real command/click mismatch
 found + fixed**) · ✅ nav-minimap-integration-visual (same fix) ·
 ✅ blast-hole-picking-visual · ✅ blast-drill-plan-ui (**Finding #4: real
 spacing-stepper gap found + fixed at the root, ParamStrip.ts**) ·
-✅ blast-drill-plan-visual (same fix) · ⬜ i18n-live-locale-switch ·
-⬜ crew-fleet-panels-visual · ⬜ money-surfaces-visual
+✅ blast-drill-plan-visual (same fix) · ✅ i18n-live-locale-switch ·
+✅ crew-fleet-panels-visual · ✅ money-surfaces-visual
+
+### Batch 1 — ✅ COMPLETE (14 files, see Done list below)
 
 ### Batch 2 — blast-* (25)
 ⬜ blast-basic · ⬜ blast-charge-loading-ui · ⬜ blast-detonation-sequence-ui ·
@@ -374,7 +376,7 @@ _(Add new findings here as you hit them. Number sequentially.)_
 Legend: ⬜ not started · 🔶 in progress · ✅ expect added + unmarked-step
 audit done + both modes verified
 
-### ✅ Done (11)
+### ✅ Done (14) — Batch 1 complete
 - survey-panel-visual (Batch 0 — mechanism pilot)
 - scene-picking-visual (Batch 1 — playtest scene-picking.json parity closed)
 - ambient-life-visual, weather-popover-visual, wind-clouds-visual,
@@ -389,8 +391,24 @@ audit done + both modes verified
   (Batch 1 — Finding #4: the drill grid spacing stepper had no selector at
   all; fixed at the root in `ParamStrip.ts`, both files' grids now reach
   their declared exact spacing before dragging)
+- i18n-live-locale-switch (baseline + `usable`/`blocked` on the locale
+  switch's panel-still-alive and mutual-exclusion checks; no text-content
+  assertion field exists, screenshots remain the real proof of "is it
+  French")
+- crew-fleet-panels-visual (real hiring/purchase costs verified against
+  `HIRING_COSTS`/the actual state dump; the drill_rig cash-guard finding
+  from #479 now has a real `expect.blocked` proof instead of just a
+  documented note)
+- money-surfaces-visual (holeCount/chargedCount/sequencedCount through a
+  full drill→charge→sequence→blast→reset cycle, all against real dumps;
+  `blocked` used for presence-proof on the accepted contract's disabled
+  Deliver row — a deliberate, explained stretch of its usual "must not be
+  reachable" meaning)
 
-112 remaining across Batches 1-7. Parity audits for research-center-gate/
+Batch 1 done: 14/14, 4 findings (2 real production/content bugs fixed —
+#3 command/click grid mismatch, #4 missing stepper selector — plus the 2
+foundational mechanism fixes: state-parity #2, the mechanism itself #1).
+108 remaining across Batches 2-7. Parity audits for research-center-gate/
 training still open; tutorial.json's gap is scoped (2 missing negative-test
 beats + no `expect` blocks yet in tutorial-interactive.json). **Ground rule
 #10 (new): every remaining `drill_plan grid` step in Batches 2-7 needs a
@@ -415,3 +433,26 @@ got, whether main was merged, and whether GitHub Actions is back up yet.
   interaction-mode per-file), per the user's explicit instruction to work
   that way until GitHub recovers. Next: Batch 1 (misc visual, 14 files,
   including the scene-picking-visual parity check).
+- 2026-08-07 — **Batch 1 complete (14 files).** playtest scene-picking.json
+  parity closed (scene-picking-visual.json was building-only; extended with
+  4 employee-picking steps). Two real, previously-invisible bugs found and
+  fixed via the new assertions, not just assertions added: Finding #3
+  (nav-cell-types-visual/nav-minimap-integration-visual's `drill_plan grid`
+  command field never matched what the click actually produced — the
+  panel's spacing state, not the command's declared spacing, decides the
+  real grid) and Finding #4, which generalizes it (the spacing/depth
+  stepper had no selector at all until `ParamStrip.ts` got `data-field`
+  attributes — a root fix, not a per-file workaround). Also fixed a real
+  command/interaction state-parity gap before starting the batch (Finding
+  #2: `serializeGameState` was missing fields `window.__gameState()`
+  already had, silently breaking command-mode assertions on them).
+  **Ground rule #10 added**: every remaining `drill_plan grid` step across
+  Batches 2-7 needs a hand-check against the real panel spacing state — the
+  original #479 interaction-mode pass never compared hole counts, so
+  "it already passed" proves nothing about whether the grid shape was ever
+  right. Full local sweep green after every commit (typecheck, 8284 tests,
+  124/124 command-mode scenarios, each batch's files individually verified
+  in interaction mode with a real browser). GitHub Actions still down this
+  whole session — all verification remains local. Next: Batch 2 (blast-*,
+  25 files) — expect several more Finding-#4-class grid mismatches there,
+  per the note left in that finding.

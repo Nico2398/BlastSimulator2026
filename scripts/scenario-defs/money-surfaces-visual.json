@@ -23,13 +23,19 @@
           "type": "command",
           "command": "new_game seed:42 size:32"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "holeCount": 0
+        }
+      }
     },
     {
       "command": "drill_plan grid origin:5,5 rows:2 cols:2 spacing:3 depth:6",
       "timeout": 60,
       "role": "player",
-      "description": "Split out of the original bundled setup step (issue #479).",
+      "description": "Split out of the original bundled setup step (issue #479). This grid's spacing:3 already matches the placement strip's default (DEFAULT_SPACING_M, Drill.ts) — unlike blast-drill-plan-ui.json/blast-drill-plan-visual.json (Finding #4), no stepper clicks are needed for the click to reach the declared 2x2 pattern.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -54,7 +60,12 @@
           "type": "clickSelector",
           "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "holeCount": 4
+        }
+      }
     },
     {
       "command": "charge hole:* explosive:boomite amount:5kg stemming:2m",
@@ -65,7 +76,12 @@
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "chargedCount": 4
+        }
+      }
     },
     {
       "command": "sequence auto delay_step:25",
@@ -76,7 +92,12 @@
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "sequencedCount": 4
+        }
+      }
     },
     {
       "command": "blast",
@@ -103,7 +124,15 @@
           "type": "clickSelector",
           "selector": "[data-action=\"report-close\"]"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        },
+        "note": "a fired blast clears the plan back to zero; confirmed against the real dump — cash does not change here (charge/blast spend is not reflected in the serialized cash field for this pipeline, unlike a building/vehicle purchase)"
+      }
     },
     {
       "command": "contract accept id:2",
@@ -145,7 +174,11 @@
           "type": "screenshot"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "blocked": "#bs-contract-panel .bs-contract-deliver",
+        "note": "'blocked' here is used for presence, not the usual guard-proof: a Deliver row only renders on an ACCEPTED contract's card (offered cards show Accept/Negotiate/Decline instead), so its presence proves id:2 actually got accepted. It's disabled (confirmed via a real interaction-mode run), since nothing has been hauled to storage yet to deliver — that's why 'blocked' (present, not reachable) is correct here rather than 'usable'."
+      }
     },
     {
       "command": "state",
@@ -168,7 +201,11 @@
           "type": "screenshot"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "blocked": "#bs-contract-panel .bs-contract-deliver",
+        "note": "toolbar panels are mutually exclusive — opening Finances via the TopBar balance click must hide Contracts"
+      }
     },
     {
       "command": "state",
@@ -191,7 +228,11 @@
           "type": "screenshot"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "usable": "#bs-policy-apply",
+        "note": "the Apply control the next step clicks must already be usable once this panel is open"
+      }
     },
     {
       "command": "set_policy mode:shift_12h",

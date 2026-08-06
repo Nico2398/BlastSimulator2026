@@ -23,7 +23,14 @@
           "type": "command",
           "command": "new_game seed:42 size:32"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "employeeCount": 0,
+          "vehicleCount": 0
+        }
+      }
     },
     {
       "command": "employee hire role:driller",
@@ -43,7 +50,14 @@
           "type": "clickSelector",
           "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
-      ]
+      ],
+      "expect": {
+        "increased": ["employeeCount"],
+        "equals": {
+          "cash": 49000
+        },
+        "note": "HIRING_COSTS.driller is 1000 (balance.ts)"
+      }
     },
     {
       "command": "employee hire role:driver",
@@ -58,7 +72,14 @@
           "type": "clickSelector",
           "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
-      ]
+      ],
+      "expect": {
+        "increased": ["employeeCount"],
+        "equals": {
+          "cash": 48200
+        },
+        "note": "HIRING_COSTS.driver is 800 (balance.ts)"
+      }
     },
     {
       "command": "vehicle buy debris_hauler tier:1",
@@ -77,7 +98,14 @@
           "type": "clickSelector",
           "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         }
-      ]
+      ],
+      "expect": {
+        "increased": ["vehicleCount"],
+        "equals": {
+          "cash": 23200
+        },
+        "note": "tier-1 debris_hauler costs 25000 (confirmed against the real state dump, VEHICLE_BASE_STATS pricing is computed, not a flat constant)"
+      }
     },
     {
       "command": "vehicle buy drill_rig tier:1",
@@ -88,7 +116,11 @@
           "command": "vehicle buy drill_rig tier:1"
         }
       ],
-      "description": "BLOCKED FINDING (same as Finding #1 in the plan doc): after buying a debris_hauler, cash is short of a tier-1 drill rig too, so the Fleet panel correctly disables the button. `vehicle buy` doesn't guard affordability in command mode, so it succeeds there. Left as a command deliberately rather than a click that cannot land."
+      "description": "BLOCKED FINDING (same as Finding #1 in the plan doc): after buying a debris_hauler, cash is short of a tier-1 drill rig too, so the Fleet panel correctly disables the button. `vehicle buy` doesn't guard affordability in command mode, so it succeeds there. Left as a command deliberately rather than a click that cannot land.",
+      "expect": {
+        "blocked": "#bs-vehicle-panel [data-vtype=\"drill_rig\"][data-tier=\"1\"]",
+        "note": "proves the disabled-button guard is real (interaction mode only — command mode has no DOM to check), without needing the cash-guard fix itself"
+      }
     },
     {
       "command": "state",
