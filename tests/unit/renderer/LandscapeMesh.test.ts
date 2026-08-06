@@ -448,8 +448,23 @@ describe('LandscapeMesh', () => {
       return { handle, palette, rect };
     }
 
-    /** Height of the emitted vertex nearest the claim edge (largest x still < 16). */
-    function closestUnownedVertexHeight(scene: THREE.Scene): number {
+    /**
+     * Height of the emitted vertex nearest the claim edge (largest x still < 16),
+     * restricted to genuine INTERIOR boundary-quad nodes.
+     *
+     * buildBoundaryQuad's flat-edge rule (see LandscapeMesh.ts) routes every node
+     * on a boundary quad's Z-perimeter (row===0 or row===subdiv, i.e. z a multiple
+     * of coarseStep away from the tile's own origin) through coarse-corner
+     * interpolation ALWAYS — never through boundaryHeightAt — regardless of live
+     * grid state, specifically to avoid T-junction cracks against the neighbouring
+     * unsubdivided coarse quad. Only interior fine nodes (row strictly between 0
+     * and subdiv) are ever routed through boundaryHeightAt. A helper that doesn't
+     * exclude perimeter rows can land on a flat-edge (theoretical-height) vertex
+     * that happens to share the same x as a closer interior one, and its result
+     * would then depend on geometry emission order rather than on whether
+     * boundaryHeightAt is actually honored — so filter to interior rows only.
+     */
+    function closestUnownedVertexHeight(scene: THREE.Scene, originZ: number, coarseStep: number): number {
       let bestX = -Infinity;
       let bestY = NaN;
       for (const child of scene.children) {
@@ -458,6 +473,10 @@ describe('LandscapeMesh', () => {
         if (!pos) continue;
         for (let i = 0; i < pos.length; i += 3) {
           const x = pos[i]!;
+          const z = pos[i + 2]!;
+          const offsetFromOrigin = ((z - originZ) % coarseStep + coarseStep) % coarseStep;
+          const onZPerimeter = Math.abs(offsetFromOrigin) < 1e-6;
+          if (onZPerimeter) continue; // flat-edge rule node — never reflects boundaryHeightAt
           if (x < 16 && x > bestX) { bestX = x; bestY = pos[i + 1]!; }
         }
       }
@@ -471,7 +490,7 @@ describe('LandscapeMesh', () => {
 
       const lm = new LandscapeMesh(scene, makeMaterial());
       lm.build(handle, palette, playable);
-      expect(closestUnownedVertexHeight(scene)).toBeCloseTo(50, 1);
+      expect(closestUnownedVertexHeight(scene, -1000, handle.map.coarseStep)).toBeCloseTo(50, 1);
       lm.dispose();
     });
 
@@ -482,7 +501,7 @@ describe('LandscapeMesh', () => {
 
       const lm = new LandscapeMesh(scene, makeMaterial());
       lm.build(handle, palette, playable);
-      const y = closestUnownedVertexHeight(scene);
+      const y = closestUnownedVertexHeight(scene, -1000, handle.map.coarseStep);
       expect(y).toBeCloseTo(44, 1);
       expect(Math.abs(y - 50)).toBeGreaterThan(2); // must not have fallen back to the theoretical height
       lm.dispose();
