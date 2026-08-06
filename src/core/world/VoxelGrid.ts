@@ -685,3 +685,37 @@ export function computeVoxelColumnSurfaceY(grid: VoxelGrid, x: number, z: number
   }
   return -1;
 }
+
+/**
+ * Continuous height of the topmost solid-to-air crossing at column (x, z),
+ * in the same datum as heightToVoxelYContinuous. Mirrors
+ * computeVoxelColumnSurfaceY's top-down scan and clamp-to-edge-column
+ * behaviour, but returns the fractional crossing height (via densityAt
+ * interpolation between the topmost solid voxel and the one above it),
+ * matching what TerrainMesh's marching cubes actually renders at that
+ * column right now, pre- or post-blast. Returns 0 for a column with no
+ * solid voxel at all.
+ */
+export function computeVoxelColumnSurfaceHeight(grid: VoxelGrid, x: number, z: number): number {
+  if (grid.sizeX <= 0 || grid.sizeZ <= 0) return 0;
+
+  const cx = Math.max(grid.minX, Math.min(grid.maxX - 1, Math.floor(x)));
+  const cz = Math.max(grid.minZ, Math.min(grid.maxZ - 1, Math.floor(z)));
+  for (let y = grid.sizeY - 1; y >= 0; y--) {
+    const density0 = grid.densityAt(cx, y, cz);
+    if (density0 >= 0.5) {
+      // Same crossing interpolation as TerrainMesh's emitVertex: the voxel
+      // above a topmost-solid voxel is air-side (density < 0.5, or 0 past
+      // the grid's own top), and the fractional height along that edge is
+      // where density == 0.5. Matches marching cubes exactly.
+      const density1 = grid.densityAt(cx, y + 1, cz);
+      let t = 0.5;
+      if (Math.abs(density1 - density0) > 1e-6) {
+        t = (0.5 - density0) / (density1 - density0);
+      }
+      t = Math.max(0, Math.min(1, t));
+      return y + t;
+    }
+  }
+  return 0;
+}

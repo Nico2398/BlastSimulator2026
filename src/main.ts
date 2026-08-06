@@ -474,6 +474,7 @@ window.__gameState = () => {
     })() : null,
     // Terrain mesh bounding box from Three.js geometry
     meshBounds: gameRenderer.terrain?.getBounds() ?? null,
+    ambientClockSeconds: gameRenderer.ambientClockSeconds,
   };
 };
 
