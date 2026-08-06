@@ -325,6 +325,62 @@ describe('TerrainMesh', () => {
     });
   });
 
+  describe('adjacent chunks share exact boundary geometry (#491)', () => {
+    it('shares exact position AND normal at the seam between two chunks, for a surface that varies along the seam', () => {
+      // A flat, uniform surface would make any implementation agree trivially.
+      // Varying the surface height by z gives the boundary several distinct
+      // vertices, each a real test that both chunks compute the identical
+      // interpolated crossing from the same shared VoxelGrid data.
+      const scene = makeScene();
+      const grid = new VoxelGrid(32, 16, 16); // 2 chunks along x (16 each), 1 along y/z
+      for (let x = 0; x < 32; x++) {
+        for (let z = 0; z < 16; z++) {
+          const surfaceY = 4 + (z % 5); // varies 4..8 with z
+          for (let y = 0; y < surfaceY; y++) grid.setVoxel(x, y, z, makeSolidVoxel());
+        }
+      }
+      const tm = new TerrainMesh(scene, grid);
+      tm.buildAll();
+
+      const mesh0 = tm.getChunkMesh(0, 0, 0);
+      const mesh1 = tm.getChunkMesh(1, 0, 0);
+      expect(mesh0).not.toBeNull();
+      expect(mesh1).not.toBeNull();
+
+      function boundaryVertices(mesh: THREE.Mesh): Map<string, { position: [number, number, number]; normal: [number, number, number] }> {
+        const pos = mesh.geometry.getAttribute('position').array as Float32Array;
+        const nrm = mesh.geometry.getAttribute('normal').array as Float32Array;
+        const out = new Map<string, { position: [number, number, number]; normal: [number, number, number] }>();
+        for (let i = 0; i < pos.length; i += 3) {
+          if (Math.abs(pos[i]! - 16) < 1e-9) {
+            const key = `${pos[i + 1]!.toFixed(4)},${pos[i + 2]!.toFixed(4)}`;
+            out.set(key, {
+              position: [pos[i]!, pos[i + 1]!, pos[i + 2]!],
+              normal: [nrm[i]!, nrm[i + 1]!, nrm[i + 2]!],
+            });
+          }
+        }
+        return out;
+      }
+
+      const b0 = boundaryVertices(mesh0!);
+      const b1 = boundaryVertices(mesh1!);
+      expect(b0.size).toBeGreaterThan(0);
+
+      for (const [key, v0] of b0) {
+        const v1 = b1.get(key);
+        expect(v1).toBeDefined();
+        expect(v1!.position[0]).toBeCloseTo(v0.position[0], 6);
+        expect(v1!.position[1]).toBeCloseTo(v0.position[1], 6);
+        expect(v1!.position[2]).toBeCloseTo(v0.position[2], 6);
+        expect(v1!.normal[0]).toBeCloseTo(v0.normal[0], 6);
+        expect(v1!.normal[1]).toBeCloseTo(v0.normal[1], 6);
+        expect(v1!.normal[2]).toBeCloseTo(v0.normal[2], 6);
+      }
+      tm.dispose();
+    });
+  });
+
   describe('meshes (P2 — scene picking raycast targets)', () => {
     it('returns every built chunk mesh', () => {
       const scene = makeScene();

@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import type { MiningContext } from '../console/commands/mining.js';
 import { ensureLandscape, type LandscapeHandle } from '../console/commands/world.js';
 import type { GameState } from '../core/state/GameState.js';
-import { type VoxelGrid, computeVoxelColumnSurfaceY } from '../core/world/VoxelGrid.js';
+import { type VoxelGrid, computeVoxelColumnSurfaceY, computeVoxelColumnSurfaceHeight } from '../core/world/VoxelGrid.js';
 import { getBiome } from '../core/world/BiomeCatalog.js';
 import type { WeatherState } from '../core/weather/WeatherCycle.js';
 import { BIOME_GRADES, NEUTRAL_GRADE } from './post/AerialPerspectivePass.js';
@@ -654,6 +654,10 @@ export class GameRenderer {
     return {
       rect: { minX: grid.minX, minZ: grid.minZ, maxX: grid.maxX, maxZ: grid.maxZ },
       ownsColumn: (x, z) => grid.containsColumn(x, z),
+      // Live surface height, so the landscape's claim-boundary ring matches
+      // whatever the playable marching-cubes mesh renders there right now —
+      // before or after a blast — instead of the static WorldGen prediction.
+      boundaryHeightAt: (x, z) => computeVoxelColumnSurfaceHeight(grid, x, z),
     };
   }
 
