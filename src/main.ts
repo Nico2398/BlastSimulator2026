@@ -61,12 +61,16 @@ const selectionBar = new SelectionBar(uiContainer);
 /**
  * How far back the camera sits to frame a guided placement region.
  *
- * Scales with the region so a single tile is not framed from orbit and a
- * 13-tile ramp corridor is not framed half off-screen; the floor keeps the
- * target above the bottom-docked strip and tutorial card either way.
+ * Scales with the region so a 13-tile ramp corridor is not framed half
+ * off-screen. The floor is what matters for a one-tile target: closer than
+ * this, the game's ground-level camera sits low enough that a tile near the
+ * edge of the map is grazed rather than faced by its own camera ray, and the
+ * click lands on no tile at all. It also keeps the target clear of the
+ * bottom-docked strip and the tutorial card.
  */
+const PLACEMENT_FRAMING_MIN_DISTANCE = 40;
 const placementFramingDistance = (region: TileRegion): number =>
-  Math.max(26, regionSpan(region) * 3.5);
+  Math.max(PLACEMENT_FRAMING_MIN_DISTANCE, regionSpan(region) * 3.5);
 
 // --- In-scene placement (redesign P3): the grid-select tool that replaced the 2D tile picker ---
 const placementController = new PlacementController(canvas, scene.camera, gameRenderer, scene.cameraController);

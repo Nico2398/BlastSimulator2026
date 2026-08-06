@@ -103,9 +103,12 @@ const REGION = {
   // resulting holes spilled out of would be telling the player the wrong thing.
   drill: { x1: 20, z1: 20, x2: 30, z2: 30, exact: true },
   // One tile: the warehouse is placed by its origin corner, and the footprint
-  // ghost shows the rest. (4,4) is the tile the playtest has always used and
-  // the level's flat north-west corner.
-  warehouse: { x1: 4, z1: 4, x2: 4, z2: 4, exact: true },
+  // ghost shows the rest. In the level's clear north-west quarter, but pulled
+  // off the map's own corner: at (4,4) the camera ray through that tile's
+  // pixel skims past the edge of the terrain mesh and hits nothing, so the
+  // click resolved to no tile at all. (6,6) picks cleanly at every framing
+  // distance, and leaves room for the footprint to sit on the map.
+  warehouse: { x1: 6, z1: 6, x2: 6, z2: 6, exact: true },
   // The starter cut runs down the west side of where the drill pattern will
   // go, on ground that is still intact — the point of the step is that it is
   // dug *before* anything is blasted, so the first shot has a face to break

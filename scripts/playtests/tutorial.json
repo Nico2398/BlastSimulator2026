@@ -354,9 +354,9 @@
         },
         {
           "do": "pickTile",
-          "x": 4,
-          "z": 4,
-          "note": "On screen because arming the build tool frames the guided region; the beat no longer zooms out for itself."
+          "x": 6,
+          "z": 6,
+          "note": "On screen because arming the build tool frames the guided region. Not the map corner: at (4,4) the ground-level camera ray through that tile grazes the edge of the terrain mesh and hits nothing, so the click resolved to no tile at all."
         },
         {
           "do": "click",
