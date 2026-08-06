@@ -211,12 +211,13 @@ describe('LandscapeMesh', () => {
       return { tile: makeFakeTile(-100, -100, 40, compId), n: 40 };
     }
 
-    it('never emits a vertex more than one coarse step inside the claim (fine subdivision stays within its own boundary quad)', () => {
-      // Under the fixed design a coarse quad classified 'inside' (every corner
-      // owned) is dropped whole, but a 'boundary' quad's fine subdivision keeps
-      // any fine cell with at least one unowned corner — so geometry can still
-      // reach up to one coarse-tile step (4m, the default coarseStep here) past
-      // the claim edge, never further.
+    it('never emits a triangle deeper than one boundary-quad ring inside the playable rect (#491)', () => {
+      // Coarse quads fully inside the rect are dropped outright (classifyQuad
+      // 'inside'). Only the single quad-wide ring straddling the claim edge
+      // (classifyQuad 'boundary') is subdivided by buildBoundaryQuad, and
+      // even there a fine cell survives only with >=1 unowned corner — so no
+      // vertex can sit deeper than one diagonal fine step (FINE_STEP=1m)
+      // inside the rect, unlike the old coarse-only test's strict <= 0.
       const scene = makeScene();
       const { palette, compId } = makePalette();
       const { tile, n } = tileCoveringRect(compId);
@@ -225,14 +226,13 @@ describe('LandscapeMesh', () => {
       const lm = new LandscapeMesh(scene, makeMaterial());
       lm.build(handle, palette);
 
-      const tileMesh = scene.children.find(
-        (c) => (c as THREE.Mesh).geometry?.getAttribute('position')?.count === n * n,
-      ) as THREE.Mesh;
-      expect(tileMesh).toBeDefined();
+      expect(scene.children.length).toBe(1);
+      const tileMesh = scene.children[0] as THREE.Mesh;
 
+      const maxBoundaryReach = Math.SQRT2; // diagonal fine-cell slack
       for (const tri of triangles(tileMesh)) {
         for (const [x, z] of tri) {
-          expect(insideDepth(x, z)).toBeLessThanOrEqual(4 + 1e-6);
+          expect(insideDepth(x, z)).toBeLessThanOrEqual(maxBoundaryReach + 1e-6);
         }
       }
       lm.dispose();
@@ -247,13 +247,16 @@ describe('LandscapeMesh', () => {
       const lm = new LandscapeMesh(scene, makeMaterial());
       lm.build(handle, palette);
 
-      const tileMesh = scene.children.find(
-        (c) => (c as THREE.Mesh).geometry?.getAttribute('position')?.count === n * n,
-      ) as THREE.Mesh;
-      const kept = tileMesh.geometry.getIndex()!.count / 6;
-      const total = (n - 1) * (n - 1);
-      expect(kept).toBeGreaterThan(total * 0.8); // only the pit's few quads are gone
-      expect(kept).toBeLessThan(total);          // but some really are gone
+      const tileMesh = scene.children[0] as THREE.Mesh;
+      const triangleCount = tileMesh.geometry.getIndex()!.count / 3;
+      const fullGridTriangleCount = (n - 1) * (n - 1) * 2;
+      // Ground outside the rect is still there — the tile isn't dropped
+      // wholesale. Total count differs from a naive uncut grid either way:
+      // fully-'inside' quads are dropped outright, while 'boundary' quads
+      // are subdivided into more (smaller) triangles than the one coarse
+      // quad they replace, so the two effects don't net to a simple bound.
+      expect(triangleCount).toBeGreaterThan(0);
+      expect(triangleCount).not.toBe(fullGridTriangleCount);
       lm.dispose();
     });
 
@@ -321,6 +324,117 @@ describe('LandscapeMesh', () => {
         }
       }
       lm.dispose();
+    });
+  });
+
+  // #491: the old two-mesh design (a coarse tile sheet plus a separate,
+  // overlapping fine "seam" mesh dropped OVERLAP_DROP below it) is gone.
+  // Every tile is now the single source of ground at the claim boundary:
+  // classifyQuad + buildBoundaryQuad subdivide only the one quad-wide ring
+  // straddling the edge, in place. These tests cover the invariants the old
+  // seam mesh existed for — no crack at the boundary, and the boundary ring
+  // tracking the live playable surface — against the new design.
+  describe('claim-boundary ring (#491: no overlap, no gap, no crack)', () => {
+    it('never leaves two vertices at the same (x, z) with different heights (no T-junction crack)', () => {
+      // A non-flat field makes any mismatch between the flat-edge-interpolated
+      // boundary ring and its unsubdivided coarse neighbour visible as a
+      // height disagreement at a shared (x, z) — a flat field would hide it
+      // (every scheme agrees on a plane).
+      const scene = makeScene();
+      const { palette, compId } = makePalette();
+      const rect: Rect = { minX: 0, minZ: 0, maxX: 32, maxZ: 32 };
+      const field = (x: number, z: number) => 20 + Math.sin(x * 0.1) * 3 + Math.cos(z * 0.07) * 2;
+      const handle = makeFakeHandle(
+        rect,
+        [makeFakeTile(-100, -100, 40, compId)],
+        40,
+        compId,
+        (x, z) => ({ height: field(x, z), biomeId: 0, surfCompId: compId }),
+      );
+      // makeFakeTile ignores the sample function for its stored heights, so
+      // rebuild the tile's own samples from the same field the boundary ring
+      // reads, or the tile's flat interior would trivially disagree with a
+      // sloped boundary ring at every shared corner.
+      const n = 40;
+      const step = 4;
+      const originX = -100, originZ = -100;
+      const heights = new Float32Array(n * n);
+      for (let row = 0; row < n; row++) {
+        for (let col = 0; col < n; col++) {
+          heights[row * n + col] = field(originX + col * step, originZ + row * step);
+        }
+      }
+      handle.map.tiles[0]!.heights.set(heights);
+
+      const lm = new LandscapeMesh(scene, makeMaterial());
+      lm.build(handle, palette);
+
+      const tileMesh = scene.children[0] as THREE.Mesh;
+      const positions = tileMesh.geometry.getAttribute('position').array as Float32Array;
+
+      const heightAt = new Map<string, number>();
+      for (let i = 0; i < positions.length; i += 3) {
+        const x = positions[i]!, y = positions[i + 1]!, z = positions[i + 2]!;
+        const key = `${x.toFixed(3)},${z.toFixed(3)}`;
+        const existing = heightAt.get(key);
+        if (existing !== undefined) {
+          expect(y).toBeCloseTo(existing, 4);
+        } else {
+          heightAt.set(key, y);
+        }
+      }
+      lm.dispose();
+    });
+
+    it('uses the live boundaryHeightAt (not the theoretical WorldGen height) inside the boundary ring', () => {
+      const scene = makeScene();
+      const { palette, compId } = makePalette();
+      const rect: Rect = { minX: 0, minZ: 0, maxX: 32, maxZ: 32 };
+      const theoreticalH = 50;
+      const liveH = 12; // deliberately far off, so a fallback to the theoretical height is unmistakable
+      const handle = makeFakeHandle(
+        rect, [makeFakeTile(-100, -100, 40, compId)], 40, compId,
+        () => ({ height: theoreticalH, biomeId: 0, surfCompId: compId }),
+      );
+
+      const lm = new LandscapeMesh(scene, makeMaterial());
+      lm.build(handle, palette, {
+        rect,
+        ownsColumn: (x, z) => x > rect.minX && x < rect.maxX && z > rect.minZ && z < rect.maxZ,
+        boundaryHeightAt: () => liveH,
+      });
+
+      const tileMesh = scene.children[0] as THREE.Mesh;
+      const positions = tileMesh.geometry.getAttribute('position').array as Float32Array;
+
+      let sawLiveHeight = false;
+      for (let i = 0; i < positions.length; i += 3) {
+        if (positions[i + 1] === liveH) sawLiveHeight = true;
+      }
+      expect(sawLiveHeight).toBe(true);
+      lm.dispose();
+    });
+
+    it('is deterministic for the same handle, palette, and cut', () => {
+      const { palette, compId } = makePalette();
+      const rect: Rect = { minX: 0, minZ: 0, maxX: 32, maxZ: 32 };
+      const handle = makeFakeHandle(rect, [makeFakeTile(-100, -100, 40, compId)], 40, compId);
+
+      const sceneA = makeScene();
+      const lmA = new LandscapeMesh(sceneA, makeMaterial());
+      lmA.build(handle, palette);
+      const meshA = sceneA.children[0] as THREE.Mesh;
+
+      const sceneB = makeScene();
+      const lmB = new LandscapeMesh(sceneB, makeMaterial());
+      lmB.build(handle, palette);
+      const meshB = sceneB.children[0] as THREE.Mesh;
+
+      expect(Array.from(meshA.geometry.getAttribute('position').array))
+        .toEqual(Array.from(meshB.geometry.getAttribute('position').array));
+
+      lmA.dispose();
+      lmB.dispose();
     });
   });
 
@@ -693,6 +807,35 @@ describe('LandscapeMesh — normals come from the height field, not the triangle
       const nrm = normalAt(mesh, row, col);
       expect(nrm[0]).toBeCloseTo(-dhdx / len, 5);
       expect(nrm[2]).toBeCloseTo(-dhdz / len, 5);
+    }
+    lm.dispose();
+  });
+
+  it('boundary-ring vertices are shaded from the sampled height field too (#491)', () => {
+    // The boundary ring's fine nodes are appended past the tile's own n*n
+    // coarse nodes (buildTileMesh pushes those unconditionally first), so
+    // indices >= n*n identify them without needing to know which quads were
+    // classified 'boundary'.
+    const scene = makeScene();
+    const { palette, compId } = makePalette();
+    const rect: Rect = { minX: 0, minZ: 0, maxX: 32, maxZ: 32 };
+    const n = 40;
+    // A slope steep enough that a wrong normal is unmistakable.
+    const sample = (x: number, z: number) => ({ height: 20 + x * 0.25 - z * 0.1, biomeId: 0, surfCompId: compId });
+    const handle = makeFakeHandle(rect, [makeFakeTile(-100, -100, n, compId)], n, compId, sample);
+
+    const lm = new LandscapeMesh(scene, makeMaterial());
+    lm.build(handle, palette);
+    const tileMesh = scene.children[0] as THREE.Mesh;
+    const normals = tileMesh.geometry.getAttribute('normal').array as Float32Array;
+    const vertexCount = normals.length / 3;
+    expect(vertexCount).toBeGreaterThan(n * n); // boundary ring really did append vertices
+
+    const len = Math.hypot(0.25, 1, -0.1);
+    for (let i = n * n; i < vertexCount; i++) {
+      expect(normals[i * 3]!).toBeCloseTo(-0.25 / len, 3);
+      expect(normals[i * 3 + 1]!).toBeCloseTo(1 / len, 3);
+      expect(normals[i * 3 + 2]!).toBeCloseTo(0.1 / len, 3);
     }
     lm.dispose();
   });

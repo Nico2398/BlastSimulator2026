@@ -1,33 +1,31 @@
-// BlastSimulator2026 — Landscape mesher (#458 T3.2/D7/A16)
+// BlastSimulator2026 — Landscape mesher (#458 T3.2/D7/A16, #491)
 // Builds real ground geometry for LandscapeMap's tiles, replacing
 // DistantScenery's ring of unrelated decorative primitives with continuous
 // terrain that actually meets the playable voxel mesh at its edge.
 //
-// Two kinds of geometry, sharing the same material as the playable terrain:
-//   - One indexed grid Mesh per LandscapeTile, at the map's stored coarse
-//     resolution (4m by default).
-//   - One "seam" Mesh: a fine (1m) band from FINE_MARGIN outside the
-//     playable rect to OVERLAP inside it, sampled directly (the stored
-//     tiles don't have 1m resolution) so silhouette density matches the
-//     voxel mesh right at the junction, with the inside-the-rect portion
-//     lowered by OVERLAP_DROP so it sits safely under the playable mesh —
-//     no gap can open there regardless of voxelization rounding (#458 A16).
-// The deep interior (more than OVERLAP inside the rect) is skipped
-// entirely: that's the playable VoxelGrid's own marching-cubes job.
+// One indexed grid Mesh per LandscapeTile, at the map's stored coarse
+// resolution (4m by default): quads fully outside the playable rect are
+// emitted as-is, quads fully inside it are dropped (the voxel mesh owns that
+// ground), and quads straddling the boundary are subdivided down to
+// FINE_STEP (1m) by buildBoundaryQuad instead of duplicated by a second,
+// overlapping "seam" mesh (#491 — the old two-mesh overlap-and-hide-the-seam
+// design left a ~20m band where the coarse tile's loose corner-in-rect test
+// and the fine seam mesh's own placement could disagree, producing floating
+// or detached ground shards along ridges/slopes). Every boundary quad's
+// outer perimeter interpolates linearly between its PARENT coarse quad's own
+// corner heights (the "flat-edge rule") so it always meets its unsubdivided
+// coarse neighbours with no crack, while interior boundary nodes — and the
+// exact claim edge, via PlayableCut.boundaryHeightAt — read the live surface
+// so a blast never opens a gap before the next rebuild moves the boundary.
 
 import * as THREE from 'three';
 import type { LandscapeHandle } from '../../console/commands/world.js';
 import type { LandscapeTile } from '../../core/world/LandscapeMap.js';
 import type { Rect } from '../../core/world/WorldGen.js';
-import { getDominantRockId, type CompositionPalette } from '../../core/world/VoxelGrid.js';
+import { type CompositionPalette } from '../../core/world/VoxelGrid.js';
 import { rockIndexOf } from '../../core/world/RockCatalog.js';
 
-/** Metres outside the playable rect within which the seam subdivides to FINE_STEP (#458 A16). */
-const FINE_MARGIN = 24;
-/** Metres inside the playable rect the seam mesh still covers. */
-const OVERLAP = 2;
-/** The overlap strip's vertices are lowered by this much so it sits under the playable mesh, never fighting it. */
-const OVERLAP_DROP = 0.15;
+/** Sample spacing of a boundary quad's subdivision, metres — matches the old seam mesh's resolution. */
 const FINE_STEP = 1;
 
 type SampleFn = (x: number, z: number) => { height: number; biomeId: number; surfCompId: number };
@@ -91,28 +89,6 @@ export function voxelSurfaceHeight(continuousHeight: number): number {
 }
 
 /**
- * Seam vertex height.
- *
- * Both meshes now agree on the continuous height, so the seam simply follows
- * it. The strip that overlaps the playable rect is still dropped clear of the
- * mesh that owns that ground, so the two can never z-fight.
- */
-export function seamHeightAt(continuousHeight: number, insideDepth: number): number {
-  const y = voxelSurfaceHeight(continuousHeight);
-  return insideDepth > 0 ? y - OVERLAP_DROP : y;
-}
-
-/**
- * Landscape samples carry one rock (no marching-cubes blend), so both shader
- * rock slots are the same index and the blend weight is 0 — no ore data is
- * tracked in LandscapeMap, so aOre is always "none" (#458 T4.1/A18).
- */
-function rockIndexFor(palette: CompositionPalette, surfCompId: number): number {
-  const comp = palette.get(surfCompId).comp;
-  return Math.max(0, rockIndexOf(getDominantRockId(comp)));
-}
-
-/**
  * The ground the playable mesh owns, which the landscape must not overlap.
  *
  * `rect` is the site's live bounding box, and `ownsColumn` its actual claimed
@@ -138,14 +114,26 @@ function rectCut(rect: Rect): PlayableCut {
 /**
  * Two-rock blend for one sample, replacing rockIndexFor's collapse to a
  * single dominant index. `rockA`/`rockB` are shader rock-catalog indices;
- * `weight` is the blend fraction toward `rockB` (0 = pure rockA).
- *
- * TODO: implement — read the top two coefficients out of the composition
- * at surfCompId instead of only the dominant one.
+ * `weight` is the blend fraction toward `rockB` (0 = pure rockA), matching
+ * TerrainMesh.emitVertex's convention exactly (rockA/rockB/weight feed the
+ * one shared shader, which rounds each to an int per-fragment and blends
+ * their material recipes by vRockW).
  */
-export function rockBlendFor(_palette: CompositionPalette, _surfCompId: number): { rockA: number; rockB: number; weight: number } {
-  // TODO: implement
-  return { rockA: 0, rockB: 0, weight: 0 };
+export function rockBlendFor(palette: CompositionPalette, surfCompId: number): { rockA: number; rockB: number; weight: number } {
+  const rocks = palette.get(surfCompId).comp.rocks;
+  if (rocks.length === 0) return { rockA: 0, rockB: 0, weight: 0 };
+
+  const sorted = [...rocks].sort((a, b) => b.coefficient - a.coefficient);
+  const first = sorted[0]!;
+  const second = sorted[1];
+
+  const rockA = Math.max(0, rockIndexOf(first.rockId));
+  if (!second || second.coefficient <= 0) {
+    return { rockA, rockB: rockA, weight: 0 };
+  }
+  const rockB = Math.max(0, rockIndexOf(second.rockId));
+  const weight = second.coefficient / (first.coefficient + second.coefficient);
+  return { rockA, rockB, weight };
 }
 
 /**
@@ -154,46 +142,143 @@ export function rockBlendFor(_palette: CompositionPalette, _surfCompId: number):
  * as-is), fully inside it (dropped — the voxel mesh owns that ground), or
  * straddling the boundary (needs clipping/subdivision via buildBoundaryQuad
  * instead of being emitted whole).
- *
- * TODO: implement — replace buildTileMesh's current binary
- * drop-if-any-corner-inside test with this three-way classification.
  */
-export function classifyQuad(_playable: PlayableCut, _x0: number, _z0: number, _x1: number, _z1: number): 'outside' | 'inside' | 'boundary' {
-  // TODO: implement
-  return 'outside';
+export function classifyQuad(playable: PlayableCut, x0: number, z0: number, x1: number, z1: number): 'outside' | 'inside' | 'boundary' {
+  const owned = [
+    playable.ownsColumn(x0, z0),
+    playable.ownsColumn(x1, z0),
+    playable.ownsColumn(x0, z1),
+    playable.ownsColumn(x1, z1),
+  ];
+  if (owned.every(o => o)) return 'inside';
+  if (owned.every(o => !o)) return 'outside';
+  return 'boundary';
 }
 
 /**
  * Emits the clipped/subdivided geometry for one boundary quad (a coarse-tile
  * quad classifyQuad marked 'boundary') into the given output arrays, sampled
- * at fine resolution against the live claim edge so it meets the playable
- * mesh with no overlap and no gap.
+ * at fine (FINE_STEP) resolution against the live claim edge so it meets the
+ * playable mesh with no overlap and no gap.
  *
- * TODO: implement — replace the fixed OVERLAP/OVERLAP_DROP seam-mesh
- * strategy for this quad with an exact clip against `playable.ownsColumn`
- * (and `playable.boundaryHeightAt` where available).
+ * Subdivides the one coarse quad into SUBDIV×SUBDIV fine cells and keeps a
+ * cell only if at least one of its 4 corners is unowned — this is what drops
+ * the pit-side ground entirely rather than duplicating it. Every kept cell's
+ * two triangles are appended to the (growable) output arrays the caller's
+ * coarse pass already populated for its own tile.
+ *
+ * Node positions follow the flat-edge rule: a node sitting exactly on the
+ * PARENT coarse quad's own perimeter is placed by linear interpolation
+ * between that side's two coarse corner heights (never the true sampled
+ * height), so the boundary quad's outer edge always matches whatever an
+ * unsubdivided neighbouring coarse quad computes for the same edge — no
+ * T-junction crack is possible. Interior nodes use the live surface height
+ * (`playable.boundaryHeightAt`) when the caller supplies one, falling back to
+ * the theoretical WorldGen height otherwise, so the boundary ring never
+ * drifts from what the playable marching-cubes mesh renders after a blast.
  */
 export function buildBoundaryQuad(
-  _positions: number[],
-  _normals: number[],
-  _rockA: number[],
-  _rockB: number[],
-  _rockWeight: number[],
-  _ore: number[],
-  _indices: number[],
-  _x0: number, _z0: number, _x1: number, _z1: number,
-  _sampleColumn: SampleFn,
-  _palette: CompositionPalette,
-  _playable: PlayableCut,
+  positions: number[],
+  normals: number[],
+  rockA: number[],
+  rockB: number[],
+  rockWeight: number[],
+  ore: number[],
+  indices: number[],
+  x0: number, z0: number, x1: number, z1: number,
+  sampleColumn: SampleFn,
+  palette: CompositionPalette,
+  playable: PlayableCut,
 ): void {
-  // TODO: implement
+  const subdiv = Math.max(1, Math.round((x1 - x0) / FINE_STEP));
+
+  // Parent coarse corner heights, read directly (never boundary-adjusted) —
+  // the flat-edge rule's whole point is to reproduce exactly what an
+  // unsubdivided coarse neighbour would compute for this same edge.
+  const h00 = sampleColumn(x0, z0).height;
+  const h10 = sampleColumn(x1, z0).height;
+  const h01 = sampleColumn(x0, z1).height;
+  const h11 = sampleColumn(x1, z1).height;
+
+  // Slope source for shading: the live/theoretical field, never the
+  // flat-edge-adjusted position (a T-junction fix, not a slope).
+  const heightCache = new Map<string, number>();
+  const trueHeightAt = (x: number, z: number): number => {
+    const key = `${x},${z}`;
+    const cached = heightCache.get(key);
+    if (cached !== undefined) return cached;
+    const h = playable.boundaryHeightAt ? playable.boundaryHeightAt(x, z) : sampleColumn(x, z).height;
+    heightCache.set(key, h);
+    return h;
+  };
+
+  const vertexIndex = new Map<number, number>();
+
+  const emitVertex = (row: number, col: number): number => {
+    const key = row * (subdiv + 1) + col;
+    const existing = vertexIndex.get(key);
+    if (existing !== undefined) return existing;
+
+    const x = x0 + col * FINE_STEP;
+    const z = z0 + row * FINE_STEP;
+    const sample = sampleColumn(x, z);
+
+    const onXEdge = col === 0 || col === subdiv;
+    const onZEdge = row === 0 || row === subdiv;
+
+    let y: number;
+    if (onXEdge && onZEdge) {
+      y = col === 0 ? (row === 0 ? h00 : h01) : (row === 0 ? h10 : h11);
+    } else if (onZEdge) {
+      const t = col / subdiv;
+      y = row === 0 ? h00 + t * (h10 - h00) : h01 + t * (h11 - h01);
+    } else if (onXEdge) {
+      const t = row / subdiv;
+      y = col === 0 ? h00 + t * (h01 - h00) : h10 + t * (h11 - h10);
+    } else {
+      y = playable.boundaryHeightAt ? playable.boundaryHeightAt(x, z) : sample.height;
+    }
+
+    const dhdx = (trueHeightAt(x + FINE_STEP, z) - trueHeightAt(x - FINE_STEP, z)) / (2 * FINE_STEP);
+    const dhdz = (trueHeightAt(x, z + FINE_STEP) - trueHeightAt(x, z - FINE_STEP)) / (2 * FINE_STEP);
+    const normal = heightFieldNormal(dhdx, dhdz);
+
+    const idx = positions.length / 3;
+    positions.push(x, y, z);
+    normals.push(normal[0], normal[1], normal[2]);
+
+    const blend = rockBlendFor(palette, sample.surfCompId);
+    rockA.push(blend.rockA);
+    rockB.push(blend.rockB);
+    rockWeight.push(blend.weight);
+    ore.push(-1, 0); // landscape never carries ore (#458 A18)
+
+    vertexIndex.set(key, idx);
+    return idx;
+  };
+
+  for (let row = 0; row < subdiv; row++) {
+    for (let col = 0; col < subdiv; col++) {
+      const cx0 = x0 + col * FINE_STEP, cx1 = cx0 + FINE_STEP;
+      const cz0 = z0 + row * FINE_STEP, cz1 = cz0 + FINE_STEP;
+      const anyUnowned =
+        !playable.ownsColumn(cx0, cz0) || !playable.ownsColumn(cx1, cz0) ||
+        !playable.ownsColumn(cx0, cz1) || !playable.ownsColumn(cx1, cz1);
+      if (!anyUnowned) continue; // fully claimed — the playable mesh owns this cell
+
+      const i0 = emitVertex(row, col);
+      const i1 = emitVertex(row, col + 1);
+      const i2 = emitVertex(row + 1, col);
+      const i3 = emitVertex(row + 1, col + 1);
+      pushQuad(indices, i0, i1, i2, i3, row + col);
+    }
+  }
 }
 
 export class LandscapeMesh {
   private readonly scene: THREE.Scene;
   private readonly material: THREE.Material;
   private readonly tileMeshes: THREE.Mesh[] = [];
-  private seamMesh: THREE.Mesh | null = null;
   /** Tiles by grid index, so a vertex on a tile's edge can read its neighbour's samples for a slope. */
   private readonly tileIndex = new Map<string, LandscapeTile>();
 
@@ -203,9 +288,9 @@ export class LandscapeMesh {
     this.material = material;
   }
 
-  /** Total mesh count (tiles + seam, if any) — diagnostics and tests. */
+  /** Total mesh count (one per non-empty tile) — diagnostics and tests. */
   get meshCount(): number {
-    return this.tileMeshes.length + (this.seamMesh ? 1 : 0);
+    return this.tileMeshes.length;
   }
 
   /**
@@ -221,16 +306,13 @@ export class LandscapeMesh {
 
     for (const tile of handle.map.tiles) {
       const mesh = this.buildTileMesh(
-        tile, handle.map.coarseStep, handle.map.samplesPerTile, palette, playable,
+        tile, handle.map.coarseStep, handle.map.samplesPerTile, palette, playable, handle.sampleColumn,
       );
       if (mesh) {
         this.scene.add(mesh);
         this.tileMeshes.push(mesh);
       }
     }
-
-    this.seamMesh = this.buildSeamMesh(playable.rect, handle.sampleColumn, palette);
-    if (this.seamMesh) this.scene.add(this.seamMesh);
   }
 
   dispose(): void {
@@ -240,11 +322,6 @@ export class LandscapeMesh {
     }
     this.tileMeshes.length = 0;
     this.tileIndex.clear();
-    if (this.seamMesh) {
-      this.scene.remove(this.seamMesh);
-      this.seamMesh.geometry.dispose();
-      this.seamMesh = null;
-    }
   }
 
   // ---------- Internal ----------
@@ -276,16 +353,17 @@ export class LandscapeMesh {
   /**
    * Indexed grid mesh from one tile's stored samples, smooth-shaded (#458 A16).
    *
-   * Quads reaching into the playable rect are dropped. A tile spans 512 m
-   * while a playable rect is 32–160 m, so every rect sits deep inside its
-   * tiles — without this the coarse 4 m sheet blankets the whole pit at the
-   * pre-dig surface height and hides everything the voxel mesh does beneath
-   * it, craters included. The seam mesh already bridges from FINE_MARGIN
-   * outside the rect to OVERLAP inside it, so cutting the tiles back to the
-   * rect boundary opens no gap.
+   * A tile spans 512 m while a playable rect is 32–160 m, so every rect sits
+   * deep inside its tiles. Each coarse quad is classified against the live
+   * claim boundary (classifyQuad): 'inside' quads are dropped (the voxel mesh
+   * owns that ground), 'outside' quads are emitted whole exactly as before,
+   * and 'boundary' quads — the single quad-wide ring actually straddling the
+   * claim edge — are subdivided by buildBoundaryQuad instead of a second,
+   * overlapping seam mesh (#491).
    */
   private buildTileMesh(
     tile: LandscapeTile, step: number, n: number, palette: CompositionPalette, playable: PlayableCut,
+    sampleColumn: SampleFn,
   ): THREE.Mesh | null {
     if (tile.heights.length === 0) return null;
 
@@ -297,13 +375,18 @@ export class LandscapeMesh {
       tileMaxX > playable.rect.minX && tile.originX < playable.rect.maxX &&
       tileMaxZ > playable.rect.minZ && tile.originZ < playable.rect.maxZ;
 
-    const positions = new Float32Array(n * n * 3);
-    const normals = new Float32Array(n * n * 3);
-    const rockA = new Float32Array(n * n);
-    const rockB = new Float32Array(n * n);
-    const rockWeight = new Float32Array(n * n); // all zero: single-rock samples (#458 A18)
-    const ore = new Float32Array(n * n * 2); // (id, amt) pairs; landscape never carries ore (#458 A18)
-    for (let i = 0; i < n * n; i++) ore[i * 2] = -1; // id = -1 (none); amt stays 0
+    // Growable, not fixed-size: boundary quads append extra fine-grid
+    // vertices past the tile's own n*n coarse nodes.
+    const positions: number[] = [];
+    const normals: number[] = [];
+    const rockA: number[] = [];
+    const rockB: number[] = [];
+    const rockWeight: number[] = [];
+    const ore: number[] = []; // (id, amt) pairs; landscape never carries ore (#458 A18)
+
+    // Coarse nodes are pushed unconditionally, in row-major order, so index
+    // row*n+col stays valid for every 'outside' quad regardless of which
+    // quads elsewhere in the tile turn out to be 'inside'/'boundary'.
     for (let row = 0; row < n; row++) {
       const z = tile.originZ + row * step;
       for (let col = 0; col < n; col++) {
@@ -311,9 +394,7 @@ export class LandscapeMesh {
         const idx = row * n + col;
         const y = tile.heights[idx]!;
 
-        positions[idx * 3] = x;
-        positions[idx * 3 + 1] = y;
-        positions[idx * 3 + 2] = z;
+        positions.push(x, y, z);
 
         // Central differences over the sample spacing, reaching into the
         // neighbouring tile at a tile edge so the slope — and therefore the
@@ -321,13 +402,13 @@ export class LandscapeMesh {
         const dhdx = (this.nodeHeight(tile, row, col + 1, n) - this.nodeHeight(tile, row, col - 1, n)) / (2 * step);
         const dhdz = (this.nodeHeight(tile, row + 1, col, n) - this.nodeHeight(tile, row - 1, col, n)) / (2 * step);
         const normal = heightFieldNormal(dhdx, dhdz);
-        normals[idx * 3] = normal[0];
-        normals[idx * 3 + 1] = normal[1];
-        normals[idx * 3 + 2] = normal[2];
+        normals.push(normal[0], normal[1], normal[2]);
 
-        const rockIdx = rockIndexFor(palette, tile.surfCompIds[idx]!);
-        rockA[idx] = rockIdx;
-        rockB[idx] = rockIdx;
+        const blend = rockBlendFor(palette, tile.surfCompIds[idx]!);
+        rockA.push(blend.rockA);
+        rockB.push(blend.rockB);
+        rockWeight.push(blend.weight);
+        ore.push(-1, 0); // id = -1 (none); amt stays 0
       }
     }
 
@@ -337,123 +418,20 @@ export class LandscapeMesh {
       for (let col = 0; col < n - 1; col++) {
         if (touchesRect) {
           const x0 = tile.originX + col * step, x1 = x0 + step;
-          // Any corner over claimed ground means this quad overhangs what the
-          // voxel mesh owns — drop the whole quad rather than let it dip in.
-          const reachesIntoSite =
-            playable.ownsColumn(x0, z0) || playable.ownsColumn(x1, z0) ||
-            playable.ownsColumn(x0, z1) || playable.ownsColumn(x1, z1);
-          if (reachesIntoSite) continue;
+          const cls = classifyQuad(playable, x0, z0, x1, z1);
+          if (cls === 'inside') continue;
+          if (cls === 'boundary') {
+            buildBoundaryQuad(
+              positions, normals, rockA, rockB, rockWeight, ore, indices,
+              x0, z0, x1, z1, sampleColumn, palette, playable,
+            );
+            continue;
+          }
         }
         const i0 = row * n + col;
         const i1 = i0 + 1;
         const i2 = i0 + n;
         const i3 = i2 + 1;
-        pushQuad(indices, i0, i1, i2, i3, row + col);
-      }
-    }
-    if (indices.length === 0) return null;
-
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    geometry.setAttribute('aRockA', new THREE.BufferAttribute(rockA, 1));
-    geometry.setAttribute('aRockB', new THREE.BufferAttribute(rockB, 1));
-    geometry.setAttribute('aRockWeight', new THREE.BufferAttribute(rockWeight, 1));
-    geometry.setAttribute('aOre', new THREE.BufferAttribute(ore, 2));
-    geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
-    geometry.setIndex(indices);
-    geometry.computeBoundingSphere();
-
-    const mesh = new THREE.Mesh(geometry, this.material);
-    mesh.frustumCulled = true;
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    return mesh;
-  }
-
-  /**
-   * Fine (1m) band from FINE_MARGIN outside the playable rect to OVERLAP
-   * inside it, sampled directly since the stored tiles don't have this
-   * resolution. Quads whose every corner sits more than OVERLAP inside the
-   * rect are skipped — the playable mesh owns that ground.
-   */
-  private buildSeamMesh(rect: Rect, sampleColumn: SampleFn, palette: CompositionPalette): THREE.Mesh | null {
-    const outerMinX = rect.minX - FINE_MARGIN;
-    const outerMinZ = rect.minZ - FINE_MARGIN;
-    const cols = Math.round((rect.maxX + FINE_MARGIN - outerMinX) / FINE_STEP) + 1;
-    const rows = Math.round((rect.maxZ + FINE_MARGIN - outerMinZ) / FINE_STEP) + 1;
-
-    const positions: number[] = [];
-    const normals: number[] = [];
-    const rockA: number[] = [];
-    const rockB: number[] = [];
-    const rockWeight: number[] = [];
-    const ore: number[] = [];
-    const indices: number[] = [];
-    const vertexIndex = new Map<number, number>();
-
-    const worldX = (col: number) => outerMinX + col * FINE_STEP;
-    const worldZ = (row: number) => outerMinZ + row * FINE_STEP;
-
-    // Slopes need the neighbouring nodes' heights, and every node is a
-    // neighbour of four others — sampling each one once and reusing it keeps
-    // this to barely more than one sample per vertex.
-    const heightCache = new Map<number, number>();
-    const heightAtNode = (row: number, col: number): number => {
-      const key = (row + 1) * (cols + 2) + (col + 1);
-      const cached = heightCache.get(key);
-      if (cached !== undefined) return cached;
-      const h = sampleColumn(worldX(col), worldZ(row)).height;
-      heightCache.set(key, h);
-      return h;
-    };
-
-    const emitVertex = (row: number, col: number): number => {
-      const key = row * cols + col;
-      const existing = vertexIndex.get(key);
-      if (existing !== undefined) return existing;
-
-      const x = worldX(col), z = worldZ(row);
-      const sample = sampleColumn(x, z);
-      heightCache.set((row + 1) * (cols + 2) + (col + 1), sample.height);
-      const insideDepth = distanceInsideRect(rect, x, z);
-      const y = seamHeightAt(sample.height, insideDepth);
-
-      // From the sampled height field, not from the dropped seam height: the
-      // OVERLAP_DROP step is a depth-fighting trick, not a slope, and shading
-      // it as one would ring the site with a bright line.
-      const dhdx = (heightAtNode(row, col + 1) - heightAtNode(row, col - 1)) / (2 * FINE_STEP);
-      const dhdz = (heightAtNode(row + 1, col) - heightAtNode(row - 1, col)) / (2 * FINE_STEP);
-      const normal = heightFieldNormal(dhdx, dhdz);
-
-      const idx = positions.length / 3;
-      positions.push(x, y, z);
-      normals.push(normal[0], normal[1], normal[2]);
-      // Single-rock sample: both shader rock slots are the same index, blend
-      // weight 0, no ore data tracked by LandscapeMap (#458 A18).
-      const rockIdx = rockIndexFor(palette, sample.surfCompId);
-      rockA.push(rockIdx);
-      rockB.push(rockIdx);
-      rockWeight.push(0);
-      ore.push(-1, 0);
-      vertexIndex.set(key, idx);
-      return idx;
-    };
-
-    for (let row = 0; row < rows - 1; row++) {
-      const z0 = worldZ(row), z1 = worldZ(row + 1);
-      for (let col = 0; col < cols - 1; col++) {
-        const x0 = worldX(col), x1 = worldX(col + 1);
-        const allDeepInside =
-          distanceInsideRect(rect, x0, z0) > OVERLAP &&
-          distanceInsideRect(rect, x1, z0) > OVERLAP &&
-          distanceInsideRect(rect, x0, z1) > OVERLAP &&
-          distanceInsideRect(rect, x1, z1) > OVERLAP;
-        if (allDeepInside) continue; // playable mesh already covers this ground
-
-        const i0 = emitVertex(row, col);
-        const i1 = emitVertex(row, col + 1);
-        const i2 = emitVertex(row + 1, col);
-        const i3 = emitVertex(row + 1, col + 1);
         pushQuad(indices, i0, i1, i2, i3, row + col);
       }
     }
