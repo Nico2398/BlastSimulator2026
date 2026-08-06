@@ -9,7 +9,8 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -18,7 +19,8 @@
           "type": "command",
           "command": "campaign start level:dusty_hollow"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "time resume",
@@ -27,7 +29,8 @@
           "type": "command",
           "command": "time resume"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "corrupt target:judge cost:5000",
@@ -36,7 +39,8 @@
           "type": "command",
           "command": "corrupt target:judge cost:5000"
         }
-      ]
+      ],
+      "description": "Left unmarked: ShadyPanel.ts's per-target \"Make the Call\" buttons and mafia service buttons carry no data-target/data-action scoping -- only plain text buttons distinguished by locale-dependent label text. Same class as Finding #8 (contract offer rows have no id-scoped selector): no stable selector exists to click a specific target, left as a command."
     },
     {
       "command": "corrupt target:inspector cost:5000",
@@ -45,7 +49,8 @@
           "type": "command",
           "command": "corrupt target:inspector cost:5000"
         }
-      ]
+      ],
+      "description": "Left unmarked: ShadyPanel.ts's per-target \"Make the Call\" buttons and mafia service buttons carry no data-target/data-action scoping -- only plain text buttons distinguished by locale-dependent label text. Same class as Finding #8 (contract offer rows have no id-scoped selector): no stable selector exists to click a specific target, left as a command."
     },
     {
       "command": "corrupt target:union_leader cost:5000",
@@ -54,7 +59,8 @@
           "type": "command",
           "command": "corrupt target:union_leader cost:5000"
         }
-      ]
+      ],
+      "description": "Left unmarked: ShadyPanel.ts's per-target \"Make the Call\" buttons and mafia service buttons carry no data-target/data-action scoping -- only plain text buttons distinguished by locale-dependent label text. Same class as Finding #8 (contract offer rows have no id-scoped selector): no stable selector exists to click a specific target, left as a command."
     },
     {
       "command": "corrupt target:politician cost:5000",
@@ -63,7 +69,8 @@
           "type": "command",
           "command": "corrupt target:politician cost:5000"
         }
-      ]
+      ],
+      "description": "Left unmarked: ShadyPanel.ts's per-target \"Make the Call\" buttons and mafia service buttons carry no data-target/data-action scoping -- only plain text buttons distinguished by locale-dependent label text. Same class as Finding #8 (contract offer rows have no id-scoped selector): no stable selector exists to click a specific target, left as a command."
     },
     {
       "command": "corrupt target:witness cost:5000",
@@ -72,7 +79,8 @@
           "type": "command",
           "command": "corrupt target:witness cost:5000"
         }
-      ]
+      ],
+      "description": "Left unmarked: ShadyPanel.ts's per-target \"Make the Call\" buttons and mafia service buttons carry no data-target/data-action scoping -- only plain text buttons distinguished by locale-dependent label text. Same class as Finding #8 (contract offer rows have no id-scoped selector): no stable selector exists to click a specific target, left as a command."
     },
     {
       "command": "corrupt target:judge cost:10000",
@@ -81,7 +89,8 @@
           "type": "command",
           "command": "corrupt target:judge cost:10000"
         }
-      ]
+      ],
+      "description": "Left unmarked: ShadyPanel.ts's per-target \"Make the Call\" buttons and mafia service buttons carry no data-target/data-action scoping -- only plain text buttons distinguished by locale-dependent label text. Same class as Finding #8 (contract offer rows have no id-scoped selector): no stable selector exists to click a specific target, left as a command."
     },
     {
       "command": "corrupt target:inspector cost:10000",
@@ -90,7 +99,8 @@
           "type": "command",
           "command": "corrupt target:inspector cost:10000"
         }
-      ]
+      ],
+      "description": "Left unmarked: ShadyPanel.ts's per-target \"Make the Call\" buttons and mafia service buttons carry no data-target/data-action scoping -- only plain text buttons distinguished by locale-dependent label text. Same class as Finding #8 (contract offer rows have no id-scoped selector): no stable selector exists to click a specific target, left as a command."
     },
     {
       "command": "corrupt target:union_leader cost:10000",
@@ -99,7 +109,8 @@
           "type": "command",
           "command": "corrupt target:union_leader cost:10000"
         }
-      ]
+      ],
+      "description": "Left unmarked: ShadyPanel.ts's per-target \"Make the Call\" buttons and mafia service buttons carry no data-target/data-action scoping -- only plain text buttons distinguished by locale-dependent label text. Same class as Finding #8 (contract offer rows have no id-scoped selector): no stable selector exists to click a specific target, left as a command."
     },
     {
       "command": "corrupt",
@@ -108,7 +119,8 @@
           "type": "command",
           "command": "corrupt"
         }
-      ]
+      ],
+      "description": "Left unmarked: ShadyPanel.ts's per-target \"Make the Call\" buttons and mafia service buttons carry no data-target/data-action scoping -- only plain text buttons distinguished by locale-dependent label text. Same class as Finding #8 (contract offer rows have no id-scoped selector): no stable selector exists to click a specific target, left as a command."
     },
     {
       "command": "finances",
@@ -117,7 +129,8 @@
           "type": "command",
           "command": "finances"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "mafia status",
@@ -126,7 +139,8 @@
           "type": "command",
           "command": "mafia status"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "employee hire role:driller",
@@ -135,7 +149,8 @@
           "type": "command",
           "command": "employee hire role:driller"
         }
-      ]
+      ],
+      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
     },
     {
       "command": "employee hire role:blaster",
@@ -144,7 +159,8 @@
           "type": "command",
           "command": "employee hire role:blaster"
         }
-      ]
+      ],
+      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
     },
     {
       "command": "mafia smuggle",
@@ -153,7 +169,8 @@
           "type": "command",
           "command": "mafia smuggle"
         }
-      ]
+      ],
+      "description": "Left unmarked: ShadyPanel.ts's per-target \"Make the Call\" buttons and mafia service buttons carry no data-target/data-action scoping -- only plain text buttons distinguished by locale-dependent label text. Same class as Finding #8 (contract offer rows have no id-scoped selector): no stable selector exists to click a specific target, left as a command."
     },
     {
       "command": "tick 10",
@@ -162,7 +179,8 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -171,7 +189,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "tick 10",
@@ -180,7 +199,8 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -189,7 +209,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "tick 10",
@@ -198,7 +219,8 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -207,7 +229,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "mafia status",
@@ -216,7 +239,8 @@
           "type": "command",
           "command": "mafia status"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "finances",
@@ -225,7 +249,8 @@
           "type": "command",
           "command": "finances"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "corrupt target:judge cost:5000",
@@ -234,7 +259,8 @@
           "type": "command",
           "command": "corrupt target:judge cost:5000"
         }
-      ]
+      ],
+      "description": "Left unmarked: ShadyPanel.ts's per-target \"Make the Call\" buttons and mafia service buttons carry no data-target/data-action scoping -- only plain text buttons distinguished by locale-dependent label text. Same class as Finding #8 (contract offer rows have no id-scoped selector): no stable selector exists to click a specific target, left as a command."
     },
     {
       "command": "corrupt target:politician cost:5000",
@@ -243,7 +269,8 @@
           "type": "command",
           "command": "corrupt target:politician cost:5000"
         }
-      ]
+      ],
+      "description": "Left unmarked: ShadyPanel.ts's per-target \"Make the Call\" buttons and mafia service buttons carry no data-target/data-action scoping -- only plain text buttons distinguished by locale-dependent label text. Same class as Finding #8 (contract offer rows have no id-scoped selector): no stable selector exists to click a specific target, left as a command."
     },
     {
       "command": "tick 10",
@@ -252,7 +279,8 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -261,7 +289,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "tick 10",
@@ -270,7 +299,8 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -279,7 +309,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "tick 10",
@@ -288,7 +319,8 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -297,7 +329,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "tick 10",
@@ -306,7 +339,8 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -315,7 +349,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "mafia status",
@@ -324,7 +359,8 @@
           "type": "command",
           "command": "mafia status"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "finances",
@@ -333,7 +369,8 @@
           "type": "command",
           "command": "finances"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "scores",
@@ -342,7 +379,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "stats",
@@ -351,7 +389,8 @@
           "type": "command",
           "command": "stats"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "campaign status",
@@ -360,7 +399,8 @@
           "type": "command",
           "command": "campaign status"
         }
-      ]
+      ],
+      "role": "setup"
     }
   ]
 }

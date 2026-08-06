@@ -9,7 +9,8 @@
           "type": "command",
           "command": "new_game seed:3666"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "campaign start level:treranium_depths",
@@ -18,7 +19,8 @@
           "type": "command",
           "command": "campaign start level:treranium_depths"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "time resume",
@@ -27,7 +29,8 @@
           "type": "command",
           "command": "time resume"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "scores",
@@ -36,7 +39,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "finances",
@@ -45,97 +49,152 @@
           "type": "command",
           "command": "finances"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "employee hire role:surveyor",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:surveyor"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "employee hire role:surveyor",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:surveyor"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driller"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driller"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driller"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "employee hire role:blaster",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:blaster"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "employee hire role:blaster",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:blaster"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "employee hire role:driver",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driver"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "employee hire role:driver",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driver"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "employee hire role:manager",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:manager"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "employee assign_skill 1 geology 5",
@@ -144,7 +203,8 @@
           "type": "command",
           "command": "employee assign_skill 1 geology 5"
         }
-      ]
+      ],
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`."
     },
     {
       "command": "employee assign_skill 2 geology 4",
@@ -153,7 +213,8 @@
           "type": "command",
           "command": "employee assign_skill 2 geology 4"
         }
-      ]
+      ],
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`."
     },
     {
       "command": "employee list",
@@ -162,7 +223,8 @@
           "type": "command",
           "command": "employee list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -171,34 +233,102 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "survey seismic x:25 z:25",
       "interaction": [
         {
-          "type": "command",
-          "command": "survey seismic x:25 z:25"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"survey\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-panel [data-method=\"seismic\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-run"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 25,
+          "z": 25
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "survey core_sample x:25 z:25",
       "interaction": [
         {
-          "type": "command",
-          "command": "survey core_sample x:25 z:25"
+          "type": "clickSelector",
+          "selector": "#bs-survey-panel [data-method=\"core_sample\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-run"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 25,
+          "z": 25
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "survey aerial x:25 z:25",
       "interaction": [
         {
-          "type": "command",
-          "command": "survey aerial x:25 z:25"
+          "type": "clickSelector",
+          "selector": "#bs-survey-panel [data-method=\"aerial\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-run"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 25,
+          "z": 25
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "survey show",
@@ -207,7 +337,8 @@
           "type": "command",
           "command": "survey show"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -216,7 +347,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 8",
@@ -225,7 +357,8 @@
           "type": "command",
           "command": "tick 8"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -234,7 +367,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "tick 8",
@@ -243,7 +377,8 @@
           "type": "command",
           "command": "tick 8"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -252,7 +387,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "tick 8",
@@ -261,7 +397,8 @@
           "type": "command",
           "command": "tick 8"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -270,7 +407,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "tick 8",
@@ -279,7 +417,8 @@
           "type": "command",
           "command": "tick 8"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -288,7 +427,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "survey show",
@@ -297,7 +437,8 @@
           "type": "command",
           "command": "survey show"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -306,7 +447,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "build office at:5,5",
@@ -315,7 +457,8 @@
           "type": "command",
           "command": "build office at:5,5"
         }
-      ]
+      ],
+      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`)."
     },
     {
       "command": "build storage_depot at:10,5",
@@ -324,7 +467,8 @@
           "type": "command",
           "command": "build storage_depot at:10,5"
         }
-      ]
+      ],
+      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`)."
     },
     {
       "command": "build canteen at:5,10",
@@ -333,7 +477,8 @@
           "type": "command",
           "command": "build canteen at:5,10"
         }
-      ]
+      ],
+      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`)."
     },
     {
       "command": "build break_room at:10,10",
@@ -342,7 +487,8 @@
           "type": "command",
           "command": "build break_room at:10,10"
         }
-      ]
+      ],
+      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`)."
     },
     {
       "command": "build medical_bay at:15,5",
@@ -351,7 +497,8 @@
           "type": "command",
           "command": "build medical_bay at:15,5"
         }
-      ]
+      ],
+      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`)."
     },
     {
       "command": "build bunkhouse at:15,10",
@@ -360,7 +507,8 @@
           "type": "command",
           "command": "build bunkhouse at:15,10"
         }
-      ]
+      ],
+      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`)."
     },
     {
       "command": "build list",
@@ -369,7 +517,8 @@
           "type": "command",
           "command": "build list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -378,7 +527,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "vehicle buy rock_digger",
@@ -387,7 +537,8 @@
           "type": "command",
           "command": "vehicle buy rock_digger"
         }
-      ]
+      ],
+      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
     },
     {
       "command": "vehicle buy debris_hauler",
@@ -396,7 +547,8 @@
           "type": "command",
           "command": "vehicle buy debris_hauler"
         }
-      ]
+      ],
+      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
     },
     {
       "command": "vehicle buy drill_rig",
@@ -405,7 +557,8 @@
           "type": "command",
           "command": "vehicle buy drill_rig"
         }
-      ]
+      ],
+      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
     },
     {
       "command": "vehicle buy building_destroyer",
@@ -414,7 +567,8 @@
           "type": "command",
           "command": "vehicle buy building_destroyer"
         }
-      ]
+      ],
+      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
     },
     {
       "command": "vehicle buy debris_hauler",
@@ -423,7 +577,8 @@
           "type": "command",
           "command": "vehicle buy debris_hauler"
         }
-      ]
+      ],
+      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
     },
     {
       "command": "vehicle list",
@@ -432,7 +587,8 @@
           "type": "command",
           "command": "vehicle list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "finances",
@@ -441,16 +597,44 @@
           "type": "command",
           "command": "finances"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "drill_plan grid rows:3 cols:4 spacing:5 depth:10 start:25,25",
       "interaction": [
         {
-          "type": "command",
-          "command": "drill_plan grid rows:3 cols:4 spacing:5 depth:10 start:25,25"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 25,
+          "z1": 25,
+          "x2": 40,
+          "z2": 35
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:3",
@@ -459,25 +643,52 @@
           "type": "command",
           "command": "charge hole:* explosive:boomite amount:5 stemming:3"
         }
-      ]
+      ],
+      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show."
     },
     {
       "command": "sequence auto delay_step:25",
       "interaction": [
         {
-          "type": "command",
-          "command": "sequence auto delay_step:25"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "blast",
       "interaction": [
         {
-          "type": "command",
-          "command": "blast"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"5\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "state full",
@@ -486,7 +697,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "finances",
@@ -495,7 +707,8 @@
           "type": "command",
           "command": "finances"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "scores",
@@ -504,7 +717,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 6",
@@ -513,7 +727,8 @@
           "type": "command",
           "command": "tick 6"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -522,7 +737,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "tick 6",
@@ -531,7 +747,8 @@
           "type": "command",
           "command": "tick 6"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -540,7 +757,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "contract list",
@@ -549,16 +767,26 @@
           "type": "command",
           "command": "contract list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "contract accept 1",
       "interaction": [
         {
-          "type": "command",
-          "command": "contract accept 1"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"contracts\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-contract-panel .bs-contract-accept"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel .bs-contract-accept"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "contract deliver 1 amount:1000",
@@ -567,7 +795,8 @@
           "type": "command",
           "command": "contract deliver 1 amount:1000"
         }
-      ]
+      ],
+      "description": "Left unmarked (legacy): `contract deliver` returns success:false rather than throwing when the amount exceeds stock, and command-mode's runner only fails a step on a thrown exception, so the exact deliverable amount here is not independently verified. Same class as Finding #2."
     },
     {
       "command": "finances",
@@ -576,16 +805,44 @@
           "type": "command",
           "command": "finances"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "drill_plan grid rows:4 cols:4 spacing:5 depth:12 start:30,20",
       "interaction": [
         {
-          "type": "command",
-          "command": "drill_plan grid rows:4 cols:4 spacing:5 depth:12 start:30,20"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 30,
+          "z1": 20,
+          "x2": 45,
+          "z2": 35
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "charge hole:* explosive:krackle amount:5 stemming:3",
@@ -594,7 +851,8 @@
           "type": "command",
           "command": "charge hole:* explosive:krackle amount:5 stemming:3"
         }
-      ]
+      ],
+      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show."
     },
     {
       "command": "sequence auto delay_step:20",
@@ -603,16 +861,38 @@
           "type": "command",
           "command": "sequence auto delay_step:20"
         }
-      ]
+      ],
+      "description": "Left unmarked: this delay_step doesn't match the Sequence panel's default (25ms), and the stepper that changes it has never been click-tested in this conversion (Batch 6's safety-projection-visual note) -- left as a command rather than guessing at an unproven selector."
     },
     {
       "command": "blast",
       "interaction": [
         {
-          "type": "command",
-          "command": "blast"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"5\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "state full",
@@ -621,7 +901,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "finances",
@@ -630,7 +911,8 @@
           "type": "command",
           "command": "finances"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "scores",
@@ -639,7 +921,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 6",
@@ -648,7 +931,8 @@
           "type": "command",
           "command": "tick 6"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -657,7 +941,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "tick 6",
@@ -666,7 +951,8 @@
           "type": "command",
           "command": "tick 6"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -675,7 +961,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "contract list",
@@ -684,16 +971,26 @@
           "type": "command",
           "command": "contract list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "contract accept 2",
       "interaction": [
         {
-          "type": "command",
-          "command": "contract accept 2"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"contracts\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-contract-panel .bs-contract-accept"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel .bs-contract-accept"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "contract deliver 2 amount:1500",
@@ -702,7 +999,8 @@
           "type": "command",
           "command": "contract deliver 2 amount:1500"
         }
-      ]
+      ],
+      "description": "Left unmarked (legacy): `contract deliver` returns success:false rather than throwing when the amount exceeds stock, and command-mode's runner only fails a step on a thrown exception, so the exact deliverable amount here is not independently verified. Same class as Finding #2."
     },
     {
       "command": "contract status",
@@ -711,16 +1009,44 @@
           "type": "command",
           "command": "contract status"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "drill_plan grid rows:4 cols:5 spacing:4 depth:14 start:20,30",
       "interaction": [
         {
-          "type": "command",
-          "command": "drill_plan grid rows:4 cols:5 spacing:4 depth:14 start:20,30"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 20,
+          "z1": 30,
+          "x2": 36,
+          "z2": 42
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "charge hole:* explosive:shatternite amount:6 stemming:3",
@@ -729,7 +1055,8 @@
           "type": "command",
           "command": "charge hole:* explosive:shatternite amount:6 stemming:3"
         }
-      ]
+      ],
+      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show."
     },
     {
       "command": "sequence auto delay_step:20",
@@ -738,16 +1065,38 @@
           "type": "command",
           "command": "sequence auto delay_step:20"
         }
-      ]
+      ],
+      "description": "Left unmarked: this delay_step doesn't match the Sequence panel's default (25ms), and the stepper that changes it has never been click-tested in this conversion (Batch 6's safety-projection-visual note) -- left as a command rather than guessing at an unproven selector."
     },
     {
       "command": "blast",
       "interaction": [
         {
-          "type": "command",
-          "command": "blast"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"5\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "state full",
@@ -756,7 +1105,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "finances",
@@ -765,7 +1115,8 @@
           "type": "command",
           "command": "finances"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "scores",
@@ -774,7 +1125,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 6",
@@ -783,7 +1135,8 @@
           "type": "command",
           "command": "tick 6"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -792,7 +1145,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "tick 6",
@@ -801,7 +1155,8 @@
           "type": "command",
           "command": "tick 6"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -810,7 +1165,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "contract list",
@@ -819,16 +1175,26 @@
           "type": "command",
           "command": "contract list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "contract accept 3",
       "interaction": [
         {
-          "type": "command",
-          "command": "contract accept 3"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"contracts\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-contract-panel .bs-contract-accept"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel .bs-contract-accept"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "contract deliver 3 amount:2000",
@@ -837,7 +1203,8 @@
           "type": "command",
           "command": "contract deliver 3 amount:2000"
         }
-      ]
+      ],
+      "description": "Left unmarked (legacy): `contract deliver` returns success:false rather than throwing when the amount exceeds stock, and command-mode's runner only fails a step on a thrown exception, so the exact deliverable amount here is not independently verified. Same class as Finding #2."
     },
     {
       "command": "finances",
@@ -846,16 +1213,44 @@
           "type": "command",
           "command": "finances"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "drill_plan grid rows:5 cols:4 spacing:4 depth:14 start:30,30",
       "interaction": [
         {
-          "type": "command",
-          "command": "drill_plan grid rows:5 cols:4 spacing:4 depth:14 start:30,30"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 30,
+          "z1": 30,
+          "x2": 42,
+          "z2": 46
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "charge hole:* explosive:obliviax amount:5 stemming:4",
@@ -864,7 +1259,8 @@
           "type": "command",
           "command": "charge hole:* explosive:obliviax amount:5 stemming:4"
         }
-      ]
+      ],
+      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show."
     },
     {
       "command": "sequence auto delay_step:20",
@@ -873,16 +1269,38 @@
           "type": "command",
           "command": "sequence auto delay_step:20"
         }
-      ]
+      ],
+      "description": "Left unmarked: this delay_step doesn't match the Sequence panel's default (25ms), and the stepper that changes it has never been click-tested in this conversion (Batch 6's safety-projection-visual note) -- left as a command rather than guessing at an unproven selector."
     },
     {
       "command": "blast",
       "interaction": [
         {
-          "type": "command",
-          "command": "blast"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"5\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "state full",
@@ -891,7 +1309,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "finances",
@@ -900,7 +1319,8 @@
           "type": "command",
           "command": "finances"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "scores",
@@ -909,7 +1329,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 6",
@@ -918,7 +1339,8 @@
           "type": "command",
           "command": "tick 6"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -927,7 +1349,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "tick 6",
@@ -936,7 +1359,8 @@
           "type": "command",
           "command": "tick 6"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -945,7 +1369,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "contract list",
@@ -954,16 +1379,26 @@
           "type": "command",
           "command": "contract list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "contract accept 4",
       "interaction": [
         {
-          "type": "command",
-          "command": "contract accept 4"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"contracts\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-contract-panel .bs-contract-accept"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel .bs-contract-accept"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "contract deliver 4 amount:2500",
@@ -972,7 +1407,8 @@
           "type": "command",
           "command": "contract deliver 4 amount:2500"
         }
-      ]
+      ],
+      "description": "Left unmarked (legacy): `contract deliver` returns success:false rather than throwing when the amount exceeds stock, and command-mode's runner only fails a step on a thrown exception, so the exact deliverable amount here is not independently verified. Same class as Finding #2."
     },
     {
       "command": "finances",
@@ -981,16 +1417,44 @@
           "type": "command",
           "command": "finances"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "drill_plan grid rows:5 cols:5 spacing:5 depth:16 start:15,30",
       "interaction": [
         {
-          "type": "command",
-          "command": "drill_plan grid rows:5 cols:5 spacing:5 depth:16 start:15,30"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 15,
+          "z1": 30,
+          "x2": 35,
+          "z2": 50
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "charge hole:* explosive:dynatomics amount:6 stemming:4",
@@ -999,7 +1463,8 @@
           "type": "command",
           "command": "charge hole:* explosive:dynatomics amount:6 stemming:4"
         }
-      ]
+      ],
+      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show."
     },
     {
       "command": "sequence auto delay_step:20",
@@ -1008,16 +1473,38 @@
           "type": "command",
           "command": "sequence auto delay_step:20"
         }
-      ]
+      ],
+      "description": "Left unmarked: this delay_step doesn't match the Sequence panel's default (25ms), and the stepper that changes it has never been click-tested in this conversion (Batch 6's safety-projection-visual note) -- left as a command rather than guessing at an unproven selector."
     },
     {
       "command": "blast",
       "interaction": [
         {
-          "type": "command",
-          "command": "blast"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"5\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "state full",
@@ -1026,7 +1513,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "finances",
@@ -1035,7 +1523,8 @@
           "type": "command",
           "command": "finances"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "scores",
@@ -1044,7 +1533,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 6",
@@ -1053,7 +1543,8 @@
           "type": "command",
           "command": "tick 6"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -1062,7 +1553,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "tick 6",
@@ -1071,7 +1563,8 @@
           "type": "command",
           "command": "tick 6"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -1080,7 +1573,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "contract list",
@@ -1089,16 +1583,26 @@
           "type": "command",
           "command": "contract list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "contract accept 5",
       "interaction": [
         {
-          "type": "command",
-          "command": "contract accept 5"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"contracts\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-contract-panel .bs-contract-accept"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel .bs-contract-accept"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "contract deliver 5 amount:3000",
@@ -1107,7 +1611,8 @@
           "type": "command",
           "command": "contract deliver 5 amount:3000"
         }
-      ]
+      ],
+      "description": "Left unmarked (legacy): `contract deliver` returns success:false rather than throwing when the amount exceeds stock, and command-mode's runner only fails a step on a thrown exception, so the exact deliverable amount here is not independently verified. Same class as Finding #2."
     },
     {
       "command": "finances",
@@ -1116,7 +1621,8 @@
           "type": "command",
           "command": "finances"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "scores",
@@ -1125,7 +1631,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "stats",
@@ -1134,7 +1641,8 @@
           "type": "command",
           "command": "stats"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "campaign status",
@@ -1143,7 +1651,8 @@
           "type": "command",
           "command": "campaign status"
         }
-      ]
+      ],
+      "role": "setup"
     }
   ]
 }

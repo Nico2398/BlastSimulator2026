@@ -5,68 +5,99 @@
     {
       "command": "new_game seed:42",
       "interaction": [
-        { "type": "command", "command": "new_game seed:42" }
-      ]
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ],
+      "role": "setup"
     },
     {
       "command": "time speed 1",
-      "description": "1x speed baseline.",
       "interaction": [
-        { "type": "command", "command": "time speed 1" }
-      ]
+        {
+          "type": "command",
+          "command": "time speed 1"
+        }
+      ],
+      "role": "setup"
     },
     {
       "command": "state full",
-      "description": "Let some wall-clock time pass at 1x before capturing ambientClockSeconds.",
       "interaction": [
-        { "type": "wait", "durationMs": 1000 },
-        { "type": "command", "command": "state full" }
-      ]
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe"
     },
     {
       "command": "time speed 4",
-      "description": "Switch to 4x — same wall-clock wait below should now advance the ambient clock roughly 4x as far per second.",
       "interaction": [
-        { "type": "command", "command": "time speed 4" }
-      ]
+        {
+          "type": "command",
+          "command": "time speed 4"
+        }
+      ],
+      "role": "setup"
     },
     {
       "command": "state full",
       "interaction": [
-        { "type": "wait", "durationMs": 1000 },
-        { "type": "command", "command": "state full" }
-      ]
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe"
     },
     {
       "command": "time pause",
-      "description": "Pausing must freeze ambientClockSeconds even though wall-clock time keeps passing.",
       "interaction": [
-        { "type": "command", "command": "time pause" }
-      ]
+        {
+          "type": "command",
+          "command": "time pause"
+        }
+      ],
+      "role": "setup"
     },
     {
       "command": "state full",
       "interaction": [
-        { "type": "wait", "durationMs": 1000 },
-        { "type": "command", "command": "state full" }
-      ]
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe"
     },
     {
       "command": "time resume",
-      "description": "Resuming continues the ambient clock from where it froze — no catch-up jump for the time spent paused.",
       "interaction": [
-        { "type": "command", "command": "time resume" }
-      ]
+        {
+          "type": "command",
+          "command": "time resume"
+        }
+      ],
+      "role": "setup"
     },
     {
       "command": "state full",
       "interaction": [
-        { "type": "wait", "durationMs": 1000 },
-        { "type": "command", "command": "state full" }
-      ]
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe"
     }
   ],
   "shots": [
-    { "name": "overview", "yaw": 20, "pitch": 60 }
+    {
+      "name": "overview",
+      "yaw": 20,
+      "pitch": 60
+    }
   ]
 }

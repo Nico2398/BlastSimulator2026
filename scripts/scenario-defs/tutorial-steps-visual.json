@@ -22,62 +22,62 @@
     {
       "command": "new_game seed:42",
       "timeout": 15,
-      "description": "Setup: create game with seed 42 (24x12x24 tutorial_pit)",
       "interaction": [
         {
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "campaign start level:tutorial_pit",
       "timeout": 15,
-      "description": "Setup: start tutorial pit level with $20,000 starting cash",
       "interaction": [
         {
           "type": "command",
           "command": "campaign start level:tutorial_pit"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "tutorial_start",
       "timeout": 30,
-      "description": "Step 0: Start tutorial overlay — time-speed guidance displayed with highlight on #bs-hud-top .bs-speed-btn",
       "interaction": [
         {
           "type": "command",
           "command": "tutorial_start"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "time speed 2",
       "timeout": 15,
-      "description": "Step 0 complete: increase time speed (positional form actually applies the change) → overlay advances to step 1 (hire-surveyor)",
       "interaction": [
         {
           "type": "command",
           "command": "time speed 2"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "employee hire role:surveyor",
       "timeout": 15,
-      "description": "Step 1 complete: hire surveyor employee → overlay advances to step 2 (survey)",
       "interaction": [
         {
           "type": "command",
           "command": "employee hire role:surveyor"
         }
-      ]
+      ],
+      "description": "Left unmarked: `tutorial_start` (step 2) arms the tutorial's own rails (tutorialStages.ts) -- off-target controls go inert until the tutorial's current stage points at them (scenario-defs.md: \"a scenario that clicks what the current step does not allow is asserting something no player could do\"). The first interaction-mode run confirmed this: `survey`'s tile-select confirm was inert, \"blocking\" per the tutorial rail, not a missing selector. Reaching each control for real needs the same `waitForTutorialStep` gating tutorial-interactive.json uses between every click, keyed to this file's own stage sequence -- not yet mapped out, left as commands rather than guess at stage ids and risk a false pass. A real conversion of this file is future work, matching tutorial-interactive."
     },
     {
       "command": "employee assign_skill 1 skill:geology level:3",
       "timeout": 15,
-      "description": "Assign geology skill to surveyor for seismic survey",
+      "description": "Left unmarked: `tutorial_start` (step 2) arms the tutorial's own rails (tutorialStages.ts) -- off-target controls go inert until the tutorial's current stage points at them (scenario-defs.md: \"a scenario that clicks what the current step does not allow is asserting something no player could do\"). The first interaction-mode run confirmed this: `survey`'s tile-select confirm was inert, \"blocking\" per the tutorial rail, not a missing selector. Reaching each control for real needs the same `waitForTutorialStep` gating tutorial-interactive.json uses between every click, keyed to this file's own stage sequence -- not yet mapped out, left as commands rather than guess at stage ids and risk a false pass. A real conversion of this file is future work, matching tutorial-interactive.",
       "interaction": [
         {
           "type": "command",
@@ -88,73 +88,73 @@
     {
       "command": "survey seismic x:15 z:15",
       "timeout": 30,
-      "description": "Step 2: queue seismic survey (async — resolves over ticks, not on command return)",
       "interaction": [
         {
           "type": "command",
           "command": "survey seismic x:15 z:15"
         }
-      ]
+      ],
+      "description": "Left unmarked: `tutorial_start` (step 2) arms the tutorial's own rails (tutorialStages.ts) -- off-target controls go inert until the tutorial's current stage points at them (scenario-defs.md: \"a scenario that clicks what the current step does not allow is asserting something no player could do\"). The first interaction-mode run confirmed this: `survey`'s tile-select confirm was inert, \"blocking\" per the tutorial rail, not a missing selector. Reaching each control for real needs the same `waitForTutorialStep` gating tutorial-interactive.json uses between every click, keyed to this file's own stage sequence -- not yet mapped out, left as commands rather than guess at stage ids and risk a false pass. A real conversion of this file is future work, matching tutorial-interactive."
     },
     {
       "command": "tick 10",
       "timeout": 30,
-      "description": "Let queued survey work run (1/4) — matches WORK_GRACE_TICKS so the overlay resolves the survey before later commands race ahead of it",
       "interaction": [
         {
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "description": "Left unmarked: `tutorial_start` (step 2) arms the tutorial's own rails (tutorialStages.ts) -- off-target controls go inert until the tutorial's current stage points at them (scenario-defs.md: \"a scenario that clicks what the current step does not allow is asserting something no player could do\"). The first interaction-mode run confirmed this: `survey`'s tile-select confirm was inert, \"blocking\" per the tutorial rail, not a missing selector. Reaching each control for real needs the same `waitForTutorialStep` gating tutorial-interactive.json uses between every click, keyed to this file's own stage sequence -- not yet mapped out, left as commands rather than guess at stage ids and risk a false pass. A real conversion of this file is future work, matching tutorial-interactive."
     },
     {
       "command": "tick 10",
       "timeout": 30,
-      "description": "Let queued survey work run (2/4)",
       "interaction": [
         {
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "description": "Left unmarked: `tutorial_start` (step 2) arms the tutorial's own rails (tutorialStages.ts) -- off-target controls go inert until the tutorial's current stage points at them (scenario-defs.md: \"a scenario that clicks what the current step does not allow is asserting something no player could do\"). The first interaction-mode run confirmed this: `survey`'s tile-select confirm was inert, \"blocking\" per the tutorial rail, not a missing selector. Reaching each control for real needs the same `waitForTutorialStep` gating tutorial-interactive.json uses between every click, keyed to this file's own stage sequence -- not yet mapped out, left as commands rather than guess at stage ids and risk a false pass. A real conversion of this file is future work, matching tutorial-interactive."
     },
     {
       "command": "tick 10",
       "timeout": 30,
-      "description": "Let queued survey work run (3/4)",
       "interaction": [
         {
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "description": "Left unmarked: `tutorial_start` (step 2) arms the tutorial's own rails (tutorialStages.ts) -- off-target controls go inert until the tutorial's current stage points at them (scenario-defs.md: \"a scenario that clicks what the current step does not allow is asserting something no player could do\"). The first interaction-mode run confirmed this: `survey`'s tile-select confirm was inert, \"blocking\" per the tutorial rail, not a missing selector. Reaching each control for real needs the same `waitForTutorialStep` gating tutorial-interactive.json uses between every click, keyed to this file's own stage sequence -- not yet mapped out, left as commands rather than guess at stage ids and risk a false pass. A real conversion of this file is future work, matching tutorial-interactive."
     },
     {
       "command": "tick 10",
       "timeout": 30,
-      "description": "Let queued survey work run (4/4): survey resolves → overlay advances to step 3 (hire-driller)",
       "interaction": [
         {
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "description": "Left unmarked: `tutorial_start` (step 2) arms the tutorial's own rails (tutorialStages.ts) -- off-target controls go inert until the tutorial's current stage points at them (scenario-defs.md: \"a scenario that clicks what the current step does not allow is asserting something no player could do\"). The first interaction-mode run confirmed this: `survey`'s tile-select confirm was inert, \"blocking\" per the tutorial rail, not a missing selector. Reaching each control for real needs the same `waitForTutorialStep` gating tutorial-interactive.json uses between every click, keyed to this file's own stage sequence -- not yet mapped out, left as commands rather than guess at stage ids and risk a false pass. A real conversion of this file is future work, matching tutorial-interactive."
     },
     {
       "command": "employee hire role:driller",
       "timeout": 15,
-      "description": "Step 3 complete: hire driller → overlay advances to step 4 (drill-plan)",
       "interaction": [
         {
           "type": "command",
           "command": "employee hire role:driller"
         }
-      ]
+      ],
+      "description": "Left unmarked: `tutorial_start` (step 2) arms the tutorial's own rails (tutorialStages.ts) -- off-target controls go inert until the tutorial's current stage points at them (scenario-defs.md: \"a scenario that clicks what the current step does not allow is asserting something no player could do\"). The first interaction-mode run confirmed this: `survey`'s tile-select confirm was inert, \"blocking\" per the tutorial rail, not a missing selector. Reaching each control for real needs the same `waitForTutorialStep` gating tutorial-interactive.json uses between every click, keyed to this file's own stage sequence -- not yet mapped out, left as commands rather than guess at stage ids and risk a false pass. A real conversion of this file is future work, matching tutorial-interactive."
     },
     {
       "command": "employee assign_skill 2 skill:blasting level:3",
       "timeout": 15,
-      "description": "Assign blasting skill to driller for drill plan",
+      "description": "Left unmarked: `tutorial_start` (step 2) arms the tutorial's own rails (tutorialStages.ts) -- off-target controls go inert until the tutorial's current stage points at them (scenario-defs.md: \"a scenario that clicks what the current step does not allow is asserting something no player could do\"). The first interaction-mode run confirmed this: `survey`'s tile-select confirm was inert, \"blocking\" per the tutorial rail, not a missing selector. Reaching each control for real needs the same `waitForTutorialStep` gating tutorial-interactive.json uses between every click, keyed to this file's own stage sequence -- not yet mapped out, left as commands rather than guess at stage ids and risk a false pass. A real conversion of this file is future work, matching tutorial-interactive.",
       "interaction": [
         {
           "type": "command",
@@ -165,73 +165,73 @@
     {
       "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:15,15",
       "timeout": 15,
-      "description": "Step 4 complete: create drill plan → overlay advances to step 5 (charge)",
       "interaction": [
         {
           "type": "command",
           "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:15,15"
         }
-      ]
+      ],
+      "description": "Left unmarked: `tutorial_start` (step 2) arms the tutorial's own rails (tutorialStages.ts) -- off-target controls go inert until the tutorial's current stage points at them (scenario-defs.md: \"a scenario that clicks what the current step does not allow is asserting something no player could do\"). The first interaction-mode run confirmed this: `survey`'s tile-select confirm was inert, \"blocking\" per the tutorial rail, not a missing selector. Reaching each control for real needs the same `waitForTutorialStep` gating tutorial-interactive.json uses between every click, keyed to this file's own stage sequence -- not yet mapped out, left as commands rather than guess at stage ids and risk a false pass. A real conversion of this file is future work, matching tutorial-interactive."
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
       "timeout": 15,
-      "description": "Step 5 complete: set charges on all holes → overlay advances to step 6 (sequence)",
       "interaction": [
         {
           "type": "command",
           "command": "charge hole:* explosive:boomite amount:5 stemming:2"
         }
-      ]
+      ],
+      "description": "Left unmarked: `tutorial_start` (step 2) arms the tutorial's own rails (tutorialStages.ts) -- off-target controls go inert until the tutorial's current stage points at them (scenario-defs.md: \"a scenario that clicks what the current step does not allow is asserting something no player could do\"). The first interaction-mode run confirmed this: `survey`'s tile-select confirm was inert, \"blocking\" per the tutorial rail, not a missing selector. Reaching each control for real needs the same `waitForTutorialStep` gating tutorial-interactive.json uses between every click, keyed to this file's own stage sequence -- not yet mapped out, left as commands rather than guess at stage ids and risk a false pass. A real conversion of this file is future work, matching tutorial-interactive."
     },
     {
       "command": "sequence auto delay_step:25",
       "timeout": 15,
-      "description": "Step 6 complete: auto-sequence delays → overlay advances to step 7 (blast)",
       "interaction": [
         {
           "type": "command",
           "command": "sequence auto delay_step:25"
         }
-      ]
+      ],
+      "description": "Left unmarked: `tutorial_start` (step 2) arms the tutorial's own rails (tutorialStages.ts) -- off-target controls go inert until the tutorial's current stage points at them (scenario-defs.md: \"a scenario that clicks what the current step does not allow is asserting something no player could do\"). The first interaction-mode run confirmed this: `survey`'s tile-select confirm was inert, \"blocking\" per the tutorial rail, not a missing selector. Reaching each control for real needs the same `waitForTutorialStep` gating tutorial-interactive.json uses between every click, keyed to this file's own stage sequence -- not yet mapped out, left as commands rather than guess at stage ids and risk a false pass. A real conversion of this file is future work, matching tutorial-interactive."
     },
     {
       "command": "blast",
       "timeout": 30,
-      "description": "Step 7 complete: execute blast → overlay advances to step 8 (scores). Screenshot captures blast crater + fragments",
       "interaction": [
         {
           "type": "command",
           "command": "blast"
         }
-      ]
+      ],
+      "description": "Left unmarked: `tutorial_start` (step 2) arms the tutorial's own rails (tutorialStages.ts) -- off-target controls go inert until the tutorial's current stage points at them (scenario-defs.md: \"a scenario that clicks what the current step does not allow is asserting something no player could do\"). The first interaction-mode run confirmed this: `survey`'s tile-select confirm was inert, \"blocking\" per the tutorial rail, not a missing selector. Reaching each control for real needs the same `waitForTutorialStep` gating tutorial-interactive.json uses between every click, keyed to this file's own stage sequence -- not yet mapped out, left as commands rather than guess at stage ids and risk a false pass. A real conversion of this file is future work, matching tutorial-interactive."
     },
     {
       "command": "scores",
       "timeout": 15,
-      "description": "Step 8: view scores overlay → auto-advances after 2s to step 9 (event-fire-resolve). Screenshot captures scores display",
       "interaction": [
         {
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "description": "Left unmarked: `tutorial_start` (step 2) arms the tutorial's own rails (tutorialStages.ts) -- off-target controls go inert until the tutorial's current stage points at them (scenario-defs.md: \"a scenario that clicks what the current step does not allow is asserting something no player could do\"). The first interaction-mode run confirmed this: `survey`'s tile-select confirm was inert, \"blocking\" per the tutorial rail, not a missing selector. Reaching each control for real needs the same `waitForTutorialStep` gating tutorial-interactive.json uses between every click, keyed to this file's own stage sequence -- not yet mapped out, left as commands rather than guess at stage ids and risk a false pass. A real conversion of this file is future work, matching tutorial-interactive."
     },
     {
       "command": "tick 1",
       "timeout": 30,
-      "description": "Step 9: advance time to fire tutorial_synergy_consultant event. Overlay fires event, pending event dialog appears",
       "interaction": [
         {
           "type": "command",
           "command": "tick 1"
         }
-      ]
+      ],
+      "description": "Left unmarked: `tutorial_start` (step 2) arms the tutorial's own rails (tutorialStages.ts) -- off-target controls go inert until the tutorial's current stage points at them (scenario-defs.md: \"a scenario that clicks what the current step does not allow is asserting something no player could do\"). The first interaction-mode run confirmed this: `survey`'s tile-select confirm was inert, \"blocking\" per the tutorial rail, not a missing selector. Reaching each control for real needs the same `waitForTutorialStep` gating tutorial-interactive.json uses between every click, keyed to this file's own stage sequence -- not yet mapped out, left as commands rather than guess at stage ids and risk a false pass. A real conversion of this file is future work, matching tutorial-interactive."
     },
     {
       "command": "event choose 0",
       "timeout": 15,
-      "description": "Resolve tutorial_synergy_consultant (hire consultant: -$3k, +15 well-being). Clears pending event guard",
+      "description": "Left unmarked: `tutorial_start` (step 2) arms the tutorial's own rails (tutorialStages.ts) -- off-target controls go inert until the tutorial's current stage points at them (scenario-defs.md: \"a scenario that clicks what the current step does not allow is asserting something no player could do\"). The first interaction-mode run confirmed this: `survey`'s tile-select confirm was inert, \"blocking\" per the tutorial rail, not a missing selector. Reaching each control for real needs the same `waitForTutorialStep` gating tutorial-interactive.json uses between every click, keyed to this file's own stage sequence -- not yet mapped out, left as commands rather than guess at stage ids and risk a false pass. A real conversion of this file is future work, matching tutorial-interactive.",
       "interaction": [
         {
           "type": "command",
@@ -242,18 +242,18 @@
     {
       "command": "employee hire role:manager",
       "timeout": 15,
-      "description": "Step 10 complete: hire manager (event guard now clear) → overlay advances to step 11 (contract-accept)",
       "interaction": [
         {
           "type": "command",
           "command": "employee hire role:manager"
         }
-      ]
+      ],
+      "description": "Left unmarked: `tutorial_start` (step 2) arms the tutorial's own rails (tutorialStages.ts) -- off-target controls go inert until the tutorial's current stage points at them (scenario-defs.md: \"a scenario that clicks what the current step does not allow is asserting something no player could do\"). The first interaction-mode run confirmed this: `survey`'s tile-select confirm was inert, \"blocking\" per the tutorial rail, not a missing selector. Reaching each control for real needs the same `waitForTutorialStep` gating tutorial-interactive.json uses between every click, keyed to this file's own stage sequence -- not yet mapped out, left as commands rather than guess at stage ids and risk a false pass. A real conversion of this file is future work, matching tutorial-interactive."
     },
     {
       "command": "employee assign_skill 3 skill:management level:3",
       "timeout": 15,
-      "description": "Assign management skill to manager",
+      "description": "Left unmarked: `tutorial_start` (step 2) arms the tutorial's own rails (tutorialStages.ts) -- off-target controls go inert until the tutorial's current stage points at them (scenario-defs.md: \"a scenario that clicks what the current step does not allow is asserting something no player could do\"). The first interaction-mode run confirmed this: `survey`'s tile-select confirm was inert, \"blocking\" per the tutorial rail, not a missing selector. Reaching each control for real needs the same `waitForTutorialStep` gating tutorial-interactive.json uses between every click, keyed to this file's own stage sequence -- not yet mapped out, left as commands rather than guess at stage ids and risk a false pass. A real conversion of this file is future work, matching tutorial-interactive.",
       "interaction": [
         {
           "type": "command",
@@ -264,29 +264,29 @@
     {
       "command": "contract accept 1",
       "timeout": 15,
-      "description": "Step 11 complete: accept first contract → overlay advances to step 12 (hire-driver)",
       "interaction": [
         {
           "type": "command",
           "command": "contract accept 1"
         }
-      ]
+      ],
+      "description": "Left unmarked: `tutorial_start` (step 2) arms the tutorial's own rails (tutorialStages.ts) -- off-target controls go inert until the tutorial's current stage points at them (scenario-defs.md: \"a scenario that clicks what the current step does not allow is asserting something no player could do\"). The first interaction-mode run confirmed this: `survey`'s tile-select confirm was inert, \"blocking\" per the tutorial rail, not a missing selector. Reaching each control for real needs the same `waitForTutorialStep` gating tutorial-interactive.json uses between every click, keyed to this file's own stage sequence -- not yet mapped out, left as commands rather than guess at stage ids and risk a false pass. A real conversion of this file is future work, matching tutorial-interactive."
     },
     {
       "command": "employee hire role:driver",
       "timeout": 15,
-      "description": "Step 12 complete: hire driver → overlay advances to step 13 (vehicle-buy-assign)",
       "interaction": [
         {
           "type": "command",
           "command": "employee hire role:driver"
         }
-      ]
+      ],
+      "description": "Left unmarked: `tutorial_start` (step 2) arms the tutorial's own rails (tutorialStages.ts) -- off-target controls go inert until the tutorial's current stage points at them (scenario-defs.md: \"a scenario that clicks what the current step does not allow is asserting something no player could do\"). The first interaction-mode run confirmed this: `survey`'s tile-select confirm was inert, \"blocking\" per the tutorial rail, not a missing selector. Reaching each control for real needs the same `waitForTutorialStep` gating tutorial-interactive.json uses between every click, keyed to this file's own stage sequence -- not yet mapped out, left as commands rather than guess at stage ids and risk a false pass. A real conversion of this file is future work, matching tutorial-interactive."
     },
     {
       "command": "employee assign_skill 4 skill:driving.truck level:3",
       "timeout": 15,
-      "description": "Assign driving.truck skill to driver",
+      "description": "Left unmarked: `tutorial_start` (step 2) arms the tutorial's own rails (tutorialStages.ts) -- off-target controls go inert until the tutorial's current stage points at them (scenario-defs.md: \"a scenario that clicks what the current step does not allow is asserting something no player could do\"). The first interaction-mode run confirmed this: `survey`'s tile-select confirm was inert, \"blocking\" per the tutorial rail, not a missing selector. Reaching each control for real needs the same `waitForTutorialStep` gating tutorial-interactive.json uses between every click, keyed to this file's own stage sequence -- not yet mapped out, left as commands rather than guess at stage ids and risk a false pass. A real conversion of this file is future work, matching tutorial-interactive.",
       "interaction": [
         {
           "type": "command",
@@ -297,40 +297,40 @@
     {
       "command": "vehicle buy debris_hauler",
       "timeout": 15,
-      "description": "Step 13: buy debris_hauler vehicle → overlay auto-executes buy debris_hauler",
       "interaction": [
         {
           "type": "command",
           "command": "vehicle buy debris_hauler"
         }
-      ]
+      ],
+      "description": "Left unmarked: `tutorial_start` (step 2) arms the tutorial's own rails (tutorialStages.ts) -- off-target controls go inert until the tutorial's current stage points at them (scenario-defs.md: \"a scenario that clicks what the current step does not allow is asserting something no player could do\"). The first interaction-mode run confirmed this: `survey`'s tile-select confirm was inert, \"blocking\" per the tutorial rail, not a missing selector. Reaching each control for real needs the same `waitForTutorialStep` gating tutorial-interactive.json uses between every click, keyed to this file's own stage sequence -- not yet mapped out, left as commands rather than guess at stage ids and risk a false pass. A real conversion of this file is future work, matching tutorial-interactive."
     },
     {
       "command": "vehicle driver 1 4",
       "timeout": 15,
-      "description": "Step 13 complete: assign driver (ID 4) to vehicle (ID 1) → overlay advances to step 14 (build-storage)",
       "interaction": [
         {
           "type": "command",
           "command": "vehicle driver 1 4"
         }
-      ]
+      ],
+      "description": "Left unmarked: `tutorial_start` (step 2) arms the tutorial's own rails (tutorialStages.ts) -- off-target controls go inert until the tutorial's current stage points at them (scenario-defs.md: \"a scenario that clicks what the current step does not allow is asserting something no player could do\"). The first interaction-mode run confirmed this: `survey`'s tile-select confirm was inert, \"blocking\" per the tutorial rail, not a missing selector. Reaching each control for real needs the same `waitForTutorialStep` gating tutorial-interactive.json uses between every click, keyed to this file's own stage sequence -- not yet mapped out, left as commands rather than guess at stage ids and risk a false pass. A real conversion of this file is future work, matching tutorial-interactive."
     },
     {
       "command": "build freight_warehouse at:12,8",
       "timeout": 15,
-      "description": "Step 14 complete: build freight warehouse → overlay advances to step 15 (contract-deliver)",
       "interaction": [
         {
           "type": "command",
           "command": "build freight_warehouse at:12,8"
         }
-      ]
+      ],
+      "description": "Left unmarked: `tutorial_start` (step 2) arms the tutorial's own rails (tutorialStages.ts) -- off-target controls go inert until the tutorial's current stage points at them (scenario-defs.md: \"a scenario that clicks what the current step does not allow is asserting something no player could do\"). The first interaction-mode run confirmed this: `survey`'s tile-select confirm was inert, \"blocking\" per the tutorial rail, not a missing selector. Reaching each control for real needs the same `waitForTutorialStep` gating tutorial-interactive.json uses between every click, keyed to this file's own stage sequence -- not yet mapped out, left as commands rather than guess at stage ids and risk a false pass. A real conversion of this file is future work, matching tutorial-interactive."
     },
     {
       "command": "contract deliver 1 amount:5000",
       "timeout": 30,
-      "description": "Step 15 complete: deliver first contract → overlay advances to step 16 (finances)",
+      "description": "Left unmarked: `tutorial_start` (step 2) arms the tutorial's own rails (tutorialStages.ts) -- off-target controls go inert until the tutorial's current stage points at them (scenario-defs.md: \"a scenario that clicks what the current step does not allow is asserting something no player could do\"). The first interaction-mode run confirmed this: `survey`'s tile-select confirm was inert, \"blocking\" per the tutorial rail, not a missing selector. Reaching each control for real needs the same `waitForTutorialStep` gating tutorial-interactive.json uses between every click, keyed to this file's own stage sequence -- not yet mapped out, left as commands rather than guess at stage ids and risk a false pass. A real conversion of this file is future work, matching tutorial-interactive.",
       "interaction": [
         {
           "type": "command",
@@ -341,62 +341,62 @@
     {
       "command": "finances",
       "timeout": 15,
-      "description": "Step 16: view finances overlay → auto-advances after 2s to step 17 (build-ramp). Screenshot captures balance + contract earnings",
       "interaction": [
         {
           "type": "command",
           "command": "finances"
         }
-      ]
+      ],
+      "description": "Left unmarked: `tutorial_start` (step 2) arms the tutorial's own rails (tutorialStages.ts) -- off-target controls go inert until the tutorial's current stage points at them (scenario-defs.md: \"a scenario that clicks what the current step does not allow is asserting something no player could do\"). The first interaction-mode run confirmed this: `survey`'s tile-select confirm was inert, \"blocking\" per the tutorial rail, not a missing selector. Reaching each control for real needs the same `waitForTutorialStep` gating tutorial-interactive.json uses between every click, keyed to this file's own stage sequence -- not yet mapped out, left as commands rather than guess at stage ids and risk a false pass. A real conversion of this file is future work, matching tutorial-interactive."
     },
     {
       "command": "build_ramp start:10,15 end:10,25",
       "timeout": 15,
-      "description": "Step 17 complete: build ramp on navGrid → overlay advances to step 18 (needs)",
       "interaction": [
         {
           "type": "command",
           "command": "build_ramp start:10,15 end:10,25"
         }
-      ]
+      ],
+      "description": "Left unmarked: `tutorial_start` (step 2) arms the tutorial's own rails (tutorialStages.ts) -- off-target controls go inert until the tutorial's current stage points at them (scenario-defs.md: \"a scenario that clicks what the current step does not allow is asserting something no player could do\"). The first interaction-mode run confirmed this: `survey`'s tile-select confirm was inert, \"blocking\" per the tutorial rail, not a missing selector. Reaching each control for real needs the same `waitForTutorialStep` gating tutorial-interactive.json uses between every click, keyed to this file's own stage sequence -- not yet mapped out, left as commands rather than guess at stage ids and risk a false pass. A real conversion of this file is future work, matching tutorial-interactive."
     },
     {
       "command": "needs",
       "timeout": 15,
-      "description": "Step 18: view employee needs → auto-advances after 2s to step 19 (set-policy)",
       "interaction": [
         {
           "type": "command",
           "command": "needs"
         }
-      ]
+      ],
+      "description": "Left unmarked: `tutorial_start` (step 2) arms the tutorial's own rails (tutorialStages.ts) -- off-target controls go inert until the tutorial's current stage points at them (scenario-defs.md: \"a scenario that clicks what the current step does not allow is asserting something no player could do\"). The first interaction-mode run confirmed this: `survey`'s tile-select confirm was inert, \"blocking\" per the tutorial rail, not a missing selector. Reaching each control for real needs the same `waitForTutorialStep` gating tutorial-interactive.json uses between every click, keyed to this file's own stage sequence -- not yet mapped out, left as commands rather than guess at stage ids and risk a false pass. A real conversion of this file is future work, matching tutorial-interactive."
     },
     {
       "command": "set_policy mode:shift_8h",
       "timeout": 15,
-      "description": "Step 19 complete: set shift policy → overlay advances to step 20 (tick-advance)",
       "interaction": [
         {
           "type": "command",
           "command": "set_policy mode:shift_8h"
         }
-      ]
+      ],
+      "description": "Left unmarked: `tutorial_start` (step 2) arms the tutorial's own rails (tutorialStages.ts) -- off-target controls go inert until the tutorial's current stage points at them (scenario-defs.md: \"a scenario that clicks what the current step does not allow is asserting something no player could do\"). The first interaction-mode run confirmed this: `survey`'s tile-select confirm was inert, \"blocking\" per the tutorial rail, not a missing selector. Reaching each control for real needs the same `waitForTutorialStep` gating tutorial-interactive.json uses between every click, keyed to this file's own stage sequence -- not yet mapped out, left as commands rather than guess at stage ids and risk a false pass. A real conversion of this file is future work, matching tutorial-interactive."
     },
     {
       "command": "tick 6",
       "timeout": 30,
-      "description": "Step 20 complete: advance 6 ticks (tickCount > prev + 5) → overlay advances to step 21 (victory)",
       "interaction": [
         {
           "type": "command",
           "command": "tick 6"
         }
-      ]
+      ],
+      "description": "Left unmarked: `tutorial_start` (step 2) arms the tutorial's own rails (tutorialStages.ts) -- off-target controls go inert until the tutorial's current stage points at them (scenario-defs.md: \"a scenario that clicks what the current step does not allow is asserting something no player could do\"). The first interaction-mode run confirmed this: `survey`'s tile-select confirm was inert, \"blocking\" per the tutorial rail, not a missing selector. Reaching each control for real needs the same `waitForTutorialStep` gating tutorial-interactive.json uses between every click, keyed to this file's own stage sequence -- not yet mapped out, left as commands rather than guess at stage ids and risk a false pass. A real conversion of this file is future work, matching tutorial-interactive."
     },
     {
       "command": "campaign complete",
       "timeout": 15,
-      "description": "Step 21 complete: force level completion (levelEnded=true) → overlay advances to step 22 (congratulations)",
+      "description": "Left unmarked: `tutorial_start` (step 2) arms the tutorial's own rails (tutorialStages.ts) -- off-target controls go inert until the tutorial's current stage points at them (scenario-defs.md: \"a scenario that clicks what the current step does not allow is asserting something no player could do\"). The first interaction-mode run confirmed this: `survey`'s tile-select confirm was inert, \"blocking\" per the tutorial rail, not a missing selector. Reaching each control for real needs the same `waitForTutorialStep` gating tutorial-interactive.json uses between every click, keyed to this file's own stage sequence -- not yet mapped out, left as commands rather than guess at stage ids and risk a false pass. A real conversion of this file is future work, matching tutorial-interactive.",
       "interaction": [
         {
           "type": "command",
@@ -407,13 +407,13 @@
     {
       "command": "tick 1",
       "timeout": 15,
-      "description": "Step 22: congratulations displayed → overlay auto-dismisses after 4s. Final state: isPaused=false, bs_tutorial_done set",
       "interaction": [
         {
           "type": "command",
           "command": "tick 1"
         }
-      ]
+      ],
+      "description": "Left unmarked: `tutorial_start` (step 2) arms the tutorial's own rails (tutorialStages.ts) -- off-target controls go inert until the tutorial's current stage points at them (scenario-defs.md: \"a scenario that clicks what the current step does not allow is asserting something no player could do\"). The first interaction-mode run confirmed this: `survey`'s tile-select confirm was inert, \"blocking\" per the tutorial rail, not a missing selector. Reaching each control for real needs the same `waitForTutorialStep` gating tutorial-interactive.json uses between every click, keyed to this file's own stage sequence -- not yet mapped out, left as commands rather than guess at stage ids and risk a false pass. A real conversion of this file is future work, matching tutorial-interactive."
     }
   ]
 }

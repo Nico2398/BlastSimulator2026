@@ -9,7 +9,8 @@
           "type": "command",
           "command": "new_game seed:2277"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "campaign start level:grumpstone_ridge",
@@ -18,7 +19,8 @@
           "type": "command",
           "command": "campaign start level:grumpstone_ridge"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "time resume",
@@ -27,7 +29,8 @@
           "type": "command",
           "command": "time resume"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "scores",
@@ -36,7 +39,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "finances",
@@ -45,7 +49,8 @@
           "type": "command",
           "command": "finances"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "build office at:5,5",
@@ -54,7 +59,8 @@
           "type": "command",
           "command": "build office at:5,5"
         }
-      ]
+      ],
+      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`)."
     },
     {
       "command": "build storage_depot at:10,5",
@@ -63,7 +69,8 @@
           "type": "command",
           "command": "build storage_depot at:10,5"
         }
-      ]
+      ],
+      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`)."
     },
     {
       "command": "build medical_bay at:5,10",
@@ -72,7 +79,8 @@
           "type": "command",
           "command": "build medical_bay at:5,10"
         }
-      ]
+      ],
+      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`)."
     },
     {
       "command": "build canteen at:10,10",
@@ -81,7 +89,8 @@
           "type": "command",
           "command": "build canteen at:10,10"
         }
-      ]
+      ],
+      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`)."
     },
     {
       "command": "build break_room at:15,5",
@@ -90,7 +99,8 @@
           "type": "command",
           "command": "build break_room at:15,5"
         }
-      ]
+      ],
+      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`)."
     },
     {
       "command": "build bunkhouse at:15,10",
@@ -99,16 +109,38 @@
           "type": "command",
           "command": "build bunkhouse at:15,10"
         }
-      ]
+      ],
+      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`)."
     },
     {
       "command": "build management_office at:20,5",
       "interaction": [
         {
-          "type": "command",
-          "command": "build management_office at:20,5"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"management_office\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 20,
+          "z": 5
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "build list",
@@ -117,7 +149,8 @@
           "type": "command",
           "command": "build list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "finances",
@@ -126,7 +159,8 @@
           "type": "command",
           "command": "finances"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "vehicle buy rock_digger",
@@ -135,7 +169,8 @@
           "type": "command",
           "command": "vehicle buy rock_digger"
         }
-      ]
+      ],
+      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
     },
     {
       "command": "vehicle buy debris_hauler",
@@ -144,7 +179,8 @@
           "type": "command",
           "command": "vehicle buy debris_hauler"
         }
-      ]
+      ],
+      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
     },
     {
       "command": "vehicle buy drill_rig",
@@ -153,7 +189,8 @@
           "type": "command",
           "command": "vehicle buy drill_rig"
         }
-      ]
+      ],
+      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
     },
     {
       "command": "vehicle buy building_destroyer",
@@ -162,7 +199,8 @@
           "type": "command",
           "command": "vehicle buy building_destroyer"
         }
-      ]
+      ],
+      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
     },
     {
       "command": "vehicle buy debris_hauler",
@@ -171,7 +209,8 @@
           "type": "command",
           "command": "vehicle buy debris_hauler"
         }
-      ]
+      ],
+      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
     },
     {
       "command": "vehicle list",
@@ -180,7 +219,8 @@
           "type": "command",
           "command": "vehicle list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "finances",
@@ -189,7 +229,8 @@
           "type": "command",
           "command": "finances"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "employee hire role:driller",
@@ -198,7 +239,8 @@
           "type": "command",
           "command": "employee hire role:driller"
         }
-      ]
+      ],
+      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
     },
     {
       "command": "employee hire role:driller",
@@ -207,7 +249,8 @@
           "type": "command",
           "command": "employee hire role:driller"
         }
-      ]
+      ],
+      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
     },
     {
       "command": "employee hire role:driller",
@@ -216,7 +259,8 @@
           "type": "command",
           "command": "employee hire role:driller"
         }
-      ]
+      ],
+      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
     },
     {
       "command": "employee hire role:blaster",
@@ -225,7 +269,8 @@
           "type": "command",
           "command": "employee hire role:blaster"
         }
-      ]
+      ],
+      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
     },
     {
       "command": "employee hire role:blaster",
@@ -234,7 +279,8 @@
           "type": "command",
           "command": "employee hire role:blaster"
         }
-      ]
+      ],
+      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
     },
     {
       "command": "employee hire role:driver",
@@ -243,7 +289,8 @@
           "type": "command",
           "command": "employee hire role:driver"
         }
-      ]
+      ],
+      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
     },
     {
       "command": "employee hire role:driver",
@@ -252,7 +299,8 @@
           "type": "command",
           "command": "employee hire role:driver"
         }
-      ]
+      ],
+      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
     },
     {
       "command": "employee hire role:surveyor",
@@ -261,7 +309,8 @@
           "type": "command",
           "command": "employee hire role:surveyor"
         }
-      ]
+      ],
+      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
     },
     {
       "command": "employee hire role:manager",
@@ -270,7 +319,8 @@
           "type": "command",
           "command": "employee hire role:manager"
         }
-      ]
+      ],
+      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
     },
     {
       "command": "employee hire role:manager",
@@ -279,7 +329,8 @@
           "type": "command",
           "command": "employee hire role:manager"
         }
-      ]
+      ],
+      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
     },
     {
       "command": "employee list",
@@ -288,7 +339,8 @@
           "type": "command",
           "command": "employee list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "finances",
@@ -297,7 +349,8 @@
           "type": "command",
           "command": "finances"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -306,7 +359,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 10",
@@ -315,7 +369,8 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -324,7 +379,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "tick 10",
@@ -333,7 +389,8 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -342,7 +399,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "tick 10",
@@ -351,7 +409,8 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -360,7 +419,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "finances",
@@ -369,7 +429,8 @@
           "type": "command",
           "command": "finances"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "scores",
@@ -378,7 +439,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 15",
@@ -387,7 +449,8 @@
           "type": "command",
           "command": "tick 15"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -396,7 +459,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "tick 15",
@@ -405,7 +469,8 @@
           "type": "command",
           "command": "tick 15"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -414,7 +479,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "tick 15",
@@ -423,7 +489,8 @@
           "type": "command",
           "command": "tick 15"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -432,7 +499,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "finances",
@@ -441,7 +509,8 @@
           "type": "command",
           "command": "finances"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "scores",
@@ -450,7 +519,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 15",
@@ -459,7 +529,8 @@
           "type": "command",
           "command": "tick 15"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -468,7 +539,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "tick 15",
@@ -477,7 +549,8 @@
           "type": "command",
           "command": "tick 15"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -486,7 +559,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "tick 15",
@@ -495,7 +569,8 @@
           "type": "command",
           "command": "tick 15"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -504,7 +579,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "finances",
@@ -513,7 +589,8 @@
           "type": "command",
           "command": "finances"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "scores",
@@ -522,7 +599,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 15",
@@ -531,7 +609,8 @@
           "type": "command",
           "command": "tick 15"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -540,7 +619,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "tick 15",
@@ -549,7 +629,8 @@
           "type": "command",
           "command": "tick 15"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -558,7 +639,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "tick 15",
@@ -567,7 +649,8 @@
           "type": "command",
           "command": "tick 15"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -576,7 +659,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "finances",
@@ -585,7 +669,8 @@
           "type": "command",
           "command": "finances"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "scores",
@@ -594,7 +679,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 10",
@@ -603,7 +689,8 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -612,7 +699,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "tick 10",
@@ -621,7 +709,8 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -630,7 +719,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "finances",
@@ -639,7 +729,8 @@
           "type": "command",
           "command": "finances"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "scores",
@@ -648,7 +739,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "stats",
@@ -657,7 +749,8 @@
           "type": "command",
           "command": "stats"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "campaign status",
@@ -666,7 +759,8 @@
           "type": "command",
           "command": "campaign status"
         }
-      ]
+      ],
+      "role": "setup"
     }
   ]
 }
