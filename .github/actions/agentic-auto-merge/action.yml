@@ -31,6 +31,11 @@ outputs:
   unarmed:
     description: 'Space-separated PR numbers that carried the marker and are still neither armed nor merged.'
     value: ${{ steps.sweep.outputs.unarmed }}
+  pending:
+    description: >-
+      Space-separated PR numbers that carry the marker and are still waiting on
+      checks. Not a failure: the CI-completion sweep re-evaluates each of them.
+    value: ${{ steps.sweep.outputs.pending }}
   approved:
     description: 'Number of gated workflow runs released across the swept PRs.'
     value: ${{ steps.sweep.outputs.approved }}
@@ -70,17 +75,70 @@ runs:
           };
 
           // What `mergeable_state` means for a PR this action has to merge
-          // itself. GitHub computes mergeability in the background, so a PR read
-          // seconds after it was opened — exactly when a runner arms the PR it
-          // just created — answers `unknown`, and a PR whose checks are still
-          // running answers `unstable` or `blocked`. Those are "not yet", and
-          // waiting resolves them. `dirty` and `behind` are "not without a
-          // human or a branch update": no amount of waiting changes either, so
-          // they end the wait immediately rather than burning the whole budget.
-          const mergeVerdict = (state) => {
-            if (state === 'clean') return 'merge';
+          // itself, read together with the checks reporting on its head. GitHub
+          // computes mergeability in the background, so a PR read seconds after
+          // it was opened — exactly when a runner arms the PR it just created —
+          // answers `unknown`; waiting resolves that. `dirty` and `behind` are
+          // "not without a human or a branch update": no amount of waiting
+          // changes either, so they end the wait immediately rather than
+          // burning the whole budget.
+          //
+          // `unstable` and `blocked` are the two that the state alone cannot
+          // decide, because each covers both a check still running and a check
+          // that already failed. Waiting is right for the first and pointless
+          // for the second, so the checks break the tie: a failure is `stuck`
+          // now, and a run still in flight is `pending` — not a verdict this
+          // job can improve on by holding a runner open, since the sweep on CI
+          // completion re-evaluates the PR the moment there is something new to
+          // read.
+          const mergeVerdict = (state, checks) => {
+            if (checks.failed > 0) return 'stuck';
             if (state === 'dirty' || state === 'behind') return 'stuck';
+            if (state === 'clean') return 'merge';
+            if (checks.pending > 0) return 'pending';
             return 'wait';
+          };
+
+          // `cancelled` sits with the failures on purpose: `filter: latest`
+          // already drops a run superseded by a rerun of the same name, so a
+          // cancellation that survives it is one nothing is going to repeat.
+          // `action_required` is the opposite — the release above just requeued
+          // it, and the rerun has not registered yet.
+          const CHECK_FAILURES = new Set(['failure', 'cancelled', 'timed_out', 'startup_failure']);
+
+          const checkState = async (sha) => {
+            const runs = await github.paginate(github.rest.checks.listForRef, {
+              owner, repo, ref: sha, filter: 'latest', per_page: 100
+            });
+
+            let pending = 0;
+            let failed = 0;
+
+            for (const run of runs) {
+              // When a `pull_request` event carried this action here, the job
+              // running it reports a check of its own on the same head. Count
+              // that and the sweep waits on itself: `pending` forever, on a PR
+              // whose real checks all passed.
+              const url = run.details_url || run.html_url || '';
+              if (url.includes(`/actions/runs/${context.runId}/`)) continue;
+
+              if (run.status !== 'completed') pending += 1;
+              else if (run.conclusion === 'action_required') pending += 1;
+              else if (CHECK_FAILURES.has(run.conclusion)) failed += 1;
+            }
+
+            // Commit statuses are a separate API from check runs and a PR can
+            // be held by either. `total_count === 0` reads as `pending` from
+            // GitHub, which is why the count is tested before the state.
+            const { data: combined } = await github.rest.repos.getCombinedStatusForRef({
+              owner, repo, ref: sha
+            });
+            if (combined.total_count > 0) {
+              if (combined.state === 'pending') pending += 1;
+              if (combined.state === 'failure' || combined.state === 'error') failed += 1;
+            }
+
+            return { pending, failed };
           };
 
           const method = (process.env.MERGE_METHOD || 'squash').toUpperCase();
@@ -90,12 +148,16 @@ runs:
           const POLL_MS = 15_000;
 
           // Poll until the PR stops saying "ask again", or the budget runs out.
+          // Only `wait` — mergeability still being computed — is worth a poll;
+          // it resolves in seconds. Waiting out CI is not this budget's job.
           const settledState = async (n) => {
             const deadline = Date.now() + settleMs;
             for (;;) {
               const { data } = await github.rest.pulls.get({ owner, repo, pull_number: n });
               const state = data.mergeable_state;
-              if (mergeVerdict(state) !== 'wait' || Date.now() >= deadline) return state;
+              const checks = await checkState(data.head.sha);
+              const verdict = mergeVerdict(state, checks);
+              if (verdict !== 'wait' || Date.now() >= deadline) return { state, verdict, checks };
               core.info(`#${n}: \`${state}\` — waiting for it to settle.`);
               await new Promise((resolve) => setTimeout(resolve, POLL_MS));
             }
@@ -121,6 +183,7 @@ runs:
 
           const enabled = [];
           const unarmed = [];
+          const pending = [];
           let approved = 0;
 
           for (const summary of candidates) {
@@ -210,11 +273,27 @@ runs:
               // costs a wait, not a stalled queue.
               core.info(`#${n}: auto-merge refused (${message}) — merging it here instead.`);
 
-              const state = await settledState(n);
-              if (mergeVerdict(state) !== 'merge') {
+              const settled = await settledState(n);
+
+              // Checks still running is the normal state of a PR the pipeline
+              // just opened, and on a `full-ci` PR they run for the better part
+              // of an hour. Holding a runner open for that is the bug this path
+              // used to have; the sweep on CI completion picks the PR back up.
+              if (settled.verdict === 'pending') {
+                core.info(
+                  `#${n}: \`${settled.state}\`, ${settled.checks.pending} check(s) still running — ` +
+                  'the CI-completion sweep re-evaluates it once they report.'
+                );
+                pending.push(n);
+                continue;
+              }
+
+              if (settled.verdict !== 'merge') {
+                const detail = settled.checks.failed > 0
+                  ? `${settled.checks.failed} check(s) failed`
+                  : `the PR settled as \`${settled.state}\`, not \`clean\``;
                 core.warning(
-                  `#${n}: auto-merge unavailable (${message}) and the PR settled as \`${state}\`, ` +
-                  'not `clean` — it needs a look.'
+                  `#${n}: auto-merge unavailable (${message}) and ${detail} — it needs a look.`
                 );
                 unarmed.push(n);
                 continue;
@@ -235,12 +314,18 @@ runs:
 
           core.setOutput('enabled', enabled.join(' '));
           core.setOutput('unarmed', unarmed.join(' '));
+          core.setOutput('pending', pending.join(' '));
           core.setOutput('approved', String(approved));
           core.info(
             enabled.length === 0
               ? 'No PR carried the marker in a mergeable state.'
               : `Auto-merge covers PR(s): ${enabled.map((n) => `#${n}`).join(', ')}.`
           );
+          if (pending.length > 0) {
+            core.info(
+              `Waiting on checks, re-evaluated when CI reports: ${pending.map((n) => `#${n}`).join(', ')}.`
+            );
+          }
 
           // A marked PR that ends neither armed nor merged holds its issue, and
           // the queue behind it, for as long as it stays open. Nothing else is
