@@ -93,6 +93,28 @@ describe('BlastReportModal', () => {
     expect(modal.visible).toBe(true);
   });
 
+  it('opens again for a second blast fired on the same tick', () => {
+    // Nothing forces the clock to advance between two plans — a player (or a
+    // scripted sequence) can drill/charge/sequence/fire twice with no tick
+    // command in between, so both reports land on the same state.tickCount.
+    // Gating on tick equality alone made the second report never reopen; the
+    // fix compares report identity instead (buildBlastReport in mining.ts
+    // always returns a fresh object, so two distinct blasts are always two
+    // distinct references even when their tick matches). Issue #479.
+    const { modal } = makeModal();
+    const state = makeState();
+    state.lastBlastReport = makeReport({ tick: 100, fragmentCount: 47 });
+    modal.update(state);
+    (modal.root.querySelector('[data-action="report-close"]') as HTMLButtonElement).click();
+    expect(modal.visible).toBe(false);
+
+    state.lastBlastReport = makeReport({ tick: 100, fragmentCount: 12 });
+    modal.update(state);
+
+    expect(modal.visible).toBe(true);
+    expect(modal.root.textContent).toContain('12');
+  });
+
   it('shows the ore report card with real percentage and breakdown when a survey estimate exists', () => {
     const { modal } = makeModal();
     const state = makeState();

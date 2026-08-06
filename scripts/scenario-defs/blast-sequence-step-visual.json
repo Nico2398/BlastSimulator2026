@@ -2,7 +2,16 @@
   "name": "blast-sequence-step-visual",
   "description": "Redesign P4/#24: the Blast Workshop's Sequence step — delay-step stepper, Auto V-Pattern, and per-hole rows with their own +/- delay override, grouped into rows by real z coordinate.",
   "shots": [
-    { "name": "overview", "yaw": 0, "pitch": 45, "target": [10, 10], "distance": 15 }
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45,
+      "target": [
+        10,
+        10
+      ],
+      "distance": 15
+    }
   ],
   "steps": [
     {
@@ -10,16 +19,26 @@
       "timeout": 30,
       "description": "Setup: a fresh site",
       "interaction": [
-        { "type": "command", "command": "new_game seed:42 size:32" }
-      ]
+        {
+          "type": "command",
+          "command": "new_game seed:42 size:32"
+        }
+      ],
+      "role": "setup"
     },
     {
       "command": "drill_plan grid origin:10,10 rows:2 cols:2 spacing:3 depth:6",
       "timeout": 30,
-      "description": "Setup: a 2x2 drill grid (H1-H4), charged, none sequenced yet",
+      "description": "Setup: a 2x2 drill grid (H1-H4), charged, none sequenced yet — bundled fixture setup (issue #479).",
       "interaction": [
-        { "type": "command", "command": "drill_plan grid origin:10,10 rows:2 cols:2 spacing:3 depth:6" },
-        { "type": "command", "command": "charge hole:* explosive:boomite amount:5kg stemming:2m" }
+        {
+          "type": "command",
+          "command": "drill_plan grid origin:10,10 rows:2 cols:2 spacing:3 depth:6"
+        },
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:boomite amount:5kg stemming:2m"
+        }
       ]
     },
     {
@@ -27,34 +46,61 @@
       "timeout": 30,
       "description": "Opening the Blast Workshop auto-lands on step 3 (Sequence) since drilling and charging are done but nothing is sequenced — every hole row shows an unset (—) delay",
       "interaction": [
-        { "type": "command", "command": "state" },
-        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"blast\"]" },
-        { "type": "wait", "durationMs": 300 },
-        { "type": "waitForSelector", "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]" },
-        { "type": "screenshot" }
-      ]
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player"
     },
     {
       "command": "state",
       "timeout": 30,
       "description": "Clicking a single hole's + override steps its delay up by the delay-step amount, live, without touching the others",
       "interaction": [
-        { "type": "command", "command": "state" },
-        { "type": "clickSelector", "selector": "#bs-blast-panel [data-hole=\"H1\"] [data-action=\"delay-inc\"]" },
-        { "type": "wait", "durationMs": 200 },
-        { "type": "screenshot" }
-      ]
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-hole=\"H1\"] [data-action=\"delay-inc\"]"
+        },
+        {
+          "type": "wait",
+          "durationMs": 200
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player"
     },
     {
       "command": "sequence auto delay_step:25",
       "timeout": 30,
       "description": "Auto Sequence (V-Pattern) fills in every hole's delay at once, tab counter reads 4/4",
       "interaction": [
-        { "type": "command", "command": "state" },
-        { "type": "clickSelector", "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]" },
-        { "type": "wait", "durationMs": 300 },
-        { "type": "screenshot" }
-      ]
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player"
     }
   ]
 }

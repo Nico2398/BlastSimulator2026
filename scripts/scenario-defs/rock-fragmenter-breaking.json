@@ -9,41 +9,75 @@
           "type": "command",
           "command": "new_game seed:42 cash:100000"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "drill_plan grid rows:2 cols:2 spacing:5 depth:8 start:18,19",
       "interaction": [
         {
-          "type": "command",
-          "command": "drill_plan grid rows:2 cols:2 spacing:5 depth:8 start:18,19"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 18,
+          "z1": 19,
+          "x2": 23,
+          "z2": 24
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "charge hole:* explosive:boomite amount:2 stemming:2",
       "interaction": [
         {
-          "type": "command",
-          "command": "charge hole:* explosive:boomite amount:2 stemming:2"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "sequence auto delay_step:25",
       "interaction": [
         {
-          "type": "command",
-          "command": "sequence auto delay_step:25"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "blast",
       "interaction": [
         {
-          "type": "command",
-          "command": "blast"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
         },
         {
           "type": "waitForSelector",
@@ -53,7 +87,8 @@
           "type": "clickSelector",
           "selector": "[data-action=\"report-close\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "fragments",
@@ -63,7 +98,8 @@
           "type": "command",
           "command": "fragments"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -72,17 +108,27 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "employee hire role:driver",
       "description": "Employee #1 — will be crewed onto the debris_hauler.",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driver"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "employee assign_skill 1 skill:driving.truck level:5",
@@ -105,7 +151,8 @@
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "vehicle buy debris_hauler",
@@ -119,16 +166,13 @@
           "type": "clickSelector",
           "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "vehicle driver 1 1",
       "description": "Only one licensed (driving.truck) crew member is eligible, so the driver <select> already defaults to employee #1 — the assign button click alone boards them.",
       "interaction": [
-        {
-          "type": "command",
-          "command": "vehicle driver 1 1"
-        },
         {
           "type": "waitForSelector",
           "selector": "[data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
@@ -137,7 +181,8 @@
           "type": "clickSelector",
           "selector": "[data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "tick 10",
@@ -147,7 +192,8 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "vehicle haul 1 fragment:1",
@@ -166,17 +212,27 @@
           "type": "command",
           "command": "fragments"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "employee hire role:driver",
       "description": "Employee #2 — will be crewed onto the rock_fragmenter.",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driver"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "employee assign_skill 2 skill:driving.excavator level:5",
@@ -192,6 +248,10 @@
       "description": "Vehicle #2 — a real click on the tier-1 rock_fragmenter buy button. Click is the sole purchase action in interaction mode (the top-level `command` covers command mode) — combining both double-buys (#484).",
       "interaction": [
         {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
           "type": "waitForSelector",
           "selector": "#bs-vehicle-panel [data-vtype=\"rock_fragmenter\"][data-tier=\"1\"]"
         },
@@ -199,16 +259,13 @@
           "type": "clickSelector",
           "selector": "#bs-vehicle-panel [data-vtype=\"rock_fragmenter\"][data-tier=\"1\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "vehicle driver 2 2",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle driver 2 2"
-        },
-        {
           "type": "waitForSelector",
           "selector": "[data-vehicle-id=\"2\"] .bs-vehicle-assign-btn"
         },
@@ -216,7 +273,8 @@
           "type": "clickSelector",
           "selector": "[data-vehicle-id=\"2\"] .bs-vehicle-assign-btn"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "tick 10",
@@ -226,7 +284,8 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "vehicle break 2 fragment:1",
@@ -241,7 +300,8 @@
           "type": "clickSelector",
           "selector": "[data-vehicle-id=\"2\"] .bs-vehicle-break-btn"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "tick 30",
@@ -251,7 +311,8 @@
           "type": "command",
           "command": "tick 30"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "fragments",
@@ -261,21 +322,47 @@
           "type": "command",
           "command": "fragments"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "build freight_warehouse at:13,13",
       "interaction": [
         {
-          "type": "command",
-          "command": "build freight_warehouse at:13,13"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"freight_warehouse\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 13,
+          "z": 13
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "vehicle haul 1 fragment:64",
       "description": "Hauls a resulting sub-fragment with the (still-idle) debris_hauler. Command mode dispatches the hardcoded fragment:64 directly — the first sub-fragment produced by the break at step 20/21 (seed 42, this exact command sequence), not the stale fragment #2 left over from the original blast, which stays oversized and un-haulable; the scenario step vocabulary has no way to capture an id from a prior step's output, so this is hardcoded, and needs re-deriving (via a 'fragments' step) if any upstream change to blast/break fragment-id assignment shifts it. In interaction mode, this fragment is on_ground and reachable, so .bs-vehicle-haul-btn renders for vehicle #1, and the request is dispatched by a real click on that button — the button's own handler picks the fragment id (the eligibility cache's nearest reachable on-ground fragment) and calls the exact same console command the click handler in haulEligibility.ts fires.",
       "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
         {
           "type": "waitForSelector",
           "selector": "[data-vehicle-id=\"1\"] .bs-vehicle-haul-btn",
@@ -285,7 +372,8 @@
           "type": "clickSelector",
           "selector": "[data-vehicle-id=\"1\"] .bs-vehicle-haul-btn"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "tick 30",
@@ -295,7 +383,8 @@
           "type": "command",
           "command": "tick 30"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "state full",
@@ -305,7 +394,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ]
 }

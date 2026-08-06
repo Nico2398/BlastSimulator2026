@@ -9,16 +9,40 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "drill_plan grid rows:2 cols:2 spacing:6 depth:20 start:20,20",
       "interaction": [
         {
-          "type": "command",
-          "command": "drill_plan grid rows:2 cols:2 spacing:6 depth:20 start:20,20"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 20,
+          "z1": 20,
+          "x2": 26,
+          "z2": 26
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "charge hole:1 explosive:boomite amount:6 stemming:6",
@@ -27,7 +51,8 @@
           "type": "command",
           "command": "charge hole:1 explosive:boomite amount:6 stemming:6"
         }
-      ]
+      ],
+      "description": "charge hole:1 explosive:boomite amount:6 stemming:6 — no per-hole charging in the UI by design (Charge.ts's own header: \"per-hole charging isn't a feature here anyway\"); only Charge All exists. Left as a command (Finding #10)."
     },
     {
       "command": "charge hole:2 explosive:boomite amount:5 stemming:5",
@@ -36,7 +61,8 @@
           "type": "command",
           "command": "charge hole:2 explosive:boomite amount:5 stemming:5"
         }
-      ]
+      ],
+      "description": "charge hole:2 explosive:boomite amount:5 stemming:5 — no per-hole charging in the UI by design (Charge.ts's own header: \"per-hole charging isn't a feature here anyway\"); only Charge All exists. Left as a command (Finding #10)."
     },
     {
       "command": "charge hole:3 explosive:boomite amount:4 stemming:4",
@@ -45,7 +71,8 @@
           "type": "command",
           "command": "charge hole:3 explosive:boomite amount:4 stemming:4"
         }
-      ]
+      ],
+      "description": "charge hole:3 explosive:boomite amount:4 stemming:4 — no per-hole charging in the UI by design (Charge.ts's own header: \"per-hole charging isn't a feature here anyway\"); only Charge All exists. Left as a command (Finding #10)."
     },
     {
       "command": "charge hole:4 explosive:boomite amount:3 stemming:3",
@@ -54,7 +81,8 @@
           "type": "command",
           "command": "charge hole:4 explosive:boomite amount:3 stemming:3"
         }
-      ]
+      ],
+      "description": "charge hole:4 explosive:boomite amount:3 stemming:3 — no per-hole charging in the UI by design (Charge.ts's own header: \"per-hole charging isn't a feature here anyway\"); only Charge All exists. Left as a command (Finding #10)."
     },
     {
       "command": "sequence auto delay_step:25",
@@ -72,7 +100,8 @@
           "type": "command",
           "command": "blast"
         }
-      ]
+      ],
+      "description": "blast — downstream of the per-hole varying-stemming charges above (Finding #10, no UI path), the Fire step's own footer disables Execute (validateBlastPlan flags the assembled plan); console `blast` calls the same validator, so command mode's pass here may itself be the Finding #2 class (a validation rejection the command-mode runner doesn't fail on since nothing throws). Left as a command rather than a click that cannot land (Finding #11)."
     },
     {
       "command": "fragments",
@@ -81,7 +110,8 @@
           "type": "command",
           "command": "fragments"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "inspect 20,20,0",
@@ -90,7 +120,8 @@
           "type": "command",
           "command": "inspect 20,20,0"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -99,7 +130,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ]
 }

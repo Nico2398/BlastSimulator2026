@@ -197,6 +197,55 @@ here for a follow-up issue.
    unambiguously (proven in `contract-panel-visual.json`). A scenario that
    needs a *specific* contract id among several offers stays a command for
    that portion.
+9. **Per-hole sequence delay is only reachable via relative +/- steppers**
+   (`[data-hole="H1"] [data-action="delay-inc"/"delay-dec"]`, confirmed
+   real — `blast-sequence-step-visual.json` already clicked one), never a
+   set-to-value control. Reaching an exact target delay (`sequence set
+   hole:H1 delay:200`) would mean replicating Auto Sequence's row
+   algorithm to compute a click count; left as a command.
+10. **No per-hole charging in the UI, by design** — Charge.ts's own header
+    comment: "per-hole charging isn't a feature here anyway... nothing is
+    lost by requiring the extra click" (Charge All is the only commit).
+    `charge hole:H1 explosive:X amount:Y` (distinct per hole) has no click
+    path at all; stays a command wherever a scenario does this.
+11. **A blast plan built from per-hole-varying charges (Finding #10) can
+    leave `validateBlastPlan` rejecting it** — the Fire footer's own Execute
+    button disables (`multi-deck-blast.json`'s 4 differently-stemmed
+    holes). Console `blast` calls the same validator, so a command-mode
+    "pass" on a plan like this may itself be hiding a validation rejection
+    the runner never surfaces (the #445/Finding #2 class — success:false
+    isn't a thrown exception). Not independently confirmed which specific
+    rule rejects it; left as a command rather than a click that cannot
+    land, downstream of Finding #10 either way.
+12. **BlastReportModal never reopened for a second blast fired on the same
+    tick** — real bug, not a conversion gap, found running
+    `vibration-budget.json`'s 3-blast sequence for real: nothing forces
+    the clock to advance between plans, so two blasts with no `tick`
+    between them share `state.tickCount`, and the modal's old
+    `report.tick === lastShownTick` gate silently treated the second
+    report as already-shown. **Fixed** — compares report *identity* now
+    (`buildBlastReport` always returns a fresh object), not tick
+    (`src/ui/panels/BlastReportModal.ts`; regression test in
+    `tests/unit/ui/panels/BlastReportModal.test.ts`). A player who fires
+    twice in a row without an intervening tick would have seen this too —
+    command mode never would, since it doesn't touch the modal.
+13. **A partially-hand-converted step's leftover leading `command` action
+    is the single most common self-inflicted bug in this conversion.**
+    Several source files already had real clicks *plus* a stale
+    `{"type":"command", "command": step.command}` entry still in front of
+    them (pre-dating this mechanism, or left behind by an earlier, buggy
+    pass of mine). A `player`-marked step rejects **any** command action,
+    so these always fail at runtime even though the clicks themselves are
+    correct. **Always grep a step's full `interaction` array for
+    `"type": "command"` after marking it `player`, not just eyeball the
+    `command` field.**
+14. **When "fix the role" only changes the `role` key, stale `interaction`
+    content from an earlier (wrong) pass survives untouched** — several
+    Batch 2 failures traced back to a step whose `role` I'd corrected but
+    whose `interaction` array still held clicks written for a *different*
+    step during an earlier off-by-one mistake. **After any index/mapping
+    correction, re-dump and re-read the full file — don't trust that a
+    role-only fix was sufficient.**
 
 _(Add new findings here as you hit them. Number sequentially.)_
 
@@ -220,26 +269,36 @@ for f in sorted(os.listdir(d)):
 EOF
 ```
 
-### ✅ Done (18)
+### ✅ Done (43)
 - tutorial-interactive, vehicle-purchase-visual, contract-panel-visual, event-dialog-visual
-- ambient-life-visual, weather-popover-visual, wind-clouds-visual, survey-panel-visual,
-  loading-screen-visual, scene-picking-visual, nav-cell-types-visual,
+- Batch 1 (14): ambient-life-visual, weather-popover-visual, wind-clouds-visual,
+  survey-panel-visual, loading-screen-visual, scene-picking-visual, nav-cell-types-visual,
   nav-minimap-integration-visual, blast-hole-picking-visual, blast-drill-plan-ui,
   blast-drill-plan-visual, i18n-live-locale-switch, crew-fleet-panels-visual,
-  money-surfaces-visual (Batch 1, all interaction-verified in a real browser)
+  money-surfaces-visual
+- Batch 2 (24): blast-basic, blast-charge-loading-ui, blast-detonation-sequence-ui,
+  blast-execution-effects, blast-overcharge, blast-undercharge, blast-report-metrics,
+  blast-voxel-fragmentation, blast-voxel-fragmentation-visual, blast-preview-software-tiers,
+  blast-report-visual, blast-visual-full, blast-charge-sequence-visual,
+  blast-preview-tiers-visual, blast-workshop-french-visual, blast-preview-step-visual,
+  blast-sequence-step-visual, blast-fire-step-visual, multi-deck-blast, presplit-wall,
+  vibration-budget, collapse-recovery, rock-fragmenter-breaking, ramp-navigation,
+  blast-execution-visual
 
-### Batch 2 — blast-* (25)
-⬜ blast-basic · ⬜ blast-charge-loading-ui · ⬜ blast-charge-sequence-visual ·
-⬜ blast-detonation-sequence-ui · ⬜ blast-execution-effects ·
-⬜ blast-execution-visual · ⬜ blast-fire-step-visual ·
-⬜ blast-overcharge · ⬜ blast-preview-software-tiers ·
-⬜ blast-preview-step-visual · ⬜ blast-preview-tiers-visual ·
-⬜ blast-report-metrics · ⬜ blast-report-visual ·
-⬜ blast-sequence-step-visual · ⬜ blast-undercharge ·
-⬜ blast-visual-full · ⬜ blast-voxel-fragmentation ·
-⬜ blast-voxel-fragmentation-visual · ⬜ blast-workshop-french-visual ·
-⬜ multi-deck-blast · ⬜ presplit-wall · ⬜ rock-fragmenter-breaking ·
-⬜ vibration-budget · ⬜ ramp-navigation · ⬜ collapse-recovery
+All 43 interaction-verified in a real browser (each individually, and Batch 2
+re-verified as one 24-file batch run at the end to catch cross-file
+regressions). Batch 2 also fixed a real game bug (Finding #12,
+BlastReportModal) found only by actually running the clicks — command mode
+never would have caught it, since it never touches the modal.
+
+**Caution for whoever resumes:** `blast-visual-full` was inspected early in
+Batch 2 but its actual conversion was skipped in the first pass — it slipped
+through as "not yet role-marked = trivially unconstrained = passes" in a
+batch run, which read as done but wasn't. Don't trust a passing batch run
+alone as proof a file was converted; cross-check the status table (or grep
+for `"role"` in the file) before crossing it off.
+
+### Batch 2 — blast-* — ✅ COMPLETE (25 files, see Done list above + blast-execution-visual)
 
 ### Batch 3 — survey-* (13)
 ⬜ survey-confidence-display · ⬜ survey-confidence-overlay ·
@@ -298,6 +357,21 @@ got and whether main was merged recently.
   Findings #5-8 added (bundled setup steps must be split; rail-toggle bug
   is cross-role, not just player-to-player; BlastWorkshop auto-advances
   its internal tab; contract rows have no id-scoped selector). Full sweep
-  green (typecheck, 122/122 command mode). Next: Batch 2 (blast-*, 25
-  files) — expect the BlastWorkshop tab-navigation and charge/sequence
-  patterns from this batch to mostly carry over directly.
+  green (typecheck, 122/122 command mode).
+- 2026-08-06 — Merged main (landscape/terrain work, unrelated — clean,
+  no conflicts on the mechanism files).
+- 2026-08-06 — Batch 2 (25 files, all blast-*) converted and
+  interaction-verified, including a full 24-file batch re-run at the end
+  to catch cross-file regressions. Findings #9-14 added: per-hole
+  sequence/charge have no exact-value UI path (only relative steppers or
+  none at all); a per-hole-varying plan can fail validateBlastPlan in a
+  way command mode's runner doesn't surface; **a real game bug fixed**
+  (Finding #12 — BlastReportModal never reopened for a second blast fired
+  on the same tick; fixed with a regression test); and two self-inflicted
+  process bugs worth remembering — stale leading `command` actions
+  surviving a partial hand-conversion, and stale `interaction` content
+  surviving a role-only fix after an index mistake. `blast-visual-full`
+  initially slipped through unconverted in a passing batch run (see
+  caution note above the Done list) — caught and fixed before commit.
+  Full sweep green (typecheck, 283 files/8038 tests, 124/124 command
+  mode). Next: Batch 3 (survey-*, 13 files).

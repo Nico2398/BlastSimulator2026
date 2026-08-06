@@ -120,7 +120,14 @@ function describeReason(r: UnclickableReport): string {
  */
 export const OBSERVATION_COMMANDS = [
   'state', 'scores', 'finances', 'needs', 'inspect', 'fragments', 'stats',
-  'preview', 'blast_preview', 'blast_plan', 'terrain_info', 'help',
+  'preview', 'terrain_info', 'help',
+  // NOT here, on purpose: `blast_preview` ("Run Analysis") writes
+  // state.lastBlastPreview (mining.ts) — it is an action with a real button
+  // (`[data-action="run-analysis"]`), not a read; `preview <slice>` is the
+  // read of what it wrote. `blast_plan` is `save|load|list|validate` —
+  // save/load mutate, so the bare command can't be blanket-allowed either.
+  // Both were wrongly in this list originally; caught converting scenarios
+  // that actually click "Run Analysis" (issue #479).
 ] as const;
 
 /**

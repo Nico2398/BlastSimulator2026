@@ -10,25 +10,50 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "drill_plan grid rows:2 cols:3 spacing:4 depth:6 start:15,15",
       "interaction": [
         {
-          "type": "command",
-          "command": "drill_plan grid rows:2 cols:3 spacing:4 depth:6 start:15,15"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 15,
+          "z1": 15,
+          "x2": 23,
+          "z2": 19
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
       "interaction": [
         {
-          "type": "command",
-          "command": "charge hole:* explosive:boomite amount:5 stemming:2"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "charge hole:H1 explosive:boomite amount:8 stemming:3",
@@ -37,16 +62,18 @@
           "type": "command",
           "command": "charge hole:H1 explosive:boomite amount:8 stemming:3"
         }
-      ]
+      ],
+      "description": "charge hole:H1 explosive:boomite amount:8 stemming:3 — no per-hole charging in the UI by design (Charge.ts's own header: \"per-hole charging isn't a feature here anyway\"); only Charge All exists. Left as a command (Finding #10)."
     },
     {
       "command": "sequence auto delay_step:25",
       "interaction": [
         {
-          "type": "command",
-          "command": "sequence auto delay_step:25"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "sequence show",
@@ -55,7 +82,8 @@
           "type": "command",
           "command": "sequence show"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "sequence set hole:H1 delay:0",
@@ -64,7 +92,8 @@
           "type": "command",
           "command": "sequence set hole:H1 delay:0"
         }
-      ]
+      ],
+      "description": "sequence set hole:H1 delay:0 — per-hole delay is only reachable via relative +/- steppers ([data-hole=\"H1\"] [data-action=\"delay-inc\"/\"delay-dec\"]), not a set-to-value click; reaching an exact target would mean replicating Auto Sequence's row algorithm to compute a click count. Left as a command (Finding #9)."
     },
     {
       "command": "sequence set hole:H2 delay:50",
@@ -73,7 +102,8 @@
           "type": "command",
           "command": "sequence set hole:H2 delay:50"
         }
-      ]
+      ],
+      "description": "sequence set hole:H2 delay:50 — per-hole delay is only reachable via relative +/- steppers ([data-hole=\"H1\"] [data-action=\"delay-inc\"/\"delay-dec\"]), not a set-to-value click; reaching an exact target would mean replicating Auto Sequence's row algorithm to compute a click count. Left as a command (Finding #9)."
     },
     {
       "command": "sequence show",
@@ -82,7 +112,8 @@
           "type": "command",
           "command": "sequence show"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -91,7 +122,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "inspect 15,15,0",
@@ -100,7 +132,8 @@
           "type": "command",
           "command": "inspect 15,15,0"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ],
   "shots": [
