@@ -51,20 +51,50 @@ export type InteractionStepAction =
   | { type: 'assert'; selector?: string; property?: string; expectedValue?: unknown }
   | { type: 'viewport'; width: number; height: number }
   | { type: 'command'; command: string }
-  | { type: 'screenshot' };
+  | { type: 'screenshot' }
+  // ── Ported from the playability harness (issue #479) ──────────────────
+  // A player step can only be expressed in clicks if the vocabulary covers
+  // everything a player does, and the scenario vocabulary did not: there was
+  // no way to set a <select>, so a step like `charge hole:* explosive:X
+  // amount:Y` had no click-equivalent and stayed a console command. Each of
+  // these delegates to `runAction` in `playtest-driver.ts` — the same
+  // implementation the playtest channel uses, rather than a second copy that
+  // can drift from it.
+  /** Set a form control's value the way typing or picking would. */
+  | { type: 'set'; selector: string; value: string }
+  /** Click the first usable control whose label matches (case-insensitive). */
+  | { type: 'clickLabel'; label: string; region?: string }
+  /** Wait for a selector to exist and be genuinely usable, not merely present. */
+  | { type: 'awaitUsable'; selector: string; timeoutMs?: number }
+  /** Scroll the wheel out N ticks, to bring an off-screen tile into view. */
+  | { type: 'zoomOut'; ticks?: number }
+  /** Re-aim the camera at a world tile before clicking it. */
+  | { type: 'focusTile'; x: number; z: number; distance?: number }
+  /** Click a live scene entity by kind + id rather than a baked coordinate. */
+  | { type: 'clickEntity'; kind: 'building' | 'vehicle' | 'employee' | 'fragment'; id: number; distance?: number };
 
 /**
  * Whether a step's `interaction` models something the player must do by
  * clicking, or setup/observation the harness may still drive by console
  * command.
  *
- * Omitted means the step predates this distinction and is unconstrained —
- * true of every scenario except the pilot conversion (tutorial-interactive.json,
- * issue #479). A step opts in by setting this explicitly; nothing infers it
- * from the step's command, because inference is exactly the kind of
- * convention a future edit can quietly violate.
+ * The three categories are the ones issue #479 measured the suite against:
+ *
+ * - `player` — something a player does. May not reach the console at all.
+ * - `setup` — world bootstrapping and time control. May run a command, but
+ *   only one `isAllowedSetupCommand` admits, so this cannot quietly become a
+ *   hatch for gameplay commands.
+ * - `observe` — read-only inspection (`state`, `scores`, `vehicle list`).
+ *   This is how the harness records what happened, and it has no UI
+ *   equivalent by design, so it stays a command — but only a command on
+ *   `OBSERVATION_COMMANDS`, which is checked, not assumed.
+ *
+ * Omitted means the step predates this distinction and is unconstrained.
+ * A step opts in by setting this explicitly; nothing infers it from the
+ * step's command, because inference is exactly the kind of convention a
+ * future edit can quietly violate.
  */
-export type ScenarioStepRole = 'player' | 'setup';
+export type ScenarioStepRole = 'player' | 'setup' | 'observe';
 
 /**
  * Object form of a scenario step with command and optional interaction array.

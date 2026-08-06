@@ -12,6 +12,8 @@ import type { Page, KeyInput } from 'puppeteer';
 import type { InteractionStepAction, ScenarioStepDef } from './scenario-types.js';
 import { awaitPlacementArmed } from './tile-picker.js';
 import { isAllowedSetupCommand, SETUP_COMMAND_ALLOWLIST, TIME_COMMAND_ALLOWLIST } from './playtest-types.js';
+import type { PlayerAction } from './playtest-types.js';
+import { runAction } from './playtest-driver.js';
 
 /** How long a tile-space action waits for its picker to open. */
 const PICKER_TIMEOUT_MS = 5000;
@@ -108,6 +110,35 @@ function describeReason(r: UnclickableReport): string {
 }
 
 /**
+ * Read-only commands an `observe`-marked step may run.
+ *
+ * These report state rather than changing it, which is how a scenario records
+ * what happened — there is no button for "dump the game state", and there
+ * should not be. Kept as an explicit list rather than a naming convention
+ * (`*_list`, `*_status`) so that adding a mutating command to it is a visible
+ * edit here, not an accident of what somebody named a subcommand.
+ */
+export const OBSERVATION_COMMANDS = [
+  'state', 'scores', 'finances', 'needs', 'inspect', 'fragments', 'stats',
+  'preview', 'blast_preview', 'blast_plan', 'terrain_info', 'help',
+] as const;
+
+/**
+ * Read-only *subcommands*: `<command> list|status|show|types|mode|ore_report`
+ * inspects, where the bare command would act. `vehicle list` is an
+ * observation; `vehicle buy` is a player action.
+ */
+const OBSERVATION_SUBCOMMANDS = ['list', 'status', 'show', 'types', 'mode', 'ore_report'] as const;
+
+/** True when `command` only reports state. */
+export function isObservationCommand(command: string): boolean {
+  const [top, sub] = command.trim().split(/\s+/);
+  if (top === undefined) return false;
+  if ((OBSERVATION_COMMANDS as readonly string[]).includes(top)) return true;
+  return sub !== undefined && (OBSERVATION_SUBCOMMANDS as readonly string[]).includes(sub);
+}
+
+/**
  * Whether `action` (already known to be a `command`) may run inside `step`,
  * given the step's role (issue #479). Returns a message naming the step and
  * the reason when it may not; `null` when it is fine.
@@ -117,8 +148,10 @@ function describeReason(r: UnclickableReport): string {
  * still run a command, but only one `isAllowedSetupCommand` admits: the same
  * allowlist the playtest harness uses to bootstrap a world, reused rather
  * than reinvented so there is exactly one place that decides what counts as
- * "setup" instead of two that can drift apart. A step with no role is
- * unconstrained — see {@link ScenarioStepRole}.
+ * "setup" instead of two that can drift apart. An observe step is held to
+ * `isObservationCommand`, so "I only wanted to read the state" cannot smuggle
+ * a `build` through. A step with no role is unconstrained — see
+ * {@link ScenarioStepRole}.
  */
 export function checkStepActionAllowed(
   step: ScenarioStepDef,
@@ -132,6 +165,10 @@ export function checkStepActionAllowed(
   if (step.role === 'setup' && !isAllowedSetupCommand(action.command)) {
     return `step "${label}" is setup-marked but runs console command "${action.command}", `
       + `which is not on the setup allowlist (${[...SETUP_COMMAND_ALLOWLIST, ...TIME_COMMAND_ALLOWLIST].join(', ')}).`;
+  }
+  if (step.role === 'observe' && !isObservationCommand(action.command)) {
+    return `step "${label}" is observe-marked but runs console command "${action.command}", `
+      + `which changes state rather than reporting it — mark it "player" and click it, or "setup" if it bootstraps the world.`;
   }
   return null;
 }
@@ -348,6 +385,21 @@ export async function executeActionOnPage(
     case 'screenshot':
       // Screenshot is handled by the caller, not here
       break;
+    // The vocabulary shared with the playability harness (issue #479). These
+    // are structurally identical to their `PlayerAction` counterparts, so they
+    // run through `runAction` rather than being reimplemented here — one
+    // implementation means a converted scenario step and the playtest beat it
+    // mirrors genuinely do the same thing, including the failure diagnosis.
+    case 'set':
+    case 'clickLabel':
+    case 'awaitUsable':
+    case 'zoomOut':
+    case 'focusTile':
+    case 'clickEntity': {
+      const { type, ...rest } = action;
+      await runAction(page, { do: type, ...rest } as PlayerAction);
+      break;
+    }
     default: {
       // Exhaustiveness check
       const _exhaustive: never = action;

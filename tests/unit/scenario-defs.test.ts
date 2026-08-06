@@ -18,6 +18,10 @@ const KNOWN_INTERACTION_ACTION_TYPES = [
   'scroll', 'wheel',
   'wait', 'waitForSelector', 'waitForTutorialStep', 'type',
   'assert', 'viewport', 'command', 'screenshot',
+  // Shared with the playability harness (issue #479) — same names, same
+  // implementations, so a converted step and its playtest counterpart do the
+  // same thing. See InteractionStepAction in scripts/shared/scenario-types.ts.
+  'set', 'clickLabel', 'awaitUsable', 'zoomOut', 'focusTile', 'clickEntity',
 ] as const;
 
 const PLAYTHROUGH_SCENARIO_NAMES = [
@@ -620,18 +624,25 @@ describe('Every scenario step has a dual-play interaction array', () => {
       }
     });
 
-    it(`${name} — command-mirror steps replay step.command as their first action`, () => {
-      // UI-driven scenarios deliberately click real controls instead of
-      // replaying the command, so they are exempt; their `command` field is the
-      // command-mode equivalent, not a script for interaction mode.
-      if (UI_DRIVEN_SCENARIO_NAMES.includes(name as never)) return;
+    it(`${name} — unconverted steps still replay step.command as their first action`, () => {
+      // A role-marked step drives the UI instead of replaying the command, so
+      // it is exempt — its `command` field is the command-mode equivalent, not
+      // a script for interaction mode. Derived from the data rather than a
+      // hardcoded name list so that converting a scenario (issue #479) does not
+      // also require remembering to edit this test's exemption list; a step
+      // that is still unconverted is still held to the mirror rule.
       const scenario = loadScenarioDef(name, SCENARIO_DIR);
+      if (UI_DRIVEN_SCENARIO_NAMES.includes(name as never)) return;
       for (let i = 0; i < scenario.steps.length; i++) {
         const step = scenario.steps[i] as ScenarioStepDef;
         expect(step.interaction).toBeDefined();
         expect(step.interaction!.length).toBeGreaterThan(0);
+        if (step.role !== undefined) continue;
         const firstAction = step.interaction![0];
-        expect(firstAction.type).toBe('command');
+        expect(
+          firstAction.type,
+          `step[${i}] ("${step.command}") is unconverted, so its interaction must still mirror the command`,
+        ).toBe('command');
         if (firstAction.type === 'command') {
           expect(firstAction.command).toBe(step.command);
         }
@@ -674,14 +685,14 @@ describe('UI-driven scenarios click real controls', () => {
 // ──────────────────────────────────────────────
 describe('Step role field is a recognized value when present', () => {
   for (const name of ALL_SCENARIO_NAMES) {
-    it(`${name} — every step's role, if set, is "player" or "setup"`, () => {
+    it(`${name} — every step's role, if set, is "player", "setup" or "observe"`, () => {
       const scenario = loadScenarioDef(name, SCENARIO_DIR);
       for (let i = 0; i < scenario.steps.length; i++) {
         const step = scenario.steps[i] as ScenarioStepDef;
         if (step.role === undefined) continue;
         expect(
-          ['player', 'setup'],
-          `step[${i}] role "${step.role}" must be "player" or "setup"`,
+          ['player', 'setup', 'observe'],
+          `step[${i}] role "${step.role}" must be "player", "setup" or "observe"`,
         ).toContain(step.role);
       }
     });
@@ -744,6 +755,25 @@ describe('Role-marked steps obey checkStepActionAllowed (issue #479)', () => {
     const violation = checkStepActionAllowed(step, { type: 'command', command: cheat });
     expect(violation).not.toBeNull();
     expect(violation).toContain(cheat);
+  });
+
+  it('an observe-marked step may run a read-only command', () => {
+    for (const readOnly of ['state full', 'scores', 'vehicle list', 'contract status', 'drill_plan show']) {
+      const step: ScenarioStepDef = { command: readOnly, role: 'observe' };
+      expect(
+        checkStepActionAllowed(step, { type: 'command', command: readOnly }),
+        `"${readOnly}" reports state and must be allowed`,
+      ).toBeNull();
+    }
+  });
+
+  it('an observe-marked step is rejected for a command that changes state', () => {
+    for (const mutating of ['vehicle buy debris_hauler', 'build freight_warehouse at:4,4', 'contract accept 1']) {
+      const step: ScenarioStepDef = { command: mutating, role: 'observe' };
+      const violation = checkStepActionAllowed(step, { type: 'command', command: mutating });
+      expect(violation, `"${mutating}" changes state and must be refused`).not.toBeNull();
+      expect(violation).toContain('changes state rather than reporting it');
+    }
   });
 
   it('a step with no role tag is unconstrained (predates the distinction)', () => {

@@ -97,7 +97,11 @@ async function runBatchInteraction(
         // tutorial stalled. Every other interaction harness (initBrowser,
         // scenario-test) already navigates with it; this batch runner did not.
         await page.goto(`http://localhost:${port}/?scenarioMode=1`, { waitUntil: 'domcontentloaded' });
-        await page.waitForSelector('#game-canvas, canvas', { timeout: 10000 });
+        // 30s, not 10s: a fresh tab boots the renderer with no GPU, and the
+        // first scenario of a batch pays that cold start on top. At 10s this
+        // flaked as "Waiting for selector `#game-canvas, canvas` failed",
+        // which reads like a broken page rather than a slow one.
+        await page.waitForSelector('#game-canvas, canvas', { timeout: 30000 });
         // Main menu starts visible, same as initBrowser() — each scenario's
         // own `new_game` first step tears it down (main.ts console bridge).
         // Batch mode passes enableScreenshots=false, so nothing here reads

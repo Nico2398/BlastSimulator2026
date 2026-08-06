@@ -1,16 +1,17 @@
 {
   "name": "vehicle-purchase-visual",
-  "description": "Visual check: purchase vehicle deducts cost from cash, mesh appears in scene, fleet shows idle state",
+  "description": "Visual check: purchase vehicle deducts cost from cash, mesh appears in scene, fleet shows idle state. Vehicle purchases are made by clicking the dealership rows in the Fleet panel (issue #479), not by typing `vehicle buy`; the list/scores steps stay observation commands.",
   "steps": [
     {
       "command": "new_game seed:42",
-      "timeout": 10,
+      "timeout": 30,
       "interaction": [
         {
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -19,7 +20,8 @@
           "type": "command",
           "command": "campaign start level:dusty_hollow"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "scores",
@@ -28,16 +30,29 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "vehicle buy debris_hauler",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle buy debris_hauler"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "screenshot"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "scores",
@@ -46,7 +61,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "vehicle list",
@@ -55,7 +71,8 @@
           "type": "command",
           "command": "vehicle list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "vehicle buy drill_rig",
@@ -64,7 +81,8 @@
           "type": "command",
           "command": "vehicle buy drill_rig"
         }
-      ]
+      ],
+      "description": "BLOCKED FINDING, left unconverted deliberately: no player can reach this state. After the hauler above, cash is short of a drill rig, so the Fleet panel correctly disables its buy button — but `vehicle buy` subtracts the cost unconditionally and drives cash negative, so command mode succeeds where the UI refuses. `research queue`, `employee train` and `survey` all reject an unaffordable purchase; `vehicle buy`, `employee hire` and `build` do not. Filed as a separate finding rather than papered over with a click that cannot land (.claude/rules/playability.md)."
     },
     {
       "command": "vehicle list",
@@ -73,7 +91,8 @@
           "type": "command",
           "command": "vehicle list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -82,7 +101,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ],
   "shots": [
