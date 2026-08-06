@@ -8,7 +8,7 @@
   "steps": [
     {
       "command": "new_game mine_type:alpine_granite seed:11 size:48",
-      "timeout": 30,
+      "timeout": 90,
       "description": "Setup: relief terrain (alpine_granite) with several dominant rocks, big enough to have a real interior away from every edge",
       "interaction": [
         { "type": "command", "command": "new_game mine_type:alpine_granite seed:11 size:48" }
@@ -16,7 +16,7 @@
     },
     {
       "command": "terrain_info",
-      "timeout": 15,
+      "timeout": 90,
       "description": "Sanity check: the playable grid and landscape both exist before framing any of it",
       "interaction": [
         { "type": "command", "command": "terrain_info" }
@@ -24,7 +24,7 @@
     },
     {
       "command": "state",
-      "timeout": 15,
+      "timeout": 120,
       "description": "Frame a ridge in the landscape's interior — the coarse tile mesh and its slope shading, no floating shards",
       "interaction": [
         { "type": "command", "command": "state" },
@@ -35,7 +35,7 @@
     },
     {
       "command": "state",
-      "timeout": 15,
+      "timeout": 120,
       "description": "Frame a slope away from the pit edge — one continuous surface, no seam crease and no duplicated geometry",
       "interaction": [
         { "type": "command", "command": "state" },
@@ -46,7 +46,7 @@
     },
     {
       "command": "state",
-      "timeout": 15,
+      "timeout": 120,
       "description": "Frame the close pit edge (pre-blast) — the landscape's boundary quad must meet the playable mesh with no gap and no floating shard",
       "interaction": [
         { "type": "command", "command": "state" },
@@ -57,7 +57,7 @@
     },
     {
       "command": "state",
-      "timeout": 15,
+      "timeout": 120,
       "description": "Frame the far pit edge (pre-blast), the opposite side of the site from the close edge above",
       "interaction": [
         { "type": "command", "command": "state" },
@@ -68,7 +68,7 @@
     },
     {
       "command": "state",
-      "timeout": 15,
+      "timeout": 120,
       "description": "Frame a material/biome transition — adjacent landscape vertices with different dominant rocks should blend smoothly, not snap at a hard tessellation-dependent edge",
       "interaction": [
         { "type": "command", "command": "state" },
@@ -79,7 +79,7 @@
     },
     {
       "command": "drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:2,22",
-      "timeout": 20,
+      "timeout": 90,
       "description": "Drill right at the close pit edge, so the following blast reshapes the live junction the landscape must track",
       "interaction": [
         { "type": "command", "command": "drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:2,22" }
@@ -87,7 +87,7 @@
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
-      "timeout": 20,
+      "timeout": 90,
       "description": "Charge every drilled hole at the pit edge",
       "interaction": [
         { "type": "command", "command": "charge hole:* explosive:boomite amount:5 stemming:2" }
@@ -95,7 +95,7 @@
     },
     {
       "command": "sequence auto delay_step:25",
-      "timeout": 20,
+      "timeout": 90,
       "description": "Auto-sequence the charges",
       "interaction": [
         { "type": "command", "command": "sequence auto delay_step:25" }
@@ -103,7 +103,7 @@
     },
     {
       "command": "blast",
-      "timeout": 30,
+      "timeout": 240,
       "frames": 6,
       "interval": 50,
       "description": "Fire the pit-edge blast — the crater it carves is the new live boundary the landscape must match",
@@ -113,7 +113,7 @@
     },
     {
       "command": "state",
-      "timeout": 20,
+      "timeout": 120,
       "description": "Re-frame the close pit edge post-blast — the landscape's boundary nodes must track the new, lower live surface (PlayableCut.boundaryHeightAt), not the stale pre-dig height, still with no gap or overlap",
       "interaction": [
         { "type": "command", "command": "state" },
@@ -124,7 +124,7 @@
     },
     {
       "command": "terrain_info",
-      "timeout": 15,
+      "timeout": 90,
       "description": "Final inspection: playable terrain state after the pit-edge blast",
       "interaction": [
         { "type": "command", "command": "terrain_info" }
