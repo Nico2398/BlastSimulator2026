@@ -18,12 +18,19 @@
       }
     },
     {
-      "goal": "close Settings and start the tutorial — the coach card must open already in French, not the English baked in when TutorialOverlay was constructed at page load",
-      "setup": [
-        "tutorial_start"
-      ],
+      "goal": "close Settings before the tutorial starts — its toggle and the panel's own close button both go rail-locked the instant tutorial_start engages the rails",
       "actions": [
         { "do": "click", "selector": "#bs-toolbar [data-panel=\"settings\"]" }
+      ],
+      "expect": {
+        "blocked": "#bs-settings-panel [data-lang=\"fr\"]",
+        "note": "Confirms the panel actually closed/hid rather than just deselected — the click must land before tutorial_start engages the rails in the next beat."
+      }
+    },
+    {
+      "goal": "start the tutorial — the coach card must open already in French, not the English baked in when TutorialOverlay was constructed at page load",
+      "setup": [
+        "tutorial_start"
       ],
       "expect": {
         "tutorialStep": "time-speed",
