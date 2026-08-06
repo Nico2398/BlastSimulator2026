@@ -167,6 +167,36 @@ here for a follow-up issue.
 4. **`run-all-scenarios.ts` waited only 10s for the canvas** on a cold
    tab, which flaked under no-GPU rasterization. **Fixed** — raised to 30s
    (`scripts/run-all-scenarios.ts`).
+5. **Some scenario files bundle several distinct setup+player commands
+   into one JSON step's `interaction` array** (a "big setup blob" pattern,
+   seen in `crew-fleet-panels-visual`/`money-surfaces-visual`), rather
+   than one command per step like `tutorial-interactive.json`. A single
+   step can only carry one role, so a bundled step mixing `new_game` with
+   `employee hire` etc. cannot be tagged at all. **Fix: split the step**
+   into one JSON step per command, each independently role-marked. Check
+   the *full* `interaction` array before converting a step, not just its
+   `command` field summary — a step whose `command` looks like a simple
+   `state` can still have a multi-command `interaction` array from before
+   this mechanism existed.
+6. **The rail-toggle bug (Finding #3) isn't limited to consecutive
+   player steps — it applies across ANY consecutive steps that touch the
+   same panel, including an `observe` step that opens a panel for a
+   screenshot immediately followed by a `player` step on the same panel.**
+   Track "which panel is currently open" as running state across the
+   *whole* step sequence when converting a file, not just within a single
+   step or a single role.
+7. **BlastWorkshop auto-advances its internal step** (Drill → Charge →
+   Sequence → Preview → Fire) once its own completion heuristic is met —
+   e.g. once holes exist, it can advance off Drill on its own. Re-using an
+   earlier step's control (e.g. the grid tool for a second `drill_plan
+   grid`) needs an explicit click back to that tab first:
+   `#bs-blast-panel [data-step="N"]` (N = 1..5, 1=Drill).
+8. **Contract offer rows carry no id-scoped selector** — there is no way
+   to click "negotiate contract 1" vs "accept contract 2" specifically
+   when multiple offers are on screen; only "the first offer" resolves
+   unambiguously (proven in `contract-panel-visual.json`). A scenario that
+   needs a *specific* contract id among several offers stays a command for
+   that portion.
 
 _(Add new findings here as you hit them. Number sequentially.)_
 
@@ -190,19 +220,13 @@ for f in sorted(os.listdir(d)):
 EOF
 ```
 
-### ✅ Done (4)
-- tutorial-interactive
-- vehicle-purchase-visual
-- contract-panel-visual
-- event-dialog-visual
-
-### Batch 1 — small/simple, build momentum (target next)
-⬜ ambient-life-visual · ⬜ weather-popover-visual · ⬜ wind-clouds-visual ·
-⬜ survey-panel-visual · ⬜ loading-screen-visual · ⬜ scene-picking-visual ·
-⬜ nav-cell-types-visual · ⬜ nav-minimap-integration-visual ·
-⬜ blast-hole-picking-visual · ⬜ blast-drill-plan-ui ·
-⬜ blast-drill-plan-visual · ⬜ i18n-live-locale-switch ·
-⬜ crew-fleet-panels-visual · ⬜ money-surfaces-visual
+### ✅ Done (18)
+- tutorial-interactive, vehicle-purchase-visual, contract-panel-visual, event-dialog-visual
+- ambient-life-visual, weather-popover-visual, wind-clouds-visual, survey-panel-visual,
+  loading-screen-visual, scene-picking-visual, nav-cell-types-visual,
+  nav-minimap-integration-visual, blast-hole-picking-visual, blast-drill-plan-ui,
+  blast-drill-plan-visual, i18n-live-locale-switch, crew-fleet-panels-visual,
+  money-surfaces-visual (Batch 1, all interaction-verified in a real browser)
 
 ### Batch 2 — blast-* (25)
 ⬜ blast-basic · ⬜ blast-charge-loading-ui · ⬜ blast-charge-sequence-visual ·
@@ -262,7 +286,7 @@ EOF
 ⬜ level2-playthrough-bankruptcy · ⬜ level2-playthrough-win ·
 ⬜ level3-playthrough-ecology · ⬜ level3-playthrough-win
 
-118 total remaining across all batches.
+104 total remaining across batches 2-7.
 
 ## Session log
 
@@ -270,3 +294,10 @@ Append a line each time you resume, so it's clear how far a given session
 got and whether main was merged recently.
 
 - 2026-08-06 — plan created; 4 files done pre-plan (mechanism + pilot batch).
+- 2026-08-06 — Batch 1 (14 files) converted and interaction-verified.
+  Findings #5-8 added (bundled setup steps must be split; rail-toggle bug
+  is cross-role, not just player-to-player; BlastWorkshop auto-advances
+  its internal tab; contract rows have no id-scoped selector). Full sweep
+  green (typecheck, 122/122 command mode). Next: Batch 2 (blast-*, 25
+  files) — expect the BlastWorkshop tab-navigation and charge/sequence
+  patterns from this batch to mostly carry over directly.

@@ -10,16 +10,40 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "drill_plan grid rows:3 cols:4 spacing:5 depth:8 start:20,20",
       "interaction": [
         {
-          "type": "command",
-          "command": "drill_plan grid rows:3 cols:4 spacing:5 depth:8 start:20,20"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 20,
+          "z1": 20,
+          "x2": 35,
+          "z2": 30
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "drill_plan show",
@@ -28,7 +52,8 @@
           "type": "command",
           "command": "drill_plan show"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -37,7 +62,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "inspect 20,20,0",
@@ -46,7 +72,8 @@
           "type": "command",
           "command": "inspect 20,20,0"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ],
   "shots": [

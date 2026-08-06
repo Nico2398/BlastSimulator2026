@@ -1,25 +1,127 @@
 {
   "name": "money-surfaces-visual",
-  "description": "Redesign P5: Contracts, Finances, and Operations panels rendered with real state — a blasted plan (spend + fragments + logistics), one negotiated offer, one accepted contract, and a shift-policy change. Plan origin (5,5), not (10,10): see blast-workshop-french-visual.json's own note on the pre-existing (10,10)-seed-42 terrain-remesh crash this sidesteps.",
+  "description": "Redesign P5: Contracts, Finances, and Operations panels rendered with real state — a blasted plan (spend + fragments + logistics), one negotiated offer, one accepted contract, and a shift-policy change. Plan origin (5,5), not (10,10): see blast-workshop-french-visual.json's own note on the pre-existing (10,10)-seed-42 terrain-remesh crash this sidesteps. Setup split so the blast pipeline steps are individually role-marked and clicked for real (issue #479); the multi-offer contract targeting stays a command (see step description) because offer rows have no id-scoped selector.",
   "shots": [
-    { "name": "overview", "yaw": 0, "pitch": 45, "target": [5, 5], "distance": 15 }
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45,
+      "target": [
+        5,
+        5
+      ],
+      "distance": 15
+    }
   ],
   "steps": [
     {
       "command": "new_game seed:42 size:32",
       "timeout": 30,
-      "description": "Setup: a small blasted plan (spend + fragments for Finances/Operations), then two contract offers — one negotiated (left in Offered, for the inline result), one accepted (moved to Active)",
+      "role": "setup",
       "interaction": [
-        { "type": "command", "command": "new_game seed:42 size:32" },
-        { "type": "command", "command": "drill_plan grid origin:5,5 rows:2 cols:2 spacing:3 depth:6" },
-        { "type": "command", "command": "charge hole:* explosive:boomite amount:5kg stemming:2m" },
-        { "type": "command", "command": "sequence auto delay_step:25" },
-        { "type": "command", "command": "blast" },
-        { "type": "wait", "durationMs": 300 },
-        { "type": "clickSelector", "selector": "[data-action=\"report-close\"]" },
-        { "type": "command", "command": "contract list" },
-        { "type": "command", "command": "contract negotiate id:1" },
-        { "type": "command", "command": "contract accept id:2" }
+        {
+          "type": "command",
+          "command": "new_game seed:42 size:32"
+        }
+      ]
+    },
+    {
+      "command": "drill_plan grid origin:5,5 rows:2 cols:2 spacing:3 depth:6",
+      "timeout": 60,
+      "role": "player",
+      "description": "Split out of the original bundled setup step (issue #479).",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 5,
+          "z1": 5,
+          "x2": 8,
+          "z2": 8
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:5kg stemming:2m",
+      "timeout": 30,
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+        }
+      ]
+    },
+    {
+      "command": "sequence auto delay_step:25",
+      "timeout": 30,
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
+        }
+      ]
+    },
+    {
+      "command": "blast",
+      "timeout": 60,
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
+        }
+      ]
+    },
+    {
+      "command": "contract accept id:2",
+      "timeout": 30,
+      "description": "BLOCKED FINDING, left unconverted deliberately: offered-contract rows carry no id-scoped selector, so negotiating contract 1 and accepting contract 2 specifically can't be expressed as a reliable click — only \"the first offer\" resolves unambiguously (proven in contract-panel-visual.json). A click here risks acting on the wrong contract, which is worse than staying a command.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract list"
+        },
+        {
+          "type": "command",
+          "command": "contract negotiate id:1"
+        },
+        {
+          "type": "command",
+          "command": "contract accept id:2"
+        }
       ]
     },
     {
@@ -27,47 +129,92 @@
       "timeout": 30,
       "description": "Contracts panel: storage strip, one active card, offered cards with the negotiate result inline on #1",
       "interaction": [
-        { "type": "command", "command": "state" },
-        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"contracts\"]" },
-        { "type": "wait", "durationMs": 300 },
-        { "type": "screenshot" }
-      ]
+        {
+          "type": "command",
+          "command": "state"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"contracts\"]"
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "observe"
     },
     {
       "command": "state",
       "timeout": 30,
       "description": "Finances panel: real balance/trend/runway, category bars from the blast spend, ledger — opened via the TopBar balance click, not a rail button",
       "interaction": [
-        { "type": "command", "command": "state" },
-        { "type": "clickSelector", "selector": "[data-action=\"open-finances\"]" },
-        { "type": "wait", "durationMs": 300 },
-        { "type": "screenshot" }
-      ]
+        {
+          "type": "command",
+          "command": "state"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"open-finances\"]"
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "observe"
     },
     {
       "command": "state",
       "timeout": 30,
       "description": "Operations panel: logistics rows from the blast's fragments, empty ore-on-hand/incidents states, site policy card",
       "interaction": [
-        { "type": "command", "command": "state" },
-        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"ops\"]" },
-        { "type": "wait", "durationMs": 300 },
-        { "type": "screenshot" }
-      ]
+        {
+          "type": "command",
+          "command": "state"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"ops\"]"
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "observe"
     },
     {
       "command": "set_policy mode:shift_12h",
       "timeout": 30,
       "description": "Operations panel: clicking a shift pill and Apply is a real, clickable interaction — pill highlight updates, note text changes, Apply dispatches set_policy",
       "interaction": [
-        { "type": "command", "command": "set_policy mode:shift_12h" },
-        { "type": "clickSelector", "selector": "#bs-policy-shift [data-shift-mode=\"shift_12h\"]" },
-        { "type": "wait", "durationMs": 150 },
-        { "type": "screenshot" },
-        { "type": "clickSelector", "selector": "#bs-policy-apply" },
-        { "type": "wait", "durationMs": 300 },
-        { "type": "screenshot" }
-      ]
+        {
+          "type": "waitForSelector",
+          "selector": "[data-shift-mode=\"shift_12h\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-shift-mode=\"shift_12h\"]"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-policy-apply"
+        }
+      ],
+      "role": "player"
     }
   ]
 }

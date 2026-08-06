@@ -5,18 +5,30 @@
     {
       "command": "new_game seed:42",
       "interaction": [
-        { "type": "command", "command": "new_game seed:42" }
-      ]
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ],
+      "role": "setup"
     },
     {
       "command": "campaign start level:dusty_hollow",
       "description": "A real (non-tutorial) level so the landscape zone is big enough to show tree cover, and any villages/rivers within camera range.",
       "interaction": [
-        { "type": "command", "command": "campaign start level:dusty_hollow" }
-      ]
+        {
+          "type": "command",
+          "command": "campaign start level:dusty_hollow"
+        }
+      ],
+      "role": "setup"
     }
   ],
   "shots": [
-    { "name": "wide", "yaw": 20, "pitch": 70 }
+    {
+      "name": "wide",
+      "yaw": 20,
+      "pitch": 70
+    }
   ]
 }

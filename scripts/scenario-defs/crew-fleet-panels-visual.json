@@ -1,54 +1,163 @@
 {
   "name": "crew-fleet-panels-visual",
-  "description": "Redesign P6: Operations panel's unclaimed-work line, and (once wired in P6-cleanup) the Crew and Fleet panels themselves.",
+  "description": "Redesign P6: Operations panel's unclaimed-work line, and (once wired in P6-cleanup) the Crew and Fleet panels themselves. Setup split into one step per action so each is individually role-marked (issue #479); the four hire/buy actions are all real clicks, not console commands.",
   "shots": [
-    { "name": "overview", "yaw": 0, "pitch": 45, "target": [5, 5], "distance": 15 }
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45,
+      "target": [
+        5,
+        5
+      ],
+      "distance": 15
+    }
   ],
   "steps": [
     {
       "command": "new_game seed:42 size:32",
       "timeout": 30,
-      "description": "Setup: hire a driller and a driver so the crew roster is non-empty, buy a hauler and a drill rig (unlicensed) for the fleet.",
+      "role": "setup",
       "interaction": [
-        { "type": "command", "command": "new_game seed:42 size:32" },
-        { "type": "command", "command": "employee hire role:driller" },
-        { "type": "command", "command": "employee hire role:driver" },
-        { "type": "command", "command": "vehicle buy debris_hauler tier:1" },
-        { "type": "command", "command": "vehicle buy drill_rig tier:1" }
+        {
+          "type": "command",
+          "command": "new_game seed:42 size:32"
+        }
       ]
+    },
+    {
+      "command": "employee hire role:driller",
+      "timeout": 30,
+      "role": "player",
+      "description": "Split out of the original bundled setup step so each command gets its own role (issue #479).",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:driver",
+      "timeout": 30,
+      "role": "player",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ]
+    },
+    {
+      "command": "vehicle buy debris_hauler tier:1",
+      "timeout": 30,
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+        }
+      ]
+    },
+    {
+      "command": "vehicle buy drill_rig tier:1",
+      "timeout": 30,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle buy drill_rig tier:1"
+        }
+      ],
+      "description": "BLOCKED FINDING (same as Finding #1 in the plan doc): after buying a debris_hauler, cash is short of a tier-1 drill rig too, so the Fleet panel correctly disables the button. `vehicle buy` doesn't guard affordability in command mode, so it succeeds there. Left as a command deliberately rather than a click that cannot land."
     },
     {
       "command": "state",
       "timeout": 30,
       "description": "Operations panel: real logistics rows plus the new single 'Unclaimed Work' line (count from state.pendingActions, not one row repeated per eligible employee — that per-employee repeat is exactly what #39 removed).",
       "interaction": [
-        { "type": "command", "command": "state" },
-        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"ops\"]" },
-        { "type": "wait", "durationMs": 300 },
-        { "type": "screenshot" }
-      ]
+        {
+          "type": "command",
+          "command": "state"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"ops\"]"
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "observe"
     },
     {
       "command": "state",
       "timeout": 30,
       "description": "Crew panel wired into UIManager (P6-cleanup): roster cards render with the driller and driver hired in step 0, under the ui.crew.* namespace.",
       "interaction": [
-        { "type": "command", "command": "state" },
-        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"employees\"]" },
-        { "type": "wait", "durationMs": 300 },
-        { "type": "screenshot" }
-      ]
+        {
+          "type": "command",
+          "command": "state"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "observe"
     },
     {
       "command": "state",
       "timeout": 30,
       "description": "Fleet panel wired into UIManager (P6-cleanup): vehicle cards render with the hauler and drill rig bought in step 0, under the ui.fleet.* namespace.",
       "interaction": [
-        { "type": "command", "command": "state" },
-        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"vehicles\"]" },
-        { "type": "wait", "durationMs": 300 },
-        { "type": "screenshot" }
-      ]
+        {
+          "type": "command",
+          "command": "state"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "observe"
     }
   ]
 }

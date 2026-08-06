@@ -2,7 +2,16 @@
   "name": "blast-hole-picking-visual",
   "description": "Redesign P4/#21: drill holes join the P2 scene-picking system. Clicking a hole marker shows a selection ring plus the bottom selection bar with the hole's id, depth, and a Focus action; Esc deselects both.",
   "shots": [
-    { "name": "overview", "yaw": 0, "pitch": 45, "target": [10, 10], "distance": 15 }
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45,
+      "target": [
+        10,
+        10
+      ],
+      "distance": 15
+    }
   ],
   "steps": [
     {
@@ -10,41 +19,109 @@
       "timeout": 30,
       "description": "Setup: a fresh site with open ground around the origin",
       "interaction": [
-        { "type": "command", "command": "new_game seed:42 size:32" }
-      ]
+        {
+          "type": "command",
+          "command": "new_game seed:42 size:32"
+        }
+      ],
+      "role": "setup"
     },
     {
       "command": "drill_plan grid origin:10,10 rows:1 cols:1 spacing:3 depth:8",
       "timeout": 30,
       "description": "Setup: a single drill hole (H1) at a known position — its own position is the click target",
       "interaction": [
-        { "type": "command", "command": "drill_plan grid origin:10,10 rows:1 cols:1 spacing:3 depth:8" }
-      ]
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 10,
+          "z1": 10,
+          "x2": 10,
+          "z2": 10
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player"
     },
     {
       "command": "state",
       "timeout": 30,
       "description": "Click the hole marker — a dashed selection ring appears on the ground and the bottom selection bar shows the hole's id/depth and a Focus action",
       "interaction": [
-        { "type": "command", "command": "state" },
-        { "type": "cameraFocus", "x": 10, "z": 10, "distance": 8 },
-        { "type": "click", "x": 640, "y": 360 },
-        { "type": "wait", "durationMs": 300 },
-        { "type": "waitForSelector", "selector": "#bs-selection-bar [data-action=\"focus\"]" },
-        { "type": "screenshot" }
-      ]
+        {
+          "type": "command",
+          "command": "state"
+        },
+        {
+          "type": "cameraFocus",
+          "x": 10,
+          "z": 10,
+          "distance": 8
+        },
+        {
+          "type": "click",
+          "x": 640,
+          "y": 360
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-selection-bar [data-action=\"focus\"]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "observe"
     },
     {
       "command": "state",
       "timeout": 30,
       "description": "Esc deselects — the ring and the selection bar both disappear",
       "interaction": [
-        { "type": "command", "command": "state" },
-        { "type": "cameraFocus", "x": 10, "z": 10, "distance": 8 },
-        { "type": "keypress", "key": "Escape" },
-        { "type": "wait", "durationMs": 200 },
-        { "type": "screenshot" }
-      ]
+        {
+          "type": "command",
+          "command": "state"
+        },
+        {
+          "type": "cameraFocus",
+          "x": 10,
+          "z": 10,
+          "distance": 8
+        },
+        {
+          "type": "keypress",
+          "key": "Escape"
+        },
+        {
+          "type": "wait",
+          "durationMs": 200
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "observe"
     }
   ]
 }

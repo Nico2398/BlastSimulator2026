@@ -6,19 +6,30 @@
       "command": "new_game seed:42 size:24",
       "timeout": 15,
       "interaction": [
-        { "type": "command", "command": "new_game seed:42 size:24" }
-      ]
+        {
+          "type": "command",
+          "command": "new_game seed:42 size:24"
+        }
+      ],
+      "role": "setup"
     },
     {
       "command": "employee hire role:surveyor",
       "interaction": [
-        { "type": "command", "command": "employee hire role:surveyor" },
-        { "type": "command", "command": "survey seismic x:12 z:12" },
-        { "type": "command", "command": "tick 20" },
-        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"survey\"]" },
-        { "type": "wait", "durationMs": 300 },
-        { "type": "screenshot" }
-      ]
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        }
+      ],
+      "role": "player"
     }
   ]
 }

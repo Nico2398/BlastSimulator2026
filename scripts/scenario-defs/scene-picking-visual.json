@@ -2,8 +2,21 @@
   "name": "scene-picking-visual",
   "description": "Redesign P2: hovering and clicking scene entities (raycaster over terrain + entity meshes). Hover a placed building — the debounced hover tag should show its name and HP; click it — a selection ring should appear on the ground and the bottom selection bar should show Upgrade/Move/Demolish; Esc deselects — both disappear; hovering bare terrain shows tile coordinates and 'no survey data'.",
   "shots": [
-    { "name": "overview", "yaw": 0, "pitch": 45 },
-    { "name": "closeup", "yaw": 30, "pitch": 35, "target": [11, 11], "distance": 12 }
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45
+    },
+    {
+      "name": "closeup",
+      "yaw": 30,
+      "pitch": 35,
+      "target": [
+        11,
+        11
+      ],
+      "distance": 12
+    }
   ],
   "steps": [
     {
@@ -11,65 +24,167 @@
       "timeout": 30,
       "description": "Setup: a fresh site with open ground around the origin",
       "interaction": [
-        { "type": "command", "command": "new_game seed:42 size:32" }
-      ]
+        {
+          "type": "command",
+          "command": "new_game seed:42 size:32"
+        }
+      ],
+      "role": "setup"
     },
     {
       "command": "build management_office at:10,10 tier:1",
       "timeout": 30,
       "description": "Setup: place a building at a known tile — its footprint centre (11, 11) is the click target",
       "interaction": [
-        { "type": "command", "command": "build management_office at:10,10 tier:1" }
-      ]
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"management_office\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 10,
+          "z": 10
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player"
     },
     {
       "command": "state",
       "timeout": 30,
       "description": "Frame the building dead-centre, then hover it — the tag should appear once the 60ms debounce settles, showing the building's name and HP",
       "interaction": [
-        { "type": "command", "command": "state" },
-        { "type": "cameraFocus", "x": 11, "z": 11, "distance": 15 },
-        { "type": "mousemove", "x": 640, "y": 360 },
-        { "type": "wait", "durationMs": 300 },
-        { "type": "screenshot" }
-      ]
+        {
+          "type": "command",
+          "command": "state"
+        },
+        {
+          "type": "cameraFocus",
+          "x": 11,
+          "z": 11,
+          "distance": 15
+        },
+        {
+          "type": "mousemove",
+          "x": 640,
+          "y": 360
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "observe"
     },
     {
       "command": "state",
       "timeout": 30,
       "description": "Click the building — a dashed selection ring appears on the ground and the bottom selection bar shows Upgrade/Move/Demolish",
       "interaction": [
-        { "type": "command", "command": "state" },
-        { "type": "cameraFocus", "x": 11, "z": 11, "distance": 15 },
-        { "type": "click", "x": 640, "y": 360 },
-        { "type": "wait", "durationMs": 300 },
-        { "type": "waitForSelector", "selector": "#bs-selection-bar [data-action=\"upgrade\"]" },
-        { "type": "screenshot" }
-      ]
+        {
+          "type": "command",
+          "command": "state"
+        },
+        {
+          "type": "cameraFocus",
+          "x": 11,
+          "z": 11,
+          "distance": 15
+        },
+        {
+          "type": "click",
+          "x": 640,
+          "y": 360
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-selection-bar [data-action=\"upgrade\"]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "observe"
     },
     {
       "command": "state",
       "timeout": 30,
       "description": "Esc deselects — the ring and the selection bar both disappear",
       "interaction": [
-        { "type": "command", "command": "state" },
-        { "type": "cameraFocus", "x": 11, "z": 11, "distance": 15 },
-        { "type": "keypress", "key": "Escape" },
-        { "type": "wait", "durationMs": 200 },
-        { "type": "screenshot" }
-      ]
+        {
+          "type": "command",
+          "command": "state"
+        },
+        {
+          "type": "cameraFocus",
+          "x": 11,
+          "z": 11,
+          "distance": 15
+        },
+        {
+          "type": "keypress",
+          "key": "Escape"
+        },
+        {
+          "type": "wait",
+          "durationMs": 200
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "observe"
     },
     {
       "command": "state",
       "timeout": 30,
       "description": "Hover bare terrain away from the building — the tag shows tile coordinates and 'no survey data' (nothing has surveyed this column)",
       "interaction": [
-        { "type": "command", "command": "state" },
-        { "type": "cameraFocus", "x": 5, "z": 5, "distance": 22 },
-        { "type": "mousemove", "x": 640, "y": 450 },
-        { "type": "wait", "durationMs": 300 },
-        { "type": "screenshot" }
-      ]
+        {
+          "type": "command",
+          "command": "state"
+        },
+        {
+          "type": "cameraFocus",
+          "x": 5,
+          "z": 5,
+          "distance": 22
+        },
+        {
+          "type": "mousemove",
+          "x": 640,
+          "y": 450
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "observe"
     }
   ]
 }

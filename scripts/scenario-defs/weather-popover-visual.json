@@ -6,17 +6,32 @@
       "command": "new_game seed:42 size:24",
       "timeout": 15,
       "interaction": [
-        { "type": "command", "command": "new_game seed:42 size:24" }
-      ]
+        {
+          "type": "command",
+          "command": "new_game seed:42 size:24"
+        }
+      ],
+      "role": "setup"
     },
     {
       "command": "weather set storm",
-      "description": "A rainy state gives the popover's effect line and advisory something real to say, and the outlook strip mixed icons to render.",
+      "description": "A rainy state gives the popover's effect line and advisory something real to say, and the outlook strip mixed icons to render. — weather has no player-facing control (it happens to the site, the player doesn't set it); no UI in src/ui/ sets weather. Test-only forcing hook, same class as `event fire`. Left unmarked.",
       "interaction": [
-        { "type": "command", "command": "weather set storm" },
-        { "type": "clickSelector", "selector": ".bs-weather" },
-        { "type": "wait", "durationMs": 300 },
-        { "type": "screenshot" }
+        {
+          "type": "command",
+          "command": "weather set storm"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-weather"
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
+        },
+        {
+          "type": "screenshot"
+        }
       ]
     }
   ]

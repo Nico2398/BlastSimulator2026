@@ -20,7 +20,8 @@
           "property": "visible",
           "expectedValue": false
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state",
@@ -38,7 +39,8 @@
           "type": "waitForSelector",
           "selector": "#bs-main-menu"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "new_game seed:1138 size:24",
@@ -48,7 +50,8 @@
           "type": "command",
           "command": "new_game seed:1138 size:24"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -68,7 +71,8 @@
           "property": "visible",
           "expectedValue": false
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "terrain_info",
@@ -78,7 +82,8 @@
           "type": "command",
           "command": "terrain_info"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ]
 }
