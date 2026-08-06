@@ -21,6 +21,7 @@ import {
   captureFrame,
   suspendDrawing,
 } from './shared/puppeteer-utils.js';
+import { checkGoal, gameState, PlaytestFailure } from './shared/playtest-driver.js';
 
 const MAX_SCREENSHOT_BYTES = 5 * 1024 * 1024;
 
@@ -46,9 +47,14 @@ export interface ShotDef {
 export function describeStepFailure(step: ScenarioStepDef, err: unknown): string {
   const raw = err instanceof Error ? err.message : String(err);
   const label = step.description ?? step.command;
-  return step.role === 'player'
+  const base = step.role === 'player'
     ? `player step "${label}" did not complete: ${raw}`
     : raw;
+  // PlaytestFailure (thrown by checkGoal for a failed `expect`, or by a
+  // reused playtest-driver action like `set`/`clickEntity`) carries a
+  // diagnosis — what was usable/blocked at the moment of failure — that a
+  // bare message loses. Surface it the same way `npm run playtest` does.
+  return err instanceof PlaytestFailure ? `${base}\n${err.diagnosis}` : base;
 }
 
 function checkScreenshotSize(filepath: string): string | undefined {
@@ -101,10 +107,23 @@ export async function runScenarioInteraction(
       try {
         await Promise.race([
           (async () => {
+            // Captured before the step's own actions run, so `expect.increased`
+            // (below) measures this step's effect and not everything before it.
+            const before = step.expect ? await gameState(page) : {};
+
             const interactionResult = await executeInteractionActions(
               page, step, enableScreenshots, outDir, paddedIdx, cmdSlug,
             );
             stepScreenshotPaths.push(...interactionResult.screenshotPaths);
+
+            // Real DOM/tutorial checks, not just "nothing threw" — reuses
+            // playtest-driver.ts's checkGoal so a step's `expect` and a
+            // playtest beat's `expect` are proven the same way (issue #479
+            // follow-up: scenarios gained assertions instead of staying a
+            // pass/fail-on-exception-only channel).
+            if (step.expect) {
+              await checkGoal(page, step.expect, before);
+            }
 
             let screenshotPath = '';
             let sizeWarn: string | undefined;

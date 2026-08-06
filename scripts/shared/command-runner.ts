@@ -14,6 +14,7 @@ import {
   buildScenarioReport,
   type ReportableStep,
 } from './scenario-utils.js';
+import { checkGoalAgainstState } from './scenario-goal.js';
 
 // Re-export canonical types from scenario-types.ts
 export type { StepResult } from './scenario-types.js';
@@ -43,10 +44,16 @@ export function runSteps(
     const step = steps[i]!;
     const paddedIdx = formatStepIndex(i);
     const cmdSlug = formatCommandSlug(step.command);
+    const before = (serializeGameState(ctx) as Record<string, unknown> | null) ?? {};
 
     try {
       const result = runCommand(engine, step.command);
       const gameState = serializeGameState(ctx) as Record<string, unknown> | null;
+
+      if (step.expect) {
+        const violation = checkGoalAgainstState(step.expect, before, gameState);
+        if (violation !== null) throw new Error(`expect failed: ${violation}`);
+      }
 
       const stateData = {
         step: i,

@@ -787,3 +787,62 @@ describe('Role-marked steps obey checkStepActionAllowed (issue #479)', () => {
     )).toBeNull();
   });
 });
+
+// ──────────────────────────────────────────────
+// 15. A step's `expect`, when present, is shaped correctly and checkable
+// (issue #479 follow-up: scenarios gained assertions instead of proving only
+// "the command didn't throw" — mirrors playtest-defs.test.ts's equivalent
+// rule for beats). Checked in BOTH modes: command mode via
+// checkGoalAgainstState (equals/increased only — no DOM), interaction mode
+// via checkGoal (all fields) — scripts/shared/scenario-goal.ts and
+// scripts/shared/playtest-driver.ts respectively.
+// ──────────────────────────────────────────────
+describe('Step expect field is shaped correctly when present', () => {
+  for (const name of ALL_SCENARIO_NAMES) {
+    it(`${name} — every step's expect, if set, has well-typed fields`, () => {
+      const scenario = loadScenarioDef(name, SCENARIO_DIR);
+      for (let i = 0; i < scenario.steps.length; i++) {
+        const step = scenario.steps[i] as ScenarioStepDef;
+        const e = step.expect;
+        if (e === undefined) continue;
+        if (e.increased !== undefined) {
+          expect(Array.isArray(e.increased), `step[${i}] expect.increased must be an array`).toBe(true);
+          for (const field of e.increased) {
+            expect(typeof field, `step[${i}] expect.increased entries must be field names`).toBe('string');
+            expect(field.length, `step[${i}] expect.increased has an empty field name`).toBeGreaterThan(0);
+          }
+        }
+        if (e.equals !== undefined) {
+          expect(typeof e.equals, `step[${i}] expect.equals must be an object`).toBe('object');
+          expect(Object.keys(e.equals).length, `step[${i}] expect.equals is empty`).toBeGreaterThan(0);
+        }
+        for (const field of ['usable', 'blocked', 'tutorialStep'] as const) {
+          if (e[field] === undefined) continue;
+          expect(typeof e[field], `step[${i}] expect.${field} must be a string`).toBe('string');
+          expect((e[field] as string).length, `step[${i}] expect.${field} is empty`).toBeGreaterThan(0);
+        }
+        if (e.note !== undefined) {
+          expect(typeof e.note, `step[${i}] expect.note must be a string`).toBe('string');
+        }
+      }
+    });
+
+    it(`${name} — every step's expect, if set, carries at least one checkable field`, () => {
+      const scenario = loadScenarioDef(name, SCENARIO_DIR);
+      for (let i = 0; i < scenario.steps.length; i++) {
+        const step = scenario.steps[i] as ScenarioStepDef;
+        const e = step.expect;
+        if (e === undefined) continue;
+        const checkable = e.tutorialStep !== undefined
+          || (e.increased?.length ?? 0) > 0
+          || e.equals !== undefined
+          || e.usable !== undefined
+          || e.blocked !== undefined;
+        expect(
+          checkable,
+          `step[${i}] expect has no checkable field (equals/increased/usable/blocked/tutorialStep) — a note alone proves nothing`,
+        ).toBe(true);
+      }
+    });
+  }
+});

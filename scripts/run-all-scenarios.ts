@@ -36,6 +36,7 @@ import {
   SCREENSHOT_DIR,
 } from './shared/puppeteer-utils.js';
 import { describeStepFailure } from './scenario-interaction-runner.js';
+import { checkGoal, gameState } from './shared/playtest-driver.js';
 
 const DEV_SERVER_PORT = 5173;
 
@@ -122,9 +123,17 @@ async function runBatchInteraction(
           try {
             await Promise.race([
               (async () => {
+                // Before this step's own actions run, so `expect.increased`
+                // measures this step's effect, not everything before it.
+                const before = step.expect ? await gameState(page) : {};
+
                 const interactionResult = await executeInteractionActions(
                   page, step, false, outDir, paddedIdx, cmdSlug,
                 );
+
+                if (step.expect) {
+                  await checkGoal(page, step.expect, before);
+                }
 
                 // Save state JSON
                 const stateData = {

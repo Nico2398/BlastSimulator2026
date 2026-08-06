@@ -97,6 +97,37 @@ export type InteractionStepAction =
 export type ScenarioStepRole = 'player' | 'setup' | 'observe';
 
 /**
+ * What must be true after a step's actions ran. A scenario with no `expect`
+ * anywhere only proves "nothing threw" — the playtest harness's whole
+ * argument was that this is not the same as "the step actually happened"
+ * (a click that silently no-ops still throws nothing). Field-for-field
+ * mirror of `PlaytestGoal` (scripts/shared/playtest-types.ts) so interaction
+ * mode reuses `checkGoal` from `playtest-driver.ts` directly — one evaluator,
+ * not two that can drift apart.
+ *
+ * `usable`/`blocked`/`tutorialStep` need a live page and are only checked
+ * when the scenario runs in interaction mode; command mode has no DOM, so it
+ * checks `equals`/`increased` only (`scenario-goal.ts`'s
+ * `checkGoalAgainstState`). This is the same asymmetry the rest of the dual
+ * -play mechanism already has — interaction mode is strictly the stronger
+ * proof, command mode the faster one.
+ */
+export interface ScenarioStepGoal {
+  /** These numeric fields of the state dump must have grown since before this step's actions ran. */
+  increased?: string[];
+  /** Field/value pairs the state dump must match exactly after this step's actions ran. */
+  equals?: Record<string, unknown>;
+  /** A control that must be usable after this step (interaction mode only). */
+  usable?: string;
+  /** A control that must NOT be reachable after this step (interaction mode only). For guard/rejection proofs. */
+  blocked?: string;
+  /** The tutorial card must show this step id after this step (interaction mode only). */
+  tutorialStep?: string;
+  /** Free-text note shown in failure reports. */
+  note?: string;
+}
+
+/**
  * Object form of a scenario step with command and optional interaction array.
  */
 export interface ScenarioStepDef {
@@ -108,6 +139,8 @@ export interface ScenarioStepDef {
   interaction?: InteractionStepAction[];
   /** See {@link ScenarioStepRole}. */
   role?: ScenarioStepRole;
+  /** See {@link ScenarioStepGoal}. */
+  expect?: ScenarioStepGoal;
 }
 
 /**
