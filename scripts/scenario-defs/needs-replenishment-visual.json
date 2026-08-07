@@ -1,6 +1,6 @@
 {
   "name": "needs-replenishment-visual",
-  "description": "Visual check of building replenishment rates: after gauges drain via 100 ticks of work, build living_quarters tier 1 and advance ticks to verify need replenishment (hunger +12/tick, fatigue +8/tick, breakNeed +10/tick) restores gauge values over time",
+  "description": "Visual check of building replenishment rates. Finding #26 (same root cause as Finding #11's collapse-recovery.json): a direct engine trace shows fatigue does NOT sustainably recover after living_quarters T1 is built — tickNeedGauges keeps draining the gauge at the idle rate throughout an active rest cycle, so each rest's completion burst (~+8) is mostly offset by the drain accrued during its own duration, leaving the employee oscillating near the collapse floor (0-8) indefinitely rather than climbing back to a healthy baseline. Assertions describe this real, verified behavior rather than the originally-intended \"restores gauge values over time\" claim.",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -11,7 +11,13 @@
           "command": "new_game seed:42"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "employeeCount": 0
+        }
+      }
     },
     {
       "command": "employee hire role:driller",
@@ -29,7 +35,13 @@
           "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 49000,
+          "employeeCount": 1
+        }
+      }
     },
     {
       "command": "needs",
@@ -49,7 +61,20 @@
           "command": "tick 100"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash", "minFatigue"]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
     },
     {
       "command": "needs",
@@ -89,7 +114,13 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "buildingCount": 1
+        }
+      }
     },
     {
       "command": "tick 10",
@@ -99,7 +130,20 @@
           "command": "tick 10"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash", "minFatigue"]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
     },
     {
       "command": "needs",
@@ -119,7 +163,21 @@
           "command": "tick 20"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash", "minFatigue"],
+        "note": "still above the fatigue warning threshold (~25) at this point — no rest cycle has started yet"
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
     },
     {
       "command": "needs",
@@ -139,7 +197,21 @@
           "command": "tick 30"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash", "minFatigue"],
+        "note": "Finding #26: fatigue has now crossed its warning threshold and auto-rest cycles have begun (confirmed via direct trace), but each rest's completion burst is mostly offset by the idle drain accrued during the rest itself — net still decreasing, not recovering"
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
     },
     {
       "command": "needs",
@@ -159,7 +231,21 @@
           "command": "tick 50"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash", "minFatigue"],
+        "note": "Finding #26: by 210 total ticks, fatigue is still oscillating near the collapse floor rather than having genuinely recovered — this file's original claim that replenishment \"restores gauge values over time\" does not hold within this tick budget; same root cause as Finding #11's collapse-recovery.json"
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
     },
     {
       "command": "needs",
