@@ -51,7 +51,11 @@ export type InteractionStepAction =
   | { type: 'assert'; selector?: string; property?: string; expectedValue?: unknown }
   | { type: 'viewport'; width: number; height: number }
   | { type: 'command'; command: string }
-  | { type: 'screenshot' };
+  | { type: 'screenshot' }
+  // Drives the loading screen's debug preview bridge directly, bypassing a
+  // real level entry, so a scenario can assert the new comp blocks (eyebrow,
+  // briefing, stage row, tip) without paying for terrain generation.
+  | { type: 'loadingScreenDebug'; action: 'preview' | 'hide'; kind?: 'level' | 'sandbox'; locale?: 'en' | 'fr' };
 
 /**
  * Object form of a scenario step with command and optional interaction array.

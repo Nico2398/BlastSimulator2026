@@ -77,3 +77,33 @@ export class QuipBag {
     return this.remaining.length;
   }
 }
+
+/**
+ * Gameplay tips shown in the loading screen's tip block, served by TipBag.
+ *
+ * Placeholder — test-writer/implementer fill in real copy; do not invent tip
+ * text during the skeleton pass.
+ */
+export const LOADING_TIPS: readonly string[] = [];
+
+/**
+ * A bag that hands out tips without repeating until it is empty — same shape
+ * as QuipBag. Kept as its own class in this pass rather than factored into a
+ * shared `DrawBag<T>`; that refactor, if any, is implementation-phase work.
+ */
+export class TipBag {
+  constructor(random: () => number = Math.random) {
+    void random;
+    // TODO: implement
+  }
+
+  next(): string {
+    // TODO: implement
+    return '';
+  }
+
+  get remainingCount(): number {
+    // TODO: implement
+    return 0;
+  }
+}
