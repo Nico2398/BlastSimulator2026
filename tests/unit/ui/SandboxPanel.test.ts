@@ -8,7 +8,12 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SandboxPanel } from '../../../src/ui/SandboxPanel.js';
-import { SANDBOX_DEFAULTS, SANDBOX_FIELDS, SANDBOX_DIFFICULTY_ORDER } from '../../../src/core/campaign/Sandbox.js';
+import {
+  SANDBOX_DEFAULTS,
+  SANDBOX_FIELDS,
+  SANDBOX_DIFFICULTY_ORDER,
+  randomSandboxSeed,
+} from '../../../src/core/campaign/Sandbox.js';
 import type { SandboxConfig } from '../../../src/core/campaign/Sandbox.js';
 
 const REMOVED_FIELD_IDS = [
@@ -88,8 +93,14 @@ describe('SandboxPanel', () => {
   });
 
   it('starts with the defaults and reports them back', () => {
-    panel.show();
-    expect(panel.getConfig()).toEqual(SANDBOX_DEFAULTS);
+    const rand = () => 0;
+    const freshContainer = document.createElement('div');
+    document.body.appendChild(freshContainer);
+    const freshPanel = new SandboxPanel(freshContainer, rand);
+
+    freshPanel.show();
+
+    expect(freshPanel.getConfig()).toEqual({ ...SANDBOX_DEFAULTS, seed: randomSandboxSeed(rand) });
   });
 
   it('picks up an edited seed so a known map can be replayed', () => {
