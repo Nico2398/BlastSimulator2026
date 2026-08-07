@@ -27,7 +27,13 @@
           "command": "new_game seed:42"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "holeCount": 0
+        }
+      }
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -37,7 +43,10 @@
           "command": "campaign start level:dusty_hollow"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "increased": ["worldSizeX"]
+      }
     },
     {
       "command": "time resume",
@@ -57,7 +66,16 @@
           "command": "scores"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "wellBeing": 50,
+          "safety": 50,
+          "ecology": 50,
+          "nuisance": 50
+        },
+        "note": "createScoreState's neutral baseline"
+      }
     },
     {
       "command": "employee hire role:surveyor",
@@ -75,7 +93,13 @@
           "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "employeeCount": 1,
+          "cash": 48800
+        }
+      }
     },
     {
       "command": "employee hire role:surveyor",
@@ -89,27 +113,39 @@
           "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "employeeCount": 2,
+          "cash": 47600
+        }
+      }
     },
     {
-      "command": "employee assign_skill 1 geology 5",
+      "command": "employee assign_skill 1 skill:geology level:5",
       "interaction": [
         {
           "type": "command",
-          "command": "employee assign_skill 1 geology 5"
+          "command": "employee assign_skill 1 skill:geology level:5"
         }
       ],
-      "description": "Test-only bootstrap, not a player action: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts, same for the UI hire button and this console command), so this only raises the level for the scenario's needs. No role tag -- there is no UI control for this and none should exist; the player-facing way to raise a skill is `employee train` at a training building. Command mode keeps running it unchanged; interaction mode keeps it as an unmarked (legacy) command step."
+      "description": "Test-only bootstrap, not a player action: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts, same for the UI hire button and this console command), so this only raises the level for the scenario's needs. No role tag -- there is no UI control for this and none should exist; the player-facing way to raise a skill is `employee train` at a training building. Command mode keeps running it unchanged; interaction mode keeps it as an unmarked (legacy) command step. Finding #15: the original command used positional args (`employee assign_skill 1 geology 5`, no `skill:`/`level:` prefixes) — assignSkillCommand requires the named form and silently rejects anything else ('Usage: employee assign_skill <id> skill:<category> level:1-5', never thrown), so this call — and the matching one below — failed on every run in this file's history; proficiencyTotal never moved off the two Rookie-level starting qualifications (2), undermining the file's own two-surveyor skill-difference premise. Fixed by using the correct named-argument syntax survey-confidence-display.json already had right.",
+      "expect": {
+        "equals": {
+          "proficiencyTotal": 6
+        },
+        "note": "employee 1 (Rookie 1) -> level 5, employee 2 stays Rookie 1: 5+1=6"
+      }
     },
     {
-      "command": "employee assign_skill 2 geology 1",
+      "command": "employee assign_skill 2 skill:geology level:1",
       "interaction": [
         {
           "type": "command",
-          "command": "employee assign_skill 2 geology 1"
+          "command": "employee assign_skill 2 skill:geology level:1"
         }
       ],
-      "description": "Test-only bootstrap — see the assign_skill step above for why this stays an unmarked (legacy) command step in interaction mode too."
+      "description": "Test-only bootstrap — see the assign_skill step above for why this stays an unmarked (legacy) command step in interaction mode too, and for Finding #15."
     },
     {
       "command": "employee list",
@@ -133,6 +169,7 @@
     },
     {
       "command": "survey core_sample x:20 z:20",
+      "description": "Round 1, survey 1/3: 3 different methods at the same spot, comparing confidence between methods.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -163,10 +200,18 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "surveyCount": 0
+        },
+        "note": "surveys are arrival-gated (#437), not instant — queued and paid for, not yet completed"
+      }
     },
     {
       "command": "survey seismic x:20 z:20",
+      "description": "Round 1, survey 2/3.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -193,10 +238,14 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"]
+      }
     },
     {
       "command": "survey aerial x:20 z:20",
+      "description": "Round 1, survey 3/3.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -223,7 +272,14 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "surveyCount": 0
+        },
+        "note": "all 3 round-1 surveys queued, none completed yet"
+      }
     },
     {
       "command": "survey show",
@@ -253,7 +309,11 @@
           "command": "tick 53"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "increased": ["surveyCount"],
+        "note": "all 3 round-1 surveys complete within 53 ticks in a real run — increased rather than an exact count per ground rule #12/#14"
+      }
     },
     {
       "command": "event choose 0",
@@ -423,7 +483,13 @@
           "command": "survey show"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "surveyCount": 3
+        },
+        "note": "round 1's 3 surveys are all done by now (53+8*5=93 ticks since queued)"
+      }
     },
     {
       "command": "state full",
@@ -437,6 +503,7 @@
     },
     {
       "command": "survey core_sample x:35 z:20",
+      "description": "Round 2, survey 1/3: same method, 3 different locations.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -463,10 +530,14 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"]
+      }
     },
     {
       "command": "survey core_sample x:20 z:35",
+      "description": "Round 2, survey 2/3.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -493,10 +564,14 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"]
+      }
     },
     {
       "command": "survey core_sample x:35 z:35",
+      "description": "Round 2, survey 3/3.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -523,7 +598,14 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "surveyCount": 3
+        },
+        "note": "round 1's 3 surveys stay completed; round 2's 3 are queued but not completed yet"
+      }
     },
     {
       "command": "survey show",
@@ -553,7 +635,11 @@
           "command": "tick 53"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "increased": ["surveyCount"],
+        "note": "all 3 round-2 surveys complete within 53 ticks in a real run (surveyCount 3->6) — increased rather than an exact count per ground rule #12/#14"
+      }
     },
     {
       "command": "event choose 0",
@@ -643,7 +729,13 @@
           "command": "survey show"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "surveyCount": 6
+        },
+        "note": "exact equals is safe here (ground rule #14) -- 6 is a natural ceiling, only 6 surveys were ever queued across both rounds"
+      }
     },
     {
       "command": "state full",

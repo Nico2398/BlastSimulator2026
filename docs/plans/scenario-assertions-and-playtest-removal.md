@@ -298,7 +298,10 @@ storedMassKg))
 ### Batch 3 — survey-* (12, survey-panel-visual done in Batch 0)
 ✅ survey-confidence-display (exposed surveyCount, first file to establish
 the arrival-gated survey timing pattern — see ground rule #14) ·
-⬜ survey-confidence-overlay · ⬜ survey-execution · ⬜ survey-method-selection ·
+✅ survey-confidence-overlay (**Finding #15: assign_skill used positional
+args instead of named, silently failed on every run, proficiencyTotal
+never moved off the Rookie baseline — fixed**) ·
+⬜ survey-execution · ⬜ survey-method-selection ·
 ⬜ survey-ore-vein-visibility · ⬜ survey-overlay-lifecycle ·
 ⬜ survey-post-blast-ore-report · ⬜ survey-result-visualization ·
 ⬜ survey-seismic-side-effects · ⬜ survey-stale-handling ·
@@ -542,6 +545,10 @@ of each session, in case main added/removed a file.)
 13. **`buildRampCommand` deducted `ctx.state!.cash` directly but never called `addExpense` on `ctx.state!.finances`** (`mining.ts`) — a real, previously-invisible production bug, not a scenario-file issue. Every other cash-spending command (`employee hire`, `build`, `employee train`, `entities.ts`'s demolish/upgrade/relocate) pairs the flat `cash` mutation with `addExpense(state.finances, ...)`, keeping `finances.cash` in sync — `console-api.test.ts` already asserts this invariant ("mirrors cash in both the flat field and the finances object"), but only against a fresh game, so it never caught a command that skips one side. `build_ramp` was that command: the moment a ramp was built, `finances.cash` silently froze at its pre-ramp value while the real, player-visible `cash` field (what `FinancesPanel.ts` actually reads) kept moving correctly — a low-severity but genuine divergence, caught only because writing this file's assertions meant dumping both fields side by side for the first time. **Fixed at the root**: added the missing `addExpense(ctx.state!.finances, result.cost, 'construction', 'Build ramp', ctx.state!.tickCount)` call, matching the exact pattern every other construction-cost command already uses. New unit test in `mining-commands.test.ts` proving `finances.cash` and the flat `cash` field move together — would have caught this on its own.
 
     Also: ramps carve the voxel grid directly rather than creating a tracked entity (no `rampCount` field, or any state field at all, records that a ramp exists) — `cash` decreasing by the exact `RAMP_COST_PER_METER × length` amount is the strongest available state-level proof a `build_ramp` call actually landed, since there is nothing else to check it against.
+
+14. Exposed `surveyCount` (`state.surveyResults.length`) on both `window.__gameState()` and `serializeGameState()`, same pattern as Findings #2/#9/#11/#13 — no field previously let a scenario prove a survey actually completed, only that the command didn't throw. Discovered while writing `survey-confidence-display.json`'s assertions that `survey <method>` queues an arrival-gated `PendingAction` (#437) rather than completing instantly — see ground rule #14 in the ground-rules section above (kept there rather than duplicated here, since it governs every survey-touching file in this batch).
+
+15. **`survey-confidence-overlay.json`'s two `employee assign_skill` calls used positional arguments (`employee assign_skill 1 geology 5`)** instead of the named form (`skill:geology level:5`) `assignSkillCommand` actually requires — every call returned `{success:false, output:'Usage: employee assign_skill <id> skill:<category> level:1-5'}`, silently, never thrown. `proficiencyTotal` never moved off the two employees' starting Rookie-level qualifications (a flat 2) in any run of this file's history, undermining its own "two surveyors at different skill levels" premise — the sibling file `survey-confidence-display.json` had the correct syntax the whole time, making this an isolated typo in this one file, not a systemic gap. **Fixed** by correcting the syntax; verified `proficiencyTotal` reaches 6 (5+1) against a real engine run.
 
 _(Add new findings here as you hit them. Number sequentially.)_
 
