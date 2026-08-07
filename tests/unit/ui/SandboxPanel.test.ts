@@ -150,6 +150,26 @@ describe('SandboxPanel', () => {
     expect(seen.size).toBeGreaterThan(1);
   });
 
+  it('reroll changes only the seed, leaving biome and difficulty untouched', () => {
+    panel.show();
+    const biomeSelect = control('biome') as HTMLSelectElement;
+    biomeSelect.value = 'alpine_granite';
+    biomeSelect.dispatchEvent(new Event('change'));
+
+    const difficultySelect = control('difficulty') as HTMLSelectElement;
+    difficultySelect.value = 'hard';
+    difficultySelect.dispatchEvent(new Event('change'));
+
+    const seed = control('seed') as HTMLInputElement;
+    const seedBefore = seed.value;
+
+    (document.getElementById('bs-sandbox-randomize') as HTMLButtonElement).click();
+
+    expect(seed.value).not.toBe(seedBefore);
+    expect(panel.getConfig().biome).toBe('alpine_granite');
+    expect(panel.getConfig().difficulty).toBe('hard');
+  });
+
   it('opening the panel twice with an injected rand sequence yields two different seed values', () => {
     let calls = 0;
     const seq = [0.1, 0.9, 0.3, 0.7];

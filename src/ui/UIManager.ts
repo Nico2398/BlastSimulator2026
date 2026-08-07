@@ -319,6 +319,9 @@ export class UIManager {
     if (this.blastReportModal.visible) this.blastReportModal.hide();
   }
 
+  /** Read-only accessor for tests (#504) — whether the BlastReportModal is currently open. */
+  get blastReportModalVisible(): boolean { return this.blastReportModal.visible; }
+
   /** Re-render all owned panels' locale-dependent text after a language change. */
   refreshLocale(): void {
     this.topBar.refreshLocale();

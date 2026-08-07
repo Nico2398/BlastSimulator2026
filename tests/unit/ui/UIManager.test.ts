@@ -11,9 +11,11 @@ import { MiniMap } from '../../../src/ui/MiniMap.js';
 import { CrewPanel } from '../../../src/ui/panels/CrewPanel.js';
 import { SurveyPanel } from '../../../src/ui/panels/SurveyPanel.js';
 import { createGame } from '../../../src/core/state/GameState.js';
+import type { GameState } from '../../../src/core/state/GameState.js';
 import { NavGrid } from '../../../src/core/nav/NavGrid.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { t, setLocale, getLocale } from '../../../src/core/i18n/I18n.js';
+import type { BlastReport } from '../../../src/core/mining/BlastExecution.js';
 
 function makeState() {
   const state = createGame({ seed: 1, mineType: 'desert' });
@@ -327,5 +329,79 @@ describe('UIManager — survey overlay toggle wiring (#496)', () => {
     uiManager.setSurveyOverlayVisible(false);
 
     expect(btn.outerHTML).not.toBe(before);
+  });
+});
+
+// ── closeStaleLevelOverlays: BlastReportModal left open across a level
+// re-entry (#504) ─────────────────────────────────────────────────────────
+//
+// A second `sandbox start` (or any direct level-entry command) previously
+// left the FIRST site's Blast Report modal stuck open over the new site's
+// terrain — nothing ever closed it, since BlastReportModal.update() only
+// ever opens itself on a fresh report and a new GameState's lastBlastReport
+// starts null. closeStaleLevelOverlays() is main.ts's fix, wired into the
+// same `enteredNewLevel` guard that also hides the main menu.
+
+function makeBlastReport(tick: number): BlastReport {
+  return {
+    tick,
+    rating: 'good',
+    clearedVoxels: 12,
+    crackedVoxels: 3,
+    fragmentCount: 6,
+    oversizedFragments: 0,
+    totalRockVolume: 24,
+    projectionCount: 0,
+    maxProjectionDistanceM: 0,
+    totalOreValue: 500,
+    spent: 200,
+    destroyedBuildings: [],
+  };
+}
+
+function makeStateWithReport(tick: number): GameState {
+  const state = createGame({ seed: 1, mineType: 'desert' });
+  state.lastBlastReport = makeBlastReport(tick);
+  return state;
+}
+
+describe('UIManager — closeStaleLevelOverlays (#504)', () => {
+  let container: HTMLDivElement;
+  let uiManager: UIManager;
+
+  beforeEach(() => {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+  });
+
+  afterEach(() => {
+    uiManager?.dispose();
+    container.remove();
+    vi.restoreAllMocks();
+  });
+
+  it('closes a BlastReportModal left open from a previous site\'s last blast', () => {
+    // jsdom has no real canvas backend — stub MiniMap.update() the same way
+    // the NavGrid overlay tests above do, since UIManager.update() also
+    // drives the minimap.
+    vi.spyOn(MiniMap.prototype, 'update').mockImplementation(() => {});
+    uiManager = new UIManager(container);
+    // Simulate the first site's blast report opening the modal, the way a
+    // real `blast` command's uiManager.update(state) call does.
+    uiManager.update(makeStateWithReport(10));
+    expect(uiManager.blastReportModalVisible).toBe(true);
+
+    uiManager.closeStaleLevelOverlays();
+
+    expect(uiManager.blastReportModalVisible).toBe(false);
+  });
+
+  it('is a no-op when no BlastReportModal is open', () => {
+    uiManager = new UIManager(container);
+    expect(uiManager.blastReportModalVisible).toBe(false);
+
+    expect(() => uiManager.closeStaleLevelOverlays()).not.toThrow();
+
+    expect(uiManager.blastReportModalVisible).toBe(false);
   });
 });
