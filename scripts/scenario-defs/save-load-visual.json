@@ -176,8 +176,8 @@
       }
     },
     {
-      "command": "drill_plan grid rows:2 cols:2 spacing:3 depth:4 start:15,15",
-      "description": "Drill a small plan after slot 1 was saved, so the blast below craters terrain the saved slot does not know about.",
+      "command": "drill_plan grid rows:2 cols:2 spacing:3 depth:6 start:15,15",
+      "description": "Drill a small plan after slot 1 was saved, so the blast below craters terrain the saved slot does not know about. depth corrected from 4 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -281,7 +281,7 @@
     },
     {
       "command": "state",
-      "description": "Load back slot 1 by clicking the Saves modal's own Load button (SavesModal.ts, main.ts's setOnLoad handler) — not a raw console command — so this step exercises the click-driven path that must regenerate the grid, replacing the post-blast crater above with clean terrain matching the saved state. The command field stays the inert `state` read (rather than `load slot:...`) so command mode does not pre-clear the crater itself and mask a regression in the click path.",
+      "description": "Load back slot 1 by clicking the Saves modal's own Load button (SavesModal.ts, main.ts's setOnLoad handler) \u2014 not a raw console command \u2014 so this step exercises the click-driven path that must regenerate the grid, replacing the post-blast crater above with clean terrain matching the saved state. The command field stays the inert `state` read (rather than `load slot:...`) so command mode does not pre-clear the crater itself and mask a regression in the click path.",
       "interaction": [
         {
           "type": "clickSelector",
