@@ -327,10 +327,14 @@ use the real ceiling (3, not 4)**) ·
 ✅ survey-overlay-lifecycle (**Finding #15 class: same positional-args
 assign_skill bug, fixed**; 2 surveyors split round-1's 2 surveys cleanly —
 no Finding #16 drop with 2 employees vs. 1 — plus Finding #4 grid check) ·
-⬜ survey-ore-vein-visibility · ⬜ survey-overlay-lifecycle ·
-⬜ survey-post-blast-ore-report · ⬜ survey-result-visualization ·
-⬜ survey-seismic-side-effects · ⬜ survey-stale-handling ·
-⬜ survey-then-blast · ⬜ survey-then-blast-playthrough · ⬜ skill-progression
+✅ survey-post-blast-ore-report (2 survey rounds pre-blast, then a real
+drill/charge/sequence/blast pipeline; Finding #4 grid-spacing-stepper fix
+needed (default 3 → declared 5, 2 increment clicks); `survey ore_report`'s
+rich-text yield comparison left unmarked — no scalar field exists for it in
+`SerializableGameState`, matches precedent for `fragments`/`inspect`) ·
+⬜ survey-result-visualization · ⬜ survey-seismic-side-effects ·
+⬜ survey-stale-handling · ⬜ survey-then-blast ·
+⬜ survey-then-blast-playthrough · ⬜ skill-progression
 
 ### Batch 4 — building-* (12) — **+ research-center-gate parity check**
 ⬜ building-destruction-visual · ⬜ building-lifecycle ·
@@ -577,6 +581,8 @@ of each session, in case main added/removed a file.)
 
 16. **A single employee holding several queued survey `PendingAction`s at once can silently lose one — a likely real engine bug, not chased to a root cause.** `survey-ore-vein-visibility.json` queues 4 `survey seismic` calls back to back (one surveyor, no ticks in between) and gives the surveyor a generous 77-tick budget (`tick 53` + 3× `tick 8`) to finish all 4. A direct engine trace — sampling `state.pendingActions`/`state.surveyResults` every 5 ticks — shows only 3 of the 4 ever complete: the action targeting (15, 25) disappears from `pendingActions` between two consecutive samples without ever producing a matching `SurveyResult`. `survey show`/`surveyCount` give no hint anything went wrong — the queue is genuinely empty (`"No pending surveys."`), so this reads as "everything finished" unless the actual count is checked against what was queued. Confirmed deterministic (reproduces identically in both command mode and a real browser run, same seed). Root cause not chased down — would need tracing `tickEmployees`'/the `PendingAction` claim-and-dispatch order for one employee holding multiple same-type actions, a bigger investigation than this pass scopes to. **Fixed the test, not the game**: this file's assertions use the real, verified ceiling (3, not the naively-expected 4) after round 1, carrying through to a 4-survey total at the end (3 + the round-2 `core_sample`, not 5). Filed as a follow-up — worth a dedicated investigation into the employee-dispatch/PendingAction-claim path, since silently dropping a queued player-paid-for action is a real gameplay defect if it holds up under scrutiny.
 
+17. **A regression test locked in a stale literal after Finding #5's own fix.** `tests/unit/scenario-defs-blast-visual-coverage.test.ts` (issue #404 coverage) hardcoded `charge hole:* explosive:boomite amount:8 stemming:0` as the expected max-charge command string in `blast-execution-visual.json`. But `Charge.ts`'s `adjustStemming` floors at `Math.max(0.5, ...)` — the stemming stepper can never reach 0 by clicking — so when Finding #5 fixed that file's charge steps to match what interaction mode can actually click, the command field correctly became `stemming:0.5`, not `stemming:0`. The coverage test was never updated to match, so it sat red until this session's full local sweep caught it (full-sweep discipline working as intended — a channel red before arrival, per ground rule/CLAUDE.md's channel-6 rule, not something to skip past). **Fixed**: updated the test's literal and comment to `0.5`, noting why (the achievable floor, not a literal zero) instead of reverting the scenario file.
+
 _(Add new findings here as you hit them. Number sequentially.)_
 
 ## Status table
@@ -664,3 +670,28 @@ got, whether main was merged, and whether GitHub Actions is back up yet.
   whole session — all verification remains local. Next: Batch 2 (blast-*,
   25 files) — expect several more Finding-#4-class grid mismatches there,
   per the note left in that finding.
+- 2026-08-07 — Batch 2 (blast-*, 25 files) completed 25/25 since the prior
+  log line (not itemized here per-file — see Findings #7-#13 for the real
+  bugs it turned up: hole-id syntax, `drill_plan grid` replace-not-append,
+  nonexistent `presplit` explosive, charge-amount-over-max silently
+  rejected, Charge-All using whatever explosive was last selected, tick-
+  drift on `equals` after a wall-clock gap, `buildRampCommand`'s finance
+  desync). Batch 3 (survey-*, 12 files) reached 7/12: survey-confidence-
+  display, survey-confidence-overlay, survey-execution, survey-method-
+  selection, survey-ore-vein-visibility, survey-overlay-lifecycle (all
+  carried over from before this log entry — see Findings #14-#16), plus
+  survey-post-blast-ore-report finished this session (2 survey rounds,
+  Finding #4 grid-spacing fix, full drill/charge/sequence/blast pipeline,
+  `survey ore_report`'s rich-text output left unmarked). Full local sweep
+  green after the file: typecheck clean, 124/124 command-mode scenarios,
+  8300/8300 unit+integration tests. One pre-existing red found and fixed
+  during the sweep, unrelated to this file's edits — Finding #17: `tests/
+  unit/scenario-defs-blast-visual-coverage.test.ts` hardcoded a stale
+  `stemming:0` literal that Finding #5's own fix (during Batch 2) had
+  already moved to `stemming:0.5` in the scenario file itself; updated the
+  test to match, per CLAUDE.md's rule that a channel red before arrival is
+  a finding to fix, not a precondition to shrug past. GitHub Actions still
+  not re-checked this session — all verification remains local. Next: the
+  5 remaining Batch 3 files (survey-result-visualization, survey-seismic-
+  side-effects, survey-stale-handling, survey-then-blast, survey-then-
+  blast-playthrough, skill-progression).
