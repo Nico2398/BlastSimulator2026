@@ -63,8 +63,8 @@
       }
     },
     {
-      "command": "drill_plan grid rows:2 cols:2 spacing:4 depth:8 start:10,10",
-      "description": "Grid 1/3. The spacing stepper defaults to 3m (DEFAULT_SPACING_M, Drill.ts); the (10,10)-(14,14) rectangle (4x4) computes round(4/3)+1=2 per axis at that default \u2014 the declared 2x2 by coincidence, no stepper click needed (unlike most other blast-* grid steps, Finding #4's class).",
+      "command": "drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:10,10",
+      "description": "Grid 1/3. The spacing stepper defaults to 3m (DEFAULT_SPACING_M, Drill.ts); the (10,10)-(14,14) rectangle (4x4) computes round(4/3)+1=2 per axis at that default \u2014 the declared 2x2 by coincidence, no stepper click needed (unlike most other blast-* grid steps, Finding #4's class). depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, all 3 grids in this file): none of the 3 drill_plan steps click the depth stepper, so the real drag always produces the panel's own 6m default. Unlike tutorial-playthrough.json's real divergence, this file's own assertions (decreased/equals:0 on already-floor-clamped nuisance, no employees anywhere to die) are directional and floor-based, so they already tolerated the real (more violent, shallower) blast regardless \u2014 confirmed by re-running both modes unchanged after the fix. This is a metadata-only correction, not a behavior fix.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -267,7 +267,7 @@
       }
     },
     {
-      "command": "drill_plan grid rows:2 cols:2 spacing:4 depth:8 start:20,10",
+      "command": "drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:20,10",
       "description": "Grid 2/3.",
       "interaction": [
         {
@@ -466,7 +466,7 @@
       }
     },
     {
-      "command": "drill_plan grid rows:2 cols:2 spacing:4 depth:8 start:30,10",
+      "command": "drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:30,10",
       "description": "Grid 3/3.",
       "interaction": [
         {
