@@ -20,8 +20,8 @@
       }
     },
     {
-      "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:20,20",
-      "description": "Grid 1/4. The spacing stepper defaults to 3m (DEFAULT_SPACING_M, Drill.ts); two increment clicks raise it to 5 before dragging, so the (20,20)-(30,30) rectangle (10x10) computes the declared 3x3 instead of the default-spacing 4x4 (issue #479 follow-up, Finding #4). Spacing stays at 5 afterward — it persists across grid operations within a session, so grids 2-4 below inherit it.",
+      "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:6 start:20,20",
+      "description": "Grid 1/4. The spacing stepper defaults to 3m (DEFAULT_SPACING_M, Drill.ts); two increment clicks raise it to 5 before dragging, so the (20,20)-(30,30) rectangle (10x10) computes the declared 3x3 instead of the default-spacing 4x4 (issue #479 follow-up, Finding #4). Spacing stays at 5 afterward — it persists across grid operations within a session, so grids 2-4 below inherit it. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper, so the real drag always produces the panel's own 6m default. Only hole/charge/sequence counts are asserted anywhere in this file (depth-insensitive), so this is a metadata-only correction.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -521,8 +521,8 @@
       "role": "observe"
     },
     {
-      "command": "drill_plan grid rows:8 cols:8 spacing:4 depth:10 start:5,5",
-      "description": "Grid 4/4. Spacing is still 5 from grid 1; one decrement click brings it to 4 before dragging, so the (5,5)-(33,33) rectangle (28x28) computes round(28/4)+1=8 per axis — the declared 8x8 instead of the 5m-spacing 7x7 (issue #479 follow-up, Finding #4). PHYSICS_FRAGMENT_CAP overflow stress case: 64 holes, thousands of fragments.",
+      "command": "drill_plan grid rows:8 cols:8 spacing:4 depth:6 start:5,5",
+      "description": "Grid 4/4. Spacing is still 5 from grid 1; one decrement click brings it to 4 before dragging, so the (5,5)-(33,33) rectangle (28x28) computes round(28/4)+1=8 per axis — the declared 8x8 instead of the 5m-spacing 7x7 (issue #479 follow-up, Finding #4). PHYSICS_FRAGMENT_CAP overflow stress case: 64 holes, thousands of fragments. depth corrected from 10 to 6 (Ground rule #15/Finding #42's class): this step never clicks the depth stepper either, so the real drag always produces 6m regardless of what's declared.",
       "interaction": [
         {
           "type": "clickSelector",
