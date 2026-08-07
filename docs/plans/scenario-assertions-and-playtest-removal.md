@@ -144,6 +144,18 @@ deleted, not after.
     extra real-time ticks in interaction mode can only get there sooner,
     never overshoot a value nothing can exceed).
 
+    **Don't assume the file's own first `tick N` after a survey is enough
+    to complete it — verify against a real dump.** `survey-execution.json`
+    uses `tick 23` as the first post-survey tick (vs. `tick 53` in the
+    other 2 survey files so far); 23 ticks alone was not enough for even
+    one survey to finish in a real run (`surveyCount` stayed 0), so an
+    `increased` check placed there failed in command mode outright — not
+    an interaction-mode-only drift issue, a genuinely wrong assumption
+    about timing. Dropped that mid-round check; kept only the ceiling-safe
+    `equals` at each round's final `survey show`, after all of that round's
+    padding ticks. When a file's tick budget per round isn't obviously
+    "generous", dump the real sequence before asserting mid-pipeline.
+
 ## Mechanism (built, tested, proven — do not redesign)
 
 - `ScenarioStepGoal` (`scripts/shared/scenario-types.ts`) — new type,
@@ -301,7 +313,10 @@ the arrival-gated survey timing pattern — see ground rule #14) ·
 ✅ survey-confidence-overlay (**Finding #15: assign_skill used positional
 args instead of named, silently failed on every run, proficiencyTotal
 never moved off the Rookie baseline — fixed**) ·
-⬜ survey-execution · ⬜ survey-method-selection ·
+✅ survey-execution (single-method rounds; tick 23 alone isn't always
+enough for a survey to complete — dropped the fragile mid-round `increased`
+check, kept only the ceiling-safe `equals` at each round's `survey show`) ·
+⬜ survey-method-selection ·
 ⬜ survey-ore-vein-visibility · ⬜ survey-overlay-lifecycle ·
 ⬜ survey-post-blast-ore-report · ⬜ survey-result-visualization ·
 ⬜ survey-seismic-side-effects · ⬜ survey-stale-handling ·
