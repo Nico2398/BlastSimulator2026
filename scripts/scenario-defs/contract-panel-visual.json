@@ -11,7 +11,13 @@
           "command": "new_game seed:42"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "activeContractCount": 0
+        }
+      }
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -21,7 +27,12 @@
           "command": "campaign start level:dusty_hollow"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "time resume",
@@ -59,7 +70,14 @@
           "selector": "#bs-contract-panel .bs-contract-accept"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "activeContractCount": 1,
+          "cash": 50000
+        },
+        "note": "real click on the Contracts panel's first available row -- contract #1 (Supply dirtite) is genuinely first in both the console list and the panel, matching `contract accept 1`'s explicit id; no Finding #55-class mismatch here"
+      }
     },
     {
       "command": "contract status",
@@ -79,7 +97,12 @@
           "command": "tick 10"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -89,7 +112,7 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 — follows a bare tick, so whether an event is pending is a random roll and there may be no dialog on screen at all. Deliberately left unconverted: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
+      "description": "event choose 0 \u2014 follows a bare tick, so whether an event is pending is a random roll and there may be no dialog on screen at all. Deliberately left unconverted: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
     },
     {
       "command": "tick 10",
@@ -99,7 +122,12 @@
           "command": "tick 10"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -109,7 +137,7 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 — follows a bare tick, so whether an event is pending is a random roll and there may be no dialog on screen at all. Deliberately left unconverted: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
+      "description": "event choose 0 \u2014 follows a bare tick, so whether an event is pending is a random roll and there may be no dialog on screen at all. Deliberately left unconverted: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
     },
     {
       "command": "contract list",
@@ -133,7 +161,14 @@
           "selector": "#bs-contract-panel .bs-contract-accept"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "activeContractCount": 2,
+          "cash": 50000
+        },
+        "note": "2nd real click on the same unqualified .bs-contract-accept selector -- with contract #1 already moved to active, the panel's first available row is now #2 (Dispose of rubble), matching `contract accept 2`'s explicit id; verified via a real interaction-mode run rather than assumed from panel-ordering logic"
+      }
     },
     {
       "command": "contract status",
@@ -153,7 +188,12 @@
           "command": "tick 10"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -163,7 +203,7 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 — follows a bare tick, so whether an event is pending is a random roll and there may be no dialog on screen at all. Deliberately left unconverted: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
+      "description": "event choose 0 \u2014 follows a bare tick, so whether an event is pending is a random roll and there may be no dialog on screen at all. Deliberately left unconverted: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
     },
     {
       "command": "contract deliver 2 amount:300",
@@ -173,7 +213,14 @@
           "command": "contract deliver 2 amount:300"
         }
       ],
-      "description": "BLOCKED FINDING, left unconverted deliberately: this scenario never mines or hauls any ore, so nothing is in storage and the Contracts panel correctly disables Deliver (maxDeliverable <= 0). The console rejects it too — consumeStoredOre fails — but it returns success:false rather than throwing, and the command-mode runner only fails a step on a thrown exception, so command mode reports this no-op as a pass (the #445 class). Converting it to a click is what surfaced that; papering over it with a command would hide it again."
+      "description": "BLOCKED FINDING, left unconverted deliberately: this scenario never mines or hauls any ore, so nothing is in storage and the Contracts panel correctly disables Deliver (maxDeliverable <= 0). The console rejects it too \u2014 consumeStoredOre fails \u2014 but it returns success:false rather than throwing, and the command-mode runner only fails a step on a thrown exception, so command mode reports this no-op as a pass (the #445 class). Converting it to a click is what surfaced that; papering over it with a command would hide it again.",
+      "expect": {
+        "equals": {
+          "activeContractCount": 2,
+          "cash": 50000
+        },
+        "note": "delivery fails honestly (0.0 kg available) -- this scenario never mines or hauls, so nothing is ever in storage; see this step's own BLOCKED FINDING description for the #445 silent-no-op class this surfaced"
+      }
     },
     {
       "command": "contract status",
@@ -193,7 +240,12 @@
           "command": "finances"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "state full",
@@ -203,7 +255,13 @@
           "command": "state full"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "activeContractCount": 2
+        }
+      }
     }
   ],
   "shots": [

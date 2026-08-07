@@ -679,7 +679,15 @@ layers — unit, integration, and this scenario — plus a sixth Finding
 #13-class cash/finances desync caught in `tubingCommand`'s `buy`
 subcommand along the way)
 
-### Batch 7 — big playthroughs + the 3 stragglers (19) — **+ tutorial parity check**
+### Batch 7 — big playthroughs + the 4 stragglers (20) — **+ tutorial parity check**
+
+(Pre-existing miscount, corrected here: this batch's checklist has always
+had 20 entries — 14 playthroughs + `ambient-timescale-sync` +
+`landscape-continuity-visual` + `tutorial-steps-visual` +
+`vehicle-purchase-visual` + `contract-panel-visual` + `event-dialog-visual`
+is 20, not 19. Every session-log "Batch 7 N/19" entry below predates this
+correction and is left as-written — a dated log, not live state; the
+checklist body itself is the source of truth.)
 ✅ tutorial-interactive (parity check closed — see the parity table
 above; 22/22 `tutorial.json` beats mirrored, both missing negative-test
 beats added as real new steps, verified 1/1 in both modes with a real
@@ -851,7 +859,16 @@ purchase, left as a command since the real buy button disables itself
 once unaffordable, now has a real `expect` proving the uncapped
 negative-cash consequence rather than just documenting it; verified
 1/1 in both modes) ·
-⬜ contract-panel-visual · ⬜ event-dialog-visual
+✅ contract-panel-visual (**Finding #69** — see the findings log; the
+2 real clicks both land on the same contracts `contract accept 1`/`2`
+target explicitly, no Finding #55-class mismatch despite using the
+same unqualified `.bs-contract-accept` selector twice — confirmed via
+a real interaction-mode run, not assumed from panel-ordering logic;
+the pre-existing BLOCKED FINDING note on `contract deliver` (issue
+#445's silent-no-op class) now has a real `expect` proving the honest
+failure; zero cost drivers anywhere in the file — cash is flat
+$50,000 hard-asserted throughout; verified 1/1 in both modes) ·
+⬜ event-dialog-visual
 
 (123 remaining after Batch 0's 1; batches above sum to 122 — reconcile the
 exact count against `ls scripts/scenario-defs/*.json | wc -l` at the start
@@ -1156,6 +1173,8 @@ of each session, in case main added/removed a file.)
 67. **`tutorial-steps-visual.json` is the 2nd of PR #497's two scenarios explicitly left un-converted to real clicks (`sandbox-mode.json` was the 1st, Finding #65's file) — every step's `interaction` array uses `type:"command"` in both modes, so command mode and interaction mode read the exact same `serializeGameState()` values at every step, confirmed by running both.** The one place the two modes *do* differ — `tutorial_start` itself — turns out to be invisible to every other assertion in the file: it's registered only in `src/main.ts` (`runner.register('tutorial_start', ...)`, wired at browser boot), not in the shared command table `createRunner()` uses in `console-api.ts`, so command mode reports "Unknown command" and never starts the tutorial overlay at all, while interaction mode's `command` action reaches the real handler and does start it — arming `TutorialOverlay`'s rails and setting `state.isPaused = true` (`TutorialOverlay.ts` line 91). Traced both effects to confirm neither leaks into anything assertable: `isPaused` doesn't gate the explicit `tick` command (grepped the tick handler directly, no reference), and `SerializableGameState` carries no tutorial-related field at all (grepped `console-api.ts` for `tutorial`, zero hits) — so every subsequent step, which also uses `command` rather than a real click, produces bit-identical state regardless of which mode actually started the tutorial. Given the file's own stated purpose is a per-step *visual* walkthrough (`shots`-driven screenshots, highlight targets, progress indicator — a `visual`-channel concern outside `expect`'s reach), kept `expect` density deliberately light: hard `equals` on `cash`/count fields at real state transitions (hires, drill/charge/sequence, contract accept, vehicle buy, build), one `decreased:["safety"]` rather than a brittle 15-decimal float for the post-death score decay, and skipped `wellBeing`/`ecology`/`nuisance` entirely as incidental to this file's premise. The file's single blast (5m spacing/8m depth/5kg charge, all command-driven so no Finding #52 drag-mismatch risk applies) kills 1 of the 2 employees on site — Rating: BAD, 4 projections — a real, deterministic consequence of the declared parameters, documented rather than tuned away, matching the Finding #40/#56/#59 precedent. Zero random events anywhere in the trace (every `tick` step's own state dump was read directly, not just its text output, closing off a Finding #60-style silent event as a possibility). Verified 1/1 in both modes; not re-run for determinism, same reasoning as `landscape-continuity-visual.json` (Finding #64) — fully deterministic, fixed seed, no RNG-sensitive step anywhere in the file.
 
 68. **`vehicle-purchase-visual.json`'s one real click — buying a `debris_hauler` off the Fleet panel's `[data-vtype="debris_hauler"][data-tier="1"]` row — was already a plausible spot for a Finding #3/#4-class command/click mismatch (the exact bug class those findings fixed elsewhere: a click landing on a different purchase than the paired command implies), but traced clean.** `parseVehicleTierArg` (`vehicle.ts`) defaults `tier` to 1 when the command omits it, so `vehicle buy debris_hauler` and the tier-1 row target the identical purchase — confirmed empirically (not just by reading the default), both modes land on `cash:25000, vehicleCount:1` with no divergence. The file's 2nd purchase (`vehicle buy drill_rig`) was already correctly left as a documented command-only step from the #479 pass — cash is short of a drill rig after the first purchase, so the Fleet panel disables its buy button, but `vehicle buy` itself has no affordability guard and drives cash to exactly `-10000`; added `expect.equals` on that real, uncapped value rather than leaving the finding as prose only. Zero ticks anywhere in this file (no time-based state to desync), so no RNG surface exists at all — verified 1/1 in both modes, not re-run for determinism.
+
+69. **`contract-panel-visual.json` clicks the same unqualified `.bs-contract-accept` selector twice, in two separate steps — structurally the exact shape that produced Finding #55's real command/click divergence in `level1-win-efficient.json` — but traced and ran clean.** Finding #55's bug was a *duplicated* step clicking an unqualified selector twice in immediate succession, racing against a panel that hadn't re-rendered between clicks; here each click is its own step separated by a `contract status`/multiple `tick`s, giving the panel time to remove the just-accepted contract from its available list before the next click, so `.bs-contract-accept` genuinely resolves to a different row each time. Traced first (`contract accept 1` → "Supply dirtite," `contract accept 2` → "Dispose of rubble," both IDs already matching the real available-contract ordering, no ID-mismatch fix needed) then confirmed empirically with a real interaction-mode run rather than trusting the ordering argument alone, given this project's history with exactly this selector-reuse shape. Zero cost drivers anywhere in the file — no employees ever hired, no ticks with salary expense, no mining/hauling — so `cash` stays exactible at exactly $50,000 through all 19 steps and is hard-asserted throughout; `state full`'s `finances.transactions` is empty, independently confirming no silent event fired (the Finding #60 class). The file's pre-existing BLOCKED FINDING (`contract deliver 2 amount:300` correctly fails since nothing was ever mined into storage, surfacing the #445 silent-`success:false`-vs-thrown-exception gap between command-mode's pass/fail semantics and a real disabled button) now carries a real `expect.equals` on the honest failure state instead of prose alone.
 
 _(Add new findings here as you hit them. Number sequentially.)_
 
@@ -2176,3 +2195,26 @@ got, whether main was merged, and whether GitHub Actions is back up yet.
   determinism. Next: the remaining 2 Batch 7 files
   (`contract-panel-visual` next), then the depth-mismatch audit before
   Phase 3.
+
+- Finished `contract-panel-visual.json` (**Finding #69**, Batch 7
+  19/20 — corrected an off-by-one in this batch's own header while
+  here: the section has always listed 20 files, not the 19 its title
+  claimed, so every earlier "Batch 7 N/19" entry in this log
+  undercounts by one file against the checklist; left as-written,
+  the checklist body is the source of truth), 19 steps. The 2 real
+  `.bs-contract-accept` clicks reuse the same unqualified selector
+  Finding #55 already burned this project on once — traced and ran a
+  real interaction-mode check specifically because of that history,
+  came back clean: each click is separated by enough steps for the
+  panel to re-render before the next one, so it isn't Finding #55's
+  race shape. Zero cost drivers anywhere in the file (no hires, no
+  mining) — `cash` hard-asserted at exactly $50,000 through all 19
+  steps, independently confirmed against `state full`'s empty
+  `finances.transactions`. Added a real `expect` to the file's
+  pre-existing #445-class BLOCKED FINDING (delivery correctly fails
+  since nothing was ever mined). Verified 1/1 in both modes, not
+  re-run for determinism (zero RNG surface). One file left in Batch 7:
+  `event-dialog-visual`. Next: finish it, then the depth-mismatch
+  audit (Ground rule #15/Finding #42/#52 class) across the whole suite
+  before Phase 3, per the plan's stated gate, then continuing toward
+  the full 124-file goal beyond Batch 7.
