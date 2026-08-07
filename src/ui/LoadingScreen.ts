@@ -16,7 +16,7 @@
 import { t } from '../core/i18n/I18n.js';
 import { QuipBag, TipBag } from './loadingQuips.js';
 import { iconEl } from './icons.js';
-import { buildStrataBackdrop } from './loadingBackdrop.js';
+import { buildLoadingScreenLayout } from './loadingLayout.js';
 
 /**
  * Resolve once the browser has presented a frame.
@@ -87,103 +87,26 @@ export class LoadingScreen {
   private readonly tips = new TipBag();
 
   constructor(container: HTMLElement) {
-    this.overlay = document.createElement('div');
-    this.overlay.id = 'bs-loading-screen';
-    // Above the main menu and the sandbox panel — a load can start from either.
-    this.overlay.style.cssText = [
-      'position:fixed;inset:0;z-index:10500;display:none',
-      'align-items:center;justify-content:center',
-      // overflow before background: jsdom's cssstyle parser silently voids
-      // the whole cssText when a `background` shorthand is followed by an
-      // `overflow` declaration in the same string (reproduced in isolation;
-      // `overflow-then-background` and `background-color` both parse fine).
-      'overflow:hidden;background:#0d1116',
-    ].join(';');
+    const layout = buildLoadingScreenLayout();
+    this.overlay = layout.overlay;
+    this.label = layout.label;
+    this.barFill = layout.barFill;
+    this.percentEl = layout.percentEl;
+    this.titleEl = layout.titleEl;
+    this.eyebrowEl = layout.eyebrowEl;
+    this.subtitleEl = layout.subtitleEl;
+    this.briefingEl = layout.briefingEl;
+    this.marksLayer = layout.marksLayer;
+    this.stageLabelEl = layout.stageLabelEl;
+    this.stageMetaEl = layout.stageMetaEl;
+    this.tipLabelEl = layout.tipLabelEl;
+    this.tipTextEl = layout.tipTextEl;
+    this.tipNextBtn = layout.tipNextBtn;
 
-    this.overlay.appendChild(buildStrataBackdrop());
-
-    const vignette = document.createElement('div');
-    vignette.style.cssText = 'position:absolute;inset:0;'
-      + 'background:radial-gradient(96% 76% at 50% 44%, rgba(26,32,40,.55), rgba(11,14,19,.92) 74%)';
-    this.overlay.appendChild(vignette);
-
-    const column = document.createElement('div');
-    column.style.cssText = 'position:relative;z-index:1;width:100%;max-width:640px;padding:0 24px;'
-      + 'display:flex;flex-direction:column;align-items:center;gap:18px;text-align:center';
-
-    this.eyebrowEl = document.createElement('div');
-    this.eyebrowEl.id = 'bs-loading-eyebrow';
-    this.eyebrowEl.className = 'bsx-loading-eyebrow';
-
-    this.titleEl = document.createElement('div');
-    this.titleEl.style.cssText = 'font:900 32px/1.15 var(--bsx-font-ui, sans-serif);letter-spacing:-.02em;color:var(--bsx-text-primary, #f2f4f7)';
-
-    this.subtitleEl = document.createElement('div');
-    this.subtitleEl.id = 'bs-loading-subtitle';
-    this.subtitleEl.className = 'bsx-loading-subtitle';
-
-    this.briefingEl = document.createElement('div');
-    this.briefingEl.id = 'bs-loading-briefing';
-    this.briefingEl.className = 'bsx-loading-briefing';
-
-    const phaseLine = document.createElement('div');
-    phaseLine.style.cssText = 'display:flex;align-items:center;gap:9px;color:var(--bsx-text-secondary, #c9d1db)';
-    const chev = iconEl('chevR', 10);
-    chev.style.color = 'var(--bsx-text-muted, #8a94a2)';
-    this.label = document.createElement('span');
-    this.label.id = 'bs-loading-label';
-    this.label.style.cssText = 'font:400 13px/1.5 var(--bsx-font-ui, sans-serif)';
-    phaseLine.append(chev, this.label);
-
-    const progressBlock = document.createElement('div');
-    progressBlock.style.cssText = 'width:100%;display:flex;flex-direction:column;gap:8px';
-
-    const track = document.createElement('div');
-    track.style.cssText = 'position:relative;height:6px;border-radius:3px;overflow:hidden;background:#1b212a';
-    this.barFill = document.createElement('div');
-    this.barFill.id = 'bs-loading-bar';
-    this.barFill.style.cssText = 'height:100%;width:0%;background:var(--bsx-amber, #ffb02e);transition:width 120ms linear';
-    this.marksLayer = document.createElement('div');
-    this.marksLayer.className = 'bsx-loading-marks';
-    track.append(this.barFill, this.marksLayer);
-
-    const stageRow = document.createElement('div');
-    stageRow.className = 'bsx-loading-stage-row';
-    this.stageLabelEl = document.createElement('span');
-    this.stageLabelEl.id = 'bs-loading-stage-label';
-    this.stageLabelEl.className = 'bsx-loading-stage-label';
-    this.stageMetaEl = document.createElement('span');
-    this.stageMetaEl.id = 'bs-loading-stage-meta';
-    this.stageMetaEl.className = 'bsx-loading-stage-meta';
-
-    this.percentEl = document.createElement('div');
-    this.percentEl.style.cssText = 'margin-left:auto;font:600 12px/1 var(--bsx-font-mono, monospace);color:var(--bsx-text-secondary, #c9d1db)';
-    stageRow.append(this.stageLabelEl, this.stageMetaEl, this.percentEl);
-
-    const tipBlock = document.createElement('div');
-    tipBlock.id = 'bs-loading-tip';
-    tipBlock.className = 'bsx-loading-tip';
-    const tipIconWrap = document.createElement('span');
-    tipIconWrap.className = 'bsx-loading-tip-icon';
-    tipIconWrap.appendChild(iconEl('training', 13));
-    this.tipLabelEl = document.createElement('span');
-    this.tipLabelEl.className = 'bsx-loading-tip-label';
-    tipIconWrap.appendChild(this.tipLabelEl);
-    this.tipTextEl = document.createElement('span');
-    this.tipTextEl.id = 'bs-loading-tip-text';
-    this.tipTextEl.className = 'bsx-loading-tip-text';
-    this.tipNextBtn = document.createElement('button');
-    this.tipNextBtn.id = 'bs-loading-tip-next';
-    this.tipNextBtn.className = 'bsx-loading-tip-next';
-    this.tipNextBtn.type = 'button';
-    // Click wiring only — label text is set per-show() in renderTip() so it
-    // refreshes on locale switch, same as every other block.
+    // Label text is set per-show() in renderTip() so it refreshes on locale
+    // switch, same as every other block — this is click wiring only.
     this.tipNextBtn.addEventListener('click', () => { this.nextTip(); });
-    tipBlock.append(tipIconWrap, this.tipTextEl, this.tipNextBtn);
 
-    progressBlock.append(track, stageRow);
-    column.append(this.eyebrowEl, this.titleEl, this.subtitleEl, this.briefingEl, phaseLine, progressBlock, tipBlock);
-    this.overlay.appendChild(column);
     container.appendChild(this.overlay);
 
     // The scenario harness asserts visibility on the DOM node itself — the
