@@ -183,6 +183,16 @@ describe('LoadingScreen — site info blocks', () => {
     ]);
   });
 
+  it('renders one pip per difficulty point in the eyebrow', () => {
+    screen.show(FIXTURE_SITE_INFO); // difficulty: 2
+    expect(container.querySelectorAll('.bsx-loading-eyebrow-pips bs-icon')).toHaveLength(2);
+  });
+
+  it('renders zero pips at difficulty 0, not one by an off-by-one', () => {
+    screen.show({ ...FIXTURE_SITE_INFO, difficulty: 0 });
+    expect(container.querySelectorAll('.bsx-loading-eyebrow-pips bs-icon')).toHaveLength(0);
+  });
+
   it('show() with no siteInfo leaves eyebrow/subtitle/briefing empty', () => {
     screen.show();
     expect(screen.eyebrowText).toBe('');
@@ -240,21 +250,30 @@ describe('LoadingScreen — segment marks and stage row', () => {
 
   afterEach(() => { vi.unstubAllGlobals(); });
 
-  it('renders one segment per phase — proven through the stage total, since there is no public marks-count accessor', async () => {
-    const n = 5;
-    let lastTotalSeen = -1;
-    await screen.runPhases(Array.from({ length: n }, (_, i) => ({
-      run: () => {
-        // stage_meta is "Stage {current} of {total}" — decoding `total` back
-        // out of it is how this proves the mark count without a new getter.
-        for (let total = 1; total <= n + 2; total++) {
-          if (screen.stageMetaText === t('loading.stage_meta', { current: i + 1, total })) {
-            lastTotalSeen = total;
-          }
-        }
-      },
-    })));
-    expect(lastTotalSeen).toBe(n);
+  it('renders one .bsx-loading-mark per phase, queried straight off the DOM', async () => {
+    await screen.runPhases(Array.from({ length: 2 }, () => ({ run: () => {} })));
+    expect(container.querySelectorAll('.bsx-loading-mark')).toHaveLength(2);
+  });
+
+  it('renders a mark count that tracks phaseCount, not a fixed number', async () => {
+    await screen.runPhases(Array.from({ length: 4 }, () => ({ run: () => {} })));
+    expect(container.querySelectorAll('.bsx-loading-mark')).toHaveLength(4);
+  });
+
+  it('positions each mark at k/(phaseCount+1)*100%, matching the bar\'s own fraction', async () => {
+    const n = 4;
+    await screen.runPhases(Array.from({ length: n }, () => ({ run: () => {} })));
+    const marks = Array.from(container.querySelectorAll<HTMLElement>('.bsx-loading-mark'));
+    expect(marks).toHaveLength(n);
+    marks.forEach((mark, idx) => {
+      const k = idx + 1;
+      expect(mark.style.left).toBe(`${(k / (n + 1)) * 100}%`);
+    });
+  });
+
+  it('renders zero marks for an empty phase list', async () => {
+    await screen.runPhases([]);
+    expect(container.querySelectorAll('.bsx-loading-mark')).toHaveLength(0);
   });
 
   it('stageLabelText/stageMetaText update in lockstep with progress on each phase', async () => {

@@ -46,13 +46,12 @@ export const LOADING_QUIPS: readonly string[] = [
 ];
 
 /**
- * A bag that hands out quips without repeating until it is empty.
- *
- * Repetition inside one load is what would give the joke away as a fixed
- * list, so the bag is drawn down rather than sampled independently each time.
+ * Shared shuffle-without-repeat implementation behind both QuipBag and
+ * TipBag: draws from `pool()` until it is empty, then reshuffles. The two
+ * bags differ only in which constant array they draw from (#493).
  */
-export class QuipBag {
-  private remaining: string[] = [];
+abstract class DrawBag<T> {
+  private remaining: T[] = [];
   private readonly random: () => number;
 
   /** `random` is injectable so tests can pin the order. */
@@ -61,21 +60,34 @@ export class QuipBag {
     this.refill();
   }
 
+  /** The fixed pool this bag draws from, without repeating until exhausted. */
+  protected abstract pool(): readonly T[];
+
   private refill(): void {
-    this.remaining = [...LOADING_QUIPS];
+    this.remaining = [...this.pool()];
   }
 
-  /** Draw a quip. Refills once every line has been used. */
-  next(): string {
+  /** Draw an item. Refills once every item has been used. */
+  next(): T {
     if (this.remaining.length === 0) this.refill();
     const i = Math.min(this.remaining.length - 1, Math.floor(this.random() * this.remaining.length));
     return this.remaining.splice(i, 1)[0]!;
   }
 
-  /** Lines still unused in the current pass — exposed for tests. */
+  /** Items still unused in the current pass — exposed for tests. */
   get remainingCount(): number {
     return this.remaining.length;
   }
+}
+
+/**
+ * A bag that hands out quips without repeating until it is empty.
+ *
+ * Repetition inside one load is what would give the joke away as a fixed
+ * list, so the bag is drawn down rather than sampled independently each time.
+ */
+export class QuipBag extends DrawBag<string> {
+  protected pool(): readonly string[] { return LOADING_QUIPS; }
 }
 
 /**
@@ -104,32 +116,8 @@ export const LOADING_TIPS: readonly string[] = [
 
 /**
  * A bag that hands out tips without repeating until it is empty — same shape
- * as QuipBag. Kept as its own class in this pass rather than factored into a
- * shared `DrawBag<T>`; that refactor, if any, is implementation-phase work.
+ * as QuipBag, sharing the draw logic via `DrawBag<T>`.
  */
-export class TipBag {
-  private remaining: string[] = [];
-  private readonly random: () => number;
-
-  /** `random` is injectable so tests can pin the order. */
-  constructor(random: () => number = Math.random) {
-    this.random = random;
-    this.refill();
-  }
-
-  private refill(): void {
-    this.remaining = [...LOADING_TIPS];
-  }
-
-  /** Draw a tip. Refills once every line has been used. */
-  next(): string {
-    if (this.remaining.length === 0) this.refill();
-    const i = Math.min(this.remaining.length - 1, Math.floor(this.random() * this.remaining.length));
-    return this.remaining.splice(i, 1)[0]!;
-  }
-
-  /** Lines still unused in the current pass — exposed for tests. */
-  get remainingCount(): number {
-    return this.remaining.length;
-  }
+export class TipBag extends DrawBag<string> {
+  protected pool(): readonly string[] { return LOADING_TIPS; }
 }

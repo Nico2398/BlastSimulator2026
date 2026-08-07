@@ -375,7 +375,7 @@ const TOKENS_CSS = `
   border: 1px solid rgba(255,176,46,.42);
   border-radius: var(--bsx-r-control);
   background: transparent;
-  color: #ffc978;
+  color: var(--bsx-amber-hover);
   font: 600 10px/1 var(--bsx-font-ui);
   letter-spacing: .12em;
   cursor: pointer;

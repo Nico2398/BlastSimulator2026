@@ -313,7 +313,7 @@ export async function executeActionOnPage(
       // A real level load blocks the main thread for seconds — no player
       // action a scenario can drive gets there deterministically, so this
       // bypasses the load and previews the loading screen directly (#493).
-      await page.evaluate(({ debugAction, kind, locale }: { debugAction: string; kind?: string; locale?: string }) => {
+      await page.evaluate(({ debugAction, kind, locale }: { debugAction: string; kind: string | undefined; locale: string | undefined }) => {
         if (debugAction === 'hide') {
           (window as any).__loadingScreenHide?.();
         } else {
