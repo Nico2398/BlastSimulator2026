@@ -155,6 +155,26 @@ deleted, not after.
     `equals` at each round's final `survey show`, after all of that round's
     padding ticks. When a file's tick budget per round isn't obviously
     "generous", dump the real sequence before asserting mid-pipeline.
+15. **Ground rule #10's `holeCount` check is necessary but not sufficient —
+    the Drill panel's real click also ignores a scenario's declared
+    `depth:`, using its own `DEFAULT_DEPTH_M=6` (`Drill.ts`) regardless of
+    what the command field says.** Finding #42, caught only because
+    `level1-lose-ecology.json` asserts exact scores right after a blast —
+    hole count alone can never catch a depth mismatch, since depth doesn't
+    change how many holes exist, only how violent the resulting blast is
+    (shallower holes concentrate the same charge over less rock). Any
+    already-completed file with a `drill_plan grid ... depth:N` where N ≠ 6
+    may be silently wrong in interaction mode and simply never got caught
+    because it didn't assert anything depth-sensitive (exact post-blast
+    scores, `deathCount`, oversized-fragment counts) right after — a
+    dedicated grep-and-recheck pass across all committed files is still
+    open, tracked as a Phase-3 prerequisite alongside the parity audit.
+    When writing or re-checking a `drill_plan grid` step: assert
+    `holeCount` (rule #10) AND, if the file's own point depends on blast
+    intensity (scores, deaths, fragment sizes), correct `depth:` to 6 (or
+    add a depth-stepper click sequence reaching the declared depth for
+    real, mirroring rule #10's own preference) before trusting any
+    command-mode trace derived from the wrong depth.
 
 ## Mechanism (built, tested, proven — do not redesign)
 
@@ -678,7 +698,12 @@ employee overspend with zero income drives `bankrupt`/`levelEnded`/
 the 6 declared buildings are all invalid types and never exist, so
 only vehicles+employees actually drive the overspend, documented via
 a note) ·
-⬜ level1-lose-ecology · ⬜ level1-lose-revolt ·
+✅ level1-lose-ecology (**Finding #42** — see the findings log and
+Ground rule #15; a real interaction-mode run caught a new depth-
+mismatch bug class the row/col/spacing check can't see — fixed and
+re-traced, the corrected blasts now genuinely reach the government
+shutdown within the file's own original tick budget) ·
+⬜ level1-lose-revolt ·
 ⬜ level1-playthrough-revolt · ⬜ level1-playthrough-win ·
 ⬜ level1-win-conservative · ⬜ level1-win-efficient ·
 ⬜ level2-playthrough-bankruptcy · ⬜ level2-playthrough-win ·
@@ -936,6 +961,8 @@ of each session, in case main added/removed a file.)
 40. **`tutorial-playthrough.json`'s grid-spacing fix (Finding #3's class, first `drill_plan grid`) had a much bigger consequence than any prior instance: the corrected 16-hole grid is dense/energetic enough to kill both starting employees.** The file originally declared `rows:3 cols:3 spacing:5` for a (15,15)-(25,25) drag, but the click's real default spacing (3) produces `round(10/3)+1 = 4x4 = 16` holes — the same class already fixed repeatedly this project (`nav-cell-types-visual.json`, `hauling-gate.json`, `safety-projection-visual.json`, `core-loop-visual.json`, `weather-flood.json`). Correcting it and tracing the resulting blast surfaced something new: `state.damage.deathCount` goes 0→2 — both the surveyor (hired first, dispatched to survey near the blast site) and the driller (hired second, never dispatched anywhere) die from the blast's own projections (`processProjections`, `mining.ts`'s `blastCommand`), confirmed via direct trace and independently reproduced on a real browser run (both command mode and interaction mode agree exactly). **No fix was needed beyond the grid correction itself** — this is a real, verified, reproducible consequence of dragging the file's own original rectangle at the panel's real default spacing, not a scenario-authoring error to route around; the file's later steps never depend on employee #1 or #2 specifically again (later roles are filled by newly-hired employees #3/#4), so the playthrough continues normally. **Added `deathCount` to `SerializableGameState`** (`state.damage.deathCount`) in lockstep across `console-api.ts`/`main.ts`/`validate-state-schema.ts`, closing the same class of gap the other count fields closed for their own mechanics (a scenario proving a fatality genuinely happened had no field to check beyond inferring it from a flat `employeeCount`, which still counts dead employees since `killEmployee` marks `alive:false` rather than removing the roster entry) — two new `console-api.test.ts` tests (zero on a fresh game; 1 after a real blast-projection death, using the same drill/charge/sequence/blast sequence that surfaces the bug). The follow-on tick-based safety crash (50→~20 over 3 ticks) is fully deterministic (`ScoreManager.ts`'s `sfDelta -= recentAccidents * 5`, no RNG anywhere in the calculation) but asserted with `decreased` rather than an exact value, since the precise magnitude depends on the accident-recency window's exact tick alignment — safer given real wall-clock ticking in interaction mode is not guaranteed to reproduce bit-for-bit even though this specific run did. The second, smaller blast later in the file (a different area, `(8,8)-(12,12)`) does not add further deaths, confirmed via the same trace — neither of the two later hires (manager, driver) were ever dispatched near it. Verified in both command mode and a real browser, both passing on the first run.
 
 41. **`level1-lose-arrest.json`'s premise is only half right: the level actually WINS (profit-threshold `levelEndReason:'completed'`) 30 ticks before the arrest it's named for ever triggers.** `mafia smuggle` (toggled once, unmarked — no UI selector exists for it, same class as Finding #8) turns on an $8000/tick income stream (`SMUGGLE_BASE_INCOME`, `MafiaActions.ts`) that isn't a one-time payout but keeps accruing every subsequent tick — confirmed via direct trace: cash swings from -$7500 to +$71,200 after just one `tick 10`, then to +$149,900 after the next, at which point `levelEnded` flips `true` with `levelEndReason:'completed'` (tick 20) — dusty_hollow's own profit-threshold win condition, tripped by smuggling proceeds, not by any mining. `arrested` doesn't flip `true` until tick 50, by which point the level has already been won for 30 ticks; cash keeps climbing throughout regardless (ending at $533,400). Neither flag is a bug — this is intentional, verified design tension between smuggling's profitability and its exposure risk (`state.mafia.exposureRisk`) — but the file's own name and description described only the second half. **Fixed the test to describe both halves of the real trajectory** rather than only the arrest, with `expect` on every cash-changing step (all fully deterministic — `corrupt`'s cost deduction is unconditional regardless of its own RNG-driven bribe-success/scandal roll, confirmed by reading `corruptCommand`, `events.ts`) and the two flag-flip moments called out explicitly with notes. Confirmed `levelEnded:true` doesn't block or alter any later command's behavior — every step after tick 20 continues to run and change state normally in both modes. Verified in both command mode and a real browser; this file's `interaction` was already 100% bare commands (no clicks anywhere, same "zero drift risk" class as `sandbox-mode.json`), so no click-vs-command divergence was possible to begin with.
+
+42. **A new sub-class of Finding #3/#4, caught only by a real interaction-mode run on `level1-lose-ecology.json`: the Drill panel's real click ignores a scenario's declared `depth:`, not just its row/col/spacing.** Every prior grid-spacing fix this project only ever checked hole COUNT (rows×cols matching what `round(dragSize/DEFAULT_SPACING_M)+1` produces) — this file was the first whose `drill_plan grid` command already had the *right* spacing (3, matching `DEFAULT_SPACING_M`) but the *wrong* depth (12, vs. the Drill panel's own `DEFAULT_DEPTH_M=6`, `Drill.ts`) — a mismatch hole-count alone can never catch, since depth doesn't affect how many holes exist. Caught only because this file asserts exact ecology scores after each blast: command mode's depth:12 trace showed ecology dropping 50→48.99 on the first blast, but the real interaction-mode run failed outright — `ecology should be 48.99 but is 14.469999999999999`. Investigated via a direct state-dump comparison (`holeCount`/hole positions matched exactly, 25 holes each, only `depth` differed, 6 vs. 12) tracing the actual mechanism: shallower holes with the same charge amount concentrate energy over less rock, producing far more violent fragmentation and projectile counts, which `recordVibration` (`ScoreManager.ts`, driven by `result.projectionCount` in `mining.ts`'s `blastCommand`) converts into ecology/nuisance damage. **Fixed** by correcting all 5 of this file's `drill_plan grid` commands from `depth:12` to `depth:6`, then re-deriving the entire back half of the file's assertions from a fresh trace — the corrected, more violent blasts drive ecology to exactly 0 after just the **second** blast (not the fifth), and — because `applyDecay` (`ScoreManager.ts`) never recovers a score sitting at exactly 0 — it stays pinned there for the rest of the file, deterministic and safe to hard-assert regardless of any later random event. The corrected trajectory also means the file's own *original* 160-tick budget is already enough to cross `ECOLOGICAL_SHUTDOWN_TICKS` (150 consecutive ticks at ecology≤0, `EcologicalDisaster.ts`) — the government shutdown this file is named for now fires for real, inside the file's existing structure, no added steps needed. **Open follow-up, not yet audited**: this depth-mismatch class could be silently present in any already-completed file whose `drill_plan grid` declares a `depth:` other than 6 — none of those files' hole-count-only grid-spacing fixes would have caught it, and most were protected only by accident (by not asserting anything depth-sensitive, like exact scores or `deathCount`, right after the affected blast). Worth a dedicated grep-and-recheck pass before Phase 3, not blocking Batch 7's remaining files.
 
 _(Add new findings here as you hit them. Number sequentially.)_
 
@@ -1485,3 +1512,29 @@ got, whether main was merged, and whether GitHub Actions is back up yet.
   full test suite. GitHub Actions still not re-checked this session —
   all verification remains local. Next: the remaining 15 Batch 7
   files.
+- 2026-08-07 (cont.) — level1-lose-ecology.json done (**Finding #42**,
+  Ground rule #15 added; Batch 7 5/19). A real interaction-mode run
+  caught a genuinely new bug class: the Drill panel's real click
+  ignores a scenario's declared `depth:` just like it ignores
+  `spacing:`, using its own `DEFAULT_DEPTH_M=6` regardless — this
+  file's `depth:12` looked fine by every hole-count check (rule #10)
+  but failed hard on the first real browser run once exact post-blast
+  ecology scores were asserted (`14.47` actual vs `48.99` traced).
+  Fixed by correcting all 5 `drill_plan grid` commands to `depth:6`
+  and re-deriving the whole back half of the file from a fresh trace.
+  The corrected, more violent blasts drive ecology to exactly 0 after
+  just the 2nd blast (not the 5th) — and since `applyDecay` never
+  recovers a score sitting at exactly 0, it stays there deterministically
+  for the rest of the file. The corrected trajectory also means the
+  file's own original 160-tick budget already crosses
+  ECOLOGICAL_SHUTDOWN_TICKS (150) — the government shutdown this file
+  is named for now fires for real, inside the file's existing
+  structure. Flagged an open follow-up (not yet audited): this depth-
+  mismatch class could be silently present in any already-completed
+  file with `drill_plan grid ... depth:N` where N≠6 — a dedicated
+  grep-and-recheck pass is needed before Phase 3. Verified in both
+  modes (interaction mode failed once, correctly, before the fix).
+  Full local sweep green: typecheck, 124/124 scenarios, full test
+  suite. GitHub Actions still not re-checked this session — all
+  verification remains local. Next: the remaining 14 Batch 7 files,
+  then the depth-mismatch audit before Phase 3.

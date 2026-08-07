@@ -1,6 +1,6 @@
 {
   "name": "level1-lose-ecology",
-  "description": "Level 1 losing scenario: massive blasts with max krackle, triggering ecology score collapse",
+  "description": "Level 1 losing scenario: massive blasts with max krackle, triggering ecology score collapse and, after a sustained 150-tick zero streak, the government shutdown that actually ends the level (ECOLOGICAL_SHUTDOWN_TICKS, EcologicalDisaster.ts). depth:6 (not the originally-declared 12) throughout: the Drill panel's real click always uses its own DEFAULT_DEPTH_M regardless of what a scenario's command field declares, a new sub-class of Finding #3/#4 caught only by a real interaction-mode run (see the note on the first blast step). With the corrected, shallower/more-violent holes, ecology bottoms out at exactly 0 after just the SECOND blast (not the fifth), and the file's own original tick budget already ticks past the 150-consecutive-ticks-at-zero threshold -- the shutdown this file is named for now fires for real, no extension needed.",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -10,7 +10,12 @@
           "command": "new_game seed:42"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -20,7 +25,12 @@
           "command": "campaign start level:dusty_hollow"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "time resume",
@@ -30,7 +40,12 @@
           "command": "time resume"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "scores",
@@ -40,10 +55,18 @@
           "command": "scores"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "ecology": 50,
+          "safety": 50,
+          "wellBeing": 50,
+          "nuisance": 50
+        }
+      }
     },
     {
-      "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:12 start:5,5",
+      "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:6 start:5,5",
       "interaction": [
         {
           "type": "clickSelector",
@@ -76,7 +99,14 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 25,
+          "cash": 50000
+        },
+        "note": "spacing:3 already matches the Drill panel's own default (DEFAULT_SPACING_M=3, Drill.ts) -- the (5,5)-(17,17) drag is a 12-unit span, round(12/3)+1=5, so the row/col/spacing part of the grid was already correct. depth was not: corrected from the originally-declared 12 to 6, the panel's own DEFAULT_DEPTH_M -- caught only by a real interaction-mode run, which failed with ecology 14.47 instead of the depth:12 command-mode trace's 48.99 (shallower holes with the same charge concentrate energy over less rock, producing far more violent fragmentation/projections). A new sub-class of Finding #3/#4: the grid tool's real defaults extend to depth, not just row/col/spacing -- every prior file's `drill_plan grid` fix only ever checked hole COUNT, which depth doesn't affect, so this class could be silently present in already-completed files too; flagged in the plan doc as a follow-up audit item."
+      }
     },
     {
       "command": "charge hole:* explosive:krackle amount:10 stemming:1",
@@ -86,7 +116,13 @@
           "command": "charge hole:* explosive:krackle amount:10 stemming:1"
         }
       ],
-      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show."
+      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show.",
+      "expect": {
+        "equals": {
+          "chargedCount": 25,
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "sequence auto delay_step:10",
@@ -96,7 +132,12 @@
           "command": "sequence auto delay_step:10"
         }
       ],
-      "description": "Left unmarked: this delay_step doesn't match the Sequence panel's default (25ms), and the stepper that changes it has never been click-tested in this conversion (Batch 6's safety-projection-visual note) -- left as a command rather than guessing at an unproven selector."
+      "description": "Left unmarked: this delay_step doesn't match the Sequence panel's default (25ms), and the stepper that changes it has never been click-tested in this conversion (Batch 6's safety-projection-visual note) -- left as a command rather than guessing at an unproven selector.",
+      "expect": {
+        "equals": {
+          "sequencedCount": 25
+        }
+      }
     },
     {
       "command": "blast",
@@ -126,7 +167,17 @@
           "selector": "[data-action=\"report-close\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0,
+          "ecology": 14.469999999999999,
+          "cash": 50000
+        },
+        "note": "confirmed via direct trace with the corrected depth:6: krackle's vibration cuts ecology from 50 to 14.47 in one blast -- deterministic (no RNG in the blast->ecology formula, ScoreManager.ts's recordVibration, called from mining.ts's blastCommand with vibrationMmS derived from result.projectionCount), safe to assert exactly in both modes."
+      }
     },
     {
       "command": "scores",
@@ -139,7 +190,7 @@
       "role": "observe"
     },
     {
-      "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:12 start:20,5",
+      "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:6 start:20,5",
       "interaction": [
         {
           "type": "clickSelector",
@@ -168,7 +219,13 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 25,
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "charge hole:* explosive:krackle amount:10 stemming:1",
@@ -178,7 +235,12 @@
           "command": "charge hole:* explosive:krackle amount:10 stemming:1"
         }
       ],
-      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show."
+      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show.",
+      "expect": {
+        "equals": {
+          "chargedCount": 25
+        }
+      }
     },
     {
       "command": "sequence auto delay_step:10",
@@ -188,7 +250,12 @@
           "command": "sequence auto delay_step:10"
         }
       ],
-      "description": "Left unmarked: this delay_step doesn't match the Sequence panel's default (25ms), and the stepper that changes it has never been click-tested in this conversion (Batch 6's safety-projection-visual note) -- left as a command rather than guessing at an unproven selector."
+      "description": "Left unmarked: this delay_step doesn't match the Sequence panel's default (25ms), and the stepper that changes it has never been click-tested in this conversion (Batch 6's safety-projection-visual note) -- left as a command rather than guessing at an unproven selector.",
+      "expect": {
+        "equals": {
+          "sequencedCount": 25
+        }
+      }
     },
     {
       "command": "blast",
@@ -218,7 +285,15 @@
           "selector": "[data-action=\"report-close\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "ecology": 0,
+          "cash": 50000
+        },
+        "note": "the 2nd blast alone drives ecology all the way to exactly 0 -- not just low, the literal floor. From here applyDecay's own >0 check (ScoreManager.ts) means it can never climb back on its own without another positive contributor (a building with a positive ecology effect; this file builds nothing), so ecology now stays pinned at exactly 0 for the rest of the file, safe to assert exactly regardless of any other random event firing (confirmed via direct trace: it never moves again, including across the random event that does fire further down)."
+      }
     },
     {
       "command": "scores",
@@ -231,7 +306,7 @@
       "role": "observe"
     },
     {
-      "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:12 start:5,20",
+      "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:6 start:5,20",
       "interaction": [
         {
           "type": "clickSelector",
@@ -260,7 +335,12 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 25
+        }
+      }
     },
     {
       "command": "charge hole:* explosive:krackle amount:10 stemming:1",
@@ -270,7 +350,12 @@
           "command": "charge hole:* explosive:krackle amount:10 stemming:1"
         }
       ],
-      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show."
+      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show.",
+      "expect": {
+        "equals": {
+          "chargedCount": 25
+        }
+      }
     },
     {
       "command": "sequence auto delay_step:10",
@@ -280,7 +365,12 @@
           "command": "sequence auto delay_step:10"
         }
       ],
-      "description": "Left unmarked: this delay_step doesn't match the Sequence panel's default (25ms), and the stepper that changes it has never been click-tested in this conversion (Batch 6's safety-projection-visual note) -- left as a command rather than guessing at an unproven selector."
+      "description": "Left unmarked: this delay_step doesn't match the Sequence panel's default (25ms), and the stepper that changes it has never been click-tested in this conversion (Batch 6's safety-projection-visual note) -- left as a command rather than guessing at an unproven selector.",
+      "expect": {
+        "equals": {
+          "sequencedCount": 25
+        }
+      }
     },
     {
       "command": "blast",
@@ -310,7 +400,14 @@
           "selector": "[data-action=\"report-close\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "ecology": 0,
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "scores",
@@ -323,7 +420,7 @@
       "role": "observe"
     },
     {
-      "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:12 start:20,20",
+      "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:6 start:20,20",
       "interaction": [
         {
           "type": "clickSelector",
@@ -352,7 +449,12 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 25
+        }
+      }
     },
     {
       "command": "charge hole:* explosive:krackle amount:10 stemming:1",
@@ -362,7 +464,12 @@
           "command": "charge hole:* explosive:krackle amount:10 stemming:1"
         }
       ],
-      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show."
+      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show.",
+      "expect": {
+        "equals": {
+          "chargedCount": 25
+        }
+      }
     },
     {
       "command": "sequence auto delay_step:10",
@@ -372,7 +479,12 @@
           "command": "sequence auto delay_step:10"
         }
       ],
-      "description": "Left unmarked: this delay_step doesn't match the Sequence panel's default (25ms), and the stepper that changes it has never been click-tested in this conversion (Batch 6's safety-projection-visual note) -- left as a command rather than guessing at an unproven selector."
+      "description": "Left unmarked: this delay_step doesn't match the Sequence panel's default (25ms), and the stepper that changes it has never been click-tested in this conversion (Batch 6's safety-projection-visual note) -- left as a command rather than guessing at an unproven selector.",
+      "expect": {
+        "equals": {
+          "sequencedCount": 25
+        }
+      }
     },
     {
       "command": "blast",
@@ -402,7 +514,14 @@
           "selector": "[data-action=\"report-close\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "ecology": 0,
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "scores",
@@ -422,7 +541,13 @@
           "command": "tick 20"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "ecology": 0
+        },
+        "note": "ecology has been pinned at exactly 0 since blast 2 and stays there through ordinary ticking -- see the note on that step for why (applyDecay never recovers a score sitting at exactly 0). Ticks-at-zero (EcologicalDisaster.ts) has been accumulating since tick 1 of this block; the shutdown threshold is checked at the file's final tick 30 block below."
+      }
     },
     {
       "command": "event choose 0",
@@ -442,7 +567,12 @@
           "command": "tick 20"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "ecology": 0
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -462,7 +592,12 @@
           "command": "tick 20"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "ecology": 0
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -485,7 +620,7 @@
       "role": "observe"
     },
     {
-      "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:12 start:10,10",
+      "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:6 start:10,10",
       "interaction": [
         {
           "type": "clickSelector",
@@ -514,7 +649,12 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 25
+        }
+      }
     },
     {
       "command": "charge hole:* explosive:krackle amount:10 stemming:1",
@@ -524,7 +664,12 @@
           "command": "charge hole:* explosive:krackle amount:10 stemming:1"
         }
       ],
-      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show."
+      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show.",
+      "expect": {
+        "equals": {
+          "chargedCount": 25
+        }
+      }
     },
     {
       "command": "sequence auto delay_step:10",
@@ -534,7 +679,12 @@
           "command": "sequence auto delay_step:10"
         }
       ],
-      "description": "Left unmarked: this delay_step doesn't match the Sequence panel's default (25ms), and the stepper that changes it has never been click-tested in this conversion (Batch 6's safety-projection-visual note) -- left as a command rather than guessing at an unproven selector."
+      "description": "Left unmarked: this delay_step doesn't match the Sequence panel's default (25ms), and the stepper that changes it has never been click-tested in this conversion (Batch 6's safety-projection-visual note) -- left as a command rather than guessing at an unproven selector.",
+      "expect": {
+        "equals": {
+          "sequencedCount": 25
+        }
+      }
     },
     {
       "command": "blast",
@@ -564,7 +714,13 @@
           "selector": "[data-action=\"report-close\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "ecology": 0
+        }
+      }
     },
     {
       "command": "scores",
@@ -584,7 +740,13 @@
           "command": "tick 30"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "ecology": 0,
+          "levelEnded": false
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -604,7 +766,13 @@
           "command": "tick 30"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "ecology": 0,
+          "levelEnded": false
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -624,7 +792,14 @@
           "command": "tick 30"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "ecology": 0,
+          "levelEnded": false
+        },
+        "note": "a real random event fires somewhere in this file's tick sequence (confirmed via direct trace), moving cash/safety/wellBeing; deliberately not asserted here since a real browser run is not guaranteed to roll the same event at the same point (Finding #12/#34's class). ecology itself is unaffected either way, per the note on the 2nd blast above."
+      }
     },
     {
       "command": "event choose 0",
@@ -638,13 +813,24 @@
     },
     {
       "command": "tick 30",
+      "description": "With the corrected depth:6, ecology has been at exactly 0 since the 2nd blast (well before any ticking started), so this file's own original tick budget was always going to be enough: the 150th consecutive tick-at-zero (ECOLOGICAL_SHUTDOWN_TICKS, balance.ts) lands inside this final block -- the government shutdown fires for real here, confirmed via direct trace. No file extension needed, unlike what the depth:12 version would have required.",
       "interaction": [
         {
           "type": "command",
           "command": "tick 30"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "ecology": 0,
+          "tickCount": 160,
+          "ecologicalShutdown": true,
+          "levelEnded": true,
+          "levelEndReason": "ecological_shutdown"
+        },
+        "note": "the file's own premise, finally proven for real: ecology sat at exactly 0 for 150 straight ticks and the government closed the site. Confirmed via direct trace that levelEnded does not block or alter tick's own advancement, nor any later command in this file."
+      }
     },
     {
       "command": "event choose 0",
@@ -694,7 +880,17 @@
           "command": "campaign status"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "ecology": 0,
+          "tickCount": 160,
+          "ecologicalShutdown": true,
+          "levelEnded": true,
+          "levelEndReason": "ecological_shutdown"
+        },
+        "note": "shutdown persists unchanged through the remaining read-only observe steps, confirming the flag doesn't revert."
+      }
     }
   ]
 }
