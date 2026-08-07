@@ -89,9 +89,11 @@ The game's own simulation is not the cost — turning ticking off changes the fr
 | Whole playability suite (`npm run playtest`) | CI job `Playtest (playability)` (label the PR `full-ci`). |
 | All scenarios in interaction mode | CI job `Scenarios (interaction mode)` (label the PR `full-ci`). |
 
-Both browser jobs are gated behind the `full-ci` label because the terrain material costs ~6.4 s/frame without a GPU (#475): the harness waits on the render loop for every probe, so one beat costs minutes. Add the label when a change touches a player-facing flow, and read the job.
+Both browser jobs are gated behind the `full-ci` label because the terrain material costs ~6.4 s/frame without a GPU (#475): the harness waits on the render loop for every probe, so one beat costs minutes. Together they add ~50 minutes to the merge path, so the label goes on a PR whose change a playtest definition actually drives, or which touches machinery every scenario runs through — not on every diff that a player can see. `agentic-pipeline-pr-management` holds the test and the cost.
 
 Push, then read the CI job — its result *is* the channel's result, and its artifacts carry the FAIL screenshots. Locally, run one named definition you are actively debugging, never the whole suite.
+
+A channel that belongs to CI is **covered**, never pending: an autonomous run marks its PR `READY TO MERGE` and the merge machinery waits for the job and decides on its result. Handing a channel to CI is not a reason to withhold the marker — `agentic-pipeline-pr-management` again.
 
 **While any browser-driven run is in flight: change no file** (Vite reloads the page and kills the run with `Execution context was destroyed`, which looks like a game bug and is not), **start no second browser harness**, and **wait for the run's own terminal line**. Slow is not stuck. A run you interrupted produced no result — report the channel as pending CI, never as passed.
 
