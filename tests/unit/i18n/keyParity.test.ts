@@ -45,7 +45,12 @@ describe('en.json / fr.json — key-set parity', () => {
   });
 
   it('both locale files declare exactly the same key count, pinned to the current key-complete baseline', () => {
-    // Baseline is 3234 (up from 3232): the survey-overlay visibility toggle
+    // Baseline is 3228 (down from 3234): the sandbox setup screen collapse
+    // (#504) removed 10 `sandbox.*` keys for the deleted controls and added
+    // 4 new ones — sandbox.field.difficulty, sandbox.difficulty.easy,
+    // sandbox.difficulty.normal, sandbox.difficulty.hard — net -6, both
+    // locale files updated together.
+    // Before that, baseline was 3234 (up from 3232): the survey-overlay visibility toggle
     // (#496) added 2 new keys — ui.survey.overlay_toggle_tip and
     // shortcuts.survey_overlay — both already translated in fr.json, not
     // just carried over in English.
@@ -64,7 +69,7 @@ describe('en.json / fr.json — key-set parity', () => {
     // ORPHAN_KEYS in src/core/i18n/glossary.ts. Update this baseline only
     // alongside a deliberate key addition/removal, not silently.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3234);
+    expect(Object.keys(en).length).toBe(3228);
   });
 });
 

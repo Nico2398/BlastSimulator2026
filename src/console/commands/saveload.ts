@@ -15,7 +15,8 @@
 // same way `new_game` builds it, same as this file's whole history (#408).
 
 import type { GameContext } from './world.js';
-import { regenerateGrid, restoreGrid, terrainGenDatum, DEFAULT_GRID_SIZE } from './world.js';
+import { regenerateGrid, restoreGrid, terrainGenDatum } from './world.js';
+import { DEFAULT_GRID_SIZE } from '../../core/config/balance.js';
 import type { CommandResult } from '../ConsoleRunner.js';
 import { serialize, deserialize } from '../../core/state/SaveLoad.js';
 import { getBiome } from '../../core/world/BiomeCatalog.js';

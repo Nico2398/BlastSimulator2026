@@ -17,8 +17,7 @@ import type { LoadingSiteInfo } from './ui/LoadingScreen.js';
 import type { CommandResult } from './console/ConsoleRunner.js';
 import { getLevel, getAllLevels, type LevelDef } from './core/campaign/Level.js';
 import { formatMoney } from './core/economy/formatMoney.js';
-import { SANDBOX_DEFAULTS, type SandboxConfig } from './core/campaign/Sandbox.js';
-import { getAllExplosives } from './core/world/ExplosiveCatalog.js';
+import { SANDBOX_DEFAULTS, sandboxLevelDef, type SandboxConfig } from './core/campaign/Sandbox.js';
 import { AudioManager } from './audio/AudioManager.js';
 import { AudioHooks } from './audio/AudioHooks.js';
 import { IndexedDBPersistence } from './persistence/IndexedDBPersistence.js';
@@ -253,19 +252,16 @@ function buildLoadingSiteInfo(level: LevelDef): LoadingSiteInfo {
 
 /** Loading screen content for a sandbox site — no site number, no difficulty pips. */
 function buildSandboxLoadingSiteInfo(config: SandboxConfig): LoadingSiteInfo {
-  // Empty availableExplosives means "every explosive" (SandboxConfig's own convention).
-  const explosivesCount = config.availableExplosives.length > 0
-    ? config.availableExplosives.length
-    : getAllExplosives().length;
+  const level = sandboxLevelDef(config);
   return {
     siteNumber: null,
     biomeCategoryKey: BIOME_CATEGORY_KEY[config.biome] ?? DEFAULT_BIOME_CATEGORY_KEY,
     difficulty: 0,
     descriptionKey: 'loading.sandbox_subtitle',
     briefing: [
-      { labelKey: 'loading.brief.starting_cash', value: `$${formatMoney(config.startingCash)}` },
-      { labelKey: 'loading.brief.target', value: `$${formatMoney(config.unlockThreshold)}` },
-      { labelKey: 'loading.brief.explosives', value: String(explosivesCount) },
+      { labelKey: 'loading.brief.starting_cash', value: `$${formatMoney(level.startingCash)}` },
+      { labelKey: 'loading.brief.target', value: `$${formatMoney(level.unlockThreshold)}` },
+      { labelKey: 'loading.brief.explosives', value: String(level.availableExplosives.length) },
     ],
   };
 }
@@ -308,14 +304,8 @@ const sandboxPanel = new SandboxPanel(uiContainer);
 mainMenu.setOnSandbox(() => { mainMenu.hide(); sandboxPanel.show(); });
 sandboxPanel.setOnBack(() => { mainMenu.show(); });
 sandboxPanel.setOnStart((config) => {
-  const explosives = config.availableExplosives.length > 0
-    ? ` explosives:${config.availableExplosives.join(',')}`
-    : '';
   void enterLevel([
-    `sandbox start biome:${config.biome} seed:${config.seed} size:${config.size}` +
-    ` depth:${config.depth} cash:${config.startingCash} goal:${config.unlockThreshold}` +
-    ` events:${config.eventFreqMultiplier} prices:${config.contractPriceMultiplier}` +
-    ` decay:${config.scoreDecayRate} mixed_rock:${config.mixedRockHardness}${explosives}`,
+    `sandbox start biome:${config.biome} difficulty:${config.difficulty} seed:${config.seed}`,
   ], buildSandboxLoadingSiteInfo(config));
 });
 
@@ -446,24 +436,34 @@ function runGameCommand(cmd: string, opts?: { syncRenderer?: boolean }): Command
   if (opts?.syncRenderer !== false) gameRenderer.syncFromContext(ctx);
   const cmdName = parseCommand(cmd).command;
 
+  // Whether this command replaced ctx.state with a new object — new_game,
+  // campaign level transitions, sandbox start, and any future entry point
+  // that does the same. Comparing identity rather than matching command
+  // names means this can't miss one.
+  const enteredNewLevel = Boolean(ctx.state && ctx.state !== prevState);
+
   // A fresh game replaces whatever the splash screen was showing — the normal
   // click paths (world map "Start", tutorial button) already call
-  // mainMenu.hide() themselves, but `new_game` run directly (console mode,
-  // scenario harness) bypassed that and left the overlay covering the canvas.
-  if (cmdName === 'new_game' && result.success) {
+  // mainMenu.hide() themselves, but a level-entry command run directly
+  // (console mode, scenario harness) bypassed that and left the overlay
+  // covering the canvas. Same identity change also has to close any overlay
+  // whose visibility is a stale carry-over from the PREVIOUS level's ended
+  // state (e.g. BlastReportModal left open from an earlier site's last
+  // blast) — a second `sandbox start` otherwise left that site's "Rating:
+  // Perfect" dialog covering the new site's terrain (#504).
+  if (enteredNewLevel) {
     mainMenu.hide();
+    uiManager.closeStaleLevelOverlays();
   }
 
   // (Re)seed the weather cycle whenever ctx.state was replaced with a new
-  // object — new_game, campaign level transitions, sandbox start, and any
-  // future entry point that does the same. Comparing identity rather than
-  // matching command names means this can't miss one. Previously
-  // ctx.weatherCycle only ever got created lazily inside weatherCommand
-  // (the `weather` console command, which nothing player-facing calls), so
-  // outside of manual console/test use the weather popover would have had
-  // nothing real to show, and a second game in the same session would have
-  // kept the first game's weather cycle at the wrong seed.
-  if (ctx.state && ctx.state !== prevState) {
+  // object. Previously ctx.weatherCycle only ever got created lazily inside
+  // weatherCommand (the `weather` console command, which nothing
+  // player-facing calls), so outside of manual console/test use the weather
+  // popover would have had nothing real to show, and a second game in the
+  // same session would have kept the first game's weather cycle at the wrong
+  // seed.
+  if (enteredNewLevel && ctx.state) {
     ctx.weatherCycle = createWeatherCycle(ctx.state.seed);
     ctx.rng = new Random(ctx.state.seed + 1000);
   }

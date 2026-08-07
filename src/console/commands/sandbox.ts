@@ -8,6 +8,7 @@ import type { CommandResult } from '../ConsoleRunner.js';
 import type { GameContext } from './world.js';
 import {
   SANDBOX_DEFAULTS,
+  SANDBOX_DIFFICULTY_ORDER,
   clampSandboxConfig,
   randomSandboxSeed,
   sandboxLevelDef,
@@ -19,35 +20,16 @@ import { generateContracts } from '../../core/economy/Contract.js';
 import { Random } from '../../core/math/Random.js';
 import { regenerateGrid } from './world.js';
 
-/** Named console args → a partial config. Unset keys keep their defaults. */
+/** Named console args → a partial config. Unset keys keep their defaults. Unknown keys (size, cash, …) are ignored. */
 export function parseSandboxArgs(named: Record<string, string>): Partial<SandboxConfig> {
   const out: Partial<SandboxConfig> = {};
-  const num = (key: string): number | undefined => {
-    const raw = named[key];
-    if (raw === undefined) return undefined;
-    const parsed = Number(raw);
-    return Number.isFinite(parsed) ? parsed : undefined;
-  };
 
   if (named['biome'] !== undefined) out.biome = named['biome'];
+  if (named['difficulty'] !== undefined) out.difficulty = named['difficulty'] as SandboxConfig['difficulty'];
   // seed:random asks for a fresh map; any number replays a known one.
   if (named['seed'] !== undefined) {
-    const seed = named['seed'] === 'random' ? randomSandboxSeed() : num('seed');
-    if (seed !== undefined) out.seed = seed;
-  }
-  const assign = <K extends keyof SandboxConfig>(key: K, value: number | undefined) => {
-    if (value !== undefined) out[key] = value as SandboxConfig[K];
-  };
-  assign('size', num('size'));
-  assign('depth', num('depth'));
-  assign('startingCash', num('cash'));
-  assign('unlockThreshold', num('goal'));
-  assign('eventFreqMultiplier', num('events'));
-  assign('contractPriceMultiplier', num('prices'));
-  assign('scoreDecayRate', num('decay'));
-  if (named['mixed_rock'] !== undefined) out.mixedRockHardness = named['mixed_rock'] === 'true';
-  if (named['explosives'] !== undefined) {
-    out.availableExplosives = named['explosives'].split(',').map(s => s.trim()).filter(Boolean);
+    const seed = named['seed'] === 'random' ? randomSandboxSeed() : Number(named['seed']);
+    if (Number.isFinite(seed)) out.seed = seed;
   }
   return out;
 }
@@ -74,6 +56,10 @@ export function sandboxCommand(
     const valid = getAllBiomes().map(b => b.id).join(', ');
     return { success: false, output: `Unknown biome: "${requested.biome}". Valid: ${valid}` };
   }
+  if (requested.difficulty !== undefined && !SANDBOX_DIFFICULTY_ORDER.includes(requested.difficulty)) {
+    const valid = SANDBOX_DIFFICULTY_ORDER.join(', ');
+    return { success: false, output: `Unknown difficulty: "${requested.difficulty}". Valid: ${valid}` };
+  }
 
   const config = clampSandboxConfig(requested);
   const level = sandboxLevelDef(config);
@@ -81,8 +67,8 @@ export function sandboxCommand(
   ctx.state = createGame({
     seed: config.seed,
     mineType: config.biome,
-    startingCash: config.startingCash,
-    eventFreqMultiplier: config.eventFreqMultiplier,
+    startingCash: level.startingCash,
+    eventFreqMultiplier: level.eventFreqMultiplier,
   });
   ctx.state.world = createWorldState(level.gridX, level.gridY, level.gridZ, true);
 
@@ -92,7 +78,7 @@ export function sandboxCommand(
     sizeX: level.gridX,
     sizeY: level.gridY,
     sizeZ: level.gridZ,
-    mixedRockHardness: config.mixedRockHardness,
+    mixedRockHardness: level.mixedRockHardness,
   });
 
   const contractRng = new Random(ctx.state.seed + ctx.state.tickCount);
@@ -100,7 +86,8 @@ export function sandboxCommand(
 
   return {
     success: true,
-    output: `Sandbox started. ${level.gridX}x${level.gridY}x${level.gridZ} ${config.biome}, seed ${config.seed}, cash $${config.startingCash.toLocaleString('en-US')}.`,
+    output: `Sandbox started. ${level.gridX}x${level.gridY}x${level.gridZ} ${config.biome}, ` +
+      `difficulty ${config.difficulty}, seed ${config.seed}, cash $${level.startingCash.toLocaleString('en-US')}.`,
   };
 }
 

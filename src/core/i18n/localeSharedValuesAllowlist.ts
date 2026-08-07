@@ -54,6 +54,7 @@ export const LOCALE_SHARED_VALUE_ALLOWLIST: string[] = [
   'ui.settings.audio.ui',       // "Interface"
   'ui.settings.session',        // "Session"
   'sandbox.field.biome',        // "Biome"
+  'sandbox.difficulty.normal',  // "Normal"
   'ui.blast_workshop.preview.row_fragments', // "Fragments"
   'ui.blast_workshop.preflight.stat_charge', // "Charge"
   'ui.blast_workshop.preflight.predicted_voxels', // "{count} voxels" — technical term, unchanged in French
