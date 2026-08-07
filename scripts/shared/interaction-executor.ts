@@ -309,6 +309,18 @@ export async function executeActionOnPage(
         (window as any).__renderFrame?.();
       }, { x: action.x, z: action.z, distance: action.distance });
       break;
+    case 'loadingScreenDebug':
+      // A real level load blocks the main thread for seconds — no player
+      // action a scenario can drive gets there deterministically, so this
+      // bypasses the load and previews the loading screen directly (#493).
+      await page.evaluate(({ debugAction, kind, locale }: { debugAction: string; kind: string | undefined; locale: string | undefined }) => {
+        if (debugAction === 'hide') {
+          (window as any).__loadingScreenHide?.();
+        } else {
+          (window as any).__loadingScreenPreview?.(kind, locale);
+        }
+      }, { debugAction: action.action, kind: action.kind, locale: action.locale });
+      break;
     case 'screenshot':
       // Screenshot is handled by the caller, not here
       break;

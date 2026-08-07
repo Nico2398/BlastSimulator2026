@@ -14,8 +14,9 @@
 // while the work happens.
 
 import { t } from '../core/i18n/I18n.js';
-import { QuipBag } from './loadingQuips.js';
+import { QuipBag, TipBag } from './loadingQuips.js';
 import { iconEl } from './icons.js';
+import { buildLoadingScreenLayout } from './loadingLayout.js';
 
 /**
  * Resolve once the browser has presented a frame.
@@ -43,78 +44,28 @@ export interface LoadPhase {
   run: () => void;
 }
 
-const SVG_NS = 'http://www.w3.org/2000/svg';
-
-function svgEl<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string, string>): SVGElementTagNameMap[K] {
-  const node = document.createElementNS(SVG_NS, tag) as SVGElementTagNameMap[K];
-  for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
-  return node;
+/** One key/value row in the briefing block under the subtitle. */
+export interface LoadingBriefingRow {
+  /** i18n key for the row's label, e.g. 'loading.brief.starting_cash'. */
+  labelKey: string;
+  /** Pre-formatted, e.g. "$75,000" — LoadingScreen does not reformat it. */
+  value: string;
+  /** '--bsx-*' token incl. leading '--'; default '--bsx-text-primary'. */
+  colorVar?: string;
 }
 
-/**
- * Opaque geological cross-section backdrop, matching the design comp's own
- * construction: 7 wavy horizontal strata bands (drawn back-to-front so each
- * later band's tone paints over the previous one's lower portion), seam
- * lines on the boundary between them, scattered ore ellipses, and two dashed
- * borehole guide lines with depth ticks. It reads as the site's own survey
- * diagram rather than a render — computed once, since it is decoration, not
- * gameplay data tied to any particular level.
- */
-function waveTrace(yTop: number, amp: number, phase: number): string {
-  const pts: string[] = [];
-  for (let x = 0; x <= 1600; x += 64) {
-    const y = yTop
-      + Math.sin((x / 1600) * Math.PI * 3 + phase) * amp
-      + Math.sin((x / 1600) * Math.PI * 6.2 + phase * 1.7) * amp * 0.34;
-    pts.push(`${x},${y.toFixed(1)}`);
-  }
-  return pts.join(' L');
-}
-
-const STRATA_TONES = ['#161c24', '#1b222b', '#202832', '#1c232c', '#171d25', '#13181f', '#0f1318'];
-const DEPTH_TICKS = [214, 300, 386, 472, 558, 644, 730];
-
-function buildStrataBackdrop(): SVGSVGElement {
-  const svg = svgEl('svg', { viewBox: '0 0 1600 900', preserveAspectRatio: 'xMidYMid slice' });
-  svg.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:block';
-  svg.appendChild(svgEl('rect', { x: '0', y: '0', width: '1600', height: '900', fill: '#0d1116' }));
-
-  const bandTraces: string[] = [];
-  STRATA_TONES.forEach((fill, i) => {
-    const trace = waveTrace(212 + i * 96, 20 - i * 1.6, i * 1.9);
-    bandTraces.push(trace);
-    svg.appendChild(svgEl('path', { d: `M${trace} L1600,900 L0,900 Z`, fill }));
-  });
-  for (let i = 1; i < bandTraces.length; i++) {
-    svg.appendChild(svgEl('path', {
-      d: `M${bandTraces[i]}`, fill: 'none', stroke: 'rgba(255,255,255,.05)', 'stroke-width': '1',
-    }));
-  }
-
-  for (let i = 0; i < 16; i++) {
-    const a = i * 2.399;
-    svg.appendChild(svgEl('ellipse', {
-      cx: (240 + ((i * 337) % 1120)).toFixed(0),
-      cy: (430 + Math.sin(a) * 118 + (i % 3) * 26).toFixed(0),
-      rx: (7 + (i % 4) * 3.4).toFixed(1),
-      ry: (3 + (i % 3) * 1.5).toFixed(1),
-      fill: 'rgba(169,140,255,.16)',
-    }));
-  }
-
-  svg.appendChild(svgEl('line', {
-    x1: '1318', y1: '150', x2: '1318', y2: '742',
-    stroke: 'rgba(255,176,46,.16)', 'stroke-width': '1.5', 'stroke-dasharray': '7 6',
-  }));
-  for (const y of DEPTH_TICKS) {
-    svg.appendChild(svgEl('line', { x1: '1306', y1: `${y}`, x2: '1330', y2: `${y}`, stroke: 'rgba(255,176,46,.13)', 'stroke-width': '1.5' }));
-  }
-  svg.appendChild(svgEl('line', {
-    x1: '196', y1: '196', x2: '196', y2: '640',
-    stroke: 'rgba(255,255,255,.05)', 'stroke-width': '1.5', 'stroke-dasharray': '7 6',
-  }));
-
-  return svg;
+/** Identifies the site a load is preparing, for the eyebrow/subtitle/briefing blocks. */
+export interface LoadingSiteInfo {
+  /** null → sandbox eyebrow wording, no "SITE NN". */
+  siteNumber: number | null;
+  /** 'ui.portfolio.biome.desert' | '.mountain' | '.tropical'. */
+  biomeCategoryKey: string;
+  /** 0-3, difficulty pip count. */
+  difficulty: number;
+  /** Subtitle i18n key; omitted → no subtitle block. */
+  descriptionKey?: string;
+  /** Omitted/empty → no briefing block. */
+  briefing?: readonly LoadingBriefingRow[];
 }
 
 export class LoadingScreen {
@@ -123,61 +74,39 @@ export class LoadingScreen {
   private readonly barFill: HTMLElement;
   private readonly percentEl: HTMLElement;
   private readonly titleEl: HTMLElement;
+  private readonly eyebrowEl: HTMLElement;
+  private readonly subtitleEl: HTMLElement;
+  private readonly briefingEl: HTMLElement;
+  private readonly marksLayer: HTMLElement;
+  private readonly stageLabelEl: HTMLElement;
+  private readonly stageMetaEl: HTMLElement;
+  private readonly tipLabelEl: HTMLElement;
+  private readonly tipTextEl: HTMLElement;
+  private readonly tipNextBtn: HTMLButtonElement;
   private readonly quips = new QuipBag();
+  private readonly tips = new TipBag();
 
   constructor(container: HTMLElement) {
-    this.overlay = document.createElement('div');
-    this.overlay.id = 'bs-loading-screen';
-    // Above the main menu and the sandbox panel — a load can start from either.
-    this.overlay.style.cssText = [
-      'position:fixed;inset:0;z-index:10500;display:none',
-      'align-items:center;justify-content:center',
-      // overflow before background: jsdom's cssstyle parser silently voids
-      // the whole cssText when a `background` shorthand is followed by an
-      // `overflow` declaration in the same string (reproduced in isolation;
-      // `overflow-then-background` and `background-color` both parse fine).
-      'overflow:hidden;background:#0d1116',
-    ].join(';');
+    const layout = buildLoadingScreenLayout();
+    this.overlay = layout.overlay;
+    this.label = layout.label;
+    this.barFill = layout.barFill;
+    this.percentEl = layout.percentEl;
+    this.titleEl = layout.titleEl;
+    this.eyebrowEl = layout.eyebrowEl;
+    this.subtitleEl = layout.subtitleEl;
+    this.briefingEl = layout.briefingEl;
+    this.marksLayer = layout.marksLayer;
+    this.stageLabelEl = layout.stageLabelEl;
+    this.stageMetaEl = layout.stageMetaEl;
+    this.tipLabelEl = layout.tipLabelEl;
+    this.tipTextEl = layout.tipTextEl;
+    this.tipNextBtn = layout.tipNextBtn;
 
-    this.overlay.appendChild(buildStrataBackdrop());
+    // Label text is set per-show() in renderTip() so it refreshes on locale
+    // switch, same as every other block — this is click wiring only.
+    this.tipNextBtn.addEventListener('click', () => { this.nextTip(); });
 
-    const vignette = document.createElement('div');
-    vignette.style.cssText = 'position:absolute;inset:0;'
-      + 'background:radial-gradient(96% 76% at 50% 44%, rgba(26,32,40,.55), rgba(11,14,19,.92) 74%)';
-    this.overlay.appendChild(vignette);
-
-    const column = document.createElement('div');
-    column.style.cssText = 'position:relative;z-index:1;width:100%;max-width:640px;padding:0 24px;'
-      + 'display:flex;flex-direction:column;align-items:center;gap:18px;text-align:center';
-
-    this.titleEl = document.createElement('div');
-    this.titleEl.style.cssText = 'font:900 32px/1.15 var(--bsx-font-ui, sans-serif);letter-spacing:-.02em;color:var(--bsx-text-primary, #f2f4f7)';
-
-    const phaseLine = document.createElement('div');
-    phaseLine.style.cssText = 'display:flex;align-items:center;gap:9px;color:var(--bsx-text-secondary, #c9d1db)';
-    const chev = iconEl('chevR', 10);
-    chev.style.color = 'var(--bsx-text-muted, #8a94a2)';
-    this.label = document.createElement('span');
-    this.label.id = 'bs-loading-label';
-    this.label.style.cssText = 'font:400 13px/1.5 var(--bsx-font-ui, sans-serif)';
-    phaseLine.append(chev, this.label);
-
-    const progressBlock = document.createElement('div');
-    progressBlock.style.cssText = 'width:100%;display:flex;flex-direction:column;gap:8px';
-
-    const track = document.createElement('div');
-    track.style.cssText = 'height:6px;border-radius:3px;overflow:hidden;background:#1b212a';
-    this.barFill = document.createElement('div');
-    this.barFill.id = 'bs-loading-bar';
-    this.barFill.style.cssText = 'height:100%;width:0%;background:var(--bsx-amber, #ffb02e);transition:width 120ms linear';
-    track.appendChild(this.barFill);
-
-    this.percentEl = document.createElement('div');
-    this.percentEl.style.cssText = 'align-self:flex-end;font:600 12px/1 var(--bsx-font-mono, monospace);color:var(--bsx-text-muted, #8a94a2)';
-
-    progressBlock.append(track, this.percentEl);
-    column.append(this.titleEl, phaseLine, progressBlock);
-    this.overlay.appendChild(column);
     container.appendChild(this.overlay);
 
     // The scenario harness asserts visibility on the DOM node itself — the
@@ -194,8 +123,44 @@ export class LoadingScreen {
   /** Progress as a 0-1 fraction, read back off the bar. */
   get progress(): number { return parseFloat(this.barFill.style.width) / 100; }
 
-  show(): void {
+  /** Eyebrow row text (site identity + biome) — exposed for tests. */
+  get eyebrowText(): string {
+    return this.eyebrowEl.querySelector('.bsx-loading-eyebrow-text')?.textContent ?? '';
+  }
+
+  /** Subtitle text under the title — exposed for tests. */
+  get subtitleText(): string { return this.subtitleEl.textContent ?? ''; }
+
+  /** Briefing rows currently rendered — exposed for tests. */
+  get briefingRows(): { label: string; value: string }[] {
+    return Array.from(this.briefingEl.children).map((cell) => ({
+      label: cell.querySelector('.bsx-stat-key')?.textContent ?? '',
+      value: cell.querySelector('.bsx-stat-value')?.textContent ?? '',
+    }));
+  }
+
+  /** Stage label text alongside the percentage — exposed for tests. */
+  get stageLabelText(): string { return this.stageLabelEl.textContent ?? ''; }
+
+  /** Stage meta text alongside the percentage — exposed for tests. */
+  get stageMetaText(): string { return this.stageMetaEl.textContent ?? ''; }
+
+  /** Tip text currently shown in the tip block — exposed for tests. */
+  get tipText(): string { return this.tipTextEl.textContent ?? ''; }
+
+  /** TIP badge label — exposed for tests (locale refresh, #493). */
+  get tipLabelText(): string { return this.tipLabelEl.textContent ?? ''; }
+
+  /** NEXT button label — exposed for tests (locale refresh, #493). */
+  get tipNextText(): string { return this.tipNextBtn.textContent ?? ''; }
+
+  show(siteInfo?: LoadingSiteInfo): void {
     this.titleEl.textContent = t('loading.title');
+    this.renderEyebrow(siteInfo ?? null);
+    this.renderSubtitle(siteInfo ?? null);
+    this.renderBriefing(siteInfo ?? null);
+    this.setStage(0, 0);
+    this.renderTip();
     this.setPhase(this.quips.next(), 0);
     this.overlay.style.display = 'flex';
   }
@@ -211,9 +176,113 @@ export class LoadingScreen {
   /** Next unused quip, so a caller driving its own phases can label them. */
   nextQuip(): string { return this.quips.next(); }
 
+  /** Serve another tip into the tip block, for the NEXT button. */
+  nextTip(): string {
+    const tip = this.tips.next();
+    this.tipTextEl.textContent = tip;
+    return tip;
+  }
+
   hide(): void { this.overlay.style.display = 'none'; }
 
   dispose(): void { this.overlay.remove(); }
+
+  /** Populate the eyebrow row (site identity, biome, difficulty pips) from `info`. */
+  private renderEyebrow(info: LoadingSiteInfo | null): void {
+    this.eyebrowEl.replaceChildren();
+    if (!info) return;
+
+    const leadRule = document.createElement('span');
+    leadRule.className = 'bsx-loading-eyebrow-rule';
+
+    const text = document.createElement('span');
+    text.className = 'bsx-loading-eyebrow-text';
+    const siteText = info.siteNumber === null
+      ? t('loading.eyebrow_sandbox')
+      : t('loading.eyebrow_site', { number: String(info.siteNumber).padStart(2, '0') });
+    text.textContent = `${siteText} · ${t(info.biomeCategoryKey)}`;
+
+    const pips = document.createElement('span');
+    pips.className = 'bsx-loading-eyebrow-pips';
+    for (let i = 0; i < Math.max(0, info.difficulty); i++) pips.appendChild(iconEl('pick', 13));
+
+    const tailRule = document.createElement('span');
+    tailRule.className = 'bsx-loading-eyebrow-rule';
+
+    this.eyebrowEl.append(leadRule, text, pips, tailRule);
+  }
+
+  /** Populate the subtitle from `info.descriptionKey`, or clear it when absent. */
+  private renderSubtitle(info: LoadingSiteInfo | null): void {
+    this.subtitleEl.textContent = info?.descriptionKey ? t(info.descriptionKey) : '';
+  }
+
+  /** Populate the briefing block's key/value rows from `info.briefing`. */
+  private renderBriefing(info: LoadingSiteInfo | null): void {
+    this.briefingEl.replaceChildren();
+    for (const row of info?.briefing ?? []) {
+      const cell = document.createElement('div');
+      cell.className = 'bsx-stat-cell bsx-stat-cell-center';
+
+      const key = document.createElement('span');
+      key.className = 'bsx-stat-key';
+      key.textContent = t(row.labelKey);
+
+      const value = document.createElement('span');
+      value.className = 'bsx-stat-value';
+      value.textContent = row.value;
+      value.style.color = `var(${row.colorVar ?? '--bsx-text-primary'})`;
+
+      cell.append(key, value);
+      this.briefingEl.appendChild(cell);
+    }
+  }
+
+  /**
+   * Lay `phaseCount` segment marks onto the progress track.
+   *
+   * Boundaries mirror the fractions `setPhase` already drives the bar to
+   * ((i+1)/(phaseCount+1) for each phase index i) — one mark per phase
+   * boundary, none at 0% or 100%.
+   */
+  private renderSegmentMarks(phaseCount: number): void {
+    this.marksLayer.replaceChildren();
+    if (phaseCount <= 0) return;
+    const total = phaseCount + 1;
+    for (let i = 1; i <= phaseCount; i++) {
+      const mark = document.createElement('div');
+      mark.className = 'bsx-loading-mark';
+      mark.style.left = `${(i / total) * 100}%`;
+      this.marksLayer.appendChild(mark);
+    }
+  }
+
+  /**
+   * Update the stage label + meta alongside the percentage.
+   *
+   * `total <= 0` means no phase count is known yet — `show()` calls this
+   * before `runPhases()` has any phases to report, e.g. the debug-preview
+   * path that never calls `runPhases()` at all. "PHASE 0 / 0" would read as
+   * zero total stages rather than "not started yet", so an em dash stands in
+   * for both numbers until the first real call arrives.
+   */
+  private setStage(current: number, total: number): void {
+    if (total <= 0) {
+      this.stageLabelEl.textContent = t('loading.stage_label', { current: '—', total: '—' });
+      this.stageMetaEl.textContent = t('loading.stage_meta', { current: '—', total: '—' });
+      return;
+    }
+    this.stageLabelEl.textContent = t('loading.stage_label', { current, total });
+    this.stageMetaEl.textContent = t('loading.stage_meta', { current, total });
+  }
+
+  /** Refresh the tip block's own static labels, then draw the next tip. */
+  private renderTip(): void {
+    this.tipLabelEl.textContent = t('loading.tip_label');
+    this.tipNextBtn.title = t('loading.tip_next_hint');
+    this.tipNextBtn.textContent = t('loading.tip_next');
+    this.nextTip();
+  }
 
   /**
    * Run each phase with the overlay visible and its caption up to date.
@@ -223,8 +292,9 @@ export class LoadingScreen {
    * The overlay is hidden even if a phase throws, so a failed load can never
    * strand the player behind an opaque panel.
    */
-  async runPhases(phases: readonly LoadPhase[]): Promise<void> {
-    this.show();
+  async runPhases(phases: readonly LoadPhase[], siteInfo?: LoadingSiteInfo): Promise<void> {
+    this.show(siteInfo);
+    this.renderSegmentMarks(phases.length);
     await nextPaint();
     try {
       for (let i = 0; i < phases.length; i++) {
@@ -233,6 +303,7 @@ export class LoadingScreen {
         // the longest phase, which reads as nothing happening. This starts it
         // moving on the first phase and still leaves the last step for "ready".
         this.setPhase(this.quips.next(), (i + 1) / (phases.length + 1));
+        this.setStage(i + 1, phases.length);
         await nextPaint();
         phase.run();
       }

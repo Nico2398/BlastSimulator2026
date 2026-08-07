@@ -46,13 +46,12 @@ export const LOADING_QUIPS: readonly string[] = [
 ];
 
 /**
- * A bag that hands out quips without repeating until it is empty.
- *
- * Repetition inside one load is what would give the joke away as a fixed
- * list, so the bag is drawn down rather than sampled independently each time.
+ * Shared shuffle-without-repeat implementation behind both QuipBag and
+ * TipBag: draws from `pool()` until it is empty, then reshuffles. The two
+ * bags differ only in which constant array they draw from (#493).
  */
-export class QuipBag {
-  private remaining: string[] = [];
+abstract class DrawBag<T> {
+  private remaining: T[] = [];
   private readonly random: () => number;
 
   /** `random` is injectable so tests can pin the order. */
@@ -61,19 +60,64 @@ export class QuipBag {
     this.refill();
   }
 
+  /** The fixed pool this bag draws from, without repeating until exhausted. */
+  protected abstract pool(): readonly T[];
+
   private refill(): void {
-    this.remaining = [...LOADING_QUIPS];
+    this.remaining = [...this.pool()];
   }
 
-  /** Draw a quip. Refills once every line has been used. */
-  next(): string {
+  /** Draw an item. Refills once every item has been used. */
+  next(): T {
     if (this.remaining.length === 0) this.refill();
     const i = Math.min(this.remaining.length - 1, Math.floor(this.random() * this.remaining.length));
     return this.remaining.splice(i, 1)[0]!;
   }
 
-  /** Lines still unused in the current pass — exposed for tests. */
+  /** Items still unused in the current pass — exposed for tests. */
   get remainingCount(): number {
     return this.remaining.length;
   }
+}
+
+/**
+ * A bag that hands out quips without repeating until it is empty.
+ *
+ * Repetition inside one load is what would give the joke away as a fixed
+ * list, so the bag is drawn down rather than sampled independently each time.
+ */
+export class QuipBag extends DrawBag<string> {
+  protected pool(): readonly string[] { return LOADING_QUIPS; }
+}
+
+/**
+ * Gameplay tips shown in the loading screen's tip block, served by TipBag.
+ *
+ * Unlike LOADING_QUIPS these are meant to be read and acted on, not just a
+ * joke to skim past — real mechanics a player might not have discovered yet.
+ */
+export const LOADING_TIPS: readonly string[] = [
+  'A survey narrows the odds before you drill — skipping it is a bet, not a shortcut.',
+  'Stemming the top of a hole keeps the blast energy pointed at the rock, not the sky.',
+  'A free face lets rock break sideways. Without one, energy has nowhere to go but up.',
+  'Underloaded holes leave oversize boulders; overloaded ones fling debris past the berm.',
+  'Fatigued crew work slower and get hurt more — a bunkhouse pays for itself.',
+  'Contracts reward the ore grade you promised, not the grade you hoped for.',
+  'A hauler idle at the depot is a hauler not making you money on the muck pile.',
+  'Weather changes visibility and footing — check it before committing to a big sequence.',
+  'Training a proficiency to the next level shows up in task duration, not just the number.',
+  'The union notices skipped breaks long before it notices skipped raises.',
+  'A warehouse tier caps how much ore you can stockpile before a sale.',
+  'Sequencing charges in the right order controls where the muck pile ends up.',
+  'Corruption buys speed today and an inspector tomorrow.',
+  'Mixed rock hardness sites hide soft pockets next to hard ones — surveys still lie less than guessing.',
+  'A vehicle needs a qualified driver before it needs fuel.',
+];
+
+/**
+ * A bag that hands out tips without repeating until it is empty — same shape
+ * as QuipBag, sharing the draw logic via `DrawBag<T>`.
+ */
+export class TipBag extends DrawBag<string> {
+  protected pool(): readonly string[] { return LOADING_TIPS; }
 }
