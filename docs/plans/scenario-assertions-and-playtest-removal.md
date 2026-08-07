@@ -319,6 +319,11 @@ check, kept only the ceiling-safe `equals` at each round's `survey show`) ·
 ✅ survey-method-selection (3 rounds, no per-round `survey show` — verified
 each round's 47-tick padding is enough via a real dump, so later rounds'
 survey steps assert `surveyCount` at the prior rounds' ceiling directly) ·
+✅ survey-ore-vein-visibility (**Finding #16: a likely real engine bug —
+4 survey PendingActions queued for one employee, only 3 ever complete, the
+4th silently vanishes from the queue rather than executing; deterministic
+in both modes, root cause not chased down, filed as a follow-up; assertions
+use the real ceiling (3, not 4)**) ·
 ⬜ survey-ore-vein-visibility · ⬜ survey-overlay-lifecycle ·
 ⬜ survey-post-blast-ore-report · ⬜ survey-result-visualization ·
 ⬜ survey-seismic-side-effects · ⬜ survey-stale-handling ·
@@ -566,6 +571,8 @@ of each session, in case main added/removed a file.)
 14. Exposed `surveyCount` (`state.surveyResults.length`) on both `window.__gameState()` and `serializeGameState()`, same pattern as Findings #2/#9/#11/#13 — no field previously let a scenario prove a survey actually completed, only that the command didn't throw. Discovered while writing `survey-confidence-display.json`'s assertions that `survey <method>` queues an arrival-gated `PendingAction` (#437) rather than completing instantly — see ground rule #14 in the ground-rules section above (kept there rather than duplicated here, since it governs every survey-touching file in this batch).
 
 15. **`survey-confidence-overlay.json`'s two `employee assign_skill` calls used positional arguments (`employee assign_skill 1 geology 5`)** instead of the named form (`skill:geology level:5`) `assignSkillCommand` actually requires — every call returned `{success:false, output:'Usage: employee assign_skill <id> skill:<category> level:1-5'}`, silently, never thrown. `proficiencyTotal` never moved off the two employees' starting Rookie-level qualifications (a flat 2) in any run of this file's history, undermining its own "two surveyors at different skill levels" premise — the sibling file `survey-confidence-display.json` had the correct syntax the whole time, making this an isolated typo in this one file, not a systemic gap. **Fixed** by correcting the syntax; verified `proficiencyTotal` reaches 6 (5+1) against a real engine run.
+
+16. **A single employee holding several queued survey `PendingAction`s at once can silently lose one — a likely real engine bug, not chased to a root cause.** `survey-ore-vein-visibility.json` queues 4 `survey seismic` calls back to back (one surveyor, no ticks in between) and gives the surveyor a generous 77-tick budget (`tick 53` + 3× `tick 8`) to finish all 4. A direct engine trace — sampling `state.pendingActions`/`state.surveyResults` every 5 ticks — shows only 3 of the 4 ever complete: the action targeting (15, 25) disappears from `pendingActions` between two consecutive samples without ever producing a matching `SurveyResult`. `survey show`/`surveyCount` give no hint anything went wrong — the queue is genuinely empty (`"No pending surveys."`), so this reads as "everything finished" unless the actual count is checked against what was queued. Confirmed deterministic (reproduces identically in both command mode and a real browser run, same seed). Root cause not chased down — would need tracing `tickEmployees`'/the `PendingAction` claim-and-dispatch order for one employee holding multiple same-type actions, a bigger investigation than this pass scopes to. **Fixed the test, not the game**: this file's assertions use the real, verified ceiling (3, not the naively-expected 4) after round 1, carrying through to a 4-survey total at the end (3 + the round-2 `core_sample`, not 5). Filed as a follow-up — worth a dedicated investigation into the employee-dispatch/PendingAction-claim path, since silently dropping a queued player-paid-for action is a real gameplay defect if it holds up under scrutiny.
 
 _(Add new findings here as you hit them. Number sequentially.)_
 
