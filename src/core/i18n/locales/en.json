@@ -2819,7 +2819,7 @@
   "shortcuts.survey": "S: Survey Mode",
   "shortcuts.map": "M: Mini-map",
   "shortcuts.navgrid": "N: Toggle NavGrid Overlay",
-  "shortcuts.survey_overlay": "O: Toggle Survey Overlay",
+  "shortcuts.survey_overlay": "O: Toggle Confidence Overlay",
   "shortcuts.saves": "F5: Quick Save",
   "shortcuts.settings": "Esc: Close Panel",
   "shortcuts.build": "G: Build",

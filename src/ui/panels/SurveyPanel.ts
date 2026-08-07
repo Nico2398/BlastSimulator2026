@@ -12,7 +12,7 @@
 // for their own root ids in P6.
 
 import { t } from '../../core/i18n/I18n.js';
-import { el, card, button, sectionHeader, emptyState, reasonLine, progressBar } from '../dom.js';
+import { el, card, button, sectionHeader, emptyState, reasonLine, progressBar, paintToggleButton } from '../dom.js';
 import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import type { GameState } from '../../core/state/GameState.js';
@@ -215,19 +215,15 @@ export class SurveyPanel {
     }
   }
 
-  /** Overlay-toggle button click (#496): flip preference, update button, notify the click-path callback. */
+  /** Overlay-toggle button click (#496): delegate to the same set-and-repaint path the external sync uses, then notify. */
   private handleOverlayToggleClick(): void {
-    this.overlayVisible = !this.overlayVisible;
-    this.syncOverlayButton();
+    this.setOverlayVisible(!this.overlayVisible);
     this.onToggleOverlayCb?.(this.overlayVisible);
   }
 
   /** Paint the toggle button's on/off visual state, matching MiniMap's own nav-toggle-button convention. */
   private syncOverlayButton(): void {
-    const active = this.overlayVisible;
-    this.overlayToggleBtn.style.borderColor = active ? 'var(--bsx-amber)' : 'var(--bsx-hairline-strong)';
-    this.overlayToggleBtn.style.color = active ? 'var(--bsx-amber)' : 'var(--bsx-text-muted)';
-    this.overlayToggleBtn.style.background = active ? 'rgba(255,176,46,.12)' : 'transparent';
+    paintToggleButton(this.overlayToggleBtn, this.overlayVisible);
   }
 
   // ── Internals ─────────────────────────────────────────────────────────────

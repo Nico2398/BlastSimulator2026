@@ -2819,7 +2819,7 @@
   "shortcuts.survey": "S : Mode sondage",
   "shortcuts.map": "M : Mini-carte",
   "shortcuts.navgrid": "N : Afficher la grille de navigation",
-  "shortcuts.survey_overlay": "O : Afficher/masquer la surcouche de sondage",
+  "shortcuts.survey_overlay": "O : Afficher/masquer la surcouche de confiance",
   "shortcuts.saves": "F5 : Sauvegarde rapide",
   "shortcuts.settings": "Échap : Fermer le panneau",
   "shortcuts.build": "G : Construction",

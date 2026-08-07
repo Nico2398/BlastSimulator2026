@@ -381,6 +381,12 @@ export class GameRenderer {
     this.syncSurveyOverlay(this.buildSurveyOverlayOptions(this.lastState));
   }
 
+  /** Flip the survey confidence overlay's visibility preference (#496) and return the new value, so callers (e.g. the keyboard shortcut) don't have to read-flip-set by hand. */
+  toggleSurveyOverlayVisible(): boolean {
+    this.setSurveyOverlayVisible(!this.surveyOverlayPreference);
+    return this.surveyOverlayPreference;
+  }
+
   /**
    * Sync survey confidence overlay from the current game state.
    * Call from syncFromContext() to keep the overlay visible during gameplay.

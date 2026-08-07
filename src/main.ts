@@ -919,14 +919,10 @@ new KeyboardShortcuts({
   quickSave: () => { if (ctx.state) void savesModal['autoSave'](ctx.state); },
   onEscape: () => uiManager.handleEscape(),
   onToggleNavGrid: () => uiManager.toggleNavGridOverlay(),
-  onToggleSurveyOverlay: () => {
-    const next = !gameRenderer.surveyOverlayVisible;
-    gameRenderer.setSurveyOverlayVisible(next);
-    // Keep the panel's own button in sync even while the panel is closed —
-    // its click handler is the other path into the same preference, and the
-    // two must never disagree the next time the panel opens.
-    uiManager.setSurveyOverlayVisible(next);
-  },
+  // Keep the panel's own button in sync even while the panel is closed —
+  // its click handler is the other path into the same preference, and the
+  // two must never disagree the next time the panel opens.
+  onToggleSurveyOverlay: () => uiManager.setSurveyOverlayVisible(gameRenderer.toggleSurveyOverlayVisible()),
 });
 
 // --- Render loop + game tick timer ---
