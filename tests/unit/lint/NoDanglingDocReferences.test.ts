@@ -50,23 +50,17 @@ const SCANNED_EXTENSIONS = ['.ts', '.tsx', '.md'];
  *    hypothetical.
  *  - scripts/a11y-check.ts:13 — JSDoc documenting the *generated* report
  *    path (`screenshots/` is gitignored output, never checked in).
- *  - docs/plans/issue-458-terrain-overhaul.md:20,135 and
- *    docs/plans/rock-fragmentation-refactor.md:210,375,556 and
- *    records/verification-327.md:17 — inside the exact leftover planning
- *    docs issue #494 deletes outright; their stale internal citations to
- *    since-renamed/removed files stop existing the moment the doc does, so
- *    they are not part of the citation-repoint work and not worth chasing.
+ *  - A handful of entries used to cover the exact leftover planning docs
+ *    issue #494 deletes outright, allowlisted for their own stale internal
+ *    citations. Issue #494's cleanup has since removed those files from the
+ *    tree entirely, so there is nothing left on disk to carry a stale
+ *    citation — the entries were dropped rather than kept as dead allowlist
+ *    weight.
  */
 const DANGLING_REFERENCE_ALLOWLIST: readonly string[] = [
   'README.md:304',
   'README.md:305',
   'scripts/a11y-check.ts:13',
-  'docs/plans/issue-458-terrain-overhaul.md:20',
-  'docs/plans/issue-458-terrain-overhaul.md:135',
-  'docs/plans/rock-fragmentation-refactor.md:210',
-  'docs/plans/rock-fragmentation-refactor.md:375',
-  'docs/plans/rock-fragmentation-refactor.md:556',
-  'records/verification-327.md:17',
   // docs/ui-redesign-spec.md:25 cites en.json directly under src/core/i18n;
   // the real path adds a `locales/` segment. Pre-existing, unrelated to
   // #494's deletions — out of scope for this issue's citation-repoint work.
