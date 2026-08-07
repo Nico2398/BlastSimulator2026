@@ -360,7 +360,26 @@ drill/charge/sequence/blast pipeline with the Finding #4 fix; `contract
 accept`/`contract deliver` left unmarked — no contract-count field exists,
 and `contract deliver`'s own step already carries a legacy note about
 command-runner.ts's success-handling gap) ·
-⬜ skill-progression
+✅ skill-progression (**Finding #15 class: `assign_skill id:1 ...` used
+`id:` as a named arg, but the id is positional — fixed to bare `1`.
+Finding #18: the file's whole premise was untestable as written — it
+ticked 700 times with no work ever assigned to the driller, so the
+excavator skill could never gain XP (XP only accrues via
+`tickTaskProgress` while a task is actively in progress, per
+GameLoop.ts) — fixed for real by queuing 40 `employee dispatch` calls
+(a test-only console helper built for exactly this) up front so the
+driller has continuous work through the full budget. Finding #19: a
+single `tick 700` step silently under-ran in real (non-scratch) execution
+— `runCommand`'s action-count increment can trigger a random event
+mid-batch, and `tick` both stops advancing the instant an event fires
+and refuses to advance at all while one is pending, so the un-chunked
+step delivered far fewer than 700 real ticks and the skill never
+reached level 5. Fixed by chunking into 14× (tick 50, event choose 0),
+matching this file's own sibling scenarios' established pattern — reaches
+proficiencyTotal:6 (level 5 excavator) as the original scenario name
+promised**)
+
+Batch 3 done: 12/12, Findings #14-#19.
 
 ### Batch 4 — building-* (12) — **+ research-center-gate parity check**
 ⬜ building-destruction-visual · ⬜ building-lifecycle ·
@@ -609,6 +628,9 @@ of each session, in case main added/removed a file.)
 
 17. **A regression test locked in a stale literal after Finding #5's own fix.** `tests/unit/scenario-defs-blast-visual-coverage.test.ts` (issue #404 coverage) hardcoded `charge hole:* explosive:boomite amount:8 stemming:0` as the expected max-charge command string in `blast-execution-visual.json`. But `Charge.ts`'s `adjustStemming` floors at `Math.max(0.5, ...)` — the stemming stepper can never reach 0 by clicking — so when Finding #5 fixed that file's charge steps to match what interaction mode can actually click, the command field correctly became `stemming:0.5`, not `stemming:0`. The coverage test was never updated to match, so it sat red until this session's full local sweep caught it (full-sweep discipline working as intended — a channel red before arrival, per ground rule/CLAUDE.md's channel-6 rule, not something to skip past). **Fixed**: updated the test's literal and comment to `0.5`, noting why (the achievable floor, not a literal zero) instead of reverting the scenario file.
 
+18. **`skill-progression.json`'s whole premise was untestable as written.** The file's own name and description promise "verify Level 5 after 700 ticks of work," but the file only ever hired a driller, assigned a `driving.excavator` qualification, and ticked 700 times — no task was ever dispatched to that employee. `gainXp` (`EmployeeGainXp.ts`) is only ever called from `tickTaskProgress` (`GameLoop.ts`), gated on `emp.taskTicksRemaining !== null` — i.e. XP only accrues while a task is actively in progress. An idle employee, no matter how many ticks pass, never gains a single point of XP. Confirmed via a real dump: after the original sequence, `driving.excavator` stayed at proficiencyLevel 1, xp 0, for the full 700 ticks. **Fixed for real, not just re-scoped to the broken behavior**: `employee dispatch <id> x:<X> z:<Z> skill:<category>` is a console-only helper that already exists in `employees.ts` specifically so "console/scenario driving can put an employee to genuine, ticksWorked-incrementing work without a full drill/haul pipeline" (its own doc comment). Queuing 40 of these up front (before any tick) gives the driller continuous excavator work through the full 700-tick budget — verified via a real dump this reaches proficiencyLevel 5 (xp 1266), matching the file's original, previously-unverified claim.
+19. **A single large `tick N` step can silently deliver far fewer than N real ticks — a gap in test-writing method, not a game bug — discovered while verifying Finding #18's fix.** Every scratch check up to this point had called `runner.run(cmd)` directly, which does not increment `state.events`'s action counter and so never triggers a random event. The real scenario runner instead calls `runCommand(engine, cmd)` (`command-runner.ts`), which wraps every non-meta command with `incrementActionCount` — meaning random events can fire mid-command in the real path even though they never did in any of this session's scratch scripts. `tick` (`console/commands/events.ts:89`) refuses to advance a single tick while `state.events.pendingEvent` is set, and separately, an event firing mid-batch stops that batch right there (`tick 700` returned `"...(Advanced 135 of 700 requested ticks)"` when a random event fired at relative tick 135) — the unconsumed remainder is not queued for later, it is simply lost. A single `tick 700` step with no `event choose 0` therefore silently delivered only 135 real ticks in Finding #18's fix, leaving the skill stuck below level 5 and the new `expect` failing. **Fixed** by chunking into 14× (`tick 50`, `event choose 0`) — the same pattern every other file in this batch already uses for exactly this reason, just not yet applied to this file's original, pre-existing `tick 700` step. Worth remembering for any future large bare `tick N` step: verify it against the real `runCommand` path, not a bare `runner.run` scratch script, before trusting the tick count it reports actually landed.
+
 _(Add new findings here as you hit them. Number sequentially.)_
 
 ## Status table
@@ -721,3 +743,19 @@ got, whether main was merged, and whether GitHub Actions is back up yet.
   5 remaining Batch 3 files (survey-result-visualization, survey-seismic-
   side-effects, survey-stale-handling, survey-then-blast, survey-then-
   blast-playthrough, skill-progression).
+- 2026-08-07 (cont.) — Finished Batch 3: survey-result-visualization,
+  survey-seismic-side-effects, survey-stale-handling, survey-then-blast,
+  survey-then-blast-playthrough, skill-progression — 12/12, committed and
+  pushed individually. Two more Finding-#15-class positional-arg bugs
+  found and fixed (survey-then-blast, survey-then-blast-playthrough).
+  skill-progression.json needed real repair, not just assertions bolted
+  on: Finding #18 (its whole premise — XP after idle ticks — was
+  untestable, fixed by giving the employee real dispatched work) and
+  Finding #19 (a single `tick 700` step silently under-runs against the
+  real `runCommand` path once a random event fires mid-batch; fixed by
+  chunking into the same tick/event-choose pattern already used
+  everywhere else). Full local sweep green after every file: typecheck,
+  124/124 command-mode scenarios, 8300/8300 unit+integration tests.
+  GitHub Actions still not re-checked this session — all verification
+  remains local. Batch 3 complete. Next: Batch 4 — building-* (12 files)
+  plus the research-center-gate parity check.
