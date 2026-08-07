@@ -15,7 +15,11 @@
           "selector": "#bs-main-menu"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "usable": "#bs-main-menu #bs-menu-new-campaign",
+        "note": "no game state exists yet, so only usable/blocked (DOM-only, interaction mode) can check anything here -- confirms the New Campaign button genuinely renders before any command runs"
+      }
     },
     {
       "command": "state",
@@ -30,7 +34,12 @@
           "durationMs": 300
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "usable": "#bs-world-map-back",
+        "blocked": "#bs-main-menu #bs-menu-new-campaign",
+        "note": "the world map genuinely replaced the main menu -- Back is now reachable, New Campaign is not"
+      }
     },
     {
       "command": "state",
@@ -45,7 +54,12 @@
           "durationMs": 300
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "usable": "#bs-main-menu #bs-menu-new-campaign",
+        "blocked": "#bs-world-map-back",
+        "note": "the round trip genuinely returns to the main menu, not a leftover world map still in the DOM"
+      }
     },
     {
       "command": "new_game seed:42",
@@ -56,7 +70,14 @@
           "command": "new_game seed:42"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "wellBeing": 50,
+          "safety": 50
+        }
+      }
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -66,7 +87,12 @@
           "command": "campaign start level:dusty_hollow"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "time resume",
@@ -86,7 +112,13 @@
           "command": "tick 5"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        },
+        "note": "confirmed via direct trace: cash stays flat with no employees/buildings/vehicles to drain it"
+      }
     },
     {
       "command": "event choose 0",
@@ -136,7 +168,13 @@
           "command": "state full"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "tickCount": 5
+        }
+      }
     }
   ],
   "shots": [

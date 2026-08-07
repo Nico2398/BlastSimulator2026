@@ -618,7 +618,15 @@ more violent 16-hole grid) ·
 Finding-#15-class syntax bug and a repeat of the grid-spacing
 mismatch, plus the same never-hauls-anything contract-deliver gap
 already documented in contract-negotiation.json) ·
-⬜ i18n-display-visual · ⬜ main-menu-visual ·
+✅ i18n-display-visual (entirely read-only — scores/finances/contract
+list/time status/employee list/build list/inspect — cash and the four
+scores asserted unchanged from the fresh-game default at both ends;
+no findings) ·
+✅ main-menu-visual (the two pre-game menu-flow steps have no game
+state to check yet, so `usable`/`blocked` on real DOM selectors prove
+the New Campaign → world map → Back round trip for real, the first
+file in this project to lean on that pair for pre-game UI; no
+findings) ·
 ⬜ save-load-visual · ⬜ sandbox-mode · ⬜ weather-display-visual ·
 ⬜ weather-flood
 
@@ -1232,3 +1240,18 @@ got, whether main was merged, and whether GitHub Actions is back up yet.
   typecheck, 124/124 scenarios, 8312/8312 tests. GitHub Actions still
   not re-checked this session — all verification remains local. Next:
   i18n-display-visual, main-menu-visual, then the rest of Batch 6.
+- 2026-08-07 (cont.) — i18n-display-visual.json and main-menu-visual.json
+  done, no findings in either. i18n-display-visual is entirely
+  read-only (scores/finances/contract list/time status/employee list/
+  build list/inspect) — cash and the four scores asserted unchanged
+  from the fresh-game default at both ends. main-menu-visual's first
+  two steps run before any game exists, so `usable`/`blocked` on real
+  DOM selectors (command mode silently skips both, per
+  scenario-goal.ts's own doc comment) prove the New Campaign -> world
+  map -> Back round trip for real — the first file in this project to
+  lean on that pair for pre-game UI, since no game state exists yet to
+  check any other way. Batch 6: 14/18 done. Full local sweep green:
+  typecheck, 124/124 scenarios, 8312/8312 tests. GitHub Actions still
+  not re-checked this session — all verification remains local. Next:
+  save-load-visual, sandbox-mode, weather-display-visual, weather-flood
+  to finish Batch 6.

@@ -11,7 +11,18 @@
           "command": "new_game seed:42"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "wellBeing": 50,
+          "safety": 50,
+          "ecology": 50,
+          "nuisance": 50,
+          "employeeCount": 0,
+          "buildingCount": 0
+        }
+      }
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -21,7 +32,12 @@
           "command": "campaign start level:dusty_hollow"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "time resume",
@@ -111,7 +127,19 @@
           "command": "state full"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "wellBeing": 50,
+          "safety": 50,
+          "ecology": 50,
+          "nuisance": 50,
+          "employeeCount": 0,
+          "buildingCount": 0
+        },
+        "note": "this whole file is read-only (scores/finances/contract list/time status/employee list/build list/inspect) -- nothing in state ever moves between the setup and this final check, since its purpose is visual i18n text verification, not gameplay"
+      }
     }
   ],
   "shots": [
