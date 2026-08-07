@@ -11,7 +11,13 @@
           "command": "new_game seed:42"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "employeeCount": 0
+        }
+      }
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -21,7 +27,13 @@
           "command": "campaign start level:dusty_hollow"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        },
+        "note": "dusty_hollow also starts at $50,000 -- a real re-init (Grid: 96x40x96, replacing new_game's 64x64x64), not a no-op, that happens to land on the same cash value"
+      }
     },
     {
       "command": "employee hire role:blaster",
@@ -40,7 +52,15 @@
           "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "employeeCount": 1,
+          "qualificationCount": 1,
+          "proficiencyTotal": 1
+        }
+      }
     },
     {
       "command": "employee hire role:driver",
@@ -55,7 +75,15 @@
           "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "employeeCount": 2,
+          "qualificationCount": 2,
+          "proficiencyTotal": 2
+        }
+      }
     },
     {
       "command": "employee assign_skill 1 skill:blasting level:1",
@@ -65,7 +93,14 @@
           "type": "command",
           "command": "employee assign_skill 1 skill:blasting level:1"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "cash": 47700,
+          "proficiencyTotal": 2
+        },
+        "note": "already level 1 from hiring's Rookie starting qualification -- this call is a same-level no-op, not the first level-up"
+      }
     },
     {
       "command": "employee assign_skill 2 skill:driving.truck level:1",
@@ -75,7 +110,13 @@
           "command": "employee assign_skill 2 skill:driving.truck level:1"
         }
       ],
-      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`."
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
+      "expect": {
+        "equals": {
+          "cash": 47700,
+          "proficiencyTotal": 2
+        }
+      }
     },
     {
       "command": "employee list",
@@ -95,7 +136,13 @@
           "type": "command",
           "command": "employee dispatch 1 x:20 z:20 skill:blasting"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "cash": 47700,
+          "pendingActionCount": 1
+        }
+      }
     },
     {
       "command": "tick 1",
@@ -106,7 +153,13 @@
           "command": "tick 1"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 47700,
+          "pendingActionCount": 0
+        }
+      }
     },
     {
       "command": "employee dispatch 1 x:25 z:22 skill:blasting",
@@ -116,7 +169,14 @@
           "type": "command",
           "command": "employee dispatch 1 x:25 z:22 skill:blasting"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "cash": 47700,
+          "pendingActionCount": 1
+        },
+        "note": "the second dispatch's ghost preview -- employee A is still busy with the first task and employee B can't claim it (wrong skill), so this stays queued through the next several checkpoints"
+      }
     },
     {
       "command": "employee list",
@@ -138,7 +198,13 @@
           "command": "tick 10"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "pendingActionCount": 1
+        }
+      }
     },
     {
       "command": "employee list",
@@ -159,7 +225,14 @@
           "command": "tick 60"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "pendingActionCount": 0
+        },
+        "note": "the second dispatch's ghost preview disappears here -- employee A finished the first task and auto-claimed it"
+      }
     },
     {
       "command": "employee list",
@@ -180,7 +253,10 @@
           "command": "tick 150"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash"]
+      }
     },
     {
       "command": "event choose 0",
@@ -190,7 +266,11 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "expect": {
+        "decreased": ["cash"],
+        "note": "seed:42's politics_ev_mandate always fires here (per this file's own checkpoint-3 description) -- option 0 costs $60,000, genuinely applied since Finding #29's fix"
+      }
     },
     {
       "command": "tick 96",
@@ -201,7 +281,10 @@
           "command": "tick 96"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash"]
+      }
     },
     {
       "command": "employee list",
@@ -221,7 +304,13 @@
           "command": "state full"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "proficiencyTotal": 2
+        },
+        "note": "no scalar exists for a single employee's XP/level within SerializableGameState -- only the roster-wide sum, which never crosses a level threshold across this file's 221-tick budget even though employee A genuinely works the whole time (confirmed via direct trace); the XP-bar-fill claim this file is named for is a screenshot-only assertion, not one this field can make"
+      }
     }
   ],
   "shots": [

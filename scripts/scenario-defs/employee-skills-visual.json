@@ -11,7 +11,13 @@
           "command": "new_game seed:42"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "employeeCount": 0
+        }
+      }
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -21,7 +27,12 @@
           "command": "campaign start level:dusty_hollow"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "employee hire role:driller",
@@ -39,7 +50,15 @@
           "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "employeeCount": 1,
+          "qualificationCount": 1,
+          "proficiencyTotal": 1
+        }
+      }
     },
     {
       "command": "employee hire role:blaster",
@@ -53,7 +72,15 @@
           "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "employeeCount": 2,
+          "qualificationCount": 2,
+          "proficiencyTotal": 2
+        }
+      }
     },
     {
       "command": "employee hire role:driver",
@@ -67,7 +94,15 @@
           "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "employeeCount": 3,
+          "qualificationCount": 3,
+          "proficiencyTotal": 3
+        }
+      }
     },
     {
       "command": "employee hire role:surveyor",
@@ -81,7 +116,15 @@
           "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "employeeCount": 4,
+          "qualificationCount": 4,
+          "proficiencyTotal": 4
+        }
+      }
     },
     {
       "command": "employee hire role:manager",
@@ -95,7 +138,15 @@
           "selector": "#bs-employee-panel [data-role=\"manager\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "employeeCount": 5,
+          "qualificationCount": 5,
+          "proficiencyTotal": 5
+        }
+      }
     },
     {
       "command": "employee hire role:driller",
@@ -110,7 +161,15 @@
           "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "employeeCount": 6,
+          "qualificationCount": 6,
+          "proficiencyTotal": 6
+        }
+      }
     },
     {
       "command": "employee assign_skill 1 skill:driving.excavator level:3",
@@ -120,7 +179,15 @@
           "command": "employee assign_skill 1 skill:driving.excavator level:3"
         }
       ],
-      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`."
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
+      "expect": {
+        "equals": {
+          "cash": 42500,
+          "qualificationCount": 7,
+          "proficiencyTotal": 9
+        },
+        "note": "a new qualification (driller's own starting one is blasting, not driving.excavator) -- qualificationCount +1, proficiencyTotal +3 for the level"
+      }
     },
     {
       "command": "employee assign_skill 1 skill:geology level:2",
@@ -130,7 +197,15 @@
           "command": "employee assign_skill 1 skill:geology level:2"
         }
       ],
-      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`."
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
+      "expect": {
+        "equals": {
+          "cash": 42500,
+          "qualificationCount": 8,
+          "proficiencyTotal": 11
+        },
+        "note": "employee #1's third distinct qualification -- qualificationCount +1, proficiencyTotal +2"
+      }
     },
     {
       "command": "employee assign_skill 2 skill:blasting level:4",
@@ -140,7 +215,15 @@
           "command": "employee assign_skill 2 skill:blasting level:4"
         }
       ],
-      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`."
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
+      "expect": {
+        "equals": {
+          "cash": 42500,
+          "qualificationCount": 8,
+          "proficiencyTotal": 14
+        },
+        "note": "raises the blaster's own starting qualification (blasting) from its Rookie level 1 to 4 -- qualificationCount unchanged, proficiencyTotal +3"
+      }
     },
     {
       "command": "employee assign_skill 3 skill:driving.truck level:1",
@@ -150,7 +233,15 @@
           "command": "employee assign_skill 3 skill:driving.truck level:1"
         }
       ],
-      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`."
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
+      "expect": {
+        "equals": {
+          "cash": 42500,
+          "qualificationCount": 8,
+          "proficiencyTotal": 14
+        },
+        "note": "the driver's starting qualification is already driving.truck at level 1 -- this call is a same-level no-op, unlike the others in this block"
+      }
     },
     {
       "command": "employee assign_skill 4 skill:geology level:5",
@@ -160,7 +251,15 @@
           "command": "employee assign_skill 4 skill:geology level:5"
         }
       ],
-      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`."
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
+      "expect": {
+        "equals": {
+          "cash": 42500,
+          "qualificationCount": 8,
+          "proficiencyTotal": 18
+        },
+        "note": "raises the surveyor's own starting qualification (geology) from level 1 to 5 -- proficiencyTotal +4"
+      }
     },
     {
       "command": "employee assign_skill 5 skill:management level:2",
@@ -170,7 +269,15 @@
           "command": "employee assign_skill 5 skill:management level:2"
         }
       ],
-      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`."
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
+      "expect": {
+        "equals": {
+          "cash": 42500,
+          "qualificationCount": 8,
+          "proficiencyTotal": 19
+        },
+        "note": "raises the manager's own starting qualification (management) from level 1 to 2 -- proficiencyTotal +1"
+      }
     },
     {
       "command": "employee list",
@@ -190,7 +297,14 @@
           "command": "tick 1"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 42500,
+          "qualificationCount": 8,
+          "proficiencyTotal": 19
+        }
+      }
     },
     {
       "command": "employee list",
@@ -210,7 +324,13 @@
           "type": "command",
           "command": "employee dispatch 6 x:10 z:10 skill:blasting"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "cash": 42500,
+          "pendingActionCount": 1
+        }
+      }
     },
     {
       "command": "employee dispatch 6 x:11 z:10 skill:blasting",
@@ -220,7 +340,12 @@
           "command": "employee dispatch 6 x:11 z:10 skill:blasting"
         }
       ],
-      "description": "Left unmarked: no UI control drives `employee dispatch` and none should exist -- employees.ts's own case comment: \"no console command currently creates one... left the Bunkhouse shift-cycle unreachable from any player-facing flow\" -- a test hook by design."
+      "description": "Left unmarked: no UI control drives `employee dispatch` and none should exist -- employees.ts's own case comment: \"no console command currently creates one... left the Bunkhouse shift-cycle unreachable from any player-facing flow\" -- a test hook by design.",
+      "expect": {
+        "equals": {
+          "pendingActionCount": 2
+        }
+      }
     },
     {
       "command": "employee dispatch 6 x:12 z:10 skill:blasting",
@@ -230,7 +355,12 @@
           "command": "employee dispatch 6 x:12 z:10 skill:blasting"
         }
       ],
-      "description": "Left unmarked: no UI control drives `employee dispatch` and none should exist -- employees.ts's own case comment: \"no console command currently creates one... left the Bunkhouse shift-cycle unreachable from any player-facing flow\" -- a test hook by design."
+      "description": "Left unmarked: no UI control drives `employee dispatch` and none should exist -- employees.ts's own case comment: \"no console command currently creates one... left the Bunkhouse shift-cycle unreachable from any player-facing flow\" -- a test hook by design.",
+      "expect": {
+        "equals": {
+          "pendingActionCount": 3
+        }
+      }
     },
     {
       "command": "employee dispatch 6 x:13 z:10 skill:blasting",
@@ -240,7 +370,12 @@
           "command": "employee dispatch 6 x:13 z:10 skill:blasting"
         }
       ],
-      "description": "Left unmarked: no UI control drives `employee dispatch` and none should exist -- employees.ts's own case comment: \"no console command currently creates one... left the Bunkhouse shift-cycle unreachable from any player-facing flow\" -- a test hook by design."
+      "description": "Left unmarked: no UI control drives `employee dispatch` and none should exist -- employees.ts's own case comment: \"no console command currently creates one... left the Bunkhouse shift-cycle unreachable from any player-facing flow\" -- a test hook by design.",
+      "expect": {
+        "equals": {
+          "pendingActionCount": 4
+        }
+      }
     },
     {
       "command": "employee dispatch 6 x:14 z:10 skill:blasting",
@@ -250,7 +385,12 @@
           "command": "employee dispatch 6 x:14 z:10 skill:blasting"
         }
       ],
-      "description": "Left unmarked: no UI control drives `employee dispatch` and none should exist -- employees.ts's own case comment: \"no console command currently creates one... left the Bunkhouse shift-cycle unreachable from any player-facing flow\" -- a test hook by design."
+      "description": "Left unmarked: no UI control drives `employee dispatch` and none should exist -- employees.ts's own case comment: \"no console command currently creates one... left the Bunkhouse shift-cycle unreachable from any player-facing flow\" -- a test hook by design.",
+      "expect": {
+        "equals": {
+          "pendingActionCount": 5
+        }
+      }
     },
     {
       "command": "employee dispatch 6 x:15 z:10 skill:blasting",
@@ -260,7 +400,13 @@
           "type": "command",
           "command": "employee dispatch 6 x:15 z:10 skill:blasting"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "pendingActionCount": 6
+        },
+        "note": "the task-queue-overflow this file is named for -- 6 dispatches queued for one employee, only 1 of which can be actively worked at a time"
+      }
     },
     {
       "command": "employee list",
@@ -280,7 +426,13 @@
           "command": "state full"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 42500,
+          "pendingActionCount": 6
+        }
+      }
     }
   ],
   "shots": [

@@ -565,7 +565,17 @@ Batch 5 complete: 22/22 (vehicle-* 7/7, needs-* 9/9, nav-*/site-
 expansion 6/6).
 
 ### Batch 6 — employee/economy/misc (18) — **+ training parity check**
-⬜ employee-skill-progression-visual · ⬜ employee-skills-visual ·
+✅ employee-skill-progression-visual (**Finding #29** surfaced here —
+see the findings log; cash/employeeCount/qualificationCount/
+proficiencyTotal/pendingActionCount asserted throughout, including a
+`note` on the final step documenting that no scalar exists for a
+single employee's XP/level, only the roster-wide sum) ·
+✅ employee-skills-visual (6 employees hired with distinct assign_skill
+levels — qualificationCount/proficiencyTotal traced and asserted
+exactly per assignment, including the one same-level no-op call
+(driver's own starting driving.truck); 6 dispatches to one employee
+assert pendingActionCount climbing 1→6, the task-queue-overflow this
+file is named for; no findings) ·
 ⬜ employee-training (parity check here) · ⬜ contract-negotiation ·
 ⬜ economy-display-visual · ⬜ economy-full-loop · ⬜ hauling-gate ·
 ⬜ maintenance-cost-drain · ⬜ scores-display-visual ·
@@ -1000,3 +1010,27 @@ got, whether main was merged, and whether GitHub Actions is back up yet.
   re-checked this session — all verification remains local. Batch 5:
   22/22 done. Next: Batch 6 — employee/economy/misc (18 files) plus the
   training parity check (employee-training.json vs training.json).
+- 2026-08-07 (cont.) — Started Batch 6. First file
+  (employee-skill-progression-visual.json) led to Finding #29: two real
+  cash-tracking bugs, committed separately before returning to scenario
+  work — see the findings log for the full writeup. (a) `event choose`
+  applied a resolved event's cashDelta to state.finances.cash only,
+  never to the flat state.cash field FinancesPanel/bankruptcy/
+  serializeGameState all actually read — every event with a cashDelta
+  was silently a no-op on the player's real balance, in both command
+  mode and a real browser. (b) fixing (a) let cash go genuinely
+  negative for the first time in needs-proactive-queue-visual.json's
+  own trace, which exposed deductRestCost silently resetting any
+  pre-existing negative cash back up to exactly 0 on the next
+  need-rest visit. Both fixed at the root with regression tests;
+  needs-proactive-queue-visual.json itself needed zero assertion
+  changes — its pre-existing decreased-cash check on that step is what
+  caught the regression. Then finished employee-skill-progression-
+  visual.json's own assertions (re-traced with both fixes applied) and
+  employee-skills-visual.json (6 employees, distinct assign_skill
+  levels, task-queue-overflow via 6 dispatches to one employee) — 2/18
+  done, no further findings in either. Full local sweep green after
+  every commit: typecheck, 124/124 scenarios, 8306/8306 tests. GitHub
+  Actions still not re-checked this session — all verification remains
+  local. Next: employee-training.json (+ its parity check against
+  training.json), then the rest of Batch 6.
