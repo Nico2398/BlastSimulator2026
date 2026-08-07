@@ -11,7 +11,13 @@
           "command": "new_game seed:42 cash:60000"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 60000,
+          "buildingCount": 0
+        }
+      }
     },
     {
       "command": "build driving_center at:5,5",
@@ -41,7 +47,13 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 48000,
+          "buildingCount": 1
+        }
+      }
     },
     {
       "command": "build blasting_academy at:10,5",
@@ -67,7 +79,13 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 33000,
+          "buildingCount": 2
+        }
+      }
     },
     {
       "command": "build management_office at:15,5",
@@ -93,7 +111,13 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 25000,
+          "buildingCount": 3
+        }
+      }
     },
     {
       "command": "build geology_lab at:20,5",
@@ -119,7 +143,13 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 13000,
+          "buildingCount": 4
+        }
+      }
     },
     {
       "command": "build list",
@@ -147,7 +177,13 @@
           "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 12000,
+          "employeeCount": 1
+        }
+      }
     },
     {
       "command": "employee hire role:blaster",
@@ -161,7 +197,13 @@
           "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 10500,
+          "employeeCount": 2
+        }
+      }
     },
     {
       "command": "employee list",
@@ -189,7 +231,13 @@
           "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-train-btn[data-skill=\"driving.excavator\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 8000,
+          "trainingCount": 1
+        }
+      }
     },
     {
       "command": "employee list",
@@ -209,7 +257,13 @@
           "command": "tick 10"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "trainingCount": 1
+        },
+        "note": "training takes 20 ticks — still in progress at 10"
+      }
     },
     {
       "command": "employee list",
@@ -229,7 +283,14 @@
           "command": "tick 25"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "trainingCount": 0,
+          "proficiencyTotal": 3
+        },
+        "note": "35 ticks total now past the 20-tick training duration — driving.excavator gained (proficiencyTotal 2→3), training slot freed"
+      }
     },
     {
       "command": "employee list",

@@ -430,7 +430,12 @@ research-center-gate.json parity row's tier-unlock requirement) ·
 Queue Research, Upgrade, Demolish, no console shortcuts; confirmed
 `build upgrade` REPLACES the building with a new id rather than adding
 one, buildingCount stays flat across both T1→T2 and T2→T3 upgrades) ·
-⬜ building-training-visual ·
+✅ building-training-visual (4 training buildings, 2 hires, real
+`employee train` via clicking `.bs-train-btn` — not `assign_skill`, this
+one has a genuine UI path; confirmed `trainingCount` 0→1 during the
+20-tick course, back to 0 with `proficiencyTotal` 2→3 once it completes
+at 35 ticks; not the `employee-training.json`/`training.json` parity
+target — that pairing is a separate, later Batch 6 file) ·
 ⬜ building-vehicle-depot-visual · ⬜ building-warehouse-visual
 
 ### Batch 5 — vehicle-* / needs-* / nav-* (22)
