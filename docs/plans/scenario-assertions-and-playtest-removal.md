@@ -408,7 +408,9 @@ Finding #1's class: plain `build` has no funds guard, so it drives cash
 negative in command mode at points where the UI's buy button would
 already be disabled; asserted the exact negative cash values for real,
 confirming the overdraw rather than just describing it) ·
-⬜ building-placement-visual · ⬜ building-ramp-visual ·
+✅ building-placement-visual (4 straightforward builds at different grid
+positions, cash/buildingCount asserted exactly at each — no findings) ·
+⬜ building-ramp-visual ·
 ⬜ building-research-progression-visual (parity check here) ·
 ⬜ building-research-visual (parity check here) ·
 ⬜ building-tier-system-visual · ⬜ building-training-visual ·
