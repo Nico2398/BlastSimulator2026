@@ -1201,6 +1201,8 @@ of each session, in case main added/removed a file.)
     
     General lesson, sharpest from the last 3 files: a clean depth-value swap is not always metadata-only — anywhere a scenario hardcodes an id derived from a specific blast's output (a fragment, a hole), correcting an upstream parameter invalidates it silently, and the only reliable fix is re-deriving the id by calling the same eligibility function the real UI control calls, not guessing from the old id's neighborhood. `npm run typecheck`/schema test/both interaction-mode batches all green throughout; every commit pushed individually. This closes the Ground rule #15 follow-up the plan doc has carried since level1-lose-ecology.json.
 
+72. **`needs-collapse-visual.json` failed CI's interaction-mode suite (a real check_run failure webhook, not something the local audit surfaced) the first time that suite actually ran all session, thanks to the GitHub Actions outage clearing.** `build living_quarters` reported its buy button disabled. Traced with a real browser console capture rather than assumed: cash is genuinely -$10,950 at that point (default $50,000 start, 2 hires, 300 ticks of continuous payroll with zero income anywhere in the file) — a correct affordability gate, not a UI staleness bug (an earlier hypothesis along those lines, that `UIManager`/`BuildMenu` needed a refresh-on-panel-open fix, was fully implemented and tested but then reverted once the real cause was confirmed — the panel's disabled state was accurate, not stale). Considered moving the build step to run before the ticks, when cash is still $47,500 — verified via a real interaction-mode run that this breaks the file's actual premise: with `living_quarters` already built, the dispatched employee's fatigue no longer recovers by tick 200 (`collapsedCount` stays 1, not 0), a genuine interaction between the needs/dispatch system and building presence, not safe to route around. Fixed by raising starting cash to $100,000 instead (`new_game seed:42 cash:100000`, the same pattern `hauling-gate.json`/`rock-fragmenter-breaking.json` already use), preserving every step and mechanic unchanged — leaves $38,950 at the build step. Verified 1/1 in both modes via the real harness. General lesson: a disabled-button failure is not automatically a UI bug — check the actual blocking value before assuming staleness, the same discipline Ground rule #1 already asks for everywhere else.
+
 _(Add new findings here as you hit them. Number sequentially.)_
 
 ## Status table
@@ -2309,4 +2311,21 @@ got, whether main was merged, and whether GitHub Actions is back up yet.
   is a large, destructive body of work (deleting `playtest.ts`,
   removing a CI job, deleting a skill/rule file, editing CLAUDE.md)
   that reaching this point doesn't by itself authorize starting
+  without a check-in first.
+
+- CI's full interaction-mode suite finished on the audit's push
+  (head `c355ed41`) and reported the outage genuinely over: 124/125
+  files green, one real failure — `needs-collapse-visual.json`
+  (**Finding #72**). Diagnosed via a real browser console capture,
+  not assumption: the buy button was correctly disabled on a real
+  -$10,950 cash balance (300 ticks of unfunded payroll), not a UI
+  staleness bug — a first hypothesis along those lines (a `showPanel`/
+  `BuildMenu` refresh-on-open fix) was fully implemented, tested
+  clean, and then reverted once the real cause was confirmed, rather
+  than left in as an unrelated, unproven change to production UI
+  code. A reorder-the-build fix was tried and rejected after it broke
+  the file's actual premise (the employee's fatigue stopped
+  recovering with the building already present) — fixed by raising
+  starting cash to $100,000 instead, the same pattern two other files
+  already use. Verified 1/1 in both modes, pushed (`fd16107`).
   without a check-in first.
