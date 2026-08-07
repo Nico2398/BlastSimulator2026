@@ -10,7 +10,13 @@
           "command": "new_game seed:42"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "holeCount": 0
+        }
+      }
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -20,7 +26,10 @@
           "command": "campaign start level:dusty_hollow"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "increased": ["worldSizeX"]
+      }
     },
     {
       "command": "time resume",
@@ -68,17 +77,28 @@
           "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "employeeCount": 1,
+          "cash": 48800
+        }
+      }
     },
     {
-      "command": "employee assign_skill 1 geology 3",
+      "command": "employee assign_skill 1 skill:geology level:3",
       "interaction": [
         {
           "type": "command",
-          "command": "employee assign_skill 1 geology 3"
+          "command": "employee assign_skill 1 skill:geology level:3"
         }
       ],
-      "description": "Test-only bootstrap, not a player action: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts, same for the UI hire button and this console command), so this only raises the level for the scenario's needs. No role tag -- there is no UI control for this and none should exist; the player-facing way to raise a skill is `employee train` at a training building. Command mode keeps running it unchanged; interaction mode keeps it as an unmarked (legacy) command step."
+      "description": "Test-only bootstrap, not a player action: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts, same for the UI hire button and this console command), so this only raises the level for the scenario's needs. No role tag -- there is no UI control for this and none should exist; the player-facing way to raise a skill is `employee train` at a training building. Command mode keeps running it unchanged; interaction mode keeps it as an unmarked (legacy) command step.",
+      "expect": {
+        "equals": {
+          "proficiencyTotal": 3
+        }
+      }
     },
     {
       "command": "employee list",
@@ -132,7 +152,14 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "surveyCount": 0
+        },
+        "note": "arrival-gated (#437) — queued and paid for, not yet completed"
+      }
     },
     {
       "command": "survey show",
@@ -142,7 +169,12 @@
           "command": "survey show"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "surveyCount": 0
+        }
+      }
     },
     {
       "command": "tick 25",
@@ -232,7 +264,12 @@
           "command": "survey show"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "surveyCount": 1
+        }
+      }
     },
     {
       "command": "state full",
@@ -272,7 +309,14 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "surveyCount": 1
+        },
+        "note": "arrival-gated (#437) — queued and paid for, not yet completed"
+      }
     },
     {
       "command": "survey show",
@@ -282,7 +326,12 @@
           "command": "survey show"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "surveyCount": 1
+        }
+      }
     },
     {
       "command": "tick 23",
@@ -372,7 +421,12 @@
           "command": "survey show"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "surveyCount": 2
+        }
+      }
     },
     {
       "command": "state full",
@@ -400,6 +454,14 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
+        },
+        {
           "type": "dragTiles",
           "x1": 25,
           "z1": 25,
@@ -414,7 +476,12 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 9
+        }
+      }
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
@@ -424,7 +491,12 @@
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "chargedCount": 9
+        }
+      }
     },
     {
       "command": "sequence auto delay_step:25",
@@ -434,7 +506,12 @@
           "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "sequencedCount": 9
+        }
+      }
     },
     {
       "command": "blast",
@@ -460,7 +537,14 @@
           "selector": "[data-action=\"report-close\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        }
+      }
     },
     {
       "command": "state full",

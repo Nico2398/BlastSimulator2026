@@ -348,7 +348,11 @@ staleness-wait round follows with the ceiling asserted unchanged at 1 since
 nothing new is queued, then a core_sample at the same position brings it
 to 2 — no overlay-colour/staleness field exists to check directly, so the
 proof stays at the surveyCount/cash level) ·
-⬜ survey-then-blast · ⬜ survey-then-blast-playthrough · ⬜ skill-progression
+✅ survey-then-blast (**Finding #15 class: `employee assign_skill 1 geology
+3` used bare positional args, silently failed — fixed to `skill:geology
+level:3`**; 2 survey rounds then a real drill/charge/sequence/blast
+pipeline, Finding #4 grid-spacing-stepper fix needed again) ·
+⬜ survey-then-blast-playthrough · ⬜ skill-progression
 
 ### Batch 4 — building-* (12) — **+ research-center-gate parity check**
 ⬜ building-destruction-visual · ⬜ building-lifecycle ·
