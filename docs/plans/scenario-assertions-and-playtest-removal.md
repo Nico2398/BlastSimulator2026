@@ -831,7 +831,18 @@ surrounding terrain with no visible gap or hard seam, issue #491's
 fix holds. Only file this batch needing just a cosmetic spacing-text
 fix (hole count already matched). Verified 1/1 in both modes, 13/13
 steps) ·
-⬜ tutorial-steps-visual · ⬜ vehicle-purchase-visual ·
+✅ tutorial-steps-visual (**Finding #67** — see the findings log; a
+purely command-driven file in both modes — `tutorial_start` has no
+console-mode equivalent (registered only in `main.ts`'s browser boot
+path) so command mode no-ops it while interaction mode really arms
+the tutorial overlay, but every later step also uses `command` rather
+than a real click, so the divergence is invisible to every `expect`
+below, confirmed identical across both modes; light `expect` density
+on purpose since the file's real premise is the per-step screenshots,
+not economy state — a single undersized-grid blast kills 1 of 2
+employees, documented as a real consequence rather than fixed, same
+Finding #40/#56 class; verified 1/1 in both modes) ·
+⬜ vehicle-purchase-visual ·
 ⬜ contract-panel-visual · ⬜ event-dialog-visual
 
 (123 remaining after Batch 0's 1; batches above sum to 122 — reconcile the
@@ -1129,6 +1140,12 @@ of each session, in case main added/removed a file.)
 63. **`ambient-timescale-sync.json` is a genuinely different shape of file from everything else converted this session: its entire subject, `ambientClockSeconds`, cannot be asserted through `expect.equals` without breaking one of the two required channels.** Confirmed via direct source read: `serializeGameState()` (`console-api.ts`, command mode's state source) never includes `ambientClockSeconds` at all, while `window.__gameState()` (`main.ts`, interaction mode's source) includes it via `gameRenderer.ambientClockSeconds` — a renderer-owned clock that only exists when a renderer exists. Any `equals` check on it would compare `undefined` against a number in command mode and fail there by construction, which is the opposite of what dual-mode verification is for. Resolved by asserting the fields this file's premise actually depends on and that genuinely exist in both modes — `timeScale`/`isPaused` — and separately verifying the file's real subject the way a rendering claim should be verified (CLAUDE.md's rule: an image, or here, a value, must actually be inspected, not just reasoned about from source): ran the file in interaction mode and read the real `gameState.ambientClockSeconds` values out of the written state JSON dumps directly. The evidence is clean and unambiguous: across the `time pause` → `state full` → `time resume` step sequence, `ambientClockSeconds` reads exactly 0.4852 at all three of the pause-adjacent snapshots (the pause command's own dump, the following `state full`, and the resume command's own dump, captured before resume's effect could apply) — a real, sustained freeze across the entire pause window, not just a small delta — then advances again once resumed. Reproduced identically (frozen at a different absolute value, same zero-delta-while-paused shape) on a 2nd, independent interaction-mode run. This confirms `GameRenderer.update()`'s `gameDt` convention (`rendering.md`: `dt * state.timeScale`, `0` while paused) is genuinely wired correctly for the ambient module family this file exercises — issue #490's fix holds. No code change; this finding is entirely about how to verify a renderer-only field's correctness within a scenario framework built around dual-mode state assertions, for future files that hit the same shape.
 
 64. **`landscape-continuity-visual.json`'s real subject — whether the landscape and a fresh blast crater read as one continuous, gap-free surface — has no structured state field to assert against, the 2nd file this session in that shape (after Finding #63).** `SerializableGameState` has no "gap detected" or "seam count" field; mesh continuity is a rendering property, not a simulation one. `expect.equals` here asserts what genuinely is structural and dual-mode-safe instead: `worldSizeX`/`worldSizeZ`/`worldMinX`/`worldMinZ` stay exactly constant across all 13 steps (proving the world never shifts or resizes mid-file), plus `holeCount`/`chargedCount`/`sequencedCount` through the drill/charge/sequence/blast cycle and `ecology`/`nuisance` after the blast. The continuity claim itself was verified the way a rendering claim should be, per the project's own rule that an image must actually be inspected: ran interaction mode with `--screenshots` and compared `step-07-drill_plan-ss0.png` (pre-blast — also useful independently, since it shows the Grid Tool panel's live spacing/depth/diameter readout, confirming the panel's real defaults directly rather than by inference) against `step-10-blast.png` (post-blast, same camera framing) with the Read tool. The fresh crater — a lighter, exposed-rock patch — blends into the surrounding terrain with a naturally jagged boundary; no visible gap, floating chunk, or hard material seam. Issue #491's fix holds. Also discovered along the way: this file's own multi-angle `shots` (`overview`/`birdseye`) use a fixed, world-relative camera framing unrelated to the drill site's specific coordinates — useful for general ridge/slope terrain regression, but the crater-boundary comparison had to come from the per-step default screenshots instead, not the named shots. Unlike every other file converted this session, this one's single `drill_plan` step only needed a cosmetic Finding #52-class fix (`spacing:4`→`spacing:3`, plus `diameter:0.089`) — the declared 2×2 hole count already matched what a spacing-3 drag of this size produces, so nothing about the actual grid shape changed, only the declared metadata's accuracy.
+
+65. **PR #497's merge against `main` silently staled 4 `expect` blocks in `sandbox-mode.json` that git's own conflict detection never flagged, because main's #504 rewrote `sandbox start`'s accepted parameters without touching the exact lines HEAD's assertions lived on.** The 2 real conflict hunks were both the command line itself — HEAD's `sandbox start biome:X size:48 depth:24 cash:250000 mixed_rock:true` vs. main's `sandbox start biome:X difficulty:hard seed:Y` — resolved by taking main's syntax after confirming via source (`src/console/commands/sandbox.ts`) that `size`/`depth`/`cash`/`mixed_rock` are no longer read at all; world extents are now the fixed `DEFAULT_GRID_SIZE=64`/`SANDBOX_GRID_DEPTH=32` (`balance.ts`) and starting cash comes from `SANDBOX_DIFFICULTIES` (`Sandbox.ts`: `hard:$50,000`, `easy:$250,000`), regardless of request. But 4 *unconflicted* `expect` blocks elsewhere in the same file still asserted the old numbers (`worldSizeX/Z:48`, `cash:250000` under `difficulty:hard`) — caught only by writing a fresh trace script and running it, not by reading the diff. Fixed all 4 (`worldSizeX/Z:48→64` on `terrain_info`; `cash:250000→50000` on the drill/charge/blast steps under `difficulty:hard`) and added a previously-missing `expect` block to the file's final, second `sandbox start difficulty:easy` step. General lesson: a clean textual merge proves the conflicted lines are consistent with each other, not that the rest of the file is still consistent with a renamed/reworked command elsewhere in the same merge — worth a real re-trace on any file whose merge touches a command's own parameter list, even when most of the file merged cleanly.
+
+66. **A second file in the same merge, `tutorial-interactive.json`, had a conflict hunk that was internally consistent and textually well-justified, but empirically false against the merged codebase.** The conflicting hunk was a negative-test step: drag an out-of-region rectangle (22,22)-(26,26) during the drill-plan stage, assert `expect.blocked: "#bs-tile-select-confirm"`. HEAD's side kept the negative-test framing; main's side claimed the step completed a real drill plan instead — but main's own *unconflicted* surrounding interaction array and expect block still matched HEAD's negative-test framing, making main's side internally inconsistent (its prose didn't match its own code), so HEAD's version was kept as the textually correct resolution. A real interaction-mode run afterward proved it false anyway: `#bs-tile-select-confirm is reachable but should not be`. `src/ui/tutorialStages.ts`'s `REGION.drill` (`{x1:20,z1:20,x2:30,z2:30,exact:true}`) still declares the same exact-rectangle requirement it always did, so the rejection mechanism didn't visibly change — but something in main's #489 ("make every tutorial step completable") pass relaxed whatever actually gates the confirm button, and it isn't `REGION`'s own flag. Root cause not reverse-engineered past that point; fixed pragmatically instead of theoretically, by deleting the negative-test step and folding its 3 setup clicks onto the front of the following real `drill_plan` step (verified the prior step used the Build panel, not Blast, so re-opening Blast there doesn't toggle-close anything). Verified clean on 2 separate interaction-mode runs post-fix. General lesson, sharper than #65's: textual consistency between two sides of a conflict — even cross-checked against each side's own unconflicted context — is still not proof of correctness against the *post-merge* codebase. The only channel that actually caught this was running it for real.
+
+67. **`tutorial-steps-visual.json` is the 2nd of PR #497's two scenarios explicitly left un-converted to real clicks (`sandbox-mode.json` was the 1st, Finding #65's file) — every step's `interaction` array uses `type:"command"` in both modes, so command mode and interaction mode read the exact same `serializeGameState()` values at every step, confirmed by running both.** The one place the two modes *do* differ — `tutorial_start` itself — turns out to be invisible to every other assertion in the file: it's registered only in `src/main.ts` (`runner.register('tutorial_start', ...)`, wired at browser boot), not in the shared command table `createRunner()` uses in `console-api.ts`, so command mode reports "Unknown command" and never starts the tutorial overlay at all, while interaction mode's `command` action reaches the real handler and does start it — arming `TutorialOverlay`'s rails and setting `state.isPaused = true` (`TutorialOverlay.ts` line 91). Traced both effects to confirm neither leaks into anything assertable: `isPaused` doesn't gate the explicit `tick` command (grepped the tick handler directly, no reference), and `SerializableGameState` carries no tutorial-related field at all (grepped `console-api.ts` for `tutorial`, zero hits) — so every subsequent step, which also uses `command` rather than a real click, produces bit-identical state regardless of which mode actually started the tutorial. Given the file's own stated purpose is a per-step *visual* walkthrough (`shots`-driven screenshots, highlight targets, progress indicator — a `visual`-channel concern outside `expect`'s reach), kept `expect` density deliberately light: hard `equals` on `cash`/count fields at real state transitions (hires, drill/charge/sequence, contract accept, vehicle buy, build), one `decreased:["safety"]` rather than a brittle 15-decimal float for the post-death score decay, and skipped `wellBeing`/`ecology`/`nuisance` entirely as incidental to this file's premise. The file's single blast (5m spacing/8m depth/5kg charge, all command-driven so no Finding #52 drag-mismatch risk applies) kills 1 of the 2 employees on site — Rating: BAD, 4 projections — a real, deterministic consequence of the declared parameters, documented rather than tuned away, matching the Finding #40/#56/#59 precedent. Zero random events anywhere in the trace (every `tick` step's own state dump was read directly, not just its text output, closing off a Finding #60-style silent event as a possibility). Verified 1/1 in both modes; not re-run for determinism, same reasoning as `landscape-continuity-visual.json` (Finding #64) — fully deterministic, fixed seed, no RNG-sensitive step anywhere in the file.
 
 _(Add new findings here as you hit them. Number sequentially.)_
 
@@ -2095,3 +2112,40 @@ got, whether main was merged, and whether GitHub Actions is back up yet.
   (fetch/merge main, resolve, push), then the remaining 3 Batch 7
   files (tutorial-steps-visual next), then the depth-mismatch audit
   before Phase 3.
+
+- Resolved PR #497's merge conflict against `main` (8 diverged commits:
+  sandbox-start syntax rewrite #504, an i18n correctness pass #492, a
+  tutorial completability fix #489, a loading-screen debug preview
+  #493, a dangling-doc-reference lint #494, plus unrelated fragment/
+  terrain work). 6 conflicted files, all additive union-type/array
+  extensions except two genuine content divergences — full resolution
+  reasoning in **Findings #65-66**. `sandbox-mode.json` needed 4
+  downstream `expect` fixes the textual merge left stale (Finding
+  #65); `tutorial-interactive.json`'s hand-resolved negative-test step
+  was textually justified but empirically false post-merge, fixed by
+  removing the step (Finding #66). Also fixed 2 dangling-doc-reference
+  lint failures in this doc's own historical prose (a deleted scratch
+  script's path-like name, reworded rather than allowlisted). Full
+  local verification green post-merge: typecheck, 8530 tests, 125
+  scenarios (both modes for every touched file), context validation,
+  build. Committed (`0e37241`) and pushed; PR #497's `mergeable_state`
+  back to normal (`unstable` — pending/running checks, not a
+  conflict), CI running again for the first time all session (the
+  infra outage that spanned this entire session appears to have
+  cleared on its own).
+
+- Finished `tutorial-steps-visual.json` (**Finding #67**, Batch 7
+  17/19). Fully command-driven in both modes (one of PR #497's two
+  explicitly-deferred UI conversions, alongside `sandbox-mode.json`),
+  so this file needed no drag/click-mismatch fixes — traced with a
+  scratch script against the real command handlers, added `expect` at
+  22 of 36 steps (state transitions only; kept it light since the
+  file's real premise is its per-step screenshots, a `visual`-channel
+  concern outside `expect`'s reach), confirmed both modes produce
+  bit-identical state despite `tutorial_start` itself behaving
+  differently (no-ops in command mode, really starts the overlay in
+  interaction mode — traced why that's invisible to every assertion
+  in the file). Verified 1/1 in both modes; not re-run for
+  determinism (fully deterministic, no RNG-sensitive step). Next: the
+  remaining 3 Batch 7 files (`vehicle-purchase-visual` next), then the
+  depth-mismatch audit before Phase 3.
