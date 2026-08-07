@@ -572,9 +572,15 @@ function resolveBuildingApproach(
  */
 export function deductRestCost(state: GameState, needKey: NeedKey): number {
   const cost = NEED_REST_COSTS[needKey];
-  const actualDeduction = Math.min(state.cash, cost);
+  // Clamp to [0, cash]: a player already at or below 0 owes nothing more for
+  // this specific visit (rather than being charged the full cost like every
+  // other expense in the game), but — unlike the previous `Math.max(0, cash -
+  // cost)` formula — never resets pre-existing negative cash back up to 0.
+  // That old formula treated "already in debt" the same as "can afford part
+  // of this," silently erasing any debt the moment a need-rest cost fired.
+  const actualDeduction = Math.max(0, Math.min(state.cash, cost));
 
-  state.cash = Math.max(0, state.cash - cost);
+  state.cash -= actualDeduction;
   addExpense(state.finances, actualDeduction, 'needs', `Rest: ${needKey}`, state.tickCount);
   return cost;
 }
