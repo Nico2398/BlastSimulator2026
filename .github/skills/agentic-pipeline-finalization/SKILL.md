@@ -35,10 +35,13 @@ Runs after qualimetry passes. Branch: `pipeline/feature-<N>`.
                             if fail → @implementer (big loop)
  6. [verify-commit]      → final commit check before PR
  7. [open-pr]            → create PR from feature branch to main.
-                             Evaluate draft/ready per `agentic-pipeline-pr-management` skill.
+                             Evaluate draft/ready per `agentic-pipeline-pr-management` skill,
+                             and decide the `full-ci` label by the same skill's test.
                              Carry every defaulted requirement into the body under
                              `## Decisions taken` per `agentic-decision-autonomy`.
                              **If `visual_incomplete=true` → MUST use --draft, NO `READY TO MERGE`.**
+                             **The PR leaves this step marked or --draft. Never both absent:
+                             a channel CI runs is covered by the marker, not a reason to defer it.**
  8. [decision-followup]  → If any decision was material to gameplay, economy, or a player-facing
                              default: `gh issue create --label decision-review` carrying the
                              `## Decisions taken` block and the PR link. No `ready` label — it
@@ -70,6 +73,6 @@ Do NOT re-run skeleton-writer or test-writer — branches and tests already exis
 | merge-findings | Deduplicate and merge all reviewer outputs → pass/fail (evaluate after ALL reviewers complete) |
 | After refactorer | `npx vitest run` — PASS → @validator, FAIL → @implementer (big loop) |
 | verify-commit | `git log --oneline -1` — auto-commit if dirty, use message `"<agent-name>: <step-context> (#<N>)"` |
-| open-pr | `gh pr create --base main --head pipeline/feature-<N> --title "<type>: Resolve #<N>" --body "Closes #<N>\n\n<test_count> tests — all passing\n\n<decisions_block>\n\nREADY TO MERGE"`. Determine `<type>` from pipeline: `full → feat`, `fix-bug → fix`, `multi → feat`. Count test cases: `npx vitest list --reporter=json 2>$null | ConvertFrom-Json | ForEach-Object { $_.testModules } | Measure-Object`. `<decisions_block>` is the `## Decisions taken` section, omitted when the run defaulted nothing. For draft: add `--draft`, omit `READY TO MERGE` line. |
+| open-pr | `gh pr create --base main --head pipeline/feature-<N> --title "<type>: Resolve #<N>" --body "Closes #<N>\n\n<test_count> tests — all passing\n\n<decisions_block>\n\nREADY TO MERGE"`. Determine `<type>` from pipeline: `full → feat`, `fix-bug → fix`, `multi → feat`. Count test cases: `npx vitest list --reporter=json 2>$null | ConvertFrom-Json | ForEach-Object { $_.testModules } | Measure-Object`. `<decisions_block>` is the `## Decisions taken` section, omitted when the run defaulted nothing. For draft: add `--draft`, omit `READY TO MERGE` line. Then apply the `full-ci` label if and only if `agentic-pipeline-pr-management`'s test says so: `gh pr edit <number> --add-label "full-ci"`. |
 | decision-followup | `gh label create decision-review --description "A default the pipeline chose; revisit when convenient" --color ededed --force` then `gh issue create --label decision-review --title "Decision review: <summary> (from #<N>)" --body "<decisions block + PR link>"`. `--force` makes the label step idempotent — it updates an existing label instead of failing the run on every issue after the first. |
 | git-verify | `git status --porcelain` (must be empty) → `git branch --show-current` → `git log --oneline -3` |

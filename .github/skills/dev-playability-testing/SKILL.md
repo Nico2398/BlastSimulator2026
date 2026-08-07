@@ -55,9 +55,15 @@ So the `playtest` job in `.github/workflows/ci.yml` is gated behind the
 `full-ci` label, like the interaction-mode scenario job. It runs every
 definition and uploads the FAIL screenshots as an artifact.
 
-1. **Default: label the PR `full-ci`, push, and read the CI job.** Treat
-   `Playtest (playability)` as the channel's result. Read the failing beat and
-   the uploaded screenshot from the run, exactly as you would locally.
+1. **When a definition drives the change: label the PR `full-ci`, push, and read
+   the CI job.** Treat `Playtest (playability)` as the channel's result — read
+   the failing beat and the uploaded screenshot from the run, exactly as you
+   would locally. The label is a decision, not a reflex: it costs the merge path
+   ~50 minutes, and the definitions in this directory are the whole channel, so
+   a diff none of them clicks its way into learns nothing from running them.
+   `agentic-pipeline-pr-management` holds the rule and the two other cases that
+   earn the label. Labelling never withholds `READY TO MERGE` — the marker is
+   what makes auto-merge wait for the job and merge on its result.
 2. **Run it locally only for one named definition you are actively debugging**,
    never the whole suite: `npm run playtest -- <name> --screenshots`.
 3. **Never claim the channel passed from a run you interrupted.** A run with no

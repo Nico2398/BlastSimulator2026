@@ -25,6 +25,11 @@ outputs:
   unarmed:
     description: 'Space-separated PR numbers that carried the marker and are still neither armed nor merged.'
     value: ${{ steps.sweep.outputs.unarmed }}
+  unmarked:
+    description: >-
+      Space-separated pipeline PR numbers that are neither marked nor draft —
+      runs that ended without saying whether their work ships.
+    value: ${{ steps.sweep.outputs.unmarked }}
   pending:
     description: >-
       Space-separated PR numbers that carry the marker and are still waiting on
@@ -162,8 +167,20 @@ runs:
             });
           }
 
+          // A pipeline run leaves its PR marked or draft; there is no third
+          // state. `pipeline/feature-<N>` is the pipeline's own branch, so a
+          // non-draft PR from one carrying no marker is a run that stopped
+          // mid-sentence — #507 and #508 each said the marker "will follow once
+          // the full-ci jobs report", and nothing exists to bring it. This
+          // action skips an unmarked PR, `auto-assign-next` chains from a merge
+          // that never happens, and the watchdog skips any issue with a linked
+          // PR, so issue #504 held `in-progress` for a day with every
+          // assignment behind it waiting. This is the only place that sees it.
+          const PIPELINE_HEAD = /^pipeline\/feature-\d+$/;
+
           const enabled = [];
           const unarmed = [];
+          const unmarked = [];
           const pending = [];
           let approved = 0;
 
@@ -179,7 +196,16 @@ runs:
               continue;
             }
             if (!carriesMergeMarker(summary.body)) {
-              core.info(`#${n}: no READY TO MERGE marker.`);
+              if (PIPELINE_HEAD.test(summary.head?.ref || '')) {
+                core.warning(
+                  `#${n}: opened from ${summary.head.ref}, not a draft, and carrying no READY TO MERGE marker. ` +
+                  'A pipeline PR ships marked or it is a draft naming the channel that stopped it. ' +
+                  'Neither was said, so nothing merges it and its issue stays in-progress.'
+                );
+                unmarked.push(n);
+              } else {
+                core.info(`#${n}: no READY TO MERGE marker.`);
+              }
               continue;
             }
 
@@ -309,6 +335,7 @@ runs:
 
           core.setOutput('enabled', enabled.join(' '));
           core.setOutput('unarmed', unarmed.join(' '));
+          core.setOutput('unmarked', unmarked.join(' '));
           core.setOutput('pending', pending.join(' '));
           core.setOutput('approved', String(approved));
           core.info(
@@ -319,6 +346,18 @@ runs:
           if (pending.length > 0) {
             core.info(
               `Waiting on checks, re-evaluated when CI reports: ${pending.map((n) => `#${n}`).join(', ')}.`
+            );
+          }
+
+          // Said out loud for the same reason as `unarmed` below: an unmarked
+          // pipeline PR is not waiting on anything, it is stranded, and only a
+          // human can tell which it should have been. Red here rather than a
+          // warning in a log nobody reads.
+          if (unmarked.length > 0) {
+            core.setFailed(
+              `Neither marked nor draft: ${unmarked.map((n) => `#${n}`).join(', ')}. ` +
+              'Each is a pipeline PR whose run ended without saying whether its work ships. ' +
+              'Add READY TO MERGE, or convert it to a draft naming the channel that stopped it.'
             );
           }
 
