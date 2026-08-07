@@ -10,7 +10,13 @@
           "command": "new_game seed:42"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "stuckEmployeeCount": 0
+        }
+      }
     },
     {
       "command": "employee hire role:driller",
@@ -28,7 +34,13 @@
           "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 49000,
+          "employeeCount": 1
+        }
+      }
     },
     {
       "command": "employee hire role:driller",
@@ -42,7 +54,13 @@
           "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 48000,
+          "employeeCount": 2
+        }
+      }
     },
     {
       "command": "employee list",
@@ -62,7 +80,12 @@
           "type": "command",
           "command": "employee dispatch 1 x:0 z:0"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "cash": 48000
+        }
+      }
     },
     {
       "command": "tick 19",
@@ -73,7 +96,20 @@
           "command": "tick 19"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash"]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "description": "follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
     },
     {
       "command": "build management_office at:2,0",
@@ -104,7 +140,13 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "buildingCount": 1
+        }
+      }
     },
     {
       "command": "build management_office at:0,2",
@@ -131,7 +173,13 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "buildingCount": 2
+        }
+      }
     },
     {
       "command": "build management_office at:2,2",
@@ -158,7 +206,13 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "buildingCount": 3
+        }
+      }
     },
     {
       "command": "tick 5",
@@ -169,7 +223,23 @@
           "command": "tick 5"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "stuckEmployeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "event choose 0",
+      "description": "follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
     },
     {
       "command": "state full",
@@ -189,7 +259,23 @@
           "command": "tick 10"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "stuckEmployeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "event choose 0",
+      "description": "follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ]
     },
     {
       "command": "build destroy 1",
@@ -203,7 +289,13 @@
           "selector": "#bs-build-panel [data-building-id=\"1\"] .bs-build-demolish-btn"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "buildingCount": 2
+        }
+      }
     },
     {
       "command": "build destroy 2",
@@ -217,7 +309,13 @@
           "selector": "#bs-build-panel [data-building-id=\"2\"] .bs-build-demolish-btn"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "buildingCount": 1
+        }
+      }
     },
     {
       "command": "build destroy 3",
@@ -232,7 +330,13 @@
           "selector": "#bs-build-panel [data-building-id=\"3\"] .bs-build-demolish-btn"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "buildingCount": 0
+        }
+      }
     },
     {
       "command": "tick 15",
@@ -243,7 +347,13 @@
           "command": "tick 15"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "stuckEmployeeCount": 0
+        }
+      }
     }
   ],
   "shots": [

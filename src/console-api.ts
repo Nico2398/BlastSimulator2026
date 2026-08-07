@@ -47,6 +47,8 @@ export interface SerializableGameState {
   collapsedCount: number;
   /** Lowest `fatigue` (0-100, 100 = fully rested) across the roster — the employee closest to collapse. 100 with no employees. */
   minFatigue: number;
+  /** Employees currently in the `isMoveStuck` state — pathfinding has failed STUCK_THRESHOLD consecutive times (EntityMovementTick.ts). */
+  stuckEmployeeCount: number;
   levelEnded: boolean;
   levelEndReason: string | null;
   bankrupt: boolean;
@@ -99,6 +101,7 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     trainingCount: s.employees.employees.filter(e => e.trainingState !== null).length,
     collapsedCount: s.employees.employees.filter(e => e.collapsing).length,
     minFatigue: s.employees.employees.reduce((m, e) => Math.min(m, e.fatigue), 100),
+    stuckEmployeeCount: s.employees.employees.filter(e => e.isMoveStuck).length,
     levelEnded: s.levelEnded,
     levelEndReason: s.levelEndReason,
     bankrupt: s.bankruptcy.bankrupt,

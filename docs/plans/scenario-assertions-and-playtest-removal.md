@@ -537,7 +537,13 @@ whole drill/charge/sequence/blast/vehicle pipeline, no findings) ·
 ✅ nav-move-costs-visual (1×3 grid, Finding #4 spacing-stepper fix
 needed; a vehicle then crosses the drill_hole row's different NavGrid
 cost — cash/holeCount/buildingCount/vehicleCount asserted throughout) ·
-⬜ nav-path-following-visual ·
+✅ nav-path-following-visual (**Finding #28: added `stuckEmployeeCount`
+to `SerializableGameState`** — no field existed to prove `isMoveStuck`
+ever flipped true/false; the file's own premise checked out for real —
+boxing in the (0,0) corner with 3 management offices genuinely flips
+employee #1 to stuck after `STUCK_THRESHOLD` consecutive pathfinding
+failures, and demolishing all three genuinely un-sticks it; added
+missing `event choose 0` after tick 19/tick 5/tick 10) ·
 ⬜ nav-pathfinding-visual · ⬜ nav-ramp-routing-visual · ⬜ site-expansion
 
 ### Batch 6 — employee/economy/misc (18) — **+ training parity check**
@@ -784,6 +790,7 @@ of each session, in case main added/removed a file.)
 26. **`needs-replenishment-visual.json`'s claim — "verify need replenishment... restores gauge values over time" — does not hold, the same root cause Finding #11 already documented in `collapse-recovery.json` recurring in a second file.** A direct engine trace (sampling `employees.employees[0].fatigue`/`restTicksRemaining`/`pendingActions` tick by tick) confirms `autoInsertNeedTasks` genuinely queues and claims rest tasks once fatigue crosses its warning threshold, and each rest completion does give a real burst (~+7.6), but `tickNeedGauges` keeps draining fatigue at the idle rate *throughout* the rest cycle itself — so the completion burst is mostly offset by the drain accrued during that same rest, and by 210 total ticks the employee is oscillating in a narrow band (0-8) near the collapse floor indefinitely, never climbing back to a healthy baseline. **Fixed the test to describe this real, verified behavior** rather than the original claim — same treatment as Finding #11, not a re-investigation of the root cause (already correctly left as an open design question there: "a possible bug OR intended difficulty").
 
 27. **`needs-shift-cycle-visual.json`'s claim — "employees work 6 ticks then auto-enter 8-tick sleep rest" — is structurally unreachable, a third recurrence of the Findings #20/#21/#26 pattern.** `processShiftCycle` (`GameLoop.ts`) requires a `living_quarters` with `tier >= 2` and returns `{active: false}` (does nothing at all) otherwise — but this file's own very next step, `build upgrade 1`, is genuinely rejected (`Tier 2 living_quarters is not researched`), already correctly documented as a real no-op by its own pre-existing description. That leaves the built living_quarters at Tier 1 for the whole scenario, so the shift-cycle mechanic this file is named for never activates. Confirmed via a direct trace: `ticksWorked` stays 0 and `restTicksRemaining` stays `null` through the entire 20-tick budget, no matter how long the employee stays dispatched. **Fixed the test to describe this real, verified behavior** (ordinary idle/work need-drain, no shift cycle) rather than the originally-intended claim — same treatment as Findings #20/#21/#26, not a root-cause fix (the T2-research gate is a real, intentional game mechanic, not a bug).
+28. **Added `stuckEmployeeCount` (`state.employees.employees.filter(e => e.isMoveStuck).length`) to `SerializableGameState`** while writing `nav-path-following-visual.json` — no field existed to prove the `isMoveStuck` state (`Employee.ts`) ever actually flipped, which this file's whole premise depends on (boxing an employee in with buildings, then freeing it again). Added in lockstep across `console-api.ts`/`main.ts`/`validate-state-schema.ts`, with real tests in `console-api.test.ts` (zero on a fresh game with no employees; a full box-in/demolish sequence proving 0→1→0). Confirmed via a direct trace (`runCommand`, replaying the file's exact command sequence including its interleaved `event choose 0` steps, per Finding #19/#24's lesson) that the file's own premise holds for real: employee #1 genuinely flips to stuck after 3 management offices seal the (0,0) corner and `STUCK_THRESHOLD` consecutive pathfinding failures accrue (`tick 5`, `stuckEmployeeCount: 1`), stays stuck through a further `tick 10` (still 1, `moveConsecutiveFailures` climbing 5→15), and genuinely resumes once all three buildings are demolished (`tick 15`, back to 0). Also added the file's two missing `event choose 0` steps (after `tick 19` and `tick 5`, matching the Finding #23 pattern) that this file had never had.
 
 _(Add new findings here as you hit them. Number sequentially.)_
 
@@ -929,3 +936,27 @@ got, whether main was merged, and whether GitHub Actions is back up yet.
   124/124 command-mode scenarios, 8300/8300 unit+integration tests.
   GitHub Actions still not re-checked this session — all verification
   remains local. Next: Batch 5 — vehicle-*/needs-*/nav-* (22 files).
+- 2026-08-07 (cont.) — Batch 5's vehicle-* (7/7) and needs-* (9/9) groups
+  complete, committed and pushed individually per file. Findings #21/#22
+  (traffic-jam timing, one file's premise structurally unreachable, its
+  sibling fixed by extending the tick budget), #23/#24 (missing
+  `event choose 0` steps freezing back-halves of files, plus the
+  scratch-trace-must-replay-every-command lesson), #25 (added
+  `pendingActionCount` field), #26/#27 (two more recurrences of Finding
+  #11's rest-vs-drain-offset pattern, tests corrected to real behavior,
+  root cause not re-chased). Continued into nav-*: nav-dynamic-updates-
+  visual and nav-move-costs-visual done with no new findings beyond
+  Finding #4's spacing-stepper class. Then nav-path-following-visual:
+  Finding #28 — added `stuckEmployeeCount` to `SerializableGameState`
+  (lockstep across console-api.ts/main.ts/validate-state-schema.ts, two
+  new console-api.test.ts tests), added its two missing `event choose 0`
+  steps, and confirmed via direct trace that the file's own premise
+  (boxing an employee in with 3 buildings genuinely triggers the stuck
+  state; demolishing them genuinely clears it) holds for real. Verified
+  in both command mode and a real browser (interaction mode) before the
+  full sweep. Full local sweep green: typecheck clean, 124/124 command-
+  mode scenarios, 8304/8304 unit+integration tests (up from 8302 with
+  the two new stuckEmployeeCount tests). GitHub Actions still not
+  re-checked this session — all verification remains local. Batch 5:
+  19/22 done (vehicle-* 7/7, needs-* 9/9, nav-*/site-expansion 3/6).
+  Next: nav-pathfinding-visual, nav-ramp-routing-visual, site-expansion.

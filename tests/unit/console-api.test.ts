@@ -35,6 +35,9 @@ import type { MiningContext } from '../../src/console-api.js';
  * pendingActionCount (state.pendingActions.length) closes the same gap for
  * queued-but-unclaimed actions, including auto-inserted rest tasks — a
  * scenario proving a proactive rest was queued had no field to check either.
+ * stuckEmployeeCount closes the same gap for the isMoveStuck state — a
+ * scenario proving pathfinding genuinely got an employee stuck (and later
+ * un-stuck) had no field to check either.
  */
 const SERIALIZED_FIELDS = [
   'seed', 'time', 'tickCount', 'isPaused', 'mineType',
@@ -42,6 +45,7 @@ const SERIALIZED_FIELDS = [
   'drillHoles', 'chargesByHole', 'sequenceDelays', 'finances', 'holeCount', 'chargedCount',
   'sequencedCount', 'surveyCount', 'pendingActionCount', 'buildingCount', 'vehicleCount', 'employeeCount',
   'qualificationCount', 'proficiencyTotal', 'trainingCount', 'collapsedCount', 'minFatigue',
+  'stuckEmployeeCount',
   'levelEnded', 'levelEndReason', 'bankrupt', 'revolted', 'ecologicalShutdown',
   'arrested', 'cash', 'profit', 'wellBeing', 'safety', 'ecology', 'nuisance', 'muckPile',
   'storedMassKg',
@@ -154,6 +158,35 @@ describe('console-api', () => {
 
       expect(state.minFatigue).toBe(100);
       expect(state.collapsedCount).toBe(0);
+    });
+
+    it('reports zero stuckEmployeeCount for a fresh game with no employees', () => {
+      runner.runner.run('new_game mine_type:desert seed:42');
+      const state = serializeGameState(runner.ctx as MiningContext)!;
+
+      expect(state.stuckEmployeeCount).toBe(0);
+    });
+
+    it('counts an employee as stuck once boxed in by buildings, then un-stuck once demolished', () => {
+      runner.runner.run('new_game seed:42');
+      runner.runner.run('employee hire role:driller');
+      runner.runner.run('employee dispatch 1 x:0 z:0');
+      runner.runner.run('tick 19');
+      runner.runner.run('build management_office at:2,0');
+      runner.runner.run('build management_office at:0,2');
+      runner.runner.run('build management_office at:2,2');
+      runner.runner.run('tick 5');
+
+      const stuckState = serializeGameState(runner.ctx as MiningContext)!;
+      expect(stuckState.stuckEmployeeCount).toBe(1);
+
+      runner.runner.run('build destroy 1');
+      runner.runner.run('build destroy 2');
+      runner.runner.run('build destroy 3');
+      runner.runner.run('tick 15');
+
+      const freedState = serializeGameState(runner.ctx as MiningContext)!;
+      expect(freedState.stuckEmployeeCount).toBe(0);
     });
 
     it('reports zero surveyCount for a fresh game with no surveys run', () => {
