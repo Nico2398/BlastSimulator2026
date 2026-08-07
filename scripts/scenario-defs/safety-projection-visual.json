@@ -11,7 +11,13 @@
           "command": "new_game seed:42"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "buildingCount": 0
+        }
+      }
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -21,7 +27,12 @@
           "command": "campaign start level:dusty_hollow"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "time resume",
@@ -51,7 +62,13 @@
           "command": "zone clear x1:5 y1:5 x2:35 y2:35"
         }
       ],
-      "description": "Left unmarked: Fire.ts's Sound the Horn button (`[data-action=\"sound-horn\"]`) sends `zone clear` using its own auto-computed `currentZone`, not player-typed coordinates -- whether that computed zone matches this scenario's explicit x1:5 y1:5 x2:35 y2:35 rectangle is unverified. Left as a command rather than risk a click that lands on a different-shaped zone than the scenario expects."
+      "description": "Left unmarked: Fire.ts's Sound the Horn button (`[data-action=\"sound-horn\"]`) sends `zone clear` using its own auto-computed `currentZone`, not player-typed coordinates -- whether that computed zone matches this scenario's explicit x1:5 y1:5 x2:35 y2:35 rectangle is unverified. Left as a command rather than risk a click that lands on a different-shaped zone than the scenario expects.",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        },
+        "note": "no state field exposes zone bounds/status -- proven instead by the zone status observe step's own text output"
+      }
     },
     {
       "command": "zone status",
@@ -91,10 +108,17 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "buildingCount": 1
+        }
+      }
     },
     {
-      "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:20,20",
+      "command": "drill_plan grid rows:4 cols:4 spacing:3 depth:8 start:20,20",
+      "description": "Corrected from the original rows:3 cols:3 spacing:5 (which command mode ran literally, producing 9 holes): the click drags the (20,20)-(30,30) rectangle at the Drill panel's own default spacing (DEFAULT_SPACING_M=3), computing cols/rows as round(size/spacing)+1 = 4x4 = 16 holes for that same rectangle -- the command and the click were silently testing two different grids, the same class of bug already fixed in nav-cell-types-visual.json. Caught by adding expect.equals.holeCount; fixed by describing what the click actually produces.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -123,7 +147,12 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 16
+        }
+      }
     },
     {
       "command": "charge hole:* explosive:boomite amount:8 stemming:1",
@@ -133,7 +162,12 @@
           "type": "command",
           "command": "charge hole:* explosive:boomite amount:8 stemming:1"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "chargedCount": 16
+        }
+      }
     },
     {
       "command": "sequence auto delay_step:10",
@@ -143,7 +177,12 @@
           "command": "sequence auto delay_step:10"
         }
       ],
-      "description": "Left unmarked: delay_step:10ms doesn't match the Sequence panel's default (25ms). The stepper that changes it (Sequence.ts's dstepMs, +/-5ms per click) has never been click-tested in this conversion --  unlike the ramp tool's single-field #bs-param-strip, the Sequence tab shares DOM space with other blast steps whose tab-visibility isn't verified here, so left as a command rather than guessing at an unproven selector."
+      "description": "Left unmarked: delay_step:10ms doesn't match the Sequence panel's default (25ms). The stepper that changes it (Sequence.ts's dstepMs, +/-5ms per click) has never been click-tested in this conversion --  unlike the ramp tool's single-field #bs-param-strip, the Sequence tab shares DOM space with other blast steps whose tab-visibility isn't verified here, so left as a command rather than guessing at an unproven selector.",
+      "expect": {
+        "equals": {
+          "sequencedCount": 16
+        }
+      }
     },
     {
       "command": "buy_software tier:1",
@@ -162,7 +201,10 @@
           "selector": "#bs-blast-panel [data-tier=\"1\"] [data-action=\"buy-tier\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"]
+      }
     },
     {
       "command": "buy_software tier:2",
@@ -180,7 +222,10 @@
           "selector": "#bs-blast-panel [data-tier=\"2\"] [data-action=\"buy-tier\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"]
+      }
     },
     {
       "command": "buy_software tier:3",
@@ -198,7 +243,14 @@
           "selector": "#bs-blast-panel [data-tier=\"3\"] [data-action=\"buy-tier\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "cash": 27500
+        },
+        "note": "Finding #36: buy_software used to leave state.finances.cash diverged from this flat field by the sum of every tier cost, fixed at the root"
+      }
     },
     {
       "command": "blast_preview",
@@ -212,7 +264,13 @@
           "selector": "#bs-blast-panel [data-action=\"run-analysis\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 27500
+        },
+        "note": "a preview is read-only -- no cash or hole/charge/sequence count moves"
+      }
     },
     {
       "command": "preview projections",
@@ -251,7 +309,17 @@
           "selector": "[data-action=\"report-close\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0,
+          "buildingCount": 1
+        },
+        "decreased": ["ecology", "nuisance"],
+        "note": "buildingCount stays 1 -- the freight_warehouse the safety-zone/projection setup is built around survives the blast unscathed (confirmed via direct trace: HP 150/150 unchanged), which is this file's own premise about the safety zone doing its job"
+      }
     },
     {
       "command": "fragments",
@@ -271,7 +339,12 @@
           "command": "build list"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "buildingCount": 1
+        }
+      }
     },
     {
       "command": "scores",
@@ -291,7 +364,13 @@
           "command": "state full"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "buildingCount": 1,
+          "holeCount": 0
+        }
+      }
     }
   ],
   "shots": [

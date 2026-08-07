@@ -610,7 +610,10 @@ that both crashed a score and destroyed a building) ·
 own description promising real speed/pause button clicks** — see the
 findings log; added `timeScale` field and a `data-action="pause-toggle"`
 selector to close the gap) ·
-⬜ safety-projection-visual ·
+✅ safety-projection-visual (**Finding #36** — see the findings log;
+the file's own premise — a warehouse inside a cleared safety zone
+survives the blast — held true, confirmed even under the corrected,
+more violent 16-hole grid) ·
 ⬜ core-loop-visual · ⬜ i18n-display-visual · ⬜ main-menu-visual ·
 ⬜ save-load-visual · ⬜ sandbox-mode · ⬜ weather-display-visual ·
 ⬜ weather-flood
@@ -864,6 +867,8 @@ of each session, in case main added/removed a file.)
 34. **`scores-display-visual.json`'s score-trend assertions (increased/decreased on wellBeing/safety/ecology/nuisance across 5 tick checkpoints over a 110-tick budget) were NOT safe across both modes, even though a direct command-mode trace confirmed the file's own narrative exactly** — a genuinely new sub-class of Finding #12, worse than ordinary numeric drift. A first real browser run failed with `safety should have increased but went 50 → 0.49999999999999484` at the very first tick step: a random event fired under interaction mode's wall-clock ticking and, via the file's own `event choose 0` (always picks option 0 blindly, matching every other file's convention) landed a severe safety penalty — not a small numeric drift but a complete score collapse in the opposite direction from command mode's clean trace. **Fixing that surfaced a second failure**: the same event (or a different one further into the run) had also genuinely destroyed one of the file's two buildings, failing the final `state full` step's `buildingCount: 2` check. **Fixed** by dropping the increased/decreased assertions on the four score fields from all 5 tick steps and the roster/building counts from the final step, replacing them with `note`s documenting the real, command-mode-confirmed trend (verified via direct trace to genuinely match the file's own narrative) — kept only what stays true regardless of which random event fires: `decreased: ["cash"]` on every tick step (payroll/maintenance/fuel never stop draining) and `holeCount`/`chargedCount`/`sequencedCount` staying at 0 forever after the blast. The deterministic checks earlier in the file (immediately after each hire/build/blast, before any tick could let an event fire) needed no changes. Re-verified passing on two separate real browser runs to build confidence this wasn't a lucky pass given the randomness involved.
 
 35. **`time-management-visual.json` was console-only despite its own description explicitly promising real button clicks ("speed buttons... pause/resume toggle") — a direct instance of the original mandate's click-only requirement, not just a missing-assertion gap.** Every step's `interaction` used `type: "command"` for `time pause`/`time resume`/`time speed N`, never a click, and grepping every scenario file confirmed no file anywhere had ever clicked the HUD's pause or speed controls (`TopBar.ts`) — the only reference at all was one file clicking the *container* `.bs-speed-btn`, never an individual button. **Fixed** by rewriting every pause/resume/speed step to a real click: the speed buttons already carried a `data-speed` attribute (`TopBar.ts`, ready-made), but the pause/resume toggle had no selector at all — added `pauseBtn.dataset['action'] = 'pause-toggle'` (one line, no behavior change, confirmed via a screenshot that nothing visually shifted). Also **added `timeScale` to `SerializableGameState`** (`state.timeScale`, mirrored in `console-api.ts`/`main.ts`/`validate-state-schema.ts`, two new `console-api.test.ts` tests) — no field existed to prove a speed-button click genuinely changed the simulation rate rather than just being clickable; `isPaused` already existed and needed no addition. Verified in both command mode and a real browser.
+
+36. **`safety-projection-visual.json` had two problems, both repeats of earlier finding classes.** (a) A fourth instance of Finding #13's class: `buySoftwareCommand` (`mining.ts`) deducted `state.cash` directly for every software tier purchase but never called `addExpense` on `state.finances`. Confirmed by dumping both fields side by side after buying tiers 1/2/3 ($500+$2000+$5000): the flat `cash` field correctly dropped by $7500, but `state.finances.cash` never moved — an exact $7500 gap, invisible to every prior verification pass for the same reason as Finding #32 (no committed scenario assertion reads the nested `finances.cash` path). **Fixed at the root** — added the missing `addExpense(ctx.state!.finances, result.cost, 'equipment', ...)` call, matching the pattern every other cash-spending command already uses. New unit test in `mining-commands.test.ts` proving `state.finances.cash` mirrors the flat field after a tier purchase. (b) A repeat of Finding #3's class: `drill_plan grid rows:3 cols:3 spacing:5` didn't match the click's real (20,20)-(30,30) drag at the panel's default spacing (3), which actually produces a 4×4=16-hole grid, not 3×3=9 — same class already fixed in `nav-cell-types-visual.json`/`hauling-gate.json`. Fixed by correcting the command. Both fixes verified together: the file's own central premise — a `freight_warehouse` built inside a cleared safety zone survives the blast unscathed (HP 150/150 unchanged) — held true both before and after the grid correction, confirmed via direct trace even under the corrected, more violent 16-hole "BAD"-rated blast (furthest throw 23.9m vs. the original 4-hole version's much gentler spread). No existing scenario-file assertions needed updating for (a); (b) required updating the file's own hole/charge/sequence counts from 9 to 16.
 
 _(Add new findings here as you hit them. Number sequentially.)_
 
@@ -1196,3 +1201,15 @@ got, whether main was merged, and whether GitHub Actions is back up yet.
   8311/8311 tests. GitHub Actions still not re-checked this session —
   all verification remains local. Next: safety-projection-visual,
   core-loop-visual, then the rest of Batch 6.
+- 2026-08-07 (cont.) — safety-projection-visual.json done (Finding
+  #36): a fourth Finding-#13-class bug (buy_software silently missing
+  from state.finances, fixed at the root and committed separately) plus
+  a repeat of Finding #3's grid-spacing command/click mismatch (9 vs.
+  the click's real 16 holes). The file's own central premise — a
+  freight_warehouse inside a cleared safety zone survives the blast
+  unscathed — held true, confirmed even under the corrected, more
+  violent 16-hole "BAD"-rated blast. Verified in both modes. Batch 6:
+  11/18 done. Full local sweep green: typecheck, 124/124 scenarios,
+  8312/8312 tests. GitHub Actions still not re-checked this session —
+  all verification remains local. Next: core-loop-visual,
+  i18n-display-visual, main-menu-visual, then the rest of Batch 6.
