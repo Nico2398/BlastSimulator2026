@@ -1,6 +1,6 @@
 {
   "name": "hauling-gate",
-  "description": "Arrival-gated debris hauling (issue #437): 'vehicle haul <id> fragment:<id>' sets hauling intent only — a debris_hauler then drives to the blast fragment, loads it only on arrival, drives to the nearest freight_warehouse, and delivers it only on arrival. Immediately after the haul command (before the first post-command tick block), the fragment must still be on_ground/untransported — the state dump right after 'vehicle haul' proves the task did not start/complete instantly. After the first tick 20 the vehicle should be in transit (fragment picked up, hauling toward the depot) or already delivered; after the following tick 40 the fragment must be state:stored and logistics.storedMassKg increased.",
+  "description": "Arrival-gated debris hauling (issue #437): 'vehicle haul <id> fragment:<id>' sets hauling intent only \u2014 a debris_hauler then drives to the blast fragment, loads it only on arrival, drives to the nearest freight_warehouse, and delivers it only on arrival. Immediately after the haul command (before the first post-command tick block), the fragment must still be on_ground/untransported \u2014 the state dump right after 'vehicle haul' proves the task did not start/complete instantly. After the first tick 20 the vehicle should be in transit (fragment picked up, hauling toward the depot) or already delivered; after the following tick 40 the fragment must be state:stored and logistics.storedMassKg increased.",
   "steps": [
     {
       "command": "new_game seed:42 cash:100000",
@@ -48,15 +48,17 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "buildingCount": 1
         }
       }
     },
     {
-      "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:8 start:20,20",
-      "description": "Corrected from the original rows:2 cols:2 spacing:5 (which command mode ran literally, producing 4 holes): the click drags the (20,20)-(25,25) rectangle at the Drill panel's own default spacing (DEFAULT_SPACING_M=3), computing cols/rows as round(size/spacing)+1 = 3x3 = 9 holes for that same rectangle -- the command and the click were silently testing two different grids, the same class of bug already fixed in nav-cell-types-visual.json. Caught by adding expect.equals.holeCount; fixed by describing what the click actually produces.",
+      "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:6 start:20,20",
+      "description": "Corrected from the original rows:2 cols:2 spacing:5 (which command mode ran literally, producing 4 holes): the click drags the (20,20)-(25,25) rectangle at the Drill panel's own default spacing (DEFAULT_SPACING_M=3), computing cols/rows as round(size/spacing)+1 = 3x3 = 9 holes for that same rectangle -- the command and the click were silently testing two different grids, the same class of bug already fixed in nav-cell-types-visual.json. Caught by adding expect.equals.holeCount; fixed by describing what the click actually produces. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -198,7 +200,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "vehicleCount": 1
         }
@@ -222,7 +226,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "employeeCount": 1
         }
@@ -277,7 +283,9 @@
       ],
       "role": "setup",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "storedMassKg": 0
         }
@@ -294,8 +302,8 @@
       "role": "observe"
     },
     {
-      "command": "vehicle haul 1 fragment:531",
-      "description": "The Haul button always picks the vehicle's nearest reachable, non-oversized, storage-fitting fragment (findReachableGroundFragment, HaulEligibility.ts) -- not a fixed index. #531 is what that function itself returns for this exact seed/command sequence (confirmed by calling it directly), which is why this id looks arbitrary rather than a round number picked by hand -- it must be re-derived the same way if anything upstream (the grid, the blast, the vehicle's spawn point) ever changes.",
+      "command": "vehicle haul 1 fragment:785",
+      "description": "The Haul button always picks the vehicle's nearest reachable, non-oversized, storage-fitting fragment (findReachableGroundFragment, HaulEligibility.ts) -- not a fixed index. #785 is what that function itself returns for this exact seed/command sequence (confirmed by calling it directly), which is why this id looks arbitrary rather than a round number picked by hand -- it must be re-derived the same way if anything upstream (the grid, the blast, the vehicle's spawn point) ever changes. Re-derived from #531 during the depth-mismatch audit (Ground rule #15/Finding #42): correcting this file's drill_plan depth from 8 to 6 (the grid tool's real default, since this step never clicks the depth stepper) changes the whole blast/fragment population, invalidating the old hardcoded id -- confirmed the hard way, the first pass at the depth fix left #531 in place and storedMassKg silently stayed 0 through both tick 20 and tick 40 (fragment #531 no longer exists in the corrected population), exactly the kind of regression a fixed-id hack risks and the file's own note above already warned about.",
       "interaction": [
         {
           "type": "waitForSelector",
@@ -351,8 +359,12 @@
       ],
       "role": "setup",
       "expect": {
-        "decreased": ["cash"],
-        "increased": ["storedMassKg"]
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "storedMassKg"
+        ]
       }
     },
     {
@@ -385,8 +397,10 @@
       ],
       "role": "setup",
       "expect": {
-        "decreased": ["cash"],
-        "note": "storedMassKg is deliberately not asserted to an exact value here: findReachableGroundFragment (the real Haul button's own fragment choice) is sensitive to the vehicle's exact tick-by-tick position, and interaction mode's real wall-clock ticking (Finding #12) can pick a different -- but equally valid -- fragment than command mode's clean tick10. The delivered amount genuinely differs between modes (confirmed: 263.25kg in command mode, 1050kg in a real browser run) without either being wrong; tick 20's own increased:[storedMassKg] check already proves delivery genuinely completed, which is this file's actual premise."
+        "decreased": [
+          "cash"
+        ],
+        "note": "storedMassKg is deliberately not asserted to an exact value here: findReachableGroundFragment (the real Haul button's own fragment choice) is sensitive to the vehicle's exact tick-by-tick position, and interaction mode's real wall-clock ticking (Finding #12) can in principle pick a different -- but equally valid -- fragment than command mode's clean tick10. Historically (before the depth-mismatch audit's fragment-id re-derivation above) the delivered amount genuinely differed between modes (263.25kg in command mode vs 1050kg in a real browser run); since the fragment is now pinned explicitly by id (`vehicle haul 1 fragment:785`) rather than left to each mode's own opportunistic re-targeting, both modes now deliver the identical 1050kg -- confirmed directly, both modes re-run after the fix. Left as increased/undereasserted-exact rather than hard-pinning 1050kg here too, since this step's own point is proving delivery completed at all (tick 20's increased:[storedMassKg] already does that), not re-asserting the amount a second time."
       }
     },
     {
