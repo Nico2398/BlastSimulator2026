@@ -33,7 +33,7 @@ The open-pr step passes `--draft` to `gh pr create` when evaluation is `draft`.
 
 ## READY TO MERGE
 
-After creating the PR, the body must include `READY TO MERGE` on its own line, with nothing else on it. That line is the only thing that puts a PR into auto-merge: the `agentic-auto-merge` action reads it, releases any workflow run parked as `action_required` on the PR head, and enables GitHub native auto-merge via a PAT token. The account that opened the PR is never consulted — see `agentic-autonomous-pipeline`.
+The line goes into the body the PR is **created with** — the last line of `gh pr create --body` at the open-pr step, written in the same command that opens the PR. It is never a later edit, and there is no step after open-pr that adds it. `READY TO MERGE` sits on its own line with nothing else on it. That line is the only thing that puts a PR into auto-merge: the `agentic-auto-merge` action reads it, releases any workflow run parked as `action_required` on the PR head, and enables GitHub native auto-merge via a PAT token. The account that opened the PR is never consulted — see `agentic-autonomous-pipeline`.
 
 This is the **default**, skipped only in the three draft cases above. When skipping, post a comment naming the channel or blocker and the remedy — never a summary of how much work the run took:
 
