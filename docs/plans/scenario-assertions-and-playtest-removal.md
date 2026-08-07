@@ -842,7 +842,15 @@ on purpose since the file's real premise is the per-step screenshots,
 not economy state — a single undersized-grid blast kills 1 of 2
 employees, documented as a real consequence rather than fixed, same
 Finding #40/#56 class; verified 1/1 in both modes) ·
-⬜ vehicle-purchase-visual ·
+✅ vehicle-purchase-visual (**Finding #68** — see the findings log; the
+one real click in the file — buying a debris_hauler off the Fleet
+panel's tier-1 row — lands on exactly the same purchase `vehicle buy
+debris_hauler`'s own tier default produces, confirmed empirically, no
+mismatch; the file's pre-existing BLOCKED FINDING note on the 2nd
+purchase, left as a command since the real buy button disables itself
+once unaffordable, now has a real `expect` proving the uncapped
+negative-cash consequence rather than just documenting it; verified
+1/1 in both modes) ·
 ⬜ contract-panel-visual · ⬜ event-dialog-visual
 
 (123 remaining after Batch 0's 1; batches above sum to 122 — reconcile the
@@ -1146,6 +1154,8 @@ of each session, in case main added/removed a file.)
 66. **A second file in the same merge, `tutorial-interactive.json`, had a conflict hunk that was internally consistent and textually well-justified, but empirically false against the merged codebase.** The conflicting hunk was a negative-test step: drag an out-of-region rectangle (22,22)-(26,26) during the drill-plan stage, assert `expect.blocked: "#bs-tile-select-confirm"`. HEAD's side kept the negative-test framing; main's side claimed the step completed a real drill plan instead — but main's own *unconflicted* surrounding interaction array and expect block still matched HEAD's negative-test framing, making main's side internally inconsistent (its prose didn't match its own code), so HEAD's version was kept as the textually correct resolution. A real interaction-mode run afterward proved it false anyway: `#bs-tile-select-confirm is reachable but should not be`. `src/ui/tutorialStages.ts`'s `REGION.drill` (`{x1:20,z1:20,x2:30,z2:30,exact:true}`) still declares the same exact-rectangle requirement it always did, so the rejection mechanism didn't visibly change — but something in main's #489 ("make every tutorial step completable") pass relaxed whatever actually gates the confirm button, and it isn't `REGION`'s own flag. Root cause not reverse-engineered past that point; fixed pragmatically instead of theoretically, by deleting the negative-test step and folding its 3 setup clicks onto the front of the following real `drill_plan` step (verified the prior step used the Build panel, not Blast, so re-opening Blast there doesn't toggle-close anything). Verified clean on 2 separate interaction-mode runs post-fix. General lesson, sharper than #65's: textual consistency between two sides of a conflict — even cross-checked against each side's own unconflicted context — is still not proof of correctness against the *post-merge* codebase. The only channel that actually caught this was running it for real.
 
 67. **`tutorial-steps-visual.json` is the 2nd of PR #497's two scenarios explicitly left un-converted to real clicks (`sandbox-mode.json` was the 1st, Finding #65's file) — every step's `interaction` array uses `type:"command"` in both modes, so command mode and interaction mode read the exact same `serializeGameState()` values at every step, confirmed by running both.** The one place the two modes *do* differ — `tutorial_start` itself — turns out to be invisible to every other assertion in the file: it's registered only in `src/main.ts` (`runner.register('tutorial_start', ...)`, wired at browser boot), not in the shared command table `createRunner()` uses in `console-api.ts`, so command mode reports "Unknown command" and never starts the tutorial overlay at all, while interaction mode's `command` action reaches the real handler and does start it — arming `TutorialOverlay`'s rails and setting `state.isPaused = true` (`TutorialOverlay.ts` line 91). Traced both effects to confirm neither leaks into anything assertable: `isPaused` doesn't gate the explicit `tick` command (grepped the tick handler directly, no reference), and `SerializableGameState` carries no tutorial-related field at all (grepped `console-api.ts` for `tutorial`, zero hits) — so every subsequent step, which also uses `command` rather than a real click, produces bit-identical state regardless of which mode actually started the tutorial. Given the file's own stated purpose is a per-step *visual* walkthrough (`shots`-driven screenshots, highlight targets, progress indicator — a `visual`-channel concern outside `expect`'s reach), kept `expect` density deliberately light: hard `equals` on `cash`/count fields at real state transitions (hires, drill/charge/sequence, contract accept, vehicle buy, build), one `decreased:["safety"]` rather than a brittle 15-decimal float for the post-death score decay, and skipped `wellBeing`/`ecology`/`nuisance` entirely as incidental to this file's premise. The file's single blast (5m spacing/8m depth/5kg charge, all command-driven so no Finding #52 drag-mismatch risk applies) kills 1 of the 2 employees on site — Rating: BAD, 4 projections — a real, deterministic consequence of the declared parameters, documented rather than tuned away, matching the Finding #40/#56/#59 precedent. Zero random events anywhere in the trace (every `tick` step's own state dump was read directly, not just its text output, closing off a Finding #60-style silent event as a possibility). Verified 1/1 in both modes; not re-run for determinism, same reasoning as `landscape-continuity-visual.json` (Finding #64) — fully deterministic, fixed seed, no RNG-sensitive step anywhere in the file.
+
+68. **`vehicle-purchase-visual.json`'s one real click — buying a `debris_hauler` off the Fleet panel's `[data-vtype="debris_hauler"][data-tier="1"]` row — was already a plausible spot for a Finding #3/#4-class command/click mismatch (the exact bug class those findings fixed elsewhere: a click landing on a different purchase than the paired command implies), but traced clean.** `parseVehicleTierArg` (`vehicle.ts`) defaults `tier` to 1 when the command omits it, so `vehicle buy debris_hauler` and the tier-1 row target the identical purchase — confirmed empirically (not just by reading the default), both modes land on `cash:25000, vehicleCount:1` with no divergence. The file's 2nd purchase (`vehicle buy drill_rig`) was already correctly left as a documented command-only step from the #479 pass — cash is short of a drill rig after the first purchase, so the Fleet panel disables its buy button, but `vehicle buy` itself has no affordability guard and drives cash to exactly `-10000`; added `expect.equals` on that real, uncapped value rather than leaving the finding as prose only. Zero ticks anywhere in this file (no time-based state to desync), so no RNG surface exists at all — verified 1/1 in both modes, not re-run for determinism.
 
 _(Add new findings here as you hit them. Number sequentially.)_
 
@@ -2149,3 +2159,20 @@ got, whether main was merged, and whether GitHub Actions is back up yet.
   determinism (fully deterministic, no RNG-sensitive step). Next: the
   remaining 3 Batch 7 files (`vehicle-purchase-visual` next), then the
   depth-mismatch audit before Phase 3.
+
+- Finished `vehicle-purchase-visual.json` (**Finding #68**, Batch 7
+  18/19), 9 steps, the smallest file left in the batch. One real
+  click (buying a debris_hauler off the Fleet panel's tier-1 row) —
+  exactly the shape of step that produced Finding #3/#4's real
+  command/click mismatches earlier in the project, but this one
+  traced clean: `vehicle buy debris_hauler`'s default tier and the
+  panel's tier-1 row target the identical purchase, confirmed
+  empirically. Added a real `expect.equals` on the file's pre-existing
+  BLOCKED FINDING note (the 2nd purchase drives cash to exactly
+  -10000 since `vehicle buy` has no affordability guard, even though
+  the real button that would trigger it is disabled) rather than
+  leaving it as prose only. Zero ticks in the whole file, no RNG
+  surface at all. Verified 1/1 in both modes, not re-run for
+  determinism. Next: the remaining 2 Batch 7 files
+  (`contract-panel-visual` next), then the depth-mismatch audit before
+  Phase 3.
