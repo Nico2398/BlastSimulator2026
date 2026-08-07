@@ -1,6 +1,6 @@
 {
   "name": "level3-playthrough-ecology",
-  "description": "Level 3 ecological shutdown scenario: massive krackle and obliviax blasts with no mitigation, long tick cycles to trigger ecology collapse",
+  "description": "Level 3 (Treranium Depths) ecological shutdown scenario: massive krackle and obliviax blasts with no mitigation, long tick cycles to trigger ecology collapse. `campaign start level:treranium_depths` fails outright (tier-3, locked by default -- pre-existing, already documented per Finding #24 in this file's own step descriptions and Finding #58/#59 elsewhere in this doc); runs against the substitute new_game world instead. The named ecological-shutdown outcome is otherwise completely real: levelEndReason:'ecological_shutdown' fires at tick 184, taking all 7 employees with it. See Finding #61 for the depth-mismatch fix applied here.",
   "steps": [
     {
       "command": "new_game seed:3666",
@@ -10,7 +10,17 @@
           "command": "new_game seed:3666"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 0,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "campaign start level:treranium_depths",
@@ -20,7 +30,17 @@
           "command": "campaign start level:treranium_depths"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 0,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "time resume",
@@ -30,7 +50,17 @@
           "command": "time resume"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 0,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "scores",
@@ -40,7 +70,21 @@
           "command": "scores"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 0,
+          "wellBeing": 50,
+          "safety": 50,
+          "ecology": 50,
+          "nuisance": 50,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "finances",
@@ -50,7 +94,17 @@
           "command": "finances"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 0,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "employee hire role:driller",
@@ -68,7 +122,17 @@
           "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 49000,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 1,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "employee hire role:driller",
@@ -82,7 +146,17 @@
           "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 48000,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 2,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "employee hire role:driller",
@@ -96,7 +170,17 @@
           "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 47000,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 3,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "employee hire role:blaster",
@@ -110,7 +194,17 @@
           "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 45500,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 4,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "employee hire role:blaster",
@@ -124,7 +218,17 @@
           "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 44000,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 5,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "employee hire role:blaster",
@@ -138,7 +242,17 @@
           "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 42500,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 6,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "employee hire role:driver",
@@ -152,7 +266,17 @@
           "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 41700,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 7,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "employee list",
@@ -162,7 +286,17 @@
           "command": "employee list"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 41700,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 7,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "state full",
@@ -172,7 +306,17 @@
           "command": "state full"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 41700,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 7,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "tick 5",
@@ -183,7 +327,17 @@
         }
       ],
       "timeout": 90,
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 41700,
+          "tickCount": 5,
+          "deathCount": 0,
+          "employeeCount": 7,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -193,7 +347,17 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": 41700,
+          "tickCount": 5,
+          "deathCount": 0,
+          "employeeCount": 7,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "tick 5",
@@ -204,7 +368,17 @@
         }
       ],
       "timeout": 90,
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 37350,
+          "tickCount": 10,
+          "deathCount": 0,
+          "employeeCount": 7,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -214,7 +388,17 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": 37350,
+          "tickCount": 10,
+          "deathCount": 0,
+          "employeeCount": 7,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "scores",
@@ -224,10 +408,24 @@
           "command": "scores"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 37350,
+          "tickCount": 10,
+          "deathCount": 0,
+          "employeeCount": 7,
+          "wellBeing": 52.400000000000034,
+          "safety": 50,
+          "ecology": 50,
+          "nuisance": 50,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
-      "command": "drill_plan grid rows:5 cols:4 spacing:3 depth:12 start:10,10",
+      "command": "drill_plan grid rows:5 cols:4 spacing:3 depth:6 diameter:0.089 start:10,10",
       "interaction": [
         {
           "type": "clickSelector",
@@ -260,7 +458,20 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 37350,
+          "tickCount": 10,
+          "deathCount": 0,
+          "employeeCount": 7,
+          "holeCount": 20,
+          "chargedCount": 0,
+          "sequencedCount": 0,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "charge hole:* explosive:krackle amount:10 stemming:1",
@@ -270,7 +481,20 @@
           "command": "charge hole:* explosive:krackle amount:10 stemming:1"
         }
       ],
-      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show."
+      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show.",
+      "expect": {
+        "equals": {
+          "cash": 37350,
+          "tickCount": 10,
+          "deathCount": 0,
+          "employeeCount": 7,
+          "holeCount": 20,
+          "chargedCount": 20,
+          "sequencedCount": 0,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "sequence auto delay_step:10",
@@ -280,7 +504,20 @@
           "command": "sequence auto delay_step:10"
         }
       ],
-      "description": "Left unmarked: this delay_step doesn't match the Sequence panel's default (25ms), and the stepper that changes it has never been click-tested in this conversion (Batch 6's safety-projection-visual note) -- left as a command rather than guessing at an unproven selector."
+      "description": "Left unmarked: this delay_step doesn't match the Sequence panel's default (25ms), and the stepper that changes it has never been click-tested in this conversion (Batch 6's safety-projection-visual note) -- left as a command rather than guessing at an unproven selector.",
+      "expect": {
+        "equals": {
+          "cash": 37350,
+          "tickCount": 10,
+          "deathCount": 0,
+          "employeeCount": 7,
+          "holeCount": 20,
+          "chargedCount": 20,
+          "sequencedCount": 20,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "blast",
@@ -299,7 +536,20 @@
           "selector": "[data-action=\"report-close\"]"
         }
       ],
-      "description": "campaign start level:treranium_depths FAILS at step 1 (\"Level treranium_depths is locked. Complete previous levels first.\" -- Campaign.ts unlocks only tier-1 levels by default, treranium_depths is tier 3) -- a real, pre-existing scenario bug, not introduced by this conversion. Every subsequent command runs against whatever bare new_game seed:3666 produced instead of the intended level, and by this cycle the mismatch leaves the Fire step's execute button disabled -- validateBlastPlan genuinely rejects this plan on the wrong world, not a selector or tab-visibility issue. The detonate itself stays a command rather than force a click that cannot land, but the resulting BlastReportModal opens regardless of how the blast fired (Finding #12 -- state-reactive, not click-reactive) and blocks every later panel click until closed, so the close IS a real click here. See Finding #24 in the plan doc."
+      "description": "campaign start level:treranium_depths FAILS at step 1 (\"Level treranium_depths is locked. Complete previous levels first.\" -- Campaign.ts unlocks only tier-1 levels by default, treranium_depths is tier 3) -- a real, pre-existing scenario bug, not introduced by this conversion. Every subsequent command runs against whatever bare new_game seed:3666 produced instead of the intended level, and by this cycle the mismatch leaves the Fire step's execute button disabled -- validateBlastPlan genuinely rejects this plan on the wrong world, not a selector or tab-visibility issue. The detonate itself stays a command rather than force a click that cannot land, but the resulting BlastReportModal opens regardless of how the blast fired (Finding #12 -- state-reactive, not click-reactive) and blocks every later panel click until closed, so the close IS a real click here. See Finding #24 in the plan doc.",
+      "expect": {
+        "equals": {
+          "cash": 37350,
+          "tickCount": 10,
+          "deathCount": 0,
+          "employeeCount": 7,
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "state full",
@@ -310,7 +560,17 @@
           "command": "state full"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 37350,
+          "tickCount": 10,
+          "deathCount": 0,
+          "employeeCount": 7,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "scores",
@@ -320,10 +580,24 @@
           "command": "scores"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 37350,
+          "tickCount": 10,
+          "deathCount": 0,
+          "employeeCount": 7,
+          "wellBeing": 52.400000000000034,
+          "safety": 50,
+          "ecology": 29.53,
+          "nuisance": 0,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
-      "command": "drill_plan grid rows:4 cols:5 spacing:3 depth:12 start:25,10",
+      "command": "drill_plan grid rows:4 cols:5 spacing:3 depth:6 diameter:0.089 start:25,10",
       "interaction": [
         {
           "type": "clickSelector",
@@ -352,7 +626,20 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 37350,
+          "tickCount": 10,
+          "deathCount": 0,
+          "employeeCount": 7,
+          "holeCount": 20,
+          "chargedCount": 0,
+          "sequencedCount": 0,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "charge hole:* explosive:krackle amount:10 stemming:1",
@@ -362,7 +649,20 @@
           "command": "charge hole:* explosive:krackle amount:10 stemming:1"
         }
       ],
-      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show."
+      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show.",
+      "expect": {
+        "equals": {
+          "cash": 37350,
+          "tickCount": 10,
+          "deathCount": 0,
+          "employeeCount": 7,
+          "holeCount": 20,
+          "chargedCount": 20,
+          "sequencedCount": 0,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "sequence auto delay_step:10",
@@ -372,7 +672,20 @@
           "command": "sequence auto delay_step:10"
         }
       ],
-      "description": "Left unmarked: this delay_step doesn't match the Sequence panel's default (25ms), and the stepper that changes it has never been click-tested in this conversion (Batch 6's safety-projection-visual note) -- left as a command rather than guessing at an unproven selector."
+      "description": "Left unmarked: this delay_step doesn't match the Sequence panel's default (25ms), and the stepper that changes it has never been click-tested in this conversion (Batch 6's safety-projection-visual note) -- left as a command rather than guessing at an unproven selector.",
+      "expect": {
+        "equals": {
+          "cash": 37350,
+          "tickCount": 10,
+          "deathCount": 0,
+          "employeeCount": 7,
+          "holeCount": 20,
+          "chargedCount": 20,
+          "sequencedCount": 20,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "blast",
@@ -391,7 +704,20 @@
           "selector": "[data-action=\"report-close\"]"
         }
       ],
-      "description": "campaign start level:treranium_depths FAILS at step 1 (\"Level treranium_depths is locked. Complete previous levels first.\" -- Campaign.ts unlocks only tier-1 levels by default, treranium_depths is tier 3) -- a real, pre-existing scenario bug, not introduced by this conversion. Every subsequent command runs against whatever bare new_game seed:3666 produced instead of the intended level, and by this cycle the mismatch leaves the Fire step's execute button disabled -- validateBlastPlan genuinely rejects this plan on the wrong world, not a selector or tab-visibility issue. The detonate itself stays a command rather than force a click that cannot land, but the resulting BlastReportModal opens regardless of how the blast fired (Finding #12 -- state-reactive, not click-reactive) and blocks every later panel click until closed, so the close IS a real click here. See Finding #24 in the plan doc."
+      "description": "campaign start level:treranium_depths FAILS at step 1 (\"Level treranium_depths is locked. Complete previous levels first.\" -- Campaign.ts unlocks only tier-1 levels by default, treranium_depths is tier 3) -- a real, pre-existing scenario bug, not introduced by this conversion. Every subsequent command runs against whatever bare new_game seed:3666 produced instead of the intended level, and by this cycle the mismatch leaves the Fire step's execute button disabled -- validateBlastPlan genuinely rejects this plan on the wrong world, not a selector or tab-visibility issue. The detonate itself stays a command rather than force a click that cannot land, but the resulting BlastReportModal opens regardless of how the blast fired (Finding #12 -- state-reactive, not click-reactive) and blocks every later panel click until closed, so the close IS a real click here. See Finding #24 in the plan doc.",
+      "expect": {
+        "equals": {
+          "cash": 37350,
+          "tickCount": 10,
+          "deathCount": 5,
+          "employeeCount": 7,
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "state full",
@@ -402,7 +728,17 @@
           "command": "state full"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 37350,
+          "tickCount": 10,
+          "deathCount": 5,
+          "employeeCount": 7,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "scores",
@@ -412,7 +748,21 @@
           "command": "scores"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 37350,
+          "tickCount": 10,
+          "deathCount": 5,
+          "employeeCount": 7,
+          "wellBeing": 52.400000000000034,
+          "safety": 50,
+          "ecology": 8.030000000000001,
+          "nuisance": 0,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "tick 8",
@@ -423,7 +773,17 @@
         }
       ],
       "timeout": 90,
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 37350,
+          "tickCount": 18,
+          "deathCount": 5,
+          "employeeCount": 7,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -433,7 +793,17 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": 37350,
+          "tickCount": 18,
+          "deathCount": 5,
+          "employeeCount": 7,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "tick 8",
@@ -444,7 +814,17 @@
         }
       ],
       "timeout": 90,
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 35850,
+          "tickCount": 26,
+          "deathCount": 5,
+          "employeeCount": 7,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -454,7 +834,17 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": 35850,
+          "tickCount": 26,
+          "deathCount": 5,
+          "employeeCount": 7,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "tick 8",
@@ -465,7 +855,17 @@
         }
       ],
       "timeout": 90,
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 34350,
+          "tickCount": 34,
+          "deathCount": 5,
+          "employeeCount": 7,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -475,7 +875,17 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": 34350,
+          "tickCount": 34,
+          "deathCount": 5,
+          "employeeCount": 7,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "scores",
@@ -485,10 +895,24 @@
           "command": "scores"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 34350,
+          "tickCount": 34,
+          "deathCount": 5,
+          "employeeCount": 7,
+          "wellBeing": 62.377142857142964,
+          "safety": 0,
+          "ecology": 9.230000000000018,
+          "nuisance": 0,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
-      "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:14 start:10,25",
+      "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:6 diameter:0.089 start:10,25",
       "interaction": [
         {
           "type": "clickSelector",
@@ -517,7 +941,20 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 34350,
+          "tickCount": 34,
+          "deathCount": 5,
+          "employeeCount": 7,
+          "holeCount": 25,
+          "chargedCount": 0,
+          "sequencedCount": 0,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "charge hole:* explosive:obliviax amount:8 stemming:1",
@@ -527,7 +964,20 @@
           "command": "charge hole:* explosive:obliviax amount:8 stemming:1"
         }
       ],
-      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show."
+      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show.",
+      "expect": {
+        "equals": {
+          "cash": 34350,
+          "tickCount": 34,
+          "deathCount": 5,
+          "employeeCount": 7,
+          "holeCount": 25,
+          "chargedCount": 25,
+          "sequencedCount": 0,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "sequence auto delay_step:10",
@@ -537,7 +987,20 @@
           "command": "sequence auto delay_step:10"
         }
       ],
-      "description": "Left unmarked: this delay_step doesn't match the Sequence panel's default (25ms), and the stepper that changes it has never been click-tested in this conversion (Batch 6's safety-projection-visual note) -- left as a command rather than guessing at an unproven selector."
+      "description": "Left unmarked: this delay_step doesn't match the Sequence panel's default (25ms), and the stepper that changes it has never been click-tested in this conversion (Batch 6's safety-projection-visual note) -- left as a command rather than guessing at an unproven selector.",
+      "expect": {
+        "equals": {
+          "cash": 34350,
+          "tickCount": 34,
+          "deathCount": 5,
+          "employeeCount": 7,
+          "holeCount": 25,
+          "chargedCount": 25,
+          "sequencedCount": 25,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "blast",
@@ -556,7 +1019,20 @@
           "selector": "[data-action=\"report-close\"]"
         }
       ],
-      "description": "campaign start level:treranium_depths FAILS at step 1 (\"Level treranium_depths is locked. Complete previous levels first.\" -- Campaign.ts unlocks only tier-1 levels by default, treranium_depths is tier 3) -- a real, pre-existing scenario bug, not introduced by this conversion. Every subsequent command runs against whatever bare new_game seed:3666 produced instead of the intended level, and by this cycle the mismatch leaves the Fire step's execute button disabled -- validateBlastPlan genuinely rejects this plan on the wrong world, not a selector or tab-visibility issue. The detonate itself stays a command rather than force a click that cannot land, but the resulting BlastReportModal opens regardless of how the blast fired (Finding #12 -- state-reactive, not click-reactive) and blocks every later panel click until closed, so the close IS a real click here. See Finding #24 in the plan doc."
+      "description": "campaign start level:treranium_depths FAILS at step 1 (\"Level treranium_depths is locked. Complete previous levels first.\" -- Campaign.ts unlocks only tier-1 levels by default, treranium_depths is tier 3) -- a real, pre-existing scenario bug, not introduced by this conversion. Every subsequent command runs against whatever bare new_game seed:3666 produced instead of the intended level, and by this cycle the mismatch leaves the Fire step's execute button disabled -- validateBlastPlan genuinely rejects this plan on the wrong world, not a selector or tab-visibility issue. The detonate itself stays a command rather than force a click that cannot land, but the resulting BlastReportModal opens regardless of how the blast fired (Finding #12 -- state-reactive, not click-reactive) and blocks every later panel click until closed, so the close IS a real click here. See Finding #24 in the plan doc.",
+      "expect": {
+        "equals": {
+          "cash": 34350,
+          "tickCount": 34,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "state full",
@@ -567,7 +1043,17 @@
           "command": "state full"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 34350,
+          "tickCount": 34,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "scores",
@@ -577,10 +1063,24 @@
           "command": "scores"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 34350,
+          "tickCount": 34,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "wellBeing": 62.377142857142964,
+          "safety": 0,
+          "ecology": 0,
+          "nuisance": 0,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
-      "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:14 start:25,25",
+      "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:6 diameter:0.089 start:25,25",
       "interaction": [
         {
           "type": "clickSelector",
@@ -609,7 +1109,20 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 34350,
+          "tickCount": 34,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "holeCount": 25,
+          "chargedCount": 0,
+          "sequencedCount": 0,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "charge hole:* explosive:krackle amount:12 stemming:1",
@@ -619,7 +1132,20 @@
           "command": "charge hole:* explosive:krackle amount:12 stemming:1"
         }
       ],
-      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show."
+      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show.",
+      "expect": {
+        "equals": {
+          "cash": 34350,
+          "tickCount": 34,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "holeCount": 25,
+          "chargedCount": 0,
+          "sequencedCount": 0,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "sequence auto delay_step:10",
@@ -629,7 +1155,20 @@
           "command": "sequence auto delay_step:10"
         }
       ],
-      "description": "Left unmarked: this delay_step doesn't match the Sequence panel's default (25ms), and the stepper that changes it has never been click-tested in this conversion (Batch 6's safety-projection-visual note) -- left as a command rather than guessing at an unproven selector."
+      "description": "Left unmarked: this delay_step doesn't match the Sequence panel's default (25ms), and the stepper that changes it has never been click-tested in this conversion (Batch 6's safety-projection-visual note) -- left as a command rather than guessing at an unproven selector.",
+      "expect": {
+        "equals": {
+          "cash": 34350,
+          "tickCount": 34,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "holeCount": 25,
+          "chargedCount": 0,
+          "sequencedCount": 25,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "blast",
@@ -640,7 +1179,20 @@
           "command": "blast"
         }
       ],
-      "description": "campaign start level:treranium_depths FAILS at step 1 (\"Level treranium_depths is locked. Complete previous levels first.\" -- Campaign.ts unlocks only tier-1 levels by default, treranium_depths is tier 3) -- a real, pre-existing scenario bug, not introduced by this conversion. Every subsequent command runs against whatever bare new_game seed:3666 produced instead of the intended level, and by this cycle the mismatch leaves the Fire step's execute button disabled -- validateBlastPlan genuinely rejects this plan on the wrong world, not a selector or tab-visibility issue. The detonate itself stays a command rather than force a click that cannot land, but the resulting BlastReportModal opens regardless of how the blast fired (Finding #12 -- state-reactive, not click-reactive) and blocks every later panel click until closed, so the close IS a real click here. See Finding #24 in the plan doc. This specific cycle's blast fails outright (\"Invalid plan: Missing charge\" on every hole) rather than just failing validation -- no report is produced, so no modal opens and no close click is needed here."
+      "description": "campaign start level:treranium_depths FAILS at step 1 (\"Level treranium_depths is locked. Complete previous levels first.\" -- Campaign.ts unlocks only tier-1 levels by default, treranium_depths is tier 3) -- a real, pre-existing scenario bug, not introduced by this conversion. Every subsequent command runs against whatever bare new_game seed:3666 produced instead of the intended level, and by this cycle the mismatch leaves the Fire step's execute button disabled -- validateBlastPlan genuinely rejects this plan on the wrong world, not a selector or tab-visibility issue. The detonate itself stays a command rather than force a click that cannot land, but the resulting BlastReportModal opens regardless of how the blast fired (Finding #12 -- state-reactive, not click-reactive) and blocks every later panel click until closed, so the close IS a real click here. See Finding #24 in the plan doc. This specific cycle's blast fails outright (\"Invalid plan: Missing charge\" on every hole) rather than just failing validation -- no report is produced, so no modal opens and no close click is needed here.",
+      "expect": {
+        "equals": {
+          "cash": 34350,
+          "tickCount": 34,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "holeCount": 25,
+          "chargedCount": 0,
+          "sequencedCount": 25,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "state full",
@@ -651,7 +1203,17 @@
           "command": "state full"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 34350,
+          "tickCount": 34,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "scores",
@@ -661,7 +1223,21 @@
           "command": "scores"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 34350,
+          "tickCount": 34,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "wellBeing": 62.377142857142964,
+          "safety": 0,
+          "ecology": 0,
+          "nuisance": 0,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "tick 10",
@@ -672,7 +1248,17 @@
         }
       ],
       "timeout": 90,
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 34350,
+          "tickCount": 44,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -682,7 +1268,17 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": 34350,
+          "tickCount": 44,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "tick 10",
@@ -693,7 +1289,17 @@
         }
       ],
       "timeout": 90,
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 34350,
+          "tickCount": 54,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -703,7 +1309,17 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": 34350,
+          "tickCount": 54,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "tick 10",
@@ -714,7 +1330,17 @@
         }
       ],
       "timeout": 90,
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 34350,
+          "tickCount": 64,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -724,7 +1350,17 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": 34350,
+          "tickCount": 64,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "scores",
@@ -734,10 +1370,24 @@
           "command": "scores"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 34350,
+          "tickCount": 64,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "wellBeing": 76.99142857142867,
+          "safety": 0,
+          "ecology": 0,
+          "nuisance": 0,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
-      "command": "drill_plan grid rows:6 cols:5 spacing:3 depth:16 start:15,15",
+      "command": "drill_plan grid rows:6 cols:5 spacing:3 depth:6 diameter:0.089 start:15,15",
       "interaction": [
         {
           "type": "clickSelector",
@@ -766,7 +1416,20 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 34350,
+          "tickCount": 64,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "holeCount": 30,
+          "chargedCount": 0,
+          "sequencedCount": 0,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "charge hole:* explosive:obliviax amount:10 stemming:1",
@@ -776,7 +1439,20 @@
           "command": "charge hole:* explosive:obliviax amount:10 stemming:1"
         }
       ],
-      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show."
+      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show.",
+      "expect": {
+        "equals": {
+          "cash": 34350,
+          "tickCount": 64,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "holeCount": 30,
+          "chargedCount": 30,
+          "sequencedCount": 0,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "sequence auto delay_step:10",
@@ -786,7 +1462,20 @@
           "command": "sequence auto delay_step:10"
         }
       ],
-      "description": "Left unmarked: this delay_step doesn't match the Sequence panel's default (25ms), and the stepper that changes it has never been click-tested in this conversion (Batch 6's safety-projection-visual note) -- left as a command rather than guessing at an unproven selector."
+      "description": "Left unmarked: this delay_step doesn't match the Sequence panel's default (25ms), and the stepper that changes it has never been click-tested in this conversion (Batch 6's safety-projection-visual note) -- left as a command rather than guessing at an unproven selector.",
+      "expect": {
+        "equals": {
+          "cash": 34350,
+          "tickCount": 64,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "holeCount": 30,
+          "chargedCount": 30,
+          "sequencedCount": 30,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "blast",
@@ -805,7 +1494,20 @@
           "selector": "[data-action=\"report-close\"]"
         }
       ],
-      "description": "campaign start level:treranium_depths FAILS at step 1 (\"Level treranium_depths is locked. Complete previous levels first.\" -- Campaign.ts unlocks only tier-1 levels by default, treranium_depths is tier 3) -- a real, pre-existing scenario bug, not introduced by this conversion. Every subsequent command runs against whatever bare new_game seed:3666 produced instead of the intended level, and by this cycle the mismatch leaves the Fire step's execute button disabled -- validateBlastPlan genuinely rejects this plan on the wrong world, not a selector or tab-visibility issue. The detonate itself stays a command rather than force a click that cannot land, but the resulting BlastReportModal opens regardless of how the blast fired (Finding #12 -- state-reactive, not click-reactive) and blocks every later panel click until closed, so the close IS a real click here. See Finding #24 in the plan doc."
+      "description": "campaign start level:treranium_depths FAILS at step 1 (\"Level treranium_depths is locked. Complete previous levels first.\" -- Campaign.ts unlocks only tier-1 levels by default, treranium_depths is tier 3) -- a real, pre-existing scenario bug, not introduced by this conversion. Every subsequent command runs against whatever bare new_game seed:3666 produced instead of the intended level, and by this cycle the mismatch leaves the Fire step's execute button disabled -- validateBlastPlan genuinely rejects this plan on the wrong world, not a selector or tab-visibility issue. The detonate itself stays a command rather than force a click that cannot land, but the resulting BlastReportModal opens regardless of how the blast fired (Finding #12 -- state-reactive, not click-reactive) and blocks every later panel click until closed, so the close IS a real click here. See Finding #24 in the plan doc.",
+      "expect": {
+        "equals": {
+          "cash": 34350,
+          "tickCount": 64,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "state full",
@@ -816,7 +1518,17 @@
           "command": "state full"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 34350,
+          "tickCount": 64,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "scores",
@@ -826,7 +1538,21 @@
           "command": "scores"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 34350,
+          "tickCount": 64,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "wellBeing": 76.99142857142867,
+          "safety": 0,
+          "ecology": 0,
+          "nuisance": 0,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "tick 10",
@@ -837,7 +1563,17 @@
         }
       ],
       "timeout": 90,
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 34350,
+          "tickCount": 74,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -847,7 +1583,17 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": 34350,
+          "tickCount": 74,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "tick 10",
@@ -858,7 +1604,17 @@
         }
       ],
       "timeout": 90,
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 34350,
+          "tickCount": 84,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -868,7 +1624,17 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": 34350,
+          "tickCount": 84,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "tick 10",
@@ -879,7 +1645,17 @@
         }
       ],
       "timeout": 90,
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 34350,
+          "tickCount": 94,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -889,7 +1665,17 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": 34350,
+          "tickCount": 94,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "tick 10",
@@ -900,7 +1686,17 @@
         }
       ],
       "timeout": 90,
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 34350,
+          "tickCount": 104,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -910,7 +1706,17 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": 34350,
+          "tickCount": 104,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "scores",
@@ -920,10 +1726,24 @@
           "command": "scores"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 34350,
+          "tickCount": 104,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "wellBeing": 96.47714285714294,
+          "safety": 0,
+          "ecology": 0,
+          "nuisance": 0,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
-      "command": "drill_plan grid rows:6 cols:6 spacing:3 depth:16 start:20,20",
+      "command": "drill_plan grid rows:6 cols:6 spacing:3 depth:6 diameter:0.089 start:20,20",
       "interaction": [
         {
           "type": "clickSelector",
@@ -952,7 +1772,20 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 34350,
+          "tickCount": 104,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "holeCount": 36,
+          "chargedCount": 0,
+          "sequencedCount": 0,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "charge hole:* explosive:krackle amount:15 stemming:1",
@@ -962,7 +1795,20 @@
           "command": "charge hole:* explosive:krackle amount:15 stemming:1"
         }
       ],
-      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show."
+      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show.",
+      "expect": {
+        "equals": {
+          "cash": 34350,
+          "tickCount": 104,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "holeCount": 36,
+          "chargedCount": 0,
+          "sequencedCount": 0,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "sequence auto delay_step:10",
@@ -972,7 +1818,20 @@
           "command": "sequence auto delay_step:10"
         }
       ],
-      "description": "Left unmarked: this delay_step doesn't match the Sequence panel's default (25ms), and the stepper that changes it has never been click-tested in this conversion (Batch 6's safety-projection-visual note) -- left as a command rather than guessing at an unproven selector."
+      "description": "Left unmarked: this delay_step doesn't match the Sequence panel's default (25ms), and the stepper that changes it has never been click-tested in this conversion (Batch 6's safety-projection-visual note) -- left as a command rather than guessing at an unproven selector.",
+      "expect": {
+        "equals": {
+          "cash": 34350,
+          "tickCount": 104,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "holeCount": 36,
+          "chargedCount": 0,
+          "sequencedCount": 36,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "blast",
@@ -983,7 +1842,20 @@
           "command": "blast"
         }
       ],
-      "description": "campaign start level:treranium_depths FAILS at step 1 (\"Level treranium_depths is locked. Complete previous levels first.\" -- Campaign.ts unlocks only tier-1 levels by default, treranium_depths is tier 3) -- a real, pre-existing scenario bug, not introduced by this conversion. Every subsequent command runs against whatever bare new_game seed:3666 produced instead of the intended level, and by this cycle the mismatch leaves the Fire step's execute button disabled -- validateBlastPlan genuinely rejects this plan on the wrong world, not a selector or tab-visibility issue. The detonate itself stays a command rather than force a click that cannot land, but the resulting BlastReportModal opens regardless of how the blast fired (Finding #12 -- state-reactive, not click-reactive) and blocks every later panel click until closed, so the close IS a real click here. See Finding #24 in the plan doc. This specific cycle's blast fails outright (\"Invalid plan: Missing charge\" on every hole) rather than just failing validation -- no report is produced, so no modal opens and no close click is needed here."
+      "description": "campaign start level:treranium_depths FAILS at step 1 (\"Level treranium_depths is locked. Complete previous levels first.\" -- Campaign.ts unlocks only tier-1 levels by default, treranium_depths is tier 3) -- a real, pre-existing scenario bug, not introduced by this conversion. Every subsequent command runs against whatever bare new_game seed:3666 produced instead of the intended level, and by this cycle the mismatch leaves the Fire step's execute button disabled -- validateBlastPlan genuinely rejects this plan on the wrong world, not a selector or tab-visibility issue. The detonate itself stays a command rather than force a click that cannot land, but the resulting BlastReportModal opens regardless of how the blast fired (Finding #12 -- state-reactive, not click-reactive) and blocks every later panel click until closed, so the close IS a real click here. See Finding #24 in the plan doc. This specific cycle's blast fails outright (\"Invalid plan: Missing charge\" on every hole) rather than just failing validation -- no report is produced, so no modal opens and no close click is needed here.",
+      "expect": {
+        "equals": {
+          "cash": 34350,
+          "tickCount": 104,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "holeCount": 36,
+          "chargedCount": 0,
+          "sequencedCount": 36,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "state full",
@@ -994,7 +1866,17 @@
           "command": "state full"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 34350,
+          "tickCount": 104,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "scores",
@@ -1004,7 +1886,21 @@
           "command": "scores"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 34350,
+          "tickCount": 104,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "wellBeing": 96.47714285714294,
+          "safety": 0,
+          "ecology": 0,
+          "nuisance": 0,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "tick 10",
@@ -1015,7 +1911,17 @@
         }
       ],
       "timeout": 90,
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 34350,
+          "tickCount": 114,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -1025,7 +1931,17 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": 34350,
+          "tickCount": 114,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "tick 10",
@@ -1036,7 +1952,17 @@
         }
       ],
       "timeout": 90,
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 34350,
+          "tickCount": 124,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -1046,7 +1972,17 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": 34350,
+          "tickCount": 124,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "tick 10",
@@ -1057,7 +1993,17 @@
         }
       ],
       "timeout": 90,
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 34350,
+          "tickCount": 134,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -1067,7 +2013,17 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": 34350,
+          "tickCount": 134,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "tick 10",
@@ -1078,7 +2034,17 @@
         }
       ],
       "timeout": 90,
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 34350,
+          "tickCount": 135,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -1088,7 +2054,17 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": -5650,
+          "tickCount": 135,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "tick 10",
@@ -1099,7 +2075,17 @@
         }
       ],
       "timeout": 90,
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": -5650,
+          "tickCount": 145,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -1109,7 +2095,17 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": -5650,
+          "tickCount": 145,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "tick 10",
@@ -1120,7 +2116,17 @@
         }
       ],
       "timeout": 90,
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": -5650,
+          "tickCount": 155,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -1130,7 +2136,17 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": -5650,
+          "tickCount": 155,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "scores",
@@ -1140,7 +2156,21 @@
           "command": "scores"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": -5650,
+          "tickCount": 155,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "wellBeing": 99.95,
+          "safety": 0,
+          "ecology": 0,
+          "nuisance": 0,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "tick 10",
@@ -1151,7 +2181,17 @@
         }
       ],
       "timeout": 90,
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": -5650,
+          "tickCount": 165,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -1161,7 +2201,17 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": -5650,
+          "tickCount": 165,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "tick 10",
@@ -1172,7 +2222,17 @@
         }
       ],
       "timeout": 90,
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": -5650,
+          "tickCount": 175,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -1182,7 +2242,17 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": -5650,
+          "tickCount": 175,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "tick 10",
@@ -1193,7 +2263,17 @@
         }
       ],
       "timeout": 90,
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": -5650,
+          "tickCount": 185,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "levelEnded": true,
+          "levelEndReason": "ecological_shutdown"
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -1203,7 +2283,17 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": -5650,
+          "tickCount": 185,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "levelEnded": true,
+          "levelEndReason": "ecological_shutdown"
+        }
+      }
     },
     {
       "command": "tick 10",
@@ -1214,7 +2304,17 @@
         }
       ],
       "timeout": 90,
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": -5650,
+          "tickCount": 195,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "levelEnded": true,
+          "levelEndReason": "ecological_shutdown"
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -1224,7 +2324,17 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": -5650,
+          "tickCount": 195,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "levelEnded": true,
+          "levelEndReason": "ecological_shutdown"
+        }
+      }
     },
     {
       "command": "tick 10",
@@ -1235,7 +2345,17 @@
         }
       ],
       "timeout": 90,
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": -5650,
+          "tickCount": 205,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "levelEnded": true,
+          "levelEndReason": "ecological_shutdown"
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -1245,7 +2365,17 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": -5650,
+          "tickCount": 205,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "levelEnded": true,
+          "levelEndReason": "ecological_shutdown"
+        }
+      }
     },
     {
       "command": "tick 10",
@@ -1256,7 +2386,17 @@
         }
       ],
       "timeout": 90,
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": -5650,
+          "tickCount": 215,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "levelEnded": true,
+          "levelEndReason": "ecological_shutdown"
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -1266,7 +2406,17 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": -5650,
+          "tickCount": 215,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "levelEnded": true,
+          "levelEndReason": "ecological_shutdown"
+        }
+      }
     },
     {
       "command": "scores",
@@ -1276,7 +2426,21 @@
           "command": "scores"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": -5650,
+          "tickCount": 215,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "wellBeing": 99.95,
+          "safety": 0,
+          "ecology": 0,
+          "nuisance": 0,
+          "levelEnded": true,
+          "levelEndReason": "ecological_shutdown"
+        }
+      }
     },
     {
       "command": "finances",
@@ -1286,7 +2450,17 @@
           "command": "finances"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": -5650,
+          "tickCount": 215,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "levelEnded": true,
+          "levelEndReason": "ecological_shutdown"
+        }
+      }
     },
     {
       "command": "stats",
@@ -1296,7 +2470,21 @@
           "command": "stats"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": -5650,
+          "tickCount": 215,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "wellBeing": 99.95,
+          "safety": 0,
+          "ecology": 0,
+          "nuisance": 0,
+          "levelEnded": true,
+          "levelEndReason": "ecological_shutdown"
+        }
+      }
     },
     {
       "command": "campaign status",
@@ -1306,7 +2494,23 @@
           "command": "campaign status"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": -5650,
+          "tickCount": 215,
+          "deathCount": 7,
+          "employeeCount": 7,
+          "wellBeing": 99.95,
+          "safety": 0,
+          "ecology": 0,
+          "nuisance": 0,
+          "levelEnded": true,
+          "levelEndReason": "ecological_shutdown",
+          "bankrupt": false
+        },
+        "note": "Finding #61: all 6 `drill_plan grid` steps already declared `spacing:3` (the Drill panel's real default), so no rows/cols mismatch existed here -- but all 6 also declared a `depth` (12/12/14/14/16/16) other than the panel's real default of 6, the exact Ground rule #15/Finding #42 class, with none of their interaction arrays clicking a depth stepper. Fixed all 6 to `depth:6` (plus the usual `diameter:0.089`), matching the panel's true defaults, and re-traced fresh -- consistent with Finding #42's own precedent, the corrected shallower holes make blasts genuinely MORE violent, not less, which only helps this file's own 'ecological collapse' premise. The premise holds for real either way: `levelEndReason:'ecological_shutdown'` fires at tick 184, all 7 employees eventually dead (deathCount 7) from repeated blasts with zero mitigation. Two of the six drill cycles (the 4th and 6th) never actually detonate -- their `charge` commands request amounts (12kg, 15kg krackle) outside krackle's real valid range ([1-10kg]), a genuine, pre-existing authoring choice already flagged in this file's own step descriptions from the #479 pass, not something this pass fixed or needed to: the charge validation correctly rejects it, `sequence` still reports its nominal hole count since it doesn't check charge state, and the following `blast` then fails outright ('Invalid plan: Missing charge' on every hole) -- `stats` confirms 'Blasts performed: 4' out of 6 attempted cycles, and this file's `expect` blocks assert exactly that non-firing outcome at those two cycles (chargedCount:0, holeCount unchanged) rather than treating it as a bug. This file's own step descriptions already carry extensive, accurate documentation of the locked-level cascade (referencing Finding #24) predating this pass; not duplicated here beyond what's needed to record the depth fix. No contracts, vehicles, or hauling anywhere in this file -- pure blast-only, so none of the hauling-mechanism findings apply. Verified in both command mode and a real browser (interaction mode re-run twice for determinism, both clean), 107/107 steps."
+      }
     }
   ]
 }

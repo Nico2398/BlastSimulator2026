@@ -786,7 +786,19 @@ tick command's own "No events fired" text, softening `cash`
 assertions past the first such event accordingly. Verified 1/1 in
 both modes, interaction mode re-run twice for determinism, 108/108
 steps) ·
-⬜ level3-playthrough-ecology · ⬜ level3-playthrough-win ·
+✅ level3-playthrough-ecology (**Finding #61** — see the findings log;
+already carried extensive pre-existing documentation of the
+locked-level cascade from the #479 pass (Finding #24), so nothing new
+needed there; all 6 grids already declared the real default spacing
+(3), so only depth needed the Ground rule #15/#42 fix — applied
+proactively across all 6 before tracing, no iteration needed; the
+named ecological-shutdown outcome is completely real, firing at tick
+184 and taking all 7 employees with it; 2 of 6 blast cycles
+deliberately request out-of-range explosive amounts and correctly
+never detonate, already documented and asserted as such rather than
+fixed. Verified 1/1 in both modes, interaction mode re-run twice for
+determinism, 107/107 steps) ·
+⬜ level3-playthrough-win ·
 ⬜ ambient-timescale-sync · ⬜ landscape-continuity-visual ·
 ⬜ tutorial-steps-visual · ⬜ vehicle-purchase-visual ·
 ⬜ contract-panel-visual · ⬜ event-dialog-visual
@@ -1078,6 +1090,8 @@ of each session, in case main added/removed a file.)
 59. **`level2-playthrough-win.json` recurs nearly every established finding class in one file, plus one genuinely new discovery.** `campaign start level:grumpstone_ridge` fails the same way as Finding #58 (not fixed, same reason). `employee assign_skill` used the same rejected positional syntax as Findings #45/#54 — fixed. All 5 `build` commands name nonexistent types — left as documented no-ops, matching Finding #5/#47/#58. A `debris_hauler` is bought alongside a rock_digger and drill_rig, but never assigned a driver and never sent on a single `vehicle haul` — despite 4 real blasts, `storedMassKg` never leaves 0 and all 5 contract deliveries fail honestly for lack of storage; not fixed, for the same reason as `level1-win-conservative.json`/`level1-win-efficient.json` — the hauling mechanism is already proven end-to-end elsewhere, and re-proving it here buys nothing. Finding #52's drill-grid class recurred a 4th time, across all 4 of this file's grids (declared 12/16/20/20 holes vs. real 24/25/30/48 once traced against the panel's true defaults) — fixed the same way, and the corrected, much larger 1st blast now kills 2 employees (deathCount 0→2 at tick 32) where the originally-declared, undersized grid never would have. The one file-specific surprise: unlike every other multi-cycle-contract file this session, this file's own hardcoded contract IDs (1 through 5) all happened to already match the real, currently-available pool at every listing — no ID-mismatch fix was needed at all, the first (and so far only) file where that was true.
 
 60. **Discovered while chasing an unexplained $10,000-per-cycle income jump in `level2-playthrough-win.json`'s `finances` output despite every contract delivery failing: some random events resolve silently and instantly inside a `tick` call, with no pending-choice step at all.** Traced the exact transaction via `state.finances.transactions` directly (the `finances` command's own text output truncates to the last few entries, hiding older ones) and found `{"tick":32,"amount":10000,"category":"contracts","description":"Event: lucky_strike"}` — yet the `tick` command's own output at that exact point read "Advanced 8 tick(s). Now at tick 32. **No events fired.**" This is a materially different mechanic from every other event this project has encountered so far (Findings #34/#44's `weather_bad_forecast`, this session's own `lucky_strike` instances in `level1-win-conservative.json`/`level1-win-efficient.json`/`level2-playthrough-bankruptcy.json`), all of which print `[tick N] EVENT: Name` and block on a required `event choose <index>` step. Read `acceptContract`/the `contract accept`/`deliver` command handlers directly first to rule out a mundane explanation (a signing bonus, a partial-delivery credit) — confirmed neither exists; `consumeStoredOre` (`Logistics.ts`) genuinely returns `success:false` with zero funds movement whenever requested amount exceeds either the ore-specific or raw `storedMassKg` balance, for both the ore-specific and rubble/no-ore branches. The income has to be an auto-resolving event type, distinct from the pending-choice events documented so far. Because this file has a real (if silent) event firing, `cash` is hard-asserted only through the tick it fires at (32) and left unasserted afterward, applying Ground rule #12/Finding #34's established treatment rather than assuming safety just because no `event choose` step happened to be needed. Open follow-up: worth checking whether other already-completed files' `tick` steps have silently absorbed one of these auto-events without anyone noticing, since "No events fired" in the tick output is not actually proof that nothing happened to cash.
+
+61. **`level3-playthrough-ecology.json`'s 6 `drill_plan grid` steps all already declared `spacing:3` (the Drill panel's real default) — the first file this session to get that part right from the start — but all 6 still declared a `depth` (12/12/14/14/16/16) other than the panel's real default of 6, the exact Ground rule #15/Finding #42 class, since none of their interaction arrays click a depth stepper.** Fixed all 6 to `depth:6` (plus `diameter:0.089`, matching the by-now-established pattern) proactively, before tracing at all — paid off, needed only one trace pass. Consistent with Finding #42's own precedent, the corrected shallower holes make blasts genuinely more violent, which only helps rather than hurts this file's own "ecological collapse" premise: `levelEndReason:'ecological_shutdown'` fires for real at tick 184, and by the file's end all 7 hired employees are dead. Separately (not part of this finding, already correctly handled): 2 of the file's 6 blast cycles request explosive amounts outside the given explosive's valid range (12kg and 15kg krackle against a real [1-10kg] limit) — genuine, pre-existing, deliberate authoring choices matching the file's own "no mitigation" premise, already documented in this file's own step descriptions from the #479 pass. The charge validation correctly rejects both, `sequence` still reports its nominal hole count (it doesn't check charge state), and the following `blast` fails outright with "Invalid plan: Missing charge" on every hole — `stats` confirms exactly 4 of 6 attempted cycles actually detonated. This file's `expect` blocks assert that non-firing outcome directly (chargedCount:0, unchanged holeCount) rather than treating it as something to fix. This is also the first file this session whose step descriptions already carried thorough, accurate documentation of the locked-level cascade (referencing Finding #24 by number) predating this pass entirely — confirms the #479 conversion pass did real, careful diagnostic work on this file already, this pass only needed to add `expect` on top of it.
 
 _(Add new findings here as you hit them. Number sequentially.)_
 
@@ -1932,3 +1946,27 @@ got, whether main was merged, and whether GitHub Actions is back up yet.
   whether any already-completed file's tick steps silently absorbed an
   auto-resolving event without the session noticing, since "No events
   fired" isn't proof nothing happened to cash.
+- 2026-08-07 (cont.) — level3-playthrough-ecology.json done (**Finding
+  #61**, Batch 7 13/19), the cleanest fix of the batch so far. All 6
+  `drill_plan grid` steps already declared the real default spacing
+  (3) — the first file this session to get that part right without
+  a fix — so only depth needed the Ground rule #15/#42 correction;
+  applied proactively to all 6 before tracing, and it held on the
+  first pass with no iteration. This file's own step descriptions,
+  written during the #479 pass, already carried thorough, accurate
+  documentation of the locked-level cascade (naming Finding #24
+  directly) — the first file this session where that prior work was
+  visibly careful enough to need no re-derivation at all, just
+  `expect` blocks on top. The named ecological-shutdown outcome is
+  completely real: fires at tick 184, all 7 employees dead by the
+  file's end. 2 of 6 blast cycles deliberately request out-of-range
+  explosive amounts (already documented, matching the file's own "no
+  mitigation" premise) and correctly never detonate — asserted as the
+  real non-firing outcome rather than treated as something to fix.
+  Verified: JSON valid, `scenario-defs.test.ts` green (3088 tests),
+  full local sweep green (typecheck, 124/124 scenarios, 8328/8328
+  tests), command mode passes, interaction mode passes twice for
+  determinism (107/107 steps each, ~40s per run). GitHub Actions
+  still down for this branch — all verification remains local. Next:
+  the remaining 6 Batch 7 files (level3-playthrough-win next), then
+  the depth-mismatch audit before Phase 3.
