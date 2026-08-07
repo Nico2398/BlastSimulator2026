@@ -20,8 +20,8 @@
       }
     },
     {
-      "command": "drill_plan grid rows:3 cols:4 spacing:5 depth:8 start:20,20",
-      "description": "Two increment clicks on the spacing stepper (data-field=\"spacing\") raise it 3->5m (DEFAULT_SPACING_M, Drill.ts) before dragging, so the (20,20)-(35,30) rectangle computes the declared 4x3 instead of the default-spacing 6x4 (issue #479 follow-up, Finding #4).",
+      "command": "drill_plan grid rows:3 cols:4 spacing:5 depth:6 start:20,20",
+      "description": "Two increment clicks on the spacing stepper (data-field=\"spacing\") raise it 3->5m (DEFAULT_SPACING_M, Drill.ts) before dragging, so the (20,20)-(35,30) rectangle computes the declared 4x3 instead of the default-spacing 6x4 (issue #479 follow-up, Finding #4). depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -117,7 +117,7 @@
           "command": "charge hole:H1 explosive:boomite amount:8 stemming:3"
         }
       ],
-      "description": "charge hole:H1 explosive:boomite amount:8 stemming:3 — no per-hole charging in the UI by design (Finding #10). Left as a command."
+      "description": "charge hole:H1 explosive:boomite amount:8 stemming:3 \u2014 no per-hole charging in the UI by design (Finding #10). Left as a command."
     },
     {
       "command": "charge hole:H2 explosive:boomite amount:3 stemming:1",
@@ -127,7 +127,7 @@
           "command": "charge hole:H2 explosive:boomite amount:3 stemming:1"
         }
       ],
-      "description": "charge hole:H2 explosive:boomite amount:3 stemming:1 — no per-hole charging in the UI by design (Finding #10). Left as a command."
+      "description": "charge hole:H2 explosive:boomite amount:3 stemming:1 \u2014 no per-hole charging in the UI by design (Finding #10). Left as a command."
     },
     {
       "command": "sequence auto delay_step:25",
@@ -156,7 +156,7 @@
           "command": "sequence set hole:H1 delay:0"
         }
       ],
-      "description": "sequence set hole:H1 delay:0 — per-hole delay only reachable via relative +/- steppers, not a set-to-value click (Finding #9). Left as a command."
+      "description": "sequence set hole:H1 delay:0 \u2014 per-hole delay only reachable via relative +/- steppers, not a set-to-value click (Finding #9). Left as a command."
     },
     {
       "command": "sequence set hole:H6 delay:100",
@@ -166,7 +166,7 @@
           "command": "sequence set hole:H6 delay:100"
         }
       ],
-      "description": "sequence set hole:H6 delay:100 — per-hole delay only reachable via relative +/- steppers, not a set-to-value click (Finding #9). Left as a command."
+      "description": "sequence set hole:H6 delay:100 \u2014 per-hole delay only reachable via relative +/- steppers, not a set-to-value click (Finding #9). Left as a command."
     },
     {
       "command": "sequence show",
