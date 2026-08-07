@@ -49,6 +49,17 @@ describe('SandboxPanel', () => {
 
   const control = (key: string) => document.getElementById(`bs-sandbox-${key}`);
 
+  /** Selects a biome then a difficulty the way a player clicking through the form would. */
+  function selectBiomeAndDifficulty(biome: string, difficulty: string): void {
+    const biomeSelect = control('biome') as HTMLSelectElement;
+    biomeSelect.value = biome;
+    biomeSelect.dispatchEvent(new Event('change'));
+
+    const difficultySelect = control('difficulty') as HTMLSelectElement;
+    difficultySelect.value = difficulty;
+    difficultySelect.dispatchEvent(new Event('change'));
+  }
+
   it('starts hidden and shows on demand', () => {
     expect(panel.visible).toBe(false);
     panel.show();
@@ -152,13 +163,7 @@ describe('SandboxPanel', () => {
 
   it('reroll changes only the seed, leaving biome and difficulty untouched', () => {
     panel.show();
-    const biomeSelect = control('biome') as HTMLSelectElement;
-    biomeSelect.value = 'alpine_granite';
-    biomeSelect.dispatchEvent(new Event('change'));
-
-    const difficultySelect = control('difficulty') as HTMLSelectElement;
-    difficultySelect.value = 'hard';
-    difficultySelect.dispatchEvent(new Event('change'));
+    selectBiomeAndDifficulty('alpine_granite', 'hard');
 
     const seed = control('seed') as HTMLInputElement;
     const seedBefore = seed.value;
@@ -192,13 +197,7 @@ describe('SandboxPanel', () => {
     panel.setOnStart((c) => { got = c; });
     panel.show();
 
-    const biomeSelect = control('biome') as HTMLSelectElement;
-    biomeSelect.value = 'tropical_karst';
-    biomeSelect.dispatchEvent(new Event('change'));
-
-    const difficultySelect = control('difficulty') as HTMLSelectElement;
-    difficultySelect.value = 'easy';
-    difficultySelect.dispatchEvent(new Event('change'));
+    selectBiomeAndDifficulty('tropical_karst', 'easy');
 
     const seed = control('seed') as HTMLInputElement;
     seed.value = '999';
@@ -230,13 +229,7 @@ describe('SandboxPanel', () => {
     // The seed is documented to reroll on every show() (#504), but biome and
     // difficulty are not — an edit there must survive re-opening the panel.
     panel.show();
-    const biomeSelect = control('biome') as HTMLSelectElement;
-    biomeSelect.value = 'alpine_granite';
-    biomeSelect.dispatchEvent(new Event('change'));
-
-    const difficultySelect = control('difficulty') as HTMLSelectElement;
-    difficultySelect.value = 'hard';
-    difficultySelect.dispatchEvent(new Event('change'));
+    selectBiomeAndDifficulty('alpine_granite', 'hard');
 
     panel.hide();
     panel.show();
