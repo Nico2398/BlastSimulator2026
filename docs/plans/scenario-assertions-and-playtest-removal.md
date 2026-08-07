@@ -708,7 +708,13 @@ the Ground rule #15 depth fix proactively this time, but the file's
 premise still doesn't hold — `wellBeing` only ever rises from
 undispatched, unharmed hires, so revolt is structurally unreachable,
 not just under-ticked; described the real trajectory instead) ·
-⬜ level1-playthrough-revolt · ⬜ level1-playthrough-win ·
+✅ level1-playthrough-revolt (**Finding #44** — see the findings log;
+named for revolt but the real, deterministic loss is bankruptcy from
+7 up-front hires with zero income anywhere in the file — the first
+file this project hit with a real, observed mid-trace random event,
+handled via Finding #34's class plus a `Bankruptcy.ts` read proving
+the 100-tick grace countdown completes regardless of the event's
+exact timing) · ⬜ level1-playthrough-win ·
 ⬜ level1-win-conservative · ⬜ level1-win-efficient ·
 ⬜ level2-playthrough-bankruptcy · ⬜ level2-playthrough-win ·
 ⬜ level3-playthrough-ecology · ⬜ level3-playthrough-win ·
@@ -969,6 +975,8 @@ of each session, in case main added/removed a file.)
 42. **A new sub-class of Finding #3/#4, caught only by a real interaction-mode run on `level1-lose-ecology.json`: the Drill panel's real click ignores a scenario's declared `depth:`, not just its row/col/spacing.** Every prior grid-spacing fix this project only ever checked hole COUNT (rows×cols matching what `round(dragSize/DEFAULT_SPACING_M)+1` produces) — this file was the first whose `drill_plan grid` command already had the *right* spacing (3, matching `DEFAULT_SPACING_M`) but the *wrong* depth (12, vs. the Drill panel's own `DEFAULT_DEPTH_M=6`, `Drill.ts`) — a mismatch hole-count alone can never catch, since depth doesn't affect how many holes exist. Caught only because this file asserts exact ecology scores after each blast: command mode's depth:12 trace showed ecology dropping 50→48.99 on the first blast, but the real interaction-mode run failed outright — `ecology should be 48.99 but is 14.469999999999999`. Investigated via a direct state-dump comparison (`holeCount`/hole positions matched exactly, 25 holes each, only `depth` differed, 6 vs. 12) tracing the actual mechanism: shallower holes with the same charge amount concentrate energy over less rock, producing far more violent fragmentation and projectile counts, which `recordVibration` (`ScoreManager.ts`, driven by `result.projectionCount` in `mining.ts`'s `blastCommand`) converts into ecology/nuisance damage. **Fixed** by correcting all 5 of this file's `drill_plan grid` commands from `depth:12` to `depth:6`, then re-deriving the entire back half of the file's assertions from a fresh trace — the corrected, more violent blasts drive ecology to exactly 0 after just the **second** blast (not the fifth), and — because `applyDecay` (`ScoreManager.ts`) never recovers a score sitting at exactly 0 — it stays pinned there for the rest of the file, deterministic and safe to hard-assert regardless of any later random event. The corrected trajectory also means the file's own *original* 160-tick budget is already enough to cross `ECOLOGICAL_SHUTDOWN_TICKS` (150 consecutive ticks at ecology≤0, `EcologicalDisaster.ts`) — the government shutdown this file is named for now fires for real, inside the file's existing structure, no added steps needed. **Open follow-up, not yet audited**: this depth-mismatch class could be silently present in any already-completed file whose `drill_plan grid` declares a `depth:` other than 6 — none of those files' hole-count-only grid-spacing fixes would have caught it, and most were protected only by accident (by not asserting anything depth-sensitive, like exact scores or `deathCount`, right after the affected blast). Worth a dedicated grep-and-recheck pass before Phase 3, not blocking Batch 7's remaining files.
 
 43. **`level1-lose-revolt.json`'s premise doesn't hold at all: `wellBeing` only ever rises, never falls, so `revolted` never flips true within any tick budget.** Applied the Finding #42/Ground rule #15 depth fix proactively this time (`depth:12`→`depth:6` on both `drill_plan grid` steps, before tracing at all, avoiding the wasted re-trace loop that hit `level1-lose-ecology.json`). Traced the full 110-tick file fresh: `avgMorale` (`events.ts`, averaged over `state.employees.employees[].morale`) starts and stays above 50 for all 6 hires — nobody is ever dispatched into harm, dismissed, or left starving — so `wbDelta += (avgMorale-50)*0.02` (`updateScores`) only ever pushes `wellBeing` up, climbing 50→99.95 by tick 70 and sitting flat at the ceiling for the remaining 40 ticks. This is a materially different case from Finding #42: there the trajectory was heading toward the named outcome and just needed a bug fixed to get there (or Finding #41, where the outcome was real but not the one named); here `wellBeing` is trending in the *opposite* direction from what a "neglect causes revolt" premise requires, so no amount of additional ticking could ever reach `REVOLT_TICKS` — the file cannot be fixed toward its own name, only accurately described. **No code change** — treated like Findings #20/#21/#26/#27/#41: `expect` blocks assert the real trajectory (`wellBeing` rising to a 99.95 ceiling, `revolted:false`, `levelEnded:false` through the full 110-tick budget), with a note on the final `campaign status` step naming the false premise directly. `deathCount` stays `0` throughout — unlike `tutorial-playthrough.json`'s Finding #40, neither blast's cleared zone overlaps any of the 6 hires. `ecology` still collapses to exactly 0 after the second (corrected, depth:6) blast, same mechanism as Finding #42, but is incidental here: the file's 110-tick budget never reaches `ECOLOGICAL_SHUTDOWN_TICKS` (150), so the collapse is asserted but doesn't end the level. Zero random events fire anywhere in the trace (every `event choose 0` reports no pending event), making the entire file deterministic and safe for exact `equals` assertions with no `decreased`/`increased` softening needed anywhere. Verified in both command mode and a real browser, both passing on the first run after the proactive depth fix.
+
+44. **`level1-playthrough-revolt.json` is named for worker revolt but its real, deterministic loss condition is bankruptcy — and a real random event genuinely fires partway through this file's 200-tick trace, the first file this project has hit where Finding #34's "four score fields become unsafe once an event could fire" class had to be applied against an *observed*, not just theoretical, firing.** Applied the Ground rule #15 depth fix proactively to all 4 `drill_plan grid` steps before tracing (10/12→6). The command-mode trace ran clean through 70 ticks with zero events (`avgMorale` stays comfortably above 50 for all 7 hires — same non-neglect mechanic as Finding #43 — so `wellBeing` climbs to its 99.95 ceiling and `revolted` never approaches true), then at tick 130 a real `weather_bad_forecast` event resolves (cash −8000, safety +6, wellBeing −4) — the first actually-observed mid-file random event in this project's scenario conversion, as opposed to the zero-event traces of Findings #41/#43 or the *theoretical* risk documented in Ground rule #12/Finding #34. Investigated whether this made the file's outcome itself uncertain across modes by reading `Bankruptcy.ts` directly: `BANKRUPTCY_THRESHOLD=5000`, `BANKRUPTCY_GRACE_TICKS=100` — cash must stay below $5000 for **100 consecutive ticks** (not a single threshold crossing) before bankruptcy fires, and the streak resets the instant cash recovers above the threshold. Because this file hires 7 employees up front and never opens a single contract or income source afterward, cash declines strictly monotonically (a fixed −4750 per completed 10-tick payday cycle, confirmed identical before and after the one event) — it first crosses below $5000 around tick ~76, over 50 ticks before the weather event even fires at tick 130, so the grace countdown is already running cleanly by the time the one observed event could possibly perturb it, and — since cash never recovers — the countdown is guaranteed to complete by tick ~176-180 regardless of whether that event fires, fires at a different tick, or a completely different event fires instead in a real interaction-mode run. **Fixed the test to describe this real trajectory rather than the named one**, following Finding #34's exact treatment: `equals`/`decreased` stay exact for `tickCount`/`holeCount`/`deathCount`/`employeeCount` throughout (unaffected by which score-event fires, verified against the applyDecay-floor reasoning from Finding #42/#43 but deliberately *not* extended to `ecology`/`nuisance` here even though they're pinned at 0 by the same mechanism — Finding #34 showed a real event can have totally unexpected side effects, e.g. destroying a building outright, so this file drops hard-asserts on all four score fields, not just the two under direct threat, the moment the observed event fires); `decreased:["cash"]` on every tick step from that point on (payroll never stops draining, always true regardless of event specifics); `bankrupt`/`levelEnded`/`levelEndReason:'bankruptcy'`/`revolted:false` asserted only at the file's final two steps, never at the exact tick command-mode happened to cross at (step 81), since that specific tick could shift by one block depending on the event's real timing even though the eventual outcome by tick 200 is robust. Verified in both command mode and a real browser; the browser run passed on the first attempt, consistent with (but not proof beyond) the monotonic-decline argument above. Deleted the scratch trace script (`scripts/check-playthrough-revolt.ts`) before running `typecheck`, having forgotten to on the first pass — re-confirms the established practice of deleting scratch scripts immediately after use, not just at end-of-session.
 
 _(Add new findings here as you hit them. Number sequentially.)_
 
@@ -1575,3 +1583,40 @@ got, whether main was merged, and whether GitHub Actions is back up yet.
   remains local. Next: the remaining 13 Batch 7 files
   (level1-playthrough-revolt next), then the depth-mismatch audit
   before Phase 3.
+- 2026-08-07 (cont.) — level1-playthrough-revolt.json done (**Finding
+  #44**, Batch 7 7/19). Applied the Ground rule #15 depth fix
+  proactively to all 4 `drill_plan grid` steps before tracing. Named
+  for revolt, but `wellBeing` climbs to its 99.95 ceiling instead of
+  falling (same non-neglect mechanic as Finding #43) — the real,
+  deterministic loss condition is bankruptcy: 7 up-front hires, zero
+  contracts or other income anywhere in the file, so cash declines
+  monotonically and crosses below $5000 around tick ~76. This is the
+  first file in the whole conversion where a real random event
+  genuinely fires mid-trace (`weather_bad_forecast` at tick 130,
+  cash -8000/safety +6/wellBeing -4) rather than the theoretical risk
+  Ground rule #12/Finding #34 describe or the zero-event traces of
+  Findings #41/#43. Read `Bankruptcy.ts` directly to check whether
+  this made the ending itself uncertain across modes:
+  `BANKRUPTCY_GRACE_TICKS=100` consecutive ticks below the $5000
+  threshold, streak resets on recovery — but this file's cash never
+  recovers once it crosses, and the crossing happens 50+ ticks before
+  the one observed event, so the grace countdown completes by
+  ~tick 180 regardless of the event's exact timing or presence.
+  Followed Finding #34's treatment exactly once the event fires:
+  dropped hard-asserts on all four score fields (not just the two the
+  event touches directly — Finding #34 showed a real event can have
+  totally unexpected side effects), kept `decreased:["cash"]` on every
+  later tick step (payroll never stops draining) plus exact
+  `tickCount`/`holeCount`/`deathCount`/`employeeCount` (unaffected by
+  which score-event fires), and deferred `bankrupt`/`levelEnded`/
+  `levelEndReason`/`revolted` to the file's final two steps rather
+  than the exact tick command-mode happened to cross bankruptcy at.
+  Verified in both command mode and a real browser, both passing on
+  the first run. Caught and fixed a leftover scratch trace script
+  (`scripts/check-playthrough-revolt.ts`) that broke `typecheck` on
+  the first sweep — deleted it, matching established practice. Full
+  local sweep green: typecheck, 124/124 scenarios, full test suite
+  (8328/8328). GitHub Actions still not re-checked this session — all
+  verification remains local. Next: the remaining 12 Batch 7 files
+  (level1-playthrough-win next), then the depth-mismatch audit before
+  Phase 3.

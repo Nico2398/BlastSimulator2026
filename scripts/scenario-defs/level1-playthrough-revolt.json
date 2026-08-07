@@ -10,7 +10,12 @@
           "command": "new_game seed:42"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -20,7 +25,12 @@
           "command": "campaign start level:dusty_hollow"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "time resume",
@@ -30,7 +40,12 @@
           "command": "time resume"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "scores",
@@ -40,7 +55,16 @@
           "command": "scores"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "ecology": 50,
+          "safety": 50,
+          "wellBeing": 50,
+          "nuisance": 50
+        }
+      }
     },
     {
       "command": "finances",
@@ -50,7 +74,12 @@
           "command": "finances"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "employee hire role:driller",
@@ -68,7 +97,13 @@
           "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 49000,
+          "employeeCount": 1
+        }
+      }
     },
     {
       "command": "employee hire role:driller",
@@ -82,7 +117,13 @@
           "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 48000,
+          "employeeCount": 2
+        }
+      }
     },
     {
       "command": "employee hire role:blaster",
@@ -96,7 +137,13 @@
           "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 46500,
+          "employeeCount": 3
+        }
+      }
     },
     {
       "command": "employee hire role:blaster",
@@ -110,7 +157,13 @@
           "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 45000,
+          "employeeCount": 4
+        }
+      }
     },
     {
       "command": "employee hire role:driver",
@@ -124,7 +177,13 @@
           "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 44200,
+          "employeeCount": 5
+        }
+      }
     },
     {
       "command": "employee hire role:surveyor",
@@ -138,7 +197,13 @@
           "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 43000,
+          "employeeCount": 6
+        }
+      }
     },
     {
       "command": "employee hire role:manager",
@@ -152,7 +217,13 @@
           "selector": "#bs-employee-panel [data-role=\"manager\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 41000,
+          "employeeCount": 7
+        }
+      }
     },
     {
       "command": "employee list",
@@ -162,7 +233,13 @@
           "command": "employee list"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 41000,
+          "employeeCount": 7
+        }
+      }
     },
     {
       "command": "state full",
@@ -172,7 +249,15 @@
           "command": "state full"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 41000,
+          "employeeCount": 7,
+          "holeCount": 0,
+          "deathCount": 0
+        }
+      }
     },
     {
       "command": "tick 5",
@@ -182,7 +267,14 @@
           "command": "tick 5"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 5,
+          "cash": 41000,
+          "wellBeing": 50.95000000000002
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -202,7 +294,14 @@
           "command": "tick 5"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 10,
+          "cash": 36250,
+          "wellBeing": 52.400000000000034
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -222,10 +321,20 @@
           "command": "scores"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "tickCount": 10,
+          "cash": 36250,
+          "ecology": 50,
+          "safety": 50,
+          "wellBeing": 52.400000000000034,
+          "nuisance": 50
+        }
+      }
     },
     {
-      "command": "drill_plan grid rows:4 cols:4 spacing:3 depth:10 start:5,5",
+      "command": "drill_plan grid rows:4 cols:4 spacing:3 depth:6 start:5,5",
       "interaction": [
         {
           "type": "clickSelector",
@@ -258,7 +367,12 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 16
+        }
+      }
     },
     {
       "command": "charge hole:* explosive:krackle amount:8 stemming:1",
@@ -308,7 +422,16 @@
           "selector": "[data-action=\"report-close\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "ecology": 32.16,
+          "nuisance": 5.399999999999999,
+          "cash": 36250,
+          "deathCount": 0
+        }
+      }
     },
     {
       "command": "state full",
@@ -318,7 +441,16 @@
           "command": "state full"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "ecology": 32.16,
+          "nuisance": 5.399999999999999,
+          "deathCount": 0,
+          "employeeCount": 7
+        }
+      }
     },
     {
       "command": "scores",
@@ -328,7 +460,15 @@
           "command": "scores"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "ecology": 32.16,
+          "safety": 50,
+          "wellBeing": 52.400000000000034,
+          "nuisance": 5.399999999999999
+        }
+      }
     },
     {
       "command": "tick 5",
@@ -338,7 +478,16 @@
           "command": "tick 5"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 15,
+          "ecology": 32.40999999999998,
+          "wellBeing": 54.350000000000044,
+          "nuisance": 5.649999999999998,
+          "cash": 36250
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -358,7 +507,16 @@
           "command": "tick 5"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 20,
+          "cash": 31500,
+          "ecology": 32.65999999999997,
+          "wellBeing": 56.80000000000006,
+          "nuisance": 5.899999999999997
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -378,10 +536,20 @@
           "command": "scores"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "tickCount": 20,
+          "cash": 31500,
+          "ecology": 32.65999999999997,
+          "safety": 50,
+          "wellBeing": 56.80000000000006,
+          "nuisance": 5.899999999999997
+        }
+      }
     },
     {
-      "command": "drill_plan grid rows:5 cols:4 spacing:3 depth:12 start:15,5",
+      "command": "drill_plan grid rows:5 cols:4 spacing:3 depth:6 start:15,5",
       "interaction": [
         {
           "type": "clickSelector",
@@ -410,7 +578,12 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 20
+        }
+      }
     },
     {
       "command": "charge hole:* explosive:krackle amount:10 stemming:1",
@@ -460,7 +633,16 @@
           "selector": "[data-action=\"report-close\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "ecology": 7.149999999999967,
+          "nuisance": 0,
+          "cash": 31500,
+          "deathCount": 0
+        }
+      }
     },
     {
       "command": "state full",
@@ -470,7 +652,16 @@
           "command": "state full"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "ecology": 7.149999999999967,
+          "nuisance": 0,
+          "deathCount": 0,
+          "employeeCount": 7
+        }
+      }
     },
     {
       "command": "scores",
@@ -480,7 +671,15 @@
           "command": "scores"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "ecology": 7.149999999999967,
+          "safety": 50,
+          "wellBeing": 56.80000000000006,
+          "nuisance": 0
+        }
+      }
     },
     {
       "command": "tick 10",
@@ -490,7 +689,16 @@
           "command": "tick 10"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 30,
+          "cash": 26750,
+          "ecology": 7.649999999999965,
+          "wellBeing": 63.20000000000009,
+          "nuisance": 0
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -510,7 +718,16 @@
           "command": "tick 10"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 40,
+          "cash": 22000,
+          "ecology": 8.149999999999965,
+          "wellBeing": 71.60000000000011,
+          "nuisance": 0
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -530,7 +747,16 @@
           "command": "tick 10"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 50,
+          "cash": 17250,
+          "ecology": 8.649999999999972,
+          "wellBeing": 81.10000000000014,
+          "nuisance": 0
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -550,10 +776,20 @@
           "command": "scores"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "tickCount": 50,
+          "cash": 17250,
+          "ecology": 8.649999999999972,
+          "safety": 50,
+          "wellBeing": 81.10000000000014,
+          "nuisance": 0
+        }
+      }
     },
     {
-      "command": "drill_plan grid rows:4 cols:5 spacing:3 depth:10 start:5,15",
+      "command": "drill_plan grid rows:4 cols:5 spacing:3 depth:6 start:5,15",
       "interaction": [
         {
           "type": "clickSelector",
@@ -582,7 +818,12 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 20
+        }
+      }
     },
     {
       "command": "charge hole:* explosive:krackle amount:8 stemming:1",
@@ -632,7 +873,16 @@
           "selector": "[data-action=\"report-close\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "ecology": 0,
+          "nuisance": 0,
+          "cash": 17250,
+          "deathCount": 0
+        }
+      }
     },
     {
       "command": "state full",
@@ -642,7 +892,16 @@
           "command": "state full"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "ecology": 0,
+          "nuisance": 0,
+          "deathCount": 0,
+          "employeeCount": 7
+        }
+      }
     },
     {
       "command": "scores",
@@ -652,7 +911,15 @@
           "command": "scores"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "ecology": 0,
+          "safety": 50,
+          "wellBeing": 81.10000000000014,
+          "nuisance": 0
+        }
+      }
     },
     {
       "command": "tick 10",
@@ -662,7 +929,16 @@
           "command": "tick 10"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 60,
+          "cash": 12500,
+          "wellBeing": 90.60000000000016,
+          "ecology": 0,
+          "nuisance": 0
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -682,7 +958,16 @@
           "command": "tick 10"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 70,
+          "cash": 7750,
+          "wellBeing": 99.95,
+          "ecology": 0,
+          "nuisance": 0
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -702,7 +987,16 @@
           "command": "tick 10"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 80,
+          "cash": 3000,
+          "wellBeing": 99.95,
+          "ecology": 0,
+          "nuisance": 0
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -722,10 +1016,20 @@
           "command": "scores"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "tickCount": 80,
+          "cash": 3000,
+          "ecology": 0,
+          "safety": 50,
+          "wellBeing": 99.95,
+          "nuisance": 0
+        }
+      }
     },
     {
-      "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:12 start:15,15",
+      "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:6 start:15,15",
       "interaction": [
         {
           "type": "clickSelector",
@@ -754,7 +1058,12 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 25
+        }
+      }
     },
     {
       "command": "charge hole:* explosive:krackle amount:10 stemming:1",
@@ -804,7 +1113,16 @@
           "selector": "[data-action=\"report-close\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "ecology": 0,
+          "nuisance": 0,
+          "cash": 3000,
+          "deathCount": 0
+        }
+      }
     },
     {
       "command": "state full",
@@ -814,7 +1132,16 @@
           "command": "state full"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "ecology": 0,
+          "nuisance": 0,
+          "deathCount": 0,
+          "employeeCount": 7
+        }
+      }
     },
     {
       "command": "scores",
@@ -824,7 +1151,15 @@
           "command": "scores"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "ecology": 0,
+          "safety": 50,
+          "wellBeing": 99.95,
+          "nuisance": 0
+        }
+      }
     },
     {
       "command": "tick 10",
@@ -834,7 +1169,16 @@
           "command": "tick 10"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 90,
+          "cash": -1750,
+          "wellBeing": 99.95,
+          "ecology": 0,
+          "nuisance": 0
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -854,7 +1198,16 @@
           "command": "tick 10"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 100,
+          "cash": -6500,
+          "wellBeing": 99.95,
+          "ecology": 0,
+          "nuisance": 0
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -874,7 +1227,16 @@
           "command": "tick 10"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 110,
+          "cash": -11250,
+          "wellBeing": 99.95,
+          "ecology": 0,
+          "nuisance": 0
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -894,7 +1256,16 @@
           "command": "tick 10"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 120,
+          "cash": -16000,
+          "wellBeing": 99.95,
+          "ecology": 0,
+          "nuisance": 0
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -914,7 +1285,18 @@
           "command": "tick 10"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 130,
+          "cash": -20750,
+          "wellBeing": 99.95,
+          "ecology": 0,
+          "safety": 50,
+          "nuisance": 0
+        },
+        "note": "last checkpoint before the region where a real random event fires in the command-mode trace (next event choose 0 step) -- see that step's description and Finding #44."
+      }
     },
     {
       "command": "event choose 0",
@@ -924,7 +1306,7 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15). In the command-mode trace this one resolves a real event (weather_bad_forecast: cash -8000, safety +6, wellBeing -4) -- from here on, cash/safety/wellBeing/ecology/nuisance are no longer hard-asserted exactly, since interaction mode's real wall-clock ticking (Ground rule #12) could shift whether/when this fires, the same class Finding #34 already established (scores-display-visual.json). Structural fields (tickCount, holeCount, deathCount, employeeCount) are unaffected and stay exact (Finding #44)."
     },
     {
       "command": "tick 10",
@@ -934,137 +1316,17 @@
           "command": "tick 10"
         }
       ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "event choose 0"
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "tickCount": 140,
+          "deathCount": 0,
+          "employeeCount": 7
         }
-      ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
-    },
-    {
-      "command": "scores",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "scores"
-        }
-      ],
-      "role": "observe"
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "event choose 0"
-        }
-      ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "event choose 0"
-        }
-      ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "event choose 0"
-        }
-      ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "event choose 0"
-        }
-      ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "event choose 0"
-        }
-      ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup"
+      }
     },
     {
       "command": "event choose 0",
@@ -1084,7 +1346,217 @@
           "command": "scores"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "tickCount": 140,
+          "deathCount": 0,
+          "employeeCount": 7
+        },
+        "note": "cash/ecology/safety/wellBeing/nuisance intentionally not asserted from here on -- see step 71's description and Finding #44."
+      }
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "tickCount": 150,
+          "deathCount": 0,
+          "employeeCount": 7
+        }
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "tickCount": 160,
+          "deathCount": 0,
+          "employeeCount": 7
+        }
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "tickCount": 170,
+          "deathCount": 0,
+          "employeeCount": 7
+        }
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "tickCount": 180,
+          "deathCount": 0,
+          "employeeCount": 7
+        },
+        "note": "command-mode trace shows bankrupt flips true here (levelEndReason: 'bankruptcy') but that is not hard-asserted at this exact step -- the earlier event's uncertain timing (step 71) could shift which 10-tick block crosses the bankruptcy grace countdown by one block either way. Asserted instead at the file's final step, where it is robust regardless: BANKRUPTCY_GRACE_TICKS=100 consecutive ticks below the $5000 threshold (Bankruptcy.ts), and this file's cash declines monotonically with zero income sources anywhere, so the countdown that starts around tick ~76 completes by tick 200 no matter when the one weather event's extra -$8000 lands (Finding #44)."
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "tickCount": 190,
+          "deathCount": 0,
+          "employeeCount": 7
+        }
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "tickCount": 200,
+          "deathCount": 0,
+          "employeeCount": 7
+        }
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "tickCount": 200,
+          "deathCount": 0,
+          "employeeCount": 7,
+          "bankrupt": true,
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy",
+          "revolted": false
+        }
+      }
     },
     {
       "command": "finances",
@@ -1094,7 +1566,13 @@
           "command": "finances"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "bankrupt": true,
+          "tickCount": 200
+        }
+      }
     },
     {
       "command": "stats",
@@ -1104,7 +1582,13 @@
           "command": "stats"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "tickCount": 200,
+          "employeeCount": 7
+        }
+      }
     },
     {
       "command": "campaign status",
@@ -1114,7 +1598,19 @@
           "command": "campaign status"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 200,
+          "deathCount": 0,
+          "employeeCount": 7,
+          "bankrupt": true,
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy",
+          "revolted": false
+        },
+        "note": "confirms the file's own premise doesn't hold: named for worker revolt, but revolted stays false throughout -- wellBeing never gets low enough (it spends the file between 50 and 99.95, only mildly declining near the very end, nowhere near a sustained-low band; see WorkerRevolt.ts). The real, deterministic loss condition is bankruptcy: hiring 7 employees up front with zero contracts or other income anywhere in the file drains cash below the $5000 threshold around tick ~76, and BANKRUPTCY_GRACE_TICKS=100 consecutive ticks below that threshold (Bankruptcy.ts) triggers game-over ~100 ticks later -- independent of which random events fire in between, since this file's cash never recovers once it crosses (Finding #44)."
+      }
     }
   ]
 }
