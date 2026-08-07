@@ -11,7 +11,16 @@
           "command": "new_game seed:42"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "wellBeing": 50,
+          "safety": 50,
+          "ecology": 50,
+          "nuisance": 50
+        }
+      }
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -21,7 +30,12 @@
           "command": "campaign start level:dusty_hollow"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "time resume",
@@ -69,7 +83,13 @@
           "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "employeeCount": 1
+        }
+      }
     },
     {
       "command": "employee hire role:blaster",
@@ -83,7 +103,13 @@
           "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "employeeCount": 2
+        }
+      }
     },
     {
       "command": "employee hire role:driver",
@@ -97,17 +123,28 @@
           "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "employeeCount": 3
+        }
+      }
     },
     {
       "command": "tick 10",
+      "description": "Payroll and the three hiring costs together drive the expense breakdown this file exists to demonstrate.",
       "interaction": [
         {
           "type": "command",
           "command": "tick 10"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash"],
+        "increased": ["wellBeing"]
+      }
     },
     {
       "command": "event choose 0",
@@ -145,7 +182,13 @@
           "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "vehicleCount": 1
+        }
+      }
     },
     {
       "command": "build freight_warehouse at:25,25",
@@ -175,17 +218,28 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "buildingCount": 1
+        }
+      }
     },
     {
       "command": "tick 10",
+      "description": "Maintenance and vehicle fuel/upkeep join payroll in the expense breakdown from here on.",
       "interaction": [
         {
           "type": "command",
           "command": "tick 10"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash"],
+        "increased": ["wellBeing"]
+      }
     },
     {
       "command": "event choose 0",
@@ -233,7 +287,12 @@
           "selector": "#bs-contract-panel .bs-contract-accept"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "activeContractCount": 1
+        }
+      }
     },
     {
       "command": "tick 5",
@@ -243,7 +302,14 @@
           "command": "tick 5"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash"],
+        "increased": ["wellBeing"],
+        "equals": {
+          "activeContractCount": 1
+        }
+      }
     },
     {
       "command": "finances",
@@ -273,7 +339,15 @@
           "command": "state full"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "employeeCount": 3,
+          "vehicleCount": 1,
+          "buildingCount": 1,
+          "activeContractCount": 1
+        }
+      }
     }
   ],
   "shots": [
