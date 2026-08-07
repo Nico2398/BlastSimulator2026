@@ -30,13 +30,14 @@ import type { MiningContext } from '../../src/console-api.js';
  * tracks the minimum across the roster — the employee closest to collapse
  * — not the maximum. storedMassKg (LogisticsState) closes the same gap for
  * warehouse storage — a scenario proving a hauled fragment actually got
- * delivered had no field to check before this.
+ * delivered had no field to check before this. surveyCount
+ * (state.surveyResults.length) closes the same gap for surveys.
  */
 const SERIALIZED_FIELDS = [
   'seed', 'time', 'tickCount', 'isPaused', 'mineType',
   'worldSizeX', 'worldSizeZ', 'worldMinX', 'worldMinZ',
   'drillHoles', 'chargesByHole', 'sequenceDelays', 'finances', 'holeCount', 'chargedCount',
-  'sequencedCount', 'buildingCount', 'vehicleCount', 'employeeCount',
+  'sequencedCount', 'surveyCount', 'buildingCount', 'vehicleCount', 'employeeCount',
   'qualificationCount', 'proficiencyTotal', 'trainingCount', 'collapsedCount', 'minFatigue',
   'levelEnded', 'levelEndReason', 'bankrupt', 'revolted', 'ecologicalShutdown',
   'arrested', 'cash', 'profit', 'wellBeing', 'safety', 'ecology', 'nuisance', 'muckPile',
@@ -150,6 +151,23 @@ describe('console-api', () => {
 
       expect(state.minFatigue).toBe(100);
       expect(state.collapsedCount).toBe(0);
+    });
+
+    it('reports zero surveyCount for a fresh game with no surveys run', () => {
+      runner.runner.run('new_game mine_type:desert seed:42');
+      const state = serializeGameState(runner.ctx as MiningContext)!;
+
+      expect(state.surveyCount).toBe(0);
+    });
+
+    it('counts a completed survey once the surveyor has walked there and finished (arrival-gated, #437)', () => {
+      runner.runner.run('new_game mine_type:desert seed:42');
+      runner.runner.run('employee hire role:surveyor');
+      runner.runner.run('survey seismic x:20 z:20');
+      runner.runner.run('tick 50');
+      const state = serializeGameState(runner.ctx as MiningContext)!;
+
+      expect(state.surveyCount).toBe(1);
     });
 
     it('reports zero storedMassKg for a fresh game with nothing hauled', () => {

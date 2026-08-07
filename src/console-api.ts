@@ -32,6 +32,8 @@ export interface SerializableGameState {
   holeCount: number;
   chargedCount: number;
   sequencedCount: number;
+  /** Completed survey results (SurveyResult[], state.surveyResults). */
+  surveyCount: number;
   buildingCount: number;
   vehicleCount: number;
   employeeCount: number;
@@ -83,6 +85,7 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     holeCount: s.drillHoles.length,
     chargedCount: Object.keys(s.chargesByHole).length,
     sequencedCount: Object.keys(s.sequenceDelays).length,
+    surveyCount: s.surveyResults.length,
     buildingCount: s.buildings.buildings.length,
     vehicleCount: s.vehicles.vehicles.length,
     employeeCount: s.employees.employees.length,

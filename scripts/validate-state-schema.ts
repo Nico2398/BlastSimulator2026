@@ -71,6 +71,7 @@ export const GAME_STATE_SCHEMA: Schema = {
   holeCount: { type: 'number' },
   chargedCount: { type: 'number' },
   sequencedCount: { type: 'number' },
+  surveyCount: { type: 'number', description: 'Completed survey results (state.surveyResults.length)' },
   buildingCount: { type: 'number' },
   vehicleCount: { type: 'number' },
   employeeCount: { type: 'number' },

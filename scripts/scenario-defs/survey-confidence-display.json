@@ -10,7 +10,13 @@
           "command": "new_game seed:42"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "holeCount": 0
+        }
+      }
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -20,7 +26,10 @@
           "command": "campaign start level:dusty_hollow"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "increased": ["worldSizeX"]
+      }
     },
     {
       "command": "time resume",
@@ -48,7 +57,14 @@
           "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "employeeCount": 1,
+          "cash": 48800
+        },
+        "note": "HIRING_COSTS.surveyor = 1200 (balance.ts)"
+      }
     },
     {
       "command": "employee assign_skill 1 skill:geology level:5",
@@ -58,7 +74,13 @@
           "command": "employee assign_skill 1 skill:geology level:5"
         }
       ],
-      "description": "Test-only bootstrap, not a player action: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts, same for the UI hire button and this console command), so this only raises the level for the scenario's needs. No role tag -- there is no UI control for this and none should exist; the player-facing way to raise a skill is `employee train` at a training building. Command mode keeps running it unchanged; interaction mode keeps it as an unmarked (legacy) command step."
+      "description": "Test-only bootstrap, not a player action: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts, same for the UI hire button and this console command), so this only raises the level for the scenario's needs. No role tag -- there is no UI control for this and none should exist; the player-facing way to raise a skill is `employee train` at a training building. Command mode keeps running it unchanged; interaction mode keeps it as an unmarked (legacy) command step.",
+      "expect": {
+        "equals": {
+          "proficiencyTotal": 5
+        },
+        "note": "level:5 replaces the Rookie starting qualification's proficiency 1"
+      }
     },
     {
       "command": "employee hire role:surveyor",
@@ -72,7 +94,13 @@
           "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "employeeCount": 2,
+          "cash": 47600
+        }
+      }
     },
     {
       "command": "employee assign_skill 2 skill:geology level:1",
@@ -106,6 +134,7 @@
     },
     {
       "command": "survey seismic x:20 z:20",
+      "description": "Survey 1/4. Surveys are arrival-gated PendingActions (#437), not instant — the surveyor must walk to the site before the result completes, so surveyCount stays 0 through all 4 of these clicks. Each queued survey does cost its SURVEY_COSTS entry immediately, though, which is the real proof this click actually landed.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -136,10 +165,17 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "surveyCount": 0
+        }
+      }
     },
     {
       "command": "survey core_sample x:30 z:20",
+      "description": "Survey 2/4.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -166,10 +202,14 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"]
+      }
     },
     {
       "command": "survey aerial x:20 z:30",
+      "description": "Survey 3/4.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -196,10 +236,14 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"]
+      }
     },
     {
       "command": "survey seismic x:30 z:30",
+      "description": "Survey 4/4.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -226,7 +270,14 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "surveyCount": 0
+        },
+        "note": "all 4 surveys queued, none completed yet — confirms the arrival-gated system hasn't fired early"
+      }
     },
     {
       "command": "survey show",
@@ -256,7 +307,11 @@
           "command": "tick 53"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "increased": ["surveyCount"],
+        "note": "at least one of the 4 queued surveys has completed by now (a real run: 3/4 at exactly 53 ticks in command mode) — increased rather than an exact count, since new_game leaves isPaused:false and interaction mode's real wall-clock ticking (Finding #12) can complete more of them within the same click round-trip than command mode's headless tick 53 alone"
+      }
     },
     {
       "command": "event choose 0",
@@ -330,13 +385,20 @@
     },
     {
       "command": "survey show",
+      "description": "By now (53+8+8+8 = 77 ticks since the surveys were queued) all 4 must be done — 'No pending surveys.' in a real run.",
       "interaction": [
         {
           "type": "command",
           "command": "survey show"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "surveyCount": 4
+        },
+        "note": "exact equals is safe here even under Finding #12's real-time drift — 4 is a natural ceiling (only 4 surveys were ever queued), so extra ambient ticks in interaction mode can only get there sooner, never push the count past it"
+      }
     },
     {
       "command": "state full",

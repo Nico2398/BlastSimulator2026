@@ -129,6 +129,20 @@ deleted, not after.
     32748 expected vs 32769 actual, purely from the click round-trip's real
     elapsed time). Expect every `tick N`-heavy playthrough file in Batches
     5-7 to need this same treatment.
+14. **`survey <method> x:X z:Z` queues an arrival-gated `PendingAction`
+    (#437) — it does not complete on the same tick it's issued.** The
+    surveyor must walk to the site first; `surveyCount` (added this batch)
+    stays at its pre-survey value through the click/command itself, and only
+    grows once enough `tick`s pass for the walk + the method's own duration.
+    Cash for the survey's `SURVEY_COSTS` entry deducts immediately at
+    queue-time, though — `decreased: ["cash"]` is the right check on the
+    survey step itself; `increased`/`equals` on `surveyCount` belongs on a
+    later `tick N` step, and per ground rule #12, prefer `increased` mid-
+    pipeline and save an exact `equals` for a checkpoint where the count has
+    hit a natural ceiling (e.g. "4 surveys were queued, so `surveyCount: 4`
+    is safe once enough ticks have definitely passed for all of them" —
+    extra real-time ticks in interaction mode can only get there sooner,
+    never overshoot a value nothing can exceed).
 
 ## Mechanism (built, tested, proven — do not redesign)
 
@@ -282,8 +296,9 @@ state fields (wellBeing/safety/ecology/nuisance, collapsedCount/minFatigue,
 storedMassKg))
 
 ### Batch 3 — survey-* (12, survey-panel-visual done in Batch 0)
-⬜ survey-confidence-display · ⬜ survey-confidence-overlay ·
-⬜ survey-execution · ⬜ survey-method-selection ·
+✅ survey-confidence-display (exposed surveyCount, first file to establish
+the arrival-gated survey timing pattern — see ground rule #14) ·
+⬜ survey-confidence-overlay · ⬜ survey-execution · ⬜ survey-method-selection ·
 ⬜ survey-ore-vein-visibility · ⬜ survey-overlay-lifecycle ·
 ⬜ survey-post-blast-ore-report · ⬜ survey-result-visualization ·
 ⬜ survey-seismic-side-effects · ⬜ survey-stale-handling ·
