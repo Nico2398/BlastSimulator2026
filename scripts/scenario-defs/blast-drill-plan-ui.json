@@ -77,7 +77,7 @@
       "role": "observe"
     },
     {
-      "command": "drill_plan grid rows:2 cols:2 spacing:8 depth:10 start:20,20",
+      "command": "drill_plan grid rows:2 cols:2 spacing:8 depth:6 start:20,20",
       "interaction": [
         {
           "type": "clickSelector",
@@ -123,7 +123,7 @@
         }
       ],
       "role": "player",
-      "description": "drill_plan grid rows:2 cols:2 spacing:8 depth:10 start:20,20 BlastWorkshop auto-advances Drill -> Charge once holes exist, so re-using the grid tool needs an explicit click back to the Drill tab ([data-step=\"1\"]) first. The spacing stepper also carries its value over from the first grid above (now 5, not the 3m default) — 3 more increments reach this step's declared spacing:8 (round(8/8)+1=2 cols/rows, matching rows:2 cols:2) before dragging.",
+      "description": "drill_plan grid rows:2 cols:2 spacing:8 depth:6 start:20,20 BlastWorkshop auto-advances Drill -> Charge once holes exist, so re-using the grid tool needs an explicit click back to the Drill tab ([data-step=\"1\"]) first. The spacing stepper also carries its value over from the first grid above (now 5, not the 3m default) — 3 more increments reach this step's declared spacing:8 (round(8/8)+1=2 cols/rows, matching rows:2 cols:2) before dragging. depth corrected from 10 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. Only holeCount is asserted here (depth-insensitive), so this is a metadata-only correction.",
       "expect": {
         "equals": {
           "holeCount": 4
