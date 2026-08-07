@@ -534,7 +534,10 @@ Batch 5 needs-* group (9/9) done. Continuing with nav-*.
 ✅ nav-dynamic-updates-visual (1×1 grid blast then a vehicle move —
 holeCount/chargedCount/sequencedCount and cash asserted through the
 whole drill/charge/sequence/blast/vehicle pipeline, no findings) ·
-⬜ nav-move-costs-visual · ⬜ nav-path-following-visual ·
+✅ nav-move-costs-visual (1×3 grid, Finding #4 spacing-stepper fix
+needed; a vehicle then crosses the drill_hole row's different NavGrid
+cost — cash/holeCount/buildingCount/vehicleCount asserted throughout) ·
+⬜ nav-path-following-visual ·
 ⬜ nav-pathfinding-visual · ⬜ nav-ramp-routing-visual · ⬜ site-expansion
 
 ### Batch 6 — employee/economy/misc (18) — **+ training parity check**

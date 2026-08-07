@@ -10,7 +10,13 @@
           "command": "new_game seed:42"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "holeCount": 0
+        }
+      }
     },
     {
       "command": "drill_plan grid rows:1 cols:3 spacing:4 depth:6 start:5,5",
@@ -28,6 +34,10 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
+        },
+        {
           "type": "dragTiles",
           "x1": 5,
           "z1": 5,
@@ -42,7 +52,12 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 3
+        }
+      }
     },
     {
       "command": "build management_office at:2,2",
@@ -72,7 +87,13 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 42000,
+          "buildingCount": 1
+        }
+      }
     },
     {
       "command": "vehicle buy debris_hauler",
@@ -91,7 +112,13 @@
           "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 17000,
+          "vehicleCount": 1
+        }
+      }
     },
     {
       "command": "vehicle move 1 to:5,9",
@@ -101,7 +128,12 @@
           "command": "vehicle move 1 to:5,9"
         }
       ],
-      "description": "Left unmarked: no UI control drives this exact command and none should exist -- FleetPanel.ts only wires vehicle buy/driver/scrap to the console (grep confirms no `vehicle move`/`vehicle assign` call site anywhere in src/ui) -- vehicles move autonomously via task/haul assignment, never by a player teleporting one to a raw x,z."
+      "description": "Left unmarked: no UI control drives this exact command and none should exist -- FleetPanel.ts only wires vehicle buy/driver/scrap to the console (grep confirms no `vehicle move`/`vehicle assign` call site anywhere in src/ui) -- vehicles move autonomously via task/haul assignment, never by a player teleporting one to a raw x,z.",
+      "expect": {
+        "equals": {
+          "cash": 17000
+        }
+      }
     },
     {
       "command": "state full",
@@ -121,7 +153,11 @@
           "command": "tick 10"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash"],
+        "note": "vehicle list confirms real per-tick progress toward (5,9), crossing the drill_hole row's different NavGrid cost"
+      }
     },
     {
       "command": "state full",
