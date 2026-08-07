@@ -28,7 +28,9 @@
       ],
       "role": "setup",
       "expect": {
-        "increased": ["worldSizeX"]
+        "increased": [
+          "worldSizeX"
+        ]
       }
     },
     {
@@ -135,11 +137,13 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "surveyCount": 0
         },
-        "note": "arrival-gated (#437) — queued and paid for, not yet completed"
+        "note": "arrival-gated (#437) \u2014 queued and paid for, not yet completed"
       }
     },
     {
@@ -302,7 +306,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "surveyCount": 1
         }
@@ -439,7 +445,7 @@
       "role": "observe"
     },
     {
-      "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:20,20",
+      "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:6 start:20,20",
       "interaction": [
         {
           "type": "clickSelector",
@@ -481,7 +487,8 @@
         "equals": {
           "holeCount": 9
         }
-      }
+      },
+      "description": "depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged."
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
