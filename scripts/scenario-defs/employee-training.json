@@ -1,6 +1,6 @@
 {
   "name": "employee-training",
-  "description": "Chapter 3: Hire generalist employee, train drilling and geology skills, then complete a blast task",
+  "description": "Chapter 3: hire an employee, obtain a licence no role starts with (driving.excavator) and promote an already-held one (blasting) via real click-driven training -- the two proofs playtests/training.json's beats require -- then complete a blast task",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -10,7 +10,13 @@
           "command": "new_game seed:42"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "buildingCount": 0
+        }
+      }
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -20,7 +26,12 @@
           "command": "campaign start level:dusty_hollow"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "time resume",
@@ -48,27 +59,193 @@
           "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "employeeCount": 1,
+          "qualificationCount": 1,
+          "proficiencyTotal": 1
+        }
+      }
     },
     {
-      "command": "employee assign_skill id:1 skill:driving.excavator level:3",
+      "command": "build driving_center at:5,5",
+      "description": "Real UI training gap (parity with playtests/training.json, #479): driving.excavator belongs to no hiring role (ROLE_STARTING_QUALIFICATION), so a driving_center -- the only school that teaches it -- is the sole in-game path to ever holding it. Placed away from the drill grid below (15,15)-(20,20).",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"driving_center\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 5,
+          "z": 5
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "buildingCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee train 1 skill:driving.excavator",
+      "description": "Real click path: open the employee detail panel, confirm the excavator course is genuinely offered and clickable (#479's own concern -- \"if this control is missing or disabled with a school standing, the licence belongs to nobody\"), then enrol.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel .bs-detail-toggle"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel .bs-train-btn[data-skill=\"driving.excavator\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel .bs-train-btn[data-skill=\"driving.excavator\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "trainingCount": 1
+        }
+      }
+    },
+    {
+      "command": "tick 20",
+      "description": "TRAINING_BASE_TICKS(20) * TRAINING_LEVEL_COST_MULTIPLIER[1](1) * TRAINING_TIER_SPEED[1](1) -- the exact course length for a Tier-1 driving_center's first level.",
       "interaction": [
         {
           "type": "command",
-          "command": "employee assign_skill id:1 skill:driving.excavator level:3"
+          "command": "tick 20"
         }
       ],
-      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`."
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "trainingCount": 0,
+          "qualificationCount": 2
+        },
+        "note": "the excavator licence is genuinely obtained -- no role starts with it, so this is the only way anyone on the roster ever holds it"
+      }
     },
     {
-      "command": "employee assign_skill id:1 skill:geology level:2",
+      "command": "employee assign_skill 1 skill:geology level:2",
       "interaction": [
         {
           "type": "command",
-          "command": "employee assign_skill id:1 skill:geology level:2"
+          "command": "employee assign_skill 1 skill:geology level:2"
         }
       ],
-      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`."
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
+      "expect": {
+        "equals": {
+          "cash": 33240,
+          "qualificationCount": 3,
+          "proficiencyTotal": 4
+        }
+      }
+    },
+    {
+      "command": "build blasting_academy at:7,5",
+      "description": "The second half of #479's parity gap: prove a promotion (raising an already-held qualification above Rookie) is obtainable via real clicks too, not just a brand-new licence. Placed beside the driving_center, away from the drill grid.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"blasting_academy\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 7,
+          "z": 5
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "buildingCount": 2
+        }
+      }
+    },
+    {
+      "command": "employee train 1 skill:blasting",
+      "description": "Chuck Miner already holds blasting at Rookie (a driller's own ROLE_STARTING_QUALIFICATION) -- this course promotes it, the same control used for a brand-new licence above.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel .bs-train-btn[data-skill=\"blasting\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel .bs-train-btn[data-skill=\"blasting\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "trainingCount": 1
+        }
+      }
+    },
+    {
+      "command": "tick 32",
+      "description": "TRAINING_BASE_TICKS(20) * TRAINING_LEVEL_COST_MULTIPLIER[2](1.6) * TRAINING_TIER_SPEED[1](1) = 32 -- the exact course length to promote level 1 to 2.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 32"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "trainingCount": 0,
+          "qualificationCount": 3,
+          "proficiencyTotal": 5
+        },
+        "note": "a promotion raises the level of a held qualification rather than adding a second copy of it -- qualificationCount unchanged, proficiencyTotal +1"
+      }
     },
     {
       "command": "employee list",
@@ -81,7 +258,8 @@
       "role": "observe"
     },
     {
-      "command": "drill_plan grid rows:2 cols:2 spacing:5 depth:8 start:15,15",
+      "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:8 start:15,15",
+      "description": "Corrected from the original rows:2 cols:2 spacing:5 (which command mode ran literally, producing 4 holes): the click drags the (15,15)-(20,20) rectangle at the Drill panel's own default spacing (DEFAULT_SPACING_M=3), computing cols/rows as round(size/spacing)+1 = 3x3 = 9 holes for that same rectangle -- the command and the click were silently testing two different grids, the same class of bug already fixed in nav-cell-types-visual.json. Caught by adding expect.equals.holeCount; fixed by describing what the click actually produces.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -110,7 +288,12 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 9
+        }
+      }
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
@@ -120,7 +303,12 @@
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "chargedCount": 9
+        }
+      }
     },
     {
       "command": "sequence auto delay_step:25",
@@ -130,7 +318,12 @@
           "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "sequencedCount": 9
+        }
+      }
     },
     {
       "command": "blast",
@@ -156,7 +349,14 @@
           "selector": "[data-action=\"report-close\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        }
+      }
     },
     {
       "command": "fragments",
@@ -176,7 +376,13 @@
           "command": "state full"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "qualificationCount": 3,
+          "proficiencyTotal": 5
+        }
+      }
     }
   ]
 }
