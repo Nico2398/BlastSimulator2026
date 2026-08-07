@@ -24,26 +24,60 @@
           "command": "new_game seed:42 size:32"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "holeCount": 0
+        }
+      }
     },
     {
       "command": "drill_plan grid origin:10,10 rows:1 cols:1 spacing:3 depth:6",
       "timeout": 30,
-      "description": "Setup: a single hole, charged and sequenced — a complete, valid plan — bundled fixture setup; `sequence set` on the one hole isn't reachable as a precise click (Finding #9).",
+      "description": "Setup: a single hole — a complete, valid plan once charged and sequenced below. Split into one step per command (issue #479, same class as Finding #5 in the original #479 plan doc): the bundled 3-command interaction array only ever ran its first command in command mode, since command-runner.ts's runSteps executes step.command alone, not the interaction array.",
       "interaction": [
         {
           "type": "command",
           "command": "drill_plan grid origin:10,10 rows:1 cols:1 spacing:3 depth:6"
-        },
+        }
+      ],
+      "expect": {
+        "equals": {
+          "holeCount": 1
+        }
+      }
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:5kg stemming:2m",
+      "timeout": 30,
+      "interaction": [
         {
           "type": "command",
           "command": "charge hole:* explosive:boomite amount:5kg stemming:2m"
-        },
+        }
+      ],
+      "expect": {
+        "equals": {
+          "chargedCount": 1
+        }
+      }
+    },
+    {
+      "command": "sequence set hole:H1 delay:0ms",
+      "timeout": 30,
+      "description": "sequence set hole:H1 delay:0ms — per-hole delay only reachable via relative +/- steppers, not a set-to-value click (Finding #9). Left as a command.",
+      "interaction": [
         {
           "type": "command",
           "command": "sequence set hole:H1 delay:0ms"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "sequencedCount": 1
+        }
+      }
     },
     {
       "command": "state",
@@ -66,7 +100,10 @@
           "type": "screenshot"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "usable": "#bs-blast-panel [data-action=\"execute\"]"
+      }
     },
     {
       "command": "state",
@@ -89,7 +126,10 @@
           "type": "screenshot"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "usable": "[data-action=\"preflight-detonate\"]"
+      }
     },
     {
       "command": "blast",
@@ -112,7 +152,15 @@
           "type": "screenshot"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        },
+        "note": "a fired blast clears the plan back to zero"
+      }
     },
     {
       "command": "state",
@@ -131,7 +179,11 @@
           "type": "screenshot"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "blocked": "[data-action=\"report-close\"]",
+        "note": "the report modal must hide once closed, same invariant as BlastReportModal's other conversions"
+      }
     }
   ]
 }
