@@ -324,6 +324,9 @@ survey steps assert `surveyCount` at the prior rounds' ceiling directly) ·
 4th silently vanishes from the queue rather than executing; deterministic
 in both modes, root cause not chased down, filed as a follow-up; assertions
 use the real ceiling (3, not 4)**) ·
+✅ survey-overlay-lifecycle (**Finding #15 class: same positional-args
+assign_skill bug, fixed**; 2 surveyors split round-1's 2 surveys cleanly —
+no Finding #16 drop with 2 employees vs. 1 — plus Finding #4 grid check) ·
 ⬜ survey-ore-vein-visibility · ⬜ survey-overlay-lifecycle ·
 ⬜ survey-post-blast-ore-report · ⬜ survey-result-visualization ·
 ⬜ survey-seismic-side-effects · ⬜ survey-stale-handling ·
