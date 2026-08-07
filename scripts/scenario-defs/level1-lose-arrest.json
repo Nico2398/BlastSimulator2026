@@ -1,6 +1,6 @@
 {
   "name": "level1-lose-arrest",
-  "description": "Level 1 losing scenario: heavy corruption and mafia use, triggering criminal arrest",
+  "description": "Level 1 losing scenario: heavy corruption and mafia use, triggering criminal arrest. The full trajectory is more interesting than the name alone suggests: mafia smuggling's $8000/tick income (MafiaActions.ts's SMUGGLE_BASE_INCOME) is so lucrative that the level's own profit-threshold win condition fires first (levelEndReason:'completed' at tick 20) -- arrest doesn't happen until tick 50, by which point the level has already been won. Confirmed via direct trace; see the note on the second tick 10 step and the final campaign status step.",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -10,7 +10,12 @@
           "command": "new_game seed:42"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -20,7 +25,12 @@
           "command": "campaign start level:dusty_hollow"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "time resume",
@@ -30,7 +40,12 @@
           "command": "time resume"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "corrupt target:judge cost:5000",
@@ -40,7 +55,13 @@
           "command": "corrupt target:judge cost:5000"
         }
       ],
-      "description": "Left unmarked: ShadyPanel.ts's per-target \"Make the Call\" buttons and mafia service buttons carry no data-target/data-action scoping -- only plain text buttons distinguished by locale-dependent label text. Same class as Finding #8 (contract offer rows have no id-scoped selector): no stable selector exists to click a specific target, left as a command."
+      "description": "Left unmarked: ShadyPanel.ts's per-target \"Make the Call\" buttons and mafia service buttons carry no data-target/data-action scoping -- only plain text buttons distinguished by locale-dependent label text. Same class as Finding #8 (contract offer rows have no id-scoped selector): no stable selector exists to click a specific target, left as a command.",
+      "expect": {
+        "equals": {
+          "cash": 45000
+        },
+        "note": "the bribe's own success/scandal roll (attemptCorruption, corruptCommand -- events.ts) is RNG-driven and not asserted here, but the cost deduction (state.cash -= result.cost) happens unconditionally regardless of that roll, so cash is safe to assert exactly."
+      }
     },
     {
       "command": "corrupt target:inspector cost:5000",
@@ -50,7 +71,12 @@
           "command": "corrupt target:inspector cost:5000"
         }
       ],
-      "description": "Left unmarked: ShadyPanel.ts's per-target \"Make the Call\" buttons and mafia service buttons carry no data-target/data-action scoping -- only plain text buttons distinguished by locale-dependent label text. Same class as Finding #8 (contract offer rows have no id-scoped selector): no stable selector exists to click a specific target, left as a command."
+      "description": "Left unmarked: ShadyPanel.ts's per-target \"Make the Call\" buttons and mafia service buttons carry no data-target/data-action scoping -- only plain text buttons distinguished by locale-dependent label text. Same class as Finding #8 (contract offer rows have no id-scoped selector): no stable selector exists to click a specific target, left as a command.",
+      "expect": {
+        "equals": {
+          "cash": 40000
+        }
+      }
     },
     {
       "command": "corrupt target:union_leader cost:5000",
@@ -60,7 +86,12 @@
           "command": "corrupt target:union_leader cost:5000"
         }
       ],
-      "description": "Left unmarked: ShadyPanel.ts's per-target \"Make the Call\" buttons and mafia service buttons carry no data-target/data-action scoping -- only plain text buttons distinguished by locale-dependent label text. Same class as Finding #8 (contract offer rows have no id-scoped selector): no stable selector exists to click a specific target, left as a command."
+      "description": "Left unmarked: ShadyPanel.ts's per-target \"Make the Call\" buttons and mafia service buttons carry no data-target/data-action scoping -- only plain text buttons distinguished by locale-dependent label text. Same class as Finding #8 (contract offer rows have no id-scoped selector): no stable selector exists to click a specific target, left as a command.",
+      "expect": {
+        "equals": {
+          "cash": 35000
+        }
+      }
     },
     {
       "command": "corrupt target:politician cost:5000",
@@ -70,7 +101,12 @@
           "command": "corrupt target:politician cost:5000"
         }
       ],
-      "description": "Left unmarked: ShadyPanel.ts's per-target \"Make the Call\" buttons and mafia service buttons carry no data-target/data-action scoping -- only plain text buttons distinguished by locale-dependent label text. Same class as Finding #8 (contract offer rows have no id-scoped selector): no stable selector exists to click a specific target, left as a command."
+      "description": "Left unmarked: ShadyPanel.ts's per-target \"Make the Call\" buttons and mafia service buttons carry no data-target/data-action scoping -- only plain text buttons distinguished by locale-dependent label text. Same class as Finding #8 (contract offer rows have no id-scoped selector): no stable selector exists to click a specific target, left as a command.",
+      "expect": {
+        "equals": {
+          "cash": 30000
+        }
+      }
     },
     {
       "command": "corrupt target:witness cost:5000",
@@ -80,7 +116,12 @@
           "command": "corrupt target:witness cost:5000"
         }
       ],
-      "description": "Left unmarked: ShadyPanel.ts's per-target \"Make the Call\" buttons and mafia service buttons carry no data-target/data-action scoping -- only plain text buttons distinguished by locale-dependent label text. Same class as Finding #8 (contract offer rows have no id-scoped selector): no stable selector exists to click a specific target, left as a command."
+      "description": "Left unmarked: ShadyPanel.ts's per-target \"Make the Call\" buttons and mafia service buttons carry no data-target/data-action scoping -- only plain text buttons distinguished by locale-dependent label text. Same class as Finding #8 (contract offer rows have no id-scoped selector): no stable selector exists to click a specific target, left as a command.",
+      "expect": {
+        "equals": {
+          "cash": 25000
+        }
+      }
     },
     {
       "command": "corrupt target:judge cost:10000",
@@ -90,7 +131,12 @@
           "command": "corrupt target:judge cost:10000"
         }
       ],
-      "description": "Left unmarked: ShadyPanel.ts's per-target \"Make the Call\" buttons and mafia service buttons carry no data-target/data-action scoping -- only plain text buttons distinguished by locale-dependent label text. Same class as Finding #8 (contract offer rows have no id-scoped selector): no stable selector exists to click a specific target, left as a command."
+      "description": "Left unmarked: ShadyPanel.ts's per-target \"Make the Call\" buttons and mafia service buttons carry no data-target/data-action scoping -- only plain text buttons distinguished by locale-dependent label text. Same class as Finding #8 (contract offer rows have no id-scoped selector): no stable selector exists to click a specific target, left as a command.",
+      "expect": {
+        "equals": {
+          "cash": 15000
+        }
+      }
     },
     {
       "command": "corrupt target:inspector cost:10000",
@@ -100,7 +146,12 @@
           "command": "corrupt target:inspector cost:10000"
         }
       ],
-      "description": "Left unmarked: ShadyPanel.ts's per-target \"Make the Call\" buttons and mafia service buttons carry no data-target/data-action scoping -- only plain text buttons distinguished by locale-dependent label text. Same class as Finding #8 (contract offer rows have no id-scoped selector): no stable selector exists to click a specific target, left as a command."
+      "description": "Left unmarked: ShadyPanel.ts's per-target \"Make the Call\" buttons and mafia service buttons carry no data-target/data-action scoping -- only plain text buttons distinguished by locale-dependent label text. Same class as Finding #8 (contract offer rows have no id-scoped selector): no stable selector exists to click a specific target, left as a command.",
+      "expect": {
+        "equals": {
+          "cash": 5000
+        }
+      }
     },
     {
       "command": "corrupt target:union_leader cost:10000",
@@ -110,7 +161,13 @@
           "command": "corrupt target:union_leader cost:10000"
         }
       ],
-      "description": "Left unmarked: ShadyPanel.ts's per-target \"Make the Call\" buttons and mafia service buttons carry no data-target/data-action scoping -- only plain text buttons distinguished by locale-dependent label text. Same class as Finding #8 (contract offer rows have no id-scoped selector): no stable selector exists to click a specific target, left as a command."
+      "description": "Left unmarked: ShadyPanel.ts's per-target \"Make the Call\" buttons and mafia service buttons carry no data-target/data-action scoping -- only plain text buttons distinguished by locale-dependent label text. Same class as Finding #8 (contract offer rows have no id-scoped selector): no stable selector exists to click a specific target, left as a command.",
+      "expect": {
+        "equals": {
+          "cash": -5000
+        },
+        "note": "confirmed via direct trace: the game genuinely allows cash to go negative here (no funds guard on corrupt, same class as Finding #1/#16) -- not a bankruptcy trigger by itself since BANKRUPTCY_THRESHOLD is far more negative than -5000."
+      }
     },
     {
       "command": "corrupt",
@@ -120,7 +177,13 @@
           "command": "corrupt"
         }
       ],
-      "description": "Left unmarked: ShadyPanel.ts's per-target \"Make the Call\" buttons and mafia service buttons carry no data-target/data-action scoping -- only plain text buttons distinguished by locale-dependent label text. Same class as Finding #8 (contract offer rows have no id-scoped selector): no stable selector exists to click a specific target, left as a command."
+      "description": "Left unmarked: ShadyPanel.ts's per-target \"Make the Call\" buttons and mafia service buttons carry no data-target/data-action scoping -- only plain text buttons distinguished by locale-dependent label text. Same class as Finding #8 (contract offer rows have no id-scoped selector): no stable selector exists to click a specific target, left as a command.",
+      "expect": {
+        "equals": {
+          "cash": -5000
+        },
+        "note": "bare `corrupt` is a read-only status query (corruption level/success rate/mafia-unlocked/attempts) -- no cost, cash unchanged."
+      }
     },
     {
       "command": "finances",
@@ -150,7 +213,13 @@
           "command": "employee hire role:driller"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
+      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "expect": {
+        "equals": {
+          "cash": -6000,
+          "employeeCount": 1
+        }
+      }
     },
     {
       "command": "employee hire role:blaster",
@@ -160,7 +229,13 @@
           "command": "employee hire role:blaster"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
+      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "expect": {
+        "equals": {
+          "cash": -7500,
+          "employeeCount": 2
+        }
+      }
     },
     {
       "command": "mafia smuggle",
@@ -170,7 +245,13 @@
           "command": "mafia smuggle"
         }
       ],
-      "description": "Left unmarked: ShadyPanel.ts's per-target \"Make the Call\" buttons and mafia service buttons carry no data-target/data-action scoping -- only plain text buttons distinguished by locale-dependent label text. Same class as Finding #8 (contract offer rows have no id-scoped selector): no stable selector exists to click a specific target, left as a command."
+      "description": "Left unmarked: ShadyPanel.ts's per-target \"Make the Call\" buttons and mafia service buttons carry no data-target/data-action scoping -- only plain text buttons distinguished by locale-dependent label text. Same class as Finding #8 (contract offer rows have no id-scoped selector): no stable selector exists to click a specific target, left as a command.",
+      "expect": {
+        "equals": {
+          "cash": -7500
+        },
+        "note": "toggling smuggling ON is free and instant -- the $8000/tick income (SMUGGLE_BASE_INCOME, MafiaActions.ts) only starts accruing once ticking resumes, checked on the next tick step. This single toggle is the whole reason the level ends in a win before arrest ever triggers -- see the file's own top-level description."
+      }
     },
     {
       "command": "tick 10",
@@ -180,7 +261,15 @@
           "command": "tick 10"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 71200,
+          "tickCount": 10,
+          "levelEnded": false
+        },
+        "note": "confirmed via direct trace: smuggling's $8000/tick over 10 ticks ($80,000) minus payroll for the 2 employees swings cash from -7500 to +71200 -- not yet enough to trip the level's profit threshold."
+      }
     },
     {
       "command": "event choose 0",
@@ -200,7 +289,16 @@
           "command": "tick 10"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 149900,
+          "tickCount": 20,
+          "levelEnded": true,
+          "levelEndReason": "completed"
+        },
+        "note": "the level's own profit-threshold win condition fires here, confirmed via direct trace -- another 10 ticks of $8000/tick smuggling income pushes cumulative profit past dusty_hollow's unlock threshold. This is a real, verified consequence, not a scenario bug: this \"losing scenario\" actually WINS first, 30 ticks before arrest (below) ever triggers. levelEnded staying true does not block further commands from running or state from continuing to change, confirmed by every step after this one."
+      }
     },
     {
       "command": "event choose 0",
@@ -220,7 +318,13 @@
           "command": "tick 10"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 228600,
+          "tickCount": 30
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -260,7 +364,12 @@
           "command": "corrupt target:judge cost:5000"
         }
       ],
-      "description": "Left unmarked: ShadyPanel.ts's per-target \"Make the Call\" buttons and mafia service buttons carry no data-target/data-action scoping -- only plain text buttons distinguished by locale-dependent label text. Same class as Finding #8 (contract offer rows have no id-scoped selector): no stable selector exists to click a specific target, left as a command."
+      "description": "Left unmarked: ShadyPanel.ts's per-target \"Make the Call\" buttons and mafia service buttons carry no data-target/data-action scoping -- only plain text buttons distinguished by locale-dependent label text. Same class as Finding #8 (contract offer rows have no id-scoped selector): no stable selector exists to click a specific target, left as a command.",
+      "expect": {
+        "equals": {
+          "cash": 223600
+        }
+      }
     },
     {
       "command": "corrupt target:politician cost:5000",
@@ -270,7 +379,12 @@
           "command": "corrupt target:politician cost:5000"
         }
       ],
-      "description": "Left unmarked: ShadyPanel.ts's per-target \"Make the Call\" buttons and mafia service buttons carry no data-target/data-action scoping -- only plain text buttons distinguished by locale-dependent label text. Same class as Finding #8 (contract offer rows have no id-scoped selector): no stable selector exists to click a specific target, left as a command."
+      "description": "Left unmarked: ShadyPanel.ts's per-target \"Make the Call\" buttons and mafia service buttons carry no data-target/data-action scoping -- only plain text buttons distinguished by locale-dependent label text. Same class as Finding #8 (contract offer rows have no id-scoped selector): no stable selector exists to click a specific target, left as a command.",
+      "expect": {
+        "equals": {
+          "cash": 218600
+        }
+      }
     },
     {
       "command": "tick 10",
@@ -280,7 +394,13 @@
           "command": "tick 10"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 297300,
+          "tickCount": 40
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -300,7 +420,15 @@
           "command": "tick 10"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 376000,
+          "tickCount": 50,
+          "arrested": true
+        },
+        "note": "confirmed via direct trace: arrest finally triggers here, 30 ticks after the level had already ended in victory above -- the file's own name and premise (\"triggering criminal arrest\") do hold by the end, just not as the first or only outcome."
+      }
     },
     {
       "command": "event choose 0",
@@ -320,7 +448,13 @@
           "command": "tick 10"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 454700,
+          "tickCount": 60
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -340,7 +474,13 @@
           "command": "tick 10"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 533400,
+          "tickCount": 70
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -400,7 +540,17 @@
           "command": "campaign status"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 533400,
+          "tickCount": 70,
+          "arrested": true,
+          "levelEnded": true,
+          "levelEndReason": "completed"
+        },
+        "note": "final state: both the win (tick 20) and the arrest (tick 50) are real and both hold by the end -- the level's own end-game screens would show victory first, arrest second, an intentional-looking design tension between smuggling's profitability and its exposure risk rather than a bug."
+      }
     }
   ]
 }
