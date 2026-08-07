@@ -11,7 +11,13 @@
           "command": "new_game seed:42"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "buildingCount": 0
+        }
+      }
     },
     {
       "command": "build types",
@@ -61,7 +67,13 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 40000,
+          "buildingCount": 1
+        }
+      }
     },
     {
       "command": "build management_office at:10,5",
@@ -87,7 +99,13 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 32000,
+          "buildingCount": 2
+        }
+      }
     },
     {
       "command": "build driving_center at:15,5",
@@ -113,7 +131,13 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 20000,
+          "buildingCount": 3
+        }
+      }
     },
     {
       "command": "build explosive_warehouse at:20,5",
@@ -139,7 +163,13 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 0,
+          "buildingCount": 4
+        }
+      }
     },
     {
       "command": "build freight_warehouse at:5,10",
@@ -149,7 +179,14 @@
           "command": "build freight_warehouse at:5,10"
         }
       ],
-      "description": "Left unmarked: cash is already at or below this building's cost at this point in the scenario, so the Build panel's buy button is disabled (BuildMenu.ts: `btn.disabled = cash < def.constructionCost || locked`) and a real player could not click it -- but the console `build` command has no funds guard and drives cash negative anyway (Finding #1's class, previously only confirmed for `vehicle buy`; this generalizes it to plain `build` too). Found by the interaction channel: command mode passes this step silently by overdrawing, something no click can do."
+      "description": "Left unmarked: cash is already at or below this building's cost at this point in the scenario, so the Build panel's buy button is disabled (BuildMenu.ts: `btn.disabled = cash < def.constructionCost || locked`) and a real player could not click it -- but the console `build` command has no funds guard and drives cash negative anyway (Finding #1's class, previously only confirmed for `vehicle buy`; this generalizes it to plain `build` too). Found by the interaction channel: command mode passes this step silently by overdrawing, something no click can do.",
+      "expect": {
+        "equals": {
+          "cash": -15000,
+          "buildingCount": 5
+        },
+        "note": "confirms the overdraw for real: cash goes negative, a state no click could ever reach"
+      }
     },
     {
       "command": "build vehicle_depot at:10,10",
@@ -159,7 +196,13 @@
           "command": "build vehicle_depot at:10,10"
         }
       ],
-      "description": "Left unmarked: cash is already at or below this building's cost at this point in the scenario, so the Build panel's buy button is disabled (BuildMenu.ts: `btn.disabled = cash < def.constructionCost || locked`) and a real player could not click it -- but the console `build` command has no funds guard and drives cash negative anyway (Finding #1's class, previously only confirmed for `vehicle buy`; this generalizes it to plain `build` too). Found by the interaction channel: command mode passes this step silently by overdrawing, something no click can do."
+      "description": "Left unmarked: cash is already at or below this building's cost at this point in the scenario, so the Build panel's buy button is disabled (BuildMenu.ts: `btn.disabled = cash < def.constructionCost || locked`) and a real player could not click it -- but the console `build` command has no funds guard and drives cash negative anyway (Finding #1's class, previously only confirmed for `vehicle buy`; this generalizes it to plain `build` too). Found by the interaction channel: command mode passes this step silently by overdrawing, something no click can do.",
+      "expect": {
+        "equals": {
+          "cash": -33000,
+          "buildingCount": 6
+        }
+      }
     },
     {
       "command": "build list",

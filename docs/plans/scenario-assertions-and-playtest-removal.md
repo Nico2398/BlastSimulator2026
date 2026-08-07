@@ -402,7 +402,12 @@ minFatigue drops from 100 after just 5 idle ticks, no work assigned;
 `decreased` scopes to the step's OWN before/after — a `decreased` on the
 `needs` step right after `tick 5` fails since nothing changes fatigue
 between them, it has to sit on the `tick 5` step itself) ·
-⬜ building-menu-visual ·
+✅ building-menu-visual (4 clean builds then 2 already-known-broken ones —
+the file's own pre-existing description flags a real bug generalizing
+Finding #1's class: plain `build` has no funds guard, so it drives cash
+negative in command mode at points where the UI's buy button would
+already be disabled; asserted the exact negative cash values for real,
+confirming the overdraw rather than just describing it) ·
 ⬜ building-placement-visual · ⬜ building-ramp-visual ·
 ⬜ building-research-progression-visual (parity check here) ·
 ⬜ building-research-visual (parity check here) ·
