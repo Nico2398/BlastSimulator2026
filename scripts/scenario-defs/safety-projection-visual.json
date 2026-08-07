@@ -110,15 +110,17 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "buildingCount": 1
         }
       }
     },
     {
-      "command": "drill_plan grid rows:4 cols:4 spacing:3 depth:8 start:20,20",
-      "description": "Corrected from the original rows:3 cols:3 spacing:5 (which command mode ran literally, producing 9 holes): the click drags the (20,20)-(30,30) rectangle at the Drill panel's own default spacing (DEFAULT_SPACING_M=3), computing cols/rows as round(size/spacing)+1 = 4x4 = 16 holes for that same rectangle -- the command and the click were silently testing two different grids, the same class of bug already fixed in nav-cell-types-visual.json. Caught by adding expect.equals.holeCount; fixed by describing what the click actually produces.",
+      "command": "drill_plan grid rows:4 cols:4 spacing:3 depth:6 start:20,20",
+      "description": "Corrected from the original rows:3 cols:3 spacing:5 (which command mode ran literally, producing 9 holes): the click drags the (20,20)-(30,30) rectangle at the Drill panel's own default spacing (DEFAULT_SPACING_M=3), computing cols/rows as round(size/spacing)+1 = 4x4 = 16 holes for that same rectangle -- the command and the click were silently testing two different grids, the same class of bug already fixed in nav-cell-types-visual.json. Caught by adding expect.equals.holeCount; fixed by describing what the click actually produces. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -186,7 +188,7 @@
     },
     {
       "command": "buy_software tier:1",
-      "description": "preview projections requires software tier 3+ (default tier is 0) — unlock sequentially so the projection preview actually computes instead of printing a lock message",
+      "description": "preview projections requires software tier 3+ (default tier is 0) \u2014 unlock sequentially so the projection preview actually computes instead of printing a lock message",
       "interaction": [
         {
           "type": "clickSelector",
@@ -203,7 +205,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"]
+        "decreased": [
+          "cash"
+        ]
       }
     },
     {
@@ -224,7 +228,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"]
+        "decreased": [
+          "cash"
+        ]
       }
     },
     {
@@ -245,7 +251,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "cash": 27500
         },
@@ -317,7 +325,10 @@
           "sequencedCount": 0,
           "buildingCount": 1
         },
-        "decreased": ["ecology", "nuisance"],
+        "decreased": [
+          "ecology",
+          "nuisance"
+        ],
         "note": "buildingCount stays 1 -- the freight_warehouse the safety-zone/projection setup is built around survives the blast unscathed (confirmed via direct trace: HP 150/150 unchanged), which is this file's own premise about the safety zone doing its job"
       }
     },
