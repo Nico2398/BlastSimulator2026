@@ -407,6 +407,7 @@ window.__gameState = () => {
     time: s.time,
     tickCount: s.tickCount,
     isPaused: s.isPaused,
+    timeScale: s.timeScale,
     mineType: s.mineType,
     // The site's live bounding box, so a harness can map grid coordinates to
     // the tile picker without inferring them from a terrain bounding box that

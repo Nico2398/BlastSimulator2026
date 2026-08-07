@@ -40,10 +40,12 @@ import type { MiningContext } from '../../src/console-api.js';
  * un-stuck) had no field to check either. activeContractCount closes the
  * same gap for state.contracts.active — a scenario proving a contract
  * accept/decline/deliver-completion actually moved a contract had no field
- * to check either.
+ * to check either. timeScale closes the same gap for the HUD's speed
+ * buttons (1x/2x/4x/8x) — a scenario proving `time speed` genuinely changed
+ * the simulation rate, not just accepted the command, had no field to check.
  */
 const SERIALIZED_FIELDS = [
-  'seed', 'time', 'tickCount', 'isPaused', 'mineType',
+  'seed', 'time', 'tickCount', 'isPaused', 'timeScale', 'mineType',
   'worldSizeX', 'worldSizeZ', 'worldMinX', 'worldMinZ',
   'drillHoles', 'chargesByHole', 'sequenceDelays', 'finances', 'holeCount', 'chargedCount',
   'sequencedCount', 'surveyCount', 'pendingActionCount', 'buildingCount', 'vehicleCount', 'employeeCount',
@@ -92,6 +94,21 @@ describe('console-api', () => {
 
       expect(state.seed).toBe(42);
       expect(state.mineType).toBe('desert');
+    });
+
+    it('reports timeScale of 1 for a fresh game', () => {
+      runner.runner.run('new_game mine_type:desert seed:42');
+      const state = serializeGameState(runner.ctx as MiningContext)!;
+
+      expect(state.timeScale).toBe(1);
+    });
+
+    it('reports the new timeScale after `time speed` changes it', () => {
+      runner.runner.run('new_game mine_type:desert seed:42');
+      runner.runner.run('time speed 4');
+      const state = serializeGameState(runner.ctx as MiningContext)!;
+
+      expect(state.timeScale).toBe(4);
     });
 
     it('reports zero counts for a fresh game', () => {

@@ -606,7 +606,11 @@ command-mode trend across all 5 tick checkpoints are documented via
 notes rather than hard-asserted with increased/decreased on the score
 fields themselves, after a real browser run hit a severe random event
 that both crashed a score and destroyed a building) ·
-⬜ time-management-visual · ⬜ safety-projection-visual ·
+✅ time-management-visual (**Finding #35: was console-only despite its
+own description promising real speed/pause button clicks** — see the
+findings log; added `timeScale` field and a `data-action="pause-toggle"`
+selector to close the gap) ·
+⬜ safety-projection-visual ·
 ⬜ core-loop-visual · ⬜ i18n-display-visual · ⬜ main-menu-visual ·
 ⬜ save-load-visual · ⬜ sandbox-mode · ⬜ weather-display-visual ·
 ⬜ weather-flood
@@ -858,6 +862,8 @@ of each session, in case main added/removed a file.)
 33. **`hauling-gate.json` had two problems, one a repeat of Finding #3's class, the other a new discovery specific to the Haul button's own selection logic.** (a) The `drill_plan grid rows:2 cols:2 spacing:5` command didn't match the click's real (20,20)-(25,25) drag at the panel's default spacing (3), which actually produces a 3×3=9-hole grid, not 2×2=4 — same class as `nav-cell-types-visual.json`. Fixed by correcting the command. (b) Fixing (a) changed the blast's fragment distribution enough that the file's original hardcoded `fragment:1` became oversized and un-haulable ("Fragment is oversized and needs a Rock Fragmenter first") — but investigating *why* revealed something more interesting: the real Haul button never lets a player pick a fragment id at all. It calls `findReachableGroundFragment` (`HaulingTask.ts`), which auto-selects the vehicle's nearest reachable, non-oversized, storage-fitting fragment based on the vehicle's *exact current position* — a fundamentally different selection than "whatever index a human guesses and hardcodes." Calling that function directly against the traced state gave the real answer (fragment #531, confirmed deterministic under command mode's clean tick10). But a real browser's wall-clock ticking (Finding #12) shifts the vehicle's exact position by click time, so the *same* selection logic picks a genuinely different fragment there — confirmed via a real run: 263.25kg delivered in command mode vs. 1050kg in interaction mode, neither wrong. **Fixed** by using the real, trace-confirmed fragment id (#531) in the command field (documented as position-derived, not a round number picked by hand), and by not asserting the exact delivered tonnage on the later `tick 40`/final `state full` steps — only the earlier `tick 20` step's `increased: ["storedMassKg"]` check, which holds regardless of which specific fragment gets picked and is what actually proves this file's premise (arrival-gated delivery genuinely completes, not instantly). Verified in both command mode and a real browser.
 
 34. **`scores-display-visual.json`'s score-trend assertions (increased/decreased on wellBeing/safety/ecology/nuisance across 5 tick checkpoints over a 110-tick budget) were NOT safe across both modes, even though a direct command-mode trace confirmed the file's own narrative exactly** — a genuinely new sub-class of Finding #12, worse than ordinary numeric drift. A first real browser run failed with `safety should have increased but went 50 → 0.49999999999999484` at the very first tick step: a random event fired under interaction mode's wall-clock ticking and, via the file's own `event choose 0` (always picks option 0 blindly, matching every other file's convention) landed a severe safety penalty — not a small numeric drift but a complete score collapse in the opposite direction from command mode's clean trace. **Fixing that surfaced a second failure**: the same event (or a different one further into the run) had also genuinely destroyed one of the file's two buildings, failing the final `state full` step's `buildingCount: 2` check. **Fixed** by dropping the increased/decreased assertions on the four score fields from all 5 tick steps and the roster/building counts from the final step, replacing them with `note`s documenting the real, command-mode-confirmed trend (verified via direct trace to genuinely match the file's own narrative) — kept only what stays true regardless of which random event fires: `decreased: ["cash"]` on every tick step (payroll/maintenance/fuel never stop draining) and `holeCount`/`chargedCount`/`sequencedCount` staying at 0 forever after the blast. The deterministic checks earlier in the file (immediately after each hire/build/blast, before any tick could let an event fire) needed no changes. Re-verified passing on two separate real browser runs to build confidence this wasn't a lucky pass given the randomness involved.
+
+35. **`time-management-visual.json` was console-only despite its own description explicitly promising real button clicks ("speed buttons... pause/resume toggle") — a direct instance of the original mandate's click-only requirement, not just a missing-assertion gap.** Every step's `interaction` used `type: "command"` for `time pause`/`time resume`/`time speed N`, never a click, and grepping every scenario file confirmed no file anywhere had ever clicked the HUD's pause or speed controls (`TopBar.ts`) — the only reference at all was one file clicking the *container* `.bs-speed-btn`, never an individual button. **Fixed** by rewriting every pause/resume/speed step to a real click: the speed buttons already carried a `data-speed` attribute (`TopBar.ts`, ready-made), but the pause/resume toggle had no selector at all — added `pauseBtn.dataset['action'] = 'pause-toggle'` (one line, no behavior change, confirmed via a screenshot that nothing visually shifted). Also **added `timeScale` to `SerializableGameState`** (`state.timeScale`, mirrored in `console-api.ts`/`main.ts`/`validate-state-schema.ts`, two new `console-api.test.ts` tests) — no field existed to prove a speed-button click genuinely changed the simulation rate rather than just being clickable; `isPaused` already existed and needed no addition. Verified in both command mode and a real browser.
 
 _(Add new findings here as you hit them. Number sequentially.)_
 
@@ -1177,3 +1183,16 @@ got, whether main was merged, and whether GitHub Actions is back up yet.
   tests. GitHub Actions still not re-checked this session — all
   verification remains local. Next: time-management-visual,
   safety-projection-visual, core-loop-visual, then the rest of Batch 6.
+- 2026-08-07 (cont.) — time-management-visual.json done (Finding #35):
+  was console-only despite its own description promising real speed/
+  pause button clicks — a genuine click-only gap, not just a missing-
+  assertion one, and grep confirmed no scenario file anywhere had ever
+  clicked these HUD controls. Rewrote every pause/resume/speed step to
+  a real click; added `data-action="pause-toggle"` to the pause button
+  (TopBar.ts, one line, confirmed via screenshot no visual change) and
+  a new `timeScale` field to SerializableGameState (no field existed to
+  prove a speed click genuinely changed the simulation rate). Batch 6:
+  10/18 done. Full local sweep green: typecheck, 124/124 scenarios,
+  8311/8311 tests. GitHub Actions still not re-checked this session —
+  all verification remains local. Next: safety-projection-visual,
+  core-loop-visual, then the rest of Batch 6.

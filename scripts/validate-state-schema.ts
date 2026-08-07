@@ -59,6 +59,7 @@ export const GAME_STATE_SCHEMA: Schema = {
   time: { type: 'number', description: 'Elapsed game time' },
   tickCount: { type: 'number', description: 'Simulation ticks elapsed' },
   isPaused: { type: 'boolean' },
+  timeScale: { type: 'number', description: 'Simulation speed multiplier (1/2/4/8) set by `time speed`' },
   mineType: { type: 'string', description: 'Terrain preset identifier' },
   worldSizeX: { type: 'number', optional: true, description: 'Live world bounding box (#473)' },
   worldSizeZ: { type: 'number', optional: true },

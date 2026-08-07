@@ -19,6 +19,8 @@ export interface SerializableGameState {
   time: number;
   tickCount: number;
   isPaused: boolean;
+  /** Simulation speed multiplier (1/2/4/8) set by `time speed` — the HUD's speed buttons. */
+  timeScale: number;
   mineType: string;
   /** The site's live bounding box (#473 — a bounding box, not a fixed size, once the site has grown). */
   worldSizeX: number | null;
@@ -79,6 +81,7 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     time: s.time,
     tickCount: s.tickCount,
     isPaused: s.isPaused,
+    timeScale: s.timeScale,
     mineType: s.mineType,
     worldSizeX: s.world?.sizeX ?? null,
     worldSizeZ: s.world?.sizeZ ?? null,

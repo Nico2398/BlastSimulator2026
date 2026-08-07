@@ -175,6 +175,7 @@ export class TopBar {
     const speedGroup = el('div', { className: 'bs-speed-btn' });
     speedGroup.style.cssText = 'display:flex;height:32px;border:1px solid var(--bsx-hairline-strong);border-radius:4px;overflow:hidden;background:var(--bsx-well)';
     const pauseBtn = document.createElement('button');
+    pauseBtn.dataset['action'] = 'pause-toggle';
     pauseBtn.style.cssText = 'width:32px;border:0;border-right:1px solid var(--bsx-hairline);background:transparent;color:var(--bsx-text-secondary);cursor:pointer;display:flex;align-items:center;justify-content:center';
     pauseBtn.appendChild(iconEl('pause', 12));
     this.locale.bindTitle(pauseBtn, 'shell.topbar.pause_tip');
