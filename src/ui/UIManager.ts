@@ -170,7 +170,7 @@ export class UIManager {
     // TopBar/ToolRail/Toasts/MiniMap are HUD chrome — nothing to show before a
     // game exists. Previously nothing ever hid them; they were only ever masked
     // by MainMenu's own opaque backdrop, which the redesign's translucent menu
-    // no longer provides (#ui-implementation-plan.md P8, "fix the leak").
+    // no longer provides ("fix the leak").
     this.hide();
   }
 

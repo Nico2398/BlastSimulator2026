@@ -5,8 +5,8 @@
 //   1. A low charge that collapses in place, producing no projections.
 //   2. An overcharged, unstemmed blast that throws rock.
 //   3. A blast large enough to stress the projectile path, where fragments are
-//      grouped rather than simulated one by one
-//      (docs/plans/rock-fragmentation-refactor.md §6/A5).
+//      grouped rather than simulated one by one — see the blast pipeline
+//      (gameplay-blast-system skill).
 //
 // This is a scenario-definition regression test: it locks in that the JSON
 // steps exist with the right shape, so a future edit cannot silently drop

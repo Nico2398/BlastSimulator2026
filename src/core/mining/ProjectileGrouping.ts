@@ -14,7 +14,7 @@
 // thousands of fragments — so neighbours come from a spatial hash rather than
 // scans, and speeds are computed once per fragment rather than per comparison.
 //
-// Refactor plan: docs/plans/rock-fragmentation-refactor.md §6/A5.
+// See the gameplay-blast-system skill, "Step 4 — Throw, Flight and the Muck Pile" (projectile grouping).
 
 import { vec3, type Vec3 } from '../math/Vec3.js';
 import {

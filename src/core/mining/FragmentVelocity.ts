@@ -10,7 +10,7 @@
 //                        of venting up the hole, so an under-stemmed hole is what
 //                        turns a blast into flyrock
 //
-// Refactor plan: docs/plans/rock-fragmentation-refactor.md §6/A4.
+// See the gameplay-blast-system skill, "Step 4 — Throw, Flight and the Muck Pile".
 
 import { vec3, normalize, scale, length as vecLength, type Vec3 } from '../math/Vec3.js';
 import {

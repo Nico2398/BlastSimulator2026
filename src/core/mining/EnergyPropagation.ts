@@ -11,7 +11,7 @@
 // many times over, so per-voxel object or string-key allocation is the one
 // thing this must not do.
 //
-// Refactor plan: docs/plans/rock-fragmentation-refactor.md §6/A1.
+// See the gameplay-blast-system skill, "Step 1 — Energy Propagation".
 
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 import { getRock } from '../world/RockCatalog.js';

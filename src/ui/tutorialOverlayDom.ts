@@ -44,12 +44,12 @@ export interface TutorialCardElements {
  * close/dismiss control — the only way through a step is to perform it (see
  * the "no escape hatch" tests in TutorialOverlay.test.ts). The design comp
  * this reskin ports (`docs/BlastSim game UI design/BlastSim UI.dc.html`,
- * `endCoach` on the coach card) and one bullet in
- * `docs/ui-implementation-plan.md`'s P10 scope both show a close (x) button;
- * both predate the deliberate, later, explicitly-tested decision recorded
- * here and in `docs/ui-redesign-spec.md` §6.17 (which lists the card's
- * elements without one). The spec and the tests — written after and more
- * specifically than the plan's phase-list bullet — win: no close button.
+ * `endCoach` on the coach card) and an early phase-list bullet from the
+ * (since-completed) implementation plan both show a close (x) button; both
+ * predate the deliberate, later, explicitly-tested decision recorded here and
+ * in `docs/ui-redesign-spec.md` §6.17 (which lists the card's elements
+ * without one). The spec and the tests — written after and more specifically
+ * than the old phase-list bullet — win: no close button.
  */
 export function buildTutorialCard(container: HTMLElement): TutorialCardElements {
   const overlay = document.createElement('div');
