@@ -494,7 +494,10 @@ is categorically unreachable, "canteen" isn't a real building type and
 no-ops by the file's own pre-existing step descriptions, now given real
 `equals` confirmation instead of just prose; the 2 real hires and idle
 need-decay over 40 ticks are what this file actually tests) ·
-⬜ needs-drain-visual ·
+✅ needs-drain-visual (confirmed the file's own claim for real: over 160
+idle ticks fatigue drains steadily to ~30, breakNeed stays flat at 100
+the whole time per `needs`'s own output, and hunger/fatigue diverge by
+the end — added missing `event choose 0` after every tick step) ·
 ⬜ needs-gauges-visual · ⬜ needs-morale-visual ·
 ⬜ needs-proactive-queue-visual · ⬜ needs-replenishment-visual ·
 ⬜ needs-shift-cycle-visual · ⬜ nav-dynamic-updates-visual ·
