@@ -21,7 +21,13 @@
           "command": "campaign start level:dusty_hollow"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "vehicleCount": 0
+        }
+      }
     },
     {
       "command": "vehicle buy debris_hauler",
@@ -39,7 +45,13 @@
           "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 25000,
+          "vehicleCount": 1
+        }
+      }
     },
     {
       "command": "vehicle list",
@@ -59,7 +71,14 @@
           "type": "command",
           "command": "vehicle move 1 to:2,2"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "cash": 25000,
+          "vehicleCount": 1
+        },
+        "note": "vehicle list confirms idle → moving; no scalar field exists for vehicle task state"
+      }
     },
     {
       "command": "vehicle list",
@@ -79,7 +98,10 @@
           "command": "tick 5"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash"]
+      }
     },
     {
       "command": "vehicle list",
@@ -99,7 +121,13 @@
           "command": "vehicle assign 1 task:transport"
         }
       ],
-      "description": "Left unmarked: no UI control drives this exact command and none should exist -- FleetPanel.ts only wires vehicle buy/driver/scrap to the console (grep confirms no `vehicle move`/`vehicle assign` call site anywhere in src/ui) -- vehicles move autonomously via task/haul assignment, never by a player teleporting one to a raw x,z."
+      "description": "Left unmarked: no UI control drives this exact command and none should exist -- FleetPanel.ts only wires vehicle buy/driver/scrap to the console (grep confirms no `vehicle move`/`vehicle assign` call site anywhere in src/ui) -- vehicles move autonomously via task/haul assignment, never by a player teleporting one to a raw x,z.",
+      "expect": {
+        "equals": {
+          "vehicleCount": 1
+        },
+        "note": "vehicle list confirms moving → transport, overriding the earlier move task"
+      }
     },
     {
       "command": "vehicle list",

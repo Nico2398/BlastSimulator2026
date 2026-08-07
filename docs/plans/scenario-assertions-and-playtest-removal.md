@@ -462,7 +462,10 @@ affordable within the file's $300,000 bump — cash/vehicleCount asserted
 exactly at each, no overdraw here unlike vehicle-3d-rendering-visual) ·
 ✅ vehicle-roles-panel-visual (same 5-vehicle-purchase sequence as
 vehicle-3d-rendering-visual — identical cash/vehicleCount values reused) ·
-⬜ vehicle-task-states-visual · ⬜ vehicle-traffic ·
+✅ vehicle-task-states-visual (idle→moving→transport state chain
+confirmed via `vehicle list`'s rich text — no scalar field exists for
+vehicle task state; cash/vehicleCount asserted at each actionable step) ·
+⬜ vehicle-traffic ·
 ⬜ vehicle-traffic-routing-visual · ⬜ needs-collapse-visual ·
 ⬜ needs-cost-visual · ⬜ needs-cycle · ⬜ needs-drain-visual ·
 ⬜ needs-gauges-visual · ⬜ needs-morale-visual ·
