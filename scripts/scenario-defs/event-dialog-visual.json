@@ -11,7 +11,12 @@
           "command": "new_game seed:42"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -21,7 +26,12 @@
           "command": "campaign start level:dusty_hollow"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "time resume",
@@ -51,7 +61,7 @@
           "command": "event fire union_coffee_uprising"
         }
       ],
-      "description": "event fire union_coffee_uprising — test hook: `event fire` has no UI control and none is intended (a player cannot summon an event on demand). Left unmarked (legacy/unconstrained) rather than mislabelled."
+      "description": "event fire union_coffee_uprising \u2014 test hook: `event fire` has no UI control and none is intended (a player cannot summon an event on demand). Left unmarked (legacy/unconstrained) rather than mislabelled."
     },
     {
       "command": "event choose 0",
@@ -76,7 +86,16 @@
           "selector": "#bs-event-dialog .bs-event-dismiss"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 42000
+        },
+        "increased": [
+          "wellBeing"
+        ],
+        "note": "real click resolves union_coffee_uprising option 0 -- Lost $8000, wellBeing +12, matching the command-mode consequence text exactly"
+      }
     },
     {
       "command": "tick 8",
@@ -86,7 +105,12 @@
           "command": "tick 8"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 42000
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -96,7 +120,7 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 — follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
+      "description": "event choose 0 \u2014 follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
     },
     {
       "command": "event fire tutorial_synergy_consultant",
@@ -106,7 +130,7 @@
           "command": "event fire tutorial_synergy_consultant"
         }
       ],
-      "description": "event fire tutorial_synergy_consultant — test hook: `event fire` has no UI control and none is intended (a player cannot summon an event on demand). Left unmarked (legacy/unconstrained) rather than mislabelled."
+      "description": "event fire tutorial_synergy_consultant \u2014 test hook: `event fire` has no UI control and none is intended (a player cannot summon an event on demand). Left unmarked (legacy/unconstrained) rather than mislabelled."
     },
     {
       "command": "event choose 1",
@@ -131,11 +155,21 @@
           "selector": "#bs-event-dialog .bs-event-dismiss"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 42000
+        },
+        "decreased": [
+          "wellBeing",
+          "safety"
+        ],
+        "note": "real click on the 2nd option (nth-child(2), index 1) resolves tutorial_synergy_consultant's 'Get off my site' -- no cash cost, wellBeing -10/safety -5, confirming the dialog's 2nd-choice selector reaches the same option `event choose 1` names"
+      }
     },
     {
       "command": "event fire mafia_protection_racket",
-      "description": "Mafia category: 'consulting fee' protection racket, 3 options — dialog must render the mafia-specific tone/consequences — test hook: `event fire` has no UI control and none is intended (a player cannot summon an event on demand). Left unmarked (legacy/unconstrained) rather than mislabelled.",
+      "description": "Mafia category: 'consulting fee' protection racket, 3 options \u2014 dialog must render the mafia-specific tone/consequences \u2014 test hook: `event fire` has no UI control and none is intended (a player cannot summon an event on demand). Left unmarked (legacy/unconstrained) rather than mislabelled.",
       "interaction": [
         {
           "type": "command",
@@ -166,11 +200,20 @@
           "selector": "#bs-event-dialog .bs-event-dismiss"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 37000
+        },
+        "increased": [
+          "safety"
+        ],
+        "note": "mafia_protection_racket option 0 -- Lost $5000, safety +4 (also Corruption +5, not exposed via serializeGameState so not assertable here)"
+      }
     },
     {
       "command": "event fire lawsuit_wrongful_death",
-      "description": "Lawsuit category: wrongful death suit, 3 options — dialog must render the lawsuit-specific tone/consequences — test hook: `event fire` has no UI control and none is intended (a player cannot summon an event on demand). Left unmarked (legacy/unconstrained) rather than mislabelled.",
+      "description": "Lawsuit category: wrongful death suit, 3 options \u2014 dialog must render the lawsuit-specific tone/consequences \u2014 test hook: `event fire` has no UI control and none is intended (a player cannot summon an event on demand). Left unmarked (legacy/unconstrained) rather than mislabelled.",
       "interaction": [
         {
           "type": "command",
@@ -201,11 +244,20 @@
           "selector": "#bs-event-dialog .bs-event-dismiss"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": -163000
+        },
+        "increased": [
+          "safety"
+        ],
+        "note": "lawsuit_wrongful_death option 0 -- Lost $200000, safety +5; drives cash sharply negative (finances.isBankrupt flips true) but the separate bankruptcy-consequence tracker (ticksBelowThreshold) hasn't crossed its grace threshold yet, so levelEnded stays false"
+      }
     },
     {
       "command": "event fire politics_explosive_embargo",
-      "description": "Politics category: explosive embargo, 3 options — dialog must render the politics-specific tone/consequences — test hook: `event fire` has no UI control and none is intended (a player cannot summon an event on demand). Left unmarked (legacy/unconstrained) rather than mislabelled.",
+      "description": "Politics category: explosive embargo, 3 options \u2014 dialog must render the politics-specific tone/consequences \u2014 test hook: `event fire` has no UI control and none is intended (a player cannot summon an event on demand). Left unmarked (legacy/unconstrained) rather than mislabelled.",
       "interaction": [
         {
           "type": "command",
@@ -236,11 +288,20 @@
           "selector": "#bs-event-dialog .bs-event-dismiss"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": -203000
+        },
+        "increased": [
+          "ecology"
+        ],
+        "note": "politics_explosive_embargo option 0 -- Lost $40000, ecology +3"
+      }
     },
     {
       "command": "event fire weather_pit_flood",
-      "description": "Weather category: pit flood, 3 options — dialog must render the weather-specific tone/consequences — test hook: `event fire` has no UI control and none is intended (a player cannot summon an event on demand). Left unmarked (legacy/unconstrained) rather than mislabelled.",
+      "description": "Weather category: pit flood, 3 options \u2014 dialog must render the weather-specific tone/consequences \u2014 test hook: `event fire` has no UI control and none is intended (a player cannot summon an event on demand). Left unmarked (legacy/unconstrained) rather than mislabelled.",
       "interaction": [
         {
           "type": "command",
@@ -271,7 +332,17 @@
           "selector": "#bs-event-dialog .bs-event-dismiss"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": -223000
+        },
+        "increased": [
+          "ecology",
+          "safety"
+        ],
+        "note": "weather_pit_flood option 0 -- Lost $20000, ecology +8, safety +5"
+      }
     },
     {
       "command": "tick 8",
@@ -281,7 +352,12 @@
           "command": "tick 8"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": -223000
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -291,7 +367,7 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 — follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
+      "description": "event choose 0 \u2014 follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
     },
     {
       "command": "event status",
@@ -311,7 +387,12 @@
           "command": "tick 8"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": -223000
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -321,7 +402,7 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 — follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
+      "description": "event choose 0 \u2014 follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
     },
     {
       "command": "scores",
@@ -351,7 +432,14 @@
           "command": "state full"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": -223000,
+          "activeContractCount": 0
+        },
+        "note": "this file never accepts a contract -- activeContractCount stays 0 throughout, only event consequences move any state"
+      }
     }
   ],
   "shots": [

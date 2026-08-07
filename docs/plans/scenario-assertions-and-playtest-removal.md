@@ -868,7 +868,19 @@ the pre-existing BLOCKED FINDING note on `contract deliver` (issue
 #445's silent-no-op class) now has a real `expect` proving the honest
 failure; zero cost drivers anywhere in the file — cash is flat
 $50,000 hard-asserted throughout; verified 1/1 in both modes) ·
-⬜ event-dialog-visual
+✅ event-dialog-visual (**Finding #70** — see the findings log; 6 real
+dialog clicks across 6 event categories (union/consultant/mafia/
+lawsuit/politics/weather), each verified against the command-mode
+consequence text exactly — cash via hard `equals` (always a clean
+integer in this trace), score fields via `increased`/`decreased`
+directionally rather than brittle floats, matching the file's own
+premise of proving consequences render and apply; the consultant
+event's `:nth-child(2)` option-index selector reaches the same choice
+`event choose 1` names; drives cash to -223000 and flips
+`finances.isBankrupt` true without tripping the separate
+grace-period bankruptcy tracker, a real and correctly-modeled
+distinction; verified 1/1 in both modes — **Batch 7 complete,
+20/20**)
 
 (123 remaining after Batch 0's 1; batches above sum to 122 — reconcile the
 exact count against `ls scripts/scenario-defs/*.json | wc -l` at the start
@@ -1175,6 +1187,8 @@ of each session, in case main added/removed a file.)
 68. **`vehicle-purchase-visual.json`'s one real click — buying a `debris_hauler` off the Fleet panel's `[data-vtype="debris_hauler"][data-tier="1"]` row — was already a plausible spot for a Finding #3/#4-class command/click mismatch (the exact bug class those findings fixed elsewhere: a click landing on a different purchase than the paired command implies), but traced clean.** `parseVehicleTierArg` (`vehicle.ts`) defaults `tier` to 1 when the command omits it, so `vehicle buy debris_hauler` and the tier-1 row target the identical purchase — confirmed empirically (not just by reading the default), both modes land on `cash:25000, vehicleCount:1` with no divergence. The file's 2nd purchase (`vehicle buy drill_rig`) was already correctly left as a documented command-only step from the #479 pass — cash is short of a drill rig after the first purchase, so the Fleet panel disables its buy button, but `vehicle buy` itself has no affordability guard and drives cash to exactly `-10000`; added `expect.equals` on that real, uncapped value rather than leaving the finding as prose only. Zero ticks anywhere in this file (no time-based state to desync), so no RNG surface exists at all — verified 1/1 in both modes, not re-run for determinism.
 
 69. **`contract-panel-visual.json` clicks the same unqualified `.bs-contract-accept` selector twice, in two separate steps — structurally the exact shape that produced Finding #55's real command/click divergence in `level1-win-efficient.json` — but traced and ran clean.** Finding #55's bug was a *duplicated* step clicking an unqualified selector twice in immediate succession, racing against a panel that hadn't re-rendered between clicks; here each click is its own step separated by a `contract status`/multiple `tick`s, giving the panel time to remove the just-accepted contract from its available list before the next click, so `.bs-contract-accept` genuinely resolves to a different row each time. Traced first (`contract accept 1` → "Supply dirtite," `contract accept 2` → "Dispose of rubble," both IDs already matching the real available-contract ordering, no ID-mismatch fix needed) then confirmed empirically with a real interaction-mode run rather than trusting the ordering argument alone, given this project's history with exactly this selector-reuse shape. Zero cost drivers anywhere in the file — no employees ever hired, no ticks with salary expense, no mining/hauling — so `cash` stays exactible at exactly $50,000 through all 19 steps and is hard-asserted throughout; `state full`'s `finances.transactions` is empty, independently confirming no silent event fired (the Finding #60 class). The file's pre-existing BLOCKED FINDING (`contract deliver 2 amount:300` correctly fails since nothing was ever mined into storage, surfacing the #445 silent-`success:false`-vs-thrown-exception gap between command-mode's pass/fail semantics and a real disabled button) now carries a real `expect.equals` on the honest failure state instead of prose alone.
+
+70. **`event-dialog-visual.json` — the last Batch 7 file — resolves 6 real event dialogs across all 6 categories the game has (union, a tutorial-only consultant event, mafia, lawsuit, politics, weather), each via its own real click sequence, and every one traced clean against the command-mode consequence text.** Unlike every prior score-bearing file this session, used `increased`/`decreased` directionally for the `wellBeing`/`safety`/`ecology` deltas instead of pinning exact floats — a better semantic match here, since the file's own premise is specifically that a dialog's stated consequences ("Lost $8000", "wellBeing +12") actually apply, which a directional check proves as directly as an exact float would while staying immune to unrelated decay-constant tuning between the assertion step and the moment it's read. `cash` stayed a hard `equals` throughout — every event's cost is a clean integer in this trace, no rounding risk. The one non-obvious selector in the file, `tutorial_synergy_consultant`'s option resolved via `:nth-child(2)` (index 1, "Get off my site") rather than the default first-option pattern every other event in this file uses, reached the exact same choice `event choose 1` names — confirmed empirically rather than assumed from the selector alone, since an off-by-one in a `:nth-child` index is exactly the kind of thing that fails silently against the wrong option. The lawsuit event alone (`Lost $200000`) drives cash from a mild -$0 range to -$163,000, flipping `finances.isBankrupt` true — but the separate `bankruptcy.ticksBelowThreshold` grace-period tracker (Finding #34's mechanic) correctly stays under its threshold and `levelEnded` stays false, the same real distinction between "cash is negative right now" and "the game has decided you're bankrupt" this project has documented before. `corruption.level` (the mafia event's 3rd consequence, +5) has no field in `serializeGameState()` — noted, not asserted, the same treatment as every other exists-in-raw-state-but-not-the-lean-subset field found this session. Zero silent events anywhere: the file's 3 "bare tick then `event choose 0`" checkpoints all report "No pending event" and only smooth score decay moves state between them, consistent with the tick-based event system's established seed+tick determinism. Verified 1/1 in both modes, not re-run for determinism. **This closes Batch 7 at 20/20.**
 
 _(Add new findings here as you hit them. Number sequentially.)_
 
@@ -2218,3 +2232,24 @@ got, whether main was merged, and whether GitHub Actions is back up yet.
   audit (Ground rule #15/Finding #42/#52 class) across the whole suite
   before Phase 3, per the plan's stated gate, then continuing toward
   the full 124-file goal beyond Batch 7.
+
+- Finished `event-dialog-visual.json` (**Finding #70**, Batch 7
+  20/20 — **Batch 7 complete**), 26 steps, 6 real dialog resolutions
+  across every event category the game has. Switched to
+  `increased`/`decreased` for the score-consequence fields instead of
+  exact floats — a better fit than this session's usual `equals`
+  pinning, since the file's own premise is that a dialog's stated
+  consequences actually apply, which a directional check proves
+  cleanly without brittleness; `cash` stayed hard-asserted throughout
+  since every event cost is a clean integer here. The one
+  non-default selector in the file — the consultant event's
+  `:nth-child(2)` option pick — reached the exact choice `event
+  choose 1` names, confirmed empirically. Zero silent events; the
+  file's bare-tick checkpoints all genuinely have nothing pending.
+  Verified 1/1 in both modes, not re-run for determinism. **Batch 7
+  is now genuinely complete, 20/20 files** (corrected count — see
+  Finding #69's log entry for the header miscount this closes out).
+  Next: the depth-mismatch audit (Ground rule #15/Finding #42/#52
+  class) across the whole scenario suite before Phase 3, per the
+  plan's stated gate — then continuing toward the full 124-file goal
+  with whichever batch/domain the audit doesn't already fold into.
