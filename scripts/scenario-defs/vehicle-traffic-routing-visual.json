@@ -1,6 +1,6 @@
 {
   "name": "vehicle-traffic-routing-visual",
-  "description": "Visual check: multiple vehicles on shared navmesh cause congestion with waiting state and traffic jam alert",
+  "description": "Visual check: multiple vehicles on shared navmesh cause congestion with waiting state and traffic jam alert. Confirmed via direct engine trace (Finding #22) that the traffic_jam event genuinely fires at tick 25 once the tick budget was corrected — see the tick 26 step for detail.",
   "steps": [
     {
       "command": "new_game seed:42 cash:150000",
@@ -12,7 +12,13 @@
         }
       ],
       "role": "setup",
-      "description": "Bumped cash from the 50k default to 150k -- same reasoning as vehicle-traffic: all 4 debris_haulers need to exist for the routing test."
+      "description": "Bumped cash from the 50k default to 150k -- same reasoning as vehicle-traffic: all 4 debris_haulers need to exist for the routing test.",
+      "expect": {
+        "equals": {
+          "cash": 150000,
+          "vehicleCount": 0
+        }
+      }
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -23,7 +29,13 @@
         }
       ],
       "role": "setup",
-      "description": "campaign start replaces the whole GameState including cash, reset to the level's own startingCash -- a `new_game ... cash:N` override does not survive this step (tried, reverted; see vehicle-3d-rendering-visual for the same finding)."
+      "description": "campaign start replaces the whole GameState including cash, reset to the level's own startingCash -- a `new_game ... cash:N` override does not survive this step (tried, reverted; see vehicle-3d-rendering-visual for the same finding).",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "vehicleCount": 0
+        }
+      }
     },
     {
       "command": "employee hire role:driver",
@@ -41,7 +53,13 @@
           "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 49200,
+          "employeeCount": 1
+        }
+      }
     },
     {
       "command": "employee hire role:driver",
@@ -55,7 +73,13 @@
           "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 48400,
+          "employeeCount": 2
+        }
+      }
     },
     {
       "command": "employee hire role:driver",
@@ -69,7 +93,13 @@
           "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 47600,
+          "employeeCount": 3
+        }
+      }
     },
     {
       "command": "employee hire role:driver",
@@ -83,7 +113,13 @@
           "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 46800,
+          "employeeCount": 4
+        }
+      }
     },
     {
       "command": "vehicle buy debris_hauler",
@@ -101,7 +137,13 @@
           "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 21800,
+          "vehicleCount": 1
+        }
+      }
     },
     {
       "command": "vehicle buy debris_hauler",
@@ -111,7 +153,13 @@
           "command": "vehicle buy debris_hauler"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
+      "description": "Left unmarked: cash is already at or below cost, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "expect": {
+        "equals": {
+          "cash": -3200,
+          "vehicleCount": 2
+        }
+      }
     },
     {
       "command": "vehicle buy debris_hauler",
@@ -121,7 +169,13 @@
           "command": "vehicle buy debris_hauler"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
+      "description": "Left unmarked: cash is already at or below cost, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "expect": {
+        "equals": {
+          "cash": -28200,
+          "vehicleCount": 3
+        }
+      }
     },
     {
       "command": "vehicle buy debris_hauler",
@@ -131,7 +185,13 @@
           "command": "vehicle buy debris_hauler"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
+      "description": "Left unmarked: cash is already at or below cost, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "expect": {
+        "equals": {
+          "cash": -53200,
+          "vehicleCount": 4
+        }
+      }
     },
     {
       "command": "vehicle list",
@@ -192,7 +252,13 @@
           "command": "tick 6"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "vehicleCount": 4
+        },
+        "note": "all 4 vehicles still converging on (37,33) — real jam confirmed at tick 25, see the tick 26 step below (Finding #22)"
+      }
     },
     {
       "command": "vehicle list",
@@ -205,15 +271,21 @@
       "role": "observe"
     },
     {
-      "command": "tick 16",
-      "description": "Extended from tick 6 (#411 round 3, issue B): TRAFFIC_JAM_MIN_TICKS=10 consecutive waiting ticks on top of the ~8-10 ticks it takes the haulers to converge means the jam fires around cumulative tick 20 — this scenario's own stated purpose (demonstrating TrafficJamEvent) was previously unreachable within its 6+6=12 tick budget even after wiring detectTrafficJam into the console tick path. 6+16=22 gives margin past the tick-20 fire point.",
+      "command": "tick 26",
+      "description": "Finding #22: a direct engine trace (sampling state.events.pendingEvent tick by tick) found the jam actually fires at absolute tick 25, not tick 20 as this step previously assumed — the previous 6+16=22 tick budget was 3 ticks short and left the event unfired every run. Extended to 6+26=32 for real margin past the confirmed tick-25 fire point (verified: all 4 vehicles converge on (37,33), vehicle #1 occupies it, #2/#3/#4 all enter the waiting state simultaneously and cross TRAFFIC_JAM_MIN_TICKS=10 together, satisfying TRAFFIC_JAM_MIN_VEHICLES=3 — unlike vehicle-traffic.json's Finding #21, converging all 4 purchased vehicles rather than 3 is exactly what makes this one work).",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 16"
+          "command": "tick 26"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "vehicleCount": 4
+        },
+        "note": "confirmed via direct engine trace that state.events.pendingEvent is {eventId:'traffic_jam', firedAtTick:25} at this point — no scalar field exists in SerializableGameState to assert that directly, so this anchors on the fleet staying intact at 4 while the jam condition is met"
+      }
     },
     {
       "command": "vehicle list",
