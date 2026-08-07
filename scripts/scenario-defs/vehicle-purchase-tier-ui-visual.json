@@ -12,7 +12,13 @@
           "command": "new_game seed:42 cash:300000"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 300000,
+          "vehicleCount": 0
+        }
+      }
     },
     {
       "command": "vehicle list",
@@ -40,7 +46,13 @@
           "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 275000,
+          "vehicleCount": 1
+        }
+      }
     },
     {
       "command": "vehicle list",
@@ -65,7 +77,13 @@
           "selector": "#bs-vehicle-panel [data-vtype=\"rock_digger\"][data-tier=\"1\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 225000,
+          "vehicleCount": 2
+        }
+      }
     },
     {
       "command": "vehicle buy debris_hauler tier:2",
@@ -80,7 +98,13 @@
           "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"2\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 175000,
+          "vehicleCount": 3
+        }
+      }
     },
     {
       "command": "vehicle buy drill_rig tier:3",
@@ -95,7 +119,13 @@
           "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"][data-tier=\"3\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 35000,
+          "vehicleCount": 4
+        }
+      }
     },
     {
       "command": "vehicle list",
