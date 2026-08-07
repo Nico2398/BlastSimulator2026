@@ -11,7 +11,18 @@
           "command": "new_game seed:42 size:32 cash:500000"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 500000,
+          "worldSizeX": 32,
+          "worldSizeZ": 32,
+          "worldMinX": 0,
+          "worldMinZ": 0,
+          "holeCount": 0,
+          "buildingCount": 0
+        }
+      }
     },
     {
       "command": "terrain_info",
@@ -22,7 +33,13 @@
           "command": "terrain_info"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "worldSizeX": 32,
+          "worldSizeZ": 32
+        }
+      }
     },
     {
       "command": "drill_plan add x:34 z:10 depth:6",
@@ -32,7 +49,14 @@
           "type": "command",
           "command": "drill_plan add x:34 z:10 depth:6"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "worldSizeX": 48,
+          "worldSizeZ": 32,
+          "holeCount": 1
+        }
+      }
     },
     {
       "command": "drill_plan add x:-4 z:10 depth:6",
@@ -42,7 +66,14 @@
           "type": "command",
           "command": "drill_plan add x:-4 z:10 depth:6"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "worldSizeX": 64,
+          "worldMinX": -16,
+          "holeCount": 2
+        }
+      }
     },
     {
       "command": "terrain_info",
@@ -53,7 +84,13 @@
           "command": "terrain_info"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "worldSizeX": 64,
+          "worldMinX": -16
+        }
+      }
     },
     {
       "command": "inspect -4,0,10",
@@ -75,7 +112,13 @@
           "type": "command",
           "command": "build_ramp origin:30,20 direction:east length:8 depth:6"
         }
-      ]
+      ],
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "buildingCount": 0
+        }
+      }
     },
     {
       "command": "build management_office at:34,4",
@@ -85,7 +128,13 @@
           "type": "command",
           "command": "build management_office at:34,4"
         }
-      ]
+      ],
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "buildingCount": 1
+        }
+      }
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
@@ -99,7 +148,12 @@
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "chargedCount": 2
+        }
+      }
     },
     {
       "command": "sequence auto delay_step:25",
@@ -109,7 +163,12 @@
           "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "sequencedCount": 2
+        }
+      }
     },
     {
       "command": "blast",
@@ -137,7 +196,14 @@
           "selector": "[data-action=\"report-close\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        }
+      }
     },
     {
       "command": "save slot:expanded",
@@ -148,18 +214,31 @@
           "type": "command",
           "command": "save slot:expanded"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "cash": 491200
+        }
+      }
     },
     {
       "command": "load slot:expanded",
-      "description": "Left unmarked: save/load UI is out of scope for this batch -- see save-load-visual.json (Batch 6) for the real control.",
+      "description": "Left unmarked: save/load UI is out of scope for this batch -- see save-load-visual.json (Batch 6) for the real control. The point of this round-trip: the expanded site bounds (not just cash/buildings) must survive a save/load, not only a live session.",
       "timeout": 15,
       "interaction": [
         {
           "type": "command",
           "command": "load slot:expanded"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "cash": 491200,
+          "worldSizeX": 64,
+          "worldMinX": -16,
+          "buildingCount": 1
+        }
+      }
     },
     {
       "command": "terrain_info",
@@ -169,7 +248,13 @@
           "command": "terrain_info"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "worldSizeX": 64,
+          "worldMinX": -16
+        }
+      }
     },
     {
       "command": "state full",

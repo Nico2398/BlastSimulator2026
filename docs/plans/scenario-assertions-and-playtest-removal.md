@@ -544,7 +544,25 @@ boxing in the (0,0) corner with 3 management offices genuinely flips
 employee #1 to stuck after `STUCK_THRESHOLD` consecutive pathfinding
 failures, and demolishing all three genuinely un-sticks it; added
 missing `event choose 0` after tick 19/tick 5/tick 10) ·
-⬜ nav-pathfinding-visual · ⬜ nav-ramp-routing-visual · ⬜ site-expansion
+✅ nav-pathfinding-visual (3 management offices placed so a driller must
+route *around* them, not through — `stuckEmployeeCount` stays 0 for
+real across the full tick budget, confirming the file's sibling
+contrast with nav-path-following-visual.json's deliberate box-in; no
+findings) ·
+✅ nav-ramp-routing-visual (vehicle + employee both route across a
+`build_ramp`-cleared span toward the same destination; `buildingCount`
+confirms a ramp doesn't register as a building, `stuckEmployeeCount`
+stays 0 throughout confirming the ramp route works for both movers; no
+findings) ·
+✅ site-expansion (drilling/ramping/building past the original 32×32
+bounds genuinely grows `worldSizeX`/`worldMinX` live — asserted through
+the full drill→ramp→build→charge→sequence→blast→save→load pipeline;
+the save/load round-trip step is the one that matters most here, since
+it proves the expanded site bounds — not just cash/buildings — survive
+a save/load, not only a live session; no findings)
+
+Batch 5 complete: 22/22 (vehicle-* 7/7, needs-* 9/9, nav-*/site-
+expansion 6/6).
 
 ### Batch 6 — employee/economy/misc (18) — **+ training parity check**
 ⬜ employee-skill-progression-visual · ⬜ employee-skills-visual ·
@@ -960,3 +978,23 @@ got, whether main was merged, and whether GitHub Actions is back up yet.
   re-checked this session — all verification remains local. Batch 5:
   19/22 done (vehicle-* 7/7, needs-* 9/9, nav-*/site-expansion 3/6).
   Next: nav-pathfinding-visual, nav-ramp-routing-visual, site-expansion.
+- 2026-08-07 (cont.) — Batch 5 complete: nav-pathfinding-visual,
+  nav-ramp-routing-visual, site-expansion — 3/3, committed together with
+  the plan doc update. No new findings in any of the three — each
+  file's own premise checked out for real against a direct engine
+  trace before assertions were written. nav-pathfinding-visual proves
+  the sibling contrast with nav-path-following-visual.json's box-in
+  (obstacles placed so routing succeeds around them, stuckEmployeeCount
+  stays 0). nav-ramp-routing-visual proves a built ramp doesn't count
+  as a building and both a vehicle and an employee route across it
+  without going stuck. site-expansion is the most consequential of the
+  three: verified worldSizeX/worldMinX genuinely grow live as
+  drill/ramp/build commands land outside the original 32×32 bounds,
+  and — the point the save/load steps exist to prove — that the
+  expanded bounds survive a real save/load round-trip, not just a live
+  session. All three verified in both command mode and a real browser.
+  Full local sweep green: typecheck clean, 124/124 command-mode
+  scenarios, 8304/8304 unit+integration tests. GitHub Actions still not
+  re-checked this session — all verification remains local. Batch 5:
+  22/22 done. Next: Batch 6 — employee/economy/misc (18 files) plus the
+  training parity check (employee-training.json vs training.json).

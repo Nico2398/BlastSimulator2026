@@ -10,7 +10,14 @@
           "command": "new_game seed:42"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "buildingCount": 0,
+          "vehicleCount": 0
+        }
+      }
     },
     {
       "command": "vehicle buy debris_hauler",
@@ -29,7 +36,13 @@
           "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "vehicleCount": 1
+        }
+      }
     },
     {
       "command": "vehicle move 1 to:8,20",
@@ -39,7 +52,12 @@
           "type": "command",
           "command": "vehicle move 1 to:8,20"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "cash": 25000
+        }
+      }
     },
     {
       "command": "tick 5",
@@ -49,7 +67,10 @@
           "command": "tick 5"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash"]
+      }
     },
     {
       "command": "state full",
@@ -92,7 +113,13 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "buildingCount": 0
+        }
+      }
     },
     {
       "command": "vehicle move 1 to:8,20",
@@ -102,7 +129,12 @@
           "type": "command",
           "command": "vehicle move 1 to:8,20"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "cash": 23960
+        }
+      }
     },
     {
       "command": "employee hire role:driller",
@@ -120,7 +152,13 @@
           "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "employeeCount": 1
+        }
+      }
     },
     {
       "command": "employee dispatch 1 x:8 z:20",
@@ -130,7 +168,12 @@
           "type": "command",
           "command": "employee dispatch 1 x:8 z:20"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "cash": 22960
+        }
+      }
     },
     {
       "command": "employee list",
@@ -144,13 +187,20 @@
     },
     {
       "command": "tick 30",
+      "description": "Both the vehicle and the driller route through the ramp toward (8,20) -- confirmed via direct trace neither ever goes stuck across the full budget.",
       "interaction": [
         {
           "type": "command",
           "command": "tick 30"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "stuckEmployeeCount": 0
+        }
+      }
     },
     {
       "command": "inspect 8,20,0",
