@@ -798,7 +798,17 @@ deliberately request out-of-range explosive amounts and correctly
 never detonate, already documented and asserted as such rather than
 fixed. Verified 1/1 in both modes, interaction mode re-run twice for
 determinism, 107/107 steps) ·
-⬜ level3-playthrough-win ·
+✅ level3-playthrough-win (**Finding #62** — see the findings log; the
+biggest file this batch (127 steps), recurring every established
+finding class in one place — locked level, `assign_skill` syntax,
+no-op buildings, an unused debris_hauler, and a 5th recurrence of the
+drill-grid class whose corrected grids (up to 64 holes vs. a declared
+25) kill all 10 hired employees, the most severe casualty count yet;
+like `level2-playthrough-win.json`, the hardcoded contract IDs already
+matched the real pool everywhere, and unlike it, zero random events
+fire anywhere in this file so `cash` is hard-asserted at every step
+with no softening needed. Verified 1/1 in both modes, interaction
+mode re-run twice for determinism, 127/127 steps) ·
 ⬜ ambient-timescale-sync · ⬜ landscape-continuity-visual ·
 ⬜ tutorial-steps-visual · ⬜ vehicle-purchase-visual ·
 ⬜ contract-panel-visual · ⬜ event-dialog-visual
@@ -1092,6 +1102,8 @@ of each session, in case main added/removed a file.)
 60. **Discovered while chasing an unexplained $10,000-per-cycle income jump in `level2-playthrough-win.json`'s `finances` output despite every contract delivery failing: some random events resolve silently and instantly inside a `tick` call, with no pending-choice step at all.** Traced the exact transaction via `state.finances.transactions` directly (the `finances` command's own text output truncates to the last few entries, hiding older ones) and found `{"tick":32,"amount":10000,"category":"contracts","description":"Event: lucky_strike"}` — yet the `tick` command's own output at that exact point read "Advanced 8 tick(s). Now at tick 32. **No events fired.**" This is a materially different mechanic from every other event this project has encountered so far (Findings #34/#44's `weather_bad_forecast`, this session's own `lucky_strike` instances in `level1-win-conservative.json`/`level1-win-efficient.json`/`level2-playthrough-bankruptcy.json`), all of which print `[tick N] EVENT: Name` and block on a required `event choose <index>` step. Read `acceptContract`/the `contract accept`/`deliver` command handlers directly first to rule out a mundane explanation (a signing bonus, a partial-delivery credit) — confirmed neither exists; `consumeStoredOre` (`Logistics.ts`) genuinely returns `success:false` with zero funds movement whenever requested amount exceeds either the ore-specific or raw `storedMassKg` balance, for both the ore-specific and rubble/no-ore branches. The income has to be an auto-resolving event type, distinct from the pending-choice events documented so far. Because this file has a real (if silent) event firing, `cash` is hard-asserted only through the tick it fires at (32) and left unasserted afterward, applying Ground rule #12/Finding #34's established treatment rather than assuming safety just because no `event choose` step happened to be needed. Open follow-up: worth checking whether other already-completed files' `tick` steps have silently absorbed one of these auto-events without anyone noticing, since "No events fired" in the tick output is not actually proof that nothing happened to cash.
 
 61. **`level3-playthrough-ecology.json`'s 6 `drill_plan grid` steps all already declared `spacing:3` (the Drill panel's real default) — the first file this session to get that part right from the start — but all 6 still declared a `depth` (12/12/14/14/16/16) other than the panel's real default of 6, the exact Ground rule #15/Finding #42 class, since none of their interaction arrays click a depth stepper.** Fixed all 6 to `depth:6` (plus `diameter:0.089`, matching the by-now-established pattern) proactively, before tracing at all — paid off, needed only one trace pass. Consistent with Finding #42's own precedent, the corrected shallower holes make blasts genuinely more violent, which only helps rather than hurts this file's own "ecological collapse" premise: `levelEndReason:'ecological_shutdown'` fires for real at tick 184, and by the file's end all 7 hired employees are dead. Separately (not part of this finding, already correctly handled): 2 of the file's 6 blast cycles request explosive amounts outside the given explosive's valid range (12kg and 15kg krackle against a real [1-10kg] limit) — genuine, pre-existing, deliberate authoring choices matching the file's own "no mitigation" premise, already documented in this file's own step descriptions from the #479 pass. The charge validation correctly rejects both, `sequence` still reports its nominal hole count (it doesn't check charge state), and the following `blast` fails outright with "Invalid plan: Missing charge" on every hole — `stats` confirms exactly 4 of 6 attempted cycles actually detonated. This file's `expect` blocks assert that non-firing outcome directly (chargedCount:0, unchanged holeCount) rather than treating it as something to fix. This is also the first file this session whose step descriptions already carried thorough, accurate documentation of the locked-level cascade (referencing Finding #24 by number) predating this pass entirely — confirms the #479 conversion pass did real, careful diagnostic work on this file already, this pass only needed to add `expect` on top of it.
+
+62. **`level3-playthrough-win.json` (127 steps, the largest file this batch) recurs every established finding class from the rest of Batch 7 in a single file, plus the most severe casualty count yet.** `campaign start level:treranium_depths` fails outright (Finding #58/#59/#61's class, not fixed). `employee assign_skill` used the rejected positional syntax (Finding #45/#54/#59) — fixed. All 6 `build` commands name nonexistent types — left as documented no-ops. Two `debris_hauler`s are bought but neither is ever driven — `storedMassKg` stays 0 for the whole file and all 5 deliveries fail honestly; not fixed, same reasoning as the other `win`-named files this session. Finding #52's drill-grid class recurred a 5th time across all 5 grids (declared 12/16/20/20/25 holes vs. real 24/36/30/30/64) — fixed the same way. Like `level2-playthrough-win.json`, this file's hardcoded contract IDs (1-5) all happened to already match the real pool at every listing — no ID fix needed, the 2nd file this session where that held. The corrected, dramatically larger grids (the final cycle alone: declared 25 holes → real 64) are violent enough to kill all 10 hired employees across the file's 5 blasts — `stats` confirms "Casualties: 10," the most severe outcome of the Finding #40/#56/#59 real-consequence class encountered so far. Unlike `level2-playthrough-win.json`, zero random events fire anywhere in this file's trace (income stays exactly $0.00 throughout) — no Finding #60-style cash softening was needed; `cash` is hard-asserted at every single step and held cleanly across two separate interaction-mode runs.
 
 _(Add new findings here as you hit them. Number sequentially.)_
 
@@ -1970,3 +1982,30 @@ got, whether main was merged, and whether GitHub Actions is back up yet.
   still down for this branch — all verification remains local. Next:
   the remaining 6 Batch 7 files (level3-playthrough-win next), then
   the depth-mismatch audit before Phase 3.
+- 2026-08-07 (cont.) — level3-playthrough-win.json done (**Finding
+  #62**, Batch 7 14/19), 127 steps, the largest and last of the "big
+  playthrough" files. Applied every proactive fix from the start
+  (`assign_skill` syntax, all 5 drill grids) — one trace, no
+  iteration. Recurred essentially every finding class from the rest
+  of this batch at once: locked level (Finding #58/#59/#61), no-op
+  buildings, an unused debris_hauler pair (not fixed, mechanism
+  already proven elsewhere), and a 5th recurrence of the drill-grid
+  class. The corrected grids are dramatic here — the final cycle goes
+  from a declared 25 holes to a real 64 — and kill all 10 hired
+  employees across the file's 5 blasts, the most severe casualty
+  outcome this project has produced. Like `level2-playthrough-win.json`,
+  the hardcoded contract IDs already matched the real pool everywhere;
+  unlike it, zero random events fire anywhere in this file, so `cash`
+  needed no Finding #60-style softening — hard-asserted at every
+  single step and held clean across two separate interaction-mode
+  runs. Verified: JSON valid, `scenario-defs.test.ts` green (3088
+  tests), full local sweep green (typecheck, 124/124 scenarios,
+  8328/8328 tests), command mode passes, interaction mode passes
+  twice for determinism (127/127 steps each, ~58s per run — the
+  slowest single-file run this session, matching its size). GitHub
+  Actions still down for this branch — all verification remains
+  local. This closes out every "big playthrough" file in Batch 7.
+  Next: the remaining 5 Batch 7 files, all `-visual`/sync-style files
+  expected to be much cheaper than anything done today
+  (ambient-timescale-sync next), then the depth-mismatch audit before
+  Phase 3.
