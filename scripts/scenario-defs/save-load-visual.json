@@ -11,7 +11,13 @@
           "command": "new_game seed:42"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "holeCount": 0
+        }
+      }
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -21,7 +27,12 @@
           "command": "campaign start level:dusty_hollow"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "time resume",
@@ -41,7 +52,13 @@
           "command": "tick 10"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        },
+        "note": "confirmed via direct trace: cash stays flat with no employees/buildings/vehicles to drain it"
+      }
     },
     {
       "command": "event choose 0",
@@ -61,7 +78,12 @@
           "command": "tick 10"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -101,7 +123,12 @@
           "type": "command",
           "command": "save slot:quicksave"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "state",
@@ -116,7 +143,12 @@
           "selector": "#bs-saves-modal"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "state",
@@ -135,7 +167,13 @@
           "selector": "#bs-saves-modal > div > div:first-child button"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        },
+        "note": "the real UI slot_1 here goes through SavesModal.ts's own IndexedDB-backed persistence -- a completely separate backend from the console save/load commands' in-memory quickSaveSlots map used above. This is the actual save the later load step reads back."
+      }
     },
     {
       "command": "drill_plan grid rows:2 cols:2 spacing:3 depth:4 start:15,15",
@@ -168,7 +206,12 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 4
+        }
+      }
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
@@ -178,7 +221,13 @@
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "chargedCount": 4,
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "sequence auto delay_step:25",
@@ -188,7 +237,12 @@
           "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "sequencedCount": 4
+        }
+      }
     },
     {
       "command": "blast",
@@ -216,7 +270,14 @@
           "selector": "[data-action=\"report-close\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        }
+      }
     },
     {
       "command": "state",
@@ -239,7 +300,14 @@
           "durationMs": 300
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "cash": 50000
+        },
+        "note": "command mode's own command field is the inert `state` read (see this step's description) -- it never actually reverts anything, so these values hold here simply because the post-blast state already matches them (blast always zeroes hole/charge/sequence counts, and nothing in this file ever spends cash). In a real browser, the same values hold for the opposite reason: the click genuinely reverts to slot_1's pre-blast save. Both paths converge on the same scalars, but only interaction mode is actually testing the load -- the terrain/voxel revert this step's whole point is about has no state field to check at all, only the screenshot."
+      }
     },
     {
       "command": "campaign status",
@@ -259,7 +327,14 @@
           "command": "state full"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "holeCount": 0,
+          "tickCount": 20
+        }
+      }
     }
   ],
   "shots": [

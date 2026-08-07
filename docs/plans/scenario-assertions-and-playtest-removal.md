@@ -627,7 +627,15 @@ state to check yet, so `usable`/`blocked` on real DOM selectors prove
 the New Campaign → world map → Back round trip for real, the first
 file in this project to lean on that pair for pre-game UI; no
 findings) ·
-⬜ save-load-visual · ⬜ sandbox-mode · ⬜ weather-display-visual ·
+✅ save-load-visual (no findings; confirmed the console `save`/`load`
+commands' in-memory `quickSaveSlots` map is a completely separate
+backend from the real UI's IndexedDB-backed `SavesModal.ts` slots —
+command mode's `state` steps paired with the real save/load clicks are
+deliberately inert, so the final `equals` check holds for two different
+reasons in the two modes: command mode because nothing ever reverts
+post-blast state that already matches, interaction mode because the
+click genuinely reverts to the pre-blast save; documented in a note on
+the load step) · ⬜ sandbox-mode · ⬜ weather-display-visual ·
 ⬜ weather-flood
 
 ### Batch 7 — big playthroughs + the 3 stragglers (19) — **+ tutorial parity check**
@@ -1255,3 +1263,19 @@ got, whether main was merged, and whether GitHub Actions is back up yet.
   not re-checked this session — all verification remains local. Next:
   save-load-visual, sandbox-mode, weather-display-visual, weather-flood
   to finish Batch 6.
+- 2026-08-07 (cont.) — save-load-visual.json done, no findings. Confirmed
+  the console `save`/`load` commands' in-memory `quickSaveSlots` map
+  (`src/console/commands/saveload.ts`) is a wholly separate backend from
+  the real UI's IndexedDB-backed `SavesModal.ts` slots — they never
+  interact. The file's `state` command field on the real save/load click
+  steps is deliberately inert in command mode; the final `equals` check
+  (`cash:50000`, `holeCount:0`, `tickCount:20`) holds in command mode
+  because nothing ever reverts post-blast state that already matches
+  those values, and in interaction mode because the click genuinely
+  reverts to the pre-blast slot_1 save — both paths converge on the same
+  scalars for different reasons, documented in a note on the load step.
+  Verified in both modes with a real browser. Batch 6: 15/18 done. Full
+  local sweep green: typecheck, 124/124 scenarios, 8312/8312 tests.
+  GitHub Actions still not re-checked this session — all verification
+  remains local. Next: sandbox-mode, weather-display-visual,
+  weather-flood to finish Batch 6.
