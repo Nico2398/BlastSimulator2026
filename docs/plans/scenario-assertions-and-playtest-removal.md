@@ -335,8 +335,16 @@ rich-text yield comparison left unmarked — no scalar field exists for it in
 ✅ survey-result-visualization (3 clean sequential rounds — seismic,
 core_sample, aerial — each a full 47-tick round before the next is queued,
 so no Finding #16 concurrent-queue risk; surveyCount ceiling 0→1→2→3) ·
-⬜ survey-seismic-side-effects · ⬜ survey-stale-handling ·
-⬜ survey-then-blast · ⬜ survey-then-blast-playthrough · ⬜ skill-progression
+✅ survey-seismic-side-effects (2 employees + a living_quarters build before
+the survey; traced pendingActions/employees directly to confirm the
+surveyor's walk to (20,20) from spawn is long enough that this file's
+first `survey show` checkpoint (31 ticks) genuinely predates completion —
+completes at tick ~43, not a Finding-#16-class drop; score fields
+wellBeing/safety/ecology/nuisance move during the run too, but from
+generic per-tick decay/build-effects, not specifically the survey, so left
+unmarked per the no-uncaused-assertions discipline from Findings #9/#11) ·
+⬜ survey-stale-handling · ⬜ survey-then-blast ·
+⬜ survey-then-blast-playthrough · ⬜ skill-progression
 
 ### Batch 4 — building-* (12) — **+ research-center-gate parity check**
 ⬜ building-destruction-visual · ⬜ building-lifecycle ·
