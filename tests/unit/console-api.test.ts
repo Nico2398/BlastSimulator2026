@@ -48,7 +48,12 @@ import type { MiningContext } from '../../src/console-api.js';
  * had no field to check; null until ctx.weatherCycle exists, which happens
  * lazily on the first weather command here but eagerly in the browser
  * (main.ts re-seeds it whenever ctx.state is replaced), so a scenario must
- * not assert on it before its own first weather command runs.
+ * not assert on it before its own first weather command runs. deathCount
+ * closes the same gap for state.damage.deathCount — a scenario proving a
+ * blast's projections genuinely killed an employee standing in the cleared
+ * columns had no field to check beyond inferring it from a flat
+ * employeeCount (which still counts dead employees, since killEmployee
+ * marks alive:false rather than removing the roster entry).
  */
 const SERIALIZED_FIELDS = [
   'seed', 'time', 'tickCount', 'isPaused', 'timeScale', 'mineType', 'weather',
@@ -56,7 +61,7 @@ const SERIALIZED_FIELDS = [
   'drillHoles', 'chargesByHole', 'sequenceDelays', 'finances', 'holeCount', 'chargedCount',
   'sequencedCount', 'surveyCount', 'pendingActionCount', 'buildingCount', 'vehicleCount', 'employeeCount',
   'qualificationCount', 'proficiencyTotal', 'trainingCount', 'collapsedCount', 'minFatigue',
-  'stuckEmployeeCount', 'activeContractCount',
+  'stuckEmployeeCount', 'activeContractCount', 'deathCount',
   'levelEnded', 'levelEndReason', 'bankrupt', 'revolted', 'ecologicalShutdown',
   'arrested', 'cash', 'profit', 'wellBeing', 'safety', 'ecology', 'nuisance', 'muckPile',
   'storedMassKg',
@@ -252,6 +257,27 @@ describe('console-api', () => {
       const state = serializeGameState(runner.ctx as MiningContext)!;
 
       expect(state.activeContractCount).toBe(1);
+    });
+
+    it('reports zero deathCount for a fresh game with no employees', () => {
+      runner.runner.run('new_game mine_type:desert seed:42');
+      const state = serializeGameState(runner.ctx as MiningContext)!;
+
+      expect(state.deathCount).toBe(0);
+    });
+
+    it('counts an employee killed by a blast standing in the cleared columns', () => {
+      runner.runner.run('new_game seed:42');
+      runner.runner.run('campaign start level:tutorial_pit');
+      runner.runner.run('employee hire role:driller');
+      runner.runner.run('drill_plan grid rows:4 cols:4 spacing:3 depth:8 start:15,15');
+      runner.runner.run('charge hole:* explosive:boomite amount:5 stemming:2');
+      runner.runner.run('sequence auto delay_step:25');
+      runner.runner.run('blast');
+      const state = serializeGameState(runner.ctx as MiningContext)!;
+
+      expect(state.deathCount).toBe(1);
+      expect(state.employeeCount).toBe(1);
     });
 
     it('reports zero surveyCount for a fresh game with no surveys run', () => {

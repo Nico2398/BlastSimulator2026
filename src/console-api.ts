@@ -55,6 +55,8 @@ export interface SerializableGameState {
   stuckEmployeeCount: number;
   /** Contracts currently accepted and in progress (state.contracts.active) — proves accept/deliver-completion actually moved a contract, not just clicked at. */
   activeContractCount: number;
+  /** Employees killed so far (state.damage.deathCount) — a blast's projections can kill anyone standing in the cleared columns; proves a fatality genuinely happened rather than being inferred from a flat employeeCount. */
+  deathCount: number;
   levelEnded: boolean;
   levelEndReason: string | null;
   bankrupt: boolean;
@@ -111,6 +113,7 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     minFatigue: s.employees.employees.reduce((m, e) => Math.min(m, e.fatigue), 100),
     stuckEmployeeCount: s.employees.employees.filter(e => e.isMoveStuck).length,
     activeContractCount: s.contracts.active.length,
+    deathCount: s.damage.deathCount,
     levelEnded: s.levelEnded,
     levelEndReason: s.levelEndReason,
     bankrupt: s.bankruptcy.bankrupt,

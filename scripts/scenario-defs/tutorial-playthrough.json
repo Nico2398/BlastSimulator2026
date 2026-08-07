@@ -17,7 +17,12 @@
           "command": "new_game seed:42"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "campaign start level:tutorial_pit",
@@ -27,7 +32,12 @@
           "command": "campaign start level:tutorial_pit"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 80000
+        }
+      }
     },
     {
       "command": "time speed:2",
@@ -37,7 +47,13 @@
           "command": "time speed:2"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 80000,
+          "timeScale": 2
+        }
+      }
     },
     {
       "command": "employee hire role:surveyor",
@@ -55,7 +71,13 @@
           "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 78800,
+          "employeeCount": 1
+        }
+      }
     },
     {
       "command": "employee assign_skill 1 skill:geology level:3",
@@ -65,7 +87,12 @@
           "command": "employee assign_skill 1 skill:geology level:3"
         }
       ],
-      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`."
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
+      "expect": {
+        "equals": {
+          "cash": 78800
+        }
+      }
     },
     {
       "command": "survey seismic x:15 z:15",
@@ -99,7 +126,12 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 75800
+        }
+      }
     },
     {
       "command": "employee hire role:driller",
@@ -117,7 +149,13 @@
           "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 74800,
+          "employeeCount": 2
+        }
+      }
     },
     {
       "command": "employee assign_skill 2 skill:blasting level:3",
@@ -127,10 +165,16 @@
           "command": "employee assign_skill 2 skill:blasting level:3"
         }
       ],
-      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`."
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
+      "expect": {
+        "equals": {
+          "cash": 74800
+        }
+      }
     },
     {
-      "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:15,15",
+      "command": "drill_plan grid rows:4 cols:4 spacing:3 depth:8 start:15,15",
+      "description": "Corrected from rows:3 cols:3 spacing:5 (which command mode ran literally, producing 9 holes): the click drags the (15,15)-(25,25) rectangle at the Drill panel's own default spacing (DEFAULT_SPACING_M=3), computing cols/rows as round(size/spacing)+1 = round(10/3)+1 = 4x4 = 16 holes for that same rectangle -- the command and the click were silently testing two different grids, the same class of bug already fixed in nav-cell-types-visual.json and repeated in several other files this project (hauling-gate.json, safety-projection-visual.json, core-loop-visual.json, weather-flood.json). The corrected, larger grid has a real consequence worth knowing about before charging it: see the blast step below.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -163,7 +207,13 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 16,
+          "cash": 74800
+        }
+      }
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
@@ -177,7 +227,13 @@
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "chargedCount": 16,
+          "cash": 74800
+        }
+      }
     },
     {
       "command": "sequence auto delay_step:25",
@@ -191,10 +247,16 @@
           "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "sequencedCount": 16
+        }
+      }
     },
     {
       "command": "blast",
+      "description": "Finding #40: the corrected 16-hole grid (vs. the originally-declared 9) is dense and energetic enough to kill both employees standing nearby -- confirmed via direct trace (state.damage.deathCount goes 0->2, both the surveyor and the driller, neither of whom this file ever dispatches away from the blast area first). This is a real, verified consequence of fixing the grid-spacing bug, not a scenario-authoring mistake to route around: the file's own later steps never depend on employee #1 or #2 specifically again (later roles are filled by newly-hired employees #3/#4), so the playthrough continues normally with a smaller, grimmer workforce -- exactly what a real player who dragged this same rectangle would experience.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -221,7 +283,16 @@
           "selector": "[data-action=\"report-close\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0,
+          "deathCount": 2,
+          "cash": 74800
+        }
+      }
     },
     {
       "command": "scores",
@@ -231,7 +302,13 @@
           "command": "scores"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "safety": 50
+        },
+        "note": "still the fresh-game baseline here -- the two deaths' safety penalty (recentAccidents * 5 per tick, ScoreManager.ts) only starts applying once ticking resumes, checked on the next tick step."
+      }
     },
     {
       "command": "finances",
@@ -251,7 +328,12 @@
           "command": "tick 3"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "increased": ["tickCount"],
+        "decreased": ["safety"],
+        "note": "confirmed via direct trace: safety crashes 50 -> ~20 over these 3 ticks (recentAccidents * 5 per tick against the two deaths from the blast above) -- decreased rather than an exact value since the precise magnitude depends on the accident-recency window's exact tick alignment, which real wall-clock ticking in interaction mode is not guaranteed to reproduce bit-for-bit."
+      }
     },
     {
       "command": "event fire tutorial_synergy_consultant",
@@ -261,7 +343,13 @@
           "command": "event fire tutorial_synergy_consultant"
         }
       ],
-      "description": "event fire -- test hook: no UI control and none is intended (a player cannot summon an event on demand). Left unmarked (legacy)."
+      "description": "event fire -- test hook: no UI control and none is intended (a player cannot summon an event on demand). Left unmarked (legacy).",
+      "expect": {
+        "equals": {
+          "cash": 74800
+        },
+        "note": "firing only makes the event pending -- its consequence doesn't apply until the choice below."
+      }
     },
     {
       "command": "event choose 0",
@@ -286,7 +374,14 @@
           "selector": "#bs-event-dialog .bs-event-dismiss"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 71800
+        },
+        "increased": ["wellBeing"],
+        "note": "tutorial_synergy_consultant's option 0 is a fixed, RNG-free delta (cashDelta:-3000, scoreDelta.wellBeing:15 -- TutorialEvents.ts) -- deterministic in both modes since the event itself was forced above, not randomly selected."
+      }
     },
     {
       "command": "employee hire role:manager",
@@ -304,7 +399,13 @@
           "selector": "#bs-employee-panel [data-role=\"manager\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 69800,
+          "employeeCount": 3
+        }
+      }
     },
     {
       "command": "employee assign_skill 3 skill:management level:3",
@@ -314,7 +415,12 @@
           "command": "employee assign_skill 3 skill:management level:3"
         }
       ],
-      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`."
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
+      "expect": {
+        "equals": {
+          "cash": 69800
+        }
+      }
     },
     {
       "command": "contract accept 1",
@@ -332,7 +438,12 @@
           "selector": "#bs-contract-panel .bs-contract-accept"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "activeContractCount": 1
+        }
+      }
     },
     {
       "command": "contract deliver 1 amount:5000",
@@ -342,7 +453,13 @@
           "command": "contract deliver 1 amount:5000"
         }
       ],
-      "description": "Left unmarked (legacy): `contract deliver` returns success:false rather than throwing when the amount exceeds stock, and command-mode's runner only fails a step on a thrown exception, so the exact deliverable amount here is not independently verified. Same class as Finding #2."
+      "description": "Left unmarked (legacy): `contract deliver` returns success:false rather than throwing when the amount exceeds stock, and command-mode's runner only fails a step on a thrown exception, so the exact deliverable amount here is not independently verified. Same class as Finding #2. This file never hauls anything into storage (no `vehicle haul` call anywhere), so delivery genuinely fails every time -- confirmed via direct trace (\"Not enough stored material: 0.0 kg available\").",
+      "expect": {
+        "equals": {
+          "activeContractCount": 1
+        },
+        "note": "stays active/undelivered -- economy-full-loop.json is the file that actually hauls stock and completes a delivery."
+      }
     },
     {
       "command": "finances",
@@ -370,7 +487,13 @@
           "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 69000,
+          "employeeCount": 4
+        }
+      }
     },
     {
       "command": "employee assign_skill 4 skill:driving.truck level:3",
@@ -380,7 +503,12 @@
           "command": "employee assign_skill 4 skill:driving.truck level:3"
         }
       ],
-      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`."
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
+      "expect": {
+        "equals": {
+          "cash": 69000
+        }
+      }
     },
     {
       "command": "vehicle buy debris_hauler",
@@ -398,7 +526,13 @@
           "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 44000,
+          "vehicleCount": 1
+        }
+      }
     },
     {
       "command": "vehicle driver 1 4",
@@ -412,7 +546,12 @@
           "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 44000
+        }
+      }
     },
     {
       "command": "build storage_depot at:12,8",
@@ -422,7 +561,14 @@
           "command": "build storage_depot at:12,8"
         }
       ],
-      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`)."
+      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`).",
+      "expect": {
+        "equals": {
+          "cash": 44000,
+          "buildingCount": 0
+        },
+        "note": "confirms the no-op genuinely does nothing, in both modes."
+      }
     },
     {
       "command": "contract accept 2",
@@ -440,7 +586,12 @@
           "selector": "#bs-contract-panel .bs-contract-accept"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "activeContractCount": 2
+        }
+      }
     },
     {
       "command": "contract deliver 2 amount:5000",
@@ -450,7 +601,12 @@
           "command": "contract deliver 2 amount:5000"
         }
       ],
-      "description": "Left unmarked (legacy): `contract deliver` returns success:false rather than throwing when the amount exceeds stock, and command-mode's runner only fails a step on a thrown exception, so the exact deliverable amount here is not independently verified. Same class as Finding #2."
+      "description": "Left unmarked (legacy): `contract deliver` returns success:false rather than throwing when the amount exceeds stock, and command-mode's runner only fails a step on a thrown exception, so the exact deliverable amount here is not independently verified. Same class as Finding #2. This file never hauls anything into storage -- delivery genuinely fails every time.",
+      "expect": {
+        "equals": {
+          "activeContractCount": 2
+        }
+      }
     },
     {
       "command": "finances",
@@ -492,7 +648,12 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 43000
+        }
+      }
     },
     {
       "command": "needs",
@@ -520,7 +681,12 @@
           "selector": "#bs-policy-apply"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 43000
+        }
+      }
     },
     {
       "command": "contract accept 3",
@@ -538,7 +704,12 @@
           "selector": "#bs-contract-panel .bs-contract-accept"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "activeContractCount": 3
+        }
+      }
     },
     {
       "command": "contract deliver 3 amount:5000",
@@ -548,7 +719,12 @@
           "command": "contract deliver 3 amount:5000"
         }
       ],
-      "description": "Left unmarked (legacy): `contract deliver` returns success:false rather than throwing when the amount exceeds stock, and command-mode's runner only fails a step on a thrown exception, so the exact deliverable amount here is not independently verified. Same class as Finding #2."
+      "description": "Left unmarked (legacy): `contract deliver` returns success:false rather than throwing when the amount exceeds stock, and command-mode's runner only fails a step on a thrown exception, so the exact deliverable amount here is not independently verified. Same class as Finding #2. This file never hauls anything into storage -- delivery genuinely fails every time.",
+      "expect": {
+        "equals": {
+          "activeContractCount": 3
+        }
+      }
     },
     {
       "command": "finances",
@@ -561,7 +737,8 @@
       "role": "observe"
     },
     {
-      "command": "drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:8,8",
+      "command": "drill_plan grid rows:2 cols:2 spacing:3 depth:6 start:8,8",
+      "description": "spacing corrected from 4 to 3 (the Drill panel's real default, DEFAULT_SPACING_M): the click drags a 4-unit (8,8)-(12,12) rectangle, and round(4/3)+1 = 2 either way, so the hole COUNT this file originally declared (2x2=4) already happened to match by coincidence -- but the declared spacing value did not match what the click actually uses, so corrected for accuracy per the same principle as the first drill_plan step above, even though no assertion here was actually at risk.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -594,7 +771,13 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 4,
+          "cash": 43000
+        }
+      }
     },
     {
       "command": "charge hole:* explosive:boomite amount:4 stemming:2",
@@ -604,7 +787,13 @@
           "command": "charge hole:* explosive:boomite amount:4 stemming:2"
         }
       ],
-      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show."
+      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show.",
+      "expect": {
+        "equals": {
+          "chargedCount": 4,
+          "cash": 43000
+        }
+      }
     },
     {
       "command": "sequence auto delay_step:20",
@@ -614,7 +803,12 @@
           "command": "sequence auto delay_step:20"
         }
       ],
-      "description": "Left unmarked: this delay_step doesn't match the Sequence panel's default (25ms), and the stepper that changes it has never been click-tested in this conversion (Batch 6's safety-projection-visual note) -- left as a command rather than guessing at an unproven selector."
+      "description": "Left unmarked: this delay_step doesn't match the Sequence panel's default (25ms), and the stepper that changes it has never been click-tested in this conversion (Batch 6's safety-projection-visual note) -- left as a command rather than guessing at an unproven selector.",
+      "expect": {
+        "equals": {
+          "sequencedCount": 4
+        }
+      }
     },
     {
       "command": "blast",
@@ -644,7 +838,17 @@
           "selector": "[data-action=\"report-close\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0,
+          "deathCount": 2,
+          "cash": 43000
+        },
+        "note": "confirmed via direct trace: this second, smaller blast at (8,8) doesn't add any further deaths -- neither the manager (#3) nor the driver (#4) were ever dispatched near this area, unlike the first blast's own workforce."
+      }
     },
     {
       "command": "scores",
@@ -674,7 +878,12 @@
           "command": "tick 10"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "increased": ["tickCount"],
+        "decreased": ["cash"],
+        "note": "confirmed via direct trace: cash drops from ongoing payroll/maintenance even with no active tasks (43000 -> 41130), matching every other file's ordinary tick-drain pattern."
+      }
     },
     {
       "command": "campaign status",
@@ -684,7 +893,16 @@
           "command": "campaign status"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "deathCount": 2,
+          "activeContractCount": 3,
+          "employeeCount": 4,
+          "vehicleCount": 1,
+          "holeCount": 0
+        }
+      }
     }
   ]
 }

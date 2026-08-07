@@ -443,6 +443,7 @@ window.__gameState = () => {
     minFatigue: s.employees.employees.reduce((m, e) => Math.min(m, e.fatigue), 100),
     stuckEmployeeCount: s.employees.employees.filter(e => e.isMoveStuck).length,
     activeContractCount: s.contracts.active.length,
+    deathCount: s.damage.deathCount,
     levelEnded: s.levelEnded,
     levelEndReason: s.levelEndReason,
     // ── Game-over detection fields ──
