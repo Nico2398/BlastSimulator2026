@@ -74,6 +74,8 @@ export interface PlaytestGoal {
   tutorialStep?: string;
   /** These numeric fields of the state dump must have grown. */
   increased?: string[];
+  /** These numeric fields of the state dump must have shrunk. */
+  decreased?: string[];
   /** Field/value pairs the state dump must match exactly. */
   equals?: Record<string, unknown>;
   /** A control that must be usable by now. */

@@ -85,6 +85,27 @@ describe('checkGoal — increased', () => {
   });
 });
 
+describe('checkGoal — decreased', () => {
+  it('passes when the field shrank relative to the before snapshot', async () => {
+    const page = fakePage({ gameState: { nuisance: 20 } });
+    await expect(
+      checkGoal(page, { decreased: ['nuisance'] }, { nuisance: 50 }),
+    ).resolves.toBeUndefined();
+  });
+
+  it('throws when the field did not shrink, reporting was → now', async () => {
+    const page = fakePage({ gameState: { nuisance: 50 } });
+    let caught: unknown;
+    try {
+      await checkGoal(page, { decreased: ['nuisance'] }, { nuisance: 50 });
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(PlaytestFailure);
+    expect((caught as Error).message).toContain('50 → 50');
+  });
+});
+
 describe('checkGoal — tutorialStep', () => {
   it('passes when the tutorial card is on the expected step', async () => {
     const page = fakePage({

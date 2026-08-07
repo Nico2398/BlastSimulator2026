@@ -319,6 +319,22 @@ export async function checkGoal(
     }
   }
 
+  if (goal.decreased) {
+    const after = await gameState(page);
+    for (const field of goal.decreased) {
+      const wasRaw = before[field];
+      const nowRaw = after[field];
+      const was = typeof wasRaw === 'number' ? wasRaw : 0;
+      const now = typeof nowRaw === 'number' ? nowRaw : 0;
+      if (!(now < was)) {
+        throw new PlaytestFailure(
+          `${field} should have decreased but went ${was} → ${now}`,
+          describeAvailable(await probe(page)),
+        );
+      }
+    }
+  }
+
   if (goal.equals) {
     const after = await gameState(page);
     for (const [field, expected] of Object.entries(goal.equals)) {

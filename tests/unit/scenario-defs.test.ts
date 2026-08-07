@@ -812,6 +812,13 @@ describe('Step expect field is shaped correctly when present', () => {
             expect(field.length, `step[${i}] expect.increased has an empty field name`).toBeGreaterThan(0);
           }
         }
+        if (e.decreased !== undefined) {
+          expect(Array.isArray(e.decreased), `step[${i}] expect.decreased must be an array`).toBe(true);
+          for (const field of e.decreased) {
+            expect(typeof field, `step[${i}] expect.decreased entries must be field names`).toBe('string');
+            expect(field.length, `step[${i}] expect.decreased has an empty field name`).toBeGreaterThan(0);
+          }
+        }
         if (e.equals !== undefined) {
           expect(typeof e.equals, `step[${i}] expect.equals must be an object`).toBe('object');
           expect(Object.keys(e.equals).length, `step[${i}] expect.equals is empty`).toBeGreaterThan(0);
@@ -835,12 +842,13 @@ describe('Step expect field is shaped correctly when present', () => {
         if (e === undefined) continue;
         const checkable = e.tutorialStep !== undefined
           || (e.increased?.length ?? 0) > 0
+          || (e.decreased?.length ?? 0) > 0
           || e.equals !== undefined
           || e.usable !== undefined
           || e.blocked !== undefined;
         expect(
           checkable,
-          `step[${i}] expect has no checkable field (equals/increased/usable/blocked/tutorialStep) — a note alone proves nothing`,
+          `step[${i}] expect has no checkable field (equals/increased/decreased/usable/blocked/tutorialStep) — a note alone proves nothing`,
         ).toBe(true);
       }
     });

@@ -65,6 +65,25 @@ describe('command-mode runSteps checks a step\'s expect, not just whether the co
     expect(results[2]!.error).toBeUndefined();
   });
 
+  it('passes a step whose expect.decreased field genuinely shrank', () => {
+    const results = run([
+      { command: 'new_game seed:42' },
+      // Hiring spends HIRING_COSTS.driller — cash genuinely drops.
+      { command: 'employee hire role:driller', expect: { decreased: ['cash'] } },
+    ]);
+    expect(results[1]!.error).toBeUndefined();
+  });
+
+  it('fails a step whose expect.decreased field did not move', () => {
+    const results = run([
+      { command: 'new_game seed:42' },
+      // `state` is a pure read — nothing decreases.
+      { command: 'state', expect: { decreased: ['cash'] } },
+    ]);
+    expect(results[1]!.error).toMatch(/expect failed/);
+    expect(results[1]!.error).toMatch(/cash/);
+  });
+
   it('a goal with only usable/blocked/tutorialStep is a no-op in command mode (no page to check against)', () => {
     const results = run([
       { command: 'new_game seed:42', expect: { usable: '#bs-survey-run', tutorialStep: 'time-speed' } },

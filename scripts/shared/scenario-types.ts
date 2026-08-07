@@ -107,7 +107,7 @@ export type ScenarioStepRole = 'player' | 'setup' | 'observe';
  *
  * `usable`/`blocked`/`tutorialStep` need a live page and are only checked
  * when the scenario runs in interaction mode; command mode has no DOM, so it
- * checks `equals`/`increased` only (`scenario-goal.ts`'s
+ * checks `equals`/`increased`/`decreased` only (`scenario-goal.ts`'s
  * `checkGoalAgainstState`). This is the same asymmetry the rest of the dual
  * -play mechanism already has — interaction mode is strictly the stronger
  * proof, command mode the faster one.
@@ -115,6 +115,8 @@ export type ScenarioStepRole = 'player' | 'setup' | 'observe';
 export interface ScenarioStepGoal {
   /** These numeric fields of the state dump must have grown since before this step's actions ran. */
   increased?: string[];
+  /** These numeric fields of the state dump must have shrunk since before this step's actions ran. */
+  decreased?: string[];
   /** Field/value pairs the state dump must match exactly after this step's actions ran. */
   equals?: Record<string, unknown>;
   /** A control that must be usable after this step (interaction mode only). */

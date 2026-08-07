@@ -14,11 +14,12 @@
 import type { ScenarioStepGoal } from './scenario-types.js';
 
 /**
- * Checks `goal.equals`/`goal.increased` against `before`/`after` state
- * dumps. Returns a violation message naming the field and the mismatch, or
- * `null` when everything holds. `usable`/`blocked`/`tutorialStep` are
- * silently skipped — command mode has no page to check them against, and
- * that gap is filled by the same scenario running in interaction mode.
+ * Checks `goal.equals`/`goal.increased`/`goal.decreased` against
+ * `before`/`after` state dumps. Returns a violation message naming the
+ * field and the mismatch, or `null` when everything holds.
+ * `usable`/`blocked`/`tutorialStep` are silently skipped — command mode has
+ * no page to check them against, and that gap is filled by the same
+ * scenario running in interaction mode.
  */
 export function checkGoalAgainstState(
   goal: ScenarioStepGoal,
@@ -33,6 +34,18 @@ export function checkGoalAgainstState(
       const now = typeof nowRaw === 'number' ? nowRaw : 0;
       if (!(now > was)) {
         return `${field} should have increased but went ${was} → ${now}`;
+      }
+    }
+  }
+
+  if (goal.decreased) {
+    for (const field of goal.decreased) {
+      const wasRaw = before[field];
+      const nowRaw = after?.[field];
+      const was = typeof wasRaw === 'number' ? wasRaw : 0;
+      const now = typeof nowRaw === 'number' ? nowRaw : 0;
+      if (!(now < was)) {
+        return `${field} should have decreased but went ${was} → ${now}`;
       }
     }
   }

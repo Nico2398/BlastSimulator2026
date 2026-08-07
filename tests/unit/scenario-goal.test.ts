@@ -80,6 +80,45 @@ describe('checkGoalAgainstState — increased', () => {
   });
 });
 
+describe('checkGoalAgainstState — decreased', () => {
+  it('passes when the field shrank', () => {
+    const violation = checkGoalAgainstState(
+      { decreased: ['nuisance'] },
+      { nuisance: 50 },
+      { nuisance: 20 },
+    );
+    expect(violation).toBeNull();
+  });
+
+  it('fails when the field stayed flat', () => {
+    const violation = checkGoalAgainstState(
+      { decreased: ['nuisance'] },
+      { nuisance: 50 },
+      { nuisance: 50 },
+    );
+    expect(violation).toContain('nuisance');
+    expect(violation).toContain('50 → 50');
+  });
+
+  it('fails when the field went up', () => {
+    const violation = checkGoalAgainstState(
+      { decreased: ['ecology'] },
+      { ecology: 20 },
+      { ecology: 40 },
+    );
+    expect(violation).toContain('ecology');
+  });
+
+  it('treats a missing/non-numeric before or after field as 0, not a crash', () => {
+    const violation = checkGoalAgainstState(
+      { decreased: ['newField'] },
+      { newField: 5 },
+      {},
+    );
+    expect(violation).toBeNull();
+  });
+});
+
 describe('checkGoalAgainstState — combined and empty goals', () => {
   it('checks increased before equals, reporting the first violation found', () => {
     const violation = checkGoalAgainstState(
@@ -88,6 +127,15 @@ describe('checkGoalAgainstState — combined and empty goals', () => {
       { cash: 100, buildingCount: 1 },
     );
     expect(violation).toContain('cash');
+  });
+
+  it('checks decreased before equals, reporting the first violation found', () => {
+    const violation = checkGoalAgainstState(
+      { decreased: ['nuisance'], equals: { buildingCount: 1 } },
+      { nuisance: 50 },
+      { nuisance: 50, buildingCount: 1 },
+    );
+    expect(violation).toContain('nuisance');
   });
 
   it('a goal with only usable/blocked/tutorialStep/note (no equals or increased) passes trivially in command mode', () => {
