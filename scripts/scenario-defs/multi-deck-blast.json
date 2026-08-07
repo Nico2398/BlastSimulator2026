@@ -19,8 +19,8 @@
       }
     },
     {
-      "command": "drill_plan grid rows:2 cols:2 spacing:6 depth:20 start:20,20",
-      "description": "The grid tool's spacing stepper defaults to 3m (DEFAULT_SPACING_M, Drill.ts); three increment clicks on the strip's spacing stepper (data-field=\"spacing\") raise it 3->6m before dragging, so the (20,20)-(26,26) rectangle (6x6) computes the declared 2x2 instead of the default-spacing 3x3 (issue #479 follow-up, Finding #4).",
+      "command": "drill_plan grid rows:2 cols:2 spacing:6 depth:6 start:20,20",
+      "description": "The grid tool's spacing stepper defaults to 3m (DEFAULT_SPACING_M, Drill.ts); three increment clicks on the strip's spacing stepper (data-field=\"spacing\") raise it 3->6m before dragging, so the (20,20)-(26,26) rectangle (6x6) computes the declared 2x2 instead of the default-spacing 3x3 (issue #479 follow-up, Finding #4). depth:6 matches the grid tool's own default (DEFAULT_DEPTH_M, Drill.ts) -- this step's interaction array never clicks the depth stepper (data-field=\"depth\"), so the real drag always produces 6m regardless of what's declared (Ground rule #15/Finding #42's class); the file originally declared depth:20 for 'deep fracture' flavor, but a real interaction-mode run at the true 6m depth still produces the exact same PERFECT/0-projections outcome this file's premise describes, confirmed empirically rather than assumed -- so the fix here is only correcting the declared metadata to match reality, no downstream behavior changes.",
       "interaction": [
         {
           "type": "clickSelector",
