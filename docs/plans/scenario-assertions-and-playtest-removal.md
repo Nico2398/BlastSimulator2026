@@ -483,7 +483,12 @@ re-trace confirmed the file's actual premise holds for real: genuine
 collapse at 50 ticks, genuine recovery by 250, staying recovered through
 to the end — unlike Findings #20/#21's false narratives, this one just
 needed the event-handling fix) ·
-⬜ needs-cost-visual · ⬜ needs-cycle · ⬜ needs-drain-visual ·
+✅ needs-cost-visual (confirmed the file's own claim for real: by 170
+total ticks a genuine "needs" expense category appears in `finances`
+output — Rest: hunger, $50 each — as minFatigue crashes toward the
+collapse threshold; added missing `event choose 0` after every tick
+step, matching Finding #23's fix) ·
+⬜ needs-cycle · ⬜ needs-drain-visual ·
 ⬜ needs-gauges-visual · ⬜ needs-morale-visual ·
 ⬜ needs-proactive-queue-visual · ⬜ needs-replenishment-visual ·
 ⬜ needs-shift-cycle-visual · ⬜ nav-dynamic-updates-visual ·
