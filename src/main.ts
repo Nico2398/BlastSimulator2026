@@ -436,24 +436,29 @@ function runGameCommand(cmd: string, opts?: { syncRenderer?: boolean }): Command
   if (opts?.syncRenderer !== false) gameRenderer.syncFromContext(ctx);
   const cmdName = parseCommand(cmd).command;
 
+  // Whether this command replaced ctx.state with a new object — new_game,
+  // campaign level transitions, sandbox start, and any future entry point
+  // that does the same. Comparing identity rather than matching command
+  // names means this can't miss one.
+  const enteredNewLevel = Boolean(ctx.state && ctx.state !== prevState);
+
   // A fresh game replaces whatever the splash screen was showing — the normal
   // click paths (world map "Start", tutorial button) already call
-  // mainMenu.hide() themselves, but `new_game` run directly (console mode,
-  // scenario harness) bypassed that and left the overlay covering the canvas.
-  if (cmdName === 'new_game' && result.success) {
+  // mainMenu.hide() themselves, but a level-entry command run directly
+  // (console mode, scenario harness) bypassed that and left the overlay
+  // covering the canvas.
+  if (enteredNewLevel) {
     mainMenu.hide();
   }
 
   // (Re)seed the weather cycle whenever ctx.state was replaced with a new
-  // object — new_game, campaign level transitions, sandbox start, and any
-  // future entry point that does the same. Comparing identity rather than
-  // matching command names means this can't miss one. Previously
-  // ctx.weatherCycle only ever got created lazily inside weatherCommand
-  // (the `weather` console command, which nothing player-facing calls), so
-  // outside of manual console/test use the weather popover would have had
-  // nothing real to show, and a second game in the same session would have
-  // kept the first game's weather cycle at the wrong seed.
-  if (ctx.state && ctx.state !== prevState) {
+  // object. Previously ctx.weatherCycle only ever got created lazily inside
+  // weatherCommand (the `weather` console command, which nothing
+  // player-facing calls), so outside of manual console/test use the weather
+  // popover would have had nothing real to show, and a second game in the
+  // same session would have kept the first game's weather cycle at the wrong
+  // seed.
+  if (enteredNewLevel && ctx.state) {
     ctx.weatherCycle = createWeatherCycle(ctx.state.seed);
     ctx.rng = new Random(ctx.state.seed + 1000);
   }
