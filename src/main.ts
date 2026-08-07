@@ -17,8 +17,7 @@ import type { LoadingSiteInfo } from './ui/LoadingScreen.js';
 import type { CommandResult } from './console/ConsoleRunner.js';
 import { getLevel, getAllLevels, type LevelDef } from './core/campaign/Level.js';
 import { formatMoney } from './core/economy/formatMoney.js';
-import { SANDBOX_DEFAULTS, type SandboxConfig } from './core/campaign/Sandbox.js';
-import { getAllExplosives } from './core/world/ExplosiveCatalog.js';
+import { SANDBOX_DEFAULTS, sandboxLevelDef, type SandboxConfig } from './core/campaign/Sandbox.js';
 import { AudioManager } from './audio/AudioManager.js';
 import { AudioHooks } from './audio/AudioHooks.js';
 import { IndexedDBPersistence } from './persistence/IndexedDBPersistence.js';
@@ -253,19 +252,20 @@ function buildLoadingSiteInfo(level: LevelDef): LoadingSiteInfo {
 
 /** Loading screen content for a sandbox site — no site number, no difficulty pips. */
 function buildSandboxLoadingSiteInfo(config: SandboxConfig): LoadingSiteInfo {
-  // Empty availableExplosives means "every explosive" (SandboxConfig's own convention).
-  const explosivesCount = config.availableExplosives.length > 0
-    ? config.availableExplosives.length
-    : getAllExplosives().length;
+  // TODO(#504): implementer — reduced SandboxConfig no longer carries
+  // startingCash/unlockThreshold/availableExplosives directly; derive the
+  // briefing from SANDBOX_DIFFICULTIES[config.difficulty] and sandboxLevelDef(config)
+  // (or the LevelDef built for this site) instead of the config itself.
+  const level = sandboxLevelDef(config);
   return {
     siteNumber: null,
     biomeCategoryKey: BIOME_CATEGORY_KEY[config.biome] ?? DEFAULT_BIOME_CATEGORY_KEY,
     difficulty: 0,
     descriptionKey: 'loading.sandbox_subtitle',
     briefing: [
-      { labelKey: 'loading.brief.starting_cash', value: `$${formatMoney(config.startingCash)}` },
-      { labelKey: 'loading.brief.target', value: `$${formatMoney(config.unlockThreshold)}` },
-      { labelKey: 'loading.brief.explosives', value: String(explosivesCount) },
+      { labelKey: 'loading.brief.starting_cash', value: `$${formatMoney(level.startingCash)}` },
+      { labelKey: 'loading.brief.target', value: `$${formatMoney(level.unlockThreshold)}` },
+      { labelKey: 'loading.brief.explosives', value: String(level.availableExplosives.length) },
     ],
   };
 }
@@ -308,14 +308,8 @@ const sandboxPanel = new SandboxPanel(uiContainer);
 mainMenu.setOnSandbox(() => { mainMenu.hide(); sandboxPanel.show(); });
 sandboxPanel.setOnBack(() => { mainMenu.show(); });
 sandboxPanel.setOnStart((config) => {
-  const explosives = config.availableExplosives.length > 0
-    ? ` explosives:${config.availableExplosives.join(',')}`
-    : '';
   void enterLevel([
-    `sandbox start biome:${config.biome} seed:${config.seed} size:${config.size}` +
-    ` depth:${config.depth} cash:${config.startingCash} goal:${config.unlockThreshold}` +
-    ` events:${config.eventFreqMultiplier} prices:${config.contractPriceMultiplier}` +
-    ` decay:${config.scoreDecayRate} mixed_rock:${config.mixedRockHardness}${explosives}`,
+    `sandbox start biome:${config.biome} difficulty:${config.difficulty} seed:${config.seed}`,
   ], buildSandboxLoadingSiteInfo(config));
 });
 

@@ -80,6 +80,13 @@ export const BRIBERY_COSTS = {
 /** Score decay rate per tick (0–100 scale). All scores trend toward 50 without input. */
 export const SCORE_DECAY_RATE = 0.05;
 
+// ─── World / Sandbox ────────────────────────────────────────────────────────────
+
+/** Grid edge length (voxels), X/Z, used when a size is not explicitly given. */
+export const DEFAULT_GRID_SIZE = 64;
+/** Fixed sandbox site depth (voxels), Y. Sandbox no longer exposes depth as a player control (#504). */
+export const SANDBOX_GRID_DEPTH = 32;
+
 // ─── Campaign / Win-Lose Thresholds ────────────────────────────────────────────
 
 /** Cash below which bankruptcy warning fires ($). */

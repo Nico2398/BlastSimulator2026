@@ -37,8 +37,11 @@ export class SandboxPanel {
   private onBack?: OnSandboxBack;
   /** Live controls by config key, so randomising the seed can write back into its input. */
   private readonly inputs = new Map<string, HTMLInputElement>();
+  /** Injectable RNG for the seed, so tests stay deterministic (#504). */
+  private readonly rand: () => number;
 
-  constructor(container: HTMLElement) {
+  constructor(container: HTMLElement, rand: () => number = Math.random) {
+    this.rand = rand;
     this.overlay = document.createElement('div');
     this.overlay.id = 'bs-sandbox-panel';
     this.overlay.style.cssText = [
@@ -136,16 +139,7 @@ export class SandboxPanel {
     label.textContent = t(field.labelKey);
     row.appendChild(label);
 
-    if (field.kind === 'multi') {
-      row.style.flexDirection = 'column';
-      row.style.alignItems = 'stretch';
-      row.appendChild(this.renderExplosives());
-      return row;
-    }
-
-    const control = field.kind === 'choice' ? this.renderChoice(field)
-      : field.kind === 'boolean' ? this.renderBoolean(field)
-      : this.renderNumber(field);
+    const control = field.kind === 'choice' ? this.renderChoice(field) : this.renderNumber(field);
 
     // The seed is the one field a player copies down and types back in, so it
     // gets a randomise control right next to it.
@@ -160,7 +154,7 @@ export class SandboxPanel {
       dice.setAttribute('aria-label', t('sandbox.randomize'));
       dice.textContent = '🎲';
       dice.addEventListener('click', () => {
-        this.config.seed = randomSandboxSeed();
+        this.config.seed = randomSandboxSeed(this.rand);
         const input = this.inputs.get('seed');
         if (input) input.value = String(this.config.seed);
       });
@@ -210,57 +204,7 @@ export class SandboxPanel {
     return select;
   }
 
-  private renderBoolean(field: SandboxField): HTMLElement {
-    const input = document.createElement('input');
-    input.id = `bs-sandbox-${String(field.key)}`;
-    input.type = 'checkbox';
-    input.style.cssText = 'width:16px;height:16px;accent-color:#c08030';
-    input.checked = Boolean(this.config[field.key]);
-    input.addEventListener('change', () => {
-      this.config = clampSandboxConfig({ ...this.config, [field.key]: input.checked });
-    });
-    return input;
-  }
-
-  /**
-   * Explosive availability. Nothing ticked means "all of them" — the same
-   * convention the config uses, so a player who ignores this row gets the full
-   * catalog rather than an unplayable site with no explosives.
-   */
-  private renderExplosives(): HTMLElement {
-    const wrap = document.createElement('div');
-    wrap.id = 'bs-sandbox-availableExplosives';
-    wrap.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;margin-top:4px';
-
-    const field = SANDBOX_FIELDS.find(f => f.key === 'availableExplosives')!;
-    for (const option of field.options?.() ?? []) {
-      const tag = document.createElement('label');
-      tag.style.cssText = [
-        'display:flex;align-items:center;gap:4px;font-size:11px;color:#a08850',
-        'border:1px solid rgba(200,160,60,0.25);border-radius:4px;padding:3px 7px;cursor:pointer',
-      ].join(';');
-
-      const box = document.createElement('input');
-      box.type = 'checkbox';
-      box.id = `bs-sandbox-explosive-${option.id}`;
-      box.style.cssText = 'width:12px;height:12px;accent-color:#c08030';
-      box.checked = this.config.availableExplosives.includes(option.id);
-      box.addEventListener('change', () => {
-        const current = new Set(this.config.availableExplosives);
-        if (box.checked) current.add(option.id); else current.delete(option.id);
-        this.config = clampSandboxConfig({ ...this.config, availableExplosives: [...current] });
-      });
-
-      const text = document.createElement('span');
-      text.textContent = t(option.labelKey);
-      tag.append(box, text);
-      wrap.appendChild(tag);
-    }
-
-    const hint = document.createElement('div');
-    hint.style.cssText = 'font-size:10px;color:#5a4428;width:100%;margin-top:2px';
-    hint.textContent = t('sandbox.explosives_hint');
-    wrap.appendChild(hint);
-    return wrap;
-  }
+  // renderBoolean/renderExplosives removed (#504) — SandboxConfig no longer
+  // carries a boolean or multi field (mixedRockHardness/availableExplosives
+  // are gone), so SandboxFieldKind no longer has 'boolean'/'multi' variants.
 }

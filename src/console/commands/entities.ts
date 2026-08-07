@@ -24,7 +24,7 @@ import type { VoxelGrid } from '../../core/world/VoxelGrid.js';
 
 import { requireGame, NO_EMPLOYEES_MSG } from './commandUtils.js';
 import { claimForAction, cellsInRect } from './siteExpansion.js';
-import { DEFAULT_GRID_SIZE } from './world.js';
+import { DEFAULT_GRID_SIZE } from '../../core/config/balance.js';
 
 // The employee command moved to ./employees.ts; re-exported so existing imports
 // and the runner registration keep resolving from here.

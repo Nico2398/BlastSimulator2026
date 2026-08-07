@@ -14,6 +14,7 @@ import { getDominantRockId } from '../../core/world/VoxelGrid.js';
 import type { VoxelGrid } from '../../core/world/VoxelGrid.js';
 import { EventEmitter } from '../../core/state/EventEmitter.js';
 import { decodeVoxelGrid, type SerializedVoxels, type SerializedTerrainGen } from '../../core/state/VoxelGridCodec.js';
+import { DEFAULT_GRID_SIZE } from '../../core/config/balance.js';
 
 /**
  * The landscape's coarse tile map plus a reusable fine-grained sampler
@@ -100,8 +101,8 @@ function gridDirtyRegion(grid: VoxelGrid): {
   };
 }
 
-/** Grid edge length (voxels) used when a size is not explicitly given. */
-export const DEFAULT_GRID_SIZE = 64;
+/** Re-exported so existing importers of `./world.js` keep working (#504 moved the source of truth to core/config/balance.js). */
+export { DEFAULT_GRID_SIZE };
 
 /**
  * Regenerate `ctx.grid` and its dependent navgrid for `ctx.state`. The
