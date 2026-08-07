@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { LoadingScreen, nextPaint, type LoadingSiteInfo } from '../../../src/ui/LoadingScreen.js';
 import { LOADING_QUIPS, QuipBag, LOADING_TIPS, TipBag } from '../../../src/ui/loadingQuips.js';
-import { t } from '../../../src/core/i18n/I18n.js';
+import { t, setLocale, getLocale } from '../../../src/core/i18n/I18n.js';
 
 /** Fixture site info for the eyebrow/subtitle/briefing block tests (#493). */
 const FIXTURE_SITE_INFO: LoadingSiteInfo = {
@@ -281,6 +281,20 @@ describe('LoadingScreen — segment marks and stage row', () => {
     // Final phase reports current === total.
     expect(seen[n - 1]!.label).toBe(t('loading.stage_label', { current: n, total: n }));
   });
+
+  it('show() populates the stage row immediately, before any phase runs (#493)', () => {
+    expect(screen.stageLabelText).toBe('');
+    expect(screen.stageMetaText).toBe('');
+    screen.show();
+    // No phase count is known yet at show()-time — the debug-preview path
+    // never calls runPhases() at all — so the row must not stay blank the
+    // way it did before this fix, but it also must not read "0 / 0" as if
+    // there were zero total stages.
+    expect(screen.stageLabelText.length).toBeGreaterThan(0);
+    expect(screen.stageMetaText.length).toBeGreaterThan(0);
+    expect(screen.stageLabelText).not.toContain('0');
+    expect(screen.stageMetaText).not.toContain('0');
+  });
 });
 
 // ── Tip block (#493) ──
@@ -347,6 +361,29 @@ describe('LoadingScreen — tip block', () => {
     ]);
     expect(before).not.toBeNull();
     expect(after).toEqual(before);
+  });
+
+  it('TIP badge and NEXT button retranslate on locale switch across shows (#493)', () => {
+    const original = getLocale();
+    try {
+      screen.show();
+      expect(screen.tipLabelText).toBe(t('loading.tip_label'));
+      expect(screen.tipNextText).toBe(t('loading.tip_next'));
+
+      setLocale('fr');
+      screen.show();
+      expect(screen.tipLabelText).toBe(t('loading.tip_label'));
+      expect(screen.tipNextText).toBe(t('loading.tip_next'));
+      expect(screen.tipLabelText).toBe('ASTUCE');
+      expect(screen.tipNextText).toBe('SUIVANT');
+
+      setLocale('en');
+      screen.show();
+      expect(screen.tipLabelText).toBe('TIP');
+      expect(screen.tipNextText).toBe('NEXT');
+    } finally {
+      setLocale(original);
+    }
   });
 });
 

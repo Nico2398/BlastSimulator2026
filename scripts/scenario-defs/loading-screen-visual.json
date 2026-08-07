@@ -177,6 +177,39 @@
     },
     {
       "command": "state",
+      "description": "Debug-preview a level load under the FR locale — every block (eyebrow, subtitle, briefing, stage row, TIP/NEXT) must retranslate with no clipped or overflowing text (#493).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state"
+        },
+        {
+          "type": "loadingScreenDebug",
+          "action": "preview",
+          "kind": "level",
+          "locale": "fr"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-loading-screen",
+          "property": "visible",
+          "expectedValue": true
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-loading-eyebrow"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-loading-tip-text"
+        },
+        {
+          "type": "screenshot"
+        }
+      ]
+    },
+    {
+      "command": "state",
       "description": "Dismiss the debug preview — the overlay must come back down without a real level ever loading.",
       "interaction": [
         {

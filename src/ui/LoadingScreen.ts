@@ -153,6 +153,7 @@ export class LoadingScreen {
   private readonly marksLayer: HTMLElement;
   private readonly stageLabelEl: HTMLElement;
   private readonly stageMetaEl: HTMLElement;
+  private readonly tipLabelEl: HTMLElement;
   private readonly tipTextEl: HTMLElement;
   private readonly tipNextBtn: HTMLButtonElement;
   private readonly quips = new QuipBag();
@@ -238,10 +239,9 @@ export class LoadingScreen {
     const tipIconWrap = document.createElement('span');
     tipIconWrap.className = 'bsx-loading-tip-icon';
     tipIconWrap.appendChild(iconEl('training', 13));
-    const tipLabelEl = document.createElement('span');
-    tipLabelEl.className = 'bsx-loading-tip-label';
-    tipLabelEl.textContent = t('loading.tip_label');
-    tipIconWrap.appendChild(tipLabelEl);
+    this.tipLabelEl = document.createElement('span');
+    this.tipLabelEl.className = 'bsx-loading-tip-label';
+    tipIconWrap.appendChild(this.tipLabelEl);
     this.tipTextEl = document.createElement('span');
     this.tipTextEl.id = 'bs-loading-tip-text';
     this.tipTextEl.className = 'bsx-loading-tip-text';
@@ -249,8 +249,8 @@ export class LoadingScreen {
     this.tipNextBtn.id = 'bs-loading-tip-next';
     this.tipNextBtn.className = 'bsx-loading-tip-next';
     this.tipNextBtn.type = 'button';
-    this.tipNextBtn.title = t('loading.tip_next_hint');
-    this.tipNextBtn.textContent = t('loading.tip_next');
+    // Click wiring only — label text is set per-show() in renderTip() so it
+    // refreshes on locale switch, same as every other block.
     this.tipNextBtn.addEventListener('click', () => { this.nextTip(); });
     tipBlock.append(tipIconWrap, this.tipTextEl, this.tipNextBtn);
 
@@ -298,11 +298,18 @@ export class LoadingScreen {
   /** Tip text currently shown in the tip block — exposed for tests. */
   get tipText(): string { return this.tipTextEl.textContent ?? ''; }
 
+  /** TIP badge label — exposed for tests (locale refresh, #493). */
+  get tipLabelText(): string { return this.tipLabelEl.textContent ?? ''; }
+
+  /** NEXT button label — exposed for tests (locale refresh, #493). */
+  get tipNextText(): string { return this.tipNextBtn.textContent ?? ''; }
+
   show(siteInfo?: LoadingSiteInfo): void {
     this.titleEl.textContent = t('loading.title');
     this.renderEyebrow(siteInfo ?? null);
     this.renderSubtitle(siteInfo ?? null);
     this.renderBriefing(siteInfo ?? null);
+    this.setStage(0, 0);
     this.renderTip();
     this.setPhase(this.quips.next(), 0);
     this.overlay.style.display = 'flex';
@@ -400,14 +407,30 @@ export class LoadingScreen {
     }
   }
 
-  /** Update the stage label + meta alongside the percentage. */
+  /**
+   * Update the stage label + meta alongside the percentage.
+   *
+   * `total <= 0` means no phase count is known yet — `show()` calls this
+   * before `runPhases()` has any phases to report, e.g. the debug-preview
+   * path that never calls `runPhases()` at all. "PHASE 0 / 0" would read as
+   * zero total stages rather than "not started yet", so an em dash stands in
+   * for both numbers until the first real call arrives.
+   */
   private setStage(current: number, total: number): void {
+    if (total <= 0) {
+      this.stageLabelEl.textContent = t('loading.stage_label', { current: '—', total: '—' });
+      this.stageMetaEl.textContent = t('loading.stage_meta', { current: '—', total: '—' });
+      return;
+    }
     this.stageLabelEl.textContent = t('loading.stage_label', { current, total });
     this.stageMetaEl.textContent = t('loading.stage_meta', { current, total });
   }
 
-  /** Draw the next tip into the tip block. */
+  /** Refresh the tip block's own static labels, then draw the next tip. */
   private renderTip(): void {
+    this.tipLabelEl.textContent = t('loading.tip_label');
+    this.tipNextBtn.title = t('loading.tip_next_hint');
+    this.tipNextBtn.textContent = t('loading.tip_next');
     this.nextTip();
   }
 
