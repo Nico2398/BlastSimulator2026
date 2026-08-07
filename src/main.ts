@@ -446,9 +446,14 @@ function runGameCommand(cmd: string, opts?: { syncRenderer?: boolean }): Command
   // click paths (world map "Start", tutorial button) already call
   // mainMenu.hide() themselves, but a level-entry command run directly
   // (console mode, scenario harness) bypassed that and left the overlay
-  // covering the canvas.
+  // covering the canvas. Same identity change also has to close any overlay
+  // whose visibility is a stale carry-over from the PREVIOUS level's ended
+  // state (e.g. BlastReportModal left open from an earlier site's last
+  // blast) — a second `sandbox start` otherwise left that site's "Rating:
+  // Perfect" dialog covering the new site's terrain (#504).
   if (enteredNewLevel) {
     mainMenu.hide();
+    uiManager.closeStaleLevelOverlays();
   }
 
   // (Re)seed the weather cycle whenever ctx.state was replaced with a new
