@@ -426,7 +426,11 @@ exceeds 2 in this file) ·
 higher $230,000 starting cash, genuinely completes the full T1→T2→T3
 progression — confirmed via a real dump and fully asserted, closing the
 research-center-gate.json parity row's tier-unlock requirement) ·
-⬜ building-tier-system-visual · ⬜ building-training-visual ·
+✅ building-tier-system-visual (real Build-panel clicks throughout —
+Queue Research, Upgrade, Demolish, no console shortcuts; confirmed
+`build upgrade` REPLACES the building with a new id rather than adding
+one, buildingCount stays flat across both T1→T2 and T2→T3 upgrades) ·
+⬜ building-training-visual ·
 ⬜ building-vehicle-depot-visual · ⬜ building-warehouse-visual
 
 ### Batch 5 — vehicle-* / needs-* / nav-* (22)
