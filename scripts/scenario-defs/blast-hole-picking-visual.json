@@ -33,9 +33,9 @@
       }
     },
     {
-      "command": "drill_plan grid origin:10,10 rows:1 cols:1 spacing:3 depth:8",
+      "command": "drill_plan grid origin:10,10 rows:1 cols:1 spacing:3 depth:6",
       "timeout": 30,
-      "description": "Setup: a single drill hole (H1) at a known position — its own position is the click target",
+      "description": "Setup: a single drill hole (H1) at a known position \u2014 its own position is the click target depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -74,7 +74,7 @@
     {
       "command": "state",
       "timeout": 30,
-      "description": "Click the hole marker — a dashed selection ring appears on the ground and the bottom selection bar shows the hole's id/depth and a Focus action",
+      "description": "Click the hole marker \u2014 a dashed selection ring appears on the ground and the bottom selection bar shows the hole's id/depth and a Focus action",
       "interaction": [
         {
           "type": "command",
@@ -112,7 +112,7 @@
     {
       "command": "state",
       "timeout": 30,
-      "description": "Esc deselects — the ring and the selection bar both disappear",
+      "description": "Esc deselects \u2014 the ring and the selection bar both disappear",
       "interaction": [
         {
           "type": "command",
