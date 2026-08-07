@@ -267,7 +267,19 @@ decreased/increased there**) · ✅ ramp-navigation (**Finding #13: a real
 production bug — buildRampCommand deducted cash but never called
 addExpense, so finances.cash silently diverged from the real cash field
 after any ramp build; fixed at the root, new unit test added**) ·
-⬜ blast-execution-visual
+✅ blast-execution-visual (Finding #4 grid fixes across 2 of its 4 grids +
+Finding #5 stemming-floor fix across 2 of its 4 charge steps, all 4
+grid/charge/sequence/blast cycles now asserted end to end)
+
+### Batch 2 — ✅ COMPLETE (25/25 files, 5 real production bugs found and
+fixed this batch: #4-class grid mismatches, #5-class stemming-floor gaps,
+#7 bare-numeric hole ids, #8 drill_plan grid replacing the whole plan, #9
+fabricated fine premise + amount-exceeds-max, #10 explosive selection never
+clicked, #11 collapse-recovery's claim not holding at its own tick budget,
+#12 cash-after-tick-gap cross-mode drift, #13 buildRampCommand's finance
+sync bug — plus 2 mechanism extensions: `decreased` goal field, and 3 new
+state fields (wellBeing/safety/ecology/nuisance, collapsedCount/minFatigue,
+storedMassKg))
 
 ### Batch 3 — survey-* (12, survey-panel-visual done in Batch 0)
 ⬜ survey-confidence-display · ⬜ survey-confidence-overlay ·
