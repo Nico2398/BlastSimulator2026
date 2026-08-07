@@ -1,6 +1,6 @@
 {
   "name": "vehicle-traffic",
-  "description": "Chapter 2: Add 4 haulers with drivers on narrow ramp and verify TrafficJamEvent triggers",
+  "description": "Chapter 2: Add 4 haulers with drivers, converge 3 of them on one tile. Finding #21: TrafficJamEvent never actually fires here, at any tick budget — a direct engine trace confirms why: the redirect happens only 5 ticks after the initial move commands, nowhere near enough travel time from the shared vehicle spawn point to reach the 3 separate staging tiles first, so all 3 vehicles travel in perfect lockstep the whole way and arrive together with no contention. detectTrafficJam (EventEngine.ts) also requires TRAFFIC_JAM_MIN_VEHICLES=3 vehicles simultaneously in the 'waiting' state on the same target tile for TRAFFIC_JAM_MIN_TICKS=10+ ticks; with only 3 vehicles converging (1 occupies the tile, at most 2 can ever be blocked waiting on it), that threshold is structurally out of reach regardless of timing — a real jam would need a 4th vehicle also converging on the same point. This file exercises real vehicle pathing/redirection but does not exercise TrafficJamEvent; assertions reflect that.",
   "steps": [
     {
       "command": "new_game seed:42 cash:150000",
@@ -11,7 +11,13 @@
         }
       ],
       "role": "setup",
-      "description": "Bumped cash from the 50k default to 150k: 4 drivers ($3200) + 4 debris_haulers ($100000) overdraws command mode past the 3rd/4th buy, which is required for the traffic-jam test itself (4 vehicles converging on one tile)."
+      "description": "Bumped cash from the 50k default to 150k: 4 drivers ($3200) + 4 debris_haulers ($100000) overdraws command mode past the 3rd/4th buy, which is required for the traffic-jam test itself (4 vehicles converging on one tile).",
+      "expect": {
+        "equals": {
+          "cash": 150000,
+          "vehicleCount": 0
+        }
+      }
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -22,7 +28,13 @@
         }
       ],
       "role": "setup",
-      "description": "campaign start replaces the whole GameState including cash, reset to the level's own startingCash -- a `new_game ... cash:N` override does not survive this step (tried, reverted; see vehicle-3d-rendering-visual for the same finding)."
+      "description": "campaign start replaces the whole GameState including cash, reset to the level's own startingCash -- a `new_game ... cash:N` override does not survive this step (tried, reverted; see vehicle-3d-rendering-visual for the same finding).",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "vehicleCount": 0
+        }
+      }
     },
     {
       "command": "time resume",
@@ -50,7 +62,13 @@
           "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 49200,
+          "employeeCount": 1
+        }
+      }
     },
     {
       "command": "employee hire role:driver",
@@ -64,7 +82,13 @@
           "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 48400,
+          "employeeCount": 2
+        }
+      }
     },
     {
       "command": "employee hire role:driver",
@@ -78,7 +102,13 @@
           "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 47600,
+          "employeeCount": 3
+        }
+      }
     },
     {
       "command": "employee hire role:driver",
@@ -92,7 +122,13 @@
           "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 46800,
+          "employeeCount": 4
+        }
+      }
     },
     {
       "command": "vehicle buy debris_hauler",
@@ -110,7 +146,13 @@
           "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 21800,
+          "vehicleCount": 1
+        }
+      }
     },
     {
       "command": "vehicle buy debris_hauler",
@@ -120,7 +162,13 @@
           "command": "vehicle buy debris_hauler"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
+      "description": "Left unmarked: cash is already at or below cost, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "expect": {
+        "equals": {
+          "cash": -3200,
+          "vehicleCount": 2
+        }
+      }
     },
     {
       "command": "vehicle buy debris_hauler",
@@ -130,7 +178,13 @@
           "command": "vehicle buy debris_hauler"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
+      "description": "Left unmarked: cash is already at or below cost, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "expect": {
+        "equals": {
+          "cash": -28200,
+          "vehicleCount": 3
+        }
+      }
     },
     {
       "command": "vehicle buy debris_hauler",
@@ -140,7 +194,13 @@
           "command": "vehicle buy debris_hauler"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
+      "description": "Left unmarked: cash is already at or below cost, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "expect": {
+        "equals": {
+          "cash": -53200,
+          "vehicleCount": 4
+        }
+      }
     },
     {
       "command": "vehicle move 2 to:21,20",
@@ -230,7 +290,13 @@
           "command": "tick 20"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "vehicleCount": 4
+        },
+        "note": "Finding #21: confirmed via a direct engine trace (state.events.pendingEvent) that no TrafficJamEvent fires by this point, at 25 total ticks or any larger budget tested — see the file's top-level description for why. No scalar field exists to assert the negative directly (pendingEvent isn't in SerializableGameState), so this anchors on the one thing that IS externally checkable: the fleet stays at 4, undisturbed."
+      }
     },
     {
       "command": "state full",
