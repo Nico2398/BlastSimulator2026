@@ -585,8 +585,14 @@ findings log) ·
 buildingCount/activeContractCount/wellBeing traced through hires,
 tick-driven payroll+maintenance+fuel drain, a vehicle purchase, a
 build, and a contract accept; no findings) ·
-⬜ economy-full-loop (**Finding #32 surfaced here** — see the findings
-log; assertions not yet applied, in progress) · ⬜ hauling-gate ·
+✅ economy-full-loop (**Finding #32** — see the findings log; the full
+survey→drill→charge→sequence→blast→haul→contract-deliver pipeline
+traced end to end with cash/employeeCount/buildingCount/vehicleCount/
+holeCount/chargedCount/sequencedCount/storedMassKg/surveyCount/
+activeContractCount/qualificationCount/proficiencyTotal all asserted;
+this is the one file in the batch where `contract deliver` genuinely
+succeeds, since it's the only one that actually hauls stock into a
+warehouse first) · ⬜ hauling-gate ·
 ⬜ maintenance-cost-drain · ⬜ scores-display-visual ·
 ⬜ time-management-visual · ⬜ safety-projection-visual ·
 ⬜ core-loop-visual · ⬜ i18n-display-visual · ⬜ main-menu-visual ·
@@ -1106,4 +1112,18 @@ got, whether main was merged, and whether GitHub Actions is back up yet.
   re-checked this session — all verification remains local. Batch 6:
   5/18 done. Next: finish economy-full-loop.json's own assertions
   (re-traced with the fix applied), then hauling-gate and the rest of
+  Batch 6.
+- 2026-08-07 (cont.) — economy-full-loop.json done, re-traced with
+  Finding #32's fix applied (cash and finances.cash now stay in sync
+  throughout, confirmed). Every stage of the full economy pipeline
+  asserted: survey queued/completed, drill/charge/sequence/blast,
+  vehicle purchase/driver assignment/haul, freight_warehouse storage,
+  and — the one file in the whole batch where this genuinely works —
+  contract accept then a real, successful contract deliver (payment
+  $234.49), since this file is the only one that actually hauls stock
+  into a warehouse before attempting delivery. No new findings beyond
+  #32. Batch 6: 6/18 done. Full local sweep green: typecheck, 124/124
+  scenarios, 8309/8309 tests. GitHub Actions still not re-checked this
+  session — all verification remains local. Next: hauling-gate,
+  maintenance-cost-drain, scores-display-visual, then the rest of
   Batch 6.

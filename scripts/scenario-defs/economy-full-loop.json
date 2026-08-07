@@ -10,7 +10,13 @@
           "command": "new_game seed:42"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "buildingCount": 0
+        }
+      }
     },
     {
       "command": "campaign start level:tutorial_pit",
@@ -20,7 +26,12 @@
           "command": "campaign start level:tutorial_pit"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 80000
+        }
+      }
     },
     {
       "command": "finances",
@@ -48,7 +59,15 @@
           "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "employeeCount": 1,
+          "qualificationCount": 1,
+          "proficiencyTotal": 1
+        }
+      }
     },
     {
       "command": "employee assign_skill 1 skill:geology level:5",
@@ -58,7 +77,13 @@
           "command": "employee assign_skill 1 skill:geology level:5"
         }
       ],
-      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`."
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
+      "expect": {
+        "equals": {
+          "cash": 78800,
+          "proficiencyTotal": 5
+        }
+      }
     },
     {
       "command": "survey seismic x:12 z:12",
@@ -92,7 +117,14 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "surveyCount": 0
+        },
+        "note": "the seismic survey cost ($3000, SURVEY_COSTS.seismic) is charged up front when queued, not on completion -- Finding #32: this used to silently diverge state.finances.cash from the flat cash field this assertion reads, fixed at the root"
+      }
     },
     {
       "command": "tick 10",
@@ -102,7 +134,13 @@
           "command": "tick 10"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "surveyCount": 0
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -130,7 +168,15 @@
           "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "employeeCount": 2,
+          "qualificationCount": 2,
+          "proficiencyTotal": 6
+        }
+      }
     },
     {
       "command": "employee assign_skill 2 skill:blasting level:5",
@@ -140,7 +186,13 @@
           "command": "employee assign_skill 2 skill:blasting level:5"
         }
       ],
-      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`."
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
+      "expect": {
+        "equals": {
+          "cash": 73700,
+          "proficiencyTotal": 10
+        }
+      }
     },
     {
       "command": "drill_plan grid rows:2 cols:2 spacing:4 depth:8 start:10,10",
@@ -172,7 +224,12 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 4
+        }
+      }
     },
     {
       "command": "charge hole:* explosive:boomite amount:3 stemming:2",
@@ -182,7 +239,12 @@
           "command": "charge hole:* explosive:boomite amount:3 stemming:2"
         }
       ],
-      "description": "Left unmarked: this amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no click path to an exact non-default value -- Finding #10's class, Charge All is the only commit, at whatever the steppers currently show."
+      "description": "Left unmarked: this amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no click path to an exact non-default value -- Finding #10's class, Charge All is the only commit, at whatever the steppers currently show.",
+      "expect": {
+        "equals": {
+          "chargedCount": 4
+        }
+      }
     },
     {
       "command": "sequence auto",
@@ -192,7 +254,12 @@
           "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "sequencedCount": 4
+        }
+      }
     },
     {
       "command": "finances",
@@ -238,7 +305,14 @@
           "selector": "[data-action=\"report-close\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        }
+      }
     },
     {
       "command": "finances",
@@ -276,7 +350,15 @@
           "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "employeeCount": 3,
+          "qualificationCount": 3,
+          "proficiencyTotal": 11
+        }
+      }
     },
     {
       "command": "employee assign_skill 3 skill:driving.truck level:5",
@@ -286,7 +368,13 @@
           "command": "employee assign_skill 3 skill:driving.truck level:5"
         }
       ],
-      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`."
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
+      "expect": {
+        "equals": {
+          "cash": 72900,
+          "proficiencyTotal": 15
+        }
+      }
     },
     {
       "command": "build freight_warehouse at:5,5",
@@ -316,7 +404,13 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "buildingCount": 1
+        }
+      }
     },
     {
       "command": "vehicle buy debris_hauler",
@@ -334,7 +428,13 @@
           "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "vehicleCount": 1
+        }
+      }
     },
     {
       "command": "vehicle driver 1 3",
@@ -348,17 +448,29 @@
           "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 32900
+        }
+      }
     },
     {
       "command": "tick 10",
+      "description": "Long enough for the surveyor to reach (12,12) and complete the seismic survey queued at the very start.",
       "interaction": [
         {
           "type": "command",
           "command": "tick 10"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "surveyCount": 1
+        }
+      }
     },
     {
       "command": "vehicle haul 1 fragment:0",
@@ -372,17 +484,27 @@
           "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-haul-btn"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 29770
+        }
+      }
     },
     {
       "command": "tick 10",
+      "description": "Long enough for the driver to haul fragment #0 all the way to the freight_warehouse.",
       "interaction": [
         {
           "type": "command",
           "command": "tick 10"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash"],
+        "increased": ["storedMassKg"]
+      }
     },
     {
       "command": "fragments status",
@@ -410,7 +532,12 @@
           "selector": "#bs-contract-panel .bs-contract-accept"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "activeContractCount": 1
+        }
+      }
     },
     {
       "command": "contract deliver 1 amount:200",
@@ -420,7 +547,11 @@
           "command": "contract deliver 1 amount:200"
         }
       ],
-      "description": "Left unmarked (legacy): `contract deliver` returns success:false rather than throwing when the amount exceeds stock, and command-mode's runner only fails a step on a thrown exception, so the exact deliverable amount here is not independently verified. Same class as Finding #2."
+      "description": "Left unmarked (legacy): `contract deliver` returns success:false rather than throwing when the amount exceeds stock, and command-mode's runner only fails a step on a thrown exception, so the exact deliverable amount here is not independently verified. Same class as Finding #2. Unlike contract-negotiation.json/economy-display-visual.json, this file's hauled stock (1050kg, well over the 200kg requested) makes delivery genuinely succeed -- the whole pipeline this file exists to demonstrate.",
+      "expect": {
+        "increased": ["cash"],
+        "note": "delivery genuinely pays out here (unlike contract-negotiation.json, which never hauls anything into storage) -- confirmed via direct trace: Payment $234.49"
+      }
     },
     {
       "command": "finances",
@@ -440,7 +571,16 @@
           "command": "state full"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "employeeCount": 3,
+          "buildingCount": 1,
+          "vehicleCount": 1,
+          "activeContractCount": 1,
+          "surveyCount": 1
+        }
+      }
     }
   ]
 }
