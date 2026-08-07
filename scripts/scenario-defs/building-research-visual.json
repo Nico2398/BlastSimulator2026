@@ -11,7 +11,13 @@
           "command": "new_game seed:42 cash:230000"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 230000,
+          "buildingCount": 0
+        }
+      }
     },
     {
       "command": "build research_center at:5,5",
@@ -41,7 +47,13 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 205000,
+          "buildingCount": 1
+        }
+      }
     },
     {
       "command": "build research_center at:15,5 tier:2",
@@ -51,7 +63,14 @@
           "type": "command",
           "command": "build research_center at:15,5 tier:2"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "cash": 205000,
+          "buildingCount": 1
+        },
+        "note": "rejected: tier 2 not yet researched"
+      }
     },
     {
       "command": "research queue type:research_center tier:2",
@@ -70,7 +89,12 @@
           "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-research-btn"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 200000
+        }
+      }
     },
     {
       "command": "research queue type:research_center tier:3",
@@ -90,7 +114,14 @@
           "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-research-btn"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 200000,
+          "buildingCount": 1
+        },
+        "note": "rejected: tier 2 research is only queued, not yet completed"
+      }
     },
     {
       "command": "tick 50",
@@ -131,7 +162,14 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "buildingCount": 2
+        },
+        "note": "tier 2 now buildable — real unlock, not just a queued task. cash uses decreased not equals since this follows a tick step (Finding #12)"
+      }
     },
     {
       "command": "research queue type:research_center tier:3",
@@ -150,7 +188,11 @@
           "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-research-btn"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "note": "now succeeds — tier 3's condition (tier 2 research completed) is satisfied"
+      }
     },
     {
       "command": "tick 50",
@@ -186,7 +228,14 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "buildingCount": 3
+        },
+        "note": "tier 3 now buildable — full T1→T2→T3 progression completes as this file's own description promises, unlike its sibling building-research-progression-visual.json (Finding #20)"
+      }
     },
     {
       "command": "build list",

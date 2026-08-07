@@ -1,6 +1,6 @@
 {
   "name": "building-research-progression-visual",
-  "description": "Visual check of the research tier-gate: Tier 1 Research Center placed, a direct Tier 2 attempt rejected, Tier 2 researched instantly (cost-only), an early Tier 3 attempt rejected by the conditions gate, then Tier 3 progresses over ticks and becomes buildable once its own Tier 2 research has completed",
+  "description": "Visual check of the research tier-gate: Tier 1 Research Center placed, a direct Tier 2 attempt rejected, Tier 2 researched instantly (cost-only), an early Tier 3 attempt rejected by the conditions gate, then Tier 2 is built once researched — which overdraws this file's modest starting cash deeply negative (Finding #1's class: build has no funds guard) and, as a real consequence, Tier 3 research itself is then rejected for insufficient_funds and never completes. building-research-visual.json (higher starting cash) is the sibling file that carries the T1→T2→T3 progression through to a real Tier 3 build.",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -11,7 +11,13 @@
           "command": "new_game seed:42"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "buildingCount": 0
+        }
+      }
     },
     {
       "command": "build research_center at:5,5",
@@ -41,7 +47,13 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 25000,
+          "buildingCount": 1
+        }
+      }
     },
     {
       "command": "build list",
@@ -61,7 +73,14 @@
           "type": "command",
           "command": "build research_center at:15,5 tier:2"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "cash": 25000,
+          "buildingCount": 1
+        },
+        "note": "rejected: tier 2 not yet researched"
+      }
     },
     {
       "command": "build list",
@@ -91,7 +110,12 @@
           "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-research-btn"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 20000
+        }
+      }
     },
     {
       "command": "research queue type:research_center tier:3",
@@ -111,7 +135,14 @@
           "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-research-btn"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 20000,
+          "buildingCount": 1
+        },
+        "note": "rejected: tier 2 research is only queued, not yet completed"
+      }
     },
     {
       "command": "research status",
@@ -132,7 +163,11 @@
           "command": "tick 1"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash"],
+        "note": "tiny ambient drain from the tick itself, separate from the research (paid in full at queue time) — decreased not equals per Finding #12"
+      }
     },
     {
       "command": "research status",
@@ -152,7 +187,14 @@
           "type": "command",
           "command": "build research_center at:15,5 tier:2"
         }
-      ]
+      ],
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "buildingCount": 2
+        },
+        "note": "Finding #20: this succeeds (tier 2 IS researched) but the $60,000 cost drives cash deeply negative from this file's modest 50,000 starting cash — a real consequence of Finding #1's class that cascades into the next step's rejection"
+      }
     },
     {
       "command": "build list",
@@ -166,7 +208,7 @@
     },
     {
       "command": "research queue type:research_center tier:3",
-      "description": "Now succeeds — tier-3's condition (tier-2 research completed) is satisfied. This task carries real duration (50 ticks), unlike the cost-only tier-2 task above.",
+      "description": "Finding #20: does NOT succeed despite tier-3's condition (tier-2 research completed) being satisfied — the prior step's overdraw (Finding #1's class) leaves cash too negative to afford this task's $12,000 cost, so it is rejected for insufficient_funds instead. The scenario's original description claimed this succeeds and tier 3 unlocks over the following ticks; a real dump shows neither happens. building-research-visual.json (higher starting cash) is the sibling file where this task genuinely queues and completes.",
       "interaction": [
         {
           "type": "set",
@@ -182,10 +224,17 @@
           "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-research-btn"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "buildingCount": 2
+        },
+        "note": "rejected: insufficient_funds — tier 3 research never actually queues in this file"
+      }
     },
     {
       "command": "research status",
+      "description": "Finding #20: \"No research queued\" — the prior step's queue attempt was rejected (insufficient_funds), so there is nothing here to progress despite the tier-3 gate condition being satisfied.",
       "interaction": [
         {
           "type": "command",
@@ -206,7 +255,7 @@
     },
     {
       "command": "research status",
-      "description": "Tier-3 task still in progress — ticksRemaining has decreased by 10 but has not reached 0.",
+      "description": "Finding #20: still \"No research queued\" — these ticks have nothing to advance since tier-3 research was never queued.",
       "interaction": [
         {
           "type": "command",
@@ -227,7 +276,7 @@
     },
     {
       "command": "research status",
-      "description": "Tier-3 research has now completed (50 ticks total) — queue is empty again.",
+      "description": "Finding #20: still \"No research queued\" at the 50-tick mark this file's original description claimed tier-3 research would complete at — it was never queued in the first place.",
       "interaction": [
         {
           "type": "command",
@@ -238,13 +287,19 @@
     },
     {
       "command": "build research_center at:25,5 tier:3",
-      "description": "Left unmarked: at this point the button is genuinely disabled (tier not yet researched / affordable, or the target id doesn't exist), so a real player could not click it either -- this step deliberately demonstrates the rejection command mode shows via the same disabled-button rule that gates the UI. Not converted to a click; the console command reproduces the same no-op the disabled button would.",
+      "description": "Left unmarked: at this point the button is genuinely disabled (tier not yet researched), so a real player could not click it either -- this step deliberately demonstrates the rejection command mode shows via the same disabled-button rule that gates the UI. Not converted to a click; the console command reproduces the same no-op the disabled button would. Finding #20: rejected for the same reason as the tier-2 direct attempt earlier in this file (tier 3 was never researched, since its research queue attempt failed for insufficient_funds, not because \"the target id doesn't exist\" as the generic boilerplate elsewhere in this file would suggest).",
       "interaction": [
         {
           "type": "command",
           "command": "build research_center at:25,5 tier:3"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "buildingCount": 2
+        },
+        "note": "rejected: tier 3 not researched — building-count stays at 2, confirming tier 3 was never actually reached in this file"
+      }
     },
     {
       "command": "build list",
