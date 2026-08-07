@@ -8,6 +8,7 @@ import { TUTORIAL_STEPS, TOTAL_TUTORIAL_STEPS } from './tutorialSteps.js';
 import { buildTutorialCard } from './tutorialOverlayDom.js';
 import { GUIDED_CLASS } from './tutorialGuide.js';
 import { TutorialRails } from './tutorialRails.js';
+import type { LocaleTextRegistry } from './localeText.js';
 
 /**
  * How often (ms) the guide re-reads the DOM.
@@ -39,10 +40,12 @@ export class TutorialOverlay {
   private readonly textEl: HTMLElement;
   private readonly stageEl: HTMLElement;
   private readonly pausedEl: HTMLElement;
+  private readonly pausedChipEl: HTMLElement;
   private readonly stepCounter: HTMLElement;
   private readonly progressEl: HTMLElement;
   private readonly commandsLabel: HTMLElement;
   private readonly commandsHint: HTMLElement;
+  private readonly locale: LocaleTextRegistry;
   private _active = false;
   private _executingCommands = false;
   private stepIndex = 0;
@@ -61,10 +64,15 @@ export class TutorialOverlay {
     this.textEl = els.textEl;
     this.stageEl = els.stageEl;
     this.pausedEl = els.pausedEl;
+    this.pausedChipEl = els.pausedChipEl;
+    // Its text is owned by `this.locale` now (bound in buildTutorialCard()); kept as
+    // a field only so direct DOM introspection (tests, debugging) can still reach it.
+    void this.pausedChipEl;
     this.stepCounter = els.stepCounter;
     this.progressEl = els.progressEl;
     this.commandsLabel = els.commandsLabel;
     this.commandsHint = els.commandsHint;
+    this.locale = els.locale;
   }
 
   start(state?: GameState): void {
@@ -103,6 +111,27 @@ export class TutorialOverlay {
 
   setGameConsole(fn: (cmd: string) => CommandResult): void {
     this.gameConsole = fn;
+  }
+
+  /**
+   * Re-apply every piece of card text — step title/body, the "CLOCK HELD"
+   * chip and its tooltip, the console-hint label, and the current stage
+   * line — against whichever locale is active right now.
+   *
+   * Every other panel that owns construction-time text exposes this same
+   * method and gets it called from a language-change handler (see
+   * `LocaleTextRegistry` in `localeText.ts` and `UIManager.refreshLocale()`
+   * for the established pattern). TutorialOverlay follows the same pattern:
+   * `this.locale` holds the bindings for its construction-time text, and
+   * `main.ts` calls `tutorial.refreshLocale()` from both of its
+   * language-change fan-out sites.
+   */
+  refreshLocale(): void {
+    this.locale.refresh();
+    // Re-derives title/body/step-counter/commands-hint for the currently
+    // displayed step and re-runs the guide's stage-line lookup — the same
+    // translation lookups render() already performs on every step change.
+    this.render();
   }
 
   dispose(): void {

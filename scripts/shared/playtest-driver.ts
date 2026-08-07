@@ -384,4 +384,54 @@ export async function checkGoal(
       );
     }
   }
+
+  if (goal.textEquals) {
+    for (const [selector, expected] of Object.entries(goal.textEquals)) {
+      const actual = await domProperty(page, selector, 'textContent');
+      if (actual === undefined) {
+        throw new PlaytestFailure(
+          `textEquals: selector "${selector}" not found in the DOM`,
+          describeAvailable(await probe(page)),
+        );
+      }
+      if (actual !== expected) {
+        throw new PlaytestFailure(
+          `textEquals: "${selector}" should read ${JSON.stringify(expected)} but reads ${JSON.stringify(actual)}`,
+          describeAvailable(await probe(page)),
+        );
+      }
+    }
+  }
+
+  if (goal.titleEquals) {
+    for (const [selector, expected] of Object.entries(goal.titleEquals)) {
+      const actual = await domProperty(page, selector, 'title');
+      if (actual === undefined) {
+        throw new PlaytestFailure(
+          `titleEquals: selector "${selector}" not found in the DOM`,
+          describeAvailable(await probe(page)),
+        );
+      }
+      if (actual !== expected) {
+        throw new PlaytestFailure(
+          `titleEquals: "${selector}".title should read ${JSON.stringify(expected)} but reads ${JSON.stringify(actual)}`,
+          describeAvailable(await probe(page)),
+        );
+      }
+    }
+  }
+}
+
+/** Read a DOM element's `textContent`/`title`, or `undefined` when the selector matches nothing. */
+async function domProperty(
+  page: Page, selector: string, prop: 'textContent' | 'title',
+): Promise<string | undefined> {
+  return page.evaluate(
+    ({ sel, p }: { sel: string; p: 'textContent' | 'title' }) => {
+      const el = document.querySelector(sel);
+      if (!el) return undefined;
+      return (el as unknown as Record<string, string>)[p] ?? '';
+    },
+    { sel: selector, p: prop },
+  ) as Promise<string | undefined>;
 }

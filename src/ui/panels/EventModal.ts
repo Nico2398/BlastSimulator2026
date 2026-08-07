@@ -136,8 +136,9 @@ export class EventModal {
     this.titleEl = el('span', { className: 'bs-event-title', attrs: { style: 'font:800 15px/1.25 var(--bsx-font-ui);color:var(--bsx-text-primary)' } });
     titleCol.append(this.categoryLabelEl, this.titleEl);
 
-    this.clockChip = chip(t('ui.event.clock_held'), 'warn');
+    this.clockChip = chip('', 'warn');
     this.clockChip.style.flex = '0 0 auto';
+    this.locale.bindText(this.clockChip, 'ui.event.clock_held');
 
     header.append(this.iconChipEl, titleCol, this.clockChip);
 

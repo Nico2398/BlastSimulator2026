@@ -2,9 +2,9 @@
 // Builds the tutorial card element tree. Extracted from TutorialOverlay.ts to
 // keep each file under the 300-line limit; holds no behaviour of its own.
 
-import { t } from '../core/i18n/I18n.js';
 import { el } from './dom.js';
 import { iconEl } from './icons.js';
+import { LocaleTextRegistry } from './localeText.js';
 
 /** Every element TutorialOverlay needs a handle on after construction. */
 export interface TutorialCardElements {
@@ -14,10 +14,24 @@ export interface TutorialCardElements {
   textEl: HTMLElement;
   stageEl: HTMLElement;
   pausedEl: HTMLElement;
+  /**
+   * The "CLOCK HELD" chip's own text node, inside `pausedEl`. `pausedEl`
+   * carries the tooltip (`title`) for the same string; this is the visible
+   * label. Exposed separately so a locale refresh can update both without
+   * tearing down and rebuilding the chip.
+   */
+  pausedChipEl: HTMLElement;
   stepCounter: HTMLElement;
   progressEl: HTMLElement;
   commandsLabel: HTMLElement;
   commandsHint: HTMLElement;
+  /**
+   * Bindings for this card's construction-time text (the "CLOCK HELD" chip's
+   * label and tooltip, and the console-hint label) — the same
+   * `LocaleTextRegistry` pattern every other panel uses. TutorialOverlay
+   * stores this and calls `.refresh()` from its own `refreshLocale()`.
+   */
+  locale: LocaleTextRegistry;
 }
 
 /**
@@ -54,6 +68,8 @@ export function buildTutorialCard(container: HTMLElement): TutorialCardElements 
   progressEl.style.width = '0%';
   progressTrack.appendChild(progressEl);
 
+  const locale = new LocaleTextRegistry();
+
   const iconChip = el('div', {
     attrs: {
       style: 'width:32px;height:32px;flex:0 0 32px;border-radius:6px;display:flex;'
@@ -71,10 +87,13 @@ export function buildTutorialCard(container: HTMLElement): TutorialCardElements 
   // have to carry a full sentence.
   const pausedEl = el('span', {
     className: 'bs-tutorial-paused',
-    attrs: { style: 'display:none', title: t('tutorial.clock_held') },
+    attrs: { style: 'display:none' },
   });
+  locale.bindTitle(pausedEl, 'tutorial.clock_held');
   pausedEl.appendChild(iconEl('pause', 8));
-  pausedEl.appendChild(el('span', { text: t('tutorial.clock_held_chip') }));
+  const pausedChipEl = el('span', {});
+  locale.bindText(pausedChipEl, 'tutorial.clock_held_chip');
+  pausedEl.appendChild(pausedChipEl);
 
   const stepCounter = document.createElement('div');
   stepCounter.className = 'bs-tutorial-progress';
@@ -99,7 +118,7 @@ export function buildTutorialCard(container: HTMLElement): TutorialCardElements 
 
   const commandsLabel = document.createElement('div');
   commandsLabel.className = 'bs-tutorial-commands-label';
-  commandsLabel.textContent = t('tutorial.console_hint');
+  locale.bindText(commandsLabel, 'tutorial.console_hint');
   commandsLabel.style.display = 'none';
 
   const commandsHint = document.createElement('div');
@@ -121,7 +140,7 @@ export function buildTutorialCard(container: HTMLElement): TutorialCardElements 
   container.appendChild(overlay);
 
   return {
-    overlay, box, titleEl, textEl, stageEl, pausedEl, stepCounter,
-    progressEl, commandsLabel, commandsHint,
+    overlay, box, titleEl, textEl, stageEl, pausedEl, pausedChipEl, stepCounter,
+    progressEl, commandsLabel, commandsHint, locale,
   };
 }

@@ -17,6 +17,19 @@
 // MUST currently fail (red) against: TileSelectOverlay.ts ('No selection' x2,
 // 'Confirm', 'Cancel', two 'Selected:' templates), MainMenu.ts (subtitle),
 // MiniMap.ts (fillText 'No map data'), and main.ts (7 notification strings).
+//
+// Widened for issue #492 section 3: the original scan only catches literals
+// on the LHS of a direct `.textContent =` / `.title =` / `.innerHTML =`
+// assignment or the first arg of `fillText(...)`. It never looks inside the
+// `el(tag, { text: '...', attrs: { title: '...' } })` helper (`src/ui/dom.ts`)
+// that most panels actually build their trees with — `opts.text` and
+// `opts.attrs.title/alt/placeholder` reach the DOM via `node.textContent =`
+// and `node.setAttribute(k, v)` *inside* `el()`, one layer away from the
+// literal at the call site, so none of that ever matched the original
+// per-line assignment regex. Also widens the direct-assignment pattern
+// itself to `.alt =` / `.placeholder =`, and adds a `.setAttribute('title'|
+// 'aria-label'|'placeholder'|'alt', '...')` pattern for call sites that
+// bypass `el()` entirely (raw `document.createElement` + `setAttribute`).
 
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'fs';
@@ -28,8 +41,19 @@ const ROOT = join(import.meta.dirname, '../../..');
  * Keys whitelisted as legitimately non-translatable (debug-only output,
  * technical strings) — never used to hide real src/ui or src/renderer DOM
  * text. Format: `relative/path/to/File.ts:<line>`.
+ *
+ * The three `el(..., { text: '...' })` entries below are MainMenu.ts's brand
+ * wordmark suffix ("SIM", pairs with the literal 'BLAST' string right next to
+ * it) and its two language-pill labels ("EN"/"FR") — language codes, not
+ * prose, and MainMenu.ts is out of scope for #492 section 3 (its lang-pill
+ * sync landed in section 2). Both are intentional, not oversights this issue
+ * is about.
  */
-const HARDCODED_STRING_ALLOWLIST: readonly string[] = [];
+const HARDCODED_STRING_ALLOWLIST: readonly string[] = [
+  'src/ui/MainMenu.ts:68',
+  'src/ui/MainMenu.ts:116',
+  'src/ui/MainMenu.ts:118',
+];
 
 interface Violation {
   file: string;
@@ -64,7 +88,7 @@ function looksLikeEnglishText(literal: string): boolean {
 function scanPlainQuotedAssignments(relPath: string, source: string): Violation[] {
   const violations: Violation[] = [];
   const lines = source.split('\n');
-  const assignPattern = /\.(textContent|title|innerHTML)\s*=\s*(['"])((?:(?!\2).)*)\2/;
+  const assignPattern = /\.(textContent|title|innerHTML|alt|placeholder)\s*=\s*(['"])((?:(?!\2).)*)\2/;
   const fillTextPattern = /fillText\(\s*(['"])((?:(?!\1).)*)\1/;
 
   lines.forEach((lineText, idx) => {
@@ -130,6 +154,57 @@ function scanSelectedTemplateLiteral(relPath: string, source: string): Violation
   return violations;
 }
 
+/**
+ * Scans for `.setAttribute('title'|'aria-label'|'placeholder'|'alt', '...')`
+ * call sites (raw DOM, outside the `el()` helper) whose value literal never
+ * passes through `t(...)`.
+ */
+function scanSetAttributeCalls(relPath: string, source: string): Violation[] {
+  const violations: Violation[] = [];
+  const lines = source.split('\n');
+  const pattern = /\.setAttribute\(\s*(['"])(?:title|aria-label|placeholder|alt)\1\s*,\s*(['"])((?:(?!\2).)*)\2/;
+
+  lines.forEach((lineText, idx) => {
+    if (lineText.includes('t(')) return;
+    const m = pattern.exec(lineText);
+    if (m) {
+      const literal = m[3] ?? '';
+      if (looksLikeEnglishText(literal)) {
+        violations.push({ file: relPath, line: idx + 1, snippet: lineText.trim() });
+      }
+    }
+  });
+  return violations;
+}
+
+/**
+ * Scans for the `el(tag, { text: '...' })` / `{ attrs: { title: '...' } }`
+ * option-object pattern from `src/ui/dom.ts`'s `el()` helper. `el()` writes
+ * `opts.text` to `node.textContent` and every `opts.attrs` entry via
+ * `node.setAttribute`, one call removed from the DOM write the original
+ * assignment-based scan looked for — so a literal handed to `el()` never
+ * matched `scanPlainQuotedAssignments` at all. Field-based, same shape as
+ * `scanNotifyCalls`'s `title:`/`body:` check.
+ */
+function scanElOptionLiterals(relPath: string, source: string): Violation[] {
+  const violations: Violation[] = [];
+  const lines = source.split('\n');
+  const fieldPattern = /\b(?:text|title|alt|placeholder)\s*:\s*(['"])((?:(?!\1).)*)\1/g;
+
+  lines.forEach((lineText, idx) => {
+    if (lineText.includes('t(')) return;
+    fieldPattern.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = fieldPattern.exec(lineText))) {
+      const literal = m[2] ?? '';
+      if (looksLikeEnglishText(literal)) {
+        violations.push({ file: relPath, line: idx + 1, snippet: lineText.trim() });
+      }
+    }
+  });
+  return violations;
+}
+
 function filterAllowlisted(violations: Violation[]): Violation[] {
   return violations.filter((v) => !HARDCODED_STRING_ALLOWLIST.includes(`${v.file}:${v.line}`));
 }
@@ -139,7 +214,7 @@ function formatViolations(violations: Violation[]): string {
 }
 
 describe('src/ui/ and src/renderer/ — no hardcoded English UI strings (issue #457)', () => {
-  it('every .textContent / .title / .innerHTML / fillText() literal goes through t()', () => {
+  it('every .textContent / .title / .innerHTML / .alt / .placeholder / fillText() literal goes through t()', () => {
     const dirs = ['src/ui', 'src/renderer'];
     const violations: Violation[] = [];
     for (const dir of dirs) {
@@ -148,6 +223,7 @@ describe('src/ui/ and src/renderer/ — no hardcoded English UI strings (issue #
         const source = readFileSync(file, 'utf8');
         violations.push(...scanPlainQuotedAssignments(relPath, source));
         violations.push(...scanSelectedTemplateLiteral(relPath, source));
+        violations.push(...scanSetAttributeCalls(relPath, source));
       }
     }
 
@@ -161,6 +237,26 @@ describe('src/ui/ and src/renderer/ — no hardcoded English UI strings (issue #
   it('sanity: the scanner actually finds source files to check', () => {
     const files = [...listTsFiles(join(ROOT, 'src/ui')), ...listTsFiles(join(ROOT, 'src/renderer'))];
     expect(files.length).toBeGreaterThan(10);
+  });
+});
+
+describe('src/ui/ and src/renderer/ — el() option-object literals go through t() (issue #492 section 3)', () => {
+  it('every text:/title:/alt:/placeholder: field passed to the el() helper goes through t()', () => {
+    const dirs = ['src/ui', 'src/renderer'];
+    const violations: Violation[] = [];
+    for (const dir of dirs) {
+      for (const file of listTsFiles(join(ROOT, dir))) {
+        const relPath = file.slice(ROOT.length + 1);
+        const source = readFileSync(file, 'utf8');
+        violations.push(...scanElOptionLiterals(relPath, source));
+      }
+    }
+
+    const remaining = filterAllowlisted(violations);
+    expect(
+      remaining,
+      `${remaining.length} hardcoded el()-option English UI string(s) found outside t():\n${formatViolations(remaining)}`,
+    ).toEqual([]);
   });
 });
 
