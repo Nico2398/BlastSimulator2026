@@ -99,8 +99,8 @@
       }
     },
     {
-      "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:8 start:15,15",
-      "description": "Corrected from rows:2 cols:2 spacing:5 (which command mode ran literally, producing 4 holes): the click drags the (15,15)-(20,20) rectangle at the Drill panel's own default spacing (DEFAULT_SPACING_M=3), computing cols/rows as round(size/spacing)+1 = round(5/3)+1 = 3x3 = 9 holes for that same rectangle -- the command and the click were silently testing two different grids, the same class of bug already fixed in nav-cell-types-visual.json and repeated in several other files this batch (hauling-gate.json, safety-projection-visual.json, core-loop-visual.json). Caught by adding expect.equals.holeCount; fixed by describing what the click actually produces.",
+      "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:6 start:15,15",
+      "description": "Corrected from rows:2 cols:2 spacing:5 (which command mode ran literally, producing 4 holes): the click drags the (15,15)-(20,20) rectangle at the Drill panel's own default spacing (DEFAULT_SPACING_M=3), computing cols/rows as round(size/spacing)+1 = round(5/3)+1 = 3x3 = 9 holes for that same rectangle -- the command and the click were silently testing two different grids, the same class of bug already fixed in nav-cell-types-visual.json and repeated in several other files this batch (hauling-gate.json, safety-projection-visual.json, core-loop-visual.json). Caught by adding expect.equals.holeCount; fixed by describing what the click actually produces. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged.",
       "interaction": [
         {
           "type": "clickSelector",
