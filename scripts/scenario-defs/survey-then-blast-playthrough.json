@@ -1,6 +1,6 @@
 {
   "name": "survey-then-blast-playthrough",
-  "description": "Full playthrough: new game → hire surveyor → seismic survey → confidence overlay visible → drill + charge + blast → ore report event → overlay updates after terrain remesh. FAILS until GameRenderer wires the survey confidence overlay.",
+  "description": "Full playthrough: new game \u2192 hire surveyor \u2192 seismic survey \u2192 confidence overlay visible \u2192 drill + charge + blast \u2192 ore report event \u2192 overlay updates after terrain remesh. FAILS until GameRenderer wires the survey confidence overlay.",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -28,7 +28,9 @@
       ],
       "role": "setup",
       "expect": {
-        "increased": ["worldSizeX"]
+        "increased": [
+          "worldSizeX"
+        ]
       }
     },
     {
@@ -194,11 +196,13 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "surveyCount": 0
         },
-        "note": "arrival-gated (#437) — queued and paid for, not yet completed"
+        "note": "arrival-gated (#437) \u2014 queued and paid for, not yet completed"
       }
     },
     {
@@ -231,11 +235,13 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "surveyCount": 0
         },
-        "note": "queued back to back with the seismic survey, same employee, no tick between — verified via a direct engine trace that both still complete cleanly by round 1 (no Finding #16 drop with only 2 queued)"
+        "note": "queued back to back with the seismic survey, same employee, no tick between \u2014 verified via a direct engine trace that both still complete cleanly by round 1 (no Finding #16 drop with only 2 queued)"
       }
     },
     {
@@ -464,7 +470,7 @@
       "role": "observe"
     },
     {
-      "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:25,25",
+      "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:6 start:25,25",
       "interaction": [
         {
           "type": "clickSelector",
@@ -506,7 +512,8 @@
         "equals": {
           "holeCount": 9
         }
-      }
+      },
+      "description": "depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged."
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
@@ -657,7 +664,7 @@
           "command": "contract deliver 1 amount:500"
         }
       ],
-      "description": "Left unmarked (legacy): `contract deliver` returns success:false rather than throwing when the amount exceeds what's in stock, and command-mode's runner only fails a step on a thrown exception, so the exact deliverable amount at this point is not independently verified. Same class as Finding #2 (contract-panel-visual.json) — the fix belongs in command-runner.ts's success handling across the whole suite, not one scenario."
+      "description": "Left unmarked (legacy): `contract deliver` returns success:false rather than throwing when the amount exceeds what's in stock, and command-mode's runner only fails a step on a thrown exception, so the exact deliverable amount at this point is not independently verified. Same class as Finding #2 (contract-panel-visual.json) \u2014 the fix belongs in command-runner.ts's success handling across the whole suite, not one scenario."
     },
     {
       "command": "finances",
