@@ -531,7 +531,9 @@ by its own pre-existing description; confirmed via direct trace that
 `ticksWorked`/`restTicksRemaining` never move through the whole budget)
 
 Batch 5 needs-* group (9/9) done. Continuing with nav-*.
-⬜ nav-dynamic-updates-visual ·
+✅ nav-dynamic-updates-visual (1×1 grid blast then a vehicle move —
+holeCount/chargedCount/sequencedCount and cash asserted through the
+whole drill/charge/sequence/blast/vehicle pipeline, no findings) ·
 ⬜ nav-move-costs-visual · ⬜ nav-path-following-visual ·
 ⬜ nav-pathfinding-visual · ⬜ nav-ramp-routing-visual · ⬜ site-expansion
 

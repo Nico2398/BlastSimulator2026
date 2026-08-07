@@ -10,7 +10,13 @@
           "command": "new_game seed:42"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "holeCount": 0
+        }
+      }
     },
     {
       "command": "drill_plan grid rows:1 cols:1 spacing:1 depth:6 start:10,10",
@@ -42,7 +48,12 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 1
+        }
+      }
     },
     {
       "command": "charge hole:H1 explosive:boomite amount:8kg stemming:2m",
@@ -52,7 +63,12 @@
           "command": "charge hole:H1 explosive:boomite amount:8kg stemming:2m"
         }
       ],
-      "description": "Left unmarked: Charge.ts's own header comment says per-hole charging isn't a UI feature -- Charge All (all holes, one shared amount/stemming) is the only commit. `charge hole:H1 ...` (one specific hole) has no click path at all (Finding #10's class)."
+      "description": "Left unmarked: Charge.ts's own header comment says per-hole charging isn't a UI feature -- Charge All (all holes, one shared amount/stemming) is the only commit. `charge hole:H1 ...` (one specific hole) has no click path at all (Finding #10's class).",
+      "expect": {
+        "equals": {
+          "chargedCount": 1
+        }
+      }
     },
     {
       "command": "sequence auto",
@@ -62,7 +78,12 @@
           "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "sequencedCount": 1
+        }
+      }
     },
     {
       "command": "state full",
@@ -98,7 +119,14 @@
           "selector": "[data-action=\"report-close\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        }
+      }
     },
     {
       "command": "state full",
@@ -127,7 +155,13 @@
           "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 25000,
+          "vehicleCount": 1
+        }
+      }
     },
     {
       "command": "vehicle move 1 to:15,15",
@@ -137,7 +171,13 @@
           "command": "vehicle move 1 to:15,15"
         }
       ],
-      "description": "Left unmarked: no UI control drives this exact command and none should exist -- FleetPanel.ts only wires vehicle buy/driver/scrap to the console (grep confirms no `vehicle move`/`vehicle assign` call site anywhere in src/ui) -- vehicles move autonomously via task/haul assignment, never by a player teleporting one to a raw x,z."
+      "description": "Left unmarked: no UI control drives this exact command and none should exist -- FleetPanel.ts only wires vehicle buy/driver/scrap to the console (grep confirms no `vehicle move`/`vehicle assign` call site anywhere in src/ui) -- vehicles move autonomously via task/haul assignment, never by a player teleporting one to a raw x,z.",
+      "expect": {
+        "equals": {
+          "cash": 25000,
+          "vehicleCount": 1
+        }
+      }
     },
     {
       "command": "tick 5",
@@ -147,7 +187,11 @@
           "command": "tick 5"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash"],
+        "note": "vehicle list confirms real NavGrid-aware movement toward (15,15) — position advances from spawn each tick"
+      }
     },
     {
       "command": "state full",
