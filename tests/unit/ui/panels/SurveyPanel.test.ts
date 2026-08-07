@@ -203,7 +203,11 @@ describe('SurveyPanel', () => {
     let closed = false;
     panel.setCloseHandler(() => { closed = true; });
     panel.update(makeState());
-    panel.root.querySelector('button')!.click();
+    // The header's first button is now the overlay-visibility toggle (#496)
+    // — skip it and click the first button that isn't it.
+    const closeBtn = [...panel.root.querySelectorAll('button')]
+      .find(b => b.getAttribute('data-role') !== 'overlay-toggle')!;
+    closeBtn.click();
     expect(closed).toBe(true);
   });
 
@@ -220,5 +224,73 @@ describe('SurveyPanel', () => {
     const { panel, container } = makePanel();
     panel.dispose();
     expect(container.contains(panel.root)).toBe(false);
+  });
+});
+
+// ── Survey confidence overlay toggle (#496) ─────────────────────────────────
+//
+// The header's overlay-visibility toggle button drives GameRenderer's
+// player-facing preference via setOverlayToggleHandler/setOverlayVisible.
+// Bug: the click handler is currently a no-op, so the button exists but does
+// nothing — neither firing the registered callback nor reflecting an
+// externally-set (e.g. keyboard-shortcut-driven) visibility state.
+describe('SurveyPanel — overlay visibility toggle (#496)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    for (const c of liveContainers) c.remove();
+    liveContainers.length = 0;
+  });
+
+  it('renders the overlay-toggle button in the header', () => {
+    const { panel } = makePanel();
+    panel.update(makeState());
+    const btn = panel.root.querySelector<HTMLButtonElement>('[data-role="overlay-toggle"]');
+    expect(btn).not.toBeNull();
+    expect(btn!.tagName).toBe('BUTTON');
+  });
+
+  it('clicking the toggle button calls the registered handler with false, then true, starting from the default-visible state', () => {
+    const { panel } = makePanel();
+    panel.update(makeState());
+    const cb = vi.fn();
+    panel.setOverlayToggleHandler(cb);
+    const btn = panel.root.querySelector<HTMLButtonElement>('[data-role="overlay-toggle"]')!;
+
+    btn.click();
+    expect(cb).toHaveBeenNthCalledWith(1, false);
+
+    btn.click();
+    expect(cb).toHaveBeenNthCalledWith(2, true);
+  });
+
+  it('setOverlayVisible(false) called externally updates the button state without invoking the toggle handler', () => {
+    const { panel } = makePanel();
+    panel.update(makeState());
+    const cb = vi.fn();
+    panel.setOverlayToggleHandler(cb);
+    const btn = panel.root.querySelector<HTMLButtonElement>('[data-role="overlay-toggle"]')!;
+    const beforeHtml = btn.outerHTML;
+
+    panel.setOverlayVisible(false);
+
+    expect(cb).not.toHaveBeenCalled();
+    expect(btn.outerHTML).not.toBe(beforeHtml);
+  });
+
+  it('update(state) with changed surveyResults does not reset the toggle back to visible', () => {
+    const { panel } = makePanel();
+    panel.update(makeState());
+    panel.setOverlayVisible(false);
+    const cb = vi.fn();
+    panel.setOverlayToggleHandler(cb);
+
+    panel.update(makeState({ surveyResults: [makeSurveyResult()] }));
+
+    const btn = panel.root.querySelector<HTMLButtonElement>('[data-role="overlay-toggle"]')!;
+    btn.click();
+    // If update() silently reset the toggle's tracked visibility to true, this
+    // click would report `false` (turning an already-visible overlay off)
+    // instead of `true` (turning the still-hidden overlay back on).
+    expect(cb).toHaveBeenCalledWith(true);
   });
 });

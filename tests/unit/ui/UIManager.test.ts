@@ -9,6 +9,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { UIManager } from '../../../src/ui/UIManager.js';
 import { MiniMap } from '../../../src/ui/MiniMap.js';
 import { CrewPanel } from '../../../src/ui/panels/CrewPanel.js';
+import { SurveyPanel } from '../../../src/ui/panels/SurveyPanel.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { NavGrid } from '../../../src/core/nav/NavGrid.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
@@ -276,5 +277,55 @@ describe('UIManager — showEmployeeDetail (scene selection DETAIL/TRAIN, P2)', 
     uiManager.showEmployeeDetail(3);
 
     expect(expandSpy).toHaveBeenCalledWith(3);
+  });
+});
+
+// ── Survey confidence overlay toggle wiring (#496) ──────────────────────────
+describe('UIManager — survey overlay toggle wiring (#496)', () => {
+  let container: HTMLDivElement;
+  let uiManager: UIManager;
+
+  beforeEach(() => {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+  });
+
+  afterEach(() => {
+    uiManager?.dispose();
+    container.remove();
+    vi.restoreAllMocks();
+  });
+
+  it('setSurveyOverlayToggleHandler(cb) + a real click on the open panel\'s toggle button invokes cb with the new boolean', () => {
+    uiManager = new UIManager(container);
+    const cb = vi.fn();
+    uiManager.setSurveyOverlayToggleHandler(cb);
+    uiManager.showPanel('survey');
+
+    const btn = container.querySelector<HTMLButtonElement>('[data-role="overlay-toggle"]')!;
+    expect(btn).not.toBeNull();
+    btn.click();
+
+    expect(cb).toHaveBeenCalledWith(false);
+  });
+
+  it('setSurveyOverlayVisible(visible) delegates to SurveyPanel.setOverlayVisible', () => {
+    const setOverlaySpy = vi.spyOn(SurveyPanel.prototype, 'setOverlayVisible');
+    uiManager = new UIManager(container);
+
+    uiManager.setSurveyOverlayVisible(false);
+
+    expect(setOverlaySpy).toHaveBeenCalledWith(false);
+  });
+
+  it('setSurveyOverlayVisible(false) updates the panel\'s toggle button state (mirrors the NavGrid overlay wiring)', () => {
+    uiManager = new UIManager(container);
+    uiManager.showPanel('survey');
+    const btn = container.querySelector<HTMLButtonElement>('[data-role="overlay-toggle"]')!;
+    const before = btn.outerHTML;
+
+    uiManager.setSurveyOverlayVisible(false);
+
+    expect(btn.outerHTML).not.toBe(before);
   });
 });

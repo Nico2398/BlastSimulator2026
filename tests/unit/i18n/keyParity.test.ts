@@ -45,7 +45,11 @@ describe('en.json / fr.json — key-set parity', () => {
   });
 
   it('both locale files declare exactly the same key count, pinned to the current key-complete baseline', () => {
-    // Baseline is 3232 (up from 3221): the loading screen redesign (#493)
+    // Baseline is 3234 (up from 3232): the survey-overlay visibility toggle
+    // (#496) added 2 new keys — ui.survey.overlay_toggle_tip and
+    // shortcuts.survey_overlay — both already translated in fr.json, not
+    // just carried over in English.
+    // Before that, baseline was 3232 (up from 3221): the loading screen redesign (#493)
     // added 11 new `loading.*` keys for the eyebrow, subtitle, briefing,
     // stage row, and tip block — eyebrow_site, eyebrow_sandbox,
     // brief.starting_cash, brief.target, brief.explosives, sandbox_subtitle,
@@ -60,7 +64,7 @@ describe('en.json / fr.json — key-set parity', () => {
     // ORPHAN_KEYS in src/core/i18n/glossary.ts. Update this baseline only
     // alongside a deliberate key addition/removal, not silently.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3232);
+    expect(Object.keys(en).length).toBe(3234);
   });
 });
 

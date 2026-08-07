@@ -18,6 +18,7 @@ describe('KeyboardShortcuts (12.7)', () => {
     quickSave: ReturnType<typeof vi.fn>;
     onEscape: ReturnType<typeof vi.fn>;
     onToggleNavGrid: ReturnType<typeof vi.fn>;
+    onToggleSurveyOverlay: ReturnType<typeof vi.fn>;
   };
   let ks: KeyboardShortcuts;
 
@@ -29,6 +30,7 @@ describe('KeyboardShortcuts (12.7)', () => {
       quickSave: vi.fn(),
       onEscape: vi.fn(),
       onToggleNavGrid: vi.fn(),
+      onToggleSurveyOverlay: vi.fn(),
     };
     ks = new KeyboardShortcuts(callbacks);
   });
@@ -98,6 +100,31 @@ describe('KeyboardShortcuts (12.7)', () => {
     const partialKs = new KeyboardShortcuts(partialCallbacks);
     expect(() => fireKey('KeyN')).not.toThrow();
     partialKs.dispose();
+  });
+
+  it('KeyO triggers onToggleSurveyOverlay (#496)', () => {
+    fireKey('KeyO');
+    expect(callbacks.onToggleSurveyOverlay).toHaveBeenCalledOnce();
+    ks.dispose();
+  });
+
+  it('KeyO is a no-op when onToggleSurveyOverlay is not provided (#496)', () => {
+    const partialCallbacks = {
+      togglePause: vi.fn(),
+      setSpeed: vi.fn(),
+      togglePanel: vi.fn(),
+      quickSave: vi.fn(),
+      onEscape: vi.fn(),
+    };
+    const partialKs = new KeyboardShortcuts(partialCallbacks);
+    expect(() => fireKey('KeyO')).not.toThrow();
+    partialKs.dispose();
+  });
+
+  it('KeyO does not trigger the panel-toggle callback (guards against a future key collision) (#496)', () => {
+    fireKey('KeyO');
+    expect(callbacks.togglePanel).not.toHaveBeenCalled();
+    ks.dispose();
   });
 
   it('Escape runs the Esc cascade', () => {

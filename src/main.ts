@@ -113,6 +113,12 @@ paramStrip.setConfirmHandler(() => placementController.confirm());
 paramStrip.setCancelHandler(() => placementController.cancel());
 uiManager.setPlacementKit({ controller: placementController, overlay: selectionOverlay, strip: paramStrip });
 
+// Survey confidence overlay's player-facing visibility toggle (#496): the
+// panel's own click handler drives the renderer; the renderer's current
+// preference seeds the panel once at startup so its button state matches.
+uiManager.setSurveyOverlayToggleHandler((visible) => { gameRenderer.setSurveyOverlayVisible(visible); });
+uiManager.setSurveyOverlayVisible(gameRenderer.surveyOverlayVisible);
+
 // --- Persistence ---
 let saveBackend;
 try {
@@ -608,6 +614,7 @@ window.__debugGridInfo = () => {
     terrainGridId: gameRenderer.terrain?.gridId ?? null,
     ghostCount: gameRenderer.ghostCount,
     ghostPreviewsInState: ctx.state?.ghostPreviews.length ?? -1,
+    surveyOverlayVisible: gameRenderer.surveyOverlayVisible,
   };
 };
 
@@ -912,6 +919,10 @@ new KeyboardShortcuts({
   quickSave: () => { if (ctx.state) void savesModal['autoSave'](ctx.state); },
   onEscape: () => uiManager.handleEscape(),
   onToggleNavGrid: () => uiManager.toggleNavGridOverlay(),
+  // Keep the panel's own button in sync even while the panel is closed —
+  // its click handler is the other path into the same preference, and the
+  // two must never disagree the next time the panel opens.
+  onToggleSurveyOverlay: () => uiManager.setSurveyOverlayVisible(gameRenderer.toggleSurveyOverlayVisible()),
 });
 
 // --- Render loop + game tick timer ---
