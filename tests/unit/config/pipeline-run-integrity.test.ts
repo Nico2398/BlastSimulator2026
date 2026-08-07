@@ -137,7 +137,8 @@ describe('foreground guard registration', () => {
   it('is proven wired by validate:context, not merely proven to exist', () => {
     const validator = readFileSync(join(ROOT, 'scripts/validate-context.ts'), 'utf8');
     expect(validator).toContain('require-foreground-agents.sh');
-    expect(validator).toContain('checkSettingsHooks');
+    expect(validator).toContain('SETTINGS_HOOKS');
+    expect(validator).toMatch(/issues\.push\(\.\.\.checkSettings\(\)\)/);
   });
 });
 

@@ -31,6 +31,7 @@
       "Bash(curl -sf http://localhost:*)"
     ],
     "deny": [
+      "AskUserQuestion",
       "Read(./.env)",
       "Read(./.env.*)"
     ]

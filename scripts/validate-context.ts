@@ -11,7 +11,8 @@
  *   2. Tool names in `tools` / `disallowedTools` resolve to real Claude Code tools
  *   3. `skills:` entries reference skills that exist
  *   4. Hook commands point at files that exist and are executable, and the hooks
- *      that only work when registered project-wide are registered in settings.json
+ *      that only work when registered project-wide are registered in settings.json,
+ *      alongside the tools that must be denied there
  *   5. Skill directory name matches its frontmatter `name`
  *   6. Body content is identical across .claude/, .github/, and .opencode/
  *   7. A command's `agent:` resolves to an agent that exists
@@ -418,23 +419,41 @@ const SETTINGS_HOOKS = [
   },
 ];
 
+/** Tools denied project-wide, and why the denial cannot live in frontmatter. */
+const SETTINGS_DENIED_TOOLS = [
+  {
+    tool: 'AskUserQuestion',
+    why:
+      'an autonomous run has nobody to ask. The question suspends the session while the ' +
+      'issue holds `in-progress` and every assignment behind it waits, which is the halt ' +
+      '`agentic-decision-autonomy` exists to prevent: an open choice is defaulted and ' +
+      'recorded, and a genuine blocker is written to the issue where a human will find it. ' +
+      'A `disallowedTools` entry cannot carry this — it registers only for an agent started ' +
+      'through the `Agent` tool, so the main session and the `/agentic-run` fork ignore it',
+  },
+];
+
 /**
- * Checks `.claude/settings.json` hooks.
+ * Checks `.claude/settings.json` hooks and denied tools.
  *
  * A hook file that exists and is executable still does nothing until something
  * registers it, and `checkAgent` above only proves the first half. Registration
  * is where this project has been bitten: `require-foreground-agents.sh` passed
  * every check while sitting inert, because it was declared in the one place the
- * orchestrator's session never reads.
+ * orchestrator's session never reads. A denied tool is the same shape of
+ * failure — enforced project-wide from here, or not enforced at all.
  */
-function checkSettingsHooks(): ContextIssue[] {
+function checkSettings(): ContextIssue[] {
   const relative = '.claude/settings.json';
   const path = join(ROOT, relative);
   if (!existsSync(path)) {
     return [{ file: relative, message: 'missing — project hooks and permissions live here' }];
   }
 
-  let settings: { hooks?: Record<string, { matcher?: string; hooks?: { command?: string }[] }[]> };
+  let settings: {
+    hooks?: Record<string, { matcher?: string; hooks?: { command?: string }[] }[]>;
+    permissions?: { deny?: string[] };
+  };
   try {
     settings = JSON.parse(readFileSync(path, 'utf8'));
   } catch (error) {
@@ -443,6 +462,18 @@ function checkSettingsHooks(): ContextIssue[] {
 
   const issues: ContextIssue[] = [];
   const hooks = settings.hooks ?? {};
+
+  // Claude Code matches a bare tool name, so `AskUserQuestion(...)` would deny
+  // one argument shape and leave the tool itself reachable.
+  const denied = new Set(settings.permissions?.deny ?? []);
+  for (const required of SETTINGS_DENIED_TOOLS) {
+    if (!denied.has(required.tool)) {
+      issues.push({
+        file: relative,
+        message: `\`${required.tool}\` is not in permissions.deny — ${required.why}`,
+      });
+    }
+  }
 
   for (const [event, entries] of Object.entries(hooks)) {
     for (const entry of entries) {
@@ -538,7 +569,7 @@ export function validateContextFiles(): ContextIssue[] {
   }
 
   issues.push(...checkEntryPoints(skills));
-  issues.push(...checkSettingsHooks());
+  issues.push(...checkSettings());
   issues.push(...checkCrossRuntimeSync());
   return issues;
 }
@@ -551,7 +582,7 @@ function main(): void {
   } else if (issues.length === 0) {
     console.log(
       'Context files valid: frontmatter schemas, tool names, preloaded skills, hooks, ' +
-        'settings.json hook registration, bundled skill files, runtime entry points, ' +
+        'settings.json hook registration and denied tools, bundled skill files, runtime entry points, ' +
         'cross-runtime sync.'
     );
   } else {

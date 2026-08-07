@@ -60,6 +60,14 @@ Escalation is the same shape as any other halt: label the issue `blocked`, comme
 
 Everything not on that list is a decision to take.
 
+## There is no asking
+
+`AskUserQuestion` is denied project-wide in `.claude/settings.json`, and `npm run validate:context` fails if the entry goes missing. The tool suspends the session waiting for an answer nobody is there to give — the issue holds `in-progress` for as long as it waits, and every assignment behind it waits too. That is the halt this whole skill exists to prevent, arriving through a tool call instead of through a decision.
+
+The denial removes an escape hatch, not an option: **an open choice was never a question to ask.** Default it and record it. A genuine blocker from the list above goes onto the issue as a comment, which is where a human will actually find it — asynchronously, in the place that already holds the run's history — rather than into a prompt in a session that has since ended.
+
+This binds an interactive session at a keyboard exactly as it binds a pipeline run, and deliberately: the same context files drive both, and a rule that applies only when nobody is watching is a rule the pipeline cannot rely on.
+
 ## Churn is not a blocker
 
 The count of review findings, visual iterations, implementer rounds, cherry-pick retries, and failed test runs decides nothing about PR status. A run that converged after five iterations converged. What decides status is whether every verification channel the change owes reports PASS.
