@@ -436,7 +436,9 @@ one has a genuine UI path; confirmed `trainingCount` 0→1 during the
 20-tick course, back to 0 with `proficiencyTotal` 2→3 once it completes
 at 35 ticks; not the `employee-training.json`/`training.json` parity
 target — that pairing is a separate, later Batch 6 file) ·
-⬜ building-vehicle-depot-visual · ⬜ building-warehouse-visual
+✅ building-vehicle-depot-visual (T1 build succeeds, T2/T3 direct
+attempts both genuinely rejected — not researched, no findings) ·
+⬜ building-warehouse-visual
 
 ### Batch 5 — vehicle-* / needs-* / nav-* (22)
 ⬜ vehicle-3d-rendering-visual · ⬜ vehicle-driver-assignment-visual ·
