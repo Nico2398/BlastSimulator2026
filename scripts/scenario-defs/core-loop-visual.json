@@ -1,6 +1,6 @@
 {
   "name": "core-loop-visual",
-  "description": "Visual verification of the full core gameplay loop: survey → drill plan → charge → sequence → blast → fragments → contract delivery. Multi-angle screenshots at each phase to confirm smooth transitions and visual feedback.",
+  "description": "Visual verification of the full core gameplay loop: survey \u2192 drill plan \u2192 charge \u2192 sequence \u2192 blast \u2192 fragments \u2192 contract delivery. Multi-angle screenshots at each phase to confirm smooth transitions and visual feedback.",
   "steps": [
     {
       "command": "new_game seed:42 size:24",
@@ -63,7 +63,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "employeeCount": 1,
           "qualificationCount": 1,
@@ -121,7 +123,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"]
+        "decreased": [
+          "cash"
+        ]
       }
     },
     {
@@ -163,8 +167,8 @@
       "role": "observe"
     },
     {
-      "command": "drill_plan grid rows:4 cols:4 spacing:3 depth:8 start:20,20",
-      "description": "Corrected from the original rows:3 cols:3 spacing:5 (which command mode ran literally, producing 9 holes): the click drags the (20,20)-(30,30) rectangle at the Drill panel's own default spacing (DEFAULT_SPACING_M=3), computing cols/rows as round(size/spacing)+1 = 4x4 = 16 holes for that same rectangle -- the command and the click were silently testing two different grids, the same class of bug already fixed in nav-cell-types-visual.json. Caught by adding expect.equals.holeCount; fixed by describing what the click actually produces.",
+      "command": "drill_plan grid rows:4 cols:4 spacing:3 depth:6 start:20,20",
+      "description": "Corrected from the original rows:3 cols:3 spacing:5 (which command mode ran literally, producing 9 holes): the click drags the (20,20)-(30,30) rectangle at the Drill panel's own default spacing (DEFAULT_SPACING_M=3), computing cols/rows as round(size/spacing)+1 = 4x4 = 16 holes for that same rectangle -- the command and the click were silently testing two different grids, the same class of bug already fixed in nav-cell-types-visual.json. Caught by adding expect.equals.holeCount; fixed by describing what the click actually produces. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged.",
       "interaction": [
         {
           "type": "clickSelector",
