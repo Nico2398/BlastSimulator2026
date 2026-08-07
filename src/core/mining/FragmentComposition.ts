@@ -4,7 +4,7 @@
 // Used by fragment generation (blast pipeline step 3) and by anything that
 // needs to know what a piece of broken rock is actually made of.
 //
-// Refactor plan: docs/plans/rock-fragmentation-refactor.md §6/A3.
+// See the gameplay-blast-system skill, "Step 3 — Carving Fragments" (fragment composition averaging).
 
 import type { VoxelGrid, VoxelRockComposition } from '../world/VoxelGrid.js';
 

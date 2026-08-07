@@ -1,7 +1,6 @@
 // BlastSimulator2026 — Blast pipeline balance constants
 // Verifies the blast pipeline balance constants are exported from balance.ts
-// with the values the refactor plan specifies.
-// Plan: docs/plans/rock-fragmentation-refactor.md §7.
+// with the values the blast pipeline (gameplay-blast-system skill) specifies.
 
 import { describe, it, expect } from 'vitest';
 import {

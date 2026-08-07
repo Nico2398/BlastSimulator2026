@@ -34,7 +34,7 @@ Satirical open-pit mine management game — *Theme Hospital meets capitalism*. T
 
 ## 3. Current screen inventory — superseded by the finished redesign
 
-This section originally read as "the before picture": every pre-redesign surface (`MainMenu.ts`'s bare button stack, `BlastPlanUI.ts`, `ContractUI.ts`, `EmployeePanel.ts`, `SettingsMenu.ts`'s app-only cog wheel, `TileSelectOverlay.ts`'s full-screen 2D picker, and the rest) with its observed defects, one subsection per surface. Phases P0–P10 of `docs/ui-implementation-plan.md` closed every defect it listed. The old text is no longer accurate — rather than rewrite 16 subsections to describe the new screens in the same before/after-defect prose (redundant with §6, which already specifies each target surface, and now describes what is actually built rather than a target), this section instead maps old → new so anything still linking to it by name finds its way.
+This section originally read as "the before picture": every pre-redesign surface (`MainMenu.ts`'s bare button stack, `BlastPlanUI.ts`, `ContractUI.ts`, `EmployeePanel.ts`, `SettingsMenu.ts`'s app-only cog wheel, `TileSelectOverlay.ts`'s full-screen 2D picker, and the rest) with its observed defects, one subsection per surface. The since-completed phased implementation plan closed every defect it listed. The old text is no longer accurate — rather than rewrite 16 subsections to describe the new screens in the same before/after-defect prose (redundant with §6, which already specifies each target surface, and now describes what is actually built rather than a target), this section instead maps old → new so anything still linking to it by name finds its way.
 
 | Old surface (§3.x, pre-redesign) | Replaced by | Notes |
 |---|---|---|

@@ -13,7 +13,7 @@
 // feedback on their blast design, not a performance dial. Physics cost is capped
 // separately by grouping fragments into projectiles.
 //
-// Refactor plan: docs/plans/rock-fragmentation-refactor.md §6/A3.
+// See the gameplay-blast-system skill, "Step 3 — Carving Fragments".
 
 import type { Random } from '../math/Random.js';
 import { vec3, type Vec3 } from '../math/Vec3.js';

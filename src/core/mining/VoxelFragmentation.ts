@@ -5,7 +5,7 @@
 // footing is gone — comes down too: it has nothing holding it up, and leaving it
 // floating is the single most obvious way a voxel game looks broken.
 //
-// Refactor plan: docs/plans/rock-fragmentation-refactor.md §6/A2.
+// See the gameplay-blast-system skill, "Step 2 — What Breaks".
 
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 import { FRAGMENTATION_MULTIPLIER, CRACKED_VOXEL_ENERGY_RATIO, CRACKED_VOXEL_WEAKENING, BURDEN_BREAKOUT_MAX } from '../config/balance.js';
