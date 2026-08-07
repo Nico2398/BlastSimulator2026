@@ -252,10 +252,6 @@ function buildLoadingSiteInfo(level: LevelDef): LoadingSiteInfo {
 
 /** Loading screen content for a sandbox site — no site number, no difficulty pips. */
 function buildSandboxLoadingSiteInfo(config: SandboxConfig): LoadingSiteInfo {
-  // TODO(#504): implementer — reduced SandboxConfig no longer carries
-  // startingCash/unlockThreshold/availableExplosives directly; derive the
-  // briefing from SANDBOX_DIFFICULTIES[config.difficulty] and sandboxLevelDef(config)
-  // (or the LevelDef built for this site) instead of the config itself.
   const level = sandboxLevelDef(config);
   return {
     siteNumber: null,

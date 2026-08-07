@@ -76,6 +76,9 @@ export class SandboxPanel {
   getConfig(): SandboxConfig { return clampSandboxConfig(this.config); }
 
   show(): void {
+    // A fresh random seed every time the panel opens, without touching the
+    // previously selected biome/difficulty (#504).
+    this.config = clampSandboxConfig({ ...this.config, seed: randomSandboxSeed(this.rand) });
     this.render();
     this.overlay.style.display = 'flex';
   }

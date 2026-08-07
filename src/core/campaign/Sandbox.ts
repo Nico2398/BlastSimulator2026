@@ -81,6 +81,18 @@ export const SANDBOX_DEFAULTS: SandboxConfig = {
   seed: 12345,
 };
 
+// Fixed LevelDef fields (#504) — preserved from the pre-#504 SANDBOX_DEFAULTS
+// so removing the corresponding controls doesn't change site behaviour.
+const SANDBOX_FIXED_UNLOCK_THRESHOLD = 100000;
+const SANDBOX_FIXED_EVENT_FREQ_MULTIPLIER = 1;
+const SANDBOX_FIXED_CONTRACT_PRICE_MULTIPLIER = 1;
+const SANDBOX_FIXED_MIXED_ROCK_HARDNESS = false;
+
+function clampNumber(value: number, field: SandboxField, fallback: number): number {
+  if (!Number.isFinite(value)) return fallback;
+  return Math.min(field.max ?? Infinity, Math.max(field.min ?? -Infinity, value));
+}
+
 /**
  * Fill in and bound a partial config.
  *
@@ -89,16 +101,20 @@ export const SANDBOX_DEFAULTS: SandboxConfig = {
  * accepts a partial parameter list, so both want a total function here.
  */
 export function clampSandboxConfig(partial: Partial<SandboxConfig>): SandboxConfig {
-  void partial; void getBiome;
-  // TODO: implement
-  throw new Error('not implemented');
+  const out: SandboxConfig = { ...SANDBOX_DEFAULTS, ...partial };
+
+  const seedField = SANDBOX_FIELDS.find(f => f.key === 'seed')!;
+  out.seed = Math.round(clampNumber(Number(out.seed), seedField, SANDBOX_DEFAULTS.seed));
+
+  if (!getBiome(out.biome)) out.biome = SANDBOX_DEFAULTS.biome;
+  if (!(out.difficulty in SANDBOX_DIFFICULTIES)) out.difficulty = SANDBOX_DEFAULTS.difficulty;
+
+  return out;
 }
 
 /** A fresh random seed for the randomise control. `rand` is injectable so tests stay deterministic. */
 export function randomSandboxSeed(rand: () => number = Math.random): number {
-  void rand;
-  // TODO: implement
-  throw new Error('not implemented');
+  return Math.floor(rand() * (SANDBOX_SEED_MAX + 1));
 }
 
 /**
@@ -110,7 +126,27 @@ export function randomSandboxSeed(rand: () => number = Math.random): number {
  * Grid extents are fixed constants (#504) rather than player-configurable.
  */
 export function sandboxLevelDef(config: SandboxConfig): LevelDef {
-  void config; void SCORE_DECAY_RATE; void DEFAULT_GRID_SIZE; void SANDBOX_GRID_DEPTH; void getAllExplosives;
-  // TODO: implement
-  throw new Error('not implemented');
+  const clamped = clampSandboxConfig(config);
+  const biome = getBiome(clamped.biome)!;
+
+  return {
+    id: SANDBOX_LEVEL_ID,
+    nameKey: 'sandbox.level.name',
+    descKey: 'sandbox.level.desc',
+    biome: clamped.biome,
+    climateBias: biome.climateCenter,
+    terrainSeed: clamped.seed,
+    gridX: DEFAULT_GRID_SIZE,
+    gridY: SANDBOX_GRID_DEPTH,
+    gridZ: DEFAULT_GRID_SIZE,
+    startingCash: SANDBOX_DIFFICULTIES[clamped.difficulty].startingCash,
+    availableExplosives: getAllExplosives().map(e => e.id),
+    unlockThreshold: SANDBOX_FIXED_UNLOCK_THRESHOLD,
+    eventFreqMultiplier: SANDBOX_FIXED_EVENT_FREQ_MULTIPLIER,
+    contractPriceMultiplier: SANDBOX_FIXED_CONTRACT_PRICE_MULTIPLIER,
+    scoreDecayRate: SCORE_DECAY_RATE,
+    mixedRockHardness: SANDBOX_FIXED_MIXED_ROCK_HARDNESS,
+    // Tier 0 keeps it off the campaign world map, which lists tier > 0 only.
+    difficultyTier: 0,
+  };
 }

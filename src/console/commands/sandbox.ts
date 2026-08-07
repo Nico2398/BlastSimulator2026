@@ -20,12 +20,11 @@ import { generateContracts } from '../../core/economy/Contract.js';
 import { Random } from '../../core/math/Random.js';
 import { regenerateGrid } from './world.js';
 
-/** Named console args → a partial config. Unset keys keep their defaults. */
+/** Named console args → a partial config. Unset keys keep their defaults. Unknown keys (size, cash, …) are ignored. */
 export function parseSandboxArgs(named: Record<string, string>): Partial<SandboxConfig> {
   const out: Partial<SandboxConfig> = {};
 
   if (named['biome'] !== undefined) out.biome = named['biome'];
-  // TODO(#504): implementer — validate against SANDBOX_DIFFICULTIES rather than a bare cast.
   if (named['difficulty'] !== undefined) out.difficulty = named['difficulty'] as SandboxConfig['difficulty'];
   // seed:random asks for a fresh map; any number replays a known one.
   if (named['seed'] !== undefined) {
@@ -57,10 +56,10 @@ export function sandboxCommand(
     const valid = getAllBiomes().map(b => b.id).join(', ');
     return { success: false, output: `Unknown biome: "${requested.biome}". Valid: ${valid}` };
   }
-
-  // TODO(#504): implementer — validate config.difficulty against SANDBOX_DIFFICULTIES here,
-  // mirroring the biome check above.
-  void SANDBOX_DIFFICULTIES;
+  if (requested.difficulty !== undefined && !(requested.difficulty in SANDBOX_DIFFICULTIES)) {
+    const valid = Object.keys(SANDBOX_DIFFICULTIES).join(', ');
+    return { success: false, output: `Unknown difficulty: "${requested.difficulty}". Valid: ${valid}` };
+  }
 
   const config = clampSandboxConfig(requested);
   const level = sandboxLevelDef(config);
@@ -69,6 +68,7 @@ export function sandboxCommand(
     seed: config.seed,
     mineType: config.biome,
     startingCash: level.startingCash,
+    eventFreqMultiplier: level.eventFreqMultiplier,
   });
   ctx.state.world = createWorldState(level.gridX, level.gridY, level.gridZ, true);
 
@@ -78,6 +78,7 @@ export function sandboxCommand(
     sizeX: level.gridX,
     sizeY: level.gridY,
     sizeZ: level.gridZ,
+    mixedRockHardness: level.mixedRockHardness,
   });
 
   const contractRng = new Random(ctx.state.seed + ctx.state.tickCount);
@@ -85,7 +86,8 @@ export function sandboxCommand(
 
   return {
     success: true,
-    output: `Sandbox started. ${level.gridX}x${level.gridY}x${level.gridZ} ${config.biome}, seed ${config.seed}, cash $${level.startingCash.toLocaleString('en-US')}.`,
+    output: `Sandbox started. ${level.gridX}x${level.gridY}x${level.gridZ} ${config.biome}, ` +
+      `difficulty ${config.difficulty}, seed ${config.seed}, cash $${level.startingCash.toLocaleString('en-US')}.`,
   };
 }
 
