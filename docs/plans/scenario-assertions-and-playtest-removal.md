@@ -263,7 +263,11 @@ long-standing "must have grown" TODO a real check; **Finding #12: cash
 equals checks after a tick N gap are cross-mode-fragile — isPaused:false by
 default lets interaction mode's real wall-clock keep ticking the sim
 during clicks, drifting past command mode's exact tick count — switched to
-decreased/increased there**) · ⬜ ramp-navigation · ⬜ blast-execution-visual
+decreased/increased there**) · ✅ ramp-navigation (**Finding #13: a real
+production bug — buildRampCommand deducted cash but never called
+addExpense, so finances.cash silently diverged from the real cash field
+after any ramp build; fixed at the root, new unit test added**) ·
+⬜ blast-execution-visual
 
 ### Batch 3 — survey-* (12, survey-panel-visual done in Batch 0)
 ⬜ survey-confidence-display · ⬜ survey-confidence-overlay ·
@@ -507,6 +511,10 @@ of each session, in case main added/removed a file.)
 12. **`new_game` leaves `isPaused: false` by default** (`GameState.ts`) — with no explicit pause, a real browser's game loop keeps advancing the simulation on real wall-clock time throughout interaction mode, on top of whatever `tick N` commands a scenario issues explicitly. Command mode has no such thing — a headless Node.js run only advances when a `tick N`/`blast`/etc. command is literally executed, never on its own. `rock-fragmenter-breaking.json` exposed this: a `cash` `equals` check placed after a `tick 30` step (and the `waitForSelector`-heavy clicks around it) failed in a real browser — `cash should be 32748 but is 32769` — because the click round-trip's real elapsed time let the live sim tick further than the explicit `tick 30` alone would. Two back-to-back actions with no `tick`/heavy-wait gap between them (e.g. hire immediately followed by a buy, both in this same file) stayed exactly reproducible; it's specifically a step *following* a `tick N` or a slow `waitForSelector` where the drift shows up.
 
     **New ground rule (#12): don't assert an exact `equals` value on `cash` (or any field a running simulation keeps moving — salary drain, maintenance, need decay) on a step that follows a `tick N` command or a real wait/animation gap.** Use `decreased`/`increased` there instead — direction is reproducible across modes even when the exact magnitude isn't. Exact `equals` on such fields stays fine for steps with no tick/wait gap since the previous checkpoint (a hire immediately followed by a buy, nothing in between). This generalizes past `rock-fragmenter-breaking.json` — expect every playthrough-style file in Batches 5-7 with `tick N` steps to need the same treatment; check for it rather than assuming an exact economy value survives a tick gap in interaction mode.
+
+13. **`buildRampCommand` deducted `ctx.state!.cash` directly but never called `addExpense` on `ctx.state!.finances`** (`mining.ts`) — a real, previously-invisible production bug, not a scenario-file issue. Every other cash-spending command (`employee hire`, `build`, `employee train`, `entities.ts`'s demolish/upgrade/relocate) pairs the flat `cash` mutation with `addExpense(state.finances, ...)`, keeping `finances.cash` in sync — `console-api.test.ts` already asserts this invariant ("mirrors cash in both the flat field and the finances object"), but only against a fresh game, so it never caught a command that skips one side. `build_ramp` was that command: the moment a ramp was built, `finances.cash` silently froze at its pre-ramp value while the real, player-visible `cash` field (what `FinancesPanel.ts` actually reads) kept moving correctly — a low-severity but genuine divergence, caught only because writing this file's assertions meant dumping both fields side by side for the first time. **Fixed at the root**: added the missing `addExpense(ctx.state!.finances, result.cost, 'construction', 'Build ramp', ctx.state!.tickCount)` call, matching the exact pattern every other construction-cost command already uses. New unit test in `mining-commands.test.ts` proving `finances.cash` and the flat `cash` field move together — would have caught this on its own.
+
+    Also: ramps carve the voxel grid directly rather than creating a tracked entity (no `rampCount` field, or any state field at all, records that a ramp exists) — `cash` decreasing by the exact `RAMP_COST_PER_METER × length` amount is the strongest available state-level proof a `build_ramp` call actually landed, since there is nothing else to check it against.
 
 _(Add new findings here as you hit them. Number sequentially.)_
 

@@ -10,6 +10,7 @@ import { assembleBlastPlan, validateBlastPlan } from '../../core/mining/BlastPla
 import { executeBlast, buildBlastReport } from '../../core/mining/BlastExecution.js';
 import { getExplosive } from '../../core/world/ExplosiveCatalog.js';
 import { addBlastFragments, syncLogisticsCapacity } from '../../core/economy/Logistics.js';
+import { addExpense } from '../../core/economy/Finance.js';
 import { processProjections } from '../../core/entities/Damage.js';
 import { killEmployee } from '../../core/entities/Employee.js';
 import { destroyVehicle } from '../../core/entities/Vehicle.js';
@@ -665,6 +666,7 @@ export function buildRampCommand(
 
   if (!result.success) return { success: false, output: result.message };
   ctx.state!.cash -= result.cost;
+  addExpense(ctx.state!.finances, result.cost, 'construction', 'Build ramp', ctx.state!.tickCount);
 
   // Patch NavGrid to reflect ramp terrain changes
   if (ctx.state!.navGrid && ctx.grid) {

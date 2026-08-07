@@ -10,10 +10,17 @@
           "command": "new_game seed:42"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "holeCount": 0
+        }
+      }
     },
     {
       "command": "build_ramp start:15,15 end:20,25",
+      "description": "Finding #13: buildRampCommand deducted ctx.state!.cash directly but never called addExpense on ctx.state!.finances — finances.cash silently diverged from the flat cash field the moment any ramp was built (every other cash-spending command, hire/buy/build/train/demolish/upgrade/relocate, pairs the two correctly). The flat cash field is what the Finances panel and every prior scenario assertion actually read, so this was invisible to players and to every earlier verification pass — caught only by dumping both fields side by side while writing this file's assertions. Fixed at the root (mining.ts) rather than worked around in the scenario.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -42,7 +49,13 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 49000
+        },
+        "note": "10m ramp x RAMP_COST_PER_METER (balance.ts) = 1000; a ramp carves the voxel grid directly rather than creating a tracked entity (no rampCount field exists to check), so a real cash deduction is the strongest state-level proof available that the build actually landed"
+      }
     },
     {
       "command": "employee hire role:surveyor",
@@ -60,7 +73,14 @@
           "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "employeeCount": 1,
+          "cash": 47800
+        },
+        "note": "HIRING_COSTS.surveyor = 1200 (balance.ts)"
+      }
     },
     {
       "command": "employee list",
@@ -80,7 +100,11 @@
           "command": "tick 30"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash"],
+        "note": "salary drain over 30 ticks with a surveyor on payroll — decreased, not an exact value (Finding #12: new_game leaves isPaused:false, so interaction mode's real wall-clock keeps ticking during the click round-trip beyond exactly 30, a drift command mode's headless tick 30 doesn't have)"
+      }
     },
     {
       "command": "inspect 20,20,0",

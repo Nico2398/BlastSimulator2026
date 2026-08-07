@@ -899,6 +899,16 @@ describe('buildRampCommand', () => {
     expect(ctx.state!.cash).toBe(cashBefore - 5 * RAMP_COST_PER_METER);
   });
 
+  it('deducts the cost from finances.cash too, not just the flat cash field', () => {
+    const ctx = makeMiningContext();
+    const cashBefore = ctx.state!.cash;
+
+    buildRampCommand(ctx, [], { origin: '5,5', direction: 'south', length: '5', depth: '8' });
+
+    expect(ctx.state!.finances.cash).toBe(cashBefore - 5 * RAMP_COST_PER_METER);
+    expect(ctx.state!.finances.cash).toBe(ctx.state!.cash);
+  });
+
   it('returns an error and does not deduct cash when funds are insufficient', () => {
     const ctx = makeMiningContext();
     ctx.state!.cash = 10;
