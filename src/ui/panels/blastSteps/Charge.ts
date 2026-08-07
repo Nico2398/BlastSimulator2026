@@ -75,12 +75,18 @@ export class ChargeStep {
     const stemmingStepperEl = stepper(`${this.stemmingM.toFixed(1)} m`, () => this.adjustStemming(-0.2), () => this.adjustStemming(0.2));
     this.stemmingValueEl = stemmingStepperEl.querySelector('.bsx-stepper-value') as HTMLElement;
 
-    const amountField = el('div', { children: [
+    // data-field, same reasoning as ParamStrip.ts's grid spacing/depth
+    // steppers (issue #479 follow-up, Finding #4): without it there is no
+    // selector a click-only scenario/playtest step can target to reach an
+    // exact amount/stemming before Charge All, so a declared
+    // `charge ... amount:8 stemming:0` silently charged at the panel's
+    // 5kg/2m defaults instead whenever the click never touched these.
+    const amountField = el('div', { attrs: { 'data-field': 'amount' }, children: [
       this.locale.bindText(el('span', { attrs: { style: fieldLabelStyle } }), 'ui.blast_workshop.charge.amount'),
       amountStepperEl,
     ] });
     amountField.style.cssText = 'flex:1;display:flex;flex-direction:column;gap:4px';
-    const stemmingField = el('div', { children: [
+    const stemmingField = el('div', { attrs: { 'data-field': 'stemming' }, children: [
       this.locale.bindText(el('span', { attrs: { style: fieldLabelStyle } }), 'ui.blast_workshop.charge.stemming'),
       stemmingStepperEl,
     ] });

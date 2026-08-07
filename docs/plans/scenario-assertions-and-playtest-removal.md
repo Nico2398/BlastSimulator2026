@@ -208,8 +208,13 @@ spacing-stepper gap found + fixed at the root, ParamStrip.ts**) ·
 ### Batch 1 — ✅ COMPLETE (14 files, see Done list below)
 
 ### Batch 2 — blast-* (25)
-⬜ blast-basic · ⬜ blast-charge-loading-ui · ⬜ blast-detonation-sequence-ui ·
-⬜ blast-execution-effects · ⬜ blast-overcharge · ⬜ blast-undercharge ·
+✅ blast-basic (Finding #4 grid mismatch) · ✅ blast-charge-loading-ui
+(same) · ✅ blast-detonation-sequence-ui (same) ·
+✅ blast-execution-effects (same) · ✅ blast-overcharge (**Finding #5: the
+Charge panel's amount/stemming steppers had no selector either, and
+stemming:0 turned out to be unreachable by any click — fixed at the root,
+corrected to the true UI-reachable extreme, verified against the real
+chargesByHole dump**) · ✅ blast-undercharge (same fix, amount only) ·
 ⬜ blast-report-metrics · ⬜ blast-voxel-fragmentation ·
 ⬜ blast-voxel-fragmentation-visual · ⬜ blast-preview-software-tiers ·
 ⬜ blast-report-visual · ⬜ blast-visual-full · ⬜ blast-charge-sequence-visual ·
@@ -376,6 +381,46 @@ of each session, in case main added/removed a file.)
    passed the original #479 interaction-mode verification" means the grid
    shape was ever actually correct, since that verification never checked
    hole count either.
+
+5. **Finding #4 generalizes past the Drill panel: the Charge panel's
+   amount/stemming steppers had the identical no-selector gap, and worse —
+   one of the two values in `blast-overcharge.json` was not reachable by
+   *any* click at all.** `Charge.ts`'s `adjustStemming()` floors at
+   `Math.max(0.5, ...)` — a hole can never be left truly unstemmed (0m) via
+   the UI, only down to 0.5m, while the console's `charge ... stemming:0`
+   has no such floor. `blast-overcharge.json`'s entire premise ("Stemming
+   is what keeps a big charge working on the rock instead of throwing it,
+   so an overcharge only turns dangerous once the holes are left
+   unstemmed") depended on exactly the value a player can never produce.
+   Before this fix, its Charge All click (never touching the amount/
+   stemming steppers, because they had no selector) silently applied the
+   panel's plain defaults (5kg/2m — identical to `blast-basic.json`'s
+   ordinary charge) instead of anything resembling an overcharge, in every
+   interaction-mode run since the file existed. Not a hypothetical: this
+   scenario has never once exercised overcharge/flyrock behavior through a
+   real click.
+
+   **Fixed at the root** (same pattern as Finding #4): added
+   `data-field="amount"`/`data-field="stemming"` to `Charge.ts`'s field
+   wrappers. For the unreachable-floor case, rather than leave the file
+   silently wrong or drop the click entirely, corrected the *declared*
+   value to the true UI-reachable extreme (`stemming:0.5`, not `0`) and
+   drove the steppers to it for real (3 amount clicks 5→8kg, 8 stemming
+   clicks 2.0→0.5m) — the strongest overcharge a real player can actually
+   create, verified against the real `chargesByHole` dump in interaction
+   mode (`amountKg: 8, stemmingM: 0.5` on every hole), not assumed from the
+   click count alone. `blast-undercharge.json` only needed the amount
+   stepper (its `stemming:2` already matched the panel default) — also
+   verified against the real dump.
+
+   **A UI floor that makes a documented game mechanic ("stemming 0 = no
+   confinement") literally unreachable by any player is itself worth a
+   follow-up issue** (should `adjustStemming`'s floor be 0, matching the
+   console? or is 0.5m intentional and the console should share the same
+   floor?) — out of scope to decide here, filed as a note rather than
+   silently working around it.
+
+_(Add new findings here as you hit them. Number sequentially.)_
 
 _(Add new findings here as you hit them. Number sequentially.)_
 
