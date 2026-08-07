@@ -30,8 +30,8 @@
       "role": "observe"
     },
     {
-      "command": "drill_plan grid rows:4 cols:4 spacing:4 depth:8 start:14,14",
-      "description": "One increment click on the spacing stepper (data-field=\"spacing\") raises it 3->4m (DEFAULT_SPACING_M, Drill.ts) before dragging, so the (14,14)-(26,26) rectangle computes the declared 4x4 instead of the default-spacing 5x5 (issue #479 follow-up, Finding #4).",
+      "command": "drill_plan grid rows:4 cols:4 spacing:4 depth:6 start:14,14",
+      "description": "One increment click on the spacing stepper (data-field=\"spacing\") raises it 3->4m (DEFAULT_SPACING_M, Drill.ts) before dragging, so the (14,14)-(26,26) rectangle computes the declared 4x4 instead of the default-spacing 5x5 (issue #479 follow-up, Finding #4). depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged.",
       "interaction": [
         {
           "type": "clickSelector",
