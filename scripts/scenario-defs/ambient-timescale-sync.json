@@ -20,7 +20,14 @@
           "command": "time speed 1"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 0,
+          "isPaused": false,
+          "timeScale": 1
+        }
+      }
     },
     {
       "command": "state full",
@@ -30,7 +37,14 @@
           "command": "state full"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "tickCount": 0,
+          "isPaused": false,
+          "timeScale": 1
+        }
+      }
     },
     {
       "command": "time speed 4",
@@ -40,7 +54,14 @@
           "command": "time speed 4"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 0,
+          "isPaused": false,
+          "timeScale": 4
+        }
+      }
     },
     {
       "command": "state full",
@@ -50,7 +71,14 @@
           "command": "state full"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "tickCount": 0,
+          "isPaused": false,
+          "timeScale": 4
+        }
+      }
     },
     {
       "command": "time pause",
@@ -60,7 +88,14 @@
           "command": "time pause"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 0,
+          "isPaused": true,
+          "timeScale": 4
+        }
+      }
     },
     {
       "command": "state full",
@@ -70,7 +105,14 @@
           "command": "state full"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "tickCount": 0,
+          "isPaused": true,
+          "timeScale": 4
+        }
+      }
     },
     {
       "command": "time resume",
@@ -80,7 +122,14 @@
           "command": "time resume"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 0,
+          "isPaused": false,
+          "timeScale": 4
+        }
+      }
     },
     {
       "command": "state full",
@@ -90,7 +139,15 @@
           "command": "state full"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "tickCount": 0,
+          "isPaused": false,
+          "timeScale": 4
+        },
+        "note": "ambientClockSeconds is deliberately not asserted here via `expect.equals` -- it's exposed only by window.__gameState() (main.ts), not serializeGameState() (console-api.ts), so it's undefined in command mode by design (per this file's own description) and any exact/delta check on it would always fail there, breaking dual-mode verification rather than serving it. Verified directly instead: read the real interaction-mode state JSON dumps in scratchpad and confirmed ambientClockSeconds tracks state.timeScale/isPaused exactly as GameRenderer.update()'s gameDt convention (dev docs, rendering.md) requires -- see Finding #63."
+      }
     }
   ],
   "shots": [

@@ -809,7 +809,18 @@ matched the real pool everywhere, and unlike it, zero random events
 fire anywhere in this file so `cash` is hard-asserted at every step
 with no softening needed. Verified 1/1 in both modes, interaction
 mode re-run twice for determinism, 127/127 steps) ·
-⬜ ambient-timescale-sync · ⬜ landscape-continuity-visual ·
+✅ ambient-timescale-sync (**Finding #63** — see the findings log; a
+genuinely special case — `ambientClockSeconds` only exists via
+`window.__gameState()`, never `serializeGameState()`, so it can't be
+`expect`-asserted without breaking command mode; asserted the
+dual-mode-safe fields (`timeScale`/`isPaused`) instead and separately
+confirmed the file's real subject by reading the actual interaction-
+mode state JSON dumps directly — the ambient clock genuinely freezes
+across the whole pause window and resumes after, confirmed
+identically on 2 separate runs. Small file (9 steps), by far the
+fastest interaction run this session (~15s). Verified 1/1 in both
+modes) ·
+⬜ landscape-continuity-visual ·
 ⬜ tutorial-steps-visual · ⬜ vehicle-purchase-visual ·
 ⬜ contract-panel-visual · ⬜ event-dialog-visual
 
@@ -1104,6 +1115,8 @@ of each session, in case main added/removed a file.)
 61. **`level3-playthrough-ecology.json`'s 6 `drill_plan grid` steps all already declared `spacing:3` (the Drill panel's real default) — the first file this session to get that part right from the start — but all 6 still declared a `depth` (12/12/14/14/16/16) other than the panel's real default of 6, the exact Ground rule #15/Finding #42 class, since none of their interaction arrays click a depth stepper.** Fixed all 6 to `depth:6` (plus `diameter:0.089`, matching the by-now-established pattern) proactively, before tracing at all — paid off, needed only one trace pass. Consistent with Finding #42's own precedent, the corrected shallower holes make blasts genuinely more violent, which only helps rather than hurts this file's own "ecological collapse" premise: `levelEndReason:'ecological_shutdown'` fires for real at tick 184, and by the file's end all 7 hired employees are dead. Separately (not part of this finding, already correctly handled): 2 of the file's 6 blast cycles request explosive amounts outside the given explosive's valid range (12kg and 15kg krackle against a real [1-10kg] limit) — genuine, pre-existing, deliberate authoring choices matching the file's own "no mitigation" premise, already documented in this file's own step descriptions from the #479 pass. The charge validation correctly rejects both, `sequence` still reports its nominal hole count (it doesn't check charge state), and the following `blast` fails outright with "Invalid plan: Missing charge" on every hole — `stats` confirms exactly 4 of 6 attempted cycles actually detonated. This file's `expect` blocks assert that non-firing outcome directly (chargedCount:0, unchanged holeCount) rather than treating it as something to fix. This is also the first file this session whose step descriptions already carried thorough, accurate documentation of the locked-level cascade (referencing Finding #24 by number) predating this pass entirely — confirms the #479 conversion pass did real, careful diagnostic work on this file already, this pass only needed to add `expect` on top of it.
 
 62. **`level3-playthrough-win.json` (127 steps, the largest file this batch) recurs every established finding class from the rest of Batch 7 in a single file, plus the most severe casualty count yet.** `campaign start level:treranium_depths` fails outright (Finding #58/#59/#61's class, not fixed). `employee assign_skill` used the rejected positional syntax (Finding #45/#54/#59) — fixed. All 6 `build` commands name nonexistent types — left as documented no-ops. Two `debris_hauler`s are bought but neither is ever driven — `storedMassKg` stays 0 for the whole file and all 5 deliveries fail honestly; not fixed, same reasoning as the other `win`-named files this session. Finding #52's drill-grid class recurred a 5th time across all 5 grids (declared 12/16/20/20/25 holes vs. real 24/36/30/30/64) — fixed the same way. Like `level2-playthrough-win.json`, this file's hardcoded contract IDs (1-5) all happened to already match the real pool at every listing — no ID fix needed, the 2nd file this session where that held. The corrected, dramatically larger grids (the final cycle alone: declared 25 holes → real 64) are violent enough to kill all 10 hired employees across the file's 5 blasts — `stats` confirms "Casualties: 10," the most severe outcome of the Finding #40/#56/#59 real-consequence class encountered so far. Unlike `level2-playthrough-win.json`, zero random events fire anywhere in this file's trace (income stays exactly $0.00 throughout) — no Finding #60-style cash softening was needed; `cash` is hard-asserted at every single step and held cleanly across two separate interaction-mode runs.
+
+63. **`ambient-timescale-sync.json` is a genuinely different shape of file from everything else converted this session: its entire subject, `ambientClockSeconds`, cannot be asserted through `expect.equals` without breaking one of the two required channels.** Confirmed via direct source read: `serializeGameState()` (`console-api.ts`, command mode's state source) never includes `ambientClockSeconds` at all, while `window.__gameState()` (`main.ts`, interaction mode's source) includes it via `gameRenderer.ambientClockSeconds` — a renderer-owned clock that only exists when a renderer exists. Any `equals` check on it would compare `undefined` against a number in command mode and fail there by construction, which is the opposite of what dual-mode verification is for. Resolved by asserting the fields this file's premise actually depends on and that genuinely exist in both modes — `timeScale`/`isPaused` — and separately verifying the file's real subject the way a rendering claim should be verified (CLAUDE.md's rule: an image, or here, a value, must actually be inspected, not just reasoned about from source): ran the file in interaction mode and read the real `gameState.ambientClockSeconds` values out of the written state JSON dumps directly. The evidence is clean and unambiguous: across the `time pause` → `state full` → `time resume` step sequence, `ambientClockSeconds` reads exactly 0.4852 at all three of the pause-adjacent snapshots (the pause command's own dump, the following `state full`, and the resume command's own dump, captured before resume's effect could apply) — a real, sustained freeze across the entire pause window, not just a small delta — then advances again once resumed. Reproduced identically (frozen at a different absolute value, same zero-delta-while-paused shape) on a 2nd, independent interaction-mode run. This confirms `GameRenderer.update()`'s `gameDt` convention (`rendering.md`: `dt * state.timeScale`, `0` while paused) is genuinely wired correctly for the ambient module family this file exercises — issue #490's fix holds. No code change; this finding is entirely about how to verify a renderer-only field's correctness within a scenario framework built around dual-mode state assertions, for future files that hit the same shape.
 
 _(Add new findings here as you hit them. Number sequentially.)_
 
@@ -2009,3 +2022,28 @@ got, whether main was merged, and whether GitHub Actions is back up yet.
   expected to be much cheaper than anything done today
   (ambient-timescale-sync next), then the depth-mismatch audit before
   Phase 3.
+- 2026-08-07 (cont.) — ambient-timescale-sync.json done (**Finding
+  #63**, Batch 7 15/19), 9 steps, the first genuinely different shape
+  of file this session. Its whole subject, `ambientClockSeconds`, is
+  renderer-only — exposed by `window.__gameState()` but never by
+  `serializeGameState()` — so it can't go in `expect.equals` without
+  breaking command mode outright. Asserted `timeScale`/`isPaused`
+  instead (the fields the file's premise genuinely depends on that
+  exist in both modes), then verified the real subject the way a
+  rendering claim should be: read the actual interaction-mode state
+  JSON dumps directly rather than trusting a passing run. The
+  evidence is clean — `ambientClockSeconds` reads the exact same
+  value across all 3 pause-adjacent snapshots (pause command, the
+  following `state full`, and resume command's own dump before its
+  effect lands), a real sustained freeze across the whole pause
+  window, confirmed identically on 2 independent runs. Issue #490's
+  `gameDt` fix holds for real. No code change — this finding is about
+  the verification approach itself, for the next file that hits a
+  renderer-only field. By far the fastest interaction run this
+  session (~15s vs. 40-58s for the playthrough files). Verified: JSON
+  valid, `scenario-defs.test.ts` green (3088 tests), full local sweep
+  green (typecheck, 124/124 scenarios, 8328/8328 tests), command mode
+  passes, interaction mode passes twice. GitHub Actions still down for
+  this branch — all verification remains local. Next: the remaining 4
+  Batch 7 files (landscape-continuity-visual next), then the
+  depth-mismatch audit before Phase 3.
