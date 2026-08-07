@@ -488,7 +488,13 @@ total ticks a genuine "needs" expense category appears in `finances`
 output — Rest: hunger, $50 each — as minFatigue crashes toward the
 collapse threshold; added missing `event choose 0` after every tick
 step, matching Finding #23's fix) ·
-⬜ needs-cycle · ⬜ needs-drain-visual ·
+✅ needs-cycle (the file's title promise — "verify canteen auto-queue" —
+is categorically unreachable, "canteen" isn't a real building type and
+"hauler" isn't a real hire role; both already correctly documented as
+no-ops by the file's own pre-existing step descriptions, now given real
+`equals` confirmation instead of just prose; the 2 real hires and idle
+need-decay over 40 ticks are what this file actually tests) ·
+⬜ needs-drain-visual ·
 ⬜ needs-gauges-visual · ⬜ needs-morale-visual ·
 ⬜ needs-proactive-queue-visual · ⬜ needs-replenishment-visual ·
 ⬜ needs-shift-cycle-visual · ⬜ nav-dynamic-updates-visual ·
