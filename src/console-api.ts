@@ -39,6 +39,10 @@ export interface SerializableGameState {
   qualificationCount: number;
   proficiencyTotal: number;
   trainingCount: number;
+  /** Employees currently in the `collapsing` state (needs mechanics, Employee.ts). */
+  collapsedCount: number;
+  /** Lowest `fatigue` (0-100, 100 = fully rested) across the roster — the employee closest to collapse. 100 with no employees. */
+  minFatigue: number;
   levelEnded: boolean;
   levelEndReason: string | null;
   bankrupt: boolean;
@@ -85,6 +89,8 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     proficiencyTotal: s.employees.employees
       .reduce((n, e) => n + e.qualifications.reduce((m, q) => m + q.proficiencyLevel, 0), 0),
     trainingCount: s.employees.employees.filter(e => e.trainingState !== null).length,
+    collapsedCount: s.employees.employees.filter(e => e.collapsing).length,
+    minFatigue: s.employees.employees.reduce((m, e) => Math.min(m, e.fatigue), 100),
     levelEnded: s.levelEnded,
     levelEndReason: s.levelEndReason,
     bankrupt: s.bankruptcy.bankrupt,

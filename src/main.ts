@@ -433,6 +433,10 @@ window.__gameState = () => {
     proficiencyTotal: s.employees.employees
       .reduce((n, e) => n + e.qualifications.reduce((m, q) => m + q.proficiencyLevel, 0), 0),
     trainingCount: s.employees.employees.filter(e => e.trainingState !== null).length,
+    // Needs mechanics: proves fatigue actually built up and collapse actually
+    // fired, rather than a scenario guessing at it from a screenshot alone.
+    collapsedCount: s.employees.employees.filter(e => e.collapsing).length,
+    minFatigue: s.employees.employees.reduce((m, e) => Math.min(m, e.fatigue), 100),
     levelEnded: s.levelEnded,
     levelEndReason: s.levelEndReason,
     // ── Game-over detection fields ──

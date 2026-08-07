@@ -1,6 +1,6 @@
 {
   "name": "collapse-recovery",
-  "description": "Chapter 7: Drive employee fatigue to collapse, then verify rest restores them to resume original task",
+  "description": "Chapter 7: Drive an idle employee's need gauges to collapse via nothing but time passing. Finding #11: the original claim (\"verify rest restores them to resume original task\") does not hold at this file's own tick budget — a real run confirms collapse is genuine (collapsedCount 0->1, wellBeing craters) but the employee is STILL collapsing at tick 350, not recovered; extending the run to 2350 ticks shows repeated collapse/rest cycles (hunger, fatigue, and breakNeed each collapse and recover on their own, different-length cycles) draining cash via NEED_REST_COSTS on every cycle, ending in bankruptcy + worker_revolt (LEVEL LOSS) rather than a clean recovery. Whether that's an unbalanced interaction (idle need-drain, tickNeedGauges via events.ts, keeps draining at the idle rate even while a rest action is in progress, so a short/weak rest may net-lose ground) or intended difficulty for a company that hires someone and gives them no work is a design question — filed as a follow-up, not decided here. This file now asserts only what a real run verifies: collapse is real, recovery within 350 ticks is not.",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -10,7 +10,13 @@
           "command": "new_game seed:42"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "employeeCount": 0
+        }
+      }
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -20,7 +26,10 @@
           "command": "campaign start level:dusty_hollow"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "increased": ["worldSizeX"]
+      }
     },
     {
       "command": "time resume",
@@ -48,11 +57,19 @@
           "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "employeeCount": 1,
+          "collapsedCount": 0,
+          "cash": 49000
+        },
+        "note": "HIRING_COSTS.driller = 1000 (balance.ts)"
+      }
     },
     {
       "command": "build living_quarters at:5,5",
-      "description": "'bunkhouse' was never a valid build type (NEED_REST_BUILDING_TYPES maps every need to 'living_quarters' — dedicated canteen/bunkhouse/break_room types don't exist yet), so this command always failed and the scenario ran with no rest building at all: collapse resolved via instant ground-rest in place, never exercising the arrival-gated building-rest path (#437) this scenario is named for.",
+      "description": "'bunkhouse' was never a valid build type (NEED_REST_BUILDING_TYPES maps every need to 'living_quarters' — dedicated canteen/bunkhouse/break_room types don't exist yet); this file already uses the real type. The employee hires far from this build site (spawn (82,34) vs building (5,5) on this seed's dusty_hollow map, real distance ~82 tiles) — real, not a scenario mistake, and part of why the rest cycle below struggles to keep up.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -79,7 +96,14 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "buildingCount": 1,
+          "cash": 39000
+        },
+        "note": "living_quarters T1 constructionCost = 10000 (balance.ts)"
+      }
     },
     {
       "command": "employee list",
@@ -89,7 +113,13 @@
           "command": "employee list"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "collapsedCount": 0
+        },
+        "note": "baseline before the idle-drain run below — not yet collapsing, fresh hire's needs start full"
+      }
     },
     {
       "command": "tick 250",
@@ -99,7 +129,14 @@
           "command": "tick 250"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "collapsedCount": 1
+        },
+        "decreased": ["minFatigue", "wellBeing"],
+        "note": "250 ticks of pure idle need-drain (no drill plan, nothing to do) is enough to collapse a fresh hire — real, verified via a direct engine run, not assumed from the file's own claim"
+      }
     },
     {
       "command": "employee list",
@@ -119,7 +156,14 @@
           "command": "tick 100"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "collapsedCount": 1
+        },
+        "decreased": ["wellBeing"],
+        "note": "Finding #11: still collapsing at tick 350, not recovered — the original file's claim (\"rest restores them\") does not hold within this budget; wellBeing keeps cratering rather than climbing back"
+      }
     },
     {
       "command": "employee list",

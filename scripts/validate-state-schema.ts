@@ -77,6 +77,8 @@ export const GAME_STATE_SCHEMA: Schema = {
   qualificationCount: { type: 'number', description: 'Qualifications held across the whole roster' },
   proficiencyTotal: { type: 'number', description: 'Sum of every held qualification\'s proficiency level' },
   trainingCount: { type: 'number', description: 'Employees currently enrolled in training' },
+  collapsedCount: { type: 'number', description: 'Employees currently in the collapsing state' },
+  minFatigue: { type: 'number', description: 'Lowest fatigue (0-100, 100=rested) across the roster — closest employee to collapse, 100 with none' },
   levelEnded: { type: 'boolean' },
   levelEndReason: { type: 'string', optional: true, description: 'null while the level runs' },
   bankrupt: { type: 'boolean', description: 'Loss condition' },

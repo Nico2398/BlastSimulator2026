@@ -23,14 +23,19 @@ import type { MiningContext } from '../../src/console-api.js';
  * wellBeing/safety/ecology/nuisance (ScoreState) were never exposed on
  * either side at all — added together so a scenario can finally assert on
  * the four scores that gate events/contracts/lawsuits, not just guess at
- * them from a screenshot.
+ * them from a screenshot. collapsedCount/minFatigue (needs mechanics,
+ * Employee.ts) followed the same gap for the same reason — a scenario
+ * driving fatigue to collapse had no field to prove either one happened.
+ * fatigue is inverted (100 = fully rested, 0 = exhausted), so the field
+ * tracks the minimum across the roster — the employee closest to collapse
+ * — not the maximum.
  */
 const SERIALIZED_FIELDS = [
   'seed', 'time', 'tickCount', 'isPaused', 'mineType',
   'worldSizeX', 'worldSizeZ', 'worldMinX', 'worldMinZ',
   'drillHoles', 'chargesByHole', 'sequenceDelays', 'finances', 'holeCount', 'chargedCount',
   'sequencedCount', 'buildingCount', 'vehicleCount', 'employeeCount',
-  'qualificationCount', 'proficiencyTotal', 'trainingCount',
+  'qualificationCount', 'proficiencyTotal', 'trainingCount', 'collapsedCount', 'minFatigue',
   'levelEnded', 'levelEndReason', 'bankrupt', 'revolted', 'ecologicalShutdown',
   'arrested', 'cash', 'profit', 'wellBeing', 'safety', 'ecology', 'nuisance', 'muckPile',
 ] as const;
@@ -125,6 +130,23 @@ describe('console-api', () => {
       expect(state.employeeCount).toBe(1);
       expect(state.qualificationCount).toBeGreaterThan(0);
       expect(state.proficiencyTotal).toBeGreaterThan(0);
+    });
+
+    it('reports zero collapsedCount and 100 (fully rested) minFatigue for a fresh game with no employees', () => {
+      runner.runner.run('new_game mine_type:desert seed:42');
+      const state = serializeGameState(runner.ctx as MiningContext)!;
+
+      expect(state.collapsedCount).toBe(0);
+      expect(state.minFatigue).toBe(100);
+    });
+
+    it('reports a freshly-hired employee\'s starting fatigue of 100 (fully rested, hireEmployee)', () => {
+      runner.runner.run('new_game mine_type:desert seed:42');
+      runner.runner.run('employee hire role:driller');
+      const state = serializeGameState(runner.ctx as MiningContext)!;
+
+      expect(state.minFatigue).toBe(100);
+      expect(state.collapsedCount).toBe(0);
     });
 
     it('starts all four scores at 50 (createScoreState) for a fresh game', () => {
