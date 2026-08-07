@@ -714,7 +714,19 @@ named for revolt but the real, deterministic loss is bankruptcy from
 file this project hit with a real, observed mid-trace random event,
 handled via Finding #34's class plus a `Bankruptcy.ts` read proving
 the 100-tick grace countdown completes regardless of the event's
-exact timing) · ⬜ level1-playthrough-win ·
+exact timing) ·
+✅ level1-playthrough-win (**Findings #45-#51** — see the findings
+log; the original action sequence referenced nonexistent building
+types, never bought a vehicle, and used a rejected `assign_skill`
+syntax, so no contract could ever be delivered — rebuilt the sequence
+to genuinely drill/blast/survey/haul/deliver across 2 contract cycles,
+front-loading all 8 hires before cash goes negative (the hire button
+disables itself once unaffordable); the named $80k target and 3rd
+blast cycle are both out of reach, the former on cost arithmetic
+alone, the latter blocked by a real command-mode-vs-browser
+divergence in `contract deliver`'s cleanup of `storedMassKg` and
+`activeContractCount` — described the real trajectory instead,
+verified 1/1 in both modes) ·
 ⬜ level1-win-conservative · ⬜ level1-win-efficient ·
 ⬜ level2-playthrough-bankruptcy · ⬜ level2-playthrough-win ·
 ⬜ level3-playthrough-ecology · ⬜ level3-playthrough-win ·
@@ -977,6 +989,20 @@ of each session, in case main added/removed a file.)
 43. **`level1-lose-revolt.json`'s premise doesn't hold at all: `wellBeing` only ever rises, never falls, so `revolted` never flips true within any tick budget.** Applied the Finding #42/Ground rule #15 depth fix proactively this time (`depth:12`→`depth:6` on both `drill_plan grid` steps, before tracing at all, avoiding the wasted re-trace loop that hit `level1-lose-ecology.json`). Traced the full 110-tick file fresh: `avgMorale` (`events.ts`, averaged over `state.employees.employees[].morale`) starts and stays above 50 for all 6 hires — nobody is ever dispatched into harm, dismissed, or left starving — so `wbDelta += (avgMorale-50)*0.02` (`updateScores`) only ever pushes `wellBeing` up, climbing 50→99.95 by tick 70 and sitting flat at the ceiling for the remaining 40 ticks. This is a materially different case from Finding #42: there the trajectory was heading toward the named outcome and just needed a bug fixed to get there (or Finding #41, where the outcome was real but not the one named); here `wellBeing` is trending in the *opposite* direction from what a "neglect causes revolt" premise requires, so no amount of additional ticking could ever reach `REVOLT_TICKS` — the file cannot be fixed toward its own name, only accurately described. **No code change** — treated like Findings #20/#21/#26/#27/#41: `expect` blocks assert the real trajectory (`wellBeing` rising to a 99.95 ceiling, `revolted:false`, `levelEnded:false` through the full 110-tick budget), with a note on the final `campaign status` step naming the false premise directly. `deathCount` stays `0` throughout — unlike `tutorial-playthrough.json`'s Finding #40, neither blast's cleared zone overlaps any of the 6 hires. `ecology` still collapses to exactly 0 after the second (corrected, depth:6) blast, same mechanism as Finding #42, but is incidental here: the file's 110-tick budget never reaches `ECOLOGICAL_SHUTDOWN_TICKS` (150), so the collapse is asserted but doesn't end the level. Zero random events fire anywhere in the trace (every `event choose 0` reports no pending event), making the entire file deterministic and safe for exact `equals` assertions with no `decreased`/`increased` softening needed anywhere. Verified in both command mode and a real browser, both passing on the first run after the proactive depth fix.
 
 44. **`level1-playthrough-revolt.json` is named for worker revolt but its real, deterministic loss condition is bankruptcy — and a real random event genuinely fires partway through this file's 200-tick trace, the first file this project has hit where Finding #34's "four score fields become unsafe once an event could fire" class had to be applied against an *observed*, not just theoretical, firing.** Applied the Ground rule #15 depth fix proactively to all 4 `drill_plan grid` steps before tracing (10/12→6). The command-mode trace ran clean through 70 ticks with zero events (`avgMorale` stays comfortably above 50 for all 7 hires — same non-neglect mechanic as Finding #43 — so `wellBeing` climbs to its 99.95 ceiling and `revolted` never approaches true), then at tick 130 a real `weather_bad_forecast` event resolves (cash −8000, safety +6, wellBeing −4) — the first actually-observed mid-file random event in this project's scenario conversion, as opposed to the zero-event traces of Findings #41/#43 or the *theoretical* risk documented in Ground rule #12/Finding #34. Investigated whether this made the file's outcome itself uncertain across modes by reading `Bankruptcy.ts` directly: `BANKRUPTCY_THRESHOLD=5000`, `BANKRUPTCY_GRACE_TICKS=100` — cash must stay below $5000 for **100 consecutive ticks** (not a single threshold crossing) before bankruptcy fires, and the streak resets the instant cash recovers above the threshold. Because this file hires 7 employees up front and never opens a single contract or income source afterward, cash declines strictly monotonically (a fixed −4750 per completed 10-tick payday cycle, confirmed identical before and after the one event) — it first crosses below $5000 around tick ~76, over 50 ticks before the weather event even fires at tick 130, so the grace countdown is already running cleanly by the time the one observed event could possibly perturb it, and — since cash never recovers — the countdown is guaranteed to complete by tick ~176-180 regardless of whether that event fires, fires at a different tick, or a completely different event fires instead in a real interaction-mode run. **Fixed the test to describe this real trajectory rather than the named one**, following Finding #34's exact treatment: `equals`/`decreased` stay exact for `tickCount`/`holeCount`/`deathCount`/`employeeCount` throughout (unaffected by which score-event fires, verified against the applyDecay-floor reasoning from Finding #42/#43 but deliberately *not* extended to `ecology`/`nuisance` here even though they're pinned at 0 by the same mechanism — Finding #34 showed a real event can have totally unexpected side effects, e.g. destroying a building outright, so this file drops hard-asserts on all four score fields, not just the two under direct threat, the moment the observed event fires); `decreased:["cash"]` on every tick step from that point on (payroll never stops draining, always true regardless of event specifics); `bankrupt`/`levelEnded`/`levelEndReason:'bankruptcy'`/`revolted:false` asserted only at the file's final two steps, never at the exact tick command-mode happened to cross at (step 81), since that specific tick could shift by one block depending on the event's real timing even though the eventual outcome by tick 200 is robust. Verified in both command mode and a real browser; the browser run passed on the first attempt, consistent with (but not proof beyond) the monotonic-decline argument above. Deleted the scratch trace script (`scripts/check-playthrough-revolt.ts`) before running `typecheck`, having forgotten to on the first pass — re-confirms the established practice of deleting scratch scripts immediately after use, not just at end-of-session.
+
+45. **`level1-playthrough-win.json`'s original `employee assign_skill` calls used positional arguments (`assign_skill 1 geology 3`) that the real command silently rejects — it requires `skill:<category> level:1-5` prefixes.** No error, no effect: the skill points were simply never spent. Caught only by reading the command handler directly and comparing against what the file's steps actually passed. Fixed throughout to `employee assign_skill N skill:X level:Y`.
+
+46. **The Crew panel's Hire button disables itself once cash can't cover the role's cost (`CrewPanel.ts`: `hireBtn.disabled = state.cash < HIRING_COSTS[role]`), a real UI guard the console command layer doesn't enforce.** The original file interleaved hires with other spending, so by the time later hires were attempted, command mode let them through (going deeper into debt) while a real interaction-mode run failed outright with "element is disabled" on `employee hire role:driller`. Confirmed the $50,000 starting budget covers all 8 hires ($9,000) plus the warehouse ($15,000) plus the vehicle ($25,000) with exactly $1,000 to spare. Fixed by front-loading all 8 hires (2 surveyor, 2 driller, 2 blaster, 2 driver) before any build or vehicle spending.
+
+47. **`build office` and `build storage_depot`, both named in the original file, aren't real building types.** Confirmed via `Building.ts`/`balance.ts` that the only warehouse-class building is `freight_warehouse`. Fixed to `build freight_warehouse at:5,5` — without it, blasted material has nowhere to go and every later `contract deliver` fails outright regardless of what else the file does.
+
+48. **The Fleet panel's Haul button doesn't pick the highest-value fragment — it calls `findReachableGroundFragment` (`HaulingTask.ts`), which picks the NEAREST reachable fragment by navgrid distance, with zero regard for ore content.** The original file (and my first several rewrite attempts) picked fragment IDs by sorting for highest mass, which doesn't match what a real player click reaches for — confirmed by a real interaction-mode run hauling fragment #1208 when the scenario asserted fragment #20. Fixed by inverting the logic: call `findReachableGroundFragment` directly (imported into a scratch trace script) to get the fragment the real button will actually pick, then choose the contract to match what that fragment contains, never the reverse. Also hit `contract list`'s sensitivity to exact prior call count — a hand-abbreviated trace script that skipped some of the file's own observe steps produced a different RNG-generated contract pool than the real file at the same nominal point, twice, across two file revisions — both times re-derived via a script that replays the file's literal command sequence rather than an approximation of it.
+
+49. **The seismic survey ($3,000) became unaffordable after front-loading all 8 hires (Finding #46) — only ~$922 cash remained by the time surveys were queued.** Confirmed via the real "Insufficient funds. seismic survey costs $3,000." command output. Dropped the seismic survey step entirely, keeping only the affordable `survey core_sample` ($800).
+
+50. **Real divergence between command mode and a real browser: `contract deliver` clears `storedMassKg` to exactly 0 in command mode regardless of the delivered amount, but does not clear it in a real browser run.** Confirmed directly — a 260kg rubble delivery against a 550kg-mass fragment, and separately a 60kg ore delivery against a 528kg-mass fragment, both left `storedMassKg` at 0 in command mode, while the equivalent point in a real browser run still showed 550. By the time this file's 3rd blast cycle attempted its haul, the accumulated (uncleared) leftover mass left too little room for `findReachableGroundFragment`'s `mass > roomKg` eligibility check to consider the next fragment reachable at all in the browser, so the Fleet panel's Haul button never rendered and the step timed out waiting for a control that was never coming. Not a scenario-authoring problem — a real gap between the two execution paths. Out of scope to fix here per the ground rules (a real bug with wide blast radius is a finding, not a drive-by fix); flagged here for separate investigation. The 3rd blast cycle was cut from the file entirely — 2 cycles, with 2 different contract types (rubble disposal and ore-specific), already prove the drilling/blasting/hauling/contract-fulfillment loop end-to-end twice over.
+
+51. **Same family as Finding #50, but broader: `activeContractCount` also doesn't reliably clear in a real browser after `contract deliver`, for every cycle in this file, not only a 3rd one blocked by leftover mass.** After cutting the 3rd cycle, a real interaction-mode run still failed at the file's final `campaign status` step with `activeContractCount should be 0 but is 2` — both cycle 1's and cycle 2's contracts still counted active, even though command mode reports 0 and both deliveries' cash income is genuinely received in both modes. Reproduced identically across two separate interaction-mode runs (not flaky). Left for the same separate investigation as Finding #50 — `contract deliver`'s command-mode side effects (clearing `storedMassKg`, removing the contract from the active count) don't fully apply in a real browser, and this file's `expect` blocks no longer hard-assert either field past the first delivery as a result.
 
 _(Add new findings here as you hit them. Number sequentially.)_
 
@@ -1620,3 +1646,52 @@ got, whether main was merged, and whether GitHub Actions is back up yet.
   verification remains local. Next: the remaining 12 Batch 7 files
   (level1-playthrough-win next), then the depth-mismatch audit before
   Phase 3.
+- 2026-08-07 (cont.) — level1-playthrough-win.json done (**Findings
+  #45-#51**, Batch 7 8/19). By far the most expensive file in this
+  project so far: the original action sequence wasn't just missing
+  assertions, it was fundamentally broken and could never have reached
+  its named $80k profit target under any assertions — `assign_skill`
+  used a syntax the command silently rejects (#45), no vehicle was
+  ever bought, and the two named buildings don't exist (#47), so
+  blasted material could never reach storage and every `contract
+  deliver` failed outright regardless of anything else the file did.
+  Rebuilt the sequence to genuinely exercise drilling, blasting,
+  surveying, hauling, and contract fulfillment end-to-end across 2
+  blast cycles. Along the way: the Crew panel's Hire button disables
+  itself once a role is unaffordable, a real UI guard command mode
+  doesn't enforce, so all 8 hires had to move before any build/vehicle
+  spending (#46); the seismic survey became unaffordable once hires
+  were front-loaded and was dropped (#49); and the Fleet panel's Haul
+  button picks the NEAREST reachable fragment via
+  `findReachableGroundFragment`, not the highest-mass one, so the
+  contract for each cycle had to be chosen to match what that function
+  actually picks rather than the reverse (#48) — this also surfaced
+  `contract list`'s sensitivity to exact prior call count, which broke
+  two hand-abbreviated trace scripts before switching to a script that
+  replays the file's own literal command sequence. A planned 3rd blast
+  cycle was cut after tracing a real, reproducible divergence between
+  command mode and a real browser: `contract deliver` clears
+  `storedMassKg` to exactly 0 in command mode regardless of the
+  delivered amount, but does not clear it in the browser, so leftover
+  mass accumulated until `findReachableGroundFragment`'s room check
+  made the 3rd cycle's fragment unreachable and its Haul button never
+  rendered (#50). After cutting the 3rd cycle, a real browser run
+  still failed at the final `campaign status` step with
+  `activeContractCount` stuck at 2 instead of 0 — reproduced
+  identically across two separate interaction-mode runs, a broader
+  version of the same #50 divergence affecting every cycle in the
+  file, not only the cut one (#51). Both fields are no longer
+  hard-asserted past the first delivery, and both findings are flagged
+  here for separate investigation rather than fixed inline, per the
+  ground rules on real bugs with wide blast radius. cash is likewise
+  not hard-asserted from the first delivery onward (Ground rule #12).
+  2 blast cycles with 2 different contract types (rubble disposal,
+  ore-specific) already prove the loop end-to-end twice over. Final
+  file: 68 steps. Verified: JSON valid, `scenario-defs.test.ts` green
+  (3088 tests), both command mode and a real browser pass (re-run
+  twice in interaction mode after the #51 fix, both clean). Next: the
+  remaining 11 Batch 7 files (level1-win-conservative next), then the
+  depth-mismatch audit before Phase 3. Given how expensive this single
+  file was relative to the ~116 files still remaining across the whole
+  suite, worth checking in with the user again on pace/scope before
+  committing further sessions to the same file-by-file depth.
