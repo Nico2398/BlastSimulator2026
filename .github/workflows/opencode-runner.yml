@@ -223,14 +223,12 @@ jobs:
           token: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
           head: pipeline/feature-${{ steps.context.outputs.issue }}
 
-      # When the run closed the issue without opening a PR, no pull_request event
-      # will ever fire, so auto-assign-next.yml cannot carry the chain. Do it here.
-      - name: Chain to next issue if resolved without PR
-        if: steps.context.outputs.issue != '' && vars.AGENTIC_AUTO_ASSIGN_ENABLED == 'true'
-        uses: ./.github/actions/agentic-assign
-        with:
-          token: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
-          agent: ${{ vars.AGENTIC_AGENT }}
-          guard: closed_without_pr
-          completed_issue: ${{ steps.context.outputs.issue }}
-          reason: auto-assigned after issue #${{ steps.context.outputs.issue }} was resolved without a PR
+      # No chaining step here, deliberately. A run whose deliverable was an
+      # answer or an executed command closes its own issue and stops there: it
+      # opened no PR, so there is no merge to chain from, and starting the next
+      # session without one would be the pipeline deciding to run again on its
+      # own. Only two things start a session — a human dispatching
+      # `agentic-trigger.yml`, or a merged pipeline PR via
+      # `auto-assign-next.yml`. The issue is still released (closed, `done`,
+      # `in-progress` dropped), so the queue is free the moment somebody asks
+      # for the next run.

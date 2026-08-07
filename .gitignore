@@ -24,6 +24,9 @@ Thumbs.db
 # Screenshots (generated, not source)
 screenshots/
 
+# Generated verification output (e.g. scripts/verify-blast-sequence.ts)
+docs/verification/
+
 # Logs
 *.log
 npm-debug.log*

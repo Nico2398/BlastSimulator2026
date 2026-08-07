@@ -5,6 +5,7 @@
 import { t } from '../core/i18n/I18n.js';
 import { LocaleTextRegistry } from './localeText.js';
 import { iconEl } from './icons.js';
+import { paintToggleButton } from './dom.js';
 import {
   MAP_SIZE,
   COLOR_ROCK,
@@ -110,10 +111,7 @@ export class MiniMap {
   }
 
   private syncLayerButton(btn: HTMLButtonElement): void {
-    const active = this._navGridVisible;
-    btn.style.borderColor = active ? 'var(--bsx-amber)' : 'transparent';
-    btn.style.color = active ? 'var(--bsx-amber)' : 'var(--bsx-text-muted)';
-    btn.style.background = active ? 'rgba(255,176,46,.12)' : 'transparent';
+    paintToggleButton(btn, this._navGridVisible);
   }
 
   /** Register a handler for clicking the map: called with the world (x, z) under the cursor. */

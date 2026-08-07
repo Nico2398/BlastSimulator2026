@@ -13,7 +13,11 @@ import { WorldMap } from './ui/screens/WorldMap.js';
 import { LevelEndScreen } from './ui/screens/LevelEndScreen.js';
 import { SandboxPanel } from './ui/SandboxPanel.js';
 import { LoadingScreen } from './ui/LoadingScreen.js';
+import type { LoadingSiteInfo } from './ui/LoadingScreen.js';
 import type { CommandResult } from './console/ConsoleRunner.js';
+import { getLevel, getAllLevels, type LevelDef } from './core/campaign/Level.js';
+import { formatMoney } from './core/economy/formatMoney.js';
+import { SANDBOX_DEFAULTS, sandboxLevelDef, type SandboxConfig } from './core/campaign/Sandbox.js';
 import { AudioManager } from './audio/AudioManager.js';
 import { AudioHooks } from './audio/AudioHooks.js';
 import { IndexedDBPersistence } from './persistence/IndexedDBPersistence.js';
@@ -25,7 +29,7 @@ import { encodeVoxelGrid } from './core/state/VoxelGridCodec.js';
 import { getBiome } from './core/world/BiomeCatalog.js';
 import { BASE_TICK_MS } from './core/engine/GameLoop.js';
 import { probeUiActions, probeSelector } from './ui/uiActionProbe.js';
-import { t } from './core/i18n/I18n.js';
+import { t, getLocale, setLocale, type Locale } from './core/i18n/I18n.js';
 import { ScenePicking } from './ui/scene/ScenePicking.js';
 import { HoverTag } from './ui/scene/HoverTag.js';
 import { SelectionBar } from './ui/shell/SelectionBar.js';
@@ -33,6 +37,7 @@ import { EntityHighlight } from './renderer/EntityHighlight.js';
 import { PlacementController } from './ui/scene/PlacementController.js';
 import { ParamStrip } from './ui/scene/ParamStrip.js';
 import { SelectionOverlay } from './renderer/SelectionOverlay.js';
+import { regionCenter, regionSpan, type TileRegion } from './ui/tutorialPickerRegion.js';
 import { createWeatherCycle } from './core/weather/WeatherCycle.js';
 import { Random } from './core/math/Random.js';
 import { summariseMuckPile } from './core/mining/MuckPileSummary.js';
@@ -57,6 +62,20 @@ const entityHighlight = new EntityHighlight(scene.scene);
 const hoverTag = new HoverTag(uiContainer, canvas, scene.camera);
 const selectionBar = new SelectionBar(uiContainer);
 
+/**
+ * How far back the camera sits to frame a guided placement region.
+ *
+ * Scales with the region so a 13-tile ramp corridor is not framed half
+ * off-screen. The floor is what matters for a one-tile target: closer than
+ * this, the game's ground-level camera sits low enough that a tile near the
+ * edge of the map is grazed rather than faced by its own camera ray, and the
+ * click lands on no tile at all. It also keeps the target clear of the
+ * bottom-docked strip and the tutorial card.
+ */
+const PLACEMENT_FRAMING_MIN_DISTANCE = 40;
+const placementFramingDistance = (region: TileRegion): number =>
+  Math.max(PLACEMENT_FRAMING_MIN_DISTANCE, regionSpan(region) * 3.5);
+
 // --- In-scene placement (redesign P3): the grid-select tool that replaced the 2D tile picker ---
 const placementController = new PlacementController(canvas, scene.camera, gameRenderer, scene.cameraController);
 const selectionOverlay = new SelectionOverlay(scene.scene, (x, z) => gameRenderer.surfaceYAt(x, z));
@@ -68,12 +87,36 @@ placementController.setArmedStateHandler((armed) => {
   // picker-canvas stage target needs a signal that actually means "the tool
   // is ready for a tile click now," not "the canvas element exists."
   document.body.classList.toggle('bs-placement-armed', armed);
+
+  const region = armed ? placementController.activeRegion : null;
+  selectionOverlay.setRegion(region);
+  // Frame the target before the player looks for it. A guided region can open
+  // off-screen, or low enough that the docked strip and the tutorial card cover
+  // it — clicks there land on DOM instead of the terrain and the tile "does not
+  // respond" (#489). Both playtest and scenario definitions used to paper over
+  // this with their own camera moves, which is exactly the path a player's
+  // mouse does not take.
+  if (region) {
+    const { x, z } = regionCenter(region);
+    scene.cameraController.focus(x, gameRenderer.surfaceYAt(x, z), z, placementFramingDistance(region));
+  }
+});
+// Kept separate from the panels' own change handlers: which panel armed the
+// tool must not decide whether the guided region and the refused tile are drawn.
+placementController.setFeedbackHandler(() => {
+  selectionOverlay.setBlockedTile(placementController.refusedTile);
 });
 // ParamStrip only renders what it's told; pressing its own CONFIRM/ESC buttons
 // has to reach back into the controller that armed it.
 paramStrip.setConfirmHandler(() => placementController.confirm());
 paramStrip.setCancelHandler(() => placementController.cancel());
 uiManager.setPlacementKit({ controller: placementController, overlay: selectionOverlay, strip: paramStrip });
+
+// Survey confidence overlay's player-facing visibility toggle (#496): the
+// panel's own click handler drives the renderer; the renderer's current
+// preference seeds the panel once at startup so its button state matches.
+uiManager.setSurveyOverlayToggleHandler((visible) => { gameRenderer.setSurveyOverlayVisible(visible); });
+uiManager.setSurveyOverlayVisible(gameRenderer.surveyOverlayVisible);
 
 // --- Persistence ---
 let saveBackend;
@@ -121,6 +164,7 @@ uiManager.setLanguageChangeHandler(() => {
   levelEndScreen.refreshLocale();
   savesModal.refreshLocale();
   selectionBar.refreshLocale();
+  tutorial.refreshLocale();
 });
 // Symmetric with the above: a language switch made from the main menu's own
 // EN/FR pills has to reach uiManager's owned tree (settings panel included)
@@ -131,6 +175,7 @@ mainMenu.setOnLanguageChange(() => {
   levelEndScreen.refreshLocale();
   savesModal.refreshLocale();
   selectionBar.refreshLocale();
+  tutorial.refreshLocale();
 });
 mainMenu.show();
 
@@ -144,7 +189,8 @@ worldMap.setOnStartLevel((levelId) => {
   worldMap.hide();
   // Ensure a base GameState (with campaign) exists before starting a level.
   const commands = ctx.state ? [] : ['new_game'];
-  void enterLevel([...commands, `campaign start level:${levelId}`]).then(() => {
+  const level = getLevel(levelId);
+  void enterLevel([...commands, `campaign start level:${levelId}`], level ? buildLoadingSiteInfo(level) : undefined).then(() => {
     // First-time players get tutorial guidance once their level is actually
     // loaded, not while still picking one from the world map.
     if (!TutorialOverlay.isCompleted()) tutorial.start(ctx.state ?? undefined);
@@ -155,11 +201,13 @@ worldMap.setOnStartLevel((levelId) => {
 const levelEndScreen = new LevelEndScreen(uiContainer);
 levelEndScreen.setOnReplay((levelId) => {
   levelEndScreen.hide();
-  void enterLevel([`campaign start level:${levelId}`]);
+  const level = getLevel(levelId);
+  void enterLevel([`campaign start level:${levelId}`], level ? buildLoadingSiteInfo(level) : undefined);
 });
 levelEndScreen.setOnContinue((nextLevelId) => {
   levelEndScreen.hide();
-  void enterLevel([`campaign start level:${nextLevelId}`]);
+  const level = getLevel(nextLevelId);
+  void enterLevel([`campaign start level:${nextLevelId}`], level ? buildLoadingSiteInfo(level) : undefined);
 });
 levelEndScreen.setOnBackToPortfolio(() => {
   levelEndScreen.hide();
@@ -174,27 +222,76 @@ levelEndScreen.setOnBackToPortfolio(() => {
 // command and run as its own phase.
 const loadingScreen = new LoadingScreen(uiContainer);
 
-function enterLevel(commands: readonly string[]): Promise<void> {
+/**
+ * Biome id (campaign LevelDef.biome / SandboxConfig.biome) → loading screen
+ * eyebrow category key. Mirrors WorldMap's own BIOME_STYLE categorisation
+ * (screens/WorldMap.ts) — small local duplication of a 3-entry map rather
+ * than exporting WorldMap's private table for one caller (#493).
+ */
+const BIOME_CATEGORY_KEY: Record<string, string> = {
+  desert_badlands: 'ui.portfolio.biome.desert',
+  alpine_granite: 'ui.portfolio.biome.mountain',
+  tropical_karst: 'ui.portfolio.biome.tropical',
+};
+const DEFAULT_BIOME_CATEGORY_KEY = 'ui.portfolio.biome.mountain';
+
+/** Loading screen content (eyebrow/subtitle/briefing) for a campaign level entry. */
+function buildLoadingSiteInfo(level: LevelDef): LoadingSiteInfo {
+  return {
+    siteNumber: level.difficultyTier,
+    biomeCategoryKey: BIOME_CATEGORY_KEY[level.biome] ?? DEFAULT_BIOME_CATEGORY_KEY,
+    difficulty: level.difficultyTier,
+    descriptionKey: level.descKey,
+    briefing: [
+      { labelKey: 'loading.brief.starting_cash', value: `$${formatMoney(level.startingCash)}` },
+      { labelKey: 'loading.brief.target', value: `$${formatMoney(level.unlockThreshold)}` },
+      { labelKey: 'loading.brief.explosives', value: String(level.availableExplosives.length) },
+    ],
+  };
+}
+
+/** Loading screen content for a sandbox site — no site number, no difficulty pips. */
+function buildSandboxLoadingSiteInfo(config: SandboxConfig): LoadingSiteInfo {
+  const level = sandboxLevelDef(config);
+  return {
+    siteNumber: null,
+    biomeCategoryKey: BIOME_CATEGORY_KEY[config.biome] ?? DEFAULT_BIOME_CATEGORY_KEY,
+    difficulty: 0,
+    descriptionKey: 'loading.sandbox_subtitle',
+    briefing: [
+      { labelKey: 'loading.brief.starting_cash', value: `$${formatMoney(level.startingCash)}` },
+      { labelKey: 'loading.brief.target', value: `$${formatMoney(level.unlockThreshold)}` },
+      { labelKey: 'loading.brief.explosives', value: String(level.availableExplosives.length) },
+    ],
+  };
+}
+
+function enterLevel(commands: readonly string[], siteInfo?: LoadingSiteInfo): Promise<void> {
   return loadingScreen.runPhases([
     { run: () => { for (const cmd of commands) runGameCommand(cmd, { syncRenderer: false }); } },
     { run: () => { gameRenderer.syncFromContext(ctx); } },
-  ]);
+  ], siteInfo);
 }
 
 // --- Tutorial ---
 const tutorial = new TutorialOverlay(uiContainer);
+const tutorialPitLevel = getLevel('tutorial_pit');
 mainMenu.setOnTutorial(() => {
   mainMenu.hide();
-  void enterLevel(['new_game seed:42 size:24', 'campaign start level:tutorial_pit'])
-    .then(() => { tutorial.start(ctx.state ?? undefined); });
+  void enterLevel(
+    ['new_game seed:42 size:24', 'campaign start level:tutorial_pit'],
+    tutorialPitLevel ? buildLoadingSiteInfo(tutorialPitLevel) : undefined,
+  ).then(() => { tutorial.start(ctx.state ?? undefined); });
 });
 // Settings' REPLAY TUTORIAL button (10.x): same fresh-tutorial-level entry
 // point as MainMenu's own TUTORIAL button above — the tutorial's steps are
 // tuned to that specific map (tutorialStages.ts's REGION table), not to
 // whatever the player currently has loaded.
 uiManager.setReplayTutorialHandler(() => {
-  void enterLevel(['new_game seed:42 size:24', 'campaign start level:tutorial_pit'])
-    .then(() => { tutorial.start(ctx.state ?? undefined); });
+  void enterLevel(
+    ['new_game seed:42 size:24', 'campaign start level:tutorial_pit'],
+    tutorialPitLevel ? buildLoadingSiteInfo(tutorialPitLevel) : undefined,
+  ).then(() => { tutorial.start(ctx.state ?? undefined); });
 });
 
 // --- Settings: persistence wiring (redesign P10; audio wired below, once
@@ -207,15 +304,9 @@ const sandboxPanel = new SandboxPanel(uiContainer);
 mainMenu.setOnSandbox(() => { mainMenu.hide(); sandboxPanel.show(); });
 sandboxPanel.setOnBack(() => { mainMenu.show(); });
 sandboxPanel.setOnStart((config) => {
-  const explosives = config.availableExplosives.length > 0
-    ? ` explosives:${config.availableExplosives.join(',')}`
-    : '';
   void enterLevel([
-    `sandbox start biome:${config.biome} seed:${config.seed} size:${config.size}` +
-    ` depth:${config.depth} cash:${config.startingCash} goal:${config.unlockThreshold}` +
-    ` events:${config.eventFreqMultiplier} prices:${config.contractPriceMultiplier}` +
-    ` decay:${config.scoreDecayRate} mixed_rock:${config.mixedRockHardness}${explosives}`,
-  ]);
+    `sandbox start biome:${config.biome} difficulty:${config.difficulty} seed:${config.seed}`,
+  ], buildSandboxLoadingSiteInfo(config));
 });
 
 // --- Audio ---
@@ -301,6 +392,15 @@ declare global {
     };
     /** World tile → screen pixel, for the playtest harness's real clicks on the P3 placement canvas (unlike __placement, which scenario-mode uses directly). */
     __worldToScreen: (x: number, z: number) => { px: number; py: number; onScreen: boolean } | null;
+    /**
+     * Preview the loading screen without running a real (multi-second,
+     * main-thread-blocking) level load — the visual-testing scenario has no
+     * other deterministic way to see it (#493). `kind` picks a campaign level
+     * or a sandbox site; `locale` optionally renders it in the other
+     * language, restored once the synchronous `show()` call returns.
+     */
+    __loadingScreenPreview: (kind?: 'level' | 'sandbox', locale?: 'en' | 'fr') => void;
+    __loadingScreenHide: () => void;
   }
 }
 
@@ -336,24 +436,34 @@ function runGameCommand(cmd: string, opts?: { syncRenderer?: boolean }): Command
   if (opts?.syncRenderer !== false) gameRenderer.syncFromContext(ctx);
   const cmdName = parseCommand(cmd).command;
 
+  // Whether this command replaced ctx.state with a new object — new_game,
+  // campaign level transitions, sandbox start, and any future entry point
+  // that does the same. Comparing identity rather than matching command
+  // names means this can't miss one.
+  const enteredNewLevel = Boolean(ctx.state && ctx.state !== prevState);
+
   // A fresh game replaces whatever the splash screen was showing — the normal
   // click paths (world map "Start", tutorial button) already call
-  // mainMenu.hide() themselves, but `new_game` run directly (console mode,
-  // scenario harness) bypassed that and left the overlay covering the canvas.
-  if (cmdName === 'new_game' && result.success) {
+  // mainMenu.hide() themselves, but a level-entry command run directly
+  // (console mode, scenario harness) bypassed that and left the overlay
+  // covering the canvas. Same identity change also has to close any overlay
+  // whose visibility is a stale carry-over from the PREVIOUS level's ended
+  // state (e.g. BlastReportModal left open from an earlier site's last
+  // blast) — a second `sandbox start` otherwise left that site's "Rating:
+  // Perfect" dialog covering the new site's terrain (#504).
+  if (enteredNewLevel) {
     mainMenu.hide();
+    uiManager.closeStaleLevelOverlays();
   }
 
   // (Re)seed the weather cycle whenever ctx.state was replaced with a new
-  // object — new_game, campaign level transitions, sandbox start, and any
-  // future entry point that does the same. Comparing identity rather than
-  // matching command names means this can't miss one. Previously
-  // ctx.weatherCycle only ever got created lazily inside weatherCommand
-  // (the `weather` console command, which nothing player-facing calls), so
-  // outside of manual console/test use the weather popover would have had
-  // nothing real to show, and a second game in the same session would have
-  // kept the first game's weather cycle at the wrong seed.
-  if (ctx.state && ctx.state !== prevState) {
+  // object. Previously ctx.weatherCycle only ever got created lazily inside
+  // weatherCommand (the `weather` console command, which nothing
+  // player-facing calls), so outside of manual console/test use the weather
+  // popover would have had nothing real to show, and a second game in the
+  // same session would have kept the first game's weather cycle at the wrong
+  // seed.
+  if (enteredNewLevel && ctx.state) {
     ctx.weatherCycle = createWeatherCycle(ctx.state.seed);
     ctx.rng = new Random(ctx.state.seed + 1000);
   }
@@ -520,6 +630,7 @@ window.__debugGridInfo = () => {
     terrainGridId: gameRenderer.terrain?.gridId ?? null,
     ghostCount: gameRenderer.ghostCount,
     ghostPreviewsInState: ctx.state?.ghostPreviews.length ?? -1,
+    surveyOverlayVisible: gameRenderer.surveyOverlayVisible,
   };
 };
 
@@ -664,6 +775,23 @@ window.__seekBlastPlayback = (t: number) => {
 };
 window.__blastPlaybackDuration = () => gameRenderer.fragmentPlaybackDuration;
 
+// Loading screen debug/preview bridge (#493) — see the declare-global doc comment.
+window.__loadingScreenPreview = (kind = 'level', locale) => {
+  const prevLocale = locale ? getLocale() : null;
+  if (locale) setLocale(locale as Locale);
+  try {
+    if (kind === 'sandbox') {
+      loadingScreen.show(buildSandboxLoadingSiteInfo(SANDBOX_DEFAULTS));
+    } else {
+      const level = getLevel('grumpstone_ridge') ?? getAllLevels()[0];
+      loadingScreen.show(level ? buildLoadingSiteInfo(level) : undefined);
+    }
+  } finally {
+    if (prevLocale) setLocale(prevLocale);
+  }
+};
+window.__loadingScreenHide = () => { loadingScreen.hide(); };
+
 uiManager.setGameConsole(window.__gameConsole);
 tutorial.setGameConsole(window.__gameConsole);
 
@@ -807,6 +935,10 @@ new KeyboardShortcuts({
   quickSave: () => { if (ctx.state) void savesModal['autoSave'](ctx.state); },
   onEscape: () => uiManager.handleEscape(),
   onToggleNavGrid: () => uiManager.toggleNavGridOverlay(),
+  // Keep the panel's own button in sync even while the panel is closed —
+  // its click handler is the other path into the same preference, and the
+  // two must never disagree the next time the panel opens.
+  onToggleSurveyOverlay: () => uiManager.setSurveyOverlayVisible(gameRenderer.toggleSurveyOverlayVisible()),
 });
 
 // --- Render loop + game tick timer ---

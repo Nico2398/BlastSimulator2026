@@ -1,45 +1,51 @@
 // BlastSimulator2026 — Sandbox mode
 //
 // Free play on a site the player configures, rather than one of the authored
-// campaign levels. Every parameter a LevelDef fixes is exposed, seed included,
-// so a map can be written down and replayed exactly.
+// campaign levels. Reduced to three controls (#504) — biome, difficulty and
+// seed — everything else a LevelDef needs is either a fixed constant
+// (site extents) or derived from the named difficulty (starting cash).
 //
-// SANDBOX_FIELDS is the single description of what is configurable and within
-// what bounds. The console command parses against it and the UI builds its
-// form from it, so the two can't drift apart — adding a field here surfaces it
-// in both places at once.
+// SANDBOX_FIELDS is the single description of what is configurable. The
+// console command parses against it and the UI builds its form from it, so
+// the two can't drift apart — adding a field here surfaces it in both places
+// at once.
 
 import { getAllBiomes, getBiome } from '../world/BiomeCatalog.js';
 import { getAllExplosives } from '../world/ExplosiveCatalog.js';
+import { SCORE_DECAY_RATE, DEFAULT_GRID_SIZE, SANDBOX_GRID_DEPTH } from '../config/balance.js';
 import type { LevelDef } from './Level.js';
 
 /** Level id a sandbox site runs under. Deliberately not in the campaign catalog. */
 export const SANDBOX_LEVEL_ID = 'sandbox';
 
+export type SandboxDifficultyId = 'easy' | 'normal' | 'hard';
+
+export interface SandboxDifficultyDef {
+  id: SandboxDifficultyId;
+  /** i18n key for the difficulty's label. */
+  labelKey: string;
+  startingCash: number;
+}
+
+/** Named difficulty presets — the only thing that varies between them is starting cash (#504). */
+export const SANDBOX_DIFFICULTIES: Record<SandboxDifficultyId, SandboxDifficultyDef> = {
+  easy: { id: 'easy', labelKey: 'sandbox.difficulty.easy', startingCash: 250_000 },
+  normal: { id: 'normal', labelKey: 'sandbox.difficulty.normal', startingCash: 100_000 },
+  hard: { id: 'hard', labelKey: 'sandbox.difficulty.hard', startingCash: 50_000 },
+} as const;
+
+export const SANDBOX_DIFFICULTY_ORDER: readonly SandboxDifficultyId[] = ['easy', 'normal', 'hard'];
+
 export interface SandboxConfig {
   /** Biome id from BiomeCatalog — drives climate, rock mix and colour grade. */
   biome: string;
+  /** Named difficulty — currently only varies starting cash. */
+  difficulty: SandboxDifficultyId;
   /** Terrain seed. The same seed and parameters always rebuild the same map. */
   seed: number;
-  /** Playable grid extent, in metres, on X and Z. */
-  size: number;
-  /** Playable grid depth, in metres. */
-  depth: number;
-  startingCash: number;
-  /** Cumulative profit that counts as "finished". */
-  unlockThreshold: number;
-  /** Random-event frequency: 0 disables events entirely. */
-  eventFreqMultiplier: number;
-  /** Contract price multiplier: above 1 is a generous market. */
-  contractPriceMultiplier: number;
-  scoreDecayRate: number;
-  /** Interleave hard and soft rock layers, making projection harder to manage. */
-  mixedRockHardness: boolean;
-  /** Explosive ids available on site. Empty means "every explosive". */
-  availableExplosives: readonly string[];
 }
 
-export type SandboxFieldKind = 'number' | 'choice' | 'boolean' | 'multi';
+export type SandboxFieldKind = 'number' | 'choice';
 
 export interface SandboxField {
   readonly key: keyof SandboxConfig;
@@ -50,20 +56,10 @@ export interface SandboxField {
   readonly min?: number;
   readonly max?: number;
   readonly step?: number;
-  /** choice/multi fields only — resolved lazily so catalogs stay the source of truth. */
+  /** choice fields only — resolved lazily so catalogs stay the source of truth. */
   readonly options?: () => readonly { id: string; labelKey: string }[];
 }
 
-/**
- * Grid extents are bounded by what the rest of the engine was sized for: the
- * largest authored level is 160 per axis (#458 T6.1/D13), and pathfinding,
- * physics region scoping and the landscape mesher were all tuned against that
- * ceiling. Below 16 there isn't enough room to lay out a drill pattern.
- */
-export const SANDBOX_SIZE_MIN = 16;
-export const SANDBOX_SIZE_MAX = 160;
-export const SANDBOX_DEPTH_MIN = 12;
-export const SANDBOX_DEPTH_MAX = 60;
 /** Seeds are stored and displayed as plain integers so a player can copy one down. */
 export const SANDBOX_SEED_MAX = 999999;
 
@@ -72,34 +68,25 @@ export const SANDBOX_FIELDS: readonly SandboxField[] = [
     key: 'biome', labelKey: 'sandbox.field.biome', kind: 'choice',
     options: () => getAllBiomes().map(b => ({ id: b.id, labelKey: b.nameKey })),
   },
-  { key: 'seed', labelKey: 'sandbox.field.seed', kind: 'number', min: 0, max: SANDBOX_SEED_MAX, step: 1 },
-  { key: 'size', labelKey: 'sandbox.field.size', kind: 'number', min: SANDBOX_SIZE_MIN, max: SANDBOX_SIZE_MAX, step: 8 },
-  { key: 'depth', labelKey: 'sandbox.field.depth', kind: 'number', min: SANDBOX_DEPTH_MIN, max: SANDBOX_DEPTH_MAX, step: 4 },
-  { key: 'startingCash', labelKey: 'sandbox.field.cash', kind: 'number', min: 0, max: 10000000, step: 5000 },
-  { key: 'unlockThreshold', labelKey: 'sandbox.field.goal', kind: 'number', min: 0, max: 10000000, step: 5000 },
-  { key: 'eventFreqMultiplier', labelKey: 'sandbox.field.events', kind: 'number', min: 0, max: 5, step: 0.1 },
-  { key: 'contractPriceMultiplier', labelKey: 'sandbox.field.prices', kind: 'number', min: 0.1, max: 5, step: 0.1 },
-  { key: 'scoreDecayRate', labelKey: 'sandbox.field.decay', kind: 'number', min: 0, max: 1, step: 0.01 },
-  { key: 'mixedRockHardness', labelKey: 'sandbox.field.mixed_rock', kind: 'boolean' },
   {
-    key: 'availableExplosives', labelKey: 'sandbox.field.explosives', kind: 'multi',
-    options: () => getAllExplosives().map(e => ({ id: e.id, labelKey: e.nameKey })),
+    key: 'difficulty', labelKey: 'sandbox.field.difficulty', kind: 'choice',
+    options: () => SANDBOX_DIFFICULTY_ORDER.map(id => ({ id, labelKey: SANDBOX_DIFFICULTIES[id].labelKey })),
   },
+  { key: 'seed', labelKey: 'sandbox.field.seed', kind: 'number', min: 0, max: SANDBOX_SEED_MAX, step: 1 },
 ];
 
 export const SANDBOX_DEFAULTS: SandboxConfig = {
   biome: 'desert_badlands',
+  difficulty: 'normal',
   seed: 12345,
-  size: 64,
-  depth: 32,
-  startingCash: 100000,
-  unlockThreshold: 100000,
-  eventFreqMultiplier: 1,
-  contractPriceMultiplier: 1,
-  scoreDecayRate: 0.05,
-  mixedRockHardness: false,
-  availableExplosives: [],
 };
+
+// Fixed LevelDef fields (#504) — preserved from the pre-#504 SANDBOX_DEFAULTS
+// so removing the corresponding controls doesn't change site behaviour.
+const SANDBOX_FIXED_UNLOCK_THRESHOLD = 100000;
+const SANDBOX_FIXED_EVENT_FREQ_MULTIPLIER = 1;
+const SANDBOX_FIXED_CONTRACT_PRICE_MULTIPLIER = 1;
+const SANDBOX_FIXED_MIXED_ROCK_HARDNESS = false;
 
 function clampNumber(value: number, field: SandboxField, fallback: number): number {
   if (!Number.isFinite(value)) return fallback;
@@ -116,22 +103,11 @@ function clampNumber(value: number, field: SandboxField, fallback: number): numb
 export function clampSandboxConfig(partial: Partial<SandboxConfig>): SandboxConfig {
   const out: SandboxConfig = { ...SANDBOX_DEFAULTS, ...partial };
 
-  for (const field of SANDBOX_FIELDS) {
-    if (field.kind !== 'number') continue;
-    const key = field.key as 'seed' | 'size' | 'depth' | 'startingCash' | 'unlockThreshold'
-      | 'eventFreqMultiplier' | 'contractPriceMultiplier' | 'scoreDecayRate';
-    out[key] = clampNumber(Number(out[key]), field, SANDBOX_DEFAULTS[key]);
-  }
-  // A seed is an identity, not a measurement — it has to survive a round trip
-  // through the UI's number input exactly or "replay this map" breaks.
-  out.seed = Math.round(out.seed);
-  out.size = Math.round(out.size);
-  out.depth = Math.round(out.depth);
+  const seedField = SANDBOX_FIELDS.find(f => f.key === 'seed')!;
+  out.seed = Math.round(clampNumber(Number(out.seed), seedField, SANDBOX_DEFAULTS.seed));
 
   if (!getBiome(out.biome)) out.biome = SANDBOX_DEFAULTS.biome;
-
-  const known = new Set(getAllExplosives().map(e => e.id));
-  out.availableExplosives = (out.availableExplosives ?? []).filter(id => known.has(id));
+  if (!SANDBOX_DIFFICULTY_ORDER.includes(out.difficulty)) out.difficulty = SANDBOX_DEFAULTS.difficulty;
 
   return out;
 }
@@ -147,13 +123,11 @@ export function randomSandboxSeed(rand: () => number = Math.random): number {
  * climateBias comes from the chosen biome's own climate centre, the same way
  * the authored levels set theirs, so the generator lands in the biome the
  * player picked instead of wherever the raw climate fields happen to fall.
+ * Grid extents are fixed constants (#504) rather than player-configurable.
  */
 export function sandboxLevelDef(config: SandboxConfig): LevelDef {
   const clamped = clampSandboxConfig(config);
   const biome = getBiome(clamped.biome)!;
-  const explosives = clamped.availableExplosives.length > 0
-    ? [...clamped.availableExplosives]
-    : getAllExplosives().map(e => e.id);
 
   return {
     id: SANDBOX_LEVEL_ID,
@@ -162,16 +136,16 @@ export function sandboxLevelDef(config: SandboxConfig): LevelDef {
     biome: clamped.biome,
     climateBias: biome.climateCenter,
     terrainSeed: clamped.seed,
-    gridX: clamped.size,
-    gridY: clamped.depth,
-    gridZ: clamped.size,
-    startingCash: clamped.startingCash,
-    availableExplosives: explosives,
-    unlockThreshold: clamped.unlockThreshold,
-    eventFreqMultiplier: clamped.eventFreqMultiplier,
-    contractPriceMultiplier: clamped.contractPriceMultiplier,
-    scoreDecayRate: clamped.scoreDecayRate,
-    mixedRockHardness: clamped.mixedRockHardness,
+    gridX: DEFAULT_GRID_SIZE,
+    gridY: SANDBOX_GRID_DEPTH,
+    gridZ: DEFAULT_GRID_SIZE,
+    startingCash: SANDBOX_DIFFICULTIES[clamped.difficulty].startingCash,
+    availableExplosives: getAllExplosives().map(e => e.id),
+    unlockThreshold: SANDBOX_FIXED_UNLOCK_THRESHOLD,
+    eventFreqMultiplier: SANDBOX_FIXED_EVENT_FREQ_MULTIPLIER,
+    contractPriceMultiplier: SANDBOX_FIXED_CONTRACT_PRICE_MULTIPLIER,
+    scoreDecayRate: SCORE_DECAY_RATE,
+    mixedRockHardness: SANDBOX_FIXED_MIXED_ROCK_HARDNESS,
     // Tier 0 keeps it off the campaign world map, which lists tier > 0 only.
     difficultyTier: 0,
   };

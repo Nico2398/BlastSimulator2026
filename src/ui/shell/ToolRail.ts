@@ -5,6 +5,7 @@
 
 import { iconEl, type IconName } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
+import { paintToggleButton } from '../dom.js';
 import type { PanelName } from '../UIManager.js';
 import type { GameState } from '../../core/state/GameState.js';
 
@@ -88,10 +89,7 @@ export class ToolRail {
   setActive(panel: PanelName | null): void {
     this.activePanel = panel;
     this.el.querySelectorAll<HTMLButtonElement>('button[data-panel]').forEach(btn => {
-      const isActive = btn.dataset['panel'] === panel;
-      btn.style.borderColor = isActive ? 'var(--bsx-amber)' : 'transparent';
-      btn.style.color = isActive ? 'var(--bsx-amber)' : 'var(--bsx-text-muted)';
-      btn.style.background = isActive ? 'rgba(255,176,46,.12)' : 'transparent';
+      paintToggleButton(btn, btn.dataset['panel'] === panel);
     });
   }
 

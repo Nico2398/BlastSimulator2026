@@ -18,6 +18,7 @@ import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { addHole, holeNumericId } from '../../../src/core/mining/DrillPlan.js';
+import type { SurveyResult } from '../../../src/core/mining/SurveyCalc.js';
 
 function makeMockSceneManager() {
   const scene = new THREE.Scene();
@@ -636,5 +637,110 @@ describe('GameRenderer — ambient decoration follows game clock, not wall clock
     renderer.update(0.1);
 
     expect(renderer.ambientClockSeconds).toBeCloseTo(0.8, 10);
+  });
+});
+
+// ── Survey confidence overlay visibility preference (#496) ─────────────────
+//
+// Bug: syncSurveyOverlay derives visibility purely from "are there survey
+// results" (options.points.length > 0), never consulting the player's own
+// preference — so once any survey exists the overlay can never be hidden.
+// These tests drive the preference through setSurveyOverlayVisible() and
+// assert against the real SurveyConfidenceOverlay's show()/hide(), the same
+// object syncSurveyOverlay() itself calls via terrain.getSurveyOverlay().
+
+function makeOverlaySurveyResult(overrides: Partial<SurveyResult> = {}): SurveyResult {
+  return {
+    id: 1, method: 'seismic', centerX: 20, centerZ: 20, completedTick: 0,
+    surveyorId: 1, estimates: { '20,20': { sparkium: 0.6 } }, confidence: 0.85,
+    ...overrides,
+  };
+}
+
+describe('GameRenderer — survey confidence overlay visibility preference (#496)', () => {
+  it('surveyOverlayVisible defaults to true on a fresh GameRenderer', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    expect(renderer.surveyOverlayVisible).toBe(true);
+  });
+
+  it('setSurveyOverlayVisible(false) then syncFromContext with survey results never calls show()', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    const ctx = makeCtx();
+    renderer.syncFromContext(ctx); // loadGame — builds terrain/overlay
+
+    const overlay = renderer.terrain!.getSurveyOverlay();
+    const showSpy = vi.spyOn(overlay, 'show');
+
+    renderer.setSurveyOverlayVisible(false);
+    ctx.state!.surveyResults = [makeOverlaySurveyResult()];
+    renderer.syncFromContext(ctx);
+
+    expect(showSpy).not.toHaveBeenCalled();
+  });
+
+  it('setSurveyOverlayVisible(false) called after results are already synced immediately hides the overlay', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    const ctx = makeCtx();
+    ctx.state!.surveyResults = [makeOverlaySurveyResult()];
+    renderer.syncFromContext(ctx); // overlay shown (visible defaults true)
+
+    const overlay = renderer.terrain!.getSurveyOverlay();
+    const hideSpy = vi.spyOn(overlay, 'hide');
+
+    // No further syncFromContext() call — the setter itself must re-sync.
+    renderer.setSurveyOverlayVisible(false);
+
+    expect(hideSpy).toHaveBeenCalled();
+  });
+
+  it('setSurveyOverlayVisible(true) after hiding re-shows with the full current point set', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    const ctx = makeCtx();
+    ctx.state!.surveyResults = [makeOverlaySurveyResult()];
+    renderer.syncFromContext(ctx);
+
+    const overlay = renderer.terrain!.getSurveyOverlay();
+    renderer.setSurveyOverlayVisible(false);
+    const showSpy = vi.spyOn(overlay, 'show');
+
+    renderer.setSurveyOverlayVisible(true);
+
+    expect(showSpy).toHaveBeenCalledTimes(1);
+    const options = showSpy.mock.calls[0]![0];
+    expect(options.points.length).toBeGreaterThan(0);
+  });
+
+  it('regression #496: hiding, then a new survey result arriving via syncFromContext, must not silently re-show the overlay', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    const ctx = makeCtx();
+    ctx.state!.surveyResults = [makeOverlaySurveyResult({ id: 1, centerX: 20, centerZ: 20, estimates: { '20,20': { sparkium: 0.5 } } })];
+    renderer.syncFromContext(ctx);
+    renderer.setSurveyOverlayVisible(false);
+
+    const overlay = renderer.terrain!.getSurveyOverlay();
+    const showSpy = vi.spyOn(overlay, 'show');
+
+    // A second, different survey result lands — state mutates and
+    // syncFromContext runs again, exactly as it does after every command.
+    ctx.state!.surveyResults = [
+      ...ctx.state!.surveyResults,
+      makeOverlaySurveyResult({ id: 2, centerX: 30, centerZ: 30, estimates: { '30,30': { sparkium: 0.4 } } }),
+    ];
+    renderer.syncFromContext(ctx);
+
+    expect(showSpy).not.toHaveBeenCalled();
+  });
+
+  it('empty surveyResults hides the overlay regardless of the visibility preference', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    const ctx = makeCtx();
+    renderer.syncFromContext(ctx); // no survey results, preference stays default true
+
+    const overlay = renderer.terrain!.getSurveyOverlay();
+    const hideSpy = vi.spyOn(overlay, 'hide');
+
+    renderer.syncFromContext(ctx); // re-sync with still-empty results
+
+    expect(hideSpy).toHaveBeenCalled();
   });
 });

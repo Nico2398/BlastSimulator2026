@@ -1,30 +1,17 @@
 {
   "name": "sandbox-mode",
-  "description": "Sandbox mode: a site built from explicit parameters starts from nothing, honours the seed and every setting, and is fully playable through to a blast.",
+  "description": "Sandbox mode: a site built from biome/difficulty/seed starts from nothing, honours the seed, and is fully playable through to a blast (#504: 3-control setup).",
   "steps": [
     {
-      "command": "sandbox start biome:alpine_granite seed:777 size:48 depth:24 cash:250000",
-      "description": "Left unmarked (legacy/unconstrained): Sandbox Mode has a real form-based panel (SandboxPanel.ts, #bs-sandbox-start plus per-field inputs like #bs-sandbox-biome/#bs-sandbox-seed/#bs-sandbox-size), not a single click like new_game -- filling every field and confirming the resulting command matches this scenario's exact params is unverified here and out of scope for this batch; a real future conversion, not a no-UI finding.",
+      "command": "sandbox start biome:alpine_granite difficulty:hard seed:777",
+      "description": "No new_game first — a sandbox site is created from nothing, which is the point of the mode.",
       "interaction": [
-        {
-          "type": "command",
-          "command": "sandbox start biome:alpine_granite seed:777 size:48 depth:24 cash:250000"
-        }
-      ],
-      "expect": {
-        "equals": {
-          "cash": 250000,
-          "seed": 777,
-          "worldSizeX": 48,
-          "worldSizeZ": 48,
-          "mineType": "alpine_granite",
-          "holeCount": 0
-        }
-      }
+        { "type": "command", "command": "sandbox start biome:alpine_granite difficulty:hard seed:777" }
+      ]
     },
     {
       "command": "terrain_info",
-      "description": "Grid extents, biome and seed should all match what was asked for.",
+      "description": "Biome and seed should match what was asked for. Grid extents are the fixed 64x32x64 default regardless of request (#504).",
       "interaction": [
         {
           "type": "command",
@@ -35,8 +22,8 @@
       "expect": {
         "equals": {
           "seed": 777,
-          "worldSizeX": 48,
-          "worldSizeZ": 48,
+          "worldSizeX": 64,
+          "worldSizeZ": 64,
           "mineType": "alpine_granite"
         }
       }
@@ -53,7 +40,7 @@
       "expect": {
         "equals": {
           "holeCount": 9,
-          "cash": 250000
+          "cash": 50000
         }
       }
     },
@@ -69,7 +56,7 @@
       "expect": {
         "equals": {
           "chargedCount": 9,
-          "cash": 250000
+          "cash": 50000
         }
       }
     },
@@ -102,28 +89,26 @@
           "holeCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0,
-          "cash": 250000
+          "cash": 50000
         }
       }
     },
     {
-      "command": "sandbox start biome:tropical_karst seed:31337 size:64 depth:32 mixed_rock:true",
-      "description": "Left unmarked (legacy/unconstrained): Sandbox Mode has a real form-based panel (SandboxPanel.ts, #bs-sandbox-start plus per-field inputs like #bs-sandbox-biome/#bs-sandbox-seed/#bs-sandbox-size), not a single click like new_game -- filling every field and confirming the resulting command matches this scenario's exact params is unverified here and out of scope for this batch; a real future conversion, not a no-UI finding.",
+      "command": "sandbox start biome:tropical_karst difficulty:easy seed:31337",
+      "description": "A second site with a different biome, difficulty and seed, to confirm the mode can be re-entered.",
       "interaction": [
-        {
-          "type": "command",
-          "command": "sandbox start biome:tropical_karst seed:31337 size:64 depth:32 mixed_rock:true"
-        }
+        { "type": "command", "command": "sandbox start biome:tropical_karst difficulty:easy seed:31337" }
       ],
       "expect": {
         "equals": {
-          "cash": 100000,
+          "cash": 250000,
           "seed": 31337,
           "worldSizeX": 64,
           "worldSizeZ": 64,
           "mineType": "tropical_karst",
           "holeCount": 0
-        }
+        },
+        "note": "difficulty:easy starts at $250,000 (SANDBOX_DIFFICULTIES.easy.startingCash, Sandbox.ts) -- grid extents stay the fixed 64x32x64 default (#504) regardless of biome/difficulty, same as the first site."
       }
     }
   ]

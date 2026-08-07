@@ -99,6 +99,14 @@ export class GameRenderer {
   /** Current weather, mirrored from syncFromContext() so update()'s per-frame WindState tick has it without re-reading MiningContext. */
   private lastWeather: WeatherState = 'sunny';
 
+  /**
+   * Player-facing visibility preference for the survey confidence overlay
+   * (#496) — a view-only toggle, not simulation state. Defaults to visible
+   * so existing behaviour (overlay shown whenever a survey exists) is
+   * unchanged until the player hides it.
+   */
+  private surveyOverlayPreference = true;
+
   // Track rendered entity IDs to detect additions
   private renderedBuildingIds = new Set<number>();
   private renderedVehicleIds = new Set<number>();
@@ -356,15 +364,40 @@ export class GameRenderer {
     });
   }
 
+  /** Player-facing visibility preference for the survey confidence overlay (#496). */
+  get surveyOverlayVisible(): boolean {
+    return this.surveyOverlayPreference;
+  }
+
+  /**
+   * Set the player-facing visibility preference for the survey confidence
+   * overlay (#496) and immediately re-sync it against the last known state,
+   * so hiding/showing takes effect without waiting for the next natural sync
+   * cycle. Safe to call before any game is loaded (lastState is null).
+   */
+  setSurveyOverlayVisible(visible: boolean): void {
+    this.surveyOverlayPreference = visible;
+    if (!this.lastState) return;
+    this.syncSurveyOverlay(this.buildSurveyOverlayOptions(this.lastState));
+  }
+
+  /** Flip the survey confidence overlay's visibility preference (#496) and return the new value, so callers (e.g. the keyboard shortcut) don't have to read-flip-set by hand. */
+  toggleSurveyOverlayVisible(): boolean {
+    this.setSurveyOverlayVisible(!this.surveyOverlayPreference);
+    return this.surveyOverlayPreference;
+  }
+
   /**
    * Sync survey confidence overlay from the current game state.
    * Call from syncFromContext() to keep the overlay visible during gameplay.
+   * Gated on both "is there data" (options) and the player's visibility
+   * preference (#496) — either being false hides the overlay.
    */
   syncSurveyOverlay(options: SurveyConfidenceOverlayOptions | null): void {
     if (!this.terrain) return;
 
     const overlay = this.terrain.getSurveyOverlay();
-    if (options && options.points.length > 0) {
+    if (options && options.points.length > 0 && this.surveyOverlayPreference) {
       overlay.show(options);
     } else {
       overlay.hide();

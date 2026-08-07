@@ -79,7 +79,7 @@
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-hud-top .bs-speed-btn"
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"2\"]"
         },
         {
           "type": "waitForTutorialStep",
@@ -277,9 +277,9 @@
       ]
     },
     {
-      "command": "state",
-      "timeout": 30,
-      "description": "the grid tool refuses a rectangle that is not the one asked for: (22,22)-(26,26) sits inside the outlined square but is not equal to it. The tutorial asks for exact coordinates, so Confirm must stay dead here — otherwise the step teaches one layout and accepts another (mirrors tutorial.json's own negative-test beat, closing a parity gap this scenario never had before). Does not re-click the panel/grid-tool buttons in the following step: the tool stays armed after a rejected drag, exactly like tutorial.json's own next beat does not re-open it either.",
+      "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:6 start:20,20",
+      "timeout": 60,
+      "description": "drill-plan complete: grid tool dragged over the exact 20,20-30,30 rectangle the card asks for (spacing 5 makes 3x3 holes), confirmed",
       "role": "player",
       "interaction": [
         {
@@ -294,24 +294,6 @@
           "type": "waitForSelector",
           "selector": "#bs-tile-select-confirm"
         },
-        {
-          "type": "dragTiles",
-          "x1": 22,
-          "z1": 22,
-          "x2": 26,
-          "z2": 26
-        }
-      ],
-      "expect": {
-        "blocked": "#bs-tile-select-confirm"
-      }
-    },
-    {
-      "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:6 start:20,20",
-      "timeout": 60,
-      "description": "drill-plan complete: grid tool dragged over the exact 20,20-30,30 rectangle the card asks for (spacing 5 makes 3x3 holes), confirmed",
-      "role": "player",
-      "interaction": [
         {
           "type": "dragTiles",
           "x1": 20,
@@ -586,9 +568,9 @@
       }
     },
     {
-      "command": "build freight_warehouse at:4,4",
+      "command": "build freight_warehouse at:6,6",
       "timeout": 60,
-      "description": "build-storage complete: warehouse placed by clicking a tile inside the step's region (2..9) in the Build panel picker",
+      "description": "build-storage complete: warehouse placed by clicking the step's outlined tile (6,6) in the Build panel picker",
       "role": "player",
       "interaction": [
         {
@@ -605,8 +587,8 @@
         },
         {
           "type": "pickTile",
-          "x": 4,
-          "z": 4
+          "x": 6,
+          "z": 6
         },
         {
           "type": "screenshot"

@@ -18,6 +18,7 @@ const KNOWN_INTERACTION_ACTION_TYPES = [
   'scroll', 'wheel',
   'wait', 'waitForSelector', 'waitForTutorialStep', 'type',
   'assert', 'viewport', 'command', 'screenshot',
+  'loadingScreenDebug',
   // Shared with the playability harness (issue #479) — same names, same
   // implementations, so a converted step and its playtest counterpart do the
   // same thing. See InteractionStepAction in scripts/shared/scenario-types.ts.

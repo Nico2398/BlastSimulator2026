@@ -3,12 +3,12 @@
 How a filed issue becomes a merged pull request with nobody watching, and every mechanism that keeps the chain from going quiet.
 
 ```
-issue filed / reopened / labelled `ready`        merged PR        hourly sweep        manual dispatch
-      │                                               │                 │                    │
-      ▼                                               ▼                 ▼                    ▼
-agentic-intake.yml                          auto-assign-next.yml  agentic-watchdog.yml  agentic-trigger.yml
-      └──────────────────────────────┬────────────────┴─────────────────┴────────────────────┘
-                                     ▼
+       merged PR                 manual dispatch
+            │                           │
+            ▼                           ▼
+   auto-assign-next.yml         agentic-trigger.yml
+            └─────────────┬─────────────┘
+                          ▼
                         [agentic-assign] oldest unblocked `ready` issue
                                      │  ready → in-progress, then post the assignment comment
                                      ▼
@@ -27,16 +27,16 @@ agentic-intake.yml                          auto-assign-next.yml  agentic-watchd
                                      └─ [agentic-assign] next `ready` issue → back to the top
 ```
 
-## Four ways in, and why each exists
+## Two ways in, and nothing else
 
 | Entry | Fires on | Covers |
 |-------|----------|--------|
-| `agentic-intake.yml` | `issues: opened, reopened, labeled` | The only human input, but filing alone does not start a run — `ready` does, whether it arrives with the issue (the form's own `labels:` default, or an agent authoring the issue per `agentic-issue-creation`) or a human adds it later. A `ready` label on a previously `blocked` issue is the whole resume procedure |
-| `auto-assign-next.yml` | `pull_request: opened, synchronize, closed` | Auto-merge on `READY TO MERGE`, then chain from the merge to the next issue |
-| `agentic-watchdog.yml` | hourly schedule | Sweeps stalled runs, then restarts the queue if the pipeline is idle |
-| `agentic-trigger.yml` | manual dispatch | A human forcing the queue forward |
+| `agentic-trigger.yml` | manual dispatch | A human starting the pipeline on the oldest unblocked `ready` issue. This is how a run begins from a standing start |
+| `auto-assign-next.yml` | `pull_request: opened, synchronize, closed` | Auto-merge on `READY TO MERGE`, then chain from the merge to the next issue. This is how a run begins from the previous one finishing |
 
-Events get lost — GitHub keeps one pending run per concurrency group and drops the next, a webhook can be missed, a run can end without chaining. Every entry above except the watchdog is event-driven, which is why the watchdog also assigns: it is the only mechanism on a clock, so it is the floor under the queue. At worst an idle pipeline with ready issues restarts itself within the hour.
+**Nothing else may start a session.** Filing an issue, labelling one `ready`, reopening one, and the passage of time all leave the queue exactly where it was. `agentic-intake.yml` still reacts to `issues: opened, reopened`, but only to keep the label definitions present and to drop a stale `done` from a reopened issue — it assigns nothing. `agentic-watchdog.yml` still sweeps hourly, but only to release issues whose runs died; it does not restart the queue.
+
+The consequence is deliberate and worth stating plainly: **a `ready` issue can sit in the queue indefinitely.** Nothing is scheduled to notice it. Events genuinely do get lost — GitHub keeps one pending run per concurrency group and drops the next, a webhook can be missed, a run can end its turn without chaining — and when that happens the chain stops until a human dispatches `agentic-trigger.yml`. That is the intended trade: an idle pipeline is preferable to sessions nobody asked for.
 
 ## Issue labels are the loop's state machine
 
@@ -49,7 +49,9 @@ Events get lost — GitHub keeps one pending run per concurrency group and drops
 | `done` | Finished | The merged-PR chain, or a run releasing a non-PR deliverable | — |
 | `decision-review` | A default the run chose, revisit at leisure. Carries no `ready`, so it never enters the queue | The run — see `agentic-decision-autonomy` | A human, by adding `ready` |
 
-Intake never applies `agent-task` or `ready` itself — that would take label assignment out of the hands of whoever files the issue. `agentic-assign` selects on `ready` alone, so an issue only enters the queue once something puts `ready` on it: the "Agent Task" form's own `labels:` default, an agent following `agentic-issue-creation`, or a human adding it by hand — including to resume a `blocked` issue, or to opt a free-form/API-filed issue in. A human filing without the form and without `ready` gets an issue that sits unlabelled and out of the queue until they choose to add it; that is deliberate, not an oversight.
+Intake never applies `agent-task` or `ready` itself — that would take label assignment out of the hands of whoever files the issue. `agentic-assign` selects on `ready` alone, so an issue only becomes *selectable* once something puts `ready` on it: the "Agent Task" form's own `labels:` default, an agent following `agentic-issue-creation`, or a human adding it by hand — including to resume a `blocked` issue, or to opt a free-form/API-filed issue in.
+
+`ready` marks an issue as **eligible**, never as **started**. The label puts it in the queue; only a manual dispatch or a merged pipeline PR takes it out again. This is the distinction to hold on to when reading anything below that talks about an issue "entering the queue": entering the queue is not being picked up.
 
 **An issue is released by whoever finishes it.** A run whose deliverable is a pull request is released by the merge. A run whose deliverable is an answer or an executed command releases its own issue — closes it, labels it `done`, drops `in-progress`. Skipping that leaves single flight deferring behind a run that already succeeded, until the watchdog ages it out and reports it as lost.
 
@@ -62,19 +64,19 @@ Intake never applies `agent-task` or `ready` itself — that would take label as
    **A consequence to respect:** under the PAT, everything the session posts is authored by a real user rather than a bot, and the runners' trigger guard filters on `comment.user.type != 'Bot'`. An agent-authored comment containing the agent's own mention would therefore wake a new run. No pipeline comment may contain `@claude` or `@opencode` — the assignment comment is the only comment allowed to carry a mention.
 2. **The assignment comment carries the whole assignment.** It names the issue, mandates orchestrator-first delegation, states the branch names, the verification expectation, and the PR conventions. Its text is identical for every agent apart from the mention on the first line — the runtimes read the same instructions.
 
-An issue the agent closes without opening a PR raises no `pull_request` event either, so each runner ends with its own chaining step for exactly that case.
+An issue the agent closes without opening a PR raises no `pull_request` event either, so nothing chains from it. The runners used to carry their own step for that case; it was removed, because a run starting the next run is the pipeline deciding to run again on its own. Such a run still *releases* its issue — closes it, labels it `done`, drops `in-progress` — so the queue is free the moment somebody asks for the next one.
 
 ## Single flight
 
 Two agent sessions must never run at once — they would compete over the same `pipeline/*` branch names and the same working tree. Two independent mechanisms enforce it:
 
 - **`agentic-assign` defers.** An issue keeps `in-progress` until its run is finished, so any *other* issue still carrying that label means a run is live. The action logs why and assigns nothing; finishing the outstanding run re-enters the step. It defers whether or not that issue has a linked PR, and **it never diagnoses**: a run 40 seconds old and a run that died hours ago look identical from the labels alone, so declaring one lost belongs to the watchdog, which is the only mechanism that ages it. `agentic-assign` used to comment "Pipeline halted — no linked PR was created" on sight, which it posted on #404 while that run was one minute into a two-hour session.
-- **Intake serialises its assignments** through a job-level `agentic-assignment` concurrency group. The single-flight check reads the `in-progress` label, so parallel intakes — one per issue when a human files a batch in one sitting — would each read the list before any of them writes to it, and every one would assign. Labelling stays outside the group: a dropped run there would cost an issue its `ready` label and make it invisible, while a dropped assignment costs nothing the hourly sweep does not pick back up.
-- **The runners share a `concurrency` group** named `agentic-runner`, declared identically in `claude-runner.yml` and `opencode-runner.yml`. Concurrency groups are repo-wide, so the two runners serialise against each other as well as themselves. `cancel-in-progress: false` — a queued run waits rather than killing the live one. GitHub keeps only one run pending per group; a third is dropped, which the watchdog's idle restart then recovers.
+- **The two entries cannot race by construction.** A manual dispatch is one act by one human, and the merged-PR chain fires once per merge — there is no longer an events-per-issue path that could assign a batch in parallel. (Intake used to need an `agentic-assignment` concurrency group for exactly that reason: one intake per issue when a human filed several in a sitting, each reading the `in-progress` label before any of them wrote it. Removing intake's assignment removed the race with it.)
+- **The runners share a `concurrency` group** named `agentic-runner`, declared identically in `claude-runner.yml` and `opencode-runner.yml`. Concurrency groups are repo-wide, so the two runners serialise against each other as well as themselves. `cancel-in-progress: false` — a queued run waits rather than killing the live one. GitHub keeps only one run pending per group; a third is dropped, and nothing recovers it automatically — dispatch `agentic-trigger.yml` to pick the queue back up.
 
 ## Halt conditions
 
-The loop stops deliberately when an issue is labelled `blocked`, while an issue is still `in-progress` (single flight), or when no unblocked `ready` issue remains. `handle-failure.yml` comments on `blocked` issues with the resume procedure — add `ready`, and intake takes it from there.
+The loop stops deliberately when an issue is labelled `blocked`, while an issue is still `in-progress` (single flight), or when no unblocked `ready` issue remains. `handle-failure.yml` comments on `blocked` issues with the resume procedure: add `ready` to put the issue back in the queue, then dispatch `agentic-trigger.yml` to start it — the label alone resumes nothing.
 
 A run that dies without labelling anything — OOM, a hung tool call, the job timeout, a revoked token, a turn ended on outstanding work — would otherwise leave its issue `in-progress` forever and halt the chain silently. `agentic-watchdog.yml` sweeps hourly: an issue `in-progress` past `AGENTIC_STALL_MINUTES` with no linked PR is commented on, labelled `blocked`, and stripped of `in-progress`. That labelling is what surfaces the failure, so the watchdog must use the PAT — a label applied with `GITHUB_TOKEN` raises no `issues: labeled` event and `handle-failure.yml` would never fire.
 
@@ -96,7 +98,7 @@ Intent is not a mechanism, so `agentic-rescue` runs last in both runners, with `
 
 The rescue PR is a diagnosis, not a deliverable: unreviewed and unvalidated by definition. Finishing it or dropping it is a human decision, and adding `ready` back to the issue is the whole resume procedure.
 
-**An escalation does not chain to the next issue, and that is deliberate.** The runner's own chaining step covers a run whose deliverable was not a diff — an issue closed and labelled `done`. A run that failed is different: chaining from it means the queue restarts as fast as runs fail, and a systemic failure (an expired token, a broken `main`) would march through the whole backlog labelling every issue `blocked` in minutes. The hourly sweep restarts the queue instead, which rate-limits the damage to one issue an hour and gives a human time to see the first notification.
+**An escalation does not chain to the next issue**, and neither does anything else a runner does. Chaining from a failure would restart the queue as fast as runs fail, and a systemic failure (an expired token, a broken `main`) would march through the whole backlog labelling every issue `blocked` in minutes. A failure therefore stops the pipeline outright: `handle-failure.yml` notifies, and the queue moves again when a human dispatches the trigger, having seen what went wrong.
 
 ## Dependencies between issues
 
@@ -107,7 +109,7 @@ The rescue PR is a diagnosis, not a deliverable: unreviewed and unvalidated by d
 | Variable | Values | Effect |
 |----------|--------|--------|
 | `AGENTIC_AGENT` | `@claude` / `@opencode` (leading `@` and case optional; unset means `@opencode`) | The agent that assignment comments address, and therefore the runner workflow that starts |
-| `AGENTIC_AUTO_ASSIGN_ENABLED` | `true` / anything else | Whether a finished issue chains to the next ready one, and whether the watchdog restarts an idle queue |
+| `AGENTIC_AUTO_ASSIGN_ENABLED` | `true` / anything else | Whether a merged pipeline PR chains to the next ready issue. Set to anything else, the manual trigger is the only way a run ever starts |
 | `AGENTIC_AUTO_MERGE_ENABLED` | `true` / anything else | Whether a `READY TO MERGE` PR gets GitHub native auto-merge |
 | `AGENTIC_STALL_MINUTES` | minutes, default `420`; a value below the runners' 360-minute job timeout is clamped up to it | How long an issue may stay `in-progress` without a linked PR before the watchdog marks it `blocked`. Below the job timeout it would sweep live runs |
 
@@ -133,6 +135,8 @@ All four call the same composite action, so they cannot disagree about what "rea
 **Every refusal is decided on the PR's state, never on the wording of the error.** GitHub declines native auto-merge on a PR that has nothing left to wait for and on a repository with the feature switched off, so the action falls back to merging the PR itself.
 
 **On this repository the fallback is not the exception, it is the path.** `main` requires no status check, so a PR is mergeable the moment it opens and GitHub refuses native auto-merge on every pipeline PR — `Pull request is in unstable status`, meaning there is nothing left for auto-merge to wait on. Every merge therefore happens inside the action, which makes *when the action runs* the whole mechanism. PR #499 was verified on all five channels, marked, and green, and sat open anyway: armed once at `opened`, it polled its 10-minute settle budget while the `full-ci` browser jobs still had 35 minutes to run, reported the PR stuck, and was never swept again. That is what the `workflow_run` entry above is for.
+
+**A PR that is neither marked nor draft fails the sweep.** Selection needs the marker, so an unmarked PR is skipped — which is correct for anyone's ordinary work in progress and fatal for the pipeline's own. PRs #507 and #508 were opened non-draft and unmarked, each body promising `READY TO MERGE` "once the `full-ci` jobs report", and no step exists anywhere that comes back to write it. Skipped here, chaining from a merge that never happens, and passed over by a watchdog that leaves alone any issue with a linked PR, they held their issues indefinitely. So a non-draft PR from `pipeline/feature-<N>` with no marker now fails this step by name: the pipeline's own branch means the pipeline's own PR, and that PR ships marked or says why it does not. What the run should do instead: `agentic-pipeline-pr-management`.
 
 **Nothing in the path waits on a clock.** The verdict is read off the workflow runs on the PR head — the same object the CI-completion trigger fires on, so what the action reads and what wakes it cannot drift. A failed run is stuck. A run still going, *or a head that has reported nothing at all*, is `pending`: reported, not failed, and left to the sweep that CI completing will raise. `mergeable_state` is consulted only for `dirty` and `behind`, the two things it alone knows and neither of which resolves without a human or a branch update.
 

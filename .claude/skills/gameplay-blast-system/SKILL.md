@@ -221,5 +221,3 @@ preview — never reintroduce a separate approximation.
 - `scripts/verify-blast-visual.ts` photographs a blast before, mid-collapse and settled, and dumps
   the muck pile behind each shot. Its camera looks *into* the site: a blast digs a hole, and from
   eye level the crater's rim hides everything in it. `setOrbit` takes **degrees**.
-- Design record, including four defects found in the original spec and why each was changed:
-  `docs/plans/rock-fragmentation-refactor.md`.

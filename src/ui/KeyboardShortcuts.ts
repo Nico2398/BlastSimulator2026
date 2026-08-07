@@ -19,6 +19,8 @@ export interface ShortcutCallbacks {
   onEscape: () => void;
   /** Toggle the NavGrid overlay on the MiniMap. */
   onToggleNavGrid?: () => void;
+  /** Toggle the survey confidence overlay's player-facing visibility. */
+  onToggleSurveyOverlay?: () => void;
 }
 
 export class KeyboardShortcuts {
@@ -48,6 +50,7 @@ export class KeyboardShortcuts {
         case 'KeyE': callbacks.togglePanel('employees'); break;
         case 'KeyS': callbacks.togglePanel('survey'); break;
         case 'KeyN': callbacks.onToggleNavGrid?.(); break;
+        case 'KeyO': callbacks.onToggleSurveyOverlay?.(); break;
         case 'F5':
           e.preventDefault();
           callbacks.quickSave();

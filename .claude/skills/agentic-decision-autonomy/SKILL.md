@@ -40,7 +40,7 @@ gh issue create --label decision-review \
   --body "<the Decisions taken block>, linking the PR"
 ```
 
-The `decision-review` label carries no `ready`, so the issue stays out of the assignment queue and halts nothing: `agentic-assign` selects on `ready` alone, and intake leaves the labels of an issue that already carries a lifecycle label untouched. It is where a human goes to revisit a default at leisure; adding `ready` later is how they send it back through the pipeline. Creating the issue **with** the `decision-review` label is what keeps it out — an issue filed carrying no lifecycle label at all is labelled `ready` on arrival and joins the queue.
+The `decision-review` label carries no `ready`, so the issue stays out of the assignment queue and halts nothing: `agentic-assign` selects on `ready` alone, and nothing in the pipeline ever applies `ready` to an issue a human filed. It is where a human goes to revisit a default at leisure; adding `ready` later is how they put it back in the queue, and a manual dispatch or the next merged pipeline PR is what starts it.
 
 `--force` updates the label when it already exists, so the step is safe to run on every issue rather than only the first. Both runners give the agent's shell a `GH_TOKEN` that already opens PRs and edits labels, and both workflows declare `issues: write`, so no extra permission is needed.
 
@@ -59,6 +59,21 @@ Escalate only when the work cannot be produced, or cannot be trusted once produc
 Escalation is the same shape as any other halt: label the issue `blocked`, comment what is missing and what would unblock it, stop with `ESCALATED: <reason>`.
 
 Everything not on that list is a decision to take.
+
+## There is no asking
+
+`AskUserQuestion` is blocked project-wide, in two layers, and `npm run validate:context` fails if either goes missing. The tool suspends the session waiting for an answer nobody is there to give — the issue holds `in-progress` for as long as it waits, and every assignment behind it waits too. That is the halt this whole skill exists to prevent, arriving through a tool call instead of through a decision.
+
+| Layer | Where | Holds when |
+|-------|-------|-----------|
+| `permissions.deny` | `.claude/settings.json` | The permission system is consulted at all |
+| `PreToolUse` hook | `.claude/hooks/no-ask-user-question.sh` | Always — a hook runs on the tool call whatever mode the session is in |
+
+The second layer is not redundancy. A session running with permissions bypassed never consults a deny rule, and an unattended session — a GitHub Actions runner, Claude Code on the web — is both the one that bypasses prompts and the one whose question can never be answered. The deny rule states the intent; the hook is what holds where it matters.
+
+The denial removes an escape hatch, not an option: **an open choice was never a question to ask.** Default it and record it. A genuine blocker from the list above goes onto the issue as a comment, which is where a human will actually find it — asynchronously, in the place that already holds the run's history — rather than into a prompt in a session that has since ended.
+
+This binds an interactive session at a keyboard exactly as it binds a pipeline run, and deliberately: the same context files drive both, and a rule that applies only when nobody is watching is a rule the pipeline cannot rely on.
 
 ## Churn is not a blocker
 

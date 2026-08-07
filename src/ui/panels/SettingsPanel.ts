@@ -15,6 +15,7 @@ import { t, getLocale, setLocale } from '../../core/i18n/I18n.js';
 import { el, button, sectionHeader } from '../dom.js';
 import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
+import { syncLangPills } from '../langPills.js';
 import type { AudioManager, AudioCategory } from '../../audio/AudioManager.js';
 import type { GameState } from '../../core/state/GameState.js';
 import type { SaveBackend } from '../../core/state/SaveBackend.js';
@@ -38,12 +39,14 @@ const AUDIO_CHANNELS: readonly { channel: 'master' | AudioCategory; labelKey: st
 const SHORTCUT_KEYS: readonly string[] = [
   'shortcuts.pause', 'shortcuts.speed', 'shortcuts.blast', 'shortcuts.contracts',
   'shortcuts.build', 'shortcuts.vehicles', 'shortcuts.employees', 'shortcuts.survey',
-  'shortcuts.navgrid', 'shortcuts.saves', 'shortcuts.settings',
+  'shortcuts.navgrid', 'shortcuts.survey_overlay', 'shortcuts.saves', 'shortcuts.settings',
 ];
 
 export class SettingsPanel {
   private readonly el: HTMLElement;
   private readonly sessionSection: HTMLElement;
+  private readonly enLangPill: HTMLElement;
+  private readonly frLangPill: HTMLElement;
   private readonly volumeEls: Partial<Record<'master' | AudioCategory, { input: HTMLInputElement; readout: HTMLElement }>> = {};
 
   private onCloseCb?: () => void;
@@ -102,13 +105,11 @@ export class SettingsPanel {
     const frBtn = el('button', { className: 'bsx-menu-lang-pill', attrs: { style: 'flex:1;text-align:center;padding:8px 5px', 'data-lang': 'fr' } });
     this.locale.bindText(enBtn, 'ui.settings.english');
     this.locale.bindText(frBtn, 'ui.settings.french');
-    const setLangPills = (lang: string) => {
-      enBtn.classList.toggle('active', lang === 'en');
-      frBtn.classList.toggle('active', lang === 'fr');
-    };
-    enBtn.addEventListener('click', () => { setLocale('en'); setLangPills('en'); this.onLanguageChangeCb?.('en'); });
-    frBtn.addEventListener('click', () => { setLocale('fr'); setLangPills('fr'); this.onLanguageChangeCb?.('fr'); });
-    setLangPills(getLocale());
+    this.enLangPill = enBtn;
+    this.frLangPill = frBtn;
+    enBtn.addEventListener('click', () => { setLocale('en'); this.updateLangPills(); this.onLanguageChangeCb?.('en'); });
+    frBtn.addEventListener('click', () => { setLocale('fr'); this.updateLangPills(); this.onLanguageChangeCb?.('fr'); });
+    this.updateLangPills();
     const langRow = el('div', {
       attrs: { style: 'display:flex;gap:3px;padding:3px;border-radius:5px;background:var(--bsx-well)' },
       children: [enBtn, frBtn],
@@ -204,9 +205,13 @@ export class SettingsPanel {
   hide(): void { this.el.style.display = 'none'; }
   get visible(): boolean { return this.el.style.display !== 'none'; }
 
-  refreshLocale(): void { this.locale.refresh(); }
+  refreshLocale(): void { this.locale.refresh(); this.updateLangPills(); }
 
   dispose(): void { this.el.remove(); }
+
+  private updateLangPills(): void {
+    syncLangPills(this.enLangPill, this.frLangPill, getLocale());
+  }
 
   private audioRow(channel: 'master' | AudioCategory, labelKey: string): HTMLElement {
     const label = el('span', { attrs: { style: 'font:400 11px/1 var(--bsx-font-ui);color:var(--bsx-text-secondary);width:74px;flex:0 0 74px' } });

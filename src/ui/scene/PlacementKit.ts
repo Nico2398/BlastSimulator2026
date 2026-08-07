@@ -9,9 +9,26 @@
 import type { PlacementController } from './PlacementController.js';
 import type { SelectionOverlay } from '../../renderer/SelectionOverlay.js';
 import type { ParamStrip } from './ParamStrip.js';
+import { t } from '../../core/i18n/I18n.js';
 
 export interface PlacementKit {
   readonly controller: PlacementController;
   readonly overlay: SelectionOverlay;
   readonly strip: ParamStrip;
+}
+
+/**
+ * Why Confirm is dead, in words the player can act on — or undefined when it
+ * is not dead.
+ *
+ * Shared by every panel that arms the tool so a refusal reads the same
+ * wherever it comes from. Each panel used to pass nothing at all, which left
+ * "a Confirm that never enables" as the only symptom of an out-of-bounds pick
+ * (#489).
+ */
+export function placementRefusalReason(controller: PlacementController): string | undefined {
+  if (controller.canConfirm) return undefined;
+  if (controller.refusedTile) return t('shell.placement.outside_region');
+  if (!controller.selection) return t('shell.placement.pick_first');
+  return t('shell.placement.outside_region');
 }

@@ -52,6 +52,10 @@ export type InteractionStepAction =
   | { type: 'viewport'; width: number; height: number }
   | { type: 'command'; command: string }
   | { type: 'screenshot' }
+  // Drives the loading screen's debug preview bridge directly, bypassing a
+  // real level entry, so a scenario can assert the new comp blocks (eyebrow,
+  // briefing, stage row, tip) without paying for terrain generation.
+  | { type: 'loadingScreenDebug'; action: 'preview' | 'hide'; kind?: 'level' | 'sandbox'; locale?: 'en' | 'fr' }
   // ── Ported from the playability harness (issue #479) ──────────────────
   // A player step can only be expressed in clicks if the vocabulary covers
   // everything a player does, and the scenario vocabulary did not: there was

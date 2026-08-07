@@ -300,6 +300,88 @@ const TOKENS_CSS = `
 }
 .bsx-stat-key { font: 600 10px/1 var(--bsx-font-ui); letter-spacing: .12em; color: var(--bsx-text-micro); }
 .bsx-stat-value { font: 600 15px/1 var(--bsx-font-mono); color: var(--bsx-text-primary); }
+/* Centered variant of .bsx-stat-cell — loading screen's briefing rows. */
+.bsx-stat-cell-center { align-items: center; min-width: 132px; }
+
+/* ── loading screen: eyebrow row (site identity + biome + difficulty pips) ── */
+.bsx-loading-eyebrow { display: flex; align-items: center; gap: 11px; }
+.bsx-loading-eyebrow-rule { height: 2px; width: 26px; background: var(--bsx-amber); }
+.bsx-loading-eyebrow-text { font: 700 11px/1 var(--bsx-font-ui); letter-spacing: .34em; color: var(--bsx-text-tinted); }
+.bsx-loading-eyebrow-pips { display: flex; gap: 4px; color: var(--bsx-amber); }
+
+/* ── loading screen: subtitle under the title ── */
+.bsx-loading-subtitle {
+  font: 400 15px/1.5 var(--bsx-font-ui);
+  color: var(--bsx-text-secondary);
+  text-align: center;
+  max-width: 640px;
+}
+
+/* ── loading screen: briefing block (key/value rows) ── */
+.bsx-loading-briefing {
+  display: flex;
+  gap: 1px;
+  background: var(--bsx-hairline);
+  border-radius: var(--bsx-r-card);
+  overflow: hidden;
+}
+
+/* ── loading screen: segmented progress marks on the bar ── */
+.bsx-loading-marks { position: absolute; inset: 0; pointer-events: none; }
+.bsx-loading-mark { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(13,17,22,.9); }
+
+/* ── loading screen: stage row (stage label + meta + percentage) ── */
+.bsx-loading-stage-row { display: flex; align-items: baseline; gap: 12px; }
+.bsx-loading-stage-label { font: 600 11px/1 var(--bsx-font-ui); letter-spacing: .14em; color: var(--bsx-amber); }
+.bsx-loading-stage-meta { font: 500 12px/1 var(--bsx-font-mono); color: var(--bsx-text-micro); }
+
+/* ── loading screen: tip block (icon, TIP label, tip text, NEXT button) ── */
+.bsx-loading-tip {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 12px 15px;
+  border-radius: 7px;
+  background: rgba(255,176,46,.08);
+  border: 1px solid rgba(255,176,46,.28);
+}
+.bsx-loading-tip-icon {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  padding: 5px 9px;
+  border-radius: var(--bsx-r-control);
+  background: rgba(255,176,46,.18);
+  color: var(--bsx-amber);
+  font: 700 10px/1 var(--bsx-font-ui);
+  letter-spacing: .16em;
+}
+.bsx-loading-tip-label { font: 700 10px/1 var(--bsx-font-ui); letter-spacing: .16em; }
+.bsx-loading-tip-text {
+  font: 500 14px/1.45 var(--bsx-font-ui);
+  color: var(--bsx-text-primary);
+  flex: 1;
+  min-width: 0;
+}
+.bsx-loading-tip-next {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 28px;
+  padding: 0 11px;
+  border: 1px solid rgba(255,176,46,.42);
+  border-radius: var(--bsx-r-control);
+  background: transparent;
+  color: var(--bsx-amber-hover);
+  font: 600 10px/1 var(--bsx-font-ui);
+  letter-spacing: .12em;
+  cursor: pointer;
+  pointer-events: all;
+}
+.bsx-loading-tip-next:hover { background: rgba(255,176,46,.16); color: var(--bsx-amber); }
 
 /* ── main menu buttons (icon + label + hint row) ── */
 .bsx-menu-btn {

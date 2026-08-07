@@ -1,8 +1,11 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import { TutorialOverlay } from '../../../src/ui/TutorialOverlay.js';
 import { TUTORIAL_STEPS, TOTAL_TUTORIAL_STEPS } from '../../../src/ui/tutorialSteps.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
+import { setLocale } from '../../../src/core/i18n/I18n.js';
 
 function createMockState(): GameState {
   return {
@@ -54,6 +57,7 @@ describe('TutorialOverlay (12.4)', () => {
     if (container.parentNode) {
       container.parentNode.removeChild(container);
     }
+    setLocale('en');
   });
 
   describe('construction', () => {
@@ -308,24 +312,45 @@ describe('TutorialOverlay (12.4)', () => {
       expect(tut.isActive).toBe(true);
     });
 
-    it('shows commands hint element when step has commands array', () => {
+    it('never puts the console equivalent on the card, on any step (#489)', () => {
+      // The console line reads as an instruction, and the ones carrying tile
+      // coordinates read as coordinates the player must reproduce by hand —
+      // which no control in the game accepts. The scene outline is the hint.
       const tut = new TutorialOverlay(container);
       overlay = tut;
       tut.start(createMockState());
 
       const hintEl = container.querySelector('.bs-tutorial-commands') as HTMLElement;
+      const labelEl = container.querySelector('.bs-tutorial-commands-label') as HTMLElement;
       expect(hintEl).not.toBeNull();
 
-      // Step 0 (time-speed) has no commands → hint is hidden
-      expect(hintEl.style.display).toBe('none');
+      for (let i = 0; i < TUTORIAL_STEPS.length; i++) {
+        // `as any` needed to set private stepIndex and call private render()
+        (tut as any).stepIndex = i;
+        (tut as any).render();
+        expect(hintEl.style.display, `step ${TUTORIAL_STEPS[i]!.id} shows a console hint`).toBe('none');
+        expect(labelEl.style.display).toBe('none');
+        expect(hintEl.textContent).toBe('');
+      }
+    });
 
-      // Advance to step 2 (survey), whose hint is the real console command
-      // `as any` needed to set private stepIndex and call private render()
-      (tut as any).stepIndex = 2;
-      (tut as any).render();
+    it('no step card text anywhere prints raw tile coordinates (#489)', () => {
+      const tut = new TutorialOverlay(container);
+      overlay = tut;
+      tut.start(createMockState());
 
-      expect(hintEl.style.display).not.toBe('none');
-      expect(hintEl.textContent).toBe('survey seismic x:23 z:23');
+      const textEl = container.querySelector('.bs-panel-text') as HTMLElement;
+      const stageEl = container.querySelector('.bs-tutorial-stage') as HTMLElement;
+      // "(12, 8)" / "16,19" — a pair of numbers the player is expected to aim at.
+      const COORD_PAIR = /\(?\d+\s*,\s*\d+\)?/;
+
+      for (let i = 0; i < TUTORIAL_STEPS.length; i++) {
+        (tut as any).stepIndex = i;
+        (tut as any).render();
+        const id = TUTORIAL_STEPS[i]!.id;
+        expect(COORD_PAIR.test(textEl.textContent ?? ''), `step ${id} body prints coordinates`).toBe(false);
+        expect(COORD_PAIR.test(stageEl.textContent ?? ''), `step ${id} instruction prints coordinates`).toBe(false);
+      }
     });
 
     it('never executes a step hint on the player behalf', () => {
@@ -652,6 +677,76 @@ describe('TutorialOverlay (12.4)', () => {
       expect(TutorialOverlay.isCompleted()).toBe(true);
 
       vi.useRealTimers();
+    });
+  });
+
+  describe('refreshLocale() (issue #492 section 3 — "clock held" text survives a language switch)', () => {
+    it('re-applies the CLOCK HELD tooltip (pausedEl.title) to the active locale', () => {
+      const tut = new TutorialOverlay(container) as unknown as { pausedEl: HTMLElement };
+      overlay = tut as unknown as TutorialOverlay;
+
+      // Baked in English at construction time.
+      expect(tut.pausedEl.title).toBe(
+        'Time is paused until you do this — the tutorial holds the clock so the site cannot drift ahead of you.',
+      );
+
+      setLocale('fr');
+      (overlay as TutorialOverlay).refreshLocale();
+
+      expect(tut.pausedEl.title).toBe(
+        "Le temps est en pause jusqu'à cette action — le tutoriel retient l'horloge pour que le site ne prenne pas d'avance sur vous.",
+      );
+    });
+
+    it('re-applies the CLOCK HELD chip label (pausedChipEl.textContent) to the active locale', () => {
+      const tut = new TutorialOverlay(container) as unknown as { pausedChipEl: HTMLElement };
+      overlay = tut as unknown as TutorialOverlay;
+
+      expect(tut.pausedChipEl.textContent).toBe('CLOCK HELD');
+
+      setLocale('fr');
+      (overlay as TutorialOverlay).refreshLocale();
+
+      expect(tut.pausedChipEl.textContent).toBe('HORLOGE EN PAUSE');
+    });
+
+    it('re-applies the current step title/text in the new locale', () => {
+      const tut = new TutorialOverlay(container);
+      overlay = tut;
+      const state = createMockState();
+      tut.start(state); // step 0 ('tutorial.step1.title' / 'tutorial.step1'), rendered in EN
+
+      const titleEl = container.querySelector('.bs-panel-title') as HTMLElement;
+      const textEl = container.querySelector('.bs-panel-text') as HTMLElement;
+      expect(titleEl.textContent).toBe('Game Speed');
+
+      setLocale('fr');
+      tut.refreshLocale();
+
+      expect(titleEl.textContent).toBe('Vitesse de Jeu');
+      expect(textEl.textContent).toBe(
+        'Utilisez les contrôles de vitesse sur la gauche de la barre du haut pour accélérer le jeu. Essayez la vitesse 2× ou 4× !',
+      );
+    });
+
+    it('re-applies the console-hint label ("Console equivalent" / "Équivalent console")', () => {
+      const tut = new TutorialOverlay(container);
+      overlay = tut;
+
+      const label = container.querySelector('.bs-tutorial-commands-label') as HTMLElement;
+      expect(label.textContent).toBe('Console equivalent');
+
+      setLocale('fr');
+      tut.refreshLocale();
+
+      expect(label.textContent).toBe('Équivalent console');
+    });
+
+    it('is a no-op-safe call when the tutorial has not been started (no gameState yet)', () => {
+      const tut = new TutorialOverlay(container);
+      overlay = tut;
+      setLocale('fr');
+      expect(() => tut.refreshLocale()).not.toThrow();
     });
   });
 });

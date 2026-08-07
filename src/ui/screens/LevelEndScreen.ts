@@ -1,5 +1,5 @@
 // BlastSimulator2026 — Level End Screen: victory + defeat variants (redesign P8)
-// Full-screen state (module layout per ui-implementation-plan.md), shown over
+// Full-screen state (module layout per docs/ui-redesign-spec.md §6.11), shown over
 // the HUD the moment state.levelEndReason becomes non-null. Victory renders
 // star rating + recap; the 4 defeat reasons (bankruptcy/arrest/
 // ecological_shutdown/worker_revolt) share a layout — icon identity, satirical

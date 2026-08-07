@@ -220,6 +220,25 @@ describe('EventModal', () => {
     container.remove();
   });
 
+  it('a locale refresh re-applies the CLOCK HELD chip text (built with raw t() at construction, never registered with this.locale — issue #492 section 3)', () => {
+    const { container, modal } = mount();
+    const state = stateWithPendingEvent();
+    state.isPaused = true;
+    modal.update(state);
+
+    const clockChip = Array.from(container.querySelectorAll('#bs-event-dialog .bsx-chip-warn'))
+      .find(c => c.textContent === 'CLOCK HELD') as HTMLElement;
+    expect(clockChip).toBeDefined();
+
+    setLocale('fr');
+    modal.refreshLocale();
+    modal.update(state);
+
+    expect(clockChip.textContent).toBe('HORLOGE ARRÊTÉE');
+    modal.dispose();
+    container.remove();
+  });
+
   it('dispose removes the modal from the DOM', () => {
     const { container, modal } = mount();
     modal.dispose();

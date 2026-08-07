@@ -1,9 +1,12 @@
 // BlastSimulator2026 — Autonomy loop wiring
-// The pipeline takes one human input, a filed issue, and every step from there
-// to a merged pull request is a workflow reacting to an event. A removed
-// trigger or a swapped token breaks the chain in silence: nothing errors, the
-// queue simply stops moving and no run is there to notice. These tests pin the
-// wiring that keeps it moving.
+// A filed issue is eligible for the pipeline, never a start signal for it. A
+// run begins in exactly two ways — a human dispatching `agentic-trigger.yml`,
+// or a merged pipeline pull request chaining to the next `ready` issue — and
+// from there every step to the merge is a workflow reacting to an event.
+// Both halves fail in silence. A removed trigger or a swapped token stops the
+// queue with nothing raised, and a new assignment path starts sessions nobody
+// asked for, which is how filing issue #489 woke a runner. These tests pin the
+// entry points shut and pin the chain between them open.
 
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
@@ -14,36 +17,49 @@ const workflow = (name: string): string =>
   readFileSync(join(ROOT, '.github/workflows', name), 'utf8');
 
 const ASSIGN_ACTION = 'uses: ./.github/actions/agentic-assign';
+const AUTO_MERGE_ACTION = 'uses: ./.github/actions/agentic-auto-merge';
 
-/** Every workflow that can put an issue in front of an agent. */
-const ASSIGNING_WORKFLOWS = [
+/** The only two workflows allowed to put an issue in front of an agent. */
+const ASSIGNING_WORKFLOWS = ['auto-assign-next.yml', 'agentic-trigger.yml'];
+
+// Each of these once assigned, and each removal was deliberate. Named
+// individually rather than swept up by a glob, so restoring assignment to one
+// of them fails here instead of quietly widening the entry points again.
+const NON_ASSIGNING_WORKFLOWS = [
   'agentic-intake.yml',
-  'auto-assign-next.yml',
   'agentic-watchdog.yml',
-  'agentic-trigger.yml',
   'claude-runner.yml',
   'opencode-runner.yml',
 ];
 
 describe('entry points into the assignment queue', () => {
-  it('starts a run from a filed issue', () => {
-    const intake = workflow('agentic-intake.yml');
-    expect(intake).toMatch(/issues:\s*\n\s*types:\s*\[opened, reopened, labeled\]/);
-    expect(intake).toContain(ASSIGN_ACTION);
+  it('opens exactly two ways in', () => {
+    for (const name of ASSIGNING_WORKFLOWS) {
+      expect(workflow(name), `${name} no longer assigns`).toContain(ASSIGN_ACTION);
+    }
+    for (const name of NON_ASSIGNING_WORKFLOWS) {
+      expect(workflow(name), `${name} assigns again`).not.toContain(ASSIGN_ACTION);
+    }
   });
 
-  it('re-enters intake on `ready` alone, so pipeline labels cannot retrigger it', () => {
+  // `ready` marks an issue eligible and nothing more: it joins the queue and
+  // waits there. Filing one used to reach `agentic-assign` through intake,
+  // which is how an issue created with the documented default labels started a
+  // session the moment it existed.
+  it('starts nothing when an issue is filed or labelled', () => {
     const intake = workflow('agentic-intake.yml');
-    expect(intake).toContain("github.event.label.name == 'ready'");
+    expect(intake).not.toContain(ASSIGN_ACTION);
+    expect(intake).not.toContain('labeled');
+    expect(intake).not.toMatch(/\n {2}assign:/);
   });
 
-  // Parallel intakes each read the `in-progress` label before any of them
-  // writes it, so without this every issue of a filed batch gets assigned.
-  it('serialises assignment while leaving labelling unserialised', () => {
-    const intake = workflow('agentic-intake.yml');
-    const assignJob = intake.slice(intake.indexOf('\n  assign:'));
-    expect(assignJob).toMatch(/concurrency:\s*\n\s*group: agentic-assignment/);
-    expect(intake.slice(0, intake.indexOf('\n  assign:'))).not.toContain('concurrency:');
+  it('starts a run from a human dispatching the trigger', () => {
+    const trigger = workflow('agentic-trigger.yml');
+    const triggers = trigger.slice(trigger.indexOf('\non:'), trigger.indexOf('\npermissions:'));
+    expect(triggers).toContain('workflow_dispatch:');
+    expect(triggers).not.toContain('schedule:');
+    expect(triggers).not.toContain('issues:');
+    expect(trigger).toContain(ASSIGN_ACTION);
   });
 
   it('chains from a merged pull request to the next issue', () => {
@@ -64,11 +80,27 @@ describe('entry points into the assignment queue', () => {
     }
   });
 
-  it('restarts an idle queue from the hourly sweep', () => {
+  // The sweep is the one clock left in the pipeline, and it exists to release
+  // issues, never to claim them. It used to restart an idle queue as well,
+  // which meant any `ready` issue eventually started a run on a timer.
+  it('sweeps stalled runs on a schedule without assigning anything', () => {
     const watchdog = workflow('agentic-watchdog.yml');
     expect(watchdog).toContain('schedule:');
-    expect(watchdog).toContain(ASSIGN_ACTION);
+    expect(watchdog).not.toContain(ASSIGN_ACTION);
+    expect(watchdog).toContain('in-progress');
   });
+
+  // A run that answers a question or executes a command closes its own issue
+  // and opens no PR, so there is no merge to chain from. Starting the next
+  // session there would be the pipeline deciding to run again on its own.
+  it.each(['claude-runner.yml', 'opencode-runner.yml'])(
+    '%s releases its issue without starting the next run',
+    (name) => {
+      const text = workflow(name);
+      expect(text).not.toContain(ASSIGN_ACTION);
+      expect(text).toContain(AUTO_MERGE_ACTION);
+    }
+  );
 });
 
 describe('assignment tokens', () => {
@@ -130,8 +162,6 @@ describe('dependency gating', () => {
 // same job, on the branch it was told to build — the one moment that exists
 // whoever the PR ends up attributed to.
 describe('auto-merge does not depend on the PR author', () => {
-  const AUTO_MERGE_ACTION = 'uses: ./.github/actions/agentic-auto-merge';
-
   /** Every workflow that can put a PR into auto-merge. */
   const MERGING_WORKFLOWS = [
     'claude-runner.yml',
@@ -161,7 +191,9 @@ describe('auto-merge does not depend on the PR author', () => {
     '%s arms the branch it was told to build, even when the agent step failed',
     (name) => {
       const text = workflow(name);
-      const step = text.slice(text.indexOf('- name: Arm auto-merge'), text.indexOf(ASSIGN_ACTION, text.indexOf('- name: Arm auto-merge')));
+      const start = text.indexOf('- name: Arm auto-merge');
+      const next = text.indexOf('\n      - name:', start);
+      const step = text.slice(start, next > -1 ? next : undefined);
       expect(step).toContain(AUTO_MERGE_ACTION);
       expect(step).toContain('head: pipeline/feature-${{ steps.context.outputs.issue }}');
       expect(step).toMatch(/if:\s*always\(\)/);
@@ -533,5 +565,65 @@ describe('the READY TO MERGE marker', () => {
     expect(carriesMergeMarker('')).toBe(false);
     expect(carriesMergeMarker(null)).toBe(false);
     expect(carriesMergeMarker(undefined)).toBe(false);
+  });
+});
+
+// PRs #507 and #508 were opened non-draft, verified on every channel this
+// session could run, and left unmarked — each body promising `READY TO MERGE`
+// "once the full-ci jobs report". No step anywhere writes it later. Selection
+// here needs the marker, `auto-assign-next` chains from a merge that never
+// happens, and the watchdog leaves alone any issue that has a linked PR, so
+// issue #504 held `in-progress` with every assignment behind it waiting on a
+// human noticing. A pipeline PR ships marked or is a draft naming what stopped
+// it; the third state is the one nothing in the loop can resolve.
+describe('a pipeline PR that is neither marked nor draft', () => {
+  const source = readFileSync(
+    join(ROOT, '.github/actions/agentic-auto-merge/action.yml'), 'utf8'
+  );
+
+  const pattern = /const PIPELINE_HEAD = (\/.+\/);/.exec(source)?.[1] ?? '';
+  const pipelineHead = new Function(`return ${pattern};`)() as RegExp;
+
+  it('recognises the branch the assignment told the run to build', () => {
+    expect(pattern, 'PIPELINE_HEAD is gone').not.toBe('');
+    expect(pipelineHead.test('pipeline/feature-504')).toBe(true);
+    expect(pipelineHead.test('pipeline/feature-1')).toBe(true);
+  });
+
+  // The guard says "the pipeline opened this and did not finish the sentence".
+  // Anything else non-draft and unmarked is somebody's work in progress, which
+  // is a normal thing for a PR to be and not this action's business.
+  it.each([
+    'main',
+    'pipeline/tests-504',
+    'pipeline/impl-504',
+    'claude/agentic-github-action-issues-4dtero',
+    'pipeline/feature-504-followup',
+  ])('leaves `%s` alone', (ref) => {
+    expect(pipelineHead.test(ref)).toBe(false);
+  });
+
+  it('collects such a PR instead of skipping it silently', () => {
+    const skip = source.slice(
+      source.indexOf('if (!carriesMergeMarker(summary.body))'),
+      source.indexOf('core.info(`#${n}: marked READY TO MERGE')
+    );
+    expect(skip).toContain('PIPELINE_HEAD.test(');
+    expect(skip).toContain('unmarked.push(n)');
+  });
+
+  // Same reasoning as `unarmed`: nothing else is watching, so a warning in a
+  // log nobody reads is the same as saying nothing at all.
+  it('fails the step rather than passing with a warning', () => {
+    expect(source).toContain("core.setOutput('unmarked'");
+    expect(source).toMatch(/if \(unmarked\.length > 0\) \{\s*\n\s*core\.setFailed\(/);
+  });
+
+  // A PR the run deliberately opened as a draft already says what stopped it,
+  // and the draft check must stay ahead of this one or every draft trips it.
+  it('checks draft before it checks the marker', () => {
+    expect(source.indexOf('if (summary.draft)')).toBeLessThan(
+      source.indexOf('if (!carriesMergeMarker(summary.body))')
+    );
   });
 });

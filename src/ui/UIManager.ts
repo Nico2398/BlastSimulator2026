@@ -170,7 +170,7 @@ export class UIManager {
     // TopBar/ToolRail/Toasts/MiniMap are HUD chrome — nothing to show before a
     // game exists. Previously nothing ever hid them; they were only ever masked
     // by MainMenu's own opaque backdrop, which the redesign's translucent menu
-    // no longer provides (#ui-implementation-plan.md P8, "fix the leak").
+    // no longer provides ("fix the leak").
     this.hide();
   }
 
@@ -213,6 +213,16 @@ export class UIManager {
     this.blastUI.setPlacementKit(kit);
     this.buildMenu.setPlacementKit(kit);
     this.surveyPanel.setPlacementKit(kit);
+  }
+
+  /** Wire the survey confidence overlay's player-facing visibility toggle (#496) — SurveyPanel's button drives this. */
+  setSurveyOverlayToggleHandler(cb: (visible: boolean) => void): void {
+    this.surveyPanel.setOverlayToggleHandler(cb);
+  }
+
+  /** Reflect the survey confidence overlay's current visibility preference in SurveyPanel's toggle button (#496). */
+  setSurveyOverlayVisible(visible: boolean): void {
+    this.surveyPanel.setOverlayVisible(visible);
   }
 
   setSpeedChangeHandler(cb: (speed: number) => void): void {
@@ -291,6 +301,26 @@ export class UIManager {
     }
     if (this.activePanel) this.hideAllPanels();
   }
+
+  /**
+   * Close overlays whose visibility is a stale carry-over from a previous
+   * level's ended state, not something the player is mid-answering. Call
+   * whenever ctx.state is replaced with a new object (new_game, campaign
+   * transition, sandbox start) — a fresh GameState's lastBlastReport is
+   * always null, so BlastReportModal.update() never re-closes itself on its
+   * own (it only ever opens on a new report; see BlastReportModal#update).
+   * PreflightModal/ConfirmModal are excluded on purpose: both are
+   * request/response dialogs the player just triggered, never state-derived,
+   * so a level transition mid-dialog is not this bug's shape. LevelEndScreen
+   * is excluded too — its update() already closes itself the instant
+   * state.levelEndReason reads null, which a fresh level's state always is.
+   */
+  closeStaleLevelOverlays(): void {
+    if (this.blastReportModal.visible) this.blastReportModal.hide();
+  }
+
+  /** Read-only accessor for tests (#504) — whether the BlastReportModal is currently open. */
+  get blastReportModalVisible(): boolean { return this.blastReportModal.visible; }
 
   /** Re-render all owned panels' locale-dependent text after a language change. */
   refreshLocale(): void {

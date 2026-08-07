@@ -10,7 +10,7 @@
 // and the scenario runner get the final state directly, and the renderer's job
 // is only to show the journey to a destination already decided.
 //
-// Refactor plan: docs/plans/rock-fragmentation-refactor.md §6/A6.
+// See the gameplay-blast-system skill, "Step 4 — Throw, Flight and the Muck Pile" (landing and the muck pile).
 
 import { vec3, type Vec3 } from '../math/Vec3.js';
 import { computeVoxelColumnSurfaceY, type VoxelGrid } from '../world/VoxelGrid.js';

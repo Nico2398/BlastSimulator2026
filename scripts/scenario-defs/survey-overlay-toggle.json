@@ -1,0 +1,178 @@
+{
+  "name": "survey-overlay-toggle",
+  "description": "Player-controlled survey confidence overlay visibility (#496): the header toggle hides only the overlay mesh, leaving survey results and panel cards intact, and a new survey arriving while hidden must not silently re-show it.",
+  "steps": [
+    {
+      "command": "new_game seed:42",
+      "timeout": 30,
+      "interaction": [
+        { "type": "command", "command": "new_game seed:42" }
+      ]
+    },
+    {
+      "command": "campaign start level:dusty_hollow",
+      "timeout": 30,
+      "interaction": [
+        { "type": "command", "command": "campaign start level:dusty_hollow" }
+      ]
+    },
+    {
+      "command": "time resume",
+      "interaction": [
+        { "type": "command", "command": "time resume" }
+      ]
+    },
+    {
+      "command": "employee hire role:surveyor",
+      "interaction": [
+        { "type": "command", "command": "employee hire role:surveyor" }
+      ]
+    },
+    {
+      "command": "employee assign_skill 1 skill:geology level:3",
+      "interaction": [
+        { "type": "command", "command": "employee assign_skill 1 skill:geology level:3" }
+      ]
+    },
+    {
+      "command": "survey seismic x:20 z:20",
+      "interaction": [
+        { "type": "command", "command": "survey seismic x:20 z:20" }
+      ]
+    },
+    {
+      "command": "tick 25",
+      "description": "Padding for the seismic survey to resolve",
+      "interaction": [
+        { "type": "command", "command": "tick 25" }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "command", "command": "event choose 0" }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        { "type": "command", "command": "tick 10" }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "command", "command": "event choose 0" }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        { "type": "command", "command": "tick 10" }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "command", "command": "event choose 0" }
+      ]
+    },
+    {
+      "command": "survey show",
+      "description": "Open the Survey panel and screenshot the overlay visible by default — colour-coded confidence quads over the surveyed area",
+      "interaction": [
+        { "type": "command", "command": "survey show" },
+        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"survey\"]" },
+        { "type": "cameraFocus", "x": 20, "z": 20, "distance": 25 },
+        { "type": "wait", "durationMs": 300 },
+        { "type": "screenshot" }
+      ]
+    },
+    {
+      "command": "state full",
+      "description": "Click the overlay toggle button — the overlay disappears, leaving clean terrain, while survey results stay in the panel",
+      "interaction": [
+        { "type": "command", "command": "state full" },
+        { "type": "clickSelector", "selector": "[data-role=\"overlay-toggle\"]" },
+        { "type": "wait", "durationMs": 300 },
+        { "type": "screenshot" }
+      ]
+    },
+    {
+      "command": "survey seismic x:30 z:30",
+      "description": "A second survey is run while the toggle is off",
+      "interaction": [
+        { "type": "command", "command": "survey seismic x:30 z:30" }
+      ]
+    },
+    {
+      "command": "tick 25",
+      "description": "Padding for the second seismic survey to resolve",
+      "interaction": [
+        { "type": "command", "command": "tick 25" }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "command", "command": "event choose 0" }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        { "type": "command", "command": "tick 10" }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "command", "command": "event choose 0" }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        { "type": "command", "command": "tick 10" }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "command", "command": "event choose 0" }
+      ]
+    },
+    {
+      "command": "survey show",
+      "description": "The new survey's data must not silently re-show the overlay — screenshot still shows clean terrain",
+      "interaction": [
+        { "type": "command", "command": "survey show" },
+        { "type": "cameraFocus", "x": 25, "z": 25, "distance": 30 },
+        { "type": "wait", "durationMs": 300 },
+        { "type": "screenshot" }
+      ]
+    },
+    {
+      "command": "state full",
+      "description": "Click the toggle again — the overlay reappears showing every survey's current data, both the first and second",
+      "interaction": [
+        { "type": "command", "command": "state full" },
+        { "type": "clickSelector", "selector": "[data-role=\"overlay-toggle\"]" },
+        { "type": "wait", "durationMs": 300 },
+        { "type": "screenshot" }
+      ]
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        { "type": "command", "command": "finances" }
+      ]
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        { "type": "command", "command": "scores" }
+      ]
+    }
+  ]
+}

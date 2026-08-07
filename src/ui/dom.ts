@@ -153,6 +153,18 @@ export function emptyState(text: string): HTMLElement {
   return el('div', { className: 'bsx-empty', text });
 }
 
+/**
+ * Paint a toggle button's active/inactive visual state: amber border+text+wash
+ * when active, muted/transparent when not. Shared by every hand-rolled
+ * toggle button that isn't built through `button()` (MiniMap layer toggle,
+ * ToolRail panel selection, SurveyPanel overlay toggle).
+ */
+export function paintToggleButton(btn: HTMLElement, active: boolean, inactiveBorderColor = 'transparent'): void {
+  btn.style.borderColor = active ? 'var(--bsx-amber)' : inactiveBorderColor;
+  btn.style.color = active ? 'var(--bsx-amber)' : 'var(--bsx-text-muted)';
+  btn.style.background = active ? 'rgba(255,176,46,.12)' : 'transparent';
+}
+
 /** Stat grid (blast report, pre-flight): N equal columns, each a key/value cell. */
 export function statGrid(items: { key: string; value: string; color?: string }[], columns: number): HTMLElement {
   const grid = el('div', { className: 'bsx-stat-grid' });

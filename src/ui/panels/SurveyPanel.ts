@@ -12,7 +12,7 @@
 // for their own root ids in P6.
 
 import { t } from '../../core/i18n/I18n.js';
-import { el, card, button, sectionHeader, emptyState, reasonLine, progressBar } from '../dom.js';
+import { el, card, button, sectionHeader, emptyState, reasonLine, progressBar, paintToggleButton } from '../dom.js';
 import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import type { GameState } from '../../core/state/GameState.js';
@@ -22,7 +22,7 @@ import {
   SURVEY_COSTS, SURVEY_BASE_ERROR, SURVEY_COVERAGE_RADIUS, SURVEY_DURATION_TICKS,
   SEISMIC_SURVEY_DAMAGE_RADIUS, SEISMIC_SURVEY_DAMAGE_HP,
 } from '../../core/config/balance.js';
-import type { PlacementKit } from '../scene/PlacementKit.js';
+import { placementRefusalReason, type PlacementKit } from '../scene/PlacementKit.js';
 import type { CommandResult } from '../../console/ConsoleRunner.js';
 
 export type GameConsoleFn = (cmd: string) => CommandResult;
@@ -55,6 +55,10 @@ export class SurveyPanel {
   private readonly resultsEl: HTMLElement;
   private onCloseCb?: () => void;
   private gameConsole?: GameConsoleFn;
+  private readonly overlayToggleBtn: HTMLButtonElement;
+  /** Player-facing visibility preference for the survey confidence overlay (#496), mirrored from GameRenderer via UIManager. */
+  private overlayVisible = true;
+  private onToggleOverlayCb?: (visible: boolean) => void;
   private placementKit: PlacementKit | null = null;
   private selectedMethod: SurveyMethod = 'seismic';
   private worldSizeX = 40;
@@ -86,10 +90,19 @@ export class SurveyPanel {
       el('div', { attrs: { style: 'font:700 12px/1 var(--bsx-font-ui);letter-spacing:.14em;color:var(--bsx-text-primary)' } }),
       'ui.survey.title',
     );
+    // Player-facing toggle for the survey confidence overlay (#496) — a
+    // view-only preference, wired up (click handler, tooltip, pressed state)
+    // by the implementer.
+    this.overlayToggleBtn = el('button', { children: [iconEl('survey', 12)] });
+    this.overlayToggleBtn.style.cssText = 'margin-left:auto;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:1px solid var(--bsx-hairline-strong);border-radius:4px;background:transparent;color:var(--bsx-text-muted);cursor:pointer';
+    this.overlayToggleBtn.setAttribute('data-role', 'overlay-toggle');
+    this.overlayToggleBtn.addEventListener('click', () => this.handleOverlayToggleClick());
+    this.locale.bindTitle(this.overlayToggleBtn, 'ui.survey.overlay_toggle_tip');
+
     const closeBtn = el('button', { children: [iconEl('x', 12)] });
-    closeBtn.style.cssText = 'margin-left:auto;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:1px solid var(--bsx-hairline-strong);border-radius:4px;background:transparent;color:var(--bsx-text-muted);cursor:pointer';
+    closeBtn.style.cssText = 'width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:1px solid var(--bsx-hairline-strong);border-radius:4px;background:transparent;color:var(--bsx-text-muted);cursor:pointer';
     closeBtn.addEventListener('click', () => this.onCloseCb?.());
-    header.append(iconChip, titleEl, closeBtn);
+    header.append(iconChip, titleEl, this.overlayToggleBtn, closeBtn);
 
     this.bodyEl = el('div');
     this.bodyEl.style.cssText = 'flex:1 1 auto;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:9px';
@@ -119,12 +132,27 @@ export class SurveyPanel {
     container.appendChild(this.el);
 
     this.buildMethodList();
+    this.syncOverlayButton();
   }
 
   get root(): HTMLElement { return this.el; }
   setCloseHandler(cb: () => void): void { this.onCloseCb = cb; }
   setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
   setPlacementKit(kit: PlacementKit): void { this.placementKit = kit; }
+
+  /** Register the callback fired when the player clicks the overlay-visibility toggle button (#496). */
+  setOverlayToggleHandler(cb: (visible: boolean) => void): void { this.onToggleOverlayCb = cb; }
+
+  /**
+   * External sync path (keyboard-shortcut flow via main.ts/UIManager, #496):
+   * reflect the survey confidence overlay's current visibility preference in
+   * the toggle button's state. Must NOT invoke onToggleOverlayCb — that would
+   * feed back into the renderer that just called this.
+   */
+  setOverlayVisible(visible: boolean): void {
+    this.overlayVisible = visible;
+    this.syncOverlayButton();
+  }
 
   show(): void { this.el.style.display = 'flex'; }
   hide(): void { this.el.style.display = 'none'; }
@@ -185,6 +213,17 @@ export class SurveyPanel {
       this.lastResultCount = done;
       this.renderResults(state.surveyResults, state.tickCount);
     }
+  }
+
+  /** Overlay-toggle button click (#496): delegate to the same set-and-repaint path the external sync uses, then notify. */
+  private handleOverlayToggleClick(): void {
+    this.setOverlayVisible(!this.overlayVisible);
+    this.onToggleOverlayCb?.(this.overlayVisible);
+  }
+
+  /** Paint the toggle button's on/off visual state, matching MiniMap's own nav-toggle-button convention. */
+  private syncOverlayButton(): void {
+    paintToggleButton(this.overlayToggleBtn, this.overlayVisible);
   }
 
   // ── Internals ─────────────────────────────────────────────────────────────
@@ -298,6 +337,7 @@ export class SurveyPanel {
         fields: [],
         result: sel ? `(${sel.x1}, ${sel.z1}) · $${SURVEY_COSTS[this.selectedMethod].toLocaleString('en-US')}` : '—',
         confirmEnabled: controller.canConfirm,
+        confirmDisabledReason: placementRefusalReason(controller),
         instruction: t('ui.survey.pick_instruction'),
       });
     };
