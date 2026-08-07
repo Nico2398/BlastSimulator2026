@@ -343,8 +343,12 @@ completes at tick ~43, not a Finding-#16-class drop; score fields
 wellBeing/safety/ecology/nuisance move during the run too, but from
 generic per-tick decay/build-effects, not specifically the survey, so left
 unmarked per the no-uncaused-assertions discipline from Findings #9/#11) ·
-⬜ survey-stale-handling · ⬜ survey-then-blast ·
-⬜ survey-then-blast-playthrough · ⬜ skill-progression
+✅ survey-stale-handling (seismic survey completes by 55 ticks, a 40-tick
+staleness-wait round follows with the ceiling asserted unchanged at 1 since
+nothing new is queued, then a core_sample at the same position brings it
+to 2 — no overlay-colour/staleness field exists to check directly, so the
+proof stays at the surveyCount/cash level) ·
+⬜ survey-then-blast · ⬜ survey-then-blast-playthrough · ⬜ skill-progression
 
 ### Batch 4 — building-* (12) — **+ research-center-gate parity check**
 ⬜ building-destruction-visual · ⬜ building-lifecycle ·
