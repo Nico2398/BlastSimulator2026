@@ -32,12 +32,15 @@ import type { MiningContext } from '../../src/console-api.js';
  * warehouse storage — a scenario proving a hauled fragment actually got
  * delivered had no field to check before this. surveyCount
  * (state.surveyResults.length) closes the same gap for surveys.
+ * pendingActionCount (state.pendingActions.length) closes the same gap for
+ * queued-but-unclaimed actions, including auto-inserted rest tasks — a
+ * scenario proving a proactive rest was queued had no field to check either.
  */
 const SERIALIZED_FIELDS = [
   'seed', 'time', 'tickCount', 'isPaused', 'mineType',
   'worldSizeX', 'worldSizeZ', 'worldMinX', 'worldMinZ',
   'drillHoles', 'chargesByHole', 'sequenceDelays', 'finances', 'holeCount', 'chargedCount',
-  'sequencedCount', 'surveyCount', 'buildingCount', 'vehicleCount', 'employeeCount',
+  'sequencedCount', 'surveyCount', 'pendingActionCount', 'buildingCount', 'vehicleCount', 'employeeCount',
   'qualificationCount', 'proficiencyTotal', 'trainingCount', 'collapsedCount', 'minFatigue',
   'levelEnded', 'levelEndReason', 'bankrupt', 'revolted', 'ecologicalShutdown',
   'arrested', 'cash', 'profit', 'wellBeing', 'safety', 'ecology', 'nuisance', 'muckPile',
@@ -168,6 +171,22 @@ describe('console-api', () => {
       const state = serializeGameState(runner.ctx as MiningContext)!;
 
       expect(state.surveyCount).toBe(1);
+    });
+
+    it('reports zero pendingActionCount for a fresh game with nothing queued', () => {
+      runner.runner.run('new_game mine_type:desert seed:42');
+      const state = serializeGameState(runner.ctx as MiningContext)!;
+
+      expect(state.pendingActionCount).toBe(0);
+    });
+
+    it('counts a queued-but-not-yet-completed survey as a pending action (arrival-gated, #437)', () => {
+      runner.runner.run('new_game mine_type:desert seed:42');
+      runner.runner.run('employee hire role:surveyor');
+      runner.runner.run('survey seismic x:20 z:20');
+      const state = serializeGameState(runner.ctx as MiningContext)!;
+
+      expect(state.pendingActionCount).toBe(1);
     });
 
     it('reports zero storedMassKg for a fresh game with nothing hauled', () => {

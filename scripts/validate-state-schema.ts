@@ -72,6 +72,7 @@ export const GAME_STATE_SCHEMA: Schema = {
   chargedCount: { type: 'number' },
   sequencedCount: { type: 'number' },
   surveyCount: { type: 'number', description: 'Completed survey results (state.surveyResults.length)' },
+  pendingActionCount: { type: 'number', description: 'Queued-but-not-yet-claimed PendingActions, including auto-inserted rest tasks (state.pendingActions.length)' },
   buildingCount: { type: 'number' },
   vehicleCount: { type: 'number' },
   employeeCount: { type: 'number' },

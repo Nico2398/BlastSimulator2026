@@ -11,7 +11,13 @@
           "command": "new_game seed:42"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "pendingActionCount": 0
+        }
+      }
     },
     {
       "command": "employee hire role:driller",
@@ -29,7 +35,13 @@
           "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 49000,
+          "employeeCount": 1
+        }
+      }
     },
     {
       "command": "employee dispatch 1 x:10 z:10",
@@ -39,7 +51,13 @@
           "command": "employee dispatch 1 x:10 z:10"
         }
       ],
-      "description": "Left unmarked: no UI control drives this exact command and none should exist -- employees.ts's own `dispatch` case comment: \"no console command currently creates one... which left the Bunkhouse shift-cycle unreachable from any player-facing flow\" -- a test hook by design, same class as `employee assign_skill`."
+      "description": "Left unmarked: no UI control drives this exact command and none should exist -- employees.ts's own `dispatch` case comment: \"no console command currently creates one... which left the Bunkhouse shift-cycle unreachable from any player-facing flow\" -- a test hook by design, same class as `employee assign_skill`.",
+      "expect": {
+        "equals": {
+          "pendingActionCount": 1
+        },
+        "note": "the dispatched work task itself, queued and not yet claimed"
+      }
     },
     {
       "command": "tick 40",
@@ -49,7 +67,23 @@
           "command": "tick 40"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash", "minFatigue"],
+        "equals": {
+          "pendingActionCount": 1
+        }
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
     },
     {
       "command": "needs",
@@ -100,7 +134,14 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "buildingCount": 1,
+          "pendingActionCount": 1
+        }
+      }
     },
     {
       "command": "needs",
@@ -120,7 +161,24 @@
           "command": "tick 80"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash", "minFatigue"],
+        "equals": {
+          "pendingActionCount": 0
+        },
+        "note": "minFatigue is now near the collapse threshold (~5); the earlier dispatch task has been claimed and completed"
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
     },
     {
       "command": "needs",
@@ -150,7 +208,24 @@
           "command": "tick 20"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash", "minFatigue"],
+        "equals": {
+          "pendingActionCount": 1
+        },
+        "note": "this is the file's own claimed premise made real: with minFatigue critically low, the engine proactively auto-inserts a rest PendingAction — visible here as pendingActionCount going from 0 back to 1 with no player action in between"
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
     },
     {
       "command": "needs",
@@ -180,7 +255,23 @@
           "command": "tick 30"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash", "minFatigue"],
+        "equals": {
+          "pendingActionCount": 1
+        }
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
     },
     {
       "command": "needs",

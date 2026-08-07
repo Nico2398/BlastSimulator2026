@@ -34,6 +34,8 @@ export interface SerializableGameState {
   sequencedCount: number;
   /** Completed survey results (SurveyResult[], state.surveyResults). */
   surveyCount: number;
+  /** Queued-but-not-yet-claimed PendingActions (state.pendingActions) — includes auto-inserted rest tasks. */
+  pendingActionCount: number;
   buildingCount: number;
   vehicleCount: number;
   employeeCount: number;
@@ -86,6 +88,7 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     chargedCount: Object.keys(s.chargesByHole).length,
     sequencedCount: Object.keys(s.sequenceDelays).length,
     surveyCount: s.surveyResults.length,
+    pendingActionCount: s.pendingActions.length,
     buildingCount: s.buildings.buildings.length,
     vehicleCount: s.vehicles.vehicles.length,
     employeeCount: s.employees.employees.length,
