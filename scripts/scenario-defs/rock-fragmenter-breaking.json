@@ -10,10 +10,17 @@
           "command": "new_game seed:42 cash:100000"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 100000,
+          "holeCount": 0
+        }
+      }
     },
     {
       "command": "drill_plan grid rows:2 cols:2 spacing:5 depth:8 start:18,19",
+      "description": "The grid tool's spacing stepper defaults to 3m (DEFAULT_SPACING_M, Drill.ts); two increment clicks raise it to 5 before dragging, so the (18,19)-(23,24) rectangle (5x5) computes the declared 2x2 instead of the default-spacing 3x3 (issue #479 follow-up, Finding #4).",
       "interaction": [
         {
           "type": "clickSelector",
@@ -26,6 +33,14 @@
         {
           "type": "waitForSelector",
           "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
         },
         {
           "type": "dragTiles",
@@ -42,7 +57,13 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 4
+        },
+        "note": "2 rows x 2 cols = 4"
+      }
     },
     {
       "command": "charge hole:* explosive:boomite amount:2 stemming:2",
@@ -52,7 +73,12 @@
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "chargedCount": 4
+        }
+      }
     },
     {
       "command": "sequence auto delay_step:25",
@@ -62,7 +88,12 @@
           "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "sequencedCount": 4
+        }
+      }
     },
     {
       "command": "blast",
@@ -88,7 +119,15 @@
           "selector": "[data-action=\"report-close\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        },
+        "note": "a fired blast clears the plan back to zero; undercharged 2kg boomite at wide 5m spacing leaves oversized boulders on the ground (verified via the fragments step below), setting up the fragmenter's real job"
+      }
     },
     {
       "command": "fragments",
@@ -128,7 +167,14 @@
           "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "employeeCount": 1,
+          "cash": 99200
+        },
+        "note": "HIRING_COSTS.driver = 800 (balance.ts)"
+      }
     },
     {
       "command": "employee assign_skill 1 skill:driving.truck level:5",
@@ -152,7 +198,10 @@
           "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "usable": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+      }
     },
     {
       "command": "vehicle buy debris_hauler",
@@ -167,7 +216,14 @@
           "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "vehicleCount": 1,
+          "cash": 74200
+        },
+        "note": "debris_hauler tier-1 purchaseCost = 25000 (balance.ts)"
+      }
     },
     {
       "command": "vehicle driver 1 1",
@@ -203,7 +259,13 @@
           "type": "command",
           "command": "vehicle haul 1 fragment:1"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "storedMassKg": 0
+        },
+        "note": "the refused haul must not move anything into storage — the real proof is the command's own 'Fragment is oversized' rejection text, checked nowhere else this mechanism reaches; storedMassKg staying 0 is the closest state-level corroboration"
+      }
     },
     {
       "command": "fragments",
@@ -232,7 +294,14 @@
           "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "employeeCount": 2
+        },
+        "decreased": ["cash"],
+        "note": "HIRING_COSTS.driver = 800 plus salary/maintenance drained by the tick 10 above. Not an exact-cash check: unlike a hire with no ticks in between, new_game runs with isPaused:false by default, so interaction mode's real wall-clock during the tick 10 step's click round-trip advances the sim beyond exactly 10 ticks — command mode has no such drift (no timers, only explicit tick N). decreased is the only cross-mode-robust check here."
+      }
     },
     {
       "command": "employee assign_skill 2 skill:driving.excavator level:5",
@@ -260,7 +329,14 @@
           "selector": "#bs-vehicle-panel [data-vtype=\"rock_fragmenter\"][data-tier=\"1\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "vehicleCount": 2
+        },
+        "decreased": ["cash"],
+        "note": "rock_fragmenter tier-1 purchaseCost = 32000 (balance.ts) — decreased, not an exact value, since this step's baseline (hire2's real cash) already carries the previous step's real-time drift (see hire2's note)"
+      }
     },
     {
       "command": "vehicle driver 2 2",
@@ -312,7 +388,11 @@
           "command": "tick 30"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash"],
+        "note": "50 ticks of salary/maintenance drain since the last checkpoint — decreased, not an exact value; interaction mode's real wall-clock ticking (isPaused:false by default, no explicit pause in this file) advances the sim beyond exactly N ticks during every click round-trip, a drift command mode's headless tick N can't reproduce"
+      }
     },
     {
       "command": "fragments",
@@ -353,7 +433,14 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "buildingCount": 1
+        },
+        "decreased": ["cash"],
+        "note": "freight_warehouse T1 constructionCost = 15000 (balance.ts) — decreased, not an exact value, since this step's baseline already carries the tick 30 step's real-time drift (see that step's note)"
+      }
     },
     {
       "command": "vehicle haul 1 fragment:64",
@@ -384,11 +471,16 @@
           "command": "tick 30"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "increased": ["storedMassKg"],
+        "decreased": ["cash"],
+        "note": "the file's own long-standing TODO ('Final assertion point: logistics.storedMassKg must have grown') finally has a real check — storedMassKg was 0 through the whole file until this delivery (verified: the earlier haul-refused step already proved that), so 'increased' here is the genuine proof the sub-fragment was hauled and stored, not just that the button clicked. Not an exact storedMassKg value: interaction mode's real wall-clock ticking (isPaused:false by default) can extend this 'tick 30' step's effective duration enough for the hauler to complete more than one round trip, so the exact delivered mass isn't guaranteed identical to command mode's — increased is the cross-mode-robust proof."
+      }
     },
     {
       "command": "state full",
-      "description": "Final assertion point: logistics.storedMassKg must have grown by exactly the hauled piece's mass.",
+      "description": "Final assertion point: logistics.storedMassKg must have grown by exactly the hauled piece's mass — checked on the tick 30 step above (the state the delivery actually lands in), since command mode's `before`/`after` capture is per-step and this step's own command is a pure read with nothing left to change.",
       "interaction": [
         {
           "type": "command",

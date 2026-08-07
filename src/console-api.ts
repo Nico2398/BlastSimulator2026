@@ -58,6 +58,8 @@ export interface SerializableGameState {
   nuisance: number;
   /** The rock a blast left on the ground; null before a world exists. */
   muckPile: MuckPileSummary | null;
+  /** Mass (kg) currently held in warehouse storage (LogisticsState.storedMassKg). */
+  storedMassKg: number;
 }
 
 /** Serialize ctx.state into the same shape as window.__gameState(). */
@@ -106,5 +108,6 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     muckPile: ctx.grid
       ? summariseMuckPile(s.logistics.fragments.map(f => f.fragment), ctx.grid)
       : null,
+    storedMassKg: s.logistics.storedMassKg,
   };
 }

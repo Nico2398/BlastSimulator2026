@@ -92,6 +92,7 @@ export const GAME_STATE_SCHEMA: Schema = {
   ecology: { type: 'number', description: '0-100 score (ScoreState)' },
   nuisance: { type: 'number', description: '0-100 score (ScoreState)' },
   muckPile: { type: 'object', optional: true, description: 'Fragment size, speed and clearance spread after a blast' },
+  storedMassKg: { type: 'number', description: 'Mass held in warehouse storage (LogisticsState.storedMassKg)' },
 };
 
 /** UI state schema — mirrors window.__uiState() in src/main.ts. */

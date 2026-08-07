@@ -28,7 +28,9 @@ import type { MiningContext } from '../../src/console-api.js';
  * driving fatigue to collapse had no field to prove either one happened.
  * fatigue is inverted (100 = fully rested, 0 = exhausted), so the field
  * tracks the minimum across the roster — the employee closest to collapse
- * — not the maximum.
+ * — not the maximum. storedMassKg (LogisticsState) closes the same gap for
+ * warehouse storage — a scenario proving a hauled fragment actually got
+ * delivered had no field to check before this.
  */
 const SERIALIZED_FIELDS = [
   'seed', 'time', 'tickCount', 'isPaused', 'mineType',
@@ -38,6 +40,7 @@ const SERIALIZED_FIELDS = [
   'qualificationCount', 'proficiencyTotal', 'trainingCount', 'collapsedCount', 'minFatigue',
   'levelEnded', 'levelEndReason', 'bankrupt', 'revolted', 'ecologicalShutdown',
   'arrested', 'cash', 'profit', 'wellBeing', 'safety', 'ecology', 'nuisance', 'muckPile',
+  'storedMassKg',
 ] as const;
 
 describe('console-api', () => {
@@ -147,6 +150,13 @@ describe('console-api', () => {
 
       expect(state.minFatigue).toBe(100);
       expect(state.collapsedCount).toBe(0);
+    });
+
+    it('reports zero storedMassKg for a fresh game with nothing hauled', () => {
+      runner.runner.run('new_game mine_type:desert seed:42');
+      const state = serializeGameState(runner.ctx as MiningContext)!;
+
+      expect(state.storedMassKg).toBe(0);
     });
 
     it('starts all four scores at 50 (createScoreState) for a fresh game', () => {

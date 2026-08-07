@@ -115,6 +115,20 @@ deleted, not after.
     through the pipeline, not `cash`, for these steps. `cash` assertions
     belong on `build`/`vehicle buy`/`employee hire` steps, where it
     genuinely does move.
+12. **`new_game` leaves `isPaused: false` by default** — a real browser's
+    game loop keeps advancing the sim on real wall-clock time throughout
+    interaction mode, stacking on top of whatever `tick N` a scenario issues
+    explicitly; command mode has no such drift (a headless run only
+    advances on an explicit command). Never assert an exact `equals` on
+    `cash` or any other continuously-draining field (salary, maintenance,
+    need decay) on a step that follows a `tick N` or a slow
+    `waitForSelector`/animation gap — use `decreased`/`increased` there
+    instead. Exact `equals` stays fine for two actions back-to-back with no
+    tick/wait gap between them (Finding #12, `rock-fragmenter-breaking.json`
+    — a `cash` check placed right after `tick 30` failed in a real browser,
+    32748 expected vs 32769 actual, purely from the click round-trip's real
+    elapsed time). Expect every `tick N`-heavy playthrough file in Batches
+    5-7 to need this same treatment.
 
 ## Mechanism (built, tested, proven — do not redesign)
 
@@ -243,8 +257,13 @@ whole history**) · ✅ collapse-recovery (**Finding #11: the file's own
 "rest restores them" claim doesn't hold within its 350-tick budget — a real
 run shows collapse is genuine but recovery isn't, ending in bankruptcy +
 worker_revolt when extended; assertions now check only what's verified,
-exposed collapsedCount/minFatigue fields**) · ⬜ rock-fragmenter-breaking ·
-⬜ ramp-navigation · ⬜ blast-execution-visual
+exposed collapsedCount/minFatigue fields**) · ✅ rock-fragmenter-breaking
+(Finding #4 grid fix + exposed storedMassKg, finally giving the file's own
+long-standing "must have grown" TODO a real check; **Finding #12: cash
+equals checks after a tick N gap are cross-mode-fragile — isPaused:false by
+default lets interaction mode's real wall-clock keep ticking the sim
+during clicks, drifting past command mode's exact tick count — switched to
+decreased/increased there**) · ⬜ ramp-navigation · ⬜ blast-execution-visual
 
 ### Batch 3 — survey-* (12, survey-panel-visual done in Batch 0)
 ⬜ survey-confidence-display · ⬜ survey-confidence-overlay ·
@@ -484,6 +503,10 @@ of each session, in case main added/removed a file.)
 11. **`collapse-recovery.json`'s claim ("verify rest restores them to resume original task") does not hold at the file's own tick budget.** A direct engine run (hire a driller, build `living_quarters`, `tick 250` then `tick 100`) confirms collapse is genuine — `collapsedCount` 0→1, `wellBeing` craters — but the employee is **still collapsing at tick 350**, not recovered. Extending the run to 2350 ticks shows why: the hire spawns far from the build site (real distance ~82 tiles on this seed), and while individual rest cycles for a single need (fatigue alone) do complete and recover, the employee — fully idle, no drill plan, nothing to do between collapses — cycles through hunger/fatigue/breakNeed collapses repeatedly, each charging `NEED_REST_COSTS` (`GameLoop.ts`), draining cash steadily; morale/wellBeing crater alongside it, and the run ends in bankruptcy + `worker_revolt` (a level loss), never a clean single collapse→recover arc. Root cause not fully chased down — `tickNeedGauges` (`events.ts`) drains at the *idle* rate even while a rest action is in progress (`isWorking` requires `restTicksRemaining === null`), so a short or weak rest may net-lose ground against continued idle drain; whether that is a bug (rest should pause need drain) or intended difficulty (a company that hires someone and gives them no work should struggle) is a design question, not resolved here. **Fixed the test, not the game**: assertions now check only what a real run verifies — collapse is real (`collapsedCount`, `decreased: minFatigue/wellBeing`), recovery within 350 ticks is not claimed. Filed as a follow-up: either the needs/rest balance, or this scenario's own tick budget/setup, needs a second look before its original claim can be truthfully restored.
 
     This also motivated exposing 2 more previously-invisible fields, same pattern as Findings #2/#9: `collapsedCount` (employees with `Employee.collapsing === true`) and `minFatigue` (the roster's lowest `fatigue`, i.e. the employee closest to collapse — fatigue is inverted, 100 = fully rested, so *minimum* is the number that matters, not maximum). Added to `window.__gameState()`/`serializeGameState()` in lockstep, with real coverage in `console-api.test.ts`.
+
+12. **`new_game` leaves `isPaused: false` by default** (`GameState.ts`) — with no explicit pause, a real browser's game loop keeps advancing the simulation on real wall-clock time throughout interaction mode, on top of whatever `tick N` commands a scenario issues explicitly. Command mode has no such thing — a headless Node.js run only advances when a `tick N`/`blast`/etc. command is literally executed, never on its own. `rock-fragmenter-breaking.json` exposed this: a `cash` `equals` check placed after a `tick 30` step (and the `waitForSelector`-heavy clicks around it) failed in a real browser — `cash should be 32748 but is 32769` — because the click round-trip's real elapsed time let the live sim tick further than the explicit `tick 30` alone would. Two back-to-back actions with no `tick`/heavy-wait gap between them (e.g. hire immediately followed by a buy, both in this same file) stayed exactly reproducible; it's specifically a step *following* a `tick N` or a slow `waitForSelector` where the drift shows up.
+
+    **New ground rule (#12): don't assert an exact `equals` value on `cash` (or any field a running simulation keeps moving — salary drain, maintenance, need decay) on a step that follows a `tick N` command or a real wait/animation gap.** Use `decreased`/`increased` there instead — direction is reproducible across modes even when the exact magnitude isn't. Exact `equals` on such fields stays fine for steps with no tick/wait gap since the previous checkpoint (a hire immediately followed by a buy, nothing in between). This generalizes past `rock-fragmenter-breaking.json` — expect every playthrough-style file in Batches 5-7 with `tick N` steps to need the same treatment; check for it rather than assuming an exact economy value survives a tick gap in interaction mode.
 
 _(Add new findings here as you hit them. Number sequentially.)_
 

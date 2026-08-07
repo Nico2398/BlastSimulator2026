@@ -453,6 +453,7 @@ window.__gameState = () => {
     muckPile: ctx.grid
       ? summariseMuckPile(s.logistics.fragments.map(f => f.fragment), ctx.grid)
       : null,
+    storedMassKg: s.logistics.storedMassKg,
     lastCommandOutput,
     frameCount: scene.frameCount,
     ctxGridId: ctx.grid?.id ?? null,
