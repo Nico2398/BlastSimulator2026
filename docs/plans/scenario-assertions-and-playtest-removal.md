@@ -387,7 +387,12 @@ defaults to a 64×64 world; builds 2 warehouses then drills/charges/
 sequences/blasts near them, Finding #4 grid-spacing fix needed; the
 file's own stated purpose — both warehouses destroyed by the blast —
 confirmed via a real dump, blast rating CATASTROPHIC) ·
-⬜ building-lifecycle ·
+✅ building-lifecycle (despite the file's description — "place, upgrade
+to T2, move, then demolish" — the upgrade/move/destroy steps are all
+genuine rejections by design (T2 not researched, target id #2 never
+existed since only building #1 was ever placed); `buildingCount`/`cash`
+asserted unchanged at each to confirm these are real no-ops, not silent
+successes) ·
 ⬜ building-living-visual · ⬜ building-menu-visual ·
 ⬜ building-placement-visual · ⬜ building-ramp-visual ·
 ⬜ building-research-progression-visual (parity check here) ·
