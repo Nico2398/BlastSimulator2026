@@ -1190,6 +1190,17 @@ of each session, in case main added/removed a file.)
 
 70. **`event-dialog-visual.json` — the last Batch 7 file — resolves 6 real event dialogs across all 6 categories the game has (union, a tutorial-only consultant event, mafia, lawsuit, politics, weather), each via its own real click sequence, and every one traced clean against the command-mode consequence text.** Unlike every prior score-bearing file this session, used `increased`/`decreased` directionally for the `wellBeing`/`safety`/`ecology` deltas instead of pinning exact floats — a better semantic match here, since the file's own premise is specifically that a dialog's stated consequences ("Lost $8000", "wellBeing +12") actually apply, which a directional check proves as directly as an exact float would while staying immune to unrelated decay-constant tuning between the assertion step and the moment it's read. `cash` stayed a hard `equals` throughout — every event's cost is a clean integer in this trace, no rounding risk. The one non-obvious selector in the file, `tutorial_synergy_consultant`'s option resolved via `:nth-child(2)` (index 1, "Get off my site") rather than the default first-option pattern every other event in this file uses, reached the exact same choice `event choose 1` names — confirmed empirically rather than assumed from the selector alone, since an off-by-one in a `:nth-child` index is exactly the kind of thing that fails silently against the wrong option. The lawsuit event alone (`Lost $200000`) drives cash from a mild -$0 range to -$163,000, flipping `finances.isBankrupt` true — but the separate `bankruptcy.ticksBelowThreshold` grace-period tracker (Finding #34's mechanic) correctly stays under its threshold and `levelEnded` stays false, the same real distinction between "cash is negative right now" and "the game has decided you're bankrupt" this project has documented before. `corruption.level` (the mafia event's 3rd consequence, +5) has no field in `serializeGameState()` — noted, not asserted, the same treatment as every other exists-in-raw-state-but-not-the-lean-subset field found this session. Zero silent events anywhere: the file's 3 "bare tick then `event choose 0`" checkpoints all report "No pending event" and only smooth score decay moves state between them, consistent with the tick-based event system's established seed+tick determinism. Verified 1/1 in both modes, not re-run for determinism. **This closes Batch 7 at 20/20.**
 
+71. **The Ground rule #15/Finding #42 depth-mismatch audit, promised as a follow-up since level1-lose-ecology.json first found it, is now complete across the whole suite.** Grepped every `drill_plan grid`/`drill_plan add` command across all 125 scenario files for a declared `depth:` other than 6 (the grid tool's real default, `DEFAULT_DEPTH_M`, `Drill.ts`), then filtered each hit to steps whose interaction array actually drags/places via the real UI (`dragTiles`/`pickTile`) rather than running as a plain `command` action — only the former class is exposed to the bug at all. Found 27 candidates. 2 needed nothing: `tutorial-steps-visual.json` (Finding #67, fully command-driven in both modes, no UI drag exists to mismatch) and `presplit-wall.json` (the one file in the whole suite whose real clicks already drive the depth stepper correctly — 6 increments for the production grid, 2 decrements for the presplit row's `drill_plan add` calls, both confirmed matching their declared values). The other 25 split into two shapes:
+    - **19 files needed only a metadata correction** (declared depth → 6, no downstream consequence): `blast-drill-plan-ui`, `blast-drill-plan-visual`, `blast-execution-visual`, `blast-hole-picking-visual`, `blast-overcharge`, `blast-preview-tiers-visual`, `blast-report-visual`, `blast-undercharge`, `blast-visual-full`, `blast-voxel-fragmentation`, `building-destruction-visual`, `core-loop-visual`, `employee-training`, `safety-projection-visual`, `save-load-visual`, `survey-post-blast-ore-report`, `survey-then-blast`, `survey-then-blast-playthrough`, `weather-flood`. Every one of these files' `expect` blocks only ever asserted hole/charge/sequence counts (rows×cols arithmetic, untouched by depth) around the affected blast — "protected only by accident," exactly as Finding #42 predicted. Verified each in both modes (batched: 10+9 files across two interaction-mode runs, all pass) before committing individually.
+    - **6 files had a real, previously-hidden consequence**, each its own commit:
+      - `multi-deck-blast.json` — declared depth:20 for "deep fracture" flavor; the real 6m blast produces the identical PERFECT/0-projections outcome the file describes, confirmed empirically. Metadata-only despite the large declared/real gap.
+      - `tutorial-playthrough.json` — a genuine divergence: at the old declared depth:8, command mode computed Rating PERFECT/0 projections/$1,453,550 ore value; the real 6m click produces Rating BAD/2 projections/18.3m throw/$1,652,300. Went uncaught because `deathCount` happens to be 2 either way and nothing downstream depends on ore/fragment composition (deliveries always fail, cash is fixed-cost-driven). Fixed the declared depth; every existing assertion held unchanged after re-verification.
+      - `vibration-budget.json` — 3 grids, all declared depth:8. The file's own assertions (`decreased`/`equals:0` on already-floor-clamped `nuisance`, zero employees to die) tolerated the real, more violent 6m blasts by construction — confirmed directly (nuisance hits its floor by blast 2 regardless of which depth). Metadata-only.
+      - `hauling-gate.json` and `economy-full-loop.json` — both cascaded into a hardcoded fragment id (`vehicle haul 1 fragment:531`/`fragment:0`) computed for the old, wrong-depth blast; the corrected blast's different fragment population made the old id un-haul-eligible, and `storedMassKg` silently stayed 0 through the file's final ticks. Re-derived each correct id by calling `findReachableGroundFragment` directly against the corrected blast (785 and 138 respectively) — the same function the real Haul button calls.
+      - `rock-fragmenter-breaking.json` — the deepest cascade: fragment #1, hardcoded as both "must-refuse oversized haul target" and "must-break boulder," landed exactly at the 0.5 m³ oversized threshold (not above it) in the corrected blast, so it silently stopped being oversized at all — the haul-refusal step's rejection reason silently changed from "Fragment is oversized" to the coincidentally-true "No active freight warehouse available" (checked second in `requestHaulFragment`, HaulingTask.ts), and the break command failed outright ("Fragment is not oversized"), leaving `storedMassKg` at 0 through the whole file. Re-derived all 3 ids by calling `findReachableOversizedFragment`/`findReachableGroundFragment` directly at each stage: #0 (oversized refusal), #60 (break target), #56 (final haul).
+    
+    General lesson, sharpest from the last 3 files: a clean depth-value swap is not always metadata-only — anywhere a scenario hardcodes an id derived from a specific blast's output (a fragment, a hole), correcting an upstream parameter invalidates it silently, and the only reliable fix is re-deriving the id by calling the same eligibility function the real UI control calls, not guessing from the old id's neighborhood. `npm run typecheck`/schema test/both interaction-mode batches all green throughout; every commit pushed individually. This closes the Ground rule #15 follow-up the plan doc has carried since level1-lose-ecology.json.
+
 _(Add new findings here as you hit them. Number sequentially.)_
 
 ## Status table
@@ -2253,3 +2264,49 @@ got, whether main was merged, and whether GitHub Actions is back up yet.
   class) across the whole scenario suite before Phase 3, per the
   plan's stated gate — then continuing toward the full 124-file goal
   with whichever batch/domain the audit doesn't already fold into.
+
+- **The whole-suite checklist reached 100% before this cycle started**:
+  every batch (0 through 7, 125 files including main's merged-in
+  `survey-overlay-toggle.json`) now shows ✅ — confirmed by grepping
+  the doc for `⬜` and finding only the legend's own definition line,
+  zero actual unchecked files. The original "commit to all 124 files
+  now" scope is done; what's left is exactly the gate Phase 3 already
+  names: the depth-mismatch audit.
+
+- **Closed the Ground rule #15/Finding #42 depth-mismatch audit
+  (Finding #71)** — the follow-up promised since level1-lose-ecology.json
+  first found the bug class, now resolved across the entire suite.
+  Grepped every `drill_plan grid`/`drill_plan add` command for a
+  declared depth other than 6, filtered to steps with a real UI drag/
+  place (not command-only), found 27 candidates. 2 needed nothing
+  (`tutorial-steps-visual` — command-only, immune by construction;
+  `presplit-wall` — the one file already driving the depth stepper
+  correctly, both for its grid and its add-hole tool, which shares the
+  same `gridDepth` field). 19 needed only a metadata correction —
+  every one of their `expect` blocks turned out to assert only hole/
+  charge/sequence counts, untouched by depth, "protected only by
+  accident" exactly as Finding #42 predicted; verified in 2
+  interaction-mode batches (10+9 files) before committing each
+  individually. 6 had a real, previously-hidden consequence:
+  `multi-deck-blast` (declared depth for flavor only, real depth
+  produces the identical outcome, confirmed empirically);
+  `tutorial-playthrough` (a genuine PERFECT-vs-BAD rating divergence
+  masked because deathCount matched by coincidence); `vibration-budget`
+  (directional/floor-based assertions tolerated the more violent real
+  blast by construction); `hauling-gate` and `economy-full-loop` (both
+  cascaded into a hardcoded fragment id computed for the old, wrong
+  blast, re-derived via `findReachableGroundFragment` directly); and
+  `rock-fragmenter-breaking` (the deepest cascade — a fragment landing
+  exactly at the oversized threshold silently flipped both a haul-
+  refusal reason and a break command from succeeding to failing, all 3
+  hardcoded ids re-derived via the same eligibility functions the real
+  UI controls call). Full local sweep green throughout (typecheck,
+  schema test, both interaction-mode batches); 25 commits pushed
+  individually. Next: Phase 3 itself (playtest removal) is now
+  unblocked by every stated gate except the one already-known partial
+  parity row (`research-center-gate.json`'s #442 prerequisite-gate
+  case, deferred to Phase 3's own start per the parity table) — this
+  is a large, destructive body of work (deleting `playtest.ts`,
+  removing a CI job, deleting a skill/rule file, editing CLAUDE.md)
+  that reaching this point doesn't by itself authorize starting
+  without a check-in first.
