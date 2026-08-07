@@ -219,12 +219,23 @@ chargesByHole dump**) · ✅ blast-undercharge (same fix, amount only) ·
 (same) · ✅ blast-voxel-fragmentation-visual (same) ·
 ✅ blast-preview-software-tiers (same + real tier costs 500/2000/5000/12000
 verified) · ✅ blast-report-visual (same) · ✅ blast-visual-full (same +
-same tier costs) · ⬜ blast-charge-sequence-visual ·
-⬜ blast-preview-tiers-visual · ⬜ blast-workshop-french-visual ·
-⬜ blast-preview-step-visual · ⬜ blast-sequence-step-visual ·
-⬜ blast-fire-step-visual · ⬜ multi-deck-blast · ⬜ presplit-wall ·
-⬜ vibration-budget · ⬜ collapse-recovery · ⬜ rock-fragmenter-breaking ·
-⬜ ramp-navigation · ⬜ blast-execution-visual
+same tier costs) · ✅ blast-charge-sequence-visual (Finding #4 grid fix) ·
+✅ blast-preview-tiers-visual (Finding #4 grid fix + tier costs) ·
+✅ blast-workshop-french-visual (grid already matched default spacing;
+usable/blocked across every French-rendered panel view) ·
+✅ blast-preview-step-visual · ✅ blast-sequence-step-visual
+(**command/interaction mismatch found + fixed: step declared `command:
+"state"` — a no-op — while its click issued `sequence set` through the
+console bridge; aligned the command field to the click's real effect**) ·
+✅ blast-fire-step-visual (both fixed via the same bundled-multi-command-step
+split as blast-preview-step-visual) · ✅ multi-deck-blast (**Finding #7:
+hole:N bare-numeric ids never matched, every per-hole charge silently failed
+for the file's whole history**) · ✅ presplit-wall (**Finding #8:
+drill_plan grid replaces the whole plan, so the file's 2 grids could never
+coexist; restructured to drill_plan grid + drill_plan add, first scenario to
+use the add-hole-tool UI; also found explosive:presplit doesn't exist,
+substituted pop_rock**) · ⬜ vibration-budget · ⬜ collapse-recovery ·
+⬜ rock-fragmenter-breaking · ⬜ ramp-navigation · ⬜ blast-execution-visual
 
 ### Batch 3 — survey-* (12, survey-panel-visual done in Batch 0)
 ⬜ survey-confidence-display · ⬜ survey-confidence-overlay ·
@@ -422,7 +433,36 @@ of each session, in case main added/removed a file.)
    floor?) — out of scope to decide here, filed as a note rather than
    silently working around it.
 
-_(Add new findings here as you hit them. Number sequentially.)_
+6. **`blast-preview-step-visual.json`/`blast-sequence-step-visual.json`/
+   `blast-fire-step-visual.json` all bundled 2-3 console commands inside one
+   step's `interaction` array** (e.g. `drill_plan grid` + `charge` +
+   `sequence set` all under one bootstrap step) — same class as the original
+   #479 Finding #5: `command-runner.ts`'s `runSteps` only ever executes the
+   single top-level `step.command`, never the full `interaction` array, so
+   command mode silently ran just the first command and skipped the rest.
+   **Fixed** by splitting each into one step per command (established
+   pattern, not a new one).
+
+   Past that fix, `blast-sequence-step-visual.json` still failed: its
+   delay-inc-click step declared `command: "state"` (a pure no-op read) while
+   its `interaction` clicked `[data-action="delay-inc"]`, which
+   (`Sequence.ts`'s `adjustHoleDelay`) issues `sequence set hole:H1
+   delay:25ms` through the console bridge live. Command mode's `state`
+   command never touches `sequenceDelays`, so `expect.equals.sequencedCount:
+   1` failed in command mode even though the click legitimately works in
+   interaction mode — a direct instance of the rule `scenario-defs.md`
+   already states ("command and interaction must target the same place").
+   **Fixed** by changing the step's `command` field to `sequence set
+   hole:H1 delay:25ms` — the literal, verified effect of the click (`25` is
+   `DEFAULT_DELAY_STEP_MS`, `Sequence.ts`) — rather than weakening the
+   assertion. Re-verified 3/3 in both command and real-browser interaction
+   mode.
+
+7. **`multi-deck-blast.json` and `presplit-wall.json` both used the bare-numeric `hole:1`..`hole:5` form on their per-hole `charge` commands, instead of the real `H1`..`H5` ids `drill_plan grid`/`drill_plan add` actually assign.** `chargeCommand` (`mining.ts`) resolves a hole spec that doesn't match an exact id to the legacy `hole_${spec}` scheme ("Resolve holeId: accept either the exact ID (H1) or the legacy hole_N format") — `hole:1` becomes `hole_1`, which has never existed on any hole this game drills, so `ctx.state!.drillHoles.find(...)` always misses and the command returns `{success:false, output:'Hole "hole_1" not found'}`, never thrown. Every one of these charges silently failed, in every run of either file, for the file's entire history — `chargedCount` stayed 0 through the whole charge phase, and the subsequent `blast` command was rejected by `validateBlastPlan` ("Missing charge" on every hole) — also never thrown, so command mode's old assertion-free pass proved nothing. **Fixed** by using the real ids in both files.
+
+8. **`drill_plan grid` unconditionally replaces the whole plan** (`ctx.state!.drillHoles = planned` plus `resetHoleIds()`, `mining.ts`/`DrillPlan.ts`) — it does not append. `presplit-wall.json` called it twice (a presplit row, then a production grid), and the second call silently discarded the first grid's 5 holes entirely and restarted hole numbering at H1, so the file's entire premise ("presplit row plus production holes, one blast") never actually existed as a single plan in any run, even before Finding #7's hole-id bug is considered. **Fixed** by restructuring: the production grid now drills first (`drill_plan grid`, H1-H9), then the 5 presplit holes are added individually via `drill_plan add` (H10-H14), which appends rather than replacing. This is also the first scenario file to exercise the Drill panel's single-hole placement UI (`data-action="add-hole-tool"`, a real `PlacementController` point-mode tool, `Drill.ts`) — previously used by no scenario at all — confirmed working via a real browser run and a screenshot showing all 13 (then 14) planned holes in the panel's list and on the minimap, in the presplit-row-plus-block layout the file's description always claimed.
+
+   Also found while re-verifying: `explosive:presplit`, the id both files charged their wall holes with, **does not exist** — `ExplosiveCatalog.ts` defines exactly 8 fictional products (`pop_rock`, `boomite`, `krackle`, `big_bada_boom`, `shatternite`, `rumblox`, `obliviax`, `dynatomics`), none named or aliased `presplit`. `createCharge` returns `{error: 'Unknown explosive: "presplit"'}` for it — a *second*, independent reason every one of these charges would have failed even after Finding #7's hole-id fix. **Fixed** by substituting `pop_rock` — the catalog's lowest-energy (200 vs boomite's 340), lowest-projection-risk (0.5 vs 0.8), lowest-vibration product, i.e. the real product that actually matches a presplit line's job (a small controlled charge, not a production blast), rather than inventing a new explosive type (out of scope — a game-content decision, not a test fix).
 
 _(Add new findings here as you hit them. Number sequentially.)_
 

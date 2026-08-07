@@ -10,10 +10,17 @@
           "command": "new_game seed:42"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "holeCount": 0
+        }
+      }
     },
     {
       "command": "drill_plan grid rows:2 cols:2 spacing:6 depth:20 start:20,20",
+      "description": "The grid tool's spacing stepper defaults to 3m (DEFAULT_SPACING_M, Drill.ts); three increment clicks on the strip's spacing stepper (data-field=\"spacing\") raise it 3->6m before dragging, so the (20,20)-(26,26) rectangle (6x6) computes the declared 2x2 instead of the default-spacing 3x3 (issue #479 follow-up, Finding #4).",
       "interaction": [
         {
           "type": "clickSelector",
@@ -26,6 +33,18 @@
         {
           "type": "waitForSelector",
           "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
         },
         {
           "type": "dragTiles",
@@ -42,47 +61,59 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 4
+        },
+        "note": "2 rows x 2 cols = 4"
+      }
     },
     {
-      "command": "charge hole:1 explosive:boomite amount:6 stemming:6",
+      "command": "charge hole:H1 explosive:boomite amount:6 stemming:6",
       "interaction": [
         {
           "type": "command",
-          "command": "charge hole:1 explosive:boomite amount:6 stemming:6"
+          "command": "charge hole:H1 explosive:boomite amount:6 stemming:6"
         }
       ],
-      "description": "charge hole:1 explosive:boomite amount:6 stemming:6 — no per-hole charging in the UI by design (Charge.ts's own header: \"per-hole charging isn't a feature here anyway\"); only Charge All exists. Left as a command (Finding #10)."
+      "description": "charge hole:H1 explosive:boomite amount:6 stemming:6 — no per-hole charging in the UI by design (Charge.ts's own header: \"per-hole charging isn't a feature here anyway\"); only Charge All exists. Left as a command (Finding #10)."
     },
     {
-      "command": "charge hole:2 explosive:boomite amount:5 stemming:5",
+      "command": "charge hole:H2 explosive:boomite amount:5 stemming:5",
       "interaction": [
         {
           "type": "command",
-          "command": "charge hole:2 explosive:boomite amount:5 stemming:5"
+          "command": "charge hole:H2 explosive:boomite amount:5 stemming:5"
         }
       ],
-      "description": "charge hole:2 explosive:boomite amount:5 stemming:5 — no per-hole charging in the UI by design (Charge.ts's own header: \"per-hole charging isn't a feature here anyway\"); only Charge All exists. Left as a command (Finding #10)."
+      "description": "charge hole:H2 explosive:boomite amount:5 stemming:5 — no per-hole charging in the UI by design (Charge.ts's own header: \"per-hole charging isn't a feature here anyway\"); only Charge All exists. Left as a command (Finding #10)."
     },
     {
-      "command": "charge hole:3 explosive:boomite amount:4 stemming:4",
+      "command": "charge hole:H3 explosive:boomite amount:4 stemming:4",
       "interaction": [
         {
           "type": "command",
-          "command": "charge hole:3 explosive:boomite amount:4 stemming:4"
+          "command": "charge hole:H3 explosive:boomite amount:4 stemming:4"
         }
       ],
-      "description": "charge hole:3 explosive:boomite amount:4 stemming:4 — no per-hole charging in the UI by design (Charge.ts's own header: \"per-hole charging isn't a feature here anyway\"); only Charge All exists. Left as a command (Finding #10)."
+      "description": "charge hole:H3 explosive:boomite amount:4 stemming:4 — no per-hole charging in the UI by design (Charge.ts's own header: \"per-hole charging isn't a feature here anyway\"); only Charge All exists. Left as a command (Finding #10)."
     },
     {
-      "command": "charge hole:4 explosive:boomite amount:3 stemming:3",
+      "command": "charge hole:H4 explosive:boomite amount:3 stemming:3",
       "interaction": [
         {
           "type": "command",
-          "command": "charge hole:4 explosive:boomite amount:3 stemming:3"
+          "command": "charge hole:H4 explosive:boomite amount:3 stemming:3"
         }
       ],
-      "description": "charge hole:4 explosive:boomite amount:3 stemming:3 — no per-hole charging in the UI by design (Charge.ts's own header: \"per-hole charging isn't a feature here anyway\"); only Charge All exists. Left as a command (Finding #10)."
+      "description": "charge hole:H4 explosive:boomite amount:3 stemming:3 — no per-hole charging in the UI by design (Charge.ts's own header: \"per-hole charging isn't a feature here anyway\"); only Charge All exists. Left as a command (Finding #10).",
+      "expect": {
+        "equals": {
+          "chargedCount": 4
+        },
+        "note": "all 4 per-hole overrides land — Finding #7: the file previously used the bare-numeric hole:1..hole:4 form, which chargeCommand (mining.ts) resolves to the legacy 'hole_1'..'hole_4' id scheme, never matching the real H1..H4 ids drill_plan grid assigns; every charge silently failed (success:false, 'Hole \"hole_N\" not found', not thrown) and chargedCount stayed 0 through this entire file's history. Fixed by using the real hole ids."
+      }
     },
     {
       "command": "sequence auto delay_step:25",
@@ -91,7 +122,12 @@
           "type": "command",
           "command": "sequence auto delay_step:25"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "sequencedCount": 4
+        }
+      }
     },
     {
       "command": "blast",
@@ -101,7 +137,15 @@
           "command": "blast"
         }
       ],
-      "description": "blast — downstream of the per-hole varying-stemming charges above (Finding #10, no UI path), the Fire step's own footer disables Execute (validateBlastPlan flags the assembled plan); console `blast` calls the same validator, so command mode's pass here may itself be the Finding #2 class (a validation rejection the command-mode runner doesn't fail on since nothing throws). Left as a command rather than a click that cannot land (Finding #11)."
+      "description": "blast — downstream of the per-hole varying-charge/stemming setup above (Finding #10, no UI path: Charge.ts has no per-hole control, only Charge All); console `blast` reuses the same validator the Fire step's Execute button gates. Left as a command rather than a click that cannot land (Finding #11).",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        },
+        "note": "a fired blast clears the plan back to zero — confirms the blast actually ran (rating PERFECT, 0 projections, matching this file's own 'deep fracture, no surface projection' premise) rather than being silently rejected by validateBlastPlan, which Finding #7's bug would have caused before the hole-id fix"
+      }
     },
     {
       "command": "fragments",
