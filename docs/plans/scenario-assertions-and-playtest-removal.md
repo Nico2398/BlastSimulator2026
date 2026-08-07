@@ -671,7 +671,13 @@ employees, a real reproducible consequence, not a scenario bug; added
 ✅ level1-lose-arrest (**Finding #41** — see the findings log; the
 level actually wins via smuggling profit 30 ticks before arrest ever
 triggers — both real, both now asserted, neither a bug) ·
-⬜ level1-lose-bankruptcy ·
+✅ level1-lose-bankruptcy (no findings; the file's premise holds
+exactly as described — confirmed via direct trace, cumulative vehicle/
+employee overspend with zero income drives `bankrupt`/`levelEnded`/
+`levelEndReason:'bankruptcy'` true at tick 105 and it stays that way;
+the 6 declared buildings are all invalid types and never exist, so
+only vehicles+employees actually drive the overspend, documented via
+a note) ·
 ⬜ level1-lose-ecology · ⬜ level1-lose-revolt ·
 ⬜ level1-playthrough-revolt · ⬜ level1-playthrough-win ·
 ⬜ level1-win-conservative · ⬜ level1-win-efficient ·
@@ -1462,3 +1468,20 @@ got, whether main was merged, and whether GitHub Actions is back up yet.
   Full local sweep green: typecheck, 124/124 scenarios, full test
   suite. GitHub Actions still not re-checked this session — all
   verification remains local. Next: the remaining 16 Batch 7 files.
+- 2026-08-07 (cont.) — level1-lose-bankruptcy.json done, no findings
+  (Batch 7 4/19). A clean, well-behaved contrast to the previous two
+  files: the premise ("overspend on buildings and employees with no
+  income") holds exactly, confirmed via direct trace — cumulative
+  vehicle (4) and employee (6) purchases with zero income drive cash
+  from $50,000 to deeply negative, tripping `bankrupt`/`levelEnded`/
+  `levelEndReason:'bankruptcy'` at tick 105, holding through tick 120.
+  The 6 declared building types are all invalid (confirmed genuine
+  no-ops), so only vehicles+employees actually drive the overspend —
+  noted rather than treated as a finding, since the file's own
+  per-step descriptions already correctly flagged each one. Fully
+  deterministic throughout (only one real click in the whole file,
+  a single vehicle-buy button with no coordinate ambiguity). Verified
+  in both modes. Full local sweep green: typecheck, 124/124 scenarios,
+  full test suite. GitHub Actions still not re-checked this session —
+  all verification remains local. Next: the remaining 15 Batch 7
+  files.
