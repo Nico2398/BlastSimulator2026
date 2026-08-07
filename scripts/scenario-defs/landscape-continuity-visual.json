@@ -1,6 +1,6 @@
 {
   "name": "landscape-continuity-visual",
-  "description": "Visual regression for the landscape/playable mesh junction (#491): frames a ridge, a slope, the close and far pit edges, and a material/biome transition on relief terrain, then drills, charges, sequences and blasts right at the pit edge and re-frames it post-blast — the landscape and the crater must read as one continuous, gap-free, non-overlapping surface throughout, with no hard-edged material snap across the boundary.",
+  "description": "Visual regression for the landscape/playable mesh junction (#491): frames a ridge, a slope, the close and far pit edges, and a material/biome transition on relief terrain, then drills, charges, sequences and blasts right at the pit edge and re-frames it post-blast \u2014 the landscape and the crater must read as one continuous, gap-free, non-overlapping surface throughout, with no hard-edged material snap across the boundary. Confirmed directly (not just via state assertions) by inspecting step-07's pre-blast and step-10's post-blast screenshots: the fresh crater blends into the surrounding terrain with no visible gaps, floating chunks, or hard material seam. See Finding #64.",
   "shots": [
     {
       "name": "overview",
@@ -23,7 +23,18 @@
           "command": "new_game mine_type:alpine_granite seed:11 size:48"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "worldSizeX": 48,
+          "worldSizeZ": 48,
+          "worldMinX": 0,
+          "worldMinZ": 0,
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        }
+      }
     },
     {
       "command": "terrain_info",
@@ -34,7 +45,18 @@
           "command": "terrain_info"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "worldSizeX": 48,
+          "worldSizeZ": 48,
+          "worldMinX": 0,
+          "worldMinZ": 0,
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        }
+      }
     },
     {
       "command": "state",
@@ -45,7 +67,18 @@
           "command": "state"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "worldSizeX": 48,
+          "worldSizeZ": 48,
+          "worldMinX": 0,
+          "worldMinZ": 0,
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        }
+      }
     },
     {
       "command": "state",
@@ -56,7 +89,18 @@
           "command": "state"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "worldSizeX": 48,
+          "worldSizeZ": 48,
+          "worldMinX": 0,
+          "worldMinZ": 0,
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        }
+      }
     },
     {
       "command": "state",
@@ -67,7 +111,18 @@
           "command": "state"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "worldSizeX": 48,
+          "worldSizeZ": 48,
+          "worldMinX": 0,
+          "worldMinZ": 0,
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        }
+      }
     },
     {
       "command": "state",
@@ -78,7 +133,18 @@
           "command": "state"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "worldSizeX": 48,
+          "worldSizeZ": 48,
+          "worldMinX": 0,
+          "worldMinZ": 0,
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        }
+      }
     },
     {
       "command": "state",
@@ -89,10 +155,21 @@
           "command": "state"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "worldSizeX": 48,
+          "worldSizeZ": 48,
+          "worldMinX": 0,
+          "worldMinZ": 0,
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        }
+      }
     },
     {
-      "command": "drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:2,22",
+      "command": "drill_plan grid rows:2 cols:2 spacing:3 depth:6 diameter:0.089 start:2,22",
       "timeout": 90,
       "interaction": [
         {
@@ -126,7 +203,18 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "worldSizeX": 48,
+          "worldSizeZ": 48,
+          "worldMinX": 0,
+          "worldMinZ": 0,
+          "holeCount": 4,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        }
+      }
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
@@ -141,7 +229,18 @@
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "worldSizeX": 48,
+          "worldSizeZ": 48,
+          "worldMinX": 0,
+          "worldMinZ": 0,
+          "holeCount": 4,
+          "chargedCount": 4,
+          "sequencedCount": 0
+        }
+      }
     },
     {
       "command": "sequence auto delay_step:25",
@@ -156,7 +255,18 @@
           "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "worldSizeX": 48,
+          "worldSizeZ": 48,
+          "worldMinX": 0,
+          "worldMinZ": 0,
+          "holeCount": 4,
+          "chargedCount": 4,
+          "sequencedCount": 4
+        }
+      }
     },
     {
       "command": "blast",
@@ -189,7 +299,20 @@
           "selector": "[data-action=\"report-close\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "worldSizeX": 48,
+          "worldSizeZ": 48,
+          "worldMinX": 0,
+          "worldMinZ": 0,
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0,
+          "ecology": 49.88,
+          "nuisance": 49.7
+        }
+      }
     },
     {
       "command": "state",
@@ -200,7 +323,20 @@
           "command": "state"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "worldSizeX": 48,
+          "worldSizeZ": 48,
+          "worldMinX": 0,
+          "worldMinZ": 0,
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0,
+          "ecology": 49.88,
+          "nuisance": 49.7
+        }
+      }
     },
     {
       "command": "terrain_info",
@@ -211,7 +347,21 @@
           "command": "terrain_info"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "worldSizeX": 48,
+          "worldSizeZ": 48,
+          "worldMinX": 0,
+          "worldMinZ": 0,
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0,
+          "ecology": 49.88,
+          "nuisance": 49.7
+        },
+        "note": "Finding #64: this file's real subject -- mesh continuity across the landscape/crater junction -- can't be captured by a structured state field (no 'gap count' or 'seam detected' exists in SerializableGameState), so `expect.equals` here asserts what IS structurally verifiable (world bounds stay constant at 48x48 from (0,0) throughout, proving nothing shifts or resizes; holeCount/chargedCount/sequencedCount through the drill/charge/sequence/blast cycle; ecology/nuisance after the blast) while the continuity claim itself was verified the way a rendering claim should be: ran interaction mode with --screenshots and inspected step-07-drill_plan-ss0.png (pre-blast, Grid Tool panel showing the real panel defaults -- spacing 3.0m, depth 6.0m, 89mm diameter, confirming the drag genuinely produces the declared 2x2 grid) against step-10-blast.png (post-blast, same camera framing) with the Read tool directly. The fresh crater (a lighter, exposed-rock patch) blends into the surrounding terrain with a naturally jagged boundary, no visible gap, floating chunk, or hard-edged material snap across the junction -- issue #491's fix holds. Also confirmed the file's own multi-angle 'shots' (overview/birdseye) capture a fixed world-relative camera framing (unrelated to the drill site's specific coordinates), so those specific shots show general ridge/slope terrain rather than the crater itself -- the crater comparison came from the per-step default screenshots, not the named shots. Only spacing needed correcting in this file's single `drill_plan` step (4->3, matching the panel's real default) -- the declared 2x2 hole count already matched what a spacing-3 drag of this size produces, so this was a cosmetic-accuracy fix (Finding #52's class) rather than a hole-count-changing one. Verified in both command mode and a real browser with screenshots, 13/13 steps, 0 failures."
+      }
     }
   ]
 }

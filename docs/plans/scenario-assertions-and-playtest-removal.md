@@ -820,7 +820,17 @@ across the whole pause window and resumes after, confirmed
 identically on 2 separate runs. Small file (9 steps), by far the
 fastest interaction run this session (~15s). Verified 1/1 in both
 modes) ·
-⬜ landscape-continuity-visual ·
+✅ landscape-continuity-visual (**Finding #64** — see the findings
+log; a 2nd file whose real subject can't be captured by a structured
+state field — no "gap detected" boolean exists — so `expect` asserts
+what is structurally verifiable (world bounds, hole/charge/sequence
+counts, ecology/nuisance) while the actual continuity claim was
+confirmed the way a rendering claim should be: inspected the real
+pre-blast and post-blast screenshots directly, crater blends into
+surrounding terrain with no visible gap or hard seam, issue #491's
+fix holds. Only file this batch needing just a cosmetic spacing-text
+fix (hole count already matched). Verified 1/1 in both modes, 13/13
+steps) ·
 ⬜ tutorial-steps-visual · ⬜ vehicle-purchase-visual ·
 ⬜ contract-panel-visual · ⬜ event-dialog-visual
 
@@ -1117,6 +1127,8 @@ of each session, in case main added/removed a file.)
 62. **`level3-playthrough-win.json` (127 steps, the largest file this batch) recurs every established finding class from the rest of Batch 7 in a single file, plus the most severe casualty count yet.** `campaign start level:treranium_depths` fails outright (Finding #58/#59/#61's class, not fixed). `employee assign_skill` used the rejected positional syntax (Finding #45/#54/#59) — fixed. All 6 `build` commands name nonexistent types — left as documented no-ops. Two `debris_hauler`s are bought but neither is ever driven — `storedMassKg` stays 0 for the whole file and all 5 deliveries fail honestly; not fixed, same reasoning as the other `win`-named files this session. Finding #52's drill-grid class recurred a 5th time across all 5 grids (declared 12/16/20/20/25 holes vs. real 24/36/30/30/64) — fixed the same way. Like `level2-playthrough-win.json`, this file's hardcoded contract IDs (1-5) all happened to already match the real pool at every listing — no ID fix needed, the 2nd file this session where that held. The corrected, dramatically larger grids (the final cycle alone: declared 25 holes → real 64) are violent enough to kill all 10 hired employees across the file's 5 blasts — `stats` confirms "Casualties: 10," the most severe outcome of the Finding #40/#56/#59 real-consequence class encountered so far. Unlike `level2-playthrough-win.json`, zero random events fire anywhere in this file's trace (income stays exactly $0.00 throughout) — no Finding #60-style cash softening was needed; `cash` is hard-asserted at every single step and held cleanly across two separate interaction-mode runs.
 
 63. **`ambient-timescale-sync.json` is a genuinely different shape of file from everything else converted this session: its entire subject, `ambientClockSeconds`, cannot be asserted through `expect.equals` without breaking one of the two required channels.** Confirmed via direct source read: `serializeGameState()` (`console-api.ts`, command mode's state source) never includes `ambientClockSeconds` at all, while `window.__gameState()` (`main.ts`, interaction mode's source) includes it via `gameRenderer.ambientClockSeconds` — a renderer-owned clock that only exists when a renderer exists. Any `equals` check on it would compare `undefined` against a number in command mode and fail there by construction, which is the opposite of what dual-mode verification is for. Resolved by asserting the fields this file's premise actually depends on and that genuinely exist in both modes — `timeScale`/`isPaused` — and separately verifying the file's real subject the way a rendering claim should be verified (CLAUDE.md's rule: an image, or here, a value, must actually be inspected, not just reasoned about from source): ran the file in interaction mode and read the real `gameState.ambientClockSeconds` values out of the written state JSON dumps directly. The evidence is clean and unambiguous: across the `time pause` → `state full` → `time resume` step sequence, `ambientClockSeconds` reads exactly 0.4852 at all three of the pause-adjacent snapshots (the pause command's own dump, the following `state full`, and the resume command's own dump, captured before resume's effect could apply) — a real, sustained freeze across the entire pause window, not just a small delta — then advances again once resumed. Reproduced identically (frozen at a different absolute value, same zero-delta-while-paused shape) on a 2nd, independent interaction-mode run. This confirms `GameRenderer.update()`'s `gameDt` convention (`rendering.md`: `dt * state.timeScale`, `0` while paused) is genuinely wired correctly for the ambient module family this file exercises — issue #490's fix holds. No code change; this finding is entirely about how to verify a renderer-only field's correctness within a scenario framework built around dual-mode state assertions, for future files that hit the same shape.
+
+64. **`landscape-continuity-visual.json`'s real subject — whether the landscape and a fresh blast crater read as one continuous, gap-free surface — has no structured state field to assert against, the 2nd file this session in that shape (after Finding #63).** `SerializableGameState` has no "gap detected" or "seam count" field; mesh continuity is a rendering property, not a simulation one. `expect.equals` here asserts what genuinely is structural and dual-mode-safe instead: `worldSizeX`/`worldSizeZ`/`worldMinX`/`worldMinZ` stay exactly constant across all 13 steps (proving the world never shifts or resizes mid-file), plus `holeCount`/`chargedCount`/`sequencedCount` through the drill/charge/sequence/blast cycle and `ecology`/`nuisance` after the blast. The continuity claim itself was verified the way a rendering claim should be, per the project's own rule that an image must actually be inspected: ran interaction mode with `--screenshots` and compared `step-07-drill_plan-ss0.png` (pre-blast — also useful independently, since it shows the Grid Tool panel's live spacing/depth/diameter readout, confirming the panel's real defaults directly rather than by inference) against `step-10-blast.png` (post-blast, same camera framing) with the Read tool. The fresh crater — a lighter, exposed-rock patch — blends into the surrounding terrain with a naturally jagged boundary; no visible gap, floating chunk, or hard material seam. Issue #491's fix holds. Also discovered along the way: this file's own multi-angle `shots` (`overview`/`birdseye`) use a fixed, world-relative camera framing unrelated to the drill site's specific coordinates — useful for general ridge/slope terrain regression, but the crater-boundary comparison had to come from the per-step default screenshots instead, not the named shots. Unlike every other file converted this session, this one's single `drill_plan` step only needed a cosmetic Finding #52-class fix (`spacing:4`→`spacing:3`, plus `diameter:0.089`) — the declared 2×2 hole count already matched what a spacing-3 drag of this size produces, so nothing about the actual grid shape changed, only the declared metadata's accuracy.
 
 _(Add new findings here as you hit them. Number sequentially.)_
 
@@ -2047,3 +2059,39 @@ got, whether main was merged, and whether GitHub Actions is back up yet.
   this branch — all verification remains local. Next: the remaining 4
   Batch 7 files (landscape-continuity-visual next), then the
   depth-mismatch audit before Phase 3.
+- 2026-08-07 (cont.) — landscape-continuity-visual.json done
+  (**Finding #64**, Batch 7 16/19), 13 steps, session worker restarted
+  partway through (dev server came back down, uncommitted work
+  survived intact, restarted the server and continued). 2nd file this
+  session whose real subject — mesh continuity across the landscape/
+  crater junction — has no structured state field to assert against,
+  same shape as Finding #63's ambient clock. Asserted the fields that
+  are genuinely structural (constant world bounds, hole/charge/
+  sequence counts, post-blast ecology/nuisance) and verified the real
+  claim by reading the actual pre-blast and post-blast screenshots
+  directly — the crater blends into the terrain with no visible gap
+  or hard seam, issue #491's fix holds. Also useful: the pre-blast
+  screenshot's Grid Tool panel readout independently confirmed the
+  Drill panel's real defaults (spacing 3m, depth 6m, 89mm diameter)
+  visually, not just by source reading. Cheapest fix this batch —
+  the file's single `drill_plan` step only needed a cosmetic
+  spacing-text correction, since the declared 2×2 hole count already
+  matched reality. Verified: JSON valid, `scenario-defs.test.ts`
+  green (3088 tests), full local sweep green (typecheck, 124/124
+  scenarios, 8328/8328 tests — both noticeably slower than usual this
+  run, ~76s and ~164s respectively, consistent with general system
+  load after the worker restart rather than a real regression), command
+  mode passes, interaction mode passes (13/13 steps, 0 failures) — one
+  run only, not re-run for determinism, since this file has zero
+  random events and a fixed seed/camera, unlike the playthrough files.
+  Also this cycle: ran the scheduled PR #497 CI check-in twice more
+  (still the same infra outage, zero runs for any of the ~10 commits
+  since 72c6909, re-armed silently both times per its own instructions)
+  and noticed the PR's `mergeable_state` has gone to `"dirty"` — a
+  real merge conflict against main, separate from the CI outage;
+  deferred resolving it until no browser-mode verification was in
+  flight, folded into the next PR check-in's instructions rather than
+  actioned immediately. Next: resolve the PR #497 merge conflict
+  (fetch/merge main, resolve, push), then the remaining 3 Batch 7
+  files (tutorial-steps-visual next), then the depth-mismatch audit
+  before Phase 3.
