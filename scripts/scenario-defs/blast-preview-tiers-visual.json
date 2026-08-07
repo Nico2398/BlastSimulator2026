@@ -11,10 +11,17 @@
           "command": "new_game seed:42"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "holeCount": 0
+        }
+      }
     },
     {
       "command": "drill_plan grid rows:2 cols:2 spacing:5 depth:8 start:15,15",
+      "description": "The grid tool's spacing stepper defaults to 3m (DEFAULT_SPACING_M, Drill.ts); one increment click on the strip's spacing stepper (data-field=\"spacing\") raises it to 4 before dragging, so the (15,15)-(20,20) rectangle (5x5) computes the declared 2x2 instead of the default-spacing 3x3 (issue #479 follow-up, Finding #4).",
       "interaction": [
         {
           "type": "clickSelector",
@@ -33,6 +40,10 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
+        },
+        {
           "type": "dragTiles",
           "x1": 15,
           "z1": 15,
@@ -47,7 +58,13 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 4
+        },
+        "note": "2 rows x 2 cols = 4"
+      }
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
@@ -61,7 +78,12 @@
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "chargedCount": 4
+        }
+      }
     },
     {
       "command": "sequence auto delay_step:25",
@@ -75,7 +97,12 @@
           "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "sequencedCount": 4
+        }
+      }
     },
     {
       "command": "blast_preview",
@@ -89,7 +116,10 @@
           "selector": "#bs-blast-panel [data-action=\"run-analysis\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "usable": "#bs-blast-panel [data-action=\"run-analysis\"]"
+      }
     },
     {
       "command": "preview energy",
@@ -113,7 +143,12 @@
           "selector": "#bs-blast-panel [data-tier=\"1\"] [data-action=\"buy-tier\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 49500
+        }
+      }
     },
     {
       "command": "preview energy",
@@ -137,7 +172,12 @@
           "selector": "#bs-blast-panel [data-tier=\"2\"] [data-action=\"buy-tier\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 47500
+        }
+      }
     },
     {
       "command": "preview fragments",
@@ -161,7 +201,12 @@
           "selector": "#bs-blast-panel [data-tier=\"3\"] [data-action=\"buy-tier\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 42500
+        }
+      }
     },
     {
       "command": "preview projections",
@@ -185,7 +230,12 @@
           "selector": "#bs-blast-panel [data-tier=\"4\"] [data-action=\"buy-tier\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 30500
+        }
+      }
     },
     {
       "command": "preview vibrations",
@@ -209,7 +259,11 @@
           "selector": "#bs-blast-panel [data-action=\"run-analysis\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "usable": "#bs-blast-panel [data-action=\"run-analysis\"]",
+        "note": "regression guard (#24): a fully-grown Predicted list must not push Run Analysis below the panel's fold, all 4 tiers owned"
+      }
     },
     {
       "command": "state full",

@@ -11,10 +11,17 @@
           "command": "new_game seed:42"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "holeCount": 0
+        }
+      }
     },
     {
       "command": "drill_plan grid rows:2 cols:3 spacing:4 depth:6 start:15,15",
+      "description": "The grid tool's spacing stepper defaults to 3m (DEFAULT_SPACING_M, Drill.ts); one increment click on the strip's spacing stepper (data-field=\"spacing\") raises it to 4 before dragging, so the (15,15)-(23,19) rectangle (8x4) computes the declared 3 cols x 2 rows instead of the default-spacing 4x2 (issue #479 follow-up, Finding #4).",
       "interaction": [
         {
           "type": "clickSelector",
@@ -27,6 +34,10 @@
         {
           "type": "waitForSelector",
           "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
         },
         {
           "type": "dragTiles",
@@ -43,7 +54,13 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 6
+        },
+        "note": "2 rows x 3 cols = 6"
+      }
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
@@ -53,7 +70,12 @@
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "chargedCount": 6
+        }
+      }
     },
     {
       "command": "charge hole:H1 explosive:boomite amount:8 stemming:3",
@@ -73,7 +95,12 @@
           "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "sequencedCount": 6
+        }
+      }
     },
     {
       "command": "sequence show",

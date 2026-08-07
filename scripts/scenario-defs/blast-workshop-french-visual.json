@@ -23,13 +23,19 @@
           "type": "command",
           "command": "new_game seed:42 size:32"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "holeCount": 0
+        }
+      }
     },
     {
       "command": "drill_plan grid origin:5,5 rows:2 cols:2 spacing:3 depth:6",
       "timeout": 60,
       "role": "player",
-      "description": "Split out of the original bundled setup step (issue #479).",
+      "description": "Split out of the original bundled setup step (issue #479). Drag (5,5)-(8,8) is 3x3 at the panel's own default spacing (DEFAULT_SPACING_M=3, Drill.ts) — matches the declared spacing:3 exactly, no stepper click needed (unlike most other blast-* grid steps, Finding #4).",
       "interaction": [
         {
           "type": "clickSelector",
@@ -61,7 +67,13 @@
           "type": "clickSelector",
           "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "holeCount": 4
+        },
+        "note": "2 rows x 2 cols = 4"
+      }
     },
     {
       "command": "charge hole:* explosive:boomite amount:5kg stemming:2m",
@@ -76,7 +88,12 @@
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "chargedCount": 4
+        }
+      }
     },
     {
       "command": "sequence auto delay_step:25",
@@ -91,7 +108,12 @@
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "sequencedCount": 4
+        }
+      }
     },
     {
       "command": "buy_software",
@@ -106,7 +128,12 @@
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-tier=\"1\"] [data-action=\"buy-tier\"]"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "cash": 49500
+        }
+      }
     },
     {
       "command": "blast_preview",
@@ -121,7 +148,10 @@
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"run-analysis\"]"
         }
-      ]
+      ],
+      "expect": {
+        "usable": "#bs-blast-panel [data-action=\"run-analysis\"]"
+      }
     },
     {
       "command": "state",
@@ -145,7 +175,11 @@
           "durationMs": 200
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "usable": "#bs-settings-panel",
+        "note": "panel stays alive after switching locale in place (i18n-live-locale-switch.json's Bug 1 regression pattern) — the actual French text is verified visually via screenshot, not state, since expect has no text-content field"
+      }
     },
     {
       "command": "state",
@@ -172,7 +206,11 @@
           "type": "screenshot"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "usable": "#bs-blast-panel [data-action=\"grid-tool\"]",
+        "note": "the panel must still be alive and clickable rendered in French, actual text verified via screenshot"
+      }
     },
     {
       "command": "state",
@@ -191,7 +229,11 @@
           "type": "screenshot"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "usable": "#bs-blast-panel [data-action=\"charge-all\"]",
+        "note": "the panel must still be alive and clickable rendered in French, actual text verified via screenshot"
+      }
     },
     {
       "command": "state",
@@ -210,7 +252,11 @@
           "type": "screenshot"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "usable": "#bs-blast-panel [data-action=\"auto-sequence\"]",
+        "note": "the panel must still be alive and clickable rendered in French, actual text verified via screenshot"
+      }
     },
     {
       "command": "state",
@@ -229,7 +275,11 @@
           "type": "screenshot"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "usable": "#bs-blast-panel [data-action=\"run-analysis\"]",
+        "note": "the panel must still be alive and clickable rendered in French, actual text verified via screenshot"
+      }
     },
     {
       "command": "state",
@@ -248,7 +298,11 @@
           "type": "screenshot"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "usable": "#bs-blast-panel [data-action=\"execute\"]",
+        "note": "the panel must still be alive and clickable rendered in French, actual text verified via screenshot"
+      }
     },
     {
       "command": "state",
@@ -267,7 +321,11 @@
           "type": "screenshot"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "usable": "[data-action=\"preflight-detonate\"]",
+        "note": "the modal must still be alive and clickable rendered in French, actual text verified via screenshot"
+      }
     },
     {
       "command": "blast",
@@ -286,7 +344,15 @@
           "type": "screenshot"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        },
+        "note": "a fired blast clears the plan back to zero — BlastReportModal auto-opens with the real report rendered in French, verified visually via screenshot"
+      }
     }
   ]
 }
