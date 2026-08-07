@@ -417,6 +417,17 @@ const SETTINGS_HOOKS = [
       'tool, and the orchestrator is entered by `/agentic-run` forking into it — so the ' +
       'guard never ran, and issue #406 lost its run to a backgrounded sub-agent',
   },
+  {
+    script: '.claude/hooks/no-ask-user-question.sh',
+    event: 'PreToolUse',
+    tools: ['AskUserQuestion'],
+    why:
+      'the `permissions.deny` entry beside it is read by the permission system, which a ' +
+      'session running with permissions bypassed never consults — and an unattended ' +
+      'session is both the one that bypasses prompts and the one whose question can never ' +
+      'be answered. The hook runs on the tool call in every mode, so it is the layer that ' +
+      'holds where it matters',
+  },
 ];
 
 /** Tools denied project-wide, and why the denial cannot live in frontmatter. */
