@@ -703,7 +703,11 @@ Ground rule #15; a real interaction-mode run caught a new depth-
 mismatch bug class the row/col/spacing check can't see — fixed and
 re-traced, the corrected blasts now genuinely reach the government
 shutdown within the file's own original tick budget) ·
-⬜ level1-lose-revolt ·
+✅ level1-lose-revolt (**Finding #43** — see the findings log; applied
+the Ground rule #15 depth fix proactively this time, but the file's
+premise still doesn't hold — `wellBeing` only ever rises from
+undispatched, unharmed hires, so revolt is structurally unreachable,
+not just under-ticked; described the real trajectory instead) ·
 ⬜ level1-playthrough-revolt · ⬜ level1-playthrough-win ·
 ⬜ level1-win-conservative · ⬜ level1-win-efficient ·
 ⬜ level2-playthrough-bankruptcy · ⬜ level2-playthrough-win ·
@@ -963,6 +967,8 @@ of each session, in case main added/removed a file.)
 41. **`level1-lose-arrest.json`'s premise is only half right: the level actually WINS (profit-threshold `levelEndReason:'completed'`) 30 ticks before the arrest it's named for ever triggers.** `mafia smuggle` (toggled once, unmarked — no UI selector exists for it, same class as Finding #8) turns on an $8000/tick income stream (`SMUGGLE_BASE_INCOME`, `MafiaActions.ts`) that isn't a one-time payout but keeps accruing every subsequent tick — confirmed via direct trace: cash swings from -$7500 to +$71,200 after just one `tick 10`, then to +$149,900 after the next, at which point `levelEnded` flips `true` with `levelEndReason:'completed'` (tick 20) — dusty_hollow's own profit-threshold win condition, tripped by smuggling proceeds, not by any mining. `arrested` doesn't flip `true` until tick 50, by which point the level has already been won for 30 ticks; cash keeps climbing throughout regardless (ending at $533,400). Neither flag is a bug — this is intentional, verified design tension between smuggling's profitability and its exposure risk (`state.mafia.exposureRisk`) — but the file's own name and description described only the second half. **Fixed the test to describe both halves of the real trajectory** rather than only the arrest, with `expect` on every cash-changing step (all fully deterministic — `corrupt`'s cost deduction is unconditional regardless of its own RNG-driven bribe-success/scandal roll, confirmed by reading `corruptCommand`, `events.ts`) and the two flag-flip moments called out explicitly with notes. Confirmed `levelEnded:true` doesn't block or alter any later command's behavior — every step after tick 20 continues to run and change state normally in both modes. Verified in both command mode and a real browser; this file's `interaction` was already 100% bare commands (no clicks anywhere, same "zero drift risk" class as `sandbox-mode.json`), so no click-vs-command divergence was possible to begin with.
 
 42. **A new sub-class of Finding #3/#4, caught only by a real interaction-mode run on `level1-lose-ecology.json`: the Drill panel's real click ignores a scenario's declared `depth:`, not just its row/col/spacing.** Every prior grid-spacing fix this project only ever checked hole COUNT (rows×cols matching what `round(dragSize/DEFAULT_SPACING_M)+1` produces) — this file was the first whose `drill_plan grid` command already had the *right* spacing (3, matching `DEFAULT_SPACING_M`) but the *wrong* depth (12, vs. the Drill panel's own `DEFAULT_DEPTH_M=6`, `Drill.ts`) — a mismatch hole-count alone can never catch, since depth doesn't affect how many holes exist. Caught only because this file asserts exact ecology scores after each blast: command mode's depth:12 trace showed ecology dropping 50→48.99 on the first blast, but the real interaction-mode run failed outright — `ecology should be 48.99 but is 14.469999999999999`. Investigated via a direct state-dump comparison (`holeCount`/hole positions matched exactly, 25 holes each, only `depth` differed, 6 vs. 12) tracing the actual mechanism: shallower holes with the same charge amount concentrate energy over less rock, producing far more violent fragmentation and projectile counts, which `recordVibration` (`ScoreManager.ts`, driven by `result.projectionCount` in `mining.ts`'s `blastCommand`) converts into ecology/nuisance damage. **Fixed** by correcting all 5 of this file's `drill_plan grid` commands from `depth:12` to `depth:6`, then re-deriving the entire back half of the file's assertions from a fresh trace — the corrected, more violent blasts drive ecology to exactly 0 after just the **second** blast (not the fifth), and — because `applyDecay` (`ScoreManager.ts`) never recovers a score sitting at exactly 0 — it stays pinned there for the rest of the file, deterministic and safe to hard-assert regardless of any later random event. The corrected trajectory also means the file's own *original* 160-tick budget is already enough to cross `ECOLOGICAL_SHUTDOWN_TICKS` (150 consecutive ticks at ecology≤0, `EcologicalDisaster.ts`) — the government shutdown this file is named for now fires for real, inside the file's existing structure, no added steps needed. **Open follow-up, not yet audited**: this depth-mismatch class could be silently present in any already-completed file whose `drill_plan grid` declares a `depth:` other than 6 — none of those files' hole-count-only grid-spacing fixes would have caught it, and most were protected only by accident (by not asserting anything depth-sensitive, like exact scores or `deathCount`, right after the affected blast). Worth a dedicated grep-and-recheck pass before Phase 3, not blocking Batch 7's remaining files.
+
+43. **`level1-lose-revolt.json`'s premise doesn't hold at all: `wellBeing` only ever rises, never falls, so `revolted` never flips true within any tick budget.** Applied the Finding #42/Ground rule #15 depth fix proactively this time (`depth:12`→`depth:6` on both `drill_plan grid` steps, before tracing at all, avoiding the wasted re-trace loop that hit `level1-lose-ecology.json`). Traced the full 110-tick file fresh: `avgMorale` (`events.ts`, averaged over `state.employees.employees[].morale`) starts and stays above 50 for all 6 hires — nobody is ever dispatched into harm, dismissed, or left starving — so `wbDelta += (avgMorale-50)*0.02` (`updateScores`) only ever pushes `wellBeing` up, climbing 50→99.95 by tick 70 and sitting flat at the ceiling for the remaining 40 ticks. This is a materially different case from Finding #42: there the trajectory was heading toward the named outcome and just needed a bug fixed to get there (or Finding #41, where the outcome was real but not the one named); here `wellBeing` is trending in the *opposite* direction from what a "neglect causes revolt" premise requires, so no amount of additional ticking could ever reach `REVOLT_TICKS` — the file cannot be fixed toward its own name, only accurately described. **No code change** — treated like Findings #20/#21/#26/#27/#41: `expect` blocks assert the real trajectory (`wellBeing` rising to a 99.95 ceiling, `revolted:false`, `levelEnded:false` through the full 110-tick budget), with a note on the final `campaign status` step naming the false premise directly. `deathCount` stays `0` throughout — unlike `tutorial-playthrough.json`'s Finding #40, neither blast's cleared zone overlaps any of the 6 hires. `ecology` still collapses to exactly 0 after the second (corrected, depth:6) blast, same mechanism as Finding #42, but is incidental here: the file's 110-tick budget never reaches `ECOLOGICAL_SHUTDOWN_TICKS` (150), so the collapse is asserted but doesn't end the level. Zero random events fire anywhere in the trace (every `event choose 0` reports no pending event), making the entire file deterministic and safe for exact `equals` assertions with no `decreased`/`increased` softening needed anywhere. Verified in both command mode and a real browser, both passing on the first run after the proactive depth fix.
 
 _(Add new findings here as you hit them. Number sequentially.)_
 
@@ -1538,3 +1544,34 @@ got, whether main was merged, and whether GitHub Actions is back up yet.
   suite. GitHub Actions still not re-checked this session — all
   verification remains local. Next: the remaining 14 Batch 7 files,
   then the depth-mismatch audit before Phase 3.
+- 2026-08-07 (cont.) — level1-lose-revolt.json done (**Finding #43**,
+  Batch 7 6/19). Applied the Ground rule #15 depth fix proactively
+  this time (`depth:12`→`depth:6` on both `drill_plan grid` steps,
+  before the first trace), avoiding the re-trace loop that hit the
+  ecology file. The proactive fix held — command mode and interaction
+  mode agreed on the first run — but the file's named premise still
+  doesn't hold: `avgMorale` stays above 50 for all 6 hires (nobody
+  dispatched into harm, dismissed, or left idle-and-starving), so
+  `wellBeing` only ever rises, climbing 50→99.95 and sitting flat at
+  the ceiling — the opposite direction from what "neglect causes
+  revolt" requires. Unlike Finding #42 (fixable toward the named
+  outcome) or #41 (real outcome, just not the named one), this
+  outcome is structurally unreachable — no tick extension gets there.
+  Treated like Findings #20/#21/#26/#27/#41: asserted the real
+  trajectory, no code change. `ecology` still collapses to exactly 0
+  after the corrected second blast (Finding #42's mechanism) but is
+  incidental — the file's 110-tick budget never reaches
+  ECOLOGICAL_SHUTDOWN_TICKS. `deathCount` stays 0 throughout (neither
+  blast's cleared zone overlaps any of the 6 hires). Zero random
+  events fire anywhere in the 110-tick trace, making the file fully
+  deterministic — every assertion is exact `equals`, no
+  `decreased`/`increased` softening needed. Verified: JSON valid,
+  structural diff against the pre-edit version confirmed identical
+  command/interaction/role content (55=55 steps, 0 diffs after
+  normalizing depth), `scenario-defs.test.ts` green (3088 tests),
+  both command mode and a real browser pass. Full local sweep green:
+  typecheck, 124/124 scenarios, full test suite (8328/8328). GitHub
+  Actions still not re-checked this session — all verification
+  remains local. Next: the remaining 13 Batch 7 files
+  (level1-playthrough-revolt next), then the depth-mismatch audit
+  before Phase 3.
