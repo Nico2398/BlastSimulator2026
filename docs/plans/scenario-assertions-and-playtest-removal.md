@@ -452,7 +452,11 @@ affordable — `campaign start` wipes the file's cash:200000 bump back to
 dusty_hollow's own $50,000 default, already correctly documented in the
 file's own step descriptions; confirmed the remaining 4 overdraw exactly
 as described, vehicleCount reaching 5 regardless) ·
-⬜ vehicle-driver-assignment-visual ·
+✅ vehicle-driver-assignment-visual (confirmed driver assignment is
+arrival-gated like surveys — `vehicle list` shows driver:none right
+after the assign click, driver:#1 only after the driver walks there
+over the following ticks; unqualified assignment attempt genuinely
+rejected, licence check confirmed real) ·
 ⬜ vehicle-purchase-tier-ui-visual · ⬜ vehicle-roles-panel-visual ·
 ⬜ vehicle-task-states-visual · ⬜ vehicle-traffic ·
 ⬜ vehicle-traffic-routing-visual · ⬜ needs-collapse-visual ·
