@@ -438,7 +438,13 @@ at 35 ticks; not the `employee-training.json`/`training.json` parity
 target — that pairing is a separate, later Batch 6 file) ·
 ✅ building-vehicle-depot-visual (T1 build succeeds, T2/T3 direct
 attempts both genuinely rejected — not researched, no findings) ·
-⬜ building-warehouse-visual
+✅ building-warehouse-visual (2 T1 warehouses succeed, T2 direct
+attempts on both genuinely rejected — not researched, no findings)
+
+Batch 4 done: 12/12, Finding #20 (building-research-progression-visual's
+false narrative, cascading from Finding #1's class). research-center-gate
+parity row partially closed (tier-unlock proven both files; #442
+prerequisite-gate case still open for Phase 3).
 
 ### Batch 5 — vehicle-* / needs-* / nav-* (22)
 ⬜ vehicle-3d-rendering-visual · ⬜ vehicle-driver-assignment-visual ·
@@ -811,3 +817,19 @@ got, whether main was merged, and whether GitHub Actions is back up yet.
   GitHub Actions still not re-checked this session — all verification
   remains local. Batch 3 complete. Next: Batch 4 — building-* (12 files)
   plus the research-center-gate parity check.
+- 2026-08-07 (cont.) — Batch 4 complete: 12/12 building-* files,
+  committed and pushed individually. Notable: Finding #20 —
+  building-research-progression-visual.json's back-half narrative was
+  entirely false (Tier 3 was claimed to unlock over ticks but never
+  does, a cascading consequence of the already-known Finding #1 funds-
+  guard gap); every misleading step description in that file corrected
+  to match verified reality, not the intended-but-broken story. Its
+  sibling building-research-visual.json (higher starting cash) does
+  complete the real T1→T2→T3 progression and is now fully asserted,
+  closing the research-center-gate.json parity row's tier-unlock half —
+  the #442 prerequisite-gate half (Queue Research with zero Research
+  Centers built at all) is still open, deferred to Phase 3, not
+  blocking. Full local sweep green after every file: typecheck,
+  124/124 command-mode scenarios, 8300/8300 unit+integration tests.
+  GitHub Actions still not re-checked this session — all verification
+  remains local. Next: Batch 5 — vehicle-*/needs-*/nav-* (22 files).
