@@ -22,6 +22,8 @@ export interface SerializableGameState {
   /** Simulation speed multiplier (1/2/4/8) set by `time speed` — the HUD's speed buttons. */
   timeScale: number;
   mineType: string;
+  /** Current weather state (WeatherCycle.ts) — null until `ctx.weatherCycle` exists, which happens lazily on the first `weather`/`weather set`/`weather advance` command or eagerly whenever `ctx.state` is replaced (new_game, campaign start, sandbox start — main.ts). */
+  weather: string | null;
   /** The site's live bounding box (#473 — a bounding box, not a fixed size, once the site has grown). */
   worldSizeX: number | null;
   worldSizeZ: number | null;
@@ -83,6 +85,7 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     isPaused: s.isPaused,
     timeScale: s.timeScale,
     mineType: s.mineType,
+    weather: ctx.weatherCycle?.current ?? null,
     worldSizeX: s.world?.sizeX ?? null,
     worldSizeZ: s.world?.sizeZ ?? null,
     worldMinX: s.world?.minX ?? null,

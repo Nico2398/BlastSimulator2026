@@ -43,9 +43,15 @@ import type { MiningContext } from '../../src/console-api.js';
  * to check either. timeScale closes the same gap for the HUD's speed
  * buttons (1x/2x/4x/8x) — a scenario proving `time speed` genuinely changed
  * the simulation rate, not just accepted the command, had no field to check.
+ * weather closes the same gap for WeatherCycle.ts — a scenario proving
+ * `weather set`/`weather advance` genuinely changed the HUD's weather icon
+ * had no field to check; null until ctx.weatherCycle exists, which happens
+ * lazily on the first weather command here but eagerly in the browser
+ * (main.ts re-seeds it whenever ctx.state is replaced), so a scenario must
+ * not assert on it before its own first weather command runs.
  */
 const SERIALIZED_FIELDS = [
-  'seed', 'time', 'tickCount', 'isPaused', 'timeScale', 'mineType',
+  'seed', 'time', 'tickCount', 'isPaused', 'timeScale', 'mineType', 'weather',
   'worldSizeX', 'worldSizeZ', 'worldMinX', 'worldMinZ',
   'drillHoles', 'chargesByHole', 'sequenceDelays', 'finances', 'holeCount', 'chargedCount',
   'sequencedCount', 'surveyCount', 'pendingActionCount', 'buildingCount', 'vehicleCount', 'employeeCount',
@@ -109,6 +115,29 @@ describe('console-api', () => {
       const state = serializeGameState(runner.ctx as MiningContext)!;
 
       expect(state.timeScale).toBe(4);
+    });
+
+    it('reports weather as null before any weather command has run (ctx.weatherCycle not yet created)', () => {
+      runner.runner.run('new_game mine_type:desert seed:42');
+      const state = serializeGameState(runner.ctx as MiningContext)!;
+
+      expect(state.weather).toBeNull();
+    });
+
+    it('reports weather as sunny (createWeatherCycle\'s initial state) once the first weather command creates the cycle', () => {
+      runner.runner.run('new_game mine_type:desert seed:42');
+      runner.runner.run('weather');
+      const state = serializeGameState(runner.ctx as MiningContext)!;
+
+      expect(state.weather).toBe('sunny');
+    });
+
+    it('reports the new weather after `weather set` changes it', () => {
+      runner.runner.run('new_game mine_type:desert seed:42');
+      runner.runner.run('weather set storm');
+      const state = serializeGameState(runner.ctx as MiningContext)!;
+
+      expect(state.weather).toBe('storm');
     });
 
     it('reports zero counts for a fresh game', () => {

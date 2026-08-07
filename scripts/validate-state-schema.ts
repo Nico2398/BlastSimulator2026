@@ -61,6 +61,7 @@ export const GAME_STATE_SCHEMA: Schema = {
   isPaused: { type: 'boolean' },
   timeScale: { type: 'number', description: 'Simulation speed multiplier (1/2/4/8) set by `time speed`' },
   mineType: { type: 'string', description: 'Terrain preset identifier' },
+  weather: { type: 'string', optional: true, description: 'Current weather state (WeatherCycle.ts); null until ctx.weatherCycle exists' },
   worldSizeX: { type: 'number', optional: true, description: 'Live world bounding box (#473)' },
   worldSizeZ: { type: 'number', optional: true },
   worldMinX: { type: 'number', optional: true },

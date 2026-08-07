@@ -409,6 +409,7 @@ window.__gameState = () => {
     isPaused: s.isPaused,
     timeScale: s.timeScale,
     mineType: s.mineType,
+    weather: ctx.weatherCycle?.current ?? null,
     // The site's live bounding box, so a harness can map grid coordinates to
     // the tile picker without inferring them from a terrain bounding box that
     // blasts and ramps change underneath it. Size is a bounding box, not a

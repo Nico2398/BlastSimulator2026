@@ -644,7 +644,13 @@ byte-identical commands with zero drift risk, confirmed via a full
 real-values trace: `cash`/`seed`/`worldSizeX`/`worldSizeZ`/`mineType`
 after each of the file's two independent `sandbox start` calls,
 `holeCount`/`chargedCount`/`sequencedCount` through the drill→charge→
-sequence→blast pipeline) · ⬜ weather-display-visual ·
+sequence→blast pipeline) ·
+✅ weather-display-visual (**Finding #38** — see the findings log; no
+state field existed to check the weather cycle at all, closed by adding
+`weather` to `SerializableGameState`, which surfaced a real
+command-vs-interaction bootstrap-timing asymmetry — lazy creation on
+first `weather` command vs. eager creation on `new_game`/`campaign
+start` — distinct from Finding #12's wall-clock drift) ·
 ⬜ weather-flood
 
 ### Batch 7 — big playthroughs + the 3 stragglers (19) — **+ tutorial parity check**
@@ -900,6 +906,8 @@ of each session, in case main added/removed a file.)
 36. **`safety-projection-visual.json` had two problems, both repeats of earlier finding classes.** (a) A fourth instance of Finding #13's class: `buySoftwareCommand` (`mining.ts`) deducted `state.cash` directly for every software tier purchase but never called `addExpense` on `state.finances`. Confirmed by dumping both fields side by side after buying tiers 1/2/3 ($500+$2000+$5000): the flat `cash` field correctly dropped by $7500, but `state.finances.cash` never moved — an exact $7500 gap, invisible to every prior verification pass for the same reason as Finding #32 (no committed scenario assertion reads the nested `finances.cash` path). **Fixed at the root** — added the missing `addExpense(ctx.state!.finances, result.cost, 'equipment', ...)` call, matching the pattern every other cash-spending command already uses. New unit test in `mining-commands.test.ts` proving `state.finances.cash` mirrors the flat field after a tier purchase. (b) A repeat of Finding #3's class: `drill_plan grid rows:3 cols:3 spacing:5` didn't match the click's real (20,20)-(30,30) drag at the panel's default spacing (3), which actually produces a 4×4=16-hole grid, not 3×3=9 — same class already fixed in `nav-cell-types-visual.json`/`hauling-gate.json`. Fixed by correcting the command. Both fixes verified together: the file's own central premise — a `freight_warehouse` built inside a cleared safety zone survives the blast unscathed (HP 150/150 unchanged) — held true both before and after the grid correction, confirmed via direct trace even under the corrected, more violent 16-hole "BAD"-rated blast (furthest throw 23.9m vs. the original 4-hole version's much gentler spread). No existing scenario-file assertions needed updating for (a); (b) required updating the file's own hole/charge/sequence counts from 9 to 16.
 
 37. **`core-loop-visual.json` combined three already-known finding classes in one file.** (a) A Finding-#15-class syntax bug: `employee assign_skill 1 geology 3` used bare positional args, which the command silently rejects (`skill:`/`level:` are named params) — fixed to `skill:geology level:3`. (b) A repeat of Finding #3's grid-spacing class: `drill_plan grid rows:3 cols:3 spacing:5` didn't match the click's real (20,20)-(30,30) drag at the panel's default spacing, which produces 4×4=16 holes, not 3×3=9 — fixed by correcting the command. (c) The same never-hauls-anything gap already documented in `contract-negotiation.json`: this file's `contract deliver` step genuinely fails every run (confirmed via direct trace) since no vehicle ever hauls fragments into storage — fixed the test to describe this reality (`activeContractCount` stays 1, undelivered) rather than assume completion, with a `note` pointing at `economy-full-loop.json` as the file that actually completes a delivery. **A methodological catch during verification**: an initial `decreased: ["cash"]` guess on the `tick 5` step (copied from the pattern used elsewhere in this batch) failed command mode outright — a direct trace showed cash stays exactly flat there, since with only 1 employee and no buildings/vehicles yet, payroll doesn't cycle within a 5-tick window. Fixed by checking the real traced value instead of assuming the pattern held. Verified in both command mode and a real browser.
+
+38. **`weather-display-visual.json`'s entire premise — verify the weather cycle's state transitions — had no state field to check at all, and the fix surfaced a genuine mode-asymmetric bootstrap timing gap distinct from Finding #12's wall-clock drift.** `SerializableGameState` had no `weather` field in either `serializeGameState()` or `window.__gameState()` — every `weather set`/`weather advance` this file (and any future one) could ever do was verifiable only by eyeballing a screenshot. **Added `weather: string | null`** (`ctx.weatherCycle?.current ?? null`) in lockstep across `console-api.ts`/`main.ts`/`validate-state-schema.ts`, with three new `console-api.test.ts` tests (null before any weather command; `'sunny'` — `createWeatherCycle`'s fixed initial state — once the first one lazily creates the cycle; the new value after `weather set`). Investigating the right field type surfaced a real structural difference between the two modes, not drift: `ctx.weatherCycle` is created *lazily* in command mode (only inside `weatherCommand`, on the first explicit `weather`/`weather set`/`weather advance` call) but *eagerly* in the browser (`main.ts`'s `runGameCommand` re-seeds it the instant `ctx.state` is replaced — `new_game`/`campaign start`/`sandbox start`). So immediately after `new_game`, command mode's `weather` field reads `null` while interaction mode's already reads `'sunny'` — a real, permanent asymmetry, not a timing race, and it would fail one mode or the other on any file that asserts `weather` before that file's own first explicit weather command. Confirmed via grep that `advanceWeather`/`forceAdvance` have zero call sites anywhere in `src/` outside the console command and `WeatherCycle.ts` itself — nothing ticks weather automatically, so once both modes converge (both have created the cycle from the same `ctx.state.seed`, and `setWeather` is a direct, RNG-free assignment), every subsequent value is fully deterministic and identical in both modes. **Fixed** by never asserting `weather` on the file's first three (bootstrap) steps, and asserting it on every step from the file's own first `weather` command onward — the file's full sunny→cloudy→light_rain→heavy_rain→storm→heat_wave→cold_snap cycle is now genuinely proven, in both modes, for the first time. Verified in both command mode and a real browser. Lesson for future files: any `ctx`-level field created lazily by a console command but eagerly by `main.ts`'s bootstrap wrapper needs the same treatment — check both creation paths, not just one, before asserting on it near a bootstrap step.
 
 _(Add new findings here as you hit them. Number sequentially.)_
 
@@ -1305,3 +1313,27 @@ got, whether main was merged, and whether GitHub Actions is back up yet.
   8312/8312 tests. GitHub Actions still not re-checked this session —
   all verification remains local. Next: weather-display-visual,
   weather-flood to finish Batch 6.
+- 2026-08-07 (cont.) — weather-display-visual.json done (**Finding
+  #38**): `SerializableGameState` had no `weather` field at all, so this
+  file's entire premise (the weather cycle's own state transitions) was
+  unverifiable by anything but a screenshot. Added `weather: string |
+  null` in lockstep across `console-api.ts`/`main.ts`/
+  `validate-state-schema.ts`, 3 new `console-api.test.ts` tests. Root-
+  caused a real command-vs-interaction bootstrap asymmetry along the
+  way: `ctx.weatherCycle` is created lazily in command mode (first
+  explicit `weather` command) but eagerly in the browser (`main.ts`
+  re-seeds it whenever `ctx.state` is replaced) — so `weather` reads
+  `null` vs `'sunny'` immediately after `new_game` depending on mode.
+  Confirmed via grep that nothing ever auto-advances weather via ticks
+  (`advanceWeather`/`forceAdvance` have zero call sites outside the
+  console command and their own definition), so once both modes have
+  created the cycle every subsequent value is deterministic and
+  identical. Fixed by never asserting `weather` on the file's bootstrap
+  steps, only from its own first `weather` command onward — the file's
+  full 7-state cycle (sunny→cloudy→light_rain→heavy_rain→storm→
+  heat_wave→cold_snap) is now genuinely proven in both modes for the
+  first time. Verified in both modes with a real browser. Batch 6:
+  17/18 done. Full local sweep green: typecheck, 124/124 scenarios,
+  8315/8315 tests (+3 from the new weather field-parity tests). GitHub
+  Actions still not re-checked this session — all verification remains
+  local. Next: weather-flood, the last Batch 6 file.
