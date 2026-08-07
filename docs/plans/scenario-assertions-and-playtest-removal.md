@@ -592,7 +592,11 @@ holeCount/chargedCount/sequencedCount/storedMassKg/surveyCount/
 activeContractCount/qualificationCount/proficiencyTotal all asserted;
 this is the one file in the batch where `contract deliver` genuinely
 succeeds, since it's the only one that actually hauls stock into a
-warehouse first) · ⬜ hauling-gate ·
+warehouse first) ·
+✅ hauling-gate (**Finding #33** — see the findings log; the Haul
+button's own fragment-picking is position-sensitive, so the delivered
+tonnage genuinely differs between command mode and a real browser
+without either being wrong) ·
 ⬜ maintenance-cost-drain · ⬜ scores-display-visual ·
 ⬜ time-management-visual · ⬜ safety-projection-visual ·
 ⬜ core-loop-visual · ⬜ i18n-display-visual · ⬜ main-menu-visual ·
@@ -842,6 +846,8 @@ of each session, in case main added/removed a file.)
 31. **`contract-negotiation.json`'s whole premise was never actually exercised — the file never once called `contract negotiate`, despite its own name and description ("Negotiate contracts repeatedly to observe both improved and worsened pricing outcomes").** It only ever called `contract accept`/`contract deliver`, with no drill/blast/haul pipeline to ever put material in storage — a direct trace confirmed `contract deliver` fails on *every* run ("Not enough dirtite in storage: 0.0 kg available"), cash never once moves through the whole file (`finances` shows $0 income/expenses throughout), and the file's own second `contract accept 1` call fails too ("Contract #1 not found in available list") since the contract pool had refreshed with new ids by then. Nothing about "pricing outcomes" was ever observable. **Fixed by actually exercising the mechanic**: a real `contract negotiate id:1` UI click (`ContractsPanel.ts`'s `[data-action="negotiate"]` button — a control that existed the whole time and was simply never used) at round 1, a `tick 5` (negotiate's RNG reseeds from `state.seed + state.tickCount` each call, per `economy.ts` — two calls at the same tick roll identically), then a second `contract negotiate id:1` at round 2. Confirmed via direct trace (seed:42, dusty_hollow): round 1 genuinely FAILS (deadline worsened 11%), round 2 genuinely SUCCEEDS (deadline improved 8%) — the file's own claim, proven for real rather than never attempted. No state field exposes a contract's own terms, so each negotiate step's `expect` anchors on `cash` (negotiating is free) with a `note` documenting the trace-confirmed real outcome, the same precedent Findings #21/#22 set for effects no scalar can check directly. **Also added `activeContractCount`** (`state.contracts.active.length`) to `SerializableGameState` in lockstep across `console-api.ts`/`main.ts`/`validate-state-schema.ts` — no field existed to prove `contract accept` ever moved a contract from available to active at all, closing the same class of gap `pendingActionCount`/`stuckEmployeeCount` closed for their own mechanics; two new `console-api.test.ts` tests (zero on a fresh game, 1 after a real accept). Left `contract deliver`'s genuine failure (no stock, by this file's own narrower scope) as `activeContractCount: 1` unchanged with a `note` explaining the full haul-to-storage pipeline is `economy-full-loop.json`'s job, not this file's. Verified in both command mode and a real browser.
 
 32. **A third instance of Finding #13's class, found tracing `economy-full-loop.json`: `runSurvey` (`SurveyCalc.ts`) deducted `state.cash` directly for every survey but never called `addExpense` on `state.finances`.** Confirmed by dumping both fields side by side: a `survey seismic` call correctly dropped the flat `cash` by `SURVEY_COSTS.seismic` ($3000), but `state.finances.cash` never moved — a permanent, silent $3000 gap that persisted through the rest of the trace (visible only once a `finances` command's own output was compared against the flat field, since every prior scenario assertion in this whole project has correctly read the flat `cash` field, which was never wrong). No committed scenario file asserts on the nested `finances.cash` path directly (confirmed by grep — only one file, `ramp-navigation.json`, even mentions `finances.` at all, in a descriptive comment about Finding #13 itself, not a live assertion), so this bug was invisible to every earlier verification pass in this project despite affecting every survey-using scenario (the whole Batch 3 survey-* group). **Fixed at the root** — added the missing `addExpense(state.finances, cost, 'materials', ...)` call, matching the pattern every other cash-spending command already uses (a legacy, unused, dead-code sibling function in `Survey.ts` has the same bug but has no importers anywhere in `src/` — confirmed via grep — so left alone as genuinely unreachable, not a live gap). New unit test in `SurveyCalc.test.ts` proving `state.finances.cash` mirrors the flat field after a survey. No existing scenario-file assertions needed updating, since none checked the field that was actually broken.
+
+33. **`hauling-gate.json` had two problems, one a repeat of Finding #3's class, the other a new discovery specific to the Haul button's own selection logic.** (a) The `drill_plan grid rows:2 cols:2 spacing:5` command didn't match the click's real (20,20)-(25,25) drag at the panel's default spacing (3), which actually produces a 3×3=9-hole grid, not 2×2=4 — same class as `nav-cell-types-visual.json`. Fixed by correcting the command. (b) Fixing (a) changed the blast's fragment distribution enough that the file's original hardcoded `fragment:1` became oversized and un-haulable ("Fragment is oversized and needs a Rock Fragmenter first") — but investigating *why* revealed something more interesting: the real Haul button never lets a player pick a fragment id at all. It calls `findReachableGroundFragment` (`HaulingTask.ts`), which auto-selects the vehicle's nearest reachable, non-oversized, storage-fitting fragment based on the vehicle's *exact current position* — a fundamentally different selection than "whatever index a human guesses and hardcodes." Calling that function directly against the traced state gave the real answer (fragment #531, confirmed deterministic under command mode's clean tick10). But a real browser's wall-clock ticking (Finding #12) shifts the vehicle's exact position by click time, so the *same* selection logic picks a genuinely different fragment there — confirmed via a real run: 263.25kg delivered in command mode vs. 1050kg in interaction mode, neither wrong. **Fixed** by using the real, trace-confirmed fragment id (#531) in the command field (documented as position-derived, not a round number picked by hand), and by not asserting the exact delivered tonnage on the later `tick 40`/final `state full` steps — only the earlier `tick 20` step's `increased: ["storedMassKg"]` check, which holds regardless of which specific fragment gets picked and is what actually proves this file's premise (arrival-gated delivery genuinely completes, not instantly). Verified in both command mode and a real browser.
 
 _(Add new findings here as you hit them. Number sequentially.)_
 
@@ -1125,5 +1131,22 @@ got, whether main was merged, and whether GitHub Actions is back up yet.
   #32. Batch 6: 6/18 done. Full local sweep green: typecheck, 124/124
   scenarios, 8309/8309 tests. GitHub Actions still not re-checked this
   session — all verification remains local. Next: hauling-gate,
+  maintenance-cost-drain, scores-display-visual, then the rest of
+  Batch 6.
+- 2026-08-07 (cont.) — hauling-gate.json done (Finding #33): a repeat
+  of the grid-spacing command/click mismatch (Finding #3's class, same
+  fix as before) plus a new discovery — the real Haul button auto-picks
+  the vehicle's nearest reachable fragment by exact position
+  (findReachableGroundFragment), not a fixed index, and a real
+  browser's wall-clock ticking shifts that position enough to pick a
+  genuinely different fragment than command mode's clean ticks (263kg
+  vs 1050kg delivered, confirmed via a real run, neither wrong). Fixed
+  by using the real trace-confirmed fragment id for command mode and
+  dropping the exact-tonnage assertion on later steps, keeping only the
+  earlier increased-storedMassKg check that holds regardless of which
+  fragment gets picked — the actual premise this file tests. Verified
+  in both modes. Batch 6: 7/18 done. Full local sweep green: typecheck,
+  124/124 scenarios, 8309/8309 tests. GitHub Actions still not
+  re-checked this session — all verification remains local. Next:
   maintenance-cost-drain, scores-display-visual, then the rest of
   Batch 6.

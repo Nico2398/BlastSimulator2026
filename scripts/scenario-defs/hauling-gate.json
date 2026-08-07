@@ -10,7 +10,13 @@
           "command": "new_game seed:42 cash:100000"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 100000,
+          "buildingCount": 0
+        }
+      }
     },
     {
       "command": "build freight_warehouse at:5,5",
@@ -40,10 +46,17 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "buildingCount": 1
+        }
+      }
     },
     {
-      "command": "drill_plan grid rows:2 cols:2 spacing:5 depth:8 start:20,20",
+      "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:8 start:20,20",
+      "description": "Corrected from the original rows:2 cols:2 spacing:5 (which command mode ran literally, producing 4 holes): the click drags the (20,20)-(25,25) rectangle at the Drill panel's own default spacing (DEFAULT_SPACING_M=3), computing cols/rows as round(size/spacing)+1 = 3x3 = 9 holes for that same rectangle -- the command and the click were silently testing two different grids, the same class of bug already fixed in nav-cell-types-visual.json. Caught by adding expect.equals.holeCount; fixed by describing what the click actually produces.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -72,7 +85,12 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 9
+        }
+      }
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
@@ -82,7 +100,12 @@
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "chargedCount": 9
+        }
+      }
     },
     {
       "command": "sequence auto delay_step:25",
@@ -92,7 +115,12 @@
           "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "sequencedCount": 9
+        }
+      }
     },
     {
       "command": "blast",
@@ -118,7 +146,14 @@
           "selector": "[data-action=\"report-close\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        }
+      }
     },
     {
       "command": "fragments",
@@ -128,7 +163,12 @@
           "command": "fragments"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "storedMassKg": 0
+        }
+      }
     },
     {
       "command": "state full",
@@ -156,7 +196,13 @@
           "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "vehicleCount": 1
+        }
+      }
     },
     {
       "command": "employee hire role:driver",
@@ -174,7 +220,13 @@
           "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "employeeCount": 1
+        }
+      }
     },
     {
       "command": "employee assign_skill 1 skill:driving.truck level:1",
@@ -184,7 +236,13 @@
           "command": "employee assign_skill 1 skill:driving.truck level:1"
         }
       ],
-      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`."
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
+      "expect": {
+        "equals": {
+          "cash": 59200
+        },
+        "note": "the driver already holds driving.truck at level 1 from ROLE_STARTING_QUALIFICATION -- this call is a same-level no-op"
+      }
     },
     {
       "command": "vehicle driver 1 1",
@@ -202,7 +260,12 @@
           "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 59200
+        }
+      }
     },
     {
       "command": "tick 10",
@@ -212,7 +275,13 @@
           "command": "tick 10"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "storedMassKg": 0
+        }
+      }
     },
     {
       "command": "vehicle list",
@@ -225,7 +294,8 @@
       "role": "observe"
     },
     {
-      "command": "vehicle haul 1 fragment:1",
+      "command": "vehicle haul 1 fragment:531",
+      "description": "The Haul button always picks the vehicle's nearest reachable, non-oversized, storage-fitting fragment (findReachableGroundFragment, HaulEligibility.ts) -- not a fixed index. #531 is what that function itself returns for this exact seed/command sequence (confirmed by calling it directly), which is why this id looks arbitrary rather than a round number picked by hand -- it must be re-derived the same way if anything upstream (the grid, the blast, the vehicle's spawn point) ever changes.",
       "interaction": [
         {
           "type": "waitForSelector",
@@ -236,7 +306,14 @@
           "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-haul-btn"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 58620,
+          "storedMassKg": 0
+        },
+        "note": "sets hauling intent only -- the fragment is not yet loaded, proving 'vehicle haul' does not complete instantly (#437)"
+      }
     },
     {
       "command": "fragments",
@@ -246,7 +323,12 @@
           "command": "fragments"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "storedMassKg": 0
+        }
+      }
     },
     {
       "command": "state full",
@@ -260,13 +342,18 @@
     },
     {
       "command": "tick 20",
+      "description": "Confirmed via direct trace (seed:42) that the full pickup-drive-deliver cycle completes within this window -- storedMassKg is already at its final value by the end of this step, not just 'in transit'.",
       "interaction": [
         {
           "type": "command",
           "command": "tick 20"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash"],
+        "increased": ["storedMassKg"]
+      }
     },
     {
       "command": "fragments",
@@ -296,7 +383,11 @@
           "command": "tick 40"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash"],
+        "note": "storedMassKg is deliberately not asserted to an exact value here: findReachableGroundFragment (the real Haul button's own fragment choice) is sensitive to the vehicle's exact tick-by-tick position, and interaction mode's real wall-clock ticking (Finding #12) can pick a different -- but equally valid -- fragment than command mode's clean tick10. The delivered amount genuinely differs between modes (confirmed: 263.25kg in command mode, 1050kg in a real browser run) without either being wrong; tick 20's own increased:[storedMassKg] check already proves delivery genuinely completed, which is this file's actual premise."
+      }
     },
     {
       "command": "fragments",
@@ -316,7 +407,14 @@
           "command": "state full"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "employeeCount": 1,
+          "vehicleCount": 1,
+          "buildingCount": 1
+        }
+      }
     }
   ]
 }
