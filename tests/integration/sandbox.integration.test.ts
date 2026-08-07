@@ -55,6 +55,14 @@ describe('sandbox mode', () => {
     expect(result.output).toContain('hard');
   });
 
+  it('rejects difficulty:constructor rather than resolving it to Object.prototype.constructor (#504 prototype pollution)', () => {
+    const result = runner.run('sandbox start biome:desert_badlands difficulty:constructor seed:1');
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('easy');
+    expect(result.output).toContain('normal');
+    expect(result.output).toContain('hard');
+  });
+
   it('rejects an unknown biome instead of silently substituting one', () => {
     const result = runner.run('sandbox start biome:atlantis');
     expect(result.success).toBe(false);

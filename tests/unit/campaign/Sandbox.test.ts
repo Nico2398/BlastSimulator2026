@@ -80,6 +80,12 @@ describe('clampSandboxConfig', () => {
     expect(cfg.difficulty).toBe(SANDBOX_DEFAULTS.difficulty);
   });
 
+  it('falls back to the default difficulty for an inherited Object.prototype key (#504 prototype pollution)', () => {
+    const cfg = clampSandboxConfig({ difficulty: 'constructor' as SandboxDifficultyId });
+    expect(cfg.difficulty).toBe(SANDBOX_DEFAULTS.difficulty);
+    expect(() => clampSandboxConfig({ difficulty: 'constructor' as SandboxDifficultyId })).not.toThrow();
+  });
+
   it('accepts every named difficulty', () => {
     for (const id of SANDBOX_DIFFICULTY_ORDER) {
       expect(clampSandboxConfig({ difficulty: id }).difficulty).toBe(id);
