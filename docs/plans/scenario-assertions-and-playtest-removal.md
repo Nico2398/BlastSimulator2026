@@ -382,7 +382,12 @@ promised**)
 Batch 3 done: 12/12, Findings #14-#19.
 
 ### Batch 4 — building-* (12) — **+ research-center-gate parity check**
-⬜ building-destruction-visual · ⬜ building-lifecycle ·
+✅ building-destruction-visual (no `campaign start` — sandbox `new_game`
+defaults to a 64×64 world; builds 2 warehouses then drills/charges/
+sequences/blasts near them, Finding #4 grid-spacing fix needed; the
+file's own stated purpose — both warehouses destroyed by the blast —
+confirmed via a real dump, blast rating CATASTROPHIC) ·
+⬜ building-lifecycle ·
 ⬜ building-living-visual · ⬜ building-menu-visual ·
 ⬜ building-placement-visual · ⬜ building-ramp-visual ·
 ⬜ building-research-progression-visual (parity check here) ·

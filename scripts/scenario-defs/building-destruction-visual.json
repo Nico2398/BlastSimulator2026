@@ -11,7 +11,14 @@
           "command": "new_game seed:42"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "holeCount": 0,
+          "buildingCount": 0
+        }
+      }
     },
     {
       "command": "build explosive_warehouse at:20,20",
@@ -41,7 +48,13 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 30000,
+          "buildingCount": 1
+        }
+      }
     },
     {
       "command": "build freight_warehouse at:25,25",
@@ -67,7 +80,13 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 15000,
+          "buildingCount": 2
+        }
+      }
     },
     {
       "command": "build list",
@@ -95,6 +114,14 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
+        },
+        {
           "type": "dragTiles",
           "x1": 15,
           "z1": 15,
@@ -109,7 +136,12 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 9
+        }
+      }
     },
     {
       "command": "charge hole:* explosive:boomite amount:8 stemming:1",
@@ -119,7 +151,12 @@
           "command": "charge hole:* explosive:boomite amount:8 stemming:1"
         }
       ],
-      "description": "Left unmarked: amount:8/stemming:1 don't match the Charge panel's defaults (boomite/5kg/2m), and there is no click path to an exact non-default amount -- same class as Finding #10 (per-hole charging has no UI at all; Charge All is the only commit, at whatever the steppers currently show). Sequence/blast afterward still click normally since the panel reacts to state, not to how holes got charged."
+      "description": "Left unmarked: amount:8/stemming:1 don't match the Charge panel's defaults (boomite/5kg/2m), and there is no click path to an exact non-default amount -- same class as Finding #10 (per-hole charging has no UI at all; Charge All is the only commit, at whatever the steppers currently show). Sequence/blast afterward still click normally since the panel reacts to state, not to how holes got charged.",
+      "expect": {
+        "equals": {
+          "chargedCount": 9
+        }
+      }
     },
     {
       "command": "sequence auto delay_step:25",
@@ -129,7 +166,12 @@
           "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "sequencedCount": 9
+        }
+      }
     },
     {
       "command": "blast",
@@ -158,7 +200,16 @@
           "selector": "[data-action=\"report-close\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0,
+          "buildingCount": 0
+        },
+        "note": "both warehouses (200/150 max HP) are within the blast's damage radius and get destroyed — the file's own stated purpose, confirmed via a real dump (blast rating CATASTROPHIC, 'Buildings destroyed: explosive_warehouse #1, freight_warehouse #2')"
+      }
     },
     {
       "command": "build list",
