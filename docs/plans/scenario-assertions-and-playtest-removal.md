@@ -460,7 +460,8 @@ rejected, licence check confirmed real) ·
 ✅ vehicle-purchase-tier-ui-visual (4 purchases across T1/T2/T3, all
 affordable within the file's $300,000 bump — cash/vehicleCount asserted
 exactly at each, no overdraw here unlike vehicle-3d-rendering-visual) ·
-⬜ vehicle-roles-panel-visual ·
+✅ vehicle-roles-panel-visual (same 5-vehicle-purchase sequence as
+vehicle-3d-rendering-visual — identical cash/vehicleCount values reused) ·
 ⬜ vehicle-task-states-visual · ⬜ vehicle-traffic ·
 ⬜ vehicle-traffic-routing-visual · ⬜ needs-collapse-visual ·
 ⬜ needs-cost-visual · ⬜ needs-cycle · ⬜ needs-drain-visual ·

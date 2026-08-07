@@ -12,7 +12,13 @@
         }
       ],
       "role": "setup",
-      "description": "Bumped cash from the 50k default to 200k -- same reasoning as vehicle-3d-rendering-visual: all 5 vehicle-role buys need to land for a real click, not just the first."
+      "description": "Bumped cash from the 50k default to 200k -- same reasoning as vehicle-3d-rendering-visual: all 5 vehicle-role buys need to land for a real click, not just the first.",
+      "expect": {
+        "equals": {
+          "cash": 200000,
+          "vehicleCount": 0
+        }
+      }
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -23,7 +29,13 @@
         }
       ],
       "role": "setup",
-      "description": "campaign start replaces the whole GameState including cash, reset to the level's own startingCash -- same as vehicle-3d-rendering-visual, a `new_game ... cash:N` override does not survive this step."
+      "description": "campaign start replaces the whole GameState including cash, reset to the level's own startingCash -- same as vehicle-3d-rendering-visual, a `new_game ... cash:N` override does not survive this step.",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "vehicleCount": 0
+        }
+      }
     },
     {
       "command": "vehicle list",
@@ -51,7 +63,13 @@
           "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 25000,
+          "vehicleCount": 1
+        }
+      }
     },
     {
       "command": "vehicle buy rock_digger",
@@ -61,7 +79,13 @@
           "command": "vehicle buy rock_digger"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
+      "description": "Left unmarked: cash is already at or below cost, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "expect": {
+        "equals": {
+          "cash": -25000,
+          "vehicleCount": 2
+        }
+      }
     },
     {
       "command": "vehicle buy drill_rig",
@@ -71,7 +95,13 @@
           "command": "vehicle buy drill_rig"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
+      "description": "Left unmarked: cash is already at or below cost, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "expect": {
+        "equals": {
+          "cash": -60000,
+          "vehicleCount": 3
+        }
+      }
     },
     {
       "command": "vehicle buy building_destroyer",
@@ -81,7 +111,13 @@
           "command": "vehicle buy building_destroyer"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
+      "description": "Left unmarked: cash is already at or below cost, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "expect": {
+        "equals": {
+          "cash": -90000,
+          "vehicleCount": 4
+        }
+      }
     },
     {
       "command": "vehicle buy rock_fragmenter",
@@ -91,7 +127,13 @@
           "command": "vehicle buy rock_fragmenter"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
+      "description": "Left unmarked: cash is already at or below cost, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "expect": {
+        "equals": {
+          "cash": -122000,
+          "vehicleCount": 5
+        }
+      }
     },
     {
       "command": "vehicle list",
