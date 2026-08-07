@@ -613,6 +613,7 @@ export function buySoftwareCommand(
   const result = purchaseSoftware(currentTier, ctx.state!.cash);
   if ('error' in result) return { success: false, output: result.error };
   ctx.state!.cash -= result.cost;
+  addExpense(ctx.state!.finances, result.cost, 'equipment', `Software tier ${result.newTier}`, ctx.state!.tickCount);
   ctx.state!.softwareTier = result.newTier;
   return { success: true, output: `Upgraded to software tier ${result.newTier}. Cost: $${result.cost}` };
 }

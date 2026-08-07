@@ -155,6 +155,23 @@ describe('buy_software tier validation', () => {
     expect(ctx.state!.softwareTier).toBe(1);
   });
 
+  it('mirrors the deduction in state.finances.cash, not just the flat field', () => {
+    const ctx = makeMiningContext();
+    ctx.state!.cash = 999_999;
+    ctx.state!.finances.cash = 999_999;
+    const cashBefore = ctx.state!.cash;
+
+    const result = buySoftwareCommand(ctx, [], { tier: '1' });
+
+    expect(result.success).toBe(true);
+    expect(ctx.state!.finances.cash).toBe(ctx.state!.cash);
+    expect(ctx.state!.cash).toBeLessThan(cashBefore);
+    const entry = ctx.state!.finances.transactions.find(t => t.category === 'equipment');
+    expect(entry).toBeDefined();
+    expect(entry!.type).toBe('expense');
+    expect(entry!.description).toContain('Software tier 1');
+  });
+
   it('tier:1 when at tier 0 succeeds', () => {
     const ctx = makeMiningContext();
     ctx.state!.cash = 999_999;
