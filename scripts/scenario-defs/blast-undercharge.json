@@ -19,8 +19,8 @@
       }
     },
     {
-      "command": "drill_plan grid rows:2 cols:2 spacing:5 depth:8 start:15,15",
-      "description": "Two increment clicks on the spacing stepper (data-field=\"spacing\") raise it 3->5m (DEFAULT_SPACING_M, Drill.ts) before dragging, so the (15,15)-(20,20) rectangle computes the declared 2x2 instead of the default-spacing 3x3 (issue #479 follow-up, Finding #4).",
+      "command": "drill_plan grid rows:2 cols:2 spacing:5 depth:6 start:15,15",
+      "description": "Two increment clicks on the spacing stepper (data-field=\"spacing\") raise it 3->5m (DEFAULT_SPACING_M, Drill.ts) before dragging, so the (15,15)-(20,20) rectangle computes the declared 2x2 instead of the default-spacing 3x3 (issue #479 follow-up, Finding #4). depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -67,7 +67,7 @@
     },
     {
       "command": "charge hole:* explosive:boomite amount:2 stemming:2",
-      "description": "stemming:2 already matches the Charge panel's default (DEFAULT_STEMMING_M, Charge.ts), so only amount needs adjusting: 3 decrement clicks on the amount stepper (data-field=\"amount\") reach boomite's minimum viable charge, 5->2kg, before Charge All (issue #479 follow-up, same class as Finding #4/the overcharge fix — verified against the real chargesByHole dump, not assumed).",
+      "description": "stemming:2 already matches the Charge panel's default (DEFAULT_STEMMING_M, Charge.ts), so only amount needs adjusting: 3 decrement clicks on the amount stepper (data-field=\"amount\") reach boomite's minimum viable charge, 5->2kg, before Charge All (issue #479 follow-up, same class as Finding #4/the overcharge fix \u2014 verified against the real chargesByHole dump, not assumed).",
       "interaction": [
         {
           "type": "clickSelector",
