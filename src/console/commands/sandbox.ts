@@ -8,7 +8,7 @@ import type { CommandResult } from '../ConsoleRunner.js';
 import type { GameContext } from './world.js';
 import {
   SANDBOX_DEFAULTS,
-  SANDBOX_DIFFICULTIES,
+  SANDBOX_DIFFICULTY_ORDER,
   clampSandboxConfig,
   randomSandboxSeed,
   sandboxLevelDef,
@@ -56,8 +56,8 @@ export function sandboxCommand(
     const valid = getAllBiomes().map(b => b.id).join(', ');
     return { success: false, output: `Unknown biome: "${requested.biome}". Valid: ${valid}` };
   }
-  if (requested.difficulty !== undefined && !(requested.difficulty in SANDBOX_DIFFICULTIES)) {
-    const valid = Object.keys(SANDBOX_DIFFICULTIES).join(', ');
+  if (requested.difficulty !== undefined && !SANDBOX_DIFFICULTY_ORDER.includes(requested.difficulty)) {
+    const valid = SANDBOX_DIFFICULTY_ORDER.join(', ');
     return { success: false, output: `Unknown difficulty: "${requested.difficulty}". Valid: ${valid}` };
   }
 

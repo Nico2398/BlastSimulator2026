@@ -107,7 +107,7 @@ export function clampSandboxConfig(partial: Partial<SandboxConfig>): SandboxConf
   out.seed = Math.round(clampNumber(Number(out.seed), seedField, SANDBOX_DEFAULTS.seed));
 
   if (!getBiome(out.biome)) out.biome = SANDBOX_DEFAULTS.biome;
-  if (!(out.difficulty in SANDBOX_DIFFICULTIES)) out.difficulty = SANDBOX_DEFAULTS.difficulty;
+  if (!SANDBOX_DIFFICULTY_ORDER.includes(out.difficulty)) out.difficulty = SANDBOX_DEFAULTS.difficulty;
 
   return out;
 }
