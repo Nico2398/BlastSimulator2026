@@ -1,6 +1,6 @@
 {
   "name": "level1-win-efficient",
-  "description": "Level 1 winning scenario: efficient blasting + survey confidence overlay + contract fulfillment to reach $80k profit. Includes survey overlay checkpoints to verify confidence markers render during gameplay. FAILS until GameRenderer wires survey overlay into syncFromContext().",
+  "description": "Level 1 (Dusty Hollow): 3 blasts, 2 surveys, and 3 contract attempts with no vehicle ever bought -- named for an efficient $80k win, but no hauling infrastructure means no delivery ever succeeds; see Findings #54-#57 for the real trajectory asserted instead, and for confirmation (via an inspected screenshot, not just source reading) that the survey confidence overlay this file was originally written to gate on now genuinely renders -- the stale 'FAILS until GameRenderer wires survey overlay into syncFromContext()' warning this file previously carried is no longer true.",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -10,7 +10,17 @@
           "command": "new_game seed:42"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 0,
+          "activeContractCount": 0,
+          "surveyCount": 0
+        }
+      }
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -20,7 +30,17 @@
           "command": "campaign start level:dusty_hollow"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 0,
+          "activeContractCount": 0,
+          "surveyCount": 0
+        }
+      }
     },
     {
       "command": "time resume",
@@ -30,7 +50,17 @@
           "command": "time resume"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 0,
+          "activeContractCount": 0,
+          "surveyCount": 0
+        }
+      }
     },
     {
       "command": "scores",
@@ -40,7 +70,21 @@
           "command": "scores"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 0,
+          "activeContractCount": 0,
+          "surveyCount": 0,
+          "wellBeing": 50,
+          "safety": 50,
+          "ecology": 50,
+          "nuisance": 50
+        }
+      }
     },
     {
       "command": "finances",
@@ -50,7 +94,17 @@
           "command": "finances"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 0,
+          "activeContractCount": 0,
+          "surveyCount": 0
+        }
+      }
     },
     {
       "command": "employee hire role:surveyor",
@@ -68,17 +122,37 @@
           "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 48800,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 1,
+          "activeContractCount": 0,
+          "surveyCount": 0
+        }
+      }
     },
     {
-      "command": "employee assign_skill 1 geology 3",
+      "command": "employee assign_skill 1 skill:geology level:3",
       "interaction": [
         {
           "type": "command",
-          "command": "employee assign_skill 1 geology 3"
+          "command": "employee assign_skill 1 skill:geology level:3"
         }
       ],
-      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`."
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
+      "expect": {
+        "equals": {
+          "cash": 48800,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 1,
+          "activeContractCount": 0,
+          "surveyCount": 0
+        }
+      }
     },
     {
       "command": "employee list",
@@ -88,7 +162,17 @@
           "command": "employee list"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 48800,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 1,
+          "activeContractCount": 0,
+          "surveyCount": 0
+        }
+      }
     },
     {
       "command": "state full",
@@ -98,7 +182,17 @@
           "command": "state full"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 48800,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 1,
+          "activeContractCount": 0,
+          "surveyCount": 0
+        }
+      }
     },
     {
       "command": "survey core_sample x:10 z:10",
@@ -132,7 +226,17 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 48000,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 1,
+          "activeContractCount": 0,
+          "surveyCount": 0
+        }
+      }
     },
     {
       "command": "survey seismic x:20 z:20",
@@ -162,7 +266,17 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 45000,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 1,
+          "activeContractCount": 0,
+          "surveyCount": 0
+        }
+      }
     },
     {
       "command": "survey show",
@@ -172,7 +286,17 @@
           "command": "survey show"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 45000,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 1,
+          "activeContractCount": 0,
+          "surveyCount": 0
+        }
+      }
     },
     {
       "command": "state full",
@@ -182,7 +306,17 @@
           "command": "state full"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 45000,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 1,
+          "activeContractCount": 0,
+          "surveyCount": 0
+        }
+      }
     },
     {
       "command": "tick 10",
@@ -192,7 +326,17 @@
           "command": "tick 10"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 44180,
+          "tickCount": 10,
+          "deathCount": 0,
+          "employeeCount": 1,
+          "activeContractCount": 0,
+          "surveyCount": 0
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -202,7 +346,17 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": 44180,
+          "tickCount": 10,
+          "deathCount": 0,
+          "employeeCount": 1,
+          "activeContractCount": 0,
+          "surveyCount": 0
+        }
+      }
     },
     {
       "command": "tick 10",
@@ -212,7 +366,17 @@
           "command": "tick 10"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 43360,
+          "tickCount": 20,
+          "deathCount": 0,
+          "employeeCount": 1,
+          "activeContractCount": 0,
+          "surveyCount": 0
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -222,7 +386,17 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": 43360,
+          "tickCount": 20,
+          "deathCount": 0,
+          "employeeCount": 1,
+          "activeContractCount": 0,
+          "surveyCount": 0
+        }
+      }
     },
     {
       "command": "tick 10",
@@ -232,7 +406,17 @@
           "command": "tick 10"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 42540,
+          "tickCount": 30,
+          "deathCount": 0,
+          "employeeCount": 1,
+          "activeContractCount": 0,
+          "surveyCount": 0
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -242,7 +426,17 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": 42540,
+          "tickCount": 30,
+          "deathCount": 0,
+          "employeeCount": 1,
+          "activeContractCount": 0,
+          "surveyCount": 0
+        }
+      }
     },
     {
       "command": "tick 10",
@@ -252,7 +446,17 @@
           "command": "tick 10"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 41720,
+          "tickCount": 40,
+          "deathCount": 0,
+          "employeeCount": 1,
+          "activeContractCount": 0,
+          "surveyCount": 0
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -262,7 +466,17 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": 41720,
+          "tickCount": 40,
+          "deathCount": 0,
+          "employeeCount": 1,
+          "activeContractCount": 0,
+          "surveyCount": 0
+        }
+      }
     },
     {
       "command": "survey show",
@@ -272,7 +486,17 @@
           "command": "survey show"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 41720,
+          "tickCount": 40,
+          "deathCount": 0,
+          "employeeCount": 1,
+          "activeContractCount": 0,
+          "surveyCount": 0
+        }
+      }
     },
     {
       "command": "state full",
@@ -282,7 +506,17 @@
           "command": "state full"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 41720,
+          "tickCount": 40,
+          "deathCount": 0,
+          "employeeCount": 1,
+          "activeContractCount": 0,
+          "surveyCount": 0
+        }
+      }
     },
     {
       "command": "tick 8",
@@ -292,7 +526,17 @@
           "command": "tick 8"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 41720,
+          "tickCount": 48,
+          "deathCount": 0,
+          "employeeCount": 1,
+          "activeContractCount": 0,
+          "surveyCount": 1
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -302,7 +546,17 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": 41720,
+          "tickCount": 48,
+          "deathCount": 0,
+          "employeeCount": 1,
+          "activeContractCount": 0,
+          "surveyCount": 1
+        }
+      }
     },
     {
       "command": "tick 8",
@@ -312,7 +566,17 @@
           "command": "tick 8"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 40900,
+          "tickCount": 56,
+          "deathCount": 0,
+          "employeeCount": 1,
+          "activeContractCount": 0,
+          "surveyCount": 1
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -322,7 +586,17 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": 40900,
+          "tickCount": 56,
+          "deathCount": 0,
+          "employeeCount": 1,
+          "activeContractCount": 0,
+          "surveyCount": 1
+        }
+      }
     },
     {
       "command": "tick 8",
@@ -332,7 +606,17 @@
           "command": "tick 8"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 40080,
+          "tickCount": 64,
+          "deathCount": 0,
+          "employeeCount": 1,
+          "activeContractCount": 0,
+          "surveyCount": 2
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -342,7 +626,17 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": 40080,
+          "tickCount": 64,
+          "deathCount": 0,
+          "employeeCount": 1,
+          "activeContractCount": 0,
+          "surveyCount": 2
+        }
+      }
     },
     {
       "command": "tick 8",
@@ -352,7 +646,17 @@
           "command": "tick 8"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 39260,
+          "tickCount": 72,
+          "deathCount": 0,
+          "employeeCount": 1,
+          "activeContractCount": 0,
+          "surveyCount": 2
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -362,7 +666,17 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": 39260,
+          "tickCount": 72,
+          "deathCount": 0,
+          "employeeCount": 1,
+          "activeContractCount": 0,
+          "surveyCount": 2
+        }
+      }
     },
     {
       "command": "survey show",
@@ -372,7 +686,17 @@
           "command": "survey show"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 39260,
+          "tickCount": 72,
+          "deathCount": 0,
+          "employeeCount": 1,
+          "activeContractCount": 0,
+          "surveyCount": 2
+        }
+      }
     },
     {
       "command": "state full",
@@ -382,10 +706,20 @@
           "command": "state full"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 39260,
+          "tickCount": 72,
+          "deathCount": 0,
+          "employeeCount": 1,
+          "activeContractCount": 0,
+          "surveyCount": 2
+        }
+      }
     },
     {
-      "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:10,10",
+      "command": "drill_plan grid rows:4 cols:4 spacing:3 depth:6 diameter:0.089 start:10,10",
       "interaction": [
         {
           "type": "clickSelector",
@@ -418,7 +752,20 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 39260,
+          "tickCount": 72,
+          "deathCount": 0,
+          "employeeCount": 1,
+          "activeContractCount": 0,
+          "surveyCount": 2,
+          "holeCount": 16,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        }
+      }
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
@@ -432,7 +779,20 @@
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 39260,
+          "tickCount": 72,
+          "deathCount": 0,
+          "employeeCount": 1,
+          "activeContractCount": 0,
+          "surveyCount": 2,
+          "holeCount": 16,
+          "chargedCount": 16,
+          "sequencedCount": 0
+        }
+      }
     },
     {
       "command": "sequence auto delay_step:25",
@@ -446,7 +806,20 @@
           "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 39260,
+          "tickCount": 72,
+          "deathCount": 0,
+          "employeeCount": 1,
+          "activeContractCount": 0,
+          "surveyCount": 2,
+          "holeCount": 16,
+          "chargedCount": 16,
+          "sequencedCount": 16
+        }
+      }
     },
     {
       "command": "blast",
@@ -476,7 +849,20 @@
           "selector": "[data-action=\"report-close\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 39260,
+          "tickCount": 72,
+          "deathCount": 1,
+          "employeeCount": 1,
+          "activeContractCount": 0,
+          "surveyCount": 2,
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        }
+      }
     },
     {
       "command": "state full",
@@ -486,7 +872,17 @@
           "command": "state full"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 39260,
+          "tickCount": 72,
+          "deathCount": 1,
+          "employeeCount": 1,
+          "activeContractCount": 0,
+          "surveyCount": 2
+        }
+      }
     },
     {
       "command": "finances",
@@ -496,7 +892,17 @@
           "command": "finances"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 39260,
+          "tickCount": 72,
+          "deathCount": 1,
+          "employeeCount": 1,
+          "activeContractCount": 0,
+          "surveyCount": 2
+        }
+      }
     },
     {
       "command": "scores",
@@ -506,7 +912,21 @@
           "command": "scores"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 39260,
+          "tickCount": 72,
+          "deathCount": 1,
+          "employeeCount": 1,
+          "activeContractCount": 0,
+          "surveyCount": 2,
+          "wellBeing": 41.890000000000164,
+          "safety": 50,
+          "ecology": 49.18,
+          "nuisance": 47.95
+        }
+      }
     },
     {
       "command": "stats",
@@ -516,7 +936,21 @@
           "command": "stats"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 39260,
+          "tickCount": 72,
+          "deathCount": 1,
+          "employeeCount": 1,
+          "activeContractCount": 0,
+          "surveyCount": 2,
+          "wellBeing": 41.890000000000164,
+          "safety": 50,
+          "ecology": 49.18,
+          "nuisance": 47.95
+        }
+      }
     },
     {
       "command": "tick 5",
@@ -526,7 +960,17 @@
           "command": "tick 5"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 39260,
+          "tickCount": 77,
+          "deathCount": 1,
+          "employeeCount": 1,
+          "activeContractCount": 0,
+          "surveyCount": 2
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -536,7 +980,17 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": 39260,
+          "tickCount": 77,
+          "deathCount": 1,
+          "employeeCount": 1,
+          "activeContractCount": 0,
+          "surveyCount": 2
+        }
+      }
     },
     {
       "command": "tick 5",
@@ -546,7 +1000,17 @@
           "command": "tick 5"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 39260,
+          "tickCount": 82,
+          "deathCount": 1,
+          "employeeCount": 1,
+          "activeContractCount": 0,
+          "surveyCount": 2
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -556,7 +1020,17 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": 39260,
+          "tickCount": 82,
+          "deathCount": 1,
+          "employeeCount": 1,
+          "activeContractCount": 0,
+          "surveyCount": 2
+        }
+      }
     },
     {
       "command": "contract list",
@@ -566,10 +1040,20 @@
           "command": "contract list"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 39260,
+          "tickCount": 82,
+          "deathCount": 1,
+          "employeeCount": 1,
+          "activeContractCount": 0,
+          "surveyCount": 2
+        }
+      }
     },
     {
-      "command": "contract accept 1",
+      "command": "contract accept 3",
       "interaction": [
         {
           "type": "clickSelector",
@@ -584,10 +1068,20 @@
           "selector": "#bs-contract-panel .bs-contract-accept"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 39260,
+          "tickCount": 82,
+          "deathCount": 1,
+          "employeeCount": 1,
+          "activeContractCount": 1,
+          "surveyCount": 2
+        }
+      }
     },
     {
-      "command": "contract accept 2",
+      "command": "contract accept 4",
       "interaction": [
         {
           "type": "waitForSelector",
@@ -598,27 +1092,57 @@
           "selector": "#bs-contract-panel .bs-contract-accept"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 39260,
+          "tickCount": 82,
+          "deathCount": 1,
+          "employeeCount": 1,
+          "activeContractCount": 2,
+          "surveyCount": 2
+        }
+      }
     },
     {
-      "command": "contract deliver 1 amount:500",
+      "command": "contract deliver 3 amount:400",
       "interaction": [
         {
           "type": "command",
-          "command": "contract deliver 1 amount:500"
+          "command": "contract deliver 3 amount:400"
         }
       ],
-      "description": "Left unmarked (legacy): `contract deliver` returns success:false rather than throwing when the amount exceeds stock, and command-mode's runner only fails a step on a thrown exception, so the exact deliverable amount here is not independently verified. Same class as Finding #2."
+      "description": "Left unmarked (legacy): `contract deliver` returns success:false rather than throwing when the amount exceeds stock, and command-mode's runner only fails a step on a thrown exception, so the exact deliverable amount here is not independently verified. Same class as Finding #2.",
+      "expect": {
+        "equals": {
+          "cash": 39260,
+          "tickCount": 82,
+          "deathCount": 1,
+          "employeeCount": 1,
+          "activeContractCount": 2,
+          "surveyCount": 2
+        }
+      }
     },
     {
-      "command": "contract deliver 2 amount:500",
+      "command": "contract deliver 4 amount:450",
       "interaction": [
         {
           "type": "command",
-          "command": "contract deliver 2 amount:500"
+          "command": "contract deliver 4 amount:450"
         }
       ],
-      "description": "Left unmarked (legacy): `contract deliver` returns success:false rather than throwing when the amount exceeds stock, and command-mode's runner only fails a step on a thrown exception, so the exact deliverable amount here is not independently verified. Same class as Finding #2."
+      "description": "Left unmarked (legacy): `contract deliver` returns success:false rather than throwing when the amount exceeds stock, and command-mode's runner only fails a step on a thrown exception, so the exact deliverable amount here is not independently verified. Same class as Finding #2.",
+      "expect": {
+        "equals": {
+          "cash": 39260,
+          "tickCount": 82,
+          "deathCount": 1,
+          "employeeCount": 1,
+          "activeContractCount": 2,
+          "surveyCount": 2
+        }
+      }
     },
     {
       "command": "finances",
@@ -628,10 +1152,20 @@
           "command": "finances"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 39260,
+          "tickCount": 82,
+          "deathCount": 1,
+          "employeeCount": 1,
+          "activeContractCount": 2,
+          "surveyCount": 2
+        }
+      }
     },
     {
-      "command": "drill_plan grid rows:4 cols:4 spacing:4 depth:10 start:15,15",
+      "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:6 diameter:0.089 start:15,15",
       "interaction": [
         {
           "type": "clickSelector",
@@ -664,7 +1198,20 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 39260,
+          "tickCount": 82,
+          "deathCount": 1,
+          "employeeCount": 1,
+          "activeContractCount": 2,
+          "surveyCount": 2,
+          "holeCount": 25,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        }
+      }
     },
     {
       "command": "charge hole:* explosive:krackle amount:4 stemming:3",
@@ -674,7 +1221,20 @@
           "command": "charge hole:* explosive:krackle amount:4 stemming:3"
         }
       ],
-      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show."
+      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show.",
+      "expect": {
+        "equals": {
+          "cash": 39260,
+          "tickCount": 82,
+          "deathCount": 1,
+          "employeeCount": 1,
+          "activeContractCount": 2,
+          "surveyCount": 2,
+          "holeCount": 25,
+          "chargedCount": 25,
+          "sequencedCount": 0
+        }
+      }
     },
     {
       "command": "sequence auto delay_step:20",
@@ -684,7 +1244,20 @@
           "command": "sequence auto delay_step:20"
         }
       ],
-      "description": "Left unmarked: this delay_step doesn't match the Sequence panel's default (25ms), and the stepper that changes it has never been click-tested in this conversion (Batch 6's safety-projection-visual note) -- left as a command rather than guessing at an unproven selector."
+      "description": "Left unmarked: this delay_step doesn't match the Sequence panel's default (25ms), and the stepper that changes it has never been click-tested in this conversion (Batch 6's safety-projection-visual note) -- left as a command rather than guessing at an unproven selector.",
+      "expect": {
+        "equals": {
+          "cash": 39260,
+          "tickCount": 82,
+          "deathCount": 1,
+          "employeeCount": 1,
+          "activeContractCount": 2,
+          "surveyCount": 2,
+          "holeCount": 25,
+          "chargedCount": 25,
+          "sequencedCount": 25
+        }
+      }
     },
     {
       "command": "blast",
@@ -714,7 +1287,20 @@
           "selector": "[data-action=\"report-close\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 39260,
+          "tickCount": 82,
+          "deathCount": 1,
+          "employeeCount": 1,
+          "activeContractCount": 2,
+          "surveyCount": 2,
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        }
+      }
     },
     {
       "command": "state full",
@@ -724,7 +1310,17 @@
           "command": "state full"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 39260,
+          "tickCount": 82,
+          "deathCount": 1,
+          "employeeCount": 1,
+          "activeContractCount": 2,
+          "surveyCount": 2
+        }
+      }
     },
     {
       "command": "finances",
@@ -734,7 +1330,17 @@
           "command": "finances"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 39260,
+          "tickCount": 82,
+          "deathCount": 1,
+          "employeeCount": 1,
+          "activeContractCount": 2,
+          "surveyCount": 2
+        }
+      }
     },
     {
       "command": "scores",
@@ -744,7 +1350,21 @@
           "command": "scores"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 39260,
+          "tickCount": 82,
+          "deathCount": 1,
+          "employeeCount": 1,
+          "activeContractCount": 2,
+          "surveyCount": 2,
+          "wellBeing": 32.390000000000136,
+          "safety": 0.49999999999999484,
+          "ecology": 46.45999999999997,
+          "nuisance": 40.39999999999998
+        }
+      }
     },
     {
       "command": "stats",
@@ -754,7 +1374,21 @@
           "command": "stats"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 39260,
+          "tickCount": 82,
+          "deathCount": 1,
+          "employeeCount": 1,
+          "activeContractCount": 2,
+          "surveyCount": 2,
+          "wellBeing": 32.390000000000136,
+          "safety": 0.49999999999999484,
+          "ecology": 46.45999999999997,
+          "nuisance": 40.39999999999998
+        }
+      }
     },
     {
       "command": "tick 5",
@@ -764,7 +1398,17 @@
           "command": "tick 5"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 39260,
+          "tickCount": 87,
+          "deathCount": 1,
+          "employeeCount": 1,
+          "activeContractCount": 2,
+          "surveyCount": 2
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -774,7 +1418,17 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": 39260,
+          "tickCount": 87,
+          "deathCount": 1,
+          "employeeCount": 1,
+          "activeContractCount": 2,
+          "surveyCount": 2
+        }
+      }
     },
     {
       "command": "tick 5",
@@ -784,7 +1438,17 @@
           "command": "tick 5"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 39260,
+          "tickCount": 92,
+          "deathCount": 1,
+          "employeeCount": 1,
+          "activeContractCount": 2,
+          "surveyCount": 2
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -794,7 +1458,17 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": 39260,
+          "tickCount": 92,
+          "deathCount": 1,
+          "employeeCount": 1,
+          "activeContractCount": 2,
+          "surveyCount": 2
+        }
+      }
     },
     {
       "command": "contract list",
@@ -804,10 +1478,20 @@
           "command": "contract list"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 39260,
+          "tickCount": 92,
+          "deathCount": 1,
+          "employeeCount": 1,
+          "activeContractCount": 2,
+          "surveyCount": 2
+        }
+      }
     },
     {
-      "command": "contract accept 3",
+      "command": "contract accept 5",
       "interaction": [
         {
           "type": "clickSelector",
@@ -822,17 +1506,37 @@
           "selector": "#bs-contract-panel .bs-contract-accept"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 39260,
+          "tickCount": 92,
+          "deathCount": 1,
+          "employeeCount": 1,
+          "activeContractCount": 3,
+          "surveyCount": 2
+        }
+      }
     },
     {
-      "command": "contract deliver 3 amount:1000",
+      "command": "contract deliver 5 amount:400",
       "interaction": [
         {
           "type": "command",
-          "command": "contract deliver 3 amount:1000"
+          "command": "contract deliver 5 amount:400"
         }
       ],
-      "description": "Left unmarked (legacy): `contract deliver` returns success:false rather than throwing when the amount exceeds stock, and command-mode's runner only fails a step on a thrown exception, so the exact deliverable amount here is not independently verified. Same class as Finding #2."
+      "description": "Left unmarked (legacy): `contract deliver` returns success:false rather than throwing when the amount exceeds stock, and command-mode's runner only fails a step on a thrown exception, so the exact deliverable amount here is not independently verified. Same class as Finding #2.",
+      "expect": {
+        "equals": {
+          "cash": 39260,
+          "tickCount": 92,
+          "deathCount": 1,
+          "employeeCount": 1,
+          "activeContractCount": 3,
+          "surveyCount": 2
+        }
+      }
     },
     {
       "command": "contract status",
@@ -842,7 +1546,17 @@
           "command": "contract status"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 39260,
+          "tickCount": 92,
+          "deathCount": 1,
+          "employeeCount": 1,
+          "activeContractCount": 3,
+          "surveyCount": 2
+        }
+      }
     },
     {
       "command": "employee hire role:driller",
@@ -860,7 +1574,17 @@
           "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 38260,
+          "tickCount": 92,
+          "deathCount": 1,
+          "employeeCount": 2,
+          "activeContractCount": 3,
+          "surveyCount": 2
+        }
+      }
     },
     {
       "command": "employee hire role:blaster",
@@ -874,7 +1598,17 @@
           "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 36760,
+          "tickCount": 92,
+          "deathCount": 1,
+          "employeeCount": 3,
+          "activeContractCount": 3,
+          "surveyCount": 2
+        }
+      }
     },
     {
       "command": "employee list",
@@ -884,10 +1618,20 @@
           "command": "employee list"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 36760,
+          "tickCount": 92,
+          "deathCount": 1,
+          "employeeCount": 3,
+          "activeContractCount": 3,
+          "surveyCount": 2
+        }
+      }
     },
     {
-      "command": "drill_plan grid rows:4 cols:4 spacing:5 depth:12 start:5,5",
+      "command": "drill_plan grid rows:6 cols:6 spacing:3 depth:6 diameter:0.089 start:5,5",
       "interaction": [
         {
           "type": "clickSelector",
@@ -920,7 +1664,20 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 36760,
+          "tickCount": 92,
+          "deathCount": 1,
+          "employeeCount": 3,
+          "activeContractCount": 3,
+          "surveyCount": 2,
+          "holeCount": 36,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        }
+      }
     },
     {
       "command": "charge hole:* explosive:krackle amount:5 stemming:4",
@@ -930,7 +1687,20 @@
           "command": "charge hole:* explosive:krackle amount:5 stemming:4"
         }
       ],
-      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show."
+      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show.",
+      "expect": {
+        "equals": {
+          "cash": 36760,
+          "tickCount": 92,
+          "deathCount": 1,
+          "employeeCount": 3,
+          "activeContractCount": 3,
+          "surveyCount": 2,
+          "holeCount": 36,
+          "chargedCount": 36,
+          "sequencedCount": 0
+        }
+      }
     },
     {
       "command": "sequence auto delay_step:25",
@@ -944,7 +1714,20 @@
           "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 36760,
+          "tickCount": 92,
+          "deathCount": 1,
+          "employeeCount": 3,
+          "activeContractCount": 3,
+          "surveyCount": 2,
+          "holeCount": 36,
+          "chargedCount": 36,
+          "sequencedCount": 36
+        }
+      }
     },
     {
       "command": "blast",
@@ -974,7 +1757,20 @@
           "selector": "[data-action=\"report-close\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 36760,
+          "tickCount": 92,
+          "deathCount": 3,
+          "employeeCount": 3,
+          "activeContractCount": 3,
+          "surveyCount": 2,
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        }
+      }
     },
     {
       "command": "state full",
@@ -984,7 +1780,17 @@
           "command": "state full"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 36760,
+          "tickCount": 92,
+          "deathCount": 3,
+          "employeeCount": 3,
+          "activeContractCount": 3,
+          "surveyCount": 2
+        }
+      }
     },
     {
       "command": "tick 5",
@@ -994,7 +1800,17 @@
           "command": "tick 5"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 36760,
+          "tickCount": 92,
+          "deathCount": 3,
+          "employeeCount": 3,
+          "activeContractCount": 3,
+          "surveyCount": 2
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -1004,7 +1820,17 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": 46760,
+          "tickCount": 92,
+          "deathCount": 3,
+          "employeeCount": 3,
+          "activeContractCount": 3,
+          "surveyCount": 2
+        }
+      }
     },
     {
       "command": "tick 5",
@@ -1014,7 +1840,17 @@
           "command": "tick 5"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 46760,
+          "tickCount": 97,
+          "deathCount": 3,
+          "employeeCount": 3,
+          "activeContractCount": 3,
+          "surveyCount": 2
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -1024,7 +1860,17 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": 46760,
+          "tickCount": 97,
+          "deathCount": 3,
+          "employeeCount": 3,
+          "activeContractCount": 3,
+          "surveyCount": 2
+        }
+      }
     },
     {
       "command": "finances",
@@ -1034,7 +1880,17 @@
           "command": "finances"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 46760,
+          "tickCount": 97,
+          "deathCount": 3,
+          "employeeCount": 3,
+          "activeContractCount": 3,
+          "surveyCount": 2
+        }
+      }
     },
     {
       "command": "scores",
@@ -1044,7 +1900,21 @@
           "command": "scores"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 46760,
+          "tickCount": 97,
+          "deathCount": 3,
+          "employeeCount": 3,
+          "activeContractCount": 3,
+          "surveyCount": 2,
+          "wellBeing": 22.14000000000015,
+          "safety": 0,
+          "ecology": 26.939999999999948,
+          "nuisance": 0
+        }
+      }
     },
     {
       "command": "stats",
@@ -1054,7 +1924,21 @@
           "command": "stats"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 46760,
+          "tickCount": 97,
+          "deathCount": 3,
+          "employeeCount": 3,
+          "activeContractCount": 3,
+          "surveyCount": 2,
+          "wellBeing": 22.14000000000015,
+          "safety": 0,
+          "ecology": 26.939999999999948,
+          "nuisance": 0
+        }
+      }
     },
     {
       "command": "campaign status",
@@ -1064,7 +1948,25 @@
           "command": "campaign status"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 46760,
+          "tickCount": 97,
+          "deathCount": 3,
+          "employeeCount": 3,
+          "activeContractCount": 3,
+          "surveyCount": 2,
+          "wellBeing": 22.14000000000015,
+          "safety": 0,
+          "ecology": 26.939999999999948,
+          "nuisance": 0,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        },
+        "note": "Findings #54-#57: this file's original `employee assign_skill 1 geology 3` used the same rejected positional syntax as Finding #45 -- fixed to `skill:geology level:3`, which matters more here than in other files since this file's whole premise is the survey confidence overlay, and `SurveyCalc.ts` confirms surveyor skill level directly reduces estimate noise (Finding #54). The 2 contract-accept steps in the file's first contract cycle both click the same unqualified `.bs-contract-accept` selector -- the Contracts panel has no per-row selector, so each click lands on whichever contract is currently first-listed; with the original hardcoded `contract accept 1`/`contract accept 2` text, command mode would accept only 1 contract (the first attempt failing outright) while a real click-driven run would accept 2 (each click hits a different, now-shifted first row) -- a genuine, dangerous activeContractCount divergence between modes, not just a wrong-number typo. Fixed by deriving both real target IDs from a direct trace and pairing the command text to what each successive click actually lands on. Discovered mid-fix that correcting the `assign_skill` syntax shifted the RNG stream far enough (better survey noise draws feeding the shared Random instance) to change which contract IDs were even available by the time contract cycles ran, requiring a full re-trace rather than reusing an earlier one (Finding #55). Same Finding #52 class recurred a 3rd time: all 3 of this file's `drill_plan grid` steps declared spacing/depth the real Drill panel never used (no stepper-click interaction step sets them), so the real drag-to-grid formula produced substantially bigger grids than declared (16/25/36 holes vs. the declared 9/16/16) -- fixed the same way, by matching the declared grid to what the real drag at the panel's true defaults produces. The corrected, much larger 3rd blast (36 holes vs. the originally-declared 16) is violent enough to kill both of the 2 employees hired immediately beforehand, taking deathCount from 1 to 3 -- a real, reproducible consequence of the fix, not a scenario bug (Finding #40's exact precedent) (Finding #56). Like the 2 previous playthrough files, no vehicle is ever bought, so despite 3 real blasts every contract delivery fails honestly for lack of storage -- not re-fixed here for the same reason as `level1-win-conservative.json` (the mechanism is already proven end-to-end by `level1-playthrough-win.json`). Verified the file's own stated premise directly rather than trusting its stale warning: inspected `screenshots/scenario-level1-win-efficient-interaction/step-31-survey.png` (a real browser run) with the Read tool and confirmed the survey confidence overlay genuinely renders (a lime tile-pattern coverage overlay on the terrain) and the Results panel shows real computed confidence (96% for the core sample, 89% for the seismic survey) -- the file's original 'FAILS until GameRenderer wires survey overlay into syncFromContext()' warning is stale; that wiring already exists in current `GameRenderer.syncFromContext()` (Finding #57). No bankruptcy, revolt, or ecological shutdown -- cash ends at $46,760 despite $50k in penalties/costs, thanks to two lucky_strike random events landing on +$10,000 each (both reproduced identically in the real browser run). safety and nuisance both bottom out at exactly 0 by the end from the accumulated real blast violence. Verified in both command mode and a real interaction-mode run with screenshots (83/83 steps, 0 failures)."
+      }
     }
   ]
 }

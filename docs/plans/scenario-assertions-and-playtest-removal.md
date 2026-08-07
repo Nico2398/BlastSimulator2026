@@ -740,7 +740,23 @@ the real trajectory (net cash loss from two expired-contract
 penalties and one weather event, no win) instead of forcing the named
 outcome, verified 1/1 in both modes, re-run twice in interaction mode
 for determinism) ·
-⬜ level1-win-efficient ·
+✅ level1-win-efficient (**Findings #54-#57** — see the findings log;
+same `assign_skill` syntax bug as Finding #45, but fixing it here
+matters more since the file's whole premise is the survey confidence
+overlay, which `SurveyCalc.ts` confirms surveyor skill level directly
+feeds; a real click-driven divergence in the file's paired
+contract-accept steps (both clicking the same unqualified selector,
+so a real run would've accepted 2 contracts against command mode's 1)
+compounded with an RNG cascade from the `assign_skill` fix, requiring
+a full re-trace; a 3rd recurrence of the Finding #52 drill-grid class
+across all 3 of this file's grids, whose corrected (much larger) 3rd
+blast now kills 2 more employees, a real reproducible consequence
+(Finding #40's precedent); and — the one non-mechanical finding of
+the batch so far — confirmed via an actually-inspected screenshot
+that the survey confidence overlay genuinely renders with real
+computed confidence values, closing out this file's own stale
+"FAILS until..." warning. Verified 1/1 in both modes, interaction
+mode run with screenshots, 83/83 steps, 0 failures) ·
 ⬜ level2-playthrough-bankruptcy · ⬜ level2-playthrough-win ·
 ⬜ level3-playthrough-ecology · ⬜ level3-playthrough-win ·
 ⬜ ambient-timescale-sync · ⬜ landscape-continuity-visual ·
@@ -1020,6 +1036,14 @@ of each session, in case main added/removed a file.)
 52. **All 4 of `level1-win-conservative.json`'s `drill_plan grid` steps declared `spacing`/`depth` values the real Drill panel never actually used, because none of their `interaction` arrays click a stepper to move off the panel's own defaults.** Read `Drill.ts` directly: `DEFAULT_SPACING_M=3`, `DEFAULT_DEPTH_M=6`, `DEFAULT_DIAMETER_M=0.089` (vs. command mode's own unrelated default of 0.15 when `diameter:` is omitted from the command text) — and the real drag-to-grid conversion is `cols = max(1, round((x2-x1)/gridSpacing)+1)`, `rows = max(1, round((z2-z1)/gridSpacing)+1)`, using whatever `gridSpacing` the panel currently holds, not whatever the scenario's `command` field happens to say. For 2 of the 4 steps in this file, the declared rows×cols only matched what a spacing-3 drag actually produces by coincidence (the drag rectangle's size rounded to the same grid either way); for the other 2, it didn't — a real interaction-mode run caught it directly: `holeCount should be 6 but is 8`. This was invisible before this pass because no prior pass had added an exact `holeCount` check that could catch a real/command divergence in the drilled grid — the two channels had been silently drilling different-shaped grids (and, via the diameter default mismatch, different-diameter holes) this whole time. **Fixed** by rewriting all 4 commands' rows/cols/spacing/depth/diameter to match what the real drag at the panel's true defaults actually produces, rather than adding unproven stepper-click steps (this file's existing convention, per its own `charge`/`sequence` step notes, is to avoid guessing at unverified stepper selectors). Re-derived the full downstream trace after the fix — the corrected, larger real grids (holeCount 4/8/16/16 instead of the declared 4/6/9/9) produce measurably more violent blasts, so ecology/nuisance after the later blasts are meaningfully lower than an uncorrected trace would show. Open follow-up, same shape as Finding #42's: any other file whose `drill_plan grid` step is `role:'player'` (a real drag) and declares non-default spacing/depth without a matching stepper-click interaction step could have the same latent mismatch, caught only once exact `holeCount` or blast-derived score assertions are added — worth the same dedicated recheck pass Finding #42 already flagged.
 
 53. **`level1-win-conservative.json` never buys a vehicle or hires anyone, so despite 4 real blasts producing hundreds of tons of ore, `storedMassKg` stays 0 for the entire file and every `contract deliver` fails with a real, honest "not enough in storage" error.** Confirmed via `HaulingTask.ts`: `requestHaulFragment` requires `vehicle.driverId !== null` before it will even attempt a haul ("Vehicle has no driver" otherwise), and this file has zero employees to assign as a driver in the first place — the same missing-hauling-infrastructure class as Finding #48/#50, but here nothing was added to fix it, since the mechanism is already proven end-to-end by `level1-playthrough-win.json` (Findings #45-#51) and re-proving it here would cost the same again for no new verification value. Also fixed the file's `contract accept N` target IDs to match the real, sequentially-assigned pool at each listing (contract IDs never reset between `contract list` calls, so the file's original assumption of small fixed IDs like `contract accept 2`/`contract accept 3` repeatedly missed) — necessary because the Contracts panel's Accept button has no per-row selector, so a real click always lands on whichever contract renders first, and the command text must name that same contract or the two channels silently accept different contracts. That fix meant this run's 2nd blast cycle ends up accepting whichever contract the panel lists first, which happened to be the highest-visibility one (sparkium ore, 420kg @ $237.60/kg) rather than a cheap one — since it can never be delivered either way (no storage), the real cost is entirely its penalty: a single expired sparkium contract fines $29,937, over 150x the $196 penalty a missed dirtite contract costs one cycle earlier. Left this as the real, honest outcome rather than steering the accepted contract toward a cheaper one, since doing so would mean the command text and the real first-listed contract no longer agree (reintroducing the exact class of bug this fix was correcting). **No code change** — treated like Findings #41/#43/#44: `expect` blocks assert the real trajectory (cash ending at $11,867, down from $50,000, almost entirely from two expired-contract fines and one weather event rather than any operating cost; ecology/nuisance take real damage from the blasts but settle well short of any shutdown threshold; no deaths since no employees ever exist; no bankruptcy, revolt, or win). Verified in both command mode and a real browser, the interaction-mode run re-executed twice for determinism, both clean.
+
+54. **`level1-win-efficient.json`'s `employee assign_skill 1 geology 3` has the same rejected positional syntax as Finding #45 — but fixing it here has a real, confirmed effect on the very feature this file exists to test.** Read `SurveyCalc.ts` directly: "Surveyor skill level 1–5. Higher values reduce noise" feeding straight into the `confidence` calculation returned with every survey result. Left broken, this file would only ever demonstrate the survey confidence overlay at the surveyor's default (Rookie, level 1) skill, understating what the overlay looks like for a genuinely skilled hire. Fixed to `employee assign_skill 1 skill:geology level:3`, matching Finding #45's established correction.
+
+55. **The file's first contract cycle accepts 2 different contracts back to back, and both `contract accept` steps click the exact same unqualified `#bs-contract-panel .bs-contract-accept` selector — the Contracts panel has no per-row selector, so each click always lands on whichever contract currently renders first.** With the file's original hardcoded IDs (`contract accept 1` then `contract accept 2`), command mode would accept only 1 contract total (the first attempt fails outright, ID 1 having already rolled past), while a real click-driven run would accept 2 (each click hits a different, freshly-first-placed row after the previous accept removes its target from the list) — a genuine `activeContractCount` divergence between modes, not merely a cosmetic wrong-number typo, and exactly the class of bug the dual-mode verification mandate exists to catch. Fixed by tracing the real, currently-available pool at each point and pairing the command text to whatever each successive click actually lands on. While fixing this, discovered that correcting Finding #54's `assign_skill` syntax shifted the shared RNG stream (better survey-noise draws) far enough to change which contract IDs were even available by the time this file's contract cycles ran — a trace taken before the Finding #54 fix and one taken after showed different contract pools at the identical step. Re-traced from scratch after both fixes landed rather than patching the pre-#54 trace's numbers.
+
+56. **A 3rd recurrence of Finding #52's drill-grid class: all 3 of `level1-win-efficient.json`'s `drill_plan grid` steps declared spacing/depth values the real Drill panel never used, since none of their interaction arrays click a stepper before dragging.** Read the real drag-to-grid formula from `Drill.ts` directly (as in Finding #52) and recomputed each of the 3 grids against the panel's true defaults (`spacing=3`, `depth=6`, `diameter=0.089`): declared 3×3/4×4/4×4 (9/16/16 holes) versus real 4×4/5×5/6×6 (16/25/36 holes) — a much larger gap than Finding #52's file, since this file's drag rectangles are bigger relative to the 3m default spacing. Fixed the same way: rewrote the declared grids to match what the real drag genuinely produces. The corrected, far larger 3rd blast (36 holes instead of the originally-declared 16) is violent enough to kill both employees hired immediately beforehand (a driller and a blaster, hired right before this blast to staff future cycles) — `deathCount` goes from 1 to 3 across this one blast. Same treatment as Finding #40: a real, reproducible consequence of correcting the grid to match reality, not a scenario-authoring mistake to paper over. This is now the 2nd file (after Finding #40's `tutorial-playthrough.json`) where a grid-size correction directly causes additional deaths — worth treating as expected, not alarming, once the Finding #42/#52 depth-mismatch audit reaches a file with newly-hired employees standing near a corrected blast.
+
+57. **Confirmed via an actually-inspected screenshot, not just source reading, that `level1-win-efficient.json`'s stated blocker no longer holds.** The file's original description read "FAILS until GameRenderer wires survey overlay into syncFromContext()." Read `GameRenderer.ts` directly first: `syncFromContext()` (the method itself, not just a helper near it) already calls `this.syncSurveyOverlay(this.buildSurveyOverlayOptions(ctx.state))` at its own tail end — the wiring the description says is missing already exists in current `main`. Rather than trust that static read alone, ran this file in interaction mode with `--screenshots` and opened `screenshots/scenario-level1-win-efficient-interaction/step-31-survey.png` (a real browser run, Survey panel open after both surveys completed) with the Read tool: a lime-colored tile-pattern overlay is genuinely rendered on the terrain over the seismic survey's coverage area, and the Results list shows real computed confidence — 96% for the core sample, 89% for the seismic survey, both consistent with the level-3 geology skill from Finding #54. Updated the file's `description` field to remove the stale warning and record this confirmation, per the project's rendering-verification rule that a rendering claim is unverified until an image has actually been inspected, not merely reasoned about from source.
 
 _(Add new findings here as you hit them. Number sequentially.)_
 
@@ -1757,3 +1781,54 @@ got, whether main was merged, and whether GitHub Actions is back up yet.
   larger, since it's no longer just about wrong depth but potentially
   wrong hole count on any `role:'player'` `drill_plan grid` step with
   a non-default spacing and no stepper-click interaction.
+- 2026-08-07 (cont.) — level1-win-efficient.json done (**Findings
+  #54-#57**, Batch 7 10/19), 83 steps, the largest file this batch so
+  far. Same `assign_skill` positional-syntax bug as Finding #45, but
+  this file's whole premise is the survey confidence overlay, and
+  `SurveyCalc.ts` confirms surveyor skill level feeds the confidence
+  calculation directly — so fixing it here wasn't just cleanup, it
+  determined what the demonstrated overlay actually looks like
+  (#54). The file's first contract cycle pairs 2 `contract accept`
+  steps that both click the same unqualified selector — with the
+  file's original hardcoded IDs, command mode would have accepted 1
+  contract while a real click-driven run accepted 2, a genuine
+  activeContractCount divergence between modes; fixing it surfaced a
+  second-order effect, where correcting Finding #54's syntax bug
+  shifted the shared RNG stream far enough to change which contract
+  IDs were even available downstream, forcing a full re-trace rather
+  than patching numbers (#55). Finding #52's drill-grid class
+  recurred a 3rd time across all 3 of this file's grids (declared
+  9/16/16 holes vs. real 16/25/36) — the corrected, far larger 3rd
+  blast kills 2 more employees (deathCount 1→3), the 2nd file after
+  Finding #40 where a grid-size correction directly causes additional
+  deaths (#56). Unlike every other finding this batch, #57 wasn't a
+  bug: read `GameRenderer.ts` directly and confirmed
+  `syncFromContext()` already wires the survey overlay, then verified
+  it for real — ran the file in interaction mode with `--screenshots`
+  and opened `step-31-survey.png` with the Read tool, confirming a
+  genuine rendered confidence overlay (a lime tile-pattern coverage
+  area) and real computed confidence values (96%/89%) consistent with
+  the level-3 geology skill from #54. The file's stale "FAILS
+  until..." warning is removed from its description accordingly. No
+  vehicle bought here either, same as `level1-win-conservative.json`
+  and for the same reason (mechanism already proven elsewhere) — every
+  contract delivery fails honestly for lack of storage despite 3 real
+  blasts. Final state: cash $46,760 (two lucky_strike events at
+  +$10,000 each covering most of the blast/hiring/penalty costs),
+  deathCount 3, activeContractCount 3, no bankruptcy/revolt/ecological
+  shutdown, safety and nuisance both bottomed out at exactly 0.
+  Verified: JSON valid, `scenario-defs.test.ts` green (3088 tests),
+  full local sweep green (typecheck, 124/124 scenarios, 8328/8328
+  tests), command mode passes, interaction mode passes with
+  screenshots enabled (83/83 steps, 0 failures, survey overlay
+  screenshot inspected directly). GitHub Actions still down for this
+  branch as of this session (infra outage predating this file, tracked
+  separately via a self-scheduled PR #497 check-in, not a blocker for
+  local work) — all verification here remains local. Next: the
+  remaining 9 Batch 7 files (level2-playthrough-bankruptcy next), then
+  the depth-mismatch audit before Phase 3 — now 3 files deep
+  (tutorial-playthrough, level1-win-conservative,
+  level1-win-efficient), all confirming the same class: any
+  `role:'player'` `drill_plan grid` step with non-default
+  spacing/depth and no matching stepper-click interaction is
+  suspect, not just an edge case.
