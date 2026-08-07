@@ -1,6 +1,6 @@
 {
   "name": "needs-shift-cycle-visual",
-  "description": "Visual check of shift cycle: build living_quarters tier 2+ to activate 8-tick shift cycle, set policy to shift_8h mode, then advance ticks to verify employees work 6 ticks then auto-enter 8-tick sleep rest; state dump should show restTicksRemaining during rest and ticksWorked reset on completion",
+  "description": "Visual check of shift cycle. Finding #27: this file's own next step (`build upgrade 1`) is genuinely rejected — Tier 2 living_quarters is not researched — so the living_quarters this scenario builds stays at Tier 1 for its whole run. processShiftCycle (GameLoop.ts) requires `living_quarters tier >= 2` and returns `{active: false}` otherwise, doing nothing at all: no employee ever accrues ticksWorked or enters a forced shift rest through this mechanism. Confirmed via a direct trace that ticksWorked stays 0 and restTicksRemaining stays null through the whole scenario. Assertions describe this real, verified behavior (ordinary idle/work need-drain, no shift cycle) rather than the originally-intended \"employees work 6 ticks then auto-enter 8-tick sleep rest\" claim.",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -11,7 +11,13 @@
           "command": "new_game seed:42"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "employeeCount": 0
+        }
+      }
     },
     {
       "command": "employee hire role:driller",
@@ -29,7 +35,13 @@
           "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 49000,
+          "employeeCount": 1
+        }
+      }
     },
     {
       "command": "build living_quarters at:10,10",
@@ -59,7 +71,13 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 39000,
+          "buildingCount": 1
+        }
+      }
     },
     {
       "command": "build upgrade 1",
@@ -69,7 +87,14 @@
           "command": "build upgrade 1"
         }
       ],
-      "description": "Left unmarked: the button is genuinely disabled or absent at this point (tier not researched, id doesn't exist, or the building/role name isn't real), so a real player could not do this either -- the console command reproduces the same rejection."
+      "description": "Left unmarked: the button is genuinely disabled or absent at this point (tier not researched, id doesn't exist, or the building/role name isn't real), so a real player could not do this either -- the console command reproduces the same rejection.",
+      "expect": {
+        "equals": {
+          "cash": 39000,
+          "buildingCount": 1
+        },
+        "note": "rejected: Tier 2 living_quarters is not researched — this is Finding #27's root cause, confirmed here in state too"
+      }
     },
     {
       "command": "set_policy mode:shift_8h",
@@ -87,7 +112,13 @@
           "selector": "#bs-policy-apply"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 39000
+        },
+        "note": "the policy applies for real (confirmed via a real dump: 'Policy updated: mode=shift_8h hunger=40 fatigue=25 social=20'), but has no shift-cycle effect to observe since the tier-2 bunkhouse gate is never met (Finding #27)"
+      }
     },
     {
       "command": "employee dispatch 1 x:20 z:20",
@@ -97,7 +128,13 @@
           "type": "command",
           "command": "employee dispatch 1 x:20 z:20"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "cash": 39000,
+          "employeeCount": 1
+        }
+      }
     },
     {
       "command": "employee list",
@@ -117,7 +154,20 @@
           "command": "tick 5"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash", "minFatigue"]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
     },
     {
       "command": "employee list",
@@ -147,7 +197,20 @@
           "command": "tick 5"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash", "minFatigue"]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
     },
     {
       "command": "employee list",
@@ -177,7 +240,21 @@
           "command": "tick 10"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash", "minFatigue"],
+        "note": "Finding #27: 20 total ticks pass with the employee continuously dispatched, but ticksWorked/restTicksRemaining never move — no shift cycle ever triggers since the tier-2 bunkhouse gate is never met; only ordinary need-drain is observable"
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
     },
     {
       "command": "employee list",

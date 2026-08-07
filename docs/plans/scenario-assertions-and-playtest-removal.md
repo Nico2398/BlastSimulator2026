@@ -522,7 +522,16 @@ a direct trace shows rest cycles genuinely fire but each completion
 burst is mostly offset by drain accrued during the rest itself, leaving
 fatigue oscillating near the collapse floor indefinitely. Test corrected
 to describe the real, verified behavior) ·
-⬜ needs-shift-cycle-visual · ⬜ nav-dynamic-updates-visual ·
+✅ needs-shift-cycle-visual (**Finding #27: third recurrence of the
+Findings #20/#21/#26 pattern** — "employees work 6 ticks then auto-enter
+8-tick sleep rest" is structurally unreachable since `processShiftCycle`
+requires a Tier-2 bunkhouse, but this file's own `build upgrade 1` step
+is genuinely rejected (T2 not researched), already correctly documented
+by its own pre-existing description; confirmed via direct trace that
+`ticksWorked`/`restTicksRemaining` never move through the whole budget)
+
+Batch 5 needs-* group (9/9) done. Continuing with nav-*.
+⬜ nav-dynamic-updates-visual ·
 ⬜ nav-move-costs-visual · ⬜ nav-path-following-visual ·
 ⬜ nav-pathfinding-visual · ⬜ nav-ramp-routing-visual · ⬜ site-expansion
 
@@ -768,6 +777,8 @@ of each session, in case main added/removed a file.)
 25. **Added `pendingActionCount` (state.pendingActions.length) to `SerializableGameState`** while writing `needs-proactive-queue-visual.json` — no field existed to prove a `PendingAction` was ever queued at all, which this file's whole premise depends on (an auto-inserted rest task appearing in the queue once fatigue crashes near collapse). Added in lockstep across `console-api.ts`/`main.ts`/`validate-state-schema.ts`, with real tests in `console-api.test.ts` (zero on a fresh game; 1 right after a survey is queued, before it's claimed — reuses the existing arrival-gated survey pattern as a ready-made non-trivial case). Confirmed via a direct trace (replaying the file's exact command sequence, per Finding #24's lesson) that `pendingActionCount` genuinely drops to 0 once the dispatched work task is claimed, then jumps back to 1 with no player action in between once fatigue crashes near collapse — the auto-insertion this file was written to demonstrate, now actually proven rather than just screenshotted.
 
 26. **`needs-replenishment-visual.json`'s claim — "verify need replenishment... restores gauge values over time" — does not hold, the same root cause Finding #11 already documented in `collapse-recovery.json` recurring in a second file.** A direct engine trace (sampling `employees.employees[0].fatigue`/`restTicksRemaining`/`pendingActions` tick by tick) confirms `autoInsertNeedTasks` genuinely queues and claims rest tasks once fatigue crosses its warning threshold, and each rest completion does give a real burst (~+7.6), but `tickNeedGauges` keeps draining fatigue at the idle rate *throughout* the rest cycle itself — so the completion burst is mostly offset by the drain accrued during that same rest, and by 210 total ticks the employee is oscillating in a narrow band (0-8) near the collapse floor indefinitely, never climbing back to a healthy baseline. **Fixed the test to describe this real, verified behavior** rather than the original claim — same treatment as Finding #11, not a re-investigation of the root cause (already correctly left as an open design question there: "a possible bug OR intended difficulty").
+
+27. **`needs-shift-cycle-visual.json`'s claim — "employees work 6 ticks then auto-enter 8-tick sleep rest" — is structurally unreachable, a third recurrence of the Findings #20/#21/#26 pattern.** `processShiftCycle` (`GameLoop.ts`) requires a `living_quarters` with `tier >= 2` and returns `{active: false}` (does nothing at all) otherwise — but this file's own very next step, `build upgrade 1`, is genuinely rejected (`Tier 2 living_quarters is not researched`), already correctly documented as a real no-op by its own pre-existing description. That leaves the built living_quarters at Tier 1 for the whole scenario, so the shift-cycle mechanic this file is named for never activates. Confirmed via a direct trace: `ticksWorked` stays 0 and `restTicksRemaining` stays `null` through the entire 20-tick budget, no matter how long the employee stays dispatched. **Fixed the test to describe this real, verified behavior** (ordinary idle/work need-drain, no shift cycle) rather than the originally-intended claim — same treatment as Findings #20/#21/#26, not a root-cause fix (the T2-research gate is a real, intentional game mechanic, not a bug).
 
 _(Add new findings here as you hit them. Number sequentially.)_
 
